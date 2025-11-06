@@ -1,2 +1,4 @@
+project_id = "audavudqfgtecwzndfgc"
+
 [functions.analyze-store-data]
 verify_jwt = false
