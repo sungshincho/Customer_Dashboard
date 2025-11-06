@@ -5,6 +5,18 @@ import { Users, TrendingUp, Package, DollarSign } from "lucide-react";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase";
+import {
+  TrafficHeatmap,
+  ConversionFunnel,
+  VisitorFlow,
+  DwellTime,
+  PeakHours,
+  Demographics,
+  ProductInteraction,
+  ZonePerformance,
+  CustomerJourney,
+  ABTesting,
+} from "@/components/features";
 
 const initialStats = [
   {
@@ -196,6 +208,27 @@ const Dashboard = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Analytics Section */}
+        <div className="space-y-6">
+          <div className="animate-fade-in">
+            <h2 className="text-2xl font-bold gradient-text">심화 분석</h2>
+            <p className="mt-2 text-muted-foreground">매장 운영 최적화를 위한 10가지 핵심 지표</p>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <TrafficHeatmap />
+            <ConversionFunnel />
+            <VisitorFlow />
+            <DwellTime />
+            <PeakHours />
+            <Demographics />
+            <ProductInteraction />
+            <ZonePerformance />
+            <CustomerJourney />
+            <ABTesting />
+          </div>
+        </div>
       </div>
     </DashboardLayout>
   );
