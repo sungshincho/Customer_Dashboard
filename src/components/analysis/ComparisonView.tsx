@@ -2,6 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowUpDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { EnhancedChart } from "./EnhancedChart";
 
 interface ComparisonData {
   label: string;
@@ -85,30 +86,49 @@ export const ComparisonView = ({
         </div>
       </div>
 
-      <div className="space-y-3">
-        {data.map((item, index) => {
-          const change = calculateChange(item.current, item.previous);
-          const isPositive = change > 0;
-          
-          return (
-            <div key={index} className="p-4 rounded-lg bg-muted/50">
-              <div className="flex justify-between items-center mb-2">
-                <span className="font-medium">{item.label}</span>
-                <Badge variant={isPositive ? "default" : "secondary"}>
-                  {isPositive ? "+" : ""}{change.toFixed(1)}%
-                </Badge>
+      <div className="grid md:grid-cols-2 gap-6">
+        <div className="space-y-3">
+          {data.map((item, index) => {
+            const change = calculateChange(item.current, item.previous);
+            const isPositive = change > 0;
+            
+            return (
+              <div key={index} className="p-4 rounded-lg bg-muted/50">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="font-medium">{item.label}</span>
+                  <Badge variant={isPositive ? "default" : "secondary"}>
+                    {isPositive ? "+" : ""}{change.toFixed(1)}%
+                  </Badge>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    현재: {item.current}{item.unit}
+                  </span>
+                  <span className="text-muted-foreground">
+                    이전: {item.previous}{item.unit}
+                  </span>
+                </div>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">
-                  현재: {item.current}{item.unit}
-                </span>
-                <span className="text-muted-foreground">
-                  이전: {item.previous}{item.unit}
-                </span>
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
+
+        <div>
+          <EnhancedChart
+            data={data.map((item, index) => ({
+              name: item.label,
+              현재: item.current,
+              이전: item.previous,
+            }))}
+            title="비교 차트"
+            defaultChartType="bar"
+            xAxisKey="name"
+            yAxisKeys={[
+              { key: "현재", name: "현재", color: "hsl(var(--primary))" },
+              { key: "이전", name: "이전", color: "hsl(var(--muted-foreground))" }
+            ]}
+          />
+        </div>
       </div>
     </Card>
   );

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { EnhancedChart } from "@/components/analysis/EnhancedChart";
 
 const generateForecast = (weather: string, event: string, day: string) => {
   const baseData = [
@@ -95,42 +95,16 @@ export const DemandForecast = () => {
       </div>
 
       {/* Chart */}
-      <Card className="glass p-6">
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-            <XAxis dataKey="day" stroke="hsl(var(--foreground))" />
-            <YAxis yAxisId="left" stroke="hsl(var(--primary))" />
-            <YAxis yAxisId="right" orientation="right" stroke="hsl(var(--secondary))" />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: "hsl(var(--card))",
-                border: "1px solid hsl(var(--border))",
-                borderRadius: "8px",
-              }}
-            />
-            <Legend />
-            <Line
-              yAxisId="left"
-              type="monotone"
-              dataKey="sales"
-              stroke="hsl(var(--primary))"
-              strokeWidth={2}
-              name="매출 (₩k)"
-              dot={{ fill: "hsl(var(--primary))", r: 4 }}
-            />
-            <Line
-              yAxisId="right"
-              type="monotone"
-              dataKey="conversion"
-              stroke="hsl(var(--secondary))"
-              strokeWidth={2}
-              name="전환율 (%)"
-              dot={{ fill: "hsl(var(--secondary))", r: 4 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </Card>
+      <EnhancedChart
+        data={data}
+        title="매출 및 전환율 예측"
+        defaultChartType="line"
+        xAxisKey="day"
+        yAxisKeys={[
+          { key: "sales", name: "매출 (₩k)", color: "hsl(var(--primary))" },
+          { key: "conversion", name: "전환율 (%)", color: "hsl(var(--secondary))" }
+        ]}
+      />
     </div>
   );
 };

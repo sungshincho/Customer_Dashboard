@@ -2,8 +2,8 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TrendingUp, TrendingDown, Users, ShoppingCart, DollarSign } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { useState } from "react";
+import { EnhancedChart } from "@/components/analysis/EnhancedChart";
 
 const funnelData = [
   { stage: "방문", count: 1000, rate: 100, color: "hsl(var(--primary))" },
@@ -98,28 +98,15 @@ export const ConversionFunnel = () => {
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
-        <Card className="glass p-6">
-          <h5 className="text-sm font-semibold mb-4">퍼널 시각화</h5>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={scaledData} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis type="number" stroke="hsl(var(--muted-foreground))" />
-              <YAxis dataKey="stage" type="category" stroke="hsl(var(--muted-foreground))" />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px",
-                }}
-              />
-              <Bar dataKey="count" radius={[0, 8, 8, 0]}>
-                {scaledData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
+        <EnhancedChart
+          data={scaledData}
+          title="퍼널 시각화"
+          defaultChartType="bar"
+          xAxisKey="stage"
+          yAxisKeys={[
+            { key: "count", name: "방문자 수", color: "hsl(var(--primary))" }
+          ]}
+        />
 
         <Card className="glass p-6 space-y-4">
           <h5 className="text-sm font-semibold">단계별 전환율</h5>

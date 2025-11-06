@@ -2,8 +2,8 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TrendingUp, TrendingDown, Package, AlertTriangle } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from "recharts";
 import { useState } from "react";
+import { EnhancedChart } from "@/components/analysis/EnhancedChart";
 
 interface Product {
   id: string;
@@ -158,54 +158,27 @@ export const ProductPerformance = () => {
 
         {/* Charts */}
         <div className="space-y-4">
-          <Card className="glass p-6">
-            <h5 className="text-sm font-semibold mb-4">카테고리별 매출</h5>
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie
-                  data={categoryData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {categoryData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "8px",
-                  }}
-                  formatter={(value: number) => `₩${(value / 1000000).toFixed(1)}M`}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </Card>
+          <EnhancedChart
+            data={categoryData}
+            title="카테고리별 매출"
+            defaultChartType="pie"
+            xAxisKey="name"
+            yAxisKeys={categoryData.map(cat => ({
+              key: "value",
+              name: cat.name,
+              color: cat.color
+            }))}
+          />
 
-          <Card className="glass p-6">
-            <h5 className="text-sm font-semibold mb-4">상위 5개 상품 판매량</h5>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={sortedProducts.slice(0, 5)}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="id" stroke="hsl(var(--muted-foreground))" />
-                <YAxis stroke="hsl(var(--muted-foreground))" />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "8px",
-                  }}
-                />
-                <Bar dataKey="sales" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </Card>
+          <EnhancedChart
+            data={sortedProducts.slice(0, 5)}
+            title="상위 5개 상품 판매량"
+            defaultChartType="bar"
+            xAxisKey="id"
+            yAxisKeys={[
+              { key: "sales", name: "판매량", color: "hsl(var(--primary))" }
+            ]}
+          />
 
           <Card className="glass p-4 bg-amber-500/5 border-amber-500/20">
             <div className="flex items-start gap-3">
