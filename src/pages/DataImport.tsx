@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -146,10 +146,7 @@ const DataImport = () => {
   };
 
   const handleUpload = async () => {
-    console.log("🔵 Upload button clicked", { file, dataType });
-    
     if (!file || !dataType) {
-      console.log("❌ Missing file or dataType");
       toast({
         title: "입력 필요",
         description: "파일과 데이터 타입을 모두 선택해주세요.",
@@ -158,17 +155,13 @@ const DataImport = () => {
       return;
     }
 
-    console.log("✅ Starting upload process");
     setIsUploading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("로그인이 필요합니다.");
 
-      console.log("📦 Parsing file...");
       const parsedData = await parseFile(file);
-      console.log("✅ File parsed, rows:", parsedData.length);
       
-      console.log("💾 Inserting to database...");
       const { error } = await supabase.from("user_data_imports").insert({
         user_id: user.id,
         file_name: file.name,
@@ -178,12 +171,8 @@ const DataImport = () => {
         row_count: parsedData.length,
       });
 
-      if (error) {
-        console.error("❌ Database error:", error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log("✅ Upload completed successfully");
       toast({
         title: "업로드 완료",
         description: `${parsedData.length}개의 데이터가 성공적으로 임포트되었습니다.`,
@@ -191,21 +180,14 @@ const DataImport = () => {
 
       setFile(null);
       setDataType("");
-      
-      // Reset file input
-      const fileInput = document.getElementById("file") as HTMLInputElement;
-      if (fileInput) fileInput.value = "";
-      
       loadImports();
     } catch (error: any) {
-      console.error("❌ Upload failed:", error);
       toast({
         title: "업로드 실패",
         description: error.message,
         variant: "destructive",
       });
     } finally {
-      console.log("🔵 Upload process finished");
       setIsUploading(false);
     }
   };
@@ -314,9 +296,9 @@ const DataImport = () => {
     XLSX.writeFile(workbook, `export_${importData.file_name}`);
   };
 
-  useEffect(() => {
+  useState(() => {
     loadImports();
-  }, []);
+  });
 
   return (
     <DashboardLayout>
