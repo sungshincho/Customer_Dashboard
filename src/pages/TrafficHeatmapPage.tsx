@@ -9,6 +9,7 @@ import { AIInsights, Insight } from "@/components/analysis/AIInsights";
 import { AlertSettings, Alert } from "@/components/analysis/AlertSettings";
 import { ComparisonView } from "@/components/analysis/ComparisonView";
 import { AIAnalysisButton } from "@/components/analysis/AIAnalysisButton";
+import { AnalysisHistory } from "@/components/analysis/AnalysisHistory";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const TrafficHeatmapPage = () => {
@@ -16,6 +17,7 @@ const TrafficHeatmapPage = () => {
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
+  const [historyRefresh, setHistoryRefresh] = useState(0);
 
   const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);
@@ -63,6 +65,7 @@ const TrafficHeatmapPage = () => {
             <TabsTrigger value="analysis">히트맵</TabsTrigger>
             <TabsTrigger value="comparison">비교</TabsTrigger>
             <TabsTrigger value="insights">AI 인사이트</TabsTrigger>
+            <TabsTrigger value="history">히스토리</TabsTrigger>
             <TabsTrigger value="alerts">알림 설정</TabsTrigger>
           </TabsList>
           
@@ -71,6 +74,7 @@ const TrafficHeatmapPage = () => {
               analysisType="traffic-heatmap"
               data={comparisonData}
               title="AI 레이아웃 최적화 제안"
+              onAnalysisComplete={() => setHistoryRefresh(prev => prev + 1)}
             />
             <div key={refreshKey}>
               <TrafficHeatmap />
@@ -88,12 +92,16 @@ const TrafficHeatmapPage = () => {
           <TabsContent value="insights">
             <AIInsights insights={insights} />
           </TabsContent>
+
+          <TabsContent value="history">
+            <AnalysisHistory analysisType="traffic-heatmap" refreshTrigger={historyRefresh} />
+          </TabsContent>
           
           <TabsContent value="alerts">
             <AlertSettings
               alerts={alerts}
               onAlertsChange={setAlerts}
-              availableMetrics={["피크 밀집도", "평균 밀집도", "핫스팟 개수", "이동 속도"]}
+              availableMetrics={["피크 밀집도", "평균 밀집도", "핫스팟 개수", "고객 체류 시간"]}
             />
           </TabsContent>
         </Tabs>

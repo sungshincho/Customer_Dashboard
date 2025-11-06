@@ -9,9 +9,10 @@ interface AIAnalysisButtonProps {
   analysisType: string;
   data: any;
   title?: string;
+  onAnalysisComplete?: () => void;
 }
 
-export const AIAnalysisButton = ({ analysisType, data, title = "AI 분석 요청" }: AIAnalysisButtonProps) => {
+export const AIAnalysisButton = ({ analysisType, data, title = "AI 분석 요청", onAnalysisComplete }: AIAnalysisButtonProps) => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<string | null>(null);
   const { toast } = useToast();
@@ -34,6 +35,22 @@ export const AIAnalysisButton = ({ analysisType, data, title = "AI 분석 요청
       }
 
       setAnalysis(result.analysis);
+      
+      // Save to history
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from('analysis_history').insert({
+          user_id: user.id,
+          analysis_type: analysisType,
+          input_data: data,
+          result: result.analysis
+        });
+      }
+
+      if (onAnalysisComplete) {
+        onAnalysisComplete();
+      }
+
       toast({
         title: "AI 분석 완료",
         description: "분석 결과를 확인해보세요.",

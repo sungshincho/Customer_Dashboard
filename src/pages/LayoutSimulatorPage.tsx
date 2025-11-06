@@ -9,6 +9,7 @@ import { AIInsights, Insight } from "@/components/analysis/AIInsights";
 import { AlertSettings, Alert } from "@/components/analysis/AlertSettings";
 import { ComparisonView } from "@/components/analysis/ComparisonView";
 import { AIAnalysisButton } from "@/components/analysis/AIAnalysisButton";
+import { AnalysisHistory } from "@/components/analysis/AnalysisHistory";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const LayoutSimulatorPage = () => {
@@ -16,6 +17,7 @@ const LayoutSimulatorPage = () => {
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
+  const [historyRefresh, setHistoryRefresh] = useState(0);
 
   const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);
@@ -63,6 +65,7 @@ const LayoutSimulatorPage = () => {
             <TabsTrigger value="analysis">시뮬레이션</TabsTrigger>
             <TabsTrigger value="comparison">비교</TabsTrigger>
             <TabsTrigger value="insights">AI 인사이트</TabsTrigger>
+            <TabsTrigger value="history">히스토리</TabsTrigger>
             <TabsTrigger value="alerts">알림 설정</TabsTrigger>
           </TabsList>
           
@@ -71,6 +74,7 @@ const LayoutSimulatorPage = () => {
               analysisType="layout-simulator"
               data={comparisonData}
               title="AI 레이아웃 시뮬레이션"
+              onAnalysisComplete={() => setHistoryRefresh(prev => prev + 1)}
             />
             <div key={refreshKey}>
               <LayoutSimulator />
@@ -87,6 +91,10 @@ const LayoutSimulatorPage = () => {
           
           <TabsContent value="insights">
             <AIInsights insights={insights} />
+          </TabsContent>
+
+          <TabsContent value="history">
+            <AnalysisHistory analysisType="layout-simulator" refreshTrigger={historyRefresh} />
           </TabsContent>
           
           <TabsContent value="alerts">
