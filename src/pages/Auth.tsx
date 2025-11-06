@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { useNavigate } from "react-router-dom";
@@ -19,7 +20,10 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const { signIn, signUp, user } = useAuth();
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const { signIn, signUp, user, resetPassword } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -109,6 +113,43 @@ const Auth = () => {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetLoading(true);
+
+    try {
+      const emailSchema = z.string().trim().email({ message: "올바른 이메일 주소를 입력하세요" });
+      const validatedEmail = emailSchema.parse(resetEmail);
+
+      const { error } = await resetPassword(validatedEmail);
+
+      if (error) {
+        toast({
+          title: "비밀번호 재설정 실패",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "이메일 전송 완료",
+          description: "비밀번호 재설정 링크를 이메일로 전송했습니다. 이메일을 확인해주세요.",
+        });
+        setResetDialogOpen(false);
+        setResetEmail("");
+      }
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast({
+          title: "입력 오류",
+          description: error.issues[0].message,
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -203,6 +244,54 @@ const Auth = () => {
                     "로그인"
                   )}
                 </Button>
+                
+                <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+                  <DialogTrigger asChild>
+                    <button 
+                      type="button"
+                      className="mt-2 text-sm text-muted-foreground hover:text-primary transition-colors text-center w-full"
+                    >
+                      비밀번호를 잊으셨나요?
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>비밀번호 재설정</DialogTitle>
+                      <DialogDescription>
+                        가입하신 이메일 주소를 입력하시면 비밀번호 재설정 링크를 보내드립니다.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handlePasswordReset} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="reset-email">이메일</Label>
+                        <Input
+                          id="reset-email"
+                          type="email"
+                          placeholder="admin@neuraltwin.com"
+                          value={resetEmail}
+                          onChange={(e) => setResetEmail(e.target.value)}
+                          required
+                          maxLength={255}
+                          className="h-11"
+                        />
+                      </div>
+                      <Button 
+                        type="submit" 
+                        className="w-full" 
+                        disabled={resetLoading}
+                      >
+                        {resetLoading ? (
+                          <span className="flex items-center gap-2">
+                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                            전송 중...
+                          </span>
+                        ) : (
+                          "재설정 링크 전송"
+                        )}
+                      </Button>
+                    </form>
+                  </DialogContent>
+                </Dialog>
               </form>
             </TabsContent>
 
