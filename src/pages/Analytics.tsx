@@ -37,8 +37,8 @@ const Analytics = () => {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold">방문자 분석</h1>
+        <div className="animate-fade-in">
+          <h1 className="text-3xl font-bold gradient-text">방문자 분석</h1>
           <p className="mt-2 text-muted-foreground">매장 방문자 데이터 및 히트맵 분석</p>
         </div>
 
@@ -50,7 +50,7 @@ const Analytics = () => {
           </TabsList>
 
           <TabsContent value="hourly" className="space-y-4">
-            <Card>
+            <Card className="hover-lift animate-fade-in">
               <CardHeader>
                 <CardTitle>시간대별 방문자</CardTitle>
                 <CardDescription>오늘 시간대별 방문 패턴</CardDescription>
@@ -82,7 +82,7 @@ const Analytics = () => {
           </TabsContent>
 
           <TabsContent value="weekly" className="space-y-4">
-            <Card>
+            <Card className="hover-lift animate-fade-in">
               <CardHeader>
                 <CardTitle>요일별 방문자</CardTitle>
                 <CardDescription>이번 주 요일별 방문 현황</CardDescription>
@@ -109,7 +109,7 @@ const Analytics = () => {
 
           <TabsContent value="demographics" className="space-y-4">
             <div className="grid gap-6 md:grid-cols-2">
-              <Card>
+              <Card className="hover-lift animate-fade-in">
                 <CardHeader>
                   <CardTitle>연령대별 분포</CardTitle>
                   <CardDescription>방문자 연령대 비율</CardDescription>
@@ -137,7 +137,7 @@ const Analytics = () => {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="hover-lift animate-fade-in" style={{ animationDelay: "100ms" }}>
                 <CardHeader>
                   <CardTitle>주요 인사이트</CardTitle>
                   <CardDescription>AI 분석 결과</CardDescription>

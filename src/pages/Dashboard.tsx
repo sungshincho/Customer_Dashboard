@@ -86,22 +86,24 @@ const Dashboard = () => {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold">실시간 대시보드</h1>
+        <div className="animate-fade-in">
+          <h1 className="text-3xl font-bold gradient-text">실시간 대시보드</h1>
           <p className="mt-2 text-muted-foreground">매장 운영 현황 및 주요 지표</p>
         </div>
 
         {/* Stats Grid */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {stats.map((stat) => (
-            <StatCard key={stat.title} {...stat} />
+          {stats.map((stat, index) => (
+            <div key={stat.title} style={{ animationDelay: `${index * 100}ms` }}>
+              <StatCard {...stat} />
+            </div>
           ))}
         </div>
 
         {/* Charts Section */}
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6 lg:grid-cols-2 animate-slide-up">
           {/* Visitor Chart */}
-          <Card>
+          <Card className="hover-lift">
             <CardHeader>
               <CardTitle>실시간 방문자</CardTitle>
               <CardDescription>오늘 시간대별 방문자 수</CardDescription>
@@ -138,7 +140,7 @@ const Dashboard = () => {
           </Card>
 
           {/* Sales Chart */}
-          <Card>
+          <Card className="hover-lift">
             <CardHeader>
               <CardTitle>매장별 매출</CardTitle>
               <CardDescription>오늘 매장별 판매 현황</CardDescription>
@@ -164,7 +166,7 @@ const Dashboard = () => {
         </div>
 
         {/* Recent Alerts */}
-        <Card>
+        <Card className="animate-slide-up hover-lift">
           <CardHeader>
             <CardTitle>최근 알림</CardTitle>
             <CardDescription>실시간 이벤트 및 알림</CardDescription>
@@ -179,10 +181,10 @@ const Dashboard = () => {
               ].map((alert, idx) => (
                 <div
                   key={idx}
-                  className="flex items-center justify-between border-b border-border pb-4 last:border-0 last:pb-0"
+                  className="flex items-center justify-between border-b border-border pb-4 last:border-0 last:pb-0 hover:bg-accent/5 transition-colors duration-200 rounded-lg px-2 -mx-2"
                 >
                   <div className="flex items-center gap-4">
-                    <div className={`flex h-2 w-2 rounded-full ${alert.urgent ? 'bg-destructive' : 'bg-primary'}`} />
+                    <div className={`flex h-2 w-2 rounded-full ${alert.urgent ? 'bg-destructive animate-pulse-glow' : 'bg-primary'}`} />
                     <div>
                       <p className="text-sm font-medium">{alert.type}</p>
                       <p className="text-sm text-muted-foreground">{alert.message}</p>

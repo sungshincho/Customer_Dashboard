@@ -113,10 +113,10 @@ const Auth = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-hero p-4">
+      <Card className="w-full max-w-md hover-lift animate-scale-in shadow-xl">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+          <CardTitle className="text-3xl font-bold gradient-text">
             NEURALTWIN
           </CardTitle>
           <CardDescription>관리자 대시보드에 오신 것을 환영합니다</CardDescription>

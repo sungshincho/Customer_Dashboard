@@ -36,13 +36,13 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-lg font-bold">
+          <SidebarGroupLabel className="text-lg font-bold py-4">
             {!collapsed && (
-              <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              <span className="gradient-text text-xl">
                 NEURALTWIN
               </span>
             )}
-            {collapsed && <span className="text-primary">NT</span>}
+            {collapsed && <span className="gradient-text text-xl">NT</span>}
           </SidebarGroupLabel>
           <SidebarGroupContent className="mt-4">
             <SidebarMenu>
@@ -51,8 +51,8 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     <NavLink 
                       to={item.url}
-                      className="flex items-center gap-3 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                      activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                      className="flex items-center gap-3 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-all duration-200 rounded-lg"
+                      activeClassName="bg-gradient-primary text-white font-medium shadow-md"
                       end
                     >
                       <item.icon className="h-5 w-5" />

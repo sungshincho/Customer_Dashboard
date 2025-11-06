@@ -56,18 +56,18 @@ const Stores = () => {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between animate-fade-in">
           <div>
-            <h1 className="text-3xl font-bold">매장 관리</h1>
+            <h1 className="text-3xl font-bold gradient-text">매장 관리</h1>
             <p className="mt-2 text-muted-foreground">전체 매장 현황 및 관리</p>
           </div>
-          <Button>새 매장 추가</Button>
+          <Button className="bg-gradient-primary hover:shadow-glow">새 매장 추가</Button>
         </div>
 
         {/* Stores Grid */}
         <div className="grid gap-6 md:grid-cols-2">
-          {stores.map((store) => (
-            <Card key={store.id}>
+          {stores.map((store, index) => (
+            <Card key={store.id} className="hover-lift animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div>
@@ -118,8 +118,8 @@ const Stores = () => {
 
                 {/* Actions */}
                 <div className="flex gap-2 pt-2">
-                  <Button variant="outline" className="flex-1">상세보기</Button>
-                  <Button variant="outline" className="flex-1">설정</Button>
+                  <Button variant="outline" className="flex-1 hover:bg-primary hover:text-primary-foreground transition-all">상세보기</Button>
+                  <Button variant="outline" className="flex-1 hover:bg-secondary transition-all">설정</Button>
                 </div>
               </CardContent>
             </Card>

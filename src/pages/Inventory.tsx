@@ -29,12 +29,12 @@ const Inventory = () => {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between animate-fade-in">
           <div>
-            <h1 className="text-3xl font-bold">재고 관리</h1>
+            <h1 className="text-3xl font-bold gradient-text">재고 관리</h1>
             <p className="mt-2 text-muted-foreground">전체 매장 재고 현황 및 관리</p>
           </div>
-          <Button>발주 요청</Button>
+          <Button className="bg-gradient-primary hover:shadow-glow">발주 요청</Button>
         </div>
 
         {/* Alert Banner */}
@@ -62,7 +62,7 @@ const Inventory = () => {
         </div>
 
         {/* Inventory Table */}
-        <Card>
+        <Card className="hover-lift animate-slide-up">
           <CardHeader>
             <CardTitle>재고 목록</CardTitle>
             <CardDescription>전체 매장 재고 현황</CardDescription>

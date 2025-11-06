@@ -12,8 +12,8 @@ const Settings = () => {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold">설정</h1>
+        <div className="animate-fade-in">
+          <h1 className="text-3xl font-bold gradient-text">설정</h1>
           <p className="mt-2 text-muted-foreground">시스템 설정 및 환경 구성</p>
         </div>
 

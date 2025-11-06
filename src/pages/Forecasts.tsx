@@ -28,14 +28,14 @@ const Forecasts = () => {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold">AI 예측</h1>
+        <div className="animate-fade-in">
+          <h1 className="text-3xl font-bold gradient-text">AI 예측</h1>
           <p className="mt-2 text-muted-foreground">AI 기반 매출 및 방문자 예측 분석</p>
         </div>
 
         {/* AI Insights */}
         <div className="grid gap-4 md:grid-cols-3">
-          <Card>
+          <Card className="hover-lift animate-fade-in">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-medium">다음 달 예측 매출</CardTitle>
@@ -48,7 +48,7 @@ const Forecasts = () => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="hover-lift animate-fade-in" style={{ animationDelay: "100ms" }}>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-medium">예상 방문자</CardTitle>
@@ -61,7 +61,7 @@ const Forecasts = () => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="hover-lift animate-fade-in" style={{ animationDelay: "200ms" }}>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-medium">재고 소진 예측</CardTitle>
