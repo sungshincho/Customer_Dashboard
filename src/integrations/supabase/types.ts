@@ -41,6 +41,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_data_imports: {
+        Row: {
+          created_at: string
+          data_type: string
+          file_name: string
+          file_type: string
+          id: string
+          raw_data: Json
+          row_count: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data_type: string
+          file_name: string
+          file_type: string
+          id?: string
+          raw_data: Json
+          row_count: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data_type?: string
+          file_name?: string
+          file_type?: string
+          id?: string
+          raw_data?: Json
+          row_count?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

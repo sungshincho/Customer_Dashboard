@@ -14,7 +14,8 @@ import {
   UserCheck,
   Map,
   Filter,
-  Building2
+  Building2,
+  Upload
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
@@ -35,6 +36,7 @@ const menuItems = [
   { title: "방문자 분석", url: "/analytics", icon: BarChart3 },
   { title: "재고 관리", url: "/inventory", icon: Package },
   { title: "AI 예측", url: "/forecasts", icon: TrendingUp },
+  { title: "데이터 임포트", url: "/data-import", icon: Upload },
   { title: "설정", url: "/settings", icon: Settings },
 ];
 

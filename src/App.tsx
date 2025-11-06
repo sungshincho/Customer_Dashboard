@@ -24,6 +24,7 @@ import StaffEfficiencyPage from "./pages/StaffEfficiencyPage";
 import CustomerJourneyPage from "./pages/CustomerJourneyPage";
 import ConversionFunnelPage from "./pages/ConversionFunnelPage";
 import HQStoreSyncPage from "./pages/HQStoreSyncPage";
+import DataImport from "./pages/DataImport";
 
 const queryClient = new QueryClient();
 
@@ -161,6 +162,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <HQStoreSyncPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/data-import"
+              element={
+                <ProtectedRoute>
+                  <DataImport />
                 </ProtectedRoute>
               }
             />
