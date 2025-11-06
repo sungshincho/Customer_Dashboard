@@ -34,6 +34,16 @@ const Auth = () => {
     }
   }, [user, navigate]);
 
+  useEffect(() => {
+    // Force dark mode for auth page
+    document.documentElement.classList.add('dark');
+    
+    return () => {
+      // Restore user's theme preference when leaving auth page
+      document.documentElement.classList.remove('dark');
+    };
+  }, []);
+
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
