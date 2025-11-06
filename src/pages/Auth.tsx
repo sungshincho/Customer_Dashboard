@@ -113,25 +113,56 @@ const Auth = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-hero p-4">
-      <Card className="w-full max-w-md hover-lift animate-scale-in shadow-xl">
-        <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-bold gradient-text">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-background via-background/95 to-primary/5 p-4">
+      {/* Animated background elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-1/2 -left-1/2 h-full w-full animate-float rounded-full bg-primary/5 blur-3xl" />
+        <div className="absolute -bottom-1/2 -right-1/2 h-full w-full animate-float rounded-full bg-accent/5 blur-3xl" style={{ animationDelay: '2s' }} />
+      </div>
+
+      {/* Main card */}
+      <Card className="relative w-full max-w-md backdrop-blur-xl bg-card/80 border-border/50 shadow-2xl hover-lift animate-scale-in">
+        <CardHeader className="space-y-4 pb-8 pt-10 text-center">
+          <div className="mx-auto mb-2 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent shadow-lg animate-pulse">
+            <svg
+              className="h-8 w-8 text-primary-foreground"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+              />
+            </svg>
+          </div>
+          <CardTitle className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent animate-fade-in">
             NEURALTWIN
           </CardTitle>
-          <CardDescription>관리자 대시보드에 오신 것을 환영합니다</CardDescription>
+          <CardDescription className="text-base text-muted-foreground/80">
+            AI 기반 매장 분석 플랫폼
+          </CardDescription>
         </CardHeader>
-        <CardContent>
+        
+        <CardContent className="pb-8">
           <Tabs defaultValue="signin" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="signin">로그인</TabsTrigger>
-              <TabsTrigger value="signup">회원가입</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 mb-6 bg-muted/50">
+              <TabsTrigger value="signin" className="data-[state=active]:bg-background">
+                로그인
+              </TabsTrigger>
+              <TabsTrigger value="signup" className="data-[state=active]:bg-background">
+                회원가입
+              </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="signin">
+            <TabsContent value="signin" className="space-y-4 mt-0">
               <form onSubmit={handleSignIn} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="signin-email">이메일</Label>
+                  <Label htmlFor="signin-email" className="text-sm font-medium">
+                    이메일
+                  </Label>
                   <Input
                     id="signin-email"
                     type="email"
@@ -140,10 +171,13 @@ const Auth = () => {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     maxLength={255}
+                    className="h-11 bg-background/50 border-border/50 focus:border-primary transition-colors"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signin-password">비밀번호</Label>
+                  <Label htmlFor="signin-password" className="text-sm font-medium">
+                    비밀번호
+                  </Label>
                   <Input
                     id="signin-password"
                     type="password"
@@ -152,18 +186,32 @@ const Auth = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     maxLength={100}
+                    className="h-11 bg-background/50 border-border/50 focus:border-primary transition-colors"
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "로그인 중..." : "로그인"}
+                <Button 
+                  type="submit" 
+                  className="w-full h-11 bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity shadow-lg" 
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <span className="flex items-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                      로그인 중...
+                    </span>
+                  ) : (
+                    "로그인"
+                  )}
                 </Button>
               </form>
             </TabsContent>
 
-            <TabsContent value="signup">
+            <TabsContent value="signup" className="space-y-4 mt-0">
               <form onSubmit={handleSignUp} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="signup-email">이메일</Label>
+                  <Label htmlFor="signup-email" className="text-sm font-medium">
+                    이메일
+                  </Label>
                   <Input
                     id="signup-email"
                     type="email"
@@ -172,10 +220,13 @@ const Auth = () => {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     maxLength={255}
+                    className="h-11 bg-background/50 border-border/50 focus:border-primary transition-colors"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signup-password">비밀번호</Label>
+                  <Label htmlFor="signup-password" className="text-sm font-medium">
+                    비밀번호
+                  </Label>
                   <Input
                     id="signup-password"
                     type="password"
@@ -185,11 +236,23 @@ const Auth = () => {
                     required
                     minLength={6}
                     maxLength={100}
+                    className="h-11 bg-background/50 border-border/50 focus:border-primary transition-colors"
                   />
                   <p className="text-xs text-muted-foreground">최소 6자 이상</p>
                 </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "가입 중..." : "회원가입"}
+                <Button 
+                  type="submit" 
+                  className="w-full h-11 bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity shadow-lg" 
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <span className="flex items-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                      가입 중...
+                    </span>
+                  ) : (
+                    "회원가입"
+                  )}
                 </Button>
               </form>
             </TabsContent>
