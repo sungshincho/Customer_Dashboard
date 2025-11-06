@@ -13,6 +13,12 @@ serve(async (req) => {
 
   try {
     const { analysisType, data, userId } = await req.json();
+    
+    console.log("=== AI Analysis Request Started ===");
+    console.log("Analysis Type:", analysisType);
+    console.log("User ID:", userId);
+    console.log("Data received:", data ? "Yes" : "No");
+    
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -27,7 +33,7 @@ serve(async (req) => {
     // Fetch user's imported data for context
     let historicalContext = "";
     if (userId) {
-      console.log(`Fetching imported data for user: ${userId}`);
+      console.log(`✅ Fetching imported data for user: ${userId}`);
       
       // Map analysis types to relevant data types
       const dataTypeMapping: Record<string, string[]> = {
@@ -42,6 +48,8 @@ serve(async (req) => {
 
       const relevantDataTypes = dataTypeMapping[analysisType] || ["sales", "customer", "inventory", "traffic"];
       
+      console.log(`📊 Querying data types:`, relevantDataTypes);
+      
       const { data: importedData, error: importError } = await supabase
         .from("user_data_imports")
         .select("data_type, raw_data, row_count, created_at, file_name")
@@ -51,7 +59,13 @@ serve(async (req) => {
         .limit(5);
 
       if (!importError && importedData && importedData.length > 0) {
-        console.log(`Found ${importedData.length} relevant imported datasets`);
+        console.log(`✅ Found ${importedData.length} relevant imported datasets`);
+        console.log("Dataset details:", importedData.map(d => ({
+          type: d.data_type,
+          file: d.file_name,
+          rows: d.row_count,
+          date: d.created_at
+        })));
         
         // Summarize historical data for AI context
         const dataSummaries = importedData.map(item => {
@@ -69,9 +83,15 @@ serve(async (req) => {
         }).join('\n\n---\n\n');
 
         historicalContext = `\n\n## 고객사 임포트 데이터 컨텍스트\n아래는 고객이 이전에 업로드한 실제 비즈니스 데이터입니다. 이 과거 데이터를 참고하여 더욱 정확하고 맞춤화된 분석을 제공하세요:\n\n${dataSummaries}\n\n위 데이터의 패턴과 트렌드를 고려하여 분석하세요.`;
+        console.log("📝 Historical context prepared, length:", historicalContext.length);
       } else {
-        console.log("No relevant imported data found or error occurred:", importError);
+        console.log("❌ No relevant imported data found");
+        if (importError) {
+          console.error("Database error:", importError);
+        }
       }
+    } else {
+      console.log("⚠️ No userId provided, skipping imported data fetch");
     }
 
     let systemPrompt = "";
@@ -140,6 +160,9 @@ serve(async (req) => {
 
     const aiResponse = await response.json();
     const analysis = aiResponse.choices[0].message.content;
+    
+    console.log("✅ AI Analysis completed successfully");
+    console.log("=== AI Analysis Request Completed ===");
 
     return new Response(
       JSON.stringify({ analysis }),
