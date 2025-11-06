@@ -10,7 +10,6 @@ import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
-import logoWhite from "@/assets/logo-white.png";
 
 const authSchema = z.object({
   email: z.string().trim().email({ message: "올바른 이메일 주소를 입력하세요" }).max(255, { message: "이메일은 255자 이하여야 합니다" }),
@@ -199,13 +198,24 @@ const Auth = () => {
       {/* Main card */}
       <Card className="relative w-full max-w-md backdrop-blur-xl bg-card/80 border-border/50 shadow-2xl hover-lift animate-scale-in">
         <CardHeader className="space-y-4 pb-8 pt-10 text-center">
-          <div className="mx-auto mb-6">
-            <img 
-              src={logoWhite} 
-              alt="NEURALTWIN" 
-              className="h-12 w-auto mx-auto animate-fade-in"
-            />
+          <div className="mx-auto mb-2 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent shadow-lg animate-pulse">
+            <svg
+              className="h-8 w-8 text-primary-foreground"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+              />
+            </svg>
           </div>
+          <CardTitle className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent animate-fade-in">
+            NEURALTWIN
+          </CardTitle>
           <CardDescription className="text-base text-muted-foreground/80">
             AI 기반 매장 분석 플랫폼
           </CardDescription>
