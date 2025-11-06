@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -296,9 +296,9 @@ const DataImport = () => {
     XLSX.writeFile(workbook, `export_${importData.file_name}`);
   };
 
-  useState(() => {
+  useEffect(() => {
     loadImports();
-  });
+  }, []);
 
   return (
     <DashboardLayout>
