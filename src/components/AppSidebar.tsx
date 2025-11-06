@@ -29,6 +29,8 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import logoWhite from "@/assets/logo-white.png";
+import logoBlack from "@/assets/logo-black.png";
 
 const menuItems = [
   { title: "대시보드", url: "/", icon: LayoutDashboard },
@@ -63,9 +65,18 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupLabel className="text-lg font-bold py-4">
             {!collapsed && (
-              <span className="gradient-text text-xl">
-                NEURALTWIN
-              </span>
+              <img 
+                src={logoWhite} 
+                alt="NEURALTWIN" 
+                className="h-8 w-auto dark:block hidden"
+              />
+            )}
+            {!collapsed && (
+              <img 
+                src={logoBlack} 
+                alt="NEURALTWIN" 
+                className="h-8 w-auto dark:hidden block"
+              />
             )}
             {collapsed && <span className="gradient-text text-xl">NT</span>}
           </SidebarGroupLabel>
