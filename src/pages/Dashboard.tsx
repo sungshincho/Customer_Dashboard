@@ -6,16 +6,16 @@ import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, R
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase";
 import {
+  FootfallVisualizer,
+  DemandForecast,
   TrafficHeatmap,
-  ConversionFunnel,
-  VisitorFlow,
-  DwellTime,
-  PeakHours,
-  Demographics,
-  ProductInteraction,
-  ZonePerformance,
+  ProductPerformance,
+  InventoryOptimizer,
+  LayoutSimulator,
+  StaffEfficiency,
   CustomerJourney,
-  ABTesting,
+  ConversionFunnel,
+  HQStoreSync,
 } from "@/components/features";
 
 const initialStats = [
@@ -217,16 +217,16 @@ const Dashboard = () => {
           </div>
 
           <div className="grid gap-6 lg:grid-cols-2">
+            <FootfallVisualizer />
+            <DemandForecast />
             <TrafficHeatmap />
-            <ConversionFunnel />
-            <VisitorFlow />
-            <DwellTime />
-            <PeakHours />
-            <Demographics />
-            <ProductInteraction />
-            <ZonePerformance />
+            <ProductPerformance />
+            <InventoryOptimizer />
+            <LayoutSimulator />
+            <StaffEfficiency />
             <CustomerJourney />
-            <ABTesting />
+            <ConversionFunnel />
+            <HQStoreSync />
           </div>
         </div>
       </div>
