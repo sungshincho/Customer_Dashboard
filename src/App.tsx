@@ -14,6 +14,16 @@ import Forecasts from "./pages/Forecasts";
 import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import FootfallAnalysis from "./pages/FootfallAnalysis";
+import DemandForecastPage from "./pages/DemandForecastPage";
+import TrafficHeatmapPage from "./pages/TrafficHeatmapPage";
+import ProductPerformancePage from "./pages/ProductPerformancePage";
+import InventoryOptimizerPage from "./pages/InventoryOptimizerPage";
+import LayoutSimulatorPage from "./pages/LayoutSimulatorPage";
+import StaffEfficiencyPage from "./pages/StaffEfficiencyPage";
+import CustomerJourneyPage from "./pages/CustomerJourneyPage";
+import ConversionFunnelPage from "./pages/ConversionFunnelPage";
+import HQStoreSyncPage from "./pages/HQStoreSyncPage";
 
 const queryClient = new QueryClient();
 
@@ -71,6 +81,86 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Settings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/footfall-analysis"
+              element={
+                <ProtectedRoute>
+                  <FootfallAnalysis />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/demand-forecast"
+              element={
+                <ProtectedRoute>
+                  <DemandForecastPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/traffic-heatmap"
+              element={
+                <ProtectedRoute>
+                  <TrafficHeatmapPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/product-performance"
+              element={
+                <ProtectedRoute>
+                  <ProductPerformancePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/inventory-optimizer"
+              element={
+                <ProtectedRoute>
+                  <InventoryOptimizerPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/layout-simulator"
+              element={
+                <ProtectedRoute>
+                  <LayoutSimulatorPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/staff-efficiency"
+              element={
+                <ProtectedRoute>
+                  <StaffEfficiencyPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/customer-journey"
+              element={
+                <ProtectedRoute>
+                  <CustomerJourneyPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/conversion-funnel"
+              element={
+                <ProtectedRoute>
+                  <ConversionFunnelPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/hq-store-sync"
+              element={
+                <ProtectedRoute>
+                  <HQStoreSyncPage />
                 </ProtectedRoute>
               }
             />
