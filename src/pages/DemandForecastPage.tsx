@@ -8,6 +8,7 @@ import { ExportButton } from "@/components/analysis/ExportButton";
 import { AIInsights, Insight } from "@/components/analysis/AIInsights";
 import { AlertSettings, Alert } from "@/components/analysis/AlertSettings";
 import { ComparisonView } from "@/components/analysis/ComparisonView";
+import { AIAnalysisButton } from "@/components/analysis/AIAnalysisButton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const DemandForecastPage = () => {
@@ -66,6 +67,11 @@ const DemandForecastPage = () => {
           </TabsList>
           
           <TabsContent value="analysis" className="space-y-6">
+            <AIAnalysisButton
+              analysisType="demand-forecast"
+              data={comparisonData}
+              title="AI 수요 시뮬레이션"
+            />
             <div key={refreshKey}>
               <DemandForecast />
             </div>

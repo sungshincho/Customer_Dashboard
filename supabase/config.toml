@@ -1,0 +1,2 @@
+[functions.analyze-store-data]
+verify_jwt = false

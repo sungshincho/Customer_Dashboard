@@ -8,6 +8,7 @@ import { ExportButton } from "@/components/analysis/ExportButton";
 import { AIInsights, Insight } from "@/components/analysis/AIInsights";
 import { AlertSettings, Alert } from "@/components/analysis/AlertSettings";
 import { ComparisonView } from "@/components/analysis/ComparisonView";
+import { AIAnalysisButton } from "@/components/analysis/AIAnalysisButton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const ProductPerformancePage = () => {
@@ -66,6 +67,11 @@ const ProductPerformancePage = () => {
           </TabsList>
           
           <TabsContent value="analysis" className="space-y-6">
+            <AIAnalysisButton
+              analysisType="product-performance"
+              data={comparisonData}
+              title="AI 상품 전략 제안"
+            />
             <div key={refreshKey}>
               <ProductPerformance />
             </div>

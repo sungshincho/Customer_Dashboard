@@ -8,6 +8,7 @@ import { ExportButton } from "@/components/analysis/ExportButton";
 import { AIInsights, Insight } from "@/components/analysis/AIInsights";
 import { AlertSettings, Alert } from "@/components/analysis/AlertSettings";
 import { ComparisonView } from "@/components/analysis/ComparisonView";
+import { AIAnalysisButton } from "@/components/analysis/AIAnalysisButton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const TrafficHeatmapPage = () => {
@@ -66,6 +67,11 @@ const TrafficHeatmapPage = () => {
           </TabsList>
           
           <TabsContent value="analysis" className="space-y-6">
+            <AIAnalysisButton
+              analysisType="traffic-heatmap"
+              data={comparisonData}
+              title="AI 레이아웃 최적화 제안"
+            />
             <div key={refreshKey}>
               <TrafficHeatmap />
             </div>
