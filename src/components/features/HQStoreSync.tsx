@@ -1,154 +1,229 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Building2, TrendingUp, Users, DollarSign, Clock } from "lucide-react";
+import { Send, CheckCircle2, Clock, Building2, Store } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 
-const storeData = [
-  {
-    name: "강남점",
-    status: "online",
-    visitors: 1456,
-    sales: 12340000,
-    efficiency: 92,
-    lastSync: "방금 전",
-  },
-  {
-    name: "홍대점",
-    status: "online",
-    visitors: 1289,
-    sales: 10230000,
-    efficiency: 88,
-    lastSync: "1분 전",
-  },
-  {
-    name: "명동점",
-    status: "online",
-    visitors: 1678,
-    sales: 14560000,
-    efficiency: 95,
-    lastSync: "방금 전",
-  },
-  {
-    name: "잠실점",
-    status: "warning",
-    visitors: 987,
-    sales: 7890000,
-    efficiency: 76,
-    lastSync: "5분 전",
-  },
-  {
-    name: "신촌점",
-    status: "online",
-    visitors: 1123,
-    sales: 9450000,
-    efficiency: 84,
-    lastSync: "2분 전",
-  },
-];
+interface Message {
+  id: string;
+  from: "store" | "hq";
+  content: string;
+  status: "pending" | "approved" | "rejected";
+  timestamp: Date;
+}
 
-export function HQStoreSync() {
-  const totalVisitors = storeData.reduce((sum, s) => sum + s.visitors, 0);
-  const totalSales = storeData.reduce((sum, s) => sum + s.sales, 0);
-  const avgEfficiency = Math.round(storeData.reduce((sum, s) => sum + s.efficiency, 0) / storeData.length);
-  const onlineStores = storeData.filter(s => s.status === "online").length;
+export const HQStoreSync = () => {
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: "1",
+      from: "store",
+      content: "신상품 진열 위치 변경 요청",
+      status: "approved",
+      timestamp: new Date(Date.now() - 3600000),
+    },
+  ]);
+  const [newMessage, setNewMessage] = useState("");
+  const [syncProgress, setSyncProgress] = useState(0);
+  const [isSyncing, setIsSyncing] = useState(false);
 
-  const getStatusColor = (status: string) => {
+  const handleSendMessage = () => {
+    if (!newMessage.trim()) return;
+
+    const message: Message = {
+      id: Date.now().toString(),
+      from: "store",
+      content: newMessage,
+      status: "pending",
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, message]);
+    setNewMessage("");
+    setIsSyncing(true);
+    setSyncProgress(0);
+
+    const interval = setInterval(() => {
+      setSyncProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setIsSyncing(false);
+          setMessages((msgs) =>
+            msgs.map((m) =>
+              m.id === message.id ? { ...m, status: "approved" } : m
+            )
+          );
+          return 100;
+        }
+        return prev + 10;
+      });
+    }, 100);
+  };
+
+  const getStatusBadge = (status: Message["status"]) => {
     switch (status) {
-      case "online": return "default";
-      case "warning": return "secondary";
-      case "offline": return "destructive";
-      default: return "outline";
+      case "pending":
+        return (
+          <Badge variant="outline" className="gap-1">
+            <Clock className="w-3 h-3" />
+            대기중
+          </Badge>
+        );
+      case "approved":
+        return (
+          <Badge className="gap-1 bg-green-500/20 text-green-500 border-green-500/50">
+            <CheckCircle2 className="w-3 h-3" />
+            승인
+          </Badge>
+        );
+      case "rejected":
+        return (
+          <Badge variant="destructive" className="gap-1">
+            거절
+          </Badge>
+        );
     }
   };
 
+  const getTimeAgo = (date: Date) => {
+    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (seconds < 60) return `${seconds}초 전`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}분 전`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours}시간 전`;
+  };
+
   return (
-    <Card className="glass-card animate-fade-in">
-      <CardHeader>
-        <CardTitle className="gradient-text">본사-매장 실시간 동기화</CardTitle>
-        <CardDescription>전체 매장 통합 모니터링</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="mb-4 grid grid-cols-4 gap-3">
-          <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
-            <Building2 className="w-4 h-4 text-primary mb-1" />
-            <p className="text-xs text-muted-foreground">온라인</p>
-            <p className="text-xl font-bold gradient-text">{onlineStores}/{storeData.length}</p>
+    <div className="space-y-6">
+      <div className="grid md:grid-cols-2 gap-6">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h4 className="font-semibold">실시간 커뮤니케이션</h4>
+            <Badge variant="secondary" className="gap-1">
+              <Clock className="w-3 h-3" />
+              평균 1분 내 승인
+            </Badge>
           </div>
-          <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
-            <Users className="w-4 h-4 text-primary mb-1" />
-            <p className="text-xs text-muted-foreground">총 방문자</p>
-            <p className="text-xl font-bold text-primary animate-glow-pulse">{totalVisitors}</p>
+
+          <div className="glass rounded-xl p-4 space-y-4 max-h-[400px] overflow-y-auto">
+            {messages.map((message) => (
+              <Card
+                key={message.id}
+                className={`p-4 space-y-3 ${
+                  message.from === "store" ? "ml-4" : "mr-4"
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    {message.from === "store" ? (
+                      <Store className="w-4 h-4 text-primary" />
+                    ) : (
+                      <Building2 className="w-4 h-4 text-amber-500" />
+                    )}
+                    <span className="text-sm font-semibold">
+                      {message.from === "store" ? "매장" : "본사"}
+                    </span>
+                  </div>
+                  {getStatusBadge(message.status)}
+                </div>
+
+                <p className="text-sm">{message.content}</p>
+
+                <div className="text-xs text-muted-foreground">
+                  {getTimeAgo(message.timestamp)}
+                </div>
+
+                {message.status === "pending" && isSyncing && (
+                  <div className="space-y-2">
+                    <Progress value={syncProgress} className="h-1" />
+                    <p className="text-xs text-muted-foreground">
+                      본사 승인 대기중... {syncProgress}%
+                    </p>
+                  </div>
+                )}
+              </Card>
+            ))}
           </div>
-          <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
-            <DollarSign className="w-4 h-4 text-primary mb-1" />
-            <p className="text-xs text-muted-foreground">총 매출</p>
-            <p className="text-lg font-bold gradient-text">₩{(totalSales / 10000000).toFixed(1)}억</p>
-          </div>
-          <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
-            <TrendingUp className="w-4 h-4 text-primary mb-1" />
-            <p className="text-xs text-muted-foreground">평균 효율</p>
-            <p className="text-xl font-bold gradient-text">{avgEfficiency}%</p>
+
+          <div className="flex gap-2">
+            <Input
+              placeholder="변경 요청 메시지 입력..."
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
+              disabled={isSyncing}
+            />
+            <Button onClick={handleSendMessage} disabled={isSyncing || !newMessage.trim()}>
+              <Send className="w-4 h-4" />
+            </Button>
           </div>
         </div>
 
-        <div className="space-y-3">
-          {storeData.map((store, index) => (
-            <div
-              key={index}
-              className="p-4 rounded-lg border border-border/50 hover:border-primary/30 transition-all bg-background/50"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <Building2 className="w-5 h-5 text-primary" />
-                  <div>
-                    <p className="font-semibold">{store.name}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant={getStatusColor(store.status)} className="text-xs">
-                        {store.status === "online" ? "운영중" : store.status === "warning" ? "주의" : "오프라인"}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {store.lastSync}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold text-primary">{store.efficiency}%</p>
-                  <p className="text-xs text-muted-foreground">효율</p>
-                </div>
+        <div className="space-y-4">
+          <h4 className="font-semibold">개선 효과</h4>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Card className="glass p-4">
+              <div className="text-sm text-muted-foreground mb-1">기존 프로세스</div>
+              <div className="text-3xl font-bold text-muted-foreground line-through">
+                24h
               </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                이메일/전화 → 회의 → 승인
+              </p>
+            </Card>
 
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">방문자</p>
-                    <p className="font-semibold">{store.visitors}명</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <DollarSign className="w-4 h-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">매출</p>
-                    <p className="font-semibold">₩{(store.sales / 10000).toFixed(0)}만</p>
-                  </div>
-                </div>
-              </div>
+            <Card className="glass p-4 border-primary/50">
+              <div className="text-sm text-muted-foreground mb-1">NEURALTWIN</div>
+              <div className="text-3xl font-bold text-primary">1분</div>
+              <p className="text-xs text-muted-foreground mt-2">
+                실시간 동기화 & 자동 승인
+              </p>
+            </Card>
 
-              {store.status === "warning" && (
-                <div className="mt-3 p-2 rounded bg-secondary/20 border border-secondary">
-                  <p className="text-xs text-muted-foreground">⚠️ 동기화 지연 - 시스템 점검 필요</p>
-                </div>
-              )}
-            </div>
-          ))}
+            <Card className="glass p-4">
+              <div className="text-sm text-muted-foreground mb-1">월간 요청 건수</div>
+              <div className="text-2xl font-bold">245건</div>
+            </Card>
+
+            <Card className="glass p-4">
+              <div className="text-sm text-muted-foreground mb-1">시간 절감</div>
+              <div className="text-2xl font-bold text-green-500">98.9%</div>
+            </Card>
+          </div>
+
+          <Card className="glass p-4 space-y-3">
+            <h5 className="text-sm font-semibold">주요 기능</h5>
+            <ul className="space-y-2 text-sm">
+              <li className="flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                <span>레이아웃 변경 요청 & 즉시 승인</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                <span>재고 이동 및 프로모션 조율</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                <span>실시간 KPI 공유 & 피드백</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                <span>AI 기반 자동 의사결정 제안</span>
+              </li>
+            </ul>
+          </Card>
+
+          <Card className="glass p-4 bg-primary/5 border-primary/20">
+            <p className="text-sm">
+              <span className="font-semibold">ROI:</span> 매장당 연간{" "}
+              <span className="text-primary font-bold">3,500만원</span> 운영비 절감
+            </p>
+          </Card>
         </div>
-
-        <div className="mt-4 p-4 rounded-lg bg-primary/10 border border-primary/20">
-          <p className="text-sm text-muted-foreground">실시간 동기화 상태</p>
-          <p className="text-sm font-medium">모든 매장 데이터 실시간 업데이트 중 ✓</p>
-        </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
-}
+};

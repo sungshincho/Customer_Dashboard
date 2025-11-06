@@ -1,130 +1,223 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { useState } from "react";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { LayoutGrid, TrendingUp, Users, DollarSign } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Sparkles, RotateCcw, TrendingUp } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
-const layoutOptions = [
-  {
-    name: "현재 레이아웃",
-    type: "current",
-    traffic: 1234,
-    conversion: 18.6,
-    revenue: 8450000,
-    score: 78,
-  },
-  {
-    name: "AI 추천 레이아웃 A",
-    type: "recommended",
-    traffic: 1456,
-    conversion: 23.2,
-    revenue: 10230000,
-    score: 92,
-    improvements: ["+18% 방문자", "+24.7% 전환율", "+21% 매출"],
-  },
-  {
-    name: "AI 추천 레이아웃 B",
-    type: "recommended",
-    traffic: 1389,
-    conversion: 21.5,
-    revenue: 9680000,
-    score: 87,
-    improvements: ["+12.5% 방문자", "+15.6% 전환율", "+14.5% 매출"],
-  },
+interface Product {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  color: string;
+}
+
+const initialProducts: Product[] = [
+  { id: "A", name: "신상품", x: 20, y: 20, color: "bg-primary" },
+  { id: "B", name: "인기상품", x: 60, y: 20, color: "bg-blue-500" },
+  { id: "C", name: "할인상품", x: 20, y: 60, color: "bg-purple-500" },
+  { id: "D", name: "프리미엄", x: 60, y: 60, color: "bg-amber-500" },
 ];
 
-export function LayoutSimulator() {
-  const bestLayout = layoutOptions.reduce((best, current) => 
-    current.score > best.score ? current : best
-  );
+const aiSuggestedLayout: Product[] = [
+  { id: "A", name: "신상품", x: 60, y: 20, color: "bg-primary" },
+  { id: "B", name: "인기상품", x: 20, y: 20, color: "bg-blue-500" },
+  { id: "C", name: "할인상품", x: 60, y: 60, color: "bg-purple-500" },
+  { id: "D", name: "프리미엄", x: 20, y: 60, color: "bg-amber-500" },
+];
+
+const generateMetrics = (products: Product[]) => {
+  const baseConversion = 15;
+  const layoutScore = products.reduce((sum, p) => sum + (p.x + p.y), 0);
+  const variance = (layoutScore % 50) - 25;
+  return {
+    conversion: baseConversion + variance * 0.2,
+    traffic: 450 + variance * 5,
+    dwell: 180 + variance * 2,
+  };
+};
+
+export const LayoutSimulator = () => {
+  const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [draggedProduct, setDraggedProduct] = useState<string | null>(null);
+  const [isAiLayout, setIsAiLayout] = useState(false);
+
+  const metrics = generateMetrics(products);
+  const aiMetrics = generateMetrics(aiSuggestedLayout);
+
+  const chartData = [
+    { time: "Mon", current: metrics.conversion, optimized: aiMetrics.conversion },
+    { time: "Tue", current: metrics.conversion + 1, optimized: aiMetrics.conversion + 1.5 },
+    { time: "Wed", current: metrics.conversion - 0.5, optimized: aiMetrics.conversion + 2 },
+    { time: "Thu", current: metrics.conversion + 0.8, optimized: aiMetrics.conversion + 2.5 },
+    { time: "Fri", current: metrics.conversion + 2, optimized: aiMetrics.conversion + 3.5 },
+    { time: "Sat", current: metrics.conversion + 3, optimized: aiMetrics.conversion + 5 },
+    { time: "Sun", current: metrics.conversion + 2.5, optimized: aiMetrics.conversion + 4.5 },
+  ];
+
+  const handleDragStart = (productId: string) => {
+    setDraggedProduct(productId);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!draggedProduct) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.id === draggedProduct
+          ? { ...p, x: Math.max(5, Math.min(85, x)), y: Math.max(5, Math.min(85, y)) }
+          : p
+      )
+    );
+    setDraggedProduct(null);
+    setIsAiLayout(false);
+  };
+
+  const applyAiSuggestion = () => {
+    setProducts(aiSuggestedLayout);
+    setIsAiLayout(true);
+  };
+
+  const resetLayout = () => {
+    setProducts(initialProducts);
+    setIsAiLayout(false);
+  };
 
   return (
-    <Card className="glass-card animate-fade-in">
-      <CardHeader>
-        <CardTitle className="gradient-text">매장 레이아웃 시뮬레이터</CardTitle>
-        <CardDescription>AI 기반 최적 배치 시뮬레이션</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="mb-4 p-4 rounded-lg bg-primary/10 border border-primary/20">
-          <div className="flex items-center gap-2 mb-2">
-            <TrendingUp className="w-5 h-5 text-primary animate-glow-pulse" />
-            <p className="font-semibold gradient-text">AI 최고 추천</p>
+    <div className="space-y-6">
+      <div className="grid md:grid-cols-2 gap-6">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h4 className="font-semibold">매장 레이아웃</h4>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={resetLayout}>
+                <RotateCcw className="w-4 h-4 mr-2" />
+                초기화
+              </Button>
+              <Button size="sm" onClick={applyAiSuggestion}>
+                <Sparkles className="w-4 h-4 mr-2" />
+                AI 제안
+              </Button>
+            </div>
           </div>
-          <p className="text-sm text-muted-foreground">{bestLayout.name} - {bestLayout.score}점</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            예상 매출 증가: ₩{((bestLayout.revenue - layoutOptions[0].revenue) / 10000).toFixed(0)}만원
-          </p>
+
+          <div
+            className="relative w-full aspect-square glass rounded-xl border-2 border-dashed border-border overflow-hidden"
+            onDrop={handleDrop}
+            onDragOver={(e) => e.preventDefault()}
+          >
+            <div className="absolute top-2 left-2 text-xs text-muted-foreground">입구</div>
+            {products.map((product) => (
+              <div
+                key={product.id}
+                draggable
+                onDragStart={() => handleDragStart(product.id)}
+                className={`absolute w-16 h-16 ${product.color} rounded-lg cursor-move flex items-center justify-center text-white font-bold shadow-lg hover:scale-110 transition-transform`}
+                style={{
+                  left: `${product.x}%`,
+                  top: `${product.y}%`,
+                  transform: "translate(-50%, -50%)",
+                }}
+              >
+                {product.id}
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {products.map((product) => (
+              <div key={product.id} className="flex items-center gap-2">
+                <div className={`w-3 h-3 ${product.color} rounded`} />
+                <span className="text-sm">{product.name}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="space-y-4">
-          {layoutOptions.map((layout, index) => (
-            <div
-              key={index}
-              className={`p-4 rounded-lg border transition-all ${
-                layout.type === "current"
-                  ? "bg-background/50 border-border/50"
-                  : "bg-primary/5 border-primary/20 hover:border-primary/40"
-              }`}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <LayoutGrid className="w-5 h-5 text-primary" />
-                  <span className="font-semibold">{layout.name}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant={layout.type === "current" ? "secondary" : "default"}>
-                    {layout.score}점
-                  </Badge>
-                  {layout.type === "recommended" && (
-                    <Badge variant="outline" className="text-primary border-primary">
-                      AI 추천
-                    </Badge>
-                  )}
-                </div>
-              </div>
+          <h4 className="font-semibold">예측 지표</h4>
 
-              <div className="grid grid-cols-3 gap-3 mb-3">
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">방문자</p>
-                    <p className="text-sm font-semibold">{layout.traffic}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">전환율</p>
-                    <p className="text-sm font-semibold">{layout.conversion}%</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <DollarSign className="w-4 h-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">매출</p>
-                    <p className="text-sm font-semibold">₩{(layout.revenue / 10000).toFixed(0)}만</p>
-                  </div>
-                </div>
-              </div>
-
-              {layout.improvements && (
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {layout.improvements.map((improvement, idx) => (
-                    <Badge key={idx} variant="secondary" className="text-xs">
-                      {improvement}
-                    </Badge>
-                  ))}
-                </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Card className="glass p-4">
+              <div className="text-sm text-muted-foreground mb-1">전환율</div>
+              <div className="text-2xl font-bold">{metrics.conversion.toFixed(1)}%</div>
+              {isAiLayout && (
+                <Badge variant="secondary" className="mt-2">
+                  <TrendingUp className="w-3 h-3 mr-1" />
+                  +{(aiMetrics.conversion - metrics.conversion).toFixed(1)}%
+                </Badge>
               )}
+            </Card>
 
-              {layout.type === "recommended" && (
-                <Button size="sm" className="w-full">
-                  시뮬레이션 상세보기
-                </Button>
+            <Card className="glass p-4">
+              <div className="text-sm text-muted-foreground mb-1">일 방문자</div>
+              <div className="text-2xl font-bold">{Math.round(metrics.traffic)}</div>
+              {isAiLayout && (
+                <Badge variant="secondary" className="mt-2">
+                  <TrendingUp className="w-3 h-3 mr-1" />
+                  +{Math.round(aiMetrics.traffic - metrics.traffic)}
+                </Badge>
               )}
-            </div>
-          ))}
+            </Card>
+
+            <Card className="glass p-4">
+              <div className="text-sm text-muted-foreground mb-1">평균 체류(초)</div>
+              <div className="text-2xl font-bold">{Math.round(metrics.dwell)}</div>
+              {isAiLayout && (
+                <Badge variant="secondary" className="mt-2">
+                  <TrendingUp className="w-3 h-3 mr-1" />
+                  +{Math.round(aiMetrics.dwell - metrics.dwell)}
+                </Badge>
+              )}
+            </Card>
+
+            <Card className="glass p-4">
+              <div className="text-sm text-muted-foreground mb-1">예상 증가 매출</div>
+              <div className="text-2xl font-bold">
+                {isAiLayout ? "+12.5%" : "0%"}
+              </div>
+            </Card>
+          </div>
+
+          <div className="glass p-4 rounded-xl">
+            <h5 className="text-sm font-semibold mb-3">주간 전환율 예측</h5>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="time" stroke="hsl(var(--muted-foreground))" />
+                <YAxis stroke="hsl(var(--muted-foreground))" />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--card))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "8px",
+                  }}
+                />
+                <Legend />
+                <Line
+                  type="monotone"
+                  dataKey="current"
+                  stroke="hsl(var(--muted-foreground))"
+                  name="현재 레이아웃"
+                  strokeWidth={2}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="optimized"
+                  stroke="hsl(var(--primary))"
+                  name="최적화 레이아웃"
+                  strokeWidth={2}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
-}
+};
