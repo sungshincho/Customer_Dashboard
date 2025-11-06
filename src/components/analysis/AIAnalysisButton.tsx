@@ -22,8 +22,14 @@ export const AIAnalysisButton = ({ analysisType, data, title = "AI 분석 요청
     setAnalysis(null);
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
       const { data: result, error } = await supabase.functions.invoke('analyze-store-data', {
-        body: { analysisType, data }
+        body: { 
+          analysisType, 
+          data,
+          userId: user?.id
+        }
       });
 
       if (error) {
@@ -37,7 +43,6 @@ export const AIAnalysisButton = ({ analysisType, data, title = "AI 분석 요청
       setAnalysis(result.analysis);
       
       // Save to history
-      const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         await supabase.from('analysis_history').insert({
           user_id: user.id,
