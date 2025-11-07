@@ -16,6 +16,7 @@ import { InsightsDashboard } from "@/components/analysis/InsightsDashboard";
 import { CorrelationAnalysis } from "@/components/analysis/CorrelationAnalysis";
 import { WTPAnalysisView } from "@/components/analysis/WTPAnalysisView";
 import { GraphQueryBuilder } from "@/components/graph/GraphQueryBuilder";
+import { AdvancedAIInference } from "@/components/analysis/AdvancedAIInference";
 
 interface Node {
   id: string;
@@ -484,11 +485,12 @@ const GraphAnalysis = () => {
 
             {analysisResult && (
               <Tabs defaultValue="analysis">
-                <TabsList className="grid w-full grid-cols-4">
+                <TabsList className="grid w-full grid-cols-5">
                   <TabsTrigger value="analysis">통합 분석</TabsTrigger>
                   <TabsTrigger value="correlation">핵심 상관관계</TabsTrigger>
                   <TabsTrigger value="wtp">WTP 분석</TabsTrigger>
                   <TabsTrigger value="query">그래프 쿼리</TabsTrigger>
+                  <TabsTrigger value="ai">AI 추론</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="analysis" className="space-y-4">
@@ -645,6 +647,14 @@ const GraphAnalysis = () => {
                       </CardContent>
                     </Card>
                   )}
+                </TabsContent>
+
+                <TabsContent value="ai" className="space-y-4">
+                  <AdvancedAIInference 
+                    data={imports.filter(imp => selectedImportIds.includes(imp.id)).flatMap(imp => imp.raw_data || [])}
+                    graphData={analysisResult ? { nodes: analysisResult.nodes || [], edges: analysisResult.edges || [] } : undefined}
+                    timeSeriesData={analysisResult?.timeSeriesPatterns}
+                  />
                 </TabsContent>
               </Tabs>
             )}
