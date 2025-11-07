@@ -322,7 +322,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      graph_n_hop_query: {
+        Args: {
+          p_max_hops?: number
+          p_start_entity_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      graph_shortest_path: {
+        Args: { p_end_id: string; p_start_id: string; p_user_id: string }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
