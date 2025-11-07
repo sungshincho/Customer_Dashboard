@@ -1,7 +1,9 @@
 import { SCHEMA_MAP, DataSchema, ColumnSchema } from './dataSchemas';
+import { ENTERPRISE_SCHEMA_MAP, EnterpriseDataSchema, EnterpriseColumnSchema, COMMON_KEY_COLUMNS, SCD2_COLUMNS } from './enterpriseSchemas';
 
 export interface NormalizedData {
   schema_type: string;
+  schema_category: 'fact' | 'dimension' | 'bridge' | 'other';
   original_columns: string[];
   mapped_data: any[];
   metadata: {
@@ -9,6 +11,8 @@ export interface NormalizedData {
     normalized_at: string;
     column_mappings: Record<string, string>;
     quality_score: number;
+    validation_errors?: string[];
+    detected_keys?: string[]; // 감지된 키 컬럼들
   };
 }
 
@@ -225,7 +229,7 @@ function mergeArrayColumns(rawData: any[]): any[] {
 }
 
 /**
- * 원본 데이터를 표준 스키마로 정규화
+ * 원본 데이터를 표준 스키마로 정규화 (엔터프라이즈 버전)
  */
 export function normalizeData(
   rawData: any[],
@@ -234,6 +238,7 @@ export function normalizeData(
   if (!rawData || rawData.length === 0) {
     return {
       schema_type: dataType,
+      schema_category: 'other',
       original_columns: [],
       mapped_data: [],
       metadata: {
@@ -250,12 +255,22 @@ export function normalizeData(
   
   // 자동 타입 감지
   const detectedType = detectDataType(dataType);
+  
+  // 엔터프라이즈 스키마 우선 사용
+  const enterpriseSchema = ENTERPRISE_SCHEMA_MAP[detectedType];
+  
+  if (enterpriseSchema) {
+    return normalizeWithEnterpriseSchema(mergedData, detectedType, enterpriseSchema);
+  }
+  
+  // 폴백: 기본 스키마 사용
   const schema = SCHEMA_MAP[detectedType];
   
   if (!schema) {
     // 스키마가 없으면 원본 그대로 반환
     return {
       schema_type: dataType,
+      schema_category: 'other',
       original_columns: Object.keys(mergedData[0] || {}),
       mapped_data: mergedData,
       metadata: {
@@ -267,13 +282,10 @@ export function normalizeData(
     };
   }
   
-  // 원본 컬럼명 추출
+  // 기존 로직 (하위 호환성 유지)
   const rawColumns = Object.keys(mergedData[0] || {});
-  
-  // 자동 컬럼 매핑
   const columnMappings = autoMapColumns(rawColumns, schema);
   
-  // 데이터 변환
   const mappedData = mergedData.map((row, index) => {
     const normalized: any = {};
     
@@ -282,38 +294,27 @@ export function normalizeData(
       if (rawColName && row[rawColName] !== undefined) {
         normalized[schemaCol.name] = convertValue(row[rawColName], schemaCol.type);
       } else if (schemaCol.required) {
-        // 필수 컬럼이 없으면 null로 설정
         normalized[schemaCol.name] = null;
       }
     });
     
     // 자동 계산 필드
     if (detectedType === 'sales') {
-      // transaction_id가 없으면 자동 생성
       if (!normalized.transaction_id) {
         normalized.transaction_id = `TXN_${Date.now()}_${index}`;
       }
-      
-      // total_amount 우선순위: 실판매금액 > price * quantity
-      if (!normalized.total_amount) {
-        if (normalized.price && normalized.quantity) {
-          normalized.total_amount = normalized.price * normalized.quantity;
-        }
+      if (!normalized.total_amount && normalized.price && normalized.quantity) {
+        normalized.total_amount = normalized.price * normalized.quantity;
       }
-      
-      // discount가 음수면 절댓값으로 변환
       if (normalized.discount && normalized.discount < 0) {
         normalized.discount = Math.abs(normalized.discount);
       }
     }
     
-    // 원본 데이터도 보존 (unmapped 필드)
     normalized._original = row;
-    
     return normalized;
   });
   
-  // 품질 점수 계산 (필수 필드 + 중요 선택 필드 채워진 비율)
   const requiredFields = schema.columns.filter(c => c.required);
   const optionalImportantFields = schema.columns.filter(c => !c.required && 
     ['timestamp', 'product_category', 'total_amount', 'discount'].includes(c.name)
@@ -330,6 +331,7 @@ export function normalizeData(
   
   return {
     schema_type: detectedType,
+    schema_category: 'other',
     original_columns: rawColumns,
     mapped_data: mappedData,
     metadata: {
@@ -339,6 +341,231 @@ export function normalizeData(
       quality_score: qualityScore,
     }
   };
+}
+
+/**
+ * 엔터프라이즈 스키마 기반 정규화
+ */
+function normalizeWithEnterpriseSchema(
+  rawData: any[],
+  dataType: string,
+  schema: EnterpriseDataSchema
+): NormalizedData {
+  const rawColumns = Object.keys(rawData[0] || {});
+  const columnMappings = autoMapEnterpriseColumns(rawColumns, schema);
+  const validationErrors: string[] = [];
+  const detectedKeys: string[] = [];
+  
+  const mappedData = rawData.map((row, index) => {
+    const normalized: any = {};
+    
+    schema.columns.forEach(schemaCol => {
+      const rawColName = columnMappings[schemaCol.name];
+      
+      if (rawColName && row[rawColName] !== undefined) {
+        const value = convertEnterpriseValue(row[rawColName], schemaCol);
+        normalized[schemaCol.name] = value;
+        
+        // 키 컬럼 감지
+        if (schemaCol.isKey && value && !detectedKeys.includes(schemaCol.name)) {
+          detectedKeys.push(schemaCol.name);
+        }
+        
+        // 제약조건 검증
+        if (schemaCol.constraints) {
+          schemaCol.constraints.forEach(constraint => {
+            if (!validateConstraint(value, constraint, schemaCol.name)) {
+              validationErrors.push(`Row ${index}: ${schemaCol.name} violates ${constraint}`);
+            }
+          });
+        }
+      } else if (schemaCol.required) {
+        normalized[schemaCol.name] = null;
+        validationErrors.push(`Row ${index}: Missing required field ${schemaCol.name}`);
+      }
+    });
+    
+    // 자동 계산 필드 (매출 데이터)
+    if (dataType === 'sales') {
+      if (!normalized.transaction_id) {
+        normalized.transaction_id = `TXN_${Date.now()}_${index}`;
+      }
+      if (!normalized.event_date && normalized.event_ts) {
+        normalized.event_date = new Date(normalized.event_ts).toISOString().split('T')[0];
+      }
+      // net_revenue 검증
+      if (normalized.qty && normalized.unit_price) {
+        const calculated = normalized.qty * normalized.unit_price - 
+                          (normalized.line_discount || 0) + 
+                          (normalized.line_tax || 0);
+        if (normalized.net_revenue && Math.abs(normalized.net_revenue - calculated) > 0.01) {
+          validationErrors.push(`Row ${index}: net_revenue mismatch (expected: ${calculated}, got: ${normalized.net_revenue})`);
+        }
+        if (!normalized.net_revenue) {
+          normalized.net_revenue = calculated;
+        }
+      }
+    }
+    
+    // SCD2 필드 자동 추가 (dimension 타입)
+    if (schema.category === 'dimension') {
+      if (normalized.is_current === undefined) normalized.is_current = true;
+      if (!normalized.valid_from) normalized.valid_from = new Date().toISOString();
+      if (!normalized.valid_to) normalized.valid_to = null;
+    }
+    
+    // 파티션 필드 자동 추가
+    if (schema.partitionBy && !normalized[schema.partitionBy]) {
+      if (normalized.event_ts) {
+        normalized[schema.partitionBy] = new Date(normalized.event_ts).toISOString().split('T')[0];
+      }
+    }
+    
+    normalized._original = row;
+    return normalized;
+  });
+  
+  // 품질 점수 계산
+  const requiredFields = schema.columns.filter(c => c.required);
+  const keyFields = schema.columns.filter(c => c.isKey);
+  const allImportantFields = [...requiredFields, ...keyFields];
+  const uniqueImportantFields = [...new Set(allImportantFields.map(f => f.name))];
+  
+  const mappedImportantCount = uniqueImportantFields.filter(fieldName => 
+    columnMappings[fieldName]
+  ).length;
+  
+  let qualityScore = uniqueImportantFields.length > 0 
+    ? mappedImportantCount / uniqueImportantFields.length 
+    : 0.5;
+  
+  // 검증 에러가 많으면 점수 감점
+  if (validationErrors.length > 0) {
+    const errorRate = validationErrors.length / (rawData.length * schema.columns.length);
+    qualityScore = qualityScore * (1 - errorRate);
+  }
+  
+  return {
+    schema_type: dataType,
+    schema_category: schema.category,
+    original_columns: rawColumns,
+    mapped_data: mappedData,
+    metadata: {
+      total_records: mappedData.length,
+      normalized_at: new Date().toISOString(),
+      column_mappings: columnMappings,
+      quality_score: Math.max(0, qualityScore),
+      validation_errors: validationErrors.length > 10 
+        ? [...validationErrors.slice(0, 10), `... and ${validationErrors.length - 10} more errors`]
+        : validationErrors,
+      detected_keys: detectedKeys,
+    }
+  };
+}
+
+/**
+ * 엔터프라이즈 컬럼 자동 매핑
+ */
+function autoMapEnterpriseColumns(
+  rawColumns: string[],
+  schema: EnterpriseDataSchema
+): Record<string, string> {
+  const mappings: Record<string, string> = {};
+  const usedRawColumns = new Set<string>();
+  
+  schema.columns.forEach(schemaCol => {
+    let bestMatch = '';
+    let bestScore = 0;
+    
+    rawColumns.forEach(rawCol => {
+      if (usedRawColumns.has(rawCol)) return;
+      
+      const searchTerms = [
+        schemaCol.name,
+        schemaCol.description,
+        ...(schemaCol.examples || [])
+      ];
+      
+      let maxScore = 0;
+      searchTerms.forEach(term => {
+        const score = calculateSimilarity(rawCol, term);
+        maxScore = Math.max(maxScore, score);
+      });
+      
+      // 키 컬럼이면 가중치 추가
+      if (schemaCol.isKey && COMMON_KEY_COLUMNS.includes(schemaCol.name)) {
+        const hasKeyword = COMMON_KEY_COLUMNS.some(key => 
+          rawCol.toLowerCase().includes(key.toLowerCase().replace('_', ''))
+        );
+        if (hasKeyword) maxScore = Math.min(maxScore + 0.2, 1.0);
+      }
+      
+      const hasExactExample = (schemaCol.examples || []).some(ex => 
+        rawCol.toLowerCase().includes(ex.toLowerCase()) || 
+        ex.toLowerCase().includes(rawCol.toLowerCase())
+      );
+      if (hasExactExample) {
+        maxScore = Math.min(maxScore + 0.3, 1.0);
+      }
+      
+      if (maxScore > bestScore && maxScore > 0.2) {
+        bestScore = maxScore;
+        bestMatch = rawCol;
+      }
+    });
+    
+    if (bestMatch) {
+      mappings[schemaCol.name] = bestMatch;
+      usedRawColumns.add(bestMatch);
+    }
+  });
+  
+  return mappings;
+}
+
+/**
+ * 엔터프라이즈 값 변환 (ENUM, 제약조건 포함)
+ */
+function convertEnterpriseValue(value: any, schemaCol: EnterpriseColumnSchema): any {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  
+  // ENUM 검증
+  if (schemaCol.enum && schemaCol.type === 'enum') {
+    const strValue = String(value).toLowerCase();
+    const matched = schemaCol.enum.find(e => 
+      e.toLowerCase() === strValue || 
+      strValue.includes(e.toLowerCase())
+    );
+    return matched || null;
+  }
+  
+  // 기본 타입 변환
+  return convertValue(value, schemaCol.type as any);
+}
+
+/**
+ * 제약조건 검증
+ */
+function validateConstraint(value: any, constraint: string, fieldName: string): boolean {
+  if (value === null || value === undefined) return true;
+  
+  if (constraint === 'NOT NULL') {
+    return value !== null && value !== undefined;
+  }
+  
+  if (constraint.startsWith('>=')) {
+    const threshold = parseFloat(constraint.substring(2));
+    return Number(value) >= threshold;
+  }
+  
+  if (constraint.startsWith('>')) {
+    const threshold = parseFloat(constraint.substring(1));
+    return Number(value) > threshold;
+  }
+  
+  return true;
 }
 
 /**
