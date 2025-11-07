@@ -75,164 +75,29 @@ serve(async (req) => {
               { type: 'correlated_with', from: 'Product', to: 'Product', weight: 'low' }
             ];
 
-            const systemPrompt = `당신은 오프라인 리테일 데이터 분석 전문가입니다. LSTM-GNN 하이브리드 모델 개념을 활용하여 데이터를 분석합니다.
+            const systemPrompt = `당신은 오프라인 리테일 데이터 분석 전문가입니다.
 
-온톨로지 노드 타입: ${JSON.stringify(ontologyNodes, null, 2)}
-관계 타입: ${JSON.stringify(relationshipTypes, null, 2)}
+**중요: 간결하고 핵심적인 JSON만 반환하세요. 설명 없이 JSON만 출력하세요.**
 
-분석 목표:
-1. 매출 상승 방법 도출
-2. 전년동기대비 매출 변화 원인 파악
-3. 데이터 팩터 간 상관관계 분석
-4. WTP (Willingness To Pay) 분석
-
-**중요: 반드시 아래 예시와 동일한 JSON 구조로만 응답하세요. 모든 필드는 필수입니다:**
-
-예시 응답:
+응답 형식 (필수):
 {
-  "nodes": [
-    {
-      "id": "customer-segment-vip",
-      "type": "Customer",
-      "label": "VIP 고객군",
-      "properties": { "segment": "VIP", "count": 120 },
-      "metrics": { "avgPurchase": 85000, "visitFrequency": "주 2회" }
-    },
-    {
-      "id": "product-premium-coffee",
-      "type": "Product",
-      "label": "프리미엄 커피",
-      "properties": { "category": "음료", "price": 6500 },
-      "metrics": { "salesVolume": 450, "margin": 0.62 }
-    },
-    {
-      "id": "zone-entrance",
-      "type": "Zone",
-      "label": "매장 입구",
-      "properties": { "area": "입구 5m 반경" },
-      "metrics": { "traffic": 1200, "dwellTime": "45초" }
-    }
-  ],
-  "edges": [
-    {
-      "source": "customer-segment-vip",
-      "target": "product-premium-coffee",
-      "type": "purchases",
-      "weight": 0.85,
-      "properties": { "frequency": "높음", "avgQuantity": 2.3 }
-    },
-    {
-      "source": "customer-segment-vip",
-      "target": "zone-entrance",
-      "type": "visits",
-      "weight": 0.72,
-      "properties": { "conversionRate": 0.68 }
-    },
-    {
-      "source": "zone-entrance",
-      "target": "zone-main-display",
-      "type": "moves_to",
-      "weight": 0.65,
-      "properties": { "transitionRate": "65%" }
-    }
-  ],
-  "insights": [
-    {
-      "title": "VIP 고객의 프리미엄 제품 선호도 증가",
-      "description": "최근 3개월간 VIP 고객의 프리미엄 제품 구매가 전년 대비 32% 증가했습니다. 특히 오전 시간대(10-12시)의 구매율이 높습니다.",
-      "impact": "high",
-      "recommendation": "오전 시간대 VIP 고객 대상 프리미엄 신제품 프로모션 진행 및 전용 공간 확대를 권장합니다."
-    },
-    {
-      "title": "입구 동선과 매출의 강한 상관관계",
-      "description": "입구에서 메인 디스플레이로의 자연스러운 동선이 확보된 날의 평균 매출이 15% 높습니다.",
-      "impact": "medium",
-      "recommendation": "입구 진열대 높이를 낮추고 메인 디스플레이로의 시선 유도 사이니지를 설치하세요."
-    }
-  ],
-  "correlations": [
-    {
-      "factor1": "입구 체류시간",
-      "factor2": "1일 매출",
-      "correlation": 0.73,
-      "significance": "입구에서 45초 이상 머무는 고객의 구매 전환율이 2.3배 높음"
-    },
-    {
-      "factor1": "프리미엄 제품 진열 위치",
-      "factor2": "VIP 고객 방문 빈도",
-      "correlation": 0.68,
-      "significance": "눈높이 진열 시 VIP 고객 재방문율 28% 증가"
-    },
-    {
-      "factor1": "날씨(맑음)",
-      "factor2": "신규 고객 유입",
-      "correlation": 0.54,
-      "significance": "맑은 날 신규 고객 유입이 평균 23% 증가"
-    }
-  ],
-  "wtpAnalysis": {
-    "avgWTP": "24,500원",
-    "priceElasticity": "-1.35 (탄력적)",
-    "recommendations": [
-      "현재 평균 판매가 21,000원 대비 3,500원 상향 여지 존재",
-      "프리미엄 라인 가격을 27,000원까지 인상 가능 (VIP 세그먼트)",
-      "번들 상품 구성 시 단품 합계 대비 15% 할인으로 판매량 극대화"
-    ]
-  },
-  "timeSeriesPatterns": [
-    {
-      "period": "주간 패턴",
-      "trend": "상승",
-      "seasonality": "주말(금-일) 매출이 평일 대비 평균 42% 높음. 특히 토요일 오후 2-5시가 피크",
-      "anomalies": ["10월 2주차 평일 매출 급증(지역 축제 영향)", "8월 마지막 주 주말 매출 30% 감소(경쟁사 오픈)"]
-    },
-    {
-      "period": "시간대 패턴",
-      "trend": "유지",
-      "seasonality": "오전(10-12시) VIP 고객 집중, 오후(2-5시) 일반 고객 증가, 저녁(6-8시) 직장인 유입",
-      "anomalies": ["비 오는 날 저녁 시간대 매출 18% 증가(배달 수요 전환)"]
-    }
-  ]
+  "nodes": [최소 5개, 최대 10개],
+  "edges": [최소 5개, 최대 10개],
+  "insights": [최소 2개, 최대 3개],
+  "correlations": [최소 2개, 최대 3개],
+  "wtpAnalysis": { "avgWTP": "금액", "priceElasticity": "수치", "recommendations": ["권장1", "권장2"] },
+  "timeSeriesPatterns": [최소 1개, 최대 2개]
 }
 
-위 예시처럼 구체적인 수치와 실행 가능한 인사이트를 포함하여 응답하세요.`;
+노드/엣지는 핵심만 선별하세요. 인사이트는 100자 이내로 작성하세요.`;
 
             const userPrompt = `
-분석 유형: ${analysisType}
-총 데이터 수: ${data.length}개 (샘플링: ${processedData.length}개)
-데이터 컬럼: ${dataStats.columns.join(', ')}
-샘플 데이터:
-${JSON.stringify(dataStats.sampleRecords, null, 2)}
+데이터 타입: ${analysisType}
+총 레코드: ${data.length}개 (분석: ${processedData.length}개)
+샘플:
+${JSON.stringify(dataStats.sampleRecords.slice(0, 5), null, 2)}
 
-활성화된 노드 관계: ${JSON.stringify(nodeRelations || 'all', null, 2)}
-
-**필수 요구사항:**
-아래의 완전한 JSON 형식으로만 응답하세요. 설명 없이 JSON만 반환하세요.
-
-{
-  "nodes": [
-    { "id": "고유ID", "type": "Customer|Product|Brand|Store|Zone|Path|Transaction|Event", "label": "노드명", "properties": {}, "metrics": {} }
-  ],
-  "edges": [
-    { "source": "시작노드ID", "target": "목표노드ID", "type": "purchases|visits|moves_to|contains|located_in|belongs_to|influenced_by|correlated_with", "weight": 0.0~1.0, "properties": {} }
-  ],
-  "insights": [
-    { "title": "인사이트 제목", "description": "상세 설명", "impact": "high|medium|low", "recommendation": "실행 가능한 권장사항" }
-  ],
-  "correlations": [
-    { "factor1": "팩터1명", "factor2": "팩터2명", "correlation": 0.0~1.0, "significance": "설명" }
-  ],
-  "wtpAnalysis": {
-    "avgWTP": "평균 지불 의향 금액",
-    "priceElasticity": "가격 탄력성 수치",
-    "recommendations": ["권장사항1", "권장사항2", "권장사항3"]
-  },
-  "timeSeriesPatterns": [
-    { "period": "기간", "trend": "상승|하락|유지", "seasonality": "계절성 설명", "anomalies": ["이상치 설명"] }
-  ]
-}
-
-위 데이터를 분석하여 각 필드를 모두 채워주세요. 데이터가 부족하면 합리적인 추론을 사용하세요.`;
+**JSON 형식으로만 응답하세요. 설명 없이 {} 안의 내용만 출력하세요.**`;
 
             sendProgress(40, 'analyzing', 'AI 분석 진행 중... (30-60초 소요 예상)');
 
@@ -248,8 +113,8 @@ ${JSON.stringify(dataStats.sampleRecords, null, 2)}
                   { role: 'system', content: systemPrompt },
                   { role: 'user', content: userPrompt }
                 ],
-                temperature: 0.7,
-                max_tokens: 6000,
+                temperature: 0.5,
+                max_tokens: 8000,
               }),
             });
 
@@ -269,46 +134,57 @@ ${JSON.stringify(dataStats.sampleRecords, null, 2)}
               const content = aiResponse.choices[0].message.content;
               console.log("🔍 Raw AI response length:", content.length);
               
-              // JSON 추출 시도
-              let jsonStr = content;
-              const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/);
-              if (jsonMatch) {
-                jsonStr = jsonMatch[1];
-              } else {
-                const objectMatch = content.match(/\{[\s\S]*\}/);
-                if (objectMatch) {
-                  jsonStr = objectMatch[0];
-                }
+              // JSON 추출
+              let jsonStr = content.trim();
+              
+              // 마크다운 코드 블록 제거
+              const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+              if (codeBlockMatch) {
+                jsonStr = codeBlockMatch[1].trim();
+              }
+              
+              // 첫 { 부터 마지막 } 까지 추출
+              const firstBrace = jsonStr.indexOf('{');
+              const lastBrace = jsonStr.lastIndexOf('}');
+              if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+                jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
               }
               
               console.log("🔍 Extracted JSON length:", jsonStr.length);
               
-              // JSON 수정 시도 (불완전한 JSON 처리)
-              let fixedJson = jsonStr.trim();
-              
-              // 끝나지 않은 문자열 수정
-              if (!fixedJson.endsWith('}')) {
-                console.log("⚠️ JSON appears truncated, attempting to fix...");
+              // JSON 파싱 시도
+              try {
+                analysisResult = JSON.parse(jsonStr);
+                console.log("✅ Successfully parsed JSON");
+              } catch (parseError) {
+                console.log("⚠️ JSON parsing failed, attempting repair...");
                 
-                // 마지막 완전한 객체/배열까지만 사용
-                const lastCompleteObject = fixedJson.lastIndexOf('}');
-                const lastCompleteArray = fixedJson.lastIndexOf(']');
-                const cutPoint = Math.max(lastCompleteObject, lastCompleteArray);
+                // JSON 수정 시도
+                let repairedJson = jsonStr;
                 
-                if (cutPoint > 0) {
-                  fixedJson = fixedJson.substring(0, cutPoint + 1);
-                  
-                  // 닫히지 않은 중괄호 수정
-                  const openBraces = (fixedJson.match(/\{/g) || []).length;
-                  const closeBraces = (fixedJson.match(/\}/g) || []).length;
-                  if (openBraces > closeBraces) {
-                    fixedJson += '}'.repeat(openBraces - closeBraces);
-                  }
+                // 끝나지 않은 배열이나 객체 수정
+                const openBraces = (repairedJson.match(/\{/g) || []).length;
+                const closeBraces = (repairedJson.match(/\}/g) || []).length;
+                const openBrackets = (repairedJson.match(/\[/g) || []).length;
+                const closeBrackets = (repairedJson.match(/\]/g) || []).length;
+                
+                // 닫히지 않은 배열 닫기
+                if (openBrackets > closeBrackets) {
+                  repairedJson += ']'.repeat(openBrackets - closeBrackets);
                 }
+                
+                // 닫히지 않은 객체 닫기
+                if (openBraces > closeBraces) {
+                  repairedJson += '}'.repeat(openBraces - closeBraces);
+                }
+                
+                // 마지막 쉼표 제거
+                repairedJson = repairedJson.replace(/,(\s*[}\]])/g, '$1');
+                
+                console.log("🔧 Repaired JSON length:", repairedJson.length);
+                analysisResult = JSON.parse(repairedJson);
+                console.log("✅ Successfully parsed repaired JSON");
               }
-              
-              analysisResult = JSON.parse(fixedJson);
-              console.log("✅ Successfully parsed JSON");
               
               // 필수 필드 검증 및 기본값 설정
               analysisResult.nodes = analysisResult.nodes || [];
@@ -332,9 +208,9 @@ ${JSON.stringify(dataStats.sampleRecords, null, 2)}
                 edges: [],
                 insights: [{ 
                   title: "분석 파싱 오류", 
-                  description: "AI 응답을 파싱할 수 없습니다. 응답이 너무 길거나 형식이 잘못되었습니다.",
+                  description: "AI 응답을 파싱할 수 없습니다. 데이터 양을 줄이거나 다시 시도하세요.",
                   impact: "high",
-                  recommendation: "데이터 양을 줄이거나 분석 범위를 좁혀서 다시 시도하세요"
+                  recommendation: "선택한 데이터 수를 줄이거나 데이터를 정제하여 재시도하세요"
                 }],
                 correlations: [],
                 wtpAnalysis: {
