@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Network } from "lucide-react";
+import { Network, Database } from "lucide-react";
 import ForceGraph2D from "react-force-graph-2d";
 import { normalizeMultipleDatasets } from "@/utils/dataNormalizer";
 import { InsightsDashboard } from "@/components/analysis/InsightsDashboard";
@@ -276,8 +276,13 @@ const GraphAnalysis = () => {
         <div>
           <h1 className="text-3xl font-bold text-foreground">그래프 네트워크 분석</h1>
           <p className="text-muted-foreground mt-2">
-            LSTM-GNN 하이브리드 모델 기반 리테일 데이터 분석
+            LSTM-GNN 하이브리드 모델로 임포트된 데이터를 정밀 분석합니다
           </p>
+          {imports.length === 0 && (
+            <p className="text-sm text-yellow-600 dark:text-yellow-500 mt-2">
+              ⚠️ 임포트된 데이터가 없습니다. 데이터 임포트 페이지에서 먼저 데이터를 업로드하세요.
+            </p>
+          )}
         </div>
 
         <div className="grid gap-6 md:grid-cols-3">
@@ -287,7 +292,15 @@ const GraphAnalysis = () => {
               <CardDescription>데이터 선택 및 관계 설정</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-3">
+              {imports.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Database className="mx-auto h-12 w-12 mb-4 opacity-50" />
+                  <p className="text-sm">임포트된 데이터가 없습니다</p>
+                  <p className="text-xs mt-1">데이터 임포트 페이지에서 먼저 데이터를 업로드하세요</p>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <Label>분석 데이터</Label>
                   <Button
@@ -379,7 +392,9 @@ const GraphAnalysis = () => {
                     </div>
                   ))}
                 </div>
-              </div>
+                  </div>
+                </>
+              )}
 
               {isAnalyzing && (
                 <div className="space-y-3 mb-4">
@@ -405,11 +420,16 @@ const GraphAnalysis = () => {
 
               <Button 
                 onClick={handleAnalyze} 
-                disabled={selectedImportIds.length === 0 || isAnalyzing}
+                disabled={selectedImportIds.length === 0 || isAnalyzing || imports.length === 0}
                 className="w-full"
               >
                 <Network className="mr-2 h-4 w-4" />
-                {isAnalyzing ? "분석 중..." : `분석 시작 (${selectedImportIds.length}개)`}
+                {isAnalyzing 
+                  ? "LSTM-GNN 분석 중..." 
+                  : imports.length === 0
+                    ? "데이터 없음"
+                    : `분석 시작 (${selectedImportIds.length}개)`
+                }
               </Button>
             </CardContent>
           </Card>

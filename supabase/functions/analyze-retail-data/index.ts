@@ -11,8 +11,12 @@ serve(async (req) => {
   }
 
   try {
-    const { data, analysisType, nodeRelations, stream } = await req.json();
-    console.log("🔵 Starting retail data analysis", { analysisType, dataLength: data?.length });
+    const { data, analysisType, nodeRelations, stream, metadata } = await req.json();
+    console.log("🔵 LSTM-GNN 하이브리드 분석 시작", { 
+      analysisType, 
+      dataLength: data?.length,
+      datasets: metadata?.datasets?.length 
+    });
 
     // 스트리밍 모드일 경우
     if (stream) {
@@ -75,58 +79,57 @@ serve(async (req) => {
               { type: 'correlated_with', from: 'Product', to: 'Product', weight: 'low' }
             ];
 
-            const systemPrompt = `당신은 리테일 데이터를 실행 가능한 비즈니스 인사이트로 변환하는 전문 분석 AI입니다.
+            // 메타데이터 기반 데이터 품질 및 컨텍스트 생성
+            const dataContext = metadata?.datasets ? metadata.datasets.map((ds: any) => 
+              `[${ds.schema_type}] ${ds.record_count}개 레코드 (품질: ${(ds.quality_score * 100).toFixed(0)}%)`
+            ).join('\n') : '';
 
-**핵심 역량:**
-• 매출 증대 기회 발굴 (구체적인 수치와 함께)
-• 고객 동선 최적화 (Zone별 개선 포인트)
-• 상품 배치 전략 (교차판매 기회)
-• 가격 최적화 (WTP 기반)
+            const systemPrompt = `당신은 LSTM-GNN 하이브리드 모델을 활용한 리테일 분석 전문가입니다.
 
-**분석 원칙:**
-1. 간결성: 핵심만 전달 (인사이트당 50-80자)
-2. 구체성: 정확한 수치와 비율 제시
-3. 실행성: 즉시 적용 가능한 권장사항
-4. 임팩트: 매출/전환율 향상에 직접 기여
+**분석 방법론:**
+1. LSTM 시계열 분석: 매출/트래픽 패턴, 계절성, 트렌드 예측
+2. GNN 그래프 분석: 고객-상품-매장 관계, 공간 네트워크, 동선 패턴
+3. 엔터프라이즈 스키마 기반: 정규화된 데이터 구조 활용
 
-**중요: 모든 출력은 한글로만 작성. 영어 단어 사용 금지.**`;
+**데이터 컨텍스트:**
+${dataContext}
+
+**출력 원칙:**
+- 간결성: 인사이트당 50-80자
+- 정확성: 실제 데이터 기반 수치
+- 실행성: 즉시 적용 가능한 권장사항
+- 모든 출력은 한글로만 작성`;
 
             const userPrompt = `
-데이터: ${analysisType} | 총 ${data.length}개 레코드 중 ${processedData.length}개 분석
+**LSTM-GNN 하이브리드 분석 요청**
+
+데이터 컨텍스트:
+- 타입: ${analysisType}
+- 전체 레코드: ${data.length}개
+- 분석 샘플: ${processedData.length}개
+- 데이터 품질: ${metadata?.datasets?.map((ds: any) => `${(ds.quality_score * 100).toFixed(0)}%`).join(', ')}
+
 샘플 데이터:
-${JSON.stringify(dataStats.sampleRecords.slice(0, 3), null, 2)}
+${JSON.stringify(dataStats.sampleRecords.slice(0, 5), null, 2)}
 
-**중요: 이 데이터는 상품별 집계 데이터입니다. 개별 거래 데이터가 아닙니다.**
+**분석 목표:**
+1. 시계열 패턴 발굴 (LSTM): 매출 트렌드, 계절성, 이상 탐지
+2. 관계 네트워크 구축 (GNN): 고객-상품-매장 상호작용
+3. 실행 가능한 인사이트: 매출 증대, 전환율 개선, 재고 최적화
 
-**WTP & ATV 계산 방법:**
-1. ATV (객단가) = 총 실판매금액 합계 / 총 판매건수 합계
-   - 예: total_amount 전체 합 / quantity 전체 합
-   - 단위: 원 (정수)
-2. WTP (지불의사최대금액) = 데이터 기반 추론
-   - 실제 판매가격, 할인율, 판매량을 분석하여 고객이 기꺼이 지불할 최대 금액 추정
-   - 공식: 상품가격 평균 × (1 - 평균할인율 × 가격탄력성계수)
-   - 단위: 원 (정수)
-3. 가격 탄력성 점수 = 할인에 대한 판매량 반응도 (0-10점)
-   - 할인율이 높을수록 판매량이 증가하는 정도
+**출력 구조:**
+- 노드 8-12개: 핵심 엔티티 (고객 세그먼트, 인기 상품, 주요 매장/구역)
+- 엣지 10-15개: 강한 관계 (구매, 방문, 상관관계 등)
+- 인사이트 3-5개: 구체적 수치 + 실행 방안
+- 상관관계 3-4개: 통계적으로 유의미한 관계 (r > 0.5)
+- WTP/ATV 분석: 가격 최적화 기회
 
-**분석 과제:**
-이 데이터에서 매출을 즉시 증대시킬 수 있는 TOP 3 기회를 찾아내세요.
+**계산 방법:**
+- ATV = 총 매출액 / 총 거래 건수
+- WTP = 실제 판매가 × (1 - 평균 할인율 × 탄력성)
+- 상관계수: Pearson correlation
 
-**출력 요구사항:**
-1. 그래프 노드 6-10개 (핵심 엔티티만)
-2. 관계 엣지 6-12개 (강한 상관관계만)
-3. 인사이트 3-4개 (각 50-80자, 구체적 수치 포함)
-   - 예: "Zone A 방문객 중 23%만 구매. 상품 재배치로 40% 목표"
-4. 상관관계 2-3개 (r > 0.5만)
-5. WTP 분석 (위 공식 사용, 정확한 계산)
-
-**금지 사항:**
-- 추상적/일반적 표현
-- 데이터 없이 추측
-- 실행 불가능한 권장사항
-- 잘못된 ATV/WTP 계산
-
-**필수: 모든 텍스트 한글로만 작성. 인사이트에 구체적 수치/비율 포함.**`;
+모든 텍스트는 한글로만 작성하세요.`;
 
             sendProgress(40, 'analyzing', 'AI 분석 진행 중... (30-60초 소요 예상)');
 
@@ -141,88 +144,139 @@ ${JSON.stringify(dataStats.sampleRecords.slice(0, 3), null, 2)}
                 messages: [
                   { 
                     role: 'system', 
-                    content: `당신은 고급 리테일 분석 AI입니다. 고객 행동, 매장 레이아웃, 상품, 매출을 분석하여 다음을 제공합니다:
-- 고객 동선 패턴 및 세그먼트
-- Zone 성과 및 공간 상관관계
-- 상품-위치 효과성
-- 매출-동선 전환율
-- WTP (지불 의향) 인사이트
-- 교차 판매 기회
-- 운영 최적화 권장사항
-
-**중요: 모든 응답은 반드시 한글로 작성하세요. 영어를 사용하지 마세요.**
-구조화되고 실행 가능한 인사이트를 한글로 반환하세요.`
+                    content: systemPrompt
                   },
                   { role: 'user', content: userPrompt }
                 ],
                 tools: [{
                   type: "function",
                   function: {
-                    name: "generate_retail_insights",
-                    description: "리테일 분석 인사이트를 그래프 구조로 생성합니다. 모든 텍스트는 한글로 작성해야 합니다.",
+                    name: "lstm_gnn_retail_analysis",
+                    description: "LSTM-GNN 하이브리드 모델 기반 리테일 데이터 분석 (시계열 + 그래프 네트워크)",
                     parameters: {
                       type: "object",
                       properties: {
                         nodes: {
                           type: "array",
-                          description: "엔티티를 나타내는 그래프 노드 (5-15개), label은 반드시 한글",
+                          description: "그래프 노드 8-12개 (고객, 상품, 매장, 구역 등 핵심 엔티티)",
                           items: {
                             type: "object",
                             properties: {
-                              id: { type: "string" },
-                              type: { type: "string" },
-                              label: { type: "string" },
-                              properties: { type: "object" },
-                              metrics: { type: "object" }
+                              id: { type: "string", description: "고유 ID (예: C001, P001, S001)" },
+                              type: { type: "string", enum: ["Customer", "Product", "Brand", "Store", "Zone", "Path", "Transaction", "Event"] },
+                              label: { type: "string", description: "표시 이름 (한글)" },
+                              properties: { 
+                                type: "object",
+                                description: "추가 속성 (예: category, value, count 등)"
+                              },
+                              metrics: { 
+                                type: "object",
+                                description: "메트릭 (예: revenue, conversion_rate, frequency 등)"
+                              }
                             },
                             required: ["id", "type", "label"]
-                          }
+                          },
+                          minItems: 8,
+                          maxItems: 12
                         },
                         edges: {
                           type: "array",
-                          description: "관계를 나타내는 그래프 엣지 (5-20개), label은 반드시 한글",
+                          description: "그래프 엣지 10-15개 (노드 간 관계)",
                           items: {
                             type: "object",
                             properties: {
-                              source: { type: "string" },
-                              target: { type: "string" },
-                              type: { type: "string" },
-                              weight: { type: "number" },
-                              label: { type: "string" }
+                              source: { type: "string", description: "출발 노드 ID" },
+                              target: { type: "string", description: "도착 노드 ID" },
+                              type: { 
+                                type: "string",
+                                enum: ["purchases", "visits", "moves_to", "contains", "located_in", "belongs_to", "influenced_by", "correlated_with"],
+                                description: "관계 유형"
+                              },
+                              weight: { 
+                                type: "number",
+                                description: "관계 강도 (0.0-1.0)",
+                                minimum: 0,
+                                maximum: 1
+                              },
+                              label: { type: "string", description: "관계 설명 (한글, 선택)" }
                             },
-                            required: ["source", "target", "type"]
-                          }
+                            required: ["source", "target", "type", "weight"]
+                          },
+                          minItems: 10,
+                          maxItems: 15
                         },
                         insights: {
                           type: "array",
-                          description: "핵심 비즈니스 인사이트 3-4개. 각 인사이트는 50-80자로 간결하게, 구체적 수치 포함 필수. 한글만 사용.",
+                          description: "핵심 인사이트 3-5개 (구체적 수치 + 실행 방안)",
                           items: {
                             type: "object",
                             properties: {
-                              category: { type: "string", description: "카테고리: 매출/동선/상품/전환율" },
-                              title: { type: "string", description: "핵심 발견 (20자 이내)" },
-                              description: { type: "string", description: "구체적 데이터와 수치 (50-80자)" },
-                              impact: { type: "string", enum: ["high", "medium", "low"] },
-                              actionable: { type: "string", description: "즉시 실행 가능한 1가지 액션 (50자 이내)" }
+                              category: { 
+                                type: "string",
+                                enum: ["매출", "동선", "상품", "전환율", "재고", "가격"],
+                                description: "인사이트 카테고리"
+                              },
+                              title: { 
+                                type: "string",
+                                description: "핵심 발견 (20자 이내, 한글)",
+                                maxLength: 20
+                              },
+                              description: { 
+                                type: "string",
+                                description: "구체적 데이터와 수치 (50-80자, 한글)",
+                                minLength: 50,
+                                maxLength: 80
+                              },
+                              impact: { 
+                                type: "string",
+                                enum: ["high", "medium", "low"],
+                                description: "영향도"
+                              },
+                              actionable: { 
+                                type: "string",
+                                description: "즉시 실행 가능한 액션 (50자 이내, 한글)",
+                                maxLength: 50
+                              }
                             },
                             required: ["category", "title", "description", "impact", "actionable"]
-                          }
+                          },
+                          minItems: 3,
+                          maxItems: 5
                         },
                         correlations: {
                           type: "array",
-                          description: "강한 상관관계 2-3개 (r > 0.5만). 한글만 사용. actionable 필수. 상품 가격과 실 판매 금액 관계는 반드시 포함하고 'x%' 형식으로 표시.",
+                          description: "강한 상관관계 3-4개 (r > 0.5)",
                           items: {
                             type: "object",
                             properties: {
-                              factor1: { type: "string", description: "첫번째 요소 (한글)" },
-                              factor2: { type: "string", description: "두번째 요소 (한글)" },
-                              correlation: { type: "number", description: "상관계수 -1~1" },
-                              correlationPercent: { type: "string", description: "상관계수를 %로 표현 (예: '87%'). 필수." },
-                              insight: { type: "string", description: "인사이트 (40자 이내)" },
-                              actionable: { type: "string", description: "실행 방안 (40자 이내)" }
+                              factor1: { type: "string", description: "첫 번째 요소 (한글)" },
+                              factor2: { type: "string", description: "두 번째 요소 (한글)" },
+                              correlation: { 
+                                type: "number",
+                                description: "상관계수 (-1.0 ~ 1.0)",
+                                minimum: -1,
+                                maximum: 1
+                              },
+                              correlationPercent: { 
+                                type: "string",
+                                description: "상관계수를 %로 표현 (예: '87%')",
+                                pattern: "^\\d+%$"
+                              },
+                              insight: { 
+                                type: "string",
+                                description: "인사이트 (40자 이내, 한글)",
+                                maxLength: 40
+                              },
+                              actionable: { 
+                                type: "string",
+                                description: "실행 방안 (40자 이내, 한글)",
+                                maxLength: 40
+                              }
                             },
                             required: ["factor1", "factor2", "correlation", "correlationPercent", "insight", "actionable"]
-                          }
+                          },
+                          minItems: 3,
+                          maxItems: 4
                         },
                         wtpAnalysis: {
                           type: "object",
@@ -289,14 +343,15 @@ ${JSON.stringify(dataStats.sampleRecords.slice(0, 3), null, 2)}
                         },
                         summary: { 
                           type: "string",
-                          description: "분석 전체 요약 (최대 200자), 반드시 한글로 작성"
+                          description: "LSTM-GNN 분석 전체 요약 (200자 이내, 한글)",
+                          maxLength: 200
                         }
                       },
-                      required: ["nodes", "edges", "insights", "summary"]
+                      required: ["nodes", "edges", "insights", "correlations", "summary"]
                     }
                   }
                 }],
-                tool_choice: { type: "function", function: { name: "generate_retail_insights" } },
+                tool_choice: { type: "function", function: { name: "lstm_gnn_retail_analysis" } },
               }),
             });
 
@@ -316,10 +371,10 @@ ${JSON.stringify(dataStats.sampleRecords.slice(0, 3), null, 2)}
               // Tool calling을 사용했으므로 tool_calls에서 arguments를 파싱
               const toolCall = aiResponse.choices[0].message.tool_calls?.[0];
               
-              if (toolCall && toolCall.function.name === 'generate_retail_insights') {
-                console.log("✅ Tool call detected, parsing arguments");
+              if (toolCall && toolCall.function.name === 'lstm_gnn_retail_analysis') {
+                console.log("✅ LSTM-GNN 분석 완료");
                 analysisResult = JSON.parse(toolCall.function.arguments);
-                console.log(`✅ Parsed result: ${analysisResult.nodes.length} nodes, ${analysisResult.edges.length} edges`);
+                console.log(`✅ 결과: ${analysisResult.nodes?.length || 0}개 노드, ${analysisResult.edges?.length || 0}개 엣지`);
               } else {
                 // Fallback: content에서 JSON 추출 시도
                 const content = aiResponse.choices[0].message.content || "{}";
