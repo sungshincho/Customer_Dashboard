@@ -507,7 +507,11 @@ const DataImport = () => {
                     />
                     <Button
                       onClick={handleUpload}
-                      disabled={!file || !dataType || isUploading}
+                      disabled={
+                        !file || 
+                        isUploading || 
+                        (!file?.name.match(/\.(xlsx|xls)$/i) && !dataType)
+                      }
                     >
                       <Upload className="mr-2 h-4 w-4" />
                       {isUploading ? "업로드 중..." : "업로드"}
