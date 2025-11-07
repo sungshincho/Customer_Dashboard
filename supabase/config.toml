@@ -11,3 +11,6 @@ verify_jwt = true
 
 [functions.advanced-ai-inference]
 verify_jwt = true
+
+[functions.schema-etl]
+verify_jwt = true

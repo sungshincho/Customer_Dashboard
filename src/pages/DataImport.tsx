@@ -14,6 +14,9 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { detectDataType } from "@/utils/dataNormalizer";
 import * as XLSX from "xlsx";
+import { SchemaMapper } from "@/components/etl/SchemaMapper";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { toast as sonnerToast } from "sonner";
 
 interface ImportedData {
   id: string;
@@ -39,6 +42,8 @@ const DataImport = () => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [sheetAnalysis, setSheetAnalysis] = useState<any[]>([]);
   const [showSheetReview, setShowSheetReview] = useState(false);
+  const [selectedImportForETL, setSelectedImportForETL] = useState<ImportedData | null>(null);
+  const [showETLDialog, setShowETLDialog] = useState(false);
   const { toast } = useToast();
 
   const loadImports = async () => {
@@ -778,7 +783,19 @@ const DataImport = () => {
                       <TableCell>
                         {new Date(item.created_at).toLocaleString("ko-KR")}
                       </TableCell>
-                      <TableCell className="text-right space-x-2">
+                       <TableCell className="text-right space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedImportForETL(item);
+                            setShowETLDialog(true);
+                          }}
+                          title="온톨로지 스키마로 변환"
+                        >
+                          <Database className="h-4 w-4 mr-1" />
+                          ETL
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -801,6 +818,26 @@ const DataImport = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* ETL Dialog */}
+        <Dialog open={showETLDialog} onOpenChange={setShowETLDialog}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>스키마 ETL 파이프라인</DialogTitle>
+            </DialogHeader>
+            {selectedImportForETL && (
+              <SchemaMapper
+                importId={selectedImportForETL.id}
+                importData={selectedImportForETL}
+                onComplete={() => {
+                  setShowETLDialog(false);
+                  setSelectedImportForETL(null);
+                  sonnerToast.success('ETL이 완료되었습니다. GraphAnalysis 페이지에서 확인하세요.');
+                }}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
