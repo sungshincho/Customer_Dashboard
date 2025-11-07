@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Network, TrendingUp, AlertCircle, Zap } from "lucide-react";
 import ForceGraph2D from "react-force-graph-2d";
+import { normalizeMultipleDatasets } from "@/utils/dataNormalizer";
 
 interface Node {
   id: string;
@@ -110,16 +111,50 @@ const GraphAnalysis = () => {
       const selectedImports = imports.filter(imp => selectedImportIds.includes(imp.id));
       if (selectedImports.length === 0) throw new Error("선택한 데이터를 찾을 수 없습니다.");
 
-      const combinedData = selectedImports.flatMap(imp => imp.raw_data);
-      const analysisTypes = [...new Set(selectedImports.map(imp => imp.data_type))].join(', ');
+      // 🆕 데이터 정규화
+      setAnalysisMessage('데이터 구조 정규화 중...');
+      const normalizedDatasets = normalizeMultipleDatasets(
+        selectedImports.map(imp => ({
+          raw_data: imp.raw_data,
+          data_type: imp.data_type
+        }))
+      );
       
-      // 예상 시간 계산 (데이터 크기 기반)
+      // 정규화된 데이터 통합
+      const combinedData = Object.values(normalizedDatasets).flatMap(ds => ds.mapped_data);
+      const analysisTypes = Object.values(normalizedDatasets).map(ds => ds.schema_type).join(', ');
+      
+      // 데이터 품질 체크
+      const avgQuality = Object.values(normalizedDatasets).reduce((sum, ds) => 
+        sum + ds.metadata.quality_score, 0
+      ) / Object.keys(normalizedDatasets).length;
+      
+      if (avgQuality < 0.3) {
+        toast({
+          title: "데이터 품질 경고",
+          description: `데이터 매핑 품질이 낮습니다 (${(avgQuality * 100).toFixed(0)}%). 분석 결과가 부정확할 수 있습니다.`,
+          variant: "destructive",
+        });
+      }
+      
+      // 예상 시간 계산
       const estimatedSeconds = Math.ceil(combinedData.length / 10) + 30;
       setEstimatedTime(`약 ${estimatedSeconds}초`);
 
       const activeRelations = Object.entries(nodeRelations)
         .filter(([_, active]) => active)
         .map(([type]) => type);
+
+      // 정규화된 메타데이터도 함께 전송
+      const metadata = {
+        datasets: Object.entries(normalizedDatasets).map(([key, ds]) => ({
+          key,
+          schema_type: ds.schema_type,
+          record_count: ds.metadata.total_records,
+          quality_score: ds.metadata.quality_score,
+          column_mappings: ds.metadata.column_mappings,
+        }))
+      };
 
       // 스트리밍 요청
       const response = await fetch(
@@ -135,6 +170,7 @@ const GraphAnalysis = () => {
             analysisType: analysisTypes,
             nodeRelations: activeRelations,
             stream: true,
+            metadata, // 🆕 정규화 메타데이터 포함
           }),
         }
       );
