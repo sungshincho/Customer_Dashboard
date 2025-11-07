@@ -14,10 +14,10 @@ serve(async (req) => {
     const { data, analysisType, nodeRelations } = await req.json();
     console.log("🔵 Starting retail data analysis", { analysisType, dataLength: data?.length });
 
-    // 데이터가 너무 많으면 샘플링 (최대 100개로 제한)
+    // 데이터 샘플링 (최대 200개로 제한 - Pro 모델 사용)
     let processedData = data;
-    if (data && data.length > 100) {
-      const sampleSize = 100;
+    if (data && data.length > 200) {
+      const sampleSize = 200;
       const step = Math.floor(data.length / sampleSize);
       processedData = data.filter((_: any, index: number) => index % step === 0).slice(0, sampleSize);
       console.log(`📊 Sampled ${processedData.length} records from ${data.length} total records`);
@@ -123,13 +123,13 @@ ${JSON.stringify(dataStats.sampleRecords, null, 2)}
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'google/gemini-2.5-flash',
+          model: 'google/gemini-2.5-pro',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }
           ],
           temperature: 0.7,
-          max_tokens: 3000,
+          max_tokens: 4000,
         }),
         signal: controller.signal,
       });
