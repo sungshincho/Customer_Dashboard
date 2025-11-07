@@ -196,30 +196,46 @@ ${JSON.stringify(dataStats.sampleRecords.slice(0, 3), null, 2)}
                         },
                         correlations: {
                           type: "array",
-                          description: "강한 상관관계 2-3개 (r > 0.5만 포함). 한글만 사용.",
+                          description: "강한 상관관계 2-3개 (r > 0.5만). 한글만 사용. actionable 필수.",
                           items: {
                             type: "object",
                             properties: {
-                              factor1: { type: "string" },
-                              factor2: { type: "string" },
-                              correlation: { type: "number" },
-                              significance: { type: "string" },
-                              insight: { type: "string" }
+                              factor1: { type: "string", description: "첫번째 요소 (한글)" },
+                              factor2: { type: "string", description: "두번째 요소 (한글)" },
+                              correlation: { type: "number", description: "상관계수 -1~1" },
+                              insight: { type: "string", description: "인사이트 (40자 이내)" },
+                              actionable: { type: "string", description: "실행 방안 (40자 이내)" }
                             },
-                            required: ["factor1", "factor2", "correlation"]
+                            required: ["factor1", "factor2", "correlation", "insight", "actionable"]
                           }
                         },
                         wtpAnalysis: {
                           type: "object",
-                          description: "지불 의향(WTP) 분석, 모든 텍스트는 한글",
+                          description: "WTP 및 ATV 분석 (거래/매출 데이터 있을 경우). 한글만 사용.",
                           properties: {
-                            avgWTP: { type: "string" },
-                            priceElasticity: { type: "string" },
-                            recommendations: {
+                            avgWTP: { 
+                              type: "number",
+                              description: "평균 지불 의향 (%p 단위, 소수점 1자리)"
+                            },
+                            atv: {
+                              type: "number", 
+                              description: "객단가 Average Transaction Value (원 단위)"
+                            },
+                            priceElasticityScore: {
+                              type: "number",
+                              description: "가격 탄력성 점수 0-10 (높을수록 가격 민감)"
+                            },
+                            priceElasticityInsights: {
                               type: "array",
+                              description: "가격 탄력성 핵심 인사이트 2-3개 (각 30자 이내)",
                               items: { type: "string" }
+                            },
+                            actionable: {
+                              type: "string",
+                              description: "WTP/ATV 기반 핵심 실행 방안 (50자 이내)"
                             }
-                          }
+                          },
+                          required: ["avgWTP", "atv", "priceElasticityScore", "priceElasticityInsights", "actionable"]
                         },
                         timeSeriesPatterns: {
                           type: "array",

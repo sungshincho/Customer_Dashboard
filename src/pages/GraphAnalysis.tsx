@@ -503,14 +503,14 @@ const GraphAnalysis = () => {
               const totalSales = zoneContributionData.reduce((sum, z) => sum + z.sales, 0);
               
               return (
-                <Tabs defaultValue="insights">
+                <Tabs defaultValue="analysis">
                   <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="insights">핵심 인사이트</TabsTrigger>
+                    <TabsTrigger value="analysis">통합 분석</TabsTrigger>
                     <TabsTrigger value="heatmap">매장 히트맵</TabsTrigger>
                     <TabsTrigger value="contribution">Zone 기여도</TabsTrigger>
                   </TabsList>
 
-                  <TabsContent value="insights" className="space-y-4">
+                  <TabsContent value="analysis" className="space-y-4">
                     <InsightsDashboard
                       insights={analysisResult.insights || []}
                       correlations={analysisResult.correlations}
