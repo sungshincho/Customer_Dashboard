@@ -504,12 +504,10 @@ const GraphAnalysis = () => {
               
               return (
                 <Tabs defaultValue="insights">
-                  <TabsList className="grid w-full grid-cols-5">
-                    <TabsTrigger value="insights">인사이트</TabsTrigger>
-                    <TabsTrigger value="heatmap">히트맵</TabsTrigger>
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="insights">핵심 인사이트</TabsTrigger>
+                    <TabsTrigger value="heatmap">매장 히트맵</TabsTrigger>
                     <TabsTrigger value="contribution">Zone 기여도</TabsTrigger>
-                    <TabsTrigger value="correlations">상관관계</TabsTrigger>
-                    <TabsTrigger value="wtp">WTP 분석</TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="insights" className="space-y-4">
@@ -517,7 +515,6 @@ const GraphAnalysis = () => {
                       insights={analysisResult.insights || []}
                       correlations={analysisResult.correlations}
                       wtpAnalysis={analysisResult.wtpAnalysis}
-                      timeSeriesPatterns={analysisResult.timeSeriesPatterns}
                       summary={(analysisResult as any).summary}
                     />
                   </TabsContent>
@@ -562,74 +559,6 @@ const GraphAnalysis = () => {
                         </CardContent>
                       </Card>
                     )}
-                  </TabsContent>
-
-                  <TabsContent value="correlations">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>팩터 간 상관관계</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {analysisResult.correlations && analysisResult.correlations.length > 0 ? (
-                          <div className="space-y-3">
-                            {analysisResult.correlations.map((corr: any, idx: number) => (
-                              <div key={idx} className="flex items-center justify-between p-3 border rounded-lg">
-                                <div className="flex-1">
-                                  <p className="text-sm font-medium">
-                                    {corr.factor1} ↔ {corr.factor2}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">{corr.significance}</p>
-                                </div>
-                                <Badge variant="outline">
-                                  {typeof corr.correlation === 'number' ? (corr.correlation * 100).toFixed(1) : corr.correlation}%
-                                </Badge>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-center text-muted-foreground py-8">상관관계 데이터가 없습니다</p>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
-
-                  <TabsContent value="wtp">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>WTP (Willingness To Pay) 분석</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {analysisResult.wtpAnalysis ? (
-                          <div className="space-y-4">
-                            <div className="grid gap-4 md:grid-cols-2">
-                              <div className="p-4 border rounded-lg">
-                                <p className="text-sm text-muted-foreground">평균 WTP</p>
-                                <p className="text-2xl font-bold">{analysisResult.wtpAnalysis.avgWTP}</p>
-                              </div>
-                              <div className="p-4 border rounded-lg">
-                                <p className="text-sm text-muted-foreground">가격 탄력성</p>
-                                <p className="text-2xl font-bold">{analysisResult.wtpAnalysis.priceElasticity}</p>
-                              </div>
-                            </div>
-                            <div className="p-4 border rounded-lg bg-muted/20">
-                              <div className="flex items-start gap-2">
-                                <Zap className="h-4 w-4 text-primary mt-0.5" />
-                                <div>
-                                  <p className="text-sm font-medium mb-2">권장사항</p>
-                                  <ul className="text-sm text-muted-foreground space-y-1">
-                                    {analysisResult.wtpAnalysis.recommendations?.map((rec: string, idx: number) => (
-                                      <li key={idx}>• {rec}</li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <p className="text-center text-muted-foreground py-8">WTP 데이터가 없습니다</p>
-                        )}
-                      </CardContent>
-                    </Card>
                   </TabsContent>
                 </Tabs>
               );

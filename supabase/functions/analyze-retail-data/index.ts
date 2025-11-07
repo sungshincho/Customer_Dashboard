@@ -75,42 +75,44 @@ serve(async (req) => {
               { type: 'correlated_with', from: 'Product', to: 'Product', weight: 'low' }
             ];
 
-            const systemPrompt = `당신은 다음 분야를 전문으로 하는 고급 리테일 분석 AI입니다:
+            const systemPrompt = `당신은 리테일 데이터를 실행 가능한 비즈니스 인사이트로 변환하는 전문 분석 AI입니다.
 
-**통합 분석**: 고객-공간-상품-매출 간 상관관계
-**WTP 분석**: 지불 의향(Willingness To Pay) 및 가격 탄력성
-**동선 패턴**: 고객 이동 및 zone 성과
-**상품 최적화**: 위치 효과성 및 교차 판매
-**비즈니스 인사이트**: 매출 증대를 위한 실행 가능한 권장사항
+**핵심 역량:**
+• 매출 증대 기회 발굴 (구체적인 수치와 함께)
+• 고객 동선 최적화 (Zone별 개선 포인트)
+• 상품 배치 전략 (교차판매 기회)
+• 가격 최적화 (WTP 기반)
 
-온톨로지 노드: ${JSON.stringify(ontologyNodes, null, 2)}
-관계 유형: ${JSON.stringify(relationshipTypes, null, 2)}
+**분석 원칙:**
+1. 간결성: 핵심만 전달 (인사이트당 50-80자)
+2. 구체성: 정확한 수치와 비율 제시
+3. 실행성: 즉시 적용 가능한 권장사항
+4. 임팩트: 매출/전환율 향상에 직접 기여
 
-**중요: 모든 노드 라벨, 인사이트, 설명은 반드시 한글로 작성하세요.**
-매출과 고객 경험을 직접적으로 향상시키는 고영향 인사이트에 집중하세요.`;
+**중요: 모든 출력은 한글로만 작성. 영어 단어 사용 금지.**`;
 
             const userPrompt = `
-분석 유형: ${analysisType}
-총 레코드: ${data.length}개 (분석 중: ${processedData.length}개)
-샘플 데이터 (처음 5개 레코드):
-${JSON.stringify(dataStats.sampleRecords.slice(0, 5), null, 2)}
+데이터: ${analysisType} | 총 ${data.length}개 레코드 중 ${processedData.length}개 분석
+샘플 데이터:
+${JSON.stringify(dataStats.sampleRecords.slice(0, 3), null, 2)}
 
-**주요 목표:**
-1. 고객-공간-상품-매출 간 상관관계 파악
-2. WTP(지불 의향) 및 가격 탄력성 계산
-3. 고영향 zone 및 상품 배치 발견
-4. 매출 최적화 권장사항 생성
+**분석 과제:**
+이 데이터에서 매출을 즉시 증대시킬 수 있는 TOP 3 기회를 찾아내세요.
 
-**지침:**
-- 의미 있는 노드 5-12개 생성 (고객, Zone, 상품, 거래 유형)
-- 관계를 나타내는 가중치 엣지 5-15개 생성
-- 비즈니스 임팩트가 있는 실행 가능한 인사이트 3-5개 제공
-- 핵심 요소 간 상관관계 2-4개 포함
-- 거래 데이터가 있으면 WTP 패턴 분석
-- 시간 기반 패턴(시간대별, 일별, 주별) 식별
+**출력 요구사항:**
+1. 그래프 노드 6-10개 (핵심 엔티티만)
+2. 관계 엣지 6-12개 (강한 상관관계만)
+3. 인사이트 3-4개 (각 50-80자, 구체적 수치 포함)
+   - 예: "Zone A 방문객 중 23%만 구매. 상품 재배치로 40% 목표"
+4. 상관관계 2-3개 (r > 0.5만)
+5. WTP 분석 (데이터 있을 경우, 구체적 가격대 제시)
 
-**중요: 모든 label, title, description, actionable, insight는 반드시 한글로 작성하세요.**
-매출과 고객 경험에 직접 영향을 미치는 인사이트에 집중하세요.`;
+**금지 사항:**
+- 추상적/일반적 표현
+- 데이터 없이 추측
+- 실행 불가능한 권장사항
+
+**필수: 모든 텍스트 한글로만 작성. 인사이트에 구체적 수치/비율 포함.**`;
 
             sendProgress(40, 'analyzing', 'AI 분석 진행 중... (30-60초 소요 예상)');
 
@@ -179,22 +181,22 @@ ${JSON.stringify(dataStats.sampleRecords.slice(0, 5), null, 2)}
                         },
                         insights: {
                           type: "array",
-                          description: "핵심 비즈니스 인사이트 (3-5개, 각 최대 150자), 반드시 한글로 작성",
+                          description: "핵심 비즈니스 인사이트 3-4개. 각 인사이트는 50-80자로 간결하게, 구체적 수치 포함 필수. 한글만 사용.",
                           items: {
                             type: "object",
                             properties: {
-                              category: { type: "string" },
-                              title: { type: "string" },
-                              description: { type: "string" },
+                              category: { type: "string", description: "카테고리: 매출/동선/상품/전환율" },
+                              title: { type: "string", description: "핵심 발견 (20자 이내)" },
+                              description: { type: "string", description: "구체적 데이터와 수치 (50-80자)" },
                               impact: { type: "string", enum: ["high", "medium", "low"] },
-                              actionable: { type: "string" }
+                              actionable: { type: "string", description: "즉시 실행 가능한 1가지 액션 (50자 이내)" }
                             },
-                            required: ["category", "title", "description", "impact"]
+                            required: ["category", "title", "description", "impact", "actionable"]
                           }
                         },
                         correlations: {
                           type: "array",
-                          description: "요소 간 상관관계 (2-4개), 반드시 한글로 작성",
+                          description: "강한 상관관계 2-3개 (r > 0.5만 포함). 한글만 사용.",
                           items: {
                             type: "object",
                             properties: {
