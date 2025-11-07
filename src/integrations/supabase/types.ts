@@ -41,6 +41,102 @@ export type Database = {
         }
         Relationships: []
       }
+      graph_entities: {
+        Row: {
+          created_at: string | null
+          entity_type_id: string
+          id: string
+          label: string
+          properties: Json | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          entity_type_id: string
+          id?: string
+          label: string
+          properties?: Json | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          entity_type_id?: string
+          id?: string
+          label?: string
+          properties?: Json | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "graph_entities_entity_type_id_fkey"
+            columns: ["entity_type_id"]
+            isOneToOne: false
+            referencedRelation: "ontology_entity_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      graph_relations: {
+        Row: {
+          created_at: string | null
+          id: string
+          properties: Json | null
+          relation_type_id: string
+          source_entity_id: string
+          target_entity_id: string
+          updated_at: string | null
+          user_id: string
+          weight: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          properties?: Json | null
+          relation_type_id: string
+          source_entity_id: string
+          target_entity_id: string
+          updated_at?: string | null
+          user_id: string
+          weight?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          properties?: Json | null
+          relation_type_id?: string
+          source_entity_id?: string
+          target_entity_id?: string
+          updated_at?: string | null
+          user_id?: string
+          weight?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "graph_relations_relation_type_id_fkey"
+            columns: ["relation_type_id"]
+            isOneToOne: false
+            referencedRelation: "ontology_relation_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "graph_relations_source_entity_id_fkey"
+            columns: ["source_entity_id"]
+            isOneToOne: false
+            referencedRelation: "graph_entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "graph_relations_target_entity_id_fkey"
+            columns: ["target_entity_id"]
+            isOneToOne: false
+            referencedRelation: "graph_relations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ontology_entity_types: {
         Row: {
           color: string | null
