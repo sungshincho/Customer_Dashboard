@@ -28,7 +28,42 @@ function extractKeywords(columnName: string): string[] {
 }
 
 /**
- * 두 문자열의 유사도 계산 (한글 지원 강화)
+ * 한글-영문 동의어 매핑 (확장형)
+ */
+const KOREAN_ENGLISH_SYNONYMS: Record<string, string[]> = {
+  '고객': ['customer', 'user', 'member', 'client'],
+  '회원': ['member', 'customer', 'user'],
+  '상품': ['product', 'item', 'goods', 'merchandise'],
+  '제품': ['product', 'item'],
+  '가격': ['price', 'cost', 'amount'],
+  '금액': ['amount', 'price', 'total'],
+  '수량': ['quantity', 'qty', 'count', 'amount'],
+  '날짜': ['date', 'day', 'time'],
+  '시간': ['time', 'datetime', 'timestamp'],
+  '매장': ['store', 'shop', 'branch', 'location'],
+  '지점': ['branch', 'store', 'location'],
+  '판매': ['sales', 'sell', 'transaction'],
+  '매출': ['sales', 'revenue'],
+  '할인': ['discount', 'sale'],
+  '브랜드': ['brand', 'maker'],
+  '카테고리': ['category', 'type', 'class'],
+  '분류': ['category', 'classification'],
+  '코드': ['code', 'id', 'number'],
+  '번호': ['number', 'id', 'code'],
+  '이름': ['name', 'title'],
+  '명칭': ['name', 'title'],
+  '거래': ['transaction', 'trade', 'deal'],
+  '주문': ['order', 'purchase'],
+  '결제': ['payment', 'pay'],
+  '총액': ['total', 'sum', 'amount'],
+  '단가': ['unit_price', 'price'],
+  '구매': ['purchase', 'buy'],
+  '세금': ['tax', 'vat'],
+  '부가세': ['tax', 'vat'],
+};
+
+/**
+ * 두 문자열의 유사도 계산 (한글-영문 동의어 지원 + 퍼지 매칭)
  */
 function calculateSimilarity(str1: string, str2: string): number {
   const normalize = (s: string) => s.toLowerCase()
@@ -41,27 +76,80 @@ function calculateSimilarity(str1: string, str2: string): number {
   // 완전 일치
   if (s1 === s2) return 1.0;
   
-  // 포함 관계 체크 (한글 지원)
-  if (s1.includes(s2) || s2.includes(s1)) return 0.9;
+  // 포함 관계 체크
+  if (s1.includes(s2) || s2.includes(s1)) return 0.95;
   
-  // 키워드 기반 매칭
+  // 한글-영문 동의어 체크
+  for (const [korean, englishWords] of Object.entries(KOREAN_ENGLISH_SYNONYMS)) {
+    const hasKorean = s1.includes(korean) || s2.includes(korean);
+    const hasEnglish = englishWords.some(eng => s1.includes(eng) || s2.includes(eng));
+    
+    if (hasKorean && hasEnglish) {
+      return 0.90; // 높은 신뢰도
+    }
+  }
+  
+  // 키워드 기반 매칭 (개선)
   const keywords1 = extractKeywords(str1);
   const keywords2 = extractKeywords(str2);
   
   if (keywords1.length === 0 || keywords2.length === 0) return 0;
   
   let matches = 0;
+  let maxMatches = 0;
+  
   keywords1.forEach(k1 => {
     keywords2.forEach(k2 => {
+      maxMatches++;
+      
+      // 정확한 매칭
       if (k1 === k2) {
-        matches += 2; // 정확한 매칭
-      } else if (k1.includes(k2) || k2.includes(k1)) {
-        matches += 1; // 부분 매칭
+        matches += 3;
+      }
+      // 한쪽이 다른 쪽을 포함
+      else if (k1.includes(k2) || k2.includes(k1)) {
+        matches += 2;
+      }
+      // 레벤슈타인 거리 기반 유사도 (철자 오류 대응)
+      else {
+        const distance = levenshteinDistance(k1, k2);
+        const maxLen = Math.max(k1.length, k2.length);
+        if (maxLen > 0 && distance / maxLen < 0.3) { // 70% 이상 유사
+          matches += 1;
+        }
       }
     });
   });
   
-  return Math.min(matches / Math.max(keywords1.length, keywords2.length, 1), 1.0);
+  return Math.min(matches / Math.max(maxMatches, 1) * 1.5, 1.0);
+}
+
+/**
+ * 레벤슈타인 거리 계산 (문자열 유사도 측정)
+ */
+function levenshteinDistance(str1: string, str2: string): number {
+  const m = str1.length;
+  const n = str2.length;
+  const dp: number[][] = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+  
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (str1[i - 1] === str2[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1];
+      } else {
+        dp[i][j] = Math.min(
+          dp[i - 1][j] + 1,    // 삭제
+          dp[i][j - 1] + 1,    // 삽입
+          dp[i - 1][j - 1] + 1 // 치환
+        );
+      }
+    }
+  }
+  
+  return dp[m][n];
 }
 
 /**
@@ -129,7 +217,7 @@ function autoMapColumns(
         maxScore = Math.min(maxScore + 0.3, 1.0);
       }
       
-      if (maxScore > bestScore && maxScore > 0.25) { // 최소 25% 유사도로 완화
+      if (maxScore > bestScore && maxScore > 0.15) { // 최소 15% 유사도로 더욱 완화
         bestScore = maxScore;
         bestMatch = rawCol;
       }

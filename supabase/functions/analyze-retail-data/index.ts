@@ -47,7 +47,7 @@ serve(async (req) => {
               throw new Error('LOVABLE_API_KEY is not configured');
             }
 
-            // 데이터 통계 생성
+            // 데이터 통계 생성 (확장형)
             const columns = processedData.length > 0 ? Object.keys(processedData[0]) : [];
             const columnStats: any = {};
             
@@ -58,22 +58,35 @@ serve(async (req) => {
               
               if (numericValues.length > 0) {
                 const nums = numericValues.map((v: any) => Number(v));
+                const sorted = [...nums].sort((a, b) => a - b);
                 columnStats[col] = {
                   type: 'numeric',
                   count: nums.length,
                   min: Math.min(...nums),
                   max: Math.max(...nums),
                   avg: nums.reduce((a: number, b: number) => a + b, 0) / nums.length,
-                  sample: values.slice(0, 3)
+                  median: sorted[Math.floor(sorted.length / 2)],
+                  sum: nums.reduce((a: number, b: number) => a + b, 0),
+                  sample: values.slice(0, 5)
                 };
               } else {
                 const uniqueValues = [...new Set(values)];
+                const valueCounts: Record<string, number> = {};
+                values.forEach((v: any) => {
+                  const key = String(v);
+                  valueCounts[key] = (valueCounts[key] || 0) + 1;
+                });
+                const topValues = Object.entries(valueCounts)
+                  .sort((a, b) => b[1] - a[1])
+                  .slice(0, 10)
+                  .map(([val, count]) => ({ value: val, count }));
+                
                 columnStats[col] = {
                   type: 'categorical',
                   count: values.length,
                   unique: uniqueValues.length,
-                  top: uniqueValues.slice(0, 5),
-                  sample: values.slice(0, 3)
+                  top: topValues,
+                  sample: values.slice(0, 5)
                 };
               }
             });
@@ -84,7 +97,7 @@ serve(async (req) => {
               dataTypes: analysisType,
               columns: columns,
               columnStats: columnStats,
-              sampleRecords: processedData.slice(0, 50)
+              sampleRecords: processedData.slice(0, 100) // 50개에서 100개로 증가
             };
 
             sendProgress(30, 'analyzing', 'AI 모델에 데이터 전송 중...');
@@ -118,6 +131,12 @@ serve(async (req) => {
 
             const systemPrompt = `당신은 LSTM-GNN 하이브리드 모델을 활용한 리테일 분석 전문가입니다.
 
+**핵심 원칙:**
+1. 제공된 실제 데이터만 사용 - 가상 데이터 절대 금지
+2. 모든 수치는 실제 데이터 통계에서 계산
+3. 노드와 엣지는 실제 데이터의 값과 관계 반영
+4. 인사이트는 데이터에서 관찰된 패턴만 기술
+
 **분석 방법론:**
 1. LSTM 시계열 분석: 매출/트래픽 패턴, 계절성, 트렌드 예측
 2. GNN 그래프 분석: 고객-상품-매장 관계, 공간 네트워크, 동선 패턴
@@ -126,32 +145,43 @@ serve(async (req) => {
 **데이터 컨텍스트:**
 ${dataContext}
 
-**CRITICAL 분석 원칙:**
-- 제공된 실제 데이터만을 기반으로 분석합니다
-- 가상의 데이터나 가정을 사용하지 않습니다
-- 모든 수치는 실제 데이터에서 계산된 값이어야 합니다
-- 컬럼 통계와 샘플 데이터를 정확히 분석하여 패턴을 도출합니다
-
-**출력 원칙:**
+**출력 규칙:**
 - 간결성: 인사이트당 50-80자
-- 정확성: 실제 데이터 기반 수치만 사용
-- 실행성: 즉시 적용 가능한 권장사항
-- 모든 출력은 한글로만 작성`;
+- 정확성: 통계 기반 수치만 사용
+- 실행성: 구체적이고 즉시 적용 가능
+- 한글: 모든 출력은 한글로만 작성
+
+**금지사항:**
+- 예시나 가상의 데이터 사용 금지
+- 제공되지 않은 필드 언급 금지
+- 추측성 수치 사용 금지`;
 
             const userPrompt = `
-**LSTM-GNN 하이브리드 분석 요청**
+**CRITICAL: 실제 데이터만 분석하세요**
 
-데이터 컨텍스트:
+아래는 실제로 임포트된 ${dataStats.totalRecords}개의 데이터입니다. 
+이 데이터의 실제 패턴과 수치를 기반으로만 분석해야 합니다.
+가상의 데이터나 예시를 만들지 마세요.
+
+**데이터 컨텍스트:**
 - 타입: ${analysisType}
 - 전체 레코드: ${data.length}개
 - 분석 샘플: ${processedData.length}개
 - 데이터 품질: ${metadata?.datasets?.map((ds: any) => `${(ds.quality_score * 100).toFixed(0)}%`).join(', ')}
 
-**컬럼 통계 정보:**
+**전체 컬럼 통계 (실제 데이터):**
 ${JSON.stringify(dataStats.columnStats, null, 2)}
 
-**실제 샘플 데이터 (최신 30개):**
-${JSON.stringify(dataStats.sampleRecords.slice(0, 30), null, 2)}
+**실제 샘플 데이터 (최신 100개 레코드):**
+${JSON.stringify(dataStats.sampleRecords, null, 2)}
+
+**분석 지침:**
+1. 위 샘플 데이터에서 실제로 관찰되는 패턴만 사용하세요
+2. 컬럼 통계의 min, max, avg, sum 값을 활용하세요
+3. categorical 필드의 top 값들을 기반으로 세그먼트를 만드세요
+4. 노드는 실제 데이터의 고유값(예: 매장ID, 상품코드)을 사용하세요
+5. 엣지는 실제 데이터에서 발견된 관계만 표현하세요
+6. 모든 수치는 위 통계에서 계산 가능한 값이어야 합니다
 
 **분석 목표:**
 1. 시계열 패턴 발굴 (LSTM): 매출 트렌드, 계절성, 이상 탐지
