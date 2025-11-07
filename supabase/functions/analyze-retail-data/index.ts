@@ -75,40 +75,42 @@ serve(async (req) => {
               { type: 'correlated_with', from: 'Product', to: 'Product', weight: 'low' }
             ];
 
-            const systemPrompt = `You are an advanced retail analytics AI specialized in:
+            const systemPrompt = `당신은 다음 분야를 전문으로 하는 고급 리테일 분석 AI입니다:
 
-**Integrated Analysis**: Customer-Space-Product-Sales correlations
-**WTP Analysis**: Willingness To Pay and price elasticity
-**Journey Patterns**: Customer movement and zone performance
-**Product Optimization**: Location effectiveness and cross-selling
-**Business Insights**: Actionable recommendations to increase revenue
+**통합 분석**: 고객-공간-상품-매출 간 상관관계
+**WTP 분석**: 지불 의향(Willingness To Pay) 및 가격 탄력성
+**동선 패턴**: 고객 이동 및 zone 성과
+**상품 최적화**: 위치 효과성 및 교차 판매
+**비즈니스 인사이트**: 매출 증대를 위한 실행 가능한 권장사항
 
-Ontology Nodes: ${JSON.stringify(ontologyNodes, null, 2)}
-Relationships: ${JSON.stringify(relationshipTypes, null, 2)}
+온톨로지 노드: ${JSON.stringify(ontologyNodes, null, 2)}
+관계 유형: ${JSON.stringify(relationshipTypes, null, 2)}
 
-Focus on high-impact insights that directly drive sales and customer experience.`;
+**중요: 모든 노드 라벨, 인사이트, 설명은 반드시 한글로 작성하세요.**
+매출과 고객 경험을 직접적으로 향상시키는 고영향 인사이트에 집중하세요.`;
 
             const userPrompt = `
-Analysis Type: ${analysisType}
-Total Records: ${data.length} (Analyzing: ${processedData.length})
-Sample Data (first 5 records):
+분석 유형: ${analysisType}
+총 레코드: ${data.length}개 (분석 중: ${processedData.length}개)
+샘플 데이터 (처음 5개 레코드):
 ${JSON.stringify(dataStats.sampleRecords.slice(0, 5), null, 2)}
 
-**Primary Objectives:**
-1. Identify customer-space-product-sales correlations
-2. Calculate WTP (Willingness To Pay) and price elasticity
-3. Discover high-impact zones and product placements
-4. Generate revenue optimization recommendations
+**주요 목표:**
+1. 고객-공간-상품-매출 간 상관관계 파악
+2. WTP(지불 의향) 및 가격 탄력성 계산
+3. 고영향 zone 및 상품 배치 발견
+4. 매출 최적화 권장사항 생성
 
-**Instructions:**
-- Create 5-12 meaningful nodes (Customer, Zone, Product, Transaction types)
-- Create 5-15 weighted edges showing relationships
-- Provide 3-5 actionable insights with business impact
-- Include 2-4 correlations between key factors
-- Analyze WTP patterns if transaction data exists
-- Identify time-based patterns (hourly, daily, weekly)
+**지침:**
+- 의미 있는 노드 5-12개 생성 (고객, Zone, 상품, 거래 유형)
+- 관계를 나타내는 가중치 엣지 5-15개 생성
+- 비즈니스 임팩트가 있는 실행 가능한 인사이트 3-5개 제공
+- 핵심 요소 간 상관관계 2-4개 포함
+- 거래 데이터가 있으면 WTP 패턴 분석
+- 시간 기반 패턴(시간대별, 일별, 주별) 식별
 
-Focus on insights that directly impact revenue and customer experience.`;
+**중요: 모든 label, title, description, actionable, insight는 반드시 한글로 작성하세요.**
+매출과 고객 경험에 직접 영향을 미치는 인사이트에 집중하세요.`;
 
             sendProgress(40, 'analyzing', 'AI 분석 진행 중... (30-60초 소요 예상)');
 
@@ -123,16 +125,17 @@ Focus on insights that directly impact revenue and customer experience.`;
                 messages: [
                   { 
                     role: 'system', 
-                    content: `You are an advanced retail analytics AI. Analyze customer behavior, store layout, products, and sales to provide:
-- Customer journey patterns and segments
-- Zone performance and spatial correlations
-- Product-location effectiveness
-- Sales-traffic conversion
-- WTP (Willingness To Pay) insights
-- Cross-selling opportunities
-- Operational recommendations
+                    content: `당신은 고급 리테일 분석 AI입니다. 고객 행동, 매장 레이아웃, 상품, 매출을 분석하여 다음을 제공합니다:
+- 고객 동선 패턴 및 세그먼트
+- Zone 성과 및 공간 상관관계
+- 상품-위치 효과성
+- 매출-동선 전환율
+- WTP (지불 의향) 인사이트
+- 교차 판매 기회
+- 운영 최적화 권장사항
 
-Return structured, actionable insights.`
+**중요: 모든 응답은 반드시 한글로 작성하세요. 영어를 사용하지 마세요.**
+구조화되고 실행 가능한 인사이트를 한글로 반환하세요.`
                   },
                   { role: 'user', content: userPrompt }
                 ],
@@ -140,13 +143,13 @@ Return structured, actionable insights.`
                   type: "function",
                   function: {
                     name: "generate_retail_insights",
-                    description: "Generate retail analytics insights with graph structure",
+                    description: "리테일 분석 인사이트를 그래프 구조로 생성합니다. 모든 텍스트는 한글로 작성해야 합니다.",
                     parameters: {
                       type: "object",
                       properties: {
                         nodes: {
                           type: "array",
-                          description: "Graph nodes representing entities (5-15 nodes)",
+                          description: "엔티티를 나타내는 그래프 노드 (5-15개), label은 반드시 한글",
                           items: {
                             type: "object",
                             properties: {
@@ -161,7 +164,7 @@ Return structured, actionable insights.`
                         },
                         edges: {
                           type: "array",
-                          description: "Graph edges representing relationships (5-20 edges)",
+                          description: "관계를 나타내는 그래프 엣지 (5-20개), label은 반드시 한글",
                           items: {
                             type: "object",
                             properties: {
@@ -176,7 +179,7 @@ Return structured, actionable insights.`
                         },
                         insights: {
                           type: "array",
-                          description: "Key business insights (3-5 insights, max 150 chars each)",
+                          description: "핵심 비즈니스 인사이트 (3-5개, 각 최대 150자), 반드시 한글로 작성",
                           items: {
                             type: "object",
                             properties: {
@@ -191,7 +194,7 @@ Return structured, actionable insights.`
                         },
                         correlations: {
                           type: "array",
-                          description: "Factor correlations (2-4 correlations)",
+                          description: "요소 간 상관관계 (2-4개), 반드시 한글로 작성",
                           items: {
                             type: "object",
                             properties: {
@@ -206,7 +209,7 @@ Return structured, actionable insights.`
                         },
                         wtpAnalysis: {
                           type: "object",
-                          description: "Willingness To Pay analysis",
+                          description: "지불 의향(WTP) 분석, 모든 텍스트는 한글",
                           properties: {
                             avgWTP: { type: "string" },
                             priceElasticity: { type: "string" },
@@ -218,7 +221,7 @@ Return structured, actionable insights.`
                         },
                         timeSeriesPatterns: {
                           type: "array",
-                          description: "Time series patterns (1-3 patterns)",
+                          description: "시계열 패턴 (1-3개), 반드시 한글로 작성",
                           items: {
                             type: "object",
                             properties: {
@@ -234,7 +237,7 @@ Return structured, actionable insights.`
                         },
                         summary: { 
                           type: "string",
-                          description: "Overall summary of analysis (max 200 chars)"
+                          description: "분석 전체 요약 (최대 200자), 반드시 한글로 작성"
                         }
                       },
                       required: ["nodes", "edges", "insights", "summary"]
@@ -415,18 +418,19 @@ Return structured, actionable insights.`
       { type: 'correlated_with', from: 'Product', to: 'Product', weight: 'low' }
     ];
 
-    const systemPrompt = `You are an advanced retail analytics AI specialized in:
+    const systemPrompt = `당신은 다음 분야를 전문으로 하는 고급 리테일 분석 AI입니다:
 
-**Integrated Analysis**: Customer-Space-Product-Sales correlations
-**WTP Analysis**: Willingness To Pay and price elasticity
-**Journey Patterns**: Customer movement and zone performance
-**Product Optimization**: Location effectiveness and cross-selling
-**Business Insights**: Actionable recommendations to increase revenue
+**통합 분석**: 고객-공간-상품-매출 간 상관관계
+**WTP 분석**: 지불 의향(Willingness To Pay) 및 가격 탄력성
+**동선 패턴**: 고객 이동 및 zone 성과
+**상품 최적화**: 위치 효과성 및 교차 판매
+**비즈니스 인사이트**: 매출 증대를 위한 실행 가능한 권장사항
 
-Ontology Nodes: ${JSON.stringify(ontologyNodes, null, 2)}
-Relationships: ${JSON.stringify(relationshipTypes, null, 2)}
+온톨로지 노드: ${JSON.stringify(ontologyNodes, null, 2)}
+관계 유형: ${JSON.stringify(relationshipTypes, null, 2)}
 
-Focus on high-impact insights that directly drive sales and customer experience.`;
+**중요: 모든 노드 라벨, 인사이트, 설명은 반드시 한글로 작성하세요.**
+매출과 고객 경험을 직접적으로 향상시키는 고영향 인사이트에 집중하세요.`;
 
     // 간단한 데이터 통계만 생성
     const dataStats = {
@@ -438,29 +442,30 @@ Focus on high-impact insights that directly drive sales and customer experience.
     };
 
     const userPrompt = `
-Analysis Type: ${analysisType}
-Total Records: ${data.length} (Analyzing: ${processedData.length})
-Data Columns: ${dataStats.columns.join(', ')}
-Sample Data (first 5 records):
+분석 유형: ${analysisType}
+총 레코드: ${data.length}개 (분석 중: ${processedData.length}개)
+데이터 컬럼: ${dataStats.columns.join(', ')}
+샘플 데이터 (처음 5개 레코드):
 ${JSON.stringify(dataStats.sampleRecords.slice(0, 5), null, 2)}
 
-Activated Node Relations: ${JSON.stringify(nodeRelations || 'all', null, 2)}
+활성화된 노드 관계: ${JSON.stringify(nodeRelations || 'all', null, 2)}
 
-**Primary Objectives:**
-1. Identify customer-space-product-sales correlations
-2. Calculate WTP (Willingness To Pay) and price elasticity
-3. Discover high-impact zones and product placements
-4. Generate revenue optimization recommendations
+**주요 목표:**
+1. 고객-공간-상품-매출 간 상관관계 파악
+2. WTP(지불 의향) 및 가격 탄력성 계산
+3. 고영향 zone 및 상품 배치 발견
+4. 매출 최적화 권장사항 생성
 
-**Instructions:**
-- Create 5-12 meaningful nodes (Customer, Zone, Product, Transaction types)
-- Create 5-15 weighted edges showing relationships
-- Provide 3-5 actionable insights with business impact
-- Include 2-4 correlations between key factors
-- Analyze WTP patterns if transaction data exists
-- Identify time-based patterns (hourly, daily, weekly)
+**지침:**
+- 의미 있는 노드 5-12개 생성 (고객, Zone, 상품, 거래 유형)
+- 관계를 나타내는 가중치 엣지 5-15개 생성
+- 비즈니스 임팩트가 있는 실행 가능한 인사이트 3-5개 제공
+- 핵심 요소 간 상관관계 2-4개 포함
+- 거래 데이터가 있으면 WTP 패턴 분석
+- 시간 기반 패턴(시간대별, 일별, 주별) 식별
 
-Focus on insights that directly impact revenue and customer experience.
+**중요: 모든 label, title, description, actionable, insight는 반드시 한글로 작성하세요.**
+매출과 고객 경험에 직접 영향을 미치는 인사이트에 집중하세요.
 `;
 
     console.log("🤖 Calling Lovable AI for analysis...");
@@ -480,16 +485,17 @@ Focus on insights that directly impact revenue and customer experience.
           messages: [
             { 
               role: 'system', 
-              content: `You are an advanced retail analytics AI. Analyze customer behavior, store layout, products, and sales to provide:
-- Customer journey patterns and segments
-- Zone performance and spatial correlations
-- Product-location effectiveness
-- Sales-traffic conversion
-- WTP (Willingness To Pay) insights
-- Cross-selling opportunities
-- Operational recommendations
+              content: `당신은 고급 리테일 분석 AI입니다. 고객 행동, 매장 레이아웃, 상품, 매출을 분석하여 다음을 제공합니다:
+- 고객 동선 패턴 및 세그먼트
+- Zone 성과 및 공간 상관관계
+- 상품-위치 효과성
+- 매출-동선 전환율
+- WTP (지불 의향) 인사이트
+- 교차 판매 기회
+- 운영 최적화 권장사항
 
-Return structured, actionable insights.`
+**중요: 모든 응답은 반드시 한글로 작성하세요. 영어를 사용하지 마세요.**
+구조화되고 실행 가능한 인사이트를 한글로 반환하세요.`
             },
             { role: 'user', content: userPrompt }
           ],
@@ -497,13 +503,13 @@ Return structured, actionable insights.`
             type: "function",
             function: {
               name: "generate_retail_insights",
-              description: "Generate retail analytics insights with graph structure",
+              description: "리테일 분석 인사이트를 그래프 구조로 생성합니다. 모든 텍스트는 한글로 작성해야 합니다.",
               parameters: {
                 type: "object",
                 properties: {
-                  nodes: {
-                    type: "array",
-                    description: "Graph nodes representing entities (5-15 nodes)",
+                nodes: {
+                  type: "array",
+                  description: "엔티티를 나타내는 그래프 노드 (5-15개), label은 반드시 한글",
                     items: {
                       type: "object",
                       properties: {
@@ -516,9 +522,9 @@ Return structured, actionable insights.`
                       required: ["id", "type", "label"]
                     }
                   },
-                  edges: {
-                    type: "array",
-                    description: "Graph edges representing relationships (5-20 edges)",
+                edges: {
+                  type: "array",
+                  description: "관계를 나타내는 그래프 엣지 (5-20개), label은 반드시 한글",
                     items: {
                       type: "object",
                       properties: {
@@ -531,9 +537,9 @@ Return structured, actionable insights.`
                       required: ["source", "target", "type"]
                     }
                   },
-                  insights: {
-                    type: "array",
-                    description: "Key business insights (3-5 insights, max 150 chars each)",
+                insights: {
+                  type: "array",
+                  description: "핵심 비즈니스 인사이트 (3-5개, 각 최대 150자), 반드시 한글로 작성",
                     items: {
                       type: "object",
                       properties: {
@@ -546,9 +552,9 @@ Return structured, actionable insights.`
                       required: ["category", "title", "description", "impact"]
                     }
                   },
-                  correlations: {
-                    type: "array",
-                    description: "Factor correlations (2-4 correlations)",
+                correlations: {
+                  type: "array",
+                  description: "요소 간 상관관계 (2-4개), 반드시 한글로 작성",
                     items: {
                       type: "object",
                       properties: {
@@ -561,9 +567,9 @@ Return structured, actionable insights.`
                       required: ["factor1", "factor2", "correlation"]
                     }
                   },
-                  wtpAnalysis: {
-                    type: "object",
-                    description: "Willingness To Pay analysis",
+                wtpAnalysis: {
+                  type: "object",
+                  description: "지불 의향(WTP) 분석, 모든 텍스트는 한글",
                     properties: {
                       avgWTP: { type: "string" },
                       priceElasticity: { type: "string" },
@@ -573,9 +579,9 @@ Return structured, actionable insights.`
                       }
                     }
                   },
-                  timeSeriesPatterns: {
-                    type: "array",
-                    description: "Time series patterns (1-3 patterns)",
+                timeSeriesPatterns: {
+                  type: "array",
+                  description: "시계열 패턴 (1-3개), 반드시 한글로 작성",
                     items: {
                       type: "object",
                       properties: {
@@ -589,10 +595,10 @@ Return structured, actionable insights.`
                       }
                     }
                   },
-                  summary: { 
-                    type: "string",
-                    description: "Overall summary of analysis (max 200 chars)"
-                  }
+                summary: { 
+                  type: "string",
+                  description: "분석 전체 요약 (최대 200자), 반드시 한글로 작성"
+                }
                 },
                 required: ["nodes", "edges", "insights", "summary"]
               }
