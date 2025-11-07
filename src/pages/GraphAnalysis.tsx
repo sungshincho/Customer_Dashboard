@@ -46,7 +46,7 @@ interface AnalysisResult {
 
 const GraphAnalysis = () => {
   const [imports, setImports] = useState<any[]>([]);
-  const [selectedImportId, setSelectedImportId] = useState<string>("");
+  const [selectedImportIds, setSelectedImportIds] = useState<string[]>([]);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [nodeRelations, setNodeRelations] = useState<Record<string, boolean>>({
@@ -88,7 +88,7 @@ const GraphAnalysis = () => {
   };
 
   const handleAnalyze = async () => {
-    if (!selectedImportId) {
+    if (selectedImportIds.length === 0) {
       toast({
         title: "데이터 선택 필요",
         description: "분석할 데이터를 선택해주세요.",
@@ -99,8 +99,12 @@ const GraphAnalysis = () => {
 
     setIsAnalyzing(true);
     try {
-      const selectedImport = imports.find(imp => imp.id === selectedImportId);
-      if (!selectedImport) throw new Error("선택한 데이터를 찾을 수 없습니다.");
+      const selectedImports = imports.filter(imp => selectedImportIds.includes(imp.id));
+      if (selectedImports.length === 0) throw new Error("선택한 데이터를 찾을 수 없습니다.");
+
+      // 모든 선택된 데이터를 통합
+      const combinedData = selectedImports.flatMap(imp => imp.raw_data);
+      const analysisTypes = [...new Set(selectedImports.map(imp => imp.data_type))].join(', ');
 
       const activeRelations = Object.entries(nodeRelations)
         .filter(([_, active]) => active)
@@ -108,8 +112,8 @@ const GraphAnalysis = () => {
 
       const { data, error } = await supabase.functions.invoke('analyze-retail-data', {
         body: {
-          data: selectedImport.raw_data,
-          analysisType: selectedImport.data_type,
+          data: combinedData,
+          analysisType: analysisTypes,
           nodeRelations: activeRelations
         }
       });
@@ -203,20 +207,48 @@ const GraphAnalysis = () => {
               <CardDescription>데이터 선택 및 관계 설정</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>분석 데이터</Label>
-                <Select value={selectedImportId} onValueChange={setSelectedImportId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="데이터 선택" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {imports.map((imp) => (
-                      <SelectItem key={imp.id} value={imp.id}>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>분석 데이터</Label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (selectedImportIds.length === imports.length) {
+                        setSelectedImportIds([]);
+                      } else {
+                        setSelectedImportIds(imports.map(imp => imp.id));
+                      }
+                    }}
+                  >
+                    {selectedImportIds.length === imports.length ? "전체 해제" : "전체 선택"}
+                  </Button>
+                </div>
+                <div className="space-y-2 max-h-[200px] overflow-y-auto border rounded-lg p-3">
+                  {imports.map((imp) => (
+                    <div key={imp.id} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={`import-${imp.id}`}
+                        checked={selectedImportIds.includes(imp.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedImportIds([...selectedImportIds, imp.id]);
+                          } else {
+                            setSelectedImportIds(selectedImportIds.filter(id => id !== imp.id));
+                          }
+                        }}
+                        className="rounded border-input"
+                      />
+                      <Label 
+                        htmlFor={`import-${imp.id}`} 
+                        className="text-sm cursor-pointer flex-1"
+                      >
                         {imp.file_name} ({imp.data_type})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      </Label>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="space-y-3">
@@ -241,11 +273,11 @@ const GraphAnalysis = () => {
 
               <Button 
                 onClick={handleAnalyze} 
-                disabled={!selectedImportId || isAnalyzing}
+                disabled={selectedImportIds.length === 0 || isAnalyzing}
                 className="w-full"
               >
                 <Network className="mr-2 h-4 w-4" />
-                {isAnalyzing ? "분석 중..." : "분석 시작"}
+                {isAnalyzing ? "분석 중..." : `분석 시작 (${selectedImportIds.length}개)`}
               </Button>
             </CardContent>
           </Card>
