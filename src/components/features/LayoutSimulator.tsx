@@ -22,12 +22,30 @@ const initialProducts: Product[] = [...LAYOUT_PRODUCTS];
 const aiSuggestedLayout: Product[] = [...AI_OPTIMIZED_LAYOUT];
 
 const generateMetrics = (products: Product[]) => {
-  const totalSales = products.reduce((sum, p) => sum + p.sales, 0);
-  const avgConversion = products.reduce((sum, p) => sum + p.conversion, 0) / products.length;
+  // 상품 위치 기반 성과 예측 (입구에 가까울수록, 중앙에 가까울수록 성과 증가)
+  const totalSales = products.reduce((sum, p) => {
+    const entranceProximity = (100 - p.y) / 100; // 위쪽(입구)에 가까울수록 높음
+    const centerProximity = 1 - Math.abs(50 - p.x) / 50; // 중앙에 가까울수록 높음
+    const locationBonus = (entranceProximity * 0.3 + centerProximity * 0.2) * 100;
+    return sum + p.sales + locationBonus;
+  }, 0);
+  
+  const avgConversion = products.reduce((sum, p) => {
+    const entranceProximity = (100 - p.y) / 100;
+    const centerProximity = 1 - Math.abs(50 - p.x) / 50;
+    const conversionBonus = (entranceProximity * 2 + centerProximity * 1.5);
+    return sum + p.conversion + conversionBonus;
+  }, 0) / products.length;
+  
+  const avgTraffic = products.reduce((sum, p) => {
+    const visibility = ((100 - p.y) / 100) * 200;
+    return sum + visibility;
+  }, 0);
+  
   return {
-    conversion: avgConversion,
-    traffic: 450 + products.length * 50,
-    dwell: 180 + products.length * 10,
+    conversion: Math.round(avgConversion * 10) / 10,
+    traffic: Math.round(450 + avgTraffic),
+    dwell: Math.round(180 + products.length * 10),
   };
 };
 
@@ -51,6 +69,7 @@ export const LayoutSimulator = () => {
 
   const handleDragStart = (productId: string) => {
     setDraggedProduct(productId);
+    setIsAiLayout(false); // 수동 조정 시 AI 모드 해제
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
