@@ -49,6 +49,10 @@ const GraphAnalysis = () => {
   const [selectedImportIds, setSelectedImportIds] = useState<string[]>([]);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState(0);
+  const [analysisStage, setAnalysisStage] = useState('');
+  const [analysisMessage, setAnalysisMessage] = useState('');
+  const [estimatedTime, setEstimatedTime] = useState('');
   const [nodeRelations, setNodeRelations] = useState<Record<string, boolean>>({
     purchases: true,
     visits: true,
@@ -98,53 +102,81 @@ const GraphAnalysis = () => {
     }
 
     setIsAnalyzing(true);
+    setAnalysisProgress(0);
+    setAnalysisStage('preparing');
+    setAnalysisMessage('분석 준비 중...');
+    
     try {
       const selectedImports = imports.filter(imp => selectedImportIds.includes(imp.id));
       if (selectedImports.length === 0) throw new Error("선택한 데이터를 찾을 수 없습니다.");
 
-      // 모든 선택된 데이터를 통합
       const combinedData = selectedImports.flatMap(imp => imp.raw_data);
       const analysisTypes = [...new Set(selectedImports.map(imp => imp.data_type))].join(', ');
+      
+      // 예상 시간 계산 (데이터 크기 기반)
+      const estimatedSeconds = Math.ceil(combinedData.length / 10) + 30;
+      setEstimatedTime(`약 ${estimatedSeconds}초`);
 
       const activeRelations = Object.entries(nodeRelations)
         .filter(([_, active]) => active)
         .map(([type]) => type);
 
-      const { data, error } = await supabase.functions.invoke('analyze-retail-data', {
-        body: {
-          data: combinedData,
-          analysisType: analysisTypes,
-          nodeRelations: activeRelations
+      // 스트리밍 요청
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-retail-data`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            data: combinedData,
+            analysisType: analysisTypes,
+            nodeRelations: activeRelations,
+            stream: true,
+          }),
         }
-      });
+      );
 
-      if (error) throw error;
+      if (!response.ok) throw new Error('Failed to start analysis');
 
-      if (data.error) {
-        if (data.error.includes("Rate limit")) {
-          toast({
-            title: "요청 제한 초과",
-            description: "잠시 후 다시 시도해주세요.",
-            variant: "destructive",
-          });
-        } else if (data.error.includes("Payment required")) {
-          toast({
-            title: "크레딧 부족",
-            description: "워크스페이스에 크레딧을 추가해주세요.",
-            variant: "destructive",
-          });
-        } else {
-          throw new Error(data.error);
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (reader) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          
+          try {
+            const data = JSON.parse(line.slice(6));
+            
+            if (data.type === 'progress') {
+              setAnalysisProgress(data.progress);
+              setAnalysisStage(data.stage);
+              setAnalysisMessage(data.message);
+            } else if (data.type === 'result') {
+              setAnalysisResult(data.analysis);
+              toast({
+                title: "분석 완료",
+                description: `${data.analysis.nodes?.length || 0}개의 노드와 ${data.analysis.edges?.length || 0}개의 관계가 발견되었습니다.`,
+              });
+            } else if (data.type === 'error') {
+              throw new Error(data.error);
+            }
+          } catch (e) {
+            console.error('Failed to parse SSE data:', e);
+          }
         }
-        return;
       }
-
-      setAnalysisResult(data.analysis);
-      
-      toast({
-        title: "분석 완료",
-        description: `${data.analysis.nodes?.length || 0}개의 노드와 ${data.analysis.edges?.length || 0}개의 관계가 발견되었습니다.`,
-      });
     } catch (error: any) {
       console.error("Analysis error:", error);
       toast({
@@ -154,6 +186,10 @@ const GraphAnalysis = () => {
       });
     } finally {
       setIsAnalyzing(false);
+      setAnalysisProgress(0);
+      setAnalysisStage('');
+      setAnalysisMessage('');
+      setEstimatedTime('');
     }
   };
 
@@ -270,6 +306,28 @@ const GraphAnalysis = () => {
                   ))}
                 </div>
               </div>
+
+              {isAnalyzing && (
+                <div className="space-y-3 mb-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">{analysisMessage}</span>
+                      <span className="font-medium">{analysisProgress}%</span>
+                    </div>
+                    <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                      <div 
+                        className="bg-primary h-full transition-all duration-300 ease-out"
+                        style={{ width: `${analysisProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                  {estimatedTime && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      예상 소요 시간: {estimatedTime}
+                    </p>
+                  )}
+                </div>
+              )}
 
               <Button 
                 onClick={handleAnalyze} 
