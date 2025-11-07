@@ -86,14 +86,22 @@ serve(async (req) => {
 3. 데이터 팩터 간 상관관계 분석
 4. WTP (Willingness To Pay) 분석
 
-다음을 수행하세요:
-1. 입력 데이터를 표준화하고 온톨로지 노드로 매핑
-2. 노드 간 관계 추출 및 가중치 계산
-3. 시계열 패턴 분석 (LSTM 개념)
-4. 그래프 구조 분석 (GNN 개념)
-5. 핵심 인사이트 및 액션 아이템 도출
+**중요: 반드시 다음 JSON 구조를 완전하게 반환해야 합니다. 모든 필드는 필수입니다:**
 
-응답은 JSON 형식으로 제공하세요.`;
+{
+  "nodes": [최소 5개 이상의 노드],
+  "edges": [최소 5개 이상의 관계],
+  "insights": [최소 3개 이상의 인사이트],
+  "correlations": [최소 3개 이상의 상관관계],
+  "wtpAnalysis": {
+    "avgWTP": "구체적인 금액",
+    "priceElasticity": "구체적인 수치",
+    "recommendations": [최소 3개의 권장사항]
+  },
+  "timeSeriesPatterns": [최소 2개 이상의 패턴]
+}
+
+데이터가 부족하더라도 합리적인 추론을 통해 모든 필드를 채워주세요.`;
 
             const userPrompt = `
 분석 유형: ${analysisType}
@@ -104,14 +112,33 @@ ${JSON.stringify(dataStats.sampleRecords, null, 2)}
 
 활성화된 노드 관계: ${JSON.stringify(nodeRelations || 'all', null, 2)}
 
-위 데이터를 분석하여 다음을 제공하세요:
-1. nodes: 온톨로지 기반 노드 배열 [{ id, type, label, properties, metrics }]
-2. edges: 관계 배열 [{ source, target, type, weight, properties }]
-3. insights: 핵심 인사이트 배열 [{ title, description, impact, recommendation }]
-4. correlations: 팩터 간 상관관계 [{ factor1, factor2, correlation, significance }]
-5. wtpAnalysis: WTP 분석 결과 { avgWTP, priceElasticity, recommendations }
-6. timeSeriesPatterns: 시계열 패턴 [{ period, trend, seasonality, anomalies }]
-`;
+**필수 요구사항:**
+아래의 완전한 JSON 형식으로만 응답하세요. 설명 없이 JSON만 반환하세요.
+
+{
+  "nodes": [
+    { "id": "고유ID", "type": "Customer|Product|Brand|Store|Zone|Path|Transaction|Event", "label": "노드명", "properties": {}, "metrics": {} }
+  ],
+  "edges": [
+    { "source": "시작노드ID", "target": "목표노드ID", "type": "purchases|visits|moves_to|contains|located_in|belongs_to|influenced_by|correlated_with", "weight": 0.0~1.0, "properties": {} }
+  ],
+  "insights": [
+    { "title": "인사이트 제목", "description": "상세 설명", "impact": "high|medium|low", "recommendation": "실행 가능한 권장사항" }
+  ],
+  "correlations": [
+    { "factor1": "팩터1명", "factor2": "팩터2명", "correlation": 0.0~1.0, "significance": "설명" }
+  ],
+  "wtpAnalysis": {
+    "avgWTP": "평균 지불 의향 금액",
+    "priceElasticity": "가격 탄력성 수치",
+    "recommendations": ["권장사항1", "권장사항2", "권장사항3"]
+  },
+  "timeSeriesPatterns": [
+    { "period": "기간", "trend": "상승|하락|유지", "seasonality": "계절성 설명", "anomalies": ["이상치 설명"] }
+  ]
+}
+
+위 데이터를 분석하여 각 필드를 모두 채워주세요. 데이터가 부족하면 합리적인 추론을 사용하세요.`;
 
             sendProgress(40, 'analyzing', 'AI 분석 진행 중... (30-60초 소요 예상)');
 
@@ -149,17 +176,38 @@ ${JSON.stringify(dataStats.sampleRecords, null, 2)}
               const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) || content.match(/\{[\s\S]*\}/);
               const jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : content;
               analysisResult = JSON.parse(jsonStr);
+              
+              // 필수 필드 검증 및 기본값 설정
+              analysisResult.nodes = analysisResult.nodes || [];
+              analysisResult.edges = analysisResult.edges || [];
+              analysisResult.insights = analysisResult.insights || [];
+              analysisResult.correlations = analysisResult.correlations || [];
+              analysisResult.wtpAnalysis = analysisResult.wtpAnalysis || {
+                avgWTP: "데이터 부족",
+                priceElasticity: "분석 불가",
+                recommendations: ["더 많은 거래 데이터 수집 필요"]
+              };
+              analysisResult.timeSeriesPatterns = analysisResult.timeSeriesPatterns || [];
+              
+              console.log(`✅ Parsed result: ${analysisResult.nodes.length} nodes, ${analysisResult.edges.length} edges, ${analysisResult.correlations.length} correlations`);
             } catch (e) {
               console.error("⚠️ Failed to parse AI response as JSON:", e);
               analysisResult = {
                 nodes: [],
                 edges: [],
                 insights: [{ 
-                  title: "분석 완료", 
-                  description: aiResponse.choices[0].message.content,
-                  impact: "medium",
-                  recommendation: "상세 분석을 위해 데이터를 확인하세요"
+                  title: "분석 파싱 오류", 
+                  description: "AI 응답을 파싱할 수 없습니다. 데이터 형식을 확인해주세요.",
+                  impact: "high",
+                  recommendation: "데이터를 재확인하고 다시 시도하세요"
                 }],
+                correlations: [],
+                wtpAnalysis: {
+                  avgWTP: "오류",
+                  priceElasticity: "오류",
+                  recommendations: ["분석 재시도 필요"]
+                },
+                timeSeriesPatterns: [],
                 rawResponse: aiResponse.choices[0].message.content
               };
             }
