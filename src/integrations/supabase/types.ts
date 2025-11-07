@@ -41,6 +41,114 @@ export type Database = {
         }
         Relationships: []
       }
+      ontology_entity_types: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          description: string | null
+          icon: string | null
+          id: string
+          label: string
+          name: string
+          properties: Json | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          label: string
+          name: string
+          properties?: Json | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          label?: string
+          name?: string
+          properties?: Json | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ontology_relation_types: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          directionality: string | null
+          id: string
+          label: string
+          name: string
+          properties: Json | null
+          source_entity_type: string
+          target_entity_type: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          directionality?: string | null
+          id?: string
+          label: string
+          name: string
+          properties?: Json | null
+          source_entity_type: string
+          target_entity_type: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          directionality?: string | null
+          id?: string
+          label?: string
+          name?: string
+          properties?: Json | null
+          source_entity_type?: string
+          target_entity_type?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ontology_schema_versions: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          schema_data: Json
+          user_id: string
+          version_number: number
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          schema_data: Json
+          user_id: string
+          version_number: number
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          schema_data?: Json
+          user_id?: string
+          version_number?: number
+        }
+        Relationships: []
+      }
       user_classification_patterns: {
         Row: {
           classified_as: string
