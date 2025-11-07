@@ -18,8 +18,11 @@ interface ZoneContributionProps {
 }
 
 export const ZoneContribution = ({ zoneData, totalSales }: ZoneContributionProps) => {
+  // 데이터 유효성 검증
+  const validZoneData = Array.isArray(zoneData) ? zoneData : [];
+  
   // Zone별 매출 기여도 계산
-  const sortedZones = [...zoneData]
+  const sortedZones = [...validZoneData]
     .map(zone => ({
       ...zone,
       sales: zone.sales || 0,
@@ -29,12 +32,16 @@ export const ZoneContribution = ({ zoneData, totalSales }: ZoneContributionProps
     .sort((a, b) => b.contribution - a.contribution);
 
   const topZones = sortedZones.slice(0, 5);
-  const maxContribution = Math.max(...sortedZones.map(z => z.contribution));
+  const maxContribution = sortedZones.length > 0 ? Math.max(...sortedZones.map(z => z.contribution), 0) : 0;
 
   // 전체 통계
-  const totalVisits = zoneData.reduce((sum, z) => sum + z.visits, 0);
-  const avgConversion = sortedZones.reduce((sum, z) => sum + z.conversion_rate, 0) / sortedZones.length;
-  const avgDwellTime = zoneData.reduce((sum, z) => sum + (z.avg_dwell_time || 0), 0) / zoneData.length;
+  const totalVisits = validZoneData.reduce((sum, z) => sum + (z.visits || 0), 0);
+  const avgConversion = sortedZones.length > 0 
+    ? sortedZones.reduce((sum, z) => sum + z.conversion_rate, 0) / sortedZones.length 
+    : 0;
+  const avgDwellTime = validZoneData.length > 0
+    ? validZoneData.reduce((sum, z) => sum + (z.avg_dwell_time || 0), 0) / validZoneData.length
+    : 0;
 
   return (
     <div className="space-y-6">

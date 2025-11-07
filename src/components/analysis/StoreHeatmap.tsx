@@ -31,8 +31,12 @@ export const StoreHeatmap = ({ zoneCoordinates, trafficData }: StoreHeatmapProps
   const [intensity, setIntensity] = useState([50]);
   const [radius, setRadius] = useState([30]);
 
+  // 데이터 유효성 검증
+  const validTrafficData = Array.isArray(trafficData) ? trafficData : [];
+  const validZoneCoordinates = Array.isArray(zoneCoordinates) ? zoneCoordinates : [];
+
   useEffect(() => {
-    if (!canvasRef.current || zoneCoordinates.length === 0) return;
+    if (!canvasRef.current || validZoneCoordinates.length === 0) return;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
@@ -43,34 +47,42 @@ export const StoreHeatmap = ({ zoneCoordinates, trafficData }: StoreHeatmapProps
     const height = canvas.height = 600;
 
     // 좌표 정규화
-    const xCoords = zoneCoordinates.map(z => z.x);
-    const yCoords = zoneCoordinates.map(z => z.y);
+    const xCoords = validZoneCoordinates.map(z => z.x).filter(x => typeof x === 'number' && !isNaN(x));
+    const yCoords = validZoneCoordinates.map(z => z.y).filter(y => typeof y === 'number' && !isNaN(y));
+    
+    if (xCoords.length === 0 || yCoords.length === 0) return;
+    
     const minX = Math.min(...xCoords);
     const maxX = Math.max(...xCoords);
     const minY = Math.min(...yCoords);
     const maxY = Math.max(...yCoords);
 
-    const normalizeX = (x: number) => ((x - minX) / (maxX - minX)) * (width - 100) + 50;
-    const normalizeY = (y: number) => ((y - minY) / (maxY - minY)) * (height - 100) + 50;
+    const normalizeX = (x: number) => ((x - minX) / (maxX - minX || 1)) * (width - 100) + 50;
+    const normalizeY = (y: number) => ((y - minY) / (maxY - minY || 1)) * (height - 100) + 50;
 
     // Zone별 방문 빈도 계산
     const zoneVisits = new Map<string, number>();
-    trafficData.forEach(traffic => {
-      traffic.zones.forEach(zoneId => {
-        zoneVisits.set(zoneId, (zoneVisits.get(zoneId) || 0) + 1);
+    validTrafficData.forEach(traffic => {
+      const zones = Array.isArray(traffic.zones) ? traffic.zones : [];
+      zones.forEach(zoneId => {
+        if (zoneId) {
+          zoneVisits.set(zoneId, (zoneVisits.get(zoneId) || 0) + 1);
+        }
       });
     });
 
-    const maxVisits = Math.max(...Array.from(zoneVisits.values()));
+    const maxVisits = Math.max(...Array.from(zoneVisits.values()), 1);
 
     // 배경 그리기
     ctx.fillStyle = '#0A1020';
     ctx.fillRect(0, 0, width, height);
 
     // 히트맵 그리기 (방사형 그라디언트)
-    zoneCoordinates.forEach(zone => {
+    validZoneCoordinates.forEach(zone => {
+      if (typeof zone.x !== 'number' || typeof zone.y !== 'number' || isNaN(zone.x) || isNaN(zone.y)) return;
+      
       const visits = zoneVisits.get(zone.zone_id) || 0;
-      const heatIntensity = visits / maxVisits;
+      const heatIntensity = maxVisits > 0 ? visits / maxVisits : 0;
       const x = normalizeX(zone.x);
       const y = normalizeY(zone.y);
       const r = radius[0];
@@ -88,7 +100,9 @@ export const StoreHeatmap = ({ zoneCoordinates, trafficData }: StoreHeatmapProps
     });
 
     // Zone 포인트 및 라벨 그리기
-    zoneCoordinates.forEach(zone => {
+    validZoneCoordinates.forEach(zone => {
+      if (typeof zone.x !== 'number' || typeof zone.y !== 'number' || isNaN(zone.x) || isNaN(zone.y)) return;
+      
       const visits = zoneVisits.get(zone.zone_id) || 0;
       const x = normalizeX(zone.x);
       const y = normalizeY(zone.y);
@@ -114,11 +128,14 @@ export const StoreHeatmap = ({ zoneCoordinates, trafficData }: StoreHeatmapProps
       }
     });
 
-  }, [zoneCoordinates, trafficData, intensity, radius]);
+  }, [validZoneCoordinates, validTrafficData, intensity, radius]);
 
-  const totalVisits = trafficData.reduce((sum, t) => sum + t.zones.length, 0);
-  const uniqueCustomers = new Set(trafficData.map(t => t.person_id)).size;
-  const avgZonesPerCustomer = totalVisits / uniqueCustomers;
+  const totalVisits = validTrafficData.reduce((sum, t) => {
+    const zones = Array.isArray(t.zones) ? t.zones : [];
+    return sum + zones.length;
+  }, 0);
+  const uniqueCustomers = new Set(validTrafficData.map(t => t.person_id).filter(Boolean)).size;
+  const avgZonesPerCustomer = uniqueCustomers > 0 ? totalVisits / uniqueCustomers : 0;
 
   return (
     <Card>

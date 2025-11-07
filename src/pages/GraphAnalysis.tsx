@@ -458,8 +458,19 @@ const GraphAnalysis = () => {
             {analysisResult && (() => {
               // 실제 데이터 추출
               const selectedData = imports.filter(imp => selectedImportIds.includes(imp.id));
-              const trafficData = selectedData.find(d => d.file_name?.includes('tracking_zone'))?.raw_data || [];
-              const zoneCoordinates = selectedData.find(d => d.file_name?.includes('zone') && d.file_name?.includes('coordinates'))?.raw_data || [];
+              const trafficDataRaw = selectedData.find(d => d.file_name?.includes('tracking_zone'))?.raw_data;
+              const zoneCoordinatesRaw = selectedData.find(d => d.file_name?.includes('zone') && d.file_name?.includes('coordinates'))?.raw_data;
+              
+              // 데이터 유효성 검증
+              const trafficData = Array.isArray(trafficDataRaw) ? trafficDataRaw : [];
+              const zoneCoordinates = Array.isArray(zoneCoordinatesRaw) ? zoneCoordinatesRaw : [];
+              
+              console.log('📊 Heatmap Data:', { 
+                trafficCount: trafficData.length, 
+                zoneCount: zoneCoordinates.length,
+                sampleTraffic: trafficData[0],
+                sampleZone: zoneCoordinates[0]
+              });
               
               // Zone별 매출 데이터 추출 (매출 데이터에서)
               const salesData = selectedData.filter(d => d.data_type === 'sales');
