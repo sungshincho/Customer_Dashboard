@@ -30,7 +30,7 @@ export const AnalysisHistory = ({ analysisType, refreshTrigger }: AnalysisHistor
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data, error } = await supabase
+      const { data, error} = await (supabase as any)
         .from('analysis_history')
         .select('*')
         .eq('user_id', user.id)
@@ -58,7 +58,7 @@ export const AnalysisHistory = ({ analysisType, refreshTrigger }: AnalysisHistor
 
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('analysis_history')
         .delete()
         .eq('id', id);

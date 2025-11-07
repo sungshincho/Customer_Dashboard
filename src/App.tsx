@@ -25,6 +25,7 @@ import CustomerJourneyPage from "./pages/CustomerJourneyPage";
 import ConversionFunnelPage from "./pages/ConversionFunnelPage";
 import HQStoreSyncPage from "./pages/HQStoreSyncPage";
 import DataImport from "./pages/DataImport";
+import GraphAnalysis from "./pages/GraphAnalysis";
 
 const queryClient = new QueryClient();
 
@@ -170,6 +171,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <DataImport />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/graph-analysis"
+              element={
+                <ProtectedRoute>
+                  <GraphAnalysis />
                 </ProtectedRoute>
               }
             />

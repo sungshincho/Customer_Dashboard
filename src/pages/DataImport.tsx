@@ -43,7 +43,7 @@ const DataImport = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("user_data_imports")
         .select("*")
         .order("created_at", { ascending: false });
@@ -168,8 +168,7 @@ const DataImport = () => {
       const parsedData = await parseFile(file);
       console.log("✅ File parsed, rows:", parsedData.length);
       
-      console.log("💾 Inserting to database...");
-      const { error } = await supabase.from("user_data_imports").insert({
+      const { error } = await (supabase as any).from("user_data_imports").insert({
         user_id: user.id,
         file_name: file.name,
         file_type: file.name.split(".").pop() || "unknown",
@@ -212,7 +211,7 @@ const DataImport = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("user_data_imports")
         .delete()
         .eq("id", id);
@@ -276,7 +275,7 @@ const DataImport = () => {
       const apiData = await response.json();
       const dataArray = Array.isArray(apiData) ? apiData : [apiData];
 
-      const { error } = await supabase.from("user_data_imports").insert({
+      const { error } = await (supabase as any).from("user_data_imports").insert({
         user_id: user.id,
         file_name: `API_${new Date().toISOString()}`,
         file_type: "api",

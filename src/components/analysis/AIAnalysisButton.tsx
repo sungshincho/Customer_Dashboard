@@ -44,7 +44,7 @@ export const AIAnalysisButton = ({ analysisType, data, title = "AI 분석 요청
       
       // Save to history
       if (user) {
-        await supabase.from('analysis_history').insert({
+        await (supabase as any).from('analysis_history').insert({
           user_id: user.id,
           analysis_type: analysisType,
           input_data: data,
