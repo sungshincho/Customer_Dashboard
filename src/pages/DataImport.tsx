@@ -22,6 +22,7 @@ interface ImportedData {
   row_count: number;
   created_at: string;
   raw_data: any;
+  sheet_name?: string;
 }
 
 const DataImport = () => {
@@ -78,7 +79,7 @@ const DataImport = () => {
     }
   };
 
-  const parseFile = async (file: File): Promise<any[]> => {
+  const parseFile = async (file: File): Promise<{sheets: {name: string, data: any[]}[]} | any[]> => {
     const fileType = file.name.split(".").pop()?.toLowerCase();
     
     return new Promise((resolve, reject) => {
@@ -91,25 +92,24 @@ const DataImport = () => {
           if (fileType === "csv" || fileType === "xlsx" || fileType === "xls") {
             const workbook = XLSX.read(data, { type: "binary" });
             
-            // 모든 시트의 데이터를 합침
-            let allData: any[] = [];
-            workbook.SheetNames.forEach((sheetName) => {
+            // 각 시트를 개별적으로 파싱
+            const sheets = workbook.SheetNames.map((sheetName) => {
               const sheet = workbook.Sheets[sheetName];
               const jsonData = XLSX.utils.sheet_to_json(sheet, { defval: null });
-              
-              // 실제 데이터가 있는 시트만 추가 (3개 이하는 설정 페이지)
-              if (jsonData.length > 3) {
-                allData = [...allData, ...jsonData];
-              }
-            });
+              return {
+                name: sheetName,
+                data: jsonData
+              };
+            }).filter(sheet => sheet.data.length > 0); // 빈 시트 제외
             
-            // 데이터가 없으면 첫 시트 포함
-            if (allData.length === 0) {
-              const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-              allData = XLSX.utils.sheet_to_json(firstSheet);
+            // 시트가 여러 개면 시트별로 구분, 하나면 데이터만 반환
+            if (sheets.length > 1) {
+              resolve({ sheets });
+            } else if (sheets.length === 1) {
+              resolve(sheets[0].data);
+            } else {
+              resolve([]);
             }
-            
-            resolve(allData);
           } else if (fileType === "json") {
             const jsonData = JSON.parse(data as string);
             resolve(Array.isArray(jsonData) ? jsonData : [jsonData]);
@@ -183,28 +183,57 @@ const DataImport = () => {
 
       console.log("📦 Parsing file...");
       const parsedData = await parseFile(file);
-      console.log("✅ File parsed, rows:", parsedData.length);
+      console.log("✅ File parsed:", parsedData);
       
-      const { error } = await (supabase as any).from("user_data_imports").insert({
-        user_id: user.id,
-        file_name: file.name,
-        file_type: file.name.split(".").pop() || "unknown",
-        data_type: dataType,
-        raw_data: parsedData,
-        row_count: parsedData.length,
-      });
+      // 여러 시트가 있는 경우 각 시트를 개별 레코드로 저장
+      if (parsedData && typeof parsedData === 'object' && 'sheets' in parsedData) {
+        const sheets = parsedData.sheets as {name: string, data: any[]}[];
+        const inserts = sheets.map(sheet => ({
+          user_id: user.id,
+          file_name: file.name,
+          file_type: file.name.split(".").pop() || "unknown",
+          data_type: dataType,
+          raw_data: sheet.data,
+          row_count: sheet.data.length,
+          sheet_name: sheet.name,
+        }));
 
-      if (error) {
-        console.error("❌ Database error:", error);
-        throw error;
+        const { error } = await (supabase as any).from("user_data_imports").insert(inserts);
+
+        if (error) {
+          console.error("❌ Database error:", error);
+          throw error;
+        }
+
+        const totalRows = sheets.reduce((sum, sheet) => sum + sheet.data.length, 0);
+        toast({
+          title: "업로드 완료",
+          description: `${sheets.length}개 시트, 총 ${totalRows}개의 데이터가 성공적으로 임포트되었습니다.`,
+        });
+      } else {
+        // 단일 시트 또는 CSV
+        const dataArray = Array.isArray(parsedData) ? parsedData : [parsedData];
+        const { error } = await (supabase as any).from("user_data_imports").insert({
+          user_id: user.id,
+          file_name: file.name,
+          file_type: file.name.split(".").pop() || "unknown",
+          data_type: dataType,
+          raw_data: dataArray,
+          row_count: dataArray.length,
+        });
+
+        if (error) {
+          console.error("❌ Database error:", error);
+          throw error;
+        }
+
+        toast({
+          title: "업로드 완료",
+          description: `${dataArray.length}개의 데이터가 성공적으로 임포트되었습니다.`,
+        });
       }
 
       console.log("✅ Upload completed successfully");
-      toast({
-        title: "업로드 완료",
-        description: `${parsedData.length}개의 데이터가 성공적으로 임포트되었습니다.`,
-      });
-
       setFile(null);
       setDataType("");
       
@@ -539,6 +568,7 @@ const DataImport = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>파일명</TableHead>
+                    <TableHead>시트명</TableHead>
                     <TableHead>데이터 유형</TableHead>
                     <TableHead>행 수</TableHead>
                     <TableHead>업로드 일시</TableHead>
@@ -552,6 +582,13 @@ const DataImport = () => {
                         {item.file_name}
                         {item.file_type === "api" && (
                           <Badge variant="outline" className="ml-2">API</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {item.sheet_name ? (
+                          <Badge variant="outline">{item.sheet_name}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">-</span>
                         )}
                       </TableCell>
                       <TableCell>

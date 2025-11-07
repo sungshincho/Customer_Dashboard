@@ -297,29 +297,59 @@ const GraphAnalysis = () => {
                   </Button>
                 </div>
                 <div className="space-y-2 max-h-[200px] overflow-y-auto border rounded-lg p-3">
-                  {imports.map((imp) => (
-                    <div key={imp.id} className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id={`import-${imp.id}`}
-                        checked={selectedImportIds.includes(imp.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedImportIds([...selectedImportIds, imp.id]);
-                          } else {
-                            setSelectedImportIds(selectedImportIds.filter(id => id !== imp.id));
-                          }
-                        }}
-                        className="rounded border-input"
-                      />
-                      <Label 
-                        htmlFor={`import-${imp.id}`} 
-                        className="text-sm cursor-pointer flex-1"
-                      >
-                        {imp.file_name} ({imp.data_type})
-                      </Label>
-                    </div>
-                  ))}
+                  {(() => {
+                    // 파일별로 그룹화
+                    const groupedImports = imports.reduce((acc, imp) => {
+                      const key = imp.file_name;
+                      if (!acc[key]) acc[key] = [];
+                      acc[key].push(imp);
+                      return acc;
+                    }, {} as Record<string, any[]>);
+
+                    return Object.entries(groupedImports).map(([fileName, fileImports]: [string, any[]]) => (
+                      <div key={fileName} className="space-y-1">
+                        {fileImports.length > 1 && (
+                          <div className="font-medium text-sm text-muted-foreground px-2 py-1 bg-muted/50 rounded">
+                            {fileName}
+                          </div>
+                        )}
+                        {fileImports.map((imp: any) => (
+                          <div key={imp.id} className="flex items-center space-x-2 pl-2">
+                            <input
+                              type="checkbox"
+                              id={`import-${imp.id}`}
+                              checked={selectedImportIds.includes(imp.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedImportIds([...selectedImportIds, imp.id]);
+                                } else {
+                                  setSelectedImportIds(selectedImportIds.filter(id => id !== imp.id));
+                                }
+                              }}
+                              className="rounded border-input"
+                            />
+                            <Label 
+                              htmlFor={`import-${imp.id}`} 
+                              className="text-sm cursor-pointer flex-1"
+                            >
+                              {fileImports.length > 1 ? (
+                                <>
+                                  <Badge variant="outline" className="mr-2">{imp.sheet_name || '시트1'}</Badge>
+                                  ({imp.data_type}, {imp.row_count.toLocaleString()}개)
+                                </>
+                              ) : (
+                                <>
+                                  {imp.file_name}
+                                  {imp.sheet_name && <Badge variant="outline" className="ml-2">{imp.sheet_name}</Badge>}
+                                  <span className="text-muted-foreground ml-1">({imp.data_type}, {imp.row_count.toLocaleString()}개)</span>
+                                </>
+                              )}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    ));
+                  })()}
                 </div>
               </div>
 
