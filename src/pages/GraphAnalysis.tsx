@@ -9,13 +9,12 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Network, TrendingUp, AlertCircle, Zap } from "lucide-react";
+import { Network } from "lucide-react";
 import ForceGraph2D from "react-force-graph-2d";
 import { normalizeMultipleDatasets } from "@/utils/dataNormalizer";
-import { SCHEMA_MAP } from "@/utils/dataSchemas";
 import { InsightsDashboard } from "@/components/analysis/InsightsDashboard";
-import { StoreHeatmap } from "@/components/analysis/StoreHeatmap";
-import { ZoneContribution } from "@/components/analysis/ZoneContribution";
+import { CorrelationAnalysis } from "@/components/analysis/CorrelationAnalysis";
+import { WTPAnalysisView } from "@/components/analysis/WTPAnalysisView";
 
 interface Node {
   id: string;
@@ -58,9 +57,6 @@ const GraphAnalysis = () => {
   const [analysisStage, setAnalysisStage] = useState('');
   const [analysisMessage, setAnalysisMessage] = useState('');
   const [estimatedTime, setEstimatedTime] = useState('');
-  const [showMappingReview, setShowMappingReview] = useState(false);
-  const [normalizedDatasets, setNormalizedDatasets] = useState<Record<string, any>>({});
-  const [editedMappings, setEditedMappings] = useState<Record<string, Record<string, string>>>({});
   const [nodeRelations, setNodeRelations] = useState<Record<string, boolean>>({
     purchases: true,
     visits: true,
@@ -99,55 +95,11 @@ const GraphAnalysis = () => {
     }
   };
 
-  const handlePrepareAnalysis = async () => {
+  const handleAnalyze = async () => {
     if (selectedImportIds.length === 0) {
       toast({
         title: "데이터 선택 필요",
         description: "분석할 데이터를 선택해주세요.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const selectedImports = imports.filter(imp => selectedImportIds.includes(imp.id));
-    if (selectedImports.length === 0) return;
-
-    // 데이터 정규화 수행
-    const normalized = normalizeMultipleDatasets(
-      selectedImports.map(imp => ({
-        raw_data: imp.raw_data,
-        data_type: imp.data_type
-      }))
-    );
-    
-    setNormalizedDatasets(normalized);
-    
-    // 초기 매핑 설정 (자동 매핑 결과)
-    const initialMappings: Record<string, Record<string, string>> = {};
-    Object.entries(normalized).forEach(([key, ds]) => {
-      initialMappings[key] = ds.metadata.column_mappings;
-    });
-    setEditedMappings(initialMappings);
-    
-    // 매핑 검토 단계로 이동
-    setShowMappingReview(true);
-    
-    // 평균 품질 점수 확인
-    const avgQuality = Object.values(normalized).reduce((sum: number, ds: any) => 
-      sum + ds.metadata.quality_score, 0
-    ) / Object.keys(normalized).length;
-    
-    toast({
-      title: "매핑 검토 준비 완료",
-      description: `자동 매핑 정확도: ${(avgQuality * 100).toFixed(0)}%. 매핑을 확인하고 수정하세요.`,
-    });
-  };
-
-  const handleAnalyze = async () => {
-    if (Object.keys(normalizedDatasets).length === 0) {
-      toast({
-        title: "매핑 검토 필요",
-        description: "먼저 데이터 매핑을 확인해주세요.",
         variant: "destructive",
       });
       return;
@@ -159,43 +111,26 @@ const GraphAnalysis = () => {
     setAnalysisMessage('분석 준비 중...');
     
     try {
-      // 수정된 매핑을 적용한 데이터 재생성
       const selectedImports = imports.filter(imp => selectedImportIds.includes(imp.id));
-      const remappedDatasets: Record<string, any> = {};
-      
-      Object.entries(normalizedDatasets).forEach(([key, ds]) => {
-        const editedMapping = editedMappings[key] || ds.metadata.column_mappings;
-        
-        // 매핑 적용하여 데이터 재생성
-        const mappedData = ds.mapped_data.map((row: any) => {
-          const remapped: any = {};
-          Object.entries(editedMapping).forEach(([schemaCol, rawCol]: [string, string]) => {
-            if (row._original && row._original[rawCol as string] !== undefined) {
-              remapped[schemaCol as string] = row._original[rawCol as string];
-            }
-          });
-          remapped._original = row._original;
-          return remapped;
-        });
-        
-        remappedDatasets[key] = {
-          ...ds,
-          mapped_data: mappedData,
-          metadata: {
-            ...ds.metadata,
-            column_mappings: editedMapping,
-          }
-        };
-      });
+      if (selectedImports.length === 0) throw new Error("선택한 데이터를 찾을 수 없습니다.");
+
+      // 데이터 정규화
+      setAnalysisMessage('데이터 구조 정규화 중...');
+      const normalizedDatasets = normalizeMultipleDatasets(
+        selectedImports.map(imp => ({
+          raw_data: imp.raw_data,
+          data_type: imp.data_type
+        }))
+      );
       
       // 정규화된 데이터 통합
-      const combinedData = Object.values(remappedDatasets).flatMap((ds: any) => ds.mapped_data);
-      const analysisTypes = Object.values(remappedDatasets).map((ds: any) => ds.schema_type).join(', ');
+      const combinedData = Object.values(normalizedDatasets).flatMap((ds: any) => ds.mapped_data);
+      const analysisTypes = Object.values(normalizedDatasets).map((ds: any) => ds.schema_type).join(', ');
       
       // 데이터 품질 체크
-      const avgQuality = Object.values(remappedDatasets).reduce((sum: number, ds: any) => 
+      const avgQuality = Object.values(normalizedDatasets).reduce((sum: number, ds: any) => 
         sum + ds.metadata.quality_score, 0
-      ) / Object.keys(remappedDatasets).length;
+      ) / Object.keys(normalizedDatasets).length;
       
       if (avgQuality < 0.4) {
         toast({
@@ -220,7 +155,7 @@ const GraphAnalysis = () => {
 
       // 정규화된 메타데이터도 함께 전송
       const metadata = {
-        datasets: Object.entries(remappedDatasets).map(([key, ds]: [string, any]) => ({
+        datasets: Object.entries(normalizedDatasets).map(([key, ds]: [string, any]) => ({
           key,
           schema_type: ds.schema_type,
           record_count: ds.metadata.total_records,
@@ -469,152 +404,17 @@ const GraphAnalysis = () => {
               )}
 
               <Button 
-                onClick={handlePrepareAnalysis} 
+                onClick={handleAnalyze} 
                 disabled={selectedImportIds.length === 0 || isAnalyzing}
                 className="w-full"
               >
                 <Network className="mr-2 h-4 w-4" />
-                매핑 확인 및 분석 ({selectedImportIds.length}개)
+                {isAnalyzing ? "분석 중..." : `분석 시작 (${selectedImportIds.length}개)`}
               </Button>
             </CardContent>
           </Card>
 
           <div className="md:col-span-2 space-y-6">
-            {showMappingReview && Object.keys(normalizedDatasets).length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span>데이터 매핑 검토</span>
-                    <Badge variant={
-                      Object.values(normalizedDatasets).some((ds: any) => ds.metadata.quality_score < 0.5)
-                        ? "destructive"
-                        : "default"
-                    }>
-                      평균 정확도: {(
-                        Object.values(normalizedDatasets).reduce((sum: number, ds: any) => 
-                          sum + ds.metadata.quality_score, 0
-                        ) / Object.keys(normalizedDatasets).length * 100
-                      ).toFixed(0)}%
-                    </Badge>
-                  </CardTitle>
-                  <CardDescription>
-                    자동 매핑 결과를 확인하고 수정하세요. 올바른 매핑이 분석 품질을 결정합니다.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {Object.entries(normalizedDatasets).map(([key, dataset]: [string, any], idx) => {
-                    const selectedImport = imports.find((imp, i) => 
-                      selectedImportIds.includes(imp.id) && 
-                      `dataset_${selectedImportIds.indexOf(imp.id)}_${imp.data_type}` === key
-                    );
-                    const schema = dataset.schema_type;
-                    const mappings = editedMappings[key] || {};
-                    const schemaDefinition = SCHEMA_MAP[schema];
-
-                    if (!schemaDefinition) return null;
-
-                    return (
-                      <div key={key} className="border rounded-lg p-4 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h3 className="font-semibold">{selectedImport?.file_name || `데이터셋 ${idx + 1}`}</h3>
-                            <p className="text-sm text-muted-foreground">
-                              타입: {schema} | {dataset.metadata.total_records.toLocaleString()}개 레코드
-                            </p>
-                          </div>
-                          <Badge variant={dataset.metadata.quality_score >= 0.7 ? "default" : 
-                                         dataset.metadata.quality_score >= 0.4 ? "secondary" : "destructive"}>
-                            {(dataset.metadata.quality_score * 100).toFixed(0)}%
-                          </Badge>
-                        </div>
-
-                        <div className="border rounded-lg overflow-hidden">
-                          <table className="w-full text-sm">
-                            <thead className="bg-muted/50">
-                              <tr>
-                                <th className="text-left p-2 font-medium">스키마 필드</th>
-                                <th className="text-left p-2 font-medium">원본 컬럼</th>
-                                <th className="text-center p-2 font-medium w-20">필수</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {schemaDefinition.columns.map((col) => (
-                                <tr key={col.name} className="border-t">
-                                  <td className="p-2">
-                                    <div>
-                                      <code className="text-xs bg-muted px-1 py-0.5 rounded">{col.name}</code>
-                                      <p className="text-xs text-muted-foreground mt-1">{col.description}</p>
-                                    </div>
-                                  </td>
-                                  <td className="p-2">
-                                    <Select
-                                      value={mappings[col.name] || "_unmapped"}
-                                      onValueChange={(value) => {
-                                        setEditedMappings(prev => ({
-                                          ...prev,
-                                          [key]: {
-                                            ...prev[key],
-                                            [col.name]: value === "_unmapped" ? "" : value
-                                          }
-                                        }));
-                                      }}
-                                    >
-                                      <SelectTrigger className="h-8">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="_unmapped">
-                                          <span className="text-muted-foreground italic">미매핑</span>
-                                        </SelectItem>
-                                        {dataset.original_columns.map((rawCol: string) => (
-                                          <SelectItem key={rawCol} value={rawCol}>
-                                            {rawCol}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </td>
-                                  <td className="p-2 text-center">
-                                    {col.required ? (
-                                      <Badge variant="destructive" className="text-xs">필수</Badge>
-                                    ) : (
-                                      <span className="text-muted-foreground">선택</span>
-                                    )}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  <div className="flex gap-3">
-                    <Button 
-                      onClick={() => {
-                        setShowMappingReview(false);
-                        setNormalizedDatasets({});
-                        setEditedMappings({});
-                      }}
-                      variant="outline"
-                      className="flex-1"
-                    >
-                      취소
-                    </Button>
-                    <Button 
-                      onClick={handleAnalyze}
-                      disabled={isAnalyzing}
-                      className="flex-1"
-                    >
-                      <Zap className="mr-2 h-4 w-4" />
-                      {isAnalyzing ? "분석 중..." : "분석 시작"}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
             <Card>
               <CardHeader>
                 <CardTitle>네트워크 그래프</CardTitle>
@@ -660,114 +460,32 @@ const GraphAnalysis = () => {
               </CardContent>
             </Card>
 
-            {analysisResult && (() => {
-              // 실제 데이터 추출
-              const selectedData = imports.filter(imp => selectedImportIds.includes(imp.id));
-              const trafficDataRaw = selectedData.find(d => d.file_name?.includes('tracking_zone'))?.raw_data;
-              const zoneCoordinatesRaw = selectedData.find(d => d.file_name?.includes('zone') && d.file_name?.includes('coordinates'))?.raw_data;
-              
-              // 데이터 유효성 검증
-              const trafficData = Array.isArray(trafficDataRaw) ? trafficDataRaw : [];
-              const zoneCoordinates = Array.isArray(zoneCoordinatesRaw) ? zoneCoordinatesRaw : [];
-              
-              console.log('📊 Heatmap Data:', { 
-                trafficCount: trafficData.length, 
-                zoneCount: zoneCoordinates.length,
-                sampleTraffic: trafficData[0],
-                sampleZone: zoneCoordinates[0]
-              });
-              
-              // Zone별 매출 데이터 추출 (매출 데이터에서)
-              const salesData = selectedData.filter(d => d.data_type === 'sales');
-              const zoneVisits = new Map<string, number>();
-              const zoneSales = new Map<string, number>();
-              
-              // 방문 빈도 계산
-              trafficData.forEach((traffic: any) => {
-                const zones = traffic.zones || traffic.zone_path || [];
-                if (Array.isArray(zones)) {
-                  zones.forEach((zoneId: string) => {
-                    zoneVisits.set(zoneId, (zoneVisits.get(zoneId) || 0) + 1);
-                  });
-                }
-              });
-              
-              // Zone별 매출 데이터 (임시 - 실제로는 product_location 등과 연계 필요)
-              const zoneContributionData = Array.from(zoneVisits.entries()).map(([zoneId, visits]) => {
-                const zone = zoneCoordinates.find((z: any) => z.zone_id === zoneId || z.id === zoneId);
-                return {
-                  zone_id: zoneId,
-                  zone_name: zone?.zone_name || zone?.name || zoneId,
-                  visits,
-                  sales: Math.floor(visits * 10000 * Math.random()), // 임시 매출 데이터
-                  conversion_rate: 0.15 + Math.random() * 0.3,
-                  avg_dwell_time: 30 + Math.random() * 90
-                };
-              });
-              
-              const totalSales = zoneContributionData.reduce((sum, z) => sum + z.sales, 0);
-              
-              return (
-                <Tabs defaultValue="analysis">
-                  <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="analysis">통합 분석</TabsTrigger>
-                    <TabsTrigger value="heatmap">매장 히트맵</TabsTrigger>
-                    <TabsTrigger value="contribution">Zone 기여도</TabsTrigger>
-                  </TabsList>
+            {analysisResult && (
+              <Tabs defaultValue="analysis">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="analysis">통합 분석</TabsTrigger>
+                  <TabsTrigger value="correlation">핵심 상관관계</TabsTrigger>
+                  <TabsTrigger value="wtp">WTP 분석</TabsTrigger>
+                </TabsList>
 
-                  <TabsContent value="analysis" className="space-y-4">
-                    <InsightsDashboard
-                      insights={analysisResult.insights || []}
-                      correlations={analysisResult.correlations}
-                      wtpAnalysis={analysisResult.wtpAnalysis}
-                      summary={(analysisResult as any).summary}
-                    />
-                  </TabsContent>
+                <TabsContent value="analysis" className="space-y-4">
+                  <InsightsDashboard
+                    insights={analysisResult.insights || []}
+                    correlations={analysisResult.correlations}
+                    wtpAnalysis={analysisResult.wtpAnalysis}
+                    summary={(analysisResult as any).summary}
+                  />
+                </TabsContent>
 
-                  <TabsContent value="heatmap">
-                    {zoneCoordinates.length > 0 && trafficData.length > 0 ? (
-                      <StoreHeatmap
-                        zoneCoordinates={zoneCoordinates}
-                        trafficData={trafficData}
-                      />
-                    ) : (
-                      <Card>
-                        <CardContent className="pt-6">
-                          <div className="text-center text-muted-foreground py-8">
-                            <AlertCircle className="mx-auto h-12 w-12 mb-4" />
-                            <p>히트맵 생성을 위한 데이터가 부족합니다.</p>
-                            <p className="text-sm mt-2">
-                              tracking_zone156 및 zone156_coordinates 데이터를 선택해주세요.
-                            </p>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </TabsContent>
+                <TabsContent value="correlation">
+                  <CorrelationAnalysis correlations={analysisResult.correlations} />
+                </TabsContent>
 
-                  <TabsContent value="contribution">
-                    {zoneContributionData.length > 0 ? (
-                      <ZoneContribution
-                        zoneData={zoneContributionData}
-                        totalSales={totalSales}
-                      />
-                    ) : (
-                      <Card>
-                        <CardContent className="pt-6">
-                          <div className="text-center text-muted-foreground py-8">
-                            <AlertCircle className="mx-auto h-12 w-12 mb-4" />
-                            <p>Zone 기여도 분석을 위한 데이터가 부족합니다.</p>
-                            <p className="text-sm mt-2">
-                              동선 데이터와 매출 데이터를 선택해주세요.
-                            </p>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </TabsContent>
-                </Tabs>
-              );
-            })()}
+                <TabsContent value="wtp">
+                  <WTPAnalysisView wtpAnalysis={analysisResult.wtpAnalysis} />
+                </TabsContent>
+              </Tabs>
+            )}
           </div>
         </div>
       </div>
