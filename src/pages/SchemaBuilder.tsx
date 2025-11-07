@@ -6,8 +6,9 @@ import { EntityTypeManager } from "@/components/schema/EntityTypeManager";
 import { RelationTypeManager } from "@/components/schema/RelationTypeManager";
 import { SchemaVersionManager } from "@/components/schema/SchemaVersionManager";
 import { SchemaValidator } from "@/components/schema/SchemaValidator";
+import { SchemaGraphVisualization } from "@/components/schema/SchemaGraphVisualization";
 import { Badge } from "@/components/ui/badge";
-import { Layers, Link2, History, ShieldCheck } from "lucide-react";
+import { Layers, Link2, History, ShieldCheck, Network } from "lucide-react";
 
 const SchemaBuilder = () => {
   return (
@@ -38,25 +39,33 @@ const SchemaBuilder = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="entities" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+            <Tabs defaultValue="graph" className="w-full">
+              <TabsList className="grid w-full grid-cols-5">
+                <TabsTrigger value="graph" className="flex items-center gap-2">
+                  <Network className="h-4 w-4" />
+                  그래프 뷰
+                </TabsTrigger>
                 <TabsTrigger value="entities" className="flex items-center gap-2">
                   <Layers className="h-4 w-4" />
-                  엔티티 타입
+                  엔티티
                 </TabsTrigger>
                 <TabsTrigger value="relations" className="flex items-center gap-2">
                   <Link2 className="h-4 w-4" />
-                  관계 타입
+                  관계
                 </TabsTrigger>
                 <TabsTrigger value="versions" className="flex items-center gap-2">
                   <History className="h-4 w-4" />
-                  버전 관리
+                  버전
                 </TabsTrigger>
                 <TabsTrigger value="validation" className="flex items-center gap-2">
                   <ShieldCheck className="h-4 w-4" />
-                  검증 결과
+                  검증
                 </TabsTrigger>
               </TabsList>
+
+              <TabsContent value="graph" className="space-y-4 mt-6">
+                <SchemaGraphVisualization />
+              </TabsContent>
 
               <TabsContent value="entities" className="space-y-4 mt-6">
                 <EntityTypeManager />
