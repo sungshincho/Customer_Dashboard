@@ -275,6 +275,10 @@ const DataImport = () => {
           title: "시트 분석 완료",
           description: `${sheets.length}개 시트의 데이터 타입이 자동 분석되었습니다. 검토 후 업로드하세요.`,
         });
+        
+        // 다중 시트의 경우 여기서 업로드 완료 처리하지 않음 (confirmAndUploadSheets에서 처리)
+        setIsUploading(false);
+        return;
       } else {
         // 단일 시트 또는 CSV
         const dataArray = Array.isArray(parsedData) ? parsedData : [parsedData];
@@ -296,17 +300,17 @@ const DataImport = () => {
           title: "업로드 완료",
           description: `${dataArray.length}개의 데이터가 성공적으로 임포트되었습니다.`,
         });
+        
+        console.log("✅ Upload completed successfully");
+        setFile(null);
+        setDataType("");
+        
+        // Reset file input
+        const fileInput = document.getElementById("file") as HTMLInputElement;
+        if (fileInput) fileInput.value = "";
+        
+        loadImports();
       }
-
-      console.log("✅ Upload completed successfully");
-      setFile(null);
-      setDataType("");
-      
-      // Reset file input
-      const fileInput = document.getElementById("file") as HTMLInputElement;
-      if (fileInput) fileInput.value = "";
-      
-      loadImports();
     } catch (error: any) {
       console.error("❌ Upload failed:", error);
       toast({
