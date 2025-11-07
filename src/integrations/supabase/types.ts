@@ -41,6 +41,42 @@ export type Database = {
         }
         Relationships: []
       }
+      user_classification_patterns: {
+        Row: {
+          classified_as: string
+          confidence: number
+          created_at: string
+          id: string
+          pattern_type: string
+          pattern_value: string
+          updated_at: string
+          use_count: number
+          user_id: string
+        }
+        Insert: {
+          classified_as: string
+          confidence?: number
+          created_at?: string
+          id?: string
+          pattern_type: string
+          pattern_value: string
+          updated_at?: string
+          use_count?: number
+          user_id: string
+        }
+        Update: {
+          classified_as?: string
+          confidence?: number
+          created_at?: string
+          id?: string
+          pattern_type?: string
+          pattern_value?: string
+          updated_at?: string
+          use_count?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_data_imports: {
         Row: {
           created_at: string

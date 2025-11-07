@@ -37,6 +37,8 @@ const DataImport = () => {
   const [apiHeaders, setApiHeaders] = useState<string>("");
   const [apiBody, setApiBody] = useState<string>("");
   const [isConnecting, setIsConnecting] = useState(false);
+  const [sheetAnalysis, setSheetAnalysis] = useState<any[]>([]);
+  const [showSheetReview, setShowSheetReview] = useState(false);
   const { toast } = useToast();
 
   const loadImports = async () => {
@@ -163,6 +165,61 @@ const DataImport = () => {
     });
   };
 
+  const confirmAndUploadSheets = async () => {
+    setIsUploading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("로그인이 필요합니다.");
+
+      // 학습 패턴 저장
+      const { learnFromCorrection } = await import('@/utils/classificationLearning');
+      for (const sheet of sheetAnalysis) {
+        const columns = sheet.data.length > 0 ? Object.keys(sheet.data[0]) : [];
+        await learnFromCorrection(sheet.name, columns, sheet.detectedType);
+      }
+
+      // DB에 저장
+      const inserts = sheetAnalysis.map((sheet: any) => ({
+        user_id: user.id,
+        file_name: file!.name,
+        file_type: file!.name.split(".").pop() || "unknown",
+        data_type: sheet.detectedType,
+        raw_data: sheet.data,
+        row_count: sheet.data.length,
+        sheet_name: sheet.name,
+      }));
+
+      const { error } = await (supabase as any).from("user_data_imports").insert(inserts);
+
+      if (error) throw error;
+
+      const totalRows = sheetAnalysis.reduce((sum, sheet) => sum + sheet.data.length, 0);
+      toast({
+        title: "업로드 완료",
+        description: `${sheetAnalysis.length}개 시트, 총 ${totalRows}개의 데이터가 성공적으로 임포트되었습니다.`,
+      });
+
+      // 초기화
+      setFile(null);
+      setDataType("");
+      setSheetAnalysis([]);
+      setShowSheetReview(false);
+      const fileInput = document.getElementById("file") as HTMLInputElement;
+      if (fileInput) fileInput.value = "";
+      
+      loadImports();
+    } catch (error: any) {
+      console.error("❌ Upload failed:", error);
+      toast({
+        title: "업로드 실패",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleUpload = async () => {
     console.log("🔵 Upload button clicked", { file, dataType });
     
@@ -192,40 +249,31 @@ const DataImport = () => {
       // 여러 시트가 있는 경우 각 시트를 개별 레코드로 저장
       if (parsedData && typeof parsedData === 'object' && 'sheets' in parsedData) {
         const sheets = parsedData.sheets as {name: string, data: any[]}[];
-        const inserts = sheets.map(sheet => {
-          // 각 시트의 컬럼명과 시트명을 분석하여 자동 타입 추론
-          const columns = sheet.data.length > 0 ? Object.keys(sheet.data[0]) : [];
-          const searchText = `${sheet.name} ${columns.join(' ')}`;
-          const autoDetectedType = detectDataType(searchText);
-          
-          console.log(`📊 시트 "${sheet.name}" 타입 자동 분석:`, {
-            sheetName: sheet.name,
-            columns: columns.slice(0, 5),
-            autoDetected: autoDetectedType
-          });
-          
-          return {
-            user_id: user.id,
-            file_name: file.name,
-            file_type: file.name.split(".").pop() || "unknown",
-            data_type: autoDetectedType,
-            raw_data: sheet.data,
-            row_count: sheet.data.length,
-            sheet_name: sheet.name,
-          };
-        });
-
-        const { error } = await (supabase as any).from("user_data_imports").insert(inserts);
-
-        if (error) {
-          console.error("❌ Database error:", error);
-          throw error;
-        }
-
-        const totalRows = sheets.reduce((sum, sheet) => sum + sheet.data.length, 0);
+        
+        // 시트별 자동 분류 분석
+        const analysisResults = await Promise.all(
+          sheets.map(async (sheet) => {
+            const columns = sheet.data.length > 0 ? Object.keys(sheet.data[0]) : [];
+            const { detectDataTypeWithLearning } = await import('@/utils/classificationLearning');
+            const result = await detectDataTypeWithLearning(sheet.name, columns);
+            
+            console.log(`📊 시트 "${sheet.name}" 분석 완료:`, result);
+            
+            return {
+              ...sheet,
+              detectedType: result.type,
+              confidence: result.confidence,
+              source: result.source
+            };
+          })
+        );
+        
+        setSheetAnalysis(analysisResults);
+        setShowSheetReview(true);
+        
         toast({
-          title: "업로드 완료",
-          description: `${sheets.length}개 시트, 총 ${totalRows}개의 데이터가 성공적으로 임포트되었습니다.`,
+          title: "시트 분석 완료",
+          description: `${sheets.length}개 시트의 데이터 타입이 자동 분석되었습니다. 검토 후 업로드하세요.`,
         });
       } else {
         // 단일 시트 또는 CSV
@@ -474,6 +522,98 @@ const DataImport = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {/* 시트 검토 UI */}
+            {showSheetReview && sheetAnalysis.length > 0 && (
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>시트 분석 결과</span>
+                    <Badge variant="secondary">
+                      AI 학습 활성화 🧠
+                    </Badge>
+                  </CardTitle>
+                  <CardDescription>
+                    각 시트의 자동 분류 결과를 확인하고 수정하세요. 수정한 내용은 다음 업로드 시 반영됩니다.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {sheetAnalysis.map((sheet: any, idx: number) => (
+                    <div key={idx} className="border rounded-lg p-4 space-y-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-lg">{sheet.name}</h4>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {sheet.data.length.toLocaleString()}개 레코드
+                          </p>
+                          {sheet.source === 'learned' && (
+                            <Badge variant="default" className="mt-2 text-xs">
+                              학습된 패턴 사용 ({(sheet.confidence * 100).toFixed(0)}% 신뢰도)
+                            </Badge>
+                          )}
+                          {sheet.source === 'default' && (
+                            <Badge variant="outline" className="mt-2 text-xs">
+                              기본 감지 ({(sheet.confidence * 100).toFixed(0)}% 신뢰도)
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="w-48">
+                          <Select 
+                            value={sheet.detectedType} 
+                            onValueChange={(value) => {
+                              const updated = [...sheetAnalysis];
+                              updated[idx].detectedType = value;
+                              setSheetAnalysis(updated);
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="sales">매출 데이터</SelectItem>
+                              <SelectItem value="customer">고객 데이터</SelectItem>
+                              <SelectItem value="inventory">재고 데이터</SelectItem>
+                              <SelectItem value="traffic">유동인구 데이터</SelectItem>
+                              <SelectItem value="product">상품 데이터</SelectItem>
+                              <SelectItem value="zone">Zone 데이터</SelectItem>
+                              <SelectItem value="other">기타</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div className="text-xs text-muted-foreground">
+                        주요 컬럼: {sheet.data.length > 0 ? Object.keys(sheet.data[0]).slice(0, 5).join(', ') : '없음'}
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className="flex gap-3 pt-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setShowSheetReview(false);
+                        setSheetAnalysis([]);
+                        setFile(null);
+                        const fileInput = document.getElementById("file") as HTMLInputElement;
+                        if (fileInput) fileInput.value = "";
+                      }}
+                      disabled={isUploading}
+                      className="flex-1"
+                    >
+                      취소
+                    </Button>
+                    <Button
+                      onClick={confirmAndUploadSheets}
+                      disabled={isUploading}
+                      className="flex-1"
+                    >
+                      {isUploading ? "업로드 중..." : "확인 및 업로드"}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="api">
