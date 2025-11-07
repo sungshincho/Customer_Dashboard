@@ -90,9 +90,26 @@ const DataImport = () => {
           
           if (fileType === "csv" || fileType === "xlsx" || fileType === "xls") {
             const workbook = XLSX.read(data, { type: "binary" });
-            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-            const jsonData = XLSX.utils.sheet_to_json(firstSheet);
-            resolve(jsonData);
+            
+            // 모든 시트의 데이터를 합침
+            let allData: any[] = [];
+            workbook.SheetNames.forEach((sheetName) => {
+              const sheet = workbook.Sheets[sheetName];
+              const jsonData = XLSX.utils.sheet_to_json(sheet, { defval: null });
+              
+              // 실제 데이터가 있는 시트만 추가 (3개 이하는 설정 페이지)
+              if (jsonData.length > 3) {
+                allData = [...allData, ...jsonData];
+              }
+            });
+            
+            // 데이터가 없으면 첫 시트 포함
+            if (allData.length === 0) {
+              const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+              allData = XLSX.utils.sheet_to_json(firstSheet);
+            }
+            
+            resolve(allData);
           } else if (fileType === "json") {
             const jsonData = JSON.parse(data as string);
             resolve(Array.isArray(jsonData) ? jsonData : [jsonData]);
