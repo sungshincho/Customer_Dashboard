@@ -97,7 +97,7 @@ serve(async (req) => {
               dataTypes: analysisType,
               columns: columns,
               columnStats: columnStats,
-              sampleRecords: processedData.slice(0, 30)
+              sampleRecords: processedData.slice(0, 100) // 50개에서 100개로 증가
             };
 
             sendProgress(30, 'analyzing', 'AI 모델에 데이터 전송 중...');
@@ -169,17 +169,10 @@ ${dataContext}
 - 분석 샘플: ${processedData.length}개
 - 데이터 품질: ${metadata?.datasets?.map((ds: any) => `${(ds.quality_score * 100).toFixed(0)}%`).join(', ')}
 
-**전체 컬럼 통계 (핵심 정보):**
-컬럼 수: ${columns.length}개
-${Object.entries(dataStats.columnStats).slice(0, 15).map(([col, stat]: [string, any]) => {
-  if (stat.type === 'numeric') {
-    return `- ${col}: 숫자 (평균 ${stat.avg?.toFixed(1)}, 범위 ${stat.min}-${stat.max})`;
-  } else {
-    return `- ${col}: 범주 (${stat.unique}개, 예: ${stat.top.slice(0, 2).map((t: any) => t.value).join(', ')})`;
-  }
-}).join('\n')}
+**전체 컬럼 통계 (실제 데이터):**
+${JSON.stringify(dataStats.columnStats, null, 2)}
 
-**실제 샘플 데이터 (최신 30개 레코드):**
+**실제 샘플 데이터 (최신 100개 레코드):**
 ${JSON.stringify(dataStats.sampleRecords, null, 2)}
 
 **분석 지침:**
@@ -240,42 +233,81 @@ ${JSON.stringify(dataStats.sampleRecords, null, 2)}
                           items: {
                             type: "object",
                             properties: {
-                              id: { type: "string" },
-                              type: { type: "string" },
-                              label: { type: "string" },
-                              properties: { type: "object" },
-                              metrics: { type: "object" }
+                              id: { type: "string", description: "고유 ID (예: C001, P001, S001)" },
+                              type: { type: "string", enum: ["Customer", "Product", "Brand", "Store", "Zone", "Path", "Transaction", "Event"] },
+                              label: { type: "string", description: "표시 이름 (한글)" },
+                              properties: { 
+                                type: "object",
+                                description: "추가 속성 (예: category, value, count 등)"
+                              },
+                              metrics: { 
+                                type: "object",
+                                description: "메트릭 (예: revenue, conversion_rate, frequency 등)"
+                              }
                             },
                             required: ["id", "type", "label"]
                           },
-                          minItems: 6,
-                          maxItems: 10
+                          minItems: 8,
+                          maxItems: 12
                         },
                         edges: {
                           type: "array",
+                          description: "그래프 엣지 10-15개 (노드 간 관계)",
                           items: {
                             type: "object",
                             properties: {
-                              source: { type: "string" },
-                              target: { type: "string" },
-                              type: { type: "string" },
-                              weight: { type: "number" }
+                              source: { type: "string", description: "출발 노드 ID" },
+                              target: { type: "string", description: "도착 노드 ID" },
+                              type: { 
+                                type: "string",
+                                enum: ["purchases", "visits", "moves_to", "contains", "located_in", "belongs_to", "influenced_by", "correlated_with"],
+                                description: "관계 유형"
+                              },
+                              weight: { 
+                                type: "number",
+                                description: "관계 강도 (0.0-1.0)",
+                                minimum: 0,
+                                maximum: 1
+                              },
+                              label: { type: "string", description: "관계 설명 (한글, 선택)" }
                             },
                             required: ["source", "target", "type", "weight"]
                           },
-                          minItems: 6,
-                          maxItems: 12
+                          minItems: 10,
+                          maxItems: 15
                         },
                         insights: {
                           type: "array",
+                          description: "핵심 인사이트 3-5개 (구체적 수치 + 실행 방안)",
                           items: {
                             type: "object",
                             properties: {
-                              category: { type: "string" },
-                              title: { type: "string" },
-                              description: { type: "string" },
-                              impact: { type: "string" },
-                              actionable: { type: "string" }
+                              category: { 
+                                type: "string",
+                                enum: ["매출", "동선", "상품", "전환율", "재고", "가격"],
+                                description: "인사이트 카테고리"
+                              },
+                              title: { 
+                                type: "string",
+                                description: "핵심 발견 (20자 이내, 한글)",
+                                maxLength: 20
+                              },
+                              description: { 
+                                type: "string",
+                                description: "구체적 데이터와 수치 (50-80자, 한글)",
+                                minLength: 50,
+                                maxLength: 80
+                              },
+                              impact: { 
+                                type: "string",
+                                enum: ["high", "medium", "low"],
+                                description: "영향도"
+                              },
+                              actionable: { 
+                                type: "string",
+                                description: "즉시 실행 가능한 액션 (50자 이내, 한글)",
+                                maxLength: 50
+                              }
                             },
                             required: ["category", "title", "description", "impact", "actionable"]
                           },
@@ -284,60 +316,107 @@ ${JSON.stringify(dataStats.sampleRecords, null, 2)}
                         },
                         correlations: {
                           type: "array",
+                          description: "강한 상관관계 3-4개 (r > 0.5)",
                           items: {
                             type: "object",
                             properties: {
-                              factor1: { type: "string" },
-                              factor2: { type: "string" },
-                              correlation: { type: "number" },
-                              correlationPercent: { type: "string" },
-                              insight: { type: "string" },
-                              actionable: { type: "string" }
+                              factor1: { type: "string", description: "첫 번째 요소 (한글)" },
+                              factor2: { type: "string", description: "두 번째 요소 (한글)" },
+                              correlation: { 
+                                type: "number",
+                                description: "상관계수 (-1.0 ~ 1.0)",
+                                minimum: -1,
+                                maximum: 1
+                              },
+                              correlationPercent: { 
+                                type: "string",
+                                description: "상관계수를 %로 표현 (예: '87%')",
+                                pattern: "^\\d+%$"
+                              },
+                              insight: { 
+                                type: "string",
+                                description: "인사이트 (40자 이내, 한글)",
+                                maxLength: 40
+                              },
+                              actionable: { 
+                                type: "string",
+                                description: "실행 방안 (40자 이내, 한글)",
+                                maxLength: 40
+                              }
                             },
                             required: ["factor1", "factor2", "correlation", "correlationPercent", "insight", "actionable"]
                           },
-                          minItems: 2,
+                          minItems: 3,
                           maxItems: 4
                         },
                         wtpAnalysis: {
                           type: "object",
+                          description: "WTP 및 ATV 분석 (거래/매출 데이터 있을 경우). 한글만 사용.",
                           properties: {
-                            avgWTP: { type: "number" },
-                            atv: { type: "number" },
-                            priceElasticityScore: { type: "number" },
+                            avgWTP: { 
+                              type: "number",
+                              description: "평균 지불의사최대금액 = 데이터 기반 추론 (상품가격 평균 × (1 - 평균할인율 × 가격탄력성계수)) (원 단위, 정수)"
+                            },
+                            atv: {
+                              type: "number", 
+                              description: "객단가 ATV = 총 실판매금액 합계 / 총 판매건수 합계 (원 단위, 정수)"
+                            },
+                            priceElasticityScore: {
+                              type: "number",
+                              description: "가격 탄력성 점수 0-10 (높을수록 가격 민감)"
+                            },
                             priceElasticityInsights: {
                               type: "array",
+                              description: "가격 탄력성 핵심 인사이트 2-3개 (각 30자 이내)",
                               items: { type: "string" }
                             },
-                            pricingRecommendation: { type: "string" },
+                            pricingRecommendation: {
+                              type: "string",
+                              description: "가격결정 제안 (구체적인 가격 범위와 근거 포함, 80자 이내)"
+                            },
                             purchaseInfluencers: {
                               type: "array",
+                              description: "구매영향인자 TOP 3 인사이트 (각 인사이트는 영향력 점수와 함께 50자 이내)",
                               items: {
                                 type: "object",
                                 properties: {
-                                  factor: { type: "string" },
-                                  score: { type: "number" },
-                                  insight: { type: "string" }
+                                  factor: { type: "string", description: "영향인자명 (예: '할인율', '재고수량', '요일')" },
+                                  score: { type: "number", description: "영향력 점수 0-10" },
+                                  insight: { type: "string", description: "인사이트 (50자 이내)" }
                                 },
                                 required: ["factor", "score", "insight"]
-                              }
+                              },
+                              minItems: 3,
+                              maxItems: 3
                             },
-                            actionable: { type: "string" }
+                            actionable: {
+                              type: "string",
+                              description: "WTP/ATV 기반 핵심 실행 방안 (50자 이내)"
+                            }
                           },
-                          required: ["avgWTP", "atv", "priceElasticityScore", "actionable"]
+                          required: ["avgWTP", "atv", "priceElasticityScore", "priceElasticityInsights", "pricingRecommendation", "purchaseInfluencers", "actionable"]
                         },
                         timeSeriesPatterns: {
                           type: "array",
+                          description: "시계열 패턴 (1-3개), 반드시 한글로 작성",
                           items: {
                             type: "object",
                             properties: {
                               period: { type: "string" },
                               trend: { type: "string" },
-                              seasonality: { type: "string" }
+                              seasonality: { type: "string" },
+                              anomalies: {
+                                type: "array",
+                                items: { type: "string" }
+                              }
                             }
                           }
                         },
-                        summary: { type: "string" }
+                        summary: { 
+                          type: "string",
+                          description: "LSTM-GNN 분석 전체 요약 (200자 이내, 한글)",
+                          maxLength: 200
+                        }
                       },
                       required: ["nodes", "edges", "insights", "correlations", "summary"]
                     }
