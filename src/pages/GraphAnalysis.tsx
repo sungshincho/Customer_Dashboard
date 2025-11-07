@@ -483,35 +483,65 @@ const GraphAnalysis = () => {
               </CardContent>
             </Card>
 
-            {analysisResult && (
-              <Tabs defaultValue="analysis">
-                <TabsList className="grid w-full grid-cols-5">
-                  <TabsTrigger value="analysis">통합 분석</TabsTrigger>
-                  <TabsTrigger value="correlation">핵심 상관관계</TabsTrigger>
-                  <TabsTrigger value="wtp">WTP 분석</TabsTrigger>
-                  <TabsTrigger value="query">그래프 쿼리</TabsTrigger>
-                  <TabsTrigger value="ai">AI 추론</TabsTrigger>
-                </TabsList>
+            <Tabs defaultValue="analysis">
+              <TabsList className="grid w-full grid-cols-5">
+                <TabsTrigger value="analysis">통합 분석</TabsTrigger>
+                <TabsTrigger value="correlation">핵심 상관관계</TabsTrigger>
+                <TabsTrigger value="wtp">WTP 분석</TabsTrigger>
+                <TabsTrigger value="query">그래프 쿼리</TabsTrigger>
+                <TabsTrigger value="ai">AI 추론</TabsTrigger>
+              </TabsList>
 
-                <TabsContent value="analysis" className="space-y-4">
+              <TabsContent value="analysis" className="space-y-4">
+                {analysisResult ? (
                   <InsightsDashboard
                     insights={analysisResult.insights || []}
                     correlations={analysisResult.correlations}
                     wtpAnalysis={analysisResult.wtpAnalysis}
                     summary={(analysisResult as any).summary}
                   />
-                </TabsContent>
+                ) : (
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="text-center text-muted-foreground">
+                        <Network className="mx-auto h-12 w-12 mb-4 opacity-50" />
+                        <p>먼저 데이터를 선택하고 분석을 실행하세요</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
 
-                <TabsContent value="correlation">
+              <TabsContent value="correlation">
+                {analysisResult ? (
                   <CorrelationAnalysis correlations={analysisResult.correlations} />
-                </TabsContent>
+                ) : (
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="text-center text-muted-foreground">
+                        <p>분석 결과가 필요합니다</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
 
-                <TabsContent value="wtp">
+              <TabsContent value="wtp">
+                {analysisResult ? (
                   <WTPAnalysisView wtpAnalysis={analysisResult.wtpAnalysis} />
-                </TabsContent>
+                ) : (
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="text-center text-muted-foreground">
+                        <p>분석 결과가 필요합니다</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
 
-                <TabsContent value="query" className="space-y-4">
-                  <GraphQueryBuilder onResultsChange={setQueryResults} />
+              <TabsContent value="query" className="space-y-4">
+                <GraphQueryBuilder onResultsChange={setQueryResults} />
                   
                   {queryResults && (
                     <Card>
@@ -657,7 +687,6 @@ const GraphAnalysis = () => {
                   />
                 </TabsContent>
               </Tabs>
-            )}
           </div>
         </div>
       </div>
