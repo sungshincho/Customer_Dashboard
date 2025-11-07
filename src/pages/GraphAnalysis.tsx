@@ -208,10 +208,20 @@ const GraphAnalysis = () => {
               setAnalysisStage(data.stage);
               setAnalysisMessage(data.message);
             } else if (data.type === 'result') {
-              setAnalysisResult(data.analysis);
+              // 데이터 구조 검증 및 기본값 설정
+              const validatedAnalysis: AnalysisResult = {
+                nodes: Array.isArray(data.analysis?.nodes) ? data.analysis.nodes : [],
+                edges: Array.isArray(data.analysis?.edges) ? data.analysis.edges : [],
+                insights: Array.isArray(data.analysis?.insights) ? data.analysis.insights : [],
+                correlations: Array.isArray(data.analysis?.correlations) ? data.analysis.correlations : [],
+                wtpAnalysis: data.analysis?.wtpAnalysis || null,
+                timeSeriesPatterns: Array.isArray(data.analysis?.timeSeriesPatterns) ? data.analysis.timeSeriesPatterns : [],
+              };
+              
+              setAnalysisResult(validatedAnalysis);
               toast({
                 title: "분석 완료",
-                description: `${data.analysis.nodes?.length || 0}개의 노드와 ${data.analysis.edges?.length || 0}개의 관계가 발견되었습니다.`,
+                description: `${validatedAnalysis.nodes.length}개의 노드와 ${validatedAnalysis.edges.length}개의 관계가 발견되었습니다.`,
               });
             } else if (data.type === 'error') {
               throw new Error(data.error);
