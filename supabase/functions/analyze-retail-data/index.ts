@@ -47,12 +47,44 @@ serve(async (req) => {
               throw new Error('LOVABLE_API_KEY is not configured');
             }
 
+            // 데이터 통계 생성
+            const columns = processedData.length > 0 ? Object.keys(processedData[0]) : [];
+            const columnStats: any = {};
+            
+            // 각 컬럼의 통계 정보 계산
+            columns.forEach(col => {
+              const values = processedData.map((row: any) => row[col]).filter((v: any) => v != null);
+              const numericValues = values.filter((v: any) => typeof v === 'number' || !isNaN(Number(v)));
+              
+              if (numericValues.length > 0) {
+                const nums = numericValues.map((v: any) => Number(v));
+                columnStats[col] = {
+                  type: 'numeric',
+                  count: nums.length,
+                  min: Math.min(...nums),
+                  max: Math.max(...nums),
+                  avg: nums.reduce((a: number, b: number) => a + b, 0) / nums.length,
+                  sample: values.slice(0, 3)
+                };
+              } else {
+                const uniqueValues = [...new Set(values)];
+                columnStats[col] = {
+                  type: 'categorical',
+                  count: values.length,
+                  unique: uniqueValues.length,
+                  top: uniqueValues.slice(0, 5),
+                  sample: values.slice(0, 3)
+                };
+              }
+            });
+
             const dataStats = {
               totalRecords: data.length,
               sampledRecords: processedData.length,
               dataTypes: analysisType,
-              columns: processedData.length > 0 ? Object.keys(processedData[0]).slice(0, 10) : [],
-              sampleRecords: processedData.slice(0, 20)
+              columns: columns,
+              columnStats: columnStats,
+              sampleRecords: processedData.slice(0, 50)
             };
 
             sendProgress(30, 'analyzing', 'AI 모델에 데이터 전송 중...');
@@ -94,9 +126,15 @@ serve(async (req) => {
 **데이터 컨텍스트:**
 ${dataContext}
 
+**CRITICAL 분석 원칙:**
+- 제공된 실제 데이터만을 기반으로 분석합니다
+- 가상의 데이터나 가정을 사용하지 않습니다
+- 모든 수치는 실제 데이터에서 계산된 값이어야 합니다
+- 컬럼 통계와 샘플 데이터를 정확히 분석하여 패턴을 도출합니다
+
 **출력 원칙:**
 - 간결성: 인사이트당 50-80자
-- 정확성: 실제 데이터 기반 수치
+- 정확성: 실제 데이터 기반 수치만 사용
 - 실행성: 즉시 적용 가능한 권장사항
 - 모든 출력은 한글로만 작성`;
 
@@ -109,8 +147,11 @@ ${dataContext}
 - 분석 샘플: ${processedData.length}개
 - 데이터 품질: ${metadata?.datasets?.map((ds: any) => `${(ds.quality_score * 100).toFixed(0)}%`).join(', ')}
 
-샘플 데이터:
-${JSON.stringify(dataStats.sampleRecords.slice(0, 5), null, 2)}
+**컬럼 통계 정보:**
+${JSON.stringify(dataStats.columnStats, null, 2)}
+
+**실제 샘플 데이터 (최신 30개):**
+${JSON.stringify(dataStats.sampleRecords.slice(0, 30), null, 2)}
 
 **분석 목표:**
 1. 시계열 패턴 발굴 (LSTM): 매출 트렌드, 계절성, 이상 탐지
