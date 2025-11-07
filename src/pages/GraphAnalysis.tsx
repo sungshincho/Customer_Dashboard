@@ -15,6 +15,7 @@ import { normalizeMultipleDatasets } from "@/utils/dataNormalizer";
 import { InsightsDashboard } from "@/components/analysis/InsightsDashboard";
 import { CorrelationAnalysis } from "@/components/analysis/CorrelationAnalysis";
 import { WTPAnalysisView } from "@/components/analysis/WTPAnalysisView";
+import { GraphQueryBuilder } from "@/components/graph/GraphQueryBuilder";
 
 interface Node {
   id: string;
@@ -67,6 +68,7 @@ const GraphAnalysis = () => {
     influenced_by: false,
     correlated_with: false,
   });
+  const [queryResults, setQueryResults] = useState<any>(null);
   const { toast } = useToast();
   const graphRef = useRef<any>();
 
@@ -482,10 +484,11 @@ const GraphAnalysis = () => {
 
             {analysisResult && (
               <Tabs defaultValue="analysis">
-                <TabsList className="grid w-full grid-cols-3">
+                <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="analysis">통합 분석</TabsTrigger>
                   <TabsTrigger value="correlation">핵심 상관관계</TabsTrigger>
                   <TabsTrigger value="wtp">WTP 분석</TabsTrigger>
+                  <TabsTrigger value="query">그래프 쿼리</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="analysis" className="space-y-4">
@@ -503,6 +506,145 @@ const GraphAnalysis = () => {
 
                 <TabsContent value="wtp">
                   <WTPAnalysisView wtpAnalysis={analysisResult.wtpAnalysis} />
+                </TabsContent>
+
+                <TabsContent value="query" className="space-y-4">
+                  <GraphQueryBuilder onResultsChange={setQueryResults} />
+                  
+                  {queryResults && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>쿼리 결과 시각화</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {queryResults.entities && (
+                          <div className="space-y-4">
+                            <h3 className="font-semibold">PageRank 결과</h3>
+                            <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                              {queryResults.entities.slice(0, 20).map((entity: any, idx: number) => (
+                                <div key={entity.id} className="flex items-center justify-between p-3 border rounded-lg">
+                                  <div className="flex items-center gap-3">
+                                    <Badge>{idx + 1}</Badge>
+                                    <span className="font-medium">{entity.label}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm text-muted-foreground">Score:</span>
+                                    <Badge variant="secondary">{entity.pagerank?.toFixed(4)}</Badge>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {queryResults.communities && (
+                          <div className="space-y-4">
+                            <h3 className="font-semibold">커뮤니티 탐지 결과</h3>
+                            <p className="text-sm text-muted-foreground">
+                              총 {queryResults.total_communities}개의 커뮤니티 발견
+                            </p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {queryResults.communities.slice(0, 6).map((community: any[], idx: number) => (
+                                <Card key={idx}>
+                                  <CardHeader>
+                                    <CardTitle className="text-sm">커뮤니티 {idx + 1}</CardTitle>
+                                  </CardHeader>
+                                  <CardContent>
+                                    <p className="text-sm text-muted-foreground mb-2">
+                                      {community.length}개 엔티티
+                                    </p>
+                                    <div className="flex flex-wrap gap-1">
+                                      {community.slice(0, 10).map((entity: any) => (
+                                        <Badge key={entity.id} variant="outline">
+                                          {entity.label}
+                                        </Badge>
+                                      ))}
+                                      {community.length > 10 && (
+                                        <Badge variant="secondary">+{community.length - 10}</Badge>
+                                      )}
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {queryResults.nodes && queryResults.edges && (
+                          <div className="space-y-4">
+                            <h3 className="font-semibold">N-Hop 탐색 결과</h3>
+                            <div className="grid grid-cols-2 gap-4">
+                              <Card>
+                                <CardHeader>
+                                  <CardTitle className="text-sm">노드</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                  <p className="text-2xl font-bold">{queryResults.nodes.length}</p>
+                                  <p className="text-sm text-muted-foreground">발견된 엔티티</p>
+                                </CardContent>
+                              </Card>
+                              <Card>
+                                <CardHeader>
+                                  <CardTitle className="text-sm">관계</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                  <p className="text-2xl font-bold">{queryResults.edges.length}</p>
+                                  <p className="text-sm text-muted-foreground">연결된 관계</p>
+                                </CardContent>
+                              </Card>
+                            </div>
+                          </div>
+                        )}
+
+                        {queryResults.path && (
+                          <div className="space-y-4">
+                            <h3 className="font-semibold">최단 경로</h3>
+                            <div className="p-4 border rounded-lg bg-muted/50">
+                              <p className="text-sm mb-2">
+                                거리: <Badge>{queryResults.distance}</Badge>
+                              </p>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {queryResults.path.map((nodeId: string, idx: number) => (
+                                  <div key={nodeId} className="flex items-center gap-2">
+                                    <Badge variant="outline">{nodeId}</Badge>
+                                    {idx < queryResults.path.length - 1 && (
+                                      <span className="text-muted-foreground">→</span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {queryResults.results && (
+                          <div className="space-y-4">
+                            <h3 className="font-semibold">Cypher 쿼리 결과</h3>
+                            <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                              {queryResults.results.map((result: any, idx: number) => (
+                                <div key={idx} className="p-3 border rounded-lg">
+                                  <div className="grid grid-cols-3 gap-4 text-sm">
+                                    <div>
+                                      <p className="text-muted-foreground mb-1">Source</p>
+                                      <Badge>{result.source_entity?.label}</Badge>
+                                    </div>
+                                    <div>
+                                      <p className="text-muted-foreground mb-1">Relation</p>
+                                      <Badge variant="outline">{result.relation_type?.label}</Badge>
+                                    </div>
+                                    <div>
+                                      <p className="text-muted-foreground mb-1">Target</p>
+                                      <Badge>{result.target_entity?.label}</Badge>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
                 </TabsContent>
               </Tabs>
             )}

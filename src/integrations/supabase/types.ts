@@ -132,7 +132,7 @@ export type Database = {
             foreignKeyName: "graph_relations_target_entity_id_fkey"
             columns: ["target_entity_id"]
             isOneToOne: false
-            referencedRelation: "graph_relations"
+            referencedRelation: "graph_entities"
             referencedColumns: ["id"]
           },
         ]

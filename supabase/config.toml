@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.analyze-retail-data]
 verify_jwt = true
+
+[functions.graph-query]
+verify_jwt = true
