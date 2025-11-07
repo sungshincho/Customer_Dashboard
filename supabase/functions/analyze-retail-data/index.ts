@@ -86,22 +86,116 @@ serve(async (req) => {
 3. 데이터 팩터 간 상관관계 분석
 4. WTP (Willingness To Pay) 분석
 
-**중요: 반드시 다음 JSON 구조를 완전하게 반환해야 합니다. 모든 필드는 필수입니다:**
+**중요: 반드시 아래 예시와 동일한 JSON 구조로만 응답하세요. 모든 필드는 필수입니다:**
 
+예시 응답:
 {
-  "nodes": [최소 5개 이상의 노드],
-  "edges": [최소 5개 이상의 관계],
-  "insights": [최소 3개 이상의 인사이트],
-  "correlations": [최소 3개 이상의 상관관계],
+  "nodes": [
+    {
+      "id": "customer-segment-vip",
+      "type": "Customer",
+      "label": "VIP 고객군",
+      "properties": { "segment": "VIP", "count": 120 },
+      "metrics": { "avgPurchase": 85000, "visitFrequency": "주 2회" }
+    },
+    {
+      "id": "product-premium-coffee",
+      "type": "Product",
+      "label": "프리미엄 커피",
+      "properties": { "category": "음료", "price": 6500 },
+      "metrics": { "salesVolume": 450, "margin": 0.62 }
+    },
+    {
+      "id": "zone-entrance",
+      "type": "Zone",
+      "label": "매장 입구",
+      "properties": { "area": "입구 5m 반경" },
+      "metrics": { "traffic": 1200, "dwellTime": "45초" }
+    }
+  ],
+  "edges": [
+    {
+      "source": "customer-segment-vip",
+      "target": "product-premium-coffee",
+      "type": "purchases",
+      "weight": 0.85,
+      "properties": { "frequency": "높음", "avgQuantity": 2.3 }
+    },
+    {
+      "source": "customer-segment-vip",
+      "target": "zone-entrance",
+      "type": "visits",
+      "weight": 0.72,
+      "properties": { "conversionRate": 0.68 }
+    },
+    {
+      "source": "zone-entrance",
+      "target": "zone-main-display",
+      "type": "moves_to",
+      "weight": 0.65,
+      "properties": { "transitionRate": "65%" }
+    }
+  ],
+  "insights": [
+    {
+      "title": "VIP 고객의 프리미엄 제품 선호도 증가",
+      "description": "최근 3개월간 VIP 고객의 프리미엄 제품 구매가 전년 대비 32% 증가했습니다. 특히 오전 시간대(10-12시)의 구매율이 높습니다.",
+      "impact": "high",
+      "recommendation": "오전 시간대 VIP 고객 대상 프리미엄 신제품 프로모션 진행 및 전용 공간 확대를 권장합니다."
+    },
+    {
+      "title": "입구 동선과 매출의 강한 상관관계",
+      "description": "입구에서 메인 디스플레이로의 자연스러운 동선이 확보된 날의 평균 매출이 15% 높습니다.",
+      "impact": "medium",
+      "recommendation": "입구 진열대 높이를 낮추고 메인 디스플레이로의 시선 유도 사이니지를 설치하세요."
+    }
+  ],
+  "correlations": [
+    {
+      "factor1": "입구 체류시간",
+      "factor2": "1일 매출",
+      "correlation": 0.73,
+      "significance": "입구에서 45초 이상 머무는 고객의 구매 전환율이 2.3배 높음"
+    },
+    {
+      "factor1": "프리미엄 제품 진열 위치",
+      "factor2": "VIP 고객 방문 빈도",
+      "correlation": 0.68,
+      "significance": "눈높이 진열 시 VIP 고객 재방문율 28% 증가"
+    },
+    {
+      "factor1": "날씨(맑음)",
+      "factor2": "신규 고객 유입",
+      "correlation": 0.54,
+      "significance": "맑은 날 신규 고객 유입이 평균 23% 증가"
+    }
+  ],
   "wtpAnalysis": {
-    "avgWTP": "구체적인 금액",
-    "priceElasticity": "구체적인 수치",
-    "recommendations": [최소 3개의 권장사항]
+    "avgWTP": "24,500원",
+    "priceElasticity": "-1.35 (탄력적)",
+    "recommendations": [
+      "현재 평균 판매가 21,000원 대비 3,500원 상향 여지 존재",
+      "프리미엄 라인 가격을 27,000원까지 인상 가능 (VIP 세그먼트)",
+      "번들 상품 구성 시 단품 합계 대비 15% 할인으로 판매량 극대화"
+    ]
   },
-  "timeSeriesPatterns": [최소 2개 이상의 패턴]
+  "timeSeriesPatterns": [
+    {
+      "period": "주간 패턴",
+      "trend": "상승",
+      "seasonality": "주말(금-일) 매출이 평일 대비 평균 42% 높음. 특히 토요일 오후 2-5시가 피크",
+      "anomalies": ["10월 2주차 평일 매출 급증(지역 축제 영향)", "8월 마지막 주 주말 매출 30% 감소(경쟁사 오픈)"]
+    },
+    {
+      "period": "시간대 패턴",
+      "trend": "유지",
+      "seasonality": "오전(10-12시) VIP 고객 집중, 오후(2-5시) 일반 고객 증가, 저녁(6-8시) 직장인 유입",
+      "anomalies": ["비 오는 날 저녁 시간대 매출 18% 증가(배달 수요 전환)"]
+    }
+  ]
 }
 
-데이터가 부족하더라도 합리적인 추론을 통해 모든 필드를 채워주세요.`;
+위 예시처럼 구체적인 수치와 실행 가능한 인사이트를 포함하여 응답하세요.`;
 
             const userPrompt = `
 분석 유형: ${analysisType}
