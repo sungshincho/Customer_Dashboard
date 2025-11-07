@@ -5,8 +5,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EntityTypeManager } from "@/components/schema/EntityTypeManager";
 import { RelationTypeManager } from "@/components/schema/RelationTypeManager";
 import { SchemaVersionManager } from "@/components/schema/SchemaVersionManager";
+import { SchemaValidator } from "@/components/schema/SchemaValidator";
 import { Badge } from "@/components/ui/badge";
-import { Layers, Link2, History } from "lucide-react";
+import { Layers, Link2, History, ShieldCheck } from "lucide-react";
 
 const SchemaBuilder = () => {
   return (
@@ -18,6 +19,9 @@ const SchemaBuilder = () => {
             리테일 비즈니스 도메인의 엔티티와 관계를 정의하고 관리합니다
           </p>
         </div>
+
+        {/* 검증 결과 */}
+        <SchemaValidator />
 
         <Card className="glass-card">
           <CardHeader>
@@ -35,7 +39,7 @@ const SchemaBuilder = () => {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="entities" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="entities" className="flex items-center gap-2">
                   <Layers className="h-4 w-4" />
                   엔티티 타입
@@ -47,6 +51,10 @@ const SchemaBuilder = () => {
                 <TabsTrigger value="versions" className="flex items-center gap-2">
                   <History className="h-4 w-4" />
                   버전 관리
+                </TabsTrigger>
+                <TabsTrigger value="validation" className="flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4" />
+                  검증 결과
                 </TabsTrigger>
               </TabsList>
 
@@ -60,6 +68,18 @@ const SchemaBuilder = () => {
 
               <TabsContent value="versions" className="space-y-4 mt-6">
                 <SchemaVersionManager />
+              </TabsContent>
+
+              <TabsContent value="validation" className="space-y-4 mt-6">
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-lg font-semibold">스키마 검증</h3>
+                    <p className="text-sm text-muted-foreground">
+                      온톨로지의 무결성을 자동으로 검사하고 문제를 발견합니다
+                    </p>
+                  </div>
+                  <SchemaValidator />
+                </div>
               </TabsContent>
             </Tabs>
           </CardContent>
