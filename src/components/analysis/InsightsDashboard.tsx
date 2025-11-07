@@ -16,8 +16,15 @@ interface Correlation {
   factor1: string;
   factor2: string;
   correlation: number;
+  correlationPercent?: string;
   insight?: string;
   actionable?: string;
+}
+
+interface PurchaseInfluencer {
+  factor: string;
+  score: number;
+  insight: string;
 }
 
 interface WTPAnalysis {
@@ -25,6 +32,8 @@ interface WTPAnalysis {
   atv: number;
   priceElasticityScore: number;
   priceElasticityInsights: string[];
+  pricingRecommendation?: string;
+  purchaseInfluencers?: PurchaseInfluencer[];
   actionable: string;
 }
 
@@ -150,7 +159,7 @@ export const InsightsDashboard = ({
                           variant={strength > 0.7 ? 'default' : 'outline'}
                           className="text-xs"
                         >
-                          {isPositive ? '+' : ''}{corr.correlation.toFixed(2)}
+                          {corr.correlationPercent || `${(strength * 100).toFixed(0)}%`}
                         </Badge>
                       </div>
                       <Progress value={strength * 100} className="h-1.5" />
@@ -203,9 +212,9 @@ export const InsightsDashboard = ({
                 {/* 핵심 메트릭 */}
                 <div className="grid grid-cols-2 gap-2">
                   <div className="p-3 bg-primary/5 rounded-lg border border-primary/10">
-                    <p className="text-xs text-muted-foreground mb-1">평균 WTP</p>
+                    <p className="text-xs text-muted-foreground mb-1">지불의사최대금액</p>
                     <p className="text-lg font-bold text-primary">
-                      {wtpAnalysis.avgWTP.toFixed(1)}%p
+                      ₩{wtpAnalysis.avgWTP.toLocaleString()}
                     </p>
                   </div>
                   <div className="p-3 bg-primary/5 rounded-lg border border-primary/10">
@@ -215,6 +224,44 @@ export const InsightsDashboard = ({
                     </p>
                   </div>
                 </div>
+
+                {/* 가격결정 제안 */}
+                {wtpAnalysis.pricingRecommendation && (
+                  <div className="p-3 bg-green-500/5 rounded-lg border border-green-500/20">
+                    <p className="text-xs font-semibold mb-1.5 text-green-600">가격결정 제안</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {wtpAnalysis.pricingRecommendation}
+                    </p>
+                  </div>
+                )}
+
+                {/* 구매영향인자 TOP 3 */}
+                {wtpAnalysis.purchaseInfluencers && wtpAnalysis.purchaseInfluencers.length > 0 && (
+                  <div className="p-3 bg-muted/30 rounded-lg">
+                    <p className="text-xs font-semibold mb-2">구매영향인자 TOP 3</p>
+                    <div className="space-y-2">
+                      {wtpAnalysis.purchaseInfluencers.map((influencer, idx) => (
+                        <div key={idx} className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-medium">{influencer.factor}</p>
+                            <div className="flex items-center gap-2">
+                              <Progress 
+                                value={(influencer.score / 10) * 100} 
+                                className="h-1.5 w-12"
+                              />
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                {influencer.score.toFixed(1)}
+                              </Badge>
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground pl-2 border-l-2 border-primary/30">
+                            {influencer.insight}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* 가격 탄력성 */}
                 <div className="p-3 bg-muted/30 rounded-lg">

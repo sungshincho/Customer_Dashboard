@@ -102,9 +102,10 @@ ${JSON.stringify(dataStats.sampleRecords.slice(0, 3), null, 2)}
 1. ATV (객단가) = 총 실판매금액 합계 / 총 판매건수 합계
    - 예: total_amount 전체 합 / quantity 전체 합
    - 단위: 원 (정수)
-2. WTP = ((상품가격 평균 - 실판매가격 평균) / 상품가격 평균) × 100
-   - 할인율을 기반으로 추정
-   - 단위: %p (소수점 1자리)
+2. WTP (지불의사최대금액) = 데이터 기반 추론
+   - 실제 판매가격, 할인율, 판매량을 분석하여 고객이 기꺼이 지불할 최대 금액 추정
+   - 공식: 상품가격 평균 × (1 - 평균할인율 × 가격탄력성계수)
+   - 단위: 원 (정수)
 3. 가격 탄력성 점수 = 할인에 대한 판매량 반응도 (0-10점)
    - 할인율이 높을수록 판매량이 증가하는 정도
 
@@ -209,17 +210,18 @@ ${JSON.stringify(dataStats.sampleRecords.slice(0, 3), null, 2)}
                         },
                         correlations: {
                           type: "array",
-                          description: "강한 상관관계 2-3개 (r > 0.5만). 한글만 사용. actionable 필수.",
+                          description: "강한 상관관계 2-3개 (r > 0.5만). 한글만 사용. actionable 필수. 상품 가격과 실 판매 금액 관계는 반드시 포함하고 'x%' 형식으로 표시.",
                           items: {
                             type: "object",
                             properties: {
                               factor1: { type: "string", description: "첫번째 요소 (한글)" },
                               factor2: { type: "string", description: "두번째 요소 (한글)" },
                               correlation: { type: "number", description: "상관계수 -1~1" },
+                              correlationPercent: { type: "string", description: "상관계수를 %로 표현 (예: '87%'). 필수." },
                               insight: { type: "string", description: "인사이트 (40자 이내)" },
                               actionable: { type: "string", description: "실행 방안 (40자 이내)" }
                             },
-                            required: ["factor1", "factor2", "correlation", "insight", "actionable"]
+                            required: ["factor1", "factor2", "correlation", "correlationPercent", "insight", "actionable"]
                           }
                         },
                         wtpAnalysis: {
@@ -228,7 +230,7 @@ ${JSON.stringify(dataStats.sampleRecords.slice(0, 3), null, 2)}
                           properties: {
                             avgWTP: { 
                               type: "number",
-                              description: "평균 지불 의향 = ((상품가격 평균 - 실판매가격 평균) / 상품가격 평균) × 100 (%p 단위, 소수점 1자리)"
+                              description: "평균 지불의사최대금액 = 데이터 기반 추론 (상품가격 평균 × (1 - 평균할인율 × 가격탄력성계수)) (원 단위, 정수)"
                             },
                             atv: {
                               type: "number", 
@@ -243,12 +245,31 @@ ${JSON.stringify(dataStats.sampleRecords.slice(0, 3), null, 2)}
                               description: "가격 탄력성 핵심 인사이트 2-3개 (각 30자 이내)",
                               items: { type: "string" }
                             },
+                            pricingRecommendation: {
+                              type: "string",
+                              description: "가격결정 제안 (구체적인 가격 범위와 근거 포함, 80자 이내)"
+                            },
+                            purchaseInfluencers: {
+                              type: "array",
+                              description: "구매영향인자 TOP 3 인사이트 (각 인사이트는 영향력 점수와 함께 50자 이내)",
+                              items: {
+                                type: "object",
+                                properties: {
+                                  factor: { type: "string", description: "영향인자명 (예: '할인율', '재고수량', '요일')" },
+                                  score: { type: "number", description: "영향력 점수 0-10" },
+                                  insight: { type: "string", description: "인사이트 (50자 이내)" }
+                                },
+                                required: ["factor", "score", "insight"]
+                              },
+                              minItems: 3,
+                              maxItems: 3
+                            },
                             actionable: {
                               type: "string",
                               description: "WTP/ATV 기반 핵심 실행 방안 (50자 이내)"
                             }
                           },
-                          required: ["avgWTP", "atv", "priceElasticityScore", "priceElasticityInsights", "actionable"]
+                          required: ["avgWTP", "atv", "priceElasticityScore", "priceElasticityInsights", "pricingRecommendation", "purchaseInfluencers", "actionable"]
                         },
                         timeSeriesPatterns: {
                           type: "array",
