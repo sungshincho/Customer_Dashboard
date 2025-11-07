@@ -14,10 +14,10 @@ serve(async (req) => {
     const { data, analysisType, nodeRelations } = await req.json();
     console.log("🔵 Starting retail data analysis", { analysisType, dataLength: data?.length });
 
-    // 데이터가 너무 많으면 샘플링 (최대 300개)
+    // 데이터가 너무 많으면 샘플링 (최대 100개로 제한)
     let processedData = data;
-    if (data && data.length > 300) {
-      const sampleSize = 300;
+    if (data && data.length > 100) {
+      const sampleSize = 100;
       const step = Math.floor(data.length / sampleSize);
       processedData = data.filter((_: any, index: number) => index % step === 0).slice(0, sampleSize);
       console.log(`📊 Sampled ${processedData.length} records from ${data.length} total records`);
@@ -83,45 +83,21 @@ serve(async (req) => {
 
 응답은 JSON 형식으로 제공하세요.`;
 
-    // 데이터 통계 생성
+    // 간단한 데이터 통계만 생성
     const dataStats = {
       totalRecords: data.length,
       sampledRecords: processedData.length,
       dataTypes: analysisType,
-      sampleData: processedData.slice(0, 50), // 처음 50개만 상세 데이터로
-      columns: processedData.length > 0 ? Object.keys(processedData[0]) : [],
-      summary: {
-        numericFields: {} as Record<string, { min: number, max: number, avg: number }>,
-        categoricalFields: {} as Record<string, string[]>
-      }
+      columns: processedData.length > 0 ? Object.keys(processedData[0]).slice(0, 10) : [],
+      sampleRecords: processedData.slice(0, 20) // 처음 20개만
     };
-
-    // 숫자형 필드 통계
-    if (processedData.length > 0) {
-      const firstRecord = processedData[0];
-      Object.keys(firstRecord).forEach(key => {
-        const values = processedData.map((r: any) => r[key]).filter((v: any) => typeof v === 'number');
-        if (values.length > 0) {
-          dataStats.summary.numericFields[key] = {
-            min: Math.min(...values),
-            max: Math.max(...values),
-            avg: values.reduce((a: number, b: number) => a + b, 0) / values.length
-          };
-        } else {
-          const categoricalValues = processedData.map((r: any) => r[key]).filter((v: any) => v !== null && v !== undefined);
-          const uniqueValues = [...new Set(categoricalValues)].slice(0, 20) as string[]; // 최대 20개 유니크 값
-          if (uniqueValues.length > 0) {
-            dataStats.summary.categoricalFields[key] = uniqueValues;
-          }
-        }
-      });
-    }
 
     const userPrompt = `
 분석 유형: ${analysisType}
 총 데이터 수: ${data.length}개 (샘플링: ${processedData.length}개)
-데이터 통계:
-${JSON.stringify(dataStats, null, 2)}
+데이터 컬럼: ${dataStats.columns.join(', ')}
+샘플 데이터:
+${JSON.stringify(dataStats.sampleRecords, null, 2)}
 
 활성화된 노드 관계: ${JSON.stringify(nodeRelations || 'all', null, 2)}
 
@@ -136,90 +112,109 @@ ${JSON.stringify(dataStats, null, 2)}
 
     console.log("🤖 Calling Lovable AI for analysis...");
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: 0.7,
-        max_tokens: 4000,
-      }),
-      signal: AbortSignal.timeout(60000), // 60초 타임아웃
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 50000); // 50초 타임아웃
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("❌ AI API Error:", response.status, errorText);
-      
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ 
-          error: "Rate limit exceeded. Please try again later." 
-        }), {
-          status: 429,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ 
-          error: "Payment required. Please add credits to your workspace." 
-        }), {
-          status: 402,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      throw new Error(`AI Gateway error: ${response.status}`);
-    }
-
-    const aiResponse = await response.json();
-    console.log("✅ AI Analysis completed");
-
-    let analysisResult;
     try {
-      const content = aiResponse.choices[0].message.content;
-      // JSON 추출 (마크다운 코드 블록 제거)
-      const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) || content.match(/\{[\s\S]*\}/);
-      const jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : content;
-      analysisResult = JSON.parse(jsonStr);
-    } catch (e) {
-      console.error("⚠️ Failed to parse AI response as JSON:", e);
-      analysisResult = {
-        nodes: [],
-        edges: [],
-        insights: [{ 
-          title: "분석 완료", 
-          description: aiResponse.choices[0].message.content,
-          impact: "medium",
-          recommendation: "상세 분석을 위해 데이터를 확인하세요"
-        }],
-        rawResponse: aiResponse.choices[0].message.content
-      };
-    }
+      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          temperature: 0.7,
+          max_tokens: 3000,
+        }),
+        signal: controller.signal,
+      });
 
-    return new Response(JSON.stringify({
-      success: true,
-      ontology: {
-        nodeTypes: ontologyNodes,
-        relationshipTypes: relationshipTypes
-      },
-      analysis: analysisResult,
-      metadata: {
-        analysisType,
-        totalDataCount: data?.length || 0,
-        sampledDataCount: processedData?.length || 0,
-        timestamp: new Date().toISOString()
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("❌ AI API Error:", response.status, errorText);
+        
+        if (response.status === 429) {
+          return new Response(JSON.stringify({ 
+            error: "Rate limit exceeded. Please try again later." 
+          }), {
+            status: 429,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        if (response.status === 402) {
+          return new Response(JSON.stringify({ 
+            error: "Payment required. Please add credits to your workspace." 
+          }), {
+            status: 402,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        throw new Error(`AI Gateway error: ${response.status}`);
       }
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+
+      const aiResponse = await response.json();
+      console.log("✅ AI Analysis completed");
+
+      let analysisResult;
+      try {
+        const content = aiResponse.choices[0].message.content;
+        // JSON 추출 (마크다운 코드 블록 제거)
+        const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) || content.match(/\{[\s\S]*\}/);
+        const jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : content;
+        analysisResult = JSON.parse(jsonStr);
+      } catch (e) {
+        console.error("⚠️ Failed to parse AI response as JSON:", e);
+        analysisResult = {
+          nodes: [],
+          edges: [],
+          insights: [{ 
+            title: "분석 완료", 
+            description: aiResponse.choices[0].message.content,
+            impact: "medium",
+            recommendation: "상세 분석을 위해 데이터를 확인하세요"
+          }],
+          rawResponse: aiResponse.choices[0].message.content
+        };
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        ontology: {
+          nodeTypes: ontologyNodes,
+          relationshipTypes: relationshipTypes
+        },
+        analysis: analysisResult,
+        metadata: {
+          analysisType,
+          totalDataCount: data?.length || 0,
+          sampledDataCount: processedData?.length || 0,
+          timestamp: new Date().toISOString()
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        console.error('⏱️ Request timeout');
+        return new Response(JSON.stringify({ 
+          error: "Analysis timeout. Please try with less data or wait a moment." 
+        }), {
+          status: 504,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      throw fetchError;
+    }
 
   } catch (error: any) {
     console.error('❌ Analysis error:', error);
