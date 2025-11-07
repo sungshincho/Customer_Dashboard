@@ -483,14 +483,13 @@ const DataImport = () => {
                         <SelectValue placeholder="데이터 유형 선택" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="traffic_sensor">센서(동선) 데이터</SelectItem>
+                        <SelectItem value="customer">고객(회원정보) 데이터</SelectItem>
+                        <SelectItem value="brand">브랜드 데이터</SelectItem>
+                        <SelectItem value="product">제품 데이터</SelectItem>
+                        <SelectItem value="store">매장 데이터</SelectItem>
                         <SelectItem value="sales">매출 데이터</SelectItem>
-                        <SelectItem value="customer">고객 데이터</SelectItem>
-                        <SelectItem value="inventory">재고 데이터</SelectItem>
-                        <SelectItem value="traffic">유동인구 데이터</SelectItem>
-                        <SelectItem value="staff">직원 데이터</SelectItem>
-                        <SelectItem value="product">상품 데이터</SelectItem>
-                        <SelectItem value="transaction">거래 데이터</SelectItem>
-                        <SelectItem value="other">기타</SelectItem>
+                        <SelectItem value="other">기타 데이터</SelectItem>
                       </SelectContent>
                     </Select>
                   )}
@@ -570,13 +569,13 @@ const DataImport = () => {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
+                              <SelectItem value="traffic_sensor">센서(동선) 데이터</SelectItem>
+                              <SelectItem value="customer">고객(회원정보) 데이터</SelectItem>
+                              <SelectItem value="brand">브랜드 데이터</SelectItem>
+                              <SelectItem value="product">제품 데이터</SelectItem>
+                              <SelectItem value="store">매장 데이터</SelectItem>
                               <SelectItem value="sales">매출 데이터</SelectItem>
-                              <SelectItem value="customer">고객 데이터</SelectItem>
-                              <SelectItem value="inventory">재고 데이터</SelectItem>
-                              <SelectItem value="traffic">유동인구 데이터</SelectItem>
-                              <SelectItem value="product">상품 데이터</SelectItem>
-                              <SelectItem value="zone">Zone 데이터</SelectItem>
-                              <SelectItem value="other">기타</SelectItem>
+                              <SelectItem value="other">기타 데이터</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -632,14 +631,13 @@ const DataImport = () => {
                       <SelectValue placeholder="데이터 유형 선택" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="traffic_sensor">센서(동선) 데이터</SelectItem>
+                      <SelectItem value="customer">고객(회원정보) 데이터</SelectItem>
+                      <SelectItem value="brand">브랜드 데이터</SelectItem>
+                      <SelectItem value="product">제품 데이터</SelectItem>
+                      <SelectItem value="store">매장 데이터</SelectItem>
                       <SelectItem value="sales">매출 데이터</SelectItem>
-                      <SelectItem value="customer">고객 데이터</SelectItem>
-                      <SelectItem value="inventory">재고 데이터</SelectItem>
-                      <SelectItem value="traffic">유동인구 데이터</SelectItem>
-                      <SelectItem value="staff">직원 데이터</SelectItem>
-                      <SelectItem value="product">상품 데이터</SelectItem>
-                      <SelectItem value="transaction">거래 데이터</SelectItem>
-                      <SelectItem value="other">기타</SelectItem>
+                      <SelectItem value="other">기타 데이터</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

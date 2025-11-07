@@ -83,11 +83,13 @@ export async function detectDataTypeWithLearning(
   
   const typeKeywords: Record<string, string[]> = {
     sales: ['매출', '판매', '거래', 'sales', 'transaction', '주문', 'order', '결제', 'payment'],
-    zone: ['zone', '구역', '좌표', 'x', 'y', 'coordinate', '위치', 'location'],
+    traffic_sensor: ['센서', 'sensor', '동선', 'tracking', 'path', 'zone', 'movement', 'beacon'],
     traffic: ['동선', 'traffic', '방문', 'visit', 'path', '이동', 'movement', 'person'],
     product: ['상품', 'product', '제품', '품목', 'item', 'sku'],
     customer: ['고객', 'customer', '회원', 'member', '유저', 'user'],
     inventory: ['재고', 'inventory', 'stock', '입고', '출고'],
+    brand: ['브랜드', 'brand', '제조사', 'manufacturer', 'maker'],
+    store: ['매장', 'store', '지점', 'branch', 'shop', 'location'],
   };
 
   for (const [type, keywords] of Object.entries(typeKeywords)) {

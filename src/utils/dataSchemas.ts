@@ -102,11 +102,41 @@ export const INVENTORY_SCHEMA: DataSchema = {
   relations: ['product']
 };
 
+// 브랜드 데이터 표준 스키마
+export const BRAND_SCHEMA: DataSchema = {
+  type: 'brand',
+  columns: [
+    { name: 'brand_id', type: 'string', required: true, description: '브랜드 고유 ID', examples: ['brand_id', 'id', '브랜드코드'] },
+    { name: 'brand_name', type: 'string', required: true, description: '브랜드명', examples: ['brand_name', 'name', '브랜드', '브랜드명'] },
+    { name: 'category', type: 'string', required: false, description: '브랜드 카테고리', examples: ['category', 'type', '카테고리', '분류'] },
+    { name: 'country', type: 'string', required: false, description: '원산지 국가', examples: ['country', 'origin', '국가', '원산지'] },
+    { name: 'description', type: 'string', required: false, description: '브랜드 설명', examples: ['description', 'desc', '설명', '소개'] },
+  ],
+  relations: ['product', 'sales']
+};
+
+// 매장 데이터 표준 스키마
+export const STORE_SCHEMA: DataSchema = {
+  type: 'store',
+  columns: [
+    { name: 'store_id', type: 'string', required: true, description: '매장 고유 ID', examples: ['store_id', 'id', '매장코드', '지점코드'] },
+    { name: 'store_name', type: 'string', required: true, description: '매장명', examples: ['store_name', 'name', '매장명', '지점명'] },
+    { name: 'location', type: 'string', required: false, description: '매장 위치', examples: ['location', 'address', '주소', '위치'] },
+    { name: 'store_type', type: 'string', required: false, description: '매장 유형', examples: ['store_type', 'type', '매장타입', '유형'] },
+    { name: 'area', type: 'number', required: false, description: '매장 면적 (sqm)', examples: ['area', 'size', '면적', '평수'] },
+    { name: 'open_date', type: 'date', required: false, description: '오픈일', examples: ['open_date', 'opened_at', '오픈일', '개점일'] },
+  ],
+  relations: ['sales', 'traffic', 'zone']
+};
+
 export const SCHEMA_MAP: Record<string, DataSchema> = {
   sales: SALES_SCHEMA,
   zone: ZONE_SCHEMA,
   traffic: TRAFFIC_SCHEMA,
+  traffic_sensor: TRAFFIC_SCHEMA, // 센서 데이터도 traffic 스키마 사용
   product: PRODUCT_SCHEMA,
   customer: CUSTOMER_SCHEMA,
   inventory: INVENTORY_SCHEMA,
+  brand: BRAND_SCHEMA,
+  store: STORE_SCHEMA,
 };
