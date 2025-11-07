@@ -84,13 +84,14 @@ function detectDataType(dataType: string): 'sales' | 'zone' | 'traffic' | 'produ
 }
 
 /**
- * 컬럼을 스키마에 자동 매핑
+ * 컬럼을 스키마에 자동 매핑 (개선된 알고리즘)
  */
 function autoMapColumns(
   rawColumns: string[],
   schema: DataSchema
 ): Record<string, string> {
   const mappings: Record<string, string> = {};
+  const usedRawColumns = new Set<string>(); // 중복 매핑 방지
   
   // 각 스키마 컬럼에 대해 가장 유사한 원본 컬럼 찾기
   schema.columns.forEach(schemaCol => {
@@ -98,23 +99,39 @@ function autoMapColumns(
     let bestScore = 0;
     
     rawColumns.forEach(rawCol => {
-      // 스키마 컬럼 이름, 설명, 예시를 모두 고려
+      if (usedRawColumns.has(rawCol)) return; // 이미 사용된 컬럼 스킵
+      
+      // 여러 검색어를 개별적으로 비교하여 최고 점수 선택
       const searchTerms = [
         schemaCol.name,
         schemaCol.description,
         ...(schemaCol.examples || [])
-      ].join(' ');
+      ];
       
-      const score = calculateSimilarity(rawCol, searchTerms);
+      let maxScore = 0;
+      searchTerms.forEach(term => {
+        const score = calculateSimilarity(rawCol, term);
+        maxScore = Math.max(maxScore, score);
+      });
       
-      if (score > bestScore && score > 0.3) { // 최소 30% 유사도
-        bestScore = score;
+      // 완전 일치하는 예시가 있으면 가중치 추가
+      const hasExactExample = (schemaCol.examples || []).some(ex => 
+        rawCol.toLowerCase().includes(ex.toLowerCase()) || 
+        ex.toLowerCase().includes(rawCol.toLowerCase())
+      );
+      if (hasExactExample) {
+        maxScore = Math.min(maxScore + 0.3, 1.0);
+      }
+      
+      if (maxScore > bestScore && maxScore > 0.25) { // 최소 25% 유사도로 완화
+        bestScore = maxScore;
         bestMatch = rawCol;
       }
     });
     
     if (bestMatch) {
       mappings[schemaCol.name] = bestMatch;
+      usedRawColumns.add(bestMatch);
     }
   });
   
