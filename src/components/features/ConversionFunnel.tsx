@@ -4,13 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { TrendingUp, TrendingDown, Users, ShoppingCart, DollarSign } from "lucide-react";
 import { useState } from "react";
 import { EnhancedChart } from "@/components/analysis/EnhancedChart";
-
-const funnelData = [
-  { stage: "방문", count: 1000, rate: 100, color: "hsl(var(--primary))" },
-  { stage: "관심", count: 680, rate: 68, color: "hsl(217, 91%, 60%)" },
-  { stage: "체류", count: 420, rate: 42, color: "hsl(262, 83%, 58%)" },
-  { stage: "구매", count: 150, rate: 15, color: "hsl(142, 76%, 36%)" },
-];
+import { FUNNEL_DATA } from "@/data/sampleData";
 
 const timeRanges = {
   "today": { label: "오늘", multiplier: 1 },
@@ -21,7 +15,7 @@ const timeRanges = {
 export const ConversionFunnel = () => {
   const [timeRange, setTimeRange] = useState<keyof typeof timeRanges>("today");
 
-  const scaledData = funnelData.map((item) => ({
+  const scaledData = FUNNEL_DATA.map((item) => ({
     ...item,
     count: Math.round(item.count * timeRanges[timeRange].multiplier),
   }));

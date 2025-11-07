@@ -4,24 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-
-// Demo data: simplified footfall points
-const generateDemoData = () => {
-  const points = [];
-  for (let i = 0; i < 50; i++) {
-    points.push({
-      x: Math.random() * 400,
-      y: Math.random() * 300,
-      time: Math.random() * 24,
-      isReturning: Math.random() > 0.6,
-      dwell: Math.random() * 10 + 1,
-    });
-  }
-  return points;
-};
+import { generateFootfallPoints } from "@/data/sampleData";
 
 export const FootfallVisualizer = () => {
-  const [data] = useState(generateDemoData());
+  const [data] = useState(generateFootfallPoints());
   const [timeRange, setTimeRange] = useState([0, 24]);
   const [showReturning, setShowReturning] = useState(true);
   const [showNew, setShowNew] = useState(true);

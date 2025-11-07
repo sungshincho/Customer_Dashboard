@@ -4,33 +4,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { TrendingUp, TrendingDown, Package, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { EnhancedChart } from "@/components/analysis/EnhancedChart";
+import { PRODUCT_SALES, CATEGORY_SALES } from "@/data/sampleData";
 
-interface Product {
-  id: string;
-  name: string;
-  category: string;
-  sales: number;
-  revenue: number;
-  stock: number;
-  trend: number;
-  status: "high" | "medium" | "low" | "critical";
-}
+type Product = typeof PRODUCT_SALES[number];
 
-const products: Product[] = [
-  { id: "P1", name: "데님 자켓", category: "아우터", sales: 145, revenue: 14500000, stock: 23, trend: 15, status: "high" },
-  { id: "P2", name: "화이트 티셔츠", category: "상의", sales: 320, revenue: 9600000, stock: 85, trend: 8, status: "high" },
-  { id: "P3", name: "블랙 진", category: "하의", sales: 210, revenue: 16800000, stock: 42, trend: -5, status: "medium" },
-  { id: "P4", name: "스니커즈", category: "신발", sales: 98, revenue: 11760000, stock: 8, trend: 12, status: "critical" },
-  { id: "P5", name: "백팩", category: "악세사리", sales: 67, revenue: 6700000, stock: 156, trend: -12, status: "low" },
-];
-
-const categoryData = [
-  { name: "아우터", value: 14500000, color: "hsl(var(--primary))" },
-  { name: "상의", value: 9600000, color: "hsl(217, 91%, 60%)" },
-  { name: "하의", value: 16800000, color: "hsl(262, 83%, 58%)" },
-  { name: "신발", value: 11760000, color: "hsl(142, 76%, 36%)" },
-  { name: "악세사리", value: 6700000, color: "hsl(48, 96%, 53%)" },
-];
+const products = PRODUCT_SALES;
+const categoryData = CATEGORY_SALES;
 
 export const ProductPerformance = () => {
   const [sortBy, setSortBy] = useState<"sales" | "revenue" | "trend">("sales");

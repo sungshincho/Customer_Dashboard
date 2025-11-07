@@ -4,41 +4,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Users, TrendingUp, Award, Clock } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from "recharts";
 import { useState } from "react";
+import { STAFF_DATA, STAFF_WEEKLY_DATA } from "@/data/sampleData";
 
-interface StaffMember {
-  id: string;
-  name: string;
-  role: string;
-  sales: number;
-  customers: number;
-  avgTime: number;
-  rating: number;
-  performance: number;
-}
+type StaffMember = typeof STAFF_DATA[number];
 
-const staff: StaffMember[] = [
-  { id: "S1", name: "김지훈", role: "시니어", sales: 12500000, customers: 45, avgTime: 8.5, rating: 4.8, performance: 95 },
-  { id: "S2", name: "이서연", role: "시니어", sales: 11800000, customers: 42, avgTime: 9.2, rating: 4.6, performance: 92 },
-  { id: "S3", name: "박민준", role: "주니어", sales: 8400000, customers: 38, avgTime: 11.0, rating: 4.3, performance: 78 },
-  { id: "S4", name: "최유나", role: "주니어", sales: 7200000, customers: 32, avgTime: 12.5, rating: 4.1, performance: 72 },
-];
-
-const weeklyData = [
-  { day: "Mon", 김지훈: 92, 이서연: 88, 박민준: 75, 최유나: 70 },
-  { day: "Tue", 김지훈: 95, 이서연: 90, 박민준: 78, 최유나: 72 },
-  { day: "Wed", 김지훈: 93, 이서연: 91, 박민준: 76, 최유나: 74 },
-  { day: "Thu", 김지훈: 96, 이서연: 93, 박민준: 80, 최유나: 73 },
-  { day: "Fri", 김지훈: 98, 이서연: 95, 박민준: 82, 최유나: 75 },
-  { day: "Sat", 김지훈: 97, 이서연: 94, 박민준: 79, 최유나: 71 },
-  { day: "Sun", 김지훈: 95, 이서연: 92, 박민준: 78, 최유나: 70 },
-];
+const staff = STAFF_DATA;
+const weeklyData = STAFF_WEEKLY_DATA;
 
 const radarData = [
-  { metric: "판매", A: 95, B: 92 },
-  { metric: "고객응대", A: 90, B: 88 },
-  { metric: "상품지식", A: 92, B: 85 },
-  { metric: "효율성", A: 88, B: 90 },
-  { metric: "만족도", A: 96, B: 92 },
+  { metric: "판매", A: STAFF_DATA[0].performance, B: STAFF_DATA[1].performance },
+  { metric: "고객응대", A: STAFF_DATA[0].customerSatisfaction, B: STAFF_DATA[1].customerSatisfaction },
+  { metric: "상품지식", A: STAFF_DATA[0].productKnowledge, B: STAFF_DATA[1].productKnowledge },
+  { metric: "효율성", A: STAFF_DATA[0].efficiency, B: STAFF_DATA[1].efficiency },
+  { metric: "만족도", A: STAFF_DATA[0].rating * 20, B: STAFF_DATA[1].rating * 20 },
 ];
 
 export const StaffEfficiency = () => {

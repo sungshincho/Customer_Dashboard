@@ -3,51 +3,9 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Play, Pause, RotateCcw, User } from "lucide-react";
+import { CUSTOMER_JOURNEYS } from "@/data/sampleData";
 
-interface JourneyStep {
-  x: number;
-  y: number;
-  action: string;
-  duration: number;
-}
-
-const customerJourneys = [
-  {
-    id: "C1",
-    type: "구매",
-    steps: [
-      { x: 50, y: 10, action: "입장", duration: 0 },
-      { x: 30, y: 25, action: "신상품 구경", duration: 45 },
-      { x: 30, y: 50, action: "피팅룸", duration: 180 },
-      { x: 70, y: 70, action: "계산대", duration: 90 },
-      { x: 50, y: 90, action: "퇴장", duration: 0 },
-    ],
-    revenue: 125000,
-  },
-  {
-    id: "C2",
-    type: "브라우징",
-    steps: [
-      { x: 50, y: 10, action: "입장", duration: 0 },
-      { x: 70, y: 30, action: "인기상품", duration: 60 },
-      { x: 40, y: 40, action: "할인코너", duration: 120 },
-      { x: 60, y: 60, action: "악세사리", duration: 45 },
-      { x: 50, y: 90, action: "퇴장", duration: 0 },
-    ],
-    revenue: 0,
-  },
-  {
-    id: "C3",
-    type: "구매",
-    steps: [
-      { x: 50, y: 10, action: "입장", duration: 0 },
-      { x: 60, y: 35, action: "신발 코너", duration: 90 },
-      { x: 70, y: 70, action: "계산대", duration: 60 },
-      { x: 50, y: 90, action: "퇴장", duration: 0 },
-    ],
-    revenue: 85000,
-  },
-];
+const customerJourneys = CUSTOMER_JOURNEYS;
 
 export const CustomerJourney = () => {
   const [selectedJourney, setSelectedJourney] = useState(0);

@@ -3,24 +3,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, TrendingUp, Package, CheckCircle2, Sparkles } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { INVENTORY_DATA } from "@/data/sampleData";
 
-interface InventoryItem {
-  id: string;
-  name: string;
-  current: number;
-  optimal: number;
-  dailySales: number;
-  daysLeft: number;
-  status: "critical" | "warning" | "optimal" | "excess";
-}
+type InventoryItem = typeof INVENTORY_DATA[number];
 
-const inventory: InventoryItem[] = [
-  { id: "I1", name: "화이트 티셔츠", current: 85, optimal: 120, dailySales: 14, daysLeft: 6, status: "warning" },
-  { id: "I2", name: "블랙 진", current: 42, optimal: 60, dailySales: 8, daysLeft: 5, status: "warning" },
-  { id: "I3", name: "스니커즈", current: 8, optimal: 45, dailySales: 12, daysLeft: 0.7, status: "critical" },
-  { id: "I4", name: "데님 자켓", current: 23, optimal: 35, dailySales: 4, daysLeft: 5.8, status: "optimal" },
-  { id: "I5", name: "백팩", current: 156, optimal: 80, dailySales: 3, daysLeft: 52, status: "excess" },
-];
+const inventory = INVENTORY_DATA;
 
 const chartData = inventory.map((item) => ({
   name: item.name.split(" ")[0],

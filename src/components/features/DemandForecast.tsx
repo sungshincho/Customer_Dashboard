@@ -3,17 +3,10 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { EnhancedChart } from "@/components/analysis/EnhancedChart";
+import { FORECAST_BASE_DATA } from "@/data/sampleData";
 
 const generateForecast = (weather: string, event: string, day: string) => {
-  const baseData = [
-    { day: "월", sales: 100, conversion: 3.5 },
-    { day: "화", sales: 95, conversion: 3.2 },
-    { day: "수", sales: 110, conversion: 3.8 },
-    { day: "목", sales: 105, conversion: 3.6 },
-    { day: "금", sales: 130, conversion: 4.2 },
-    { day: "토", sales: 180, conversion: 5.5 },
-    { day: "일", sales: 165, conversion: 5.1 },
-  ];
+  const baseData = FORECAST_BASE_DATA;
 
   const multiplier =
     (weather === "sunny" ? 1.1 : weather === "rainy" ? 0.85 : 1) *

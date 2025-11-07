@@ -4,37 +4,30 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, RotateCcw, TrendingUp } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { LAYOUT_PRODUCTS, AI_OPTIMIZED_LAYOUT } from "@/data/sampleData";
 
-interface Product {
+type Product = {
   id: string;
   name: string;
+  category: string;
   x: number;
   y: number;
-  color: string;
-}
+  width: number;
+  height: number;
+  sales: number;
+  conversion: number;
+};
 
-const initialProducts: Product[] = [
-  { id: "A", name: "신상품", x: 20, y: 20, color: "bg-primary" },
-  { id: "B", name: "인기상품", x: 60, y: 20, color: "bg-blue-500" },
-  { id: "C", name: "할인상품", x: 20, y: 60, color: "bg-purple-500" },
-  { id: "D", name: "프리미엄", x: 60, y: 60, color: "bg-amber-500" },
-];
-
-const aiSuggestedLayout: Product[] = [
-  { id: "A", name: "신상품", x: 60, y: 20, color: "bg-primary" },
-  { id: "B", name: "인기상품", x: 20, y: 20, color: "bg-blue-500" },
-  { id: "C", name: "할인상품", x: 60, y: 60, color: "bg-purple-500" },
-  { id: "D", name: "프리미엄", x: 20, y: 60, color: "bg-amber-500" },
-];
+const initialProducts: Product[] = [...LAYOUT_PRODUCTS];
+const aiSuggestedLayout: Product[] = [...AI_OPTIMIZED_LAYOUT];
 
 const generateMetrics = (products: Product[]) => {
-  const baseConversion = 15;
-  const layoutScore = products.reduce((sum, p) => sum + (p.x + p.y), 0);
-  const variance = (layoutScore % 50) - 25;
+  const totalSales = products.reduce((sum, p) => sum + p.sales, 0);
+  const avgConversion = products.reduce((sum, p) => sum + p.conversion, 0) / products.length;
   return {
-    conversion: baseConversion + variance * 0.2,
-    traffic: 450 + variance * 5,
-    dwell: 180 + variance * 2,
+    conversion: avgConversion,
+    traffic: 450 + products.length * 50,
+    dwell: 180 + products.length * 10,
   };
 };
 
@@ -112,27 +105,41 @@ export const LayoutSimulator = () => {
             onDragOver={(e) => e.preventDefault()}
           >
             <div className="absolute top-2 left-2 text-xs text-muted-foreground">입구</div>
-            {products.map((product) => (
-              <div
-                key={product.id}
-                draggable
-                onDragStart={() => handleDragStart(product.id)}
-                className={`absolute w-16 h-16 ${product.color} rounded-lg cursor-move flex items-center justify-center text-white font-bold shadow-lg hover:scale-110 transition-transform`}
-                style={{
-                  left: `${product.x}%`,
-                  top: `${product.y}%`,
-                  transform: "translate(-50%, -50%)",
-                }}
-              >
-                {product.id}
-              </div>
-            ))}
+                {products.map((product) => (
+                  <div
+                    key={product.id}
+                    draggable
+                    onDragStart={() => handleDragStart(product.id)}
+                    onDragEnd={() => setDraggedProduct(null)}
+                    className={`absolute w-20 h-20 ${
+                      product.category === "아우터" ? "bg-primary" : 
+                      product.category === "상의" ? "bg-blue-500" :
+                      product.category === "하의" ? "bg-purple-500" :
+                      product.category === "신발" ? "bg-amber-500" :
+                      "bg-green-500"
+                    } 
+                      rounded-lg flex items-center justify-center text-xs font-medium text-white cursor-move transition-all hover:scale-105 hover:shadow-lg`}
+                    style={{
+                      left: `${(product.x / 100) * 100}%`,
+                      top: `${(product.y / 100) * 100}%`,
+                      transform: "translate(-50%, -50%)",
+                    }}
+                  >
+                    {product.name}
+                  </div>
+                ))}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             {products.map((product) => (
               <div key={product.id} className="flex items-center gap-2">
-                <div className={`w-3 h-3 ${product.color} rounded`} />
+                <div className={`w-3 h-3 ${
+                  product.category === "아우터" ? "bg-primary" : 
+                  product.category === "상의" ? "bg-blue-500" :
+                  product.category === "하의" ? "bg-purple-500" :
+                  product.category === "신발" ? "bg-amber-500" :
+                  "bg-green-500"
+                } rounded`} />
                 <span className="text-sm">{product.name}</span>
               </div>
             ))}
