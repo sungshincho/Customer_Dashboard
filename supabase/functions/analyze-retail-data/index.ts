@@ -249,7 +249,7 @@ ${JSON.stringify(dataStats.sampleRecords, null, 2)}
                   { role: 'user', content: userPrompt }
                 ],
                 temperature: 0.7,
-                max_tokens: 4000,
+                max_tokens: 6000,
               }),
             });
 
@@ -267,9 +267,48 @@ ${JSON.stringify(dataStats.sampleRecords, null, 2)}
             let analysisResult;
             try {
               const content = aiResponse.choices[0].message.content;
-              const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) || content.match(/\{[\s\S]*\}/);
-              const jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : content;
-              analysisResult = JSON.parse(jsonStr);
+              console.log("🔍 Raw AI response length:", content.length);
+              
+              // JSON 추출 시도
+              let jsonStr = content;
+              const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/);
+              if (jsonMatch) {
+                jsonStr = jsonMatch[1];
+              } else {
+                const objectMatch = content.match(/\{[\s\S]*\}/);
+                if (objectMatch) {
+                  jsonStr = objectMatch[0];
+                }
+              }
+              
+              console.log("🔍 Extracted JSON length:", jsonStr.length);
+              
+              // JSON 수정 시도 (불완전한 JSON 처리)
+              let fixedJson = jsonStr.trim();
+              
+              // 끝나지 않은 문자열 수정
+              if (!fixedJson.endsWith('}')) {
+                console.log("⚠️ JSON appears truncated, attempting to fix...");
+                
+                // 마지막 완전한 객체/배열까지만 사용
+                const lastCompleteObject = fixedJson.lastIndexOf('}');
+                const lastCompleteArray = fixedJson.lastIndexOf(']');
+                const cutPoint = Math.max(lastCompleteObject, lastCompleteArray);
+                
+                if (cutPoint > 0) {
+                  fixedJson = fixedJson.substring(0, cutPoint + 1);
+                  
+                  // 닫히지 않은 중괄호 수정
+                  const openBraces = (fixedJson.match(/\{/g) || []).length;
+                  const closeBraces = (fixedJson.match(/\}/g) || []).length;
+                  if (openBraces > closeBraces) {
+                    fixedJson += '}'.repeat(openBraces - closeBraces);
+                  }
+                }
+              }
+              
+              analysisResult = JSON.parse(fixedJson);
+              console.log("✅ Successfully parsed JSON");
               
               // 필수 필드 검증 및 기본값 설정
               analysisResult.nodes = analysisResult.nodes || [];
@@ -283,26 +322,29 @@ ${JSON.stringify(dataStats.sampleRecords, null, 2)}
               };
               analysisResult.timeSeriesPatterns = analysisResult.timeSeriesPatterns || [];
               
-              console.log(`✅ Parsed result: ${analysisResult.nodes.length} nodes, ${analysisResult.edges.length} edges, ${analysisResult.correlations.length} correlations`);
+              console.log(`✅ Validated result: ${analysisResult.nodes.length} nodes, ${analysisResult.edges.length} edges, ${analysisResult.correlations.length} correlations`);
             } catch (e) {
               console.error("⚠️ Failed to parse AI response as JSON:", e);
+              console.error("First 500 chars of content:", aiResponse.choices[0].message.content.substring(0, 500));
+              
               analysisResult = {
                 nodes: [],
                 edges: [],
                 insights: [{ 
                   title: "분석 파싱 오류", 
-                  description: "AI 응답을 파싱할 수 없습니다. 데이터 형식을 확인해주세요.",
+                  description: "AI 응답을 파싱할 수 없습니다. 응답이 너무 길거나 형식이 잘못되었습니다.",
                   impact: "high",
-                  recommendation: "데이터를 재확인하고 다시 시도하세요"
+                  recommendation: "데이터 양을 줄이거나 분석 범위를 좁혀서 다시 시도하세요"
                 }],
                 correlations: [],
                 wtpAnalysis: {
-                  avgWTP: "오류",
-                  priceElasticity: "오류",
+                  avgWTP: "파싱 오류",
+                  priceElasticity: "파싱 오류",
                   recommendations: ["분석 재시도 필요"]
                 },
                 timeSeriesPatterns: [],
-                rawResponse: aiResponse.choices[0].message.content
+                error: e instanceof Error ? e.message : String(e),
+                rawResponse: aiResponse.choices[0].message.content.substring(0, 1000)
               };
             }
 
