@@ -9,8 +9,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Edit, Trash2, ArrowRight, Link2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Plus, Edit, Trash2, ArrowRight, Link2, Settings2, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+interface PropertyField {
+  id: string;
+  name: string;
+  label: string;
+  type: string;
+  required: boolean;
+  description?: string;
+  defaultValue?: string;
+  enumValues?: string[];
+}
 
 interface RelationType {
   id: string;
@@ -20,13 +33,29 @@ interface RelationType {
   source_entity_type: string;
   target_entity_type: string;
   directionality: string | null;
+  properties: PropertyField[];
 }
+
+// 리테일 도메인 데이터 타입
+const PROPERTY_TYPES = [
+  { value: "string", label: "텍스트" },
+  { value: "number", label: "숫자" },
+  { value: "currency", label: "금액" },
+  { value: "date", label: "날짜" },
+  { value: "datetime", label: "날짜+시간" },
+  { value: "boolean", label: "참/거짓" },
+  { value: "email", label: "이메일" },
+  { value: "phone", label: "전화번호" },
+  { value: "url", label: "URL" },
+  { value: "enum", label: "선택 목록" },
+];
 
 export const RelationTypeManager = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
   const [editingRelation, setEditingRelation] = useState<RelationType | null>(null);
+  const [activeTab, setActiveTab] = useState<"basic" | "properties">("basic");
 
   const [formData, setFormData] = useState({
     name: "",
@@ -35,6 +64,15 @@ export const RelationTypeManager = () => {
     source_entity_type: "",
     target_entity_type: "",
     directionality: "directed",
+    properties: [] as PropertyField[],
+  });
+
+  const [newProperty, setNewProperty] = useState<Partial<PropertyField>>({
+    name: "",
+    label: "",
+    type: "string",
+    required: false,
+    description: "",
   });
 
   const { data: relations, isLoading: relationsLoading } = useQuery({
@@ -46,7 +84,10 @@ export const RelationTypeManager = () => {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return data as RelationType[];
+      return (data || []).map(item => ({
+        ...item,
+        properties: (item.properties || []) as unknown as PropertyField[]
+      })) as RelationType[];
     },
   });
 
@@ -74,7 +115,7 @@ export const RelationTypeManager = () => {
           source_entity_type: data.source_entity_type,
           target_entity_type: data.target_entity_type,
           directionality: data.directionality,
-          properties: [],
+          properties: data.properties as any,
           user_id: (await supabase.auth.getUser()).data.user?.id,
         })
         .select()
@@ -105,6 +146,7 @@ export const RelationTypeManager = () => {
           source_entity_type: data.source_entity_type,
           target_entity_type: data.target_entity_type,
           directionality: data.directionality,
+          properties: data.properties as any,
         })
         .eq("id", id)
         .select()
@@ -145,7 +187,16 @@ export const RelationTypeManager = () => {
       source_entity_type: "",
       target_entity_type: "",
       directionality: "directed",
+      properties: [],
     });
+    setNewProperty({
+      name: "",
+      label: "",
+      type: "string",
+      required: false,
+      description: "",
+    });
+    setActiveTab("basic");
   };
 
   const handleEdit = (relation: RelationType) => {
@@ -157,8 +208,49 @@ export const RelationTypeManager = () => {
       source_entity_type: relation.source_entity_type,
       target_entity_type: relation.target_entity_type,
       directionality: relation.directionality || "directed",
+      properties: relation.properties || [],
     });
     setIsOpen(true);
+  };
+
+  const handleAddProperty = () => {
+    if (!newProperty.name || !newProperty.label) {
+      toast({ title: "속성 이름과 표시명을 입력하세요", variant: "destructive" });
+      return;
+    }
+
+    const property: PropertyField = {
+      id: `prop_${Date.now()}`,
+      name: newProperty.name || "",
+      label: newProperty.label || "",
+      type: newProperty.type || "string",
+      required: newProperty.required || false,
+      description: newProperty.description,
+      defaultValue: newProperty.defaultValue,
+      enumValues: newProperty.enumValues,
+    };
+
+    setFormData({
+      ...formData,
+      properties: [...formData.properties, property],
+    });
+
+    setNewProperty({
+      name: "",
+      label: "",
+      type: "string",
+      required: false,
+      description: "",
+    });
+
+    toast({ title: "속성이 추가되었습니다" });
+  };
+
+  const handleRemoveProperty = (id: string) => {
+    setFormData({
+      ...formData,
+      properties: formData.properties.filter((p) => p.id !== id),
+    });
   };
 
   const handleSubmit = () => {
@@ -193,104 +285,251 @@ export const RelationTypeManager = () => {
               새 관계 타입
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingRelation ? "관계 타입 수정" : "새 관계 타입 생성"}
               </DialogTitle>
               <DialogDescription>
-                엔티티 간의 관계를 정의하세요
+                엔티티 간의 관계를 정의하고 속성을 추가하세요
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="basic">기본 정보</TabsTrigger>
+                <TabsTrigger value="properties" className="flex items-center gap-2">
+                  <Settings2 className="h-4 w-4" />
+                  속성 정의
+                  {formData.properties.length > 0 && (
+                    <Badge variant="secondary" className="ml-1">
+                      {formData.properties.length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="basic" className="space-y-4 mt-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">이름 (영문, 고유)</Label>
+                    <Input
+                      id="name"
+                      placeholder="purchases"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="label">표시명 (한글)</Label>
+                    <Input
+                      id="label"
+                      placeholder="구매한다"
+                      value={formData.label}
+                      onChange={(e) => setFormData({ ...formData, label: e.target.value })}
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="name">이름 (영문, 고유)</Label>
-                  <Input
-                    id="name"
-                    placeholder="purchases"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  <Label htmlFor="description">설명</Label>
+                  <Textarea
+                    id="description"
+                    placeholder="이 관계 타입에 대한 설명을 입력하세요"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="label">표시명 (한글)</Label>
-                  <Input
-                    id="label"
-                    placeholder="구매한다"
-                    value={formData.label}
-                    onChange={(e) => setFormData({ ...formData, label: e.target.value })}
-                  />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="source">출발 엔티티</Label>
+                    <Select 
+                      value={formData.source_entity_type} 
+                      onValueChange={(value) => setFormData({ ...formData, source_entity_type: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="선택하세요" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {entityTypes?.map((entity) => (
+                          <SelectItem key={entity.id} value={entity.name}>
+                            {entity.label} ({entity.name})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="target">도착 엔티티</Label>
+                    <Select 
+                      value={formData.target_entity_type} 
+                      onValueChange={(value) => setFormData({ ...formData, target_entity_type: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="선택하세요" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {entityTypes?.map((entity) => (
+                          <SelectItem key={entity.id} value={entity.name}>
+                            {entity.label} ({entity.name})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="description">설명</Label>
-                <Textarea
-                  id="description"
-                  placeholder="이 관계 타입에 대한 설명을 입력하세요"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="source">출발 엔티티</Label>
+                  <Label htmlFor="directionality">방향성</Label>
                   <Select 
-                    value={formData.source_entity_type} 
-                    onValueChange={(value) => setFormData({ ...formData, source_entity_type: value })}
+                    value={formData.directionality} 
+                    onValueChange={(value) => setFormData({ ...formData, directionality: value })}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="선택하세요" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {entityTypes?.map((entity) => (
-                        <SelectItem key={entity.id} value={entity.name}>
-                          {entity.label} ({entity.name})
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="directed">방향성 있음 (A → B)</SelectItem>
+                      <SelectItem value="undirected">방향성 없음 (A ↔ B)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
+              </TabsContent>
 
-                <div className="space-y-2">
-                  <Label htmlFor="target">도착 엔티티</Label>
-                  <Select 
-                    value={formData.target_entity_type} 
-                    onValueChange={(value) => setFormData({ ...formData, target_entity_type: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="선택하세요" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {entityTypes?.map((entity) => (
-                        <SelectItem key={entity.id} value={entity.name}>
-                          {entity.label} ({entity.name})
-                        </SelectItem>
+              <TabsContent value="properties" className="space-y-4 mt-4">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-semibold">관계 속성 목록</h4>
+                      <p className="text-xs text-muted-foreground">
+                        이 관계가 가질 데이터 필드를 정의합니다 (예: 거래금액, 거래일시)
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 기존 속성 목록 */}
+                  {formData.properties.length > 0 && (
+                    <div className="space-y-2">
+                      {formData.properties.map((property) => (
+                        <Card key={property.id} className="p-3">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline">{property.label}</Badge>
+                                <Badge variant="secondary" className="text-xs">
+                                  {PROPERTY_TYPES.find(t => t.value === property.type)?.label}
+                                </Badge>
+                                {property.required && (
+                                  <Badge variant="destructive" className="text-xs">필수</Badge>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {property.name}
+                              </p>
+                              {property.description && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {property.description}
+                                </p>
+                              )}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleRemoveProperty(property.id)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </Card>
                       ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+                    </div>
+                  )}
 
-              <div className="space-y-2">
-                <Label htmlFor="directionality">방향성</Label>
-                <Select 
-                  value={formData.directionality} 
-                  onValueChange={(value) => setFormData({ ...formData, directionality: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="directed">방향성 있음 (A → B)</SelectItem>
-                    <SelectItem value="undirected">방향성 없음 (A ↔ B)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+                  {/* 새 속성 추가 폼 */}
+                  <Card className="p-4 bg-muted/50">
+                    <h4 className="text-sm font-semibold mb-3">새 속성 추가</h4>
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label className="text-xs">이름 (영문)</Label>
+                          <Input
+                            placeholder="transaction_amount"
+                            value={newProperty.name}
+                            onChange={(e) => setNewProperty({ ...newProperty, name: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">표시명 (한글)</Label>
+                          <Input
+                            placeholder="거래금액"
+                            value={newProperty.label}
+                            onChange={(e) => setNewProperty({ ...newProperty, label: e.target.value })}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label className="text-xs">데이터 타입</Label>
+                          <Select
+                            value={newProperty.type}
+                            onValueChange={(value) => setNewProperty({ ...newProperty, type: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {PROPERTY_TYPES.map((type) => (
+                                <SelectItem key={type.value} value={type.value}>
+                                  {type.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex items-end">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="required"
+                              checked={newProperty.required}
+                              onCheckedChange={(checked) =>
+                                setNewProperty({ ...newProperty, required: checked as boolean })
+                              }
+                            />
+                            <Label htmlFor="required" className="text-xs cursor-pointer">
+                              필수 항목
+                            </Label>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs">설명 (선택)</Label>
+                        <Textarea
+                          placeholder="이 속성에 대한 설명"
+                          value={newProperty.description}
+                          onChange={(e) => setNewProperty({ ...newProperty, description: e.target.value })}
+                          rows={2}
+                        />
+                      </div>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        onClick={handleAddProperty}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        속성 추가
+                      </Button>
+                    </div>
+                  </Card>
+                </div>
+              </TabsContent>
+            </Tabs>
 
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsOpen(false)}>
@@ -323,11 +562,16 @@ export const RelationTypeManager = () => {
                       {getEntityLabel(relation.target_entity_type)}
                     </Badge>
                   </div>
-                  <Badge variant="secondary" className="text-xs">
-                    {relation.name}
-                  </Badge>
-                </div>
-                <div className="flex gap-1">
+                    <Badge variant="secondary" className="text-xs">
+                      {relation.name}
+                    </Badge>
+                    {relation.properties && relation.properties.length > 0 && (
+                      <Badge variant="outline" className="text-xs">
+                        속성 {relation.properties.length}개
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex gap-1">
                   <Button
                     variant="ghost"
                     size="icon"
