@@ -14,6 +14,15 @@ serve(async (req) => {
     const { data, analysisType, nodeRelations } = await req.json();
     console.log("🔵 Starting retail data analysis", { analysisType, dataLength: data?.length });
 
+    // 데이터가 너무 많으면 샘플링 (최대 300개)
+    let processedData = data;
+    if (data && data.length > 300) {
+      const sampleSize = 300;
+      const step = Math.floor(data.length / sampleSize);
+      processedData = data.filter((_: any, index: number) => index % step === 0).slice(0, sampleSize);
+      console.log(`📊 Sampled ${processedData.length} records from ${data.length} total records`);
+    }
+
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY is not configured');
@@ -74,9 +83,46 @@ serve(async (req) => {
 
 응답은 JSON 형식으로 제공하세요.`;
 
+    // 데이터 통계 생성
+    const dataStats = {
+      totalRecords: data.length,
+      sampledRecords: processedData.length,
+      dataTypes: analysisType,
+      sampleData: processedData.slice(0, 50), // 처음 50개만 상세 데이터로
+      columns: processedData.length > 0 ? Object.keys(processedData[0]) : [],
+      summary: {
+        numericFields: {} as Record<string, { min: number, max: number, avg: number }>,
+        categoricalFields: {} as Record<string, string[]>
+      }
+    };
+
+    // 숫자형 필드 통계
+    if (processedData.length > 0) {
+      const firstRecord = processedData[0];
+      Object.keys(firstRecord).forEach(key => {
+        const values = processedData.map((r: any) => r[key]).filter((v: any) => typeof v === 'number');
+        if (values.length > 0) {
+          dataStats.summary.numericFields[key] = {
+            min: Math.min(...values),
+            max: Math.max(...values),
+            avg: values.reduce((a: number, b: number) => a + b, 0) / values.length
+          };
+        } else {
+          const categoricalValues = processedData.map((r: any) => r[key]).filter((v: any) => v !== null && v !== undefined);
+          const uniqueValues = [...new Set(categoricalValues)].slice(0, 20) as string[]; // 최대 20개 유니크 값
+          if (uniqueValues.length > 0) {
+            dataStats.summary.categoricalFields[key] = uniqueValues;
+          }
+        }
+      });
+    }
+
     const userPrompt = `
 분석 유형: ${analysisType}
-데이터: ${JSON.stringify(data, null, 2)}
+총 데이터 수: ${data.length}개 (샘플링: ${processedData.length}개)
+데이터 통계:
+${JSON.stringify(dataStats, null, 2)}
+
 활성화된 노드 관계: ${JSON.stringify(nodeRelations || 'all', null, 2)}
 
 위 데이터를 분석하여 다음을 제공하세요:
@@ -103,7 +149,9 @@ serve(async (req) => {
           { role: 'user', content: userPrompt }
         ],
         temperature: 0.7,
+        max_tokens: 4000,
       }),
+      signal: AbortSignal.timeout(60000), // 60초 타임아웃
     });
 
     if (!response.ok) {
@@ -165,7 +213,8 @@ serve(async (req) => {
       analysis: analysisResult,
       metadata: {
         analysisType,
-        dataCount: data?.length || 0,
+        totalDataCount: data?.length || 0,
+        sampledDataCount: processedData?.length || 0,
         timestamp: new Date().toISOString()
       }
     }), {
