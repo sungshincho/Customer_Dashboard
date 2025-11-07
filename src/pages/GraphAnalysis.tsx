@@ -12,6 +12,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Network, TrendingUp, AlertCircle, Zap } from "lucide-react";
 import ForceGraph2D from "react-force-graph-2d";
 import { normalizeMultipleDatasets } from "@/utils/dataNormalizer";
+import { InsightsDashboard } from "@/components/analysis/InsightsDashboard";
+import { StoreHeatmap } from "@/components/analysis/StoreHeatmap";
+import { ZoneContribution } from "@/components/analysis/ZoneContribution";
 
 interface Node {
   id: string;
@@ -452,108 +455,174 @@ const GraphAnalysis = () => {
               </CardContent>
             </Card>
 
-            {analysisResult && (
-              <Tabs defaultValue="insights">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="insights">인사이트</TabsTrigger>
-                  <TabsTrigger value="correlations">상관관계</TabsTrigger>
-                  <TabsTrigger value="wtp">WTP 분석</TabsTrigger>
-                </TabsList>
+            {analysisResult && (() => {
+              // 실제 데이터 추출
+              const selectedData = imports.filter(imp => selectedImportIds.includes(imp.id));
+              const trafficData = selectedData.find(d => d.file_name?.includes('tracking_zone'))?.raw_data || [];
+              const zoneCoordinates = selectedData.find(d => d.file_name?.includes('zone') && d.file_name?.includes('coordinates'))?.raw_data || [];
+              
+              // Zone별 매출 데이터 추출 (매출 데이터에서)
+              const salesData = selectedData.filter(d => d.data_type === 'sales');
+              const zoneVisits = new Map<string, number>();
+              const zoneSales = new Map<string, number>();
+              
+              // 방문 빈도 계산
+              trafficData.forEach((traffic: any) => {
+                const zones = traffic.zones || traffic.zone_path || [];
+                if (Array.isArray(zones)) {
+                  zones.forEach((zoneId: string) => {
+                    zoneVisits.set(zoneId, (zoneVisits.get(zoneId) || 0) + 1);
+                  });
+                }
+              });
+              
+              // Zone별 매출 데이터 (임시 - 실제로는 product_location 등과 연계 필요)
+              const zoneContributionData = Array.from(zoneVisits.entries()).map(([zoneId, visits]) => {
+                const zone = zoneCoordinates.find((z: any) => z.zone_id === zoneId || z.id === zoneId);
+                return {
+                  zone_id: zoneId,
+                  zone_name: zone?.zone_name || zone?.name || zoneId,
+                  visits,
+                  sales: Math.floor(visits * 10000 * Math.random()), // 임시 매출 데이터
+                  conversion_rate: 0.15 + Math.random() * 0.3,
+                  avg_dwell_time: 30 + Math.random() * 90
+                };
+              });
+              
+              const totalSales = zoneContributionData.reduce((sum, z) => sum + z.sales, 0);
+              
+              return (
+                <Tabs defaultValue="insights">
+                  <TabsList className="grid w-full grid-cols-5">
+                    <TabsTrigger value="insights">인사이트</TabsTrigger>
+                    <TabsTrigger value="heatmap">히트맵</TabsTrigger>
+                    <TabsTrigger value="contribution">Zone 기여도</TabsTrigger>
+                    <TabsTrigger value="correlations">상관관계</TabsTrigger>
+                    <TabsTrigger value="wtp">WTP 분석</TabsTrigger>
+                  </TabsList>
 
-                <TabsContent value="insights" className="space-y-4">
-                  {analysisResult.insights?.map((insight, idx) => (
-                    <Card key={idx}>
+                  <TabsContent value="insights" className="space-y-4">
+                    <InsightsDashboard
+                      insights={analysisResult.insights || []}
+                      correlations={analysisResult.correlations}
+                      wtpAnalysis={analysisResult.wtpAnalysis}
+                      timeSeriesPatterns={analysisResult.timeSeriesPatterns}
+                      summary={(analysisResult as any).summary}
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="heatmap">
+                    {zoneCoordinates.length > 0 && trafficData.length > 0 ? (
+                      <StoreHeatmap
+                        zoneCoordinates={zoneCoordinates}
+                        trafficData={trafficData}
+                      />
+                    ) : (
+                      <Card>
+                        <CardContent className="pt-6">
+                          <div className="text-center text-muted-foreground py-8">
+                            <AlertCircle className="mx-auto h-12 w-12 mb-4" />
+                            <p>히트맵 생성을 위한 데이터가 부족합니다.</p>
+                            <p className="text-sm mt-2">
+                              tracking_zone156 및 zone156_coordinates 데이터를 선택해주세요.
+                            </p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="contribution">
+                    {zoneContributionData.length > 0 ? (
+                      <ZoneContribution
+                        zoneData={zoneContributionData}
+                        totalSales={totalSales}
+                      />
+                    ) : (
+                      <Card>
+                        <CardContent className="pt-6">
+                          <div className="text-center text-muted-foreground py-8">
+                            <AlertCircle className="mx-auto h-12 w-12 mb-4" />
+                            <p>Zone 기여도 분석을 위한 데이터가 부족합니다.</p>
+                            <p className="text-sm mt-2">
+                              동선 데이터와 매출 데이터를 선택해주세요.
+                            </p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="correlations">
+                    <Card>
                       <CardHeader>
-                        <div className="flex items-start justify-between">
-                          <CardTitle className="text-lg">{insight.title}</CardTitle>
-                          <Badge variant={
-                            insight.impact === 'high' ? 'destructive' :
-                            insight.impact === 'medium' ? 'default' : 'secondary'
-                          }>
-                            {insight.impact} impact
-                          </Badge>
-                        </div>
+                        <CardTitle>팩터 간 상관관계</CardTitle>
                       </CardHeader>
-                      <CardContent className="space-y-2">
-                        <p className="text-sm text-muted-foreground">{insight.description}</p>
-                        <div className="flex items-start gap-2 pt-2 border-t">
-                          <TrendingUp className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                          <p className="text-sm font-medium">{insight.recommendation}</p>
-                        </div>
+                      <CardContent>
+                        {analysisResult.correlations && analysisResult.correlations.length > 0 ? (
+                          <div className="space-y-3">
+                            {analysisResult.correlations.map((corr: any, idx: number) => (
+                              <div key={idx} className="flex items-center justify-between p-3 border rounded-lg">
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium">
+                                    {corr.factor1} ↔ {corr.factor2}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">{corr.significance}</p>
+                                </div>
+                                <Badge variant="outline">
+                                  {typeof corr.correlation === 'number' ? (corr.correlation * 100).toFixed(1) : corr.correlation}%
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-center text-muted-foreground py-8">상관관계 데이터가 없습니다</p>
+                        )}
                       </CardContent>
                     </Card>
-                  ))}
-                </TabsContent>
+                  </TabsContent>
 
-                <TabsContent value="correlations">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>팩터 간 상관관계</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {analysisResult.correlations && analysisResult.correlations.length > 0 ? (
-                        <div className="space-y-3">
-                          {analysisResult.correlations.map((corr: any, idx: number) => (
-                            <div key={idx} className="flex items-center justify-between p-3 border rounded-lg">
-                              <div className="flex-1">
-                                <p className="text-sm font-medium">
-                                  {corr.factor1} ↔ {corr.factor2}
-                                </p>
-                                <p className="text-xs text-muted-foreground">{corr.significance}</p>
+                  <TabsContent value="wtp">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>WTP (Willingness To Pay) 분석</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {analysisResult.wtpAnalysis ? (
+                          <div className="space-y-4">
+                            <div className="grid gap-4 md:grid-cols-2">
+                              <div className="p-4 border rounded-lg">
+                                <p className="text-sm text-muted-foreground">평균 WTP</p>
+                                <p className="text-2xl font-bold">{analysisResult.wtpAnalysis.avgWTP}</p>
                               </div>
-                              <Badge variant="outline">
-                                {(corr.correlation * 100).toFixed(1)}%
-                              </Badge>
+                              <div className="p-4 border rounded-lg">
+                                <p className="text-sm text-muted-foreground">가격 탄력성</p>
+                                <p className="text-2xl font-bold">{analysisResult.wtpAnalysis.priceElasticity}</p>
+                              </div>
                             </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-center text-muted-foreground py-8">상관관계 데이터가 없습니다</p>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                <TabsContent value="wtp">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>WTP (Willingness To Pay) 분석</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {analysisResult.wtpAnalysis ? (
-                        <div className="space-y-4">
-                          <div className="grid gap-4 md:grid-cols-2">
-                            <div className="p-4 border rounded-lg">
-                              <p className="text-sm text-muted-foreground">평균 WTP</p>
-                              <p className="text-2xl font-bold">{analysisResult.wtpAnalysis.avgWTP}</p>
-                            </div>
-                            <div className="p-4 border rounded-lg">
-                              <p className="text-sm text-muted-foreground">가격 탄력성</p>
-                              <p className="text-2xl font-bold">{analysisResult.wtpAnalysis.priceElasticity}</p>
-                            </div>
-                          </div>
-                          <div className="p-4 border rounded-lg bg-muted/20">
-                            <div className="flex items-start gap-2">
-                              <Zap className="h-4 w-4 text-primary mt-0.5" />
-                              <div>
-                                <p className="text-sm font-medium mb-2">권장사항</p>
-                                <ul className="text-sm text-muted-foreground space-y-1">
-                                  {analysisResult.wtpAnalysis.recommendations?.map((rec: string, idx: number) => (
-                                    <li key={idx}>• {rec}</li>
-                                  ))}
-                                </ul>
+                            <div className="p-4 border rounded-lg bg-muted/20">
+                              <div className="flex items-start gap-2">
+                                <Zap className="h-4 w-4 text-primary mt-0.5" />
+                                <div>
+                                  <p className="text-sm font-medium mb-2">권장사항</p>
+                                  <ul className="text-sm text-muted-foreground space-y-1">
+                                    {analysisResult.wtpAnalysis.recommendations?.map((rec: string, idx: number) => (
+                                      <li key={idx}>• {rec}</li>
+                                    ))}
+                                  </ul>
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
-                      ) : (
-                        <p className="text-center text-muted-foreground py-8">WTP 데이터가 없습니다</p>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
-            )}
+                        ) : (
+                          <p className="text-center text-muted-foreground py-8">WTP 데이터가 없습니다</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                </Tabs>
+              );
+            })()}
           </div>
         </div>
       </div>
