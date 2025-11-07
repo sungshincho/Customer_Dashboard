@@ -75,29 +75,40 @@ serve(async (req) => {
               { type: 'correlated_with', from: 'Product', to: 'Product', weight: 'low' }
             ];
 
-            const systemPrompt = `당신은 오프라인 리테일 데이터 분석 전문가입니다.
+            const systemPrompt = `You are an advanced retail analytics AI specialized in:
 
-**중요: 간결하고 핵심적인 JSON만 반환하세요. 설명 없이 JSON만 출력하세요.**
+**Integrated Analysis**: Customer-Space-Product-Sales correlations
+**WTP Analysis**: Willingness To Pay and price elasticity
+**Journey Patterns**: Customer movement and zone performance
+**Product Optimization**: Location effectiveness and cross-selling
+**Business Insights**: Actionable recommendations to increase revenue
 
-응답 형식 (필수):
-{
-  "nodes": [최소 5개, 최대 10개],
-  "edges": [최소 5개, 최대 10개],
-  "insights": [최소 2개, 최대 3개],
-  "correlations": [최소 2개, 최대 3개],
-  "wtpAnalysis": { "avgWTP": "금액", "priceElasticity": "수치", "recommendations": ["권장1", "권장2"] },
-  "timeSeriesPatterns": [최소 1개, 최대 2개]
-}
+Ontology Nodes: ${JSON.stringify(ontologyNodes, null, 2)}
+Relationships: ${JSON.stringify(relationshipTypes, null, 2)}
 
-노드/엣지는 핵심만 선별하세요. 인사이트는 100자 이내로 작성하세요.`;
+Focus on high-impact insights that directly drive sales and customer experience.`;
 
             const userPrompt = `
-데이터 타입: ${analysisType}
-총 레코드: ${data.length}개 (분석: ${processedData.length}개)
-샘플:
+Analysis Type: ${analysisType}
+Total Records: ${data.length} (Analyzing: ${processedData.length})
+Sample Data (first 5 records):
 ${JSON.stringify(dataStats.sampleRecords.slice(0, 5), null, 2)}
 
-**JSON 형식으로만 응답하세요. 설명 없이 {} 안의 내용만 출력하세요.**`;
+**Primary Objectives:**
+1. Identify customer-space-product-sales correlations
+2. Calculate WTP (Willingness To Pay) and price elasticity
+3. Discover high-impact zones and product placements
+4. Generate revenue optimization recommendations
+
+**Instructions:**
+- Create 5-12 meaningful nodes (Customer, Zone, Product, Transaction types)
+- Create 5-15 weighted edges showing relationships
+- Provide 3-5 actionable insights with business impact
+- Include 2-4 correlations between key factors
+- Analyze WTP patterns if transaction data exists
+- Identify time-based patterns (hourly, daily, weekly)
+
+Focus on insights that directly impact revenue and customer experience.`;
 
             sendProgress(40, 'analyzing', 'AI 분석 진행 중... (30-60초 소요 예상)');
 
@@ -108,13 +119,129 @@ ${JSON.stringify(dataStats.sampleRecords.slice(0, 5), null, 2)}
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                model: 'google/gemini-2.5-pro',
+                model: 'google/gemini-2.5-flash',
                 messages: [
-                  { role: 'system', content: systemPrompt },
+                  { 
+                    role: 'system', 
+                    content: `You are an advanced retail analytics AI. Analyze customer behavior, store layout, products, and sales to provide:
+- Customer journey patterns and segments
+- Zone performance and spatial correlations
+- Product-location effectiveness
+- Sales-traffic conversion
+- WTP (Willingness To Pay) insights
+- Cross-selling opportunities
+- Operational recommendations
+
+Return structured, actionable insights.`
+                  },
                   { role: 'user', content: userPrompt }
                 ],
-                temperature: 0.5,
-                max_tokens: 8000,
+                tools: [{
+                  type: "function",
+                  function: {
+                    name: "generate_retail_insights",
+                    description: "Generate retail analytics insights with graph structure",
+                    parameters: {
+                      type: "object",
+                      properties: {
+                        nodes: {
+                          type: "array",
+                          description: "Graph nodes representing entities (5-15 nodes)",
+                          items: {
+                            type: "object",
+                            properties: {
+                              id: { type: "string" },
+                              type: { type: "string" },
+                              label: { type: "string" },
+                              properties: { type: "object" },
+                              metrics: { type: "object" }
+                            },
+                            required: ["id", "type", "label"]
+                          }
+                        },
+                        edges: {
+                          type: "array",
+                          description: "Graph edges representing relationships (5-20 edges)",
+                          items: {
+                            type: "object",
+                            properties: {
+                              source: { type: "string" },
+                              target: { type: "string" },
+                              type: { type: "string" },
+                              weight: { type: "number" },
+                              label: { type: "string" }
+                            },
+                            required: ["source", "target", "type"]
+                          }
+                        },
+                        insights: {
+                          type: "array",
+                          description: "Key business insights (3-5 insights, max 150 chars each)",
+                          items: {
+                            type: "object",
+                            properties: {
+                              category: { type: "string" },
+                              title: { type: "string" },
+                              description: { type: "string" },
+                              impact: { type: "string", enum: ["high", "medium", "low"] },
+                              actionable: { type: "string" }
+                            },
+                            required: ["category", "title", "description", "impact"]
+                          }
+                        },
+                        correlations: {
+                          type: "array",
+                          description: "Factor correlations (2-4 correlations)",
+                          items: {
+                            type: "object",
+                            properties: {
+                              factor1: { type: "string" },
+                              factor2: { type: "string" },
+                              correlation: { type: "number" },
+                              significance: { type: "string" },
+                              insight: { type: "string" }
+                            },
+                            required: ["factor1", "factor2", "correlation"]
+                          }
+                        },
+                        wtpAnalysis: {
+                          type: "object",
+                          description: "Willingness To Pay analysis",
+                          properties: {
+                            avgWTP: { type: "string" },
+                            priceElasticity: { type: "string" },
+                            recommendations: {
+                              type: "array",
+                              items: { type: "string" }
+                            }
+                          }
+                        },
+                        timeSeriesPatterns: {
+                          type: "array",
+                          description: "Time series patterns (1-3 patterns)",
+                          items: {
+                            type: "object",
+                            properties: {
+                              period: { type: "string" },
+                              trend: { type: "string" },
+                              seasonality: { type: "string" },
+                              anomalies: {
+                                type: "array",
+                                items: { type: "string" }
+                              }
+                            }
+                          }
+                        },
+                        summary: { 
+                          type: "string",
+                          description: "Overall summary of analysis (max 200 chars)"
+                        }
+                      },
+                      required: ["nodes", "edges", "insights", "summary"]
+                    }
+                  }
+                }],
+                tool_choice: { type: "function", function: { name: "generate_retail_insights" } },
               }),
             });
 
@@ -131,59 +258,29 @@ ${JSON.stringify(dataStats.sampleRecords.slice(0, 5), null, 2)}
 
             let analysisResult;
             try {
-              const content = aiResponse.choices[0].message.content;
-              console.log("🔍 Raw AI response length:", content.length);
+              // Tool calling을 사용했으므로 tool_calls에서 arguments를 파싱
+              const toolCall = aiResponse.choices[0].message.tool_calls?.[0];
               
-              // JSON 추출
-              let jsonStr = content.trim();
-              
-              // 마크다운 코드 블록 제거
-              const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-              if (codeBlockMatch) {
-                jsonStr = codeBlockMatch[1].trim();
-              }
-              
-              // 첫 { 부터 마지막 } 까지 추출
-              const firstBrace = jsonStr.indexOf('{');
-              const lastBrace = jsonStr.lastIndexOf('}');
-              if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-                jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
-              }
-              
-              console.log("🔍 Extracted JSON length:", jsonStr.length);
-              
-              // JSON 파싱 시도
-              try {
+              if (toolCall && toolCall.function.name === 'generate_retail_insights') {
+                console.log("✅ Tool call detected, parsing arguments");
+                analysisResult = JSON.parse(toolCall.function.arguments);
+                console.log(`✅ Parsed result: ${analysisResult.nodes.length} nodes, ${analysisResult.edges.length} edges`);
+              } else {
+                // Fallback: content에서 JSON 추출 시도
+                const content = aiResponse.choices[0].message.content || "{}";
+                console.log("⚠️ No tool call, trying content parsing. Length:", content.length);
+                
+                let jsonStr = content.trim();
+                const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+                if (codeBlockMatch) jsonStr = codeBlockMatch[1].trim();
+                
+                const firstBrace = jsonStr.indexOf('{');
+                const lastBrace = jsonStr.lastIndexOf('}');
+                if (firstBrace !== -1 && lastBrace !== -1) {
+                  jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
+                }
+                
                 analysisResult = JSON.parse(jsonStr);
-                console.log("✅ Successfully parsed JSON");
-              } catch (parseError) {
-                console.log("⚠️ JSON parsing failed, attempting repair...");
-                
-                // JSON 수정 시도
-                let repairedJson = jsonStr;
-                
-                // 끝나지 않은 배열이나 객체 수정
-                const openBraces = (repairedJson.match(/\{/g) || []).length;
-                const closeBraces = (repairedJson.match(/\}/g) || []).length;
-                const openBrackets = (repairedJson.match(/\[/g) || []).length;
-                const closeBrackets = (repairedJson.match(/\]/g) || []).length;
-                
-                // 닫히지 않은 배열 닫기
-                if (openBrackets > closeBrackets) {
-                  repairedJson += ']'.repeat(openBrackets - closeBrackets);
-                }
-                
-                // 닫히지 않은 객체 닫기
-                if (openBraces > closeBraces) {
-                  repairedJson += '}'.repeat(openBraces - closeBraces);
-                }
-                
-                // 마지막 쉼표 제거
-                repairedJson = repairedJson.replace(/,(\s*[}\]])/g, '$1');
-                
-                console.log("🔧 Repaired JSON length:", repairedJson.length);
-                analysisResult = JSON.parse(repairedJson);
-                console.log("✅ Successfully parsed repaired JSON");
               }
               
               // 필수 필드 검증 및 기본값 설정
@@ -198,19 +295,19 @@ ${JSON.stringify(dataStats.sampleRecords.slice(0, 5), null, 2)}
               };
               analysisResult.timeSeriesPatterns = analysisResult.timeSeriesPatterns || [];
               
-              console.log(`✅ Validated result: ${analysisResult.nodes.length} nodes, ${analysisResult.edges.length} edges, ${analysisResult.correlations.length} correlations`);
             } catch (e) {
-              console.error("⚠️ Failed to parse AI response as JSON:", e);
-              console.error("First 500 chars of content:", aiResponse.choices[0].message.content.substring(0, 500));
+              console.error("⚠️ Failed to parse AI response:", e);
+              console.error("Response:", JSON.stringify(aiResponse.choices[0], null, 2));
               
               analysisResult = {
                 nodes: [],
                 edges: [],
                 insights: [{ 
+                  category: "오류",
                   title: "분석 파싱 오류", 
-                  description: "AI 응답을 파싱할 수 없습니다. 데이터 양을 줄이거나 다시 시도하세요.",
+                  description: "AI 응답을 파싱할 수 없습니다.",
                   impact: "high",
-                  recommendation: "선택한 데이터 수를 줄이거나 데이터를 정제하여 재시도하세요"
+                  actionable: "데이터 양을 줄이거나 다시 시도하세요"
                 }],
                 correlations: [],
                 wtpAnalysis: {
@@ -219,8 +316,8 @@ ${JSON.stringify(dataStats.sampleRecords.slice(0, 5), null, 2)}
                   recommendations: ["분석 재시도 필요"]
                 },
                 timeSeriesPatterns: [],
-                error: e instanceof Error ? e.message : String(e),
-                rawResponse: aiResponse.choices[0].message.content.substring(0, 1000)
+                summary: "분석 실패",
+                error: e instanceof Error ? e.message : String(e)
               };
             }
 
@@ -318,25 +415,18 @@ ${JSON.stringify(dataStats.sampleRecords.slice(0, 5), null, 2)}
       { type: 'correlated_with', from: 'Product', to: 'Product', weight: 'low' }
     ];
 
-    const systemPrompt = `당신은 오프라인 리테일 데이터 분석 전문가입니다. LSTM-GNN 하이브리드 모델 개념을 활용하여 데이터를 분석합니다.
+    const systemPrompt = `You are an advanced retail analytics AI specialized in:
 
-온톨로지 노드 타입: ${JSON.stringify(ontologyNodes, null, 2)}
-관계 타입: ${JSON.stringify(relationshipTypes, null, 2)}
+**Integrated Analysis**: Customer-Space-Product-Sales correlations
+**WTP Analysis**: Willingness To Pay and price elasticity
+**Journey Patterns**: Customer movement and zone performance
+**Product Optimization**: Location effectiveness and cross-selling
+**Business Insights**: Actionable recommendations to increase revenue
 
-분석 목표:
-1. 매출 상승 방법 도출
-2. 전년동기대비 매출 변화 원인 파악
-3. 데이터 팩터 간 상관관계 분석
-4. WTP (Willingness To Pay) 분석
+Ontology Nodes: ${JSON.stringify(ontologyNodes, null, 2)}
+Relationships: ${JSON.stringify(relationshipTypes, null, 2)}
 
-다음을 수행하세요:
-1. 입력 데이터를 표준화하고 온톨로지 노드로 매핑
-2. 노드 간 관계 추출 및 가중치 계산
-3. 시계열 패턴 분석 (LSTM 개념)
-4. 그래프 구조 분석 (GNN 개념)
-5. 핵심 인사이트 및 액션 아이템 도출
-
-응답은 JSON 형식으로 제공하세요.`;
+Focus on high-impact insights that directly drive sales and customer experience.`;
 
     // 간단한 데이터 통계만 생성
     const dataStats = {
@@ -348,21 +438,29 @@ ${JSON.stringify(dataStats.sampleRecords.slice(0, 5), null, 2)}
     };
 
     const userPrompt = `
-분석 유형: ${analysisType}
-총 데이터 수: ${data.length}개 (샘플링: ${processedData.length}개)
-데이터 컬럼: ${dataStats.columns.join(', ')}
-샘플 데이터:
-${JSON.stringify(dataStats.sampleRecords, null, 2)}
+Analysis Type: ${analysisType}
+Total Records: ${data.length} (Analyzing: ${processedData.length})
+Data Columns: ${dataStats.columns.join(', ')}
+Sample Data (first 5 records):
+${JSON.stringify(dataStats.sampleRecords.slice(0, 5), null, 2)}
 
-활성화된 노드 관계: ${JSON.stringify(nodeRelations || 'all', null, 2)}
+Activated Node Relations: ${JSON.stringify(nodeRelations || 'all', null, 2)}
 
-위 데이터를 분석하여 다음을 제공하세요:
-1. nodes: 온톨로지 기반 노드 배열 [{ id, type, label, properties, metrics }]
-2. edges: 관계 배열 [{ source, target, type, weight, properties }]
-3. insights: 핵심 인사이트 배열 [{ title, description, impact, recommendation }]
-4. correlations: 팩터 간 상관관계 [{ factor1, factor2, correlation, significance }]
-5. wtpAnalysis: WTP 분석 결과 { avgWTP, priceElasticity, recommendations }
-6. timeSeriesPatterns: 시계열 패턴 [{ period, trend, seasonality, anomalies }]
+**Primary Objectives:**
+1. Identify customer-space-product-sales correlations
+2. Calculate WTP (Willingness To Pay) and price elasticity
+3. Discover high-impact zones and product placements
+4. Generate revenue optimization recommendations
+
+**Instructions:**
+- Create 5-12 meaningful nodes (Customer, Zone, Product, Transaction types)
+- Create 5-15 weighted edges showing relationships
+- Provide 3-5 actionable insights with business impact
+- Include 2-4 correlations between key factors
+- Analyze WTP patterns if transaction data exists
+- Identify time-based patterns (hourly, daily, weekly)
+
+Focus on insights that directly impact revenue and customer experience.
 `;
 
     console.log("🤖 Calling Lovable AI for analysis...");
@@ -378,13 +476,129 @@ ${JSON.stringify(dataStats.sampleRecords, null, 2)}
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'google/gemini-2.5-pro',
+          model: 'google/gemini-2.5-flash',
           messages: [
-            { role: 'system', content: systemPrompt },
+            { 
+              role: 'system', 
+              content: `You are an advanced retail analytics AI. Analyze customer behavior, store layout, products, and sales to provide:
+- Customer journey patterns and segments
+- Zone performance and spatial correlations
+- Product-location effectiveness
+- Sales-traffic conversion
+- WTP (Willingness To Pay) insights
+- Cross-selling opportunities
+- Operational recommendations
+
+Return structured, actionable insights.`
+            },
             { role: 'user', content: userPrompt }
           ],
-          temperature: 0.7,
-          max_tokens: 4000,
+          tools: [{
+            type: "function",
+            function: {
+              name: "generate_retail_insights",
+              description: "Generate retail analytics insights with graph structure",
+              parameters: {
+                type: "object",
+                properties: {
+                  nodes: {
+                    type: "array",
+                    description: "Graph nodes representing entities (5-15 nodes)",
+                    items: {
+                      type: "object",
+                      properties: {
+                        id: { type: "string" },
+                        type: { type: "string" },
+                        label: { type: "string" },
+                        properties: { type: "object" },
+                        metrics: { type: "object" }
+                      },
+                      required: ["id", "type", "label"]
+                    }
+                  },
+                  edges: {
+                    type: "array",
+                    description: "Graph edges representing relationships (5-20 edges)",
+                    items: {
+                      type: "object",
+                      properties: {
+                        source: { type: "string" },
+                        target: { type: "string" },
+                        type: { type: "string" },
+                        weight: { type: "number" },
+                        label: { type: "string" }
+                      },
+                      required: ["source", "target", "type"]
+                    }
+                  },
+                  insights: {
+                    type: "array",
+                    description: "Key business insights (3-5 insights, max 150 chars each)",
+                    items: {
+                      type: "object",
+                      properties: {
+                        category: { type: "string" },
+                        title: { type: "string" },
+                        description: { type: "string" },
+                        impact: { type: "string", enum: ["high", "medium", "low"] },
+                        actionable: { type: "string" }
+                      },
+                      required: ["category", "title", "description", "impact"]
+                    }
+                  },
+                  correlations: {
+                    type: "array",
+                    description: "Factor correlations (2-4 correlations)",
+                    items: {
+                      type: "object",
+                      properties: {
+                        factor1: { type: "string" },
+                        factor2: { type: "string" },
+                        correlation: { type: "number" },
+                        significance: { type: "string" },
+                        insight: { type: "string" }
+                      },
+                      required: ["factor1", "factor2", "correlation"]
+                    }
+                  },
+                  wtpAnalysis: {
+                    type: "object",
+                    description: "Willingness To Pay analysis",
+                    properties: {
+                      avgWTP: { type: "string" },
+                      priceElasticity: { type: "string" },
+                      recommendations: {
+                        type: "array",
+                        items: { type: "string" }
+                      }
+                    }
+                  },
+                  timeSeriesPatterns: {
+                    type: "array",
+                    description: "Time series patterns (1-3 patterns)",
+                    items: {
+                      type: "object",
+                      properties: {
+                        period: { type: "string" },
+                        trend: { type: "string" },
+                        seasonality: { type: "string" },
+                        anomalies: {
+                          type: "array",
+                          items: { type: "string" }
+                        }
+                      }
+                    }
+                  },
+                  summary: { 
+                    type: "string",
+                    description: "Overall summary of analysis (max 200 chars)"
+                  }
+                },
+                required: ["nodes", "edges", "insights", "summary"]
+              }
+            }
+          }],
+          tool_choice: { type: "function", function: { name: "generate_retail_insights" } },
         }),
         signal: controller.signal,
       });
@@ -421,23 +635,56 @@ ${JSON.stringify(dataStats.sampleRecords, null, 2)}
 
       let analysisResult;
       try {
-        const content = aiResponse.choices[0].message.content;
-        // JSON 추출 (마크다운 코드 블록 제거)
-        const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) || content.match(/\{[\s\S]*\}/);
-        const jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : content;
-        analysisResult = JSON.parse(jsonStr);
+        // Tool calling을 사용했으므로 tool_calls에서 arguments를 파싱
+        const toolCall = aiResponse.choices[0].message.tool_calls?.[0];
+        
+        if (toolCall && toolCall.function.name === 'generate_retail_insights') {
+          console.log("✅ Tool call detected, parsing arguments");
+          analysisResult = JSON.parse(toolCall.function.arguments);
+          console.log(`✅ Parsed result: ${analysisResult.nodes.length} nodes, ${analysisResult.edges.length} edges`);
+        } else {
+          // Fallback: content에서 JSON 추출 시도
+          const content = aiResponse.choices[0].message.content || "{}";
+          console.log("⚠️ No tool call, trying content parsing");
+          const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) || content.match(/\{[\s\S]*\}/);
+          const jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : content;
+          analysisResult = JSON.parse(jsonStr);
+        }
+        
+        // 필수 필드 검증 및 기본값
+        analysisResult.nodes = analysisResult.nodes || [];
+        analysisResult.edges = analysisResult.edges || [];
+        analysisResult.insights = analysisResult.insights || [];
+        analysisResult.correlations = analysisResult.correlations || [];
+        analysisResult.wtpAnalysis = analysisResult.wtpAnalysis || {
+          avgWTP: "데이터 부족",
+          priceElasticity: "분석 불가",
+          recommendations: ["더 많은 거래 데이터 수집 필요"]
+        };
+        analysisResult.timeSeriesPatterns = analysisResult.timeSeriesPatterns || [];
+        analysisResult.summary = analysisResult.summary || "분석 완료";
+        
       } catch (e) {
-        console.error("⚠️ Failed to parse AI response as JSON:", e);
+        console.error("⚠️ Failed to parse AI response:", e);
         analysisResult = {
           nodes: [],
           edges: [],
           insights: [{ 
-            title: "분석 완료", 
-            description: aiResponse.choices[0].message.content,
-            impact: "medium",
-            recommendation: "상세 분석을 위해 데이터를 확인하세요"
+            category: "오류",
+            title: "분석 파싱 오류", 
+            description: "AI 응답을 파싱할 수 없습니다.",
+            impact: "high",
+            actionable: "데이터 양을 줄이거나 다시 시도하세요"
           }],
-          rawResponse: aiResponse.choices[0].message.content
+          correlations: [],
+          wtpAnalysis: {
+            avgWTP: "파싱 오류",
+            priceElasticity: "파싱 오류",
+            recommendations: ["분석 재시도 필요"]
+          },
+          timeSeriesPatterns: [],
+          summary: "분석 실패",
+          error: e instanceof Error ? e.message : String(e)
         };
       }
 
