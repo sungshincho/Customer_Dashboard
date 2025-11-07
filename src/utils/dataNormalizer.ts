@@ -24,22 +24,40 @@ function extractKeywords(columnName: string): string[] {
 }
 
 /**
- * 두 문자열의 유사도 계산 (간단한 키워드 매칭)
+ * 두 문자열의 유사도 계산 (한글 지원 강화)
  */
 function calculateSimilarity(str1: string, str2: string): number {
+  const normalize = (s: string) => s.toLowerCase()
+    .replace(/[_\-\s]/g, '')
+    .trim();
+  
+  const s1 = normalize(str1);
+  const s2 = normalize(str2);
+  
+  // 완전 일치
+  if (s1 === s2) return 1.0;
+  
+  // 포함 관계 체크 (한글 지원)
+  if (s1.includes(s2) || s2.includes(s1)) return 0.9;
+  
+  // 키워드 기반 매칭
   const keywords1 = extractKeywords(str1);
   const keywords2 = extractKeywords(str2);
+  
+  if (keywords1.length === 0 || keywords2.length === 0) return 0;
   
   let matches = 0;
   keywords1.forEach(k1 => {
     keywords2.forEach(k2 => {
-      if (k1.includes(k2) || k2.includes(k1) || k1 === k2) {
-        matches++;
+      if (k1 === k2) {
+        matches += 2; // 정확한 매칭
+      } else if (k1.includes(k2) || k2.includes(k1)) {
+        matches += 1; // 부분 매칭
       }
     });
   });
   
-  return matches / Math.max(keywords1.length, keywords2.length);
+  return Math.min(matches / Math.max(keywords1.length, keywords2.length, 1), 1.0);
 }
 
 /**
@@ -257,9 +275,16 @@ export function normalizeData(
         normalized.transaction_id = `TXN_${Date.now()}_${index}`;
       }
       
-      // total_amount가 없으면 price * quantity로 계산
-      if (!normalized.total_amount && normalized.price && normalized.quantity) {
-        normalized.total_amount = normalized.price * normalized.quantity;
+      // total_amount 우선순위: 실판매금액 > price * quantity
+      if (!normalized.total_amount) {
+        if (normalized.price && normalized.quantity) {
+          normalized.total_amount = normalized.price * normalized.quantity;
+        }
+      }
+      
+      // discount가 음수면 절댓값으로 변환
+      if (normalized.discount && normalized.discount < 0) {
+        normalized.discount = Math.abs(normalized.discount);
       }
     }
     

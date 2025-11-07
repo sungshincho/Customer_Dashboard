@@ -96,6 +96,18 @@ serve(async (req) => {
 샘플 데이터:
 ${JSON.stringify(dataStats.sampleRecords.slice(0, 3), null, 2)}
 
+**중요: 이 데이터는 상품별 집계 데이터입니다. 개별 거래 데이터가 아닙니다.**
+
+**WTP & ATV 계산 방법:**
+1. ATV (객단가) = 총 실판매금액 합계 / 총 판매건수 합계
+   - 예: total_amount 전체 합 / quantity 전체 합
+   - 단위: 원 (정수)
+2. WTP = ((상품가격 평균 - 실판매가격 평균) / 상품가격 평균) × 100
+   - 할인율을 기반으로 추정
+   - 단위: %p (소수점 1자리)
+3. 가격 탄력성 점수 = 할인에 대한 판매량 반응도 (0-10점)
+   - 할인율이 높을수록 판매량이 증가하는 정도
+
 **분석 과제:**
 이 데이터에서 매출을 즉시 증대시킬 수 있는 TOP 3 기회를 찾아내세요.
 
@@ -105,12 +117,13 @@ ${JSON.stringify(dataStats.sampleRecords.slice(0, 3), null, 2)}
 3. 인사이트 3-4개 (각 50-80자, 구체적 수치 포함)
    - 예: "Zone A 방문객 중 23%만 구매. 상품 재배치로 40% 목표"
 4. 상관관계 2-3개 (r > 0.5만)
-5. WTP 분석 (데이터 있을 경우, 구체적 가격대 제시)
+5. WTP 분석 (위 공식 사용, 정확한 계산)
 
 **금지 사항:**
 - 추상적/일반적 표현
 - 데이터 없이 추측
 - 실행 불가능한 권장사항
+- 잘못된 ATV/WTP 계산
 
 **필수: 모든 텍스트 한글로만 작성. 인사이트에 구체적 수치/비율 포함.**`;
 
@@ -215,11 +228,11 @@ ${JSON.stringify(dataStats.sampleRecords.slice(0, 3), null, 2)}
                           properties: {
                             avgWTP: { 
                               type: "number",
-                              description: "평균 지불 의향 (%p 단위, 소수점 1자리)"
+                              description: "평균 지불 의향 = ((상품가격 평균 - 실판매가격 평균) / 상품가격 평균) × 100 (%p 단위, 소수점 1자리)"
                             },
                             atv: {
                               type: "number", 
-                              description: "객단가 Average Transaction Value (원 단위)"
+                              description: "객단가 ATV = 총 실판매금액 합계 / 총 판매건수 합계 (원 단위, 정수)"
                             },
                             priceElasticityScore: {
                               type: "number",
