@@ -237,7 +237,7 @@ export function normalizeData(
   const columnMappings = autoMapColumns(rawColumns, schema);
   
   // 데이터 변환
-  const mappedData = mergedData.map(row => {
+  const mappedData = mergedData.map((row, index) => {
     const normalized: any = {};
     
     schema.columns.forEach(schemaCol => {
@@ -250,18 +250,39 @@ export function normalizeData(
       }
     });
     
+    // 자동 계산 필드
+    if (detectedType === 'sales') {
+      // transaction_id가 없으면 자동 생성
+      if (!normalized.transaction_id) {
+        normalized.transaction_id = `TXN_${Date.now()}_${index}`;
+      }
+      
+      // total_amount가 없으면 price * quantity로 계산
+      if (!normalized.total_amount && normalized.price && normalized.quantity) {
+        normalized.total_amount = normalized.price * normalized.quantity;
+      }
+    }
+    
     // 원본 데이터도 보존 (unmapped 필드)
     normalized._original = row;
     
     return normalized;
   });
   
-  // 품질 점수 계산 (필수 필드 채워진 비율)
-  const requiredFields = schema.columns.filter(c => c.required).length;
-  const mappedRequiredFields = Object.keys(columnMappings).filter(key => 
-    schema.columns.find(c => c.name === key)?.required
+  // 품질 점수 계산 (필수 필드 + 중요 선택 필드 채워진 비율)
+  const requiredFields = schema.columns.filter(c => c.required);
+  const optionalImportantFields = schema.columns.filter(c => !c.required && 
+    ['timestamp', 'product_category', 'total_amount', 'discount'].includes(c.name)
+  );
+  
+  const totalImportantFields = [...requiredFields, ...optionalImportantFields];
+  const mappedImportantFields = totalImportantFields.filter(field => 
+    columnMappings[field.name]
   ).length;
-  const qualityScore = requiredFields > 0 ? mappedRequiredFields / requiredFields : 0.5;
+  
+  const qualityScore = totalImportantFields.length > 0 
+    ? mappedImportantFields / totalImportantFields.length 
+    : 0.5;
   
   return {
     schema_type: detectedType,

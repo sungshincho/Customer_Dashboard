@@ -132,11 +132,16 @@ const GraphAnalysis = () => {
         sum + ds.metadata.quality_score, 0
       ) / Object.keys(normalizedDatasets).length;
       
-      if (avgQuality < 0.3) {
+      if (avgQuality < 0.4) {
         toast({
-          title: "데이터 품질 경고",
-          description: `데이터 매핑 품질이 낮습니다 (${(avgQuality * 100).toFixed(0)}%). 분석 결과가 부정확할 수 있습니다.`,
-          variant: "destructive",
+          title: "데이터 품질 알림",
+          description: `데이터 매핑 품질: ${(avgQuality * 100).toFixed(0)}%. 일부 필드가 매핑되지 않았지만 분석은 진행됩니다.`,
+          variant: avgQuality < 0.3 ? "destructive" : "default",
+        });
+      } else if (avgQuality >= 0.7) {
+        toast({
+          title: "데이터 품질 우수",
+          description: `데이터 매핑 품질: ${(avgQuality * 100).toFixed(0)}%. 높은 정확도로 분석됩니다.`,
         });
       }
       
