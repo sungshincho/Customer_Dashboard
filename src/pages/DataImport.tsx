@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Upload, FileSpreadsheet, Trash2, Download, Link2, Database } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { detectDataType } from "@/utils/dataNormalizer";
 import * as XLSX from "xlsx";
 
 interface ImportedData {
@@ -165,11 +166,14 @@ const DataImport = () => {
   const handleUpload = async () => {
     console.log("🔵 Upload button clicked", { file, dataType });
     
-    if (!file || !dataType) {
+    // 엑셀 파일은 dataType 체크 건너뛰기 (자동 감지)
+    const isExcelFile = file && (file.name.endsWith('.xlsx') || file.name.endsWith('.xls'));
+    
+    if (!file || (!isExcelFile && !dataType)) {
       console.log("❌ Missing file or dataType");
       toast({
         title: "입력 필요",
-        description: "파일과 데이터 타입을 모두 선택해주세요.",
+        description: isExcelFile ? "파일을 선택해주세요." : "파일과 데이터 타입을 모두 선택해주세요.",
         variant: "destructive",
       });
       return;
@@ -188,15 +192,28 @@ const DataImport = () => {
       // 여러 시트가 있는 경우 각 시트를 개별 레코드로 저장
       if (parsedData && typeof parsedData === 'object' && 'sheets' in parsedData) {
         const sheets = parsedData.sheets as {name: string, data: any[]}[];
-        const inserts = sheets.map(sheet => ({
-          user_id: user.id,
-          file_name: file.name,
-          file_type: file.name.split(".").pop() || "unknown",
-          data_type: dataType,
-          raw_data: sheet.data,
-          row_count: sheet.data.length,
-          sheet_name: sheet.name,
-        }));
+        const inserts = sheets.map(sheet => {
+          // 각 시트의 컬럼명과 시트명을 분석하여 자동 타입 추론
+          const columns = sheet.data.length > 0 ? Object.keys(sheet.data[0]) : [];
+          const searchText = `${sheet.name} ${columns.join(' ')}`;
+          const autoDetectedType = detectDataType(searchText);
+          
+          console.log(`📊 시트 "${sheet.name}" 타입 자동 분석:`, {
+            sheetName: sheet.name,
+            columns: columns.slice(0, 5),
+            autoDetected: autoDetectedType
+          });
+          
+          return {
+            user_id: user.id,
+            file_name: file.name,
+            file_type: file.name.split(".").pop() || "unknown",
+            data_type: autoDetectedType,
+            raw_data: sheet.data,
+            row_count: sheet.data.length,
+            sheet_name: sheet.name,
+          };
+        });
 
         const { error } = await (supabase as any).from("user_data_imports").insert(inserts);
 
@@ -406,21 +423,29 @@ const DataImport = () => {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="dataType">데이터 유형</Label>
-                  <Select value={dataType} onValueChange={setDataType}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="데이터 유형 선택" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="sales">매출 데이터</SelectItem>
-                      <SelectItem value="customer">고객 데이터</SelectItem>
-                      <SelectItem value="inventory">재고 데이터</SelectItem>
-                      <SelectItem value="traffic">유동인구 데이터</SelectItem>
-                      <SelectItem value="staff">직원 데이터</SelectItem>
-                      <SelectItem value="product">상품 데이터</SelectItem>
-                      <SelectItem value="transaction">거래 데이터</SelectItem>
-                      <SelectItem value="other">기타</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  {file && (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) ? (
+                    <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                      <p className="text-sm text-blue-700 dark:text-blue-300">
+                        📊 엑셀 파일의 각 시트는 자동으로 데이터 타입이 분석됩니다
+                      </p>
+                    </div>
+                  ) : (
+                    <Select value={dataType} onValueChange={setDataType}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="데이터 유형 선택" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="sales">매출 데이터</SelectItem>
+                        <SelectItem value="customer">고객 데이터</SelectItem>
+                        <SelectItem value="inventory">재고 데이터</SelectItem>
+                        <SelectItem value="traffic">유동인구 데이터</SelectItem>
+                        <SelectItem value="staff">직원 데이터</SelectItem>
+                        <SelectItem value="product">상품 데이터</SelectItem>
+                        <SelectItem value="transaction">거래 데이터</SelectItem>
+                        <SelectItem value="other">기타</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
 
                 <div className="space-y-2">

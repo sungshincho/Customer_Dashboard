@@ -63,7 +63,7 @@ function calculateSimilarity(str1: string, str2: string): number {
 /**
  * 데이터 타입 자동 감지
  */
-function detectDataType(dataType: string): 'sales' | 'zone' | 'traffic' | 'product' | 'customer' | 'inventory' | 'other' {
+export function detectDataType(dataType: string): 'sales' | 'zone' | 'traffic' | 'product' | 'customer' | 'inventory' | 'other' {
   const typeKeywords: Record<string, string[]> = {
     sales: ['매출', '판매', '거래', 'sales', 'transaction', '주문', 'order', '결제', 'payment'],
     zone: ['zone', '구역', '좌표', 'x', 'y', 'coordinate', '위치', 'location'],
