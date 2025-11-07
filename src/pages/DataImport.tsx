@@ -783,33 +783,37 @@ const DataImport = () => {
                       <TableCell>
                         {new Date(item.created_at).toLocaleString("ko-KR")}
                       </TableCell>
-                       <TableCell className="text-right space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedImportForETL(item);
-                            setShowETLDialog(true);
-                          }}
-                          title="온톨로지 스키마로 변환"
-                        >
-                          <Database className="h-4 w-4 mr-1" />
-                          ETL
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleExport(item)}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(item.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                       <TableCell>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedImportForETL(item);
+                              setShowETLDialog(true);
+                            }}
+                            title="온톨로지 스키마로 변환"
+                          >
+                            <Database className="h-4 w-4 mr-1" />
+                            ETL
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleExport(item)}
+                            title="내보내기"
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(item.id)}
+                            title="삭제"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
