@@ -214,13 +214,13 @@ export const InsightsDashboard = ({
                   <div className="p-3 bg-primary/5 rounded-lg border border-primary/10">
                     <p className="text-xs text-muted-foreground mb-1">지불의사최대금액</p>
                     <p className="text-lg font-bold text-primary">
-                      ₩{wtpAnalysis.avgWTP.toLocaleString()}
+                      ₩{(wtpAnalysis.avgWTP || 0).toLocaleString()}
                     </p>
                   </div>
                   <div className="p-3 bg-primary/5 rounded-lg border border-primary/10">
                     <p className="text-xs text-muted-foreground mb-1">객단가 (ATV)</p>
                     <p className="text-lg font-bold text-primary">
-                      ₩{wtpAnalysis.atv.toLocaleString()}
+                      ₩{(wtpAnalysis.atv || 0).toLocaleString()}
                     </p>
                   </div>
                 </div>
