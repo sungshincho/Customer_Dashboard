@@ -14,3 +14,6 @@ verify_jwt = true
 
 [functions.schema-etl]
 verify_jwt = true
+
+[functions.auto-map-etl]
+verify_jwt = true

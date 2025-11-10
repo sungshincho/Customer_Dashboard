@@ -108,7 +108,7 @@ ${relationTypes?.map(rt => `- ${rt.name} (${rt.label}): ${rt.source_entity_type}
 `;
 
     // Lovable AI 호출 (gemini-2.5-flash)
-    const aiResponse = await fetch('https://api.lovable.app/v1/ai/completions', {
+    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -122,8 +122,6 @@ ${relationTypes?.map(rt => `- ${rt.name} (${rt.label}): ${rt.source_entity_type}
             content: mappingPrompt,
           },
         ],
-        temperature: 0.3, // 낮은 temperature로 일관성 향상
-        max_tokens: 4000,
       }),
     });
 
