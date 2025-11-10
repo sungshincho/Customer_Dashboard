@@ -1,5 +1,2 @@
-brand_id,brand_name,country,founded_year,category,market_position,annual_revenue,sustainability_score
-B001,그린빈스,한국,2015,식품,Premium,15000000000,8.5
-B002,에코라이프,한국,2018,생활용품,Mid-Range,8500000000,9.2
-B003,퓨어네이처,일본,2010,건강식품,Premium,22000000000,8.8
-B004,네이처글로우,프랑스,2012,뷰티,Luxury,18000000000,7.9
+brand_id,brand_name,country,founded_year,category,market_position,annual_revenue,sustainability_score,target_age_group,brand_style
+B001,URBANSTYLE,한국,2018,패션,Premium,28000000000,8.7,20-40대,모던 캐주얼

@@ -1,7 +1,2 @@
-store_id,store_name,location,city,district,manager_name,open_date,store_type,monthly_revenue,employee_count
-S001,강남점,서울 강남구 테헤란로 123,서울,강남구,최지수,2020-06-01,Flagship,85000000,25
-S002,홍대점,서울 마포구 홍익로 45,서울,마포구,정민호,2021-03-15,Standard,52000000,15
-S003,부산점,부산 해운대구 센텀로 89,부산,해운대구,강서현,2022-01-10,Standard,48000000,12
-S004,대구점,대구 중구 동성로 67,대구,중구,윤재석,2021-09-20,Standard,38000000,10
-S005,광교점,경기 수원시 영통구 광교중앙로 145,수원,영통구,임지우,2022-07-05,Standard,41000000,11
-S006,판교점,경기 성남시 분당구 판교역로 235,성남,분당구,한동훈,2020-11-18,Flagship,72000000,20
+store_id,store_name,location,city,district,manager_name,open_date,store_type,monthly_revenue,employee_count,floor_area_sqm,parking_available
+S001,URBANSTYLE 강남플래그십,서울 강남구 테헤란로 427,서울,강남구,김서현,2020-03-15,Flagship,125000000,18,380,Y
