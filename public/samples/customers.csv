@@ -1,0 +1,11 @@
+customer_id,customer_name,email,phone,age,gender,membership_level,join_date,total_purchases,preferred_payment
+C001,김민준,minjun.kim@example.com,010-1234-5678,32,M,Gold,2023-01-15,45,카드
+C002,이서연,seoyeon.lee@example.com,010-2345-6789,28,F,Platinum,2022-11-20,78,앱페이
+C003,박지훈,jihoon.park@example.com,010-3456-7890,45,M,Silver,2023-05-10,23,현금
+C004,최수진,sujin.choi@example.com,010-4567-8901,35,F,Gold,2023-02-28,56,카드
+C005,정민호,minho.jung@example.com,010-5678-9012,29,M,Bronze,2023-08-05,12,앱페이
+C006,강서현,seohyun.kang@example.com,010-6789-0123,41,F,Platinum,2022-09-14,92,카드
+C007,윤재석,jaeseok.yoon@example.com,010-7890-1234,38,M,Gold,2023-03-22,67,현금
+C008,임지우,jiwoo.lim@example.com,010-8901-2345,26,F,Silver,2023-06-18,31,앱페이
+C009,한동훈,donghoon.han@example.com,010-9012-3456,52,M,Bronze,2023-09-30,8,카드
+C010,송하나,hana.song@example.com,010-0123-4567,33,F,Gold,2023-04-11,48,앱페이
