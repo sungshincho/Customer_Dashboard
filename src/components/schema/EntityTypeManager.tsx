@@ -231,6 +231,88 @@ export const EntityTypeManager = () => {
     },
   });
 
+  // 기본 엔티티 타입 자동 생성
+  const createDefaultEntitiesMutation = useMutation({
+    mutationFn: async () => {
+      const userId = (await supabase.auth.getUser()).data.user?.id;
+      if (!userId) throw new Error("로그인이 필요합니다");
+
+      const defaultEntities = [
+        {
+          name: "staff",
+          label: "직원",
+          description: "매장 직원 정보",
+          color: "#10b981",
+          icon: "UserCheck",
+          properties: [
+            { id: "prop_staff_id", name: "staff_id", label: "직원 ID", type: "string", required: true },
+            { id: "prop_staff_name", name: "staff_name", label: "직원명", type: "string", required: true },
+            { id: "prop_store_id", name: "store_id", label: "소속 매장 ID", type: "string", required: true },
+            { id: "prop_position", name: "position", label: "직책", type: "string", required: false },
+            { id: "prop_hire_date", name: "hire_date", label: "입사일", type: "date", required: false },
+            { id: "prop_performance", name: "performance_score", label: "성과 점수", type: "number", required: false },
+          ],
+          user_id: userId,
+        },
+        {
+          name: "purchase",
+          label: "구매",
+          description: "고객 구매 거래 정보",
+          color: "#f59e0b",
+          icon: "Receipt",
+          properties: [
+            { id: "prop_purchase_id", name: "purchase_id", label: "구매 ID", type: "string", required: true },
+            { id: "prop_customer_id", name: "customer_id", label: "고객 ID", type: "string", required: true },
+            { id: "prop_product_id", name: "product_id", label: "상품 ID", type: "string", required: true },
+            { id: "prop_store_id", name: "store_id", label: "매장 ID", type: "string", required: true },
+            { id: "prop_quantity", name: "quantity", label: "수량", type: "number", required: true },
+            { id: "prop_price", name: "price", label: "가격", type: "currency", required: true },
+            { id: "prop_purchase_date", name: "purchase_date", label: "구매일", type: "date", required: true },
+          ],
+          user_id: userId,
+        },
+        {
+          name: "visit",
+          label: "방문",
+          description: "고객 매장 방문 정보",
+          color: "#8b5cf6",
+          icon: "MapPin",
+          properties: [
+            { id: "prop_visit_id", name: "visit_id", label: "방문 ID", type: "string", required: true },
+            { id: "prop_customer_id", name: "customer_id", label: "고객 ID", type: "string", required: true },
+            { id: "prop_store_id", name: "store_id", label: "매장 ID", type: "string", required: true },
+            { id: "prop_visit_date", name: "visit_date", label: "방문일", type: "date", required: true },
+            { id: "prop_duration", name: "duration", label: "체류 시간(분)", type: "number", required: false },
+            { id: "prop_purpose", name: "purpose", label: "방문 목적", type: "string", required: false },
+          ],
+          user_id: userId,
+        },
+      ];
+
+      const { data, error } = await supabase
+        .from("ontology_entity_types")
+        .insert(defaultEntities)
+        .select();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["entity-types"] });
+      toast({ 
+        title: "기본 엔티티 타입 생성 완료",
+        description: `${data.length}개의 엔티티 타입이 추가되었습니다 (직원, 구매, 방문)`,
+      });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "생성 실패", 
+        description: error.message, 
+        variant: "destructive" 
+      });
+    },
+  });
+
   const resetForm = () => {
     setFormData({
       name: "",
@@ -324,14 +406,23 @@ export const EntityTypeManager = () => {
             매장, 상품, 고객 등 비즈니스 개체를 정의합니다
           </p>
         </div>
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => { setEditingEntity(null); resetForm(); }}>
-              <Plus className="h-4 w-4 mr-2" />
-              새 엔티티 타입
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <div className="flex gap-2">
+          <Button 
+            variant="outline"
+            onClick={() => createDefaultEntitiesMutation.mutate()}
+            disabled={createDefaultEntitiesMutation.isPending}
+          >
+            <Layers className="h-4 w-4 mr-2" />
+            기본 타입 생성 (Staff, Purchase, Visit)
+          </Button>
+          <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={() => { setEditingEntity(null); resetForm(); }}>
+                <Plus className="h-4 w-4 mr-2" />
+                새 엔티티 타입
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingEntity ? "엔티티 타입 수정" : "새 엔티티 타입 생성"}
@@ -562,8 +653,9 @@ export const EntityTypeManager = () => {
                 {editingEntity ? "수정" : "생성"}
               </Button>
             </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
