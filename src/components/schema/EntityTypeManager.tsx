@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Edit, Trash2, Tag, Settings2, X } from "lucide-react";
+import { Plus, Edit, Trash2, Tag, TrendingUp, Settings2, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface PropertyField {
