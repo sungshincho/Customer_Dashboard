@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
     const rawData = importData.raw_data as any[];
     console.log(`Processing ${rawData.length} records`);
 
-    // 2. 엔티티 생성
+    // 2. 엔티티 생성 (배치 처리)
     const entityMap = new Map<string, string>(); // original_key -> entity_id
     const createdEntities: any[] = [];
 
@@ -77,7 +77,13 @@ Deno.serve(async (req) => {
 
       console.log(`Creating entities for type: ${entityType.name}`);
 
-      for (const record of rawData) {
+      // 배치 데이터 준비
+      const entitiesToInsert: any[] = [];
+      const recordMappings: Array<{ record: any; tempId: number }> = [];
+
+      for (let i = 0; i < rawData.length; i++) {
+        const record = rawData[i];
+        
         // 속성 매핑
         const properties: Record<string, any> = {};
         for (const [propName, columnName] of Object.entries(mapping.column_mappings)) {
@@ -86,66 +92,78 @@ Deno.serve(async (req) => {
           }
         }
 
-        // 라벨 생성 (템플릿 사용 - column_mappings 기반)
+        // 라벨 생성
         let label = mapping.label_template;
         
-        // 먼저 매핑된 속성 이름으로 치환 시도
         for (const [propName, columnName] of Object.entries(mapping.column_mappings)) {
           const value = record[columnName];
           if (value !== undefined && value !== null) {
-            // {property_name} 형태 치환
             label = label.replace(`{${propName}}`, String(value));
-            // {column_name} 형태도 치환 (하위 호환성)
             label = label.replace(`{${columnName}}`, String(value));
           }
         }
         
-        // 추가로 원본 레코드의 모든 키로도 치환 (fallback)
         for (const [key, value] of Object.entries(record)) {
           if (value !== undefined && value !== null) {
             label = label.replace(`{${key}}`, String(value));
           }
         }
         
-        // label이 여전히 템플릿 형태면 첫 번째 속성값 사용
         if (label.includes('{') && label.includes('}')) {
           const firstValue = Object.values(properties).find(v => v !== undefined && v !== null);
           label = firstValue ? String(firstValue) : `Entity ${Object.values(record)[0] || ''}`;
         }
 
-        // 엔티티 생성
-        const { data: entity, error: entityError } = await supabase
-          .from('graph_entities')
-          .insert({
-            user_id: user.id,
-            entity_type_id: mapping.entity_type_id,
-            label,
-            properties,
-          })
-          .select()
-          .single();
+        entitiesToInsert.push({
+          user_id: user.id,
+          entity_type_id: mapping.entity_type_id,
+          label,
+          properties,
+        });
 
-        if (!entityError && entity) {
-          createdEntities.push(entity);
-          
-          // 원본 키로 매핑 (관계 생성시 사용) - 모든 컬럼 매핑을 entityMap에 추가
-          for (const [propName, columnName] of Object.entries(mapping.column_mappings)) {
-            if (record[columnName] !== undefined && record[columnName] !== null) {
-              const key = `${mapping.entity_type_id}:${columnName}:${record[columnName]}`;
-              entityMap.set(key, entity.id);
+        recordMappings.push({ record, tempId: i });
+      }
+
+      // 배치 삽입 (1000개씩)
+      const BATCH_SIZE = 1000;
+      for (let i = 0; i < entitiesToInsert.length; i += BATCH_SIZE) {
+        const batch = entitiesToInsert.slice(i, i + BATCH_SIZE);
+        const batchRecordMappings = recordMappings.slice(i, i + BATCH_SIZE);
+
+        const { data: entities, error: batchError } = await supabase
+          .from('graph_entities')
+          .insert(batch)
+          .select();
+
+        if (!batchError && entities) {
+          // 삽입된 엔티티들을 매핑
+          entities.forEach((entity, idx) => {
+            createdEntities.push(entity);
+            const { record } = batchRecordMappings[idx];
+            
+            // entityMap 구성
+            for (const [propName, columnName] of Object.entries(mapping.column_mappings)) {
+              if (record[columnName] !== undefined && record[columnName] !== null) {
+                const key = `${mapping.entity_type_id}:${columnName}:${record[columnName]}`;
+                entityMap.set(key, entity.id);
+              }
             }
-          }
+          });
+        } else if (batchError) {
+          console.error(`Batch insert error: ${batchError.message}`);
         }
       }
     }
 
     console.log(`Created ${createdEntities.length} entities`);
 
-    // 3. 관계 생성
+    // 3. 관계 생성 (배치 처리)
     const createdRelations: any[] = [];
 
     for (const relMapping of body.relation_mappings) {
       console.log(`Creating relations for type: ${relMapping.relation_type_id}`);
+
+      const relationsToInsert: any[] = [];
 
       for (const record of rawData) {
         const sourceKey = `${relMapping.source_entity_type_id}:${relMapping.source_key}:${record[relMapping.source_key]}`;
@@ -166,22 +184,30 @@ Deno.serve(async (req) => {
           }
         }
 
-        // 관계 생성
-        const { data: relation, error: relationError } = await supabase
-          .from('graph_relations')
-          .insert({
-            user_id: user.id,
-            relation_type_id: relMapping.relation_type_id,
-            source_entity_id: sourceEntityId,
-            target_entity_id: targetEntityId,
-            properties,
-            weight: 1.0,
-          })
-          .select()
-          .single();
+        relationsToInsert.push({
+          user_id: user.id,
+          relation_type_id: relMapping.relation_type_id,
+          source_entity_id: sourceEntityId,
+          target_entity_id: targetEntityId,
+          properties,
+          weight: 1.0,
+        });
+      }
 
-        if (!relationError && relation) {
-          createdRelations.push(relation);
+      // 배치 삽입 (1000개씩)
+      const BATCH_SIZE = 1000;
+      for (let i = 0; i < relationsToInsert.length; i += BATCH_SIZE) {
+        const batch = relationsToInsert.slice(i, i + BATCH_SIZE);
+
+        const { data: relations, error: batchError } = await supabase
+          .from('graph_relations')
+          .insert(batch)
+          .select();
+
+        if (!batchError && relations) {
+          createdRelations.push(...relations);
+        } else if (batchError) {
+          console.error(`Batch relation insert error: ${batchError.message}`);
         }
       }
     }
