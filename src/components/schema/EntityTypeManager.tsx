@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Edit, Trash2, Tag, TrendingUp, Settings2, X } from "lucide-react";
+import { Plus, Edit, Trash2, Tag, TrendingUp, Settings2, X, Store, ShoppingCart, Users, CreditCard, MapPin, UserCheck, Package, Calendar, LucideIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface PropertyField {
@@ -48,6 +48,20 @@ const ICON_PRESETS = [
   { value: "Calendar", label: "이벤트" },
   { value: "Tag", label: "카테고리" },
 ];
+
+// 아이콘 매핑
+const ICON_MAP: Record<string, LucideIcon> = {
+  Store,
+  ShoppingCart,
+  Users,
+  CreditCard,
+  MapPin,
+  UserCheck,
+  Package,
+  TrendingUp,
+  Calendar,
+  Tag,
+};
 
 const COLOR_PRESETS = [
   "#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6",
@@ -526,7 +540,10 @@ export const EntityTypeManager = () => {
                     className="w-10 h-10 rounded-lg flex items-center justify-center"
                     style={{ backgroundColor: `${entity.color}20` }}
                   >
-                    <Tag className="h-5 w-5" style={{ color: entity.color || undefined }} />
+                    {(() => {
+                      const IconComponent = ICON_MAP[entity.icon || "Tag"];
+                      return IconComponent ? <IconComponent className="h-5 w-5" style={{ color: entity.color || undefined }} /> : <Tag className="h-5 w-5" style={{ color: entity.color || undefined }} />;
+                    })()}
                   </div>
                   <div>
                     <CardTitle className="text-base">{entity.label}</CardTitle>
