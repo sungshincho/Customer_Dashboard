@@ -497,6 +497,7 @@ const DataImport = () => {
                         <SelectItem value="brands">브랜드 데이터 (brands.csv)</SelectItem>
                         <SelectItem value="products">제품 데이터 (products.csv)</SelectItem>
                         <SelectItem value="stores">매장 데이터 (stores.csv)</SelectItem>
+                        <SelectItem value="staff">직원 데이터 (staff.csv)</SelectItem>
                         <SelectItem value="purchases">구매 데이터 (purchases.csv)</SelectItem>
                         <SelectItem value="social_states">소셜 상태 데이터 (social_states.csv)</SelectItem>
                         <SelectItem value="other">기타 데이터</SelectItem>

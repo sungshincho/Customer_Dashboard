@@ -129,6 +129,23 @@ export const STORE_SCHEMA: DataSchema = {
   relations: ['sales', 'traffic', 'zone']
 };
 
+// 직원 데이터 표준 스키마
+export const STAFF_SCHEMA: DataSchema = {
+  type: 'staff',
+  columns: [
+    { name: 'staff_id', type: 'string', required: true, description: '직원 고유 ID', examples: ['staff_id', 'id', '직원코드', '사원번호'] },
+    { name: 'staff_name', type: 'string', required: true, description: '직원명', examples: ['staff_name', 'name', '직원명', '이름', '사원명'] },
+    { name: 'store_id', type: 'string', required: true, description: '소속 매장 ID', examples: ['store_id', 'store', '매장코드', '지점코드'] },
+    { name: 'position', type: 'string', required: false, description: '직책/직급', examples: ['position', 'title', '직책', '직급'] },
+    { name: 'hire_date', type: 'date', required: false, description: '입사일', examples: ['hire_date', 'join_date', '입사일', '입사일자'] },
+    { name: 'salary_level', type: 'number', required: false, description: '급여 레벨', examples: ['salary_level', 'level', '급여등급', '호봉'] },
+    { name: 'performance_score', type: 'number', required: false, description: '성과 점수', examples: ['performance_score', 'score', '성과점수', '평가점수'] },
+    { name: 'sales_count_monthly', type: 'number', required: false, description: '월 판매 건수', examples: ['sales_count_monthly', 'sales_count', '월판매건수', '판매건수'] },
+    { name: 'customer_satisfaction', type: 'number', required: false, description: '고객 만족도', examples: ['customer_satisfaction', 'satisfaction', '만족도', '고객만족도'] },
+  ],
+  relations: ['store', 'sales']
+};
+
 export const SCHEMA_MAP: Record<string, DataSchema> = {
   sales: SALES_SCHEMA,
   zone: ZONE_SCHEMA,
@@ -139,4 +156,5 @@ export const SCHEMA_MAP: Record<string, DataSchema> = {
   inventory: INVENTORY_SCHEMA,
   brand: BRAND_SCHEMA,
   store: STORE_SCHEMA,
+  staff: STAFF_SCHEMA,
 };
