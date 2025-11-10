@@ -8,8 +8,40 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Database, ArrowRight, Play, Check } from 'lucide-react';
+import { Database, ArrowRight, Play, Check, Sparkles } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
+
+// 문자열 유사도 계산 (Levenshtein distance)
+const calculateSimilarity = (str1: string, str2: string): number => {
+  const s1 = str1.toLowerCase().replace(/[_-]/g, '');
+  const s2 = str2.toLowerCase().replace(/[_-]/g, '');
+  
+  const len1 = s1.length;
+  const len2 = s2.length;
+  const matrix: number[][] = [];
+
+  for (let i = 0; i <= len1; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= len2; j++) {
+    matrix[0][j] = j;
+  }
+
+  for (let i = 1; i <= len1; i++) {
+    for (let j = 1; j <= len2; j++) {
+      const cost = s1[i - 1] === s2[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost
+      );
+    }
+  }
+
+  const distance = matrix[len1][len2];
+  const maxLen = Math.max(len1, len2);
+  return maxLen === 0 ? 1 : 1 - distance / maxLen;
+};
 
 interface SchemaMappingProps {
   importId: string;
@@ -100,6 +132,71 @@ export const SchemaMapper = ({ importId, importData, onComplete }: SchemaMapping
     setEntityMappings(updated);
   };
 
+  // 스마트 자동 매핑
+  const autoMapProperties = (entityIndex: number) => {
+    const mapping = entityMappings[entityIndex];
+    if (!mapping.entity_type_id) {
+      toast.error('먼저 엔티티 타입을 선택하세요');
+      return;
+    }
+
+    const entityType = selectedEntityType(mapping.entity_type_id);
+    if (!entityType?.properties || !Array.isArray(entityType.properties)) {
+      toast.error('속성 정보를 찾을 수 없습니다');
+      return;
+    }
+
+    const newMappings: { [key: string]: string } = {};
+    let mappedCount = 0;
+
+    // 각 속성에 대해 가장 유사한 컬럼 찾기
+    entityType.properties.forEach((prop: any) => {
+      let bestMatch = '';
+      let bestScore = 0;
+
+      columns.forEach(col => {
+        const score = calculateSimilarity(prop.name, col);
+        if (score > bestScore && score > 0.5) { // 50% 이상 유사도
+          bestScore = score;
+          bestMatch = col;
+        }
+      });
+
+      if (bestMatch) {
+        newMappings[prop.name] = bestMatch;
+        mappedCount++;
+      }
+    });
+
+    // 키 컬럼 자동 추천 (id가 포함된 컬럼 찾기)
+    const keyColumn = columns.find(col => 
+      col.toLowerCase().includes('id') && 
+      col.toLowerCase().includes(entityType.name.toLowerCase())
+    ) || columns.find(col => col.toLowerCase().endsWith('id'));
+
+    if (keyColumn && !mapping.label_template) {
+      updateEntityMapping(entityIndex, 'label_template', `{${keyColumn}}`);
+    }
+
+    // 매핑 적용
+    const updated = [...entityMappings];
+    updated[entityIndex].column_mappings = {
+      ...updated[entityIndex].column_mappings,
+      ...newMappings,
+    };
+    setEntityMappings(updated);
+
+    if (mappedCount > 0) {
+      toast.success(`${mappedCount}개 속성이 자동으로 매핑되었습니다`, {
+        description: keyColumn ? `키 컬럼: ${keyColumn}` : undefined,
+      });
+    } else {
+      toast.warning('유사한 컬럼을 찾을 수 없습니다', {
+        description: '수동으로 매핑해주세요',
+      });
+    }
+  };
+
   const addPropertyMapping = (entityIndex: number, propName: string, columnName: string) => {
     const updated = [...entityMappings];
     updated[entityIndex].column_mappings = {
@@ -187,23 +284,40 @@ export const SchemaMapper = ({ importId, importData, onComplete }: SchemaMapping
             {entityMappings.map((mapping, idx) => (
               <Card key={idx}>
                 <CardContent className="pt-4 space-y-4">
-                  <div className="space-y-2">
-                    <Label>엔티티 타입</Label>
-                    <Select
-                      value={mapping.entity_type_id}
-                      onValueChange={(value) => updateEntityMapping(idx, 'entity_type_id', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="엔티티 타입 선택" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {entityTypes?.map(type => (
-                          <SelectItem key={type.id} value={type.id}>
-                            {type.label} ({type.name})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="grid grid-cols-[1fr,auto] gap-4">
+                    <div className="space-y-2">
+                      <Label>엔티티 타입</Label>
+                      <Select
+                        value={mapping.entity_type_id}
+                        onValueChange={(value) => updateEntityMapping(idx, 'entity_type_id', value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="엔티티 타입 선택" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {entityTypes?.map(type => (
+                            <SelectItem key={type.id} value={type.id}>
+                              {type.label} ({type.name})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {mapping.entity_type_id && (
+                      <div className="space-y-2">
+                        <Label className="text-transparent">_</Label>
+                        <Button 
+                          onClick={() => autoMapProperties(idx)}
+                          variant="outline"
+                          size="default"
+                          className="w-full"
+                        >
+                          <Sparkles className="mr-2 h-4 w-4" />
+                          스마트 자동 매핑
+                        </Button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-2">
