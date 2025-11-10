@@ -111,15 +111,21 @@ export const GraphQueryBuilder = ({ onResultsChange }: GraphQueryBuilderProps) =
             <div className="space-y-2">
               <Label>시작 엔티티</Label>
               <Select value={startEntityId} onValueChange={setStartEntityId}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-background">
                   <SelectValue placeholder="엔티티 선택" />
                 </SelectTrigger>
-                <SelectContent>
-                  {entities?.map((entity) => (
-                    <SelectItem key={entity.id} value={entity.id}>
-                      {entity.label}
-                    </SelectItem>
-                  ))}
+                <SelectContent className="bg-background z-50">
+                  {entities && entities.length > 0 ? (
+                    entities.map((entity) => (
+                      <SelectItem key={entity.id} value={entity.id}>
+                        {entity.label}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div className="p-2 text-sm text-muted-foreground">
+                      엔티티가 없습니다. 데이터를 먼저 임포트하세요.
+                    </div>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -147,15 +153,21 @@ export const GraphQueryBuilder = ({ onResultsChange }: GraphQueryBuilderProps) =
             <div className="space-y-2">
               <Label>시작 엔티티</Label>
               <Select value={startEntityId} onValueChange={setStartEntityId}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-background">
                   <SelectValue placeholder="엔티티 선택" />
                 </SelectTrigger>
-                <SelectContent>
-                  {entities?.map((entity) => (
-                    <SelectItem key={entity.id} value={entity.id}>
-                      {entity.label}
-                    </SelectItem>
-                  ))}
+                <SelectContent className="bg-background z-50">
+                  {entities && entities.length > 0 ? (
+                    entities.map((entity) => (
+                      <SelectItem key={entity.id} value={entity.id}>
+                        {entity.label}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div className="p-2 text-sm text-muted-foreground">
+                      엔티티가 없습니다. 데이터를 먼저 임포트하세요.
+                    </div>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -163,15 +175,21 @@ export const GraphQueryBuilder = ({ onResultsChange }: GraphQueryBuilderProps) =
             <div className="space-y-2">
               <Label>도착 엔티티</Label>
               <Select value={endEntityId} onValueChange={setEndEntityId}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-background">
                   <SelectValue placeholder="엔티티 선택" />
                 </SelectTrigger>
-                <SelectContent>
-                  {entities?.map((entity) => (
-                    <SelectItem key={entity.id} value={entity.id}>
-                      {entity.label}
-                    </SelectItem>
-                  ))}
+                <SelectContent className="bg-background z-50">
+                  {entities && entities.length > 0 ? (
+                    entities.map((entity) => (
+                      <SelectItem key={entity.id} value={entity.id}>
+                        {entity.label}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div className="p-2 text-sm text-muted-foreground">
+                      엔티티가 없습니다. 데이터를 먼저 임포트하세요.
+                    </div>
+                  )}
                 </SelectContent>
               </Select>
             </div>
