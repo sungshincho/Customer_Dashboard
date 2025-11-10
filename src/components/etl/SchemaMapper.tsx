@@ -87,7 +87,7 @@ export const SchemaMapper = ({ importId, importData, onComplete }: SchemaMapping
     setEntityMappings([
       ...entityMappings,
       {
-        entity_type_id: '',
+        entity_type_id: undefined,
         column_mappings: {},
         label_template: '',
       },
@@ -113,11 +113,11 @@ export const SchemaMapper = ({ importId, importData, onComplete }: SchemaMapping
     setRelationMappings([
       ...relationMappings,
       {
-        relation_type_id: '',
-        source_entity_type_id: '',
-        target_entity_type_id: '',
-        source_key: '',
-        target_key: '',
+        relation_type_id: undefined,
+        source_entity_type_id: undefined,
+        target_entity_type_id: undefined,
+        source_key: undefined,
+        target_key: undefined,
         properties: {},
       },
     ]);
@@ -231,7 +231,7 @@ export const SchemaMapper = ({ importId, importData, onComplete }: SchemaMapping
                             <Badge variant="outline">{prop.label}</Badge>
                             <ArrowRight className="h-4 w-4 text-muted-foreground" />
                             <Select
-                              value={mapping.column_mappings[prop.name] || ''}
+                              value={mapping.column_mappings[prop.name] || undefined}
                               onValueChange={(value) => addPropertyMapping(idx, prop.name, value)}
                             >
                               <SelectTrigger className="flex-1">
