@@ -11,7 +11,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Edit, Trash2, Tag, TrendingUp, Settings2, X, Store, ShoppingCart, Users, CreditCard, MapPin, UserCheck, Package, Calendar, LucideIcon } from "lucide-react";
+import { 
+  Plus, Edit, Trash2, Tag, TrendingUp, Settings2, X, 
+  Store, ShoppingCart, Users, CreditCard, MapPin, UserCheck, 
+  Package, Calendar, LucideIcon, Layers, Building2, Box,
+  Barcode, Shirt, ShoppingBag, DollarSign, Receipt, Percent,
+  Clock, Target, TrendingDown, PieChart, BarChart3, Globe
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface PropertyField {
@@ -38,29 +44,59 @@ interface EntityType {
 // 리테일 비즈니스 도메인 아이콘 프리셋
 const ICON_PRESETS = [
   { value: "Store", label: "매장" },
+  { value: "Building2", label: "건물" },
   { value: "ShoppingCart", label: "상품" },
-  { value: "Users", label: "고객" },
-  { value: "CreditCard", label: "거래" },
-  { value: "MapPin", label: "구역" },
-  { value: "UserCheck", label: "직원" },
+  { value: "ShoppingBag", label: "쇼핑백" },
+  { value: "Shirt", label: "의류" },
+  { value: "Box", label: "박스" },
   { value: "Package", label: "재고" },
-  { value: "TrendingUp", label: "판매" },
-  { value: "Calendar", label: "이벤트" },
-  { value: "Tag", label: "카테고리" },
+  { value: "Barcode", label: "바코드" },
+  { value: "Users", label: "고객" },
+  { value: "UserCheck", label: "직원" },
+  { value: "CreditCard", label: "거래" },
+  { value: "DollarSign", label: "금액" },
+  { value: "Receipt", label: "영수증" },
+  { value: "Percent", label: "할인" },
+  { value: "TrendingUp", label: "상승" },
+  { value: "TrendingDown", label: "하락" },
+  { value: "BarChart3", label: "막대그래프" },
+  { value: "PieChart", label: "파이차트" },
+  { value: "Target", label: "타겟" },
+  { value: "MapPin", label: "위치" },
+  { value: "Globe", label: "지역" },
+  { value: "Calendar", label: "일정" },
+  { value: "Clock", label: "시간" },
+  { value: "Tag", label: "태그" },
+  { value: "Layers", label: "레이어" },
 ];
 
 // 아이콘 매핑
 const ICON_MAP: Record<string, LucideIcon> = {
   Store,
+  Building2,
   ShoppingCart,
-  Users,
-  CreditCard,
-  MapPin,
-  UserCheck,
+  ShoppingBag,
+  Shirt,
+  Box,
   Package,
+  Barcode,
+  Users,
+  UserCheck,
+  CreditCard,
+  DollarSign,
+  Receipt,
+  Percent,
   TrendingUp,
+  TrendingDown,
+  BarChart3,
+  PieChart,
+  Target,
+  MapPin,
+  Globe,
   Calendar,
+  Clock,
   Tag,
+  Layers,
 };
 
 const COLOR_PRESETS = [
