@@ -107,11 +107,12 @@ Deno.serve(async (req) => {
         if (!entityError && entity) {
           createdEntities.push(entity);
           
-          // 원본 키로 매핑 (관계 생성시 사용)
-          const sourceKey = Object.values(mapping.column_mappings)[0];
-          if (sourceKey && record[sourceKey]) {
-            const key = `${mapping.entity_type_id}:${record[sourceKey]}`;
-            entityMap.set(key, entity.id);
+          // 원본 키로 매핑 (관계 생성시 사용) - 모든 컬럼 매핑을 entityMap에 추가
+          for (const [propName, columnName] of Object.entries(mapping.column_mappings)) {
+            if (record[columnName] !== undefined && record[columnName] !== null) {
+              const key = `${mapping.entity_type_id}:${columnName}:${record[columnName]}`;
+              entityMap.set(key, entity.id);
+            }
           }
         }
       }
@@ -126,8 +127,8 @@ Deno.serve(async (req) => {
       console.log(`Creating relations for type: ${relMapping.relation_type_id}`);
 
       for (const record of rawData) {
-        const sourceKey = `${relMapping.source_entity_type_id}:${record[relMapping.source_key]}`;
-        const targetKey = `${relMapping.target_entity_type_id}:${record[relMapping.target_key]}`;
+        const sourceKey = `${relMapping.source_entity_type_id}:${relMapping.source_key}:${record[relMapping.source_key]}`;
+        const targetKey = `${relMapping.target_entity_type_id}:${relMapping.target_key}:${record[relMapping.target_key]}`;
 
         const sourceEntityId = entityMap.get(sourceKey);
         const targetEntityId = entityMap.get(targetKey);
