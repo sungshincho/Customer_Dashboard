@@ -8,8 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Database, ArrowRight, Play, Check, Sparkles } from 'lucide-react';
+import { Database, ArrowRight, Play, Check, Sparkles, Wand2, Loader2 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 // 문자열 유사도 계산 (Levenshtein distance)
 const calculateSimilarity = (str1: string, str2: string): number => {
@@ -54,6 +55,7 @@ export const SchemaMapper = ({ importId, importData, onComplete }: SchemaMapping
   const [entityMappings, setEntityMappings] = useState<any[]>([]);
   const [relationMappings, setRelationMappings] = useState<any[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
+  const [isAutoMapping, setIsAutoMapping] = useState(false);
 
   // 온톨로지 스키마 불러오기
   const { data: entityTypes } = useQuery({
@@ -87,6 +89,53 @@ export const SchemaMapper = ({ importId, importData, onComplete }: SchemaMapping
       setColumns(cols);
     }
   }, [importData]);
+
+  // 전체 자동 매핑 (AI 기반)
+  const handleFullAutoMapping = async () => {
+    if (!entityTypes || entityTypes.length === 0) {
+      toast.error('먼저 온톨로지 스키마를 정의하세요');
+      return;
+    }
+
+    setIsAutoMapping(true);
+    try {
+      const dataSample = importData.raw_data.slice(0, 5); // 처음 5개 레코드
+
+      const { data, error } = await supabase.functions.invoke('auto-map-etl', {
+        body: {
+          import_id: importId,
+          data_sample: dataSample,
+          columns: columns,
+        },
+      });
+
+      if (error) throw error;
+
+      console.log('🤖 Auto-mapping result:', data);
+
+      // 매핑 결과 적용
+      if (data.entity_mappings && data.entity_mappings.length > 0) {
+        setEntityMappings(data.entity_mappings);
+        toast.success(
+          `AI가 ${data.entity_mappings.length}개 엔티티를 자동 매핑했습니다`,
+          { description: '결과를 검토하고 필요시 수정하세요' }
+        );
+      } else {
+        toast.warning('자동 매핑 결과가 없습니다', {
+          description: '수동으로 매핑을 추가하세요',
+        });
+      }
+
+      if (data.relation_mappings && data.relation_mappings.length > 0) {
+        setRelationMappings(data.relation_mappings);
+      }
+    } catch (error: any) {
+      console.error('Auto-mapping error:', error);
+      toast.error(`자동 매핑 실패: ${error.message}`);
+    } finally {
+      setIsAutoMapping(false);
+    }
+  };
 
   // ETL 실행
   const etlMutation = useMutation({
@@ -272,6 +321,36 @@ export const SchemaMapper = ({ importId, importData, onComplete }: SchemaMapping
             </div>
           </div>
 
+          {/* 자동 매핑 버튼 */}
+          <Alert className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 border-blue-200 dark:border-blue-800">
+            <Wand2 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            <AlertDescription className="flex items-center justify-between">
+              <div>
+                <p className="font-semibold text-blue-900 dark:text-blue-100">AI 자동 매핑</p>
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  AI가 데이터를 분석하고 온톨로지 스키마에 자동으로 매핑합니다
+                </p>
+              </div>
+              <Button
+                onClick={handleFullAutoMapping}
+                disabled={isAutoMapping || !entityTypes || entityTypes.length === 0}
+                className="ml-4"
+              >
+                {isAutoMapping ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    분석 중...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    전체 자동 매핑
+                  </>
+                )}
+              </Button>
+            </AlertDescription>
+          </Alert>
+
           {/* 엔티티 매핑 */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -282,8 +361,17 @@ export const SchemaMapper = ({ importId, importData, onComplete }: SchemaMapping
             </div>
 
             {entityMappings.map((mapping, idx) => (
-              <Card key={idx}>
+              <Card key={idx} className="relative">
                 <CardContent className="pt-4 space-y-4">
+                  {/* 신뢰도 표시 */}
+                  {mapping.confidence && (
+                    <div className="absolute top-2 right-2">
+                      <Badge variant={mapping.confidence > 0.8 ? "default" : "secondary"}>
+                        신뢰도 {(mapping.confidence * 100).toFixed(0)}%
+                      </Badge>
+                    </div>
+                  )}
+                  
                   <div className="grid grid-cols-[1fr,auto] gap-4">
                     <div className="space-y-2">
                       <Label>엔티티 타입</Label>
