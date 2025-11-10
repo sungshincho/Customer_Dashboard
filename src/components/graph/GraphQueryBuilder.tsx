@@ -30,11 +30,31 @@ export const GraphQueryBuilder = ({ onResultsChange }: GraphQueryBuilderProps) =
     queryFn: async () => {
       const { data, error } = await supabase
         .from('graph_entities')
-        .select('id, label, entity_type_id');
+        .select('id, label, entity_type_id, properties');
       if (error) throw error;
       return data;
     },
   });
+
+  // Helper to generate display label
+  const getEntityDisplayLabel = (entity: any) => {
+    if (entity.label && entity.label.trim() !== '') {
+      return entity.label;
+    }
+    
+    // Fallback: try to extract meaningful info from properties
+    const props = entity.properties || {};
+    const displayKeys = ['name', 'product_name', 'brand_name', 'store_name', 'customer_name', 'label'];
+    
+    for (const key of displayKeys) {
+      if (props[key] && String(props[key]).trim() !== '') {
+        return `${String(props[key]).substring(0, 50)} (${entity.id.substring(0, 8)})`;
+      }
+    }
+    
+    // Last resort: show ID
+    return `Entity ${entity.id.substring(0, 8)}...`;
+  };
 
   // Execute query mutation
   const executeMutation = useMutation({
@@ -114,11 +134,11 @@ export const GraphQueryBuilder = ({ onResultsChange }: GraphQueryBuilderProps) =
                 <SelectTrigger className="bg-background">
                   <SelectValue placeholder="엔티티 선택" />
                 </SelectTrigger>
-                <SelectContent className="bg-background z-50">
+                <SelectContent className="bg-background z-50 max-h-[300px] overflow-y-auto">
                   {entities && entities.length > 0 ? (
                     entities.map((entity) => (
                       <SelectItem key={entity.id} value={entity.id}>
-                        {entity.label}
+                        {getEntityDisplayLabel(entity)}
                       </SelectItem>
                     ))
                   ) : (
@@ -178,11 +198,11 @@ export const GraphQueryBuilder = ({ onResultsChange }: GraphQueryBuilderProps) =
                 <SelectTrigger className="bg-background">
                   <SelectValue placeholder="엔티티 선택" />
                 </SelectTrigger>
-                <SelectContent className="bg-background z-50">
+                <SelectContent className="bg-background z-50 max-h-[300px] overflow-y-auto">
                   {entities && entities.length > 0 ? (
                     entities.map((entity) => (
                       <SelectItem key={entity.id} value={entity.id}>
-                        {entity.label}
+                        {getEntityDisplayLabel(entity)}
                       </SelectItem>
                     ))
                   ) : (

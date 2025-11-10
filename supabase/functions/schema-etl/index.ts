@@ -86,10 +86,31 @@ Deno.serve(async (req) => {
           }
         }
 
-        // 라벨 생성 (템플릿 사용)
+        // 라벨 생성 (템플릿 사용 - column_mappings 기반)
         let label = mapping.label_template;
+        
+        // 먼저 매핑된 속성 이름으로 치환 시도
+        for (const [propName, columnName] of Object.entries(mapping.column_mappings)) {
+          const value = record[columnName];
+          if (value !== undefined && value !== null) {
+            // {property_name} 형태 치환
+            label = label.replace(`{${propName}}`, String(value));
+            // {column_name} 형태도 치환 (하위 호환성)
+            label = label.replace(`{${columnName}}`, String(value));
+          }
+        }
+        
+        // 추가로 원본 레코드의 모든 키로도 치환 (fallback)
         for (const [key, value] of Object.entries(record)) {
-          label = label.replace(`{${key}}`, String(value || ''));
+          if (value !== undefined && value !== null) {
+            label = label.replace(`{${key}}`, String(value));
+          }
+        }
+        
+        // label이 여전히 템플릿 형태면 첫 번째 속성값 사용
+        if (label.includes('{') && label.includes('}')) {
+          const firstValue = Object.values(properties).find(v => v !== undefined && v !== null);
+          label = firstValue ? String(firstValue) : `Entity ${Object.values(record)[0] || ''}`;
         }
 
         // 엔티티 생성
