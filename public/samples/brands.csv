@@ -1,2 +1,4 @@
 brand_id,brand_name,country,founded_year,category,market_position,annual_revenue,sustainability_score,target_age_group,brand_style
 B001,URBANSTYLE,한국,2018,패션,Premium,28000000000,8.7,20-40대,모던 캐주얼
+B002,DAILYWEAR,한국,2015,패션,Mid,15000000000,7.2,20-30대,베이직 데일리
+B003,STREETVIBE,한국,2020,패션,Budget,8500000000,6.8,10-20대,스트릿 캐주얼
