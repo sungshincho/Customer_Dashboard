@@ -155,7 +155,7 @@ function levenshteinDistance(str1: string, str2: string): number {
 /**
  * 데이터 타입 자동 감지
  */
-export function detectDataType(dataType: string): 'sales' | 'traffic_sensor' | 'traffic' | 'product' | 'customer' | 'inventory' | 'brand' | 'store' | 'other' {
+export function detectDataType(dataType: string): 'sales' | 'traffic_sensor' | 'traffic' | 'product' | 'customer' | 'inventory' | 'brand' | 'store' | 'staff' | 'other' {
   const typeKeywords: Record<string, string[]> = {
     sales: ['매출', '판매', '거래', 'sales', 'transaction', '주문', 'order', '결제', 'payment'],
     traffic_sensor: ['센서', 'sensor', '동선', 'tracking', 'path', 'zone', 'movement', 'beacon'],
@@ -165,6 +165,7 @@ export function detectDataType(dataType: string): 'sales' | 'traffic_sensor' | '
     inventory: ['재고', 'inventory', 'stock', '입고', '출고'],
     brand: ['브랜드', 'brand', '제조사', 'manufacturer', 'maker'],
     store: ['매장', 'store', '지점', 'branch', 'shop', 'location'],
+    staff: ['직원', 'staff', '사원', 'employee', '근무자', 'worker', 'personnel'],
   };
   
   const typeLower = dataType.toLowerCase();

@@ -162,6 +162,29 @@ export const STORE_DIM_SCHEMA: EnterpriseDataSchema = {
   qualityChecks: ['store_id unique', 'store_name not null', 'floor_area_sqm >= 0']
 };
 
+// 직원 데이터 스키마
+export const STAFF_DIM_SCHEMA: EnterpriseDataSchema = {
+  type: 'staff',
+  category: 'dimension',
+  grain: '직원 1명 (SCD2)',
+  columns: [
+    { name: 'staff_id', type: 'string', required: true, description: '직원 고유 ID', isKey: true, examples: ['staff_id', 'id', '직원코드', '사원번호', 'staffid', 'employee_id', 'emp_id', '직원id', '사원id', 'worker_id', 'staff', '직원', '사원'] },
+    { name: 'staff_name', type: 'string', required: true, description: '직원명', examples: ['staff_name', 'name', '직원명', '이름', '사원명', 'staffname', 'employee_name', 'emp_name', '성명', 'full_name'] },
+    { name: 'store_id', type: 'string', required: true, description: '소속 매장 ID', isKey: true, examples: ['store_id', 'shop_id', '매장코드', '지점코드', 'storeid', 'branch', 'location', '매장', '지점'] },
+    { name: 'position', type: 'string', required: false, description: '직책/직급', examples: ['position', 'title', 'role', '직책', '직급', '직위', '포지션', 'job_title', 'rank', '등급'] },
+    { name: 'hire_date', type: 'date', required: false, description: '입사일', examples: ['hire_date', 'join_date', 'start_date', '입사일', '입사일자', 'hiredate', 'employment_date', '채용일', '근무시작일'] },
+    { name: 'salary_level', type: 'number', required: false, description: '급여 레벨', constraints: ['>=0'], examples: ['salary_level', 'level', 'grade', '급여등급', '호봉', 'salarylevel', 'pay_grade', '등급', '레벨'] },
+    { name: 'performance_score', type: 'number', required: false, description: '성과 점수', constraints: ['>=0'], examples: ['performance_score', 'score', 'rating', '성과점수', '평가점수', 'performancescore', 'evaluation', '평가', '점수', 'kpi'] },
+    { name: 'sales_count_monthly', type: 'number', required: false, description: '월 판매 건수', constraints: ['>=0'], examples: ['sales_count_monthly', 'sales_count', 'monthly_sales', '월판매건수', '판매건수', 'salescountmonthly', 'transactions', '거래건수'] },
+    { name: 'customer_satisfaction', type: 'number', required: false, description: '고객 만족도', constraints: ['>=0'], examples: ['customer_satisfaction', 'satisfaction', 'csat', '만족도', '고객만족도', 'customersatisfaction', 'rating', '평점', 'feedback_score'] },
+    { name: 'is_current', type: 'boolean', required: true, description: 'SCD2: 현재 레코드', examples: ['is_current', 'current', 'iscurrent'] },
+    { name: 'valid_from', type: 'date', required: true, description: 'SCD2: 유효 시작일', examples: ['valid_from', 'start_date', 'validfrom', 'from_date'] },
+    { name: 'valid_to', type: 'date', required: false, description: 'SCD2: 유효 종료일', examples: ['valid_to', 'end_date', 'validto', 'to_date'] },
+  ],
+  relations: ['dim_store', 'fact_sales_line'],
+  qualityChecks: ['staff_id unique', 'staff_name not null', 'store_id FK valid']
+};
+
 // 6) 매출 데이터 스키마
 export const SALES_FACT_SCHEMA: EnterpriseDataSchema = {
   type: 'sales',
@@ -207,6 +230,7 @@ export const ENTERPRISE_SCHEMA_MAP: Record<string, EnterpriseDataSchema> = {
   product: PRODUCT_DIM_SCHEMA,
   sku: SKU_DIM_SCHEMA,
   store: STORE_DIM_SCHEMA,
+  staff: STAFF_DIM_SCHEMA,
   sales: SALES_FACT_SCHEMA,
 };
 
@@ -217,6 +241,7 @@ export const COMMON_KEY_COLUMNS = [
   'brand_id',
   'product_id',
   'sku_id',
+  'staff_id',
   'transaction_id',
   'event_id',
   'visit_id',
