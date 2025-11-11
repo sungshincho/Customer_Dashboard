@@ -20,6 +20,7 @@ import {
   ChevronDown
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
+import { useLocation } from "react-router-dom";
 import {
   Sidebar,
   SidebarContent,
@@ -77,6 +78,13 @@ const dataManagementItems = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
+  const location = useLocation();
+
+  // 현재 경로에 따라 섹션 열림 상태 결정
+  const isStoreAnalysisActive = storeAnalysisItems.some(item => location.pathname === item.url);
+  const isProfitCenterActive = profitCenterItems.some(item => location.pathname === item.url);
+  const isCostCenterActive = costCenterItems.some(item => location.pathname === item.url);
+  const isDataManagementActive = dataManagementItems.some(item => location.pathname === item.url);
 
   return (
     <Sidebar collapsible="icon">
@@ -117,7 +125,7 @@ export function AppSidebar() {
         </SidebarGroup>
 
         {/* Store Analysis 매장 분석 */}
-        <Collapsible defaultOpen className="group/collapsible">
+        <Collapsible open={isStoreAnalysisActive} defaultOpen className="group/collapsible">
           <SidebarGroup>
             <SidebarGroupLabel asChild>
               <CollapsibleTrigger className="w-full hover:bg-sidebar-accent/50 rounded-lg transition-colors">
@@ -149,7 +157,7 @@ export function AppSidebar() {
         </Collapsible>
 
         {/* Profit Center 수익 센터 */}
-        <Collapsible defaultOpen className="group/collapsible">
+        <Collapsible open={isProfitCenterActive} defaultOpen className="group/collapsible">
           <SidebarGroup>
             <SidebarGroupLabel asChild>
               <CollapsibleTrigger className="w-full hover:bg-green-500/5 rounded-lg transition-colors">
@@ -181,7 +189,7 @@ export function AppSidebar() {
         </Collapsible>
 
         {/* Cost Center 비용 센터 */}
-        <Collapsible defaultOpen className="group/collapsible">
+        <Collapsible open={isCostCenterActive} defaultOpen className="group/collapsible">
           <SidebarGroup>
             <SidebarGroupLabel asChild>
               <CollapsibleTrigger className="w-full hover:bg-orange-500/5 rounded-lg transition-colors">
@@ -213,12 +221,11 @@ export function AppSidebar() {
         </Collapsible>
 
         {/* Data Management 데이터 관리 */}
-        <Collapsible defaultOpen={false} className="group/collapsible">
+        <Collapsible open={isDataManagementActive} defaultOpen={false} className="group/collapsible">
           <SidebarGroup>
             <SidebarGroupLabel asChild>
               <CollapsibleTrigger 
                 className="w-full hover:bg-blue-500/5 rounded-lg transition-colors"
-                onClick={(e) => e.stopPropagation()}
               >
                 <span className="text-sm font-semibold text-blue-600">🗄️ 데이터 관리</span>
                 <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
