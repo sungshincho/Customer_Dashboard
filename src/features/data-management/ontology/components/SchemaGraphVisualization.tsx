@@ -33,6 +33,7 @@ interface RelationType {
   target_entity_type: string;
   directionality: string | null;
   properties: PropertyField[];
+  weight?: number;
 }
 
 interface GraphNode {
@@ -51,6 +52,7 @@ interface GraphLink {
   color: string;
   properties: PropertyField[];
   directionality: string;
+  weight: number;
 }
 
 interface GraphData {
@@ -97,23 +99,50 @@ export const SchemaGraphVisualization = () => {
   useEffect(() => {
     if (!entities || !relations) return;
 
-    const nodes: GraphNode[] = entities.map(entity => ({
-      id: entity.name,
-      name: entity.name,
-      label: entity.label,
-      color: entity.color || "#3b82f6",
-      properties: entity.properties,
-      val: 20 + (entity.properties.length * 3), // 노드 크기는 속성 개수에 비례
-    }));
+    const links: GraphLink[] = relations.map(relation => {
+      // weight 속성 추출 (properties에서 찾거나 기본값 1.0)
+      const weightProp = relation.properties.find(p => p.name === 'weight');
+      const weight = relation.weight || (weightProp ? 1.0 : 0.5);
+      
+      return {
+        source: relation.source_entity_type,
+        target: relation.target_entity_type,
+        label: relation.label,
+        color: "#6366f1",
+        properties: relation.properties,
+        directionality: relation.directionality || "directed",
+        weight,
+      };
+    });
 
-    const links: GraphLink[] = relations.map(relation => ({
-      source: relation.source_entity_type,
-      target: relation.target_entity_type,
-      label: relation.label,
-      color: "#6366f1",
-      properties: relation.properties,
-      directionality: relation.directionality || "directed",
-    }));
+    // 노드별 연결된 관계의 총 weight 계산 (중심성)
+    const nodeWeights = new Map<string, number>();
+    links.forEach(link => {
+      nodeWeights.set(
+        link.source,
+        (nodeWeights.get(link.source) || 0) + link.weight
+      );
+      nodeWeights.set(
+        link.target,
+        (nodeWeights.get(link.target) || 0) + link.weight
+      );
+    });
+
+    const nodes: GraphNode[] = entities.map(entity => {
+      const connectionWeight = nodeWeights.get(entity.name) || 0;
+      // 노드 크기는 속성 개수 + 연결 가중치 합산으로 결정
+      const baseSize = 20 + (entity.properties.length * 2);
+      const sizeBonus = connectionWeight * 3;
+      
+      return {
+        id: entity.name,
+        name: entity.name,
+        label: entity.label,
+        color: entity.color || "#3b82f6",
+        properties: entity.properties,
+        val: Math.min(baseSize + sizeBonus, 60), // 최대 크기 제한
+      };
+    });
 
     setGraphData({ nodes, links });
   }, [entities, relations]);
@@ -271,13 +300,27 @@ export const SchemaGraphVisualization = () => {
                   }
                 }}
                 linkLabel="label"
-                linkColor="color"
-                linkWidth={2}
-                linkDirectionalArrowLength={6}
+                linkColor={(link: any) => {
+                  // weight에 따라 색상 변화 (약한 관계 -> 강한 관계)
+                  const weight = link.weight || 0.5;
+                  const intensity = Math.min(weight, 1.0);
+                  // HSL 색상으로 강도 표현 (파란색 계열)
+                  return `hsla(239, 84%, ${70 - intensity * 20}%, ${0.5 + intensity * 0.5})`;
+                }}
+                linkWidth={(link: any) => {
+                  // weight에 따라 선 두께 조절
+                  const weight = link.weight || 0.5;
+                  return 1 + (weight * 4); // 1px ~ 5px
+                }}
+                linkDirectionalArrowLength={(link: any) => {
+                  const weight = link.weight || 0.5;
+                  return 4 + (weight * 6); // 4 ~ 10
+                }}
                 linkDirectionalArrowRelPos={1}
                 linkCanvasObjectMode={() => "after"}
                 linkCanvasObject={(link: any, ctx, globalScale) => {
                   const label = link.label;
+                  const weight = link.weight || 0.5;
                   const fontSize = 10 / globalScale;
                   ctx.font = `${fontSize}px Sans-Serif`;
                   
@@ -290,11 +333,14 @@ export const SchemaGraphVisualization = () => {
                     y: start.y + (end.y - start.y) / 2
                   };
 
-                  const textWidth = ctx.measureText(label).width;
+                  // Weight 표시 추가
+                  const weightText = `${label} [${weight.toFixed(1)}]`;
+                  const textWidth = ctx.measureText(weightText).width;
                   const bckgDimensions = [textWidth, fontSize].map(n => n + fontSize * 0.4);
 
-                  // 라벨 배경
-                  ctx.fillStyle = 'rgba(99, 102, 241, 0.9)';
+                  // 가중치에 따라 배경 색상 변경
+                  const intensity = Math.min(weight, 1.0);
+                  ctx.fillStyle = `rgba(99, 102, 241, ${0.7 + intensity * 0.3})`;
                   ctx.fillRect(
                     textPos.x - bckgDimensions[0] / 2,
                     textPos.y - bckgDimensions[1] / 2,
@@ -306,7 +352,26 @@ export const SchemaGraphVisualization = () => {
                   ctx.textAlign = 'center';
                   ctx.textBaseline = 'middle';
                   ctx.fillStyle = '#fff';
-                  ctx.fillText(label, textPos.x, textPos.y);
+                  ctx.fillText(weightText, textPos.x, textPos.y);
+                  
+                  // 방향 표시 강화 (양방향일 경우 양쪽 화살표)
+                  if (link.directionality === 'bidirectional') {
+                    const angle = Math.atan2(end.y - start.y, end.x - start.x);
+                    const arrowSize = (2 + weight * 2) / globalScale;
+                    
+                    // 시작점 화살표
+                    ctx.save();
+                    ctx.translate(start.x, start.y);
+                    ctx.rotate(angle + Math.PI);
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(-arrowSize, arrowSize);
+                    ctx.lineTo(-arrowSize, -arrowSize);
+                    ctx.closePath();
+                    ctx.fillStyle = link.color;
+                    ctx.fill();
+                    ctx.restore();
+                  }
                 }}
                 onNodeClick={handleNodeClick}
                 onNodeDragEnd={(node: any) => {
@@ -420,22 +485,44 @@ export const SchemaGraphVisualization = () => {
                         link.source === selectedNode.name ||
                         link.target === selectedNode.name
                     )
-                    .map((link, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center gap-2 text-sm p-2 rounded bg-muted"
-                      >
-                        <Badge variant="outline">
-                          {typeof link.source === 'string' ? link.source : link.source}
-                        </Badge>
-                        <span className="text-primary">→</span>
-                        <Badge className="bg-primary/10">{link.label}</Badge>
-                        <span className="text-primary">→</span>
-                        <Badge variant="outline">
-                          {typeof link.target === 'string' ? link.target : link.target}
-                        </Badge>
-                      </div>
-                    ))}
+                    .map((link, index) => {
+                      const isOutgoing = link.source === selectedNode.name;
+                      const arrow = link.directionality === 'bidirectional' ? '↔' : '→';
+                      
+                      return (
+                        <div
+                          key={index}
+                          className="flex items-center gap-2 text-sm p-2 rounded bg-muted"
+                        >
+                          <Badge variant="outline">
+                            {typeof link.source === 'string' ? link.source : link.source}
+                          </Badge>
+                          <span className="text-primary">{arrow}</span>
+                          <div className="flex items-center gap-1">
+                            <Badge className="bg-primary/10">{link.label}</Badge>
+                            <Badge 
+                              variant="secondary" 
+                              className="text-xs"
+                              style={{
+                                backgroundColor: `hsla(239, 84%, ${70 - link.weight * 20}%, 0.3)`
+                              }}
+                            >
+                              {link.weight.toFixed(1)}
+                            </Badge>
+                          </div>
+                          <span className="text-primary">{arrow}</span>
+                          <Badge variant="outline">
+                            {typeof link.target === 'string' ? link.target : link.target}
+                          </Badge>
+                          {isOutgoing && (
+                            <Badge variant="destructive" className="text-xs">원인</Badge>
+                          )}
+                          {!isOutgoing && (
+                            <Badge variant="default" className="text-xs">결과</Badge>
+                          )}
+                        </div>
+                      );
+                    })}
                 </div>
               </div>
             </div>
