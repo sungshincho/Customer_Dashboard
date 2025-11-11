@@ -268,21 +268,73 @@ export const RetailSchemaPreset = () => {
         throw entityError;
       }
 
-      // 관계 타입 생성
+      // 관계 타입 생성 - 모든 엔티티를 유기적으로 연결
       const retailRelations = [
-        { name: 'visits', label: '방문함', description: '고객이 매장을 방문', source_entity_type: 'Customer', target_entity_type: 'Store', directionality: 'directed', properties: [], user_id: userId },
-        { name: 'purchases', label: '구매함', description: '고객이 제품을 구매', source_entity_type: 'Customer', target_entity_type: 'Product', directionality: 'directed', properties: [], user_id: userId },
-        { name: 'stocks', label: '보유함', description: '매장이 제품 재고 보유', source_entity_type: 'Store', target_entity_type: 'Inventory', directionality: 'directed', properties: [], user_id: userId },
-        { name: 'applies_to', label: '적용됨', description: '프로모션이 제품에 적용', source_entity_type: 'Promotion', target_entity_type: 'Product', directionality: 'directed', properties: [], user_id: userId },
-        { name: 'forecasts_for', label: '예측함', description: '수요 예측 대상', source_entity_type: 'DemandForecast', target_entity_type: 'Product', directionality: 'directed', properties: [], user_id: userId },
-        { name: 'optimizes', label: '최적화함', description: '가격 최적화 대상', source_entity_type: 'PriceOptimization', target_entity_type: 'Product', directionality: 'directed', properties: [], user_id: userId },
-        { name: 'targets', label: '타겟함', description: '마케팅 캠페인 타겟', source_entity_type: 'MarketingCampaign', target_entity_type: 'Customer', directionality: 'directed', properties: [], user_id: userId },
-        { name: 'generates', label: '생성함', description: '방문이 매출 생성', source_entity_type: 'Visit', target_entity_type: 'Sale', directionality: 'directed', properties: [], user_id: userId },
-        { name: 'follows', label: '따름', description: '고객이 동선을 따름', source_entity_type: 'Customer', target_entity_type: 'CustomerPath', directionality: 'directed', properties: [], user_id: userId },
-        { name: 'converts_at', label: '전환됨', description: '구매 전환 위치', source_entity_type: 'Visit', target_entity_type: 'PurchaseConversion', directionality: 'directed', properties: [], user_id: userId },
-        { name: 'works_at', label: '근무함', description: '직원 근무 매장', source_entity_type: 'StaffSchedule', target_entity_type: 'Store', directionality: 'directed', properties: [], user_id: userId },
-        { name: 'analyzed_in', label: '분석됨', description: '구역 분석 대상', source_entity_type: 'Store', target_entity_type: 'ZoneAnalysis', directionality: 'directed', properties: [], user_id: userId },
-        { name: 'triggers', label: '트리거함', description: '이벤트가 알림 트리거', source_entity_type: 'Inventory', target_entity_type: 'Alert', directionality: 'directed', properties: [], user_id: userId }
+        // 고객 관련 관계
+        { name: 'customer_visits_store', label: '방문함', description: '고객이 매장을 방문', source_entity_type: 'Customer', target_entity_type: 'Store', directionality: 'directed', properties: [], user_id: userId },
+        { name: 'customer_purchases_product', label: '구매함', description: '고객이 제품을 구매', source_entity_type: 'Customer', target_entity_type: 'Product', directionality: 'directed', properties: [], user_id: userId },
+        { name: 'customer_follows_path', label: '동선 추적', description: '고객의 매장 내 이동 동선', source_entity_type: 'Customer', target_entity_type: 'CustomerPath', directionality: 'directed', properties: [], user_id: userId },
+        { name: 'customer_has_visit', label: '방문 기록', description: '고객의 방문 기록', source_entity_type: 'Customer', target_entity_type: 'Visit', directionality: 'directed', properties: [], user_id: userId },
+        { name: 'customer_targeted_by_campaign', label: '캠페인 타겟', description: '마케팅 캠페인의 타겟 고객', source_entity_type: 'MarketingCampaign', target_entity_type: 'Customer', directionality: 'directed', properties: [], user_id: userId },
+        
+        // 매장 관련 관계
+        { name: 'store_has_inventory', label: '재고 보유', description: '매장이 보유한 재고', source_entity_type: 'Store', target_entity_type: 'Inventory', directionality: 'directed', properties: [], user_id: userId },
+        { name: 'store_has_sale', label: '매출 발생', description: '매장에서 발생한 매출', source_entity_type: 'Store', target_entity_type: 'Sale', directionality: 'directed', properties: [], user_id: userId },
+        { name: 'store_has_zone', label: '구역 포함', description: '매장 내 분석 구역', source_entity_type: 'Store', target_entity_type: 'ZoneAnalysis', directionality: 'directed', properties: [], user_id: userId },
+        { name: 'store_has_staff', label: '직원 배치', description: '매장 근무 직원', source_entity_type: 'Store', target_entity_type: 'StaffSchedule', directionality: 'directed', properties: [], user_id: userId },
+        { name: 'store_runs_promotion', label: '프로모션 진행', description: '매장에서 진행하는 프로모션', source_entity_type: 'Store', target_entity_type: 'Promotion', directionality: 'directed', properties: [], user_id: userId },
+        { name: 'store_has_path', label: '동선 구역', description: '매장 내 고객 동선', source_entity_type: 'Store', target_entity_type: 'CustomerPath', directionality: 'directed', properties: [], user_id: userId },
+        { name: 'store_has_forecast', label: '수요 예측', description: '매장별 수요 예측', source_entity_type: 'Store', target_entity_type: 'DemandForecast', directionality: 'directed', properties: [], user_id: userId },
+        
+        // 제품 관련 관계
+        { name: 'product_in_inventory', label: '재고 품목', description: '재고로 관리되는 제품', source_entity_type: 'Inventory', target_entity_type: 'Product', directionality: 'directed', properties: [], user_id: userId },
+        { name: 'product_in_sale', label: '판매 품목', description: '매출에 포함된 제품', source_entity_type: 'Sale', target_entity_type: 'Product', directionality: 'directed', properties: [], user_id: userId },
+        { name: 'product_has_promotion', label: '프로모션 적용', description: '제품에 적용된 프로모션', source_entity_type: 'Promotion', target_entity_type: 'Product', directionality: 'directed', properties: [], user_id: userId },
+        { name: 'product_has_forecast', label: '수요 예측', description: '제품별 수요 예측', source_entity_type: 'DemandForecast', target_entity_type: 'Product', directionality: 'directed', properties: [], user_id: userId },
+        { name: 'product_has_optimization', label: '가격 최적화', description: '제품 가격 최적화', source_entity_type: 'PriceOptimization', target_entity_type: 'Product', directionality: 'directed', properties: [], user_id: userId },
+        
+        // 매출 관련 관계
+        { name: 'sale_by_customer', label: '구매자', description: '매출 구매 고객', source_entity_type: 'Sale', target_entity_type: 'Customer', directionality: 'directed', properties: [], user_id: userId },
+        { name: 'sale_from_visit', label: '방문 전환', description: '방문에서 전환된 매출', source_entity_type: 'Visit', target_entity_type: 'Sale', directionality: 'directed', properties: [], user_id: userId },
+        { name: 'sale_has_conversion', label: '전환 분석', description: '매출의 전환 분석', source_entity_type: 'Sale', target_entity_type: 'PurchaseConversion', directionality: 'directed', properties: [], user_id: userId },
+        { name: 'sale_uses_promotion', label: '프로모션 사용', description: '매출에 적용된 프로모션', source_entity_type: 'Sale', target_entity_type: 'Promotion', directionality: 'directed', properties: [], user_id: userId },
+        
+        // 방문 관련 관계
+        { name: 'visit_at_store', label: '방문 매장', description: '고객이 방문한 매장', source_entity_type: 'Visit', target_entity_type: 'Store', directionality: 'directed', properties: [], user_id: userId },
+        { name: 'visit_follows_path', label: '이동 동선', description: '방문 중 이동한 동선', source_entity_type: 'Visit', target_entity_type: 'CustomerPath', directionality: 'directed', properties: [], user_id: userId },
+        { name: 'visit_has_conversion', label: '전환 결과', description: '방문의 구매 전환 결과', source_entity_type: 'Visit', target_entity_type: 'PurchaseConversion', directionality: 'directed', properties: [], user_id: userId },
+        { name: 'visit_in_zone', label: '구역 방문', description: '방문 중 머문 구역', source_entity_type: 'Visit', target_entity_type: 'ZoneAnalysis', directionality: 'directed', properties: [], user_id: userId },
+        
+        // 동선 관련 관계
+        { name: 'path_through_zone', label: '구역 통과', description: '동선이 지나간 구역', source_entity_type: 'CustomerPath', target_entity_type: 'ZoneAnalysis', directionality: 'directed', properties: [], user_id: userId },
+        
+        // 재고 관련 관계
+        { name: 'inventory_triggers_forecast', label: '예측 트리거', description: '재고 상태가 수요 예측 트리거', source_entity_type: 'Inventory', target_entity_type: 'DemandForecast', directionality: 'directed', properties: [], user_id: userId },
+        { name: 'inventory_triggers_alert', label: '알림 트리거', description: '재고 이슈가 알림 발생', source_entity_type: 'Inventory', target_entity_type: 'Alert', directionality: 'directed', properties: [], user_id: userId },
+        
+        // 프로모션 관련 관계
+        { name: 'promotion_affects_conversion', label: '전환 영향', description: '프로모션이 전환율에 미치는 영향', source_entity_type: 'Promotion', target_entity_type: 'PurchaseConversion', directionality: 'directed', properties: [], user_id: userId },
+        { name: 'promotion_in_campaign', label: '캠페인 포함', description: '마케팅 캠페인에 포함된 프로모션', source_entity_type: 'MarketingCampaign', target_entity_type: 'Promotion', directionality: 'directed', properties: [], user_id: userId },
+        
+        // 캠페인 관련 관계
+        { name: 'campaign_affects_visit', label: '방문 유도', description: '캠페인이 방문 유도', source_entity_type: 'MarketingCampaign', target_entity_type: 'Visit', directionality: 'directed', properties: [], user_id: userId },
+        { name: 'campaign_at_store', label: '캠페인 매장', description: '캠페인 진행 매장', source_entity_type: 'MarketingCampaign', target_entity_type: 'Store', directionality: 'directed', properties: [], user_id: userId },
+        
+        // 최적화 관련 관계
+        { name: 'optimization_at_store', label: '매장별 최적화', description: '매장별 가격 최적화', source_entity_type: 'PriceOptimization', target_entity_type: 'Store', directionality: 'directed', properties: [], user_id: userId },
+        { name: 'optimization_affects_sale', label: '매출 영향', description: '가격 최적화가 매출에 미치는 영향', source_entity_type: 'PriceOptimization', target_entity_type: 'Sale', directionality: 'directed', properties: [], user_id: userId },
+        
+        // 전환 분석 관련 관계
+        { name: 'conversion_in_zone', label: '구역별 전환', description: '구역별 전환 분석', source_entity_type: 'PurchaseConversion', target_entity_type: 'ZoneAnalysis', directionality: 'directed', properties: [], user_id: userId },
+        
+        // 직원 관련 관계
+        { name: 'staff_affects_conversion', label: '전환 기여', description: '직원 서비스가 전환에 기여', source_entity_type: 'StaffSchedule', target_entity_type: 'PurchaseConversion', directionality: 'directed', properties: [], user_id: userId },
+        { name: 'staff_in_zone', label: '구역 담당', description: '직원이 담당하는 구역', source_entity_type: 'StaffSchedule', target_entity_type: 'ZoneAnalysis', directionality: 'directed', properties: [], user_id: userId },
+        
+        // 알림 관련 관계
+        { name: 'alert_for_forecast', label: '예측 알림', description: '수요 예측 기반 알림', source_entity_type: 'DemandForecast', target_entity_type: 'Alert', directionality: 'directed', properties: [], user_id: userId },
+        { name: 'alert_for_conversion', label: '전환 알림', description: '전환율 이슈 알림', source_entity_type: 'PurchaseConversion', target_entity_type: 'Alert', directionality: 'directed', properties: [], user_id: userId },
+        { name: 'alert_for_store', label: '매장 알림', description: '매장 운영 알림', source_entity_type: 'Store', target_entity_type: 'Alert', directionality: 'directed', properties: [], user_id: userId }
       ];
 
       const { error: relationError } = await supabase
@@ -307,7 +359,7 @@ export const RetailSchemaPreset = () => {
       
       toast({
         title: "오프라인 리테일 궁극 스키마 생성 완료",
-        description: `15개 엔티티 타입과 13개 관계 타입이 생성되었습니다. ${message}`,
+        description: `15개 엔티티 타입과 43개 관계 타입이 생성되었습니다. ${message}`,
       });
     },
     onError: (error: any) => {
@@ -365,10 +417,11 @@ export const RetailSchemaPreset = () => {
                 <span>• 구역 분석 (ZoneAnalysis)</span>
                 <span>• 알림 (Alert)</span>
               </div>
-              <div className="font-medium mt-3">관계 타입 (13개)</div>
+              <div className="font-medium mt-3">관계 타입 (43개) - 완전 연결 그래프</div>
               <div className="text-sm">
-                방문, 구매, 재고 보유, 프로모션 적용, 수요 예측, 가격 최적화, 
-                캠페인 타겟, 매출 생성, 동선 추적, 전환 분석, 직원 배치, 구역 분석, 알림 트리거
+                고객↔매장↔제품↔재고↔수요예측, 방문↔동선↔구역↔전환분석, 
+                매출↔프로모션↔캠페인↔가격최적화, 직원↔서비스↔알림 등 
+                모든 비즈니스 요소가 유기적으로 연결되어 인과관계 추적 가능
               </div>
             </div>
           </AlertDescription>
