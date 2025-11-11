@@ -5,29 +5,17 @@ import { RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { AdvancedFilters, FilterState } from "@/components/analysis/AdvancedFilters";
 import { ExportButton } from "@/components/analysis/ExportButton";
-import { AIInsights, Insight } from "@/components/analysis/AIInsights";
-import { AlertSettings, Alert } from "@/components/analysis/AlertSettings";
 import { ComparisonView } from "@/components/analysis/ComparisonView";
-import { AIAnalysisButton } from "@/components/analysis/AIAnalysisButton";
-import { AnalysisHistory } from "@/components/analysis/AnalysisHistory";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const CustomerJourneyPage = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
-  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
-  const [historyRefresh, setHistoryRefresh] = useState(0);
 
   const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);
   };
-
-  const insights: Insight[] = [
-    { type: "trend", title: "효율적인 동선", description: "고객들이 매장을 효율적으로 이동하고 있습니다.", impact: "medium" },
-    { type: "recommendation", title: "진열 개선", description: "입구 근처 상품 진열을 개선하면 체류 시간이 증가할 수 있습니다.", impact: "high" },
-    { type: "warning", title: "병목 지점", description: "계산대 근처에서 혼잡이 발생하고 있습니다.", impact: "high" }
-  ];
 
   const comparisonData = [
     { label: "평균 동선 길이", current: 85, previous: 78, unit: "m" },
@@ -37,8 +25,7 @@ const CustomerJourneyPage = () => {
 
   const exportData = {
     filters,
-    journeyMetrics: comparisonData,
-    insights
+    journeyMetrics: comparisonData
   };
 
   return (
@@ -63,19 +50,10 @@ const CustomerJourneyPage = () => {
         <Tabs defaultValue="analysis" className="w-full">
           <TabsList>
             <TabsTrigger value="analysis">여정 분석</TabsTrigger>
-            <TabsTrigger value="comparison">비교</TabsTrigger>
-            <TabsTrigger value="insights">AI 인사이트</TabsTrigger>
-            <TabsTrigger value="history">히스토리</TabsTrigger>
-            <TabsTrigger value="alerts">알림 설정</TabsTrigger>
+            <TabsTrigger value="comparison">비교 분석</TabsTrigger>
           </TabsList>
           
           <TabsContent value="analysis" className="space-y-6">
-            <AIAnalysisButton
-              analysisType="customer-journey"
-              data={comparisonData}
-              title="AI 고객 동선 최적화 제안"
-              onAnalysisComplete={() => setHistoryRefresh(prev => prev + 1)}
-            />
             <div key={refreshKey}>
               <CustomerJourney />
             </div>
@@ -86,22 +64,6 @@ const CustomerJourneyPage = () => {
               data={comparisonData}
               comparisonType={comparisonType}
               onComparisonTypeChange={setComparisonType}
-            />
-          </TabsContent>
-          
-          <TabsContent value="insights">
-            <AIInsights insights={insights} />
-          </TabsContent>
-
-          <TabsContent value="history">
-            <AnalysisHistory analysisType="customer-journey" refreshTrigger={historyRefresh} />
-          </TabsContent>
-          
-          <TabsContent value="alerts">
-            <AlertSettings
-              alerts={alerts}
-              onAlertsChange={setAlerts}
-              availableMetrics={["평균 동선 길이", "방문 구역 수", "체류 시간", "이탈률"]}
             />
           </TabsContent>
         </Tabs>
