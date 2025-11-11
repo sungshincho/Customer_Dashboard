@@ -8,9 +8,96 @@ import { SchemaVersionManager } from "@/features/data-management/ontology/compon
 import { SchemaValidator } from "@/features/data-management/ontology/components/SchemaValidator";
 import { SchemaGraphVisualization } from "@/features/data-management/ontology/components/SchemaGraphVisualization";
 import { Badge } from "@/components/ui/badge";
-import { Layers, Link2, History, ShieldCheck, Network } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { Layers, Link2, History, ShieldCheck, Network, Download, Loader2 } from "lucide-react";
 
 const SchemaBuilder = () => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [selectedVersion, setSelectedVersion] = useState<string>("");
+
+  // 저장된 스키마 버전 목록 가져오기
+  const { data: schemaVersions, isLoading: versionsLoading } = useQuery({
+    queryKey: ["schema-versions"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ontology_schema_versions")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // 선택한 스키마 버전 불러오기
+  const loadSchemaMutation = useMutation({
+    mutationFn: async (versionId: string) => {
+      const { data: version, error } = await supabase
+        .from("ontology_schema_versions")
+        .select("*")
+        .eq("id", versionId)
+        .single();
+
+      if (error) throw error;
+
+      const schemaData = version.schema_data as any;
+      const userId = (await supabase.auth.getUser()).data.user?.id;
+
+      // 엔티티 타입 생성
+      if (schemaData.entities && schemaData.entities.length > 0) {
+        const { error: entityError } = await supabase
+          .from("ontology_entity_types")
+          .insert(
+            schemaData.entities.map((entity: any) => ({
+              ...entity,
+              user_id: userId,
+              id: undefined, // 새 ID 생성
+            }))
+          );
+
+        if (entityError) throw entityError;
+      }
+
+      // 관계 타입 생성
+      if (schemaData.relations && schemaData.relations.length > 0) {
+        const { error: relationError } = await supabase
+          .from("ontology_relation_types")
+          .insert(
+            schemaData.relations.map((relation: any) => ({
+              ...relation,
+              user_id: userId,
+              id: undefined, // 새 ID 생성
+            }))
+          );
+
+        if (relationError) throw relationError;
+      }
+
+      return version;
+    },
+    onSuccess: (version) => {
+      queryClient.invalidateQueries({ queryKey: ["entity-types"] });
+      queryClient.invalidateQueries({ queryKey: ["relation-types"] });
+      setSelectedVersion("");
+      toast({
+        title: "스키마 불러오기 완료",
+        description: `버전 ${version.version_number} 스키마가 적용되었습니다.`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "스키마 불러오기 실패",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -23,6 +110,67 @@ const SchemaBuilder = () => {
 
         {/* 검증 결과 */}
         <SchemaValidator />
+
+        {/* 스키마 불러오기 UI */}
+        <Card className="glass-card">
+          <CardHeader>
+            <CardTitle>저장된 스키마 불러오기</CardTitle>
+            <CardDescription>
+              이전에 저장한 스키마 버전을 선택하여 현재 작업 공간에 불러옵니다
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-end gap-4">
+              <div className="flex-1 space-y-2">
+                <label className="text-sm font-medium">스키마 버전 선택</label>
+                <Select
+                  value={selectedVersion}
+                  onValueChange={setSelectedVersion}
+                  disabled={versionsLoading || !schemaVersions || schemaVersions.length === 0}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder={
+                      versionsLoading
+                        ? "로딩 중..."
+                        : !schemaVersions || schemaVersions.length === 0
+                        ? "저장된 스키마가 없습니다"
+                        : "스키마 버전 선택"
+                    } />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover z-50">
+                    {schemaVersions?.map((version) => (
+                      <SelectItem key={version.id} value={version.id}>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">v{version.version_number}</Badge>
+                          <span>{version.description || "설명 없음"}</span>
+                          <span className="text-xs text-muted-foreground">
+                            ({new Date(version.created_at).toLocaleDateString()})
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                onClick={() => selectedVersion && loadSchemaMutation.mutate(selectedVersion)}
+                disabled={!selectedVersion || loadSchemaMutation.isPending}
+              >
+                {loadSchemaMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    불러오는 중...
+                  </>
+                ) : (
+                  <>
+                    <Download className="mr-2 h-4 w-4" />
+                    스키마 불러오기
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card className="glass-card">
           <CardHeader>
