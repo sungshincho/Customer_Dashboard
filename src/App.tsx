@@ -27,6 +27,9 @@ import HQStoreSyncPage from "./pages/HQStoreSyncPage";
 import DataImport from "./pages/DataImport";
 import GraphAnalysis from "./pages/GraphAnalysis";
 import SchemaBuilder from "./pages/SchemaBuilder";
+import ProfitCenterPage from "./pages/ProfitCenterPage";
+import PricingOptimizerPage from "./pages/PricingOptimizerPage";
+import CustomerRecommendationsPage from "./pages/CustomerRecommendationsPage";
 
 const queryClient = new QueryClient();
 
@@ -188,6 +191,30 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <SchemaBuilder />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profit-center"
+              element={
+                <ProtectedRoute>
+                  <ProfitCenterPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/pricing-optimizer"
+              element={
+                <ProtectedRoute>
+                  <PricingOptimizerPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/customer-recommendations"
+              element={
+                <ProtectedRoute>
+                  <CustomerRecommendationsPage />
                 </ProtectedRoute>
               }
             />

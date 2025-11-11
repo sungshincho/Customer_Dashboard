@@ -17,7 +17,10 @@ import {
   Building2,
   Upload,
   Network,
-  Database
+  Database,
+  Zap,
+  DollarSign,
+  Target
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
@@ -42,6 +45,12 @@ const menuItems = [
   { title: "그래프 분석", url: "/graph-analysis", icon: Network },
   { title: "온톨로지 스키마", url: "/schema-builder", icon: Database },
   { title: "설정", url: "/settings", icon: Settings },
+];
+
+const profitCenterItems = [
+  { title: "통합 대시보드", url: "/profit-center", icon: Zap },
+  { title: "가격 최적화", url: "/pricing-optimizer", icon: DollarSign },
+  { title: "고객 추천", url: "/customer-recommendations", icon: Target },
 ];
 
 const analysisMenuItems = [
@@ -86,6 +95,30 @@ export function AppSidebar() {
                     >
                       <item.icon className="h-5 w-5" />
                       <span>{item.title}</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-sm font-semibold py-2 text-green-600">
+            {!collapsed && <span>💰 Profit Center</span>}
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {profitCenterItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <NavLink 
+                      to={item.url}
+                      className="flex items-center gap-3 text-sidebar-foreground hover:bg-green-500/10 hover:text-green-600 transition-all duration-200 rounded-lg"
+                      activeClassName="bg-gradient-to-r from-green-500 to-emerald-500 text-white font-medium shadow-md"
+                    >
+                      <item.icon className="h-4 w-4" />
+                      <span className="text-sm">{item.title}</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
