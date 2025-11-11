@@ -94,6 +94,148 @@ export type Database = {
           },
         ]
       }
+      data_sync_logs: {
+        Row: {
+          completed_at: string | null
+          error_message: string | null
+          id: string
+          metadata: Json | null
+          records_synced: number | null
+          schedule_id: string
+          started_at: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          records_synced?: number | null
+          schedule_id: string
+          started_at?: string
+          status: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          records_synced?: number | null
+          schedule_id?: string
+          started_at?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_sync_logs_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "data_sync_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      data_sync_schedules: {
+        Row: {
+          created_at: string
+          cron_expression: string
+          data_source_id: string
+          error_message: string | null
+          id: string
+          is_enabled: boolean
+          last_run_at: string | null
+          last_status: string | null
+          next_run_at: string | null
+          schedule_name: string
+          sync_config: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          cron_expression: string
+          data_source_id: string
+          error_message?: string | null
+          id?: string
+          is_enabled?: boolean
+          last_run_at?: string | null
+          last_status?: string | null
+          next_run_at?: string | null
+          schedule_name: string
+          sync_config?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          cron_expression?: string
+          data_source_id?: string
+          error_message?: string | null
+          id?: string
+          is_enabled?: boolean
+          last_run_at?: string | null
+          last_status?: string | null
+          next_run_at?: string | null
+          schedule_name?: string
+          sync_config?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_sync_schedules_data_source_id_fkey"
+            columns: ["data_source_id"]
+            isOneToOne: false
+            referencedRelation: "external_data_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      external_data_sources: {
+        Row: {
+          api_key_encrypted: string | null
+          api_url: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          metadata: Json | null
+          name: string
+          source_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          api_key_encrypted?: string | null
+          api_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          metadata?: Json | null
+          name: string
+          source_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          api_key_encrypted?: string | null
+          api_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          metadata?: Json | null
+          name?: string
+          source_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       graph_entities: {
         Row: {
           created_at: string | null

@@ -41,6 +41,7 @@ import GraphAnalysis from "@/features/data-management/ontology/pages/GraphAnalys
 import SchemaBuilder from "@/features/data-management/ontology/pages/SchemaBuilderPage";
 import Analytics from "@/features/data-management/analysis/pages/AnalyticsPage";
 import NeuralSenseSettingsPage from "@/features/data-management/neuralsense/pages/NeuralSenseSettingsPage";
+import BigDataAPIPage from "@/features/data-management/bigdata/pages/BigDataAPIPage";
 
 const queryClient = new QueryClient();
 
@@ -234,6 +235,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <NeuralSenseSettingsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/bigdata-api"
+              element={
+                <ProtectedRoute>
+                  <BigDataAPIPage />
                 </ProtectedRoute>
               }
             />
