@@ -17,6 +17,79 @@ export const RetailSchemaPreset = () => {
   const queryClient = useQueryClient();
   const [schemaMode, setSchemaMode] = useState<SchemaMode>('merge');
 
+  // 현재 스키마를 버전으로 백업
+  const backupCurrentSchemaMutation = useMutation({
+    mutationFn: async () => {
+      const userId = (await supabase.auth.getUser()).data.user?.id;
+      if (!userId) throw new Error("로그인이 필요합니다");
+
+      // 현재 엔티티 타입 가져오기
+      const { data: entities, error: entError } = await supabase
+        .from('ontology_entity_types')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (entError) throw entError;
+
+      // 현재 관계 타입 가져오기
+      const { data: relations, error: relError } = await supabase
+        .from('ontology_relation_types')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (relError) throw relError;
+
+      // 스키마가 비어있으면 백업 불필요
+      if (!entities || entities.length === 0) {
+        return null;
+      }
+
+      // 가장 높은 버전 번호 가져오기
+      const { data: versions, error: versionError } = await supabase
+        .from('ontology_schema_versions')
+        .select('version_number')
+        .eq('user_id', userId)
+        .order('version_number', { ascending: false })
+        .limit(1);
+
+      if (versionError) throw versionError;
+
+      const nextVersion = versions && versions.length > 0 ? versions[0].version_number + 1 : 1;
+
+      // 현재 스키마를 버전으로 저장
+      const { error: saveError } = await supabase
+        .from('ontology_schema_versions')
+        .insert({
+          user_id: userId,
+          version_number: nextVersion,
+          description: `프리셋 적용 전 자동 백업 (${new Date().toLocaleString('ko-KR')})`,
+          schema_data: {
+            entities: entities.map(e => ({
+              name: e.name,
+              label: e.label,
+              description: e.description,
+              color: e.color,
+              icon: e.icon,
+              properties: e.properties
+            })),
+            relations: relations?.map(r => ({
+              name: r.name,
+              label: r.label,
+              description: r.description,
+              source_entity_type: r.source_entity_type,
+              target_entity_type: r.target_entity_type,
+              directionality: r.directionality,
+              properties: r.properties
+            })) || []
+          }
+        });
+
+      if (saveError) throw saveError;
+
+      return nextVersion;
+    },
+  });
+
   // 기존 스키마 삭제
   const clearSchemaMutation = useMutation({
     mutationFn: async () => {
@@ -47,8 +120,14 @@ export const RetailSchemaPreset = () => {
       const userId = (await supabase.auth.getUser()).data.user?.id;
       if (!userId) throw new Error("로그인이 필요합니다");
 
-      // 프리셋으로 초기화 모드인 경우 기존 스키마 삭제
+      let backupVersion = null;
+
+      // 프리셋으로 초기화 모드인 경우 먼저 백업 후 삭제
       if (schemaMode === 'replace') {
+        // 1. 현재 스키마를 버전으로 백업
+        backupVersion = await backupCurrentSchemaMutation.mutateAsync();
+        
+        // 2. 기존 스키마 삭제
         await clearSchemaMutation.mutateAsync();
       }
       
@@ -217,12 +296,15 @@ export const RetailSchemaPreset = () => {
 
       return { entities, relations: retailRelations };
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['entity-types'] });
       queryClient.invalidateQueries({ queryKey: ['relation-types'] });
+      queryClient.invalidateQueries({ queryKey: ['schema-versions'] });
+      
       const message = schemaMode === 'merge' 
         ? "기존 스키마에 프리셋이 추가되었습니다."
-        : "프리셋 스키마로 새로 시작합니다.";
+        : "이전 스키마는 버전으로 안전하게 백업되었습니다. '스키마 불러오기'에서 복원할 수 있습니다.";
+      
       toast({
         title: "오프라인 리테일 궁극 스키마 생성 완료",
         description: `15개 엔티티 타입과 13개 관계 타입이 생성되었습니다. ${message}`,
@@ -238,7 +320,7 @@ export const RetailSchemaPreset = () => {
     },
   });
 
-  const isLoading = createRetailSchemaMutation.isPending || clearSchemaMutation.isPending;
+  const isLoading = createRetailSchemaMutation.isPending || clearSchemaMutation.isPending || backupCurrentSchemaMutation.isPending;
 
   return (
     <Card className="glass-card border-primary/20">
@@ -320,21 +402,21 @@ export const RetailSchemaPreset = () => {
             </div>
           </div>
           
-          <div className="flex items-start space-x-3 p-4 rounded-lg border-2 border-muted hover:border-destructive/40 transition-colors">
+          <div className="flex items-start space-x-3 p-4 rounded-lg border-2 border-muted hover:border-primary/40 transition-colors">
             <RadioGroupItem value="replace" id="replace" className="mt-0.5" />
             <div className="space-y-1 flex-1">
               <Label htmlFor="replace" className="text-base font-medium cursor-pointer flex items-center gap-2">
-                <RefreshCw className="h-4 w-4 text-destructive" />
-                프리셋으로 새로 시작 (초기화)
+                <RefreshCw className="h-4 w-4 text-primary" />
+                프리셋으로 새로 시작 (자동 백업)
               </Label>
               <p className="text-sm text-muted-foreground">
-                기존 스키마를 모두 삭제하고 프리셋 스키마만으로 시작합니다.
-                표준 프리셋을 베이스로 새 프로젝트를 시작할 때 선택하세요.
+                현재 스키마를 버전으로 자동 백업한 후 프리셋 스키마로 전환합니다.
+                언제든지 '스키마 불러오기'에서 이전 스키마를 복원할 수 있습니다.
               </p>
               {schemaMode === 'replace' && (
-                <div className="flex items-center gap-2 mt-2 text-sm text-destructive">
-                  <AlertTriangle className="h-4 w-4" />
-                  <span className="font-medium">기존 스키마가 모두 삭제됩니다</span>
+                <div className="flex items-center gap-2 mt-2 p-2 rounded bg-primary/10 text-sm text-primary">
+                  <CheckCircle className="h-4 w-4" />
+                  <span className="font-medium">현재 스키마는 자동으로 백업되어 안전합니다</span>
                 </div>
               )}
             </div>
@@ -346,19 +428,19 @@ export const RetailSchemaPreset = () => {
           size="lg"
           onClick={() => createRetailSchemaMutation.mutate()}
           disabled={isLoading}
-          variant={schemaMode === 'replace' ? 'destructive' : 'default'}
         >
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              {schemaMode === 'replace' ? '초기화 및 생성 중...' : '추가 중...'}
+              {backupCurrentSchemaMutation.isPending ? '스키마 백업 중...' : 
+               schemaMode === 'replace' ? '프리셋 생성 중...' : '추가 중...'}
             </>
           ) : (
             <>
               {schemaMode === 'replace' ? (
                 <>
                   <RefreshCw className="mr-2 h-5 w-5" />
-                  프리셋으로 초기화 및 생성
+                  백업 후 프리셋으로 전환
                 </>
               ) : (
                 <>
