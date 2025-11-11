@@ -19,6 +19,7 @@ import {
   UserCheck,
   ChevronDown
 } from "lucide-react";
+import { useState, useEffect } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
@@ -80,11 +81,33 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const location = useLocation();
 
-  // 현재 경로에 따라 섹션 열림 상태 결정
+  // 현재 경로에 따라 초기 섹션 열림 상태 결정
   const isStoreAnalysisActive = storeAnalysisItems.some(item => location.pathname === item.url);
   const isProfitCenterActive = profitCenterItems.some(item => location.pathname === item.url);
   const isCostCenterActive = costCenterItems.some(item => location.pathname === item.url);
   const isDataManagementActive = dataManagementItems.some(item => location.pathname === item.url);
+
+  // 각 섹션의 열림/닫힘 상태를 관리
+  const [storeAnalysisOpen, setStoreAnalysisOpen] = useState<boolean>(true);
+  const [profitCenterOpen, setProfitCenterOpen] = useState<boolean>(true);
+  const [costCenterOpen, setCostCenterOpen] = useState<boolean>(true);
+  const [dataManagementOpen, setDataManagementOpen] = useState<boolean>(false);
+
+  // 경로가 변경될 때 해당 섹션이 닫혀있으면 자동으로 열기
+  useEffect(() => {
+    if (isStoreAnalysisActive && !storeAnalysisOpen) {
+      setStoreAnalysisOpen(true);
+    }
+    if (isProfitCenterActive && !profitCenterOpen) {
+      setProfitCenterOpen(true);
+    }
+    if (isCostCenterActive && !costCenterOpen) {
+      setCostCenterOpen(true);
+    }
+    if (isDataManagementActive && !dataManagementOpen) {
+      setDataManagementOpen(true);
+    }
+  }, [location.pathname]);
 
   return (
     <Sidebar collapsible="icon">
@@ -125,7 +148,7 @@ export function AppSidebar() {
         </SidebarGroup>
 
         {/* Store Analysis 매장 분석 */}
-        <Collapsible defaultOpen={isStoreAnalysisActive} className="group/collapsible">
+        <Collapsible open={storeAnalysisOpen} onOpenChange={setStoreAnalysisOpen} className="group/collapsible">
           <SidebarGroup>
             <SidebarGroupLabel asChild>
               <CollapsibleTrigger className="w-full hover:bg-sidebar-accent/50 rounded-lg transition-colors">
@@ -157,7 +180,7 @@ export function AppSidebar() {
         </Collapsible>
 
         {/* Profit Center 수익 센터 */}
-        <Collapsible defaultOpen={isProfitCenterActive} className="group/collapsible">
+        <Collapsible open={profitCenterOpen} onOpenChange={setProfitCenterOpen} className="group/collapsible">
           <SidebarGroup>
             <SidebarGroupLabel asChild>
               <CollapsibleTrigger className="w-full hover:bg-green-500/5 rounded-lg transition-colors">
@@ -189,7 +212,7 @@ export function AppSidebar() {
         </Collapsible>
 
         {/* Cost Center 비용 센터 */}
-        <Collapsible defaultOpen={isCostCenterActive} className="group/collapsible">
+        <Collapsible open={costCenterOpen} onOpenChange={setCostCenterOpen} className="group/collapsible">
           <SidebarGroup>
             <SidebarGroupLabel asChild>
               <CollapsibleTrigger className="w-full hover:bg-orange-500/5 rounded-lg transition-colors">
@@ -221,7 +244,7 @@ export function AppSidebar() {
         </Collapsible>
 
         {/* Data Management 데이터 관리 */}
-        <Collapsible defaultOpen={isDataManagementActive} className="group/collapsible">
+        <Collapsible open={dataManagementOpen} onOpenChange={setDataManagementOpen} className="group/collapsible">
           <SidebarGroup>
             <SidebarGroupLabel asChild>
               <CollapsibleTrigger 
