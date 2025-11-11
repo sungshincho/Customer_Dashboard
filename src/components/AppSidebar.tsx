@@ -44,28 +44,27 @@ const coreItems = [
   { title: "설정", url: "/settings", icon: Settings },
 ];
 
-// Store Analysis 매장 분석
+// Store Analysis 매장 분석 (순수 데이터 분석)
 const storeAnalysisItems = [
-  { title: "방문자 분석", url: "/footfall-analysis", icon: Users },
+  { title: "방문자 현황", url: "/footfall-analysis", icon: Users },
   { title: "동선 히트맵", url: "/traffic-heatmap", icon: Activity },
-  { title: "고객 여정", url: "/customer-journey", icon: Map },
+  { title: "고객 여정 분석", url: "/customer-journey", icon: Map },
   { title: "전환 퍼널", url: "/conversion-funnel", icon: Filter },
-  { title: "본사-매장 동기화", url: "/hq-store-sync", icon: Building2 },
 ];
 
-// Profit Center 수익 센터
+// Profit Center 수익 센터 (AI 기반 최적화)
 const profitCenterItems = [
   { title: "통합 대시보드", url: "/profit-center", icon: Zap },
   { title: "수요 예측 & 재고", url: "/demand-forecast", icon: TrendingUp },
-  { title: "가격 최적화", url: "/pricing-optimizer", icon: DollarSign },
-  { title: "고객 추천", url: "/customer-recommendations", icon: Target },
+  { title: "AI 가격 최적화", url: "/pricing-optimizer", icon: DollarSign },
+  { title: "AI 고객 추천", url: "/customer-recommendations", icon: Target },
   { title: "레이아웃 시뮬레이터", url: "/layout-simulator", icon: Grid3x3 },
 ];
 
-// Cost Center 비용 센터
+// Cost Center 비용 센터 (효율성 최적화)
 const costCenterItems = [
-  { title: "상품 성과", url: "/product-performance", icon: ShoppingBag },
-  { title: "직원 효율성", url: "/staff-efficiency", icon: UserCheck },
+  { title: "상품 성과 분석", url: "/product-performance", icon: ShoppingBag },
+  { title: "직원 효율성 분석", url: "/staff-efficiency", icon: UserCheck },
 ];
 
 // Data Management 데이터 관리
@@ -121,8 +120,8 @@ export function AppSidebar() {
         <Collapsible defaultOpen className="group/collapsible">
           <SidebarGroup>
             <SidebarGroupLabel asChild>
-              <CollapsibleTrigger className="w-full">
-                <span className="text-sm font-semibold">📊 매장 분석</span>
+              <CollapsibleTrigger className="w-full hover:bg-sidebar-accent/50 rounded-lg transition-colors">
+                <span className="text-sm font-semibold">📊 매장 현황 분석</span>
                 <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
               </CollapsibleTrigger>
             </SidebarGroupLabel>
@@ -153,8 +152,8 @@ export function AppSidebar() {
         <Collapsible defaultOpen className="group/collapsible">
           <SidebarGroup>
             <SidebarGroupLabel asChild>
-              <CollapsibleTrigger className="w-full">
-                <span className="text-sm font-semibold text-green-600">💰 수익 센터</span>
+              <CollapsibleTrigger className="w-full hover:bg-green-500/5 rounded-lg transition-colors">
+                <span className="text-sm font-semibold text-green-600">💰 수익 최적화 (AI)</span>
                 <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
               </CollapsibleTrigger>
             </SidebarGroupLabel>
@@ -185,8 +184,8 @@ export function AppSidebar() {
         <Collapsible defaultOpen className="group/collapsible">
           <SidebarGroup>
             <SidebarGroupLabel asChild>
-              <CollapsibleTrigger className="w-full">
-                <span className="text-sm font-semibold text-orange-600">💸 비용 센터</span>
+              <CollapsibleTrigger className="w-full hover:bg-orange-500/5 rounded-lg transition-colors">
+                <span className="text-sm font-semibold text-orange-600">💸 비용 효율화</span>
                 <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
               </CollapsibleTrigger>
             </SidebarGroupLabel>
@@ -217,7 +216,10 @@ export function AppSidebar() {
         <Collapsible defaultOpen={false} className="group/collapsible">
           <SidebarGroup>
             <SidebarGroupLabel asChild>
-              <CollapsibleTrigger className="w-full">
+              <CollapsibleTrigger 
+                className="w-full hover:bg-blue-500/5 rounded-lg transition-colors"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <span className="text-sm font-semibold text-blue-600">🗄️ 데이터 관리</span>
                 <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
               </CollapsibleTrigger>
