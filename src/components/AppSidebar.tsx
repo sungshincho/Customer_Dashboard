@@ -17,7 +17,8 @@ import {
   ShoppingBag,
   UserCheck,
   ChevronDown,
-  LucideIcon
+  LucideIcon,
+  Cpu
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { NavLink } from "@/components/NavLink";
@@ -117,6 +118,7 @@ const menuSections: MenuSection[] = [
     textColor: "text-blue-600",
     activeGradient: "bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-medium shadow-md",
     items: [
+      { title: "NeuralSense IoT", url: "/neuralsense-settings", icon: Cpu },
       { title: "데이터 임포트", url: "/data-import", icon: Upload },
       { title: "그래프 분석", url: "/graph-analysis", icon: Network },
       { title: "온톨로지 스키마", url: "/schema-builder", icon: Database },

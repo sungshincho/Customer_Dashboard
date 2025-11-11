@@ -40,6 +40,7 @@ import DataImport from "@/features/data-management/import/pages/DataImportPage";
 import GraphAnalysis from "@/features/data-management/ontology/pages/GraphAnalysisPage";
 import SchemaBuilder from "@/features/data-management/ontology/pages/SchemaBuilderPage";
 import Analytics from "@/features/data-management/analysis/pages/AnalyticsPage";
+import NeuralSenseSettingsPage from "@/features/data-management/neuralsense/pages/NeuralSenseSettingsPage";
 
 const queryClient = new QueryClient();
 
@@ -225,6 +226,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <CustomerRecommendationsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/neuralsense-settings"
+              element={
+                <ProtectedRoute>
+                  <NeuralSenseSettingsPage />
                 </ProtectedRoute>
               }
             />

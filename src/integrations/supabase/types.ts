@@ -234,6 +234,63 @@ export type Database = {
           },
         ]
       }
+      neuralsense_devices: {
+        Row: {
+          created_at: string
+          device_id: string
+          device_name: string
+          id: string
+          ip_address: string | null
+          last_seen: string | null
+          location: string | null
+          mac_address: string | null
+          metadata: Json | null
+          probe_interval_seconds: number | null
+          probe_range_meters: number | null
+          raspberry_pi_model: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          wifi_probe_enabled: boolean | null
+        }
+        Insert: {
+          created_at?: string
+          device_id: string
+          device_name: string
+          id?: string
+          ip_address?: string | null
+          last_seen?: string | null
+          location?: string | null
+          mac_address?: string | null
+          metadata?: Json | null
+          probe_interval_seconds?: number | null
+          probe_range_meters?: number | null
+          raspberry_pi_model?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          wifi_probe_enabled?: boolean | null
+        }
+        Update: {
+          created_at?: string
+          device_id?: string
+          device_name?: string
+          id?: string
+          ip_address?: string | null
+          last_seen?: string | null
+          location?: string | null
+          mac_address?: string | null
+          metadata?: Json | null
+          probe_interval_seconds?: number | null
+          probe_range_meters?: number | null
+          raspberry_pi_model?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          wifi_probe_enabled?: boolean | null
+        }
+        Relationships: []
+      }
       ontology_entity_types: {
         Row: {
           color: string | null
@@ -455,6 +512,53 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      wifi_probe_data: {
+        Row: {
+          created_at: string
+          device_id: string
+          device_type: string | null
+          id: string
+          location_zone: string | null
+          mac_address: string
+          metadata: Json | null
+          signal_strength: number | null
+          timestamp: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_id: string
+          device_type?: string | null
+          id?: string
+          location_zone?: string | null
+          mac_address: string
+          metadata?: Json | null
+          signal_strength?: number | null
+          timestamp?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_id?: string
+          device_type?: string | null
+          id?: string
+          location_zone?: string | null
+          mac_address?: string
+          metadata?: Json | null
+          signal_strength?: number | null
+          timestamp?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wifi_probe_data_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "neuralsense_devices"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
