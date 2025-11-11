@@ -9,6 +9,7 @@ import { ComparisonView } from "@/components/analysis/ComparisonView";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const FootfallAnalysis = () => {
+  console.log("=== FootfallAnalysisPage RENDERING - UPDATED VERSION WITHOUT AI ===");
   const [refreshKey, setRefreshKey] = useState(0);
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
