@@ -112,7 +112,7 @@ const menuSections: MenuSection[] = [
     id: "dataManagement",
     label: "데이터 관리",
     emoji: "🗄️",
-    defaultOpen: false,
+    defaultOpen: true,
     hoverColor: "hover:bg-blue-500/5",
     textColor: "text-blue-600",
     activeGradient: "bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-medium shadow-md",
