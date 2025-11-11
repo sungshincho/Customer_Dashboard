@@ -6,30 +6,40 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import Dashboard from "./pages/Dashboard";
-import Stores from "./pages/Stores";
-import Analytics from "./pages/Analytics";
-import Inventory from "./pages/Inventory";
-import Forecasts from "./pages/Forecasts";
-import Settings from "./pages/Settings";
-import Auth from "./pages/Auth";
-import NotFound from "./pages/NotFound";
-import FootfallAnalysis from "./pages/FootfallAnalysis";
-import DemandForecastPage from "./pages/DemandForecastPage";
-import TrafficHeatmapPage from "./pages/TrafficHeatmapPage";
-import ProductPerformancePage from "./pages/ProductPerformancePage";
-import InventoryOptimizerPage from "./pages/InventoryOptimizerPage";
-import LayoutSimulatorPage from "./pages/LayoutSimulatorPage";
-import StaffEfficiencyPage from "./pages/StaffEfficiencyPage";
-import CustomerJourneyPage from "./pages/CustomerJourneyPage";
-import ConversionFunnelPage from "./pages/ConversionFunnelPage";
-import HQStoreSyncPage from "./pages/HQStoreSyncPage";
-import DataImport from "./pages/DataImport";
-import GraphAnalysis from "./pages/GraphAnalysis";
-import SchemaBuilder from "./pages/SchemaBuilder";
-import ProfitCenterPage from "./pages/ProfitCenterPage";
-import PricingOptimizerPage from "./pages/PricingOptimizerPage";
-import CustomerRecommendationsPage from "./pages/CustomerRecommendationsPage";
+
+// Core pages
+import Dashboard from "@/core/pages/DashboardPage";
+import Auth from "@/core/pages/AuthPage";
+import Settings from "@/core/pages/SettingsPage";
+import NotFound from "@/core/pages/NotFoundPage";
+
+// Store Analysis pages
+import FootfallAnalysis from "@/features/store-analysis/footfall/pages/FootfallAnalysisPage";
+import TrafficHeatmapPage from "@/features/store-analysis/footfall/pages/TrafficHeatmapPage";
+import CustomerJourneyPage from "@/features/store-analysis/footfall/pages/CustomerJourneyPage";
+import ConversionFunnelPage from "@/features/store-analysis/footfall/pages/ConversionFunnelPage";
+import Stores from "@/features/store-analysis/stores/pages/StoresPage";
+import HQStoreSyncPage from "@/features/store-analysis/stores/pages/HQStoreSyncPage";
+import Inventory from "@/features/store-analysis/inventory/pages/InventoryPage";
+
+// Profit Center pages
+import ProfitCenterPage from "@/features/profit-center/demand-inventory/pages/ProfitCenterPage";
+import DemandForecastPage from "@/features/profit-center/demand-inventory/pages/DemandForecastPage";
+import Forecasts from "@/features/profit-center/demand-inventory/pages/ForecastsPage";
+import InventoryOptimizerPage from "@/features/profit-center/demand-inventory/pages/InventoryOptimizerPage";
+import PricingOptimizerPage from "@/features/profit-center/pricing/pages/PricingOptimizerPage";
+import CustomerRecommendationsPage from "@/features/profit-center/personalization/pages/CustomerRecommendationsPage";
+import LayoutSimulatorPage from "@/features/profit-center/personalization/pages/LayoutSimulatorPage";
+
+// Cost Center pages
+import ProductPerformancePage from "@/features/cost-center/automation/pages/ProductPerformancePage";
+import StaffEfficiencyPage from "@/features/cost-center/automation/pages/StaffEfficiencyPage";
+
+// Data Management pages
+import DataImport from "@/features/data-management/import/pages/DataImportPage";
+import GraphAnalysis from "@/features/data-management/ontology/pages/GraphAnalysisPage";
+import SchemaBuilder from "@/features/data-management/ontology/pages/SchemaBuilderPage";
+import Analytics from "@/features/data-management/analysis/pages/AnalyticsPage";
 
 const queryClient = new QueryClient();
 
