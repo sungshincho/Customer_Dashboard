@@ -17,3 +17,6 @@ verify_jwt = true
 
 [functions.auto-map-etl]
 verify_jwt = true
+
+[functions.inventory-monitor]
+verify_jwt = true

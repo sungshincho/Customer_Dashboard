@@ -41,6 +41,59 @@ export type Database = {
         }
         Relationships: []
       }
+      auto_order_suggestions: {
+        Row: {
+          created_at: string | null
+          current_stock: number
+          estimated_stockout_date: string | null
+          id: string
+          optimal_stock: number
+          potential_revenue_loss: number | null
+          product_id: string
+          status: string
+          suggested_order_quantity: number
+          updated_at: string | null
+          urgency_level: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          current_stock: number
+          estimated_stockout_date?: string | null
+          id?: string
+          optimal_stock: number
+          potential_revenue_loss?: number | null
+          product_id: string
+          status?: string
+          suggested_order_quantity: number
+          updated_at?: string | null
+          urgency_level: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          current_stock?: number
+          estimated_stockout_date?: string | null
+          id?: string
+          optimal_stock?: number
+          potential_revenue_loss?: number | null
+          product_id?: string
+          status?: string
+          suggested_order_quantity?: number
+          updated_at?: string | null
+          urgency_level?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auto_order_suggestions_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       graph_entities: {
         Row: {
           created_at: string | null
@@ -133,6 +186,50 @@ export type Database = {
             columns: ["target_entity_id"]
             isOneToOne: false
             referencedRelation: "graph_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_levels: {
+        Row: {
+          created_at: string | null
+          current_stock: number
+          id: string
+          last_updated: string | null
+          minimum_stock: number
+          optimal_stock: number
+          product_id: string
+          user_id: string
+          weekly_demand: number
+        }
+        Insert: {
+          created_at?: string | null
+          current_stock?: number
+          id?: string
+          last_updated?: string | null
+          minimum_stock: number
+          optimal_stock: number
+          product_id: string
+          user_id: string
+          weekly_demand?: number
+        }
+        Update: {
+          created_at?: string | null
+          current_stock?: number
+          id?: string
+          last_updated?: string | null
+          minimum_stock?: number
+          optimal_stock?: number
+          product_id?: string
+          user_id?: string
+          weekly_demand?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_levels_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
@@ -242,6 +339,48 @@ export type Database = {
           schema_data?: Json
           user_id?: string
           version_number?: number
+        }
+        Relationships: []
+      }
+      products: {
+        Row: {
+          category: string | null
+          cost_price: number
+          created_at: string | null
+          id: string
+          lead_time_days: number | null
+          name: string
+          selling_price: number
+          sku: string
+          supplier: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          cost_price: number
+          created_at?: string | null
+          id?: string
+          lead_time_days?: number | null
+          name: string
+          selling_price: number
+          sku: string
+          supplier?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          cost_price?: number
+          created_at?: string | null
+          id?: string
+          lead_time_days?: number | null
+          name?: string
+          selling_price?: number
+          sku?: string
+          supplier?: string | null
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }

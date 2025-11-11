@@ -1,12 +1,14 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, TrendingUp, AlertTriangle, DollarSign, Package } from "lucide-react";
+import { RefreshCw, TrendingUp, AlertTriangle, DollarSign, Package, Check, X } from "lucide-react";
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { useRealtimeInventory } from "@/hooks/useRealtimeInventory";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // 통합 데이터 - 수요 예측과 재고를 연결
 const integratedData = [
@@ -72,16 +74,32 @@ const weeklyTrend = [
 ];
 
 const ProfitCenterPage = () => {
-  const [refreshKey, setRefreshKey] = useState(0);
+  const { 
+    inventoryLevels, 
+    orderSuggestions, 
+    isLoading, 
+    triggerMonitoring, 
+    updateSuggestionStatus 
+  } = useRealtimeInventory();
+  
+  const [isMonitoring, setIsMonitoring] = useState(false);
 
-  const handleRefresh = () => {
-    setRefreshKey(prev => prev + 1);
+  const handleMonitoring = async () => {
+    setIsMonitoring(true);
+    try {
+      await triggerMonitoring();
+    } finally {
+      setIsMonitoring(false);
+    }
   };
 
-  const totalRevenueAtRisk = integratedData.reduce((sum, item) => sum + Math.abs(item.revenueImpact), 0);
-  const criticalItems = integratedData.filter(item => item.stockoutRisk === "critical").length;
-  const highRiskItems = integratedData.filter(item => item.stockoutRisk === "high").length;
-  const totalOrderValue = integratedData.reduce((sum, item) => sum + (item.recommendedOrder * 50000), 0);
+  // Calculate metrics from real data
+  const totalRevenueAtRisk = orderSuggestions.reduce((sum, item) => sum + (item.potential_revenue_loss || 0), 0);
+  const criticalItems = orderSuggestions.filter(item => item.urgency_level === "critical").length;
+  const highRiskItems = orderSuggestions.filter(item => item.urgency_level === "high").length;
+  const totalOrderValue = orderSuggestions.reduce((sum, item) => 
+    sum + (item.suggested_order_quantity * (item.products?.cost_price || 0)), 0
+  );
 
   const getRiskBadge = (risk: string) => {
     switch (risk) {
@@ -106,10 +124,12 @@ const ProfitCenterPage = () => {
             <h1 className="text-3xl font-bold gradient-text">Profit Center 통합 대시보드</h1>
             <p className="mt-2 text-muted-foreground">수요 예측 기반 재고 최적화 및 매출 극대화</p>
           </div>
-          <Button onClick={handleRefresh} variant="outline" size="sm">
-            <RefreshCw className="w-4 h-4 mr-2" />
-            새로고침
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={handleMonitoring} variant="outline" size="sm" disabled={isMonitoring}>
+              <RefreshCw className={`w-4 h-4 mr-2 ${isMonitoring ? 'animate-spin' : ''}`} />
+              {isMonitoring ? '모니터링 중...' : '재고 모니터링'}
+            </Button>
+          </div>
         </div>
 
         {/* 핵심 지표 */}
@@ -184,64 +204,90 @@ const ProfitCenterPage = () => {
                 <CardTitle>수요-재고 통합 현황</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-6">
-                  {integratedData.map((item, idx) => (
-                    <div key={idx} className="border rounded-lg p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <h4 className="font-semibold text-lg">{item.product}</h4>
-                          {getRiskBadge(item.stockoutRisk)}
-                          <Badge variant="outline">{item.urgency}</Badge>
-                        </div>
-                        {item.revenueImpact < 0 && (
-                          <div className="text-right">
-                            <p className="text-sm text-destructive font-semibold">
-                              예상 손실: ₩{Math.abs(item.revenueImpact).toLocaleString()}
-                            </p>
+                {isLoading ? (
+                  <div className="space-y-4">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-32 w-full" />
+                    ))}
+                  </div>
+                ) : inventoryLevels.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>재고 데이터가 없습니다</p>
+                    <p className="text-sm mt-2">재고를 추가하고 모니터링을 시작하세요</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {inventoryLevels.map((item, idx) => {
+                      const stockLevel = (item.current_stock / item.optimal_stock) * 100;
+                      const daysUntilStockout = item.weekly_demand > 0 
+                        ? Math.floor(item.current_stock / (item.weekly_demand / 7))
+                        : 999;
+                      
+                      const urgency = item.current_stock <= item.minimum_stock || daysUntilStockout <= 3
+                        ? '긴급'
+                        : stockLevel < 30 || daysUntilStockout <= 7
+                        ? '높음'
+                        : '보통';
+                      
+                      const stockoutRisk = item.current_stock <= item.minimum_stock
+                        ? 'critical'
+                        : stockLevel < 30
+                        ? 'high'
+                        : 'low';
+                      
+                      return (
+                      <div key={idx} className="border rounded-lg p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <h4 className="font-semibold text-lg">{item.products.name}</h4>
+                            {getRiskBadge(stockoutRisk)}
+                            <Badge variant="outline">{urgency}</Badge>
                           </div>
-                        )}
-                      </div>
+                        </div>
 
-                      <div className="grid grid-cols-4 gap-4 text-sm">
-                        <div>
-                          <p className="text-muted-foreground">현재 재고</p>
-                          <p className="font-semibold text-lg">{item.currentStock}개</p>
+                        <div className="grid grid-cols-4 gap-4 text-sm">
+                          <div>
+                            <p className="text-muted-foreground">현재 재고</p>
+                            <p className="font-semibold text-lg">{item.current_stock}개</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">최적 재고</p>
+                            <p className="font-semibold text-lg text-primary">{item.optimal_stock}개</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">주간 수요</p>
+                            <p className="font-semibold text-lg">{item.weekly_demand}개</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">공급업체</p>
+                            <p className="font-medium text-sm">{item.products.supplier || 'N/A'}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-muted-foreground">최적 재고</p>
-                          <p className="font-semibold text-lg text-primary">{item.optimalStock}개</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">예상 수요</p>
-                          <p className="font-semibold text-lg">{item.predictedDemand}개</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">권장 발주</p>
-                          <p className="font-semibold text-lg text-green-600">{item.recommendedOrder}개</p>
-                        </div>
-                      </div>
 
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-xs">
-                          <span>재고 충족률</span>
-                          <span className="font-semibold">
-                            {getStockLevel(item.currentStock, item.optimalStock).toFixed(0)}%
-                          </span>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-xs">
+                            <span>재고 충족률</span>
+                            <span className="font-semibold">
+                              {stockLevel.toFixed(0)}%
+                            </span>
+                          </div>
+                          <Progress 
+                            value={stockLevel} 
+                            className="h-2"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            리드타임: {item.products.lead_time_days}일 | 
+                            {daysUntilStockout < 14 && 
+                              <span className="text-destructive font-semibold"> ⚠️ {daysUntilStockout}일 후 재고 소진 예상</span>
+                            }
+                          </p>
                         </div>
-                        <Progress 
-                          value={getStockLevel(item.currentStock, item.optimalStock)} 
-                          className="h-2"
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          주간 수요: {item.weeklyDemand}개 | 리드타임: {item.leadTime}일 | 
-                          {item.currentStock < item.weeklyDemand * 2 && 
-                            <span className="text-destructive font-semibold"> ⚠️ 2주 이내 재고 소진 예상</span>
-                          }
-                        </p>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    );
+                  })}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -283,35 +329,84 @@ const ProfitCenterPage = () => {
                 <CardTitle>실행 계획 및 자동화</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
-                  <h4 className="font-semibold mb-2 flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5 text-destructive" />
-                    긴급 조치 필요 (24시간 내)
-                  </h4>
-                  <ul className="space-y-2 text-sm">
-                    {integratedData.filter(i => i.stockoutRisk === "critical").map((item, idx) => (
-                      <li key={idx} className="flex items-center justify-between p-2 bg-background rounded">
-                        <span>{item.product}: <strong>{item.recommendedOrder}개</strong> 긴급 발주</span>
-                        <Button size="sm" className="ml-2">발주 요청</Button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                {isLoading ? (
+                  <div className="space-y-4">
+                    <Skeleton className="h-32 w-full" />
+                    <Skeleton className="h-32 w-full" />
+                  </div>
+                ) : orderSuggestions.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>발주 제안이 없습니다</p>
+                    <p className="text-sm mt-2">재고 모니터링을 실행하여 제안을 생성하세요</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
+                      <h4 className="font-semibold mb-2 flex items-center gap-2">
+                        <AlertTriangle className="h-5 w-5 text-destructive" />
+                        긴급 조치 필요 (24시간 내)
+                      </h4>
+                      <ul className="space-y-2 text-sm">
+                        {orderSuggestions.filter(s => s.urgency_level === "critical").map((suggestion) => (
+                          <li key={suggestion.id} className="flex items-center justify-between p-2 bg-background rounded">
+                            <div className="flex-1">
+                              <span>{suggestion.products.name}: <strong>{suggestion.suggested_order_quantity}개</strong> 긴급 발주</span>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                예상 손실: ₩{(suggestion.potential_revenue_loss || 0).toLocaleString()}
+                              </p>
+                            </div>
+                            <div className="flex gap-2 ml-2">
+                              <Button 
+                                size="sm" 
+                                onClick={() => updateSuggestionStatus(suggestion.id, 'approved')}
+                              >
+                                <Check className="h-4 w-4 mr-1" />
+                                승인
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => updateSuggestionStatus(suggestion.id, 'rejected')}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </li>
+                        ))}
+                        {orderSuggestions.filter(s => s.urgency_level === "critical").length === 0 && (
+                          <p className="text-sm text-muted-foreground p-2">긴급 발주 항목이 없습니다</p>
+                        )}
+                      </ul>
+                    </div>
 
-                <div className="p-4 bg-orange-500/5 border border-orange-500/20 rounded-lg">
-                  <h4 className="font-semibold mb-2 flex items-center gap-2">
-                    <Package className="h-5 w-5 text-orange-500" />
-                    주간 발주 계획 (3일 내)
-                  </h4>
-                  <ul className="space-y-2 text-sm">
-                    {integratedData.filter(i => i.stockoutRisk === "high").map((item, idx) => (
-                      <li key={idx} className="flex items-center justify-between p-2 bg-background rounded">
-                        <span>{item.product}: <strong>{item.recommendedOrder}개</strong> 발주 준비</span>
-                        <Button size="sm" variant="outline">예약</Button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                    <div className="p-4 bg-orange-500/5 border border-orange-500/20 rounded-lg">
+                      <h4 className="font-semibold mb-2 flex items-center gap-2">
+                        <Package className="h-5 w-5 text-orange-500" />
+                        주간 발주 계획 (3일 내)
+                      </h4>
+                      <ul className="space-y-2 text-sm">
+                        {orderSuggestions.filter(s => s.urgency_level === "high").map((suggestion) => (
+                          <li key={suggestion.id} className="flex items-center justify-between p-2 bg-background rounded">
+                            <span>{suggestion.products.name}: <strong>{suggestion.suggested_order_quantity}개</strong> 발주 준비</span>
+                            <div className="flex gap-2">
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => updateSuggestionStatus(suggestion.id, 'approved')}
+                              >
+                                승인
+                              </Button>
+                            </div>
+                          </li>
+                        ))}
+                        {orderSuggestions.filter(s => s.urgency_level === "high").length === 0 && (
+                          <p className="text-sm text-muted-foreground p-2">주간 발주 항목이 없습니다</p>
+                        )}
+                      </ul>
+                    </div>
+                  </>
+                )}
 
                 <div className="p-4 border rounded-lg">
                   <h4 className="font-semibold mb-3">🤖 자동화 설정</h4>
