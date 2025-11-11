@@ -5,15 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Store, Loader2, Sparkles, AlertTriangle, CheckCircle } from "lucide-react";
+import { Store, Loader2, Sparkles, AlertTriangle, CheckCircle, Plus, RefreshCw } from "lucide-react";
+
+type SchemaMode = 'merge' | 'replace';
 
 export const RetailSchemaPreset = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [clearExisting, setClearExisting] = useState(true);
+  const [schemaMode, setSchemaMode] = useState<SchemaMode>('merge');
 
   // 기존 스키마 삭제
   const clearSchemaMutation = useMutation({
@@ -45,8 +47,8 @@ export const RetailSchemaPreset = () => {
       const userId = (await supabase.auth.getUser()).data.user?.id;
       if (!userId) throw new Error("로그인이 필요합니다");
 
-      // 기존 스키마 삭제 옵션
-      if (clearExisting) {
+      // 프리셋으로 초기화 모드인 경우 기존 스키마 삭제
+      if (schemaMode === 'replace') {
         await clearSchemaMutation.mutateAsync();
       }
       
@@ -218,9 +220,12 @@ export const RetailSchemaPreset = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['entity-types'] });
       queryClient.invalidateQueries({ queryKey: ['relation-types'] });
+      const message = schemaMode === 'merge' 
+        ? "기존 스키마에 프리셋이 추가되었습니다."
+        : "프리셋 스키마로 새로 시작합니다.";
       toast({
         title: "오프라인 리테일 궁극 스키마 생성 완료",
-        description: "15개 엔티티 타입과 13개 관계 타입이 생성되었습니다.",
+        description: `15개 엔티티 타입과 13개 관계 타입이 생성되었습니다. ${message}`,
       });
     },
     onError: (error: any) => {
@@ -287,48 +292,80 @@ export const RetailSchemaPreset = () => {
           </AlertDescription>
         </Alert>
 
-        <Alert variant="destructive" className="bg-destructive/10 border-destructive/20">
-          <AlertTriangle className="h-4 w-4" />
+        <Alert className="bg-primary/10 border-primary/20">
+          <Sparkles className="h-4 w-4 text-primary" />
           <AlertDescription>
             <div className="space-y-2">
-              <div className="font-medium">중요: 중복 오류 방지</div>
-              <div className="text-sm">
-                이미 같은 이름의 엔티티나 관계가 존재하는 경우 생성이 실패합니다. 
-                기존 스키마를 삭제하고 새로 생성하려면 아래 옵션을 체크하세요.
+              <div className="font-medium text-foreground">스키마 베이스 선택</div>
+              <div className="text-sm text-muted-foreground">
+                작업 방식을 선택하세요. 기존 스키마에 프리셋을 추가하거나, 
+                프리셋 스키마로 새롭게 시작할 수 있습니다.
               </div>
             </div>
           </AlertDescription>
         </Alert>
 
-        <div className="flex items-center space-x-2 p-4 rounded-lg bg-muted/50">
-          <Checkbox
-            id="clear-existing"
-            checked={clearExisting}
-            onCheckedChange={(checked) => setClearExisting(checked as boolean)}
-          />
-          <Label
-            htmlFor="clear-existing"
-            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-          >
-            기존 스키마를 모두 삭제하고 새로 생성
-          </Label>
-        </div>
+        <RadioGroup value={schemaMode} onValueChange={(value) => setSchemaMode(value as SchemaMode)} className="space-y-3">
+          <div className="flex items-start space-x-3 p-4 rounded-lg border-2 border-primary/20 bg-card hover:border-primary/40 transition-colors">
+            <RadioGroupItem value="merge" id="merge" className="mt-0.5" />
+            <div className="space-y-1 flex-1">
+              <Label htmlFor="merge" className="text-base font-medium cursor-pointer flex items-center gap-2">
+                <Plus className="h-4 w-4 text-primary" />
+                기존 스키마에 프리셋 추가 (병합)
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                현재 작업 중인 스키마를 유지하고 프리셋 엔티티와 관계를 추가합니다.
+                커스텀 스키마와 표준 프리셋을 함께 활용할 때 선택하세요.
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-start space-x-3 p-4 rounded-lg border-2 border-muted hover:border-destructive/40 transition-colors">
+            <RadioGroupItem value="replace" id="replace" className="mt-0.5" />
+            <div className="space-y-1 flex-1">
+              <Label htmlFor="replace" className="text-base font-medium cursor-pointer flex items-center gap-2">
+                <RefreshCw className="h-4 w-4 text-destructive" />
+                프리셋으로 새로 시작 (초기화)
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                기존 스키마를 모두 삭제하고 프리셋 스키마만으로 시작합니다.
+                표준 프리셋을 베이스로 새 프로젝트를 시작할 때 선택하세요.
+              </p>
+              {schemaMode === 'replace' && (
+                <div className="flex items-center gap-2 mt-2 text-sm text-destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span className="font-medium">기존 스키마가 모두 삭제됩니다</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </RadioGroup>
 
         <Button
           className="w-full"
           size="lg"
           onClick={() => createRetailSchemaMutation.mutate()}
           disabled={isLoading}
+          variant={schemaMode === 'replace' ? 'destructive' : 'default'}
         >
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              생성 중...
+              {schemaMode === 'replace' ? '초기화 및 생성 중...' : '추가 중...'}
             </>
           ) : (
             <>
-              <Store className="mr-2 h-5 w-5" />
-              오프라인 리테일 궁극 스키마 생성
+              {schemaMode === 'replace' ? (
+                <>
+                  <RefreshCw className="mr-2 h-5 w-5" />
+                  프리셋으로 초기화 및 생성
+                </>
+              ) : (
+                <>
+                  <Plus className="mr-2 h-5 w-5" />
+                  프리셋 추가
+                </>
+              )}
             </>
           )}
         </Button>
