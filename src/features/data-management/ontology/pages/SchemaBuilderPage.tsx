@@ -14,6 +14,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Layers, Link2, History, ShieldCheck, Network, Download, Loader2 } from "lucide-react";
+import { RetailSchemaPreset } from "@/features/data-management/ontology/components/RetailSchemaPreset";
 
 const SchemaBuilder = () => {
   const { toast } = useToast();
@@ -110,6 +111,9 @@ const SchemaBuilder = () => {
 
         {/* 검증 결과 */}
         <SchemaValidator />
+
+        {/* 오프라인 리테일 궁극 스키마 프리셋 */}
+        <RetailSchemaPreset />
 
         {/* 스키마 불러오기 UI */}
         <Card className="glass-card">
