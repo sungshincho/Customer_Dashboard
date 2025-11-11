@@ -1,5 +1,5 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { ConversionFunnel } from "@/components/features";
+import { ConversionFunnel } from "@/features/store-analysis/footfall/components/ConversionFunnel";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 import { useState } from "react";

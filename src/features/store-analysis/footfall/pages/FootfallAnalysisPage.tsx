@@ -1,5 +1,5 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { FootfallVisualizer } from "@/components/features";
+import { FootfallVisualizer } from "@/features/store-analysis/footfall/components/FootfallVisualizer";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 import { useState } from "react";

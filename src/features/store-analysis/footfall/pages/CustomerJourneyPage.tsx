@@ -1,5 +1,5 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { CustomerJourney } from "@/components/features";
+import { CustomerJourney } from "@/features/store-analysis/footfall/components/CustomerJourney";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 import { useState } from "react";

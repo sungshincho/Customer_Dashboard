@@ -1,5 +1,5 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { InventoryOptimizer } from "@/components/features";
+import { InventoryOptimizer } from "@/features/profit-center/demand-inventory/components/InventoryOptimizer";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 import { useState } from "react";

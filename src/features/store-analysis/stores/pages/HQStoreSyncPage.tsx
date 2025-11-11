@@ -1,5 +1,5 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { HQStoreSync } from "@/components/features";
+import { HQStoreSync } from "@/features/store-analysis/stores/components/HQStoreSync";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 import { useState } from "react";

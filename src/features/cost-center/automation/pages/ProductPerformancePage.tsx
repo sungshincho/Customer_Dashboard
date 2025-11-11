@@ -1,5 +1,5 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { ProductPerformance } from "@/components/features";
+import { ProductPerformance } from "@/features/cost-center/automation/components/ProductPerformance";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 import { useState } from "react";

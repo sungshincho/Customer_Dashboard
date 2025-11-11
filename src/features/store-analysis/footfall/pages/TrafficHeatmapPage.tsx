@@ -1,5 +1,5 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { TrafficHeatmap } from "@/components/features";
+import { TrafficHeatmap } from "@/features/store-analysis/footfall/components/TrafficHeatmap";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 import { useState } from "react";

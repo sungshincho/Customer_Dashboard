@@ -1,5 +1,5 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { DemandForecast } from "@/components/features";
+import { DemandForecast } from "@/features/profit-center/demand-inventory/components/DemandForecast";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 import { useState } from "react";

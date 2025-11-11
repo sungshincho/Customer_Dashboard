@@ -1,5 +1,5 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { LayoutSimulator } from "@/components/features";
+import { LayoutSimulator } from "@/features/profit-center/personalization/components/LayoutSimulator";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 import { useState } from "react";
