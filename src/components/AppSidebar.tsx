@@ -125,7 +125,7 @@ export function AppSidebar() {
         </SidebarGroup>
 
         {/* Store Analysis 매장 분석 */}
-        <Collapsible open={isStoreAnalysisActive} defaultOpen className="group/collapsible">
+        <Collapsible defaultOpen={isStoreAnalysisActive} className="group/collapsible">
           <SidebarGroup>
             <SidebarGroupLabel asChild>
               <CollapsibleTrigger className="w-full hover:bg-sidebar-accent/50 rounded-lg transition-colors">
@@ -157,7 +157,7 @@ export function AppSidebar() {
         </Collapsible>
 
         {/* Profit Center 수익 센터 */}
-        <Collapsible open={isProfitCenterActive} defaultOpen className="group/collapsible">
+        <Collapsible defaultOpen={isProfitCenterActive} className="group/collapsible">
           <SidebarGroup>
             <SidebarGroupLabel asChild>
               <CollapsibleTrigger className="w-full hover:bg-green-500/5 rounded-lg transition-colors">
@@ -189,7 +189,7 @@ export function AppSidebar() {
         </Collapsible>
 
         {/* Cost Center 비용 센터 */}
-        <Collapsible open={isCostCenterActive} defaultOpen className="group/collapsible">
+        <Collapsible defaultOpen={isCostCenterActive} className="group/collapsible">
           <SidebarGroup>
             <SidebarGroupLabel asChild>
               <CollapsibleTrigger className="w-full hover:bg-orange-500/5 rounded-lg transition-colors">
@@ -221,7 +221,7 @@ export function AppSidebar() {
         </Collapsible>
 
         {/* Data Management 데이터 관리 */}
-        <Collapsible open={isDataManagementActive} defaultOpen={false} className="group/collapsible">
+        <Collapsible defaultOpen={isDataManagementActive} className="group/collapsible">
           <SidebarGroup>
             <SidebarGroupLabel asChild>
               <CollapsibleTrigger 
