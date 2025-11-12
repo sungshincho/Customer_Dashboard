@@ -1120,6 +1120,809 @@ NEURALTWIN 프로젝트에 3D 디지털트윈을 통합하는 가장 효율적�
 
 ---
 
-**문서 버전**: 1.0  
-**최종 수정**: 2025-01-12  
+**문서 버전**: 2.0  
+**최종 수정**: 2025-11-12  
 **작성자**: NEURALTWIN Development Team
+
+---
+
+## 🚀 React Three Fiber (R3F) 심화 구현 가이드
+
+### 왜 React Three Fiber인가?
+
+#### ✅ Lovable Cloud와 완벽 통합
+```typescript
+// Supabase 실시간 데이터 → React 상태 → Three.js 렌더링
+// 별도 백엔드 불필요, Edge Function 활용 가능
+import { supabase } from '@/integrations/supabase/client';
+
+const channel = supabase.channel('3d-updates')
+  .on('postgres_changes', { event: '*', schema: 'public' }, 
+    (payload) => update3DScene(payload))
+  .subscribe();
+```
+
+#### ✅ 즉시 프로토타입 가능
+- 기존 NEURALTWIN React 코드베이스에 바로 통합
+- `npm install` 후 30분 내 첫 3D 씬 구동
+- Hot Module Replacement (HMR) 지원
+
+#### ✅ 비용 효율적 (거의 무료)
+| 항목 | 비용 | 비고 |
+|------|------|------|
+| R3F 라이브러리 | $0 | MIT 라이선스 |
+| 호스팅 | $0 | Lovable Cloud 포함 |
+| 3D 에셋 CDN | $2-5/월 | Supabase Storage |
+| Edge Functions | $0 | 무료 티어 충분 |
+
+#### ✅ React 개발자 친화적
+```tsx
+// Three.js 원본 (명령형)
+const geometry = new THREE.BoxGeometry(1, 1, 1);
+const material = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+const cube = new THREE.Mesh(geometry, material);
+scene.add(cube);
+
+// React Three Fiber (선언형)
+<mesh>
+  <boxGeometry args={[1, 1, 1]} />
+  <meshStandardMaterial color="green" />
+</mesh>
+```
+
+#### ✅ 충분한 시각적 품질
+- PBR (Physically Based Rendering) 지원
+- 실시간 그림자, 반사, 굴절
+- Post-processing 효과 (Bloom, DOF, SSAO)
+- 4K 텍스처 지원
+
+#### ✅ 무한 확장 가능
+- 클라이언트 렌더링 → 서버 부하 0
+- 사용자 100명이든 10,000명이든 동일 비용
+- CDN 캐싱으로 전 세계 저지연
+
+---
+
+## 📦 프로젝트 설정 (Step-by-Step)
+
+### 1. 패키지 설치
+```bash
+# React Three Fiber 코어
+npm install @react-three/fiber@^8.18.0 three@^0.133.0
+
+# 유틸리티 (필수)
+npm install @react-three/drei@^9.122.0
+
+# 선택적 (추천)
+npm install @react-three/postprocessing@^2.16.0  # 후처리 효과
+npm install zustand@^4.5.0                       # 상태관리
+npm install @react-spring/three@^9.7.0           # 애니메이션
+npm install leva@^0.9.35                         # 디버깅 GUI
+
+# 타입 정의 (TypeScript)
+npm install --save-dev @types/three
+```
+
+### 2. 프로젝트 구조
+```
+src/
+├── features/
+│   └── digital-twin-3d/
+│       ├── components/
+│       │   ├── TrafficHeatmap3D.tsx      # 히트맵 컴포넌트
+│       │   ├── LayoutSimulator3D.tsx     # 레이아웃 시뮬레이터
+│       │   ├── FootfallVisualizer3D.tsx  # 발걸음 분석
+│       │   └── shared/
+│       │       ├── StoreModel.tsx        # 매장 3D 모델
+│       │       ├── Controls.tsx          # 카메라 컨트롤
+│       │       └── Lighting.tsx          # 조명 설정
+│       ├── hooks/
+│       │   ├── useRealtimeTraffic.ts     # 실시간 데이터
+│       │   ├── useStore3D.ts             # Zustand 스토어
+│       │   └── useGLTFLoader.ts          # 3D 에셋 로딩
+│       ├── materials/
+│       │   ├── HeatmapMaterial.tsx       # 커스텀 쉐이더
+│       │   └── TrailMaterial.tsx         # 동선 트레일
+│       ├── utils/
+│       │   ├── coordinateMapper.ts       # 2D ↔ 3D 변환
+│       │   └── performanceMonitor.ts     # FPS 모니터링
+│       └── pages/
+│           └── DigitalTwin3DPage.tsx     # 메인 페이지
+└── public/
+    └── models/
+        ├── store-base.glb                # 매장 구조
+        ├── products/                     # 제품 모델들
+        └── textures/                     # 텍스처
+```
+
+---
+
+## 🎨 기본 3D 씬 구성
+
+### 최소 실행 가능한 예제
+```tsx
+// src/features/digital-twin-3d/components/BasicScene.tsx
+import { Canvas } from '@react-three/fiber';
+import { OrbitControls, Environment } from '@react-three/drei';
+
+export const BasicScene = () => {
+  return (
+    <div style={{ width: '100vw', height: '100vh' }}>
+      <Canvas
+        camera={{ position: [10, 10, 10], fov: 50 }}
+        shadows
+      >
+        {/* 조명 */}
+        <ambientLight intensity={0.3} />
+        <directionalLight 
+          position={[10, 10, 5]} 
+          intensity={1} 
+          castShadow 
+        />
+
+        {/* 매장 바닥 */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+          <planeGeometry args={[50, 50]} />
+          <meshStandardMaterial color="#cccccc" />
+        </mesh>
+
+        {/* 샘플 제품 박스 */}
+        <mesh position={[0, 0.5, 0]} castShadow>
+          <boxGeometry args={[1, 1, 1]} />
+          <meshStandardMaterial color="orange" />
+        </mesh>
+
+        {/* 카메라 컨트롤 */}
+        <OrbitControls />
+
+        {/* 환경 조명 */}
+        <Environment preset="sunset" />
+      </Canvas>
+    </div>
+  );
+};
+```
+
+### Lovable 프로젝트에 통합
+```tsx
+// src/features/digital-twin-3d/pages/DigitalTwin3DPage.tsx
+import { DashboardLayout } from "@/components/DashboardLayout";
+import { BasicScene } from "../components/BasicScene";
+
+const DigitalTwin3DPage = () => {
+  return (
+    <DashboardLayout>
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold gradient-text">
+          3D 디지털 트윈
+        </h1>
+        <div className="h-[600px] rounded-lg overflow-hidden border border-border">
+          <BasicScene />
+        </div>
+      </div>
+    </DashboardLayout>
+  );
+};
+
+export default DigitalTwin3DPage;
+```
+
+---
+
+## 🔥 실전 예제: TrafficHeatmap 3D
+
+### 1. 데이터 구조 정의
+```typescript
+// src/features/digital-twin-3d/types/heatmap.ts
+export interface HeatmapPoint {
+  x: number;
+  y: number;
+  intensity: number; // 0-1
+  timestamp: Date;
+}
+
+export interface ZoneData {
+  id: string;
+  center: { x: number; y: number };
+  radius: number;
+  visitCount: number;
+  avgDwellTime: number; // 초
+}
+```
+
+### 2. 실시간 데이터 Hook
+```typescript
+// src/features/digital-twin-3d/hooks/useRealtimeTraffic.ts
+import { useEffect, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { HeatmapPoint } from '../types/heatmap';
+
+export const useRealtimeTraffic = (storeId: string) => {
+  const [heatmapData, setHeatmapData] = useState<HeatmapPoint[]>([]);
+
+  useEffect(() => {
+    // 초기 데이터 로드
+    const loadInitialData = async () => {
+      const { data } = await supabase
+        .from('traffic_logs')
+        .select('zone_x, zone_y, dwell_time')
+        .eq('store_id', storeId)
+        .gte('timestamp', new Date(Date.now() - 3600000).toISOString());
+
+      if (data) {
+        const points = data.map(d => ({
+          x: d.zone_x,
+          y: d.zone_y,
+          intensity: Math.min(d.dwell_time / 300, 1),
+          timestamp: new Date()
+        }));
+        setHeatmapData(points);
+      }
+    };
+
+    loadInitialData();
+
+    // 실시간 구독
+    const channel = supabase
+      .channel(`traffic-${storeId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'traffic_logs',
+          filter: `store_id=eq.${storeId}`
+        },
+        (payload: any) => {
+          const newPoint: HeatmapPoint = {
+            x: payload.new.zone_x,
+            y: payload.new.zone_y,
+            intensity: Math.min(payload.new.dwell_time / 300, 1),
+            timestamp: new Date(payload.new.timestamp)
+          };
+          setHeatmapData(prev => [...prev.slice(-500), newPoint]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [storeId]);
+
+  return heatmapData;
+};
+```
+
+### 3. 커스텀 히트맵 쉐이더
+```tsx
+// src/features/digital-twin-3d/materials/HeatmapMaterial.tsx
+import { useMemo } from 'react';
+import * as THREE from 'three';
+import { HeatmapPoint } from '../types/heatmap';
+
+interface HeatmapMaterialProps {
+  data: HeatmapPoint[];
+  mapWidth: number;
+  mapHeight: number;
+}
+
+export const HeatmapMaterial = ({ 
+  data, 
+  mapWidth, 
+  mapHeight 
+}: HeatmapMaterialProps) => {
+  const texture = useMemo(() => {
+    // Canvas로 히트맵 텍스처 생성
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d')!;
+
+    // 배경 투명
+    ctx.clearRect(0, 0, 512, 512);
+
+    // 각 포인트를 그라디언트로 그리기
+    data.forEach(point => {
+      const x = (point.x / mapWidth) * 512;
+      const y = (point.y / mapHeight) * 512;
+      const radius = 30 * point.intensity;
+
+      const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+      gradient.addColorStop(0, `rgba(255, 0, 0, ${point.intensity})`);
+      gradient.addColorStop(0.5, `rgba(255, 255, 0, ${point.intensity * 0.5})`);
+      gradient.addColorStop(1, 'rgba(0, 0, 255, 0)');
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+    });
+
+    // Three.js 텍스처로 변환
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.needsUpdate = true;
+    return tex;
+  }, [data, mapWidth, mapHeight]);
+
+  return (
+    <meshStandardMaterial 
+      map={texture} 
+      transparent 
+      opacity={0.8}
+      emissive="#ffffff"
+      emissiveIntensity={0.5}
+    />
+  );
+};
+```
+
+### 4. TrafficHeatmap3D 컴포넌트
+```tsx
+// src/features/digital-twin-3d/components/TrafficHeatmap3D.tsx
+import { Canvas } from '@react-three/fiber';
+import { OrbitControls, Environment, Text } from '@react-three/drei';
+import { useRealtimeTraffic } from '../hooks/useRealtimeTraffic';
+import { HeatmapMaterial } from '../materials/HeatmapMaterial';
+
+interface TrafficHeatmap3DProps {
+  storeId: string;
+}
+
+export const TrafficHeatmap3D = ({ storeId }: TrafficHeatmap3DProps) => {
+  const heatmapData = useRealtimeTraffic(storeId);
+
+  return (
+    <Canvas camera={{ position: [25, 30, 25], fov: 50 }} shadows>
+      {/* 조명 */}
+      <ambientLight intensity={0.5} />
+      <directionalLight position={[10, 20, 10]} intensity={1} castShadow />
+
+      {/* 매장 바닥 (50m × 50m) */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[50, 50]} />
+        <meshStandardMaterial color="#1a1a1a" />
+      </mesh>
+
+      {/* 히트맵 오버레이 */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
+        <planeGeometry args={[50, 50]} />
+        <HeatmapMaterial data={heatmapData} mapWidth={50} mapHeight={50} />
+      </mesh>
+
+      {/* 구역 라벨 */}
+      <group>
+        <Text
+          position={[-15, 0.5, -15]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          fontSize={1.5}
+          color="white"
+        >
+          입구
+        </Text>
+        <Text
+          position={[15, 0.5, 15]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          fontSize={1.5}
+          color="white"
+        >
+          계산대
+        </Text>
+      </group>
+
+      {/* 카메라 컨트롤 */}
+      <OrbitControls 
+        maxPolarAngle={Math.PI / 2.5}
+        minDistance={10}
+        maxDistance={100}
+      />
+
+      <Environment preset="city" />
+    </Canvas>
+  );
+};
+```
+
+### 5. UI 통합 (시간 슬라이더 추가)
+```tsx
+// src/features/digital-twin-3d/pages/TrafficHeatmap3DPage.tsx
+import { useState } from 'react';
+import { DashboardLayout } from "@/components/DashboardLayout";
+import { TrafficHeatmap3D } from "../components/TrafficHeatmap3D";
+import { Slider } from "@/components/ui/slider";
+import { Card } from "@/components/ui/card";
+
+const TrafficHeatmap3DPage = () => {
+  const [timeOfDay, setTimeOfDay] = useState(12); // 0-23시
+
+  return (
+    <DashboardLayout>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold gradient-text">
+            3D 트래픽 히트맵
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            실시간 고객 동선 분석
+          </p>
+        </div>
+
+        <Card className="p-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              시간대: {timeOfDay}:00
+            </label>
+            <Slider
+              value={[timeOfDay]}
+              onValueChange={([value]) => setTimeOfDay(value)}
+              min={0}
+              max={23}
+              step={1}
+            />
+          </div>
+        </Card>
+
+        <div className="h-[700px] rounded-lg overflow-hidden border border-border">
+          <TrafficHeatmap3D storeId="store-001" />
+        </div>
+
+        {/* 범례 */}
+        <Card className="p-4">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-blue-500 rounded" />
+              <span className="text-sm">낮은 트래픽</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-yellow-500 rounded" />
+              <span className="text-sm">중간 트래픽</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-red-500 rounded" />
+              <span className="text-sm">높은 트래픽</span>
+            </div>
+          </div>
+        </Card>
+      </div>
+    </DashboardLayout>
+  );
+};
+
+export default TrafficHeatmap3DPage;
+```
+
+---
+
+## 🎮 LayoutSimulator 3D - 드래그 앤 드롭
+
+### 1. Raycasting으로 3D 오브젝트 선택
+```tsx
+// src/features/digital-twin-3d/components/DraggableProduct.tsx
+import { useRef, useState } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
+import * as THREE from 'three';
+
+interface DraggableProductProps {
+  position: [number, number, number];
+  productId: string;
+  onDragEnd: (newPosition: [number, number, number]) => void;
+}
+
+export const DraggableProduct = ({ 
+  position, 
+  productId, 
+  onDragEnd 
+}: DraggableProductProps) => {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState(new THREE.Vector3());
+  const { camera, raycaster, pointer } = useThree();
+
+  const handlePointerDown = (e: any) => {
+    e.stopPropagation();
+    setIsDragging(true);
+    
+    // 마우스와 오브젝트 간 오프셋 계산
+    const point = e.point;
+    const offset = new THREE.Vector3().subVectors(
+      meshRef.current!.position,
+      point
+    );
+    setDragOffset(offset);
+  };
+
+  const handlePointerUp = () => {
+    if (isDragging) {
+      setIsDragging(false);
+      const pos = meshRef.current!.position;
+      onDragEnd([pos.x, pos.y, pos.z]);
+    }
+  };
+
+  useFrame(() => {
+    if (isDragging && meshRef.current) {
+      // 바닥 평면과의 교차점 계산
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+      const intersectPoint = new THREE.Vector3();
+      
+      raycaster.ray.intersectPlane(plane, intersectPoint);
+      
+      if (intersectPoint) {
+        // 그리드 스냅 (1m 단위)
+        const snappedX = Math.round(intersectPoint.x + dragOffset.x);
+        const snappedZ = Math.round(intersectPoint.z + dragOffset.z);
+        
+        meshRef.current.position.set(snappedX, 0.5, snappedZ);
+      }
+    }
+  });
+
+  return (
+    <mesh
+      ref={meshRef}
+      position={position}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      castShadow
+    >
+      <boxGeometry args={[1, 1, 1]} />
+      <meshStandardMaterial 
+        color={isDragging ? "#ff6b6b" : "#4ecdc4"} 
+        emissive={isDragging ? "#ff0000" : "#000000"}
+        emissiveIntensity={isDragging ? 0.5 : 0}
+      />
+    </mesh>
+  );
+};
+```
+
+### 2. 레이아웃 상태 관리 (Zustand)
+```typescript
+// src/features/digital-twin-3d/hooks/useStore3D.ts
+import create from 'zustand';
+import { supabase } from '@/integrations/supabase/client';
+
+interface Product {
+  id: string;
+  position: [number, number, number];
+  rotation: [number, number, number];
+  category: string;
+}
+
+interface Store3DState {
+  products: Product[];
+  updateProductPosition: (id: string, position: [number, number, number]) => void;
+  loadLayout: (layoutId: string) => Promise<void>;
+  saveLayout: () => Promise<void>;
+}
+
+export const useStore3D = create<Store3DState>((set, get) => ({
+  products: [],
+  
+  updateProductPosition: (id, position) => {
+    set(state => ({
+      products: state.products.map(p =>
+        p.id === id ? { ...p, position } : p
+      )
+    }));
+  },
+
+  loadLayout: async (layoutId) => {
+    const { data } = await supabase
+      .from('store_layouts')
+      .select('products')
+      .eq('id', layoutId)
+      .single();
+    
+    if (data) {
+      set({ products: data.products });
+    }
+  },
+
+  saveLayout: async () => {
+    const { products } = get();
+    await supabase
+      .from('store_layouts')
+      .upsert({ 
+        id: 'current-layout', 
+        products,
+        updated_at: new Date().toISOString()
+      });
+  }
+}));
+```
+
+---
+
+## ⚡ 성능 최적화 기법
+
+### 1. Instanced Rendering (100+ 오브젝트)
+```tsx
+// src/features/digital-twin-3d/components/FootfallAvatars.tsx
+import { Instances, Instance } from '@react-three/drei';
+import { useRealtimeVisitors } from '../hooks/useRealtimeVisitors';
+
+export const FootfallAvatars = ({ storeId }: { storeId: string }) => {
+  const visitors = useRealtimeVisitors(storeId);
+
+  return (
+    <Instances limit={1000}>
+      <cylinderGeometry args={[0.3, 0.3, 1.8, 8]} />
+      <meshStandardMaterial color="#4ecdc4" />
+      
+      {visitors.map(visitor => (
+        <Instance 
+          key={visitor.id} 
+          position={[visitor.x, 0.9, visitor.y]}
+          color={visitor.type === 'new' ? '#ff6b6b' : '#4ecdc4'}
+        />
+      ))}
+    </Instances>
+  );
+};
+```
+
+### 2. LOD (Level of Detail)
+```tsx
+import { Lod } from '@react-three/drei';
+
+<Lod distances={[0, 15, 30]}>
+  {/* 가까울 때: 고품질 모델 */}
+  <mesh geometry={highDetailModel} material={highDetailMaterial} />
+  
+  {/* 중간 거리: 중품질 */}
+  <mesh geometry={midDetailModel} material={midDetailMaterial} />
+  
+  {/* 멀 때: 저품질 */}
+  <mesh geometry={lowDetailModel} material={lowDetailMaterial} />
+</Lod>
+```
+
+### 3. 프레임레이트 모니터링
+```tsx
+import { Perf } from 'r3f-perf';
+
+<Canvas>
+  {process.env.NODE_ENV === 'development' && <Perf position="top-left" />}
+  {/* 나머지 씬 */}
+</Canvas>
+```
+
+---
+
+## 🐛 문제 해결 가이드
+
+### Q1: 화면이 검게 나와요
+**원인**: 조명 부족 또는 카메라 위치 문제
+```tsx
+// 해결: 기본 조명 추가
+<ambientLight intensity={0.5} />
+<directionalLight position={[10, 10, 5]} intensity={1} />
+```
+
+### Q2: 마우스 인터랙션이 안 돼요
+**원인**: `onPointerDown` 이벤트가 작동하지 않음
+```tsx
+// 해결: Canvas에 events 설정 확인
+<Canvas events={(state) => state.events}>
+  {/* ... */}
+</Canvas>
+```
+
+### Q3: 모바일에서 성능이 느려요
+**원인**: 과도한 폴리곤 수
+```tsx
+// 해결: 모바일 감지 및 품질 하향
+import { isMobile } from 'react-device-detect';
+
+<Canvas 
+  dpr={isMobile ? [1, 1.5] : [1, 2]} 
+  performance={{ min: 0.5 }}
+>
+```
+
+### Q4: glTF 모델 로딩이 느려요
+**원인**: 압축되지 않은 파일
+```bash
+# 해결: glTF-Transform으로 최적화
+npx gltf-transform optimize input.glb output.glb \
+  --texture-compress webp
+```
+
+---
+
+## 🚀 배포 체크리스트
+
+### Production Build 최적화
+```typescript
+// vite.config.ts
+export default {
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'three-vendor': ['three', '@react-three/fiber', '@react-three/drei']
+        }
+      }
+    }
+  }
+}
+```
+
+### 3D 에셋 CDN 설정
+```typescript
+// Supabase Storage에 업로드
+const { data } = await supabase.storage
+  .from('3d-assets')
+  .upload('models/store.glb', file, {
+    cacheControl: '3600',
+    upsert: false
+  });
+
+// Public URL 획득
+const { data: publicURL } = supabase.storage
+  .from('3d-assets')
+  .getPublicUrl('models/store.glb');
+```
+
+### 로딩 스피너 추가
+```tsx
+import { Suspense } from 'react';
+import { Loader } from '@react-three/drei';
+
+<Suspense fallback={<Loader />}>
+  <Canvas>
+    {/* 3D 씬 */}
+  </Canvas>
+</Suspense>
+```
+
+---
+
+## 💡 핵심 성공 요인
+
+### 1. 기술적 장점
+- **React 생태계 통합**: 기존 컴포넌트와 seamless 통합
+- **타입 안정성**: TypeScript 완벽 지원
+- **디버깅 용이**: React DevTools로 3D 씬 디버깅
+
+### 2. 비즈니스 장점
+- **빠른 시장 출시**: MVP 2주 내 가능
+- **낮은 진입 장벽**: React 개발자라면 즉시 시작 가능
+- **예측 가능한 비용**: 사용자 증가해도 비용 선형적 증가 없음
+
+### 3. 확장성
+- **점진적 개선**: 간단한 박스부터 시작해 고품질 모델로 업그레이드
+- **플러그인 생태계**: Drei, Postprocessing 등 풍부한 라이브러리
+- **커뮤니티 지원**: Poimandres Discord, GitHub Discussions 활발
+
+---
+
+## 📚 다음 단계
+
+### 즉시 시작 가능한 액션
+
+1. **환경 설정 (1시간)**
+   ```bash
+   cd neuraltwin-project
+   npm install @react-three/fiber@^8.18 @react-three/drei@^9.122 three@^0.133
+   ```
+
+2. **첫 3D 씬 구현 (2시간)**
+   - BasicScene 컴포넌트 생성
+   - TrafficHeatmap3DPage 라우팅 추가
+
+3. **실시간 데이터 연동 (1일)**
+   - useRealtimeTraffic hook 구현
+   - Supabase 채널 구독
+
+4. **프로토타입 완성 (1주)**
+   - TrafficHeatmap 3D 완성
+   - 내부 데모
+
+### 학습 리소스
+- [React Three Fiber 공식 문서](https://docs.pmnd.rs/react-three-fiber)
+- [Drei 컴포넌트 가이드](https://github.com/pmndrs/drei)
+- [Three.js Journey 강의](https://threejs-journey.com/)
+
+---
+
+**이 가이드대로 시작하면 1-2주 내 첫 3D 디지털 트윈 프로토타입을 Lovable Cloud에서 구동할 수 있습니다!** 🚀
