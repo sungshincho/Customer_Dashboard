@@ -32,17 +32,32 @@ src/
 │   │   │       ├── StoreHeatmap.tsx
 │   │   │       ├── WTPAnalysisView.tsx
 │   │   │       └── ZoneContribution.tsx
-│   │   └── ontology/
+│   │   ├── ontology/
+│   │   │   ├── pages/
+│   │   │   │   ├── SchemaBuilderPage.tsx
+│   │   │   │   └── GraphAnalysisPage.tsx
+│   │   │   └── components/
+│   │   │       ├── EntityTypeManager.tsx
+│   │   │       ├── RelationTypeManager.tsx
+│   │   │       ├── SchemaGraphVisualization.tsx
+│   │   │       ├── SchemaValidator.tsx
+│   │   │       ├── SchemaVersionManager.tsx
+│   │   │       ├── GraphQueryBuilder.tsx
+│   │   │       └── RetailSchemaPreset.tsx
+│   │   ├── neuralsense/
+│   │   │   ├── pages/
+│   │   │   │   └── NeuralSenseSettingsPage.tsx
+│   │   │   └── components/
+│   │   │       ├── DeviceList.tsx
+│   │   │       └── DeviceRegistrationForm.tsx
+│   │   └── bigdata/
 │   │       ├── pages/
-│   │       │   ├── SchemaBuilderPage.tsx
-│   │       │   └── GraphAnalysisPage.tsx
+│   │       │   └── BigDataAPIPage.tsx
 │   │       └── components/
-│   │           ├── EntityTypeManager.tsx
-│   │           ├── RelationTypeManager.tsx
-│   │           ├── SchemaGraphVisualization.tsx
-│   │           ├── SchemaValidator.tsx
-│   │           ├── SchemaVersionManager.tsx
-│   │           └── GraphQueryBuilder.tsx
+│   │           ├── DataSourceList.tsx
+│   │           ├── DataSourceForm.tsx
+│   │           ├── SyncScheduleList.tsx
+│   │           └── SyncScheduleForm.tsx
 │   │
 │   ├── store-analysis/                # 2. 매장 현황 분석
 │   │   ├── stores/
@@ -86,14 +101,43 @@ src/
 │   │       └── components/
 │   │           └── LayoutSimulator.tsx
 │   │
-│   └── cost-center/                   # 4. Cost Center (비용 절감)
-│       └── automation/
-│           ├── pages/
-│           │   ├── StaffEfficiencyPage.tsx
-│           │   └── ProductPerformancePage.tsx
-│           └── components/
-│               ├── StaffEfficiency.tsx
-│               └── ProductPerformance.tsx
+│   ├── cost-center/                   # 4. Cost Center (비용 절감)
+│   │   └── automation/
+│   │       ├── pages/
+│   │       │   ├── StaffEfficiencyPage.tsx
+│   │       │   └── ProductPerformancePage.tsx
+│   │       └── components/
+│   │           ├── StaffEfficiency.tsx
+│   │           └── ProductPerformance.tsx
+│   │
+│   └── digital-twin-3d/               # 🆕 5. 3D 디지털 트윈 (계획 중)
+│       ├── components/
+│       │   ├── TrafficHeatmap3D.tsx
+│       │   ├── LayoutSimulator3D.tsx
+│       │   ├── FootfallVisualizer3D.tsx
+│       │   ├── CustomerJourney3D.tsx
+│       │   ├── ZoneContribution3D.tsx
+│       │   └── shared/
+│       │       ├── StoreModel.tsx
+│       │       ├── Controls.tsx
+│       │       └── Lighting.tsx
+│       ├── hooks/
+│       │   ├── useRealtimeTraffic.ts
+│       │   ├── useStore3D.ts
+│       │   └── useGLTFLoader.ts
+│       ├── materials/
+│       │   ├── HeatmapMaterial.tsx
+│       │   └── TrailMaterial.tsx
+│       ├── utils/
+│       │   ├── coordinateMapper.ts
+│       │   └── performanceMonitor.ts
+│       ├── types/
+│       │   └── heatmap.ts
+│       └── pages/
+│           ├── TrafficHeatmap3DPage.tsx
+│           ├── LayoutSimulator3DPage.tsx
+│           ├── FootfallVisualizer3DPage.tsx
+│           └── DigitalTwin3DPage.tsx
 │
 ├── core/                              # 핵심 페이지
 │   └── pages/
@@ -243,14 +287,49 @@ export interface DataImport {
 - 팀원별 담당 feature 명확
 - 코드 충돌 최소화
 
+## 최신 업데이트 (2025-11-12)
+
+### 🆕 3D 디지털 트윈 통합 계획
+
+#### 개요
+React Three Fiber 기반 3D 디지털 트윈을 NEURALTWIN에 통합하여 실시간 매장 데이터를 입체적으로 시각화합니다.
+
+#### 기술 스택 추가
+```json
+{
+  "@react-three/fiber": "^8.18.0",
+  "@react-three/drei": "^9.122.0", 
+  "three": "^0.133.0",
+  "zustand": "^4.5.0",
+  "@react-spring/three": "^9.7.0"
+}
+```
+
+#### Phase 1: MVP (1-2개월)
+- TrafficHeatmap 3D
+- LayoutSimulator 3D  
+- FootfallVisualizer 3D
+
+#### 예상 비용
+- Phase 1: $0-5/월 (Lovable Cloud 내)
+- Phase 2: $10-30/월
+- Phase 3: 고객별 협의
+
+#### 상세 문서
+- `DIGITAL_TWIN_3D_INTEGRATION.md` - 완전한 구현 가이드
+
+---
+
 ## 참고 문서
 
 - `PROJECT_STRUCTURE.md` - 전체 프로젝트 구조 및 로드맵
+- `DIGITAL_TWIN_3D_INTEGRATION.md` - 3D 디지털 트윈 통합 가이드 🆕
 - `COLLABORATION_GUIDE.md` - 협업 가이드
 - `ONBOARDING.md` - 온보딩 가이드
 
 ---
 
-**작성일**: 2025-01-10
-**버전**: 2.0
-**작성자**: AI Assistant
+**작성일**: 2025-01-10  
+**최종 업데이트**: 2025-11-12 🆕  
+**버전**: 3.0  
+**작성자**: NEURALTWIN Development Team

@@ -446,6 +446,11 @@ supabase/functions/
 - **Visualization**: 
   - react-force-graph-2d (그래프 시각화)
   - d3-force (물리 엔진)
+- **3D Graphics** (계획): 
+  - @react-three/fiber ^8.18.0 (React Three.js)
+  - @react-three/drei ^9.122.0 (유틸리티)
+  - three ^0.133.0 (Three.js 코어)
+  - @react-spring/three ^9.7.0 (애니메이션)
 - **Icons**: Lucide React 0.462.0
 - **Theme**: next-themes 0.3.0
 - **Date Handling**: date-fns 3.6.0
@@ -502,53 +507,335 @@ supabase/functions/
 
 ---
 
-## 7. 우선순위 개발 로드맵
+## 7. 3D 디지털 트윈 통합
 
-### Phase 1: Profit-Center 고도화 (최우선) ⭐️⭐️⭐️
-**목표**: 매출 증대 직접 기여
+### 7.1 개요
+**현재 구현 상태: 📋 기획 완료 - 구현 준비 중**
 
-1. **수요 예측 & 재고 관리 통합** (4-6주)
-   - 실시간 연동 파이프라인 구축
-   - 재무 영향 시뮬레이션
-   - SKU별 자동 최적화
-   - 자동 발주 워크플로우
+NEURALTWIN 프로젝트에 React Three Fiber 기반 3D 디지털 트윈을 통합하여 실시간 매장 데이터를 입체적으로 시각화하고 인터랙티브한 분석 경험을 제공합니다.
 
-2. **가격·프로모션 최적화 시스템** (3-4주)
-   - 동적 가격 엔진
-   - A/B 테스트 프레임워크
-   - 가격 탄력성 분석
-   - 경쟁사 가격 추적
-
-3. **고객 개인화 경험** (3-4주)
-   - 추천 엔진 고도화
-   - RFM 세그먼테이션
-   - 실시간 개인화 시스템
-
-### Phase 2: Cost-Center 자동화 (중기) ⭐️⭐️
-**목표**: 운영 비용 절감
-
-4. **운영 프로세스 자동화** (3-4주)
-   - 자동 리포트 생성
-   - 직원 스케줄링 최적화
-   - 이상 탐지 시스템
-   - KPI 자동 추적
-
-### Phase 3: 데이터 & 분석 고도화 (장기) ⭐️
-**목표**: 인사이트 품질 향상
-
-5. **데이터 관리 고도화** (2-3주)
-   - 실시간 데이터 동기화
-   - 대용량 처리 최적화
-   - 데이터 품질 자동 검증
-
-6. **분석 툴 고도화** (2-3주)
-   - 예측 분석 강화
-   - 커스텀 리포트 빌더
-   - 실시간 분석 스트리밍
+#### 핵심 문서
+- **파일**: `DIGITAL_TWIN_3D_INTEGRATION.md`
+- 3D 통합 전략 및 구현 가이드
+- React Three Fiber 심화 가이드
+- 단계별 개발 로드맵
 
 ---
 
-## 8. 성과 지표 (KPI)
+### 7.2 구현 전략
+
+#### Phase 1: MVP (1-2개월) - React Three Fiber
+**목표**: 핵심 기능 3D 변환 및 프로토타입 검증
+
+**기술 스택**:
+```json
+{
+  "@react-three/fiber": "^8.18.0",
+  "@react-three/drei": "^9.122.0",
+  "three": "^0.133.0",
+  "zustand": "^4.5.0",
+  "@react-spring/three": "^9.7.0"
+}
+```
+
+**우선순위 기능**:
+1. **TrafficHeatmap 3D** ⭐⭐⭐⭐⭐
+   - 3D 볼륨 렌더링 히트맵
+   - 실시간 Supabase 데이터 연동
+   - 시간대별 애니메이션
+   - 예상 소요: 2주
+
+2. **LayoutSimulator 3D** ⭐⭐⭐⭐⭐
+   - 드래그 앤 드롭 제품 배치
+   - AI 추천 레이아웃 시각화
+   - 메트릭 실시간 계산
+   - 예상 소요: 3주
+
+3. **FootfallVisualizer 3D** ⭐⭐⭐⭐
+   - 실시간 고객 아바타 (Instanced Rendering)
+   - 동선 트레일 렌더링
+   - 혼잡도 시각화
+   - 예상 소요: 2주
+
+**예상 비용**: $0-5/월 (Lovable Cloud 내)
+
+---
+
+#### Phase 2: Production (3-6개월) - Hybrid
+**목표**: 프로덕션 품질 및 성능 최적화
+
+**개선 사항**:
+- 언리얼 엔진 고품질 모델 → glTF 익스포트
+- LOD (Level of Detail) 시스템
+- Occlusion Culling
+- 추가 기능: CustomerJourney 3D, ZoneContribution 3D
+
+**예상 비용**: $10-30/월
+
+---
+
+#### Phase 3: Enterprise (6개월+) - 선택적
+**목표**: 엔터프라이즈 고객 대응
+
+**추가 기능**:
+- Unreal Pixel Streaming (VIP 전용)
+- VR 지원
+- 맞춤형 매장 렌더링
+
+**예상 비용**: 고객별 협의
+
+---
+
+### 7.3 계획된 폴더 구조
+
+```
+src/
+└── features/
+    └── digital-twin-3d/              # 🆕 3D 디지털 트윈
+        ├── components/
+        │   ├── TrafficHeatmap3D.tsx
+        │   ├── LayoutSimulator3D.tsx
+        │   ├── FootfallVisualizer3D.tsx
+        │   ├── CustomerJourney3D.tsx
+        │   ├── ZoneContribution3D.tsx
+        │   └── shared/
+        │       ├── StoreModel.tsx
+        │       ├── Controls.tsx
+        │       └── Lighting.tsx
+        ├── hooks/
+        │   ├── useRealtimeTraffic.ts
+        │   ├── useStore3D.ts
+        │   └── useGLTFLoader.ts
+        ├── materials/
+        │   ├── HeatmapMaterial.tsx
+        │   └── TrailMaterial.tsx
+        ├── utils/
+        │   ├── coordinateMapper.ts
+        │   └── performanceMonitor.ts
+        ├── types/
+        │   └── heatmap.ts
+        └── pages/
+            ├── TrafficHeatmap3DPage.tsx
+            ├── LayoutSimulator3DPage.tsx
+            ├── FootfallVisualizer3DPage.tsx
+            └── DigitalTwin3DPage.tsx
+
+public/
+└── models/                          # 🆕 3D 에셋
+    ├── store-base.glb
+    ├── products/
+    └── textures/
+```
+
+---
+
+### 7.4 데이터 동기화 전략
+
+#### Supabase Realtime 통합
+```typescript
+// 실시간 트래픽 데이터 구독
+const channel = supabase
+  .channel(`traffic-${storeId}`)
+  .on('postgres_changes', {
+    event: 'INSERT',
+    schema: 'public',
+    table: 'traffic_logs',
+    filter: `store_id=eq.${storeId}`
+  }, (payload) => {
+    update3DScene(payload);
+  })
+  .subscribe();
+```
+
+#### Edge Functions 활용
+- `footfall-aggregator`: 실시간 방문자 위치 집계
+- `layout-optimizer`: AI 기반 레이아웃 최적화
+- `heatmap-generator`: 히트맵 텍스처 생성
+
+---
+
+### 7.5 성능 최적화
+
+#### 핵심 기법
+1. **Instanced Rendering**: 100+ 고객 아바타 동시 렌더링
+2. **LOD (Level of Detail)**: 거리별 모델 디테일 조정
+3. **Texture Compression**: KTX2 포맷 사용
+4. **Progressive Loading**: 3D 모델 점진적 로드
+
+#### 목표 성능 지표
+- 데스크톱: 60fps 이상
+- 모바일: 30fps 이상
+- 초기 로딩: 3초 이내
+
+---
+
+### 7.6 통합 대상 기능
+
+#### 매장 현황 분석 → 3D 변환
+- ✅ TrafficHeatmap → TrafficHeatmap3D
+- ✅ FootfallVisualizer → FootfallVisualizer3D
+- ✅ ConversionFunnel → (2D 유지, 3D 오버레이)
+- ✅ CustomerJourney → CustomerJourney3D
+
+#### Profit-Center → 3D 변환
+- ✅ LayoutSimulator → LayoutSimulator3D
+- ⚠️ PricingOptimizer → (2D 유지)
+- ⚠️ DemandForecast → (2D 유지)
+
+#### 분석 툴 → 3D 오버레이
+- ✅ StoreHeatmap → 3D 포인트 클라우드
+- ✅ ZoneContribution → 3D 막대 차트
+
+---
+
+### 7.7 기술적 고려사항
+
+#### Lovable Cloud 통합
+- ✅ **비용 효율적**: 클라이언트 렌더링으로 서버 비용 0원
+- ✅ **즉시 배포**: 정적 파일 호스팅만 필요
+- ✅ **무한 확장**: 동시 사용자 수 제한 없음
+- ✅ **실시간 연동**: Supabase Realtime 완벽 호환
+
+#### 보안
+- 3D 에셋 서명된 URL 발급
+- RLS 정책으로 데이터 접근 제어
+- 클라이언트 사이드 검증
+
+---
+
+### 7.8 개발 체크리스트
+
+#### 환경 설정
+- [ ] React Three Fiber 패키지 설치
+- [ ] Three.js 타입 정의 설치
+- [ ] Zustand 상태관리 설정
+- [ ] Supabase Realtime 테스트
+
+#### TrafficHeatmap 3D (2주)
+- [ ] 기본 Canvas 및 씬 설정
+- [ ] 매장 3D 모델 로드
+- [ ] 히트맵 쉐이더 개발
+- [ ] 시간 슬라이더 연동
+- [ ] 실시간 업데이트 구현
+- [ ] 성능 테스트 (30fps 목표)
+
+#### LayoutSimulator 3D (3주)
+- [ ] 제품 3D 모델 준비 (최소 10개)
+- [ ] Raycasting 드래그 앤 드롭
+- [ ] 그리드 스냅 로직
+- [ ] AI 추천 API 개발
+- [ ] 애니메이션 시스템
+- [ ] 메트릭 계산 연동
+
+#### FootfallVisualizer 3D (2주)
+- [ ] 아바타 Instanced Mesh
+- [ ] 동선 트레일 렌더링
+- [ ] 실시간 위치 업데이트
+- [ ] 필터링 UI
+
+#### 공통 작업
+- [ ] 로딩 스피너 / 프로그레스 바
+- [ ] 에러 핸들링
+- [ ] 모바일 반응형 처리
+- [ ] 접근성 (키보드 네비게이션)
+- [ ] 문서화 (Storybook)
+
+---
+
+### 7.9 리스크 및 대응
+
+#### 🔴 High Risk
+1. **클라이언트 성능 부족**
+   - 대응: LOD 시스템, 품질 설정 옵션, WebGL 자동 감지
+
+2. **3D 에셋 변환 오류**
+   - 대응: Datasmith Exporter, PBR 머티리얼 표준화
+
+#### 🟡 Medium Risk
+1. **실시간 데이터 동기화 지연**
+   - 대응: 클라이언트 예측, 보간, 배치 업데이트
+
+2. **브라우저 호환성**
+   - 대응: WebGL2 폴백, 크로스 브라우저 테스트
+
+---
+
+### 7.10 다음 단계
+
+#### 즉시 실행 가능 (1주)
+1. **개발 환경 설정** (1일)
+2. **POC 개발** (3일) - 간단한 3D 박스 + 히트맵
+3. **Supabase 연동 테스트** (1일)
+4. **프로토타입 데모** (2일)
+
+#### 단기 목표 (1개월)
+- TrafficHeatmap 3D 베타 완성
+- 내부 팀 피드백 수집
+- 성능 벤치마크
+
+#### 중기 목표 (3개월)
+- 3개 핵심 기능 완성
+- 사용자 테스트
+- 프로덕션 배포
+
+---
+
+## 8. 향후 개발 우선순위
+
+### 🔥 최우선 (Q1 2025)
+1. **3D 디지털 트윈 MVP** 🆕
+   - TrafficHeatmap 3D (2주)
+   - LayoutSimulator 3D (3주)
+   - FootfallVisualizer 3D (2주)
+   - React Three Fiber 기반
+   - Supabase Realtime 연동
+
+2. **수요-재고 통합 시스템** (Profit-Center 3.1)
+   - 실시간 파이프라인 구축
+   - 재무 영향 분석
+   - 자동 발주 워크플로우
+
+3. **가격 최적화 엔진** (Profit-Center 3.2)
+   - 동적 가격 제안 시스템
+   - 프로모션 효과 측정
+   - WTP 분석 고도화
+
+### ⚡ 고우선 (Q2 2025)
+4. **3D 디지털 트윈 확장** 🆕
+   - CustomerJourney 3D
+   - ZoneContribution 3D
+   - 성능 최적화 (LOD, Instancing)
+   - 고품질 3D 에셋 통합
+
+5. **고객 개인화 확장** (Profit-Center 3.3)
+   - 행동 기반 추천 엔진
+   - 실시간 개인화
+   - 레이아웃 최적화
+
+6. **운영 자동화** (Cost-Center 4.1)
+   - 자동 리포트 생성
+   - 스케줄링 최적화
+   - 이상 탐지 시스템
+
+### 📊 중우선 (Q3-Q4 2025)
+7. **3D 디지털 트윈 프로덕션** 🆕
+   - Hybrid 렌더링 (언리얼 + WebGL)
+   - VR 지원
+   - 엔터프라이즈 기능
+
+8. **고급 분석 기능**
+   - 예측 분석 고도화
+   - 이상 탐지
+   - 다변량 분석
+
+9. **실시간 센서 연동**
+   - NeuralSense 디바이스 통합
+   - IoT 센서 연동
+   - 실시간 모니터링
+
+---
+
+## 9. 성과 지표 (KPI)
 
 ### Profit-Center
 - 매출 증가율 (YoY, MoM)
@@ -574,16 +861,18 @@ supabase/functions/
 
 ---
 
-## 9. 참고 문서
+## 10. 참고 문서
 
-- `COLLABORATION_GUIDE.md` - 협업 가이드
-- `ONBOARDING.md` - 온보딩 가이드
-- `README.md` - 프로젝트 개요
+- **DIGITAL_TWIN_3D_INTEGRATION.md** - 3D 디지털 트윈 통합 가이드 🆕
+- **REFACTORING_COMPLETE.md** - 프로젝트 재구성 완료
+- **COLLABORATION_GUIDE.md** - 협업 가이드
+- **ONBOARDING.md** - 온보딩 가이드
+- **README.md** - 프로젝트 개요
 - `src/utils/dataSchemas.ts` - 데이터 스키마 정의
 - `src/utils/enterpriseSchemas.ts` - 엔터프라이즈 스키마
 
 ---
 
-**문서 작성일**: 2025-11-11  
-**버전**: 1.0  
-**다음 업데이트 예정**: Phase 1 완료 후
+**문서 버전**: 3.0  
+**최종 업데이트**: 2025-11-12  
+**작성자**: NEURALTWIN Development Team
