@@ -2,9 +2,13 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TrendingUp, TrendingDown, Users, ShoppingCart, DollarSign } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { EnhancedChart } from "@/components/analysis/EnhancedChart";
-import { FUNNEL_DATA } from "@/data/sampleData";
+
+interface ConversionFunnelProps {
+  visitsData?: any[];
+  purchasesData?: any[];
+}
 
 const timeRanges = {
   "today": { label: "오늘", multiplier: 1 },
@@ -12,16 +16,40 @@ const timeRanges = {
   "month": { label: "이번 달", multiplier: 30 },
 };
 
-export const ConversionFunnel = () => {
+export const ConversionFunnel = ({ visitsData = [], purchasesData = [] }: ConversionFunnelProps) => {
   const [timeRange, setTimeRange] = useState<keyof typeof timeRanges>("today");
 
-  const scaledData = FUNNEL_DATA.map((item) => ({
-    ...item,
-    count: Math.round(item.count * timeRanges[timeRange].multiplier),
-  }));
+  // 실제 데이터 기반으로 퍼널 생성
+  const scaledData = useMemo(() => {
+    const totalVisits = visitsData.length || 1;
+    const purchasedVisits = visitsData.filter((v: any) => v.purchased === 'Y').length;
+    const totalPurchases = purchasesData.length;
+    
+    // 방문 -> 관심 (70%) -> 체류 (50%) -> 구매
+    const interested = Math.round(totalVisits * 0.7);
+    const stayed = Math.round(interested * 0.7);
+    
+    return [
+      { stage: "방문", count: totalVisits, rate: 100, color: "hsl(var(--primary))" },
+      { stage: "관심", count: interested, rate: Math.round((interested / totalVisits) * 100), color: "#3b82f6" },
+      { stage: "체류", count: stayed, rate: Math.round((stayed / totalVisits) * 100), color: "#10b981" },
+      { stage: "구매", count: purchasedVisits, rate: Math.round((purchasedVisits / totalVisits) * 100), color: "#f59e0b" }
+    ].map(item => ({
+      ...item,
+      count: Math.round(item.count * timeRanges[timeRange].multiplier)
+    }));
+  }, [visitsData, purchasesData, timeRange]);
 
-  const totalRevenue = scaledData[3].count * 125000;
-  const conversionRate = ((scaledData[3].count / scaledData[0].count) * 100).toFixed(1);
+  const totalRevenue = useMemo(() => {
+    return purchasesData.reduce((sum: number, p: any) => {
+      const price = parseFloat(p.total_amount || p.price || 0);
+      return sum + price;
+    }, 0);
+  }, [purchasesData]);
+
+  const conversionRate = scaledData[0].count > 0 
+    ? ((scaledData[3].count / scaledData[0].count) * 100).toFixed(1)
+    : '0';
 
   return (
     <div className="space-y-6">

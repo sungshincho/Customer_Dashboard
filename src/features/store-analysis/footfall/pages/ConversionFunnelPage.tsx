@@ -106,7 +106,7 @@ const ConversionFunnelPage = () => {
           
           <TabsContent value="analysis" className="space-y-6">
             <div key={refreshKey}>
-              <ConversionFunnel />
+              <ConversionFunnel visitsData={visitsData} purchasesData={purchasesData} />
             </div>
           </TabsContent>
           

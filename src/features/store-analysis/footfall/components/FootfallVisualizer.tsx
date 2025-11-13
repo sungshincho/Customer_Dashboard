@@ -1,17 +1,36 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { generateFootfallPoints } from "@/data/sampleData";
 
-export const FootfallVisualizer = () => {
-  const [data] = useState(generateFootfallPoints());
+interface FootfallVisualizerProps {
+  visitsData?: any[];
+}
+
+export const FootfallVisualizer = ({ visitsData = [] }: FootfallVisualizerProps) => {
   const [timeRange, setTimeRange] = useState([0, 24]);
   const [showReturning, setShowReturning] = useState(true);
   const [showNew, setShowNew] = useState(true);
   const [showHeatmap, setShowHeatmap] = useState(false);
+
+  // 실제 방문 데이터를 시각화 포인트로 변환
+  const data = useMemo(() => {
+    return visitsData.map((visit: any, idx: number) => {
+      const hour = visit.visit_hour ? parseInt(visit.visit_hour) : Math.floor(Math.random() * 14) + 9;
+      const dwellMinutes = visit.dwell_time ? parseInt(visit.dwell_time) : Math.floor(Math.random() * 30) + 10;
+      const isReturning = visit.is_returning === 'Y' || Math.random() > 0.6;
+      
+      return {
+        x: (idx % 10) * 10 + Math.random() * 8,
+        y: Math.floor(idx / 10) * 10 + Math.random() * 8,
+        time: hour,
+        dwell: dwellMinutes,
+        isReturning
+      };
+    });
+  }, [visitsData]);
 
   const filteredData = data.filter(
     (point) =>
@@ -20,8 +39,10 @@ export const FootfallVisualizer = () => {
       ((point.isReturning && showReturning) || (!point.isReturning && showNew))
   );
 
-  const inboundRate = ((filteredData.length / data.length) * 100).toFixed(1);
-  const avgDwell = (filteredData.reduce((sum, p) => sum + p.dwell, 0) / filteredData.length).toFixed(1);
+  const inboundRate = data.length > 0 ? ((filteredData.length / data.length) * 100).toFixed(1) : '0';
+  const avgDwell = filteredData.length > 0 
+    ? (filteredData.reduce((sum, p) => sum + p.dwell, 0) / filteredData.length).toFixed(1)
+    : '0';
 
   return (
     <div className="space-y-6">

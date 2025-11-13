@@ -26,21 +26,27 @@ const CustomerJourneyPage = () => {
   const [sceneRecipe, setSceneRecipe] = useState<SceneRecipe | null>(null);
   const [loading3D, setLoading3D] = useState(false);
   const [visitsData, setVisitsData] = useState<any[]>([]);
+  const [purchasesData, setPurchasesData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // 매장별 방문 데이터 로드
+  // 매장별 방문 및 구매 데이터 로드
   useEffect(() => {
     if (selectedStore && user) {
       setLoading(true);
-      loadStoreFile(user.id, selectedStore.id, 'visits.csv')
-        .then(data => {
-          console.log(`${selectedStore.store_name} 고객 여정 데이터:`, data.length, '건');
-          setVisitsData(data);
+      Promise.all([
+        loadStoreFile(user.id, selectedStore.id, 'visits.csv'),
+        loadStoreFile(user.id, selectedStore.id, 'purchases.csv')
+      ])
+        .then(([visits, purchases]) => {
+          console.log(`${selectedStore.store_name} 고객 여정 데이터:`, visits.length, '방문,', purchases.length, '구매');
+          setVisitsData(visits);
+          setPurchasesData(purchases);
           setLoading(false);
         })
         .catch(error => {
-          console.error('Failed to load visits data:', error);
+          console.error('Failed to load journey data:', error);
           setVisitsData([]);
+          setPurchasesData([]);
           setLoading(false);
         });
     }
@@ -153,7 +159,7 @@ const CustomerJourneyPage = () => {
           
           <TabsContent value="analysis" className="space-y-6">
             <div key={refreshKey}>
-              <CustomerJourney />
+              <CustomerJourney visitsData={visitsData} purchasesData={purchasesData} />
             </div>
           </TabsContent>
           

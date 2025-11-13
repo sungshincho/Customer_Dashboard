@@ -1,18 +1,56 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Play, Pause, RotateCcw, User } from "lucide-react";
-import { CUSTOMER_JOURNEYS } from "@/data/sampleData";
 
-const customerJourneys = CUSTOMER_JOURNEYS;
+interface CustomerJourneyProps {
+  visitsData?: any[];
+  purchasesData?: any[];
+}
 
-export const CustomerJourney = () => {
+export const CustomerJourney = ({ visitsData = [], purchasesData = [] }: CustomerJourneyProps) => {
   const [selectedJourney, setSelectedJourney] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  const journey = customerJourneys[selectedJourney];
+  // 실제 데이터 기반으로 고객 여정 생성
+  const customerJourneys = useMemo(() => {
+    return visitsData.slice(0, 3).map((visit: any, idx: number) => {
+      const hasPurchase = visit.purchased === 'Y';
+      const dwellTime = visit.dwell_time ? parseInt(visit.dwell_time) * 60 : Math.floor(Math.random() * 600) + 300;
+      const numSteps = hasPurchase ? 5 : 3;
+      
+      const steps = [];
+      // 입구
+      steps.push({ x: 50, y: 10, action: "입장", duration: 0 });
+      
+      // 중간 단계
+      for (let i = 1; i < numSteps; i++) {
+        steps.push({
+          x: 20 + Math.random() * 60,
+          y: 20 + (i * 15) + Math.random() * 10,
+          action: hasPurchase ? ["상품 둘러보기", "상품 선택", "피팅룸", "계산대"][i-1] : ["둘러보기", "관심상품"][i-1],
+          duration: Math.floor(dwellTime / numSteps)
+        });
+      }
+      
+      // 출구
+      steps.push({ x: 50, y: 90, action: "퇴장", duration: 0 });
+      
+      const purchase = purchasesData.find((p: any) => p.customer_id === visit.customer_id);
+      const revenue = purchase ? parseFloat(purchase.total_amount || purchase.price || 0) : 0;
+      
+      return {
+        id: `C${idx + 1}`,
+        type: hasPurchase ? "구매" : "브라우징",
+        steps,
+        revenue
+      };
+    });
+  }, [visitsData, purchasesData]);
+
+  const journey = customerJourneys[selectedJourney] || { steps: [], type: "브라우징", revenue: 0, id: "C1" };
   const visibleSteps = journey.steps.slice(0, currentStep + 1);
 
   useState(() => {

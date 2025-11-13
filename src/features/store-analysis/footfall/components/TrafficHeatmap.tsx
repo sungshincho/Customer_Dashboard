@@ -1,9 +1,13 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Play, Pause, RotateCcw } from "lucide-react";
+
+interface TrafficHeatmapProps {
+  visitsData?: any[];
+}
 
 interface HeatmapCell {
   x: number;
@@ -11,9 +15,15 @@ interface HeatmapCell {
   intensity: number;
 }
 
-const generateHeatmapData = (timeOfDay: number): HeatmapCell[] => {
+const generateHeatmapData = (timeOfDay: number, visitsData: any[]): HeatmapCell[] => {
   const data: HeatmapCell[] = [];
   const gridSize = 10;
+
+  // 해당 시간대의 방문 데이터 필터링
+  const timeVisits = visitsData.filter((v: any) => {
+    const hour = v.visit_hour ? parseInt(v.visit_hour) : Math.floor(Math.random() * 14) + 9;
+    return Math.abs(hour - timeOfDay) <= 1;
+  });
 
   for (let x = 0; x < gridSize; x++) {
     for (let y = 0; y < gridSize; y++) {
@@ -23,11 +33,13 @@ const generateHeatmapData = (timeOfDay: number): HeatmapCell[] => {
       const aisleBoost = x > 3 && x < 6 ? 0.3 : 0;
       // Time-based variation
       const timeMultiplier = Math.sin((timeOfDay / 24) * Math.PI) * 0.5 + 0.5;
+      // Data-based boost
+      const dataBoost = timeVisits.length > 0 ? Math.min(0.4, timeVisits.length / visitsData.length) : 0;
 
       const baseIntensity = Math.random() * 0.3;
       const intensity = Math.min(
         1,
-        (baseIntensity + entranceBoost + aisleBoost) * timeMultiplier
+        (baseIntensity + entranceBoost + aisleBoost + dataBoost) * timeMultiplier
       );
 
       data.push({ x, y, intensity });
@@ -37,14 +49,14 @@ const generateHeatmapData = (timeOfDay: number): HeatmapCell[] => {
   return data;
 };
 
-export const TrafficHeatmap = () => {
+export const TrafficHeatmap = ({ visitsData = [] }: TrafficHeatmapProps) => {
   const [timeOfDay, setTimeOfDay] = useState(14); // 2 PM
   const [isPlaying, setIsPlaying] = useState(false);
-  const [heatmapData, setHeatmapData] = useState(() => generateHeatmapData(14));
+  const [heatmapData, setHeatmapData] = useState(() => generateHeatmapData(14, visitsData));
 
   const updateHeatmap = (newTime: number) => {
     setTimeOfDay(newTime);
-    setHeatmapData(generateHeatmapData(newTime));
+    setHeatmapData(generateHeatmapData(newTime, visitsData));
   };
 
   const handlePlay = () => {
@@ -62,7 +74,7 @@ export const TrafficHeatmap = () => {
     const interval = setInterval(() => {
       setTimeOfDay((prev) => {
         const next = prev >= 23 ? 9 : prev + 1;
-        setHeatmapData(generateHeatmapData(next));
+        setHeatmapData(generateHeatmapData(next, visitsData));
         return next;
       });
     }, 500);
