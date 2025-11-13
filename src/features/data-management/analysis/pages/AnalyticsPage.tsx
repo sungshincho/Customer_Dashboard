@@ -2,6 +2,9 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { useSelectedStore } from "@/hooks/useSelectedStore";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Store } from "lucide-react";
 
 const hourlyData = [
   { hour: "06:00", visitors: 23 },
@@ -33,13 +36,26 @@ const ageGroupData = [
 const COLORS = ["hsl(var(--primary))", "hsl(var(--accent))", "#8884d8", "#82ca9d", "#ffc658"];
 
 const Analytics = () => {
+  const { selectedStore } = useSelectedStore();
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        {!selectedStore && (
+          <Alert>
+            <Store className="h-4 w-4" />
+            <AlertDescription>
+              매장을 선택하면 해당 매장의 분석 데이터를 확인할 수 있습니다.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Header */}
         <div className="animate-fade-in">
           <h1 className="text-3xl font-bold gradient-text">방문자 분석</h1>
-          <p className="mt-2 text-muted-foreground">매장 방문자 데이터 및 히트맵 분석</p>
+          <p className="mt-2 text-muted-foreground">
+            {selectedStore ? `${selectedStore.store_name} - ` : ''}매장 방문자 데이터 및 히트맵 분석
+          </p>
         </div>
 
         <Tabs defaultValue="hourly" className="space-y-4">

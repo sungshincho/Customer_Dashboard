@@ -25,6 +25,14 @@ import {
 import { useState, useEffect } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
+import { useSelectedStore } from "@/hooks/useSelectedStore";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Sidebar,
   SidebarContent,
@@ -134,6 +142,7 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
+  const { selectedStore, setSelectedStore, stores, loading } = useSelectedStore();
 
   // 모든 섹션의 열림/닫힘 상태를 객체로 관리
   const [sectionStates, setSectionStates] = useState<Record<string, boolean>>(
@@ -171,6 +180,33 @@ export function AppSidebar() {
             )}
           </SidebarGroupLabel>
         </SidebarGroup>
+
+        {/* 매장 선택 */}
+        {!collapsed && stores.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupContent className="px-2">
+              <Select
+                value={selectedStore?.id || ""}
+                onValueChange={(value) => {
+                  const store = stores.find(s => s.id === value);
+                  setSelectedStore(store || null);
+                }}
+                disabled={loading}
+              >
+                <SelectTrigger className="w-full bg-background/50 border-primary/20 hover:border-primary/40 transition-colors z-50">
+                  <SelectValue placeholder="매장 선택" />
+                </SelectTrigger>
+                <SelectContent className="z-[100] bg-popover border-border shadow-lg">
+                  {stores.map((store) => (
+                    <SelectItem key={store.id} value={store.id} className="cursor-pointer hover:bg-accent">
+                      {store.store_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         {/* Core 핵심 메뉴 */}
         <SidebarGroup>

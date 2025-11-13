@@ -1,7 +1,7 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { FootfallVisualizer } from "@/features/store-analysis/footfall/components/FootfallVisualizer";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Loader2 } from "lucide-react";
+import { RefreshCw, Loader2, Store } from "lucide-react";
 import { useState } from "react";
 import { AdvancedFilters, FilterState } from "@/components/analysis/AdvancedFilters";
 import { ExportButton } from "@/components/analysis/ExportButton";
@@ -11,8 +11,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useStoreScene } from "@/hooks/useStoreScene";
 import { useAutoAnalysis } from "@/hooks/useAutoAnalysis";
 import { SceneViewer } from "@/features/digital-twin/components/SceneViewer";
+import { useSelectedStore } from "@/hooks/useSelectedStore";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const FootfallAnalysis = () => {
+  const { selectedStore } = useSelectedStore();
   const [refreshKey, setRefreshKey] = useState(0);
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
@@ -41,11 +44,21 @@ const FootfallAnalysis = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        {!selectedStore && (
+          <Alert>
+            <Store className="h-4 w-4" />
+            <AlertDescription>
+              매장을 선택하면 해당 매장의 방문객 분석 데이터를 확인할 수 있습니다. 
+              사이드바에서 매장을 선택하거나 <a href="/stores" className="underline font-medium">매장 관리</a>에서 매장을 등록하세요.
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="flex items-center justify-between animate-fade-in">
           <div>
             <h1 className="text-3xl font-bold gradient-text">방문객 유입 분석</h1>
             <p className="mt-2 text-muted-foreground">
-              시간대별 방문자 패턴 및 트렌드 분석
+              {selectedStore ? `${selectedStore.store_name} - ` : ''}시간대별 방문자 패턴 및 트렌드 분석
               {analyzing && <span className="ml-2 text-primary">(AI 분석 중...)</span>}
             </p>
           </div>

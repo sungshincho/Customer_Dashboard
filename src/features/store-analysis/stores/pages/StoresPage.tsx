@@ -1,57 +1,70 @@
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Phone, Clock, TrendingUp, Users } from "lucide-react";
-
-const stores = [
-  {
-    id: 1,
-    name: "강남점",
-    address: "서울특별시 강남구 테헤란로 123",
-    phone: "02-1234-5678",
-    status: "운영중",
-    visitors: 1234,
-    sales: "₩4,200,000",
-    trend: "+12%",
-    hours: "10:00 - 22:00",
-  },
-  {
-    id: 2,
-    name: "홍대점",
-    address: "서울특별시 마포구 양화로 456",
-    phone: "02-2345-6789",
-    status: "운영중",
-    visitors: 987,
-    sales: "₩3,800,000",
-    trend: "+8%",
-    hours: "11:00 - 23:00",
-  },
-  {
-    id: 3,
-    name: "명동점",
-    address: "서울특별시 중구 명동길 789",
-    phone: "02-3456-7890",
-    status: "운영중",
-    visitors: 1567,
-    sales: "₩5,100,000",
-    trend: "+15%",
-    hours: "10:00 - 22:00",
-  },
-  {
-    id: 4,
-    name: "잠실점",
-    address: "서울특별시 송파구 올림픽로 321",
-    phone: "02-4567-8901",
-    status: "점검중",
-    visitors: 0,
-    sales: "₩0",
-    trend: "0%",
-    hours: "시스템 점검",
-  },
-];
+import { Phone, Clock, Trash2, Edit, Loader2 } from "lucide-react";
+import { useSelectedStore } from "@/hooks/useSelectedStore";
+import { StoreForm } from "../components/StoreForm";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const Stores = () => {
+  const { user } = useAuth();
+  const { stores, loading, refreshStores, selectedStore, setSelectedStore } = useSelectedStore();
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  const handleDelete = async (storeId: string) => {
+    if (!user) return;
+
+    setDeleting(storeId);
+    try {
+      const { error } = await supabase
+        .from('stores')
+        .delete()
+        .eq('id', storeId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      toast.success('매장이 삭제되었습니다');
+      
+      // 선택된 매장이 삭제된 경우 선택 해제
+      if (selectedStore?.id === storeId) {
+        setSelectedStore(null);
+      }
+      
+      await refreshStores();
+    } catch (error) {
+      console.error('Delete store error:', error);
+      toast.error('매장 삭제에 실패했습니다');
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -59,67 +72,115 @@ const Stores = () => {
         <div className="flex items-center justify-between animate-fade-in">
           <div>
             <h1 className="text-3xl font-bold gradient-text">매장 관리</h1>
-            <p className="mt-2 text-muted-foreground">전체 매장 현황 및 관리</p>
+            <p className="mt-2 text-muted-foreground">
+              전체 매장 현황 및 관리 ({stores.length}개 매장)
+            </p>
           </div>
-          <Button className="bg-gradient-primary hover:shadow-glow">새 매장 추가</Button>
+          <StoreForm onSuccess={refreshStores} />
         </div>
 
+        {/* Empty State */}
+        {stores.length === 0 && (
+          <Card className="text-center py-12">
+            <CardContent>
+              <p className="text-muted-foreground mb-4">
+                등록된 매장이 없습니다. 첫 매장을 추가해보세요.
+              </p>
+              <StoreForm onSuccess={refreshStores} />
+            </CardContent>
+          </Card>
+        )}
+
         {/* Stores Grid */}
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {stores.map((store, index) => (
-            <Card key={store.id} className="hover-lift animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
+            <Card 
+              key={store.id} 
+              className={`hover-lift animate-fade-in cursor-pointer transition-all ${
+                selectedStore?.id === store.id ? 'ring-2 ring-primary shadow-lg' : ''
+              }`}
+              style={{ animationDelay: `${index * 100}ms` }}
+              onClick={() => setSelectedStore(store)}
+            >
               <CardHeader>
                 <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="text-xl">{store.name}</CardTitle>
-                    <CardDescription className="mt-1">{store.address}</CardDescription>
+                  <div className="flex-1">
+                    <CardTitle className="text-xl">{store.store_name}</CardTitle>
+                    <CardDescription className="mt-1">
+                      코드: {store.store_code}
+                    </CardDescription>
                   </div>
-                  <Badge variant={store.status === "운영중" ? "default" : "secondary"}>
-                    {store.status}
-                  </Badge>
+                  {selectedStore?.id === store.id && (
+                    <Badge variant="default">선택됨</Badge>
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Contact Info */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Phone className="h-4 w-4" />
-                    <span>{store.phone}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Clock className="h-4 w-4" />
-                    <span>{store.hours}</span>
-                  </div>
-                </div>
+                {/* Info */}
+                {store.address && (
+                  <p className="text-sm text-muted-foreground line-clamp-2">
+                    {store.address}
+                  </p>
+                )}
 
-                {/* Stats */}
-                <div className="grid grid-cols-3 gap-4 pt-4 border-t border-border">
-                  <div>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <Users className="h-4 w-4" />
-                      <span>방문자</span>
-                    </div>
-                    <p className="mt-1 text-xl font-bold">{store.visitors.toLocaleString()}</p>
+                {(store.phone || store.manager_name) && (
+                  <div className="space-y-2 pt-2 border-t">
+                    {store.manager_name && (
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">매니저: </span>
+                        <span className="font-medium">{store.manager_name}</span>
+                      </div>
+                    )}
+                    {store.phone && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Phone className="h-4 w-4" />
+                        <span>{store.phone}</span>
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <TrendingUp className="h-4 w-4" />
-                      <span>매출</span>
-                    </div>
-                    <p className="mt-1 text-lg font-bold">{store.sales}</p>
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground">증감</div>
-                    <p className={`mt-1 text-lg font-bold ${store.trend.startsWith('+') ? 'text-green-600' : 'text-muted-foreground'}`}>
-                      {store.trend}
-                    </p>
-                  </div>
-                </div>
+                )}
 
                 {/* Actions */}
-                <div className="flex gap-2 pt-2">
-                  <Button variant="outline" className="flex-1 hover:bg-primary hover:text-primary-foreground transition-all">상세보기</Button>
-                  <Button variant="outline" className="flex-1 hover:bg-secondary transition-all">설정</Button>
+                <div className="flex gap-2 pt-2" onClick={(e) => e.stopPropagation()}>
+                  <StoreForm
+                    store={store}
+                    onSuccess={refreshStores}
+                    trigger={
+                      <Button variant="outline" size="sm" className="flex-1">
+                        <Edit className="w-4 h-4 mr-1" />
+                        수정
+                      </Button>
+                    }
+                  />
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        disabled={deleting === store.id}
+                      >
+                        {deleting === store.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>매장을 삭제하시겠습니까?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {store.store_name} 매장을 삭제합니다. 이 작업은 되돌릴 수 없습니다.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>취소</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleDelete(store.id)}>
+                          삭제
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </CardContent>
             </Card>
