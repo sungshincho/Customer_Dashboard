@@ -456,7 +456,7 @@ const DataImport = () => {
 
   useEffect(() => {
     loadImports();
-  }, []);
+  }, [selectedStore]);
 
   return (
     <DashboardLayout>
@@ -759,16 +759,27 @@ const DataImport = () => {
         <Card>
           <CardHeader>
             <CardTitle>임포트 히스토리</CardTitle>
-            <CardDescription>업로드한 데이터 목록</CardDescription>
+            <CardDescription>
+              {selectedStore 
+                ? `${selectedStore.store_name} 매장의 업로드 데이터 목록` 
+                : '매장을 선택하면 해당 매장의 데이터 목록이 표시됩니다'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
+            {!selectedStore ? (
+              <div className="text-center py-8">
+                <FileSpreadsheet className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">
+                  매장을 선택하여 임포트 기록을 확인하세요
+                </p>
+              </div>
+            ) : isLoading ? (
               <p className="text-center text-muted-foreground py-8">로딩 중...</p>
             ) : imports.length === 0 ? (
               <div className="text-center py-8">
                 <FileSpreadsheet className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
                 <p className="text-muted-foreground">
-                  아직 임포트한 데이터가 없습니다
+                  {selectedStore.store_name} 매장에 아직 임포트한 데이터가 없습니다
                 </p>
               </div>
             ) : (
