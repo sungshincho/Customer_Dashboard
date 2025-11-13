@@ -8,8 +8,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Store, Loader2, Sparkles, AlertTriangle, CheckCircle, Plus, RefreshCw } from "lucide-react";
-import { insertComprehensiveSchema } from "../utils/comprehensiveRetailSchema";
+import { Store, Loader2, Sparkles, AlertTriangle, CheckCircle, Plus, RefreshCw, Link2 } from "lucide-react";
+import { insertComprehensiveSchema, insertRelationsOnly } from "../utils/comprehensiveRetailSchema";
 
 type SchemaMode = 'merge' | 'replace';
 
@@ -161,7 +161,34 @@ export const RetailSchemaPreset = () => {
     },
   });
 
-  const isLoading = createRetailSchemaMutation.isPending || clearSchemaMutation.isPending || backupCurrentSchemaMutation.isPending;
+  // 관계만 추가
+  const addRelationsMutation = useMutation({
+    mutationFn: async () => {
+      const userId = (await supabase.auth.getUser()).data.user?.id;
+      if (!userId) throw new Error("로그인이 필요합니다");
+      
+      const result = await insertRelationsOnly(userId);
+      return result;
+    },
+    onSuccess: ({ relationTypesCount }) => {
+      queryClient.invalidateQueries({ queryKey: ['relation-types'] });
+      
+      toast({
+        title: "관계 타입 추가 완료",
+        description: `${relationTypesCount}개 관계 타입이 추가되었습니다.`,
+      });
+    },
+    onError: (error: any) => {
+      console.error("관계 추가 오류:", error);
+      toast({
+        title: "관계 추가 실패",
+        description: error.message || "알 수 없는 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const isLoading = createRetailSchemaMutation.isPending || clearSchemaMutation.isPending || backupCurrentSchemaMutation.isPending || addRelationsMutation.isPending;
 
   return (
     <Card className="glass-card border-primary/20">
@@ -316,6 +343,26 @@ export const RetailSchemaPreset = () => {
                   정교한 디지털 트윈 스키마 추가
                 </>
               )}
+            </>
+          )}
+        </Button>
+
+        <Button
+          className="w-full"
+          size="default"
+          variant="outline"
+          onClick={() => addRelationsMutation.mutate()}
+          disabled={isLoading}
+        >
+          {addRelationsMutation.isPending ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              관계 추가 중...
+            </>
+          ) : (
+            <>
+              <Link2 className="mr-2 h-4 w-4" />
+              관계 93개만 추가 (엔티티는 유지)
             </>
           )}
         </Button>

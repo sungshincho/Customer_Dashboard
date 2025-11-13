@@ -1098,11 +1098,15 @@ export async function insertComprehensiveSchema(userId: string) {
 
     // 2. Insert Relation Types
     console.log('Inserting comprehensive relation types...');
+    console.log('Total relation types to insert:', COMPREHENSIVE_RELATION_TYPES.length);
+    
     const relationTypesWithUserId = COMPREHENSIVE_RELATION_TYPES.map(rt => ({
       ...rt,
       user_id: userId,
       properties: JSON.stringify([])
     }));
+
+    console.log('Sample relation:', relationTypesWithUserId[0]);
 
     const { data: relationTypes, error: relationTypesError } = await supabase
       .from('ontology_relation_types')
@@ -1123,6 +1127,39 @@ export async function insertComprehensiveSchema(userId: string) {
     };
   } catch (error: any) {
     console.error('Insert comprehensive schema error:', error);
+    throw error;
+  }
+}
+
+export async function insertRelationsOnly(userId: string) {
+  try {
+    console.log('Inserting relation types only...');
+    console.log('Total relation types to insert:', COMPREHENSIVE_RELATION_TYPES.length);
+    
+    const relationTypesWithUserId = COMPREHENSIVE_RELATION_TYPES.map(rt => ({
+      ...rt,
+      user_id: userId,
+      properties: JSON.stringify([])
+    }));
+
+    const { data: relationTypes, error: relationTypesError } = await supabase
+      .from('ontology_relation_types')
+      .upsert(relationTypesWithUserId, { onConflict: 'user_id,name,source_entity_type,target_entity_type', ignoreDuplicates: false })
+      .select();
+
+    if (relationTypesError) {
+      console.error('Relation types error:', relationTypesError);
+      throw relationTypesError;
+    }
+
+    console.log(`✅ Inserted ${relationTypes?.length || 0} relation types`);
+
+    return {
+      success: true,
+      relationTypesCount: relationTypes?.length || 0
+    };
+  } catch (error: any) {
+    console.error('Insert relations error:', error);
     throw error;
   }
 }
