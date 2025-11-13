@@ -175,11 +175,47 @@ export async function insertSample3DData(userId: string) {
 export async function checkSampleDataExists(userId: string): Promise<boolean> {
   const { data, error } = await supabase
     .from('ontology_entity_types')
-    .select('id')
+    .select('name')
     .eq('user_id', userId)
-    .eq('name', 'StoreSpace')
-    .maybeSingle();
+    .in('name', ['StoreSpace', 'Shelf', 'DisplayTable', 'Product']);
 
-  // 데이터가 존재하면 true, 없거나 에러면 false
-  return !!data && !error;
+  if (error) return false;
+  
+  // 4개 중 하나라도 존재하면 true
+  return !!data && data.length > 0;
+}
+
+export async function deleteSampleData(userId: string) {
+  try {
+    // 1. Delete graph entities first (foreign key dependency)
+    const { data: entityTypes } = await supabase
+      .from('ontology_entity_types')
+      .select('id')
+      .eq('user_id', userId)
+      .in('name', ['StoreSpace', 'Shelf', 'DisplayTable', 'Product']);
+
+    if (entityTypes && entityTypes.length > 0) {
+      const typeIds = entityTypes.map(et => et.id);
+      
+      await supabase
+        .from('graph_entities')
+        .delete()
+        .eq('user_id', userId)
+        .in('entity_type_id', typeIds);
+    }
+
+    // 2. Delete entity types
+    const { error: deleteError } = await supabase
+      .from('ontology_entity_types')
+      .delete()
+      .eq('user_id', userId)
+      .in('name', ['StoreSpace', 'Shelf', 'DisplayTable', 'Product']);
+
+    if (deleteError) throw deleteError;
+
+    return { success: true };
+  } catch (error) {
+    console.error('Sample data deletion error:', error);
+    throw error;
+  }
 }

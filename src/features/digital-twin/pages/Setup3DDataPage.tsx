@@ -3,9 +3,9 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import { insertSample3DData, checkSampleDataExists } from "../utils/sampleDataGenerator";
+import { insertSample3DData, checkSampleDataExists, deleteSampleData } from "../utils/sampleDataGenerator";
 import { toast } from "sonner";
-import { Database, Check, Loader2, Upload, ArrowRight } from "lucide-react";
+import { Database, Check, Loader2, Upload, ArrowRight, Trash2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ModelUploader } from "../components/ModelUploader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -43,16 +43,35 @@ export default function Setup3DDataPage() {
       toast.success(
         `샘플 데이터가 추가되었습니다: ${result.entityTypes}개 타입, ${result.entities}개 엔티티`
       );
-      await checkData(); // Re-check after insertion
+      await checkData();
     } catch (error: any) {
       console.error('Insert sample data error:', error);
       
-      if (error.message.includes('이미 존재')) {
+      if (error.message.includes('이미 존재') || error.message.includes('duplicate key')) {
         toast.info('샘플 데이터가 이미 존재합니다');
-        await checkData(); // Update state
+        await checkData();
+      } else if (error.message.includes('unique constraint')) {
+        toast.error('중복 데이터가 감지되었습니다. 기존 데이터를 먼저 삭제해주세요.');
+        await checkData();
       } else {
         toast.error(`데이터 추가 실패: ${error.message}`);
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteData = async () => {
+    if (!user) return;
+
+    setLoading(true);
+    try {
+      await deleteSampleData(user.id);
+      toast.success('샘플 데이터가 삭제되었습니다');
+      await checkData();
+    } catch (error: any) {
+      console.error('Delete sample data error:', error);
+      toast.error(`데이터 삭제 실패: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -114,12 +133,33 @@ export default function Setup3DDataPage() {
                 <span className="ml-2 text-muted-foreground">데이터 확인 중...</span>
               </div>
             ) : dataExists ? (
-              <Alert>
-                <Check className="h-4 w-4" />
-                <AlertDescription>
-                  샘플 데이터가 이미 존재합니다. 레이아웃 시뮬레이터에서 3D 뷰를 생성해보세요!
-                </AlertDescription>
-              </Alert>
+              <div className="space-y-4">
+                <Alert>
+                  <Check className="h-4 w-4" />
+                  <AlertDescription>
+                    샘플 데이터가 이미 존재합니다. 바로 3D 뷰를 생성하거나, 데이터를 삭제하고 다시 추가할 수 있습니다.
+                  </AlertDescription>
+                </Alert>
+                <div className="flex gap-2 justify-center">
+                  <Button
+                    variant="outline"
+                    onClick={handleDeleteData}
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        삭제 중...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        샘플 데이터 삭제
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
             ) : (
               <div className="flex flex-col items-center gap-4 py-8">
                 <Button
