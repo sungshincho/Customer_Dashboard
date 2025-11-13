@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,13 +13,64 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Layers, Link2, History, ShieldCheck, Network, Download, Loader2 } from "lucide-react";
+import { Layers, Link2, History, ShieldCheck, Network, Download, Loader2, Calculator } from "lucide-react";
 import { RetailSchemaPreset } from "@/features/data-management/ontology/components/RetailSchemaPreset";
+import { OntologyVariableCalculator } from "@/features/data-management/ontology/components/OntologyVariableCalculator";
 
 const SchemaBuilder = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedVersion, setSelectedVersion] = useState<string>("");
+  const [ontologyStats, setOntologyStats] = useState({
+    entityTypeCount: 0,
+    relationTypeCount: 0,
+    avgEntityProperties: 0,
+    avgRelationProperties: 0,
+    totalEntityInstances: 0,
+    totalRelationInstances: 0,
+  });
+
+  // 온톨로지 통계 가져오기
+  useEffect(() => {
+    const fetchStats = async () => {
+      const { data: entityTypes } = await supabase
+        .from('ontology_entity_types')
+        .select('properties');
+      
+      const { data: relationTypes } = await supabase
+        .from('ontology_relation_types')
+        .select('properties');
+      
+      const { data: entityCount } = await supabase
+        .from('graph_entities')
+        .select('id', { count: 'exact', head: true });
+      
+      const { data: relationCount } = await supabase
+        .from('graph_relations')
+        .select('id', { count: 'exact', head: true });
+
+      const entityPropsCount = entityTypes?.reduce((sum, et) => {
+        const props = Array.isArray(et.properties) ? et.properties : [];
+        return sum + props.length;
+      }, 0) || 0;
+
+      const relationPropsCount = relationTypes?.reduce((sum, rt) => {
+        const props = Array.isArray(rt.properties) ? rt.properties : [];
+        return sum + props.length;
+      }, 0) || 0;
+
+      setOntologyStats({
+        entityTypeCount: entityTypes?.length || 0,
+        relationTypeCount: relationTypes?.length || 0,
+        avgEntityProperties: entityTypes?.length ? Math.round(entityPropsCount / entityTypes.length) : 0,
+        avgRelationProperties: relationTypes?.length ? Math.round(relationPropsCount / relationTypes.length) : 0,
+        totalEntityInstances: 0,
+        totalRelationInstances: 0,
+      });
+    };
+
+    fetchStats();
+  }, []);
 
   // 저장된 스키마 버전 목록 가져오기
   const { data: schemaVersions, isLoading: versionsLoading } = useQuery({
@@ -192,7 +243,7 @@ const SchemaBuilder = () => {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="graph" className="w-full">
-              <TabsList className="grid w-full grid-cols-5">
+              <TabsList className="grid w-full grid-cols-6">
                 <TabsTrigger value="graph" className="flex items-center gap-2">
                   <Network className="h-4 w-4" />
                   그래프 뷰
@@ -204,6 +255,10 @@ const SchemaBuilder = () => {
                 <TabsTrigger value="relations" className="flex items-center gap-2">
                   <Link2 className="h-4 w-4" />
                   관계
+                </TabsTrigger>
+                <TabsTrigger value="calculator" className="flex items-center gap-2">
+                  <Calculator className="h-4 w-4" />
+                  변수 계산
                 </TabsTrigger>
                 <TabsTrigger value="versions" className="flex items-center gap-2">
                   <History className="h-4 w-4" />
@@ -225,6 +280,10 @@ const SchemaBuilder = () => {
 
               <TabsContent value="relations" className="space-y-4 mt-6">
                 <RelationTypeManager />
+              </TabsContent>
+
+              <TabsContent value="calculator" className="space-y-4 mt-6">
+                <OntologyVariableCalculator stats={ontologyStats} />
               </TabsContent>
 
               <TabsContent value="versions" className="space-y-4 mt-6">
