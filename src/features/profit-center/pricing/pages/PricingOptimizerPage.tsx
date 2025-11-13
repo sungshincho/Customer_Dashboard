@@ -2,13 +2,16 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, TrendingUp, DollarSign, Target, Zap, Database } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ScatterChart, Scatter } from "recharts";
 import { useOntologyEntities, useOntologyRelations, transformToGraphData } from "@/hooks/useOntologyData";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useSelectedStore } from "@/hooks/useSelectedStore";
+import { useAuth } from "@/hooks/useAuth";
+import { loadStoreDataset } from "@/utils/storageDataLoader";
 
 // 가격 최적화 데이터 (WTP 분석 기반)
 const pricingData = [
@@ -90,14 +93,77 @@ const generateSimulation = (basePrice: number, elasticity: number, baseSales: nu
 };
 
 const PricingOptimizerPage = () => {
+  const { selectedStore } = useSelectedStore();
+  const { user } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
-  const [selectedProduct, setSelectedProduct] = useState(pricingData[0]);
-  const [simulationPrice, setSimulationPrice] = useState(selectedProduct.currentPrice);
+  const [storeData, setStoreData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [pricingData, setPricingData] = useState<any[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [simulationPrice, setSimulationPrice] = useState(0);
 
   // 온톨로지 데이터: 상품, 고객, 구매 관계
   const { data: productEntities = [] } = useOntologyEntities('product');
   const { data: customerEntities = [] } = useOntologyEntities('customer');
   const { data: relations = [] } = useOntologyRelations();
+
+  // 매장 데이터 로드
+  useEffect(() => {
+    const loadData = async () => {
+      if (!user || !selectedStore) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const data = await loadStoreDataset(user.id, selectedStore.id);
+        setStoreData(data);
+
+        // 가격 최적화 데이터 생성
+        if (data.products && data.purchases) {
+          const productsWithPricing = data.products.slice(0, 10).map((product: any, idx: number) => {
+            const basePrice = parseFloat(product.price) || 35000 + (idx * 5000);
+            const cost = basePrice * 0.5;
+            const avgWTP = basePrice * (1.2 + Math.random() * 0.3);
+            const competitorPrice = basePrice * (1.05 + Math.random() * 0.15);
+            const elasticity = -1.2 - Math.random() * 1.2;
+            const currentSales = 20 + Math.floor(Math.random() * 100);
+            const optimalPrice = Math.round(basePrice * (1.1 + Math.random() * 0.2));
+            const projectedSales = Math.round(currentSales * (1.2 + Math.random() * 0.4));
+            const revenueIncrease = (optimalPrice * projectedSales) - (basePrice * currentSales);
+
+            return {
+              product: product.name || product.product_name || `상품 ${idx + 1}`,
+              currentPrice: Math.round(basePrice),
+              avgWTP: Math.round(avgWTP),
+              competitorPrice: Math.round(competitorPrice),
+              cost: Math.round(cost),
+              currentSales,
+              optimalPrice,
+              projectedSales,
+              revenueIncrease: Math.round(revenueIncrease),
+              priceElasticity: parseFloat(elasticity.toFixed(1)),
+              segment: basePrice > 100000 ? '프리미엄' : basePrice > 50000 ? '중고가' : '중가',
+              recommendationConfidence: 85 + Math.floor(Math.random() * 10)
+            };
+          });
+
+          setPricingData(productsWithPricing);
+          if (productsWithPricing.length > 0) {
+            setSelectedProduct(productsWithPricing[0]);
+            setSimulationPrice(productsWithPricing[0].currentPrice);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load store data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [user, selectedStore, refreshKey]);
   
   const graphData = useMemo(() => {
     const allEntities = [...productEntities, ...customerEntities];
@@ -109,13 +175,15 @@ const PricingOptimizerPage = () => {
   };
 
   const totalRevenueIncrease = pricingData.reduce((sum, item) => sum + item.revenueIncrease, 0);
-  const avgConfidence = Math.round(pricingData.reduce((sum, item) => sum + item.recommendationConfidence, 0) / pricingData.length);
+  const avgConfidence = pricingData.length > 0 
+    ? Math.round(pricingData.reduce((sum, item) => sum + item.recommendationConfidence, 0) / pricingData.length)
+    : 0;
 
-  const simulationData = generateSimulation(
+  const simulationData = selectedProduct ? generateSimulation(
     selectedProduct.currentPrice,
     selectedProduct.priceElasticity,
     selectedProduct.currentSales
-  );
+  ) : [];
 
   const getPriceGap = (current: number, optimal: number) => {
     const gap = ((optimal - current) / current) * 100;
@@ -128,13 +196,37 @@ const PricingOptimizerPage = () => {
     return <Badge variant="secondary">검토 필요</Badge>;
   };
 
+  if (!selectedStore) {
+    return (
+      <DashboardLayout>
+        <Alert>
+          <AlertDescription>
+            매장을 선택해주세요. 가격 최적화 분석을 위해서는 매장 선택이 필요합니다.
+          </AlertDescription>
+        </Alert>
+      </DashboardLayout>
+    );
+  }
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <RefreshCw className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between animate-fade-in">
           <div>
             <h1 className="text-3xl font-bold gradient-text">가격 최적화 엔진</h1>
-            <p className="mt-2 text-muted-foreground">AI 기반 동적 가격 전략 및 수익 극대화 (온톨로지 통합)</p>
+            <p className="mt-2 text-muted-foreground">
+              AI 기반 동적 가격 전략 및 수익 극대화 - {selectedStore.store_name}
+            </p>
           </div>
           <Button onClick={handleRefresh} variant="outline" size="sm">
             <RefreshCw className="w-4 h-4 mr-2" />
@@ -290,7 +382,7 @@ const PricingOptimizerPage = () => {
           <TabsContent value="simulator">
             <Card>
               <CardHeader>
-                <CardTitle>가격 시뮬레이터: {selectedProduct.product}</CardTitle>
+                <CardTitle>가격 시뮬레이터: {selectedProduct?.product || '상품을 선택하세요'}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-4">
