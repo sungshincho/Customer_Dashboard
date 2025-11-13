@@ -3,7 +3,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Phone, Trash2, Edit, Loader2, Database } from "lucide-react";
+import { Phone, Trash2, Edit, Loader2 } from "lucide-react";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { StoreForm } from "../components/StoreForm";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,10 +25,9 @@ const Stores = () => {
   const { user } = useAuth();
   const { stores, loading, refreshStores, selectedStore, setSelectedStore } = useSelectedStore();
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [generating, setGenerating] = useState(false);
   const [dataChecked, setDataChecked] = useState(false);
 
-  // 페이지 로드 시 자동으로 데이터 확인 및 생성
+  // 페이지 로드 시 자동으로 데이터 확인 및 생성 (백그라운드)
   useEffect(() => {
     const checkAndGenerateData = async () => {
       if (!user || stores.length === 0 || dataChecked) return;
@@ -43,10 +42,9 @@ const Stores = () => {
           .from('store-data')
           .list(`${user.id}/${firstStore.id}`);
 
-        // 데이터가 없으면 자동 생성
+        // 데이터가 없으면 백그라운드에서 자동 생성
         if (!files || files.length === 0) {
-          console.log('샘플 데이터가 없어서 자동 생성을 시작합니다...');
-          setGenerating(true);
+          console.log('📦 샘플 데이터 자동 생성 시작...');
           
           const response = await supabase.functions.invoke('auto-generate-store-data', {
             headers: {
@@ -55,62 +53,23 @@ const Stores = () => {
           });
 
           if (!response.error) {
-            console.log('샘플 데이터가 자동으로 생성되었습니다:', response.data);
-            toast.success('매장 샘플 데이터가 생성되었습니다');
+            console.log('✅ 샘플 데이터 생성 완료:', response.data);
+          } else {
+            console.error('❌ 샘플 데이터 생성 실패:', response.error);
           }
-          setGenerating(false);
         } else {
-          console.log('샘플 데이터가 이미 존재합니다');
+          console.log('✅ 샘플 데이터 이미 존재');
         }
         
         setDataChecked(true);
       } catch (error) {
         console.error('데이터 확인 오류:', error);
         setDataChecked(true);
-        setGenerating(false);
       }
     };
 
     checkAndGenerateData();
   }, [user, stores, dataChecked]);
-
-  const handleGenerateAllData = async () => {
-    if (!user) return;
-
-    setGenerating(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error('인증이 필요합니다');
-        return;
-      }
-
-      toast.loading('모든 매장의 샘플 데이터를 생성중입니다...', { id: 'generate-data' });
-
-      const response = await supabase.functions.invoke('auto-generate-store-data', {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        }
-      });
-
-      if (response.error) throw response.error;
-
-      console.log('Generated data:', response.data);
-      toast.success(`${stores.length}개 매장의 샘플 데이터가 생성되었습니다`, { id: 'generate-data' });
-      
-      // 각 매장별 생성된 데이터 상세 정보 표시
-      if (response.data?.results) {
-        response.data.results.forEach((result: any) => {
-          console.log(`${result.store}: 고객 ${result.stats.customers}명, 상품 ${result.stats.products}개, 구매 ${result.stats.purchases}건`);
-        });
-      }
-    } catch (error) {
-      console.error('Generate data error:', error);
-      toast.error('데이터 생성에 실패했습니다', { id: 'generate-data' });
-    } finally {
-      setGenerating(false);
-    }
-  };
 
   const handleDelete = async (storeId: string) => {
     if (!user) return;
@@ -161,28 +120,7 @@ const Stores = () => {
               전체 매장 현황 및 관리 ({stores.length}개 매장)
             </p>
           </div>
-          <div className="flex gap-2">
-            {stores.length > 0 && (
-              <Button 
-                onClick={handleGenerateAllData}
-                disabled={generating}
-                variant="outline"
-              >
-                {generating ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    데이터 생성 중...
-                  </>
-                ) : (
-                  <>
-                    <Database className="w-4 h-4 mr-2" />
-                    샘플 데이터 생성
-                  </>
-                )}
-              </Button>
-            )}
-            <StoreForm onSuccess={refreshStores} />
-          </div>
+          <StoreForm onSuccess={refreshStores} />
         </div>
 
         {/* Empty State */}
