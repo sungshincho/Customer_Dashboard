@@ -6,13 +6,26 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Upload, Loader2, CheckCircle } from 'lucide-react';
+import { Upload, Loader2, CheckCircle, Copy, ExternalLink } from 'lucide-react';
+
+interface UploadedFile {
+  name: string;
+  url: string;
+}
 
 export function ModelUploader() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "복사 완료",
+      description: "URL이 클립보드에 복사되었습니다",
+    });
+  };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -35,12 +48,12 @@ export function ModelUploader() {
           .from('3d-models')
           .getPublicUrl(fileName);
 
-        return { fileName: file.name, url: publicUrl };
+        return { name: file.name, url: publicUrl };
       });
 
       const results = await Promise.all(uploadPromises);
       
-      setUploadedFiles(prev => [...prev, ...results.map(r => r.fileName)]);
+      setUploadedFiles(prev => [...prev, ...results]);
       
       toast({
         title: "업로드 완료",
@@ -91,12 +104,38 @@ export function ModelUploader() {
 
         {uploadedFiles.length > 0 && (
           <div className="space-y-2">
-            <Label>업로드된 파일</Label>
-            <div className="space-y-1">
+            <Label>업로드된 파일 (클릭하여 URL 복사)</Label>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
               {uploadedFiles.map((file, idx) => (
-                <div key={idx} className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                  <span>{file}</span>
+                <div 
+                  key={idx} 
+                  className="flex items-center justify-between gap-2 p-3 border rounded-lg hover:bg-accent/50 transition-colors"
+                >
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{file.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{file.url}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-1 flex-shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => copyToClipboard(file.url)}
+                      title="URL 복사"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => window.open(file.url, '_blank')}
+                      title="새 탭에서 열기"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>

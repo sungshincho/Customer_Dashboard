@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { insertSample3DData, checkSampleDataExists } from "../utils/sampleDataGenerator";
 import { toast } from "sonner";
-import { Database, Check, Loader2 } from "lucide-react";
+import { Database, Check, Loader2, Upload, ArrowRight } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ModelUploader } from "../components/ModelUploader";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Setup3DDataPage() {
   const { user } = useAuth();
@@ -58,15 +60,28 @@ export default function Setup3DDataPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 max-w-4xl mx-auto">
+      <div className="space-y-6 max-w-6xl mx-auto">
         <div>
-          <h1 className="text-3xl font-bold">3D 샘플 데이터 설정</h1>
+          <h1 className="text-3xl font-bold gradient-text">3D 디지털 트윈 설정</h1>
           <p className="text-muted-foreground mt-2">
-            디지털 트윈 3D 시각화를 위한 온톨로지 샘플 데이터를 추가합니다
+            온톨로지 기반 3D 시각화를 위한 샘플 데이터 및 3D 모델을 관리합니다
           </p>
         </div>
 
-        <Card className="p-6">
+        <Tabs defaultValue="sample-data" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="sample-data">
+              <Database className="w-4 h-4 mr-2" />
+              샘플 데이터
+            </TabsTrigger>
+            <TabsTrigger value="3d-models">
+              <Upload className="w-4 h-4 mr-2" />
+              3D 모델 업로드
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="sample-data">
+            <Card className="p-6">
           <div className="space-y-6">
             <div>
               <h2 className="text-xl font-semibold mb-4">추가될 데이터</h2>
@@ -131,16 +146,66 @@ export default function Setup3DDataPage() {
             )}
 
             <div className="border-t pt-6">
-              <h3 className="font-semibold mb-3">다음 단계</h3>
+              <h3 className="font-semibold mb-3 flex items-center gap-2">
+                <ArrowRight className="w-4 h-4" />
+                테스트 방법
+              </h3>
               <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-                <li>샘플 데이터 추가 버튼 클릭</li>
-                <li>레이아웃 시뮬레이터 페이지로 이동</li>
-                <li>"3D 뷰" 탭에서 "3D 레이아웃 생성" 클릭</li>
+                <li><strong>샘플 데이터 추가</strong> 버튼 클릭</li>
+                <li>(선택) "3D 모델 업로드" 탭에서 .glb 파일 업로드</li>
+                <li><strong>분석 페이지</strong>로 이동 (방문자 현황, 동선 히트맵, 고객 여정, 레이아웃 시뮬레이터)</li>
+                <li><strong>"3D 뷰"</strong> 탭에서 "3D 매장 생성" 클릭</li>
                 <li>온톨로지 기반으로 자동 조합된 3D 씬 확인</li>
               </ol>
+              
+              <Alert className="mt-4">
+                <AlertDescription>
+                  <strong>참고:</strong> 3D 모델 파일이 없어도 색상이 있는 placeholder 박스로 표시됩니다. 
+                  실제 3D 모델을 사용하려면 "3D 모델 업로드" 탭에서 .glb 파일을 업로드한 후 
+                  스키마 빌더에서 엔티티 타입에 할당하세요.
+                </AlertDescription>
+              </Alert>
             </div>
           </div>
         </Card>
+          </TabsContent>
+
+          <TabsContent value="3d-models">
+            <div className="space-y-6">
+              <ModelUploader />
+              
+              <Card className="p-6">
+                <h3 className="font-semibold mb-4">3D 모델 사용 방법</h3>
+                <ol className="list-decimal list-inside space-y-3 text-sm text-muted-foreground">
+                  <li>
+                    <strong>.glb 또는 .gltf 파일</strong>을 위 업로더에서 업로드
+                  </li>
+                  <li>
+                    업로드된 파일의 URL이 자동으로 복사됩니다
+                  </li>
+                  <li>
+                    <strong>스키마 빌더</strong> 페이지로 이동하여 엔티티 타입 편집
+                  </li>
+                  <li>
+                    "3D Model URL" 필드에 복사한 URL을 붙여넣기
+                  </li>
+                  <li>
+                    이후 생성되는 모든 3D 씬에서 실제 모델이 표시됩니다
+                  </li>
+                </ol>
+
+                <Alert className="mt-4">
+                  <AlertDescription>
+                    <strong>추천 3D 모델 소스:</strong><br/>
+                    • <a href="https://sketchfab.com" target="_blank" rel="noopener" className="text-primary hover:underline">Sketchfab</a> - 무료 3D 모델 다운로드<br/>
+                    • <a href="https://poly.pizza" target="_blank" rel="noopener" className="text-primary hover:underline">Poly Pizza</a> - 저용량 3D 에셋<br/>
+                    • GLB 포맷 권장 (최적화된 바이너리 GLTF)
+                  </AlertDescription>
+                </Alert>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </DashboardLayout>
   );
