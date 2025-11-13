@@ -242,6 +242,9 @@ export type Database = {
           entity_type_id: string
           id: string
           label: string
+          model_3d_position: Json | null
+          model_3d_rotation: Json | null
+          model_3d_scale: Json | null
           properties: Json | null
           updated_at: string | null
           user_id: string
@@ -251,6 +254,9 @@ export type Database = {
           entity_type_id: string
           id?: string
           label: string
+          model_3d_position?: Json | null
+          model_3d_rotation?: Json | null
+          model_3d_scale?: Json | null
           properties?: Json | null
           updated_at?: string | null
           user_id: string
@@ -260,6 +266,9 @@ export type Database = {
           entity_type_id?: string
           id?: string
           label?: string
+          model_3d_position?: Json | null
+          model_3d_rotation?: Json | null
+          model_3d_scale?: Json | null
           properties?: Json | null
           updated_at?: string | null
           user_id?: string
@@ -441,6 +450,10 @@ export type Database = {
           icon: string | null
           id: string
           label: string
+          model_3d_dimensions: Json | null
+          model_3d_metadata: Json | null
+          model_3d_type: string | null
+          model_3d_url: string | null
           name: string
           properties: Json | null
           updated_at: string | null
@@ -453,6 +466,10 @@ export type Database = {
           icon?: string | null
           id?: string
           label: string
+          model_3d_dimensions?: Json | null
+          model_3d_metadata?: Json | null
+          model_3d_type?: string | null
+          model_3d_url?: string | null
           name: string
           properties?: Json | null
           updated_at?: string | null
@@ -465,6 +482,10 @@ export type Database = {
           icon?: string | null
           id?: string
           label?: string
+          model_3d_dimensions?: Json | null
+          model_3d_metadata?: Json | null
+          model_3d_type?: string | null
+          model_3d_url?: string | null
           name?: string
           properties?: Json | null
           updated_at?: string | null
