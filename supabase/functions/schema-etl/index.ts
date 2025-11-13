@@ -7,6 +7,7 @@ const corsHeaders = {
 
 interface ETLRequest {
   import_id: string;
+  store_id: string; // 매장 ID 추가
   entity_mappings: Array<{
     entity_type_id: string;
     column_mappings: Record<string, string>; // property_name -> column_name
@@ -116,6 +117,7 @@ Deno.serve(async (req) => {
 
         entitiesToInsert.push({
           user_id: user.id,
+          store_id: body.store_id,
           entity_type_id: mapping.entity_type_id,
           label,
           properties,
@@ -186,6 +188,7 @@ Deno.serve(async (req) => {
 
         relationsToInsert.push({
           user_id: user.id,
+          store_id: body.store_id,
           relation_type_id: relMapping.relation_type_id,
           source_entity_id: sourceEntityId,
           target_entity_id: targetEntityId,

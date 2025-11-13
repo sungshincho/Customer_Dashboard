@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { Database, ArrowRight, Play, Check, Sparkles, Wand2, Loader2 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useSelectedStore } from '@/hooks/useSelectedStore';
 
 // 문자열 유사도 계산 (Levenshtein distance)
 const calculateSimilarity = (str1: string, str2: string): number => {
@@ -52,6 +53,7 @@ interface SchemaMappingProps {
 
 export const SchemaMapper = ({ importId, importData, onComplete }: SchemaMappingProps) => {
   const queryClient = useQueryClient();
+  const { selectedStore } = useSelectedStore();
   const [entityMappings, setEntityMappings] = useState<any[]>([]);
   const [relationMappings, setRelationMappings] = useState<any[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
@@ -140,12 +142,17 @@ export const SchemaMapper = ({ importId, importData, onComplete }: SchemaMapping
   // ETL 실행
   const etlMutation = useMutation({
     mutationFn: async () => {
+      if (!selectedStore) {
+        throw new Error('매장을 선택해주세요');
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
       const response = await supabase.functions.invoke('schema-etl', {
         body: {
           import_id: importId,
+          store_id: selectedStore.id,
           entity_mappings: entityMappings,
           relation_mappings: relationMappings,
         },
@@ -155,7 +162,9 @@ export const SchemaMapper = ({ importId, importData, onComplete }: SchemaMapping
       return response.data;
     },
     onSuccess: (data) => {
-      toast.success(`ETL 완료: ${data.entities_created}개 엔티티, ${data.relations_created}개 관계 생성`);
+      toast.success(`ETL 완료: ${data.entities_created}개 엔티티, ${data.relations_created}개 관계 생성`, {
+        description: selectedStore ? `${selectedStore.store_name}에 저장됨` : undefined
+      });
       queryClient.invalidateQueries({ queryKey: ['graph-entities'] });
       onComplete();
     },

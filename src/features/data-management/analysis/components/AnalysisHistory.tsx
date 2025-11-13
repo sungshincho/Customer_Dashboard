@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
+import { useSelectedStore } from "@/hooks/useSelectedStore";
 
 interface AnalysisHistoryItem {
   id: string;
@@ -24,16 +25,18 @@ export const AnalysisHistory = ({ analysisType, refreshTrigger }: AnalysisHistor
   const [history, setHistory] = useState<AnalysisHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { selectedStore } = useSelectedStore();
 
   const fetchHistory = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user || !selectedStore) return;
 
       const { data, error} = await (supabase as any)
         .from('analysis_history')
         .select('*')
         .eq('user_id', user.id)
+        .eq('store_id', selectedStore.id)
         .eq('analysis_type', analysisType)
         .order('created_at', { ascending: false })
         .limit(10);
@@ -54,7 +57,7 @@ export const AnalysisHistory = ({ analysisType, refreshTrigger }: AnalysisHistor
 
   useEffect(() => {
     fetchHistory();
-  }, [analysisType, refreshTrigger]);
+  }, [analysisType, refreshTrigger, selectedStore]);
 
   const handleDelete = async (id: string) => {
     try {

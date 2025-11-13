@@ -21,6 +21,7 @@ export type Database = {
           id: string
           insights: Json
           scene_data: Json
+          store_id: string | null
           updated_at: string
           user_id: string
         }
@@ -30,6 +31,7 @@ export type Database = {
           id?: string
           insights: Json
           scene_data: Json
+          store_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -39,10 +41,19 @@ export type Database = {
           id?: string
           insights?: Json
           scene_data?: Json
+          store_id?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ai_scene_analysis_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       analysis_history: {
         Row: {
@@ -51,6 +62,7 @@ export type Database = {
           id: string
           input_data: Json
           result: string
+          store_id: string | null
           user_id: string
         }
         Insert: {
@@ -59,6 +71,7 @@ export type Database = {
           id?: string
           input_data: Json
           result: string
+          store_id?: string | null
           user_id: string
         }
         Update: {
@@ -67,9 +80,18 @@ export type Database = {
           id?: string
           input_data?: Json
           result?: string
+          store_id?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "analysis_history_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       auto_order_suggestions: {
         Row: {
@@ -276,6 +298,7 @@ export type Database = {
           model_3d_rotation: Json | null
           model_3d_scale: Json | null
           properties: Json | null
+          store_id: string | null
           updated_at: string | null
           user_id: string
         }
@@ -288,6 +311,7 @@ export type Database = {
           model_3d_rotation?: Json | null
           model_3d_scale?: Json | null
           properties?: Json | null
+          store_id?: string | null
           updated_at?: string | null
           user_id: string
         }
@@ -300,6 +324,7 @@ export type Database = {
           model_3d_rotation?: Json | null
           model_3d_scale?: Json | null
           properties?: Json | null
+          store_id?: string | null
           updated_at?: string | null
           user_id?: string
         }
@@ -311,6 +336,13 @@ export type Database = {
             referencedRelation: "ontology_entity_types"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "graph_entities_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
         ]
       }
       graph_relations: {
@@ -320,6 +352,7 @@ export type Database = {
           properties: Json | null
           relation_type_id: string
           source_entity_id: string
+          store_id: string | null
           target_entity_id: string
           updated_at: string | null
           user_id: string
@@ -331,6 +364,7 @@ export type Database = {
           properties?: Json | null
           relation_type_id: string
           source_entity_id: string
+          store_id?: string | null
           target_entity_id: string
           updated_at?: string | null
           user_id: string
@@ -342,6 +376,7 @@ export type Database = {
           properties?: Json | null
           relation_type_id?: string
           source_entity_id?: string
+          store_id?: string | null
           target_entity_id?: string
           updated_at?: string | null
           user_id?: string
@@ -360,6 +395,13 @@ export type Database = {
             columns: ["source_entity_id"]
             isOneToOne: false
             referencedRelation: "graph_entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "graph_relations_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
             referencedColumns: ["id"]
           },
           {
@@ -722,6 +764,7 @@ export type Database = {
           raw_data: Json
           row_count: number
           sheet_name: string | null
+          store_id: string | null
           user_id: string
         }
         Insert: {
@@ -733,6 +776,7 @@ export type Database = {
           raw_data: Json
           row_count: number
           sheet_name?: string | null
+          store_id?: string | null
           user_id: string
         }
         Update: {
@@ -744,9 +788,18 @@ export type Database = {
           raw_data?: Json
           row_count?: number
           sheet_name?: string | null
+          store_id?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_data_imports_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       wifi_probe_data: {
         Row: {

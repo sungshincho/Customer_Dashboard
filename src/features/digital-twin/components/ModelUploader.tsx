@@ -1,15 +1,17 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Upload, Loader2, CheckCircle, Copy, ExternalLink, Sparkles, Eye } from 'lucide-react';
+import { Upload, Loader2, CheckCircle, Copy, ExternalLink, Sparkles, Eye, AlertCircle } from 'lucide-react';
 import { AutoModelMapper } from './AutoModelMapper';
 import { Model3DPreview } from './Model3DPreview';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface UploadedFile {
   name: string;
@@ -32,6 +34,7 @@ interface ModelAnalysis {
 
 export function ModelUploader() {
   const { user } = useAuth();
+  const { selectedStore } = useSelectedStore();
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -85,12 +88,22 @@ export function ModelUploader() {
     const files = event.target.files;
     if (!files || files.length === 0 || !user) return;
 
+    if (!selectedStore) {
+      toast({
+        title: "매장을 선택해주세요",
+        description: "3D 모델을 업로드하려면 먼저 매장을 선택해야 합니다",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setUploading(true);
 
     try {
       const uploadPromises = Array.from(files).map(async (file) => {
         const fileExt = file.name.split('.').pop();
-        const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        // 매장별 경로: {userId}/{storeId}/3d-models/{filename}
+        const fileName = `${user.id}/${selectedStore.id}/3d-models/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
         const { error: uploadError } = await supabase.storage
           .from('3d-models')
@@ -132,6 +145,15 @@ export function ModelUploader() {
 
   return (
     <div className="space-y-4">
+      {!selectedStore && (
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            3D 모델을 업로드하려면 먼저 사이드바에서 매장을 선택해주세요
+          </AlertDescription>
+        </Alert>
+      )}
+
       {pendingAnalysis && (
         <AutoModelMapper
           analysis={pendingAnalysis}

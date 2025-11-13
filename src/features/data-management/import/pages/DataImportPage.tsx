@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Upload, FileSpreadsheet, Trash2, Download, Link2, Database } from "lucide-react";
+import { Upload, FileSpreadsheet, Trash2, Download, Link2, Database, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { detectDataType } from "@/utils/dataNormalizer";
@@ -17,6 +17,8 @@ import * as XLSX from "xlsx";
 import { SchemaMapper } from "@/components/etl/SchemaMapper";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast as sonnerToast } from "sonner";
+import { useSelectedStore } from "@/hooks/useSelectedStore";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface ImportedData {
   id: string;
@@ -30,6 +32,7 @@ interface ImportedData {
 }
 
 const DataImport = () => {
+  const { selectedStore } = useSelectedStore();
   const [file, setFile] = useState<File | null>(null);
   const [dataType, setDataType] = useState<string>("");
   const [isUploading, setIsUploading] = useState(false);
@@ -289,6 +292,7 @@ const DataImport = () => {
         const dataArray = Array.isArray(parsedData) ? parsedData : [parsedData];
         const { error } = await (supabase as any).from("user_data_imports").insert({
           user_id: user.id,
+          store_id: selectedStore?.id,
           file_name: file.name,
           file_type: file.name.split(".").pop() || "unknown",
           data_type: dataType,
@@ -397,6 +401,7 @@ const DataImport = () => {
 
       const { error } = await (supabase as any).from("user_data_imports").insert({
         user_id: user.id,
+        store_id: selectedStore?.id,
         file_name: `API_${new Date().toISOString()}`,
         file_type: "api",
         data_type: dataType,
@@ -443,9 +448,18 @@ const DataImport = () => {
         <div>
           <h1 className="text-3xl font-bold text-foreground">데이터 임포트</h1>
           <p className="text-muted-foreground mt-2">
-            자사 데이터를 업로드하여 분석에 활용하세요
+            {selectedStore ? `${selectedStore.store_name} - 자사 데이터를 업로드하여 분석에 활용하세요` : '매장을 선택하여 데이터를 업로드하세요'}
           </p>
         </div>
+
+        {!selectedStore && (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              데이터를 임포트하려면 먼저 사이드바에서 매장을 선택해주세요. 임포트된 모든 데이터는 선택한 매장에만 저장됩니다.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <Tabs defaultValue="file" className="space-y-4">
           <TabsList className="grid w-full grid-cols-2">

@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Sparkles, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useSelectedStore } from "@/hooks/useSelectedStore";
 
 interface AIAnalysisButtonProps {
   analysisType: string;
@@ -20,6 +21,7 @@ export const AIAnalysisButton = ({ analysisType, data, title = "AI 분석 요청
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<string | null>(null);
   const { toast } = useToast();
+  const { selectedStore } = useSelectedStore();
 
   const handleAnalyze = async () => {
     setIsAnalyzing(true);
@@ -48,9 +50,10 @@ export const AIAnalysisButton = ({ analysisType, data, title = "AI 분석 요청
       setAnalysis(result.analysis);
       
       // Save to history
-      if (user) {
+      if (user && selectedStore) {
         await (supabase as any).from('analysis_history').insert({
           user_id: user.id,
+          store_id: selectedStore.id,
           analysis_type: analysisType,
           input_data: data,
           result: result.analysis

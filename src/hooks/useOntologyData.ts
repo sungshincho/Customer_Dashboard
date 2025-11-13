@@ -1,12 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useSelectedStore } from './useSelectedStore';
 
 /**
- * 온톨로지 기반 엔티티 데이터를 가져오는 Hook
+ * 온톨로지 기반 엔티티 데이터를 가져오는 Hook (매장별 필터링)
  */
 export function useOntologyEntities(entityTypeName?: string) {
+  const { selectedStore } = useSelectedStore();
+  
   return useQuery({
-    queryKey: ['ontology-entities', entityTypeName],
+    queryKey: ['ontology-entities', entityTypeName, selectedStore?.id],
     queryFn: async () => {
       let query = supabase
         .from('graph_entities')
@@ -15,6 +18,11 @@ export function useOntologyEntities(entityTypeName?: string) {
           entity_type:ontology_entity_types!graph_entities_entity_type_id_fkey(*)
         `)
         .order('created_at', { ascending: false });
+
+      // 매장별 필터링
+      if (selectedStore) {
+        query = query.eq('store_id', selectedStore.id);
+      }
 
       // 특정 엔티티 타입 필터링
       if (entityTypeName) {
@@ -33,17 +41,20 @@ export function useOntologyEntities(entityTypeName?: string) {
       if (error) throw error;
       return data || [];
     },
+    enabled: !!selectedStore, // 매장이 선택되어야만 실행
   });
 }
 
 /**
- * 온톨로지 기반 관계 데이터를 가져오는 Hook
+ * 온톨로지 기반 관계 데이터를 가져오는 Hook (매장별 필터링)
  */
 export function useOntologyRelations(sourceEntityTypeName?: string, targetEntityTypeName?: string) {
+  const { selectedStore } = useSelectedStore();
+  
   return useQuery({
-    queryKey: ['ontology-relations', sourceEntityTypeName, targetEntityTypeName],
+    queryKey: ['ontology-relations', sourceEntityTypeName, targetEntityTypeName, selectedStore?.id],
     queryFn: async () => {
-      const query = supabase
+      let query = supabase
         .from('graph_relations')
         .select(`
           *,
@@ -53,10 +64,16 @@ export function useOntologyRelations(sourceEntityTypeName?: string, targetEntity
         `)
         .order('created_at', { ascending: false });
 
+      // 매장별 필터링
+      if (selectedStore) {
+        query = query.eq('store_id', selectedStore.id);
+      }
+
       const { data, error } = await query;
       if (error) throw error;
       return data || [];
     },
+    enabled: !!selectedStore, // 매장이 선택되어야만 실행
   });
 }
 
@@ -106,11 +123,13 @@ export function transformToGraphData(entities: any[], relations: any[]) {
 }
 
 /**
- * 엔티티 타입별 집계 데이터
+ * 엔티티 타입별 집계 데이터 (매장별 필터링)
  */
 export function useEntityAggregation(entityTypeName: string, aggregateField: string) {
+  const { selectedStore } = useSelectedStore();
+  
   return useQuery({
-    queryKey: ['entity-aggregation', entityTypeName, aggregateField],
+    queryKey: ['entity-aggregation', entityTypeName, aggregateField, selectedStore?.id],
     queryFn: async () => {
       const { data: entityType } = await supabase
         .from('ontology_entity_types')
@@ -120,10 +139,17 @@ export function useEntityAggregation(entityTypeName: string, aggregateField: str
       
       if (!entityType) return [];
 
-      const { data: entities, error } = await supabase
+      let query = supabase
         .from('graph_entities')
         .select('label, properties')
         .eq('entity_type_id', entityType.id);
+
+      // 매장별 필터링
+      if (selectedStore) {
+        query = query.eq('store_id', selectedStore.id);
+      }
+
+      const { data: entities, error } = await query;
 
       if (error) throw error;
 
@@ -133,15 +159,18 @@ export function useEntityAggregation(entityTypeName: string, aggregateField: str
         value: e.properties?.[aggregateField] || 0,
       })) || [];
     },
+    enabled: !!selectedStore,
   });
 }
 
 /**
- * 관계 기반 추론: 특정 엔티티와 연결된 다른 엔티티 찾기
+ * 관계 기반 추론: 특정 엔티티와 연결된 다른 엔티티 찾기 (매장별 필터링)
  */
 export function useRelatedEntities(entityId: string, relationTypeName?: string) {
+  const { selectedStore } = useSelectedStore();
+  
   return useQuery({
-    queryKey: ['related-entities', entityId, relationTypeName],
+    queryKey: ['related-entities', entityId, relationTypeName, selectedStore?.id],
     queryFn: async () => {
       let query = supabase
         .from('graph_relations')
@@ -150,6 +179,11 @@ export function useRelatedEntities(entityId: string, relationTypeName?: string) 
           relation_type:ontology_relation_types!graph_relations_relation_type_id_fkey(*)
         `)
         .eq('source_entity_id', entityId);
+
+      // 매장별 필터링
+      if (selectedStore) {
+        query = query.eq('store_id', selectedStore.id);
+      }
 
       if (relationTypeName) {
         const { data: relationType } = await supabase
@@ -167,6 +201,6 @@ export function useRelatedEntities(entityId: string, relationTypeName?: string) 
       if (error) throw error;
       return data || [];
     },
-    enabled: !!entityId,
+    enabled: !!entityId && !!selectedStore,
   });
 }
