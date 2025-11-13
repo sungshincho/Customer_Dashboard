@@ -17,15 +17,35 @@ export function ProductPlacement({ products, onClick }: ProductPlacementProps) {
 }
 
 function ProductItem({ asset, onClick }: { asset: ProductAsset; onClick: () => void }) {
-  const { scene } = useGLTF(asset.model_url);
-  
-  return (
-    <primitive
-      object={scene.clone()}
-      position={[asset.position.x, asset.position.y, asset.position.z]}
-      rotation={[asset.rotation.x, asset.rotation.y, asset.rotation.z]}
-      scale={[asset.scale.x, asset.scale.y, asset.scale.z]}
-      onClick={onClick}
-    />
-  );
+  // Skip if no valid model URL
+  if (!asset.model_url) {
+    return null;
+  }
+
+  try {
+    const { scene } = useGLTF(asset.model_url);
+    
+    return (
+      <primitive
+        object={scene.clone()}
+        position={[asset.position.x, asset.position.y, asset.position.z]}
+        rotation={[asset.rotation.x, asset.rotation.y, asset.rotation.z]}
+        scale={[asset.scale.x, asset.scale.y, asset.scale.z]}
+        onClick={onClick}
+      />
+    );
+  } catch (error) {
+    console.warn('Failed to load product model:', asset.sku, error);
+    // Render fallback cylinder (like a product)
+    return (
+      <mesh
+        position={[asset.position.x, asset.position.y + 0.25, asset.position.z]}
+        onClick={onClick}
+        castShadow
+      >
+        <cylinderGeometry args={[0.15, 0.15, 0.5, 16]} />
+        <meshStandardMaterial color="#4a90e2" />
+      </mesh>
+    );
+  }
 }

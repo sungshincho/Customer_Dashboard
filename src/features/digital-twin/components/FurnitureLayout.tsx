@@ -17,15 +17,35 @@ export function FurnitureLayout({ furniture, onClick }: FurnitureLayoutProps) {
 }
 
 function FurnitureItem({ asset, onClick }: { asset: FurnitureAsset; onClick: () => void }) {
-  const { scene } = useGLTF(asset.model_url);
-  
-  return (
-    <primitive
-      object={scene.clone()}
-      position={[asset.position.x, asset.position.y, asset.position.z]}
-      rotation={[asset.rotation.x, asset.rotation.y, asset.rotation.z]}
-      scale={[asset.scale.x, asset.scale.y, asset.scale.z]}
-      onClick={onClick}
-    />
-  );
+  // Skip if no valid model URL
+  if (!asset.model_url) {
+    return null;
+  }
+
+  try {
+    const { scene } = useGLTF(asset.model_url);
+    
+    return (
+      <primitive
+        object={scene.clone()}
+        position={[asset.position.x, asset.position.y, asset.position.z]}
+        rotation={[asset.rotation.x, asset.rotation.y, asset.rotation.z]}
+        scale={[asset.scale.x, asset.scale.y, asset.scale.z]}
+        onClick={onClick}
+      />
+    );
+  } catch (error) {
+    console.warn('Failed to load furniture model:', asset.furniture_type, error);
+    // Render fallback box
+    return (
+      <mesh
+        position={[asset.position.x, asset.position.y + 0.5, asset.position.z]}
+        onClick={onClick}
+        castShadow
+      >
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color="#8b4513" />
+      </mesh>
+    );
+  }
 }
