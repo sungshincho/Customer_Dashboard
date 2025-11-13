@@ -72,23 +72,65 @@ function generateCustomers(storePrefix: string, storeSeed: number, count: number
 
 function generateProducts(storePrefix: string, storeSeed: number, count: number = 30) {
   const products = [];
-  const random = seededRandom(storeSeed * 251); // 다른 소수 사용
-  const categories = ['스마트폰', '태블릿', '노트북', '액세서리', '웨어러블'];
-  const brands = ['삼성', '애플', '엘지', '샤오미', '화웨이'];
-  const productTypes = ['갤럭시', '아이폰', '아이패드', '맥북', '에어팟', '워치', '버즈'];
+  const random = seededRandom(storeSeed * 251);
+  
+  // 매장별 고유 상품 컬렉션 (store_code 기반)
+  const storeProductSets: { [key: string]: { categories: string[], brands: string[], types: string[][] } } = {
+    'GN001': { // 강남점 - Street Casual
+      categories: ['스트릿 티셔츠', '데님 팬츠', '후드/맨투맨', '스니커즈', '캡/비니'],
+      brands: ['슈프림', '스투시', '팔라스', '카르하트', '디키즈'],
+      types: [
+        ['로고 티', '그래픽 티', '오버핏 티', '타이다이 티', '크롭 티'],
+        ['슬림 진', '와이드 진', '크롭 진', '블랙 진', '워싱 진'],
+        ['기본 후드', '오버핏 후드', '크롭 후드', '집업 후드', '맨투맨'],
+        ['로우탑', '하이탑', '슬립온', '플랫폼', '러닝화'],
+        ['볼캡', '버킷햇', '비니', '스냅백', '캠프캡']
+      ]
+    },
+    'GN002': { // 강남점2 - Minimal Basic
+      categories: ['베이직 티셔츠', '슬랙스', '니트', '코트', '로퍼'],
+      brands: ['유니클로', '무인양품', 'COS', '에잇세컨즈', '스파오'],
+      types: [
+        ['라운드 티', '브이넥 티', '롱슬리브', '폴로', '헨리넥'],
+        ['기본 슬랙스', '와이드 슬랙스', '테이퍼드', '치노', '린넨 팬츠'],
+        ['라운드 니트', '터틀넥', '가디건', '조끼', '폴로 니트'],
+        ['트렌치 코트', '울 코트', '더블 코트', '싱글 코트', '맥 코트'],
+        ['페니 로퍼', '태슬 로퍼', '비트 로퍼', '스웨이드 로퍼', '특양화']
+      ]
+    },
+    'GN003': { // 강남점3 - Trendy Luxury
+      categories: ['디자이너 셔츠', '프리미엄 팬츠', '가죽 재킷', '명품 스니커즈', '디자이너 백'],
+      brands: ['발렌시아가', '생로랑', '프라다', '구찌', '디올'],
+      types: [
+        ['오버핏 셔츠', '실크 셔츠', '린넨 셔츠', '프린트 셔츠', '데님 셔츠'],
+        ['테일러드 팬츠', '와이드 팬츠', '플리츠 팬츠', '가죽 팬츠', '벨벳 팬츠'],
+        ['라이더 재킷', '봄버 재킷', '블루종', '무스탕', '수트 재킷'],
+        ['트리플 S', '스피드 러너', '클라우드버스트', '에이스', '디스럽터'],
+        ['크로스백', '토트백', '백팩', '클러치', '벨트백']
+      ]
+    }
+  };
+  
+  const storeSet = storeProductSets[storePrefix] || storeProductSets['GN001'];
   
   for (let i = 1; i <= count; i++) {
-    const category = categories[Math.floor(random() * categories.length)];
-    const brand = brands[Math.floor(random() * brands.length)];
-    const type = productTypes[Math.floor(random() * productTypes.length)];
+    const catIdx = Math.floor(random() * storeSet.categories.length);
+    const category = storeSet.categories[catIdx];
+    const brand = storeSet.brands[Math.floor(random() * storeSet.brands.length)];
+    const type = storeSet.types[catIdx][Math.floor(random() * storeSet.types[catIdx].length)];
+    
+    // 매장별 가격대 설정
+    const basePrice = storePrefix === 'GN003' ? 500000 : storePrefix === 'GN002' ? 80000 : 150000;
+    const priceVariation = storePrefix === 'GN003' ? 1500000 : storePrefix === 'GN002' ? 120000 : 200000;
+    const price = Math.floor(random() * priceVariation) + basePrice;
     
     products.push({
       product_id: `${storePrefix}_P${String(i).padStart(3, '0')}`,
-      name: `${brand} ${type} ${i}`,
-      category,
-      price: Math.floor(random() * 2000000) + 100000,
+      name: `${brand} ${type}`,
+      category: category,
+      price: price,
       stock: Math.floor(random() * 100) + 10,
-      supplier: `${brand} 공급사`,
+      supplier: brand,
       sku: `SKU${storePrefix}${String(i).padStart(4, '0')}`
     });
   }
