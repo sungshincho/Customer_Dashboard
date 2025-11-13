@@ -2,6 +2,12 @@ import { supabase } from "@/integrations/supabase/client";
 
 export async function insertSample3DData(userId: string) {
   try {
+    // Check if data already exists
+    const exists = await checkSampleDataExists(userId);
+    if (exists) {
+      throw new Error('샘플 데이터가 이미 존재합니다');
+    }
+
     // 1. Insert Entity Types
     const { data: entityTypes, error: entityTypesError } = await supabase
       .from('ontology_entity_types')
@@ -172,7 +178,8 @@ export async function checkSampleDataExists(userId: string): Promise<boolean> {
     .select('id')
     .eq('user_id', userId)
     .eq('name', 'StoreSpace')
-    .single();
+    .maybeSingle();
 
-  return !error && !!data;
+  // 데이터가 존재하면 true, 없거나 에러면 false
+  return !!data && !error;
 }

@@ -41,10 +41,16 @@ export default function Setup3DDataPage() {
       toast.success(
         `샘플 데이터가 추가되었습니다: ${result.entityTypes}개 타입, ${result.entities}개 엔티티`
       );
-      setDataExists(true);
+      await checkData(); // Re-check after insertion
     } catch (error: any) {
       console.error('Insert sample data error:', error);
-      toast.error(`데이터 추가 실패: ${error.message}`);
+      
+      if (error.message.includes('이미 존재')) {
+        toast.info('샘플 데이터가 이미 존재합니다');
+        await checkData(); // Update state
+      } else {
+        toast.error(`데이터 추가 실패: ${error.message}`);
+      }
     } finally {
       setLoading(false);
     }
