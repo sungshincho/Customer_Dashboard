@@ -2,7 +2,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { FootfallVisualizer } from "@/features/store-analysis/footfall/components/FootfallVisualizer";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Loader2, Store } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { AdvancedFilters, FilterState } from "@/components/analysis/AdvancedFilters";
 import { ExportButton } from "@/components/analysis/ExportButton";
 import { ComparisonView } from "@/components/analysis/ComparisonView";
@@ -16,6 +16,22 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { loadStoreFile } from "@/utils/storageDataLoader";
 import { useAuth } from "@/hooks/useAuth";
 import { Store3DViewer } from "@/features/digital-twin/components/Store3DViewer";
+import { CustomerPathOverlay } from "@/features/digital-twin/components/overlays/CustomerPathOverlay";
+
+// 방문 데이터를 3D 경로로 변환
+function generateCustomerPaths(visitsData: any[]) {
+  // 샘플 경로 데이터 생성 (실제로는 visit 데이터에서 변환)
+  return visitsData.slice(0, 5).map((visit, idx) => {
+    const baseX = (idx - 2) * 3;
+    return [
+      { x: baseX, y: 0, z: -8 },
+      { x: baseX + 1, y: 0, z: -4 },
+      { x: baseX - 1, y: 0, z: 0 },
+      { x: baseX + 2, y: 0, z: 4 },
+      { x: baseX, y: 0, z: 8 },
+    ];
+  });
+}
 
 const FootfallAnalysis = () => {
   const { selectedStore } = useSelectedStore();
@@ -120,13 +136,22 @@ const FootfallAnalysis = () => {
           <TabsContent value="3d-model" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>3D 매장 모델</CardTitle>
+                <CardTitle>3D 매장 - 고객 동선</CardTitle>
                 <CardDescription>
-                  업로드한 3D 매장 모델에서 방문자 현황을 확인하세요
+                  실시간 고객 이동 경로를 3D 모델에서 확인하세요
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Store3DViewer height="600px" />
+                <Store3DViewer 
+                  height="600px"
+                  overlay={
+                    <CustomerPathOverlay
+                      paths={generateCustomerPaths(visitsData)}
+                      animate
+                      color="#1B6BFF"
+                    />
+                  }
+                />
               </CardContent>
             </Card>
           </TabsContent>

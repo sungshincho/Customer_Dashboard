@@ -2,7 +2,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { TrafficHeatmap } from "@/features/store-analysis/footfall/components/TrafficHeatmap";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Box, Store } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { AdvancedFilters, FilterState } from "@/components/analysis/AdvancedFilters";
 import { ExportButton } from "@/components/analysis/ExportButton";
 import { ComparisonView } from "@/components/analysis/ComparisonView";
@@ -17,6 +17,32 @@ import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { loadStoreFile } from "@/utils/storageDataLoader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Store3DViewer } from "@/features/digital-twin/components/Store3DViewer";
+import { HeatmapOverlay3D } from "@/features/digital-twin/components/overlays/HeatmapOverlay3D";
+
+// 방문 데이터를 히트맵 포인트로 변환
+function generateHeatPoints(visitsData: any[]) {
+  // 방문 데이터를 그리드로 변환하여 밀도 계산
+  const gridSize = 10;
+  const grid: { [key: string]: number } = {};
+  
+  visitsData.forEach((visit, idx) => {
+    const x = ((idx % 10) - 5) * 2;
+    const z = (Math.floor(idx / 10) - 5) * 2;
+    const key = `${Math.floor(x)},${Math.floor(z)}`;
+    grid[key] = (grid[key] || 0) + 1;
+  });
+
+  const maxCount = Math.max(...Object.values(grid), 1);
+  
+  return Object.entries(grid).map(([key, count]) => {
+    const [x, z] = key.split(',').map(Number);
+    return {
+      x,
+      z,
+      intensity: count / maxCount
+    };
+  });
+}
 
 const TrafficHeatmapPage = () => {
   const { user } = useAuth();
@@ -150,13 +176,22 @@ const TrafficHeatmapPage = () => {
           <TabsContent value="3d-model" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>3D 매장 모델</CardTitle>
+                <CardTitle>3D 매장 - 히트맵 오버레이</CardTitle>
                 <CardDescription>
-                  업로드한 3D 매장 모델에서 동선 히트맵을 확인하세요
+                  방문 밀도를 3D 모델 위에 시각화하여 핫스팟을 확인하세요
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Store3DViewer height="600px" />
+                <Store3DViewer 
+                  height="600px"
+                  overlay={
+                    <HeatmapOverlay3D
+                      heatPoints={generateHeatPoints(visitsData)}
+                      gridSize={20}
+                      heightScale={2}
+                    />
+                  }
+                />
               </CardContent>
             </Card>
           </TabsContent>

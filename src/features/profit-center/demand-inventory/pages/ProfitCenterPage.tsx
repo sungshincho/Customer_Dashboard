@@ -2,7 +2,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, TrendingUp, AlertTriangle, DollarSign, Package, Check, X, AlertCircle, Box } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -10,6 +10,7 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, L
 import { useRealtimeInventory } from "@/hooks/useRealtimeInventory";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Store3DViewer } from "@/features/digital-twin/components";
+import { ProductInfoOverlay } from "@/features/digital-twin/components/overlays/ProductInfoOverlay";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { useAuth } from "@/hooks/useAuth";
 import { loadStoreDataset } from "@/utils/storageDataLoader";
@@ -108,6 +109,25 @@ const ProfitCenterPage = () => {
         });
     }
   }, [selectedStore, user]);
+
+  // 제품 데이터를 3D 오버레이 형식으로 변환
+  const productInfoData = useMemo(() => {
+    return integratedData.map((item, idx) => ({
+      id: `product-${idx}`,
+      name: item.product,
+      position: {
+        x: ((idx % 3) - 1) * 5,
+        y: 0,
+        z: (Math.floor(idx / 3) - 1) * 5
+      },
+      stock: item.currentStock,
+      demand: item.predictedDemand,
+      status: item.stockoutRisk === 'critical' ? 'critical' as const : 
+              item.stockoutRisk === 'high' ? 'low' as const : 
+              'normal' as const,
+      price: Math.abs(item.revenueImpact) / item.weeklyDemand
+    }));
+  }, []);
 
   const handleMonitoring = async () => {
     setIsMonitoring(true);
@@ -252,7 +272,22 @@ const ProfitCenterPage = () => {
           </TabsList>
 
           <TabsContent value="3d" className="space-y-6">
-            <Store3DViewer height="600px" />
+            <Card>
+              <CardHeader>
+                <CardTitle>3D 매장 - 제품 재고 현황</CardTitle>
+                <CardDescription>
+                  3D 모델에서 제품별 재고 수준과 긴급도를 확인하세요
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Store3DViewer 
+                  height="600px"
+                  overlay={
+                    <ProductInfoOverlay products={productInfoData} />
+                  }
+                />
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="integrated" className="space-y-4">

@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState, ReactNode } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, useGLTF, Environment, Grid } from '@react-three/drei';
 import { Card } from '@/components/ui/card';
@@ -11,6 +11,7 @@ import { useSelectedStore } from '@/hooks/useSelectedStore';
 interface Store3DViewerProps {
   height?: string;
   showControls?: boolean;
+  overlay?: ReactNode;
 }
 
 function Model({ url }: { url: string }) {
@@ -18,7 +19,7 @@ function Model({ url }: { url: string }) {
   return <primitive object={scene} />;
 }
 
-export function Store3DViewer({ height = "500px", showControls = true }: Store3DViewerProps) {
+export function Store3DViewer({ height = "500px", showControls = true, overlay }: Store3DViewerProps) {
   const { user } = useAuth();
   const { selectedStore } = useSelectedStore();
   const [modelUrl, setModelUrl] = useState<string | null>(null);
@@ -127,6 +128,9 @@ export function Store3DViewer({ height = "500px", showControls = true }: Store3D
 
           {/* 3D Model */}
           <Model url={modelUrl} />
+
+          {/* Overlay */}
+          {overlay}
 
           {/* Grid */}
           <Grid
