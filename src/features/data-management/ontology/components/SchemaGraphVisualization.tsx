@@ -74,12 +74,24 @@ export const SchemaGraphVisualization = () => {
         .select("*");
 
       if (error) throw error;
-      return (data || []).map(item => ({
-        ...item,
-        properties: typeof item.properties === 'string' 
-          ? JSON.parse(item.properties) 
-          : (item.properties || [])
-      })) as EntityType[];
+      return (data || []).map(item => {
+        let properties: PropertyField[] = [];
+        
+        if (typeof item.properties === 'string') {
+          try {
+            properties = JSON.parse(item.properties);
+          } catch (e) {
+            console.error('Failed to parse properties:', e);
+          }
+        } else if (Array.isArray(item.properties)) {
+          properties = item.properties as unknown as PropertyField[];
+        }
+        
+        return {
+          ...item,
+          properties
+        };
+      }) as EntityType[];
     },
   });
 
@@ -91,12 +103,24 @@ export const SchemaGraphVisualization = () => {
         .select("*");
 
       if (error) throw error;
-      return (data || []).map(item => ({
-        ...item,
-        properties: typeof item.properties === 'string' 
-          ? JSON.parse(item.properties) 
-          : (item.properties || [])
-      })) as RelationType[];
+      return (data || []).map(item => {
+        let properties: PropertyField[] = [];
+        
+        if (typeof item.properties === 'string') {
+          try {
+            properties = JSON.parse(item.properties);
+          } catch (e) {
+            console.error('Failed to parse properties:', e);
+          }
+        } else if (Array.isArray(item.properties)) {
+          properties = item.properties as unknown as PropertyField[];
+        }
+        
+        return {
+          ...item,
+          properties
+        };
+      }) as RelationType[];
     },
   });
 

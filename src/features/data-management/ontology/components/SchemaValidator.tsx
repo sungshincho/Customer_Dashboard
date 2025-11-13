@@ -49,12 +49,24 @@ export const SchemaValidator = () => {
         .select("*");
 
       if (error) throw error;
-      return (data || []).map(item => ({
-        ...item,
-        properties: typeof item.properties === 'string' 
-          ? JSON.parse(item.properties) 
-          : (item.properties || [])
-      })) as EntityType[];
+      return (data || []).map(item => {
+        let properties: PropertyField[] = [];
+        
+        if (typeof item.properties === 'string') {
+          try {
+            properties = JSON.parse(item.properties);
+          } catch (e) {
+            console.error('Failed to parse properties:', e);
+          }
+        } else if (Array.isArray(item.properties)) {
+          properties = item.properties as unknown as PropertyField[];
+        }
+        
+        return {
+          ...item,
+          properties
+        };
+      }) as EntityType[];
     },
   });
 
@@ -66,12 +78,24 @@ export const SchemaValidator = () => {
         .select("*");
 
       if (error) throw error;
-      return (data || []).map(item => ({
-        ...item,
-        properties: typeof item.properties === 'string' 
-          ? JSON.parse(item.properties) 
-          : (item.properties || [])
-      })) as RelationType[];
+      return (data || []).map(item => {
+        let properties: PropertyField[] = [];
+        
+        if (typeof item.properties === 'string') {
+          try {
+            properties = JSON.parse(item.properties);
+          } catch (e) {
+            console.error('Failed to parse properties:', e);
+          }
+        } else if (Array.isArray(item.properties)) {
+          properties = item.properties as unknown as PropertyField[];
+        }
+        
+        return {
+          ...item,
+          properties
+        };
+      }) as RelationType[];
     },
   });
 
@@ -165,6 +189,12 @@ export const SchemaValidator = () => {
 
     // 3. 엔티티 속성 검증
     entities.forEach(entity => {
+      // properties가 배열인지 확인
+      if (!Array.isArray(entity.properties)) {
+        console.warn('Entity properties is not an array:', entity.name, entity.properties);
+        return;
+      }
+
       // 필수 속성이 없는 엔티티
       const hasRequiredProps = entity.properties.some(p => p.required);
       if (entity.properties.length > 0 && !hasRequiredProps) {
@@ -192,6 +222,12 @@ export const SchemaValidator = () => {
 
     // 4. 관계 속성 검증
     relations.forEach(relation => {
+      // properties가 배열인지 확인
+      if (!Array.isArray(relation.properties)) {
+        console.warn('Relation properties is not an array:', relation.name, relation.properties);
+        return;
+      }
+
       // 중복 속성 이름 체크
       const propNames = relation.properties.map(p => p.name);
       const duplicates = propNames.filter((name, index) => propNames.indexOf(name) !== index);
