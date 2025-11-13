@@ -10,7 +10,8 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, L
 import { useRealtimeInventory } from "@/hooks/useRealtimeInventory";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Store3DViewer } from "@/features/digital-twin/components";
-import { ProductInfoOverlay } from "@/features/digital-twin/components/overlays/ProductInfoOverlay";
+import { ProductInfoOverlay } from "@/features/digital-twin/components/overlays";
+import { convertToProductInfo } from "@/features/digital-twin/utils/overlayDataConverter";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { useAuth } from "@/hooks/useAuth";
 import { loadStoreDataset } from "@/utils/storageDataLoader";
@@ -112,21 +113,7 @@ const ProfitCenterPage = () => {
 
   // 제품 데이터를 3D 오버레이 형식으로 변환
   const productInfoData = useMemo(() => {
-    return integratedData.map((item, idx) => ({
-      id: `product-${idx}`,
-      name: item.product,
-      position: {
-        x: ((idx % 3) - 1) * 5,
-        y: 0,
-        z: (Math.floor(idx / 3) - 1) * 5
-      },
-      stock: item.currentStock,
-      demand: item.predictedDemand,
-      status: item.stockoutRisk === 'critical' ? 'critical' as const : 
-              item.stockoutRisk === 'high' ? 'low' as const : 
-              'normal' as const,
-      price: Math.abs(item.revenueImpact) / item.weeklyDemand
-    }));
+    return convertToProductInfo(integratedData);
   }, []);
 
   const handleMonitoring = async () => {

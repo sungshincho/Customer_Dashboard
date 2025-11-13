@@ -16,22 +16,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { loadStoreFile } from "@/utils/storageDataLoader";
 import { useAuth } from "@/hooks/useAuth";
 import { Store3DViewer } from "@/features/digital-twin/components/Store3DViewer";
-import { CustomerPathOverlay } from "@/features/digital-twin/components/overlays/CustomerPathOverlay";
-
-// 방문 데이터를 3D 경로로 변환
-function generateCustomerPaths(visitsData: any[]) {
-  // 샘플 경로 데이터 생성 (실제로는 visit 데이터에서 변환)
-  return visitsData.slice(0, 5).map((visit, idx) => {
-    const baseX = (idx - 2) * 3;
-    return [
-      { x: baseX, y: 0, z: -8 },
-      { x: baseX + 1, y: 0, z: -4 },
-      { x: baseX - 1, y: 0, z: 0 },
-      { x: baseX + 2, y: 0, z: 4 },
-      { x: baseX, y: 0, z: 8 },
-    ];
-  });
-}
+import { CustomerPathOverlay } from "@/features/digital-twin/components/overlays";
+import { generateCustomerPaths } from "@/features/digital-twin/utils/overlayDataConverter";
 
 const FootfallAnalysis = () => {
   const { selectedStore } = useSelectedStore();
