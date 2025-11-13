@@ -25,3 +25,6 @@ export interface ProductInfo {
   status: 'normal' | 'low' | 'critical';
   price?: number;
 }
+
+// Re-export avatar types
+export type { CustomerAvatar, CustomerAvatarOverlayProps, CustomerStatus, AvatarColors } from './avatar.types';

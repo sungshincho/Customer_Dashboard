@@ -3,12 +3,10 @@
  * 분석 데이터를 3D 시각화 형식으로 변환
  */
 
-import type { PathPoint, HeatPoint, ProductInfo } from '../types/overlay.types';
+import type { PathPoint, HeatPoint, ProductInfo, CustomerAvatar } from '../types/overlay.types';
 
 /**
  * 방문 데이터를 3D 고객 동선 경로로 변환
- * @param visitsData 방문 데이터 배열
- * @param maxPaths 생성할 최대 경로 수 (기본값: 5)
  */
 export function generateCustomerPaths(visitsData: any[], maxPaths = 5): PathPoint[][] {
   return visitsData.slice(0, maxPaths).map((visit, idx) => {
@@ -25,7 +23,6 @@ export function generateCustomerPaths(visitsData: any[], maxPaths = 5): PathPoin
 
 /**
  * 방문 데이터를 3D 히트맵 포인트로 변환
- * @param visitsData 방문 데이터 배열
  */
 export function generateHeatPoints(visitsData: any[]): HeatPoint[] {
   const grid: { [key: string]: number } = {};
@@ -41,48 +38,67 @@ export function generateHeatPoints(visitsData: any[]): HeatPoint[] {
   
   return Object.entries(grid).map(([key, count]) => {
     const [x, z] = key.split(',').map(Number);
-    return {
-      x,
-      z,
-      intensity: count / maxCount
-    };
+    return { x, z, intensity: count / maxCount };
   });
 }
 
 /**
  * 제품 데이터를 3D 제품 정보 마커로 변환
- * @param productData 제품 재고/수요 데이터 배열
  */
 export function convertToProductInfo(productData: any[]): ProductInfo[] {
   return productData.map((item, idx) => {
-    // 재고 상태 계산
     const stockRatio = item.currentStock / item.optimalStock;
     let status: 'normal' | 'low' | 'critical';
     
-    if (stockRatio >= 0.5) {
-      status = 'normal';
-    } else if (stockRatio >= 0.3) {
-      status = 'low';
-    } else {
-      status = 'critical';
-    }
+    if (stockRatio >= 0.5) status = 'normal';
+    else if (stockRatio >= 0.3) status = 'low';
+    else status = 'critical';
 
-    // 3D 공간 배치 (그리드 형태)
     const row = Math.floor(idx / 3);
     const col = idx % 3;
     
     return {
       id: `product-${idx}`,
       name: item.product,
-      position: {
-        x: (col - 1) * 4,
-        y: 0,
-        z: (row - 1) * 4
-      },
+      position: { x: (col - 1) * 4, y: 0, z: (row - 1) * 4 },
       stock: item.currentStock,
       demand: item.predictedDemand,
       status,
       price: item.revenueImpact ? Math.abs(item.revenueImpact / item.weeklyDemand) : undefined
+    };
+  });
+}
+
+/**
+ * 방문 데이터를 고객 아바타 인스턴스로 변환
+ */
+export function generateCustomerAvatars(visitsData: any[], maxCustomers = 100): CustomerAvatar[] {
+  return visitsData.slice(0, maxCustomers).map((visit, idx) => {
+    const angle = (idx / maxCustomers) * Math.PI * 2;
+    const radius = 5 + Math.random() * 5;
+    const x = Math.cos(angle) * radius;
+    const z = Math.sin(angle) * radius;
+    
+    const purchased = visit.purchased === 'Y' || visit.purchased === true;
+    const isLeaving = Math.random() < 0.1;
+    
+    let status: 'browsing' | 'purchasing' | 'leaving';
+    if (isLeaving) status = 'leaving';
+    else if (purchased) status = 'purchasing';
+    else status = 'browsing';
+    
+    const speed = status === 'leaving' ? 2.0 : status === 'purchasing' ? 0.5 : 1.0;
+    const velocity = {
+      x: (Math.random() - 0.5) * speed,
+      z: (Math.random() - 0.5) * speed
+    };
+    
+    return {
+      id: visit.visit_id || `customer-${idx}`,
+      position: { x, y: 0, z },
+      velocity,
+      status,
+      timestamp: visit.entry_time ? new Date(visit.entry_time).getTime() : Date.now()
     };
   });
 }

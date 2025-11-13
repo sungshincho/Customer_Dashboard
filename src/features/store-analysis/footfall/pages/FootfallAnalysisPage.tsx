@@ -16,8 +16,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { loadStoreFile } from "@/utils/storageDataLoader";
 import { useAuth } from "@/hooks/useAuth";
 import { Store3DViewer } from "@/features/digital-twin/components/Store3DViewer";
-import { CustomerPathOverlay } from "@/features/digital-twin/components/overlays";
-import { generateCustomerPaths } from "@/features/digital-twin/utils/overlayDataConverter";
+import { CustomerPathOverlay, CustomerAvatarOverlay } from "@/features/digital-twin/components/overlays";
+import { generateCustomerPaths, generateCustomerAvatars } from "@/features/digital-twin/utils/overlayDataConverter";
 
 const FootfallAnalysis = () => {
   const { selectedStore } = useSelectedStore();
@@ -108,7 +108,8 @@ const FootfallAnalysis = () => {
             <Tabs defaultValue="analysis" className="w-full">
               <TabsList>
                 <TabsTrigger value="analysis">분석</TabsTrigger>
-                <TabsTrigger value="3d-model">3D 매장</TabsTrigger>
+                <TabsTrigger value="3d-avatars">3D 고객 아바타</TabsTrigger>
+                <TabsTrigger value="3d-model">3D 동선</TabsTrigger>
                 <TabsTrigger value="3d-scene">3D 방문자 뷰</TabsTrigger>
                 <TabsTrigger value="comparison">비교 분석</TabsTrigger>
               </TabsList>
@@ -117,6 +118,40 @@ const FootfallAnalysis = () => {
             <div key={refreshKey}>
               <FootfallVisualizer visitsData={visitsData} />
             </div>
+          </TabsContent>
+
+          <TabsContent value="3d-avatars" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>3D 고객 아바타 (Instanced Rendering)</CardTitle>
+                <CardDescription>
+                  {visitsData.length}명의 고객을 단일 draw call로 효율적으로 렌더링합니다.
+                  파란색: 탐색 중 | 초록색: 구매 중 | 회색: 퇴장 중
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Store3DViewer 
+                  height="600px"
+                  overlay={
+                    <CustomerAvatarOverlay
+                      customers={generateCustomerAvatars(visitsData, 100)}
+                      maxInstances={150}
+                      animationSpeed={1.5}
+                      showTrails={false}
+                    />
+                  }
+                />
+                <div className="mt-4 p-4 bg-muted rounded-lg">
+                  <h4 className="font-semibold mb-2">성능 최적화 정보</h4>
+                  <ul className="text-sm space-y-1 text-muted-foreground">
+                    <li>✅ Instanced Rendering: 단일 draw call로 {Math.min(visitsData.length, 100)}개 아바타 렌더링</li>
+                    <li>✅ Frustum Culling: 화면 밖 오브젝트 자동 제외</li>
+                    <li>✅ useMemo 캐싱: Geometry 및 Material 재사용</li>
+                    <li>✅ 부드러운 애니메이션: useFrame 기반 효율적 업데이트</li>
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="3d-model" className="space-y-6">
