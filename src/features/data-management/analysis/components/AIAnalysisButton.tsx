@@ -10,9 +10,13 @@ interface AIAnalysisButtonProps {
   data: any;
   title?: string;
   onAnalysisComplete?: () => void;
+  graphData?: {
+    nodes: any[];
+    edges: any[];
+  };
 }
 
-export const AIAnalysisButton = ({ analysisType, data, title = "AI 분석 요청", onAnalysisComplete }: AIAnalysisButtonProps) => {
+export const AIAnalysisButton = ({ analysisType, data, title = "AI 분석 요청", onAnalysisComplete, graphData }: AIAnalysisButtonProps) => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<string | null>(null);
   const { toast } = useToast();
@@ -28,7 +32,8 @@ export const AIAnalysisButton = ({ analysisType, data, title = "AI 분석 요청
         body: { 
           analysisType, 
           data,
-          userId: user?.id
+          userId: user?.id,
+          graphData
         }
       });
 

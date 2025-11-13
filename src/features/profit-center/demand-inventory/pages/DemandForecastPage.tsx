@@ -1,8 +1,8 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { DemandForecast } from "@/features/profit-center/demand-inventory/components/DemandForecast";
 import { Button } from "@/components/ui/button";
-import { RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { RefreshCw, Database } from "lucide-react";
+import { useState, useMemo } from "react";
 import { AdvancedFilters, FilterState } from "@/components/analysis/AdvancedFilters";
 import { ExportButton } from "@/components/analysis/ExportButton";
 import { AIInsights, Insight } from "@/components/analysis/AIInsights";
@@ -11,6 +11,8 @@ import { ComparisonView } from "@/components/analysis/ComparisonView";
 import { AIAnalysisButton } from "@/components/analysis/AIAnalysisButton";
 import { AnalysisHistory } from "@/components/analysis/AnalysisHistory";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useOntologyEntities, useOntologyRelations, transformToGraphData } from "@/hooks/useOntologyData";
+import { Alert as AlertUI, AlertDescription } from "@/components/ui/alert";
 
 const DemandForecastPage = () => {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -18,6 +20,17 @@ const DemandForecastPage = () => {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
   const [historyRefresh, setHistoryRefresh] = useState(0);
+
+  // 온톨로지 데이터 로드
+  const { data: visitEntities = [], isLoading: visitsLoading } = useOntologyEntities('visit');
+  const { data: storeEntities = [] } = useOntologyEntities('store');
+  const { data: relations = [] } = useOntologyRelations();
+  
+  // 그래프 데이터 변환
+  const graphData = useMemo(() => {
+    const allEntities = [...visitEntities, ...storeEntities];
+    return transformToGraphData(allEntities, relations);
+  }, [visitEntities, storeEntities, relations]);
 
   const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);
@@ -47,7 +60,7 @@ const DemandForecastPage = () => {
         <div className="flex items-center justify-between animate-fade-in">
           <div>
             <h1 className="text-3xl font-bold gradient-text">수요 예측</h1>
-            <p className="mt-2 text-muted-foreground">AI 기반 방문자 및 매출 예측 분석</p>
+            <p className="mt-2 text-muted-foreground">AI 기반 방문자 및 매출 예측 분석 (온톨로지 통합)</p>
           </div>
           <div className="flex gap-2">
             <ExportButton data={exportData} filename="demand-forecast" title="수요 예측" />
@@ -57,6 +70,16 @@ const DemandForecastPage = () => {
             </Button>
           </div>
         </div>
+
+        {/* 온톨로지 데이터 상태 */}
+        {graphData.nodes.length > 0 && (
+          <AlertUI className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+            <Database className="h-4 w-4 text-blue-600" />
+            <AlertDescription>
+              온톨로지 데이터 연동됨: {graphData.nodes.length}개 엔티티, {graphData.edges.length}개 관계
+            </AlertDescription>
+          </AlertUI>
+        )}
         
         <AdvancedFilters filters={filters} onFiltersChange={setFilters} />
         
@@ -73,8 +96,9 @@ const DemandForecastPage = () => {
             <AIAnalysisButton
               analysisType="demand-forecast"
               data={comparisonData}
-              title="AI 수요 시뮬레이션"
+              title="AI 수요 시뮬레이션 (온톨로지 기반)"
               onAnalysisComplete={() => setHistoryRefresh(prev => prev + 1)}
+              graphData={graphData}
             />
             <div key={refreshKey}>
               <DemandForecast />

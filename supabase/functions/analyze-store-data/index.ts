@@ -12,12 +12,13 @@ serve(async (req) => {
   }
 
   try {
-    const { analysisType, data, userId } = await req.json();
+    const { analysisType, data, userId, graphData } = await req.json();
     
     console.log("=== AI Analysis Request Started ===");
     console.log("Analysis Type:", analysisType);
     console.log("User ID:", userId);
     console.log("Data received:", data ? "Yes" : "No");
+    console.log("Graph Data received:", graphData ? `${graphData.nodes?.length || 0} nodes, ${graphData.edges?.length || 0} edges` : "No");
     
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -94,6 +95,25 @@ serve(async (req) => {
       console.log("⚠️ No userId provided, skipping imported data fetch");
     }
 
+    // 온톨로지 그래프 컨텍스트 준비
+    let graphContext = "";
+    if (graphData && graphData.nodes && graphData.nodes.length > 0) {
+      console.log(`🔗 Ontology graph data: ${graphData.nodes.length} nodes, ${graphData.edges.length} edges`);
+      
+      const nodeSummary = graphData.nodes.slice(0, 10).map((node: any) => 
+        `- ${node.type}: ${node.label} (속성: ${JSON.stringify(node.properties)})`
+      ).join('\n');
+      
+      const relationSummary = graphData.edges.slice(0, 10).map((edge: any) =>
+        `- ${edge.type}: ${edge.source} → ${edge.target}`
+      ).join('\n');
+      
+      graphContext = `\n\n## 온톨로지 기반 지식 그래프\n아래는 시스템에 저장된 엔티티와 관계 정보입니다. 이 구조화된 지식을 활용하여 더 정확한 추론을 하세요:\n\n### 주요 엔티티 (총 ${graphData.nodes.length}개)\n${nodeSummary}\n\n### 주요 관계 (총 ${graphData.edges.length}개)\n${relationSummary}\n\n위 그래프 구조를 활용하여 엔티티 간 관계를 고려한 인사이트를 제공하세요.`;
+      console.log("🔗 Graph context prepared, length:", graphContext.length);
+    } else {
+      console.log("⚠️ No graph data provided");
+    }
+
     let systemPrompt = "";
     
     switch (analysisType) {
@@ -134,7 +154,7 @@ serve(async (req) => {
           { role: "system", content: systemPrompt },
           { 
             role: "user", 
-            content: `다음은 현재 분석할 데이터입니다:\n\n${JSON.stringify(data, null, 2)}${historicalContext}\n\n위의 현재 데이터와 과거 임포트된 데이터를 종합적으로 분석하여, 구체적이고 실행 가능한 인사이트를 한국어로 제공해주세요. 과거 데이터의 패턴과 트렌드를 현재 분석에 반영하세요.` 
+            content: `다음은 현재 분석할 데이터입니다:\n\n${JSON.stringify(data, null, 2)}${historicalContext}${graphContext}\n\n위의 현재 데이터, 과거 임포트된 데이터, 그리고 온톨로지 그래프 구조를 종합적으로 분석하여, 구체적이고 실행 가능한 인사이트를 한국어로 제공해주세요. 온톨로지 관계를 통해 발견할 수 있는 숨겨진 패턴이나 인사이트가 있다면 반드시 언급하세요.` 
           },
         ],
       }),

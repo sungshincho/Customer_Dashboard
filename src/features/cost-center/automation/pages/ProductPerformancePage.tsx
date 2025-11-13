@@ -1,8 +1,8 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { ProductPerformance } from "@/features/cost-center/automation/components/ProductPerformance";
 import { Button } from "@/components/ui/button";
-import { RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { RefreshCw, Database } from "lucide-react";
+import { useState, useMemo } from "react";
 import { AdvancedFilters, FilterState } from "@/components/analysis/AdvancedFilters";
 import { ExportButton } from "@/components/analysis/ExportButton";
 import { AIInsights, Insight } from "@/components/analysis/AIInsights";
@@ -11,6 +11,8 @@ import { ComparisonView } from "@/components/analysis/ComparisonView";
 import { AIAnalysisButton } from "@/components/analysis/AIAnalysisButton";
 import { AnalysisHistory } from "@/components/analysis/AnalysisHistory";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useOntologyEntities, useOntologyRelations, transformToGraphData } from "@/hooks/useOntologyData";
+import { Alert as AlertUI, AlertDescription } from "@/components/ui/alert";
 
 const ProductPerformancePage = () => {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -18,6 +20,16 @@ const ProductPerformancePage = () => {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
   const [historyRefresh, setHistoryRefresh] = useState(0);
+
+  // 온톨로지 데이터: 상품, 구매, 재고
+  const { data: productEntities = [] } = useOntologyEntities('product');
+  const { data: purchaseEntities = [] } = useOntologyEntities('purchase');
+  const { data: relations = [] } = useOntologyRelations();
+  
+  const graphData = useMemo(() => {
+    const allEntities = [...productEntities, ...purchaseEntities];
+    return transformToGraphData(allEntities, relations);
+  }, [productEntities, purchaseEntities, relations]);
 
   const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);
@@ -47,7 +59,7 @@ const ProductPerformancePage = () => {
         <div className="flex items-center justify-between animate-fade-in">
           <div>
             <h1 className="text-3xl font-bold gradient-text">상품 성과 분석</h1>
-            <p className="mt-2 text-muted-foreground">판매량, 매출, 재고 통합 관리</p>
+            <p className="mt-2 text-muted-foreground">판매량, 매출, 재고 통합 관리 (온톨로지 통합)</p>
           </div>
           <div className="flex gap-2">
             <ExportButton data={exportData} filename="product-performance" title="상품 성과 분석" />
@@ -57,6 +69,15 @@ const ProductPerformancePage = () => {
             </Button>
           </div>
         </div>
+
+        {graphData.nodes.length > 0 && (
+          <AlertUI className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+            <Database className="h-4 w-4 text-blue-600" />
+            <AlertDescription>
+              온톨로지 데이터: {productEntities.length}개 상품, {purchaseEntities.length}개 구매 기록 연동됨
+            </AlertDescription>
+          </AlertUI>
+        )}
         
         <AdvancedFilters filters={filters} onFiltersChange={setFilters} />
         
@@ -73,8 +94,9 @@ const ProductPerformancePage = () => {
             <AIAnalysisButton
               analysisType="product-performance"
               data={comparisonData}
-              title="AI 상품 전략 제안"
+              title="AI 상품 전략 제안 (온톨로지 기반)"
               onAnalysisComplete={() => setHistoryRefresh(prev => prev + 1)}
+              graphData={graphData}
             />
             <div key={refreshKey}>
               <ProductPerformance />

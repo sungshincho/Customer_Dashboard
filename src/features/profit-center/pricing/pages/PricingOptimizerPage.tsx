@@ -1,12 +1,14 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, TrendingUp, DollarSign, Target, Zap } from "lucide-react";
-import { useState } from "react";
+import { RefreshCw, TrendingUp, DollarSign, Target, Zap, Database } from "lucide-react";
+import { useState, useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ScatterChart, Scatter } from "recharts";
+import { useOntologyEntities, useOntologyRelations, transformToGraphData } from "@/hooks/useOntologyData";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // 가격 최적화 데이터 (WTP 분석 기반)
 const pricingData = [
@@ -92,6 +94,16 @@ const PricingOptimizerPage = () => {
   const [selectedProduct, setSelectedProduct] = useState(pricingData[0]);
   const [simulationPrice, setSimulationPrice] = useState(selectedProduct.currentPrice);
 
+  // 온톨로지 데이터: 상품, 고객, 구매 관계
+  const { data: productEntities = [] } = useOntologyEntities('product');
+  const { data: customerEntities = [] } = useOntologyEntities('customer');
+  const { data: relations = [] } = useOntologyRelations();
+  
+  const graphData = useMemo(() => {
+    const allEntities = [...productEntities, ...customerEntities];
+    return transformToGraphData(allEntities, relations);
+  }, [productEntities, customerEntities, relations]);
+
   const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);
   };
@@ -122,13 +134,22 @@ const PricingOptimizerPage = () => {
         <div className="flex items-center justify-between animate-fade-in">
           <div>
             <h1 className="text-3xl font-bold gradient-text">가격 최적화 엔진</h1>
-            <p className="mt-2 text-muted-foreground">AI 기반 동적 가격 전략 및 수익 극대화</p>
+            <p className="mt-2 text-muted-foreground">AI 기반 동적 가격 전략 및 수익 극대화 (온톨로지 통합)</p>
           </div>
           <Button onClick={handleRefresh} variant="outline" size="sm">
             <RefreshCw className="w-4 h-4 mr-2" />
             새로고침
           </Button>
         </div>
+
+        {graphData.nodes.length > 0 && (
+          <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+            <Database className="h-4 w-4 text-blue-600" />
+            <AlertDescription>
+              온톨로지 통합: {productEntities.length}개 상품, {customerEntities.length}개 고객, {relations.length}개 관계 분석 중
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* 핵심 지표 */}
         <div className="grid gap-4 md:grid-cols-4">
