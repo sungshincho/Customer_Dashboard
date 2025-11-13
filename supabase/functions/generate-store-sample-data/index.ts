@@ -24,19 +24,28 @@ function arrayToCSV(data: any[]): string {
   return [headers.join(','), ...rows].join('\n');
 }
 
-// 시드 생성 함수 (매장별 다른 랜덤 값)
+// 시드 기반 랜덤 생성기 (매장별로 완전히 다른 데이터 생성)
 function seededRandom(seed: number) {
-  let value = seed;
   return function() {
-    value = (value * 9301 + 49297) % 233280;
-    return value / 233280;
+    seed = (seed * 16807) % 2147483647;
+    return (seed - 1) / 2147483646;
   };
+}
+
+// 매장 코드를 숫자 시드로 변환
+function storeCodeToSeed(storeCode: string): number {
+  let hash = 0;
+  for (let i = 0; i < storeCode.length; i++) {
+    hash = ((hash << 5) - hash) + storeCode.charCodeAt(i);
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash) + 1; // Ensure positive non-zero
 }
 
 // 샘플 데이터 생성 함수들
 function generateCustomers(storePrefix: string, storeSeed: number, count: number = 50) {
   const customers = [];
-  const random = seededRandom(storeSeed);
+  const random = seededRandom(storeSeed * 137); // 큰 소수로 시드 변환
   const firstNames = ['김', '이', '박', '최', '정', '강', '조', '윤', '장', '임'];
   const secondNames = ['민', '서', '지', '수', '현', '준', '은', '하', '도', '우'];
   const thirdNames = ['준', '호', '영', '진', '민', '수', '아', '연', '희', '정'];
@@ -63,7 +72,7 @@ function generateCustomers(storePrefix: string, storeSeed: number, count: number
 
 function generateProducts(storePrefix: string, storeSeed: number, count: number = 30) {
   const products = [];
-  const random = seededRandom(storeSeed + 100);
+  const random = seededRandom(storeSeed * 251); // 다른 소수 사용
   const categories = ['스마트폰', '태블릿', '노트북', '액세서리', '웨어러블'];
   const brands = ['삼성', '애플', '엘지', '샤오미', '화웨이'];
   const productTypes = ['갤럭시', '아이폰', '아이패드', '맥북', '에어팟', '워치', '버즈'];
@@ -89,7 +98,7 @@ function generateProducts(storePrefix: string, storeSeed: number, count: number 
 
 function generatePurchases(storeId: string, storePrefix: string, storeSeed: number, customerCount: number, productCount: number, count: number = 200) {
   const purchases = [];
-  const random = seededRandom(storeSeed + 200);
+  const random = seededRandom(storeSeed * 373); // 다른 소수
   const paymentMethods = ['카드', '현금', '포인트', '모바일'];
   
   for (let i = 1; i <= count; i++) {
@@ -119,7 +128,7 @@ function generatePurchases(storeId: string, storePrefix: string, storeSeed: numb
 
 function generateVisits(storeId: string, storePrefix: string, storeSeed: number, customerCount: number, count: number = 300) {
   const visits = [];
-  const random = seededRandom(storeSeed + 300);
+  const random = seededRandom(storeSeed * 509); // 다른 소수
   const purposes = ['구매', '둘러보기', '상담', '교환/환불', '수리'];
   
   for (let i = 1; i <= count; i++) {
@@ -149,7 +158,7 @@ function generateVisits(storeId: string, storePrefix: string, storeSeed: number,
 
 function generateStaff(storePrefix: string, storeSeed: number, count: number = 5) {
   const staff = [];
-  const random = seededRandom(storeSeed + 400);
+  const random = seededRandom(storeSeed * 643); // 다른 소수
   const firstNames = ['김', '이', '박', '최', '정'];
   const secondNames = ['민', '서', '지', '수', '현'];
   const thirdNames = ['수', '진', '아', '우', '영'];
@@ -206,16 +215,20 @@ Deno.serve(async (req) => {
       throw new Error('Store not found');
     }
 
-    // 매장 코드를 prefix로 사용하고 시드 생성
+    // 매장 코드를 prefix로 사용하고 고유 시드 생성
     const storePrefix = store.store_code;
-    const storeSeed = storePrefix.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const storeSeed = storeCodeToSeed(storePrefix);
+    
+    console.log(`Generating data for ${store.store_name} (${storePrefix}) with seed: ${storeSeed}`);
 
-    // 샘플 데이터 생성 (매장별로 다른 시드 사용)
+    // 샘플 데이터 생성 (매장별로 완전히 다른 시드 사용)
     const customers = generateCustomers(storePrefix, storeSeed, 50);
     const products = generateProducts(storePrefix, storeSeed, 30);
     const purchases = generatePurchases(storeId, storePrefix, storeSeed, customers.length, products.length, 200);
     const visits = generateVisits(storeId, storePrefix, storeSeed, customers.length, 300);
     const staff = generateStaff(storePrefix, storeSeed, 5);
+    
+    console.log(`Generated: ${customers.length} customers, ${products.length} products, ${purchases.length} purchases, ${visits.length} visits, ${staff.length} staff`);
 
     // CSV로 변환
     const datasets = {
