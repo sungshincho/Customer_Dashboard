@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_scene_analysis: {
+        Row: {
+          analysis_type: string
+          created_at: string
+          id: string
+          insights: Json
+          scene_data: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          analysis_type: string
+          created_at?: string
+          id?: string
+          insights: Json
+          scene_data: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          analysis_type?: string
+          created_at?: string
+          id?: string
+          insights?: Json
+          scene_data?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       analysis_history: {
         Row: {
           analysis_type: string
