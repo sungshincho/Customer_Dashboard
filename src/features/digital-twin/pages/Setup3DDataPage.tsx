@@ -3,6 +3,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { insertSample3DData, checkSampleDataExists, deleteSampleData } from "../utils/sampleDataGenerator";
 import { toast } from "sonner";
 import { Database, Check, Loader2, Upload, ArrowRight, Trash2 } from "lucide-react";
@@ -12,20 +13,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Setup3DDataPage() {
   const { user } = useAuth();
+  const { selectedStore } = useSelectedStore();
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
   const [dataExists, setDataExists] = useState(false);
 
   useEffect(() => {
     checkData();
-  }, [user]);
+  }, [user, selectedStore]);
 
   const checkData = async () => {
     if (!user) return;
     
     setChecking(true);
     try {
-      const exists = await checkSampleDataExists(user.id);
+      const exists = await checkSampleDataExists(user.id, selectedStore?.id);
       setDataExists(exists);
     } catch (error) {
       console.error('Check data error:', error);
@@ -36,10 +38,14 @@ export default function Setup3DDataPage() {
 
   const handleInsertData = async () => {
     if (!user) return;
+    if (!selectedStore) {
+      toast.error('먼저 매장을 선택해주세요');
+      return;
+    }
 
     setLoading(true);
     try {
-      const result = await insertSample3DData(user.id);
+      const result = await insertSample3DData(user.id, selectedStore.id);
       toast.success(
         `샘플 데이터가 추가되었습니다: ${result.entityTypes}개 타입, ${result.entities}개 엔티티`
       );
@@ -63,10 +69,14 @@ export default function Setup3DDataPage() {
 
   const handleDeleteData = async () => {
     if (!user) return;
+    if (!selectedStore) {
+      toast.error('먼저 매장을 선택해주세요');
+      return;
+    }
 
     setLoading(true);
     try {
-      await deleteSampleData(user.id);
+      await deleteSampleData(user.id, selectedStore.id);
       toast.success('샘플 데이터가 삭제되었습니다');
       await checkData();
     } catch (error: any) {
@@ -100,6 +110,14 @@ export default function Setup3DDataPage() {
           </TabsList>
 
           <TabsContent value="sample-data">
+            {!selectedStore && (
+              <Alert className="mb-4">
+                <AlertDescription>
+                  샘플 데이터를 추가하려면 먼저 사이드바에서 매장을 선택해주세요. 샘플 데이터는 선택한 매장에만 저장됩니다.
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <Card className="p-6">
           <div className="space-y-6">
             <div>

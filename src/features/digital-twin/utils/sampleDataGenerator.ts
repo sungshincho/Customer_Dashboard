@@ -1,9 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export async function insertSample3DData(userId: string) {
+export async function insertSample3DData(userId: string, storeId?: string) {
   try {
     // Check if data already exists
-    const exists = await checkSampleDataExists(userId);
+    const exists = await checkSampleDataExists(userId, storeId);
     if (exists) {
       throw new Error('샘플 데이터가 이미 존재합니다');
     }
@@ -84,13 +84,14 @@ export async function insertSample3DData(userId: string) {
       throw new Error('Could not find all entity type IDs');
     }
 
-    // 2. Insert Graph Entities (instances)
+    // 2. Insert Graph Entities (instances) - with optional store_id
     const { data: entities, error: entitiesError } = await supabase
       .from('graph_entities')
       .insert([
         // Main Store Space
         {
           user_id: userId,
+          store_id: storeId,
           entity_type_id: spaceTypeId,
           label: '강남점 매장',
           properties: { area: 300, zone_type: 'retail' },
@@ -101,6 +102,7 @@ export async function insertSample3DData(userId: string) {
         // Shelf 1 (Left)
         {
           user_id: userId,
+          store_id: storeId,
           entity_type_id: shelfTypeId,
           label: '왼쪽 선반 A',
           properties: { capacity: 50, shelf_type: 'wall-mounted' },
@@ -111,6 +113,7 @@ export async function insertSample3DData(userId: string) {
         // Shelf 2 (Right)
         {
           user_id: userId,
+          store_id: storeId,
           entity_type_id: shelfTypeId,
           label: '오른쪽 선반 B',
           properties: { capacity: 50, shelf_type: 'wall-mounted' },
@@ -121,6 +124,7 @@ export async function insertSample3DData(userId: string) {
         // Display Table (Center)
         {
           user_id: userId,
+          store_id: storeId,
           entity_type_id: tableTypeId,
           label: '중앙 디스플레이 테이블',
           properties: { capacity: 20 },
@@ -131,6 +135,7 @@ export async function insertSample3DData(userId: string) {
         // Products
         {
           user_id: userId,
+          store_id: storeId,
           entity_type_id: productTypeId,
           label: '삼성 갤럭시 S24',
           properties: { sku: 'SAMS24', price: 1200000, stock: 15 },
@@ -140,6 +145,7 @@ export async function insertSample3DData(userId: string) {
         },
         {
           user_id: userId,
+          store_id: storeId,
           entity_type_id: productTypeId,
           label: '애플 아이폰 15',
           properties: { sku: 'APPH15', price: 1350000, stock: 12 },
@@ -149,12 +155,13 @@ export async function insertSample3DData(userId: string) {
         },
         {
           user_id: userId,
+          store_id: storeId,
           entity_type_id: productTypeId,
-          label: '갤럭시 버즈 프로',
-          properties: { sku: 'SAMBUD', price: 250000, stock: 30 },
+          label: 'LG 노트북 그램',
+          properties: { sku: 'LGGRAM', price: 2100000, stock: 8 },
           model_3d_position: { x: 0, y: 0.8, z: -3 },
           model_3d_rotation: { x: 0, y: 0, z: 0 },
-          model_3d_scale: { x: 0.8, y: 0.8, z: 0.8 }
+          model_3d_scale: { x: 1, y: 1, z: 1 }
         }
       ])
       .select();
@@ -162,60 +169,84 @@ export async function insertSample3DData(userId: string) {
     if (entitiesError) throw entitiesError;
 
     return {
-      success: true,
       entityTypes: entityTypes.length,
       entities: entities?.length || 0
     };
   } catch (error) {
-    console.error('Sample data insertion error:', error);
+    console.error('Error inserting sample 3D data:', error);
     throw error;
   }
 }
 
-export async function checkSampleDataExists(userId: string): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('ontology_entity_types')
-    .select('name')
-    .eq('user_id', userId)
-    .in('name', ['StoreSpace', 'Shelf', 'DisplayTable', 'Product']);
-
-  if (error) return false;
-  
-  // 4개 중 하나라도 존재하면 true
-  return !!data && data.length > 0;
-}
-
-export async function deleteSampleData(userId: string) {
+export async function checkSampleDataExists(userId: string, storeId?: string): Promise<boolean> {
   try {
-    // 1. Delete graph entities first (foreign key dependency)
+    // Check entity types
     const { data: entityTypes } = await supabase
       .from('ontology_entity_types')
       .select('id')
       .eq('user_id', userId)
-      .in('name', ['StoreSpace', 'Shelf', 'DisplayTable', 'Product']);
+      .limit(1);
 
-    if (entityTypes && entityTypes.length > 0) {
-      const typeIds = entityTypes.map(et => et.id);
-      
-      await supabase
-        .from('graph_entities')
-        .delete()
-        .eq('user_id', userId)
-        .in('entity_type_id', typeIds);
+    // Check entities (optionally filter by store)
+    let entitiesQuery = supabase
+      .from('graph_entities')
+      .select('id')
+      .eq('user_id', userId);
+
+    if (storeId) {
+      entitiesQuery = entitiesQuery.eq('store_id', storeId);
     }
 
-    // 2. Delete entity types
-    const { error: deleteError } = await supabase
-      .from('ontology_entity_types')
-      .delete()
-      .eq('user_id', userId)
-      .in('name', ['StoreSpace', 'Shelf', 'DisplayTable', 'Product']);
+    const { data: entities } = await entitiesQuery.limit(1);
 
-    if (deleteError) throw deleteError;
+    return (entityTypes && entityTypes.length > 0) || (entities && entities.length > 0);
+  } catch (error) {
+    console.error('Error checking sample data:', error);
+    return false;
+  }
+}
+
+export async function deleteSampleData(userId: string, storeId?: string) {
+  try {
+    // Delete entities first (optionally filter by store)
+    let entitiesQuery = supabase
+      .from('graph_entities')
+      .delete()
+      .eq('user_id', userId);
+
+    if (storeId) {
+      entitiesQuery = entitiesQuery.eq('store_id', storeId);
+    }
+
+    const { error: entitiesError } = await entitiesQuery;
+    if (entitiesError) throw entitiesError;
+
+    // Delete relations (optionally filter by store)
+    let relationsQuery = supabase
+      .from('graph_relations')
+      .delete()
+      .eq('user_id', userId);
+
+    if (storeId) {
+      relationsQuery = relationsQuery.eq('store_id', storeId);
+    }
+
+    const { error: relationsError } = await relationsQuery;
+    if (relationsError) throw relationsError;
+
+    // Only delete entity types if no store filter (entity types are global)
+    if (!storeId) {
+      const { error: entityTypesError } = await supabase
+        .from('ontology_entity_types')
+        .delete()
+        .eq('user_id', userId);
+
+      if (entityTypesError) throw entityTypesError;
+    }
 
     return { success: true };
   } catch (error) {
-    console.error('Sample data deletion error:', error);
+    console.error('Error deleting sample data:', error);
     throw error;
   }
 }

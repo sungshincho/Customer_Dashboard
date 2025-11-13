@@ -55,10 +55,16 @@ const DataImport = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data, error } = await (supabase as any)
+      let query = (supabase as any)
         .from("user_data_imports")
-        .select("*")
-        .order("created_at", { ascending: false });
+        .select("*");
+
+      // Filter by store if selected
+      if (selectedStore) {
+        query = query.eq("store_id", selectedStore.id);
+      }
+
+      const { data, error } = await query.order("created_at", { ascending: false });
 
       if (error) throw error;
       setImports(data || []);
@@ -174,6 +180,15 @@ const DataImport = () => {
   };
 
   const confirmAndUploadSheets = async () => {
+    if (!selectedStore) {
+      toast({
+        title: "매장을 선택해주세요",
+        description: "데이터를 업로드하려면 먼저 매장을 선택해야 합니다",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsUploading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -186,9 +201,10 @@ const DataImport = () => {
         await learnFromCorrection(sheet.name, columns, sheet.detectedType);
       }
 
-      // DB에 저장
+      // DB에 저장 (store_id 포함)
       const inserts = sheetAnalysis.map((sheet: any) => ({
         user_id: user.id,
+        store_id: selectedStore.id,
         file_name: file!.name,
         file_type: file!.name.split(".").pop() || "unknown",
         data_type: sheet.detectedType,
