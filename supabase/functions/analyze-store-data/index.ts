@@ -195,7 +195,22 @@ ${relationSummary}
         systemPrompt = "당신은 수요 예측 전문가입니다. 과거 데이터와 외부 요인을 고려하여 미래 수요를 예측하고 준비해야 할 사항을 제안하세요. 고객사의 과거 판매 추세와 재고 회전율을 분석에 반영하세요.";
         break;
       case "layout-simulator":
-        systemPrompt = "당신은 매장 레이아웃 시뮬레이션 전문가입니다. 다양한 레이아웃 옵션을 분석하여 최적의 레이아웃과 그 효과를 예측하세요. 고객사의 과거 트래픽 데이터와 판매 패턴을 고려하세요.";
+        systemPrompt = `당신은 매장 레이아웃 시뮬레이션 전문가입니다. 다양한 레이아웃 옵션을 분석하여 최적의 레이아웃과 그 효과를 예측하세요. 고객사의 과거 트래픽 데이터와 판매 패턴을 고려하세요.
+
+**이동 가능한 가구(movable=true) 위치 최적화 규칙:**
+1. 온톨로지 그래프에서 movable 속성이 true인 엔티티(Rack, Shelf, DisplayTable, CheckoutCounter, Kiosk, Product 등)는 위치 변경 제안이 가능합니다.
+2. movable=false이거나 movable 속성이 없는 엔티티(Store, Zone, Camera, Beacon 등)는 고정된 구조물이므로 위치 변경을 제안하지 마세요.
+3. 위치 변경 제안 시 다음 형식으로 응답하세요:
+   - furniture_id: 가구 ID
+   - entity_type: 엔티티 타입명
+   - movable: true
+   - current_position: 현재 위치 {x, y, z}
+   - suggested_position: 제안 위치 {x, y, z}
+   - suggested_rotation: 제안 회전 {x, y, z} (degree)
+   - optimization_reason: 최적화 이유 (예: "높은 유동 인구 지역으로 이동하여 가시성 향상")
+
+4. 트래픽 히트맵, 구매 전환율, 고객 동선 데이터를 고려하여 가구 배치를 최적화하세요.
+5. 각 제안에는 예상 효과(매출 증가율, 체류 시간 증가 등)를 포함하세요.`;
         break;
       case "inventory-optimizer":
         systemPrompt = "당신은 재고 최적화 전문가입니다. 판매 데이터와 재고 수준을 분석하여 최적의 재고 수준과 발주 시점을 제안하세요. 고객사의 과거 재고 및 판매 데이터를 기반으로 하세요.";

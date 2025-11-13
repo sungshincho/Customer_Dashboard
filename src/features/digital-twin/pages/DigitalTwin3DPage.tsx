@@ -55,6 +55,9 @@ export default function DigitalTwin3DPage() {
         .filter((e: any) => ['shelf', 'displaytable', 'furniture'].includes(e.entity_type?.name?.toLowerCase()))
         .map((e: any, idx: number) => ({
           furniture_id: e.id,
+          entity_type: e.entity_type?.name || 'Unknown',
+          movable: true,
+          current_position: e.model_3d_position || { x: (idx - 1) * 3, y: 0, z: -5 },
           position: e.model_3d_position || { x: (idx - 1) * 3, y: 0, z: -5 },
           rotation: e.model_3d_rotation || { x: 0, y: 0, z: 0 }
         }));
@@ -63,6 +66,9 @@ export default function DigitalTwin3DPage() {
         .filter((e: any) => e.entity_type?.name?.toLowerCase() === 'product')
         .map((e: any, idx: number) => ({
           product_id: e.id,
+          entity_type: e.entity_type?.name || 'Product',
+          movable: true,
+          current_position: e.model_3d_position || { x: (idx - 1) * 2, y: 1, z: -4 },
           position: e.model_3d_position || { x: (idx - 1) * 2, y: 1, z: -4 }
         }));
 

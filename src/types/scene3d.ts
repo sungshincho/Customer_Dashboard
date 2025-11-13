@@ -30,12 +30,20 @@ export interface SpaceAsset extends SceneAsset {
 export interface FurnitureAsset extends SceneAsset {
   type: 'furniture';
   furniture_type?: string;
+  movable?: boolean;
+  suggested_position?: Vector3D;
+  suggested_rotation?: Vector3D;
+  optimization_reason?: string;
 }
 
 export interface ProductAsset extends SceneAsset {
   type: 'product';
   product_id?: string;
   sku?: string;
+  movable?: boolean;
+  suggested_position?: Vector3D;
+  suggested_rotation?: Vector3D;
+  optimization_reason?: string;
 }
 
 export interface LightConfig {
@@ -86,17 +94,29 @@ export interface AILayoutResult {
     zone_type: string;
     furniture: Array<{
       furniture_id: string;
+      entity_type: string;
+      movable?: boolean;
+      current_position: Vector3D;
       position: Vector3D;
+      suggested_position?: Vector3D;
       rotation: Vector3D;
+      suggested_rotation?: Vector3D;
+      optimization_reason?: string;
     }>;
     products: Array<{
       product_id: string;
+      entity_type?: string;
+      movable?: boolean;
+      current_position?: Vector3D;
       position: Vector3D;
+      suggested_position?: Vector3D;
       shelf_id?: string;
+      optimization_reason?: string;
     }>;
   }>;
   lighting_suggestion?: string;
   heatmap_data?: any;
+  optimization_summary?: string;
 }
 
 export interface OntologyQueryResult {

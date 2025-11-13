@@ -45,19 +45,27 @@ Tasks:
 1. Infer what this 3D model represents based on the filename
 2. Match it to the most appropriate entity type from the list above
 3. Suggest dimensions (width, height, depth in meters) based on typical real-world sizes
-4. Provide a confidence score (0-1)
+4. Determine if this object is movable (can be repositioned)
+5. Provide a confidence score (0-1)
+
+**Movability Rules:**
+- movable=true: Rack, Shelf, DisplayTable, CheckoutCounter, Kiosk, Product, FittingRoom (furniture that can be moved/repositioned)
+- movable=false: Store, Zone, Camera, Beacon, POS (fixed structures and permanently installed equipment)
+- Keywords: "movable", "portable", "mobile" → movable=true
+- Keywords: "fixed", "permanent", "installed" → movable=false
 
 Respond in JSON format:
 {
   "matched_entity_type": "entity_type_name",
   "confidence": 0.95,
+  "movable": true,
   "inferred_type": "description of what you think this is",
   "suggested_dimensions": {
     "width": 2.0,
     "height": 2.0,
     "depth": 0.5
   },
-  "reasoning": "why you matched it to this type"
+  "reasoning": "why you matched it to this type and whether it's movable"
 }
 `;
 

@@ -63,11 +63,17 @@ const LayoutSimulatorPage = () => {
             furniture: [
               {
                 furniture_id: 'shelf-001',
+                entity_type: 'Shelf',
+                movable: true,
+                current_position: { x: -5, y: 0, z: 0 },
                 position: { x: -5, y: 0, z: 0 },
                 rotation: { x: 0, y: Math.PI / 2, z: 0 }
               },
               {
                 furniture_id: 'shelf-002',
+                entity_type: 'Shelf',
+                movable: true,
+                current_position: { x: 5, y: 0, z: 0 },
                 position: { x: 5, y: 0, z: 0 },
                 rotation: { x: 0, y: -Math.PI / 2, z: 0 }
               }
@@ -75,10 +81,16 @@ const LayoutSimulatorPage = () => {
             products: [
               {
                 product_id: 'product-001',
+                entity_type: 'Product',
+                movable: true,
+                current_position: { x: -5, y: 1, z: 0 },
                 position: { x: -5, y: 1, z: 0 }
               },
               {
                 product_id: 'product-002',
+                entity_type: 'Product',
+                movable: true,
+                current_position: { x: 5, y: 1, z: 0 },
                 position: { x: 5, y: 1, z: 0 }
               }
             ]
