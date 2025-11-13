@@ -4,7 +4,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Store } from "lucide-react";
+import { Store, Loader2 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { useState, useEffect } from "react";
+import { loadStoreFile } from "@/utils/storageDataLoader";
 
 const hourlyData = [
   { hour: "06:00", visitors: 23 },
@@ -37,6 +40,37 @@ const COLORS = ["hsl(var(--primary))", "hsl(var(--accent))", "#8884d8", "#82ca9d
 
 const Analytics = () => {
   const { selectedStore } = useSelectedStore();
+  const { user } = useAuth();
+  const [visitsData, setVisitsData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // 매장별 방문 데이터 로드
+  useEffect(() => {
+    if (selectedStore && user) {
+      setLoading(true);
+      loadStoreFile(user.id, selectedStore.id, 'visits.csv')
+        .then(data => {
+          console.log(`${selectedStore.store_name} 분석 데이터:`, data.length, '건');
+          setVisitsData(data);
+          setLoading(false);
+        })
+        .catch(error => {
+          console.error('Failed to load visits data:', error);
+          setVisitsData([]);
+          setLoading(false);
+        });
+    }
+  }, [selectedStore, user]);
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -50,13 +84,14 @@ const Analytics = () => {
           </Alert>
         )}
 
-        {/* Header */}
-        <div className="animate-fade-in">
-          <h1 className="text-3xl font-bold gradient-text">방문자 분석</h1>
-          <p className="mt-2 text-muted-foreground">
-            {selectedStore ? `${selectedStore.store_name} - ` : ''}매장 방문자 데이터 및 히트맵 분석
-          </p>
-        </div>
+        {selectedStore && (
+          <>
+            <div className="animate-fade-in">
+              <h1 className="text-3xl font-bold gradient-text">방문자 분석</h1>
+              <p className="mt-2 text-muted-foreground">
+                {selectedStore.store_name} - 방문 데이터: {visitsData.length}건
+              </p>
+            </div>
 
         <Tabs defaultValue="hourly" className="space-y-4">
           <TabsList>
@@ -182,6 +217,8 @@ const Analytics = () => {
             </div>
           </TabsContent>
         </Tabs>
+          </>
+        )}
       </div>
     </DashboardLayout>
   );

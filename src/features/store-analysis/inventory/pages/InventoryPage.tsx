@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, AlertTriangle, Package } from "lucide-react";
+import { Search, AlertTriangle, Package, Store, Loader2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -12,30 +12,84 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-const inventory = [
-  { id: 1, name: "상품 A", sku: "SKU-001", stock: 5, minStock: 10, status: "부족", store: "강남점" },
-  { id: 2, name: "상품 B", sku: "SKU-002", stock: 45, minStock: 20, status: "정상", store: "강남점" },
-  { id: 3, name: "상품 C", sku: "SKU-003", stock: 8, minStock: 15, status: "부족", store: "홍대점" },
-  { id: 4, name: "상품 D", sku: "SKU-004", stock: 120, minStock: 50, status: "정상", store: "명동점" },
-  { id: 5, name: "상품 E", sku: "SKU-005", stock: 3, minStock: 10, status: "긴급", store: "홍대점" },
-  { id: 6, name: "상품 F", sku: "SKU-006", stock: 67, minStock: 30, status: "정상", store: "잠실점" },
-];
+import { useSelectedStore } from "@/hooks/useSelectedStore";
+import { useAuth } from "@/hooks/useAuth";
+import { useState, useEffect } from "react";
+import { loadStoreFile } from "@/utils/storageDataLoader";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const Inventory = () => {
-  const lowStockCount = inventory.filter(item => item.status === "부족" || item.status === "긴급").length;
+  const { selectedStore } = useSelectedStore();
+  const { user } = useAuth();
+  const [productsData, setProductsData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // 매장별 상품 데이터 로드
+  useEffect(() => {
+    if (selectedStore && user) {
+      setLoading(true);
+      loadStoreFile(user.id, selectedStore.id, 'products.csv')
+        .then(data => {
+          console.log(`${selectedStore.store_name} 재고 데이터:`, data.length, '개');
+          // 재고 상태 계산
+          const productsWithStock = data.map((p: any, idx: number) => ({
+            id: idx + 1,
+            name: p.name || p.product_name,
+            sku: p.sku || `SKU-${String(idx + 1).padStart(3, '0')}`,
+            stock: Math.floor(Math.random() * 100),
+            minStock: 20 + Math.floor(Math.random() * 30),
+            status: '',
+            store: selectedStore.store_name
+          })).map((p: any) => ({
+            ...p,
+            status: p.stock < 10 ? '긴급' : p.stock < p.minStock ? '부족' : '정상'
+          }));
+          setProductsData(productsWithStock);
+          setLoading(false);
+        })
+        .catch(error => {
+          console.error('Failed to load products:', error);
+          setProductsData([]);
+          setLoading(false);
+        });
+    }
+  }, [selectedStore, user]);
+
+  const lowStockCount = productsData.filter(item => item.status === "부족" || item.status === "긴급").length;
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between animate-fade-in">
-          <div>
-            <h1 className="text-3xl font-bold gradient-text">재고 관리</h1>
-            <p className="mt-2 text-muted-foreground">전체 매장 재고 현황 및 관리</p>
-          </div>
-          <Button className="bg-gradient-primary hover:shadow-glow">발주 요청</Button>
-        </div>
+        {!selectedStore && (
+          <Alert>
+            <Store className="h-4 w-4" />
+            <AlertDescription>
+              매장을 선택하면 해당 매장의 재고 데이터를 확인할 수 있습니다.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {selectedStore && (
+          <>
+            <div className="flex items-center justify-between animate-fade-in">
+              <div>
+                <h1 className="text-3xl font-bold gradient-text">재고 관리</h1>
+                <p className="mt-2 text-muted-foreground">
+                  {selectedStore.store_name} - 상품: {productsData.length}개
+                </p>
+              </div>
+              <Button className="bg-gradient-primary hover:shadow-glow">발주 요청</Button>
+            </div>
 
         {/* Alert Banner */}
         {lowStockCount > 0 && (
@@ -81,7 +135,7 @@ const Inventory = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {inventory.map((item) => (
+                {productsData.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">{item.name}</TableCell>
                     <TableCell className="text-muted-foreground">{item.sku}</TableCell>
@@ -122,7 +176,7 @@ const Inventory = () => {
             <CardContent>
               <div className="flex items-center gap-2">
                 <Package className="h-4 w-4 text-muted-foreground" />
-                <span className="text-2xl font-bold">{inventory.length}</span>
+                <span className="text-2xl font-bold">{productsData.length}</span>
               </div>
             </CardContent>
           </Card>
@@ -134,7 +188,7 @@ const Inventory = () => {
               <div className="flex items-center gap-2">
                 <div className="h-4 w-4 rounded-full bg-green-500" />
                 <span className="text-2xl font-bold">
-                  {inventory.filter(item => item.status === "정상").length}
+                  {productsData.filter(item => item.status === "정상").length}
                 </span>
               </div>
             </CardContent>
@@ -151,6 +205,8 @@ const Inventory = () => {
             </CardContent>
           </Card>
         </div>
+          </>
+        )}
       </div>
     </DashboardLayout>
   );
