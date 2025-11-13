@@ -26,6 +26,53 @@ const Stores = () => {
   const { stores, loading, refreshStores, selectedStore, setSelectedStore } = useSelectedStore();
   const [deleting, setDeleting] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [dataChecked, setDataChecked] = useState(false);
+
+  // 페이지 로드 시 자동으로 데이터 확인 및 생성
+  useEffect(() => {
+    const checkAndGenerateData = async () => {
+      if (!user || stores.length === 0 || dataChecked) return;
+
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        // 첫 번째 매장의 데이터가 있는지 확인
+        const firstStore = stores[0];
+        const { data: files } = await supabase.storage
+          .from('store-data')
+          .list(`${user.id}/${firstStore.id}`);
+
+        // 데이터가 없으면 자동 생성
+        if (!files || files.length === 0) {
+          console.log('샘플 데이터가 없어서 자동 생성을 시작합니다...');
+          setGenerating(true);
+          
+          const response = await supabase.functions.invoke('auto-generate-store-data', {
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            }
+          });
+
+          if (!response.error) {
+            console.log('샘플 데이터가 자동으로 생성되었습니다:', response.data);
+            toast.success('매장 샘플 데이터가 생성되었습니다');
+          }
+          setGenerating(false);
+        } else {
+          console.log('샘플 데이터가 이미 존재합니다');
+        }
+        
+        setDataChecked(true);
+      } catch (error) {
+        console.error('데이터 확인 오류:', error);
+        setDataChecked(true);
+        setGenerating(false);
+      }
+    };
+
+    checkAndGenerateData();
+  }, [user, stores, dataChecked]);
 
   const handleGenerateAllData = async () => {
     if (!user) return;
