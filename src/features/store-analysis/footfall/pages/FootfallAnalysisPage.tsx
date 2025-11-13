@@ -2,7 +2,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { FootfallVisualizer } from "@/features/store-analysis/footfall/components/FootfallVisualizer";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Loader2, Store } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AdvancedFilters, FilterState } from "@/components/analysis/AdvancedFilters";
 import { ExportButton } from "@/components/analysis/ExportButton";
 import { ComparisonView } from "@/components/analysis/ComparisonView";
@@ -13,29 +13,56 @@ import { useAutoAnalysis } from "@/hooks/useAutoAnalysis";
 import { SceneViewer } from "@/features/digital-twin/components/SceneViewer";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { loadStoreFile } from "@/utils/storageDataLoader";
+import { useAuth } from "@/hooks/useAuth";
 
 const FootfallAnalysis = () => {
   const { selectedStore } = useSelectedStore();
+  const { user } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
+  const [visitsData, setVisitsData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
   
   const { sceneRecipe, loading: sceneLoading, generateScene } = useStoreScene();
   const { latestAnalysis, analyzing } = useAutoAnalysis('visitor', true);
+
+  // 매장별 방문 데이터 로드
+  useEffect(() => {
+    if (selectedStore && user) {
+      setLoading(true);
+      loadStoreFile(user.id, selectedStore.id, 'visits.csv')
+        .then(data => {
+          console.log(`${selectedStore.store_name} 방문 데이터 로드됨:`, data.length, '건');
+          setVisitsData(data);
+          setLoading(false);
+        })
+        .catch(error => {
+          console.error('Failed to load visits data:', error);
+          setVisitsData([]);
+          setLoading(false);
+        });
+    }
+  }, [selectedStore, user, refreshKey]);
 
   const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);
   };
 
+  const totalVisits = visitsData.length;
+  const totalPurchased = visitsData.filter(v => v.purchased === 'Y').length;
+  const conversionRate = totalVisits > 0 ? ((totalPurchased / totalVisits) * 100).toFixed(1) : '0';
+
   const comparisonData = [
-    { label: "총 방문자", current: 1250, previous: 1100, unit: "명" },
+    { label: "총 방문자", current: totalVisits, previous: Math.round(totalVisits * 0.85), unit: "명" },
     { label: "평균 체류시간", current: 18, previous: 15, unit: "분" },
-    { label: "신규 방문자", current: 420, previous: 380, unit: "명" }
+    { label: "전환율", current: parseFloat(conversionRate), previous: parseFloat(conversionRate) * 0.9, unit: "%" }
   ];
 
   const exportData = {
     filters,
-    totalVisitors: 1250,
+    totalVisitors: totalVisits,
     avgDwellTime: 18,
     peakHours: "14:00-16:00",
     comparisonData
@@ -58,27 +85,29 @@ const FootfallAnalysis = () => {
           <div>
             <h1 className="text-3xl font-bold gradient-text">방문객 유입 분석</h1>
             <p className="mt-2 text-muted-foreground">
-              {selectedStore ? `${selectedStore.store_name} - ` : ''}시간대별 방문자 패턴 및 트렌드 분석
+              {selectedStore ? `${selectedStore.store_name} - 방문 데이터: ${totalVisits}건` : '시간대별 방문자 패턴 및 트렌드 분석'}
               {analyzing && <span className="ml-2 text-primary">(AI 분석 중...)</span>}
             </p>
           </div>
           <div className="flex gap-2">
             <ExportButton data={exportData} filename="footfall-analysis" title="방문객 유입 분석" />
-            <Button onClick={handleRefresh} variant="outline" size="sm">
-              <RefreshCw className="w-4 h-4 mr-2" />
+            <Button onClick={handleRefresh} variant="outline" size="sm" disabled={loading}>
+              {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
               새로고침
             </Button>
           </div>
         </div>
         
-        <AdvancedFilters filters={filters} onFiltersChange={setFilters} />
-        
-        <Tabs defaultValue="3d" className="w-full">
-          <TabsList>
-            <TabsTrigger value="3d">3D 방문자 뷰</TabsTrigger>
-            <TabsTrigger value="analysis">분석</TabsTrigger>
-            <TabsTrigger value="comparison">비교 분석</TabsTrigger>
-          </TabsList>
+        {selectedStore && (
+          <>
+            <AdvancedFilters filters={filters} onFiltersChange={setFilters} />
+            
+            <Tabs defaultValue="3d" className="w-full">
+              <TabsList>
+                <TabsTrigger value="3d">3D 방문자 뷰</TabsTrigger>
+                <TabsTrigger value="analysis">분석</TabsTrigger>
+                <TabsTrigger value="comparison">비교 분석</TabsTrigger>
+              </TabsList>
           
           <TabsContent value="3d" className="space-y-6">
             <Card>
@@ -130,6 +159,8 @@ const FootfallAnalysis = () => {
             />
           </TabsContent>
         </Tabs>
+          </>
+        )}
       </div>
     </DashboardLayout>
   );
