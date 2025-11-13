@@ -27,4 +27,19 @@ export interface ProductInfo {
 }
 
 // Re-export avatar types
-export type { CustomerAvatar, CustomerAvatarOverlayProps, CustomerStatus, AvatarColors } from './avatar.types';
+export type { 
+  CustomerAvatar, 
+  CustomerAvatarOverlayProps, 
+  CustomerStatus, 
+  AvatarColors 
+} from './avatar.types';
+
+// Re-export IoT types
+export type {
+  SensorType,
+  SensorPosition,
+  TrackingData,
+  StoreSpaceMetadata,
+  StoreZone,
+  CustomerPresenceState
+} from './iot.types';

@@ -16,7 +16,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { loadStoreFile } from "@/utils/storageDataLoader";
 import { useAuth } from "@/hooks/useAuth";
 import { Store3DViewer } from "@/features/digital-twin/components/Store3DViewer";
-import { CustomerPathOverlay, CustomerAvatarOverlay } from "@/features/digital-twin/components/overlays";
+import { CustomerPathOverlay, CustomerAvatarOverlay, RealtimeCustomerOverlay } from "@/features/digital-twin/components/overlays";
 import { generateCustomerPaths, generateCustomerAvatars } from "@/features/digital-twin/utils/overlayDataConverter";
 
 const FootfallAnalysis = () => {
@@ -108,6 +108,7 @@ const FootfallAnalysis = () => {
             <Tabs defaultValue="analysis" className="w-full">
               <TabsList>
                 <TabsTrigger value="analysis">분석</TabsTrigger>
+                <TabsTrigger value="3d-realtime">실시간 IoT</TabsTrigger>
                 <TabsTrigger value="3d-avatars">3D 고객 아바타</TabsTrigger>
                 <TabsTrigger value="3d-model">3D 동선</TabsTrigger>
                 <TabsTrigger value="3d-scene">3D 방문자 뷰</TabsTrigger>
@@ -118,6 +119,42 @@ const FootfallAnalysis = () => {
             <div key={refreshKey}>
               <FootfallVisualizer visitsData={visitsData} />
             </div>
+          </TabsContent>
+
+          <TabsContent value="3d-realtime" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>실시간 IoT 트래킹 (Supabase Realtime)</CardTitle>
+                <CardDescription>
+                  IoT 센서 데이터를 실시간으로 수신하여 고객 위치를 3D로 표시합니다.
+                  다른 사용자와 동기화되어 동일한 데이터를 볼 수 있습니다.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {selectedStore && (
+                  <Store3DViewer 
+                    height="600px"
+                    overlay={
+                      <RealtimeCustomerOverlay
+                        storeId={selectedStore.id}
+                        maxInstances={200}
+                        showDebugInfo
+                      />
+                    }
+                  />
+                )}
+                <div className="mt-4 p-4 bg-muted rounded-lg space-y-3">
+                  <h4 className="font-semibold">실시간 IoT 연동 방법</h4>
+                  <div className="text-sm space-y-2 text-muted-foreground">
+                    <p><strong>1. 센서 설정:</strong> iot_sensors 테이블에 WiFi/Bluetooth 센서 위치 등록</p>
+                    <p><strong>2. 트래킹 데이터 전송:</strong> IoT 디바이스에서 Supabase Broadcast로 위치 데이터 전송</p>
+                    <p><strong>3. 자동 위치 추정:</strong> 삼각측량(Trilateration)으로 고객 위치 계산</p>
+                    <p><strong>4. 칼만 필터:</strong> 노이즈 제거 및 부드러운 이동 처리</p>
+                    <p><strong>5. Presence 공유:</strong> 모든 클라이언트가 실시간으로 동일한 고객 위치 확인</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="3d-avatars" className="space-y-6">
