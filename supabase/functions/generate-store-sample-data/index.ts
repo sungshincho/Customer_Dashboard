@@ -42,10 +42,10 @@ function storeCodeToSeed(storeCode: string): number {
   return Math.abs(hash) + 1; // Ensure positive non-zero
 }
 
-// 샘플 데이터 생성 함수들
+// 샘플 데이터 생성 함수들 - Street Casual 브랜드, 20대 초반 타겟
 function generateCustomers(storePrefix: string, storeSeed: number, count: number = 50) {
   const customers = [];
-  const random = seededRandom(storeSeed * 137); // 큰 소수로 시드 변환
+  const random = seededRandom(storeSeed * 137);
   const firstNames = ['김', '이', '박', '최', '정', '강', '조', '윤', '장', '임'];
   const secondNames = ['민', '서', '지', '수', '현', '준', '은', '하', '도', '우'];
   const thirdNames = ['준', '호', '영', '진', '민', '수', '아', '연', '희', '정'];
@@ -55,15 +55,24 @@ function generateCustomers(storePrefix: string, storeSeed: number, count: number
     const secondName = secondNames[Math.floor(random() * secondNames.length)];
     const thirdName = thirdNames[Math.floor(random() * thirdNames.length)];
     
+    // 20대 초반 타겟 (20-25세)
+    const age = Math.floor(random() * 6) + 20;
+    
+    // 높은 방문 빈도 반영 (구매 횟수 많음)
+    const totalPurchases = Math.floor(random() * 30) + 15;
+    
+    // 저렴한 가격대 반영 (평균 구매액 낮음)
+    const avgPurchaseAmount = Math.floor(random() * 50000) + 30000;
+    
     customers.push({
       customer_id: `${storePrefix}_C${String(i).padStart(3, '0')}`,
       name: `${firstName}${secondName}${thirdName}`,
-      age: Math.floor(random() * 50) + 20,
+      age,
       gender: random() > 0.5 ? '남성' : '여성',
-      membership_level: ['Bronze', 'Silver', 'Gold', 'Platinum'][Math.floor(random() * 4)],
+      membership_level: ['Bronze', 'Silver', 'Gold'][Math.floor(random() * 3)], // Platinum 제외
       join_date: `2023-${String(Math.floor(random() * 12) + 1).padStart(2, '0')}-${String(Math.floor(random() * 28) + 1).padStart(2, '0')}`,
-      total_purchases: Math.floor(random() * 50) + 1,
-      avg_purchase_amount: Math.floor(random() * 500000) + 50000
+      total_purchases: totalPurchases,
+      avg_purchase_amount: avgPurchaseAmount
     });
   }
   
@@ -74,62 +83,33 @@ function generateProducts(storePrefix: string, storeSeed: number, count: number 
   const products = [];
   const random = seededRandom(storeSeed * 251);
   
-  // 매장별 고유 상품 컬렉션 (store_code 기반)
-  const storeProductSets: { [key: string]: { categories: string[], brands: string[], types: string[][] } } = {
-    'GN001': { // 강남점 - Street Casual
-      categories: ['스트릿 티셔츠', '데님 팬츠', '후드/맨투맨', '스니커즈', '캡/비니'],
-      brands: ['슈프림', '스투시', '팔라스', '카르하트', '디키즈'],
-      types: [
-        ['로고 티', '그래픽 티', '오버핏 티', '타이다이 티', '크롭 티'],
-        ['슬림 진', '와이드 진', '크롭 진', '블랙 진', '워싱 진'],
-        ['기본 후드', '오버핏 후드', '크롭 후드', '집업 후드', '맨투맨'],
-        ['로우탑', '하이탑', '슬립온', '플랫폼', '러닝화'],
-        ['볼캡', '버킷햇', '비니', '스냅백', '캠프캡']
-      ]
-    },
-    'GN002': { // 강남점2 - Minimal Basic
-      categories: ['베이직 티셔츠', '슬랙스', '니트', '코트', '로퍼'],
-      brands: ['유니클로', '무인양품', 'COS', '에잇세컨즈', '스파오'],
-      types: [
-        ['라운드 티', '브이넥 티', '롱슬리브', '폴로', '헨리넥'],
-        ['기본 슬랙스', '와이드 슬랙스', '테이퍼드', '치노', '린넨 팬츠'],
-        ['라운드 니트', '터틀넥', '가디건', '조끼', '폴로 니트'],
-        ['트렌치 코트', '울 코트', '더블 코트', '싱글 코트', '맥 코트'],
-        ['페니 로퍼', '태슬 로퍼', '비트 로퍼', '스웨이드 로퍼', '특양화']
-      ]
-    },
-    'GN003': { // 강남점3 - Trendy Luxury
-      categories: ['디자이너 셔츠', '프리미엄 팬츠', '가죽 재킷', '명품 스니커즈', '디자이너 백'],
-      brands: ['발렌시아가', '생로랑', '프라다', '구찌', '디올'],
-      types: [
-        ['오버핏 셔츠', '실크 셔츠', '린넨 셔츠', '프린트 셔츠', '데님 셔츠'],
-        ['테일러드 팬츠', '와이드 팬츠', '플리츠 팬츠', '가죽 팬츠', '벨벳 팬츠'],
-        ['라이더 재킷', '봄버 재킷', '블루종', '무스탕', '수트 재킷'],
-        ['트리플 S', '스피드 러너', '클라우드버스트', '에이스', '디스럽터'],
-        ['크로스백', '토트백', '백팩', '클러치', '벨트백']
-      ]
-    }
+  // Street Casual 브랜드 통일
+  const categories = ['스트릿 티셔츠', '데님 팬츠', '후드/맨투맨', '스니커즈', '캡/모자'];
+  const brands = ['슈프림', '스투시', '팔라스', '카르하트', '디키즈', '챔피온', '반스'];
+  
+  const productTypes: { [key: string]: string[] } = {
+    '스트릿 티셔츠': ['로고 티', '그래픽 티', '오버핏 티', '타이다이 티', '크롭 티'],
+    '데님 팬츠': ['슬림 진', '와이드 진', '크롭 진', '블랙 진', '워싱 진'],
+    '후드/맨투맨': ['기본 후드', '오버핏 후드', '크롭 후드', '집업 후드', '맨투맨'],
+    '스니커즈': ['로우탑', '하이탑', '슬립온', '플랫폼', '러닝화'],
+    '캡/모자': ['볼캡', '버킷햇', '비니', '스냅백', '캠프캡']
   };
   
-  const storeSet = storeProductSets[storePrefix] || storeProductSets['GN001'];
-  
   for (let i = 1; i <= count; i++) {
-    const catIdx = Math.floor(random() * storeSet.categories.length);
-    const category = storeSet.categories[catIdx];
-    const brand = storeSet.brands[Math.floor(random() * storeSet.brands.length)];
-    const type = storeSet.types[catIdx][Math.floor(random() * storeSet.types[catIdx].length)];
+    const category = categories[Math.floor(random() * categories.length)];
+    const brand = brands[Math.floor(random() * brands.length)];
+    const typeList = productTypes[category];
+    const type = typeList[Math.floor(random() * typeList.length)];
     
-    // 매장별 가격대 설정
-    const basePrice = storePrefix === 'GN003' ? 500000 : storePrefix === 'GN002' ? 80000 : 150000;
-    const priceVariation = storePrefix === 'GN003' ? 1500000 : storePrefix === 'GN002' ? 120000 : 200000;
-    const price = Math.floor(random() * priceVariation) + basePrice;
+    // 저렴한 가격대 설정 (20,000원 ~ 80,000원)
+    const price = Math.floor(random() * 60000) + 20000;
     
     products.push({
       product_id: `${storePrefix}_P${String(i).padStart(3, '0')}`,
       name: `${brand} ${type}`,
       category: category,
       price: price,
-      stock: Math.floor(random() * 100) + 10,
+      stock: Math.floor(random() * 100) + 20,
       supplier: brand,
       sku: `SKU${storePrefix}${String(i).padStart(4, '0')}`
     });
@@ -200,7 +180,7 @@ function generateVisits(storeId: string, storePrefix: string, storeSeed: number,
 
 function generateStaff(storePrefix: string, storeSeed: number, count: number = 5) {
   const staff = [];
-  const random = seededRandom(storeSeed * 643); // 다른 소수
+  const random = seededRandom(storeSeed * 643);
   const firstNames = ['김', '이', '박', '최', '정'];
   const secondNames = ['민', '서', '지', '수', '현'];
   const thirdNames = ['수', '진', '아', '우', '영'];
@@ -222,6 +202,55 @@ function generateStaff(storePrefix: string, storeSeed: number, count: number = 5
   }
   
   return staff;
+}
+
+function generateBrands(storePrefix: string, storeSeed: number) {
+  const random = seededRandom(storeSeed * 787);
+  const brandNames = ['슈프림', '스투시', '팔라스', '카르하트', '디키즈', '챔피온', '반스'];
+  const brands: any[] = [];
+  
+  brandNames.forEach((brandName, i) => {
+    brands.push({
+      brand_id: `${storePrefix}_B${String(i + 1).padStart(3, '0')}`,
+      brand_name: brandName,
+      category: 'Street Casual',
+      country: ['미국', '일본', '영국'][Math.floor(random() * 3)],
+      popularity_score: Math.floor(random() * 30) + 70 // 70-100
+    });
+  });
+  
+  return brands;
+}
+
+function generateSocialStates(storeId: string, storePrefix: string, storeSeed: number, customerCount: number, count: number = 100) {
+  const socialStates = [];
+  const random = seededRandom(storeSeed * 883);
+  const platforms = ['Instagram', 'TikTok', 'Twitter'];
+  const actionTypes = ['post', 'story', 'comment', 'like', 'share'];
+  const sentiments = ['positive', 'neutral', 'negative'];
+  
+  for (let i = 1; i <= count; i++) {
+    const year = 2024;
+    const month = Math.floor(random() * 3) + 1;
+    const day = Math.floor(random() * 28) + 1;
+    const hour = Math.floor(random() * 24);
+    const minute = Math.floor(random() * 60);
+    
+    socialStates.push({
+      social_id: `${storePrefix}_SS${String(i).padStart(4, '0')}`,
+      customer_id: `${storePrefix}_C${String(Math.floor(random() * customerCount) + 1).padStart(3, '0')}`,
+      store_id: storeId,
+      platform: platforms[Math.floor(random() * platforms.length)],
+      action_type: actionTypes[Math.floor(random() * actionTypes.length)],
+      content_snippet: `Great experience at store! #streetwear #fashion`,
+      sentiment: sentiments[Math.floor(random() * sentiments.length)],
+      engagement_score: Math.floor(random() * 100),
+      timestamp: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00Z`,
+      reach_count: Math.floor(random() * 1000) + 100
+    });
+  }
+  
+  return socialStates;
 }
 
 Deno.serve(async (req) => {
@@ -269,8 +298,10 @@ Deno.serve(async (req) => {
     const purchases = generatePurchases(storeId, storePrefix, storeSeed, customers.length, products.length, 200);
     const visits = generateVisits(storeId, storePrefix, storeSeed, customers.length, 300);
     const staff = generateStaff(storePrefix, storeSeed, 5);
+    const brands = generateBrands(storePrefix, storeSeed);
+    const socialStates = generateSocialStates(storeId, storePrefix, storeSeed, customers.length, 100);
     
-    console.log(`Generated: ${customers.length} customers, ${products.length} products, ${purchases.length} purchases, ${visits.length} visits, ${staff.length} staff`);
+    console.log(`Generated: ${customers.length} customers, ${products.length} products, ${purchases.length} purchases, ${visits.length} visits, ${staff.length} staff, ${brands.length} brands, ${socialStates.length} social_states`);
 
     // CSV로 변환
     const datasets = {
@@ -278,7 +309,9 @@ Deno.serve(async (req) => {
       'products.csv': arrayToCSV(products),
       'purchases.csv': arrayToCSV(purchases),
       'visits.csv': arrayToCSV(visits),
-      'staff.csv': arrayToCSV(staff)
+      'staff.csv': arrayToCSV(staff),
+      'brands.csv': arrayToCSV(brands),
+      'social_states.csv': arrayToCSV(socialStates)
     };
 
     // 스토리지에 업로드
@@ -311,7 +344,9 @@ Deno.serve(async (req) => {
           products: products.length,
           purchases: purchases.length,
           visits: visits.length,
-          staff: staff.length
+          staff: staff.length,
+          brands: brands.length,
+          social_states: socialStates.length
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
