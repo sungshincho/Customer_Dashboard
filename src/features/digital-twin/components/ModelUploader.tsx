@@ -40,6 +40,7 @@ export function ModelUploader() {
   const [analyzing, setAnalyzing] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [pendingAnalysis, setPendingAnalysis] = useState<ModelAnalysis | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -84,9 +85,34 @@ export function ModelUploader() {
     }
   };
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      await processFiles(files);
+    }
+  };
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
-    if (!files || files.length === 0 || !user) return;
+    if (!files || files.length === 0) return;
+    await processFiles(files);
+  };
+
+  const processFiles = async (files: FileList) => {
+    if (!user) return;
 
     if (!selectedStore) {
       toast({
@@ -187,31 +213,60 @@ export function ModelUploader() {
 
       <Card>
       <CardHeader>
-        <CardTitle>3D 모델 업로드</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <Upload className="w-5 h-5" />
+          3D 모델 업로드
+        </CardTitle>
         <CardDescription>
-          .glb 또는 .gltf 파일을 업로드하세요 (최대 50MB)
+          .glb 또는 .gltf 파일을 드래그하거나 클릭하여 업로드하세요
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="model-upload">3D 모델 파일 선택</Label>
-          <div className="flex gap-2">
-            <Input
-              id="model-upload"
-              type="file"
-              accept=".glb,.gltf"
-              multiple
-              onChange={handleFileUpload}
-              disabled={uploading}
-              className="flex-1"
-            />
-            <Button disabled={uploading} size="icon">
-              {uploading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Upload className="h-4 w-4" />
-              )}
-            </Button>
+      <CardContent className="space-y-6">
+        <div
+          className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+            isDragging
+              ? 'border-primary bg-primary/5'
+              : 'border-border hover:border-primary/50'
+          } ${uploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          onClick={() => !uploading && document.getElementById('model-upload')?.click()}
+        >
+          <input
+            id="model-upload"
+            type="file"
+            accept=".glb,.gltf"
+            multiple
+            onChange={handleFileUpload}
+            disabled={uploading}
+            className="hidden"
+          />
+          
+          <div className="flex flex-col items-center gap-4">
+            {uploading ? (
+              <>
+                <Loader2 className="w-12 h-12 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">업로드 중...</p>
+              </>
+            ) : (
+              <>
+                <Upload className="w-12 h-12 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">
+                    파일을 여기에 드래그하거나 클릭하여 선택
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    .glb, .gltf 파일 지원 (최대 100MB)
+                  </p>
+                </div>
+                {selectedStore && (
+                  <p className="text-xs text-muted-foreground">
+                    업로드 위치: {selectedStore.store_name}
+                  </p>
+                )}
+              </>
+            )}
           </div>
         </div>
 
