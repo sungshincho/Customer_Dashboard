@@ -263,24 +263,30 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // 인증 확인
-    const authHeader = req.headers.get('Authorization')!;
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-
-    if (authError || !user) {
-      throw new Error('Unauthorized');
-    }
-
     const { storeId } = await req.json();
 
-    // 매장 정보 가져오기
-    const { data: store, error: storeError } = await supabase
+    // 매장 정보 가져오기 (인증 헤더가 있으면 user_id 체크, 없으면 storeId만으로 조회)
+    const authHeader = req.headers.get('Authorization');
+    let userId = null;
+    
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+      if (!authError && user) {
+        userId = user.id;
+      }
+    }
+
+    let query = supabase
       .from('stores')
       .select('*')
-      .eq('id', storeId)
-      .eq('user_id', user.id)
-      .single();
+      .eq('id', storeId);
+    
+    if (userId) {
+      query = query.eq('user_id', userId);
+    }
+    
+    const { data: store, error: storeError } = await query.single();
 
     if (storeError || !store) {
       throw new Error('Store not found');
@@ -317,7 +323,7 @@ Deno.serve(async (req) => {
     // 스토리지에 업로드
     const uploadResults = [];
     for (const [filename, csvContent] of Object.entries(datasets)) {
-      const filePath = `${user.id}/${storeId}/${filename}`;
+      const filePath = `${store.user_id}/${storeId}/${filename}`;
       
       const { error: uploadError } = await supabase.storage
         .from('store-data')
