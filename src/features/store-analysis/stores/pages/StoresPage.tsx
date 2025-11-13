@@ -3,7 +3,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Phone, Clock, Trash2, Edit, Loader2, Database } from "lucide-react";
+import { Phone, Trash2, Edit, Loader2 } from "lucide-react";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { StoreForm } from "../components/StoreForm";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,51 +25,40 @@ const Stores = () => {
   const { user } = useAuth();
   const { stores, loading, refreshStores, selectedStore, setSelectedStore } = useSelectedStore();
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [generatingStores, setGeneratingStores] = useState<Set<string>>(new Set());
+  const [dataGenerated, setDataGenerated] = useState(false);
 
-  const handleGenerateSampleData = async (storeId: string, storeName: string) => {
-    setGeneratingStores(prev => new Set(prev).add(storeId));
-    
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error('인증이 필요합니다');
-        return;
-      }
+  // 페이지 로드 시 자동으로 모든 매장의 샘플 데이터 생성
+  useEffect(() => {
+    const autoGenerateAllStoreData = async () => {
+      if (!user || stores.length === 0 || dataGenerated) return;
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-store-sample-data`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ storeId })
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auto-generate-store-data`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            }
+          }
+        );
+
+        if (response.ok) {
+          const result = await response.json();
+          console.log('Auto-generated data for all stores:', result);
+          setDataGenerated(true);
         }
-      );
-
-      if (!response.ok) {
-        throw new Error('샘플 데이터 생성 실패');
+      } catch (error) {
+        console.error('Auto-generate data error:', error);
       }
+    };
 
-      const result = await response.json();
-      
-      toast.success(`${storeName} 샘플 데이터 생성 완료`, {
-        description: `고객 ${result.stats.customers}명, 제품 ${result.stats.products}개, 구매 ${result.stats.purchases}건, 방문 ${result.stats.visits}건, 직원 ${result.stats.staff}명`
-      });
-      
-    } catch (error) {
-      console.error('Sample data generation error:', error);
-      toast.error('샘플 데이터 생성 중 오류가 발생했습니다');
-    } finally {
-      setGeneratingStores(prev => {
-        const next = new Set(prev);
-        next.delete(storeId);
-        return next;
-      });
-    }
-  };
+    autoGenerateAllStoreData();
+  }, [user, stores.length, dataGenerated]);
 
   const handleDelete = async (storeId: string) => {
     if (!user) return;
@@ -187,19 +176,6 @@ const Stores = () => {
 
                 {/* Actions */}
                 <div className="flex gap-2 pt-2" onClick={(e) => e.stopPropagation()}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleGenerateSampleData(store.id, store.store_name)}
-                    disabled={generatingStores.has(store.id)}
-                    title="샘플 데이터 생성"
-                  >
-                    {generatingStores.has(store.id) ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Database className="w-4 h-4" />
-                    )}
-                  </Button>
                   <StoreForm
                     store={store}
                     onSuccess={refreshStores}

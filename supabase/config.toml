@@ -23,3 +23,10 @@ verify_jwt = true
 
 [functions.inventory-monitor]
 verify_jwt = true
+
+[functions.generate-store-sample-data]
+verify_jwt = true
+
+[functions.auto-generate-store-data]
+verify_jwt = true
+
