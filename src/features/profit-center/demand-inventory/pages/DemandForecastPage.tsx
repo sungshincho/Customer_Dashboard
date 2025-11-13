@@ -154,7 +154,10 @@ const DemandForecastPage = () => {
               graphData={graphData}
             />
             <div key={refreshKey}>
-              <DemandForecast />
+              <DemandForecast 
+                visitsData={storeData.visits}
+                purchasesData={storeData.purchases}
+              />
             </div>
           </TabsContent>
           

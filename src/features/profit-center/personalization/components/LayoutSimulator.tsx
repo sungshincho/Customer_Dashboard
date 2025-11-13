@@ -1,12 +1,16 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, RotateCcw, TrendingUp } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { LAYOUT_PRODUCTS, AI_OPTIMIZED_LAYOUT } from "@/data/sampleData";
 
-type Product = {
+interface LayoutSimulatorProps {
+  visitsData?: any[];
+  purchasesData?: any[];
+}
+
+interface Product {
   id: string;
   name: string;
   category: string;
@@ -16,10 +20,53 @@ type Product = {
   height: number;
   sales: number;
   conversion: number;
-};
+}
 
-const initialProducts: Product[] = [...LAYOUT_PRODUCTS];
-const aiSuggestedLayout: Product[] = [...AI_OPTIMIZED_LAYOUT];
+export const LayoutSimulator = ({ visitsData = [], purchasesData = [] }: LayoutSimulatorProps) => {
+  // 실제 데이터 기반으로 초기 상품 배치 생성
+  const initialProducts: Product[] = useMemo(() => {
+    if (purchasesData.length === 0) return [];
+
+    // 구매 데이터에서 상위 판매 상품 추출
+    const productSales = new Map<string, { name: string; count: number; }>();
+    purchasesData.forEach((p: any) => {
+      const productName = p.product_name || p.name || '상품';
+      const current = productSales.get(productName) || { name: productName, count: 0 };
+      productSales.set(productName, {
+        name: productName,
+        count: current.count + (parseInt(p.quantity) || 1)
+      });
+    });
+
+    const topProducts = Array.from(productSales.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+
+    return topProducts.map((product, idx) => ({
+      id: `prod-${idx}`,
+      name: product.name.substring(0, 10),
+      category: idx < 2 ? '아우터' : idx < 4 ? '상의' : idx < 6 ? '하의' : '신발',
+      x: 20 + (idx % 4) * 20,
+      y: 25 + Math.floor(idx / 4) * 35,
+      width: 15,
+      height: 15,
+      sales: product.count,
+      conversion: 10 + Math.random() * 5
+    }));
+  }, [purchasesData]);
+
+  // AI 최적화 레이아웃 (입구 근처, 중앙 배치)
+  const aiSuggestedLayout: Product[] = useMemo(() => {
+    return initialProducts.map((product, idx) => ({
+      ...product,
+      x: idx < 4 ? 25 + idx * 15 : 25 + (idx - 4) * 15,
+      y: idx < 4 ? 20 : 50
+    }));
+  }, [initialProducts]);
+
+  const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [draggedProduct, setDraggedProduct] = useState<string | null>(null);
+  const [isAiLayout, setIsAiLayout] = useState(false);
 
 const generateMetrics = (products: Product[]) => {
   // 상품 위치 기반 성과 예측 (입구에 가까울수록, 중앙에 가까울수록 성과 증가)
@@ -48,11 +95,6 @@ const generateMetrics = (products: Product[]) => {
     dwell: Math.round(180 + products.length * 10),
   };
 };
-
-export const LayoutSimulator = () => {
-  const [products, setProducts] = useState<Product[]>(initialProducts);
-  const [draggedProduct, setDraggedProduct] = useState<string | null>(null);
-  const [isAiLayout, setIsAiLayout] = useState(false);
 
   const metrics = generateMetrics(products);
   const aiMetrics = generateMetrics(aiSuggestedLayout);

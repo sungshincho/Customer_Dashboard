@@ -223,7 +223,10 @@ const LayoutSimulatorPage = () => {
               onAnalysisComplete={() => setHistoryRefresh(prev => prev + 1)}
             />
             <div key={refreshKey}>
-              <LayoutSimulator />
+              <LayoutSimulator 
+                visitsData={storeData.visits}
+                purchasesData={storeData.purchases}
+              />
             </div>
           </TabsContent>
           

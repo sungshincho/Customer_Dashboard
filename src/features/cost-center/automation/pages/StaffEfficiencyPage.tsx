@@ -51,8 +51,8 @@ const StaffEfficiencyPage = () => {
   const totalStaff = storeData.staff?.length || 0;
   const totalPurchases = storeData.purchases?.length || 0;
   const avgPerformance = totalStaff > 0 && storeData.staff
-    ? (storeData.staff.reduce((sum: number, s: any) => sum + (parseFloat(s.performance_score) || 0), 0) / totalStaff).toFixed(1)
-    : '0';
+    ? (storeData.staff.reduce((sum: number, s: any) => sum + (parseFloat(s.performance_score) || 0), 0) / totalStaff)
+    : 0;
 
   const insights: Insight[] = [
     { type: "trend", title: "생산성 향상", description: "직원 평균 생산성이 12% 증가했습니다.", impact: "high" },
@@ -62,7 +62,7 @@ const StaffEfficiencyPage = () => {
 
   const comparisonData = [
     { label: "총 직원수", current: totalStaff, previous: Math.round(totalStaff * 0.95), unit: "명" },
-    { label: "평균 성과점수", current: parseFloat(avgPerformance), previous: parseFloat(avgPerformance) * 0.92, unit: "점" },
+    { label: "평균 성과점수", current: avgPerformance, previous: avgPerformance * 0.92, unit: "점" },
     { label: "처리 건수", current: totalPurchases, previous: Math.round(totalPurchases * 0.88), unit: "건" }
   ];
 
@@ -116,18 +116,22 @@ const StaffEfficiencyPage = () => {
                   <AlertUI className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
                     <AlertCircle className="h-4 w-4 text-blue-600" />
                     <AlertDescription>
-                      {selectedStore.store_name} 직원 데이터: {totalStaff}명 직원, 평균 성과 {avgPerformance}점
+                      {selectedStore.store_name} 직원 데이터: {totalStaff}명, 평균 성과 {Math.round(avgPerformance)}%
                     </AlertDescription>
                   </AlertUI>
                 )}
+                
                 <AIAnalysisButton
                   analysisType="staff-efficiency"
-                  data={comparisonData}
-                  title="AI 직원 배치 최적화"
+                  data={{ totalStaff, totalPurchases, avgPerformance }}
+                  title="AI 직원 효율성 분석"
                   onAnalysisComplete={() => setHistoryRefresh(prev => prev + 1)}
                 />
                 <div key={refreshKey}>
-                  <StaffEfficiency />
+                  <StaffEfficiency 
+                    staffData={storeData.staff}
+                    purchasesData={storeData.purchases}
+                  />
                 </div>
               </TabsContent>
               

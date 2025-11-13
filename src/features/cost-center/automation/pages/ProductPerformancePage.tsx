@@ -136,19 +136,22 @@ const ProductPerformancePage = () => {
                   <AlertUI className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
                     <AlertCircle className="h-4 w-4 text-blue-600" />
                     <AlertDescription>
-                      {selectedStore.store_name} 상품 데이터: {totalProducts}개 상품, {totalPurchases}건 구매 기록 로드됨
+                      {selectedStore.store_name} 상품 데이터: {totalProducts}개 상품, {totalPurchases}건 구매 기록
                     </AlertDescription>
                   </AlertUI>
                 )}
+                
                 <AIAnalysisButton
                   analysisType="product-performance"
-                  data={comparisonData}
-                  title="AI 상품 전략 제안 (온톨로지 기반)"
+                  data={{ totalProducts, totalPurchases, totalRevenue }}
+                  title="AI 상품 성과 분석"
                   onAnalysisComplete={() => setHistoryRefresh(prev => prev + 1)}
-                  graphData={graphData}
                 />
                 <div key={refreshKey}>
-                  <ProductPerformance />
+                  <ProductPerformance 
+                    productsData={storeData.products}
+                    purchasesData={storeData.purchases}
+                  />
                 </div>
               </TabsContent>
               

@@ -1,31 +1,43 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { EnhancedChart } from "@/components/analysis/EnhancedChart";
-import { FORECAST_BASE_DATA } from "@/data/sampleData";
 
-const generateForecast = (weather: string, event: string, day: string) => {
-  const baseData = FORECAST_BASE_DATA;
+interface DemandForecastProps {
+  visitsData?: any[];
+  purchasesData?: any[];
+}
 
-  const multiplier =
-    (weather === "sunny" ? 1.1 : weather === "rainy" ? 0.85 : 1) *
-    (event === "sale" ? 1.3 : event === "holiday" ? 1.15 : 1) *
-    (day === "weekend" ? 1.2 : 1);
-
-  return baseData.map((d) => ({
-    ...d,
-    sales: Math.round(d.sales * multiplier),
-    conversion: parseFloat((d.conversion * multiplier).toFixed(1)),
-  }));
-};
-
-export const DemandForecast = () => {
+export const DemandForecast = ({ visitsData = [], purchasesData = [] }: DemandForecastProps) => {
   const [weather, setWeather] = useState("clear");
   const [event, setEvent] = useState("none");
   const [day, setDay] = useState("weekday");
 
-  const data = generateForecast(weather, event, day);
+  // 실제 데이터 기반 예측 데이터 생성
+  const data = useMemo(() => {
+    const totalVisits = visitsData.length;
+    const totalPurchases = purchasesData.length;
+    const totalRevenue = purchasesData.reduce((sum: number, p: any) => 
+      sum + (parseFloat(p.unit_price || p.price || 0) * (parseInt(p.quantity) || 1)), 0);
+
+    const multiplier =
+      (weather === "sunny" ? 1.1 : weather === "rainy" ? 0.85 : 1) *
+      (event === "sale" ? 1.3 : event === "holiday" ? 1.15 : 1) *
+      (day === "weekend" ? 1.2 : 1);
+
+    // 요일별 예측 데이터 생성
+    const daysOfWeek = ["월", "화", "수", "목", "금", "토", "일"];
+    const baseSales = totalRevenue > 0 ? Math.round(totalRevenue / 1000) : 150;
+    const baseConversion = totalVisits > 0 ? ((totalPurchases / totalVisits) * 100) : 15;
+
+    return daysOfWeek.map((day, idx) => ({
+      day,
+      sales: Math.round(baseSales * (0.9 + Math.random() * 0.3) * multiplier),
+      conversion: parseFloat((baseConversion * (0.85 + Math.random() * 0.3) * multiplier).toFixed(1)),
+    }));
+  }, [visitsData, purchasesData, weather, event, day]);
+
   const totalSales = data.reduce((sum, d) => sum + d.sales, 0);
   const avgConversion = (data.reduce((sum, d) => sum + d.conversion, 0) / data.length).toFixed(1);
 

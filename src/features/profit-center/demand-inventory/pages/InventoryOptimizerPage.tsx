@@ -125,12 +125,15 @@ const InventoryOptimizerPage = () => {
           <TabsContent value="analysis" className="space-y-6">
             <AIAnalysisButton
               analysisType="inventory-optimizer"
-              data={comparisonData}
+              data={{ totalProducts, totalPurchases, turnoverRate }}
               title="AI 재고 최적화 제안"
               onAnalysisComplete={() => setHistoryRefresh(prev => prev + 1)}
             />
             <div key={refreshKey}>
-              <InventoryOptimizer />
+              <InventoryOptimizer 
+                productsData={storeData.products}
+                purchasesData={storeData.purchases}
+              />
             </div>
           </TabsContent>
           
