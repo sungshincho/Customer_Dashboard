@@ -161,10 +161,24 @@ export const EntityTypeManager = () => {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return (data || []).map(item => ({
-        ...item,
-        properties: (item.properties || []) as unknown as PropertyField[]
-      })) as EntityType[];
+      return (data || []).map(item => {
+        let properties: PropertyField[] = [];
+        
+        if (typeof item.properties === 'string') {
+          try {
+            properties = JSON.parse(item.properties);
+          } catch (e) {
+            console.error('Failed to parse properties:', e);
+          }
+        } else if (Array.isArray(item.properties)) {
+          properties = item.properties as unknown as PropertyField[];
+        }
+        
+        return {
+          ...item,
+          properties
+        };
+      }) as EntityType[];
     },
   });
 
@@ -535,13 +549,26 @@ export const EntityTypeManager = () => {
 
   const handleEdit = (entity: EntityType) => {
     setEditingEntity(entity);
+    
+    // properties가 배열인지 확인하고 안전하게 변환
+    let properties: PropertyField[] = [];
+    if (typeof entity.properties === 'string') {
+      try {
+        properties = JSON.parse(entity.properties as any);
+      } catch (e) {
+        console.error('Failed to parse properties:', e);
+      }
+    } else if (Array.isArray(entity.properties)) {
+      properties = entity.properties;
+    }
+    
     setFormData({
       name: entity.name,
       label: entity.label,
       description: entity.description || "",
       color: entity.color || "#3b82f6",
       icon: entity.icon || "Store",
-      properties: entity.properties || [],
+      properties,
     });
     setIsOpen(true);
   };

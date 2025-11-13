@@ -84,10 +84,24 @@ export const RelationTypeManager = () => {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return (data || []).map(item => ({
-        ...item,
-        properties: (item.properties || []) as unknown as PropertyField[]
-      })) as RelationType[];
+      return (data || []).map(item => {
+        let properties: PropertyField[] = [];
+        
+        if (typeof item.properties === 'string') {
+          try {
+            properties = JSON.parse(item.properties);
+          } catch (e) {
+            console.error('Failed to parse properties:', e);
+          }
+        } else if (Array.isArray(item.properties)) {
+          properties = item.properties as unknown as PropertyField[];
+        }
+        
+        return {
+          ...item,
+          properties
+        };
+      }) as RelationType[];
     },
   });
 
@@ -201,6 +215,19 @@ export const RelationTypeManager = () => {
 
   const handleEdit = (relation: RelationType) => {
     setEditingRelation(relation);
+    
+    // properties가 배열인지 확인하고 안전하게 변환
+    let properties: PropertyField[] = [];
+    if (typeof relation.properties === 'string') {
+      try {
+        properties = JSON.parse(relation.properties as any);
+      } catch (e) {
+        console.error('Failed to parse properties:', e);
+      }
+    } else if (Array.isArray(relation.properties)) {
+      properties = relation.properties;
+    }
+    
     setFormData({
       name: relation.name,
       label: relation.label,
@@ -208,7 +235,7 @@ export const RelationTypeManager = () => {
       source_entity_type: relation.source_entity_type,
       target_entity_type: relation.target_entity_type,
       directionality: relation.directionality || "directed",
-      properties: relation.properties || [],
+      properties,
     });
     setIsOpen(true);
   };
