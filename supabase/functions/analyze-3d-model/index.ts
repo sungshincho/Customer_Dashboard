@@ -92,7 +92,16 @@ Respond in JSON format:
     }
 
     const aiData = await aiResponse.json();
-    const analysisResult = JSON.parse(aiData.choices[0].message.content);
+    let content = aiData.choices[0].message.content;
+    
+    // Remove markdown code block markers if present
+    if (content.startsWith('```json')) {
+      content = content.replace(/^```json\n/, '').replace(/\n```$/, '');
+    } else if (content.startsWith('```')) {
+      content = content.replace(/^```\n/, '').replace(/\n```$/, '');
+    }
+    
+    const analysisResult = JSON.parse(content);
 
     // 3. Find the matched entity type
     const matchedType = entityTypes?.find(et => et.name === analysisResult.matched_entity_type);
