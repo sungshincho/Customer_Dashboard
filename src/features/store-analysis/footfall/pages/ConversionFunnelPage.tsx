@@ -1,13 +1,12 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { ConversionFunnel } from "@/features/store-analysis/footfall/components/ConversionFunnel";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Store } from "lucide-react";
+import { RefreshCw, Store, Box } from "lucide-react";
 import { useState, useEffect } from "react";
 import { AdvancedFilters, FilterState } from "@/components/analysis/AdvancedFilters";
 import { ExportButton } from "@/components/analysis/ExportButton";
 import { ComparisonView } from "@/components/analysis/ComparisonView";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Store3DViewer } from "@/features/digital-twin/components";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { useAuth } from "@/hooks/useAuth";
@@ -100,11 +99,19 @@ const ConversionFunnelPage = () => {
         
         <AdvancedFilters filters={filters} onFiltersChange={setFilters} />
         
-        <Tabs defaultValue="analysis" className="w-full">
+        <Tabs defaultValue="3d" className="w-full">
           <TabsList>
+            <TabsTrigger value="3d">
+              <Box className="w-4 h-4 mr-2" />
+              3D 매장
+            </TabsTrigger>
             <TabsTrigger value="analysis">퍼널 분석</TabsTrigger>
             <TabsTrigger value="comparison">비교 분석</TabsTrigger>
           </TabsList>
+          
+          <TabsContent value="3d" className="space-y-6">
+            <Store3DViewer height="600px" />
+          </TabsContent>
           
           <TabsContent value="analysis" className="space-y-6">
             <div key={refreshKey}>

@@ -1,7 +1,8 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { StaffEfficiency } from "@/features/cost-center/automation/components/StaffEfficiency";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, AlertCircle } from "lucide-react";
+import { RefreshCw, AlertCircle, Box } from "lucide-react";
+import { Store3DViewer } from "@/features/digital-twin/components";
 import { useState, useEffect } from "react";
 import { AdvancedFilters, FilterState } from "@/components/analysis/AdvancedFilters";
 import { ExportButton } from "@/components/analysis/ExportButton";
@@ -109,9 +110,13 @@ const StaffEfficiencyPage = () => {
                 <TabsTrigger value="insights">AI 인사이트</TabsTrigger>
                 <TabsTrigger value="history">히스토리</TabsTrigger>
                 <TabsTrigger value="alerts">알림 설정</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="analysis" className="space-y-6">
+          </TabsList>
+          
+          <TabsContent value="3d" className="space-y-6">
+            <Store3DViewer height="600px" />
+          </TabsContent>
+          
+          <TabsContent value="analysis" className="space-y-6">
                 {totalStaff > 0 && (
                   <AlertUI className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
                     <AlertCircle className="h-4 w-4 text-blue-600" />

@@ -11,12 +11,8 @@ import { ComparisonView } from "@/components/analysis/ComparisonView";
 import { AIAnalysisButton } from "@/components/analysis/AIAnalysisButton";
 import { AnalysisHistory } from "@/components/analysis/AnalysisHistory";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { SceneComposer } from "@/features/digital-twin/components";
-import { generateSceneRecipe } from "@/features/digital-twin/utils/sceneRecipeGenerator";
+import { Store3DViewer } from "@/features/digital-twin/components";
 import { useAuth } from "@/hooks/useAuth";
-import type { SceneRecipe, AILayoutResult } from "@/types/scene3d";
-import { Card } from "@/components/ui/card";
-import { toast } from "sonner";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { loadStoreDataset } from "@/utils/storageDataLoader";
 import { Alert as AlertUI, AlertDescription } from "@/components/ui/alert";
@@ -29,8 +25,6 @@ const LayoutSimulatorPage = () => {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
   const [historyRefresh, setHistoryRefresh] = useState(0);
-  const [sceneRecipe, setSceneRecipe] = useState<SceneRecipe | null>(null);
-  const [loading3D, setLoading3D] = useState(false);
   const [storeData, setStoreData] = useState<any>({});
   const [loading, setLoading] = useState(false);
 
@@ -76,66 +70,6 @@ const LayoutSimulatorPage = () => {
     filters,
     layoutMetrics: comparisonData,
     insights
-  };
-
-  const generate3DScene = async () => {
-    if (!user) return;
-    
-    setLoading3D(true);
-    try {
-      const mockAIResult: AILayoutResult = {
-        zones: [
-          {
-            zone_id: 'entrance',
-            zone_type: 'entry',
-            furniture: [
-              {
-                furniture_id: 'shelf-001',
-                entity_type: 'Shelf',
-                movable: true,
-                current_position: { x: -5, y: 0, z: 0 },
-                position: { x: -5, y: 0, z: 0 },
-                rotation: { x: 0, y: Math.PI / 2, z: 0 }
-              },
-              {
-                furniture_id: 'shelf-002',
-                entity_type: 'Shelf',
-                movable: true,
-                current_position: { x: 5, y: 0, z: 0 },
-                position: { x: 5, y: 0, z: 0 },
-                rotation: { x: 0, y: -Math.PI / 2, z: 0 }
-              }
-            ],
-            products: [
-              {
-                product_id: 'product-001',
-                entity_type: 'Product',
-                movable: true,
-                current_position: { x: -5, y: 1, z: 0 },
-                position: { x: -5, y: 1, z: 0 }
-              },
-              {
-                product_id: 'product-002',
-                entity_type: 'Product',
-                movable: true,
-                current_position: { x: 5, y: 1, z: 0 },
-                position: { x: 5, y: 1, z: 0 }
-              }
-            ]
-          }
-        ],
-        lighting_suggestion: 'warm-retail'
-      };
-
-      const recipe = await generateSceneRecipe(mockAIResult, user.id);
-      setSceneRecipe(recipe);
-      toast.success("3D 레이아웃이 생성되었습니다");
-    } catch (error) {
-      console.error('3D scene generation error:', error);
-      toast.error("3D 씬 생성 중 오류가 발생했습니다");
-    } finally {
-      setLoading3D(false);
-    }
   };
 
   if (!selectedStore) {
@@ -195,24 +129,7 @@ const LayoutSimulatorPage = () => {
           </TabsList>
           
           <TabsContent value="3d" className="space-y-6">
-            <Card className="p-6">
-              {!sceneRecipe && (
-                <div className="flex flex-col items-center justify-center h-[500px] text-center">
-                  <Box className="w-16 h-16 mb-4 text-muted-foreground opacity-20" />
-                  <p className="text-muted-foreground mb-4">
-                    AI 추론 기반 3D 레이아웃 시뮬레이션
-                  </p>
-                  <Button onClick={generate3DScene} disabled={loading3D}>
-                    {loading3D ? "생성 중..." : "3D 레이아웃 생성"}
-                  </Button>
-                </div>
-              )}
-              {sceneRecipe && (
-                <div className="h-[600px]">
-                  <SceneComposer recipe={sceneRecipe} />
-                </div>
-              )}
-            </Card>
+            <Store3DViewer height="600px" />
           </TabsContent>
           
           <TabsContent value="analysis" className="space-y-6">

@@ -7,15 +7,11 @@ import { AdvancedFilters, FilterState } from "@/components/analysis/AdvancedFilt
 import { ExportButton } from "@/components/analysis/ExportButton";
 import { ComparisonView } from "@/components/analysis/ComparisonView";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { SceneComposer, Store3DViewer } from "@/features/digital-twin/components";
-import { generateSceneRecipe } from "@/features/digital-twin/utils/sceneRecipeGenerator";
-import { useAuth } from "@/hooks/useAuth";
-import type { SceneRecipe, AILayoutResult } from "@/types/scene3d";
-import { toast } from "sonner";
+import { Store3DViewer } from "@/features/digital-twin/components";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { loadStoreFile } from "@/utils/storageDataLoader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useAuth } from "@/hooks/useAuth";
 
 const CustomerJourneyPage = () => {
   const { user } = useAuth();
@@ -23,8 +19,6 @@ const CustomerJourneyPage = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
-  const [sceneRecipe, setSceneRecipe] = useState<SceneRecipe | null>(null);
-  const [loading3D, setLoading3D] = useState(false);
   const [visitsData, setVisitsData] = useState<any[]>([]);
   const [purchasesData, setPurchasesData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -65,34 +59,6 @@ const CustomerJourneyPage = () => {
   const exportData = {
     filters,
     journeyMetrics: comparisonData
-  };
-
-  const generate3DJourney = async () => {
-    if (!user) return;
-    
-    setLoading3D(true);
-    try {
-      const mockAIResult: AILayoutResult = {
-        zones: [
-          {
-            zone_id: 'path-1',
-            zone_type: 'journey',
-            furniture: [],
-            products: []
-          }
-        ],
-        lighting_suggestion: 'warm-retail'
-      };
-
-      const recipe = await generateSceneRecipe(mockAIResult, user.id);
-      setSceneRecipe(recipe);
-      toast.success("3D 고객 여정이 생성되었습니다");
-    } catch (error) {
-      console.error('3D journey generation error:', error);
-      toast.error("3D 여정 생성 중 오류가 발생했습니다");
-    } finally {
-      setLoading3D(false);
-    }
   };
 
   return (
@@ -137,24 +103,7 @@ const CustomerJourneyPage = () => {
           </TabsList>
           
           <TabsContent value="3d" className="space-y-6">
-            <Card className="p-6">
-              {!sceneRecipe && (
-                <div className="flex flex-col items-center justify-center h-[500px] text-center">
-                  <Box className="w-16 h-16 mb-4 text-muted-foreground opacity-20" />
-                  <p className="text-muted-foreground mb-4">
-                    고객 동선 패턴 3D 시각화
-                  </p>
-                  <Button onClick={generate3DJourney} disabled={loading3D}>
-                    {loading3D ? "생성 중..." : "3D 여정 생성"}
-                  </Button>
-                </div>
-              )}
-              {sceneRecipe && (
-                <div className="h-[600px]">
-                  <SceneComposer recipe={sceneRecipe} />
-                </div>
-              )}
-            </Card>
+            <Store3DViewer height="600px" />
           </TabsContent>
           
           <TabsContent value="analysis" className="space-y-6">

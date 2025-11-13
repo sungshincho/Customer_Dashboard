@@ -1,7 +1,7 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, TrendingUp, AlertTriangle, DollarSign, Package, Check, X, AlertCircle } from "lucide-react";
+import { RefreshCw, TrendingUp, AlertTriangle, DollarSign, Package, Check, X, AlertCircle, Box } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -240,12 +240,20 @@ const ProfitCenterPage = () => {
           </Card>
         </div>
 
-        <Tabs defaultValue="integrated" className="w-full">
+        <Tabs defaultValue="3d" className="w-full">
           <TabsList>
+            <TabsTrigger value="3d">
+              <Box className="w-4 h-4 mr-2" />
+              3D 매장
+            </TabsTrigger>
             <TabsTrigger value="integrated">통합 현황</TabsTrigger>
             <TabsTrigger value="trends">트렌드 분석</TabsTrigger>
             <TabsTrigger value="actions">실행 계획</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="3d" className="space-y-6">
+            <Store3DViewer height="600px" />
+          </TabsContent>
 
           <TabsContent value="integrated" className="space-y-4">
             <Card>
