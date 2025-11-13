@@ -3,7 +3,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Phone, Trash2, Edit, Loader2 } from "lucide-react";
+import { Phone, Trash2, Edit, Loader2, Database } from "lucide-react";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { StoreForm } from "../components/StoreForm";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,40 +25,45 @@ const Stores = () => {
   const { user } = useAuth();
   const { stores, loading, refreshStores, selectedStore, setSelectedStore } = useSelectedStore();
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [dataGenerated, setDataGenerated] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
-  // 페이지 로드 시 자동으로 모든 매장의 샘플 데이터 생성
-  useEffect(() => {
-    const autoGenerateAllStoreData = async () => {
-      if (!user || stores.length === 0 || dataGenerated) return;
+  const handleGenerateAllData = async () => {
+    if (!user) return;
 
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
-
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auto-generate-store-data`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${session.access_token}`,
-              'Content-Type': 'application/json',
-            }
-          }
-        );
-
-        if (response.ok) {
-          const result = await response.json();
-          console.log('Auto-generated data for all stores:', result);
-          setDataGenerated(true);
-        }
-      } catch (error) {
-        console.error('Auto-generate data error:', error);
+    setGenerating(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('인증이 필요합니다');
+        return;
       }
-    };
 
-    autoGenerateAllStoreData();
-  }, [user, stores.length, dataGenerated]);
+      toast.loading('모든 매장의 샘플 데이터를 생성중입니다...', { id: 'generate-data' });
+
+      const response = await supabase.functions.invoke('auto-generate-store-data', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        }
+      });
+
+      if (response.error) throw response.error;
+
+      console.log('Generated data:', response.data);
+      toast.success(`${stores.length}개 매장의 샘플 데이터가 생성되었습니다`, { id: 'generate-data' });
+      
+      // 각 매장별 생성된 데이터 상세 정보 표시
+      if (response.data?.results) {
+        response.data.results.forEach((result: any) => {
+          console.log(`${result.store}: 고객 ${result.stats.customers}명, 상품 ${result.stats.products}개, 구매 ${result.stats.purchases}건`);
+        });
+      }
+    } catch (error) {
+      console.error('Generate data error:', error);
+      toast.error('데이터 생성에 실패했습니다', { id: 'generate-data' });
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   const handleDelete = async (storeId: string) => {
     if (!user) return;
@@ -102,7 +107,6 @@ const Stores = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
         <div className="flex items-center justify-between animate-fade-in">
           <div>
             <h1 className="text-3xl font-bold gradient-text">매장 관리</h1>
@@ -110,7 +114,28 @@ const Stores = () => {
               전체 매장 현황 및 관리 ({stores.length}개 매장)
             </p>
           </div>
-          <StoreForm onSuccess={refreshStores} />
+          <div className="flex gap-2">
+            {stores.length > 0 && (
+              <Button 
+                onClick={handleGenerateAllData}
+                disabled={generating}
+                variant="outline"
+              >
+                {generating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    데이터 생성 중...
+                  </>
+                ) : (
+                  <>
+                    <Database className="w-4 h-4 mr-2" />
+                    샘플 데이터 생성
+                  </>
+                )}
+              </Button>
+            )}
+            <StoreForm onSuccess={refreshStores} />
+          </div>
         </div>
 
         {/* Empty State */}
