@@ -172,14 +172,14 @@ export const RetailSchemaPreset = () => {
           </div>
           <div className="flex-1">
             <CardTitle className="flex items-center gap-2">
-              정교한 디지털 트윈 스키마
+              통합 디지털 트윈 & 비즈니스 인텔리전스 스키마
               <Badge variant="default" className="ml-2">
                 <Sparkles className="h-3 w-3 mr-1" />
-                Ultimate
+                Complete
               </Badge>
             </CardTitle>
             <CardDescription className="mt-1.5">
-              오프라인 매장의 모든 구성요소를 포함한 완벽한 디지털 트윈 온톨로지
+              디지털 트윈(29) + 비즈니스 인텔리전스(15) = 총 44개 엔티티, 93개 관계
             </CardDescription>
           </div>
         </div>
@@ -190,40 +190,50 @@ export const RetailSchemaPreset = () => {
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-              <span className="text-sm font-medium">공간 구조</span>
+              <span className="text-sm font-medium">공간 구조 (11개)</span>
             </div>
             <p className="text-xs text-muted-foreground pl-4">
-              Zone, Shelf, DisplayTable, Rack, Wall, Entrance, CheckoutCounter, Aisle, FittingRoom, StorageRoom, Window (11개)
+              Zone, Shelf, DisplayTable, Rack, Wall, Entrance, CheckoutCounter, Aisle, FittingRoom, StorageRoom, Window
             </p>
           </div>
           
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-              <span className="text-sm font-medium">IoT & 디지털 장비</span>
+              <span className="text-sm font-medium">IoT & 디지털 장비 (9개)</span>
             </div>
             <p className="text-xs text-muted-foreground pl-4">
-              Sensor, Camera, Beacon, WiFiProbe, DigitalSignage, POS, Kiosk, SmartMirror (9개)
+              Sensor, Camera, Beacon, WiFiProbe, DigitalSignage, POS, Kiosk, SmartMirror
             </p>
           </div>
           
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-              <span className="text-sm font-medium">환경 시스템</span>
+              <span className="text-sm font-medium">환경 시스템 (5개)</span>
             </div>
             <p className="text-xs text-muted-foreground pl-4">
-              Lighting, HVAC, AudioSystem, MusicPlaylist, ScentDiffuser (5개)
+              Lighting, HVAC, AudioSystem, MusicPlaylist, ScentDiffuser
             </p>
           </div>
           
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-              <span className="text-sm font-medium">상품 & 인력</span>
+              <span className="text-sm font-medium">상품 진열 (4개)</span>
             </div>
             <p className="text-xs text-muted-foreground pl-4">
-              ProductPlacement, Display, StaffZone, CustomerJourney (4개)
+              ProductPlacement, Display, StaffZone, CustomerJourney
+            </p>
+          </div>
+          
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-secondary animate-pulse" />
+              <span className="text-sm font-medium">비즈니스 인텔리전스 (15개)</span>
+            </div>
+            <p className="text-xs text-muted-foreground pl-4">
+              Store, Customer, Product, Sale, Visit, Inventory, DemandForecast, PriceOptimization, Promotion, MarketingCampaign, PurchaseConversion, ZoneAnalysis, StaffSchedule, Alert, Staff
             </p>
           </div>
         </div>

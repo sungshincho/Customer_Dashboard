@@ -642,6 +642,294 @@ export const COMPREHENSIVE_ENTITY_TYPES = [
       { name: 'journey_duration_sec', type: 'number', required: false, description: '총 여정 시간 (초)' },
       { name: 'converted', type: 'boolean', required: false, description: '구매 전환 여부' }
     ]
+  },
+
+  // ==========================================
+  // 6. 비즈니스 인텔리전스 (Business Intelligence)
+  // ==========================================
+  {
+    name: 'Store',
+    label: '매장',
+    description: '물리적 매장 위치',
+    icon: 'Store',
+    color: '#3b82f6',
+    model_3d_type: 'space',
+    model_3d_dimensions: { width: 20, height: 3.5, depth: 15 },
+    model_3d_metadata: {
+      supports_heatmap: true,
+      supports_pathflow: true,
+      contains_zones: true
+    },
+    properties: [
+      { name: 'store_code', type: 'string', required: true, description: '매장 코드' },
+      { name: 'name', type: 'string', required: true, description: '매장명' },
+      { name: 'location', type: 'string', required: true, description: '주소' },
+      { name: 'area_sqm', type: 'number', required: false, description: '매장 면적(㎡)' },
+      { name: 'opening_date', type: 'string', required: false, description: '오픈일' },
+      { name: 'daily_traffic', type: 'number', required: false, description: '일일 방문객 수' },
+      { name: 'floor_plan_url', type: 'string', required: false, description: '평면도 URL' },
+      { name: 'ceiling_height', type: 'number', required: false, description: '천장 높이 (미터)' }
+    ]
+  },
+  {
+    name: 'Customer',
+    label: '고객',
+    description: '고객 정보',
+    icon: 'Users',
+    color: '#8b5cf6',
+    model_3d_type: null,
+    model_3d_dimensions: null,
+    model_3d_metadata: {},
+    properties: [
+      { name: 'customer_id', type: 'string', required: true, description: '고객 ID' },
+      { name: 'name', type: 'string', required: false, description: '고객명' },
+      { name: 'segment', type: 'string', required: false, description: '고객 세그먼트' },
+      { name: 'loyalty_level', type: 'string', required: false, description: '로열티 등급' },
+      { name: 'lifetime_value', type: 'number', required: false, description: '고객 생애 가치(LTV)' },
+      { name: 'churn_risk_score', type: 'number', required: false, description: '이탈 위험 점수' }
+    ]
+  },
+  {
+    name: 'Product',
+    label: '제품',
+    description: '판매 제품 정보',
+    icon: 'Package',
+    color: '#10b981',
+    model_3d_type: 'product',
+    model_3d_dimensions: { width: 0.15, height: 0.25, depth: 0.10 },
+    model_3d_metadata: {
+      default_orientation: 'front',
+      stackable: true,
+      display_mode: 'shelf'
+    },
+    properties: [
+      { name: 'sku', type: 'string', required: true, description: 'SKU 코드' },
+      { name: 'name', type: 'string', required: true, description: '제품명' },
+      { name: 'category', type: 'string', required: false, description: '카테고리' },
+      { name: 'price', type: 'number', required: true, description: '가격' },
+      { name: 'cost', type: 'number', required: false, description: '원가' },
+      { name: 'margin_rate', type: 'number', required: false, description: '마진율(%)' },
+      { name: 'price_elasticity', type: 'number', required: false, description: '가격 탄력성' },
+      { name: 'optimal_price', type: 'number', required: false, description: '최적 가격' },
+      { name: 'package_type', type: 'string', required: false, description: '포장 유형' },
+      { name: 'display_priority', type: 'number', required: false, description: '진열 우선순위' }
+    ]
+  },
+  {
+    name: 'Sale',
+    label: '매출',
+    description: '판매 트랜잭션',
+    icon: 'ShoppingCart',
+    color: '#f59e0b',
+    model_3d_type: null,
+    model_3d_dimensions: null,
+    model_3d_metadata: {},
+    properties: [
+      { name: 'transaction_id', type: 'string', required: true, description: '거래 ID' },
+      { name: 'amount', type: 'number', required: true, description: '거래 금액' },
+      { name: 'timestamp', type: 'string', required: true, description: '거래 시간' },
+      { name: 'payment_method', type: 'string', required: false, description: '결제 수단' },
+      { name: 'discount_applied', type: 'number', required: false, description: '할인 금액' },
+      { name: 'profit', type: 'number', required: false, description: '순이익' }
+    ]
+  },
+  {
+    name: 'Visit',
+    label: '방문',
+    description: '고객 매장 방문 기록',
+    icon: 'MapPin',
+    color: '#ec4899',
+    model_3d_type: null,
+    model_3d_dimensions: null,
+    model_3d_metadata: {},
+    properties: [
+      { name: 'visit_id', type: 'string', required: true, description: '방문 ID' },
+      { name: 'entry_time', type: 'string', required: true, description: '입장 시간' },
+      { name: 'exit_time', type: 'string', required: false, description: '퇴장 시간' },
+      { name: 'dwell_time_minutes', type: 'number', required: false, description: '체류 시간(분)' },
+      { name: 'zones_visited', type: 'array', required: false, description: '방문 구역' },
+      { name: 'converted_to_sale', type: 'boolean', required: false, description: '구매 전환 여부' }
+    ]
+  },
+  {
+    name: 'Inventory',
+    label: '재고',
+    description: '제품 재고 정보',
+    icon: 'Box',
+    color: '#f97316',
+    model_3d_type: null,
+    model_3d_dimensions: null,
+    model_3d_metadata: {},
+    properties: [
+      { name: 'inventory_id', type: 'string', required: true, description: '재고 ID' },
+      { name: 'current_stock', type: 'number', required: true, description: '현재 재고' },
+      { name: 'optimal_stock', type: 'number', required: false, description: '최적 재고' },
+      { name: 'reorder_point', type: 'number', required: false, description: '재주문 시점' },
+      { name: 'stockout_risk', type: 'number', required: false, description: '품절 위험도(%)' },
+      { name: 'turnover_rate', type: 'number', required: false, description: '재고 회전율' },
+      { name: 'holding_cost', type: 'number', required: false, description: '재고 유지 비용' }
+    ]
+  },
+  {
+    name: 'DemandForecast',
+    label: '수요 예측',
+    description: '미래 수요 예측',
+    icon: 'TrendingUp',
+    color: '#84cc16',
+    model_3d_type: null,
+    model_3d_dimensions: null,
+    model_3d_metadata: {},
+    properties: [
+      { name: 'forecast_id', type: 'string', required: true, description: '예측 ID' },
+      { name: 'forecast_date', type: 'string', required: true, description: '예측 날짜' },
+      { name: 'predicted_demand', type: 'number', required: true, description: '예측 수요량' },
+      { name: 'confidence_level', type: 'number', required: false, description: '신뢰도(%)' },
+      { name: 'seasonality_factor', type: 'number', required: false, description: '계절성 요인' },
+      { name: 'trend_factor', type: 'number', required: false, description: '트렌드 요인' }
+    ]
+  },
+  {
+    name: 'PriceOptimization',
+    label: '가격 최적화',
+    description: '동적 가격 최적화',
+    icon: 'DollarSign',
+    color: '#eab308',
+    model_3d_type: null,
+    model_3d_dimensions: null,
+    model_3d_metadata: {},
+    properties: [
+      { name: 'optimization_id', type: 'string', required: true, description: '최적화 ID' },
+      { name: 'current_price', type: 'number', required: true, description: '현재 가격' },
+      { name: 'recommended_price', type: 'number', required: true, description: '권장 가격' },
+      { name: 'expected_revenue_lift', type: 'number', required: false, description: '예상 매출 증가율(%)' },
+      { name: 'competitor_price', type: 'number', required: false, description: '경쟁사 가격' },
+      { name: 'wtp_average', type: 'number', required: false, description: '평균 지불의향가격' }
+    ]
+  },
+  {
+    name: 'Promotion',
+    label: '프로모션',
+    description: '오프라인 프로모션',
+    icon: 'Percent',
+    color: '#ef4444',
+    model_3d_type: null,
+    model_3d_dimensions: null,
+    model_3d_metadata: {},
+    properties: [
+      { name: 'promotion_id', type: 'string', required: true, description: '프로모션 ID' },
+      { name: 'name', type: 'string', required: true, description: '프로모션명' },
+      { name: 'discount_rate', type: 'number', required: false, description: '할인율(%)' },
+      { name: 'start_date', type: 'string', required: true, description: '시작일' },
+      { name: 'end_date', type: 'string', required: true, description: '종료일' },
+      { name: 'effectiveness_score', type: 'number', required: false, description: '효과성 점수' },
+      { name: 'roi', type: 'number', required: false, description: 'ROI(%)' }
+    ]
+  },
+  {
+    name: 'MarketingCampaign',
+    label: '마케팅 캠페인',
+    description: '오프라인 마케팅 캠페인',
+    icon: 'Zap',
+    color: '#a855f7',
+    model_3d_type: null,
+    model_3d_dimensions: null,
+    model_3d_metadata: {},
+    properties: [
+      { name: 'campaign_id', type: 'string', required: true, description: '캠페인 ID' },
+      { name: 'name', type: 'string', required: true, description: '캠페인명' },
+      { name: 'budget', type: 'number', required: false, description: '예산' },
+      { name: 'reach', type: 'number', required: false, description: '도달 수' },
+      { name: 'conversion_rate', type: 'number', required: false, description: '전환율(%)' },
+      { name: 'cost_per_acquisition', type: 'number', required: false, description: '고객 획득 비용' },
+      { name: 'suitability_score', type: 'number', required: false, description: '적합성 점수' }
+    ]
+  },
+  {
+    name: 'PurchaseConversion',
+    label: '구매 전환',
+    description: '방문-구매 전환 분석',
+    icon: 'CheckCircle',
+    color: '#14b8a6',
+    model_3d_type: null,
+    model_3d_dimensions: null,
+    model_3d_metadata: {},
+    properties: [
+      { name: 'conversion_id', type: 'string', required: true, description: '전환 ID' },
+      { name: 'conversion_rate', type: 'number', required: true, description: '전환율(%)' },
+      { name: 'average_basket_size', type: 'number', required: false, description: '평균 장바구니 크기' },
+      { name: 'conversion_factors', type: 'array', required: false, description: '전환 영향 요인' },
+      { name: 'abandonment_rate', type: 'number', required: false, description: '이탈율(%)' }
+    ]
+  },
+  {
+    name: 'ZoneAnalysis',
+    label: '구역 분석',
+    description: '매장 구역별 분석',
+    icon: 'Target',
+    color: '#64748b',
+    model_3d_type: null,
+    model_3d_dimensions: null,
+    model_3d_metadata: {},
+    properties: [
+      { name: 'zone_id', type: 'string', required: true, description: '구역 ID' },
+      { name: 'zone_name', type: 'string', required: true, description: '구역명' },
+      { name: 'traffic_density', type: 'number', required: false, description: '트래픽 밀도' },
+      { name: 'dwell_time_avg', type: 'number', required: false, description: '평균 체류 시간' },
+      { name: 'conversion_rate', type: 'number', required: false, description: '전환율(%)' },
+      { name: 'revenue_per_sqm', type: 'number', required: false, description: '평당 매출' }
+    ]
+  },
+  {
+    name: 'StaffSchedule',
+    label: '직원 스케줄',
+    description: '직원 근무 스케줄링',
+    icon: 'Calendar',
+    color: '#6366f1',
+    model_3d_type: null,
+    model_3d_dimensions: null,
+    model_3d_metadata: {},
+    properties: [
+      { name: 'schedule_id', type: 'string', required: true, description: '스케줄 ID' },
+      { name: 'shift_start', type: 'string', required: true, description: '근무 시작' },
+      { name: 'shift_end', type: 'string', required: true, description: '근무 종료' },
+      { name: 'efficiency_score', type: 'number', required: false, description: '효율성 점수' },
+      { name: 'labor_cost', type: 'number', required: false, description: '인건비' }
+    ]
+  },
+  {
+    name: 'Alert',
+    label: '알림',
+    description: '비즈니스 알림 및 경고',
+    icon: 'AlertTriangle',
+    color: '#dc2626',
+    model_3d_type: null,
+    model_3d_dimensions: null,
+    model_3d_metadata: {},
+    properties: [
+      { name: 'alert_id', type: 'string', required: true, description: '알림 ID' },
+      { name: 'type', type: 'string', required: true, description: '알림 유형' },
+      { name: 'severity', type: 'string', required: true, description: '심각도' },
+      { name: 'message', type: 'string', required: true, description: '메시지' },
+      { name: 'triggered_at', type: 'string', required: true, description: '발생 시간' },
+      { name: 'resolved', type: 'boolean', required: false, description: '해결 여부' }
+    ]
+  },
+  {
+    name: 'Staff',
+    label: '직원',
+    description: '매장 직원 정보',
+    icon: 'UserCheck',
+    color: '#4ade80',
+    model_3d_type: null,
+    model_3d_dimensions: null,
+    model_3d_metadata: {},
+    properties: [
+      { name: 'staff_id', type: 'string', required: true, description: '직원 ID' },
+      { name: 'name', type: 'string', required: true, description: '직원명' },
+      { name: 'role', type: 'string', required: false, description: '역할' },
+      { name: 'department', type: 'string', required: false, description: '부서' },
+      { name: 'performance_score', type: 'number', required: false, description: '성과 점수' }
+    ]
   }
 ];
 
@@ -709,7 +997,79 @@ export const COMPREHENSIVE_RELATION_TYPES = [
   // 구조 관계
   { name: 'has_window', label: '창문있음', description: 'A에 B 창문이 있음', source_entity_type: 'Wall', target_entity_type: 'Window', directionality: 'directed' },
   { name: 'has_entrance', label: '출입구있음', description: 'A에 B 출입구가 있음', source_entity_type: 'Store', target_entity_type: 'Entrance', directionality: 'directed' },
-  { name: 'accesses', label: '접근함', description: 'A가 B에 접근함', source_entity_type: 'Entrance', target_entity_type: 'StorageRoom', directionality: 'directed' }
+  { name: 'accesses', label: '접근함', description: 'A가 B에 접근함', source_entity_type: 'Entrance', target_entity_type: 'StorageRoom', directionality: 'directed' },
+
+  // ==========================================
+  // 비즈니스 인텔리전스 관계 (43개)
+  // ==========================================
+  
+  // 고객 관련 관계
+  { name: 'customer_visits_store', label: '방문했다', description: '고객이 매장을 방문', source_entity_type: 'Customer', target_entity_type: 'Store', directionality: 'directed' },
+  { name: 'purchased', label: '구매했다', description: '고객이 제품을 구매', source_entity_type: 'Customer', target_entity_type: 'Product', directionality: 'directed' },
+  { name: 'has_segment', label: '세그먼트 소속', description: '같은 고객 세그먼트', source_entity_type: 'Customer', target_entity_type: 'Customer', directionality: 'undirected' },
+  
+  // 매출/판매 관계
+  { name: 'sale_of', label: '판매 기록', description: '특정 제품의 판매', source_entity_type: 'Sale', target_entity_type: 'Product', directionality: 'directed' },
+  { name: 'occurred_at', label: '발생 위치', description: '매출이 발생한 매장', source_entity_type: 'Sale', target_entity_type: 'Store', directionality: 'directed' },
+  { name: 'made_by', label: '구매자', description: '매출을 발생시킨 고객', source_entity_type: 'Sale', target_entity_type: 'Customer', directionality: 'directed' },
+  
+  // 방문 관계
+  { name: 'visit_to_store', label: '매장 방문', description: '방문한 매장', source_entity_type: 'Visit', target_entity_type: 'Store', directionality: 'directed' },
+  { name: 'visit_by_customer', label: '방문 고객', description: '방문한 고객', source_entity_type: 'Visit', target_entity_type: 'Customer', directionality: 'directed' },
+  { name: 'converted_to_sale', label: '전환됨', description: '방문이 매출로 전환', source_entity_type: 'Visit', target_entity_type: 'Sale', directionality: 'directed' },
+  
+  // 고객 동선 관계
+  { name: 'path_of_visit', label: '방문 경로', description: '방문의 이동 경로', source_entity_type: 'CustomerJourney', target_entity_type: 'Visit', directionality: 'directed' },
+  { name: 'passed_through_zone', label: '통과 구역', description: '동선이 통과한 구역', source_entity_type: 'CustomerJourney', target_entity_type: 'ZoneAnalysis', directionality: 'directed' },
+  
+  // 재고 관계
+  { name: 'inventory_of', label: '재고 제품', description: '재고 관리 대상 제품', source_entity_type: 'Inventory', target_entity_type: 'Product', directionality: 'directed' },
+  { name: 'stored_at_store', label: '보관 매장', description: '재고가 보관된 매장', source_entity_type: 'Inventory', target_entity_type: 'Store', directionality: 'directed' },
+  { name: 'triggers_alert', label: '알림 발생', description: '재고가 알림을 발생', source_entity_type: 'Inventory', target_entity_type: 'Alert', directionality: 'directed' },
+  
+  // 수요 예측 관계
+  { name: 'forecast_for', label: '예측 대상', description: '수요 예측 대상 제품', source_entity_type: 'DemandForecast', target_entity_type: 'Product', directionality: 'directed' },
+  { name: 'forecast_at_store', label: '예측 매장', description: '수요 예측 매장', source_entity_type: 'DemandForecast', target_entity_type: 'Store', directionality: 'directed' },
+  { name: 'influences_inventory', label: '재고 영향', description: '예측이 재고 계획에 영향', source_entity_type: 'DemandForecast', target_entity_type: 'Inventory', directionality: 'directed' },
+  
+  // 가격 최적화 관계
+  { name: 'optimizes_price', label: '가격 최적화', description: '가격 최적화 대상 제품', source_entity_type: 'PriceOptimization', target_entity_type: 'Product', directionality: 'directed' },
+  { name: 'based_on_demand', label: '수요 기반', description: '수요 예측 기반 가격 결정', source_entity_type: 'PriceOptimization', target_entity_type: 'DemandForecast', directionality: 'directed' },
+  { name: 'considers_wtp', label: 'WTP 고려', description: '고객 지불의향가격 반영', source_entity_type: 'PriceOptimization', target_entity_type: 'Customer', directionality: 'directed' },
+  
+  // 프로모션 관계
+  { name: 'promotes_product', label: '프로모션 제품', description: '프로모션 대상 제품', source_entity_type: 'Promotion', target_entity_type: 'Product', directionality: 'directed' },
+  { name: 'runs_at_store', label: '실행 매장', description: '프로모션 실행 매장', source_entity_type: 'Promotion', target_entity_type: 'Store', directionality: 'directed' },
+  { name: 'affects_sales', label: '매출 영향', description: '프로모션이 매출에 영향', source_entity_type: 'Promotion', target_entity_type: 'Sale', directionality: 'directed' },
+  { name: 'part_of_campaign', label: '캠페인 소속', description: '마케팅 캠페인의 일부', source_entity_type: 'Promotion', target_entity_type: 'MarketingCampaign', directionality: 'directed' },
+  
+  // 마케팅 캠페인 관계
+  { name: 'targets_customers', label: '타겟 고객', description: '캠페인 타겟 고객', source_entity_type: 'MarketingCampaign', target_entity_type: 'Customer', directionality: 'directed' },
+  { name: 'increases_visits', label: '방문 증가', description: '캠페인이 방문 증가', source_entity_type: 'MarketingCampaign', target_entity_type: 'Visit', directionality: 'directed' },
+  { name: 'deployed_at_store', label: '실행 매장', description: '캠페인 실행 매장', source_entity_type: 'MarketingCampaign', target_entity_type: 'Store', directionality: 'directed' },
+  
+  // 구매 전환 관계
+  { name: 'conversion_from_visit', label: '방문 전환', description: '방문에서의 전환 분석', source_entity_type: 'PurchaseConversion', target_entity_type: 'Visit', directionality: 'directed' },
+  { name: 'conversion_to_sale', label: '매출 전환', description: '매출로의 전환', source_entity_type: 'PurchaseConversion', target_entity_type: 'Sale', directionality: 'directed' },
+  { name: 'influenced_by_path', label: '동선 영향', description: '고객 동선이 전환에 영향', source_entity_type: 'PurchaseConversion', target_entity_type: 'CustomerJourney', directionality: 'directed' },
+  { name: 'in_zone_conversion', label: '구역 내 전환', description: '특정 구역에서의 전환', source_entity_type: 'PurchaseConversion', target_entity_type: 'ZoneAnalysis', directionality: 'directed' },
+  
+  // 직원 스케줄 관계
+  { name: 'schedule_at_store', label: '근무 매장', description: '직원 근무 매장', source_entity_type: 'StaffSchedule', target_entity_type: 'Store', directionality: 'directed' },
+  { name: 'manages_zone_schedule', label: '담당 구역', description: '직원이 담당하는 구역', source_entity_type: 'StaffSchedule', target_entity_type: 'ZoneAnalysis', directionality: 'directed' },
+  { name: 'impacts_sales', label: '매출 영향', description: '직원 배치가 매출에 영향', source_entity_type: 'StaffSchedule', target_entity_type: 'Sale', directionality: 'directed' },
+  { name: 'staff_has_schedule', label: '스케줄 보유', description: '직원이 스케줄 보유', source_entity_type: 'Staff', target_entity_type: 'StaffSchedule', directionality: 'directed' },
+  
+  // 구역 분석 관계
+  { name: 'zone_in_store', label: '매장 구역', description: '매장 내 구역', source_entity_type: 'ZoneAnalysis', target_entity_type: 'Store', directionality: 'directed' },
+  { name: 'zone_traffic', label: '구역 트래픽', description: '구역 방문 트래픽', source_entity_type: 'ZoneAnalysis', target_entity_type: 'Visit', directionality: 'directed' },
+  { name: 'zone_revenue', label: '구역 매출', description: '구역에서 발생한 매출', source_entity_type: 'ZoneAnalysis', target_entity_type: 'Sale', directionality: 'directed' },
+  { name: 'displays_product_zone', label: '제품 진열', description: '구역에 진열된 제품', source_entity_type: 'ZoneAnalysis', target_entity_type: 'Product', directionality: 'directed' },
+  
+  // 알림 관계
+  { name: 'alert_for_inventory', label: '재고 알림', description: '재고 관련 알림', source_entity_type: 'Alert', target_entity_type: 'Inventory', directionality: 'directed' },
+  { name: 'alert_for_store', label: '매장 알림', description: '매장 관련 알림', source_entity_type: 'Alert', target_entity_type: 'Store', directionality: 'directed' },
+  { name: 'alert_for_product', label: '제품 알림', description: '제품 관련 알림', source_entity_type: 'Alert', target_entity_type: 'Product', directionality: 'directed' }
 ];
 
 export async function insertComprehensiveSchema(userId: string) {
