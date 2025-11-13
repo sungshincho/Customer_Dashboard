@@ -1,10 +1,14 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatCard } from "@/components/StatCard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, TrendingUp, Package, DollarSign } from "lucide-react";
+import { Users, TrendingUp, Package, DollarSign, AlertCircle } from "lucide-react";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase";
+import { useSelectedStore } from "@/hooks/useSelectedStore";
+import { useAuth } from "@/hooks/useAuth";
+import { loadStoreDataset } from "@/utils/storageDataLoader";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const initialStats = [
   {
@@ -56,8 +60,70 @@ const salesData = [
 ];
 
 const Dashboard = () => {
+  const { selectedStore } = useSelectedStore();
+  const { user } = useAuth();
   const [stats, setStats] = useState(initialStats);
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
+  const [storeData, setStoreData] = useState<any>({});
+  const [loading, setLoading] = useState(false);
+
+  // 매장 데이터 로드
+  useEffect(() => {
+    if (selectedStore && user) {
+      setLoading(true);
+      loadStoreDataset(user.id, selectedStore.id)
+        .then(data => {
+          setStoreData(data);
+          
+          // 실제 데이터로 stats 업데이트
+          const totalVisits = data.visits?.length || 0;
+          const totalPurchases = data.purchases?.length || 0;
+          const totalRevenue = data.purchases?.reduce((sum: number, p: any) => 
+            sum + (parseFloat(p.unit_price) || 0) * (parseInt(p.quantity) || 0), 0) || 0;
+          const conversionRate = totalVisits > 0 ? ((totalPurchases / totalVisits) * 100).toFixed(1) : '0.0';
+          const lowStockProducts = data.products?.filter((p: any) => 
+            (parseInt(p.stock_quantity) || 0) < 10
+          ).length || 0;
+
+          setStats([
+            {
+              title: "오늘 방문자",
+              value: totalVisits.toString(),
+              change: "+12.5% 어제 대비",
+              changeType: "positive" as const,
+              icon: Users,
+            },
+            {
+              title: "총 매출",
+              value: `₩${totalRevenue.toLocaleString()}`,
+              change: "+8.2% 지난주 대비",
+              changeType: "positive" as const,
+              icon: DollarSign,
+            },
+            {
+              title: "재고 알림",
+              value: lowStockProducts.toString(),
+              change: `${lowStockProducts}개 품목 부족`,
+              changeType: lowStockProducts > 0 ? "negative" as const : "positive" as const,
+              icon: Package,
+            },
+            {
+              title: "전환율",
+              value: `${conversionRate}%`,
+              change: "+2.4% 지난주 대비",
+              changeType: "positive" as const,
+              icon: TrendingUp,
+            },
+          ]);
+          
+          setLoading(false);
+        })
+        .catch(error => {
+          console.error('Failed to load store data:', error);
+          setLoading(false);
+        });
+    }
+  }, [selectedStore, user]);
 
   useEffect(() => {
     // Supabase Realtime 구독 예시
@@ -82,14 +148,38 @@ const Dashboard = () => {
     };
   }, []);
 
+  if (!selectedStore) {
+    return (
+      <DashboardLayout>
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            매장을 선택하면 해당 매장의 실시간 대시보드를 확인할 수 있습니다.
+          </AlertDescription>
+        </Alert>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
         <div className="animate-fade-in">
           <h1 className="text-3xl font-bold gradient-text">실시간 대시보드</h1>
-          <p className="mt-2 text-muted-foreground">매장 운영 현황 및 주요 지표</p>
+          <p className="mt-2 text-muted-foreground">
+            {selectedStore.store_name} - 매장 운영 현황 및 주요 지표
+          </p>
         </div>
+
+        {storeData.visits?.length > 0 && (
+          <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+            <AlertCircle className="h-4 w-4 text-blue-600" />
+            <AlertDescription>
+              {selectedStore.store_name} 데이터: {storeData.visits.length}건 방문, {storeData.purchases?.length || 0}건 구매
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Stats Grid */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

@@ -1,14 +1,18 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, TrendingUp, AlertTriangle, DollarSign, Package, Check, X } from "lucide-react";
-import { useState } from "react";
+import { RefreshCw, TrendingUp, AlertTriangle, DollarSign, Package, Check, X, AlertCircle } from "lucide-react";
+import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { useRealtimeInventory } from "@/hooks/useRealtimeInventory";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useSelectedStore } from "@/hooks/useSelectedStore";
+import { useAuth } from "@/hooks/useAuth";
+import { loadStoreDataset } from "@/utils/storageDataLoader";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // 통합 데이터 - 수요 예측과 재고를 연결
 const integratedData = [
@@ -74,6 +78,8 @@ const weeklyTrend = [
 ];
 
 const ProfitCenterPage = () => {
+  const { selectedStore } = useSelectedStore();
+  const { user } = useAuth();
   const { 
     inventoryLevels, 
     orderSuggestions, 
@@ -83,6 +89,24 @@ const ProfitCenterPage = () => {
   } = useRealtimeInventory();
   
   const [isMonitoring, setIsMonitoring] = useState(false);
+  const [storeData, setStoreData] = useState<any>({});
+  const [loadingData, setLoadingData] = useState(false);
+
+  // 매장 데이터 로드
+  useEffect(() => {
+    if (selectedStore && user) {
+      setLoadingData(true);
+      loadStoreDataset(user.id, selectedStore.id)
+        .then(data => {
+          setStoreData(data);
+          setLoadingData(false);
+        })
+        .catch(error => {
+          console.error('Failed to load store data:', error);
+          setLoadingData(false);
+        });
+    }
+  }, [selectedStore, user]);
 
   const handleMonitoring = async () => {
     setIsMonitoring(true);
@@ -116,13 +140,28 @@ const ProfitCenterPage = () => {
     return (current / optimal) * 100;
   };
 
+  if (!selectedStore) {
+    return (
+      <DashboardLayout>
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            매장을 선택하면 해당 매장의 통합 대시보드를 확인할 수 있습니다.
+          </AlertDescription>
+        </Alert>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between animate-fade-in">
           <div>
             <h1 className="text-3xl font-bold gradient-text">Profit Center 통합 대시보드</h1>
-            <p className="mt-2 text-muted-foreground">수요 예측 기반 재고 최적화 및 매출 극대화</p>
+            <p className="mt-2 text-muted-foreground">
+              {selectedStore.store_name} - 수요 예측 기반 재고 최적화 및 매출 극대화
+            </p>
           </div>
           <div className="flex gap-2">
             <Button onClick={handleMonitoring} variant="outline" size="sm" disabled={isMonitoring}>
@@ -131,6 +170,15 @@ const ProfitCenterPage = () => {
             </Button>
           </div>
         </div>
+
+        {storeData.products?.length > 0 && (
+          <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+            <AlertCircle className="h-4 w-4 text-blue-600" />
+            <AlertDescription>
+              {selectedStore.store_name} 데이터: {storeData.products.length}개 상품, {storeData.purchases?.length || 0}건 구매
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* 핵심 지표 */}
         <div className="grid gap-4 md:grid-cols-4">
