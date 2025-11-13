@@ -9,6 +9,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Store, Loader2, Sparkles, AlertTriangle, CheckCircle, Plus, RefreshCw } from "lucide-react";
+import { insertComprehensiveSchema } from "../utils/comprehensiveRetailSchema";
 
 type SchemaMode = 'merge' | 'replace';
 
@@ -16,6 +17,42 @@ export const RetailSchemaPreset = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [schemaMode, setSchemaMode] = useState<SchemaMode>('merge');
+  const [loadingComprehensive, setLoadingComprehensive] = useState(false);
+
+  // 정교한 디지털 트윈 스키마 로드
+  const handleLoadComprehensiveSchema = async () => {
+    setLoadingComprehensive(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: "오류",
+          description: "로그인이 필요합니다.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const result = await insertComprehensiveSchema(user.id);
+      
+      toast({
+        title: "정교한 디지털 트윈 스키마 로드 완료",
+        description: `엔티티 타입 ${result.entityTypesCount}개, 관계 타입 ${result.relationTypesCount}개가 추가되었습니다.`
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['entity-types'] });
+      queryClient.invalidateQueries({ queryKey: ['relation-types'] });
+    } catch (error: any) {
+      console.error('Load comprehensive schema error:', error);
+      toast({
+        title: "스키마 로드 실패",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingComprehensive(false);
+    }
+  };
 
   // 현재 스키마를 버전으로 백업
   const backupCurrentSchemaMutation = useMutation({
@@ -504,6 +541,46 @@ export const RetailSchemaPreset = () => {
             </>
           )}
         </Button>
+
+        <div className="mt-6 pt-6 border-t">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              <h4 className="text-lg font-semibold">정교한 디지털 트윈 스키마</h4>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              오프라인 매장의 <strong>모든 구성요소</strong>를 포함한 정교한 디지털 트윈 온톨로지입니다.
+              <br />
+              공간 구조(11개), IoT 장비(9개), 환경 시스템(5개), 상품 진열(2개), 인력 & 고객(2개) 엔티티와 50개 이상의 관계를 포함합니다.
+            </p>
+            <Alert>
+              <AlertDescription className="text-xs">
+                <strong>포함 엔티티:</strong> Zone, Shelf, DisplayTable, Rack, Wall, Entrance, CheckoutCounter, Aisle, FittingRoom, StorageRoom, Window, 
+                Sensor, Camera, Beacon, WiFiProbe, DigitalSignage, POS, Kiosk, SmartMirror, 
+                Lighting, HVAC, AudioSystem, MusicPlaylist, ScentDiffuser, ProductPlacement, Display, StaffZone, CustomerJourney
+              </AlertDescription>
+            </Alert>
+            <Button
+              className="w-full"
+              size="lg"
+              variant="secondary"
+              onClick={handleLoadComprehensiveSchema}
+              disabled={loadingComprehensive}
+            >
+              {loadingComprehensive ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  정교한 스키마 로드 중...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-2 h-5 w-5" />
+                  정교한 디지털 트윈 스키마 로드
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
