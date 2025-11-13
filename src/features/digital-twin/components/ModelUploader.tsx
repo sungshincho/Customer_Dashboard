@@ -6,18 +6,35 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Upload, Loader2, CheckCircle, Copy, ExternalLink } from 'lucide-react';
+import { Upload, Loader2, CheckCircle, Copy, ExternalLink, Sparkles } from 'lucide-react';
+import { AutoModelMapper } from './AutoModelMapper';
 
 interface UploadedFile {
   name: string;
   url: string;
 }
 
+interface ModelAnalysis {
+  matched_entity_type: any;
+  confidence: number;
+  inferred_type: string;
+  suggested_dimensions: {
+    width: number;
+    height: number;
+    depth: number;
+  };
+  reasoning: string;
+  fileName: string;
+  fileUrl: string;
+}
+
 export function ModelUploader() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [pendingAnalysis, setPendingAnalysis] = useState<ModelAnalysis | null>(null);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -25,6 +42,41 @@ export function ModelUploader() {
       title: "복사 완료",
       description: "URL이 클립보드에 복사되었습니다",
     });
+  };
+
+  const analyzeModel = async (file: UploadedFile) => {
+    if (!user) return;
+
+    setAnalyzing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('analyze-3d-model', {
+        body: {
+          fileName: file.name,
+          fileUrl: file.url,
+          userId: user.id
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success && data.analysis) {
+        setPendingAnalysis({
+          ...data.analysis,
+          matched_entity_type: data.matched_entity_type,
+          fileName: file.name,
+          fileUrl: file.url
+        });
+      }
+    } catch (err) {
+      console.error('Model analysis error:', err);
+      toast({
+        title: "분석 실패",
+        description: "3D 모델 자동 분석에 실패했습니다",
+        variant: "destructive",
+      });
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -59,6 +111,11 @@ export function ModelUploader() {
         title: "업로드 완료",
         description: `${results.length}개의 3D 모델이 업로드되었습니다.`,
       });
+
+      // Auto-analyze the first uploaded file
+      if (results.length > 0) {
+        await analyzeModel(results[0]);
+      }
     } catch (err) {
       console.error('업로드 실패:', err);
       toast({
@@ -72,7 +129,39 @@ export function ModelUploader() {
   };
 
   return (
-    <Card>
+    <div className="space-y-4">
+      {pendingAnalysis && (
+        <AutoModelMapper
+          analysis={pendingAnalysis}
+          onAccept={() => {
+            setPendingAnalysis(null);
+            toast({
+              title: "매핑 완료",
+              description: "3D 모델이 온톨로지에 자동으로 연결되었습니다",
+            });
+          }}
+          onReject={() => {
+            setPendingAnalysis(null);
+            toast({
+              title: "매핑 거부",
+              description: "수동으로 스키마 빌더에서 연결할 수 있습니다",
+            });
+          }}
+        />
+      )}
+
+      {analyzing && (
+        <Card className="border-primary">
+          <CardContent className="flex items-center justify-center py-8">
+            <div className="text-center space-y-2">
+              <Sparkles className="w-8 h-8 animate-pulse text-primary mx-auto" />
+              <p className="text-sm text-muted-foreground">AI가 3D 모델을 분석하고 있습니다...</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
       <CardHeader>
         <CardTitle>3D 모델 업로드</CardTitle>
         <CardDescription>
@@ -130,6 +219,15 @@ export function ModelUploader() {
                     <Button
                       variant="ghost"
                       size="sm"
+                      onClick={() => analyzeModel(file)}
+                      title="AI 자동 매핑"
+                      disabled={analyzing}
+                    >
+                      <Sparkles className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => window.open(file.url, '_blank')}
                       title="새 탭에서 열기"
                     >
@@ -143,14 +241,17 @@ export function ModelUploader() {
         )}
 
         <div className="text-sm text-muted-foreground space-y-1">
-          <p><strong>참고:</strong></p>
+          <p><strong>자동 매핑 기능:</strong></p>
           <ul className="list-disc list-inside space-y-1">
-            <li>업로드한 모델은 온톨로지 스키마에서 엔티티 타입에 할당할 수 있습니다</li>
-            <li>권장 포맷: .glb (바이너리 GLTF)</li>
-            <li>모델 최적화를 위해 폴리곤 수를 최소화하세요</li>
+            <li>업로드 시 AI가 자동으로 파일명을 분석합니다</li>
+            <li>기존 온톨로지 스키마와 매칭하여 적합한 엔티티 타입을 제안합니다</li>
+            <li>신뢰도와 함께 제안된 크기 정보를 제공합니다</li>
+            <li>수락 시 자동으로 스키마에 3D 모델이 연결됩니다</li>
+            <li>또는 <Sparkles className="inline h-3 w-3" /> 버튼을 눌러 수동으로 분석할 수 있습니다</li>
           </ul>
         </div>
       </CardContent>
     </Card>
+    </div>
   );
 }

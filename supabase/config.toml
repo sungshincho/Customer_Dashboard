@@ -1,5 +1,8 @@
 project_id = "fbffryjvvykhgoviektl"
 
+[functions.analyze-3d-model]
+verify_jwt = true
+
 [functions.analyze-store-data]
 verify_jwt = false
 
