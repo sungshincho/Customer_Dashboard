@@ -5,9 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Upload, Loader2, CheckCircle, Copy, ExternalLink, Sparkles } from 'lucide-react';
+import { Upload, Loader2, CheckCircle, Copy, ExternalLink, Sparkles, Eye } from 'lucide-react';
 import { AutoModelMapper } from './AutoModelMapper';
+import { Model3DPreview } from './Model3DPreview';
 
 interface UploadedFile {
   name: string;
@@ -208,6 +210,23 @@ export function ModelUploader() {
                     </div>
                   </div>
                   <div className="flex gap-1 flex-shrink-0">
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="3D 미리보기"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-4xl h-[600px]">
+                        <DialogHeader>
+                          <DialogTitle>{file.name}</DialogTitle>
+                        </DialogHeader>
+                        <Model3DPreview modelUrl={file.url} className="h-[500px]" />
+                      </DialogContent>
+                    </Dialog>
                     <Button
                       variant="ghost"
                       size="sm"

@@ -6,3 +6,4 @@ export { LightingPreset } from './LightingPreset';
 export { HeatmapOverlay } from './HeatmapOverlay';
 export { ModelUploader } from './ModelUploader';
 export { AutoModelMapper } from './AutoModelMapper';
+export { Model3DPreview } from './Model3DPreview';
