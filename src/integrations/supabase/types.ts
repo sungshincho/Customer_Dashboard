@@ -634,6 +634,48 @@ export type Database = {
         }
         Relationships: []
       }
+      stores: {
+        Row: {
+          address: string | null
+          created_at: string
+          email: string | null
+          id: string
+          manager_name: string | null
+          metadata: Json | null
+          phone: string | null
+          store_code: string
+          store_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          manager_name?: string | null
+          metadata?: Json | null
+          phone?: string | null
+          store_code: string
+          store_name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          manager_name?: string | null
+          metadata?: Json | null
+          phone?: string | null
+          store_code?: string
+          store_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_classification_patterns: {
         Row: {
           classified_as: string
