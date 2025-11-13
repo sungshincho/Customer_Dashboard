@@ -1,12 +1,16 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Users, TrendingUp, Target, ShoppingBag, Eye } from "lucide-react";
-import { useState } from "react";
+import { RefreshCw, Users, TrendingUp, Target, ShoppingBag, Eye, AlertCircle } from "lucide-react";
+import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { useSelectedStore } from "@/hooks/useSelectedStore";
+import { useAuth } from "@/hooks/useAuth";
+import { loadStoreDataset } from "@/utils/storageDataLoader";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // 고객 세그먼트 데이터
 const customerSegments = [
@@ -120,18 +124,53 @@ const behaviorData = customerSegments.map(seg => ({
 }));
 
 const CustomerRecommendationsPage = () => {
+  const { selectedStore } = useSelectedStore();
+  const { user } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedSegment, setSelectedSegment] = useState(customerSegments[0]);
+  const [storeData, setStoreData] = useState<any>({});
+  const [loading, setLoading] = useState(false);
+
+  // 매장 데이터 로드
+  useEffect(() => {
+    if (selectedStore && user) {
+      setLoading(true);
+      loadStoreDataset(user.id, selectedStore.id)
+        .then(data => {
+          setStoreData(data);
+          setLoading(false);
+        })
+        .catch(error => {
+          console.error('Failed to load store data:', error);
+          setLoading(false);
+        });
+    }
+  }, [selectedStore, user, refreshKey]);
 
   const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);
   };
 
-  const totalCustomers = customerSegments.reduce((sum, seg) => sum + seg.size, 0);
+  // 매장 데이터 기반 통계
+  const totalCustomers = storeData.customers?.length || customerSegments.reduce((sum, seg) => sum + seg.size, 0);
+  const totalPurchases = storeData.purchases?.length || 0;
   const avgConversionRate = Math.round(
-    customerSegments.reduce((sum, seg) => sum + seg.conversionRate * seg.size, 0) / totalCustomers
+    customerSegments.reduce((sum, seg) => sum + seg.conversionRate * seg.size, 0) / customerSegments.reduce((sum, seg) => sum + seg.size, 0)
   );
   const potentialRevenue = realtimeRecommendations.reduce((sum, rec) => sum + rec.expectedRevenue, 0);
+
+  if (!selectedStore) {
+    return (
+      <DashboardLayout>
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            매장을 선택하면 해당 매장의 고객 추천 데이터를 확인할 수 있습니다.
+          </AlertDescription>
+        </Alert>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -139,13 +178,24 @@ const CustomerRecommendationsPage = () => {
         <div className="flex items-center justify-between animate-fade-in">
           <div>
             <h1 className="text-3xl font-bold gradient-text">고객 추천 시스템</h1>
-            <p className="mt-2 text-muted-foreground">행동 패턴 기반 개인화 추천 및 매출 극대화</p>
+            <p className="mt-2 text-muted-foreground">
+              {selectedStore.store_name} - 행동 패턴 기반 개인화 추천
+            </p>
           </div>
           <Button onClick={handleRefresh} variant="outline" size="sm">
             <RefreshCw className="w-4 h-4 mr-2" />
             새로고침
           </Button>
         </div>
+
+        {storeData.customers?.length > 0 && (
+          <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+            <AlertCircle className="h-4 w-4 text-blue-600" />
+            <AlertDescription>
+              {selectedStore.store_name} 고객 데이터: {storeData.customers.length}명 고객, {totalPurchases}건 구매
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* 핵심 지표 */}
         <div className="grid gap-4 md:grid-cols-4">

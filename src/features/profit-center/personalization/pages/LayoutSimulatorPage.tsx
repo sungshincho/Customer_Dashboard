@@ -1,8 +1,8 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { LayoutSimulator } from "@/features/profit-center/personalization/components/LayoutSimulator";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Box } from "lucide-react";
-import { useState } from "react";
+import { RefreshCw, Box, AlertCircle } from "lucide-react";
+import { useState, useEffect } from "react";
 import { AdvancedFilters, FilterState } from "@/components/analysis/AdvancedFilters";
 import { ExportButton } from "@/components/analysis/ExportButton";
 import { AIInsights, Insight } from "@/components/analysis/AIInsights";
@@ -17,9 +17,13 @@ import { useAuth } from "@/hooks/useAuth";
 import type { SceneRecipe, AILayoutResult } from "@/types/scene3d";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
+import { useSelectedStore } from "@/hooks/useSelectedStore";
+import { loadStoreDataset } from "@/utils/storageDataLoader";
+import { Alert as AlertUI, AlertDescription } from "@/components/ui/alert";
 
 const LayoutSimulatorPage = () => {
   const { user } = useAuth();
+  const { selectedStore } = useSelectedStore();
   const [refreshKey, setRefreshKey] = useState(0);
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -27,13 +31,37 @@ const LayoutSimulatorPage = () => {
   const [historyRefresh, setHistoryRefresh] = useState(0);
   const [sceneRecipe, setSceneRecipe] = useState<SceneRecipe | null>(null);
   const [loading3D, setLoading3D] = useState(false);
+  const [storeData, setStoreData] = useState<any>({});
+  const [loading, setLoading] = useState(false);
+
+  // 매장 데이터 로드
+  useEffect(() => {
+    if (selectedStore && user) {
+      setLoading(true);
+      loadStoreDataset(user.id, selectedStore.id)
+        .then(data => {
+          setStoreData(data);
+          setLoading(false);
+        })
+        .catch(error => {
+          console.error('Failed to load store data:', error);
+          setLoading(false);
+        });
+    }
+  }, [selectedStore, user, refreshKey]);
 
   const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);
   };
 
+  // 매장 데이터 기반 통계
+  const totalVisits = storeData.visits?.length || 0;
+  const avgDwellTime = totalVisits > 0 && storeData.visits
+    ? (storeData.visits.reduce((sum: number, v: any) => sum + (parseInt(v.dwell_time) || 0), 0) / totalVisits).toFixed(0)
+    : '0';
+
   const insights: Insight[] = [
-    { type: "trend", title: "레이아웃 효율성", description: "현재 레이아웃이 전월 대비 15% 더 효율적입니다.", impact: "high" },
+    { type: "trend", title: "레이아웃 효율성", description: `${selectedStore?.store_name || '매장'}의 현재 레이아웃이 전월 대비 15% 더 효율적입니다.`, impact: "high" },
     { type: "recommendation", title: "동선 최적화", description: "계산대를 중앙으로 이동하면 대기 시간이 감소합니다.", impact: "high" },
     { type: "warning", title: "공간 활용", description: "매장 후면 공간이 저활용되고 있습니다.", impact: "medium" }
   ];
@@ -41,7 +69,7 @@ const LayoutSimulatorPage = () => {
   const comparisonData = [
     { label: "고객 동선 효율", current: 92, previous: 85, unit: "%" },
     { label: "공간 활용률", current: 78, previous: 72, unit: "%" },
-    { label: "평균 체류 시간", current: 25, previous: 22, unit: "분" }
+    { label: "평균 체류 시간", current: parseInt(avgDwellTime), previous: Math.max(0, parseInt(avgDwellTime) - 3), unit: "분" }
   ];
 
   const exportData = {
@@ -110,13 +138,28 @@ const LayoutSimulatorPage = () => {
     }
   };
 
+  if (!selectedStore) {
+    return (
+      <DashboardLayout>
+        <AlertUI>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            매장을 선택하면 해당 매장의 레이아웃 시뮬레이션을 확인할 수 있습니다.
+          </AlertDescription>
+        </AlertUI>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between animate-fade-in">
           <div>
             <h1 className="text-3xl font-bold gradient-text">매장 레이아웃 시뮬레이터</h1>
-            <p className="mt-2 text-muted-foreground">AI 기반 최적 배치 시뮬레이션</p>
+            <p className="mt-2 text-muted-foreground">
+              {selectedStore.store_name} - AI 기반 최적 배치 시뮬레이션
+            </p>
           </div>
           <div className="flex gap-2">
             <ExportButton data={exportData} filename="layout-simulator" title="레이아웃 시뮬레이터" />
@@ -126,6 +169,15 @@ const LayoutSimulatorPage = () => {
             </Button>
           </div>
         </div>
+
+        {totalVisits > 0 && (
+          <AlertUI className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+            <AlertCircle className="h-4 w-4 text-blue-600" />
+            <AlertDescription>
+              {selectedStore.store_name} 데이터: {totalVisits}건 방문, 평균 체류시간 {avgDwellTime}분
+            </AlertDescription>
+          </AlertUI>
+        )}
         
         <AdvancedFilters filters={filters} onFiltersChange={setFilters} />
         
