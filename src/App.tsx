@@ -43,6 +43,9 @@ import Analytics from "@/features/data-management/analysis/pages/AnalyticsPage";
 import NeuralSenseSettingsPage from "@/features/data-management/neuralsense/pages/NeuralSenseSettingsPage";
 import BigDataAPIPage from "@/features/data-management/bigdata/pages/BigDataAPIPage";
 
+// Digital Twin pages
+import Setup3DDataPage from "@/features/digital-twin/pages/Setup3DDataPage";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -243,6 +246,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <BigDataAPIPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/setup-3d-data"
+              element={
+                <ProtectedRoute>
+                  <Setup3DDataPage />
                 </ProtectedRoute>
               }
             />

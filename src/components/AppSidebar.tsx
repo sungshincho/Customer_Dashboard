@@ -19,7 +19,8 @@ import {
   ChevronDown,
   LucideIcon,
   Cpu,
-  Cloud
+  Cloud,
+  Box
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { NavLink } from "@/components/NavLink";
@@ -119,6 +120,7 @@ const menuSections: MenuSection[] = [
     textColor: "text-blue-600",
     activeGradient: "bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-medium shadow-md",
     items: [
+      { title: "3D 데이터 설정", url: "/setup-3d-data", icon: Box },
       { title: "NeuralSense IoT", url: "/neuralsense-settings", icon: Cpu },
       { title: "빅데이터 API", url: "/bigdata-api", icon: Cloud },
       { title: "데이터 임포트", url: "/data-import", icon: Upload },
