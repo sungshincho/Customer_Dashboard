@@ -100,15 +100,77 @@ serve(async (req) => {
     if (graphData && graphData.nodes && graphData.nodes.length > 0) {
       console.log(`🔗 Ontology graph data: ${graphData.nodes.length} nodes, ${graphData.edges.length} edges`);
       
-      const nodeSummary = graphData.nodes.slice(0, 10).map((node: any) => 
-        `- ${node.type}: ${node.label} (속성: ${JSON.stringify(node.properties)})`
-      ).join('\n');
+      // 엔티티 타입별 통계
+      const nodesByType = graphData.nodes.reduce((acc: any, node: any) => {
+        acc[node.type] = (acc[node.type] || 0) + 1;
+        return acc;
+      }, {});
       
-      const relationSummary = graphData.edges.slice(0, 10).map((edge: any) =>
-        `- ${edge.type}: ${edge.source} → ${edge.target}`
-      ).join('\n');
+      // 관계 타입별 통계
+      const edgesByType = graphData.edges.reduce((acc: any, edge: any) => {
+        acc[edge.type] = (acc[edge.type] || 0) + 1;
+        return acc;
+      }, {});
       
-      graphContext = `\n\n## 온톨로지 기반 지식 그래프\n아래는 시스템에 저장된 엔티티와 관계 정보입니다. 이 구조화된 지식을 활용하여 더 정확한 추론을 하세요:\n\n### 주요 엔티티 (총 ${graphData.nodes.length}개)\n${nodeSummary}\n\n### 주요 관계 (총 ${graphData.edges.length}개)\n${relationSummary}\n\n위 그래프 구조를 활용하여 엔티티 간 관계를 고려한 인사이트를 제공하세요.`;
+      const nodeTypeSummary = Object.entries(nodesByType)
+        .map(([type, count]) => `  - ${type}: ${count}개`)
+        .join('\n');
+      
+      const edgeTypeSummary = Object.entries(edgesByType)
+        .map(([type, count]) => `  - ${type}: ${count}개`)
+        .join('\n');
+      
+      // 샘플 엔티티 (타입별로 다양하게)
+      const sampleNodesByType: any = {};
+      graphData.nodes.forEach((node: any) => {
+        if (!sampleNodesByType[node.type]) {
+          sampleNodesByType[node.type] = [];
+        }
+        if (sampleNodesByType[node.type].length < 3) {
+          sampleNodesByType[node.type].push(node);
+        }
+      });
+      
+      const nodeSampleSummary = Object.entries(sampleNodesByType)
+        .map(([type, nodes]: [string, any]) => {
+          const nodeList = nodes.map((n: any) => 
+            `    • ${n.label} (속성: ${JSON.stringify(n.properties)})`
+          ).join('\n');
+          return `  ${type} 예시:\n${nodeList}`;
+        })
+        .join('\n\n');
+      
+      // 샘플 관계
+      const relationSummary = graphData.edges.slice(0, 15).map((edge: any) => {
+        const sourceNode = graphData.nodes.find((n: any) => n.id === edge.source);
+        const targetNode = graphData.nodes.find((n: any) => n.id === edge.target);
+        return `  - [${edge.type}] ${sourceNode?.label || edge.source} → ${targetNode?.label || edge.target}`;
+      }).join('\n');
+      
+      graphContext = `
+
+## 📊 온톨로지 기반 지식 그래프 구조
+
+**이 데이터는 실제로 시스템에 저장된 구조화된 비즈니스 지식입니다. 반드시 이 정보를 활용하여 분석하세요.**
+
+### 엔티티 통계 (총 ${graphData.nodes.length}개)
+${nodeTypeSummary}
+
+### 관계 통계 (총 ${graphData.edges.length}개)
+${edgeTypeSummary}
+
+### 주요 엔티티 샘플
+${nodeSampleSummary}
+
+### 주요 관계 샘플
+${relationSummary}
+
+**중요**: 위 온톨로지 그래프는 실제 비즈니스 구조를 나타냅니다. 엔티티 간 관계를 추적하여:
+1. 연결된 데이터 포인트 간의 숨겨진 패턴 발견
+2. 관계 강도(weight)를 고려한 중요 경로 식별
+3. 타입별 엔티티 분포에서 비즈니스 인사이트 도출
+반드시 구체적인 엔티티 이름과 관계 타입을 언급하며 분석하세요.`;
+      
       console.log("🔗 Graph context prepared, length:", graphContext.length);
     } else {
       console.log("⚠️ No graph data provided");
