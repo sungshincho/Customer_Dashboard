@@ -1,7 +1,7 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { LayoutSimulator } from "@/features/profit-center/personalization/components/LayoutSimulator";
 import { Button } from "@/components/ui/button";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Box } from "lucide-react";
 import { useState } from "react";
 import { AdvancedFilters, FilterState } from "@/components/analysis/AdvancedFilters";
 import { ExportButton } from "@/components/analysis/ExportButton";
@@ -11,13 +11,22 @@ import { ComparisonView } from "@/components/analysis/ComparisonView";
 import { AIAnalysisButton } from "@/components/analysis/AIAnalysisButton";
 import { AnalysisHistory } from "@/components/analysis/AnalysisHistory";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SceneComposer } from "@/features/digital-twin/components";
+import { generateSceneRecipe } from "@/features/digital-twin/utils/sceneRecipeGenerator";
+import { useAuth } from "@/hooks/useAuth";
+import type { SceneRecipe, AILayoutResult } from "@/types/scene3d";
+import { Card } from "@/components/ui/card";
+import { toast } from "sonner";
 
 const LayoutSimulatorPage = () => {
+  const { user } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
   const [historyRefresh, setHistoryRefresh] = useState(0);
+  const [sceneRecipe, setSceneRecipe] = useState<SceneRecipe | null>(null);
+  const [loading3D, setLoading3D] = useState(false);
 
   const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);
@@ -41,6 +50,54 @@ const LayoutSimulatorPage = () => {
     insights
   };
 
+  const generate3DScene = async () => {
+    if (!user) return;
+    
+    setLoading3D(true);
+    try {
+      const mockAIResult: AILayoutResult = {
+        zones: [
+          {
+            zone_id: 'entrance',
+            zone_type: 'entry',
+            furniture: [
+              {
+                furniture_id: 'shelf-001',
+                position: { x: -5, y: 0, z: 0 },
+                rotation: { x: 0, y: Math.PI / 2, z: 0 }
+              },
+              {
+                furniture_id: 'shelf-002',
+                position: { x: 5, y: 0, z: 0 },
+                rotation: { x: 0, y: -Math.PI / 2, z: 0 }
+              }
+            ],
+            products: [
+              {
+                product_id: 'product-001',
+                position: { x: -5, y: 1, z: 0 }
+              },
+              {
+                product_id: 'product-002',
+                position: { x: 5, y: 1, z: 0 }
+              }
+            ]
+          }
+        ],
+        lighting_suggestion: 'warm-retail'
+      };
+
+      const recipe = await generateSceneRecipe(mockAIResult, user.id);
+      setSceneRecipe(recipe);
+      toast.success("3D 레이아웃이 생성되었습니다");
+    } catch (error) {
+      console.error('3D scene generation error:', error);
+      toast.error("3D 씬 생성 중 오류가 발생했습니다");
+    } finally {
+      setLoading3D(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -60,14 +117,39 @@ const LayoutSimulatorPage = () => {
         
         <AdvancedFilters filters={filters} onFiltersChange={setFilters} />
         
-        <Tabs defaultValue="analysis" className="w-full">
+        <Tabs defaultValue="3d" className="w-full">
           <TabsList>
+            <TabsTrigger value="3d">
+              <Box className="w-4 h-4 mr-2" />
+              3D 뷰
+            </TabsTrigger>
             <TabsTrigger value="analysis">시뮬레이션</TabsTrigger>
             <TabsTrigger value="comparison">비교</TabsTrigger>
             <TabsTrigger value="insights">AI 인사이트</TabsTrigger>
             <TabsTrigger value="history">히스토리</TabsTrigger>
             <TabsTrigger value="alerts">알림 설정</TabsTrigger>
           </TabsList>
+          
+          <TabsContent value="3d" className="space-y-6">
+            <Card className="p-6">
+              {!sceneRecipe && (
+                <div className="flex flex-col items-center justify-center h-[500px] text-center">
+                  <Box className="w-16 h-16 mb-4 text-muted-foreground opacity-20" />
+                  <p className="text-muted-foreground mb-4">
+                    AI 추론 기반 3D 레이아웃 시뮬레이션
+                  </p>
+                  <Button onClick={generate3DScene} disabled={loading3D}>
+                    {loading3D ? "생성 중..." : "3D 레이아웃 생성"}
+                  </Button>
+                </div>
+              )}
+              {sceneRecipe && (
+                <div className="h-[600px]">
+                  <SceneComposer recipe={sceneRecipe} />
+                </div>
+              )}
+            </Card>
+          </TabsContent>
           
           <TabsContent value="analysis" className="space-y-6">
             <AIAnalysisButton
