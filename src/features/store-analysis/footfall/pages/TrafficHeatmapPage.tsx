@@ -7,15 +7,16 @@ import { AdvancedFilters, FilterState } from "@/components/analysis/AdvancedFilt
 import { ExportButton } from "@/components/analysis/ExportButton";
 import { ComparisonView } from "@/components/analysis/ComparisonView";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { SceneComposer } from "@/features/digital-twin/components";
 import { generateSceneRecipe } from "@/features/digital-twin/utils/sceneRecipeGenerator";
 import { useAuth } from "@/hooks/useAuth";
 import type { SceneRecipe, AILayoutResult } from "@/types/scene3d";
-import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { loadStoreFile } from "@/utils/storageDataLoader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Store3DViewer } from "@/features/digital-twin/components/Store3DViewer";
 
 const TrafficHeatmapPage = () => {
   const { user } = useAuth();
@@ -125,19 +126,42 @@ const TrafficHeatmapPage = () => {
           </div>
         </div>
         
-        <AdvancedFilters filters={filters} onFiltersChange={setFilters} />
-        
-        <Tabs defaultValue="3d" className="w-full">
-          <TabsList>
-            <TabsTrigger value="3d">
-              <Box className="w-4 h-4 mr-2" />
-              3D 히트맵
-            </TabsTrigger>
-            <TabsTrigger value="analysis">히트맵</TabsTrigger>
-            <TabsTrigger value="comparison">비교 분석</TabsTrigger>
-          </TabsList>
+        {selectedStore && (
+          <>
+            <AdvancedFilters filters={filters} onFiltersChange={setFilters} />
+            
+            <Tabs defaultValue="analysis" className="w-full">
+              <TabsList>
+                <TabsTrigger value="analysis">히트맵 분석</TabsTrigger>
+                <TabsTrigger value="3d-model">3D 매장</TabsTrigger>
+                <TabsTrigger value="3d-heatmap">
+                  <Box className="w-4 h-4 mr-2" />
+                  3D 히트맵
+                </TabsTrigger>
+                <TabsTrigger value="comparison">비교 분석</TabsTrigger>
+              </TabsList>
           
-          <TabsContent value="3d" className="space-y-6">
+          <TabsContent value="analysis" className="space-y-6">
+            <div key={refreshKey}>
+              <TrafficHeatmap visitsData={visitsData} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="3d-model" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>3D 매장 모델</CardTitle>
+                <CardDescription>
+                  업로드한 3D 매장 모델에서 동선 히트맵을 확인하세요
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Store3DViewer height="600px" />
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="3d-heatmap" className="space-y-6">
             <Card className="p-6">
               {!sceneRecipe && (
                 <div className="flex flex-col items-center justify-center h-[500px] text-center">
@@ -158,12 +182,6 @@ const TrafficHeatmapPage = () => {
             </Card>
           </TabsContent>
           
-          <TabsContent value="analysis" className="space-y-6">
-            <div key={refreshKey}>
-              <TrafficHeatmap visitsData={visitsData} />
-            </div>
-          </TabsContent>
-          
           <TabsContent value="comparison">
             <ComparisonView
               data={comparisonData}
@@ -172,6 +190,8 @@ const TrafficHeatmapPage = () => {
             />
           </TabsContent>
         </Tabs>
+          </>
+        )}
       </div>
     </DashboardLayout>
   );

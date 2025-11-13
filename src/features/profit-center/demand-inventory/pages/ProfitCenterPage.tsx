@@ -1,5 +1,5 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, TrendingUp, AlertTriangle, DollarSign, Package, Check, X, AlertCircle } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -9,6 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { useRealtimeInventory } from "@/hooks/useRealtimeInventory";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Store3DViewer } from "@/features/digital-twin/components";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { useAuth } from "@/hooks/useAuth";
 import { loadStoreDataset } from "@/utils/storageDataLoader";

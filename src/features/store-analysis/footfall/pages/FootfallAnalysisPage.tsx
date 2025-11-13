@@ -15,6 +15,7 @@ import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { loadStoreFile } from "@/utils/storageDataLoader";
 import { useAuth } from "@/hooks/useAuth";
+import { Store3DViewer } from "@/features/digital-twin/components/Store3DViewer";
 
 const FootfallAnalysis = () => {
   const { selectedStore } = useSelectedStore();
@@ -102,14 +103,35 @@ const FootfallAnalysis = () => {
           <>
             <AdvancedFilters filters={filters} onFiltersChange={setFilters} />
             
-            <Tabs defaultValue="3d" className="w-full">
+            <Tabs defaultValue="analysis" className="w-full">
               <TabsList>
-                <TabsTrigger value="3d">3D 방문자 뷰</TabsTrigger>
                 <TabsTrigger value="analysis">분석</TabsTrigger>
+                <TabsTrigger value="3d-model">3D 매장</TabsTrigger>
+                <TabsTrigger value="3d-scene">3D 방문자 뷰</TabsTrigger>
                 <TabsTrigger value="comparison">비교 분석</TabsTrigger>
               </TabsList>
           
-          <TabsContent value="3d" className="space-y-6">
+          <TabsContent value="analysis" className="space-y-6">
+            <div key={refreshKey}>
+              <FootfallVisualizer visitsData={visitsData} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="3d-model" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>3D 매장 모델</CardTitle>
+                <CardDescription>
+                  업로드한 3D 매장 모델에서 방문자 현황을 확인하세요
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Store3DViewer height="600px" />
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="3d-scene" className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>3D 방문자 현황</CardTitle>
@@ -143,12 +165,6 @@ const FootfallAnalysis = () => {
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
-          
-          <TabsContent value="analysis" className="space-y-6">
-            <div key={refreshKey}>
-              <FootfallVisualizer visitsData={visitsData} />
-            </div>
           </TabsContent>
           
           <TabsContent value="comparison">

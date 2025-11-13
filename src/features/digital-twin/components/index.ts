@@ -1,4 +1,5 @@
 export { SceneComposer } from './SceneComposer';
+export { SceneViewer } from './SceneViewer';
 export { StoreSpace } from './StoreSpace';
 export { FurnitureLayout } from './FurnitureLayout';
 export { ProductPlacement } from './ProductPlacement';
@@ -7,3 +8,4 @@ export { HeatmapOverlay } from './HeatmapOverlay';
 export { ModelUploader } from './ModelUploader';
 export { AutoModelMapper } from './AutoModelMapper';
 export { Model3DPreview } from './Model3DPreview';
+export { Store3DViewer } from './Store3DViewer';

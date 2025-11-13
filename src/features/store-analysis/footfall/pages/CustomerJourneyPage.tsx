@@ -7,11 +7,11 @@ import { AdvancedFilters, FilterState } from "@/components/analysis/AdvancedFilt
 import { ExportButton } from "@/components/analysis/ExportButton";
 import { ComparisonView } from "@/components/analysis/ComparisonView";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { SceneComposer } from "@/features/digital-twin/components";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { SceneComposer, Store3DViewer } from "@/features/digital-twin/components";
 import { generateSceneRecipe } from "@/features/digital-twin/utils/sceneRecipeGenerator";
 import { useAuth } from "@/hooks/useAuth";
 import type { SceneRecipe, AILayoutResult } from "@/types/scene3d";
-import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { loadStoreFile } from "@/utils/storageDataLoader";
