@@ -17,9 +17,28 @@ export function ProductPlacement({ products, onClick }: ProductPlacementProps) {
 }
 
 function ProductItem({ asset, onClick }: { asset: ProductAsset; onClick: () => void }) {
-  // Skip if no valid model URL
+  const dimensions = asset.dimensions || { width: 0.3, height: 0.4, depth: 0.2 };
+  
+  // Render placeholder if no model URL
   if (!asset.model_url) {
-    return null;
+    return (
+      <mesh
+        position={[
+          asset.position.x,
+          asset.position.y + dimensions.height / 2,
+          asset.position.z
+        ]}
+        onClick={onClick}
+        castShadow
+      >
+        <boxGeometry args={[dimensions.width, dimensions.height, dimensions.depth]} />
+        <meshStandardMaterial 
+          color="#3b82f6" 
+          metalness={0.3}
+          roughness={0.7}
+        />
+      </mesh>
+    );
   }
 
   try {
@@ -36,15 +55,22 @@ function ProductItem({ asset, onClick }: { asset: ProductAsset; onClick: () => v
     );
   } catch (error) {
     console.warn('Failed to load product model:', asset.sku, error);
-    // Render fallback cylinder (like a product)
     return (
       <mesh
-        position={[asset.position.x, asset.position.y + 0.25, asset.position.z]}
+        position={[
+          asset.position.x,
+          asset.position.y + dimensions.height / 2,
+          asset.position.z
+        ]}
         onClick={onClick}
         castShadow
       >
-        <cylinderGeometry args={[0.15, 0.15, 0.5, 16]} />
-        <meshStandardMaterial color="#4a90e2" />
+        <boxGeometry args={[dimensions.width, dimensions.height, dimensions.depth]} />
+        <meshStandardMaterial 
+          color="#3b82f6" 
+          metalness={0.3}
+          roughness={0.7}
+        />
       </mesh>
     );
   }
