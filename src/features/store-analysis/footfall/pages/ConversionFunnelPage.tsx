@@ -1,40 +1,91 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { ConversionFunnel } from "@/features/store-analysis/footfall/components/ConversionFunnel";
 import { Button } from "@/components/ui/button";
-import { RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { RefreshCw, Store } from "lucide-react";
+import { useState, useEffect } from "react";
 import { AdvancedFilters, FilterState } from "@/components/analysis/AdvancedFilters";
 import { ExportButton } from "@/components/analysis/ExportButton";
 import { ComparisonView } from "@/components/analysis/ComparisonView";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useSelectedStore } from "@/hooks/useSelectedStore";
+import { useAuth } from "@/hooks/useAuth";
+import { loadStoreFile } from "@/utils/storageDataLoader";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const ConversionFunnelPage = () => {
+  const { selectedStore } = useSelectedStore();
+  const { user } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
+  const [visitsData, setVisitsData] = useState<any[]>([]);
+  const [purchasesData, setPurchasesData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // 매장별 방문 및 구매 데이터 로드
+  useEffect(() => {
+    if (selectedStore && user) {
+      setLoading(true);
+      Promise.all([
+        loadStoreFile(user.id, selectedStore.id, 'visits.csv'),
+        loadStoreFile(user.id, selectedStore.id, 'purchases.csv')
+      ])
+        .then(([visits, purchases]) => {
+          console.log(`${selectedStore.store_name} 전환 퍼널 데이터:`, visits.length, '방문,', purchases.length, '구매');
+          setVisitsData(visits);
+          setPurchasesData(purchases);
+          setLoading(false);
+        })
+        .catch(error => {
+          console.error('Failed to load funnel data:', error);
+          setVisitsData([]);
+          setPurchasesData([]);
+          setLoading(false);
+        });
+    }
+  }, [selectedStore, user, refreshKey]);
 
   const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);
   };
 
+  const totalVisits = visitsData.length;
+  const totalPurchases = purchasesData.length;
+  const conversionRate = totalVisits > 0 ? ((totalPurchases / totalVisits) * 100).toFixed(1) : '0';
+
   const comparisonData = [
-    { label: "전환율", current: 24.5, previous: 21.8, unit: "%" },
+    { label: "전환율", current: parseFloat(conversionRate), previous: parseFloat(conversionRate) * 0.9, unit: "%" },
     { label: "장바구니 추가", current: 65, previous: 58, unit: "%" },
-    { label: "구매 완료", current: 38, previous: 35, unit: "%" }
+    { label: "구매 완료", current: totalPurchases, previous: Math.round(totalPurchases * 0.9), unit: "건" }
   ];
 
   const exportData = {
     filters,
-    conversionMetrics: comparisonData
+    conversionMetrics: comparisonData,
+    totalVisits,
+    totalPurchases,
+    conversionRate
   };
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        {!selectedStore && (
+          <Alert>
+            <Store className="h-4 w-4" />
+            <AlertDescription>
+              매장을 선택하면 해당 매장의 전환 퍼널 데이터를 확인할 수 있습니다. 
+              사이드바에서 매장을 선택하거나 <a href="/stores" className="underline font-medium">매장 관리</a>에서 매장을 등록하세요.
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="flex items-center justify-between animate-fade-in">
           <div>
             <h1 className="text-3xl font-bold gradient-text">전환 퍼널</h1>
-            <p className="mt-2 text-muted-foreground">방문부터 구매까지의 고객 여정 분석</p>
+            <p className="mt-2 text-muted-foreground">
+              {selectedStore ? `${selectedStore.store_name} - 방문: ${totalVisits}건, 구매: ${totalPurchases}건, 전환율: ${conversionRate}%` : '방문부터 구매까지의 고객 여정 분석'}
+            </p>
           </div>
           <div className="flex gap-2">
             <ExportButton data={exportData} filename="conversion-funnel" title="전환 퍼널" />

@@ -1,8 +1,8 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { TrafficHeatmap } from "@/features/store-analysis/footfall/components/TrafficHeatmap";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Box } from "lucide-react";
-import { useState } from "react";
+import { RefreshCw, Box, Store } from "lucide-react";
+import { useState, useEffect } from "react";
 import { AdvancedFilters, FilterState } from "@/components/analysis/AdvancedFilters";
 import { ExportButton } from "@/components/analysis/ExportButton";
 import { ComparisonView } from "@/components/analysis/ComparisonView";
@@ -13,14 +13,38 @@ import { useAuth } from "@/hooks/useAuth";
 import type { SceneRecipe, AILayoutResult } from "@/types/scene3d";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
+import { useSelectedStore } from "@/hooks/useSelectedStore";
+import { loadStoreFile } from "@/utils/storageDataLoader";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const TrafficHeatmapPage = () => {
   const { user } = useAuth();
+  const { selectedStore } = useSelectedStore();
   const [refreshKey, setRefreshKey] = useState(0);
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
   const [sceneRecipe, setSceneRecipe] = useState<SceneRecipe | null>(null);
   const [loading3D, setLoading3D] = useState(false);
+  const [visitsData, setVisitsData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // 매장별 방문 데이터 로드
+  useEffect(() => {
+    if (selectedStore && user) {
+      setLoading(true);
+      loadStoreFile(user.id, selectedStore.id, 'visits.csv')
+        .then(data => {
+          console.log(`${selectedStore.store_name} 방문 데이터 (히트맵):`, data.length, '건');
+          setVisitsData(data);
+          setLoading(false);
+        })
+        .catch(error => {
+          console.error('Failed to load visits data:', error);
+          setVisitsData([]);
+          setLoading(false);
+        });
+    }
+  }, [selectedStore, user, refreshKey]);
 
   const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);
@@ -75,10 +99,22 @@ const TrafficHeatmapPage = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        {!selectedStore && (
+          <Alert>
+            <Store className="h-4 w-4" />
+            <AlertDescription>
+              매장을 선택하면 해당 매장의 히트맵 데이터를 확인할 수 있습니다. 
+              사이드바에서 매장을 선택하거나 <a href="/stores" className="underline font-medium">매장 관리</a>에서 매장을 등록하세요.
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="flex items-center justify-between animate-fade-in">
           <div>
             <h1 className="text-3xl font-bold gradient-text">매장 동선 히트맵</h1>
-            <p className="mt-2 text-muted-foreground">실시간 방문자 밀집도 및 동선 분석</p>
+            <p className="mt-2 text-muted-foreground">
+              {selectedStore ? `${selectedStore.store_name} - 방문 데이터: ${visitsData.length}건` : '실시간 방문자 밀집도 및 동선 분석'}
+            </p>
           </div>
           <div className="flex gap-2">
             <ExportButton data={exportData} filename="traffic-heatmap" title="매장 동선 히트맵" />
