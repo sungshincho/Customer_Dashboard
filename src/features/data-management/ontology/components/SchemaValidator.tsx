@@ -51,7 +51,9 @@ export const SchemaValidator = () => {
       if (error) throw error;
       return (data || []).map(item => ({
         ...item,
-        properties: (item.properties || []) as unknown as PropertyField[]
+        properties: typeof item.properties === 'string' 
+          ? JSON.parse(item.properties) 
+          : (item.properties || [])
       })) as EntityType[];
     },
   });
@@ -66,7 +68,9 @@ export const SchemaValidator = () => {
       if (error) throw error;
       return (data || []).map(item => ({
         ...item,
-        properties: (item.properties || []) as unknown as PropertyField[]
+        properties: typeof item.properties === 'string' 
+          ? JSON.parse(item.properties) 
+          : (item.properties || [])
       })) as RelationType[];
     },
   });
