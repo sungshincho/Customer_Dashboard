@@ -83,56 +83,97 @@ export function DataImportHistory({ storeId }: DataImportHistoryProps) {
       const { data: records, error: fetchError } = await query;
       if (fetchError) throw fetchError;
 
-      // 2. Storage에서 파일 삭제
-      if (records && records.length > 0 && storeId) {
-        const filesToDelete: string[] = [];
+      let deletedCount = 0;
+
+      // 2. Storage에서 store-data 버킷 파일 삭제
+      if (storeId) {
+        const storePath = `${user.id}/${storeId}`;
         
-        for (const record of records) {
-          const filePath = `${user.id}/${storeId}/${record.file_name}`;
-          filesToDelete.push(filePath);
-        }
+        const { data: storeFiles } = await supabase.storage
+          .from('store-data')
+          .list(storePath);
         
-        if (filesToDelete.length > 0) {
-          const { error: storageError } = await supabase.storage
-            .from('store-data')
-            .remove(filesToDelete);
+        if (storeFiles && storeFiles.length > 0) {
+          const filesToDelete = storeFiles
+            .filter(f => f.id) // 폴더 제외
+            .map(f => `${storePath}/${f.name}`);
           
-          if (storageError) {
-            console.warn('일부 Storage 파일 삭제 실패:', storageError);
+          if (filesToDelete.length > 0) {
+            const { error: storageError } = await supabase.storage
+              .from('store-data')
+              .remove(filesToDelete);
+            
+            if (!storageError) {
+              deletedCount += filesToDelete.length;
+            } else {
+              console.warn('store-data 파일 삭제 실패:', storageError);
+            }
           }
         }
         
-        // 3D 모델 Storage도 삭제 시도
-        const modelPath = `${user.id}/${storeId}`;
-        const { data: modelFiles } = await supabase.storage
-          .from('3d-models')
-          .list(modelPath);
+        // 3. Storage에서 3d-models 버킷 파일 삭제 (서브폴더 포함)
+        const modelBasePath = `${user.id}/${storeId}`;
         
-        if (modelFiles && modelFiles.length > 0) {
-          const modelFilesToDelete = modelFiles.map(f => `${modelPath}/${f.name}`);
-          await supabase.storage
+        // 루트 레벨 파일 확인
+        const { data: rootItems } = await supabase.storage
+          .from('3d-models')
+          .list(modelBasePath);
+        
+        const filesToDelete3D: string[] = [];
+        
+        if (rootItems) {
+          // 루트의 .glb/.gltf 파일
+          rootItems
+            .filter(item => item.id && (item.name.endsWith('.glb') || item.name.endsWith('.gltf')))
+            .forEach(item => filesToDelete3D.push(`${modelBasePath}/${item.name}`));
+          
+          // 3d-models 서브폴더 확인
+          const has3DModelsFolder = rootItems.some(item => item.name === '3d-models');
+          if (has3DModelsFolder) {
+            const { data: subFiles } = await supabase.storage
+              .from('3d-models')
+              .list(`${modelBasePath}/3d-models`);
+            
+            if (subFiles) {
+              subFiles
+                .filter(f => f.id)
+                .forEach(f => filesToDelete3D.push(`${modelBasePath}/3d-models/${f.name}`));
+            }
+          }
+        }
+        
+        if (filesToDelete3D.length > 0) {
+          const { error: model3DError } = await supabase.storage
             .from('3d-models')
-            .remove(modelFilesToDelete);
+            .remove(filesToDelete3D);
+          
+          if (!model3DError) {
+            deletedCount += filesToDelete3D.length;
+          } else {
+            console.warn('3d-models 파일 삭제 실패:', model3DError);
+          }
         }
       }
 
-      // 3. DB에서 레코드 삭제
-      let deleteQuery = supabase
-        .from('user_data_imports')
-        .delete();
+      // 4. DB에서 레코드 삭제
+      if (records && records.length > 0) {
+        let deleteQuery = supabase
+          .from('user_data_imports')
+          .delete();
 
-      if (storeId) {
-        deleteQuery = deleteQuery.eq('store_id', storeId);
-      } else {
-        deleteQuery = deleteQuery.eq('user_id', user.id);
+        if (storeId) {
+          deleteQuery = deleteQuery.eq('store_id', storeId);
+        } else {
+          deleteQuery = deleteQuery.eq('user_id', user.id);
+        }
+
+        const { error: dbError } = await deleteQuery;
+        if (dbError) throw dbError;
       }
-
-      const { error: dbError } = await deleteQuery;
-      if (dbError) throw dbError;
 
       toast({
         title: "전체 삭제 완료",
-        description: `${records?.length || 0}개의 데이터와 Storage 파일이 삭제되었습니다`,
+        description: `DB 레코드 ${records?.length || 0}개, Storage 파일 ${deletedCount}개가 삭제되었습니다`,
       });
 
       loadImports();
