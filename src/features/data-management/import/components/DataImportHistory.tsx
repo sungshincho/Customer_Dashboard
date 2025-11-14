@@ -66,16 +66,39 @@ export function DataImportHistory({ storeId }: DataImportHistoryProps) {
 
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // 먼저 레코드 정보 가져오기
+      const { data: record } = await supabase
+        .from('user_data_imports')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      // DB에서 삭제
+      const { error: dbError } = await supabase
         .from('user_data_imports')
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (dbError) throw dbError;
+
+      // Storage에서도 삭제 시도 (storeId가 있는 경우)
+      if (record?.store_id && record?.file_name) {
+        const filePath = `${user.id}/${record.store_id}/${record.file_name}`;
+        const { error: storageError } = await supabase.storage
+          .from('store-data')
+          .remove([filePath]);
+        
+        if (storageError) {
+          console.warn('Storage 파일 삭제 실패:', storageError);
+        }
+      }
 
       toast({
         title: "삭제 완료",
-        description: "데이터가 삭제되었습니다",
+        description: "데이터와 Storage 파일이 삭제되었습니다",
       });
 
       loadImports();
