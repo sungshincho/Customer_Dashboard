@@ -1,5 +1,6 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { DemandForecast } from "@/features/profit-center/demand-inventory/components/DemandForecast";
+import { DataReadinessGuard } from "@/components/DataReadinessGuard";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Database, AlertCircle } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
@@ -84,108 +85,97 @@ const DemandForecastPage = () => {
     insights
   };
 
-  if (!selectedStore) {
-    return (
-      <DashboardLayout>
-        <AlertUI>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            매장을 선택하면 해당 매장의 수요 예측 데이터를 확인할 수 있습니다.
-          </AlertDescription>
-        </AlertUI>
-      </DashboardLayout>
-    );
-  }
-
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between animate-fade-in">
-          <div>
-            <h1 className="text-3xl font-bold gradient-text">수요 예측</h1>
-            <p className="mt-2 text-muted-foreground">
-              {selectedStore.store_name} - AI 기반 방문자 및 매출 예측 분석
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <ExportButton data={exportData} filename="demand-forecast" title="수요 예측" />
-            <Button onClick={handleRefresh} variant="outline" size="sm">
-              <RefreshCw className="w-4 h-4 mr-2" />
-              새로고침
-            </Button>
-          </div>
-        </div>
-
-        {totalVisits > 0 && (
-          <AlertUI className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
-            <AlertCircle className="h-4 w-4 text-blue-600" />
-            <AlertDescription>
-              {selectedStore.store_name} 데이터: {totalVisits}건 방문, {totalPurchases}건 구매, 전환율 {conversionRate}%
-            </AlertDescription>
-          </AlertUI>
-        )}
-        
-        {graphData.nodes.length > 0 && (
-          <AlertUI className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
-            <Database className="h-4 w-4 text-blue-600" />
-            <AlertDescription>
-              온톨로지 데이터 연동됨: {graphData.nodes.length}개 엔티티, {graphData.edges.length}개 관계
-            </AlertDescription>
-          </AlertUI>
-        )}
-        
-        <AdvancedFilters filters={filters} onFiltersChange={setFilters} />
-        
-        <Tabs defaultValue="analysis" className="w-full">
-          <TabsList>
-            <TabsTrigger value="analysis">예측</TabsTrigger>
-            <TabsTrigger value="comparison">비교</TabsTrigger>
-            <TabsTrigger value="insights">AI 인사이트</TabsTrigger>
-            <TabsTrigger value="history">히스토리</TabsTrigger>
-            <TabsTrigger value="alerts">알림 설정</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="analysis" className="space-y-6">
-            <AIAnalysisButton
-              analysisType="demand-forecast"
-              data={comparisonData}
-              title="AI 수요 시뮬레이션 (온톨로지 기반)"
-              onAnalysisComplete={() => setHistoryRefresh(prev => prev + 1)}
-              graphData={graphData}
-            />
-            <div key={refreshKey}>
-              <DemandForecast 
-                visitsData={storeData.visits}
-                purchasesData={storeData.purchases}
-              />
+      <DataReadinessGuard>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between animate-fade-in">
+            <div>
+              <h1 className="text-3xl font-bold gradient-text">수요 예측</h1>
+              <p className="mt-2 text-muted-foreground">
+                {selectedStore?.store_name} - AI 기반 방문자 및 매출 예측 분석
+              </p>
             </div>
-          </TabsContent>
-          
-          <TabsContent value="comparison">
-            <ComparisonView
-              data={comparisonData}
-              comparisonType={comparisonType}
-              onComparisonTypeChange={setComparisonType}
-            />
-          </TabsContent>
-          
-          <TabsContent value="insights">
-            <AIInsights insights={insights} />
-          </TabsContent>
+            <div className="flex gap-2">
+              <ExportButton data={exportData} filename="demand-forecast" title="수요 예측" />
+              <Button onClick={handleRefresh} variant="outline" size="sm">
+                <RefreshCw className="w-4 h-4 mr-2" />
+                새로고침
+              </Button>
+            </div>
+          </div>
 
-          <TabsContent value="history">
-            <AnalysisHistory analysisType="demand-forecast" refreshTrigger={historyRefresh} />
-          </TabsContent>
+          {totalVisits > 0 && (
+            <AlertUI className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+              <AlertCircle className="h-4 w-4 text-blue-600" />
+              <AlertDescription>
+                {selectedStore?.store_name} 데이터: {totalVisits}건 방문, {totalPurchases}건 구매, 전환율 {conversionRate}%
+              </AlertDescription>
+            </AlertUI>
+          )}
           
-          <TabsContent value="alerts">
-            <AlertSettings
-              alerts={alerts}
-              onAlertsChange={setAlerts}
-              availableMetrics={["예상 매출", "예상 방문자", "전환율", "평균 객단가"]}
-            />
-          </TabsContent>
-        </Tabs>
-      </div>
+          {graphData.nodes.length > 0 && (
+            <AlertUI className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+              <Database className="h-4 w-4 text-blue-600" />
+              <AlertDescription>
+                온톨로지 데이터 연동됨: {graphData.nodes.length}개 엔티티, {graphData.edges.length}개 관계
+              </AlertDescription>
+            </AlertUI>
+          )}
+          
+          <AdvancedFilters filters={filters} onFiltersChange={setFilters} />
+          
+          <Tabs defaultValue="analysis" className="w-full">
+            <TabsList>
+              <TabsTrigger value="analysis">예측</TabsTrigger>
+              <TabsTrigger value="comparison">비교</TabsTrigger>
+              <TabsTrigger value="insights">AI 인사이트</TabsTrigger>
+              <TabsTrigger value="history">히스토리</TabsTrigger>
+              <TabsTrigger value="alerts">알림 설정</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="analysis" className="space-y-6">
+              <AIAnalysisButton
+                analysisType="demand-forecast"
+                data={comparisonData}
+                title="AI 수요 시뮬레이션 (온톨로지 기반)"
+                onAnalysisComplete={() => setHistoryRefresh(prev => prev + 1)}
+                graphData={graphData}
+              />
+              <div key={refreshKey}>
+                <DemandForecast 
+                  visitsData={storeData.visits}
+                  purchasesData={storeData.purchases}
+                />
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="comparison">
+              <ComparisonView
+                data={comparisonData}
+                comparisonType={comparisonType}
+                onComparisonTypeChange={setComparisonType}
+              />
+            </TabsContent>
+            
+            <TabsContent value="insights">
+              <AIInsights insights={insights} />
+            </TabsContent>
+
+            <TabsContent value="history">
+              <AnalysisHistory analysisType="demand-forecast" refreshTrigger={historyRefresh} />
+            </TabsContent>
+            
+            <TabsContent value="alerts">
+              <AlertSettings
+                alerts={alerts}
+                onAlertsChange={setAlerts}
+                availableMetrics={["예상 매출", "예상 방문자", "전환율", "평균 객단가"]}
+              />
+            </TabsContent>
+          </Tabs>
+        </div>
+      </DataReadinessGuard>
     </DashboardLayout>
   );
 };
