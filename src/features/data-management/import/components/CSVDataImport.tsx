@@ -4,16 +4,26 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, FileSpreadsheet, Link2, Loader2 } from "lucide-react";
+import { Upload, FileSpreadsheet, Link2, Loader2, Trash2, Download, File } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { detectDataType } from "@/utils/dataNormalizer";
 import * as XLSX from "xlsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface CSVDataImportProps {
   storeId?: string;
+}
+
+interface StorageFile {
+  name: string;
+  path: string;
+  size: number;
+  created_at: string;
+  url: string;
 }
 
 export function CSVDataImport({ storeId }: CSVDataImportProps) {
@@ -21,6 +31,8 @@ export function CSVDataImport({ storeId }: CSVDataImportProps) {
   const [file, setFile] = useState<File | null>(null);
   const [dataType, setDataType] = useState<string>("");
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<StorageFile[]>([]);
+  const [isLoadingFiles, setIsLoadingFiles] = useState(false);
   
   // API 연동
   const [apiUrl, setApiUrl] = useState("");
@@ -28,6 +40,56 @@ export function CSVDataImport({ storeId }: CSVDataImportProps) {
   const [apiHeaders, setApiHeaders] = useState("");
   const [apiBody, setApiBody] = useState("");
   const [isConnecting, setIsConnecting] = useState(false);
+
+  // 스토리지 파일 목록 로드
+  useEffect(() => {
+    if (storeId) {
+      loadStorageFiles();
+    }
+  }, [storeId]);
+
+  const loadStorageFiles = async () => {
+    if (!storeId) return;
+    
+    setIsLoadingFiles(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const folderPath = `${user.id}/${storeId}`;
+      
+      const { data: files, error } = await supabase.storage
+        .from('store-data')
+        .list(folderPath, {
+          sortBy: { column: 'created_at', order: 'desc' }
+        });
+
+      if (error) throw error;
+
+      const filesWithUrls: StorageFile[] = await Promise.all(
+        (files || []).map(async (file) => {
+          const filePath = `${folderPath}/${file.name}`;
+          const { data: { publicUrl } } = supabase.storage
+            .from('store-data')
+            .getPublicUrl(filePath);
+
+          return {
+            name: file.name,
+            path: filePath,
+            size: file.metadata?.size || 0,
+            created_at: file.created_at,
+            url: publicUrl
+          };
+        })
+      );
+
+      setUploadedFiles(filesWithUrls);
+    } catch (error: any) {
+      console.error('Error loading files:', error);
+    } finally {
+      setIsLoadingFiles(false);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -86,21 +148,38 @@ export function CSVDataImport({ storeId }: CSVDataImportProps) {
       return;
     }
 
+    if (!storeId) {
+      toast({
+        title: "매장을 선택하세요",
+        description: "파일을 업로드하려면 먼저 매장을 선택해야 합니다",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsUploading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const parsedData = await parseFile(file);
+      // 스토리지에 파일 업로드
+      const fileName = `${dataType || 'data'}_${Date.now()}_${file.name}`;
+      const filePath = `${user.id}/${storeId}/${fileName}`;
       
-      if (parsedData.length === 0) {
-        throw new Error("파일에 데이터가 없습니다");
-      }
+      const { error: uploadError } = await supabase.storage
+        .from('store-data')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
 
-      // 데이터 타입 자동 감지
+      if (uploadError) throw uploadError;
+
+      // 파싱하여 메타데이터도 저장
+      const parsedData = await parseFile(file);
       const detectedType = dataType || detectDataType(parsedData[0]);
 
-      const { error } = await supabase
+      const { error: dbError } = await supabase
         .from("user_data_imports")
         .insert({
           user_id: user.id,
@@ -112,15 +191,16 @@ export function CSVDataImport({ storeId }: CSVDataImportProps) {
           row_count: parsedData.length,
         });
 
-      if (error) throw error;
+      if (dbError) throw dbError;
 
       toast({
-        title: "업로드 성공",
+        title: "업로드 완료",
         description: `${parsedData.length}개 행이 업로드되었습니다`,
       });
 
       setFile(null);
       setDataType("");
+      loadStorageFiles(); // 파일 목록 새로고침
     } catch (error: any) {
       toast({
         title: "업로드 실패",
@@ -198,6 +278,65 @@ export function CSVDataImport({ storeId }: CSVDataImportProps) {
     } finally {
       setIsConnecting(false);
     }
+  };
+
+  const handleDeleteFile = async (filePath: string, fileName: string) => {
+    if (!confirm(`"${fileName}" 파일을 삭제하시겠습니까?`)) return;
+
+    try {
+      const { error } = await supabase.storage
+        .from('store-data')
+        .remove([filePath]);
+
+      if (error) throw error;
+
+      toast({
+        title: "파일 삭제 완료",
+        description: `${fileName}이 삭제되었습니다`,
+      });
+
+      loadStorageFiles();
+    } catch (error: any) {
+      toast({
+        title: "삭제 실패",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDownloadFile = async (url: string, fileName: string) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(downloadUrl);
+      document.body.removeChild(a);
+      
+      toast({
+        title: "다운로드 시작",
+        description: `${fileName} 다운로드 중...`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "다운로드 실패",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   };
 
   return (
