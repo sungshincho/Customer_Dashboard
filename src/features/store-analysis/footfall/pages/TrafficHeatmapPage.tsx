@@ -24,6 +24,7 @@ const TrafficHeatmapPage = () => {
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
   const [visitsData, setVisitsData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showHeatmap, setShowHeatmap] = useState(true);
 
   // 매장별 방문 데이터 로드
   useEffect(() => {
@@ -107,22 +108,54 @@ const TrafficHeatmapPage = () => {
           <TabsContent value="digital-twin" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>디지털트윈 매장 프리뷰 - 히트맵</CardTitle>
+                <CardTitle>디지털트윈 매장 프리뷰</CardTitle>
                 <CardDescription>
                   방문 밀도를 3D 모델 위에 시각화하여 핫스팟을 확인하세요
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                {/* 토글 컨트롤 */}
+                <div className="flex flex-wrap gap-2 p-4 bg-muted rounded-lg">
+                  <Button
+                    variant={showHeatmap ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setShowHeatmap(!showHeatmap)}
+                  >
+                    {showHeatmap ? "✓" : ""} 히트맵
+                  </Button>
+                  <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>방문 데이터: {visitsData.length}건</span>
+                  </div>
+                </div>
+
+                {/* 단일 3D 뷰 */}
                 <Store3DViewer 
                   height="600px"
                   overlay={
-                    <HeatmapOverlay3D
-                      heatPoints={generateHeatPoints(visitsData)}
-                      gridSize={20}
-                      heightScale={2}
-                    />
+                    <>
+                      {showHeatmap && (
+                        <HeatmapOverlay3D
+                          heatPoints={generateHeatPoints(visitsData)}
+                          gridSize={20}
+                          heightScale={2}
+                        />
+                      )}
+                    </>
                   }
                 />
+
+                {/* 범례 */}
+                {showHeatmap && (
+                  <div className="p-4 bg-muted rounded-lg space-y-2">
+                    <h4 className="font-semibold text-sm">히트맵 색상</h4>
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 rounded" style={{ background: 'linear-gradient(to right, #0000FF, #00FFFF, #00FF00, #FFFF00, #FF0000)' }} />
+                        <span>낮음 → 높음</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
