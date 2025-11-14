@@ -38,13 +38,16 @@ export const ProductPerformance = ({ productsData = [], purchasesData = [] }: Pr
       const revenue = productPurchases.reduce((sum: number, p: any) => 
         sum + (parseFloat(p.unit_price || p.price || 0) * (parseInt(p.quantity) || 1)), 0
       );
-      const stock = parseInt(product.stock_quantity) || Math.floor(Math.random() * 100);
-      const trend = -10 + Math.random() * 30; // -10% ~ +20%
+      const stock = parseInt(product.stock_quantity) || 50;
+      
+      // 트렌드: 최근 판매량 대비 이전 판매량 증감률 (실제 데이터 기반)
+      const avgSales = purchasesData.length > 0 ? sales / Math.max(productsData.length, 1) : 0;
+      const trend = avgSales > 0 ? ((sales - avgSales) / avgSales * 100) : 0;
 
       let status: ProductStat["status"] = "medium";
       if (stock < 10) status = "critical";
       else if (stock < 30) status = "low";
-      else if (sales > 50) status = "high";
+      else if (sales > avgSales * 1.5) status = "high";
 
       return {
         id: product.product_id || product.sku || `prod-${Math.random()}`,
