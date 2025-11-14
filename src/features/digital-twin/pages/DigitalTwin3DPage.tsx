@@ -4,21 +4,37 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { SceneComposer } from "../components";
+import { Store3DViewer } from "../components/Store3DViewer";
+import { WiFiTrackingOverlay } from "../components/overlays/WiFiTrackingOverlay";
 import { generateSceneRecipe } from "../utils/sceneRecipeGenerator";
 import { useAuth } from "@/hooks/useAuth";
+import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { useOntologyEntities, transformToGraphData } from "@/hooks/useOntologyData";
+import { useWiFiTracking } from "@/hooks/useWiFiTracking";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Box, Lightbulb, Layout, Database, Sparkles } from "lucide-react";
+import { Loader2, Box, Lightbulb, Layout, Database, Sparkles, Wifi, MapPin } from "lucide-react";
 import type { SceneRecipe, AILayoutResult } from "@/types/scene3d";
 
 export default function DigitalTwin3DPage() {
   const { user } = useAuth();
+  const { selectedStore } = useSelectedStore();
   const [recipe, setRecipe] = useState<SceneRecipe | null>(null);
   const [loading, setLoading] = useState(false);
   const [analyzingLayout, setAnalyzingLayout] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<{ id: string; type: string } | null>(null);
+  const [wifiMode, setWifiMode] = useState<'realtime' | 'heatmap' | 'paths'>('realtime');
+  
+  // WiFi 트래킹 데이터 로드
+  const { 
+    zones, 
+    trackingData, 
+    loading: wifiLoading, 
+    error: wifiError,
+    refresh: refreshWiFi 
+  } = useWiFiTracking(selectedStore?.id);
 
   // 온톨로지 데이터 로드
   const { data: allEntities = [], isLoading: entitiesLoading } = useOntologyEntities();
@@ -244,24 +260,74 @@ export default function DigitalTwin3DPage() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* 3D Viewport */}
           <Card className="lg:col-span-3 p-0 overflow-hidden">
-            <div className="h-[600px] bg-background">
-              {recipe ? (
-                <SceneComposer recipe={recipe} onAssetClick={handleAssetClick} />
-              ) : (
-                <div className="h-full flex items-center justify-center text-muted-foreground">
-                  <div className="text-center">
-                    <Box className="w-16 h-16 mx-auto mb-4 opacity-20" />
-                    <p>씬 생성 버튼을 클릭하여 3D 모델을 조합하세요</p>
-                  </div>
+            <Tabs value={recipe ? "scene" : "wifi"} className="h-[600px]">
+              <div className="border-b px-4">
+                <TabsList>
+                  <TabsTrigger value="scene" disabled={!recipe}>
+                    <Box className="w-4 h-4 mr-2" />
+                    씬 에디터
+                  </TabsTrigger>
+                  <TabsTrigger value="wifi">
+                    <Wifi className="w-4 h-4 mr-2" />
+                    WiFi 트래킹
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+
+              <TabsContent value="scene" className="h-[calc(100%-3rem)] m-0">
+                <div className="h-full bg-background">
+                  {recipe ? (
+                    <SceneComposer recipe={recipe} onAssetClick={handleAssetClick} />
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-muted-foreground">
+                      <div className="text-center">
+                        <Box className="w-16 h-16 mx-auto mb-4 opacity-20" />
+                        <p>씬 생성 버튼을 클릭하여 3D 모델을 조합하세요</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </TabsContent>
+
+              <TabsContent value="wifi" className="h-[calc(100%-3rem)] m-0">
+                <div className="h-full bg-background">
+                  {!selectedStore ? (
+                    <div className="h-full flex items-center justify-center text-muted-foreground">
+                      <div className="text-center">
+                        <MapPin className="w-16 h-16 mx-auto mb-4 opacity-20" />
+                        <p>먼저 매장을 선택하세요</p>
+                      </div>
+                    </div>
+                  ) : wifiLoading ? (
+                    <div className="h-full flex items-center justify-center">
+                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                    </div>
+                  ) : wifiError ? (
+                    <div className="h-full flex items-center justify-center text-destructive">
+                      <div className="text-center">
+                        <p>WiFi 데이터 로드 실패</p>
+                        <Button onClick={refreshWiFi} className="mt-4" variant="outline">
+                          다시 시도
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Store3DViewer height="100%" overlay={
+                      <WiFiTrackingOverlay 
+                        trackingData={trackingData} 
+                        mode={wifiMode}
+                      />
+                    } />
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
           </Card>
 
           {/* Controls Panel */}
           <Card className="p-6">
             <Tabs defaultValue="lighting">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="lighting">
                   <Lightbulb className="w-4 h-4 mr-2" />
                   조명
@@ -269,6 +335,10 @@ export default function DigitalTwin3DPage() {
                 <TabsTrigger value="layout">
                   <Layout className="w-4 h-4 mr-2" />
                   레이아웃
+                </TabsTrigger>
+                <TabsTrigger value="wifi">
+                  <Wifi className="w-4 h-4 mr-2" />
+                  WiFi
                 </TabsTrigger>
               </TabsList>
 
@@ -316,6 +386,62 @@ export default function DigitalTwin3DPage() {
                   <p className="text-sm text-muted-foreground">
                     3D 뷰에서 오브젝트를 클릭하세요
                   </p>
+                )}
+              </TabsContent>
+
+              <TabsContent value="wifi" className="space-y-4">
+                <div>
+                  <h3 className="font-semibold mb-3">시각화 모드</h3>
+                  <div className="space-y-2">
+                    <Button
+                      variant={wifiMode === 'realtime' ? 'default' : 'outline'}
+                      className="w-full justify-start"
+                      onClick={() => setWifiMode('realtime')}
+                    >
+                      실시간 트래킹
+                    </Button>
+                    <Button
+                      variant={wifiMode === 'heatmap' ? 'default' : 'outline'}
+                      className="w-full justify-start"
+                      onClick={() => setWifiMode('heatmap')}
+                    >
+                      히트맵
+                    </Button>
+                    <Button
+                      variant={wifiMode === 'paths' ? 'default' : 'outline'}
+                      className="w-full justify-start"
+                      onClick={() => setWifiMode('paths')}
+                    >
+                      고객 경로
+                    </Button>
+                  </div>
+                </div>
+
+                {selectedStore && (
+                  <div className="pt-4 border-t">
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">매장:</span>
+                        <Badge variant="outline">{selectedStore.store_name}</Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Zone 수:</span>
+                        <Badge>{zones.length}개</Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">트래킹 데이터:</span>
+                        <Badge>{trackingData.length}개</Badge>
+                      </div>
+                    </div>
+                    <Button 
+                      onClick={refreshWiFi} 
+                      className="w-full mt-4"
+                      variant="outline"
+                      size="sm"
+                    >
+                      새로고침
+                    </Button>
+                  </div>
                 )}
               </TabsContent>
             </Tabs>
