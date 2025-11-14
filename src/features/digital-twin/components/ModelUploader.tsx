@@ -233,6 +233,27 @@ export function ModelUploader() {
 
       const results = await Promise.all(uploadPromises);
       
+      // DB에 임포트 기록 저장
+      const dbInserts = results.map((result, idx) => ({
+        user_id: user.id,
+        store_id: selectedStore.id,
+        file_name: result.name,
+        file_type: '3d-model',
+        data_type: '3d_model',
+        raw_data: { url: result.url },
+        row_count: 1,
+      }));
+      
+      if (dbInserts.length > 0) {
+        const { error: dbError } = await supabase
+          .from('user_data_imports')
+          .insert(dbInserts);
+        
+        if (dbError) {
+          console.error('DB insert error:', dbError);
+        }
+      }
+      
       setUploadedFiles(prev => [...prev, ...results]);
       
       toast({

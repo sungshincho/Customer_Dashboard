@@ -120,6 +120,56 @@ export function WiFiDataUploader() {
       }
 
       await Promise.all(uploadPromises);
+      
+      // DB에 임포트 기록 저장
+      const dbInserts = [];
+      
+      if (rawFile) {
+        dbInserts.push({
+          user_id: user.id,
+          store_id: selectedStore.id,
+          file_name: 'wifi_raw_signals.csv',
+          file_type: 'csv',
+          data_type: 'wifi_raw',
+          raw_data: rawPreview?.rows || [],
+          row_count: rawPreview?.rowCount || 0,
+        });
+      }
+      
+      if (processedFile) {
+        dbInserts.push({
+          user_id: user.id,
+          store_id: selectedStore.id,
+          file_name: 'wifi_tracking.csv',
+          file_type: 'csv',
+          data_type: 'wifi_tracking',
+          raw_data: processedPreview?.rows || [],
+          row_count: processedPreview?.rowCount || 0,
+        });
+      }
+      
+      if (sensorFile) {
+        dbInserts.push({
+          user_id: user.id,
+          store_id: selectedStore.id,
+          file_name: 'wifi_sensors.csv',
+          file_type: 'csv',
+          data_type: 'wifi_sensors',
+          raw_data: sensorPreview?.rows || [],
+          row_count: sensorPreview?.rowCount || 0,
+        });
+      }
+      
+      if (dbInserts.length > 0) {
+        const { error: dbError } = await supabase
+          .from('user_data_imports')
+          .insert(dbInserts);
+        
+        if (dbError) {
+          console.error('DB insert error:', dbError);
+        }
+      }
+      
       toast.success('모든 파일 업로드 완료!');
     } catch (error) {
       console.error('Upload error:', error);

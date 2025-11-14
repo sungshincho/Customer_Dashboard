@@ -184,7 +184,7 @@ export function CSVDataImport({ storeId }: CSVDataImportProps) {
         .insert({
           user_id: user.id,
           store_id: storeId,
-          file_name: file.name,
+          file_name: fileName, // 실제 Storage 파일명 저장
           file_type: file.name.split(".").pop(),
           data_type: detectedType,
           raw_data: parsedData,
