@@ -64,6 +64,87 @@ export function DataImportHistory({ storeId }: DataImportHistoryProps) {
     }
   };
 
+  const handleDeleteAll = async () => {
+    if (!confirm('이 매장의 모든 데이터를 삭제하시겠습니까? (DB 레코드 + Storage 파일)')) return;
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // 1. DB에서 삭제할 레코드 목록 가져오기
+      let query = supabase
+        .from('user_data_imports')
+        .select('*');
+
+      if (storeId) {
+        query = query.eq('store_id', storeId);
+      }
+
+      const { data: records, error: fetchError } = await query;
+      if (fetchError) throw fetchError;
+
+      // 2. Storage에서 파일 삭제
+      if (records && records.length > 0 && storeId) {
+        const filesToDelete: string[] = [];
+        
+        for (const record of records) {
+          const filePath = `${user.id}/${storeId}/${record.file_name}`;
+          filesToDelete.push(filePath);
+        }
+        
+        if (filesToDelete.length > 0) {
+          const { error: storageError } = await supabase.storage
+            .from('store-data')
+            .remove(filesToDelete);
+          
+          if (storageError) {
+            console.warn('일부 Storage 파일 삭제 실패:', storageError);
+          }
+        }
+        
+        // 3D 모델 Storage도 삭제 시도
+        const modelPath = `${user.id}/${storeId}`;
+        const { data: modelFiles } = await supabase.storage
+          .from('3d-models')
+          .list(modelPath);
+        
+        if (modelFiles && modelFiles.length > 0) {
+          const modelFilesToDelete = modelFiles.map(f => `${modelPath}/${f.name}`);
+          await supabase.storage
+            .from('3d-models')
+            .remove(modelFilesToDelete);
+        }
+      }
+
+      // 3. DB에서 레코드 삭제
+      let deleteQuery = supabase
+        .from('user_data_imports')
+        .delete();
+
+      if (storeId) {
+        deleteQuery = deleteQuery.eq('store_id', storeId);
+      } else {
+        deleteQuery = deleteQuery.eq('user_id', user.id);
+      }
+
+      const { error: dbError } = await deleteQuery;
+      if (dbError) throw dbError;
+
+      toast({
+        title: "전체 삭제 완료",
+        description: `${records?.length || 0}개의 데이터와 Storage 파일이 삭제되었습니다`,
+      });
+
+      loadImports();
+    } catch (error: any) {
+      toast({
+        title: "삭제 실패",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleDelete = async (id: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -148,10 +229,24 @@ export function DataImportHistory({ storeId }: DataImportHistoryProps) {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>데이터 임포트 히스토리</CardTitle>
-          <CardDescription>
-            업로드된 모든 데이터의 기록을 확인하고 관리하세요
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>데이터 임포트 히스토리</CardTitle>
+              <CardDescription>
+                업로드된 모든 데이터의 기록을 확인하고 관리하세요
+              </CardDescription>
+            </div>
+            {imports.length > 0 && (
+              <Button 
+                variant="destructive" 
+                size="sm"
+                onClick={handleDeleteAll}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                전체 삭제
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
