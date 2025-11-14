@@ -20,7 +20,8 @@ import {
   LucideIcon,
   Cpu,
   Cloud,
-  Box
+  Box,
+  Boxes
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { NavLink } from "@/components/NavLink";
@@ -128,6 +129,7 @@ const menuSections: MenuSection[] = [
     textColor: "text-blue-600",
     activeGradient: "bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-medium shadow-md",
     items: [
+      { title: "디지털 트윈 3D", url: "/digital-twin-3d", icon: Boxes },
       { title: "3D 데이터 설정", url: "/setup-3d-data", icon: Box },
       { title: "NeuralSense IoT", url: "/neuralsense-settings", icon: Cpu },
       { title: "빅데이터 API", url: "/bigdata-api", icon: Cloud },
