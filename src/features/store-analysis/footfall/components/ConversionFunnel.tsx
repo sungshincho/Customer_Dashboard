@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TrendingUp, TrendingDown, Users, ShoppingCart, DollarSign } from "lucide-react";
 import { useState, useMemo } from "react";
-import { EnhancedChart } from "@/components/analysis/EnhancedChart";
+import { EnhancedChart } from "@/features/data-management/analysis/components/EnhancedChart";
 
 interface ConversionFunnelProps {
   visitsData?: any[];

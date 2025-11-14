@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { detectDataType } from "@/utils/dataNormalizer";
 import * as XLSX from "xlsx";
-import { SchemaMapper } from "@/components/etl/SchemaMapper";
+import { SchemaMapper } from "@/features/data-management/import/components/SchemaMapper";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast as sonnerToast } from "sonner";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
