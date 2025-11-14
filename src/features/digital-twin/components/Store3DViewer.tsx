@@ -15,8 +15,16 @@ interface Store3DViewerProps {
 }
 
 function Model({ url }: { url: string }) {
-  const { scene } = useGLTF(url);
-  return <primitive object={scene} />;
+  console.log('🎨 Model 컴포넌트 렌더링, URL:', url);
+  
+  try {
+    const { scene } = useGLTF(url);
+    console.log('✅ GLB 모델 로드 성공:', scene);
+    return <primitive object={scene} />;
+  } catch (error) {
+    console.error('❌ GLB 모델 로드 실패:', error);
+    throw error;
+  }
 }
 
 export function Store3DViewer({ height = "500px", showControls = true, overlay }: Store3DViewerProps) {
@@ -40,12 +48,19 @@ export function Store3DViewer({ height = "500px", showControls = true, overlay }
     setError(null);
 
     try {
+      console.log('🔍 3D 모델 로드 시작:', { userId: user.id, storeId: selectedStore.id });
+      
       // List all files in the store's 3d-models folder
       const { data: files, error: listError } = await supabase.storage
         .from('3d-models')
         .list(`${user.id}/${selectedStore.id}/3d-models`);
 
-      if (listError) throw listError;
+      console.log('📂 스토리지 파일 목록:', files, listError);
+
+      if (listError) {
+        console.error('❌ 파일 목록 조회 에러:', listError);
+        throw listError;
+      }
 
       // Find the first GLB or GLTF file
       const modelFile = files?.find(file => 
@@ -53,7 +68,10 @@ export function Store3DViewer({ height = "500px", showControls = true, overlay }
         file.name.toLowerCase().endsWith('.gltf')
       );
 
+      console.log('🎯 찾은 모델 파일:', modelFile);
+
       if (!modelFile) {
+        console.warn('⚠️ 3D 모델 파일을 찾을 수 없습니다');
         setError('이 매장에 업로드된 3D 모델이 없습니다');
         setLoading(false);
         return;
@@ -64,9 +82,11 @@ export function Store3DViewer({ height = "500px", showControls = true, overlay }
         .from('3d-models')
         .getPublicUrl(`${user.id}/${selectedStore.id}/3d-models/${modelFile.name}`);
 
+      console.log('🌐 모델 공개 URL:', publicUrl);
+
       setModelUrl(publicUrl);
     } catch (err) {
-      console.error('Error loading 3D model:', err);
+      console.error('❌ 3D 모델 로드 중 오류:', err);
       setError('3D 모델 로드 중 오류가 발생했습니다');
     } finally {
       setLoading(false);
@@ -119,15 +139,21 @@ export function Store3DViewer({ height = "500px", showControls = true, overlay }
       <Canvas
         camera={{ position: [10, 10, 10], fov: 50 }}
         style={{ background: '#f8f9fa' }}
+        onCreated={() => console.log('✅ Canvas 생성 완료')}
       >
-        <Suspense fallback={null}>
+        <Suspense fallback={
+          <mesh>
+            <boxGeometry args={[1, 1, 1]} />
+            <meshStandardMaterial color="#1B6BFF" wireframe />
+          </mesh>
+        }>
           {/* Lighting */}
           <ambientLight intensity={0.5} />
           <directionalLight position={[10, 10, 5]} intensity={1} castShadow />
           <pointLight position={[-10, -10, -5]} intensity={0.5} />
 
           {/* 3D Model */}
-          <Model url={modelUrl} />
+          {modelUrl && <Model url={modelUrl} />}
 
           {/* Overlay */}
           {overlay}
