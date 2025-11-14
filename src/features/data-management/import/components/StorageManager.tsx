@@ -46,15 +46,19 @@ export function StorageManager({ storeId }: StorageManagerProps) {
       const allFiles: StorageFile[] = [];
       
       // store-data 버킷 - CSV, Excel 등
-      const { data: dataFiles } = await supabase.storage
+      const { data: dataFiles, error: dataError } = await supabase.storage
         .from('store-data')
         .list(basePath, {
           sortBy: { column: 'created_at', order: 'desc' }
         });
 
+      if (dataError) {
+        console.error('Error loading store-data:', dataError);
+      }
+
       if (dataFiles) {
         for (const file of dataFiles) {
-          if (!file.id) continue; // 폴더 제외
+          if (!file.id) continue;
           
           const filePath = `${basePath}/${file.name}`;
           const { data: { publicUrl } } = supabase.storage
@@ -72,7 +76,7 @@ export function StorageManager({ storeId }: StorageManagerProps) {
         }
       }
 
-      // 3d-models 버킷 - 3d-models 서브폴더 우선 조회
+      // 3d-models 버킷 - 3d-models 서브폴더 조회
       const modelSubPath = `${basePath}/3d-models`;
       const { data: modelSubFiles, error: subError } = await supabase.storage
         .from('3d-models')
@@ -80,7 +84,11 @@ export function StorageManager({ storeId }: StorageManagerProps) {
           sortBy: { column: 'created_at', order: 'desc' }
         });
 
-      if (modelSubFiles && !subError) {
+      if (subError) {
+        console.error('Error loading 3d-models subfolder:', subError);
+      }
+
+      if (modelSubFiles) {
         for (const file of modelSubFiles) {
           if (!file.id) continue;
           
@@ -100,12 +108,16 @@ export function StorageManager({ storeId }: StorageManagerProps) {
         }
       }
       
-      // 루트 레벨의 3D 파일들도 조회 (이전 방식 호환)
-      const { data: modelRootFiles } = await supabase.storage
+      // 루트 레벨의 3D 파일들도 조회
+      const { data: modelRootFiles, error: rootError } = await supabase.storage
         .from('3d-models')
         .list(basePath, {
           sortBy: { column: 'created_at', order: 'desc' }
         });
+
+      if (rootError) {
+        console.error('Error loading 3d-models root:', rootError);
+      }
 
       if (modelRootFiles) {
         for (const file of modelRootFiles) {
@@ -128,9 +140,9 @@ export function StorageManager({ storeId }: StorageManagerProps) {
       }
 
       setFiles(allFiles);
-      console.log('Loaded files:', allFiles.length, allFiles);
+      console.log('✅ StorageManager loaded files:', allFiles.length, allFiles);
     } catch (error: any) {
-      console.error('Error loading files:', error);
+      console.error('❌ StorageManager error:', error);
       toast({
         title: "파일 로드 실패",
         description: error.message,
