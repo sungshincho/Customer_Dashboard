@@ -1,0 +1,5 @@
+sensor_id,x,y,z,coverage_radius
+sensor_01,0,2.5,0,10
+sensor_02,10,2.5,0,10
+sensor_03,10,2.5,10,10
+sensor_04,0,2.5,10,10
