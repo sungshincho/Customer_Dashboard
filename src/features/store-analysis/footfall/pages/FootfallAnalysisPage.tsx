@@ -27,6 +27,9 @@ const FootfallAnalysis = () => {
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
   const [visitsData, setVisitsData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showRealtimeIoT, setShowRealtimeIoT] = useState(false);
+  const [showAvatars, setShowAvatars] = useState(true);
+  const [showPaths, setShowPaths] = useState(false);
   
   const { sceneRecipe, loading: sceneLoading, generateScene } = useStoreScene();
   const { latestAnalysis, analyzing } = useAutoAnalysis('visitor', true);
@@ -119,112 +122,105 @@ const FootfallAnalysis = () => {
           </TabsContent>
 
           <TabsContent value="digital-twin" className="space-y-6">
-            <div className="grid gap-6">
-              {/* 실시간 IoT 트래킹 */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>실시간 IoT 트래킹</CardTitle>
-                  <CardDescription>
-                    IoT 센서 데이터를 실시간으로 수신하여 고객 위치를 3D로 표시합니다.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {selectedStore && (
-                    <Store3DViewer 
-                      height="600px"
-                      overlay={
-                        <RealtimeCustomerOverlay
-                          storeId={selectedStore.id}
-                          maxInstances={200}
-                          showDebugInfo
-                        />
-                      }
-                    />
-                  )}
-                </CardContent>
-              </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>디지털트윈 매장 프리뷰</CardTitle>
+                <CardDescription>
+                  3D 매장 모델에서 실시간 고객 데이터를 시각화합니다
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* 토글 컨트롤 */}
+                <div className="flex flex-wrap gap-2 p-4 bg-muted rounded-lg">
+                  <Button
+                    variant={showRealtimeIoT ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setShowRealtimeIoT(!showRealtimeIoT)}
+                  >
+                    {showRealtimeIoT ? "✓" : ""} 실시간 IoT
+                  </Button>
+                  <Button
+                    variant={showAvatars ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setShowAvatars(!showAvatars)}
+                  >
+                    {showAvatars ? "✓" : ""} 고객 아바타
+                  </Button>
+                  <Button
+                    variant={showPaths ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setShowPaths(!showPaths)}
+                  >
+                    {showPaths ? "✓" : ""} 동선
+                  </Button>
+                  <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>방문 데이터: {visitsData.length}건</span>
+                  </div>
+                </div>
 
-              {/* 고객 아바타 (Instanced Rendering) */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>고객 아바타 (Instanced Rendering)</CardTitle>
-                  <CardDescription>
-                    {visitsData.length}명의 고객을 단일 draw call로 효율적으로 렌더링합니다.
-                    파란색: 탐색 중 | 초록색: 구매 중 | 회색: 퇴장 중
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
+                {/* 단일 3D 뷰 */}
+                {selectedStore && (
                   <Store3DViewer 
                     height="600px"
                     overlay={
-                      <CustomerAvatarOverlay
-                        customers={generateCustomerAvatars(visitsData, 100)}
-                        maxInstances={150}
-                        animationSpeed={1.5}
-                        showTrails={false}
-                      />
-                    }
-                  />
-                </CardContent>
-              </Card>
-
-              {/* 고객 동선 */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>고객 동선</CardTitle>
-                  <CardDescription>
-                    실시간 고객 이동 경로를 3D 모델에서 확인하세요
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Store3DViewer 
-                    height="600px"
-                    overlay={
-                      <CustomerPathOverlay
-                        paths={generateCustomerPaths(visitsData)}
-                        animate
-                        color="#1B6BFF"
-                      />
-                    }
-                  />
-                </CardContent>
-              </Card>
-
-              {/* 3D 방문자 현황 (Scene Viewer) */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>방문자 현황 (Scene Viewer)</CardTitle>
-                  <CardDescription>
-                    실시간 방문자 위치를 3D 디지털 트윈에서 확인하세요
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {!sceneRecipe ? (
-                    <div className="text-center py-12">
-                      <p className="text-muted-foreground mb-4">
-                        3D 매장을 생성하여 방문자 현황을 시각화하세요
-                      </p>
-                      <Button onClick={generateScene} disabled={sceneLoading}>
-                        {sceneLoading ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            생성 중...
-                          </>
-                        ) : (
-                          "3D 매장 생성"
+                      <>
+                        {showRealtimeIoT && (
+                          <RealtimeCustomerOverlay
+                            storeId={selectedStore.id}
+                            maxInstances={200}
+                            showDebugInfo={false}
+                          />
                         )}
-                      </Button>
-                    </div>
-                  ) : (
-                    <SceneViewer
-                      recipe={sceneRecipe}
-                      overlay="visitor"
-                      overlayData={latestAnalysis?.sceneData}
-                    />
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                        {showAvatars && (
+                          <CustomerAvatarOverlay
+                            customers={generateCustomerAvatars(visitsData, 100)}
+                            maxInstances={150}
+                            animationSpeed={1.5}
+                            showTrails={false}
+                          />
+                        )}
+                        {showPaths && (
+                          <CustomerPathOverlay
+                            paths={generateCustomerPaths(visitsData)}
+                            animate
+                            color="#1B6BFF"
+                          />
+                        )}
+                      </>
+                    }
+                  />
+                )}
+
+                {/* 범례 */}
+                <div className="p-4 bg-muted rounded-lg space-y-2">
+                  <h4 className="font-semibold text-sm">범례</h4>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                    {showAvatars && (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#1B6BFF' }} />
+                          <span>탐색 중</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#10B981' }} />
+                          <span>구매 중</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#6B7280' }} />
+                          <span>퇴장 중</span>
+                        </div>
+                      </>
+                    )}
+                    {showPaths && (
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-0.5" style={{ backgroundColor: '#1B6BFF' }} />
+                        <span>고객 동선</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
           
           <TabsContent value="comparison">
