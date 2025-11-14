@@ -12,6 +12,7 @@ import { Upload, Loader2, CheckCircle, Copy, ExternalLink, Sparkles, Eye, AlertC
 import { AutoModelMapper } from './AutoModelMapper';
 import { Model3DPreview } from './Model3DPreview';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { parseModelFilename, isMovableEntityType, suggestDefaultPosition, logParseResult } from '../utils/modelFilenameParser';
 
 interface UploadedFile {
   name: string;
@@ -48,6 +49,92 @@ export function ModelUploader() {
       title: "복사 완료",
       description: "URL이 클립보드에 복사되었습니다",
     });
+  };
+
+  const autoMapFromFilename = async (
+    file: UploadedFile, 
+    parsed: ReturnType<typeof parseModelFilename>
+  ) => {
+    if (!user || !selectedStore) return;
+
+    try {
+      // 1. 엔티티 타입 찾기 또는 생성
+      const { data: existingTypes, error: typeError } = await supabase
+        .from('ontology_entity_types')
+        .select('*')
+        .eq('user_id', user.id)
+        .ilike('label', parsed.entityType);
+
+      if (typeError) throw typeError;
+
+      let entityTypeId: string;
+
+      if (existingTypes && existingTypes.length > 0) {
+        // 기존 엔티티 타입 사용
+        entityTypeId = existingTypes[0].id;
+        
+        // 3D 모델 URL과 치수 업데이트
+        await supabase
+          .from('ontology_entity_types')
+          .update({
+            model_3d_url: file.url,
+            model_3d_dimensions: parsed.dimensions,
+            model_3d_type: isMovableEntityType(parsed.entityType) ? 'movable' : 'fixed'
+          })
+          .eq('id', entityTypeId);
+      } else {
+        // 새 엔티티 타입 생성
+        const { data: newType, error: createError } = await supabase
+          .from('ontology_entity_types')
+          .insert([{
+            label: parsed.entityType,
+            name: parsed.entityType,
+            description: `${parsed.entityType} (자동 생성)`,
+            user_id: user.id,
+            model_3d_url: file.url,
+            model_3d_dimensions: parsed.dimensions,
+            model_3d_type: isMovableEntityType(parsed.entityType) ? 'movable' : 'fixed',
+            properties: {}
+          } as any])
+          .select()
+          .single();
+
+        if (createError) throw createError;
+        if (!newType) throw new Error('엔티티 타입 생성 실패');
+        entityTypeId = newType.id;
+      }
+
+      // 2. 엔티티 인스턴스 생성
+      const position = suggestDefaultPosition(parsed.entityType, parsed.dimensions);
+      
+      const { error: entityError } = await supabase
+        .from('graph_entities')
+        .insert([{
+          entity_type_id: entityTypeId,
+          label: `${parsed.identifier}`,
+          properties: {
+            store_id: selectedStore.id,
+            store_name: selectedStore.store_name,
+            auto_mapped: true,
+            source_filename: parsed.originalFilename
+          },
+          user_id: user.id,
+          model_3d_position: position,
+          model_3d_rotation: { x: 0, y: 0, z: 0 },
+          model_3d_scale: { x: 1, y: 1, z: 1 }
+        } as any]);
+
+      if (entityError) throw entityError;
+
+      console.log(`✅ 자동 매핑 완료: ${parsed.originalFilename} → ${parsed.entityType}`);
+    } catch (err) {
+      console.error('Auto mapping error:', err);
+      toast({
+        title: "자동 매핑 실패",
+        description: "파일명 기반 자동 매핑에 실패했습니다. AI 분석을 시도하세요.",
+        variant: "destructive",
+      });
+    }
   };
 
   const analyzeModel = async (file: UploadedFile) => {
@@ -153,9 +240,27 @@ export function ModelUploader() {
         description: `${results.length}개의 3D 모델이 업로드되었습니다.`,
       });
 
-      // Auto-analyze the first uploaded file
-      if (results.length > 0) {
-        await analyzeModel(results[0]);
+      // 파일명 기반 자동 매핑 시도
+      for (const result of results) {
+        const parsed = parseModelFilename(result.name);
+        logParseResult(parsed);
+        
+        if (parsed.isValid) {
+          // 파일명 파싱 성공 → 자동으로 온톨로지에 저장
+          await autoMapFromFilename(result, parsed);
+        } else {
+          // 파일명 파싱 실패 → AI 분석 진행
+          if (results.length === 1) {
+            await analyzeModel(result);
+          }
+        }
+      }
+      
+      if (results.length > 1) {
+        toast({
+          title: "자동 매핑 완료",
+          description: "파일명 규칙에 따라 온톨로지에 자동으로 연결되었습니다",
+        });
       }
     } catch (err) {
       console.error('업로드 실패:', err);
