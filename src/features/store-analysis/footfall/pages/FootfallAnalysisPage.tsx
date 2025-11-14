@@ -108,10 +108,7 @@ const FootfallAnalysis = () => {
             <Tabs defaultValue="analysis" className="w-full">
               <TabsList>
                 <TabsTrigger value="analysis">분석</TabsTrigger>
-                <TabsTrigger value="3d-realtime">실시간 IoT</TabsTrigger>
-                <TabsTrigger value="3d-avatars">3D 고객 아바타</TabsTrigger>
-                <TabsTrigger value="3d-model">3D 동선</TabsTrigger>
-                <TabsTrigger value="3d-scene">3D 방문자 뷰</TabsTrigger>
+                <TabsTrigger value="digital-twin">디지털트윈 매장 프리뷰</TabsTrigger>
                 <TabsTrigger value="comparison">비교 분석</TabsTrigger>
               </TabsList>
           
@@ -121,133 +118,113 @@ const FootfallAnalysis = () => {
             </div>
           </TabsContent>
 
-          <TabsContent value="3d-realtime" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>실시간 IoT 트래킹 (Supabase Realtime)</CardTitle>
-                <CardDescription>
-                  IoT 센서 데이터를 실시간으로 수신하여 고객 위치를 3D로 표시합니다.
-                  다른 사용자와 동기화되어 동일한 데이터를 볼 수 있습니다.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {selectedStore && (
+          <TabsContent value="digital-twin" className="space-y-6">
+            <div className="grid gap-6">
+              {/* 실시간 IoT 트래킹 */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>실시간 IoT 트래킹</CardTitle>
+                  <CardDescription>
+                    IoT 센서 데이터를 실시간으로 수신하여 고객 위치를 3D로 표시합니다.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {selectedStore && (
+                    <Store3DViewer 
+                      height="600px"
+                      overlay={
+                        <RealtimeCustomerOverlay
+                          storeId={selectedStore.id}
+                          maxInstances={200}
+                          showDebugInfo
+                        />
+                      }
+                    />
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* 고객 아바타 (Instanced Rendering) */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>고객 아바타 (Instanced Rendering)</CardTitle>
+                  <CardDescription>
+                    {visitsData.length}명의 고객을 단일 draw call로 효율적으로 렌더링합니다.
+                    파란색: 탐색 중 | 초록색: 구매 중 | 회색: 퇴장 중
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
                   <Store3DViewer 
                     height="600px"
                     overlay={
-                      <RealtimeCustomerOverlay
-                        storeId={selectedStore.id}
-                        maxInstances={200}
-                        showDebugInfo
+                      <CustomerAvatarOverlay
+                        customers={generateCustomerAvatars(visitsData, 100)}
+                        maxInstances={150}
+                        animationSpeed={1.5}
+                        showTrails={false}
                       />
                     }
                   />
-                )}
-                <div className="mt-4 p-4 bg-muted rounded-lg space-y-3">
-                  <h4 className="font-semibold">실시간 IoT 연동 방법</h4>
-                  <div className="text-sm space-y-2 text-muted-foreground">
-                    <p><strong>1. 센서 설정:</strong> iot_sensors 테이블에 WiFi/Bluetooth 센서 위치 등록</p>
-                    <p><strong>2. 트래킹 데이터 전송:</strong> IoT 디바이스에서 Supabase Broadcast로 위치 데이터 전송</p>
-                    <p><strong>3. 자동 위치 추정:</strong> 삼각측량(Trilateration)으로 고객 위치 계산</p>
-                    <p><strong>4. 칼만 필터:</strong> 노이즈 제거 및 부드러운 이동 처리</p>
-                    <p><strong>5. Presence 공유:</strong> 모든 클라이언트가 실시간으로 동일한 고객 위치 확인</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+                </CardContent>
+              </Card>
 
-          <TabsContent value="3d-avatars" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>3D 고객 아바타 (Instanced Rendering)</CardTitle>
-                <CardDescription>
-                  {visitsData.length}명의 고객을 단일 draw call로 효율적으로 렌더링합니다.
-                  파란색: 탐색 중 | 초록색: 구매 중 | 회색: 퇴장 중
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Store3DViewer 
-                  height="600px"
-                  overlay={
-                    <CustomerAvatarOverlay
-                      customers={generateCustomerAvatars(visitsData, 100)}
-                      maxInstances={150}
-                      animationSpeed={1.5}
-                      showTrails={false}
-                    />
-                  }
-                />
-                <div className="mt-4 p-4 bg-muted rounded-lg">
-                  <h4 className="font-semibold mb-2">성능 최적화 정보</h4>
-                  <ul className="text-sm space-y-1 text-muted-foreground">
-                    <li>✅ Instanced Rendering: 단일 draw call로 {Math.min(visitsData.length, 100)}개 아바타 렌더링</li>
-                    <li>✅ Frustum Culling: 화면 밖 오브젝트 자동 제외</li>
-                    <li>✅ useMemo 캐싱: Geometry 및 Material 재사용</li>
-                    <li>✅ 부드러운 애니메이션: useFrame 기반 효율적 업데이트</li>
-                  </ul>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="3d-model" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>3D 매장 - 고객 동선</CardTitle>
-                <CardDescription>
-                  실시간 고객 이동 경로를 3D 모델에서 확인하세요
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Store3DViewer 
-                  height="600px"
-                  overlay={
-                    <CustomerPathOverlay
-                      paths={generateCustomerPaths(visitsData)}
-                      animate
-                      color="#1B6BFF"
-                    />
-                  }
-                />
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="3d-scene" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>3D 방문자 현황</CardTitle>
-                <CardDescription>
-                  실시간 방문자 위치를 3D 디지털 트윈에서 확인하세요
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {!sceneRecipe ? (
-                  <div className="text-center py-12">
-                    <p className="text-muted-foreground mb-4">
-                      3D 매장을 생성하여 방문자 현황을 시각화하세요
-                    </p>
-                    <Button onClick={generateScene} disabled={sceneLoading}>
-                      {sceneLoading ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          생성 중...
-                        </>
-                      ) : (
-                        "3D 매장 생성"
-                      )}
-                    </Button>
-                  </div>
-                ) : (
-                  <SceneViewer
-                    recipe={sceneRecipe}
-                    overlay="visitor"
-                    overlayData={latestAnalysis?.sceneData}
+              {/* 고객 동선 */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>고객 동선</CardTitle>
+                  <CardDescription>
+                    실시간 고객 이동 경로를 3D 모델에서 확인하세요
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Store3DViewer 
+                    height="600px"
+                    overlay={
+                      <CustomerPathOverlay
+                        paths={generateCustomerPaths(visitsData)}
+                        animate
+                        color="#1B6BFF"
+                      />
+                    }
                   />
-                )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+
+              {/* 3D 방문자 현황 (Scene Viewer) */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>방문자 현황 (Scene Viewer)</CardTitle>
+                  <CardDescription>
+                    실시간 방문자 위치를 3D 디지털 트윈에서 확인하세요
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {!sceneRecipe ? (
+                    <div className="text-center py-12">
+                      <p className="text-muted-foreground mb-4">
+                        3D 매장을 생성하여 방문자 현황을 시각화하세요
+                      </p>
+                      <Button onClick={generateScene} disabled={sceneLoading}>
+                        {sceneLoading ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            생성 중...
+                          </>
+                        ) : (
+                          "3D 매장 생성"
+                        )}
+                      </Button>
+                    </div>
+                  ) : (
+                    <SceneViewer
+                      recipe={sceneRecipe}
+                      overlay="visitor"
+                      overlayData={latestAnalysis?.sceneData}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
           
           <TabsContent value="comparison">

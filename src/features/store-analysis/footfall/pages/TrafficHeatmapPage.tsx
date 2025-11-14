@@ -94,7 +94,7 @@ const TrafficHeatmapPage = () => {
             <Tabs defaultValue="analysis" className="w-full">
               <TabsList>
                 <TabsTrigger value="analysis">히트맵 분석</TabsTrigger>
-                <TabsTrigger value="3d-model">3D 매장</TabsTrigger>
+                <TabsTrigger value="digital-twin">디지털트윈 매장 프리뷰</TabsTrigger>
                 <TabsTrigger value="comparison">비교 분석</TabsTrigger>
               </TabsList>
           
@@ -104,10 +104,10 @@ const TrafficHeatmapPage = () => {
             </div>
           </TabsContent>
 
-          <TabsContent value="3d-model" className="space-y-6">
+          <TabsContent value="digital-twin" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>3D 매장 - 히트맵 오버레이</CardTitle>
+                <CardTitle>디지털트윈 매장 프리뷰 - 히트맵</CardTitle>
                 <CardDescription>
                   방문 밀도를 3D 모델 위에 시각화하여 핫스팟을 확인하세요
                 </CardDescription>
