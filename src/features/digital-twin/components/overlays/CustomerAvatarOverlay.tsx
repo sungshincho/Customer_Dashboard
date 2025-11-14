@@ -1,5 +1,6 @@
-import { useRef, useMemo, useEffect } from 'react';
+import { useRef, useMemo, useEffect, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
+import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import type { CustomerAvatar, CustomerAvatarOverlayProps, AvatarColors } from '../../types/avatar.types';
 
@@ -30,6 +31,7 @@ export function CustomerAvatarOverlay({
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const trailsRef = useRef<Map<string, THREE.Vector3[]>>(new Map());
   const timeRef = useRef(0);
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerAvatar | null>(null);
 
   // Geometry와 Material을 useMemo로 캐싱 (재생성 방지)
   const geometry = useMemo(() => {
@@ -175,13 +177,26 @@ export function CustomerAvatarOverlay({
       {/* 상태별 보조 표시 */}
       {customers.slice(0, Math.min(customers.length, maxInstances)).map((customer, i) => (
         <group key={customer.id} position={[customer.position.x, 0.01, customer.position.z]}>
-          {/* 바닥 원형 인디케이터 */}
-          <mesh rotation={[-Math.PI / 2, 0, 0]}>
+          {/* 바닥 원형 인디케이터 - 클릭 가능 */}
+          <mesh 
+            rotation={[-Math.PI / 2, 0, 0]}
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedCustomer(customer);
+            }}
+            onPointerOver={(e) => {
+              e.stopPropagation();
+              document.body.style.cursor = 'pointer';
+            }}
+            onPointerOut={() => {
+              document.body.style.cursor = 'default';
+            }}
+          >
             <ringGeometry args={[0.4, 0.5, 16]} />
             <meshBasicMaterial
               color={AVATAR_COLORS[customer.status]}
               transparent
-              opacity={0.3}
+              opacity={selectedCustomer?.id === customer.id ? 0.8 : 0.3}
               side={THREE.DoubleSide}
             />
           </mesh>
@@ -196,6 +211,61 @@ export function CustomerAvatarOverlay({
                 opacity={0.6 + Math.sin(timeRef.current * 3) * 0.2}
               />
             </mesh>
+          )}
+
+          {/* 고객 정보 표시 */}
+          {selectedCustomer?.id === customer.id && (
+            <Html position={[0, 3, 0]} center>
+              <div className="bg-background/95 backdrop-blur-sm border border-border rounded-lg p-3 shadow-lg min-w-[200px]">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-semibold text-sm">고객 정보</h4>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedCustomer(null);
+                    }}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="space-y-1 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">ID:</span>
+                    <span className="font-mono">{customer.id.slice(0, 8)}...</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">상태:</span>
+                    <span className="font-semibold" style={{ color: AVATAR_COLORS[customer.status] }}>
+                      {customer.status === 'browsing' ? '탐색 중' : 
+                       customer.status === 'purchasing' ? '구매 중' : '퇴장 중'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">위치:</span>
+                    <span className="font-mono text-xs">
+                      ({customer.position.x.toFixed(1)}, {customer.position.z.toFixed(1)})
+                    </span>
+                  </div>
+                  {customer.velocity && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">속도:</span>
+                      <span className="font-mono text-xs">
+                        {Math.sqrt(customer.velocity.x ** 2 + customer.velocity.z ** 2).toFixed(2)} m/s
+                      </span>
+                    </div>
+                  )}
+                  {customer.timestamp && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">시간:</span>
+                      <span className="text-xs">
+                        {new Date(customer.timestamp).toLocaleTimeString()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Html>
           )}
         </group>
       ))}
