@@ -1,20 +1,122 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Wifi, Database, Cpu, AlertCircle } from "lucide-react";
+import { Wifi, Database, Cpu, AlertCircle, File, Trash2, Download, Loader2 } from "lucide-react";
 import { WiFiDataUploader } from "@/features/data-management/neuralsense/components/WiFiDataUploader";
 import { DeviceList, DeviceRegistrationForm } from "@/features/data-management/neuralsense/components";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface WiFiDataManagementProps {
   storeId?: string;
 }
 
+interface StorageFile {
+  name: string;
+  path: string;
+  size: number;
+  created_at: string;
+  url: string;
+}
+
 export function WiFiDataManagement({ storeId }: WiFiDataManagementProps) {
+  const { toast } = useToast();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [uploadedFiles, setUploadedFiles] = useState<StorageFile[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleRegistrationSuccess = () => {
     setRefreshTrigger((prev) => prev + 1);
+  };
+
+  useEffect(() => {
+    if (storeId) {
+      loadWiFiFiles();
+    }
+  }, [storeId]);
+
+  const loadWiFiFiles = async () => {
+    if (!storeId) return;
+    
+    setIsLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const folderPath = `${user.id}/${storeId}`;
+      
+      const { data: files, error } = await supabase.storage
+        .from('store-data')
+        .list(folderPath, {
+          sortBy: { column: 'created_at', order: 'desc' }
+        });
+
+      if (error) throw error;
+
+      // WiFi 관련 파일만 필터링
+      const wifiFiles = (files || []).filter(file => 
+        file.name.includes('wifi') || 
+        file.name.includes('sensor') ||
+        file.name.includes('tracking')
+      );
+
+      const filesWithUrls: StorageFile[] = wifiFiles.map((file) => {
+        const filePath = `${folderPath}/${file.name}`;
+        const { data: { publicUrl } } = supabase.storage
+          .from('store-data')
+          .getPublicUrl(filePath);
+
+        return {
+          name: file.name,
+          path: filePath,
+          size: file.metadata?.size || 0,
+          created_at: file.created_at,
+          url: publicUrl
+        };
+      });
+
+      setUploadedFiles(filesWithUrls);
+    } catch (error: any) {
+      console.error('Error loading WiFi files:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteFile = async (filePath: string, fileName: string) => {
+    if (!confirm(`"${fileName}" 파일을 삭제하시겠습니까?`)) return;
+
+    try {
+      const { error } = await supabase.storage
+        .from('store-data')
+        .remove([filePath]);
+
+      if (error) throw error;
+
+      toast({
+        title: "파일 삭제 완료",
+        description: `${fileName}이 삭제되었습니다`,
+      });
+
+      loadWiFiFiles();
+    } catch (error: any) {
+      toast({
+        title: "삭제 실패",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   };
 
   return (
@@ -64,10 +166,14 @@ export function WiFiDataManagement({ storeId }: WiFiDataManagementProps) {
       </div>
 
       <Tabs defaultValue="upload" className="space-y-4">
-        <TabsList>
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="upload">
             <Database className="h-4 w-4 mr-2" />
             데이터 업로드
+          </TabsTrigger>
+          <TabsTrigger value="files">
+            <File className="h-4 w-4 mr-2" />
+            업로드된 파일
           </TabsTrigger>
           <TabsTrigger value="devices">
             <Cpu className="h-4 w-4 mr-2" />
@@ -109,6 +215,79 @@ export function WiFiDataManagement({ storeId }: WiFiDataManagementProps) {
                   x, z는 선택사항 (없으면 RSSI 기반 삼변측량으로 자동 계산)
                 </p>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="files" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>업로드된 WiFi 데이터 파일</CardTitle>
+              <CardDescription>
+                {storeId ? '현재 매장의 WiFi 트래킹 데이터 파일들' : '매장을 선택하면 파일 목록을 확인할 수 있습니다'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!storeId ? (
+                <Alert>
+                  <AlertDescription>
+                    사이드바에서 매장을 먼저 선택하세요
+                  </AlertDescription>
+                </Alert>
+              ) : isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                </div>
+              ) : uploadedFiles.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  업로드된 WiFi 데이터 파일이 없습니다
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>파일명</TableHead>
+                      <TableHead>크기</TableHead>
+                      <TableHead>업로드 일시</TableHead>
+                      <TableHead className="text-right">작업</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {uploadedFiles.map((file) => (
+                      <TableRow key={file.path}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <Wifi className="w-4 h-4 text-primary" />
+                            {file.name}
+                          </div>
+                        </TableCell>
+                        <TableCell>{formatFileSize(file.size)}</TableCell>
+                        <TableCell>
+                          {new Date(file.created_at).toLocaleString('ko-KR')}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => window.open(file.url, '_blank')}
+                            >
+                              <Download className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteFile(file.path, file.name)}
+                            >
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
