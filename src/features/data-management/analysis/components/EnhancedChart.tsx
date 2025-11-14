@@ -31,6 +31,15 @@ export const EnhancedChart = ({
   const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.2, 0.6));
 
   const renderChart = () => {
+    // yAxisKeys가 비어있거나 유효하지 않으면 빈 상태 반환
+    if (!yAxisKeys || yAxisKeys.length === 0 || !yAxisKeys[0]) {
+      return (
+        <div className="flex items-center justify-center h-64 text-muted-foreground">
+          데이터를 불러올 수 없습니다
+        </div>
+      );
+    }
+
     const commonProps = {
       data,
       onClick: onDataPointClick,
@@ -46,13 +55,13 @@ export const EnhancedChart = ({
             <YAxis stroke="hsl(var(--muted-foreground))" />
             <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} />
             <Legend />
-            {yAxisKeys.map(({ key, name, color }) => (
+            {yAxisKeys.map((axis) => axis && (
               <Line 
-                key={key}
+                key={axis.key}
                 type="monotone" 
-                dataKey={key} 
-                name={name}
-                stroke={color}
+                dataKey={axis.key} 
+                name={axis.name}
+                stroke={axis.color}
                 strokeWidth={2}
                 dot={{ r: 4 }}
                 activeDot={{ r: 6 }}
@@ -69,8 +78,8 @@ export const EnhancedChart = ({
             <YAxis stroke="hsl(var(--muted-foreground))" />
             <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} />
             <Legend />
-            {yAxisKeys.map(({ key, name, color }) => (
-              <Bar key={key} dataKey={key} name={name} fill={color} />
+            {yAxisKeys.map((axis) => axis && (
+              <Bar key={axis.key} dataKey={axis.key} name={axis.name} fill={axis.color} />
             ))}
           </BarChart>
         );

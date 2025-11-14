@@ -197,27 +197,31 @@ export const ProductPerformance = ({ productsData = [], purchasesData = [] }: Pr
 
         {/* Charts */}
         <div className="space-y-4">
-          <EnhancedChart
-            data={categoryData}
-            title="카테고리별 매출"
-            defaultChartType="pie"
-            xAxisKey="name"
-            yAxisKeys={categoryData.map(cat => ({
-              key: "value",
-              name: cat.name,
-              color: cat.color
-            }))}
-          />
+          {categoryData.length > 0 && (
+            <EnhancedChart
+              data={categoryData}
+              title="카테고리별 매출"
+              defaultChartType="pie"
+              xAxisKey="name"
+              yAxisKeys={categoryData.map(cat => ({
+                key: "value",
+                name: cat.name,
+                color: cat.color
+              }))}
+            />
+          )}
 
-          <EnhancedChart
-            data={sortedProducts.slice(0, 5)}
-            title="상위 5개 상품 판매량"
-            defaultChartType="bar"
-            xAxisKey="id"
-            yAxisKeys={[
-              { key: "sales", name: "판매량", color: "hsl(var(--primary))" }
-            ]}
-          />
+          {sortedProducts.length > 0 && (
+            <EnhancedChart
+              data={sortedProducts.slice(0, 5)}
+              title="상위 5개 상품 판매량"
+              defaultChartType="bar"
+              xAxisKey="id"
+              yAxisKeys={[
+                { key: "sales", name: "판매량", color: "hsl(var(--primary))" }
+              ]}
+            />
+          )}
 
           <Card className="glass p-4 bg-amber-500/5 border-amber-500/20">
             <div className="flex items-start gap-3">
