@@ -45,7 +45,7 @@ export function StorageManager({ storeId }: StorageManagerProps) {
       const basePath = `${user.id}/${storeId}`;
       const allFiles: StorageFile[] = [];
       
-      // store-data 버킷 - 루트 레벨 파일들
+      // store-data 버킷 - CSV, Excel 등
       const { data: dataFiles } = await supabase.storage
         .from('store-data')
         .list(basePath, {
@@ -54,8 +54,7 @@ export function StorageManager({ storeId }: StorageManagerProps) {
 
       if (dataFiles) {
         for (const file of dataFiles) {
-          // 폴더는 제외하고 파일만
-          if (!file.id) continue;
+          if (!file.id) continue; // 폴더 제외
           
           const filePath = `${basePath}/${file.name}`;
           const { data: { publicUrl } } = supabase.storage
@@ -73,7 +72,35 @@ export function StorageManager({ storeId }: StorageManagerProps) {
         }
       }
 
-      // 3d-models 버킷 - 루트 레벨 확인
+      // 3d-models 버킷 - 3d-models 서브폴더 우선 조회
+      const modelSubPath = `${basePath}/3d-models`;
+      const { data: modelSubFiles, error: subError } = await supabase.storage
+        .from('3d-models')
+        .list(modelSubPath, {
+          sortBy: { column: 'created_at', order: 'desc' }
+        });
+
+      if (modelSubFiles && !subError) {
+        for (const file of modelSubFiles) {
+          if (!file.id) continue;
+          
+          const filePath = `${modelSubPath}/${file.name}`;
+          const { data: { publicUrl } } = supabase.storage
+            .from('3d-models')
+            .getPublicUrl(filePath);
+
+          allFiles.push({
+            name: file.name,
+            path: filePath,
+            size: file.metadata?.size || 0,
+            created_at: file.created_at,
+            url: publicUrl,
+            bucket: '3d-models'
+          });
+        }
+      }
+      
+      // 루트 레벨의 3D 파일들도 조회 (이전 방식 호환)
       const { data: modelRootFiles } = await supabase.storage
         .from('3d-models')
         .list(basePath, {
@@ -81,39 +108,6 @@ export function StorageManager({ storeId }: StorageManagerProps) {
         });
 
       if (modelRootFiles) {
-        // 3d-models 서브폴더가 있는지 확인
-        const has3DModelsFolder = modelRootFiles.some(item => item.name === '3d-models');
-        
-        if (has3DModelsFolder) {
-          // 3d-models 서브폴더 안의 파일들
-          const { data: modelFiles } = await supabase.storage
-            .from('3d-models')
-            .list(`${basePath}/3d-models`, {
-              sortBy: { column: 'created_at', order: 'desc' }
-            });
-
-          if (modelFiles) {
-            for (const file of modelFiles) {
-              if (!file.id) continue;
-              
-              const filePath = `${basePath}/3d-models/${file.name}`;
-              const { data: { publicUrl } } = supabase.storage
-                .from('3d-models')
-                .getPublicUrl(filePath);
-
-              allFiles.push({
-                name: file.name,
-                path: filePath,
-                size: file.metadata?.size || 0,
-                created_at: file.created_at,
-                url: publicUrl,
-                bucket: '3d-models'
-              });
-            }
-          }
-        }
-        
-        // 루트 레벨의 .glb/.gltf 파일들도 추가
         for (const file of modelRootFiles) {
           if (file.id && (file.name.endsWith('.glb') || file.name.endsWith('.gltf'))) {
             const filePath = `${basePath}/${file.name}`;
@@ -134,6 +128,7 @@ export function StorageManager({ storeId }: StorageManagerProps) {
       }
 
       setFiles(allFiles);
+      console.log('Loaded files:', allFiles.length, allFiles);
     } catch (error: any) {
       console.error('Error loading files:', error);
       toast({
