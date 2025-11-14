@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { DeviceRegistrationForm, DeviceList } from "../components";
+import { WiFiDataUploader } from "../components/WiFiDataUploader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Cpu, Wifi, Database, Settings } from "lucide-react";
@@ -65,6 +66,10 @@ export default function NeuralSenseSettingsPage() {
               <Cpu className="h-4 w-4 mr-2" />
               디바이스 관리
             </TabsTrigger>
+            <TabsTrigger value="upload">
+              <Database className="h-4 w-4 mr-2" />
+              데이터 업로드
+            </TabsTrigger>
             <TabsTrigger value="register">
               <Settings className="h-4 w-4 mr-2" />
               새 디바이스 등록
@@ -73,6 +78,10 @@ export default function NeuralSenseSettingsPage() {
 
           <TabsContent value="devices" className="space-y-4">
             <DeviceList refreshTrigger={refreshTrigger} />
+          </TabsContent>
+
+          <TabsContent value="upload" className="space-y-4">
+            <WiFiDataUploader />
           </TabsContent>
 
           <TabsContent value="register" className="space-y-4">
