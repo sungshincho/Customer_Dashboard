@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TrendingUp, TrendingDown, Package, AlertTriangle } from "lucide-react";
 import { useState } from "react";
-import { EnhancedChart } from "@/components/analysis/EnhancedChart";
+import { EnhancedChart } from "@/features/data-management/analysis/components/EnhancedChart";
 
 interface ProductPerformanceProps {
   productsData?: any[];

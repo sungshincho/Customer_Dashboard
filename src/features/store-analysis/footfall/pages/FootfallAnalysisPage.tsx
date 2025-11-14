@@ -3,9 +3,9 @@ import { FootfallVisualizer } from "@/features/store-analysis/footfall/component
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Loader2, Store } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
-import { AdvancedFilters, FilterState } from "@/components/analysis/AdvancedFilters";
-import { ExportButton } from "@/components/analysis/ExportButton";
-import { ComparisonView } from "@/components/analysis/ComparisonView";
+import { AdvancedFilters, FilterState } from "@/features/data-management/analysis/components/AdvancedFilters";
+import { ExportButton } from "@/features/data-management/analysis/components/ExportButton";
+import { ComparisonView } from "@/features/data-management/analysis/components/ComparisonView";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useStoreScene } from "@/hooks/useStoreScene";

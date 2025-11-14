@@ -12,11 +12,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Network, Database } from "lucide-react";
 import ForceGraph2D from "react-force-graph-2d";
 import { normalizeMultipleDatasets } from "@/utils/dataNormalizer";
-import { InsightsDashboard } from "@/components/analysis/InsightsDashboard";
-import { CorrelationAnalysis } from "@/components/analysis/CorrelationAnalysis";
-import { WTPAnalysisView } from "@/components/analysis/WTPAnalysisView";
+import { InsightsDashboard } from "@/features/data-management/analysis/components/InsightsDashboard";
+import { CorrelationAnalysis } from "@/features/data-management/analysis/components/CorrelationAnalysis";
+import { WTPAnalysisView } from "@/features/data-management/analysis/components/WTPAnalysisView";
 import { GraphQueryBuilder } from "@/features/data-management/ontology/components/GraphQueryBuilder";
-import { AdvancedAIInference } from "@/components/analysis/AdvancedAIInference";
+import { AdvancedAIInference } from "@/features/data-management/analysis/components/AdvancedAIInference";
 
 interface Node {
   id: string;

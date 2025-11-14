@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { EnhancedChart } from "@/components/analysis/EnhancedChart";
+import { EnhancedChart } from "@/features/data-management/analysis/components/EnhancedChart";
 
 interface DemandForecastProps {
   visitsData?: any[];

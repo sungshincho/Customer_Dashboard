@@ -34,20 +34,64 @@ NEURALTWIN은 AI 기반 실시간 매장 분석 관리자 대시보드입니다.
 
 자세한 내용은 `src/index.css`와 `tailwind.config.ts`를 참고하세요.
 
-## 프로젝트 구조
+## 프로젝트 구조 (2025-11-14 업데이트)
+
+**Feature-based 아키텍처 완전 적용**
 
 ```
 src/
-├── components/
+├── components/           # 공유 컴포넌트만 유지
 │   ├── ui/              # shadcn/ui 컴포넌트
 │   ├── AppSidebar.tsx   # 사이드바 네비게이션
 │   ├── DashboardLayout.tsx  # 공통 레이아웃
+│   ├── DataReadinessGuard.tsx  # 데이터 준비 가드
 │   ├── ProtectedRoute.tsx   # 인증 보호 라우트
-│   └── StatCard.tsx     # 통계 카드 컴포넌트
-├── pages/
-│   ├── Dashboard.tsx    # 메인 대시보드
-│   ├── Auth.tsx         # 로그인/회원가입
-│   ├── Stores.tsx       # 매장 관리
+│   ├── NavLink.tsx      # 네비게이션 링크
+│   ├── StatCard.tsx     # 통계 카드 컴포넌트
+│   └── ThemeToggle.tsx  # 다크모드 토글
+│
+├── core/                # 핵심 페이지
+│   └── pages/
+│       ├── AuthPage.tsx       # 로그인/회원가입
+│       ├── DashboardPage.tsx  # 메인 대시보드
+│       ├── SettingsPage.tsx   # 설정
+│       └── NotFoundPage.tsx   # 404
+│
+├── features/            # Feature-based 모듈
+│   ├── data-management/
+│   │   ├── import/      # CSV/Excel 임포트
+│   │   ├── analysis/    # 데이터 분석 (AI)
+│   │   ├── ontology/    # 온톨로지 스키마
+│   │   ├── bigdata/     # 외부 API 연동
+│   │   └── neuralsense/ # WiFi 센서 관리
+│   │
+│   ├── store-analysis/
+│   │   ├── stores/      # 매장 관리
+│   │   ├── footfall/    # 고객 동선 분석
+│   │   └── inventory/   # 재고 관리
+│   │
+│   ├── profit-center/
+│   │   ├── demand-inventory/  # 수요 예측
+│   │   ├── pricing/           # 가격 최적화
+│   │   └── personalization/   # 개인화 추천
+│   │
+│   ├── cost-center/
+│   │   └── automation/        # 인력/제품 효율성
+│   │
+│   └── digital-twin/
+│       ├── components/  # 3D 컴포넌트
+│       ├── pages/      # 3D 페이지
+│       ├── utils/      # 3D 유틸리티
+│       └── types/      # 3D 타입
+│
+├── hooks/              # 공유 커스텀 훅
+├── utils/              # 공유 유틸리티
+├── types/              # 공유 타입 정의
+└── integrations/       # 외부 통합 (Supabase)
+```
+
+**상세 구조:** [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md)  
+**클린업 보고서:** [CLEANUP_2025_11_14.md](./CLEANUP_2025_11_14.md)
 │   ├── Analytics.tsx    # 방문자 분석
 │   ├── Inventory.tsx    # 재고 관리
 │   ├── Forecasts.tsx    # AI 예측

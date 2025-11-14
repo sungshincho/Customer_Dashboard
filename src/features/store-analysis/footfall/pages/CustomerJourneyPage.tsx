@@ -3,9 +3,9 @@ import { CustomerJourney } from "@/features/store-analysis/footfall/components/C
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Box, Store } from "lucide-react";
 import { useState, useEffect } from "react";
-import { AdvancedFilters, FilterState } from "@/components/analysis/AdvancedFilters";
-import { ExportButton } from "@/components/analysis/ExportButton";
-import { ComparisonView } from "@/components/analysis/ComparisonView";
+import { AdvancedFilters, FilterState } from "@/features/data-management/analysis/components/AdvancedFilters";
+import { ExportButton } from "@/features/data-management/analysis/components/ExportButton";
+import { ComparisonView } from "@/features/data-management/analysis/components/ComparisonView";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Store3DViewer } from "@/features/digital-twin/components";
 import { useSelectedStore } from "@/hooks/useSelectedStore";

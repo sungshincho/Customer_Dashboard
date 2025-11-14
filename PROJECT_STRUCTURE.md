@@ -33,7 +33,7 @@
   - visits_extended.csv
 
 #### 관련 컴포넌트
-- `src/components/etl/SchemaMapper.tsx` - 스키마 매핑 UI
+- `src/features/data-management/import/components/SchemaMapper.tsx` - 스키마 매핑 UI
 
 #### 데이터베이스
 - `user_data_imports` 테이블 - 업로드된 데이터 저장
@@ -56,20 +56,12 @@
 - 차트 및 시각화
 
 #### 관련 컴포넌트
-- `src/components/analysis/AIAnalysisButton.tsx` - AI 분석 트리거
-- `src/components/analysis/AIInsights.tsx` - AI 인사이트 표시
-- `src/components/analysis/AdvancedAIInference.tsx` - 고급 AI 추론
-- `src/components/analysis/AdvancedFilters.tsx` - 필터링
-- `src/components/analysis/AlertSettings.tsx` - 알림 설정
-- `src/components/analysis/AnalysisHistory.tsx` - 분석 이력
-- `src/components/analysis/ComparisonView.tsx` - 비교 분석
-- `src/components/analysis/CorrelationAnalysis.tsx` - 상관관계 분석
-- `src/components/analysis/EnhancedChart.tsx` - 차트 컴포넌트
-- `src/components/analysis/ExportButton.tsx` - 데이터 내보내기
-- `src/components/analysis/InsightsDashboard.tsx` - 인사이트 대시보드
-- `src/components/analysis/StoreHeatmap.tsx` - 매장 히트맵
-- `src/components/analysis/WTPAnalysisView.tsx` - WTP(지불의향가격) 분석
-- `src/components/analysis/ZoneContribution.tsx` - 구역별 기여도
+- `src/features/data-management/analysis/components/` - 모든 분석 관련 컴포넌트
+  - AIAnalysisButton, AIInsights, AdvancedAIInference
+  - AdvancedFilters, AlertSettings, AnalysisHistory
+  - ComparisonView, CorrelationAnalysis, EnhancedChart
+  - ExportButton, InsightsDashboard, StoreHeatmap
+  - WTPAnalysisView, ZoneContribution
 
 #### Edge Functions
 - `supabase/functions/analyze-store-data/index.ts` - 매장 데이터 AI 분석
@@ -101,11 +93,10 @@
 - 스키마 검증
 
 #### 관련 컴포넌트
-- `src/components/schema/EntityTypeManager.tsx` - 엔티티 타입 관리
-- `src/components/schema/RelationTypeManager.tsx` - 관계 타입 관리
-- `src/components/schema/SchemaGraphVisualization.tsx` - 그래프 시각화
-- `src/components/schema/SchemaValidator.tsx` - 스키마 검증
-- `src/components/schema/SchemaVersionManager.tsx` - 버전 관리
+- `src/features/data-management/ontology/components/` - 모든 온톨로지 컴포넌트
+  - EntityTypeManager, RelationTypeManager
+  - SchemaGraphVisualization, SchemaValidator
+  - SchemaVersionManager, GraphQueryBuilder
 
 #### Edge Functions
 - `supabase/functions/auto-map-etl/index.ts` - AI 기반 자동 매핑
