@@ -86,74 +86,65 @@ export function DataImportHistory({ storeId }: DataImportHistoryProps) {
       let deletedCount = 0;
 
       // 2. Storage에서 store-data 버킷 파일 삭제
-      if (storeId) {
-        const storePath = `${user.id}/${storeId}`;
-        
-        const { data: storeFiles } = await supabase.storage
+      const storePath = storeId ? `${user.id}/${storeId}` : user.id;
+      
+      // store-data 버킷 재귀 탐색
+      const deleteFromStoreData = async (path: string) => {
+        const { data: items } = await supabase.storage
           .from('store-data')
-          .list(storePath);
+          .list(path);
         
-        if (storeFiles && storeFiles.length > 0) {
-          const filesToDelete = storeFiles
-            .filter(f => f.id) // 폴더 제외
-            .map(f => `${storePath}/${f.name}`);
+        if (items && items.length > 0) {
+          const files = items.filter(f => f.id); // 파일만
+          const folders = items.filter(f => !f.id); // 폴더만
           
-          if (filesToDelete.length > 0) {
-            const { error: storageError } = await supabase.storage
+          // 파일 삭제
+          if (files.length > 0) {
+            const filesToDelete = files.map(f => `${path}/${f.name}`);
+            const { error } = await supabase.storage
               .from('store-data')
               .remove(filesToDelete);
             
-            if (!storageError) {
-              deletedCount += filesToDelete.length;
-            } else {
-              console.warn('store-data 파일 삭제 실패:', storageError);
-            }
+            if (!error) deletedCount += files.length;
+          }
+          
+          // 폴더 재귀 삭제
+          for (const folder of folders) {
+            await deleteFromStoreData(`${path}/${folder.name}`);
           }
         }
-        
-        // 3. Storage에서 3d-models 버킷 파일 삭제 (서브폴더 포함)
-        const modelBasePath = `${user.id}/${storeId}`;
-        
-        // 루트 레벨 파일 확인
-        const { data: rootItems } = await supabase.storage
+      };
+      
+      await deleteFromStoreData(storePath);
+      
+      // 3. Storage에서 3d-models 버킷 파일 삭제
+      const deleteFrom3DModels = async (path: string) => {
+        const { data: items } = await supabase.storage
           .from('3d-models')
-          .list(modelBasePath);
+          .list(path);
         
-        const filesToDelete3D: string[] = [];
-        
-        if (rootItems) {
-          // 루트의 .glb/.gltf 파일
-          rootItems
-            .filter(item => item.id && (item.name.endsWith('.glb') || item.name.endsWith('.gltf')))
-            .forEach(item => filesToDelete3D.push(`${modelBasePath}/${item.name}`));
+        if (items && items.length > 0) {
+          const files = items.filter(f => f.id);
+          const folders = items.filter(f => !f.id);
           
-          // 3d-models 서브폴더 확인
-          const has3DModelsFolder = rootItems.some(item => item.name === '3d-models');
-          if (has3DModelsFolder) {
-            const { data: subFiles } = await supabase.storage
+          // 파일 삭제
+          if (files.length > 0) {
+            const filesToDelete = files.map(f => `${path}/${f.name}`);
+            const { error } = await supabase.storage
               .from('3d-models')
-              .list(`${modelBasePath}/3d-models`);
+              .remove(filesToDelete);
             
-            if (subFiles) {
-              subFiles
-                .filter(f => f.id)
-                .forEach(f => filesToDelete3D.push(`${modelBasePath}/3d-models/${f.name}`));
-            }
+            if (!error) deletedCount += files.length;
           }
-        }
-        
-        if (filesToDelete3D.length > 0) {
-          const { error: model3DError } = await supabase.storage
-            .from('3d-models')
-            .remove(filesToDelete3D);
           
-          if (!model3DError) {
-            deletedCount += filesToDelete3D.length;
-          } else {
-            console.warn('3d-models 파일 삭제 실패:', model3DError);
+          // 폴더 재귀 삭제
+          for (const folder of folders) {
+            await deleteFrom3DModels(`${path}/${folder.name}`);
           }
         }
-      }
+      };
+      
+      await deleteFrom3DModels(storePath);
 
       // 4. DB에서 레코드 삭제
       if (records && records.length > 0) {
