@@ -1,23 +1,121 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { ModelUploader } from "@/features/digital-twin/components/ModelUploader";
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Trash2, Download, Box, Loader2, Database, Check, AlertCircle, Upload } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { insertSample3DData, checkSampleDataExists, deleteSampleData } from "@/features/digital-twin/utils/sampleDataGenerator";
 import { useAuth } from "@/hooks/useAuth";
-import { toast } from "sonner";
-import { Database, Check, Loader2, Trash2, Box, Upload, AlertCircle } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { toast as sonnerToast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface ThreeDModelUploadProps {
   storeId?: string;
 }
 
+interface StorageFile {
+  name: string;
+  path: string;
+  size: number;
+  created_at: string;
+  url: string;
+}
+
 export function ThreeDModelUpload({ storeId }: ThreeDModelUploadProps) {
+  const { toast } = useToast();
   const { user } = useAuth();
+  const [uploadedModels, setUploadedModels] = useState<StorageFile[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [dataExists, setDataExists] = useState(false);
   const [checking, setChecking] = useState(false);
+
+  useEffect(() => {
+    if (storeId) {
+      loadModels();
+      checkData();
+    }
+  }, [storeId]);
+
+  const loadModels = async () => {
+    if (!storeId) return;
+    
+    setIsLoading(true);
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) throw new Error("Not authenticated");
+
+      // 실제 스토리지 구조: {user_id}/{store_id}/3d-models/
+      const basePath = `${currentUser.id}/${storeId}`;
+      
+      // 먼저 루트 레벨 확인
+      const { data: rootItems, error: listError } = await supabase.storage
+        .from('3d-models')
+        .list(basePath);
+
+      if (listError) throw listError;
+
+      let allFiles: StorageFile[] = [];
+
+      // 3d-models 서브폴더가 있는지 확인
+      const has3DModelsFolder = rootItems?.some(item => item.name === '3d-models');
+      
+      if (has3DModelsFolder) {
+        // 3d-models 서브폴더 안의 파일들 가져오기
+        const { data: files, error } = await supabase.storage
+          .from('3d-models')
+          .list(`${basePath}/3d-models`, {
+            sortBy: { column: 'created_at', order: 'desc' }
+          });
+
+        if (error) throw error;
+
+        allFiles = (files || [])
+          .filter(f => f.id) // 폴더 제외, 파일만
+          .map((file) => {
+            const filePath = `${basePath}/3d-models/${file.name}`;
+            const { data: { publicUrl } } = supabase.storage
+              .from('3d-models')
+              .getPublicUrl(filePath);
+
+            return {
+              name: file.name,
+              path: filePath,
+              size: file.metadata?.size || 0,
+              created_at: file.created_at,
+              url: publicUrl
+            };
+          });
+      }
+
+      // 루트 레벨의 .glb/.gltf 파일도 확인 (이전 버전 호환성)
+      const rootFiles = (rootItems || [])
+        .filter(item => item.id && (item.name.endsWith('.glb') || item.name.endsWith('.gltf')))
+        .map((file) => {
+          const filePath = `${basePath}/${file.name}`;
+          const { data: { publicUrl } } = supabase.storage
+            .from('3d-models')
+            .getPublicUrl(filePath);
+
+          return {
+            name: file.name,
+            path: filePath,
+            size: file.metadata?.size || 0,
+            created_at: file.created_at,
+            url: publicUrl
+          };
+        });
+
+      setUploadedModels([...allFiles, ...rootFiles]);
+    } catch (error: any) {
+      console.error('Error loading models:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const checkData = async () => {
     if (!user) return;
@@ -36,14 +134,14 @@ export function ThreeDModelUpload({ storeId }: ThreeDModelUploadProps) {
   const handleInsertSampleData = async () => {
     if (!user) return;
     if (!storeId) {
-      toast.error('먼저 매장을 선택해주세요');
+      sonnerToast.error('먼저 매장을 선택해주세요');
       return;
     }
 
     setLoading(true);
     try {
       const result = await insertSample3DData(user.id, storeId);
-      toast.success(
+      sonnerToast.success(
         `샘플 데이터가 추가되었습니다: ${result.entityTypes}개 타입, ${result.entities}개 엔티티`
       );
       await checkData();
@@ -51,10 +149,10 @@ export function ThreeDModelUpload({ storeId }: ThreeDModelUploadProps) {
       console.error('Insert sample data error:', error);
       
       if (error.message.includes('이미 존재') || error.message.includes('duplicate key')) {
-        toast.info('샘플 데이터가 이미 존재합니다');
+        sonnerToast.info('샘플 데이터가 이미 존재합니다');
         await checkData();
       } else {
-        toast.error(`데이터 추가 실패: ${error.message}`);
+        sonnerToast.error(`데이터 추가 실패: ${error.message}`);
       }
     } finally {
       setLoading(false);
@@ -67,14 +165,47 @@ export function ThreeDModelUpload({ storeId }: ThreeDModelUploadProps) {
     setLoading(true);
     try {
       await deleteSampleData(user.id, storeId);
-      toast.success('샘플 데이터가 삭제되었습니다');
+      sonnerToast.success('샘플 데이터가 삭제되었습니다');
       await checkData();
     } catch (error: any) {
       console.error('Delete sample data error:', error);
-      toast.error(`데이터 삭제 실패: ${error.message}`);
+      sonnerToast.error(`데이터 삭제 실패: ${error.message}`);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDeleteModel = async (filePath: string, fileName: string) => {
+    if (!confirm(`"${fileName}" 모델을 삭제하시겠습니까?`)) return;
+
+    try {
+      const { error } = await supabase.storage
+        .from('3d-models')
+        .remove([filePath]);
+
+      if (error) throw error;
+
+      toast({
+        title: "모델 삭제 완료",
+        description: `${fileName}이 삭제되었습니다`,
+      });
+
+      loadModels();
+    } catch (error: any) {
+      toast({
+        title: "삭제 실패",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   };
 
   return (
@@ -92,7 +223,7 @@ export function ThreeDModelUpload({ storeId }: ThreeDModelUploadProps) {
         <TabsList>
           <TabsTrigger value="upload">
             <Upload className="w-4 h-4 mr-2" />
-            3D 모델 업로드
+            3D 모델 관리
           </TabsTrigger>
           <TabsTrigger value="sample">
             <Database className="w-4 h-4 mr-2" />
@@ -100,7 +231,7 @@ export function ThreeDModelUpload({ storeId }: ThreeDModelUploadProps) {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="upload">
+        <TabsContent value="upload" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>3D 모델 업로드</CardTitle>
@@ -115,6 +246,77 @@ export function ThreeDModelUpload({ storeId }: ThreeDModelUploadProps) {
                 <p className="text-muted-foreground text-center py-8">
                   매장을 선택하면 3D 모델을 업로드할 수 있습니다
                 </p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>업로드된 3D 모델</CardTitle>
+              <CardDescription>
+                {storeId ? '현재 매장의 3D 모델들' : '매장을 선택하면 모델 목록을 확인할 수 있습니다'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!storeId ? (
+                <Alert>
+                  <AlertDescription>
+                    사이드바에서 매장을 먼저 선택하세요
+                  </AlertDescription>
+                </Alert>
+              ) : isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                </div>
+              ) : uploadedModels.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  업로드된 3D 모델이 없습니다
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>파일명</TableHead>
+                      <TableHead>크기</TableHead>
+                      <TableHead>업로드 일시</TableHead>
+                      <TableHead className="text-right">작업</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {uploadedModels.map((model) => (
+                      <TableRow key={model.path}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <Box className="w-4 h-4 text-primary" />
+                            {model.name}
+                          </div>
+                        </TableCell>
+                        <TableCell>{formatFileSize(model.size)}</TableCell>
+                        <TableCell>
+                          {new Date(model.created_at).toLocaleString('ko-KR')}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => window.open(model.url, '_blank')}
+                            >
+                              <Download className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteModel(model.path, model.name)}
+                            >
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>
@@ -203,7 +405,7 @@ export function ThreeDModelUpload({ storeId }: ThreeDModelUploadProps) {
                     <ul className="space-y-1 ml-4 list-disc">
                       <li>Entity Types: StoreSpace, Shelf, DisplayTable, Product</li>
                       <li>샘플 진열대 및 제품 배치</li>
-                      <li>3D 좌표 및 관계 정보</li>
+                      <li>3D 좌표 및 회전 정보</li>
                     </ul>
                   </div>
 
