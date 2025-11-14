@@ -19,6 +19,8 @@ interface StorageFile {
   created_at: string;
   url: string;
   bucket: string;
+  storeName?: string;
+  storeId?: string;
 }
 
 export function StorageManager({ storeId }: StorageManagerProps) {
@@ -35,94 +37,69 @@ export function StorageManager({ storeId }: StorageManagerProps) {
   }, [storeId]);
 
   const loadAllFiles = async () => {
-    if (!storeId) return;
-    
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const basePath = `${user.id}/${storeId}`;
       const allFiles: StorageFile[] = [];
       
-      // store-data 버킷 - CSV, Excel 등
-      const { data: dataFiles, error: dataError } = await supabase.storage
-        .from('store-data')
-        .list(basePath, {
-          sortBy: { column: 'created_at', order: 'desc' }
-        });
+      // 매장 정보 가져오기
+      const { data: stores } = await supabase
+        .from('stores')
+        .select('id, store_name')
+        .eq('user_id', user.id);
 
-      if (dataError) {
-        console.error('Error loading store-data:', dataError);
-      }
+      const storesToLoad = storeId 
+        ? stores?.filter(s => s.id === storeId) || []
+        : stores || [];
 
-      if (dataFiles) {
-        for (const file of dataFiles) {
-          if (!file.id) continue;
-          
-          const filePath = `${basePath}/${file.name}`;
-          const { data: { publicUrl } } = supabase.storage
-            .from('store-data')
-            .getPublicUrl(filePath);
-
-          allFiles.push({
-            name: file.name,
-            path: filePath,
-            size: file.metadata?.size || 0,
-            created_at: file.created_at,
-            url: publicUrl,
-            bucket: 'store-data'
+      // 각 매장별로 파일 조회
+      for (const store of storesToLoad) {
+        const basePath = `${user.id}/${store.id}`;
+        
+        // store-data 버킷
+        const { data: dataFiles } = await supabase.storage
+          .from('store-data')
+          .list(basePath, {
+            sortBy: { column: 'created_at', order: 'desc' }
           });
-        }
-      }
 
-      // 3d-models 버킷 - 3d-models 서브폴더 조회
-      const modelSubPath = `${basePath}/3d-models`;
-      const { data: modelSubFiles, error: subError } = await supabase.storage
-        .from('3d-models')
-        .list(modelSubPath, {
-          sortBy: { column: 'created_at', order: 'desc' }
-        });
-
-      if (subError) {
-        console.error('Error loading 3d-models subfolder:', subError);
-      }
-
-      if (modelSubFiles) {
-        for (const file of modelSubFiles) {
-          if (!file.id) continue;
-          
-          const filePath = `${modelSubPath}/${file.name}`;
-          const { data: { publicUrl } } = supabase.storage
-            .from('3d-models')
-            .getPublicUrl(filePath);
-
-          allFiles.push({
-            name: file.name,
-            path: filePath,
-            size: file.metadata?.size || 0,
-            created_at: file.created_at,
-            url: publicUrl,
-            bucket: '3d-models'
-          });
-        }
-      }
-      
-      // 루트 레벨의 3D 파일들도 조회
-      const { data: modelRootFiles, error: rootError } = await supabase.storage
-        .from('3d-models')
-        .list(basePath, {
-          sortBy: { column: 'created_at', order: 'desc' }
-        });
-
-      if (rootError) {
-        console.error('Error loading 3d-models root:', rootError);
-      }
-
-      if (modelRootFiles) {
-        for (const file of modelRootFiles) {
-          if (file.id && (file.name.endsWith('.glb') || file.name.endsWith('.gltf'))) {
+        if (dataFiles) {
+          for (const file of dataFiles) {
+            if (!file.id) continue;
+            
             const filePath = `${basePath}/${file.name}`;
+            const { data: { publicUrl } } = supabase.storage
+              .from('store-data')
+              .getPublicUrl(filePath);
+
+            allFiles.push({
+              name: file.name,
+              path: filePath,
+              size: file.metadata?.size || 0,
+              created_at: file.created_at,
+              url: publicUrl,
+              bucket: 'store-data',
+              storeName: store.store_name,
+              storeId: store.id
+            });
+          }
+        }
+
+        // 3d-models 서브폴더
+        const modelSubPath = `${basePath}/3d-models`;
+        const { data: modelSubFiles } = await supabase.storage
+          .from('3d-models')
+          .list(modelSubPath, {
+            sortBy: { column: 'created_at', order: 'desc' }
+          });
+
+        if (modelSubFiles) {
+          for (const file of modelSubFiles) {
+            if (!file.id) continue;
+            
+            const filePath = `${modelSubPath}/${file.name}`;
             const { data: { publicUrl } } = supabase.storage
               .from('3d-models')
               .getPublicUrl(filePath);
@@ -133,14 +110,45 @@ export function StorageManager({ storeId }: StorageManagerProps) {
               size: file.metadata?.size || 0,
               created_at: file.created_at,
               url: publicUrl,
-              bucket: '3d-models'
+              bucket: '3d-models',
+              storeName: store.store_name,
+              storeId: store.id
             });
+          }
+        }
+        
+        // 루트 레벨 3D 파일
+        const { data: modelRootFiles } = await supabase.storage
+          .from('3d-models')
+          .list(basePath, {
+            sortBy: { column: 'created_at', order: 'desc' }
+          });
+
+        if (modelRootFiles) {
+          for (const file of modelRootFiles) {
+            if (file.id && (file.name.endsWith('.glb') || file.name.endsWith('.gltf'))) {
+              const filePath = `${basePath}/${file.name}`;
+              const { data: { publicUrl } } = supabase.storage
+                .from('3d-models')
+                .getPublicUrl(filePath);
+
+              allFiles.push({
+                name: file.name,
+                path: filePath,
+                size: file.metadata?.size || 0,
+                created_at: file.created_at,
+                url: publicUrl,
+                bucket: '3d-models',
+                storeName: store.store_name,
+                storeId: store.id
+              });
+            }
           }
         }
       }
 
       setFiles(allFiles);
-      console.log('✅ StorageManager loaded files:', allFiles.length, allFiles);
+      console.log('✅ StorageManager loaded files:', allFiles.length, '파일 from', storesToLoad.length, '매장');
     } catch (error: any) {
       console.error('❌ StorageManager error:', error);
       toast({
@@ -269,22 +277,11 @@ export function StorageManager({ storeId }: StorageManagerProps) {
   };
 
   const filteredFiles = files.filter(file => 
-    file.name.toLowerCase().includes(searchQuery.toLowerCase())
+    file.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    file.storeName?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const totalSize = filteredFiles.reduce((sum, file) => sum + file.size, 0);
-
-  if (!storeId) {
-    return (
-      <Card>
-        <CardContent className="pt-6">
-          <p className="text-center text-muted-foreground">
-            사이드바에서 매장을 선택하면 스토리지를 관리할 수 있습니다
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <Card>
@@ -352,6 +349,7 @@ export function StorageManager({ storeId }: StorageManagerProps) {
                     />
                   </TableHead>
                   <TableHead>파일명</TableHead>
+                  <TableHead>매장</TableHead>
                   <TableHead>버킷</TableHead>
                   <TableHead>크기</TableHead>
                   <TableHead>업로드 일시</TableHead>
@@ -374,6 +372,11 @@ export function StorageManager({ storeId }: StorageManagerProps) {
                           {file.name}
                         </span>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-xs bg-primary/10 px-2 py-1 rounded font-medium">
+                        {file.storeName || '-'}
+                      </span>
                     </TableCell>
                     <TableCell>
                       <span className="text-xs bg-muted px-2 py-1 rounded">
