@@ -14,6 +14,8 @@ interface Statistics {
   wifiTracking: number;
   entityTypes: number;
   entities: number;
+  storageUsed: number; // bytes
+  totalFiles: number;
 }
 
 export function DataStatistics({ storeId }: DataStatisticsProps) {
@@ -23,7 +25,9 @@ export function DataStatistics({ storeId }: DataStatisticsProps) {
     wifiZones: 0,
     wifiTracking: 0,
     entityTypes: 0,
-    entities: 0
+    entities: 0,
+    storageUsed: 0,
+    totalFiles: 0
   });
   const [loading, setLoading] = useState(true);
 
@@ -45,9 +49,21 @@ export function DataStatistics({ storeId }: DataStatisticsProps) {
       const { count: csvCount } = await csvQuery;
 
       // 3D 모델 수 (스토리지에서)
+      const modelPath = storeId ? `${user.id}/${storeId}` : user.id;
       const { data: modelFiles } = await supabase.storage
         .from('3d-models')
-        .list(storeId ? `${user.id}/${storeId}` : user.id);
+        .list(modelPath);
+
+      // 스토리지 데이터 파일
+      const { data: dataFiles } = await supabase.storage
+        .from('store-data')
+        .list(modelPath);
+
+      // 총 스토리지 사용량 계산
+      const modelSize = (modelFiles || []).reduce((sum, file) => sum + (file.metadata?.size || 0), 0);
+      const dataSize = (dataFiles || []).reduce((sum, file) => sum + (file.metadata?.size || 0), 0);
+      const totalStorage = modelSize + dataSize;
+      const totalFileCount = (modelFiles?.length || 0) + (dataFiles?.length || 0);
 
       // WiFi 존 수
       let zoneQuery = supabase
@@ -84,7 +100,9 @@ export function DataStatistics({ storeId }: DataStatisticsProps) {
         wifiZones: zoneCount || 0,
         wifiTracking: trackingCount || 0,
         entityTypes: entityTypeCount || 0,
-        entities: entityCount || 0
+        entities: entityCount || 0,
+        storageUsed: totalStorage,
+        totalFiles: totalFileCount
       });
     } catch (error) {
       console.error('Failed to load statistics:', error);
@@ -93,7 +111,22 @@ export function DataStatistics({ storeId }: DataStatisticsProps) {
     }
   };
 
+  const formatBytes = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  };
+
   const statCards = [
+    {
+      title: "스토리지 사용량",
+      value: formatBytes(stats.storageUsed),
+      icon: Database,
+      description: `총 ${stats.totalFiles}개 파일`,
+      highlight: true
+    },
     {
       title: "CSV 데이터",
       value: stats.csvImports,
@@ -133,18 +166,18 @@ export function DataStatistics({ storeId }: DataStatisticsProps) {
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
       {statCards.map((stat, index) => (
-        <Card key={index}>
+        <Card key={index} className={stat.highlight ? "border-primary" : ""}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
               {stat.title}
             </CardTitle>
-            <stat.icon className="h-4 w-4 text-muted-foreground" />
+            <stat.icon className={`h-4 w-4 ${stat.highlight ? 'text-primary' : 'text-muted-foreground'}`} />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {loading ? "..." : stat.value.toLocaleString()}
+            <div className={`text-2xl font-bold ${stat.highlight ? 'text-primary' : ''}`}>
+              {loading ? "..." : typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
             </div>
             <p className="text-xs text-muted-foreground">
               {stat.description}

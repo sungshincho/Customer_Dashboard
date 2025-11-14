@@ -11,7 +11,8 @@ import {
   FileSpreadsheet,
   Cpu,
   Network,
-  Layers
+  Layers,
+  HardDrive
 } from "lucide-react";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 
@@ -22,6 +23,7 @@ import { WiFiDataManagement } from "../components/WiFiDataManagement";
 import { OntologyDataManagement } from "../components/OntologyDataManagement";
 import { DataImportHistory } from "../components/DataImportHistory";
 import { DataStatistics } from "../components/DataStatistics";
+import { StorageManager } from "../components/StorageManager";
 
 export default function UnifiedDataManagementPage() {
   const { selectedStore } = useSelectedStore();
@@ -56,7 +58,7 @@ export default function UnifiedDataManagementPage() {
 
         {/* 메인 탭 */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="overview">
               <Database className="w-4 h-4 mr-2" />
               개요
@@ -76,6 +78,10 @@ export default function UnifiedDataManagementPage() {
             <TabsTrigger value="ontology">
               <Network className="w-4 h-4 mr-2" />
               온톨로지
+            </TabsTrigger>
+            <TabsTrigger value="storage">
+              <HardDrive className="w-4 h-4 mr-2" />
+              스토리지
             </TabsTrigger>
             <TabsTrigger value="history">
               <History className="w-4 h-4 mr-2" />
@@ -252,6 +258,11 @@ export default function UnifiedDataManagementPage() {
           {/* 온톨로지 탭 */}
           <TabsContent value="ontology">
             <OntologyDataManagement storeId={selectedStore?.id} />
+          </TabsContent>
+
+          {/* 스토리지 관리 탭 */}
+          <TabsContent value="storage">
+            <StorageManager storeId={selectedStore?.id} />
           </TabsContent>
 
           {/* 히스토리 탭 */}
