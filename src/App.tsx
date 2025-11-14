@@ -46,6 +46,7 @@ import BigDataAPIPage from "@/features/data-management/bigdata/pages/BigDataAPIP
 
 // Digital Twin pages
 import Setup3DDataPage from "@/features/digital-twin/pages/Setup3DDataPage";
+import DigitalTwin3DPage from "@/features/digital-twin/pages/DigitalTwin3DPage";
 
 const queryClient = new QueryClient();
 
@@ -256,6 +257,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Setup3DDataPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/digital-twin-3d"
+              element={
+                <ProtectedRoute>
+                  <DigitalTwin3DPage />
                 </ProtectedRoute>
               }
             />
