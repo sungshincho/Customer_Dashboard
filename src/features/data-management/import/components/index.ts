@@ -5,3 +5,4 @@ export { WiFiDataManagement } from './WiFiDataManagement';
 export { OntologyDataManagement } from './OntologyDataManagement';
 export { DataImportHistory } from './DataImportHistory';
 export { DataStatistics } from './DataStatistics';
+export { StorageManager } from './StorageManager';
