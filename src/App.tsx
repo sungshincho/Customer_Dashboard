@@ -37,11 +37,10 @@ import ProductPerformancePage from "@/features/cost-center/automation/pages/Prod
 import StaffEfficiencyPage from "@/features/cost-center/automation/pages/StaffEfficiencyPage";
 
 // Data Management pages
-import DataImport from "@/features/data-management/import/pages/DataImportPage";
+import UnifiedDataManagementPage from "@/features/data-management/import/pages/UnifiedDataManagementPage";
 import GraphAnalysis from "@/features/data-management/ontology/pages/GraphAnalysisPage";
 import SchemaBuilder from "@/features/data-management/ontology/pages/SchemaBuilderPage";
 import Analytics from "@/features/data-management/analysis/pages/AnalyticsPage";
-import NeuralSenseSettingsPage from "@/features/data-management/neuralsense/pages/NeuralSenseSettingsPage";
 import BigDataAPIPage from "@/features/data-management/bigdata/pages/BigDataAPIPage";
 
 // Digital Twin pages
@@ -192,7 +191,7 @@ const App = () => (
               path="/data-import"
               element={
                 <ProtectedRoute>
-                  <DataImport />
+                  <UnifiedDataManagementPage />
                 </ProtectedRoute>
               }
             />
@@ -237,26 +236,10 @@ const App = () => (
               }
             />
             <Route
-              path="/neuralsense-settings"
-              element={
-                <ProtectedRoute>
-                  <NeuralSenseSettingsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
               path="/bigdata-api"
               element={
                 <ProtectedRoute>
                   <BigDataAPIPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/setup-3d-data"
-              element={
-                <ProtectedRoute>
-                  <Setup3DDataPage />
                 </ProtectedRoute>
               }
             />
