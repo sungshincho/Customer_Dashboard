@@ -130,10 +130,8 @@ const menuSections: MenuSection[] = [
     activeGradient: "bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-medium shadow-md",
     items: [
       { title: "디지털 트윈 3D", url: "/digital-twin-3d", icon: Boxes },
-      { title: "3D 데이터 설정", url: "/setup-3d-data", icon: Box },
-      { title: "NeuralSense IoT", url: "/neuralsense-settings", icon: Cpu },
+      { title: "통합 데이터 관리", url: "/data-import", icon: Upload },
       { title: "빅데이터 API", url: "/bigdata-api", icon: Cloud },
-      { title: "데이터 임포트", url: "/data-import", icon: Upload },
       { title: "그래프 분석", url: "/graph-analysis", icon: Network },
       { title: "온톨로지 스키마", url: "/schema-builder", icon: Database },
     ],
