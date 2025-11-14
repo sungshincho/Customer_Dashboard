@@ -179,7 +179,7 @@ export function convertToHeatmapData(
   });
 }
 
-// 개별 고객 경로 추출
+// 개별 고객 경로 추출 (MAC 랜덤화 고려)
 export function extractCustomerPaths(
   data: TrackingData[]
 ): Map<string, TrackingData[]> {
@@ -198,4 +198,94 @@ export function extractCustomerPaths(
   });
   
   return paths;
+}
+
+// 세션 기반 그룹핑 (MAC 주소 랜덤화 대응)
+// 유사한 RSSI 패턴과 시간 근접성을 기반으로 세션 묶기
+export function groupBySession(
+  data: TrackingData[],
+  timeThresholdMs: number = 300000, // 5분
+  rssiThreshold: number = 10 // dBm 차이 허용
+): Map<string, TrackingData[]> {
+  if (data.length === 0) return new Map();
+  
+  const sorted = [...data].sort((a, b) => a.timestamp - b.timestamp);
+  const sessions = new Map<string, TrackingData[]>();
+  let sessionCounter = 0;
+
+  // 첫 번째 데이터로 첫 세션 시작
+  let currentSessionId = `session_${sessionCounter++}`;
+  sessions.set(currentSessionId, [sorted[0]]);
+  
+  for (let i = 1; i < sorted.length; i++) {
+    const current = sorted[i];
+    const currentSession = sessions.get(currentSessionId)!;
+    const lastInSession = currentSession[currentSession.length - 1];
+    
+    // 시간 차이와 RSSI 패턴 유사도 확인
+    const timeDiff = current.timestamp - lastInSession.timestamp;
+    const rssiDiff = Math.abs(
+      (current.signal_strength || 0) - (lastInSession.signal_strength || 0)
+    );
+    
+    // 위치 차이 (있는 경우)
+    let locationSimilar = true;
+    if (current.x !== undefined && lastInSession.x !== undefined) {
+      const distance = Math.sqrt(
+        Math.pow(current.x - lastInSession.x, 2) +
+        Math.pow((current.z || 0) - (lastInSession.z || 0), 2)
+      );
+      locationSimilar = distance < 15; // 15m 이내
+    }
+    
+    // 같은 세션으로 묶을 수 있는 조건
+    if (
+      timeDiff < timeThresholdMs &&
+      rssiDiff < rssiThreshold &&
+      locationSimilar
+    ) {
+      currentSession.push(current);
+    } else {
+      // 새 세션 시작
+      currentSessionId = `session_${sessionCounter++}`;
+      sessions.set(currentSessionId, [current]);
+    }
+  }
+  
+  // 너무 짧은 세션 제거 (노이즈 가능성)
+  const filtered = new Map<string, TrackingData[]>();
+  sessions.forEach((session, id) => {
+    if (session.length >= 3) { // 최소 3개 이상 데이터 포인트
+      filtered.set(id, session);
+    }
+  });
+  
+  return filtered;
+}
+
+// 통계 기반 고유 방문자 수 추정 (MAC 랜덤화 대응)
+export function estimateUniqueVisitors(
+  data: TrackingData[],
+  timeWindowMs: number = 3600000 // 1시간
+): number {
+  const sessions = groupBySession(data);
+  
+  // 시간 윈도우별로 세션 수 집계
+  const timeWindows = new Map<number, Set<string>>();
+  
+  sessions.forEach((sessionData, sessionId) => {
+    if (sessionData.length === 0) return;
+    
+    const windowKey = Math.floor(sessionData[0].timestamp / timeWindowMs);
+    if (!timeWindows.has(windowKey)) {
+      timeWindows.set(windowKey, new Set());
+    }
+    timeWindows.get(windowKey)!.add(sessionId);
+  });
+  
+  // 각 윈도우의 세션 수 평균
+  const sessionCounts = Array.from(timeWindows.values()).map(s => s.size);
+  return sessionCounts.length > 0
+    ? Math.round(sessionCounts.reduce((a, b) => a + b, 0) / sessionCounts.length)
+    : 0;
 }

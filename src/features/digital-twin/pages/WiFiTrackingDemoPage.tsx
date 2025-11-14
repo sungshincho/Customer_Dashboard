@@ -6,7 +6,7 @@ import { Slider } from '@/components/ui/slider';
 import { Play, Pause, RotateCcw } from 'lucide-react';
 import { Store3DViewer } from '../components/Store3DViewer';
 import { WiFiTrackingOverlay } from '../components/overlays/WiFiTrackingOverlay';
-import { loadWiFiTrackingData, filterByTimeRange, convertToHeatmapData, extractCustomerPaths } from '@/utils/wifiDataLoader';
+import { loadWiFiTrackingData, filterByTimeRange, convertToHeatmapData, extractCustomerPaths, groupBySession, estimateUniqueVisitors } from '@/utils/wifiDataLoader';
 import { trilaterate } from '../utils/coordinateMapper';
 import type { TrackingData, SensorPosition } from '../types/iot.types';
 import { useAuth } from '@/hooks/useAuth';
@@ -112,9 +112,15 @@ export default function WiFiTrackingDemoPage() {
       ]
     : [0, 0];
 
+  // 세션 기반 통계 (MAC 랜덤화 대응)
+  const sessions = groupBySession(processedData);
+  const estimatedVisitors = estimateUniqueVisitors(processedData);
+  
   const stats = {
     totalPoints: processedData.length,
-    uniqueDevices: new Set(processedData.map(d => d.customer_id)).size,
+    uniqueMACs: new Set(processedData.map(d => d.customer_id)).size,
+    estimatedSessions: sessions.size,
+    estimatedVisitors: estimatedVisitors,
     sensors: sensors.length,
     timeSpan: timeRange[1] - timeRange[0]
   };
@@ -137,37 +143,50 @@ export default function WiFiTrackingDemoPage() {
       </div>
 
       {/* 통계 카드 */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">총 데이터</CardTitle>
+            <CardTitle className="text-sm font-medium">총 신호</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalPoints}</div>
+            <p className="text-xs text-muted-foreground mt-1">데이터 포인트</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">고유 디바이스</CardTitle>
+            <CardTitle className="text-sm font-medium">고유 MAC</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.uniqueDevices}</div>
+            <div className="text-2xl font-bold">{stats.uniqueMACs}</div>
+            <p className="text-xs text-muted-foreground mt-1">⚠️ 랜덤화됨</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">센서 수</CardTitle>
+            <CardTitle className="text-sm font-medium">추정 세션</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.estimatedSessions}</div>
+            <p className="text-xs text-muted-foreground mt-1">그룹핑 결과</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">추정 방문자</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.estimatedVisitors}</div>
+            <p className="text-xs text-muted-foreground mt-1">시간당 평균</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">센서</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.sensors}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">수집 시간</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{Math.round(stats.timeSpan / 1000)}초</div>
+            <p className="text-xs text-muted-foreground mt-1">{Math.round(stats.timeSpan / 1000)}초 수집</p>
           </CardContent>
         </Card>
       </div>
