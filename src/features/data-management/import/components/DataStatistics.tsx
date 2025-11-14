@@ -51,35 +51,35 @@ export function DataStatistics({ storeId }: DataStatisticsProps) {
       // 3D 모델 수 (스토리지에서) - 실제 경로 구조 반영
       const modelPath = storeId ? `${user.id}/${storeId}` : user.id;
       
-      // 루트 레벨 확인
+      let totalModelCount = 0;
+      let totalModelSize = 0;
+
+      // 3d-models 서브폴더 우선 조회
+      const modelSubPath = `${modelPath}/3d-models`;
+      const { data: modelSubFiles, error: subError } = await supabase.storage
+        .from('3d-models')
+        .list(modelSubPath);
+
+      if (modelSubFiles && !subError) {
+        const validFiles = modelSubFiles.filter(f => f.id);
+        totalModelCount += validFiles.length;
+        totalModelSize += validFiles.reduce((sum, f) => sum + (f.metadata?.size || 0), 0);
+        console.log('3D models in subfolder:', validFiles.length);
+      }
+      
+      // 루트 레벨의 .glb/.gltf 파일들도 확인 (이전 방식 호환)
       const { data: modelRootFiles } = await supabase.storage
         .from('3d-models')
         .list(modelPath);
 
-      let totalModelCount = 0;
-      let totalModelSize = 0;
-
-      // 3d-models 서브폴더가 있는지 확인
-      const has3DModelsFolder = modelRootFiles?.some(item => item.name === '3d-models');
-      
-      if (has3DModelsFolder) {
-        // 3d-models 서브폴더 안의 파일들
-        const { data: subfolderFiles } = await supabase.storage
-          .from('3d-models')
-          .list(`${modelPath}/3d-models`);
-        
-        if (subfolderFiles) {
-          totalModelCount += subfolderFiles.filter(f => f.id).length;
-          totalModelSize += subfolderFiles.reduce((sum, f) => sum + (f.metadata?.size || 0), 0);
-        }
+      if (modelRootFiles) {
+        const rootModels = modelRootFiles.filter(f => 
+          f.id && (f.name.endsWith('.glb') || f.name.endsWith('.gltf'))
+        );
+        totalModelCount += rootModels.length;
+        totalModelSize += rootModels.reduce((sum, f) => sum + (f.metadata?.size || 0), 0);
+        console.log('3D models in root:', rootModels.length);
       }
-      
-      // 루트 레벨의 .glb/.gltf 파일들
-      const rootModels = (modelRootFiles || []).filter(f => 
-        f.id && (f.name.endsWith('.glb') || f.name.endsWith('.gltf'))
-      );
-      totalModelCount += rootModels.length;
-      totalModelSize += rootModels.reduce((sum, f) => sum + (f.metadata?.size || 0), 0);
 
       // 스토리지 데이터 파일
       const { data: dataFiles } = await supabase.storage
