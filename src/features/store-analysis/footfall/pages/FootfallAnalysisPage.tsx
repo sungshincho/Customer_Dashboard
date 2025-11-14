@@ -161,6 +161,7 @@ const FootfallAnalysis = () => {
                 {/* 단일 3D 뷰 */}
                 {selectedStore && (
                   <Store3DViewer 
+                    key={`${selectedStore.id}-${refreshKey}`}
                     height="600px"
                     overlay={
                       <>
