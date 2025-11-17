@@ -405,43 +405,56 @@ WiFiSensor_입구센서_0.15x0.15x0.1.glb  # WiFi 센서
 
 ### 5.2 필수 3D 모델 리스트 (데모용)
 
-#### 5.2.1 고정 구조물 (Fixed Structures) - 4개
+**업로드된 샘플 데이터 기준:**
+- 매장: 1개 (NEURALTWIN Flagship Store, NT-FLG-001)
+- Zone: 8개 (존-A ~ 존-H)
+- 제품 카테고리: 6개 (Bag, Bottom, Top, Shoes, Accessory, Outer)
+- 제품 SKU: 200개
+- 직원: 18명
+
+#### 5.2.1 고정 구조물 (Fixed Structures) - 9개
 ```
-Store_A매장_20.0x10.0x4.0.glb          # 메인 매장 공간 (20m x 10m x 4m)
-Zone_입구구역_5.0x5.0x4.0.glb          # 입구 구역
-Zone_계산대구역_3.0x3.0x4.0.glb        # 계산대 구역  
-Zone_진열구역_12.0x7.0x4.0.glb         # 진열 구역
+Store_NT매장_20.0x10.0x4.0.glb         # NEURALTWIN Flagship Store (20m x 10m x 4m)
+Zone_존A_4.0x4.0x4.0.glb              # 존-A (입구 구역)
+Zone_존B_4.0x4.0x4.0.glb              # 존-B (진열 구역)
+Zone_존C_4.0x4.0x4.0.glb              # 존-C (진열 구역)
+Zone_존D_4.0x4.0x4.0.glb              # 존-D (진열 구역)
+Zone_존E_4.0x4.0x4.0.glb              # 존-E (진열 구역)
+Zone_존F_4.0x4.0x4.0.glb              # 존-F (진열 구역)
+Zone_존G_4.0x4.0x4.0.glb              # 존-G (진열 구역)
+Zone_존H_4.0x4.0x4.0.glb              # 존-H (계산대 구역)
 ```
 
 #### 5.2.2 이동 가능 가구 (Movable Furniture) - 8개
 ```
-Shelf_메인진열대_3.0x2.0x0.5.glb       # 벽면 진열대
-Shelf_사이드진열대_2.0x1.8x0.4.glb     # 측면 진열대
+Shelf_벽면진열대_3.0x2.0x0.5.glb       # 벽면 진열대
+Shelf_측면진열대_2.0x1.8x0.4.glb       # 측면 진열대
 DisplayTable_중앙테이블_2.0x1.0x0.8.glb  # 중앙 진열 테이블
 DisplayTable_원형테이블_1.5x1.5x0.9.glb  # 원형 테이블
-Rack_옷걸이_1.5x1.5x1.8.glb           # 의류 랙
-CheckoutCounter_계산대_2.5x1.0x1.1.glb  # 계산대
-Mannequin_전신마네킹_0.6x0.6x1.8.glb   # 전신 마네킹
-Mannequin_상반신_0.5x0.5x1.2.glb      # 상반신 마네킹
+Rack_의류랙_1.5x1.5x1.8.glb            # 의류 랙 (Top, Bottom, Outer용)
+CheckoutCounter_계산대_2.5x1.0x1.1.glb  # 계산대 (존-H)
+Mannequin_전신마네킹_0.6x0.6x1.8.glb    # 전신 마네킹
+Mannequin_상반신_0.5x0.5x1.2.glb       # 상반신 마네킹
 ```
 
-#### 5.2.3 제품 (Products) - 6개
+#### 5.2.3 제품 (Products) - 6개 (카테고리별 대표 모델)
 ```
-Product_청바지_0.3x0.4x0.1.glb         # 청바지
-Product_티셔츠_0.3x0.4x0.05.glb        # 티셔츠
-Product_신발_0.3x0.3x0.15.glb          # 신발
-Product_가방_0.4x0.3x0.2.glb           # 가방
-Product_모자_0.25x0.25x0.15.glb        # 모자
-Product_액세서리_0.2x0.2x0.1.glb       # 액세서리
+Product_가방_0.4x0.3x0.2.glb           # Bag (제품.csv: Bag 카테고리)
+Product_하의_0.3x0.4x0.1.glb           # Bottom (제품.csv: Bottom 카테고리)
+Product_상의_0.3x0.4x0.05.glb          # Top (제품.csv: Top 카테고리)
+Product_신발_0.3x0.3x0.15.glb          # Shoes (제품.csv: Shoes 카테고리)
+Product_액세서리_0.2x0.2x0.1.glb       # Accessory (제품.csv: Accessory 카테고리)
+Product_아우터_0.4x0.5x0.1.glb         # Outer (제품.csv: Outer 카테고리)
 ```
 
-#### 5.2.4 IoT 장비 (Sensors & Cameras) - 4개
+#### 5.2.4 IoT 장비 (Sensors & Cameras) - 3개
 ```
-Camera_천장카메라1_0.2x0.2x0.3.glb     # CCTV 카메라
-Camera_천장카메라2_0.2x0.2x0.3.glb     # CCTV 카메라
-WiFiSensor_입구센서_0.15x0.15x0.1.glb  # WiFi 센서
-WiFiSensor_중앙센서_0.15x0.15x0.1.glb  # WiFi 센서
+Camera_천장카메라_0.2x0.2x0.3.glb      # CCTV 카메라 (고객 추적용)
+WiFiSensor_입구센서_0.15x0.15x0.1.glb  # WiFi 센서 (존-A 입구)
+WiFiSensor_매장센서_0.15x0.15x0.1.glb  # WiFi 센서 (매장 중앙)
 ```
+
+**총 필수 모델 수: 26개** (고정 9개 + 가구 8개 + 제품 6개 + IoT 3개)
 
 ### 5.3 3D 모델 요구사항
 | 항목 | 요구사항 | 권장 | 설명 |
@@ -502,7 +515,7 @@ WiFiSensor_중앙센서_0.15x0.15x0.1.glb  # WiFi 센서
 
 #### 5.4.3 고정 구조물 (Store)
 ```json
-// Store_A매장_20.0x10.0x4.0.json
+// Store_NT매장_20.0x10.0x4.0.json
 {
   "entity_type": "Store",
   "movable": false,
@@ -514,40 +527,82 @@ WiFiSensor_중앙센서_0.15x0.15x0.1.glb  # WiFi 센서
   "current_position": { "x": 0, "y": 0, "z": 0 },
   "current_rotation": { "x": 0, "y": 0, "z": 0 },
   "properties": {
-    "store_id": "GN001",
-    "store_name": "강남점",
+    "store_id": "1",
+    "store_code": "NT-FLG-001",
+    "store_name": "NEURALTWIN Flagship Store",
     "total_area_sqm": 200,
-    "floor_type": "tile"
+    "floor_type": "tile",
+    "manager": "Alex Kim"
+  }
+}
+```
+
+#### 5.4.4 Zone 구역
+```json
+// Zone_존A_4.0x4.0x4.0.json
+{
+  "entity_type": "Zone",
+  "movable": false,
+  "dimensions": {
+    "width": 4.0,
+    "height": 4.0,
+    "depth": 4.0
+  },
+  "current_position": { "x": 2.0, "y": 0, "z": 2.0 },
+  "current_rotation": { "x": 0, "y": 0, "z": 0 },
+  "properties": {
+    "zone_name": "존-A",
+    "zone_type": "entrance",
+    "description": "입구 구역"
   }
 }
 ```
 
 ### 5.5 데모 시나리오별 필수 모델
 
-#### 시나리오 1: 기본 매장 구성 (최소 12개)
-- **고정 구조물**: Store x1, Zone x2
+#### 시나리오 1: 기본 매장 구성 (최소 14개)
+- **고정 구조물**: Store x1, Zone x3 (존-A 입구, 존-G 진열, 존-H 계산대)
 - **가구**: Shelf x2, DisplayTable x1, CheckoutCounter x1
-- **제품**: Product x3 (청바지, 티셔츠, 신발)
-- **IoT**: Camera x2
+- **제품**: Product x3 (가방, 상의, 신발)
+- **IoT**: Camera x1, WiFiSensor x1
 
 **목적**: 기본 3D 매장 시각화 및 제품 배치 확인
 
-#### 시나리오 2: AI 레이아웃 최적화 (18개)
-- **기본 구성** + 추가 요소:
-  - Rack x2 (의류 랙)
-  - Mannequin x2 (마네킹)
-  - WiFiSensor x2 (WiFi 센서)
+**데이터 연동**: 
+- 매장.csv → Store 모델
+- 방문.csv → 존-A, 존-G, 존-H 방문 데이터
+- 제품.csv → Bag, Top, Shoes 카테고리
 
-**목적**: AI 기반 가구 재배치 시뮬레이션 및 최적화 제안
+#### 시나리오 2: WiFi 트래킹 + 히트맵 (18개)
+- **시나리오 1** + 추가 요소:
+  - Zone x3 (존-B, 존-C, 존-D 추가)
+  - Rack x1 (의류 랙)
+  - WiFiSensor x1 (추가 센서)
+  - Product x1 (하의 추가)
 
-#### 시나리오 3: 완전한 데모 (22개)
+**목적**: WiFi 기반 고객 동선 추적 및 히트맵 시각화
+
+**데이터 연동**:
+- 방문.csv → 8개 Zone 방문 분포 (10,000건)
+- wifi_tracking.csv → 센서별 신호 데이터
+
+#### 시나리오 3: 완전한 데모 (전체 26개)
 - **전체 모델** 포함:
-  - Fixed Structures: 4개
+  - Fixed Structures: 9개 (Store x1 + Zone x8)
   - Movable Furniture: 8개
-  - Products: 6개
-  - IoT Devices: 4개
+  - Products: 6개 (전체 카테고리)
+  - IoT Devices: 3개
 
-**목적**: 실제 매장 환경 재현 + WiFi 트래킹 + 히트맵 오버레이
+**목적**: 실제 매장 환경 완전 재현 + AI 레이아웃 최적화 + 실시간 분석
+
+**데이터 연동**:
+- 매장.csv → NT Flagship Store (1개)
+- 고객.csv → 500명 프로필
+- 제품.csv → 200개 SKU (6개 카테고리)
+- 구매.csv → 5,000건 거래
+- 방문.csv → 10,000건 방문 (8개 Zone)
+- 직원.csv → 18명 직원 성과
+- 소셜상태.csv → 11,586건 감정/상호작용 데이터
 
 ### 5.6 AI 자동 인식 키워드
 
