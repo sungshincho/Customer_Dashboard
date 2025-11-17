@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { ModelLayer } from "../components/ModelLayerManager";
+import { parseModelFilename } from "./modelFilenameParser";
 
 /**
  * 사용자의 모든 3D 모델 로드
@@ -78,12 +79,21 @@ export async function loadUserModels(
         // 모델 URL이 없으면 스킵
         if (!modelUrl) continue;
 
+        // 실제 파일명에서 dimensions 추출 (원본 파일명이 있는 경우)
+        let actualDimensions = entityType.model_3d_dimensions as any;
+        if (properties?.original_file) {
+          const parsed = parseModelFilename(properties.original_file);
+          if (parsed.isValid && parsed.dimensions) {
+            actualDimensions = parsed.dimensions;
+          }
+        }
+
         models.push({
           id: `entity-${entity.id}`,
           name: entity.label,
           type,
           model_url: modelUrl,
-          dimensions: entityType.model_3d_dimensions as any,
+          dimensions: actualDimensions,
           position: entity.model_3d_position as any || { x: 0, y: 0, z: 0 },
           rotation: entity.model_3d_rotation as any || { x: 0, y: 0, z: 0 },
           scale: entity.model_3d_scale as any || { x: 1, y: 1, z: 1 },
