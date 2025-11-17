@@ -165,22 +165,30 @@ export function StorageManager({ storeId }: StorageManagerProps) {
     if (!confirm(`"${name}" 파일을 삭제하시겠습니까?`)) return;
 
     try {
-      const { error } = await supabase.storage
+      console.log(`🗑️ Deleting file from bucket "${bucket}": ${path}`);
+      
+      const { data, error } = await supabase.storage
         .from(bucket)
         .remove([path]);
 
-      if (error) throw error;
+      if (error) {
+        console.error(`❌ Delete error:`, error);
+        throw error;
+      }
+
+      console.log(`✅ Successfully deleted:`, data);
 
       toast({
         title: "파일 삭제 완료",
         description: `${name}이 삭제되었습니다`,
       });
 
-      loadAllFiles();
+      await loadAllFiles();
     } catch (error: any) {
+      console.error(`❌ Delete failed:`, error);
       toast({
         title: "삭제 실패",
-        description: error.message,
+        description: error.message || "파일 삭제 권한이 없거나 파일을 찾을 수 없습니다",
         variant: "destructive",
       });
     }
@@ -203,21 +211,40 @@ export function StorageManager({ storeId }: StorageManagerProps) {
         }
       });
 
+      let successCount = 0;
+      let failedFiles: string[] = [];
+
       for (const [bucket, paths] of filesByBucket.entries()) {
-        const { error } = await supabase.storage
+        console.log(`🗑️ Deleting from bucket "${bucket}":`, paths);
+        
+        const { data, error } = await supabase.storage
           .from(bucket)
           .remove(paths);
         
-        if (error) throw error;
+        if (error) {
+          console.error(`❌ Delete error in bucket "${bucket}":`, error);
+          failedFiles.push(`${bucket}: ${error.message}`);
+        } else {
+          console.log(`✅ Successfully deleted from "${bucket}":`, data);
+          successCount += paths.length;
+        }
       }
 
-      toast({
-        title: "일괄 삭제 완료",
-        description: `${selectedFiles.size}개 파일이 삭제되었습니다`,
-      });
+      if (failedFiles.length > 0) {
+        toast({
+          title: "일부 파일 삭제 실패",
+          description: `성공: ${successCount}개, 실패: ${failedFiles.length}개\n${failedFiles.join('\n')}`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "일괄 삭제 완료",
+          description: `${successCount}개 파일이 삭제되었습니다`,
+        });
+      }
 
       setSelectedFiles(new Set());
-      loadAllFiles();
+      await loadAllFiles();
     } catch (error: any) {
       toast({
         title: "일괄 삭제 실패",
