@@ -203,46 +203,34 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
         
         updateFileStatus(uploadFile.id, 'processing', undefined, 50);
         
-        // AI 자동 매핑 시도
+        // 자동 처리 (AI 분석 + 엔티티 타입 생성/매핑 + 인스턴스 생성)
         try {
-          const { data: mappingResult, error: mappingError } = await supabase.functions.invoke('analyze-3d-model', {
+          const { data: processResult, error: processError } = await supabase.functions.invoke('auto-process-3d-models', {
             body: {
-              fileName: safeFileName,
-              fileUrl: publicUrl
+              files: [{
+                fileName: safeFileName,
+                publicUrl: publicUrl
+              }],
+              storeId: storeId
             }
           });
           
-          if (!mappingError && mappingResult?.success && mappingResult?.matched_entity_type) {
-            // 자동 매핑 성공 - 엔티티 타입에 모델 URL 업데이트
-            await supabase
-              .from('ontology_entity_types')
-              .update({
-                model_3d_url: publicUrl,
-                model_3d_dimensions: mappingResult.analysis?.suggested_dimensions || { width: 1, height: 1, depth: 1 },
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', mappingResult.matched_entity_type.id);
-            
+          if (processError) throw processError;
+          
+          if (processResult?.success) {
+            const result = processResult.results?.[0];
             updateFileStatus(uploadFile.id, 'success', undefined, 100, {
               autoMapped: true,
-              entityType: mappingResult.matched_entity_type.label,
-              confidence: mappingResult.analysis?.confidence || 0
+              entityType: result?.entityType || '자동 생성됨',
+              instanceLabel: result?.instanceLabel,
+              position: result?.position
             });
           } else {
-            // 자동 매핑 실패 - 업로드는 성공
-            const errorMsg = mappingError?.message || mappingResult?.error || '매칭되는 온톨로지 엔티티 타입을 찾을 수 없습니다';
-            console.warn('Auto-mapping failed:', errorMsg);
-            updateFileStatus(uploadFile.id, 'success', undefined, 100, {
-              autoMapped: false,
-              message: `업로드 완료. ${errorMsg}. 온톨로지 스키마에서 해당 엔티티 타입을 먼저 생성하거나, 디지털 트윈 페이지에서 자동 생성을 사용하세요.`
-            });
+            throw new Error(processResult?.error || '자동 처리 실패');
           }
-        } catch (err) {
-          console.warn('Auto-mapping failed, manual mapping required:', err);
-          updateFileStatus(uploadFile.id, 'success', undefined, 100, {
-            autoMapped: false,
-            message: '업로드 완료. 온톨로지 스키마에서 엔티티 타입을 생성하거나 디지털 트윈 페이지의 자동 생성을 사용하세요.'
-          });
+        } catch (err: any) {
+          console.error('Auto-process failed:', err);
+          updateFileStatus(uploadFile.id, 'error', err.message || '자동 처리 실패');
         }
         
       } else if (uploadFile.type === 'csv' || uploadFile.type === 'excel') {
