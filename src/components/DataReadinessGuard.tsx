@@ -1,6 +1,6 @@
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, ArrowRight } from 'lucide-react';
 import { useDataReadiness } from '@/hooks/useDataReadiness';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ interface DataReadinessGuardProps {
 export function DataReadinessGuard({ children, requireWifiData = false }: DataReadinessGuardProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const hasShownToast = useRef(false);
   const {
     isReady,
     isLoading,
@@ -24,44 +25,58 @@ export function DataReadinessGuard({ children, requireWifiData = false }: DataRe
   } = useDataReadiness();
 
   useEffect(() => {
+    if (hasShownToast.current) return;
+
     if (!isLoading && !isReady) {
+      hasShownToast.current = true;
       const status = getStatusMessage();
       toast({
-        title: status.title,
         description: (
-          <div className="space-y-2">
-            <p>{status.message}</p>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-amber-500" />
+              <span className="font-semibold text-base">{status.title}</span>
+            </div>
+            <p className="text-sm text-muted-foreground pl-7">{status.message}</p>
             {status.actionPath && (
               <Button 
-                variant="outline" 
+                variant="default" 
                 size="sm"
                 onClick={() => navigate(status.actionPath!)}
-                className="mt-2"
+                className="w-full group animate-fade-in ml-7"
               >
-                {status.action}
+                <span>{status.action}</span>
+                <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
               </Button>
             )}
           </div>
         ),
-        duration: 6000,
+        duration: 8000,
       });
     } else if (!isLoading && requireWifiData && !hasWifiData) {
+      hasShownToast.current = true;
       toast({
-        title: 'WiFi 트래킹 데이터가 필요합니다',
         description: (
-          <div className="space-y-2">
-            <p>이 기능을 사용하려면 WiFi 트래킹 데이터를 먼저 임포트해야 합니다.</p>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-amber-500" />
+              <span className="font-semibold text-base">WiFi 트래킹 데이터가 필요합니다</span>
+            </div>
+            <p className="text-sm text-muted-foreground pl-7">
+              이 기능을 사용하려면 WiFi 트래킹 데이터를 먼저 임포트해야 합니다.
+            </p>
             <Button 
-              variant="outline" 
+              variant="default" 
               size="sm"
               onClick={() => navigate('/data-import')}
-              className="mt-2"
+              className="w-full group animate-fade-in ml-7"
             >
-              데이터 관리로 이동
+              <span>데이터 관리로 이동</span>
+              <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
             </Button>
           </div>
         ),
-        duration: 6000,
+        duration: 8000,
       });
     }
   }, [isLoading, isReady, requireWifiData, hasWifiData, toast, navigate, getStatusMessage]);
