@@ -45,63 +45,27 @@ export async function loadUserModels(
       }
     }
 
-    // 2. 온톨로지 엔티티 타입에서 3D 모델 로드
-    const query = supabase
+    // 2. 온톨로지 엔티티 타입 메타데이터 로드 (인스턴스 참조용)
+    const { data: entityTypes } = await supabase
       .from('ontology_entity_types')
       .select('*')
-      .eq('user_id', userId)
-      .not('model_3d_url', 'is', null);
+      .eq('user_id', userId);
+
+    // 3. 온톨로지 엔티티 인스턴스만 로드 (개별 인스턴스명으로 표시)
+    const entitiesQuery = supabase
+      .from('graph_entities')
+      .select('*, entity_type:ontology_entity_types(*)')
+      .eq('user_id', userId);
 
     if (storeId) {
-      // 스토어 특정 엔티티 가져오기
-      const { data: storeEntities } = await supabase
-        .from('graph_entities')
-        .select('entity_type_id')
-        .eq('user_id', userId)
-        .eq('store_id', storeId);
-
-      if (storeEntities && storeEntities.length > 0) {
-        const typeIds = [...new Set(storeEntities.map(e => e.entity_type_id))];
-        query.in('id', typeIds);
-      }
+      entitiesQuery.eq('store_id', storeId);
     }
 
-    const { data: entityTypes, error: ontologyError } = await query;
-
-    if (!ontologyError && entityTypes) {
-      for (const entityType of entityTypes) {
-        const type = inferModelTypeFromEntityType(entityType.name);
-        
-        models.push({
-          id: `ontology-${entityType.id}`,
-          name: entityType.label || entityType.name,
-          type,
-          model_url: entityType.model_3d_url!,
-          dimensions: entityType.model_3d_dimensions as any,
-          position: { x: 0, y: 0, z: 0 },
-          rotation: { x: 0, y: 0, z: 0 },
-          scale: { x: 1, y: 1, z: 1 },
-          metadata: {
-            entityTypeId: entityType.id,
-            entityTypeName: entityType.name,
-            color: entityType.color,
-            icon: entityType.icon
-          }
-        });
-      }
-    }
-
-    // 3. 온톨로지 엔티티 인스턴스에서 위치 정보 로드
-    const { data: entities } = await supabase
-      .from('graph_entities')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('store_id', storeId || '')
-      .not('model_3d_position', 'is', null);
+    const { data: entities } = await entitiesQuery;
 
     if (entities) {
       for (const entity of entities) {
-        const entityType = entityTypes?.find(et => et.id === entity.entity_type_id);
+        const entityType = entity.entity_type as any;
         if (!entityType) continue;
 
         const type = inferModelTypeFromEntityType(entityType.name);
@@ -109,6 +73,8 @@ export async function loadUserModels(
         // Properties에 model_url이 있으면 (Storage 변환 인스턴스) 그것을 사용
         const properties = entity.properties as any;
         const modelUrl = properties?.model_url || entityType.model_3d_url;
+        
+        // 모델 URL이 없으면 스킵
         if (!modelUrl) continue;
 
         models.push({
