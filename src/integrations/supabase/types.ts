@@ -801,6 +801,50 @@ export type Database = {
           },
         ]
       }
+      wifi_heatmap_cache: {
+        Row: {
+          created_at: string
+          date: string
+          grid_x: number
+          grid_z: number
+          hour: number
+          id: string
+          store_id: string | null
+          user_id: string
+          visit_count: number
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          grid_x: number
+          grid_z: number
+          hour: number
+          id?: string
+          store_id?: string | null
+          user_id?: string
+          visit_count?: number
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          grid_x?: number
+          grid_z?: number
+          hour?: number
+          id?: string
+          store_id?: string | null
+          user_id?: string
+          visit_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wifi_heatmap_cache_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wifi_probe_data: {
         Row: {
           created_at: string
@@ -844,6 +888,138 @@ export type Database = {
             columns: ["device_id"]
             isOneToOne: false
             referencedRelation: "neuralsense_devices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wifi_raw_signals: {
+        Row: {
+          created_at: string
+          id: string
+          mac_address: string
+          rssi: number
+          sensor_id: string
+          store_id: string | null
+          timestamp: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mac_address: string
+          rssi: number
+          sensor_id: string
+          store_id?: string | null
+          timestamp: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mac_address?: string
+          rssi?: number
+          sensor_id?: string
+          store_id?: string | null
+          timestamp?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wifi_raw_signals_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wifi_tracking: {
+        Row: {
+          accuracy: number | null
+          created_at: string
+          id: string
+          session_id: string
+          status: string | null
+          store_id: string | null
+          timestamp: string
+          user_id: string
+          x: number
+          z: number
+        }
+        Insert: {
+          accuracy?: number | null
+          created_at?: string
+          id?: string
+          session_id: string
+          status?: string | null
+          store_id?: string | null
+          timestamp: string
+          user_id?: string
+          x: number
+          z: number
+        }
+        Update: {
+          accuracy?: number | null
+          created_at?: string
+          id?: string
+          session_id?: string
+          status?: string | null
+          store_id?: string | null
+          timestamp?: string
+          user_id?: string
+          x?: number
+          z?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wifi_tracking_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wifi_zones: {
+        Row: {
+          created_at: string
+          id: string
+          metadata: Json | null
+          store_id: string | null
+          user_id: string
+          x: number
+          y: number
+          z: number | null
+          zone_id: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          store_id?: string | null
+          user_id?: string
+          x: number
+          y: number
+          z?: number | null
+          zone_id: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          store_id?: string | null
+          user_id?: string
+          x?: number
+          y?: number
+          z?: number | null
+          zone_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wifi_zones_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
             referencedColumns: ["id"]
           },
         ]
