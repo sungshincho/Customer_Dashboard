@@ -1,33 +1,31 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Upload, 
-  Database, 
   Wifi, 
   Box, 
   History, 
   FileSpreadsheet,
-  Cpu,
-  Network,
-  Layers,
-  HardDrive
+  Network
 } from "lucide-react";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
+import { useToast } from "@/hooks/use-toast";
 
 // 통합 컴포넌트 임포트
+import { UnifiedDataUpload } from "../components/UnifiedDataUpload";
 import { CSVDataImport } from "../components/CSVDataImport";
 import { ThreeDModelUpload } from "../components/ThreeDModelUpload";
 import { WiFiDataManagement } from "../components/WiFiDataManagement";
 import { OntologyDataManagement } from "../components/OntologyDataManagement";
 import { DataImportHistory } from "../components/DataImportHistory";
 import { DataStatistics } from "../components/DataStatistics";
-import { StorageManager } from "../components/StorageManager";
 
 export default function UnifiedDataManagementPage() {
   const { selectedStore } = useSelectedStore();
-  const [activeTab, setActiveTab] = useState("overview");
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState("unified");
 
   return (
     <DashboardLayout>
@@ -41,7 +39,6 @@ export default function UnifiedDataManagementPage() {
             2D/3D 데이터, WiFi 트래킹, 온톨로지 등 모든 데이터를 한 곳에서 관리하세요
           </p>
         </div>
-
         {/* 매장 선택 경고 */}
         {!selectedStore && (
           <Card className="border-yellow-200 bg-yellow-50/50 dark:bg-yellow-950/20">
@@ -58,10 +55,10 @@ export default function UnifiedDataManagementPage() {
 
         {/* 메인 탭 */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7">
-            <TabsTrigger value="overview">
-              <Database className="w-4 h-4 mr-2" />
-              개요
+          <TabsList className="grid w-full grid-cols-6">
+            <TabsTrigger value="unified">
+              <Upload className="w-4 h-4 mr-2" />
+              통합 업로드
             </TabsTrigger>
             <TabsTrigger value="csv-import">
               <FileSpreadsheet className="w-4 h-4 mr-2" />
@@ -79,194 +76,47 @@ export default function UnifiedDataManagementPage() {
               <Network className="w-4 h-4 mr-2" />
               온톨로지
             </TabsTrigger>
-            <TabsTrigger value="storage">
-              <HardDrive className="w-4 h-4 mr-2" />
-              스토리지
-            </TabsTrigger>
             <TabsTrigger value="history">
               <History className="w-4 h-4 mr-2" />
               히스토리
             </TabsTrigger>
           </TabsList>
 
-          {/* 개요 탭 */}
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <Card 
-                className="cursor-pointer hover:border-primary transition-colors"
-                onClick={() => setActiveTab("csv-import")}
-              >
-                <CardHeader>
-                  <FileSpreadsheet className="w-8 h-8 text-primary mb-2" />
-                  <CardTitle>CSV/Excel 데이터</CardTitle>
-                  <CardDescription>
-                    매출, 방문, 고객 데이터를 CSV 또는 Excel 파일로 업로드하세요
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-
-              <Card 
-                className="cursor-pointer hover:border-primary transition-colors"
-                onClick={() => setActiveTab("3d-models")}
-              >
-                <CardHeader>
-                  <Box className="w-8 h-8 text-primary mb-2" />
-                  <CardTitle>3D 모델 & 매장 구성</CardTitle>
-                  <CardDescription>
-                    매장의 3D 모델을 업로드하고 디지털 트윈을 구축하세요
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-
-              <Card 
-                className="cursor-pointer hover:border-primary transition-colors"
-                onClick={() => setActiveTab("wifi-data")}
-              >
-                <CardHeader>
-                  <Wifi className="w-8 h-8 text-primary mb-2" />
-                  <CardTitle>WiFi 트래킹 데이터</CardTitle>
-                  <CardDescription>
-                    라즈베리파이로 수집한 WiFi probe 데이터를 업로드하세요
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-
-              <Card 
-                className="cursor-pointer hover:border-primary transition-colors"
-                onClick={() => setActiveTab("ontology")}
-              >
-                <CardHeader>
-                  <Network className="w-8 h-8 text-primary mb-2" />
-                  <CardTitle>온톨로지 & 그래프 데이터</CardTitle>
-                  <CardDescription>
-                    Entity, Relation을 정의하고 지식 그래프를 구축하세요
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-
-              <Card 
-                className="cursor-pointer hover:border-primary transition-colors"
-                onClick={() => setActiveTab("history")}
-              >
-                <CardHeader>
-                  <History className="w-8 h-8 text-primary mb-2" />
-                  <CardTitle>데이터 히스토리</CardTitle>
-                  <CardDescription>
-                    모든 데이터 임포트 기록과 상태를 확인하세요
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-
-              <Card className="border-dashed">
-                <CardHeader>
-                  <Layers className="w-8 h-8 text-muted-foreground mb-2" />
-                  <CardTitle className="text-muted-foreground">곧 추가될 기능</CardTitle>
-                  <CardDescription>
-                    외부 API 연동, 실시간 스트리밍 데이터 등
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-            </div>
-
-            {/* 빠른 시작 가이드 */}
-            <Card>
-              <CardHeader>
-                <CardTitle>빠른 시작 가이드</CardTitle>
-                <CardDescription>
-                  데이터를 업로드하고 디지털 트윈을 구축하는 순서
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-start space-x-4">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                    1
-                  </div>
-                  <div>
-                    <h4 className="font-semibold">매장 정보 등록</h4>
-                    <p className="text-sm text-muted-foreground">
-                      사이드바 → 매장 관리에서 매장 기본 정보를 등록하세요
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-4">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                    2
-                  </div>
-                  <div>
-                    <h4 className="font-semibold">3D 모델 업로드</h4>
-                    <p className="text-sm text-muted-foreground">
-                      매장의 3D 모델(.glb 또는 .gltf)을 업로드하여 공간을 시각화하세요
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-4">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                    3
-                  </div>
-                  <div>
-                    <h4 className="font-semibold">온톨로지 구성</h4>
-                    <p className="text-sm text-muted-foreground">
-                      진열대, 제품 등 매장 구성 요소를 Entity로 정의하세요
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-4">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                    4
-                  </div>
-                  <div>
-                    <h4 className="font-semibold">거래 데이터 업로드</h4>
-                    <p className="text-sm text-muted-foreground">
-                      매출, 방문, 재고 데이터를 CSV로 업로드하세요
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-4">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                    5
-                  </div>
-                  <div>
-                    <h4 className="font-semibold">WiFi 트래킹 설정 (선택)</h4>
-                    <p className="text-sm text-muted-foreground">
-                      실시간 고객 동선 분석을 위해 WiFi 데이터를 수집하세요
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          {/* 통합 업로드 탭 */}
+          <TabsContent value="unified" className="space-y-6">
+            <UnifiedDataUpload 
+              storeId={selectedStore?.id}
+              onUploadSuccess={() => {
+                toast({
+                  title: "업로드 완료",
+                  description: "데이터가 성공적으로 업로드되고 자동 매핑되었습니다",
+                });
+              }}
+            />
           </TabsContent>
 
           {/* CSV/Excel 임포트 탭 */}
-          <TabsContent value="csv-import">
+          <TabsContent value="csv-import" className="space-y-6">
             <CSVDataImport storeId={selectedStore?.id} />
           </TabsContent>
 
-          {/* 3D 모델 탭 */}
-          <TabsContent value="3d-models">
+          {/* 3D 모델 업로드 탭 */}
+          <TabsContent value="3d-models" className="space-y-6">
             <ThreeDModelUpload storeId={selectedStore?.id} />
           </TabsContent>
 
-          {/* WiFi 데이터 탭 */}
-          <TabsContent value="wifi-data">
+          {/* WiFi 데이터 관리 탭 */}
+          <TabsContent value="wifi-data" className="space-y-6">
             <WiFiDataManagement storeId={selectedStore?.id} />
           </TabsContent>
 
-          {/* 온톨로지 탭 */}
-          <TabsContent value="ontology">
+          {/* 온톨로지 관리 탭 */}
+          <TabsContent value="ontology" className="space-y-6">
             <OntologyDataManagement storeId={selectedStore?.id} />
           </TabsContent>
 
-          {/* 스토리지 관리 탭 */}
-          <TabsContent value="storage">
-            <StorageManager storeId={selectedStore?.id} />
-          </TabsContent>
-
           {/* 히스토리 탭 */}
-          <TabsContent value="history">
+          <TabsContent value="history" className="space-y-6">
             <DataImportHistory storeId={selectedStore?.id} />
           </TabsContent>
         </Tabs>
