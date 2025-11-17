@@ -7,11 +7,14 @@ import { Loader2, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
+import { SceneComposer } from './SceneComposer';
+import type { SceneRecipe } from '@/types/scene3d';
 
 interface Store3DViewerProps {
   height?: string;
   showControls?: boolean;
   overlay?: ReactNode;
+  sceneRecipe?: SceneRecipe | null;
 }
 
 function Model({ url }: { url: string }) {
@@ -27,12 +30,26 @@ function Model({ url }: { url: string }) {
   }
 }
 
-export function Store3DViewer({ height = "500px", showControls = true, overlay }: Store3DViewerProps) {
+export function Store3DViewer({ height = "500px", showControls = true, overlay, sceneRecipe }: Store3DViewerProps) {
   const { user } = useAuth();
   const { selectedStore } = useSelectedStore();
   const [modelUrl, setModelUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // If sceneRecipe is provided, use SceneComposer instead
+  if (sceneRecipe) {
+    return (
+      <div style={{ height }} className="relative">
+        <SceneComposer recipe={sceneRecipe} />
+        {overlay && (
+          <div className="absolute inset-0 pointer-events-none">
+            {overlay}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   useEffect(() => {
     loadStoreModel();

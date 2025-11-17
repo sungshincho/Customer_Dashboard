@@ -157,6 +157,7 @@ const FootfallAnalysis = () => {
                   <Store3DViewer 
                     key={`${selectedStore.id}-${refreshKey}`}
                     height="600px"
+                    sceneRecipe={sceneRecipe}
                     overlay={
                       <>
                         {showRealtimeIoT && (
