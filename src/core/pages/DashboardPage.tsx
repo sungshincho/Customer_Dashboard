@@ -10,59 +10,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { loadStoreDataset } from "@/utils/storageDataLoader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-const initialStats = [
-  {
-    title: "오늘 방문자",
-    value: "1,234",
-    change: "+12.5% 어제 대비",
-    changeType: "positive" as const,
-    icon: Users,
-  },
-  {
-    title: "총 매출",
-    value: "₩8,450,000",
-    change: "+8.2% 지난주 대비",
-    changeType: "positive" as const,
-    icon: DollarSign,
-  },
-  {
-    title: "재고 알림",
-    value: "23",
-    change: "5개 품목 긴급",
-    changeType: "negative" as const,
-    icon: Package,
-  },
-  {
-    title: "전환율",
-    value: "18.6%",
-    change: "+2.4% 지난주 대비",
-    changeType: "positive" as const,
-    icon: TrendingUp,
-  },
-];
-
-const visitorData = [
-  { time: "00:00", visitors: 45 },
-  { time: "03:00", visitors: 32 },
-  { time: "06:00", visitors: 58 },
-  { time: "09:00", visitors: 124 },
-  { time: "12:00", visitors: 203 },
-  { time: "15:00", visitors: 186 },
-  { time: "18:00", visitors: 245 },
-  { time: "21:00", visitors: 178 },
-];
-
-const salesData = [
-  { store: "강남점", sales: 4200 },
-  { store: "홍대점", sales: 3800 },
-  { store: "명동점", sales: 5100 },
-  { store: "잠실점", sales: 3500 },
-];
-
 const Dashboard = () => {
   const { selectedStore } = useSelectedStore();
   const { user } = useAuth();
-  const [stats, setStats] = useState(initialStats);
+  const [stats, setStats] = useState<any[]>([]);
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
   const [storeData, setStoreData] = useState<any>({});
   const [loading, setLoading] = useState(false);
