@@ -17,9 +17,10 @@ import {
   Package, Calendar, LucideIcon, Layers, Building2, Box,
   Barcode, Shirt, ShoppingBag, DollarSign, Receipt, Percent,
   Clock, Target, TrendingDown, PieChart, BarChart3, Globe,
-  Navigation, Zap, Activity, AlertTriangle, CheckCircle, Loader2
+  Navigation, Zap, Activity, AlertTriangle, CheckCircle, Loader2, FileCheck2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { verifyAndCleanupModelUrls } from "@/features/digital-twin/utils";
 
 interface PropertyField {
   id: string;
@@ -266,6 +267,41 @@ export const EntityTypeManager = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["entity-types"] });
       toast({ title: "엔티티 타입이 삭제되었습니다" });
+    },
+  });
+
+  const verifyModelUrlsMutation = useMutation({
+    mutationFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('로그인이 필요합니다');
+      
+      return await verifyAndCleanupModelUrls(user.id);
+    },
+    onSuccess: (result) => {
+      if (result.success) {
+        queryClient.invalidateQueries({ queryKey: ["entity-types"] });
+        
+        if (result.cleaned === 0) {
+          toast({
+            title: "검증 완료",
+            description: `${result.checked}개 모델 URL 검증 완료. 문제없음.`,
+          });
+        } else {
+          toast({
+            title: "자동 정리 완료",
+            description: `${result.checked}개 검증, ${result.cleaned}개 잘못된 URL 제거됨`,
+          });
+        }
+      } else {
+        throw new Error(result.error || '검증 실패');
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "검증 실패",
+        description: error.message,
+        variant: "destructive"
+      });
     },
   });
 
@@ -676,6 +712,19 @@ export const EntityTypeManager = () => {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button 
+            variant="outline"
+            size="sm"
+            onClick={() => verifyModelUrlsMutation.mutate()}
+            disabled={verifyModelUrlsMutation.isPending}
+          >
+            {verifyModelUrlsMutation.isPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <FileCheck2 className="h-4 w-4 mr-2" />
+            )}
+            3D 모델 URL 검증
+          </Button>
           <Button 
             variant="outline"
             onClick={() => createDefaultEntitiesMutation.mutate()}
