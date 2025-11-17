@@ -60,7 +60,7 @@ export default function DigitalTwin3DPage() {
     if (!user) return;
     
     if (entitiesWithModels.length === 0) {
-      toast.error("3D 모델이 있는 온톨로지 엔티티가 없습니다. 먼저 '3D 데이터 설정' 페이지에서 샘플 데이터를 추가하세요.");
+      toast.error("3D 모델이 있는 온톨로지 엔티티가 없습니다. '통합 데이터 관리' 페이지에서 3D 모델을 업로드하세요.");
       return;
     }
     

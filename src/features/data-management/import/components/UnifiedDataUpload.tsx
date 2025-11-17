@@ -207,9 +207,8 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
         try {
           const { data: mappingResult, error: mappingError } = await supabase.functions.invoke('analyze-3d-model', {
             body: {
-              fileName: uploadFile.file.name,
-              fileUrl: publicUrl,
-              storeId,
+              fileName: safeFileName,
+              fileUrl: publicUrl
             }
           });
           
@@ -230,19 +229,19 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
               confidence: mappingResult.analysis?.confidence || 0
             });
           } else {
-            // 자동 매핑 실패 - 수동 매핑 필요
-            const errorMsg = mappingError?.message || mappingResult?.error || '자동 매핑 실패';
+            // 자동 매핑 실패 - 업로드는 성공
+            const errorMsg = mappingError?.message || mappingResult?.error || '매칭되는 온톨로지 엔티티 타입을 찾을 수 없습니다';
             console.warn('Auto-mapping failed:', errorMsg);
             updateFileStatus(uploadFile.id, 'success', undefined, 100, {
               autoMapped: false,
-              message: `업로드 완료. ${errorMsg}. "3D 데이터 설정" 페이지에서 수동 매핑해주세요.`
+              message: `업로드 완료. ${errorMsg}. 온톨로지 스키마에서 해당 엔티티 타입을 먼저 생성하거나, 디지털 트윈 페이지에서 자동 생성을 사용하세요.`
             });
           }
         } catch (err) {
           console.warn('Auto-mapping failed, manual mapping required:', err);
           updateFileStatus(uploadFile.id, 'success', undefined, 100, {
             autoMapped: false,
-            message: '업로드 완료. "3D 데이터 설정" 페이지에서 매핑해주세요.'
+            message: '업로드 완료. 온톨로지 스키마에서 엔티티 타입을 생성하거나 디지털 트윈 페이지의 자동 생성을 사용하세요.'
           });
         }
         
