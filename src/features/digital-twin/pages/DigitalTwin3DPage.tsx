@@ -16,8 +16,10 @@ import { useOntologyEntities, transformToGraphData } from "@/hooks/useOntologyDa
 import { useWiFiTracking } from "@/hooks/useWiFiTracking";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Box, Lightbulb, Layout, Database, Sparkles, Wifi, MapPin } from "lucide-react";
+import { Loader2, Box, Lightbulb, Layout, Database, Sparkles, Wifi, MapPin, Save, Trash2 } from "lucide-react";
 import type { SceneRecipe, AILayoutResult } from "@/types/scene3d";
+import { useStoreScene } from "@/hooks/useStoreScene";
+import { CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 export default function DigitalTwin3DPage() {
   const { user } = useAuth();
@@ -27,6 +29,9 @@ export default function DigitalTwin3DPage() {
   const [analyzingLayout, setAnalyzingLayout] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<{ id: string; type: string } | null>(null);
   const [wifiMode, setWifiMode] = useState<'realtime' | 'heatmap' | 'paths'>('realtime');
+  
+  // 씬 관리 훅
+  const { activeScene, allScenes, saveScene, setActiveScene, deleteScene, isSaving } = useStoreScene();
   
   // WiFi 트래킹 데이터 로드
   const { 
@@ -68,6 +73,14 @@ export default function DigitalTwin3DPage() {
   const entitiesWithModels = useMemo(() => {
     return entityTypes.filter((type: any) => type.model_3d_url);
   }, [entityTypes]);
+
+  // 활성 씬 자동 로드
+  useEffect(() => {
+    if (activeScene?.recipe_data && !recipe) {
+      setRecipe(activeScene.recipe_data);
+      toast.success('저장된 씬을 불러왔습니다');
+    }
+  }, [activeScene, recipe]);
 
   const handleGenerateScene = async () => {
     if (!user) return;
@@ -115,7 +128,10 @@ export default function DigitalTwin3DPage() {
 
       const generatedRecipe = await generateSceneRecipe(aiResult, user.id);
       setRecipe(generatedRecipe);
-      toast.success("온톨로지 기반 3D 씬이 생성되었습니다");
+      
+      // 자동 저장
+      await saveScene(generatedRecipe, `씬 ${new Date().toLocaleString('ko-KR')}`);
+      toast.success("3D 씬이 생성되고 저장되었습니다");
     } catch (error) {
       console.error('Scene generation error:', error);
       toast.error("씬 생성 중 오류가 발생했습니다");
@@ -339,8 +355,12 @@ export default function DigitalTwin3DPage() {
 
           {/* Controls Panel */}
           <Card className="p-6">
-            <Tabs defaultValue="lighting">
-              <TabsList className="grid w-full grid-cols-3">
+            <Tabs defaultValue="scenes">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="scenes">
+                  <Database className="w-4 h-4 mr-2" />
+                  씬
+                </TabsTrigger>
                 <TabsTrigger value="lighting">
                   <Lightbulb className="w-4 h-4 mr-2" />
                   조명
@@ -354,6 +374,84 @@ export default function DigitalTwin3DPage() {
                   WiFi
                 </TabsTrigger>
               </TabsList>
+
+              <TabsContent value="scenes" className="space-y-4">
+                <div>
+                  <h3 className="font-semibold mb-3">저장된 씬</h3>
+                  {allScenes.length > 0 ? (
+                    <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                      {allScenes.map((scene) => (
+                        <div 
+                          key={scene.id}
+                          className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent transition-colors"
+                        >
+                          <div className="flex-1 min-w-0 mr-2">
+                            <p className="text-sm font-medium truncate">
+                              {scene.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(scene.updated_at).toLocaleString('ko-KR', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </p>
+                          </div>
+                          <div className="flex gap-1">
+                            {scene.is_active ? (
+                              <Badge variant="default" className="text-xs">활성</Badge>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  setActiveScene(scene.id);
+                                  setRecipe(scene.recipe_data);
+                                }}
+                              >
+                                선택
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => deleteScene(scene.id)}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      저장된 씬이 없습니다
+                    </p>
+                  )}
+                </div>
+
+                {recipe && (
+                  <Button
+                    onClick={() => saveScene(recipe, activeScene?.name || `씬 ${new Date().toLocaleString('ko-KR')}`)}
+                    disabled={isSaving}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        저장 중...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        현재 씬 저장
+                      </>
+                    )}
+                  </Button>
+                )}
+              </TabsContent>
 
               <TabsContent value="lighting" className="space-y-4">
                 <div>
