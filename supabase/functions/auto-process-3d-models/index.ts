@@ -90,21 +90,27 @@ ${existingTypes?.map(et => `- ${et.name}: ${et.label}`).join('\n') || 'None'}
 Base Name: "${baseName}"
 
 Tasks:
-1. Infer what this represents (e.g., mannequin, display table, shelf)
+1. Infer what this represents (e.g., mannequin, display table, shelf, store building)
 2. If it matches an existing entity type, return that name
 3. If not, suggest a new entity type name and label (Korean)
 4. Suggest dimensions (width, height, depth in meters)
-5. Determine type: furniture, product, or other
+5. Determine type: space, furniture, product, or other
 
 Return JSON:
 {
   "entity_type_name": "Display" or new name,
   "entity_type_label": "디스플레이" or new label,
   "is_new_type": true/false,
-  "type": "furniture",
+  "type": "space" | "furniture" | "product" | "other",
   "suggested_dimensions": {"width": 0.4, "height": 1.6, "depth": 0.4},
   "reasoning": "explanation"
-}`;
+}
+
+Important Type Guidelines:
+- Use "space" for: Store, Room, Building, Floor (large environment/structure models)
+- Use "furniture" for: Shelves, Tables, Displays, Counters, Mannequins, Racks
+- Use "product" for: Individual sellable items
+- Use "other" only if none of the above apply`;
 
       const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
