@@ -30,3 +30,6 @@ verify_jwt = true
 [functions.auto-generate-store-data]
 verify_jwt = true
 
+[functions.auto-process-3d-models]
+verify_jwt = true
+
