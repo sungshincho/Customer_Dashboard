@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,25 +37,37 @@ export default function DigitalTwin3DPage() {
     refresh: refreshWiFi 
   } = useWiFiTracking(selectedStore?.id);
 
-  // 온톨로지 데이터 로드
-  const { data: allEntities = [], isLoading: entitiesLoading } = useOntologyEntities();
+  // 온톨로지 엔티티 타입 직접 로드 (3D 모델 확인용)
+  const { data: entityTypes = [], isLoading: entitiesLoading } = useQuery({
+    queryKey: ['ontology-entity-types-with-models', selectedStore?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('ontology_entity_types')
+        .select('*')
+        .not('model_3d_url', 'is', null);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user && !!selectedStore
+  });
+  
+  // 온톨로지 데이터 로드 (엔티티 인스턴스)
+  const { data: allEntities = [] } = useOntologyEntities();
   
   // 엔티티 타입별 통계
   const entityStats = useMemo(() => {
     const stats: Record<string, number> = {};
-    allEntities.forEach((entity: any) => {
-      const typeName = entity.entity_type?.name || 'unknown';
-      stats[typeName] = (stats[typeName] || 0) + 1;
+    entityTypes.forEach((type: any) => {
+      stats[type.name] = 1; // 타입별로 1개씩
     });
     return stats;
-  }, [allEntities]);
+  }, [entityTypes]);
 
-  // 3D 모델이 있는 엔티티만 필터링
+  // 3D 모델이 있는 엔티티 타입만 필터링
   const entitiesWithModels = useMemo(() => {
-    return allEntities.filter((entity: any) => 
-      entity.entity_type?.model_3d_url
-    );
-  }, [allEntities]);
+    return entityTypes.filter((type: any) => type.model_3d_url);
+  }, [entityTypes]);
 
   const handleGenerateScene = async () => {
     if (!user) return;
@@ -66,26 +79,26 @@ export default function DigitalTwin3DPage() {
     
     setLoading(true);
     try {
-      // 실제 온톨로지 엔티티 기반으로 레이아웃 구성
+      // 실제 온톨로지 엔티티 타입 기반으로 레이아웃 구성
       const furniture = entitiesWithModels
-        .filter((e: any) => ['shelf', 'displaytable', 'furniture'].includes(e.entity_type?.name?.toLowerCase()))
-        .map((e: any, idx: number) => ({
-          furniture_id: e.id,
-          entity_type: e.entity_type?.name || 'Unknown',
+        .filter((type: any) => ['shelf', 'rack', 'displaytable', 'furniture'].includes(type.name?.toLowerCase()))
+        .map((type: any, idx: number) => ({
+          furniture_id: type.id,
+          entity_type: type.name || 'Unknown',
           movable: true,
-          current_position: e.model_3d_position || { x: (idx - 1) * 3, y: 0, z: -5 },
-          position: e.model_3d_position || { x: (idx - 1) * 3, y: 0, z: -5 },
-          rotation: e.model_3d_rotation || { x: 0, y: 0, z: 0 }
+          current_position: { x: (idx - 1) * 3, y: 0, z: -5 },
+          position: { x: (idx - 1) * 3, y: 0, z: -5 },
+          rotation: { x: 0, y: 0, z: 0 }
         }));
 
       const products = entitiesWithModels
-        .filter((e: any) => e.entity_type?.name?.toLowerCase() === 'product')
-        .map((e: any, idx: number) => ({
-          product_id: e.id,
-          entity_type: e.entity_type?.name || 'Product',
+        .filter((type: any) => type.name?.toLowerCase() === 'product')
+        .map((type: any, idx: number) => ({
+          product_id: type.id,
+          entity_type: type.name || 'Product',
           movable: true,
-          current_position: e.model_3d_position || { x: (idx - 1) * 2, y: 1, z: -4 },
-          position: e.model_3d_position || { x: (idx - 1) * 2, y: 1, z: -4 }
+          current_position: { x: (idx - 1) * 2, y: 1, z: -4 },
+          position: { x: (idx - 1) * 2, y: 1, z: -4 }
         }));
 
       const aiResult: AILayoutResult = {
