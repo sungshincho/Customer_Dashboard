@@ -34,5 +34,5 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.cleanup-deleted-models]
-verify_jwt = false
+verify_jwt = true
 
