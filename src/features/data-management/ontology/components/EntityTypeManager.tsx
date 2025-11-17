@@ -40,6 +40,13 @@ interface EntityType {
   color: string | null;
   icon: string | null;
   properties: PropertyField[];
+  model_3d_url: string | null;
+  model_3d_dimensions: {
+    width: number;
+    height: number;
+    depth: number;
+  } | null;
+  model_3d_type: string | null;
 }
 
 // 리테일 비즈니스 도메인 아이콘 프리셋
@@ -173,10 +180,17 @@ export const EntityTypeManager = () => {
         } else if (Array.isArray(item.properties)) {
           properties = item.properties as unknown as PropertyField[];
         }
+
+        // Parse model_3d_dimensions if it exists
+        let model_3d_dimensions = null;
+        if (item.model_3d_dimensions && typeof item.model_3d_dimensions === 'object') {
+          model_3d_dimensions = item.model_3d_dimensions as { width: number; height: number; depth: number };
+        }
         
         return {
           ...item,
-          properties
+          properties,
+          model_3d_dimensions,
         };
       }) as EntityType[];
     },
@@ -252,6 +266,33 @@ export const EntityTypeManager = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["entity-types"] });
       toast({ title: "엔티티 타입이 삭제되었습니다" });
+    },
+  });
+
+  const remove3DModelMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("ontology_entity_types")
+        .update({
+          model_3d_url: null,
+          model_3d_dimensions: null,
+          model_3d_type: null,
+          model_3d_metadata: null,
+        })
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["entity-types"] });
+      toast({ title: "3D 모델이 제거되었습니다" });
+    },
+    onError: (error) => {
+      toast({ 
+        title: "3D 모델 제거 실패", 
+        description: error.message, 
+        variant: "destructive" 
+      });
     },
   });
 
@@ -919,13 +960,18 @@ export const EntityTypeManager = () => {
                   </div>
                   <div>
                     <CardTitle className="text-base">{entity.label}</CardTitle>
-                    <div className="flex gap-1 mt-1">
+                    <div className="flex gap-1 mt-1 flex-wrap">
                       <Badge variant="outline" className="text-xs">
                         {entity.name}
                       </Badge>
                       {entity.properties && entity.properties.length > 0 && (
                         <Badge variant="secondary" className="text-xs">
                           속성 {entity.properties.length}개
+                        </Badge>
+                      )}
+                      {entity.model_3d_url && (
+                        <Badge variant="default" className="text-xs bg-primary">
+                          3D 모델 연결됨
                         </Badge>
                       )}
                     </div>
@@ -951,11 +997,51 @@ export const EntityTypeManager = () => {
                 </div>
               </div>
             </CardHeader>
-            {entity.description && (
-              <CardContent>
+            <CardContent className="space-y-2">
+              {entity.description && (
                 <p className="text-sm text-muted-foreground">{entity.description}</p>
-              </CardContent>
-            )}
+              )}
+              {entity.model_3d_url && (
+                <div className="pt-2 border-t space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-muted-foreground">
+                      <p className="font-medium">3D 모델 정보</p>
+                      {entity.model_3d_dimensions && (
+                        <p className="mt-1">
+                          크기: {entity.model_3d_dimensions.width}m × {entity.model_3d_dimensions.height}m × {entity.model_3d_dimensions.depth}m
+                        </p>
+                      )}
+                      <p className="mt-1 truncate max-w-[200px]" title={entity.model_3d_url}>
+                        {entity.model_3d_url.split('/').pop()}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => {
+                      if (confirm(`"${entity.label}" 타입에서 3D 모델을 제거하시겠습니까?\n\n이 작업은 엔티티 타입과의 연결만 해제하며, Storage에서 파일을 삭제하지는 않습니다.`)) {
+                        remove3DModelMutation.mutate(entity.id);
+                      }
+                    }}
+                    disabled={remove3DModelMutation.isPending}
+                  >
+                    {remove3DModelMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        제거 중...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        3D 모델 제거
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
           </Card>
         ))}
       </div>
