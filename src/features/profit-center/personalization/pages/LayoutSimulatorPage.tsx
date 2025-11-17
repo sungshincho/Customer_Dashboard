@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { AdvancedFilters, FilterState } from "@/features/data-management/analysis/components/AdvancedFilters";
 import { ExportButton } from "@/features/data-management/analysis/components/ExportButton";
 import { AIInsights, Insight } from "@/features/data-management/analysis/components/AIInsights";
-import { AlertSettings, Alert } from "@/features/data-management/analysis/components/AlertSettings";
+import { AlertSettings, Alert as AlertType } from "@/features/data-management/analysis/components/AlertSettings";
 import { ComparisonView } from "@/features/data-management/analysis/components/ComparisonView";
 import { AIAnalysisButton } from "@/features/data-management/analysis/components/AIAnalysisButton";
 import { AnalysisHistory } from "@/features/data-management/analysis/components/AnalysisHistory";
@@ -16,13 +16,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { loadStoreDataset } from "@/utils/storageDataLoader";
 import { DataReadinessGuard } from "@/components/DataReadinessGuard";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const LayoutSimulatorPage = () => {
   const { user } = useAuth();
   const { selectedStore } = useSelectedStore();
   const [refreshKey, setRefreshKey] = useState(0);
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
-  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [alerts, setAlerts] = useState<AlertType[]>([]);
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
   const [historyRefresh, setHistoryRefresh] = useState(0);
   const [storeData, setStoreData] = useState<any>({});
@@ -93,12 +94,12 @@ const LayoutSimulatorPage = () => {
         </div>
 
         {totalVisits > 0 && (
-          <AlertUI className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+          <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
             <AlertCircle className="h-4 w-4 text-blue-600" />
             <AlertDescription>
               {selectedStore.store_name} 데이터: {totalVisits}건 방문, 평균 체류시간 {avgDwellTime}분
             </AlertDescription>
-          </AlertUI>
+          </Alert>
         )}
         
         <AdvancedFilters filters={filters} onFiltersChange={setFilters} />

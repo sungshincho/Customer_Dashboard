@@ -1,12 +1,12 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { ProductPerformance } from "@/features/cost-center/automation/components/ProductPerformance";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Database } from "lucide-react";
+import { RefreshCw, Database, AlertCircle } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { AdvancedFilters, FilterState } from "@/features/data-management/analysis/components/AdvancedFilters";
 import { ExportButton } from "@/features/data-management/analysis/components/ExportButton";
 import { AIInsights, Insight } from "@/features/data-management/analysis/components/AIInsights";
-import { AlertSettings, Alert } from "@/features/data-management/analysis/components/AlertSettings";
+import { AlertSettings, Alert as AlertType } from "@/features/data-management/analysis/components/AlertSettings";
 import { ComparisonView } from "@/features/data-management/analysis/components/ComparisonView";
 import { AIAnalysisButton } from "@/features/data-management/analysis/components/AIAnalysisButton";
 import { AnalysisHistory } from "@/features/data-management/analysis/components/AnalysisHistory";
@@ -16,11 +16,12 @@ import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { useAuth } from "@/hooks/useAuth";
 import { loadStoreDataset } from "@/utils/storageDataLoader";
 import { DataReadinessGuard } from "@/components/DataReadinessGuard";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const ProductPerformancePage = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
-  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [alerts, setAlerts] = useState<AlertType[]>([]);
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
   const [historyRefresh, setHistoryRefresh] = useState(0);
   const { selectedStore } = useSelectedStore();
@@ -83,8 +84,9 @@ const ProductPerformancePage = () => {
   };
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <DataReadinessGuard>
+      <DashboardLayout>
+        <div className="space-y-6">
         <div className="flex items-center justify-between animate-fade-in">
           <div>
             <h1 className="text-3xl font-bold gradient-text">상품 성과 분석</h1>
@@ -102,21 +104,21 @@ const ProductPerformancePage = () => {
         </div>
 
         {!selectedStore ? (
-          <AlertUI>
+          <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               매장을 선택하면 해당 매장의 상품 성과 데이터를 확인할 수 있습니다.
             </AlertDescription>
-          </AlertUI>
+          </Alert>
         ) : (
           <>
             {graphData.nodes.length > 0 && (
-              <AlertUI className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+              <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
                 <Database className="h-4 w-4 text-blue-600" />
                 <AlertDescription>
                   온톨로지 데이터: {productEntities.length}개 상품, {purchaseEntities.length}개 구매 기록 연동됨
                 </AlertDescription>
-              </AlertUI>
+              </Alert>
             )}
             
             <AdvancedFilters filters={filters} onFiltersChange={setFilters} />
@@ -132,12 +134,12 @@ const ProductPerformancePage = () => {
               
               <TabsContent value="analysis" className="space-y-6">
                 {totalProducts > 0 && (
-                  <AlertUI className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+                  <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
                     <AlertCircle className="h-4 w-4 text-blue-600" />
                     <AlertDescription>
                       {selectedStore.store_name} 상품 데이터: {totalProducts}개 상품, {totalPurchases}건 구매 기록
                     </AlertDescription>
-                  </AlertUI>
+                  </Alert>
                 )}
                 
                 <AIAnalysisButton
@@ -177,11 +179,11 @@ const ProductPerformancePage = () => {
                   availableMetrics={["판매량", "매출", "재고 수준", "회전율"]}
                 />
               </TabsContent>
-            </Tabs>
-          </>
-        )}
-      </div>
-    </DashboardLayout>
+              </Tabs>
+            </>
+          )}
+        </div>
+      </DashboardLayout>
     </DataReadinessGuard>
   );
 };

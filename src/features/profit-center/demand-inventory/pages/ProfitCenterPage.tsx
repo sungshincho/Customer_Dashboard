@@ -16,6 +16,7 @@ import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { useAuth } from "@/hooks/useAuth";
 import { loadStoreDataset } from "@/utils/storageDataLoader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { DataReadinessGuard } from "@/components/DataReadinessGuard";
 
 const ProfitCenterPage = () => {
   const { selectedStore } = useSelectedStore();
@@ -150,8 +151,9 @@ const ProfitCenterPage = () => {
   }
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <DataReadinessGuard>
+      <DashboardLayout>
+        <div className="space-y-6">
         <div className="flex items-center justify-between animate-fade-in">
           <div>
             <h1 className="text-3xl font-bold gradient-text">Profit Center 통합 대시보드</h1>
@@ -504,9 +506,9 @@ const ProfitCenterPage = () => {
               </CardContent>
             </Card>
           </TabsContent>
-        </Tabs>
-      </div>
-    </DashboardLayout>
+          </Tabs>
+        </div>
+      </DashboardLayout>
     </DataReadinessGuard>
   );
 };

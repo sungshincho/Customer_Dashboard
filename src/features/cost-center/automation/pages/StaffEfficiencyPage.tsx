@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 import { AdvancedFilters, FilterState } from "@/features/data-management/analysis/components/AdvancedFilters";
 import { ExportButton } from "@/features/data-management/analysis/components/ExportButton";
 import { AIInsights, Insight } from "@/features/data-management/analysis/components/AIInsights";
-import { AlertSettings, Alert } from "@/features/data-management/analysis/components/AlertSettings";
+import { AlertSettings, Alert as AlertType } from "@/features/data-management/analysis/components/AlertSettings";
 import { ComparisonView } from "@/features/data-management/analysis/components/ComparisonView";
 import { AIAnalysisButton } from "@/features/data-management/analysis/components/AIAnalysisButton";
 import { AnalysisHistory } from "@/features/data-management/analysis/components/AnalysisHistory";
@@ -16,11 +16,12 @@ import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { useAuth } from "@/hooks/useAuth";
 import { loadStoreDataset } from "@/utils/storageDataLoader";
 import { DataReadinessGuard } from "@/components/DataReadinessGuard";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const StaffEfficiencyPage = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
-  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [alerts, setAlerts] = useState<AlertType[]>([]);
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
   const [historyRefresh, setHistoryRefresh] = useState(0);
   const { selectedStore } = useSelectedStore();
@@ -94,12 +95,12 @@ const StaffEfficiencyPage = () => {
         </div>
 
         {!selectedStore ? (
-          <AlertUI>
+          <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               매장을 선택하면 해당 매장의 직원 효율성 데이터를 확인할 수 있습니다.
             </AlertDescription>
-          </AlertUI>
+          </Alert>
         ) : (
           <>
             <AdvancedFilters filters={filters} onFiltersChange={setFilters} />
@@ -119,12 +120,12 @@ const StaffEfficiencyPage = () => {
           
           <TabsContent value="analysis" className="space-y-6">
                 {totalStaff > 0 && (
-                  <AlertUI className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+                  <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
                     <AlertCircle className="h-4 w-4 text-blue-600" />
                     <AlertDescription>
                       {selectedStore.store_name} 직원 데이터: {totalStaff}명, 평균 성과 {Math.round(avgPerformance)}%
                     </AlertDescription>
-                  </AlertUI>
+                  </Alert>
                 )}
                 
                 <AIAnalysisButton
