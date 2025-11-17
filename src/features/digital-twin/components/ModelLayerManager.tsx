@@ -48,6 +48,19 @@ export function ModelLayerManager({
     setLocalActive(activeLayers);
   }, [activeLayers]);
 
+  // 파일명에서 베이스 이름 추출 (mannequin_1 -> mannequin)
+  const getBaseName = (name: string): string => {
+    // 언더스코어 + 숫자 패턴 제거 (예: mannequin_1 -> mannequin)
+    const baseMatch = name.match(/^(.+?)_\d+$/);
+    if (baseMatch) return baseMatch[1];
+    
+    // 언더스코어만 있는 경우 제거 (예: mannequin_ -> mannequin)
+    const underscoreMatch = name.match(/^(.+?)_$/);
+    if (underscoreMatch) return underscoreMatch[1];
+    
+    return name;
+  };
+
   // 엔티티 타입별로 그룹화 (인스턴스 포함)
   const groupedByEntityType = models.reduce((acc, model) => {
     // 엔티티 인스턴스인 경우
@@ -62,9 +75,13 @@ export function ModelLayerManager({
       }
       acc[entityTypeName].instances.push(model);
     }
-    // 스토리지 또는 타입만 있는 모델
+    // 스토리지 또는 온톨로지 타입 모델
     else {
-      const key = model.name;
+      // Storage 파일인 경우 베이스 이름으로 그룹화
+      const key = model.id.startsWith('storage-') 
+        ? getBaseName(model.name)
+        : model.name;
+      
       if (!acc[key]) {
         acc[key] = {
           type: model.type,
