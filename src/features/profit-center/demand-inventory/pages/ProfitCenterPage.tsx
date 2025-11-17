@@ -158,7 +158,7 @@ const ProfitCenterPage = () => {
           <div>
             <h1 className="text-3xl font-bold gradient-text">Profit Center 통합 대시보드</h1>
             <p className="mt-2 text-muted-foreground">
-              {selectedStore.store_name} - 수요 예측 기반 재고 최적화 및 매출 극대화
+              {selectedStore ? `${selectedStore.store_name} - 수요 예측 기반 재고 최적화 및 매출 극대화` : '수요 예측 기반 재고 최적화 및 매출 극대화'}
             </p>
           </div>
           <div className="flex gap-2">
@@ -173,7 +173,8 @@ const ProfitCenterPage = () => {
           <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
             <AlertCircle className="h-4 w-4 text-blue-600" />
             <AlertDescription>
-              {selectedStore.store_name} 데이터: {storeData.products.length}개 상품, {storeData.purchases?.length || 0}건 구매
+              {selectedStore ? `${selectedStore.store_name} 데이터: ` : ''}
+              {storeData.products.length}개 상품, {storeData.purchases?.length || 0}건 구매
             </AlertDescription>
           </Alert>
         )}

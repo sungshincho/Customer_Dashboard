@@ -81,7 +81,7 @@ const LayoutSimulatorPage = () => {
           <div>
             <h1 className="text-3xl font-bold gradient-text">매장 레이아웃 시뮬레이터</h1>
             <p className="mt-2 text-muted-foreground">
-              {selectedStore.store_name} - AI 기반 최적 배치 시뮬레이션
+              {selectedStore ? `${selectedStore.store_name} - AI 기반 최적 배치 시뮬레이션` : 'AI 기반 최적 배치 시뮬레이션'}
             </p>
           </div>
           <div className="flex gap-2">
@@ -97,7 +97,8 @@ const LayoutSimulatorPage = () => {
           <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
             <AlertCircle className="h-4 w-4 text-blue-600" />
             <AlertDescription>
-              {selectedStore.store_name} 데이터: {totalVisits}건 방문, 평균 체류시간 {avgDwellTime}분
+              {selectedStore ? `${selectedStore.store_name} 데이터: ` : ''}
+              {totalVisits}건 방문, 평균 체류시간 {avgDwellTime}분
             </AlertDescription>
           </Alert>
         )}

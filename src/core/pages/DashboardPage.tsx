@@ -103,7 +103,7 @@ const Dashboard = () => {
         <div className="animate-fade-in">
           <h1 className="text-3xl font-bold gradient-text">실시간 대시보드</h1>
           <p className="mt-2 text-muted-foreground">
-            {selectedStore.store_name} - 매장 운영 현황 및 주요 지표
+            {selectedStore ? `${selectedStore.store_name} - 매장 운영 현황 및 주요 지표` : '매장 운영 현황 및 주요 지표'}
           </p>
         </div>
 
@@ -111,7 +111,8 @@ const Dashboard = () => {
           <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
             <AlertCircle className="h-4 w-4 text-blue-600" />
             <AlertDescription>
-              {selectedStore.store_name} 데이터: {storeData.visits.length}건 방문, {storeData.purchases?.length || 0}건 구매
+              {selectedStore ? `${selectedStore.store_name} 데이터: ` : ''}
+              {storeData.visits.length}건 방문, {storeData.purchases?.length || 0}건 구매
             </AlertDescription>
           </Alert>
         )}
