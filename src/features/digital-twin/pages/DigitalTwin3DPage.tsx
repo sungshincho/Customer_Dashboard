@@ -7,11 +7,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { SceneComposer } from "../components";
 import { ModelLayerManager } from "../components/ModelLayerManager";
+import { StorageToInstanceConverter } from "../components/StorageToInstanceConverter";
 import type { ModelLayer } from "../components/ModelLayerManager";
 import { loadUserModels } from "../utils/modelLayerLoader";
 import { useAuth } from "@/hooks/useAuth";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { useStoreScene } from "@/hooks/useStoreScene";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, Save, Trash2, Layers, Eye, RefreshCw, AlertCircle, ArrowRight } from "lucide-react";
 import type { SceneRecipe, LightingPreset } from "@/types/scene3d";
@@ -25,6 +27,7 @@ export default function DigitalTwin3DPage() {
   const [activeLayers, setActiveLayers] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [sceneName, setSceneName] = useState('');
+  const [entityTypes, setEntityTypes] = useState<Array<{ id: string; name: string; label: string }>>([]);
 
   const loadModels = async () => {
     if (!user) return;
@@ -42,8 +45,25 @@ export default function DigitalTwin3DPage() {
     }
   };
 
+  const loadEntityTypes = async () => {
+    if (!user) return;
+    try {
+      const { data } = await supabase
+        .from('ontology_entity_types')
+        .select('id, name, label')
+        .eq('user_id', user.id);
+      
+      if (data) {
+        setEntityTypes(data);
+      }
+    } catch (error) {
+      console.error('Failed to load entity types:', error);
+    }
+  };
+
   useEffect(() => {
     loadModels();
+    loadEntityTypes();
   }, [user, selectedStore]);
 
   useEffect(() => {
@@ -149,6 +169,16 @@ export default function DigitalTwin3DPage() {
               storeId={selectedStore?.id}
               onModelsReload={loadModels}
             />
+            
+            {selectedStore && (
+              <StorageToInstanceConverter
+                storageModels={models.filter(m => m.id.startsWith('storage-'))}
+                entityTypes={entityTypes}
+                userId={user!.id}
+                storeId={selectedStore.id}
+                onConversionComplete={loadModels}
+              />
+            )}
               <Card>
                 <CardHeader><CardTitle>씬 저장</CardTitle></CardHeader>
                 <CardContent className="space-y-4">

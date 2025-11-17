@@ -102,15 +102,20 @@ export async function loadUserModels(
     if (entities) {
       for (const entity of entities) {
         const entityType = entityTypes?.find(et => et.id === entity.entity_type_id);
-        if (!entityType || !entityType.model_3d_url) continue;
+        if (!entityType) continue;
 
         const type = inferModelTypeFromEntityType(entityType.name);
+        
+        // Properties에 model_url이 있으면 (Storage 변환 인스턴스) 그것을 사용
+        const properties = entity.properties as any;
+        const modelUrl = properties?.model_url || entityType.model_3d_url;
+        if (!modelUrl) continue;
 
         models.push({
           id: `entity-${entity.id}`,
           name: entity.label,
           type,
-          model_url: entityType.model_3d_url,
+          model_url: modelUrl,
           dimensions: entityType.model_3d_dimensions as any,
           position: entity.model_3d_position as any || { x: 0, y: 0, z: 0 },
           rotation: entity.model_3d_rotation as any || { x: 0, y: 0, z: 0 },
