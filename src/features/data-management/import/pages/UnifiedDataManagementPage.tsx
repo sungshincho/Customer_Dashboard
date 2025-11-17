@@ -4,20 +4,16 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Upload, 
-  Wifi, 
-  Box, 
   History, 
-  FileSpreadsheet,
-  Network
+  Network,
+  Database
 } from "lucide-react";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { useToast } from "@/hooks/use-toast";
 
 // 통합 컴포넌트 임포트
 import { UnifiedDataUpload } from "../components/UnifiedDataUpload";
-import { CSVDataImport } from "../components/CSVDataImport";
-import { ThreeDModelUpload } from "../components/ThreeDModelUpload";
-import { WiFiDataManagement } from "../components/WiFiDataManagement";
+import { StorageManager } from "../components/StorageManager";
 import { OntologyDataManagement } from "../components/OntologyDataManagement";
 import { DataImportHistory } from "../components/DataImportHistory";
 import { DataStatistics } from "../components/DataStatistics";
@@ -55,22 +51,14 @@ export default function UnifiedDataManagementPage() {
 
         {/* 메인 탭 */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="unified">
               <Upload className="w-4 h-4 mr-2" />
               통합 업로드
             </TabsTrigger>
-            <TabsTrigger value="csv-import">
-              <FileSpreadsheet className="w-4 h-4 mr-2" />
-              CSV/Excel
-            </TabsTrigger>
-            <TabsTrigger value="3d-models">
-              <Box className="w-4 h-4 mr-2" />
-              3D 모델
-            </TabsTrigger>
-            <TabsTrigger value="wifi-data">
-              <Wifi className="w-4 h-4 mr-2" />
-              WiFi/IoT
+            <TabsTrigger value="storage">
+              <Database className="w-4 h-4 mr-2" />
+              스토리지
             </TabsTrigger>
             <TabsTrigger value="ontology">
               <Network className="w-4 h-4 mr-2" />
@@ -95,19 +83,9 @@ export default function UnifiedDataManagementPage() {
             />
           </TabsContent>
 
-          {/* CSV/Excel 임포트 탭 */}
-          <TabsContent value="csv-import" className="space-y-6">
-            <CSVDataImport storeId={selectedStore?.id} />
-          </TabsContent>
-
-          {/* 3D 모델 업로드 탭 */}
-          <TabsContent value="3d-models" className="space-y-6">
-            <ThreeDModelUpload storeId={selectedStore?.id} />
-          </TabsContent>
-
-          {/* WiFi 데이터 관리 탭 */}
-          <TabsContent value="wifi-data" className="space-y-6">
-            <WiFiDataManagement storeId={selectedStore?.id} />
+          {/* 스토리지 관리 탭 */}
+          <TabsContent value="storage" className="space-y-6">
+            <StorageManager storeId={selectedStore?.id} />
           </TabsContent>
 
           {/* 온톨로지 관리 탭 */}
