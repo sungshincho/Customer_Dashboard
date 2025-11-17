@@ -90,7 +90,7 @@ const InventoryOptimizerPage = () => {
           <div>
             <h1 className="text-3xl font-bold gradient-text">재고 최적화</h1>
             <p className="mt-2 text-muted-foreground">
-              {selectedStore.store_name} - 실시간 재고 관리 및 발주 권장
+              {selectedStore ? `${selectedStore.store_name} - 실시간 재고 관리 및 발주 권장` : '실시간 재고 관리 및 발주 권장'}
             </p>
           </div>
           <div className="flex gap-2">
@@ -106,7 +106,8 @@ const InventoryOptimizerPage = () => {
           <AlertUI className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
             <AlertCircle className="h-4 w-4 text-blue-600" />
             <AlertDescription>
-              {selectedStore.store_name} 재고 데이터: {totalProducts}개 상품, 회전율 {turnoverRate}회
+              {selectedStore ? `${selectedStore.store_name} 재고 데이터: ` : ''}
+              {totalProducts}개 상품, 회전율 {turnoverRate}회
             </AlertDescription>
           </AlertUI>
         )}
