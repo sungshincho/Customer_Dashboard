@@ -261,11 +261,11 @@ export default function DigitalTwin3DPage() {
           </Alert>
         )}
 
-        {allEntities.length === 0 && !entitiesLoading && (
+        {entityTypes.length === 0 && !entitiesLoading && (
           <Alert variant="destructive">
             <Database className="h-4 w-4" />
             <AlertDescription>
-              온톨로지 엔티티가 없습니다. '3D 데이터 설정' 페이지에서 샘플 데이터를 추가하세요.
+              3D 모델이 있는 온톨로지 엔티티 타입이 없습니다. '통합 데이터 관리' 페이지에서 3D 모델을 업로드하세요.
             </AlertDescription>
           </Alert>
         )}
