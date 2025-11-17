@@ -52,13 +52,13 @@ export async function loadUserModels(
       .eq('user_id', userId);
 
     // 3. 온톨로지 엔티티 인스턴스만 로드 (개별 인스턴스명으로 표시)
-    const entitiesQuery = supabase
+    let entitiesQuery = supabase
       .from('graph_entities')
       .select('*, entity_type:ontology_entity_types(*)')
       .eq('user_id', userId);
 
     if (storeId) {
-      entitiesQuery.eq('store_id', storeId);
+      entitiesQuery = entitiesQuery.eq('store_id', storeId);
     }
 
     const { data: entities } = await entitiesQuery;
