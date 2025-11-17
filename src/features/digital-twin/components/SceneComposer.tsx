@@ -1,4 +1,4 @@
-import { Suspense } from 'react';
+import { Suspense, ReactNode } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Environment } from '@react-three/drei';
 import type { SceneRecipe } from '@/types/scene3d';
@@ -11,9 +11,10 @@ import { HeatmapOverlay } from './HeatmapOverlay';
 interface SceneComposerProps {
   recipe: SceneRecipe;
   onAssetClick?: (assetId: string, assetType: string) => void;
+  overlay?: ReactNode;
 }
 
-export function SceneComposer({ recipe, onAssetClick }: SceneComposerProps) {
+export function SceneComposer({ recipe, onAssetClick, overlay }: SceneComposerProps) {
   return (
     <div className="w-full h-full">
       <Canvas shadows>
@@ -61,6 +62,9 @@ export function SceneComposer({ recipe, onAssetClick }: SceneComposerProps) {
             }
             return null;
           })}
+          
+          {/* Custom Overlay (e.g., customer avatars, tracking) */}
+          {overlay}
         </Suspense>
         
         <OrbitControls 
