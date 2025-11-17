@@ -11,10 +11,12 @@ import { trilaterate } from '../utils/coordinateMapper';
 import type { TrackingData, SensorPosition } from '../types/iot.types';
 import { useAuth } from '@/hooks/useAuth';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
+import { useStoreScene } from '@/hooks/useStoreScene';
 
 export default function WiFiTrackingDemoPage() {
   const { user } = useAuth();
   const { selectedStore } = useSelectedStore();
+  const { activeScene } = useStoreScene();
   
   const [sensors, setSensors] = useState<SensorPosition[]>([]);
   const [trackingData, setTrackingData] = useState<TrackingData[]>([]);
@@ -265,6 +267,7 @@ export default function WiFiTrackingDemoPage() {
           <div className="border rounded-lg overflow-hidden">
             <Store3DViewer
               height="600px"
+              sceneRecipe={activeScene?.recipe_data}
               overlay={
                 <WiFiTrackingOverlay
                   trackingData={processedData}

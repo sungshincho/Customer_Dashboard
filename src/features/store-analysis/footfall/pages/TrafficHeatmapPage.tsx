@@ -16,10 +16,12 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Store3DViewer } from "@/features/digital-twin/components/Store3DViewer";
 import { HeatmapOverlay3D } from "@/features/digital-twin/components/overlays";
 import { generateHeatPoints } from "@/features/digital-twin/utils/overlayDataConverter";
+import { useStoreScene } from "@/hooks/useStoreScene";
 
 const TrafficHeatmapPage = () => {
   const { user } = useAuth();
   const { selectedStore } = useSelectedStore();
+  const { activeScene } = useStoreScene();
   const [refreshKey, setRefreshKey] = useState(0);
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
@@ -120,6 +122,7 @@ const TrafficHeatmapPage = () => {
                 {/* 단일 3D 뷰 */}
                 <Store3DViewer 
                   height="600px"
+                  sceneRecipe={activeScene?.recipe_data}
                   overlay={
                     <>
                       {showHeatmap && (
