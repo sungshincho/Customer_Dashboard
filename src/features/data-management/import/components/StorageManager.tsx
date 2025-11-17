@@ -246,9 +246,10 @@ export function StorageManager({ storeId }: StorageManagerProps) {
       setSelectedFiles(new Set());
       await loadAllFiles();
     } catch (error: any) {
+      console.error(`❌ Bulk delete failed:`, error);
       toast({
-        title: "일괄 삭제 실패",
-        description: error.message,
+        title: "삭제 실패",
+        description: error.message || "파일 삭제 중 오류가 발생했습니다",
         variant: "destructive",
       });
     } finally {
