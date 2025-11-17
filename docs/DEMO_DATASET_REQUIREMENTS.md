@@ -389,46 +389,231 @@ metadata
 ### 5.1 파일명 규칙
 **형식**: `{EntityType}_{Identifier}_{Width}x{Height}x{Depth}.glb`
 
+**규칙 설명**:
+- `EntityType`: ontology_entity_types.name과 정확히 일치해야 함
+- `Identifier`: 모델을 설명하는 식별자 (한글/영문 가능)
+- `Dimensions`: 미터 단위 (Width x Height x Depth)
+
 #### 예시
 ```
-Store_강남점_20.0x10.0x4.0.glb
-Shelf_메인진열대_3.0x2.0x0.5.glb
-Product_청바지_0.3x0.4x0.1.glb
-Camera_천장카메라1_0.2x0.2x0.3.glb
-Sensor_WiFi센서1_0.1x0.1x0.1.glb
+Store_A매장_20.0x10.0x4.0.glb          # 메인 매장 공간
+Shelf_메인진열대_3.0x2.0x0.5.glb       # 벽면 진열대
+Product_청바지_0.3x0.4x0.1.glb         # 제품 모델
+Camera_천장카메라1_0.2x0.2x0.3.glb     # IoT 장비
+WiFiSensor_입구센서_0.15x0.15x0.1.glb  # WiFi 센서
 ```
 
-### 5.2 3D 모델 요구사항
-| 항목 | 요구사항 | 권장 |
-|------|----------|------|
-| 형식 | GLB, GLTF | GLB (Binary) |
-| 단위 | 미터 (m) | - |
-| 폴리곤 수 | < 20,000 | 5,000-10,000 |
-| 파일 크기 | < 5MB | 1-2MB |
-| 텍스처 | 임베디드 | 1024x1024 |
-| 좌표계 | Y-up | - |
-| 원점 | 중심 또는 하단 | 하단 중심 |
+### 5.2 필수 3D 모델 리스트 (데모용)
 
-### 5.3 3D 모델 메타데이터
+#### 5.2.1 고정 구조물 (Fixed Structures) - 4개
+```
+Store_A매장_20.0x10.0x4.0.glb          # 메인 매장 공간 (20m x 10m x 4m)
+Zone_입구구역_5.0x5.0x4.0.glb          # 입구 구역
+Zone_계산대구역_3.0x3.0x4.0.glb        # 계산대 구역  
+Zone_진열구역_12.0x7.0x4.0.glb         # 진열 구역
+```
+
+#### 5.2.2 이동 가능 가구 (Movable Furniture) - 8개
+```
+Shelf_메인진열대_3.0x2.0x0.5.glb       # 벽면 진열대
+Shelf_사이드진열대_2.0x1.8x0.4.glb     # 측면 진열대
+DisplayTable_중앙테이블_2.0x1.0x0.8.glb  # 중앙 진열 테이블
+DisplayTable_원형테이블_1.5x1.5x0.9.glb  # 원형 테이블
+Rack_옷걸이_1.5x1.5x1.8.glb           # 의류 랙
+CheckoutCounter_계산대_2.5x1.0x1.1.glb  # 계산대
+Mannequin_전신마네킹_0.6x0.6x1.8.glb   # 전신 마네킹
+Mannequin_상반신_0.5x0.5x1.2.glb      # 상반신 마네킹
+```
+
+#### 5.2.3 제품 (Products) - 6개
+```
+Product_청바지_0.3x0.4x0.1.glb         # 청바지
+Product_티셔츠_0.3x0.4x0.05.glb        # 티셔츠
+Product_신발_0.3x0.3x0.15.glb          # 신발
+Product_가방_0.4x0.3x0.2.glb           # 가방
+Product_모자_0.25x0.25x0.15.glb        # 모자
+Product_액세서리_0.2x0.2x0.1.glb       # 액세서리
+```
+
+#### 5.2.4 IoT 장비 (Sensors & Cameras) - 4개
+```
+Camera_천장카메라1_0.2x0.2x0.3.glb     # CCTV 카메라
+Camera_천장카메라2_0.2x0.2x0.3.glb     # CCTV 카메라
+WiFiSensor_입구센서_0.15x0.15x0.1.glb  # WiFi 센서
+WiFiSensor_중앙센서_0.15x0.15x0.1.glb  # WiFi 센서
+```
+
+### 5.3 3D 모델 요구사항
+| 항목 | 요구사항 | 권장 | 설명 |
+|------|----------|------|------|
+| **파일 형식** | GLB, GLTF | `.glb` | 압축된 단일 파일 (권장) |
+| **단위** | 미터 (m) | Meters | 좌표계 통일 필수 |
+| **폴리곤 수** | < 20,000 | 5,000-20,000 | 실시간 렌더링 최적화 |
+| **파일 크기** | < 5MB | 1-2MB | 로딩 속도 최적화 |
+| **텍스처** | 임베디드 | 내장 (embedded) | GLB 파일에 포함 |
+| **좌표계** | Y-up | Y-up | Three.js 표준 |
+| **원점** | 중심 또는 하단 | 하단 중심 | 배치 편의성 |
+
+### 5.4 선택적 메타데이터 JSON
+
+#### 5.4.1 기존 가구 (현재 위치 포함)
 ```json
+// Shelf_메인진열대_3.0x2.0x0.5.json
 {
-  "modelUrl": "Store_강남점_20.0x10.0x4.0.glb",
-  "entityType": "Store",
-  "identifier": "강남점",
+  "entity_type": "Shelf",
+  "movable": true,
+  "dimensions": {
+    "width": 3.0,
+    "height": 2.0,
+    "depth": 0.5
+  },
+  "current_position": { "x": -5.0, "y": 0, "z": -4.5 },
+  "current_rotation": { "x": 0, "y": 0, "z": 0 },
+  "properties": {
+    "material": "wood",
+    "color": "#8B4513",
+    "capacity": 50,
+    "manufacturer": "RetailFurniture Co."
+  },
+  "scale": { "x": 1, "y": 1, "z": 1 }
+}
+```
+
+#### 5.4.2 신규 가구 (배치 힌트 포함)
+```json
+// DisplayTable_중앙테이블_2.0x1.0x0.8.json
+{
+  "entity_type": "DisplayTable",
+  "movable": true,
+  "dimensions": {
+    "width": 2.0,
+    "height": 1.0,
+    "depth": 0.8
+  },
+  "position_hint": { "x": 0, "y": 0, "z": 0 },
+  "rotation_hint": { "x": 0, "y": 0, "z": 0 },
+  "properties": {
+    "material": "glass",
+    "color": "#FFFFFF",
+    "weight_kg": 35
+  }
+}
+```
+
+#### 5.4.3 고정 구조물 (Store)
+```json
+// Store_A매장_20.0x10.0x4.0.json
+{
+  "entity_type": "Store",
+  "movable": false,
   "dimensions": {
     "width": 20.0,
     "height": 10.0,
     "depth": 4.0
   },
-  "position": { "x": 0, "y": 0, "z": 0 },
-  "rotation": { "x": 0, "y": 0, "z": 0 },
-  "scale": { "x": 1, "y": 1, "z": 1 },
-  "metadata": {
-    "creator": "Blender 3.6",
-    "polyCount": 8543,
-    "textureSize": "1024x1024"
+  "current_position": { "x": 0, "y": 0, "z": 0 },
+  "current_rotation": { "x": 0, "y": 0, "z": 0 },
+  "properties": {
+    "store_id": "GN001",
+    "store_name": "강남점",
+    "total_area_sqm": 200,
+    "floor_type": "tile"
   }
 }
+```
+
+### 5.5 데모 시나리오별 필수 모델
+
+#### 시나리오 1: 기본 매장 구성 (최소 12개)
+- **고정 구조물**: Store x1, Zone x2
+- **가구**: Shelf x2, DisplayTable x1, CheckoutCounter x1
+- **제품**: Product x3 (청바지, 티셔츠, 신발)
+- **IoT**: Camera x2
+
+**목적**: 기본 3D 매장 시각화 및 제품 배치 확인
+
+#### 시나리오 2: AI 레이아웃 최적화 (18개)
+- **기본 구성** + 추가 요소:
+  - Rack x2 (의류 랙)
+  - Mannequin x2 (마네킹)
+  - WiFiSensor x2 (WiFi 센서)
+
+**목적**: AI 기반 가구 재배치 시뮬레이션 및 최적화 제안
+
+#### 시나리오 3: 완전한 데모 (22개)
+- **전체 모델** 포함:
+  - Fixed Structures: 4개
+  - Movable Furniture: 8개
+  - Products: 6개
+  - IoT Devices: 4개
+
+**목적**: 실제 매장 환경 재현 + WiFi 트래킹 + 히트맵 오버레이
+
+### 5.6 AI 자동 인식 키워드
+
+3D 모델 파일명에서 AI가 자동으로 EntityType을 추론할 수 있는 키워드:
+
+| 키워드 (파일명) | 추론 EntityType | 비고 |
+|----------------|----------------|------|
+| shelf, 진열대 | Shelf | 벽면/독립형 진열대 |
+| table, 테이블 | DisplayTable | 진열 테이블 |
+| rack, 랙 | Rack | 의류 랙 |
+| counter, 계산대 | CheckoutCounter | POS 계산대 |
+| mannequin, 마네킹 | Mannequin | 전신/상반신 |
+| camera, 카메라 | Camera | CCTV |
+| sensor, 센서 | WiFiSensor | WiFi/IoT 센서 |
+| store, 매장 | Store | 매장 공간 |
+| zone, 구역 | Zone | 매장 내 구역 |
+| product, 상품 | Product | 판매 제품 |
+
+### 5.7 3D 모델 업로드 워크플로우
+
+```
+1. 파일명 검증
+   ├─ EntityType 추출 → ontology_entity_types 조회
+   ├─ Dimensions 파싱 → width, height, depth
+   └─ Identifier 추출
+
+2. AI 모델 분석 (선택)
+   ├─ 폴리곤 수 확인
+   ├─ 텍스처 크기 확인
+   └─ 3D 구조 검증
+
+3. 매핑 제안
+   ├─ 파일명 기반 EntityType 매칭
+   ├─ JSON 메타데이터 읽기 (있는 경우)
+   └─ graph_entities 테이블 Insert 준비
+
+4. 사용자 확인 및 저장
+   ├─ 매핑 결과 UI 표시
+   ├─ 사용자 승인
+   └─ Storage 업로드 + DB 저장
+
+5. 3D Scene 렌더링
+   └─ SceneViewer에서 자동 로드
+```
+
+### 5.8 체크리스트
+
+#### 파일명 검증
+- [ ] `{EntityType}_{Identifier}_{Width}x{Height}x{Depth}.glb` 형식
+- [ ] EntityType이 ontology_entity_types.name과 일치
+- [ ] Dimensions가 숫자 형식 (예: 3.0x2.0x0.5)
+- [ ] 파일 확장자가 `.glb` 또는 `.gltf`
+
+#### 메타데이터 (선택사항)
+- [ ] JSON 파일명이 GLB와 동일 (확장자만 .json)
+- [ ] `entity_type` 필드가 파일명의 EntityType과 일치
+- [ ] `movable` 필드가 true/false로 명시
+- [ ] `dimensions` 필드가 파일명과 일치
+
+#### 기존 가구 메타데이터
+- [ ] `current_position` 필드 포함 (x, y, z)
+- [ ] `current_rotation` 필드 포함 (x, y, z)
+
+#### 신규 가구 메타데이터
+- [ ] `position_hint` 필드 포함
+- [ ] `rotation_hint` 필드 포함
 ```
 
 ---
