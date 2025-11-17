@@ -31,8 +31,10 @@ const FootfallAnalysis = () => {
   const [showAvatars, setShowAvatars] = useState(true);
   const [showPaths, setShowPaths] = useState(false);
   
-  const { sceneRecipe, loading: sceneLoading, generateScene } = useStoreScene();
+  const { activeScene, isLoading: sceneLoading } = useStoreScene();
   const { latestAnalysis, analyzing } = useAutoAnalysis('visitor', true);
+  
+  const sceneRecipe = activeScene?.recipe_data;
 
   // 매장별 방문 데이터 로드
   useEffect(() => {

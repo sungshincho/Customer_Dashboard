@@ -1,129 +1,255 @@
-import { useState, useEffect } from 'react';
+import { useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
-import type { SceneRecipe, SpaceAsset, FurnitureAsset, ProductAsset } from '@/types/scene3d';
+import { useAuth } from './useAuth';
+import { useSelectedStore } from './useSelectedStore';
+import { toast } from 'sonner';
+import type { SceneRecipe } from '@/types/scene3d';
 
-const DEFAULT_LIGHTING = {
-  name: "기본 조명",
-  description: "균형잡힌 매장 조명",
-  lights: [
-    { type: 'ambient' as const, color: '#ffffff', intensity: 0.5 },
-    { type: 'directional' as const, color: '#ffffff', intensity: 0.8, position: { x: 5, y: 10, z: 5 } }
-  ]
-};
+interface StoreScene {
+  id: string;
+  name: string;
+  recipe_data: SceneRecipe;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  store_id: string | null;
+}
 
 export function useStoreScene() {
   const { user } = useAuth();
-  const [sceneRecipe, setSceneRecipe] = useState<SceneRecipe | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { selectedStore } = useSelectedStore();
+  const queryClient = useQueryClient();
+  const selectedStoreId = selectedStore?.id;
 
-  const generateScene = async () => {
-    if (!user) {
-      setError('로그인이 필요합니다');
-      return;
-    }
+  // Fetch active scene for current store
+  const { data: activeScene, isLoading, error } = useQuery({
+    queryKey: ['store-scene', user?.id, selectedStoreId],
+    queryFn: async () => {
+      if (!user?.id) return null;
 
-    setLoading(true);
-    setError(null);
-
-    try {
-      // 온톨로지 엔티티 타입 가져오기
-      const { data: entityTypes, error: entityTypesError } = await supabase
-        .from('ontology_entity_types')
+      const query = supabase
+        .from('store_scenes')
         .select('*')
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .order('updated_at', { ascending: false })
+        .limit(1);
 
-      if (entityTypesError) throw entityTypesError;
-
-      // 온톨로지 엔티티 가져오기
-      const { data: entities, error: entitiesError } = await supabase
-        .from('graph_entities')
-        .select('*')
-        .eq('user_id', user.id);
-
-      if (entitiesError) throw entitiesError;
-
-      if (!entityTypes || !entities || entities.length === 0) {
-        throw new Error('온톨로지 데이터가 없습니다');
+      if (selectedStoreId) {
+        query.eq('store_id', selectedStoreId);
+      } else {
+        query.is('store_id', null);
       }
 
-      // Space 찾기
-      const spaceType = entityTypes.find(t => t.name === 'space' || t.model_3d_type === 'space');
-      const spaceEntity = entities.find(e => e.entity_type_id === spaceType?.id);
+      const { data, error } = await query.maybeSingle();
 
-      if (!spaceType || !spaceEntity) {
-        throw new Error('매장 공간 정보를 찾을 수 없습니다');
+      if (error) throw error;
+      return data ? {
+        ...data,
+        recipe_data: data.recipe_data as unknown as SceneRecipe
+      } as StoreScene : null;
+    },
+    enabled: !!user?.id,
+  });
+
+  // Fetch all scenes for current store
+  const { data: allScenes = [] } = useQuery({
+    queryKey: ['store-scenes-all', user?.id, selectedStoreId],
+    queryFn: async () => {
+      if (!user?.id) return [];
+
+      const query = supabase
+        .from('store_scenes')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false });
+
+      if (selectedStoreId) {
+        query.eq('store_id', selectedStoreId);
+      } else {
+        query.is('store_id', null);
       }
 
-      const space: SpaceAsset = {
-        id: spaceEntity.id,
-        type: 'space',
-        model_url: spaceType.model_3d_url || '',
-        position: (spaceEntity.model_3d_position as any) || { x: 0, y: 0, z: 0 },
-        rotation: (spaceEntity.model_3d_rotation as any) || { x: 0, y: 0, z: 0 },
-        scale: (spaceEntity.model_3d_scale as any) || { x: 1, y: 1, z: 1 },
-        dimensions: spaceType.model_3d_dimensions as any,
-        zone_name: spaceEntity.label
-      };
+      const { data, error } = await query;
 
-      // Furniture 찾기
-      const furnitureType = entityTypes.find(t => t.name === 'furniture' || t.model_3d_type === 'furniture');
-      const furnitureEntities = entities.filter(e => e.entity_type_id === furnitureType?.id);
+      if (error) throw error;
+      return (data || []).map(scene => ({
+        ...scene,
+        recipe_data: scene.recipe_data as unknown as SceneRecipe
+      })) as StoreScene[];
+    },
+    enabled: !!user?.id,
+  });
 
-      const furniture: FurnitureAsset[] = furnitureEntities.map(entity => ({
-        id: entity.id,
-        type: 'furniture',
-        model_url: furnitureType?.model_3d_url || '',
-        position: (entity.model_3d_position as any) || { x: 0, y: 0, z: 0 },
-        rotation: (entity.model_3d_rotation as any) || { x: 0, y: 0, z: 0 },
-        scale: (entity.model_3d_scale as any) || { x: 1, y: 1, z: 1 },
-        dimensions: furnitureType?.model_3d_dimensions as any,
-        furniture_type: entity.label
-      }));
+  // Save or update scene
+  const saveSceneMutation = useMutation({
+    mutationFn: async ({ 
+      recipe, 
+      name = 'Default Scene',
+      sceneId 
+    }: { 
+      recipe: SceneRecipe; 
+      name?: string;
+      sceneId?: string;
+    }) => {
+      if (!user?.id) throw new Error('User not authenticated');
 
-      // Products 찾기
-      const productType = entityTypes.find(t => t.name === 'product' || t.model_3d_type === 'product');
-      const productEntities = entities.filter(e => e.entity_type_id === productType?.id);
+      if (sceneId) {
+        // Update existing scene
+        const { data, error } = await supabase
+          .from('store_scenes')
+          .update({
+            recipe_data: recipe as any,
+            name,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', sceneId)
+          .eq('user_id', user.id)
+          .select()
+          .single();
 
-      const products: ProductAsset[] = productEntities.map(entity => ({
-        id: entity.id,
-        type: 'product',
-        model_url: productType?.model_3d_url || '',
-        position: (entity.model_3d_position as any) || { x: 0, y: 0, z: 0 },
-        rotation: (entity.model_3d_rotation as any) || { x: 0, y: 0, z: 0 },
-        scale: (entity.model_3d_scale as any) || { x: 1, y: 1, z: 1 },
-        dimensions: productType?.model_3d_dimensions as any,
-        sku: (entity.properties as any)?.sku,
-        product_id: entity.id
-      }));
-
-      const recipe: SceneRecipe = {
-        space,
-        furniture,
-        products,
-        lighting: DEFAULT_LIGHTING,
-        camera: {
-          position: { x: 0, y: 5, z: 10 },
-          target: { x: 0, y: 0, z: 0 },
-          fov: 75
+        if (error) throw error;
+        return data;
+      } else {
+        // Create new scene (deactivate others first)
+        if (selectedStoreId) {
+          await supabase
+            .from('store_scenes')
+            .update({ is_active: false })
+            .eq('user_id', user.id)
+            .eq('store_id', selectedStoreId);
+        } else {
+          await supabase
+            .from('store_scenes')
+            .update({ is_active: false })
+            .eq('user_id', user.id)
+            .is('store_id', null);
         }
-      };
 
-      setSceneRecipe(recipe);
-    } catch (err) {
-      console.error('씬 생성 실패:', err);
-      setError(err instanceof Error ? err.message : '씬 생성에 실패했습니다');
-    } finally {
-      setLoading(false);
-    }
-  };
+        const { data, error } = await supabase
+          .from('store_scenes')
+          .insert({
+            user_id: user.id,
+            store_id: selectedStoreId || null,
+            name,
+            recipe_data: recipe as any,
+            is_active: true,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        return data;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['store-scene'] });
+      queryClient.invalidateQueries({ queryKey: ['store-scenes-all'] });
+      toast.success('씬이 저장되었습니다');
+    },
+    onError: (error) => {
+      console.error('Failed to save scene:', error);
+      toast.error('씬 저장에 실패했습니다');
+    },
+  });
+
+  // Set active scene
+  const setActiveSceneMutation = useMutation({
+    mutationFn: async (sceneId: string) => {
+      if (!user?.id) throw new Error('User not authenticated');
+
+      // Deactivate all scenes for this store
+      if (selectedStoreId) {
+        await supabase
+          .from('store_scenes')
+          .update({ is_active: false })
+          .eq('user_id', user.id)
+          .eq('store_id', selectedStoreId);
+      } else {
+        await supabase
+          .from('store_scenes')
+          .update({ is_active: false })
+          .eq('user_id', user.id)
+          .is('store_id', null);
+      }
+
+      // Activate selected scene
+      const { data, error } = await supabase
+        .from('store_scenes')
+        .update({ is_active: true })
+        .eq('id', sceneId)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['store-scene'] });
+      queryClient.invalidateQueries({ queryKey: ['store-scenes-all'] });
+      toast.success('활성 씬이 변경되었습니다');
+    },
+    onError: (error) => {
+      console.error('Failed to set active scene:', error);
+      toast.error('씬 활성화에 실패했습니다');
+    },
+  });
+
+  // Delete scene
+  const deleteSceneMutation = useMutation({
+    mutationFn: async (sceneId: string) => {
+      if (!user?.id) throw new Error('User not authenticated');
+
+      const { error } = await supabase
+        .from('store_scenes')
+        .delete()
+        .eq('id', sceneId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['store-scene'] });
+      queryClient.invalidateQueries({ queryKey: ['store-scenes-all'] });
+      toast.success('씬이 삭제되었습니다');
+    },
+    onError: (error) => {
+      console.error('Failed to delete scene:', error);
+      toast.error('씬 삭제에 실패했습니다');
+    },
+  });
+
+  const saveScene = useCallback(
+    (recipe: SceneRecipe, name?: string, sceneId?: string) => {
+      return saveSceneMutation.mutateAsync({ recipe, name, sceneId });
+    },
+    [saveSceneMutation]
+  );
+
+  const setActiveScene = useCallback(
+    (sceneId: string) => {
+      return setActiveSceneMutation.mutateAsync(sceneId);
+    },
+    [setActiveSceneMutation]
+  );
+
+  const deleteScene = useCallback(
+    (sceneId: string) => {
+      return deleteSceneMutation.mutateAsync(sceneId);
+    },
+    [deleteSceneMutation]
+  );
 
   return {
-    sceneRecipe,
-    loading,
+    activeScene,
+    allScenes,
+    isLoading,
     error,
-    generateScene,
-    setSceneRecipe
+    saveScene,
+    setActiveScene,
+    deleteScene,
+    isSaving: saveSceneMutation.isPending,
   };
 }
