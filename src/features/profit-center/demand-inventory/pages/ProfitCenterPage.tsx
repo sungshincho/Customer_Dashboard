@@ -17,69 +17,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { loadStoreDataset } from "@/utils/storageDataLoader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-// 통합 데이터 - 수요 예측과 재고를 연결
-const integratedData = [
-  {
-    product: "프리미엄 운동화",
-    currentStock: 45,
-    optimalStock: 120,
-    predictedDemand: 150,
-    weeklyDemand: 35,
-    leadTime: 7,
-    stockoutRisk: "high",
-    revenueImpact: -5250000,
-    recommendedOrder: 105,
-    urgency: "긴급"
-  },
-  {
-    product: "캐주얼 티셔츠",
-    currentStock: 180,
-    optimalStock: 200,
-    predictedDemand: 95,
-    weeklyDemand: 22,
-    leadTime: 5,
-    stockoutRisk: "low",
-    revenueImpact: 0,
-    recommendedOrder: 40,
-    urgency: "보통"
-  },
-  {
-    product: "데님 청바지",
-    currentStock: 25,
-    optimalStock: 80,
-    predictedDemand: 120,
-    weeklyDemand: 28,
-    leadTime: 10,
-    stockoutRisk: "critical",
-    revenueImpact: -8400000,
-    recommendedOrder: 135,
-    urgency: "긴급"
-  },
-  {
-    product: "가죽 재킷",
-    currentStock: 15,
-    optimalStock: 40,
-    predictedDemand: 65,
-    weeklyDemand: 15,
-    leadTime: 14,
-    stockoutRisk: "high",
-    revenueImpact: -3900000,
-    recommendedOrder: 75,
-    urgency: "높음"
-  }
-];
-
-// 주간 수요-재고 트렌드
-const weeklyTrend = [
-  { week: "1주", demand: 320, stock: 480, revenue: 28000000 },
-  { week: "2주", demand: 380, stock: 420, revenue: 33200000 },
-  { week: "3주", demand: 350, stock: 380, revenue: 30500000 },
-  { week: "4주", demand: 420, stock: 310, revenue: 36400000 },
-  { week: "현재", demand: 450, stock: 265, revenue: 38000000 },
-  { week: "예측1", demand: 480, stock: 220, revenue: 41000000 },
-  { week: "예측2", demand: 520, stock: 150, revenue: 44500000 }
-];
-
 const ProfitCenterPage = () => {
   const { selectedStore } = useSelectedStore();
   const { user } = useAuth();
@@ -106,10 +43,61 @@ const ProfitCenterPage = () => {
         })
         .catch(error => {
           console.error('Failed to load store data:', error);
+          setStoreData({});
           setLoadingData(false);
         });
+    } else {
+      setStoreData({});
     }
   }, [selectedStore, user]);
+
+  // 통합 데이터 - 실제 데이터 기반 생성
+  const integratedData = useMemo(() => {
+    if (!storeData.products || storeData.products.length === 0) return [];
+    
+    return storeData.products.slice(0, 10).map((product: any) => {
+      const stock = parseInt(product.stock_quantity) || 50;
+      const sales = parseInt(product.sales_count) || 10;
+      const price = parseFloat(product.selling_price || product.price) || 50000;
+      
+      const optimalStock = Math.max(stock, sales * 3);
+      const predictedDemand = sales * 1.5;
+      const revenueImpact = stock < sales ? -(sales - stock) * price : 0;
+      
+      return {
+        product: product.name || product.product_name || '상품',
+        currentStock: stock,
+        optimalStock,
+        predictedDemand: Math.round(predictedDemand),
+        weeklyDemand: sales,
+        leadTime: 7,
+        stockoutRisk: stock < 10 ? "critical" : stock < 30 ? "high" : "low",
+        revenueImpact,
+        recommendedOrder: Math.max(0, optimalStock - stock),
+        urgency: stock < 10 ? "긴급" : stock < 30 ? "높음" : "보통"
+      };
+    });
+  }, [storeData.products]);
+
+  // 주간 수요-재고 트렌드 - 실제 데이터 기반
+  const weeklyTrend = useMemo(() => {
+    if (!storeData.purchases || storeData.purchases.length === 0) return [];
+    
+    const totalRevenue = storeData.purchases.reduce((sum: number, p: any) => 
+      sum + (parseFloat(p.unit_price || p.price) || 0) * (parseInt(p.quantity) || 1), 0
+    );
+    const avgDemand = storeData.visits?.length || 100;
+    const currentStock = storeData.products?.reduce((sum: number, p: any) => 
+      sum + (parseInt(p.stock_quantity) || 0), 0) || 500;
+    
+    return [
+      { week: "1주", demand: Math.round(avgDemand * 0.7), stock: Math.round(currentStock * 1.5), revenue: Math.round(totalRevenue * 0.7) },
+      { week: "2주", demand: Math.round(avgDemand * 0.85), stock: Math.round(currentStock * 1.3), revenue: Math.round(totalRevenue * 0.85) },
+      { week: "3주", demand: Math.round(avgDemand * 0.9), stock: Math.round(currentStock * 1.1), revenue: Math.round(totalRevenue * 0.9) },
+      { week: "4주", demand: Math.round(avgDemand * 0.95), stock: Math.round(currentStock * 1.05), revenue: Math.round(totalRevenue * 0.95) },
+      { week: "현재", demand: avgDemand, stock: currentStock, revenue: totalRevenue }
+    ];
+  }, [storeData.purchases, storeData.visits, storeData.products]);
 
   // 제품 데이터를 3D 오버레이 형식으로 변환
   const productInfoData = useMemo(() => {
