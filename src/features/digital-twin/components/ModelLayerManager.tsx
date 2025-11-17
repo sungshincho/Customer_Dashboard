@@ -190,8 +190,27 @@ export function ModelLayerManager({
       return next;
     });
 
-    if (result.success) {
-      toast.success('모델 삭제 완료');
+    if (result.success && result.publicUrl) {
+      // 스토리지 파일 삭제 후, 엔티티 연결 정리
+      try {
+        const { error: cleanupError } = await supabase.functions.invoke('cleanup-deleted-models', {
+          body: {
+            fileUrl: result.publicUrl,
+            userId
+          }
+        });
+
+        if (cleanupError) {
+          console.error('Cleanup error:', cleanupError);
+          toast.warning('모델은 삭제되었으나 엔티티 연결 정리에 실패했습니다');
+        } else {
+          toast.success('모델 삭제 및 엔티티 연결 해제 완료');
+        }
+      } catch (error) {
+        console.error('Cleanup failed:', error);
+        toast.warning('모델은 삭제되었으나 엔티티 연결 정리에 실패했습니다');
+      }
+      
       onModelsReload?.();
     } else {
       toast.error(`삭제 실패: ${result.error}`);

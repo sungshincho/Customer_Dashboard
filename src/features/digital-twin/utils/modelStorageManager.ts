@@ -78,9 +78,14 @@ export async function delete3DModel(
   userId: string,
   storeId: string,
   fileName: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; publicUrl?: string }> {
   try {
     const filePath = `${userId}/${storeId}/${fileName}`;
+    
+    // 삭제 전에 public URL 저장 (cleanup용)
+    const { data: urlData } = supabase.storage
+      .from('3d-models')
+      .getPublicUrl(filePath);
 
     const { error } = await supabase.storage
       .from('3d-models')
@@ -93,7 +98,7 @@ export async function delete3DModel(
       };
     }
 
-    return { success: true };
+    return { success: true, publicUrl: urlData?.publicUrl };
   } catch (error) {
     console.error('Delete error:', error);
     return {
