@@ -168,8 +168,8 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
 
       // 파일 타입별 업로드
       if (uploadFile.type === '3d-model') {
-        // 3D 모델은 3d-models 버킷에 업로드
-        const filePath = `${user.id}/${storeId}/3d-models/${uploadFile.file.name}`;
+        // 3D 모델은 3d-models 버킷에 업로드 (서브폴더 없이)
+        const filePath = `${user.id}/${storeId}/${uploadFile.file.name}`;
         const { error: uploadError } = await supabase.storage
           .from('3d-models')
           .upload(filePath, uploadFile.file, { upsert: true });
