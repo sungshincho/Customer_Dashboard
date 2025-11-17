@@ -153,6 +153,23 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
     }
   };
 
+  // 파일명 sanitize (특수문자 제거)
+  const sanitizeFileName = (fileName: string): string => {
+    // 확장자 분리
+    const lastDot = fileName.lastIndexOf('.');
+    const name = lastDot > 0 ? fileName.substring(0, lastDot) : fileName;
+    const ext = lastDot > 0 ? fileName.substring(lastDot) : '';
+    
+    // 안전한 문자만 허용 (영문, 숫자, 언더스코어, 하이픈, 점)
+    // 한글, 공백, 괄호 등을 언더스코어로 변환
+    const safeName = name
+      .replace(/[^\w\-\.]/g, '_')  // 특수문자를 _로 변환
+      .replace(/_{2,}/g, '_')       // 연속된 _를 하나로
+      .replace(/^_+|_+$/g, '');     // 앞뒤 _제거
+    
+    return safeName + ext;
+  };
+
   // 개별 파일 업로드 처리
   const uploadFile = async (uploadFile: UploadFile) => {
     if (!storeId) {
@@ -166,10 +183,13 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
 
       updateFileStatus(uploadFile.id, 'uploading', undefined, 10);
 
+      // 파일명 sanitize
+      const safeFileName = sanitizeFileName(uploadFile.file.name);
+
       // 파일 타입별 업로드
       if (uploadFile.type === '3d-model') {
         // 3D 모델은 3d-models 버킷에 업로드 (서브폴더 없이)
-        const filePath = `${user.id}/${storeId}/${uploadFile.file.name}`;
+        const filePath = `${user.id}/${storeId}/${safeFileName}`;
         const { error: uploadError } = await supabase.storage
           .from('3d-models')
           .upload(filePath, uploadFile.file, { upsert: true });
@@ -190,7 +210,7 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
         
       } else if (uploadFile.type === 'wifi') {
         // WiFi 데이터는 store-data 버킷에 업로드
-        const filePath = `${user.id}/${storeId}/${uploadFile.file.name}`;
+        const filePath = `${user.id}/${storeId}/${safeFileName}`;
         const { error: uploadError } = await supabase.storage
           .from('store-data')
           .upload(filePath, uploadFile.file, { upsert: true });
