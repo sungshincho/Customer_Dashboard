@@ -68,7 +68,8 @@ export async function loadUserModels(
         const entityType = entity.entity_type as any;
         if (!entityType) continue;
 
-        const type = inferModelTypeFromEntityType(entityType.name);
+        // 엔티티 타입의 model_3d_type이 있으면 우선 사용, 없으면 이름으로 추론
+        const type = entityType.model_3d_type || inferModelTypeFromEntityType(entityType.name);
         
         // Properties에 model_url이 있으면 (Storage 변환 인스턴스) 그것을 사용
         const properties = entity.properties as any;
@@ -109,14 +110,16 @@ export async function loadUserModels(
 function inferModelType(filename: string): ModelLayer['type'] {
   const lower = filename.toLowerCase();
   
-  if (lower.includes('space') || lower.includes('store') || lower.includes('room')) {
+  if (lower.includes('space') || lower.includes('store') || lower.includes('room') ||
+      lower.includes('매장')) {
     return 'space';
   }
   if (lower.includes('shelf') || lower.includes('rack') || lower.includes('furniture') || 
-      lower.includes('table') || lower.includes('desk')) {
+      lower.includes('table') || lower.includes('desk') || lower.includes('mannequin') ||
+      lower.includes('마네킹')) {
     return 'furniture';
   }
-  if (lower.includes('product') || lower.includes('item')) {
+  if (lower.includes('product') || lower.includes('item') || lower.includes('제품')) {
     return 'product';
   }
   
@@ -130,14 +133,16 @@ function inferModelTypeFromEntityType(name: string): ModelLayer['type'] {
   const lower = name.toLowerCase();
   
   if (lower.includes('space') || lower.includes('store') || lower.includes('room') || 
-      lower.includes('building') || lower.includes('floor')) {
+      lower.includes('building') || lower.includes('floor') || lower.includes('매장')) {
     return 'space';
   }
   if (lower.includes('shelf') || lower.includes('rack') || lower.includes('furniture') || 
-      lower.includes('table') || lower.includes('display') || lower.includes('counter')) {
+      lower.includes('table') || lower.includes('display') || lower.includes('counter') ||
+      lower.includes('mannequin') || lower.includes('마네킹')) {
     return 'furniture';
   }
-  if (lower.includes('product') || lower.includes('item') || lower.includes('goods')) {
+  if (lower.includes('product') || lower.includes('item') || lower.includes('goods') ||
+      lower.includes('제품')) {
     return 'product';
   }
   
