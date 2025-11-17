@@ -507,6 +507,7 @@ const ProfitCenterPage = () => {
         </Tabs>
       </div>
     </DashboardLayout>
+    </DataReadinessGuard>
   );
 };
 

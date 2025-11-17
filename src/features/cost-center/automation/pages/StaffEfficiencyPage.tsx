@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { useAuth } from "@/hooks/useAuth";
 import { loadStoreDataset } from "@/utils/storageDataLoader";
-import { Alert as AlertUI, AlertDescription } from "@/components/ui/alert";
+import { DataReadinessGuard } from "@/components/DataReadinessGuard";
 
 const StaffEfficiencyPage = () => {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -74,8 +74,9 @@ const StaffEfficiencyPage = () => {
   };
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <DataReadinessGuard>
+      <DashboardLayout>
+        <div className="space-y-6">
         <div className="flex items-center justify-between animate-fade-in">
           <div>
             <h1 className="text-3xl font-bold gradient-text">직원 효율성 분석</h1>
@@ -168,6 +169,7 @@ const StaffEfficiencyPage = () => {
         )}
       </div>
     </DashboardLayout>
+    </DataReadinessGuard>
   );
 };
 

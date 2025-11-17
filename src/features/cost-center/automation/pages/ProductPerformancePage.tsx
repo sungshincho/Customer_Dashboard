@@ -12,11 +12,10 @@ import { AIAnalysisButton } from "@/features/data-management/analysis/components
 import { AnalysisHistory } from "@/features/data-management/analysis/components/AnalysisHistory";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useOntologyEntities, useOntologyRelations, transformToGraphData } from "@/hooks/useOntologyData";
-import { Alert as AlertUI, AlertDescription } from "@/components/ui/alert";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { useAuth } from "@/hooks/useAuth";
 import { loadStoreDataset } from "@/utils/storageDataLoader";
-import { AlertCircle } from "lucide-react";
+import { DataReadinessGuard } from "@/components/DataReadinessGuard";
 
 const ProductPerformancePage = () => {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -183,6 +182,7 @@ const ProductPerformancePage = () => {
         )}
       </div>
     </DashboardLayout>
+    </DataReadinessGuard>
   );
 };
 

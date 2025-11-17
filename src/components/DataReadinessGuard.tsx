@@ -1,10 +1,17 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, AlertCircle, Database, Building2, Network } from 'lucide-react';
 import { useDataReadiness } from '@/hooks/useDataReadiness';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface DataReadinessGuardProps {
   children: ReactNode;
@@ -18,6 +25,7 @@ interface DataReadinessGuardProps {
  */
 export function DataReadinessGuard({ children, requireWifiData = false }: DataReadinessGuardProps) {
   const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
   const {
     isReady,
     isLoading,
@@ -29,6 +37,25 @@ export function DataReadinessGuard({ children, requireWifiData = false }: DataRe
     dataTypesSummary,
     getStatusMessage
   } = useDataReadiness();
+
+  // 데이터 준비 상태가 변경될 때마다 다이얼로그 표시 여부 결정
+  useEffect(() => {
+    if (!isLoading && !isReady) {
+      setOpen(true);
+    } else if (!isLoading && requireWifiData && !hasWifiData) {
+      setOpen(true);
+    } else {
+      setOpen(false);
+    }
+  }, [isLoading, isReady, requireWifiData, hasWifiData]);
+
+  const handleAction = () => {
+    const status = getStatusMessage();
+    if (status.actionPath) {
+      navigate(status.actionPath);
+    }
+    setOpen(false);
+  };
 
   if (isLoading) {
     return (
@@ -80,86 +107,89 @@ export function DataReadinessGuard({ children, requireWifiData = false }: DataRe
     );
   }
 
-  // 기본 조건이 충족되지 않은 경우
-  if (!isReady) {
-    const status = getStatusMessage();
-    
-    return (
-      <div className="container mx-auto p-6 max-w-2xl">
-        <Card className="border-destructive">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <AlertCircle className="w-6 h-6 text-destructive" />
-              <div>
-                <CardTitle>{status.title}</CardTitle>
-                <CardDescription>{status.message}</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* 진행 상태 표시 */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <Building2 className={`w-5 h-5 ${hasStore ? 'text-green-500' : 'text-muted-foreground'}`} />
-                <div className="flex-1">
-                  <p className="text-sm font-medium">매장 등록</p>
-                  <p className="text-xs text-muted-foreground">
-                    {hasStore ? '✓ 완료' : '○ 미완료'}
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-3">
-                <Database className={`w-5 h-5 ${hasImportedData ? 'text-green-500' : 'text-muted-foreground'}`} />
-                <div className="flex-1">
-                  <p className="text-sm font-medium">데이터 임포트</p>
-                  <p className="text-xs text-muted-foreground">
-                    {hasImportedData ? `✓ ${importCount}개 데이터셋 임포트됨` : '○ 미완료'}
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-3">
-                <Network className={`w-5 h-5 ${hasOntologySchema ? 'text-green-500' : 'text-muted-foreground'}`} />
-                <div className="flex-1">
-                  <p className="text-sm font-medium">온톨로지 스키마</p>
-                  <p className="text-xs text-muted-foreground">
-                    {hasOntologySchema ? '✓ 설정됨' : '○ 미설정'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* 임포트된 데이터 타입 요약 */}
-            {hasImportedData && Object.keys(dataTypesSummary).length > 0 && (
-              <Alert>
-                <Database className="w-4 h-4" />
-                <AlertDescription>
-                  <p className="font-medium mb-2">임포트된 데이터:</p>
-                  <div className="text-xs space-y-1">
-                    {Object.entries(dataTypesSummary).map(([type, count]) => (
-                      <p key={type}>• {type}: {count}개</p>
-                    ))}
-                  </div>
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {/* 다음 단계 안내 */}
-            {status.action && status.actionPath && (
-              <Button 
-                onClick={() => navigate(status.actionPath!)}
-                className="w-full"
-              >
-                {status.action}
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    );
+  // 모든 조건이 충족된 경우 children 렌더링
+  if (isReady && (!requireWifiData || hasWifiData)) {
+    return <>{children}</>;
   }
 
-  // 모든 조건이 충족된 경우 children 렌더링
-  return <>{children}</>;
+  const status = getStatusMessage();
+  const isWifiIssue = requireWifiData && !hasWifiData;
+
+  return (
+    <>
+      {children}
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent className="max-w-2xl">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <AlertCircle className="w-6 h-6 text-destructive" />
+              <AlertDialogTitle className="text-xl">
+                {isWifiIssue ? 'WiFi 트래킹 데이터가 필요합니다' : status.title}
+              </AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-base">
+              {isWifiIssue 
+                ? '이 기능을 사용하려면 WiFi 트래킹 데이터를 먼저 임포트해야 합니다.'
+                : '분석 기능을 사용하려면 데이터를 업로드해야 합니다. 아래 단계를 완료해주세요.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                <Building2 className={`w-5 h-5 ${hasStore ? 'text-green-500' : 'text-muted-foreground'}`} />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">1. 매장 등록</p>
+                  <p className="text-xs text-muted-foreground">
+                    {hasStore ? '✓ 완료' : '매장을 먼저 등록해주세요'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                <Database className={`w-5 h-5 ${hasImportedData ? 'text-green-500' : 'text-muted-foreground'}`} />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">2. 데이터 임포트</p>
+                  <p className="text-xs text-muted-foreground">
+                    {hasImportedData 
+                      ? `✓ ${importCount}개 파일 임포트됨` 
+                      : 'CSV/Excel 파일을 업로드해주세요'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                <Network className={`w-5 h-5 ${hasOntologySchema ? 'text-green-500' : 'text-muted-foreground'}`} />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">3. 온톨로지 스키마 설정</p>
+                  <p className="text-xs text-muted-foreground">
+                    {hasOntologySchema ? '✓ 완료' : '데이터 구조를 정의해주세요'}
+                  </p>
+                </div>
+              </div>
+
+              {requireWifiData && (
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                  <Network className={`w-5 h-5 ${hasWifiData ? 'text-green-500' : 'text-muted-foreground'}`} />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">4. WiFi 트래킹 데이터</p>
+                    <p className="text-xs text-muted-foreground">
+                      {hasWifiData ? '✓ 완료' : 'WiFi 데이터를 업로드해주세요'}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={handleAction}>
+              {status.action || '확인'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
 }

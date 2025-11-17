@@ -15,7 +15,7 @@ import { Store3DViewer } from "@/features/digital-twin/components";
 import { useAuth } from "@/hooks/useAuth";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { loadStoreDataset } from "@/utils/storageDataLoader";
-import { Alert as AlertUI, AlertDescription } from "@/components/ui/alert";
+import { DataReadinessGuard } from "@/components/DataReadinessGuard";
 
 const LayoutSimulatorPage = () => {
   const { user } = useAuth();
@@ -72,21 +72,9 @@ const LayoutSimulatorPage = () => {
     insights
   };
 
-  if (!selectedStore) {
-    return (
-      <DashboardLayout>
-        <AlertUI>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            매장을 선택하면 해당 매장의 레이아웃 시뮬레이션을 확인할 수 있습니다.
-          </AlertDescription>
-        </AlertUI>
-      </DashboardLayout>
-    );
-  }
-
   return (
-    <DashboardLayout>
+    <DataReadinessGuard>
+      <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between animate-fade-in">
           <div>
@@ -173,6 +161,7 @@ const LayoutSimulatorPage = () => {
         </Tabs>
       </div>
     </DashboardLayout>
+    </DataReadinessGuard>
   );
 };
 

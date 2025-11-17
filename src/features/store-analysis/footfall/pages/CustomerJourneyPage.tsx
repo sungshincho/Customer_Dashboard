@@ -10,8 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Store3DViewer } from "@/features/digital-twin/components";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { loadStoreFile } from "@/utils/storageDataLoader";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useAuth";
+import { DataReadinessGuard } from "@/components/DataReadinessGuard";
 
 const CustomerJourneyPage = () => {
   const { user } = useAuth();
@@ -62,17 +62,9 @@ const CustomerJourneyPage = () => {
   };
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        {!selectedStore && (
-          <Alert>
-            <Store className="h-4 w-4" />
-            <AlertDescription>
-              매장을 선택하면 해당 매장의 고객 여정 데이터를 확인할 수 있습니다. 
-              사이드바에서 매장을 선택하거나 <a href="/stores" className="underline font-medium">매장 관리</a>에서 매장을 등록하세요.
-            </AlertDescription>
-          </Alert>
-        )}
+    <DataReadinessGuard>
+      <DashboardLayout>
+        <div className="space-y-6">
 
         <div className="flex items-center justify-between animate-fade-in">
           <div>
@@ -122,6 +114,7 @@ const CustomerJourneyPage = () => {
         </Tabs>
       </div>
     </DashboardLayout>
+    </DataReadinessGuard>
   );
 };
 
