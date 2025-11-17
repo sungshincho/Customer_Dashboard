@@ -14,6 +14,7 @@ export { ModelUploader } from './ModelUploader';
 export { AutoModelMapper } from './AutoModelMapper';
 export { Model3DPreview } from './Model3DPreview';
 export { ModelLayerManager } from './ModelLayerManager';
+export { StorageToInstanceConverter } from './StorageToInstanceConverter';
 
 // 3D Viewer (Main Integration Component)
 export { Store3DViewer } from './Store3DViewer';
