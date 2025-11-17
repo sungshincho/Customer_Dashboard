@@ -13,22 +13,38 @@ serve(async (req) => {
   }
 
   try {
-    const { fileName, fileUrl, userId } = await req.json();
+    const { fileName, fileUrl, storeId } = await req.json();
+    
+    // Get user from authorization header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('Authorization header is required');
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: {
+        headers: { Authorization: authHeader }
+      }
+    });
+
+    // Get authenticated user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      throw new Error('Authentication failed');
+    }
     
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
     // 1. Get existing entity types from ontology
     const { data: entityTypes, error: entityTypesError } = await supabase
       .from('ontology_entity_types')
       .select('*')
-      .eq('user_id', userId);
+      .eq('user_id', user.id);
 
     if (entityTypesError) throw entityTypesError;
 
