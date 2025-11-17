@@ -3,8 +3,7 @@ import { StatCard } from "@/components/StatCard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, TrendingUp, Package, DollarSign, AlertCircle } from "lucide-react";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase";
+import { useEffect, useState, useMemo } from "react";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { useAuth } from "@/hooks/useAuth";
 import { loadStoreDataset } from "@/utils/storageDataLoader";
@@ -76,28 +75,24 @@ const Dashboard = () => {
     }
   }, [selectedStore, user]);
 
-  useEffect(() => {
-    // Supabase Realtime 구독 예시
-    const channel = supabase
-      .channel('dashboard-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'activities'
-        },
-        (payload) => {
-          console.log('Realtime update:', payload);
-          // 실제 데이터로 업데이트
-        }
-      )
-      .subscribe();
+  // 시간대별 방문자 데이터 생성
+  const visitorData = useMemo(() => {
+    if (!storeData.visits || storeData.visits.length === 0) return [];
+    
+    const hourlyVisits = new Map<number, number>();
+    storeData.visits.forEach((visit: any) => {
+      const hour = visit.visit_hour ? parseInt(visit.visit_hour) : 12;
+      hourlyVisits.set(hour, (hourlyVisits.get(hour) || 0) + 1);
+    });
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
+    return Array.from({ length: 8 }, (_, i) => {
+      const hour = i * 3;
+      return {
+        time: `${String(hour).padStart(2, '0')}:00`,
+        visitors: hourlyVisits.get(hour) || 0
+      };
+    });
+  }, [storeData.visits]);
 
   if (!selectedStore) {
     return (
@@ -180,30 +175,27 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Sales Chart */}
-          <Card className="hover-lift">
-            <CardHeader>
-              <CardTitle>매장별 매출</CardTitle>
-              <CardDescription>오늘 매장별 판매 현황</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={salesData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="store" className="text-xs" />
-                  <YAxis className="text-xs" />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: "hsl(var(--card))", 
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "var(--radius)"
-                    }} 
-                  />
-                  <Bar dataKey="sales" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+          {/* Recent Purchases */}
+          {storeData.purchases && storeData.purchases.length > 0 && (
+            <Card className="hover-lift">
+              <CardHeader>
+                <CardTitle>최근 구매 내역</CardTitle>
+                <CardDescription>주요 상품 판매 현황</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {storeData.purchases.slice(0, 5).map((purchase: any, idx: number) => (
+                    <div key={idx} className="flex items-center justify-between">
+                      <div className="text-sm font-medium">{purchase.product_name || '상품'}</div>
+                      <div className="text-sm text-muted-foreground">
+                        ₩{((parseFloat(purchase.unit_price) || 0) * (parseInt(purchase.quantity) || 1)).toLocaleString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Recent Alerts */}
