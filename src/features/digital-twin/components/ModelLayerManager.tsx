@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { Box, Layers, Package, Store, AlertCircle, Upload, Trash2, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { upload3DModel, delete3DModel } from "../utils/modelStorageManager";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export interface ModelLayer {
@@ -107,27 +108,61 @@ export function ModelLayerManager({
     if (!files || files.length === 0 || !userId || !storeId) return;
 
     setIsUploading(true);
-    let successCount = 0;
+    const uploadedFiles: Array<{ fileName: string; publicUrl: string }> = [];
+    let errorCount = 0;
 
+    // 1. Storage에 파일 업로드
     for (const file of Array.from(files)) {
       const result = await upload3DModel(userId, storeId, file);
-      if (result.success) {
-        successCount++;
+      if (result.success && result.publicUrl) {
+        uploadedFiles.push({
+          fileName: file.name,
+          publicUrl: result.publicUrl
+        });
       } else {
+        errorCount++;
         toast.error(`${file.name} 업로드 실패: ${result.error}`);
       }
     }
 
-    setIsUploading(false);
-    
-    if (successCount > 0) {
-      toast.success(`${successCount}개 파일 업로드 완료`);
-      onModelsReload?.();
+    if (uploadedFiles.length === 0) {
+      setIsUploading(false);
+      toast.error('업로드된 파일이 없습니다');
+      return;
     }
-    
-    // Reset file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+
+    // 2. 자동 처리 (AI 분석 + 엔티티 매핑 + 인스턴스 생성)
+    try {
+      const { data, error } = await supabase.functions.invoke('auto-process-3d-models', {
+        body: {
+          files: uploadedFiles,
+          storeId
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        toast.success(
+          `${data.processed}개 모델 자동 처리 완료`,
+          {
+            description: `엔티티 타입 매핑 및 인스턴스 생성 완료`
+          }
+        );
+        onModelsReload?.();
+      } else {
+        throw new Error(data.error || '자동 처리 실패');
+      }
+    } catch (error: any) {
+      console.error('Auto-process error:', error);
+      toast.error(`자동 처리 실패: ${error.message}`, {
+        description: '모델은 업로드되었으나 자동 매핑에 실패했습니다'
+      });
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
