@@ -1,563 +1,183 @@
 import { useState, useEffect, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { SceneComposer } from "../components";
-import { Store3DViewer } from "../components/Store3DViewer";
-import { WiFiTrackingOverlay } from "../components/overlays/WiFiTrackingOverlay";
-import { generateSceneRecipe } from "../utils/sceneRecipeGenerator";
+import { ModelLayerManager } from "../components/ModelLayerManager";
+import type { ModelLayer } from "../components/ModelLayerManager";
+import { loadUserModels } from "../utils/modelLayerLoader";
 import { useAuth } from "@/hooks/useAuth";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
-import { useOntologyEntities, transformToGraphData } from "@/hooks/useOntologyData";
-import { useWiFiTracking } from "@/hooks/useWiFiTracking";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { Loader2, Box, Lightbulb, Layout, Database, Sparkles, Wifi, MapPin, Save, Trash2 } from "lucide-react";
-import type { SceneRecipe, AILayoutResult } from "@/types/scene3d";
 import { useStoreScene } from "@/hooks/useStoreScene";
-import { CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { toast } from "sonner";
+import { Loader2, Save, Trash2, Layers, Eye, RefreshCw, AlertCircle, ArrowRight } from "lucide-react";
+import type { SceneRecipe, LightingPreset } from "@/types/scene3d";
 
 export default function DigitalTwin3DPage() {
   const { user } = useAuth();
   const { selectedStore } = useSelectedStore();
-  const [recipe, setRecipe] = useState<SceneRecipe | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [analyzingLayout, setAnalyzingLayout] = useState(false);
-  const [selectedAsset, setSelectedAsset] = useState<{ id: string; type: string } | null>(null);
-  const [wifiMode, setWifiMode] = useState<'realtime' | 'heatmap' | 'paths'>('realtime');
-  
-  // 씬 관리 훅
   const { activeScene, allScenes, saveScene, setActiveScene, deleteScene, isSaving } = useStoreScene();
-  
-  // WiFi 트래킹 데이터 로드
-  const { 
-    zones, 
-    trackingData, 
-    loading: wifiLoading, 
-    error: wifiError,
-    refresh: refreshWiFi 
-  } = useWiFiTracking(selectedStore?.id);
 
-  // 온톨로지 엔티티 타입 직접 로드 (3D 모델 확인용)
-  const { data: entityTypes = [], isLoading: entitiesLoading } = useQuery({
-    queryKey: ['ontology-entity-types-with-models', selectedStore?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('ontology_entity_types')
-        .select('*')
-        .not('model_3d_url', 'is', null);
-      
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!user && !!selectedStore
-  });
-  
-  // 온톨로지 데이터 로드 (엔티티 인스턴스)
-  const { data: allEntities = [] } = useOntologyEntities();
-  
-  // 엔티티 타입별 통계
-  const entityStats = useMemo(() => {
-    const stats: Record<string, number> = {};
-    entityTypes.forEach((type: any) => {
-      stats[type.name] = 1; // 타입별로 1개씩
-    });
-    return stats;
-  }, [entityTypes]);
+  const [models, setModels] = useState<ModelLayer[]>([]);
+  const [activeLayers, setActiveLayers] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sceneName, setSceneName] = useState('');
 
-  // 3D 모델이 있는 엔티티 타입만 필터링
-  const entitiesWithModels = useMemo(() => {
-    return entityTypes.filter((type: any) => type.model_3d_url);
-  }, [entityTypes]);
-
-  // 활성 씬 자동 로드
   useEffect(() => {
-    if (activeScene?.recipe_data && !recipe) {
-      setRecipe(activeScene.recipe_data);
-      toast.success('저장된 씬을 불러왔습니다');
-    }
-  }, [activeScene, recipe]);
-
-  const handleGenerateScene = async () => {
     if (!user) return;
-    
-    if (entitiesWithModels.length === 0) {
-      toast.error("3D 모델이 있는 온톨로지 엔티티가 없습니다. '통합 데이터 관리' 페이지에서 3D 모델을 업로드하세요.");
-      return;
-    }
-    
     setLoading(true);
-    try {
-      // 실제 온톨로지 엔티티 타입 기반으로 레이아웃 구성
-      const furniture = entitiesWithModels
-        .filter((type: any) => ['shelf', 'rack', 'displaytable', 'furniture'].includes(type.name?.toLowerCase()))
-        .map((type: any, idx: number) => ({
-          furniture_id: type.id,
-          entity_type: type.name || 'Unknown',
-          movable: true,
-          current_position: { x: (idx - 1) * 3, y: 0, z: -5 },
-          position: { x: (idx - 1) * 3, y: 0, z: -5 },
-          rotation: { x: 0, y: 0, z: 0 }
-        }));
-
-      const products = entitiesWithModels
-        .filter((type: any) => type.name?.toLowerCase() === 'product')
-        .map((type: any, idx: number) => ({
-          product_id: type.id,
-          entity_type: type.name || 'Product',
-          movable: true,
-          current_position: { x: (idx - 1) * 2, y: 1, z: -4 },
-          position: { x: (idx - 1) * 2, y: 1, z: -4 }
-        }));
-
-      const aiResult: AILayoutResult = {
-        zones: [
-          {
-            zone_id: 'main-zone',
-            zone_type: 'retail',
-            furniture,
-            products
-          }
-        ],
-        lighting_suggestion: 'warm-retail'
-      };
-
-      const generatedRecipe = await generateSceneRecipe(aiResult, user.id);
-      setRecipe(generatedRecipe);
-      
-      // 자동 저장
-      await saveScene(generatedRecipe, `씬 ${new Date().toLocaleString('ko-KR')}`);
-      toast.success("3D 씬이 생성되고 저장되었습니다");
-    } catch (error) {
-      console.error('Scene generation error:', error);
-      toast.error("씬 생성 중 오류가 발생했습니다");
-    } finally {
+    loadUserModels(user.id, selectedStore?.id).then(loadedModels => {
+      setModels(loadedModels);
+      if (loadedModels.length > 0 && activeLayers.length === 0) {
+        setActiveLayers(loadedModels.map(m => m.id));
+      }
       setLoading(false);
+    }).catch(() => {
+      toast.error('모델 로드 실패');
+      setLoading(false);
+    });
+  }, [user, selectedStore]);
+
+  useEffect(() => {
+    if (activeScene?.recipe_data) {
+      const recipe = activeScene.recipe_data;
+      const layerIds: string[] = [];
+      if (recipe.space) layerIds.push(recipe.space.id);
+      recipe.furniture?.forEach(f => layerIds.push(f.id));
+      recipe.products?.forEach(p => layerIds.push(p.id));
+      setActiveLayers(layerIds);
+      setSceneName(activeScene.name || '');
     }
-  };
+  }, [activeScene]);
 
-  const handleAILayoutOptimization = async () => {
-    if (!user || !recipe) return;
-    
-    setAnalyzingLayout(true);
-    try {
-      const graphData = transformToGraphData(allEntities, []);
-      
-      const layoutData = {
-        currentLayout: {
-          furniture: recipe.furniture.map(f => ({
-            id: f.id,
-            type: f.furniture_type,
-            position: f.position
-          })),
-          products: recipe.products.map(p => ({
-            id: p.id,
-            sku: p.sku,
-            position: p.position
-          }))
-        },
-        constraints: {
-          spaceWidth: 20,
-          spaceDepth: 15,
-          minSpacing: 1.5
-        }
-      };
+  const currentRecipe = useMemo<SceneRecipe | null>(() => {
+    const activeModels = models.filter(m => activeLayers.includes(m.id));
+    if (activeModels.length === 0) return null;
 
-      const { data: result, error } = await supabase.functions.invoke('analyze-store-data', {
-        body: { 
-          analysisType: 'layout-simulator',
-          data: layoutData,
-          userId: user.id,
-          graphData
-        }
-      });
+    const spaceModel = activeModels.find(m => m.type === 'space');
+    if (!spaceModel) return null;
 
-      if (error) throw error;
+    const lightingPreset: LightingPreset = {
+      name: 'warm-retail',
+      description: 'Default',
+      lights: [
+        { type: 'ambient', color: '#ffffff', intensity: 0.5 },
+        { type: 'directional', color: '#ffffff', intensity: 1, position: { x: 10, y: 10, z: 5 } }
+      ]
+    };
 
-      toast.success("AI 레이아웃 최적화 제안이 생성되었습니다");
-      
-      // 분석 결과를 표시 (여기서는 토스트로 간단히)
-      if (result?.analysis) {
-        console.log("AI Layout Suggestion:", result.analysis);
-      }
-    } catch (error: any) {
-      console.error('AI layout optimization error:', error);
-      toast.error("AI 최적화 분석 중 오류가 발생했습니다");
-    } finally {
-      setAnalyzingLayout(false);
-    }
-  };
+    return {
+      space: {
+        id: spaceModel.id,
+        model_url: spaceModel.model_url,
+        type: 'space',
+        position: spaceModel.position || { x: 0, y: 0, z: 0 },
+        rotation: spaceModel.rotation || { x: 0, y: 0, z: 0 },
+        scale: spaceModel.scale || { x: 1, y: 1, z: 1 },
+        dimensions: spaceModel.dimensions,
+        metadata: spaceModel.metadata
+      },
+      furniture: activeModels.filter(m => m.type === 'furniture').map(m => ({
+        id: m.id,
+        model_url: m.model_url,
+        type: 'furniture',
+        furniture_type: m.name,
+        position: m.position || { x: 0, y: 0, z: 0 },
+        rotation: m.rotation || { x: 0, y: 0, z: 0 },
+        scale: m.scale || { x: 1, y: 1, z: 1 },
+        dimensions: m.dimensions,
+        movable: true,
+        metadata: m.metadata
+      })),
+      products: activeModels.filter(m => m.type === 'product').map(m => ({
+        id: m.id,
+        model_url: m.model_url,
+        type: 'product',
+        product_id: m.metadata?.entityId,
+        sku: m.name,
+        position: m.position || { x: 0, y: 0, z: 0 },
+        rotation: m.rotation || { x: 0, y: 0, z: 0 },
+        scale: m.scale || { x: 1, y: 1, z: 1 },
+        dimensions: m.dimensions,
+        movable: true,
+        metadata: m.metadata
+      })),
+      lighting: lightingPreset,
+      camera: { position: { x: 10, y: 10, z: 15 }, target: { x: 0, y: 0, z: 0 }, fov: 50 }
+    };
+  }, [models, activeLayers]);
 
-  const handleAssetClick = (assetId: string, assetType: string) => {
-    setSelectedAsset({ id: assetId, type: assetType });
-  };
-
-  const changeLighting = async (preset: string) => {
-    if (!recipe) return;
-    
-    try {
-      const response = await fetch(`/lighting-presets/${preset}.json`);
-      if (response.ok) {
-        const lightingPreset = await response.json();
-        setRecipe({ ...recipe, lighting: lightingPreset });
-        toast.success(`조명을 ${preset}로 변경했습니다`);
-      }
-    } catch (error) {
-      toast.error("조명 프리셋 로드 실패");
-    }
-  };
+  if (!selectedStore) {
+    return (
+      <DashboardLayout>
+        <Alert><AlertCircle className="h-4 w-4" /><AlertDescription>매장을 선택하세요</AlertDescription></Alert>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold">디지털 트윈 3D</h1>
-            <p className="text-muted-foreground mt-2">
-              온톨로지 기반 3D 모델 자동 조합 및 시각화
-            </p>
+            <h1 className="text-3xl font-bold gradient-text">디지털 트윈 3D 씬 관리</h1>
+            <p className="text-muted-foreground mt-2">{selectedStore.store_name} - 레이어를 조합하여 씬 생성</p>
           </div>
-          <div className="flex gap-2">
-            {recipe && (
-              <Button 
-                onClick={handleAILayoutOptimization} 
-                disabled={analyzingLayout}
-                variant="outline"
-              >
-                {analyzingLayout ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    AI 분석 중...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4 mr-2" />
-                    AI 최적화 제안
-                  </>
-                )}
-              </Button>
-            )}
-            <Button onClick={handleGenerateScene} disabled={loading || entitiesLoading}>
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  생성 중...
-                </>
-              ) : (
-                <>
-                  <Box className="w-4 h-4 mr-2" />
-                  씬 생성
-                </>
-              )}
-            </Button>
-          </div>
+          <Button onClick={() => window.location.reload()} variant="outline" size="sm">
+            <RefreshCw className="w-4 h-4 mr-2" />새로고침
+          </Button>
         </div>
 
-        {/* 온톨로지 데이터 상태 */}
-        {allEntities.length > 0 && (
-          <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
-            <Database className="h-4 w-4 text-blue-600" />
-            <AlertDescription>
-              <div className="flex flex-wrap gap-3">
-                <span className="font-semibold">온톨로지 엔티티:</span>
-                {Object.entries(entityStats).map(([type, count]) => (
-                  <span key={type} className="text-sm">
-                    {type}: {count}개
-                  </span>
-                ))}
-                <span className="text-sm text-blue-600">
-                  (3D 모델 보유: {entitiesWithModels.length}개)
-                </span>
-              </div>
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {entityTypes.length === 0 && !entitiesLoading && (
-          <Alert variant="destructive">
-            <Database className="h-4 w-4" />
-            <AlertDescription>
-              3D 모델이 있는 온톨로지 엔티티 타입이 없습니다. '통합 데이터 관리' 페이지에서 3D 모델을 업로드하세요.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* 3D Viewport */}
-          <Card className="lg:col-span-3 p-0 overflow-hidden">
-            <Tabs value={recipe ? "scene" : "wifi"} className="h-[600px]">
-              <div className="border-b px-4">
-                <TabsList>
-                  <TabsTrigger value="scene" disabled={!recipe}>
-                    <Box className="w-4 h-4 mr-2" />
-                    씬 에디터
-                  </TabsTrigger>
-                  <TabsTrigger value="wifi">
-                    <Wifi className="w-4 h-4 mr-2" />
-                    WiFi 트래킹
-                  </TabsTrigger>
-                </TabsList>
-              </div>
-
-              <TabsContent value="scene" className="h-[calc(100%-3rem)] m-0">
-                <div className="h-full bg-background">
-                  {recipe ? (
-                    <SceneComposer recipe={recipe} onAssetClick={handleAssetClick} />
-                  ) : (
-                    <div className="h-full flex items-center justify-center text-muted-foreground">
-                      <div className="text-center">
-                        <Box className="w-16 h-16 mx-auto mb-4 opacity-20" />
-                        <p>씬 생성 버튼을 클릭하여 3D 모델을 조합하세요</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </TabsContent>
-
-              <TabsContent value="wifi" className="h-[calc(100%-3rem)] m-0">
-                <div className="h-full bg-background">
-                  {!selectedStore ? (
-                    <div className="h-full flex items-center justify-center text-muted-foreground">
-                      <div className="text-center">
-                        <MapPin className="w-16 h-16 mx-auto mb-4 opacity-20" />
-                        <p>먼저 매장을 선택하세요</p>
-                      </div>
-                    </div>
-                  ) : wifiLoading ? (
-                    <div className="h-full flex items-center justify-center">
-                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                    </div>
-                  ) : wifiError ? (
-                    <div className="h-full flex items-center justify-center text-destructive">
-                      <div className="text-center">
-                        <p>WiFi 데이터 로드 실패</p>
-                        <Button onClick={refreshWiFi} className="mt-4" variant="outline">
-                          다시 시도
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <Store3DViewer height="100%" overlay={
-                      <WiFiTrackingOverlay 
-                        trackingData={trackingData} 
-                        mode={wifiMode}
-                      />
-                    } />
-                  )}
-                </div>
-              </TabsContent>
-            </Tabs>
-          </Card>
-
-          {/* Controls Panel */}
-          <Card className="p-6">
-            <Tabs defaultValue="scenes">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="scenes">
-                  <Database className="w-4 h-4 mr-2" />
-                  씬
-                </TabsTrigger>
-                <TabsTrigger value="lighting">
-                  <Lightbulb className="w-4 h-4 mr-2" />
-                  조명
-                </TabsTrigger>
-                <TabsTrigger value="layout">
-                  <Layout className="w-4 h-4 mr-2" />
-                  레이아웃
-                </TabsTrigger>
-                <TabsTrigger value="wifi">
-                  <Wifi className="w-4 h-4 mr-2" />
-                  WiFi
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="scenes" className="space-y-4">
-                <div>
-                  <h3 className="font-semibold mb-3">저장된 씬</h3>
-                  {allScenes.length > 0 ? (
-                    <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                      {allScenes.map((scene) => (
-                        <div 
-                          key={scene.id}
-                          className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent transition-colors"
-                        >
-                          <div className="flex-1 min-w-0 mr-2">
-                            <p className="text-sm font-medium truncate">
-                              {scene.name}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {new Date(scene.updated_at).toLocaleString('ko-KR', {
-                                month: 'short',
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </p>
-                          </div>
-                          <div className="flex gap-1">
-                            {scene.is_active ? (
-                              <Badge variant="default" className="text-xs">활성</Badge>
-                            ) : (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => {
-                                  setActiveScene(scene.id);
-                                  setRecipe(scene.recipe_data);
-                                }}
-                              >
-                                선택
-                              </Button>
-                            )}
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => deleteScene(scene.id)}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground text-center py-8">
-                      저장된 씬이 없습니다
-                    </p>
-                  )}
-                </div>
-
-                {recipe && (
-                  <Button
-                    onClick={() => saveScene(recipe, activeScene?.name || `씬 ${new Date().toLocaleString('ko-KR')}`)}
-                    disabled={isSaving}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    {isSaving ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        저장 중...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="mr-2 h-4 w-4" />
-                        현재 씬 저장
-                      </>
-                    )}
+        {loading ? (
+          <Card><CardContent className="py-12 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto" /></CardContent></Card>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1 space-y-6">
+              <ModelLayerManager models={models} activeLayers={activeLayers} onLayersChange={setActiveLayers} />
+              <Card>
+                <CardHeader><CardTitle>씬 저장</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <Input placeholder="씬 이름" value={sceneName} onChange={(e) => setSceneName(e.target.value)} />
+                  <Button onClick={() => saveScene(currentRecipe!, sceneName || `씬 ${Date.now()}`).then(() => toast.success('저장됨'))} disabled={!currentRecipe || isSaving} className="w-full">
+                    <Save className="w-4 h-4 mr-2" />{isSaving ? '저장 중...' : '씬 저장'}
                   </Button>
-                )}
-              </TabsContent>
-
-              <TabsContent value="lighting" className="space-y-4">
-                <div>
-                  <h3 className="font-semibold mb-3">조명 프리셋</h3>
-                  <div className="space-y-2">
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start"
-                      onClick={() => changeLighting('warm-retail')}
-                    >
-                      따뜻한 매장
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start"
-                      onClick={() => changeLighting('cool-modern')}
-                    >
-                      모던한 매장
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start"
-                      onClick={() => changeLighting('dramatic-spot')}
-                    >
-                      프리미엄 스팟
-                    </Button>
-                  </div>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="layout" className="space-y-4">
-                {selectedAsset ? (
-                  <div>
-                    <h3 className="font-semibold mb-2">선택된 오브젝트</h3>
-                    <p className="text-sm text-muted-foreground">
-                      타입: {selectedAsset.type}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      ID: {selectedAsset.id}
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    3D 뷰에서 오브젝트를 클릭하세요
-                  </p>
-                )}
-              </TabsContent>
-
-              <TabsContent value="wifi" className="space-y-4">
-                <div>
-                  <h3 className="font-semibold mb-3">시각화 모드</h3>
-                  <div className="space-y-2">
-                    <Button
-                      variant={wifiMode === 'realtime' ? 'default' : 'outline'}
-                      className="w-full justify-start"
-                      onClick={() => setWifiMode('realtime')}
-                    >
-                      실시간 트래킹
-                    </Button>
-                    <Button
-                      variant={wifiMode === 'heatmap' ? 'default' : 'outline'}
-                      className="w-full justify-start"
-                      onClick={() => setWifiMode('heatmap')}
-                    >
-                      히트맵
-                    </Button>
-                    <Button
-                      variant={wifiMode === 'paths' ? 'default' : 'outline'}
-                      className="w-full justify-start"
-                      onClick={() => setWifiMode('paths')}
-                    >
-                      고객 경로
-                    </Button>
-                  </div>
-                </div>
-
-                {selectedStore && (
-                  <div className="pt-4 border-t">
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">매장:</span>
-                        <Badge variant="outline">{selectedStore.store_name}</Badge>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader><CardTitle>저장된 씬 ({allScenes.length})</CardTitle></CardHeader>
+                <CardContent>
+                  {allScenes.map(scene => (
+                    <div key={scene.id} className="flex justify-between p-3 border rounded mb-2">
+                      <div>
+                        <p className="font-medium">{scene.name}</p>
+                        {scene.is_active && <Badge>활성</Badge>}
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Zone 수:</span>
-                        <Badge>{zones.length}개</Badge>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">트래킹 데이터:</span>
-                        <Badge>{trackingData.length}개</Badge>
+                      <div className="flex gap-1">
+                        {!scene.is_active && <Button size="sm" variant="ghost" onClick={() => setActiveScene(scene.id)}><Eye className="w-4 h-4" /></Button>}
+                        <Button size="sm" variant="ghost" onClick={() => deleteScene(scene.id)}><Trash2 className="w-4 h-4" /></Button>
                       </div>
                     </div>
-                    <Button 
-                      onClick={refreshWiFi} 
-                      className="w-full mt-4"
-                      variant="outline"
-                      size="sm"
-                    >
-                      새로고침
-                    </Button>
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
-          </Card>
-        </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
+            <div className="lg:col-span-2">
+              <Card>
+                <CardHeader><CardTitle><Layers className="w-5 h-5 inline mr-2" />3D 프리뷰</CardTitle></CardHeader>
+                <CardContent>
+                  {currentRecipe ? (
+                    <div style={{ height: '600px' }}><SceneComposer recipe={currentRecipe} /></div>
+                  ) : (
+                    <div className="text-center py-20"><Layers className="w-16 h-16 mx-auto opacity-20" /><p>레이어를 선택하세요</p></div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );
