@@ -87,37 +87,7 @@ export function StorageManager({ storeId }: StorageManagerProps) {
           }
         }
 
-        // 3d-models 서브폴더
-        const modelSubPath = `${basePath}/3d-models`;
-        const { data: modelSubFiles } = await supabase.storage
-          .from('3d-models')
-          .list(modelSubPath, {
-            sortBy: { column: 'created_at', order: 'desc' }
-          });
-
-        if (modelSubFiles) {
-          for (const file of modelSubFiles) {
-            if (!file.id) continue;
-            
-            const filePath = `${modelSubPath}/${file.name}`;
-            const { data: { publicUrl } } = supabase.storage
-              .from('3d-models')
-              .getPublicUrl(filePath);
-
-            allFiles.push({
-              name: file.name,
-              path: filePath,
-              size: file.metadata?.size || 0,
-              created_at: file.created_at,
-              url: publicUrl,
-              bucket: '3d-models',
-              storeName: store.store_name,
-              storeId: store.id
-            });
-          }
-        }
-        
-        // 루트 레벨 3D 파일
+        // 3d-models 버킷 (루트 레벨)
         const { data: modelRootFiles } = await supabase.storage
           .from('3d-models')
           .list(basePath, {
