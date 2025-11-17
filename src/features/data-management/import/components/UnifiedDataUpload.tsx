@@ -213,13 +213,13 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
             }
           });
           
-          if (!mappingError && mappingResult?.matched_entity_type) {
+          if (!mappingError && mappingResult?.success && mappingResult?.matched_entity_type) {
             // 자동 매핑 성공 - 엔티티 타입에 모델 URL 업데이트
             await supabase
               .from('ontology_entity_types')
               .update({
                 model_3d_url: publicUrl,
-                model_3d_dimensions: mappingResult.suggested_dimensions,
+                model_3d_dimensions: mappingResult.analysis?.suggested_dimensions || { width: 1, height: 1, depth: 1 },
                 updated_at: new Date().toISOString()
               })
               .eq('id', mappingResult.matched_entity_type.id);
@@ -227,13 +227,15 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
             updateFileStatus(uploadFile.id, 'success', undefined, 100, {
               autoMapped: true,
               entityType: mappingResult.matched_entity_type.label,
-              confidence: mappingResult.confidence
+              confidence: mappingResult.analysis?.confidence || 0
             });
           } else {
             // 자동 매핑 실패 - 수동 매핑 필요
+            const errorMsg = mappingError?.message || mappingResult?.error || '자동 매핑 실패';
+            console.warn('Auto-mapping failed:', errorMsg);
             updateFileStatus(uploadFile.id, 'success', undefined, 100, {
               autoMapped: false,
-              message: '수동 매핑이 필요합니다. "3D 데이터 설정" 페이지에서 매핑해주세요.'
+              message: `업로드 완료. ${errorMsg}. "3D 데이터 설정" 페이지에서 수동 매핑해주세요.`
             });
           }
         } catch (err) {
