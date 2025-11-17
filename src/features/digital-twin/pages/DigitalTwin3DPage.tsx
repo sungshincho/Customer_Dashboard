@@ -26,19 +26,24 @@ export default function DigitalTwin3DPage() {
   const [loading, setLoading] = useState(true);
   const [sceneName, setSceneName] = useState('');
 
-  useEffect(() => {
+  const loadModels = async () => {
     if (!user) return;
     setLoading(true);
-    loadUserModels(user.id, selectedStore?.id).then(loadedModels => {
+    try {
+      const loadedModels = await loadUserModels(user.id, selectedStore?.id);
       setModels(loadedModels);
       if (loadedModels.length > 0 && activeLayers.length === 0) {
         setActiveLayers(loadedModels.map(m => m.id));
       }
-      setLoading(false);
-    }).catch(() => {
+    } catch (error) {
       toast.error('모델 로드 실패');
+    } finally {
       setLoading(false);
-    });
+    }
+  };
+
+  useEffect(() => {
+    loadModels();
   }, [user, selectedStore]);
 
   useEffect(() => {
@@ -136,7 +141,14 @@ export default function DigitalTwin3DPage() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-1 space-y-6">
-              <ModelLayerManager models={models} activeLayers={activeLayers} onLayersChange={setActiveLayers} />
+            <ModelLayerManager 
+              models={models} 
+              activeLayers={activeLayers} 
+              onLayersChange={setActiveLayers}
+              userId={user?.id}
+              storeId={selectedStore?.id}
+              onModelsReload={loadModels}
+            />
               <Card>
                 <CardHeader><CardTitle>씬 저장</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
