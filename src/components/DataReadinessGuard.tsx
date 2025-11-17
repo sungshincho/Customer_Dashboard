@@ -1,6 +1,5 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
 import { Loader2, AlertCircle, Database, Building2, Network } from 'lucide-react';
 import { useDataReadiness } from '@/hooks/useDataReadiness';
 import {
@@ -15,14 +14,9 @@ import {
 
 interface DataReadinessGuardProps {
   children: ReactNode;
-  requireWifiData?: boolean; // WiFi 데이터가 필수인 기능인 경우
+  requireWifiData?: boolean;
 }
 
-/**
- * 데모 프로세스 가드 컴포넌트
- * 매장 선택, 데이터 임포트, 온톨로지 스키마 조건을 확인하여
- * 조건이 충족되지 않으면 안내 메시지를 표시합니다.
- */
 export function DataReadinessGuard({ children, requireWifiData = false }: DataReadinessGuardProps) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -38,7 +32,6 @@ export function DataReadinessGuard({ children, requireWifiData = false }: DataRe
     getStatusMessage
   } = useDataReadiness();
 
-  // 데이터 준비 상태가 변경될 때마다 다이얼로그 표시 여부 결정
   useEffect(() => {
     if (!isLoading && !isReady) {
       setOpen(true);
@@ -68,46 +61,6 @@ export function DataReadinessGuard({ children, requireWifiData = false }: DataRe
     );
   }
 
-  // WiFi 데이터가 필수인데 없는 경우
-  if (requireWifiData && !hasWifiData) {
-    return (
-      <div className="container mx-auto p-6 max-w-2xl">
-        <Card className="border-warning">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <AlertCircle className="w-6 h-6 text-warning" />
-              <div>
-                <CardTitle>WiFi 트래킹 데이터가 필요합니다</CardTitle>
-                <CardDescription>
-                  이 기능을 사용하려면 WiFi 트래킹 데이터를 먼저 임포트해야 합니다.
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Alert>
-              <Network className="w-4 h-4" />
-              <AlertDescription>
-                통합 데이터 관리 페이지에서 WiFi 트래킹 데이터를 업로드하거나,
-                NeuralSense 설정 페이지에서 실시간 WiFi 센서를 연결하세요.
-              </AlertDescription>
-            </Alert>
-            
-            <div className="flex gap-2">
-              <Button onClick={() => navigate('/data-import')}>
-                데이터 임포트
-              </Button>
-              <Button variant="outline" onClick={() => navigate('/neuralsense-settings')}>
-                NeuralSense 설정
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // 모든 조건이 충족된 경우 children 렌더링
   if (isReady && (!requireWifiData || hasWifiData)) {
     return <>{children}</>;
   }
@@ -191,5 +144,4 @@ export function DataReadinessGuard({ children, requireWifiData = false }: DataRe
       </AlertDialog>
     </>
   );
-}
 }
