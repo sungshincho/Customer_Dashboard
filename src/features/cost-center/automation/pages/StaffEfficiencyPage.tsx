@@ -17,6 +17,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { loadStoreDataset } from "@/utils/storageDataLoader";
 import { DataReadinessGuard } from "@/components/DataReadinessGuard";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useStoreScene } from "@/hooks/useStoreScene";
 
 const StaffEfficiencyPage = () => {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -26,6 +27,7 @@ const StaffEfficiencyPage = () => {
   const [historyRefresh, setHistoryRefresh] = useState(0);
   const { selectedStore } = useSelectedStore();
   const { user } = useAuth();
+  const { activeScene } = useStoreScene();
   const [storeData, setStoreData] = useState<any>({});
   const [loading, setLoading] = useState(false);
 
@@ -115,7 +117,7 @@ const StaffEfficiencyPage = () => {
           </TabsList>
           
           <TabsContent value="3d" className="space-y-6">
-            <Store3DViewer height="600px" />
+            <Store3DViewer height="600px" sceneRecipe={activeScene?.recipe_data} />
           </TabsContent>
           
           <TabsContent value="analysis" className="space-y-6">

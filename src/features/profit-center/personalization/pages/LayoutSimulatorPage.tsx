@@ -17,10 +17,12 @@ import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { loadStoreDataset } from "@/utils/storageDataLoader";
 import { DataReadinessGuard } from "@/components/DataReadinessGuard";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useStoreScene } from "@/hooks/useStoreScene";
 
 const LayoutSimulatorPage = () => {
   const { user } = useAuth();
   const { selectedStore } = useSelectedStore();
+  const { activeScene } = useStoreScene();
   const [refreshKey, setRefreshKey] = useState(0);
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
   const [alerts, setAlerts] = useState<AlertType[]>([]);
@@ -119,7 +121,7 @@ const LayoutSimulatorPage = () => {
           </TabsList>
           
           <TabsContent value="3d" className="space-y-6">
-            <Store3DViewer height="600px" />
+            <Store3DViewer height="600px" sceneRecipe={activeScene?.recipe_data} />
           </TabsContent>
           
           <TabsContent value="analysis" className="space-y-6">

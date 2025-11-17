@@ -17,10 +17,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { loadStoreDataset } from "@/utils/storageDataLoader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { DataReadinessGuard } from "@/components/DataReadinessGuard";
+import { useStoreScene } from "@/hooks/useStoreScene";
 
 const ProfitCenterPage = () => {
   const { selectedStore } = useSelectedStore();
   const { user } = useAuth();
+  const { activeScene } = useStoreScene();
   const { 
     inventoryLevels, 
     orderSuggestions, 
@@ -260,6 +262,7 @@ const ProfitCenterPage = () => {
               <CardContent>
                 <Store3DViewer 
                   height="600px"
+                  sceneRecipe={activeScene?.recipe_data}
                   overlay={
                     <ProductInfoOverlay products={productInfoData} />
                   }

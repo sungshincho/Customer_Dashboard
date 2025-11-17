@@ -12,10 +12,12 @@ import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { loadStoreFile } from "@/utils/storageDataLoader";
 import { useAuth } from "@/hooks/useAuth";
 import { DataReadinessGuard } from "@/components/DataReadinessGuard";
+import { useStoreScene } from "@/hooks/useStoreScene";
 
 const CustomerJourneyPage = () => {
   const { user } = useAuth();
   const { selectedStore } = useSelectedStore();
+  const { activeScene } = useStoreScene();
   const [refreshKey, setRefreshKey] = useState(0);
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
@@ -95,7 +97,7 @@ const CustomerJourneyPage = () => {
           </TabsList>
           
           <TabsContent value="3d" className="space-y-6">
-            <Store3DViewer height="600px" />
+            <Store3DViewer height="600px" sceneRecipe={activeScene?.recipe_data} />
           </TabsContent>
           
           <TabsContent value="analysis" className="space-y-6">
