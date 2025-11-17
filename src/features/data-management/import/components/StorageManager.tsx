@@ -137,6 +137,11 @@ export function StorageManager({ storeId }: StorageManagerProps) {
     try {
       console.log(`🗑️ Deleting file from bucket "${bucket}": ${path}`);
       
+      // 삭제 전 URL 저장 (엔티티 참조 정리용)
+      const { data: { publicUrl } } = supabase.storage
+        .from(bucket)
+        .getPublicUrl(path);
+
       const { data, error } = await supabase.storage
         .from(bucket)
         .remove([path]);
@@ -147,6 +152,19 @@ export function StorageManager({ storeId }: StorageManagerProps) {
       }
 
       console.log(`✅ Successfully deleted:`, data);
+
+      // 3D 모델 파일인 경우 엔티티 참조 정리
+      if (bucket === '3d-models' && (name.endsWith('.glb') || name.endsWith('.gltf'))) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user && publicUrl) {
+          const { cleanupEntityReferences } = await import('@/features/digital-twin/utils/cleanupEntityReferences');
+          const result = await cleanupEntityReferences(publicUrl, user.id);
+          
+          if (result.success && (result.entityTypesUpdated > 0 || result.entitiesUpdated > 0)) {
+            console.log(`🧹 Cleaned up ${result.entityTypesUpdated} entity types and ${result.entitiesUpdated} instances`);
+          }
+        }
+      }
 
       toast({
         title: "파일 삭제 완료",
@@ -172,12 +190,18 @@ export function StorageManager({ storeId }: StorageManagerProps) {
     setLoading(true);
     try {
       const filesByBucket = new Map<string, string[]>();
+      const urlsToCleanup: string[] = [];
       
       files.forEach(file => {
         if (selectedFiles.has(file.path)) {
           const paths = filesByBucket.get(file.bucket) || [];
           paths.push(file.path);
           filesByBucket.set(file.bucket, paths);
+          
+          // 3D 모델 파일인 경우 URL 저장
+          if (file.bucket === '3d-models' && (file.name.endsWith('.glb') || file.name.endsWith('.gltf'))) {
+            urlsToCleanup.push(file.url);
+          }
         }
       });
 
@@ -197,6 +221,20 @@ export function StorageManager({ storeId }: StorageManagerProps) {
         } else {
           console.log(`✅ Successfully deleted from "${bucket}":`, data);
           successCount += paths.length;
+        }
+      }
+
+      // 3D 모델 파일에 대한 엔티티 참조 정리
+      if (urlsToCleanup.length > 0) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { cleanupEntityReferences } = await import('@/features/digital-twin/utils/cleanupEntityReferences');
+          
+          for (const url of urlsToCleanup) {
+            await cleanupEntityReferences(url, user.id);
+          }
+          
+          console.log(`🧹 Cleaned up entity references for ${urlsToCleanup.length} models`);
         }
       }
 

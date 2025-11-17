@@ -179,11 +179,23 @@ export function ThreeDModelUpload({ storeId }: ThreeDModelUploadProps) {
     if (!confirm(`"${fileName}" 모델을 삭제하시겠습니까?`)) return;
 
     try {
+      // 삭제 전 URL 저장
+      const { data: { publicUrl } } = supabase.storage
+        .from('3d-models')
+        .getPublicUrl(filePath);
+
       const { error } = await supabase.storage
         .from('3d-models')
         .remove([filePath]);
 
       if (error) throw error;
+
+      // 엔티티 참조 정리
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user && publicUrl) {
+        const { cleanupEntityReferences } = await import('@/features/digital-twin/utils/cleanupEntityReferences');
+        await cleanupEntityReferences(publicUrl, user.id);
+      }
 
       toast({
         title: "모델 삭제 완료",

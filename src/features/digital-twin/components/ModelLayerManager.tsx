@@ -192,46 +192,13 @@ export function ModelLayerManager({
 
     if (result.success && result.publicUrl) {
       // 스토리지 파일 삭제 후, 엔티티 연결 정리
-      try {
-        // 1. ontology_entity_types에서 해당 URL 제거
-        const { error: entityTypesError } = await supabase
-          .from('ontology_entity_types')
-          .update({ model_3d_url: null })
-          .eq('user_id', userId)
-          .eq('model_3d_url', result.publicUrl);
-
-        if (entityTypesError) {
-          console.error('Error updating entity types:', entityTypesError);
-        }
-
-        // 2. graph_entities에서 properties.model_url 제거
-        const { data: entities, error: entitiesError } = await supabase
-          .from('graph_entities')
-          .select('id, properties')
-          .eq('user_id', userId);
-
-        if (!entitiesError && entities) {
-          const entitiesToUpdate = entities.filter(
-            (entity) => entity.properties && (entity.properties as any).model_url === result.publicUrl
-          );
-
-          for (const entity of entitiesToUpdate) {
-            const newProperties = { ...(entity.properties as any) };
-            delete newProperties.model_url;
-
-            await supabase
-              .from('graph_entities')
-              .update({ properties: newProperties })
-              .eq('id', entity.id);
-          }
-
-          console.log(`Cleaned up ${entitiesToUpdate.length} entity instances`);
-        }
-
-        toast.success('모델 삭제 및 엔티티 연결 해제 완료');
-      } catch (error) {
-        console.error('Cleanup failed:', error);
-        toast.warning('모델은 삭제되었으나 엔티티 연결 정리에 실패했습니다');
+      const { cleanupEntityReferences } = await import('@/features/digital-twin/utils/cleanupEntityReferences');
+      const cleanupResult = await cleanupEntityReferences(result.publicUrl, userId);
+      
+      if (cleanupResult.success && (cleanupResult.entityTypesUpdated > 0 || cleanupResult.entitiesUpdated > 0)) {
+        toast.success(`모델 삭제 완료 (엔티티 타입 ${cleanupResult.entityTypesUpdated}개, 인스턴스 ${cleanupResult.entitiesUpdated}개 연결 해제)`);
+      } else {
+        toast.success('모델 삭제 완료');
       }
       
       onModelsReload?.();

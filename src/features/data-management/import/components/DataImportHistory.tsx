@@ -118,6 +118,8 @@ export function DataImportHistory({ storeId }: DataImportHistoryProps) {
       await deleteFromStoreData(storePath);
       
       // 3. Storage에서 3d-models 버킷 파일 삭제
+      const urlsToCleanup: string[] = [];
+      
       const deleteFrom3DModels = async (path: string) => {
         const { data: items } = await supabase.storage
           .from('3d-models')
@@ -130,6 +132,16 @@ export function DataImportHistory({ storeId }: DataImportHistoryProps) {
           // 파일 삭제
           if (files.length > 0) {
             const filesToDelete = files.map(f => `${path}/${f.name}`);
+            
+            // URL 저장 (엔티티 참조 정리용)
+            for (const file of files) {
+              const filePath = `${path}/${file.name}`;
+              const { data: { publicUrl } } = supabase.storage
+                .from('3d-models')
+                .getPublicUrl(filePath);
+              urlsToCleanup.push(publicUrl);
+            }
+            
             const { error } = await supabase.storage
               .from('3d-models')
               .remove(filesToDelete);
@@ -145,6 +157,15 @@ export function DataImportHistory({ storeId }: DataImportHistoryProps) {
       };
       
       await deleteFrom3DModels(storePath);
+
+      // 엔티티 참조 정리
+      if (urlsToCleanup.length > 0) {
+        const { cleanupEntityReferences } = await import('@/features/digital-twin/utils/cleanupEntityReferences');
+        for (const url of urlsToCleanup) {
+          await cleanupEntityReferences(url, user.id);
+        }
+        console.log(`🧹 Cleaned up entity references for ${urlsToCleanup.length} models`);
+      }
 
       // 4. DB에서 레코드 삭제
       if (records && records.length > 0) {
