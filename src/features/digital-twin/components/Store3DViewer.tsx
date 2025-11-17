@@ -37,16 +37,11 @@ export function Store3DViewer({ height = "500px", showControls = true, overlay, 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // If sceneRecipe is provided, use SceneComposer instead
+  // If sceneRecipe is provided, use SceneComposer with overlay
   if (sceneRecipe) {
     return (
-      <div style={{ height }} className="relative">
-        <SceneComposer recipe={sceneRecipe} />
-        {overlay && (
-          <div className="absolute inset-0 pointer-events-none">
-            {overlay}
-          </div>
-        )}
+      <div style={{ height }} className="w-full">
+        <SceneComposer recipe={sceneRecipe} overlay={overlay} />
       </div>
     );
   }
