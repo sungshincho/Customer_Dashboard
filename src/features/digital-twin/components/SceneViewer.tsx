@@ -13,9 +13,20 @@ interface SceneViewerProps {
   onAssetClick?: (assetId: string, assetType: string) => void;
   overlay?: 'visitor' | 'heatmap' | 'journey' | 'inventory' | 'layout' | null;
   overlayData?: any;
+  selectedAssetId?: string | null;
+  onPositionChange?: (assetId: string, position: { x: number; y: number; z: number }) => void;
+  editMode?: boolean;
 }
 
-export function SceneViewer({ recipe, onAssetClick, overlay, overlayData }: SceneViewerProps) {
+export function SceneViewer({ 
+  recipe, 
+  onAssetClick, 
+  overlay, 
+  overlayData,
+  selectedAssetId,
+  onPositionChange,
+  editMode = false
+}: SceneViewerProps) {
   const handleAssetClick = (id: string, type: string) => {
     console.log('Asset clicked:', { id, type });
     onAssetClick?.(id, type);
@@ -56,6 +67,9 @@ export function SceneViewer({ recipe, onAssetClick, overlay, overlayData }: Scen
             <FurnitureLayout
               furniture={recipe.furniture}
               onClick={(id) => handleAssetClick(id, 'furniture')}
+              selectedId={selectedAssetId}
+              onPositionChange={onPositionChange}
+              editMode={editMode}
             />
           )}
 
@@ -63,6 +77,9 @@ export function SceneViewer({ recipe, onAssetClick, overlay, overlayData }: Scen
             <ProductPlacement
               products={recipe.products}
               onClick={(id) => handleAssetClick(id, 'product')}
+              selectedId={selectedAssetId}
+              onPositionChange={onPositionChange}
+              editMode={editMode}
             />
           )}
 
