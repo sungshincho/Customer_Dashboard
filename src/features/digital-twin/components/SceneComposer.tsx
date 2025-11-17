@@ -10,11 +10,21 @@ import { HeatmapOverlay } from './HeatmapOverlay';
 
 interface SceneComposerProps {
   recipe: SceneRecipe;
+  selectedAssetId?: string | null;
   onAssetClick?: (assetId: string, assetType: string) => void;
+  onPositionChange?: (assetId: string, position: { x: number; y: number; z: number }) => void;
+  editMode?: boolean;
   overlay?: ReactNode;
 }
 
-export function SceneComposer({ recipe, onAssetClick, overlay }: SceneComposerProps) {
+export function SceneComposer({ 
+  recipe, 
+  onAssetClick, 
+  overlay,
+  selectedAssetId,
+  onPositionChange,
+  editMode
+}: SceneComposerProps) {
   return (
     <div className="w-full h-full">
       <Canvas shadows>
@@ -41,12 +51,18 @@ export function SceneComposer({ recipe, onAssetClick, overlay }: SceneComposerPr
           <FurnitureLayout 
             furniture={recipe.furniture}
             onClick={(id) => onAssetClick?.(id, 'furniture')}
+            selectedId={selectedAssetId}
+            onPositionChange={onPositionChange}
+            editMode={editMode}
           />
           
           {/* Product Layer */}
           <ProductPlacement 
             products={recipe.products}
             onClick={(id) => onAssetClick?.(id, 'product')}
+            selectedId={selectedAssetId}
+            onPositionChange={onPositionChange}
+            editMode={editMode}
           />
           
           {/* Effect Layers */}
