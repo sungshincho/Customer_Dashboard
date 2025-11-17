@@ -13,12 +13,27 @@ serve(async (req) => {
   }
 
   try {
-    const { fileName, fileUrl, storeId } = await req.json();
+    const { fileName, fileUrl } = await req.json();
     
-    // Get user from authorization header
+    // Get JWT token from Authorization header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       throw new Error('Authorization header is required');
+    }
+    
+    // Extract user ID from JWT token (Bearer token format)
+    const token = authHeader.replace('Bearer ', '');
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      throw new Error('Invalid JWT token');
+    }
+    
+    // Decode JWT payload (base64url encoded)
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+    const userId = payload.sub;
+    
+    if (!userId) {
+      throw new Error('User ID not found in token');
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -26,20 +41,6 @@ serve(async (req) => {
     
     // Use service role key for database operations (bypasses RLS)
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    
-    // Create a separate client with user's auth to get user info
-    const supabaseUser = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
-      global: {
-        headers: { Authorization: authHeader }
-      }
-    });
-
-    // Get authenticated user
-    const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
-    if (userError || !user) {
-      console.error('Auth error:', userError);
-      throw new Error('Authentication failed');
-    }
     
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
@@ -50,7 +51,7 @@ serve(async (req) => {
     const { data: entityTypes, error: entityTypesError } = await supabase
       .from('ontology_entity_types')
       .select('*')
-      .eq('user_id', user.id);
+      .eq('user_id', userId);
 
     if (entityTypesError) throw entityTypesError;
 
