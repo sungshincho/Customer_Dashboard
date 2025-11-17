@@ -196,7 +196,53 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
 
         if (uploadError) throw uploadError;
         
-        updateFileStatus(uploadFile.id, 'success', undefined, 100);
+        // 업로드된 URL 가져오기
+        const { data: { publicUrl } } = supabase.storage
+          .from('3d-models')
+          .getPublicUrl(filePath);
+        
+        updateFileStatus(uploadFile.id, 'processing', undefined, 50);
+        
+        // AI 자동 매핑 시도
+        try {
+          const { data: mappingResult, error: mappingError } = await supabase.functions.invoke('analyze-3d-model', {
+            body: {
+              fileName: uploadFile.file.name,
+              fileUrl: publicUrl,
+              storeId,
+            }
+          });
+          
+          if (!mappingError && mappingResult?.matched_entity_type) {
+            // 자동 매핑 성공 - 엔티티 타입에 모델 URL 업데이트
+            await supabase
+              .from('ontology_entity_types')
+              .update({
+                model_3d_url: publicUrl,
+                model_3d_dimensions: mappingResult.suggested_dimensions,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', mappingResult.matched_entity_type.id);
+            
+            updateFileStatus(uploadFile.id, 'success', undefined, 100, {
+              autoMapped: true,
+              entityType: mappingResult.matched_entity_type.label,
+              confidence: mappingResult.confidence
+            });
+          } else {
+            // 자동 매핑 실패 - 수동 매핑 필요
+            updateFileStatus(uploadFile.id, 'success', undefined, 100, {
+              autoMapped: false,
+              message: '수동 매핑이 필요합니다. "3D 데이터 설정" 페이지에서 매핑해주세요.'
+            });
+          }
+        } catch (err) {
+          console.warn('Auto-mapping failed, manual mapping required:', err);
+          updateFileStatus(uploadFile.id, 'success', undefined, 100, {
+            autoMapped: false,
+            message: '업로드 완료. "3D 데이터 설정" 페이지에서 매핑해주세요.'
+          });
+        }
         
       } else if (uploadFile.type === 'csv' || uploadFile.type === 'excel') {
         // CSV/Excel은 파싱 후 자동 매핑
@@ -323,6 +369,30 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
     }
   };
 
+  const getStatusText = (uploadFile: UploadFile) => {
+    if (uploadFile.status === 'success' && uploadFile.mappingResult) {
+      if (uploadFile.type === '3d-model') {
+        if (uploadFile.mappingResult.autoMapped) {
+          return `자동 매핑 완료: ${uploadFile.mappingResult.entityType} (신뢰도: ${(uploadFile.mappingResult.confidence * 100).toFixed(0)}%)`;
+        } else {
+          return uploadFile.mappingResult.message || '업로드 완료';
+        }
+      } else if (uploadFile.mappingResult.importId) {
+        return `자동 매핑 완료 (Import ID: ${uploadFile.mappingResult.importId})`;
+      }
+    }
+    
+    const statusMap = {
+      pending: '대기 중',
+      uploading: '업로드 중...',
+      processing: '처리 중...',
+      mapping: '자동 매핑 중...',
+      success: '완료',
+      error: uploadFile.error || '실패'
+    };
+    return statusMap[uploadFile.status];
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -436,13 +506,17 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
                     <div className="space-y-1">
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">
-                          {file.status === 'uploading' && '업로드 중...'}
-                          {file.status === 'processing' && '데이터 처리 중...'}
-                          {file.status === 'mapping' && '자동 매핑 중...'}
+                          {getStatusText(file)}
                         </span>
                         <span className="font-medium">{file.progress}%</span>
                       </div>
                       <Progress value={file.progress} />
+                    </div>
+                  )}
+
+                  {file.status === 'success' && (
+                    <div className="text-sm text-green-600 dark:text-green-400">
+                      {getStatusText(file)}
                     </div>
                   )}
 
@@ -452,7 +526,7 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
                     </Alert>
                   )}
 
-                  {file.mappingResult && (
+                  {file.mappingResult && file.mappingResult.entity_mappings && (
                     <Alert>
                       <CheckCircle2 className="h-4 w-4" />
                       <AlertDescription>
