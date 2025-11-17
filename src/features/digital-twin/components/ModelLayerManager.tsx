@@ -48,12 +48,41 @@ export function ModelLayerManager({
     setLocalActive(activeLayers);
   }, [activeLayers]);
 
-  // 레이어 타입별 그룹화
+  // 엔티티 타입별로 그룹화 (인스턴스 포함)
+  const groupedByEntityType = models.reduce((acc, model) => {
+    // 엔티티 인스턴스인 경우
+    if (model.id.startsWith('entity-')) {
+      const entityTypeName = model.metadata?.entityTypeName || 'Unknown';
+      if (!acc[entityTypeName]) {
+        acc[entityTypeName] = {
+          type: model.type,
+          entityTypeId: model.metadata?.entityTypeId,
+          instances: []
+        };
+      }
+      acc[entityTypeName].instances.push(model);
+    }
+    // 스토리지 또는 타입만 있는 모델
+    else {
+      const key = model.name;
+      if (!acc[key]) {
+        acc[key] = {
+          type: model.type,
+          entityTypeId: model.metadata?.entityTypeId,
+          instances: []
+        };
+      }
+      acc[key].instances.push(model);
+    }
+    return acc;
+  }, {} as Record<string, { type: ModelLayer['type']; entityTypeId?: string; instances: ModelLayer[] }>);
+
+  // 타입별로 재그룹화
   const groupedModels = {
-    space: models.filter(m => m.type === 'space'),
-    furniture: models.filter(m => m.type === 'furniture'),
-    product: models.filter(m => m.type === 'product'),
-    other: models.filter(m => m.type === 'other')
+    space: Object.entries(groupedByEntityType).filter(([_, group]) => group.type === 'space'),
+    furniture: Object.entries(groupedByEntityType).filter(([_, group]) => group.type === 'furniture'),
+    product: Object.entries(groupedByEntityType).filter(([_, group]) => group.type === 'product'),
+    other: Object.entries(groupedByEntityType).filter(([_, group]) => group.type === 'other')
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -62,14 +91,12 @@ export function ModelLayerManager({
 
     setIsUploading(true);
     let successCount = 0;
-    let errorCount = 0;
 
     for (const file of Array.from(files)) {
       const result = await upload3DModel(userId, storeId, file);
       if (result.success) {
         successCount++;
       } else {
-        errorCount++;
         toast.error(`${file.name} 업로드 실패: ${result.error}`);
       }
     }
@@ -119,361 +146,224 @@ export function ModelLayerManager({
     }
   };
 
-  const handleToggle = (modelId: string, checked: boolean) => {
-    const updated = checked
-      ? [...localActive, modelId]
-      : localActive.filter(id => id !== modelId);
-    
-    setLocalActive(updated);
-    onLayersChange(updated);
-  };
+  const renderGroup = (
+    title: string, 
+    icon: any, 
+    groups: [string, { type: ModelLayer['type']; entityTypeId?: string; instances: ModelLayer[] }][], 
+    color: string
+  ) => {
+    if (groups.length === 0) return null;
 
-  const handleToggleAll = (type: keyof typeof groupedModels, checked: boolean) => {
-    const typeModels = groupedModels[type].map(m => m.id);
-    const updated = checked
-      ? [...new Set([...localActive, ...typeModels])]
-      : localActive.filter(id => !typeModels.includes(id));
-    
-    setLocalActive(updated);
-    onLayersChange(updated);
-  };
+    const Icon = icon;
+    const allInstances = groups.flatMap(([_, group]) => group.instances);
+    const allSelected = allInstances.every(item => localActive.includes(item.id));
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'space': return <Store className="w-4 h-4" />;
-      case 'furniture': return <Box className="w-4 h-4" />;
-      case 'product': return <Package className="w-4 h-4" />;
-      default: return <Layers className="w-4 h-4" />;
-    }
-  };
+    const toggleAll = () => {
+      if (allSelected) {
+        const newActive = localActive.filter(id => !allInstances.find(item => item.id === id));
+        setLocalActive(newActive);
+        onLayersChange(newActive);
+      } else {
+        const newActive = [...new Set([...localActive, ...allInstances.map(item => item.id)])];
+        setLocalActive(newActive);
+        onLayersChange(newActive);
+      }
+    };
 
-  const getTypeName = (type: string) => {
-    switch (type) {
-      case 'space': return '공간';
-      case 'furniture': return '가구';
-      case 'product': return '제품';
-      default: return '기타';
-    }
-  };
+    const toggleItem = (id: string) => {
+      const newActive = localActive.includes(id)
+        ? localActive.filter(layerId => layerId !== id)
+        : [...localActive, id];
+      setLocalActive(newActive);
+      onLayersChange(newActive);
+    };
 
-  if (models.length === 0) {
+    const toggleEntityType = (instances: ModelLayer[]) => {
+      const allTypeSelected = instances.every(item => localActive.includes(item.id));
+      if (allTypeSelected) {
+        const newActive = localActive.filter(id => !instances.find(item => item.id === id));
+        setLocalActive(newActive);
+        onLayersChange(newActive);
+      } else {
+        const newActive = [...new Set([...localActive, ...instances.map(item => item.id)])];
+        setLocalActive(newActive);
+        onLayersChange(newActive);
+      }
+    };
+
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>모델 레이어</CardTitle>
-          <CardDescription>3D 모델이 없습니다</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              '3D 데이터 설정' 페이지에서 3D 모델을 업로드하거나, 
-              온톨로지 엔티티 타입에 3D 모델을 추가하세요.
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id={`all-${title}`}
+              checked={allSelected}
+              onCheckedChange={toggleAll}
+              className="data-[state=checked]:bg-primary"
+            />
+            <Icon className={`h-4 w-4 ${color}`} />
+            <label
+              htmlFor={`all-${title}`}
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+            >
+              {title}
+            </label>
+            <Badge variant="secondary" className="ml-auto">
+              {allInstances.filter(item => localActive.includes(item.id)).length} / {allInstances.length}
+            </Badge>
+          </div>
+        </div>
+        
+        <div className="ml-6 space-y-3">
+          {groups.map(([typeName, group]) => {
+            const allTypeSelected = group.instances.every(item => localActive.includes(item.id));
+            
+            return (
+              <div key={typeName} className="space-y-1">
+                {/* 엔티티 타입 헤더 */}
+                <div className="flex items-center gap-2 py-1">
+                  <Checkbox
+                    id={`type-${typeName}`}
+                    checked={allTypeSelected}
+                    onCheckedChange={() => toggleEntityType(group.instances)}
+                    className="data-[state=checked]:bg-primary"
+                  />
+                  <label
+                    htmlFor={`type-${typeName}`}
+                    className="text-sm font-medium leading-none cursor-pointer"
+                  >
+                    {typeName}
+                  </label>
+                  <Badge variant="outline" className="ml-auto text-xs">
+                    {group.instances.filter(item => localActive.includes(item.id)).length} / {group.instances.length}
+                  </Badge>
+                </div>
+                
+                {/* 인스턴스 리스트 */}
+                <div className="ml-6 space-y-1">
+                  {group.instances.map((item) => {
+                    const isDeleting = deletingIds.has(item.id);
+                    const canDelete = item.id.startsWith('storage-');
+                    const isInstance = item.id.startsWith('entity-');
+                    
+                    return (
+                      <div key={item.id} className="flex items-center justify-between group hover:bg-muted/50 rounded-md p-1">
+                        <div className="flex items-center gap-2 flex-1">
+                          <Checkbox
+                            id={item.id}
+                            checked={localActive.includes(item.id)}
+                            onCheckedChange={() => toggleItem(item.id)}
+                            className="data-[state=checked]:bg-primary"
+                            disabled={isDeleting}
+                          />
+                          <label
+                            htmlFor={item.id}
+                            className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                          >
+                            {item.name}
+                          </label>
+                          {isInstance && (
+                            <Badge variant="secondary" className="text-xs">인스턴스</Badge>
+                          )}
+                          {item.dimensions && (
+                            <span className="text-xs text-muted-foreground ml-2">
+                              {item.dimensions.width.toFixed(1)}×{item.dimensions.height.toFixed(1)}×{item.dimensions.depth.toFixed(1)}
+                            </span>
+                          )}
+                          {item.position && (item.position.x !== 0 || item.position.z !== 0) && (
+                            <span className="text-xs text-muted-foreground ml-2">
+                              ({item.position.x.toFixed(1)}, {item.position.z.toFixed(1)})
+                            </span>
+                          )}
+                        </div>
+                        {canDelete && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => handleDelete(item.id, item.name)}
+                            disabled={isDeleting}
+                          >
+                            {isDeleting ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-3 w-3 text-destructive" />
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     );
-  }
+  };
 
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Layers className="w-5 h-5" />
-              모델 레이어 관리
-            </CardTitle>
-            <CardDescription>
-              {localActive.length}/{models.length}개 레이어 활성화됨
-            </CardDescription>
-          </div>
-          {userId && storeId && (
-            <>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".glb,.gltf"
-                multiple
-                className="hidden"
-                onChange={handleFileUpload}
-              />
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-                size="sm"
-                className="gap-2"
-              >
-                {isUploading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    업로드 중...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="w-4 h-4" />
-                    모델 업로드
-                  </>
-                )}
-              </Button>
-            </>
-          )}
-        </div>
+        <CardTitle className="flex items-center gap-2">
+          <Layers className="h-5 w-5" />
+          모델 레이어 관리
+        </CardTitle>
+        <CardDescription>
+          3D 씬에 표시할 레이어를 선택하세요
+        </CardDescription>
       </CardHeader>
-      <CardContent>
-        <ScrollArea className="h-[500px] pr-4">
-          <div className="space-y-6">
-            {/* 공간 레이어 */}
-            {groupedModels.space.length > 0 && (
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    {getTypeIcon('space')}
-                    <h4 className="font-semibold">{getTypeName('space')}</h4>
-                    <Badge variant="secondary">{groupedModels.space.length}</Badge>
-                  </div>
-                  <Checkbox
-                    checked={groupedModels.space.every(m => localActive.includes(m.id))}
-                    onCheckedChange={(checked) => handleToggleAll('space', checked as boolean)}
-                  />
-                </div>
-                <div className="space-y-2 ml-6">
-                  {groupedModels.space.map(model => (
-                    <div key={model.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted">
-                      <div className="flex items-center gap-3 flex-1">
-                        <Checkbox
-                          checked={localActive.includes(model.id)}
-                          onCheckedChange={(checked) => handleToggle(model.id, checked as boolean)}
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm">{model.name}</span>
-                            {model.metadata?.entityTypeId && (
-                              <Badge variant="outline" className="text-xs">Ontology</Badge>
-                            )}
-                            {model.id.startsWith('storage-') && (
-                              <Badge variant="outline" className="text-xs">Storage</Badge>
-                            )}
-                          </div>
-                          {model.dimensions && (
-                            <div className="text-xs text-muted-foreground">
-                              {model.dimensions.width}×{model.dimensions.height}×{model.dimensions.depth}m
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      {model.id.startsWith('storage-') && userId && storeId && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(model.id, model.name);
-                          }}
-                          disabled={deletingIds.has(model.id)}
-                        >
-                          {deletingIds.has(model.id) ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
-                          )}
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <Separator className="mt-4" />
-              </div>
-            )}
+      <CardContent className="space-y-4">
+        {(!userId || !storeId) && (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              먼저 매장을 선택해주세요.
+            </AlertDescription>
+          </Alert>
+        )}
 
-            {/* 가구 레이어 */}
-            {groupedModels.furniture.length > 0 && (
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    {getTypeIcon('furniture')}
-                    <h4 className="font-semibold">{getTypeName('furniture')}</h4>
-                    <Badge variant="secondary">{groupedModels.furniture.length}</Badge>
-                  </div>
-                  <Checkbox
-                    checked={groupedModels.furniture.every(m => localActive.includes(m.id))}
-                    onCheckedChange={(checked) => handleToggleAll('furniture', checked as boolean)}
-                  />
-                </div>
-                <div className="space-y-2 ml-6">
-                  {groupedModels.furniture.map(model => (
-                    <div key={model.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted">
-                      <div className="flex items-center gap-3 flex-1">
-                        <Checkbox
-                          checked={localActive.includes(model.id)}
-                          onCheckedChange={(checked) => handleToggle(model.id, checked as boolean)}
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm">{model.name}</span>
-                            {model.metadata?.entityTypeId && (
-                              <Badge variant="outline" className="text-xs">Ontology</Badge>
-                            )}
-                            {model.id.startsWith('storage-') && (
-                              <Badge variant="outline" className="text-xs">Storage</Badge>
-                            )}
-                          </div>
-                          {model.dimensions && (
-                            <div className="text-xs text-muted-foreground">
-                              {model.dimensions.width}×{model.dimensions.height}×{model.dimensions.depth}m
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      {model.id.startsWith('storage-') && userId && storeId && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(model.id, model.name);
-                          }}
-                          disabled={deletingIds.has(model.id)}
-                        >
-                          {deletingIds.has(model.id) ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
-                          )}
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <Separator className="mt-4" />
-              </div>
-            )}
+        {userId && storeId && (
+          <div className="space-y-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".glb,.gltf"
+              multiple
+              className="hidden"
+              onChange={handleFileUpload}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+            >
+              {isUploading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  업로드 중...
+                </>
+              ) : (
+                <>
+                  <Upload className="mr-2 h-4 w-4" />
+                  3D 모델 업로드
+                </>
+              )}
+            </Button>
+          </div>
+        )}
 
-            {/* 제품 레이어 */}
-            {groupedModels.product.length > 0 && (
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    {getTypeIcon('product')}
-                    <h4 className="font-semibold">{getTypeName('product')}</h4>
-                    <Badge variant="secondary">{groupedModels.product.length}</Badge>
-                  </div>
-                  <Checkbox
-                    checked={groupedModels.product.every(m => localActive.includes(m.id))}
-                    onCheckedChange={(checked) => handleToggleAll('product', checked as boolean)}
-                  />
-                </div>
-                <div className="space-y-2 ml-6">
-                  {groupedModels.product.map(model => (
-                    <div key={model.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted">
-                      <div className="flex items-center gap-3 flex-1">
-                        <Checkbox
-                          checked={localActive.includes(model.id)}
-                          onCheckedChange={(checked) => handleToggle(model.id, checked as boolean)}
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm">{model.name}</span>
-                            {model.metadata?.entityTypeId && (
-                              <Badge variant="outline" className="text-xs">Ontology</Badge>
-                            )}
-                            {model.id.startsWith('storage-') && (
-                              <Badge variant="outline" className="text-xs">Storage</Badge>
-                            )}
-                          </div>
-                          {model.dimensions && (
-                            <div className="text-xs text-muted-foreground">
-                              {model.dimensions.width}×{model.dimensions.height}×{model.dimensions.depth}m
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      {model.id.startsWith('storage-') && userId && storeId && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(model.id, model.name);
-                          }}
-                          disabled={deletingIds.has(model.id)}
-                        >
-                          {deletingIds.has(model.id) ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
-                          )}
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <Separator className="mt-4" />
-              </div>
-            )}
+        <Separator />
 
-            {/* 기타 레이어 */}
-            {groupedModels.other.length > 0 && (
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    {getTypeIcon('other')}
-                    <h4 className="font-semibold">{getTypeName('other')}</h4>
-                    <Badge variant="secondary">{groupedModels.other.length}</Badge>
-                  </div>
-                  <Checkbox
-                    checked={groupedModels.other.every(m => localActive.includes(m.id))}
-                    onCheckedChange={(checked) => handleToggleAll('other', checked as boolean)}
-                  />
-                </div>
-                <div className="space-y-2 ml-6">
-                  {groupedModels.other.map(model => (
-                    <div key={model.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted">
-                      <div className="flex items-center gap-3 flex-1">
-                        <Checkbox
-                          checked={localActive.includes(model.id)}
-                          onCheckedChange={(checked) => handleToggle(model.id, checked as boolean)}
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm">{model.name}</span>
-                            {model.metadata?.entityTypeId && (
-                              <Badge variant="outline" className="text-xs">Ontology</Badge>
-                            )}
-                            {model.id.startsWith('storage-') && (
-                              <Badge variant="outline" className="text-xs">Storage</Badge>
-                            )}
-                          </div>
-                          {model.dimensions && (
-                            <div className="text-xs text-muted-foreground">
-                              {model.dimensions.width}×{model.dimensions.height}×{model.dimensions.depth}m
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      {model.id.startsWith('storage-') && userId && storeId && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(model.id, model.name);
-                          }}
-                          disabled={deletingIds.has(model.id)}
-                        >
-                          {deletingIds.has(model.id) ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
-                          )}
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+        <ScrollArea className="h-[400px]">
+          <div className="space-y-4 pr-4">
+            {renderGroup("매장 공간", Store, groupedModels.space, "text-blue-500")}
+            {renderGroup("가구", Box, groupedModels.furniture, "text-amber-500")}
+            {renderGroup("상품", Package, groupedModels.product, "text-green-500")}
+            {renderGroup("기타", Layers, groupedModels.other, "text-gray-500")}
           </div>
         </ScrollArea>
       </CardContent>
