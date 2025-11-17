@@ -362,7 +362,10 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
     if (uploadFile.status === 'success' && uploadFile.mappingResult) {
       if (uploadFile.type === '3d-model') {
         if (uploadFile.mappingResult.autoMapped) {
-          return `자동 매핑 완료: ${uploadFile.mappingResult.entityType} (신뢰도: ${(uploadFile.mappingResult.confidence * 100).toFixed(0)}%)`;
+          const instanceInfo = uploadFile.mappingResult.instanceLabel 
+            ? ` → ${uploadFile.mappingResult.instanceLabel}` 
+            : '';
+          return `자동 매핑 완료: ${uploadFile.mappingResult.entityType}${instanceInfo}`;
         } else {
           return uploadFile.mappingResult.message || '업로드 완료';
         }
