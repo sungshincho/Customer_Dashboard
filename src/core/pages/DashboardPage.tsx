@@ -7,7 +7,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { useAuth } from "@/hooks/useAuth";
 import { loadStoreDataset } from "@/utils/storageDataLoader";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { DataReadinessGuard } from "@/components/DataReadinessGuard";
 
 const Dashboard = () => {
   const { selectedStore } = useSelectedStore();
@@ -94,21 +94,9 @@ const Dashboard = () => {
     });
   }, [storeData.visits]);
 
-  if (!selectedStore) {
-    return (
-      <DashboardLayout>
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            매장을 선택하면 해당 매장의 실시간 대시보드를 확인할 수 있습니다.
-          </AlertDescription>
-        </Alert>
-      </DashboardLayout>
-    );
-  }
-
   return (
-    <DashboardLayout>
+    <DataReadinessGuard>
+      <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
         <div className="animate-fade-in">
@@ -231,6 +219,7 @@ const Dashboard = () => {
         </Card>
       </div>
     </DashboardLayout>
+    </DataReadinessGuard>
   );
 };
 
