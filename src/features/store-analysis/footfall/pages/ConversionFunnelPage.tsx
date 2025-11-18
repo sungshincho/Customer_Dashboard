@@ -3,54 +3,35 @@ import { ConversionFunnel } from "@/features/store-analysis/footfall/components/
 import { DataReadinessGuard } from "@/components/DataReadinessGuard";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Store, Box } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { AdvancedFilters, FilterState } from "@/features/data-management/analysis/components/AdvancedFilters";
 import { ExportButton } from "@/features/data-management/analysis/components/ExportButton";
 import { ComparisonView } from "@/features/data-management/analysis/components/ComparisonView";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Store3DViewer } from "@/features/digital-twin/components";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
-import { useAuth } from "@/hooks/useAuth";
-import { loadStoreFile } from "@/utils/storageDataLoader";
+import { useMultipleStoreDataFiles } from "@/hooks/useStoreData";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useStoreScene } from "@/hooks/useStoreScene";
 
 const ConversionFunnelPage = () => {
   const { selectedStore } = useSelectedStore();
-  const { user } = useAuth();
   const { activeScene } = useStoreScene();
   const [refreshKey, setRefreshKey] = useState(0);
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
-  const [visitsData, setVisitsData] = useState<any[]>([]);
-  const [purchasesData, setPurchasesData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
 
-  // 매장별 방문 및 구매 데이터 로드
-  useEffect(() => {
-    if (selectedStore && user) {
-      setLoading(true);
-      Promise.all([
-        loadStoreFile(user.id, selectedStore.id, 'visits.csv'),
-        loadStoreFile(user.id, selectedStore.id, 'purchases.csv')
-      ])
-        .then(([visits, purchases]) => {
-          console.log(`${selectedStore.store_name} 전환 퍼널 데이터:`, visits.length, '방문,', purchases.length, '구매');
-          setVisitsData(visits);
-          setPurchasesData(purchases);
-          setLoading(false);
-        })
-        .catch(error => {
-          console.error('Failed to load funnel data:', error);
-          setVisitsData([]);
-          setPurchasesData([]);
-          setLoading(false);
-        });
-    }
-  }, [selectedStore, user, refreshKey]);
+  // 여러 파일 동시 로드 (병렬 처리 + 개별 캐싱)
+  const dataQueries = useMultipleStoreDataFiles(['visits', 'purchases']);
+  const [visitsQuery, purchasesQuery] = dataQueries;
+  
+  const visitsData = visitsQuery.data?.data || [];
+  const purchasesData = purchasesQuery.data?.data || [];
+  const loading = visitsQuery.isLoading || purchasesQuery.isLoading;
 
   const handleRefresh = () => {
-    setRefreshKey(prev => prev + 1);
+    visitsQuery.refetch();
+    purchasesQuery.refetch();
   };
 
   const totalVisits = visitsData.length;
