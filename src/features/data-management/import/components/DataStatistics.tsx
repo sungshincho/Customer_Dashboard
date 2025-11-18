@@ -14,6 +14,7 @@ interface Statistics {
   wifiTracking: number;
   entityTypes: number;
   entities: number;
+  entitiesWith3D: number; // 실제 3D 모델이 할당된 엔티티
   storageUsed: number; // bytes
   totalFiles: number;
 }
@@ -26,6 +27,7 @@ export function DataStatistics({ storeId }: DataStatisticsProps) {
     wifiTracking: 0,
     entityTypes: 0,
     entities: 0,
+    entitiesWith3D: 0,
     storageUsed: 0,
     totalFiles: 0
   });
@@ -120,6 +122,19 @@ export function DataStatistics({ storeId }: DataStatisticsProps) {
       if (storeId) entityQuery = entityQuery.eq('store_id', storeId);
       const { count: entityCount } = await entityQuery;
 
+      // 3D 정보를 가진 엔티티 수 (유효한 model_3d_url을 가진 엔티티 타입만)
+      let entities3DQuery = supabase
+        .from('graph_entities')
+        .select(`
+          id,
+          entity_type_id,
+          ontology_entity_types!inner(model_3d_url)
+        `, { count: 'exact', head: true })
+        .not('ontology_entity_types.model_3d_url', 'is', null);
+      
+      if (storeId) entities3DQuery = entities3DQuery.eq('store_id', storeId);
+      const { count: entities3DCount } = await entities3DQuery;
+
       setStats({
         csvImports: csvCount || 0,
         models3D: totalModelCount,
@@ -127,6 +142,7 @@ export function DataStatistics({ storeId }: DataStatisticsProps) {
         wifiTracking: trackingCount || 0,
         entityTypes: entityTypeCount || 0,
         entities: entityCount || 0,
+        entitiesWith3D: entities3DCount || 0,
         storageUsed: totalStorage,
         totalFiles: totalFileCount
       });
@@ -187,7 +203,7 @@ export function DataStatistics({ storeId }: DataStatisticsProps) {
       title: "Graph Entities",
       value: stats.entities,
       icon: Network,
-      description: "생성된 엔티티 수"
+      description: `총 ${stats.entities}개 (3D: ${stats.entitiesWith3D}개)`
     }
   ];
 
