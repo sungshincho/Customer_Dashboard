@@ -17,6 +17,7 @@ import { StorageManager } from "../components/StorageManager";
 import { OntologyDataManagement } from "../components/OntologyDataManagement";
 import { DataImportHistory } from "../components/DataImportHistory";
 import { DataStatistics } from "../components/DataStatistics";
+import { IntegratedImportStatus } from "../components/IntegratedImportStatus";
 import { DataValidation } from "../components/DataValidation";
 
 export default function UnifiedDataManagementPage() {
@@ -57,7 +58,10 @@ export default function UnifiedDataManagementPage() {
         )}
 
         {/* 데이터 통계 대시보드 */}
-        <DataStatistics key={`stats-${refreshTrigger}`} storeId={selectedStore?.id} />
+        <div className="grid md:grid-cols-2 gap-6">
+          <DataStatistics key={`stats-${refreshTrigger}`} storeId={selectedStore?.id} />
+          <IntegratedImportStatus key={`integration-${refreshTrigger}`} storeId={selectedStore?.id} />
+        </div>
 
         {/* 메인 탭 */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">

@@ -256,26 +256,44 @@ export function ModelUploader() {
       
       setUploadedFiles(prev => [...prev, ...results]);
       
-      toast({
-        title: "업로드 완료",
-        description: `${results.length}개의 3D 모델이 업로드되었습니다.`,
-      });
-
-      // 파일명 기반 자동 매핑 시도
-      for (const result of results) {
-        const parsed = parseModelFilename(result.name);
-        logParseResult(parsed);
+      // 온톨로지 통합: 자동으로 3D 모델 연결
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        let linkedCount = 0;
         
-        if (parsed.isValid) {
-          // 파일명 파싱 성공 → 자동으로 온톨로지에 저장
-          await autoMapFromFilename(result, parsed);
-        } else {
-          // 파일명 파싱 실패 → AI 분석 진행
-          if (results.length === 1) {
-            await analyzeModel(result);
+        for (const result of results) {
+          try {
+            const { data: linkResult, error: linkError } = await supabase.functions.invoke(
+              'import-with-ontology',
+              {
+                body: {
+                  modelUrl: result.url,
+                  autoCreateEntityType: true
+                },
+                headers: { Authorization: `Bearer ${session.access_token}` }
+              }
+            );
+
+            if (!linkError && linkResult?.entityTypesLinked) {
+              linkedCount += linkResult.entityTypesLinked;
+            }
+          } catch (err) {
+            console.error('Model link error:', err);
           }
         }
+
+        toast({
+          title: "통합 업로드 완료",
+          description: `${results.length}개 모델 업로드 및 ${linkedCount}개 엔티티 타입 연결`,
+        });
+      } else {
+        toast({
+          title: "업로드 완료",
+          description: `${results.length}개의 3D 모델이 업로드되었습니다.`,
+        });
       }
+
+      // 기존 자동 매핑은 제거하고 통합 시스템 사용
       
       if (results.length > 1) {
         toast({
