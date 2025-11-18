@@ -1,20 +1,17 @@
 import { Card } from "@/components/ui/card";
 import { Sparkles, TrendingUp, AlertTriangle, Lightbulb } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import type { AIInsight } from "@/types/analysis.types";
 
-export interface Insight {
-  type: "trend" | "warning" | "recommendation";
-  title: string;
-  description: string;
-  impact?: "high" | "medium" | "low";
-}
+// Export for backward compatibility
+export type Insight = AIInsight;
 
 interface AIInsightsProps {
-  insights: Insight[];
+  insights: AIInsight[];
 }
 
 export const AIInsights = ({ insights }: AIInsightsProps) => {
-  const getIcon = (type: Insight["type"]) => {
+  const getIcon = (type: AIInsight["type"]) => {
     switch (type) {
       case "trend":
         return <TrendingUp className="w-5 h-5 text-blue-500" />;

@@ -6,14 +6,10 @@ import { Switch } from "@/components/ui/switch";
 import { Bell, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import type { Alert } from "@/types/analysis.types";
 
-export interface Alert {
-  id: string;
-  metric: string;
-  condition: "above" | "below";
-  threshold: number;
-  enabled: boolean;
-}
+// Export for backward compatibility
+export type { Alert };
 
 interface AlertSettingsProps {
   alerts: Alert[];
