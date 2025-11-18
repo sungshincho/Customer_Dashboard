@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Upload, FileSpreadsheet, Trash2, Download, Link2, Database, AlertCircle } from "lucide-react";
+import { Upload, FileSpreadsheet, Trash2, Download, Link2, Database, AlertCircle, Loader2, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { detectDataType } from "@/utils/dataNormalizer";
@@ -47,6 +47,8 @@ const DataImport = () => {
   const [showSheetReview, setShowSheetReview] = useState(false);
   const [selectedImportForETL, setSelectedImportForETL] = useState<ImportedData | null>(null);
   const [showETLDialog, setShowETLDialog] = useState(false);
+  const [isBulkConverting, setIsBulkConverting] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0, currentFile: '' });
   const { toast } = useToast();
 
   const loadImports = async () => {
@@ -454,6 +456,103 @@ const DataImport = () => {
     XLSX.writeFile(workbook, `export_${importData.file_name}`);
   };
 
+  // 모든 CSV 파일 일괄 온톨로지 변환
+  const handleBulkConvertToOntology = async () => {
+    setIsBulkConverting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("로그인이 필요합니다");
+
+      // CSV 파일만 필터링 (3d_model 제외)
+      const csvImports = imports.filter(imp => 
+        imp.data_type !== '3d_model' && 
+        imp.file_type !== '3d_model' &&
+        (imp.file_name.endsWith('.csv') || imp.file_name.endsWith('.xlsx'))
+      );
+
+      if (csvImports.length === 0) {
+        toast({
+          title: "변환할 파일 없음",
+          description: "온톨로지로 변환할 CSV 파일이 없습니다",
+        });
+        setIsBulkConverting(false);
+        return;
+      }
+
+      setBulkProgress({ current: 0, total: csvImports.length, currentFile: '' });
+
+      let successCount = 0;
+      let failCount = 0;
+
+      for (let i = 0; i < csvImports.length; i++) {
+        const importItem = csvImports[i];
+        setBulkProgress({ 
+          current: i + 1, 
+          total: csvImports.length, 
+          currentFile: importItem.file_name 
+        });
+
+        try {
+          // 1. AI 자동 매핑
+          const dataSample = importItem.raw_data.slice(0, 5);
+          const columns = Object.keys(importItem.raw_data[0] || {});
+
+          const { data: mappingData, error: mappingError } = await supabase.functions.invoke(
+            'auto-map-etl',
+            {
+              body: {
+                import_id: importItem.id,
+                data_sample: dataSample,
+                columns: columns,
+              }
+            }
+          );
+
+          if (mappingError) throw mappingError;
+
+          // 2. ETL 실행
+          const { data: etlData, error: etlError } = await supabase.functions.invoke(
+            'schema-etl',
+            {
+              body: {
+                import_id: importItem.id,
+                store_id: selectedStore?.id,
+                entity_mappings: mappingData.entity_mappings || [],
+                relation_mappings: mappingData.relation_mappings || [],
+              }
+            }
+          );
+
+          if (etlError) throw etlError;
+
+          successCount++;
+          sonnerToast.success(`${importItem.file_name} 변환 완료`);
+        } catch (error: any) {
+          failCount++;
+          console.error(`${importItem.file_name} 변환 실패:`, error);
+          sonnerToast.error(`${importItem.file_name} 변환 실패: ${error.message}`);
+        }
+      }
+
+      toast({
+        title: "일괄 변환 완료",
+        description: `성공: ${successCount}개, 실패: ${failCount}개`,
+      });
+
+      // 데이터 새로고침
+      loadImports();
+    } catch (error: any) {
+      toast({
+        title: "오류",
+        description: "일괄 변환 실패: " + error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsBulkConverting(false);
+      setBulkProgress({ current: 0, total: 0, currentFile: '' });
+    }
+  };
+
   useEffect(() => {
     loadImports();
   }, [selectedStore]);
@@ -475,6 +574,29 @@ const DataImport = () => {
               데이터를 임포트하려면 먼저 사이드바에서 매장을 선택해주세요. 임포트된 모든 데이터는 선택한 매장에만 저장됩니다.
             </AlertDescription>
           </Alert>
+        )}
+
+        {/* 일괄 변환 진행 상태 */}
+        {isBulkConverting && (
+          <Card className="border-primary">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                온톨로지 일괄 변환 중...
+              </CardTitle>
+              <CardDescription>
+                {bulkProgress.current} / {bulkProgress.total} - {bulkProgress.currentFile}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="w-full bg-secondary rounded-full h-2">
+                <div 
+                  className="bg-primary h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${(bulkProgress.current / bulkProgress.total) * 100}%` }}
+                />
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         <Tabs defaultValue="file" className="space-y-4">
