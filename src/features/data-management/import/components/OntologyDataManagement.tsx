@@ -2,23 +2,28 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Network, Plus, AlertCircle } from "lucide-react";
+import { Network, Plus, AlertCircle, Sparkles, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { EntityTypeManager } from "@/features/data-management/ontology/components/EntityTypeManager";
 import { RelationTypeManager } from "@/features/data-management/ontology/components/RelationTypeManager";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { toast as sonnerToast } from "sonner";
 
 interface OntologyDataManagementProps {
   storeId?: string;
 }
 
 export function OntologyDataManagement({ storeId }: OntologyDataManagementProps) {
+  const { toast } = useToast();
   const [entityTypeCount, setEntityTypeCount] = useState(0);
   const [entityCount, setEntityCount] = useState(0);
   const [relationTypeCount, setRelationTypeCount] = useState(0);
   const [relationCount, setRelationCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [isBulkConverting, setIsBulkConverting] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0, currentFile: '' });
 
   useEffect(() => {
     loadStatistics();
@@ -65,8 +70,137 @@ export function OntologyDataManagement({ storeId }: OntologyDataManagementProps)
     }
   };
 
+  // 모든 CSV 파일 일괄 온톨로지 변환
+  const handleBulkConvertToOntology = async () => {
+    setIsBulkConverting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("로그인이 필요합니다");
+
+      // CSV 파일만 필터링 (3d_model 제외)
+      let query = supabase
+        .from('user_data_imports')
+        .select('*')
+        .neq('data_type', '3d_model')
+        .neq('file_type', '3d_model');
+
+      if (storeId) {
+        query = query.eq('store_id', storeId);
+      }
+
+      const { data: csvImports, error } = await query.order('created_at', { ascending: false });
+      
+      if (error) throw error;
+
+      if (!csvImports || csvImports.length === 0) {
+        toast({
+          title: "변환할 파일 없음",
+          description: "온톨로지로 변환할 CSV 파일이 없습니다",
+        });
+        setIsBulkConverting(false);
+        return;
+      }
+
+      setBulkProgress({ current: 0, total: csvImports.length, currentFile: '' });
+
+      let successCount = 0;
+      let failCount = 0;
+
+      for (let i = 0; i < csvImports.length; i++) {
+        const importItem = csvImports[i];
+        setBulkProgress({ 
+          current: i + 1, 
+          total: csvImports.length, 
+          currentFile: importItem.file_name 
+        });
+
+        try {
+          // 1. AI 자동 매핑
+          const rawData = importItem.raw_data as any[];
+          const dataSample = Array.isArray(rawData) ? rawData.slice(0, 5) : [];
+          const columns = rawData?.[0] ? Object.keys(rawData[0]) : [];
+
+          const { data: mappingData, error: mappingError } = await supabase.functions.invoke(
+            'auto-map-etl',
+            {
+              body: {
+                import_id: importItem.id,
+                data_sample: dataSample,
+                columns: columns,
+              }
+            }
+          );
+
+          if (mappingError) throw mappingError;
+
+          // 2. ETL 실행
+          const { data: etlData, error: etlError } = await supabase.functions.invoke(
+            'schema-etl',
+            {
+              body: {
+                import_id: importItem.id,
+                store_id: storeId,
+                entity_mappings: mappingData.entity_mappings || [],
+                relation_mappings: mappingData.relation_mappings || [],
+              }
+            }
+          );
+
+          if (etlError) throw etlError;
+
+          successCount++;
+          sonnerToast.success(`${importItem.file_name} 변환 완료`);
+        } catch (error: any) {
+          failCount++;
+          console.error(`${importItem.file_name} 변환 실패:`, error);
+          sonnerToast.error(`${importItem.file_name} 변환 실패: ${error.message}`);
+        }
+      }
+
+      toast({
+        title: "일괄 변환 완료",
+        description: `성공: ${successCount}개, 실패: ${failCount}개`,
+      });
+
+      // 통계 새로고침
+      loadStatistics();
+    } catch (error: any) {
+      toast({
+        title: "오류",
+        description: "일괄 변환 실패: " + error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsBulkConverting(false);
+      setBulkProgress({ current: 0, total: 0, currentFile: '' });
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* 일괄 변환 진행 상태 */}
+      {isBulkConverting && (
+        <Card className="border-primary">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              온톨로지 일괄 변환 중...
+            </CardTitle>
+            <CardDescription>
+              {bulkProgress.current} / {bulkProgress.total} - {bulkProgress.currentFile}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="w-full bg-secondary rounded-full h-2">
+              <div 
+                className="bg-primary h-2 rounded-full transition-all duration-300"
+                style={{ width: `${(bulkProgress.current / bulkProgress.total) * 100}%` }}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -120,6 +254,38 @@ export function OntologyDataManagement({ storeId }: OntologyDataManagementProps)
           </CardContent>
         </Card>
       </div>
+
+      {/* 일괄 변환 버튼 */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>CSV → 온톨로지 일괄 변환</CardTitle>
+              <CardDescription>
+                업로드된 모든 CSV 파일을 온톨로지 엔티티로 자동 변환합니다
+              </CardDescription>
+            </div>
+            <Button 
+              onClick={handleBulkConvertToOntology}
+              disabled={isBulkConverting}
+              size="lg"
+              className="gap-2"
+            >
+              {isBulkConverting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  변환 중...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  모든 CSV 온톨로지 변환
+                </>
+              )}
+            </Button>
+          </div>
+        </CardHeader>
+      </Card>
 
       <Card>
         <CardHeader>
