@@ -3,13 +3,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { 
   CheckCircle2, 
   XCircle, 
   AlertTriangle, 
   RefreshCw,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Wand2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -42,6 +45,13 @@ export function DataValidation({ storeId }: Props) {
   const [results, setResults] = useState<ValidationResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [fixingId, setFixingId] = useState<string | null>(null);
+  const [fixOptions, setFixOptions] = useState({
+    removeDuplicates: true,
+    fillEmptyValues: true,
+    convertTypes: true,
+    useAI: true,
+  });
   const { toast } = useToast();
 
   const validateData = async () => {
@@ -188,6 +198,38 @@ export function DataValidation({ storeId }: Props) {
     }
   };
 
+  const autoFixData = async (importId: string) => {
+    setFixingId(importId);
+    try {
+      const { data, error } = await supabase.functions.invoke('auto-fix-data', {
+        body: { importId, options: fixOptions }
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        toast({
+          title: "자동 수정 완료",
+          description: `${data.fixes?.length || 0}개 문제 해결 (${data.originalCount}행 → ${data.fixedCount}행)`,
+        });
+        
+        // 수정 완료 후 재검증
+        await validateData();
+      } else {
+        throw new Error(data?.error || '자동 수정 실패');
+      }
+    } catch (error: any) {
+      console.error('Auto-fix error:', error);
+      toast({
+        title: "자동 수정 실패",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setFixingId(null);
+    }
+  };
+
   useEffect(() => {
     validateData();
   }, [storeId]);
@@ -247,6 +289,65 @@ export function DataValidation({ storeId }: Props) {
         </Button>
       </div>
 
+      {/* 자동 수정 옵션 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">자동 수정 옵션</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="removeDuplicates"
+                checked={fixOptions.removeDuplicates}
+                onCheckedChange={(checked) => 
+                  setFixOptions(prev => ({ ...prev, removeDuplicates: !!checked }))
+                }
+              />
+              <Label htmlFor="removeDuplicates" className="cursor-pointer">
+                중복 행 제거
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="fillEmptyValues"
+                checked={fixOptions.fillEmptyValues}
+                onCheckedChange={(checked) => 
+                  setFixOptions(prev => ({ ...prev, fillEmptyValues: !!checked }))
+                }
+              />
+              <Label htmlFor="fillEmptyValues" className="cursor-pointer">
+                빈 값 채우기
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="convertTypes"
+                checked={fixOptions.convertTypes}
+                onCheckedChange={(checked) => 
+                  setFixOptions(prev => ({ ...prev, convertTypes: !!checked }))
+                }
+              />
+              <Label htmlFor="convertTypes" className="cursor-pointer">
+                데이터 타입 변환
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="useAI"
+                checked={fixOptions.useAI}
+                onCheckedChange={(checked) => 
+                  setFixOptions(prev => ({ ...prev, useAI: !!checked }))
+                }
+              />
+              <Label htmlFor="useAI" className="cursor-pointer">
+                AI 품질 향상
+              </Label>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* 검증 결과 목록 */}
       {results.length === 0 ? (
         <Card>
@@ -259,8 +360,8 @@ export function DataValidation({ storeId }: Props) {
           {results.map((result) => (
             <Card key={result.importId} className="overflow-hidden">
               <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3 flex-1">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
                     {getStatusIcon(result.status)}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
@@ -274,19 +375,32 @@ export function DataValidation({ storeId }: Props) {
                       </p>
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() =>
-                      setExpandedId(expandedId === result.importId ? null : result.importId)
-                    }
-                  >
-                    {expandedId === result.importId ? (
-                      <ChevronDown className="w-4 h-4" />
-                    ) : (
-                      <ChevronRight className="w-4 h-4" />
+                  <div className="flex items-center gap-2">
+                    {result.status !== "valid" && result.issues.length > 0 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => autoFixData(result.importId)}
+                        disabled={fixingId === result.importId}
+                      >
+                        <Wand2 className={`w-4 h-4 mr-2 ${fixingId === result.importId ? "animate-spin" : ""}`} />
+                        {fixingId === result.importId ? "수정 중..." : "자동 수정"}
+                      </Button>
                     )}
-                  </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        setExpandedId(expandedId === result.importId ? null : result.importId)
+                      }
+                    >
+                      {expandedId === result.importId ? (
+                        <ChevronDown className="w-4 h-4" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4" />
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
 
