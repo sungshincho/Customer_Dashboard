@@ -30,7 +30,7 @@ const LayoutSimulatorPage = () => {
   const { data: storeData, isLoading: loading, refetch } = useStoreDataset();
 
   const handleRefresh = () => {
-    setRefreshKey(prev => prev + 1);
+    refetch();
   };
 
   // 매장 데이터 기반 통계
@@ -113,12 +113,10 @@ const LayoutSimulatorPage = () => {
               title="AI 레이아웃 시뮬레이션"
               onAnalysisComplete={() => setHistoryRefresh(prev => prev + 1)}
             />
-            <div key={refreshKey}>
-              <LayoutSimulator 
-                visitsData={storeData.visits}
+            <LayoutSimulator 
+              visitsData={storeData?.visits}
                 purchasesData={storeData.purchases}
               />
-            </div>
           </TabsContent>
           
           <TabsContent value="comparison">

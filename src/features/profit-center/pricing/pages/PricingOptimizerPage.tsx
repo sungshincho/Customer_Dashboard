@@ -10,6 +10,8 @@ import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, L
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { useStoreDataset } from "@/hooks/useStoreData";
 import { DataReadinessGuard } from "@/components/DataReadinessGuard";
+import { useOntologyEntities, useOntologyRelations, transformToGraphData } from "@/hooks/useOntologyData";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const generateSimulation = (basePrice: number, elasticity: number, baseSales: number) => {
   const points = [];
@@ -49,41 +51,33 @@ const PricingOptimizerPage = () => {
         const cost = currentPrice * 0.5;
         const avgWTP = currentPrice * 1.25;
         const competitorPrice = currentPrice * 1.1;
-            const currentSales = Math.floor(Math.random() * 100) + 20;
-            const optimalPrice = avgWTP * 0.95;
-            const projectedSales = currentSales * 1.4;
-            
-            return {
-              product: product.product_name || product.name || `상품 ${idx + 1}`,
-              currentPrice: Math.round(currentPrice),
-              avgWTP: Math.round(avgWTP),
-              competitorPrice: Math.round(competitorPrice),
-              cost: Math.round(cost),
-              currentSales,
-              optimalPrice: Math.round(optimalPrice),
-              projectedSales: Math.round(projectedSales),
-              revenueIncrease: Math.round((optimalPrice * projectedSales) - (currentPrice * currentSales)),
-              priceElasticity: -1.5,
-              segment: currentPrice > 200000 ? "프리미엄" : currentPrice > 100000 ? "중고가" : "중가",
-              recommendationConfidence: 85 + Math.floor(Math.random() * 10)
-            };
-          });
-          
-          setPricingData(productPricing);
-          if (productPricing.length > 0) {
-            setSelectedProduct(productPricing[0]);
-            setSimulationPrice(productPricing[0].currentPrice);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load store data:', error);
-      } finally {
-        setLoading(false);
+        const currentSales = Math.floor(Math.random() * 100) + 20;
+        const optimalPrice = avgWTP * 0.95;
+        const projectedSales = currentSales * 1.4;
+        
+        return {
+          product: product.product_name || product.name || `상품 ${idx + 1}`,
+          currentPrice: Math.round(currentPrice),
+          avgWTP: Math.round(avgWTP),
+          competitorPrice: Math.round(competitorPrice),
+          cost: Math.round(cost),
+          currentSales,
+          optimalPrice: Math.round(optimalPrice),
+          projectedSales: Math.round(projectedSales),
+          revenueIncrease: Math.round((optimalPrice * projectedSales) - (currentPrice * currentSales)),
+          priceElasticity: -1.5,
+          segment: currentPrice > 200000 ? "프리미엄" : currentPrice > 100000 ? "중고가" : "중가",
+          recommendationConfidence: 85 + Math.floor(Math.random() * 10)
+        };
+      });
+      
+      setPricingData(productPricing);
+      if (productPricing.length > 0) {
+        setSelectedProduct(productPricing[0]);
+        setSimulationPrice(productPricing[0].currentPrice);
       }
-    };
-
-    loadData();
-  }, [user, selectedStore, refreshKey]);
+    }
+  }, [storeData]);
 
   const graphData = useMemo(() => {
     const allEntities = [...productEntities, ...customerEntities];
@@ -91,7 +85,7 @@ const PricingOptimizerPage = () => {
   }, [productEntities, customerEntities, relations]);
 
   const handleRefresh = () => {
-    setRefreshKey(prev => prev + 1);
+    refetch();
   };
 
   const totalRevenueIncrease = pricingData.reduce((sum, item) => sum + item.revenueIncrease, 0);
