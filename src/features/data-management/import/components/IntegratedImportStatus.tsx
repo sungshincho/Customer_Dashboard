@@ -116,112 +116,149 @@ export function IntegratedImportStatus({ storeId }: IntegratedImportStatusProps)
   const hasIssues = stats.orphanedImports > 0 || stats.orphanedModels > 0;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Link2 className="w-5 h-5" />
+    <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-background via-muted/20 to-background">
+      {/* 배경 장식 */}
+      <div className="absolute top-0 left-0 w-40 h-40 bg-gradient-to-br from-primary/10 to-transparent rounded-full blur-3xl -translate-x-1/4 -translate-y-1/4" />
+      <div className="absolute bottom-0 right-0 w-40 h-40 bg-gradient-to-tl from-green-500/10 to-transparent rounded-full blur-3xl translate-x-1/4 translate-y-1/4" />
+      
+      <CardHeader className="relative">
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <div className="p-2 rounded-lg bg-gradient-to-br from-primary to-primary/80">
+            <Link2 className="w-5 h-5 text-primary-foreground" />
+          </div>
           데이터 통합 상태
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-sm">
           스토리지와 온톨로지 데이터베이스 연동 현황
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-5 relative">
         {/* 통합 건강도 */}
-        <div className="p-4 bg-primary/5 rounded-lg">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium">통합 연동률</span>
-            <span className={`text-2xl font-bold ${hasIssues ? 'text-orange-500' : 'text-green-500'}`}>
+        <div className="relative p-5 rounded-xl bg-gradient-to-br from-primary/5 via-transparent to-transparent border border-primary/10 overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent animate-pulse" />
+          
+          <div className="relative flex items-center justify-between mb-3">
+            <span className="text-sm font-semibold text-foreground/80">통합 연동률</span>
+            <span className={`text-3xl font-bold transition-colors ${
+              hasIssues 
+                ? 'text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-red-500' 
+                : 'text-transparent bg-clip-text bg-gradient-to-r from-green-500 to-emerald-500'
+            }`}>
               {integrationHealth}%
             </span>
           </div>
-          <div className="w-full bg-muted rounded-full h-2">
+          
+          <div className="relative w-full bg-muted/50 rounded-full h-3 overflow-hidden backdrop-blur-sm">
             <div 
-              className={`h-2 rounded-full transition-all ${hasIssues ? 'bg-orange-500' : 'bg-green-500'}`}
+              className={`h-3 rounded-full transition-all duration-1000 ease-out relative ${
+                hasIssues 
+                  ? 'bg-gradient-to-r from-orange-500 to-red-500' 
+                  : 'bg-gradient-to-r from-green-500 to-emerald-500'
+              }`}
               style={{ width: `${integrationHealth}%` }}
-            />
+            >
+              {/* 진행바 글로우 효과 */}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" />
+            </div>
           </div>
         </div>
 
         {/* CSV 임포트 상태 */}
-        <div className="space-y-2">
+        <div className="space-y-3">
           <h4 className="text-sm font-semibold flex items-center gap-2">
-            <Database className="w-4 h-4" />
+            <div className="p-1.5 rounded-md bg-gradient-to-br from-blue-500/20 to-blue-500/10">
+              <Database className="w-4 h-4 text-blue-500" />
+            </div>
             CSV 임포트
           </h4>
-          <div className="grid grid-cols-3 gap-2 text-sm">
-            <div className="p-2 bg-muted/50 rounded">
-              <div className="text-muted-foreground">전체</div>
-              <div className="text-lg font-bold">{stats.totalImports}</div>
+          <div className="grid grid-cols-3 gap-3 text-sm">
+            <div className="group p-3 bg-gradient-to-br from-muted/80 to-muted/40 rounded-lg hover:shadow-md transition-all duration-300 border border-border/50">
+              <div className="text-muted-foreground text-xs mb-1">전체</div>
+              <div className="text-2xl font-bold text-foreground group-hover:scale-110 transition-transform">{stats.totalImports}</div>
             </div>
-            <div className="p-2 bg-green-500/10 rounded">
-              <div className="text-muted-foreground flex items-center gap-1">
+            <div className="group p-3 bg-gradient-to-br from-green-500/20 to-green-500/5 rounded-lg hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 border border-green-500/20">
+              <div className="text-muted-foreground flex items-center gap-1 text-xs mb-1">
                 <CheckCircle2 className="w-3 h-3 text-green-500" />
                 연동됨
               </div>
-              <div className="text-lg font-bold text-green-600">{stats.importsWithEntities}</div>
+              <div className="text-2xl font-bold text-green-600 group-hover:scale-110 transition-transform">{stats.importsWithEntities}</div>
             </div>
-            <div className="p-2 bg-orange-500/10 rounded">
-              <div className="text-muted-foreground flex items-center gap-1">
+            <div className="group p-3 bg-gradient-to-br from-orange-500/20 to-orange-500/5 rounded-lg hover:shadow-lg hover:shadow-orange-500/20 transition-all duration-300 border border-orange-500/20">
+              <div className="text-muted-foreground flex items-center gap-1 text-xs mb-1">
                 <AlertCircle className="w-3 h-3 text-orange-500" />
                 미연동
               </div>
-              <div className="text-lg font-bold text-orange-600">{stats.orphanedImports}</div>
+              <div className="text-2xl font-bold text-orange-600 group-hover:scale-110 transition-transform">{stats.orphanedImports}</div>
             </div>
           </div>
         </div>
 
         {/* 3D 모델 상태 */}
-        <div className="space-y-2">
+        <div className="space-y-3">
           <h4 className="text-sm font-semibold flex items-center gap-2">
-            <Database className="w-4 h-4" />
+            <div className="p-1.5 rounded-md bg-gradient-to-br from-purple-500/20 to-purple-500/10">
+              <Database className="w-4 h-4 text-purple-500" />
+            </div>
             3D 모델
           </h4>
-          <div className="grid grid-cols-3 gap-2 text-sm">
-            <div className="p-2 bg-muted/50 rounded">
-              <div className="text-muted-foreground">전체</div>
-              <div className="text-lg font-bold">{stats.models3D}</div>
+          <div className="grid grid-cols-3 gap-3 text-sm">
+            <div className="group p-3 bg-gradient-to-br from-muted/80 to-muted/40 rounded-lg hover:shadow-md transition-all duration-300 border border-border/50">
+              <div className="text-muted-foreground text-xs mb-1">전체</div>
+              <div className="text-2xl font-bold text-foreground group-hover:scale-110 transition-transform">{stats.models3D}</div>
             </div>
-            <div className="p-2 bg-green-500/10 rounded">
-              <div className="text-muted-foreground flex items-center gap-1">
+            <div className="group p-3 bg-gradient-to-br from-green-500/20 to-green-500/5 rounded-lg hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 border border-green-500/20">
+              <div className="text-muted-foreground flex items-center gap-1 text-xs mb-1">
                 <CheckCircle2 className="w-3 h-3 text-green-500" />
                 연결됨
               </div>
-              <div className="text-lg font-bold text-green-600">{stats.modelsLinkedToTypes}</div>
+              <div className="text-2xl font-bold text-green-600 group-hover:scale-110 transition-transform">{stats.modelsLinkedToTypes}</div>
             </div>
-            <div className="p-2 bg-orange-500/10 rounded">
-              <div className="text-muted-foreground flex items-center gap-1">
+            <div className="group p-3 bg-gradient-to-br from-orange-500/20 to-orange-500/5 rounded-lg hover:shadow-lg hover:shadow-orange-500/20 transition-all duration-300 border border-orange-500/20">
+              <div className="text-muted-foreground flex items-center gap-1 text-xs mb-1">
                 <AlertCircle className="w-3 h-3 text-orange-500" />
                 미연결
               </div>
-              <div className="text-lg font-bold text-orange-600">{stats.orphanedModels}</div>
+              <div className="text-2xl font-bold text-orange-600 group-hover:scale-110 transition-transform">{stats.orphanedModels}</div>
             </div>
           </div>
         </div>
 
         {/* 경고 메시지 */}
         {hasIssues && (
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
+          <Alert className="border-0 bg-gradient-to-r from-orange-500/10 via-orange-500/5 to-transparent backdrop-blur-sm">
+            <div className="p-1.5 rounded-lg bg-orange-500/20">
+              <AlertCircle className="h-4 w-4 text-orange-500" />
+            </div>
+            <AlertDescription className="ml-2 space-y-1">
               {stats.orphanedImports > 0 && (
-                <div>• {stats.orphanedImports}개의 CSV 파일이 온톨로지 엔티티로 변환되지 않았습니다.</div>
+                <div className="flex items-start gap-2 text-sm">
+                  <span className="text-orange-500 font-bold">•</span>
+                  <span>{stats.orphanedImports}개의 CSV 파일이 온톨로지 엔티티로 변환되지 않았습니다.</span>
+                </div>
               )}
               {stats.orphanedModels > 0 && (
-                <div>• {stats.orphanedModels}개의 3D 모델이 엔티티 타입에 연결되지 않았습니다.</div>
+                <div className="flex items-start gap-2 text-sm">
+                  <span className="text-orange-500 font-bold">•</span>
+                  <span>{stats.orphanedModels}개의 3D 모델이 엔티티 타입에 연결되지 않았습니다.</span>
+                </div>
               )}
               {stats.orphanedEntities > 0 && (
-                <div>• {stats.orphanedEntities}개의 엔티티가 수동으로 생성되었습니다.</div>
+                <div className="flex items-start gap-2 text-sm">
+                  <span className="text-orange-500 font-bold">•</span>
+                  <span>{stats.orphanedEntities}개의 엔티티가 수동으로 생성되었습니다.</span>
+                </div>
               )}
             </AlertDescription>
           </Alert>
         )}
 
         {!loading && !hasIssues && stats.totalImports > 0 && (
-          <Alert className="bg-green-500/10 border-green-500/20">
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
-            <AlertDescription className="text-green-700">
-              모든 데이터가 온톨로지 시스템과 완벽하게 연동되었습니다.
+          <Alert className="border-0 bg-gradient-to-r from-green-500/10 via-emerald-500/5 to-transparent backdrop-blur-sm">
+            <div className="p-1.5 rounded-lg bg-green-500/20">
+              <CheckCircle2 className="h-4 w-4 text-green-500" />
+            </div>
+            <AlertDescription className="ml-2 text-green-700 dark:text-green-400 font-medium">
+              ✨ 모든 데이터가 온톨로지 시스템과 완벽하게 연동되었습니다.
             </AlertDescription>
           </Alert>
         )}

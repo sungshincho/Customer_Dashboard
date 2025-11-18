@@ -210,20 +210,55 @@ export function DataStatistics({ storeId }: DataStatisticsProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
       {statCards.map((stat, index) => (
-        <Card key={index} className={stat.highlight ? "border-primary" : ""}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+        <Card 
+          key={index} 
+          className={`group relative overflow-hidden transition-all duration-500 hover:shadow-2xl hover:scale-105 border-0 ${
+            stat.highlight 
+              ? 'bg-gradient-to-br from-primary/10 via-primary/5 to-background' 
+              : 'bg-gradient-to-br from-muted/50 to-background'
+          }`}
+        >
+          {/* 배경 장식 */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-primary/5 to-transparent rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+          
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 relative">
+            <CardTitle className="text-sm font-semibold text-foreground/80">
               {stat.title}
             </CardTitle>
-            <stat.icon className={`h-4 w-4 ${stat.highlight ? 'text-primary' : 'text-muted-foreground'}`} />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${stat.highlight ? 'text-primary' : ''}`}>
-              {loading ? "..." : typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
+            <div className={`relative p-3 rounded-xl transition-all duration-300 group-hover:scale-110 ${
+              stat.highlight 
+                ? 'bg-gradient-to-br from-primary to-primary/80 shadow-lg shadow-primary/20' 
+                : 'bg-gradient-to-br from-muted to-muted/70'
+            }`}>
+              <stat.icon className={`w-5 h-5 ${
+                stat.highlight ? 'text-primary-foreground' : 'text-foreground/70'
+              }`} />
+              {/* 아이콘 글로우 효과 */}
+              {stat.highlight && (
+                <div className="absolute inset-0 bg-primary/20 rounded-xl blur-md" />
+              )}
             </div>
-            <p className="text-xs text-muted-foreground">
+          </CardHeader>
+          <CardContent className="relative">
+            <div className={`text-3xl font-bold mb-1 transition-colors ${
+              stat.highlight ? 'text-primary' : 'text-foreground'
+            }`}>
+              {loading ? (
+                <div className="h-9 w-20 bg-muted/50 animate-pulse rounded" />
+              ) : (
+                typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground/80">
               {stat.description}
             </p>
+            
+            {/* 호버 시 하단 액센트 */}
+            <div className={`absolute bottom-0 left-0 right-0 h-1 transition-all duration-300 ${
+              stat.highlight 
+                ? 'bg-gradient-to-r from-primary to-primary/50 opacity-100' 
+                : 'bg-gradient-to-r from-muted to-transparent opacity-0 group-hover:opacity-100'
+            }`} />
           </CardContent>
         </Card>
       ))}
