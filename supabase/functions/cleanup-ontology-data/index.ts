@@ -38,22 +38,16 @@ Deno.serve(async (req) => {
 
     let targetImportIds: string[] = [];
 
-    // filePath로 import_id 찾기
+    // filePath로 import_id 직접 찾기
     if (filePath) {
       const { data: imports, error: importError } = await supabase
         .from('user_data_imports')
-        .select('id, file_name')
-        .eq('user_id', userId);
+        .select('id')
+        .eq('user_id', userId)
+        .eq('file_path', filePath);
 
       if (importError) throw importError;
-
-      // filePath에서 파일명 추출하여 매칭
-      const fileName = filePath.split('/').pop();
-      const matchedImports = imports?.filter(imp => 
-        imp.file_name === fileName || filePath.includes(imp.file_name)
-      ) || [];
-
-      targetImportIds = matchedImports.map(imp => imp.id);
+      targetImportIds = imports?.map(imp => imp.id) || [];
     } else if (importId) {
       targetImportIds = [importId];
     }

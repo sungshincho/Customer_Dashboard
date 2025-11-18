@@ -22,6 +22,7 @@ interface ImportRecord {
   row_count: number;
   created_at: string;
   raw_data: any;
+  file_path?: string;
 }
 
 export function DataImportHistory({ storeId }: DataImportHistoryProps) {
@@ -218,12 +219,11 @@ export function DataImportHistory({ storeId }: DataImportHistoryProps) {
 
       if (dbError) throw dbError;
 
-      // Storage에서도 삭제 시도 (storeId가 있는 경우)
-      if (record?.store_id && record?.file_name) {
-        const filePath = `${user.id}/${record.store_id}/${record.file_name}`;
+      // Storage에서도 삭제 시도
+      if (record?.file_path) {
         const { error: storageError } = await supabase.storage
           .from('store-data')
-          .remove([filePath]);
+          .remove([record.file_path]);
         
         if (storageError) {
           console.warn('Storage 파일 삭제 실패:', storageError);
@@ -317,6 +317,7 @@ export function DataImportHistory({ storeId }: DataImportHistoryProps) {
                 <TableHeader>
                   <TableRow>
                     <TableHead>파일명</TableHead>
+                    <TableHead>저장 경로</TableHead>
                     <TableHead>데이터 타입</TableHead>
                     <TableHead>행 수</TableHead>
                     <TableHead>업로드 일시</TableHead>
@@ -331,6 +332,9 @@ export function DataImportHistory({ storeId }: DataImportHistoryProps) {
                         <span className="text-xs text-muted-foreground ml-2">
                           (.{record.file_type})
                         </span>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-xs truncate">
+                        {record.file_path || '-'}
                       </TableCell>
                       <TableCell>
                         {getDataTypeBadge(record.data_type)}
