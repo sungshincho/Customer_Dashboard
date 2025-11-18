@@ -17,7 +17,7 @@ interface UnifiedDataUploadProps {
 interface UploadFile {
   file: File;
   id: string;
-  type: 'csv' | 'excel' | '3d-model' | 'wifi' | 'unknown';
+  type: 'csv' | 'excel' | '3d-model' | 'wifi' | 'json' | 'unknown';
   status: 'pending' | 'uploading' | 'processing' | 'mapping' | 'success' | 'error';
   progress: number;
   error?: string;
@@ -39,7 +39,11 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
     if (file.name.includes('wifi') || file.name.includes('tracking') || file.name.includes('sensor')) {
       return 'wifi';
     }
-    if (ext === 'json' && file.name.includes('wifi')) return 'wifi';
+    if (ext === 'json') {
+      if (file.name.includes('wifi')) return 'wifi';
+      if (file.name.includes('metadata') || file.name.includes('3d')) return 'json';
+      return 'json';
+    }
     
     return 'unknown';
   };
@@ -82,7 +86,7 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
     }
   };
 
-  // CSV/Excel 파싱
+  // CSV/Excel/JSON 파싱
   const parseDataFile = async (file: File): Promise<any[]> => {
     const ext = file.name.split('.').pop()?.toLowerCase();
     
@@ -105,6 +109,11 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
       const workbook = XLSX.read(arrayBuffer, { type: 'array' });
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
       return XLSX.utils.sheet_to_json(firstSheet);
+    } else if (ext === 'json') {
+      const text = await file.text();
+      const jsonData = JSON.parse(text);
+      // JSON이 배열이면 그대로, 객체면 배열로 감싸기
+      return Array.isArray(jsonData) ? jsonData : [jsonData];
     }
     
     return [];
@@ -353,6 +362,44 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
           throw new Error(processResult?.error || 'WiFi 데이터 처리 실패');
         }
         
+      } else if (uploadFile.type === 'json') {
+        // JSON 메타데이터는 store-data 버킷에 업로드
+        updateFileStatus(uploadFile.id, 'processing', '파일 업로드 중...', 20);
+        
+        const filePath = `${user.id}/${storeId}/metadata/${safeFileName}`;
+        const { error: uploadError } = await supabase.storage
+          .from('store-data')
+          .upload(filePath, uploadFile.file, { upsert: true });
+
+        if (uploadError) throw uploadError;
+        
+        updateFileStatus(uploadFile.id, 'processing', '데이터 파싱 중...', 50);
+        const rawData = await parseDataFile(uploadFile.file);
+        
+        // user_data_imports에 기록
+        const { data: importData, error: importError } = await supabase
+          .from('user_data_imports')
+          .insert({
+            user_id: user.id,
+            store_id: storeId,
+            file_name: safeFileName,
+            file_type: 'json',
+            data_type: 'metadata',
+            file_path: filePath,
+            row_count: rawData.length,
+            raw_data: rawData
+          })
+          .select()
+          .single();
+
+        if (importError) throw importError;
+        
+        updateFileStatus(uploadFile.id, 'success', undefined, 100, {
+          importId: importData.id,
+          recordCount: rawData.length,
+          filePath
+        });
+        
       } else {
         throw new Error('지원하지 않는 파일 타입');
       }
@@ -411,6 +458,8 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
         return <Box className="w-5 h-5" />;
       case 'wifi':
         return <Wifi className="w-5 h-5" />;
+      case 'json':
+        return <FileSpreadsheet className="w-5 h-5" />;
       default:
         return <AlertCircle className="w-5 h-5" />;
     }
@@ -422,6 +471,7 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
       'excel': 'bg-green-500/10 text-green-500 border-green-500/20',
       '3d-model': 'bg-purple-500/10 text-purple-500 border-purple-500/20',
       'wifi': 'bg-orange-500/10 text-orange-500 border-orange-500/20',
+      'json': 'bg-cyan-500/10 text-cyan-500 border-cyan-500/20',
       'unknown': 'bg-gray-500/10 text-gray-500 border-gray-500/20',
     };
 
@@ -430,6 +480,7 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
       'excel': 'Excel',
       '3d-model': '3D 모델',
       'wifi': 'WiFi',
+      'json': 'JSON',
       'unknown': '알 수 없음',
     };
 
