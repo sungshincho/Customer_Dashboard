@@ -4,7 +4,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Upload, 
-  History, 
   Network,
   Database,
   CheckCircle2
@@ -62,7 +61,7 @@ export default function UnifiedDataManagementPage() {
 
         {/* 메인 탭 */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="unified">
               <Upload className="w-4 h-4 mr-2" />
               통합 업로드
@@ -78,10 +77,6 @@ export default function UnifiedDataManagementPage() {
             <TabsTrigger value="ontology">
               <Network className="w-4 h-4 mr-2" />
               온톨로지
-            </TabsTrigger>
-            <TabsTrigger value="history">
-              <History className="w-4 h-4 mr-2" />
-              히스토리
             </TabsTrigger>
           </TabsList>
 
@@ -104,16 +99,12 @@ export default function UnifiedDataManagementPage() {
               key={`storage-${refreshTrigger}`} 
               storeId={selectedStore?.id} 
             />
+            <DataImportHistory key={`history-${refreshTrigger}`} storeId={selectedStore?.id} />
           </TabsContent>
 
           {/* 온톨로지 관리 탭 */}
           <TabsContent value="ontology" className="space-y-6">
             <OntologyDataManagement key={`ontology-${refreshTrigger}`} storeId={selectedStore?.id} />
-          </TabsContent>
-
-          {/* 히스토리 탭 */}
-          <TabsContent value="history" className="space-y-6">
-            <DataImportHistory key={`history-${refreshTrigger}`} storeId={selectedStore?.id} />
           </TabsContent>
         </Tabs>
       </div>
