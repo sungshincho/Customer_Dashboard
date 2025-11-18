@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
           store_id: body.store_id,
           entity_type_id: mapping.entity_type_id,
           label,
-          properties,
+          properties: { ...properties, source_import_id: body.import_id },
         });
 
         recordMappings.push({ record, tempId: i });
