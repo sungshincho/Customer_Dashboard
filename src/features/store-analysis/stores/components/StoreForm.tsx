@@ -32,24 +32,6 @@ interface StoreFormProps {
   trigger?: React.ReactNode;
 }
 
-function withTimeout<T extends { error: any }>(
-  promise: PromiseLike<T>,
-  timeoutMs = 15000
-): Promise<T> {
-  let timeoutId: number;
-
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = window.setTimeout(() => {
-      reject(new Error('요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.'));
-    }, timeoutMs);
-  });
-
-  return Promise.race([promise, timeoutPromise]).then((result) => {
-    window.clearTimeout(timeoutId);
-    return result as T;
-  });
-}
-
 export function StoreForm({ store, onSuccess, trigger }: StoreFormProps) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
@@ -66,25 +48,19 @@ export function StoreForm({ store, onSuccess, trigger }: StoreFormProps) {
     try {
       if (store) {
         // Update
-        const { error } = await withTimeout(
-          supabase
-            .from('stores')
-            .update(data)
-            .eq('id', store.id)
-            .eq('user_id', user.id),
-          15000
-        );
+        const { error } = await supabase
+          .from('stores')
+          .update(data)
+          .eq('id', store.id)
+          .eq('user_id', user.id);
 
         if (error) throw error;
         toast.success('매장 정보가 수정되었습니다');
       } else {
         // Create
-        const { error } = await withTimeout(
-          supabase
-            .from('stores')
-            .insert([{ ...data, user_id: user.id }]),
-          15000
-        );
+        const { error } = await supabase
+          .from('stores')
+          .insert([{ ...data, user_id: user.id }]);
 
         if (error) throw error;
         toast.success('매장이 추가되었습니다');
