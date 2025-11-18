@@ -44,7 +44,7 @@ export function IntegratedImportStatus({ storeId }: IntegratedImportStatusProps)
         .from('user_data_imports')
         .select('id, file_path', { count: 'exact' })
         .eq('user_id', user.id)
-        .neq('data_type', '3d-model');
+        .neq('data_type', '3d_model');
       
       if (storeId) importQuery = importQuery.eq('store_id', storeId);
       

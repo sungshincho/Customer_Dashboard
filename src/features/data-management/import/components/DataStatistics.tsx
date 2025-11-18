@@ -46,7 +46,7 @@ export function DataStatistics({ storeId }: DataStatisticsProps) {
       let csvQuery = supabase
         .from('user_data_imports')
         .select('id', { count: 'exact', head: true })
-        .neq('data_type', '3d-model');
+        .neq('data_type', '3d_model');
       
       if (storeId) csvQuery = csvQuery.eq('store_id', storeId);
       const { count: csvCount } = await csvQuery;
