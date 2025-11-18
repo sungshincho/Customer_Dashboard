@@ -2,43 +2,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, Target, Zap, ArrowRight, DollarSign } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import type { DashboardInsight, Correlation, PurchaseInfluencer, WTPAnalysis } from "@/types/analysis.types";
 
-interface Insight {
-  category?: string;
-  title: string;
-  description: string;
-  impact: string;
-  actionable?: string;
-  recommendation?: string;
-}
-
-interface Correlation {
-  factor1: string;
-  factor2: string;
-  correlation: number;
-  correlationPercent?: string;
-  insight?: string;
-  actionable?: string;
-}
-
-interface PurchaseInfluencer {
-  factor: string;
-  score: number;
-  insight: string;
-}
-
-interface WTPAnalysis {
-  avgWTP: number;
-  atv: number;
-  priceElasticityScore: number;
-  priceElasticityInsights: string[];
-  pricingRecommendation?: string;
-  purchaseInfluencers?: PurchaseInfluencer[];
-  actionable: string;
-}
+// Export for backward compatibility
+export type { DashboardInsight as Insight, Correlation, PurchaseInfluencer, WTPAnalysis };
 
 interface InsightsDashboardProps {
-  insights: Insight[];
+  insights: DashboardInsight[];
   correlations?: Correlation[];
   wtpAnalysis?: WTPAnalysis;
   summary?: string;

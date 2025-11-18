@@ -6,12 +6,10 @@ import { CalendarIcon, Filter } from "lucide-react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import type { FilterState } from "@/types/analysis.types";
 
-export interface FilterState {
-  dateRange: { from: Date; to?: Date } | undefined;
-  store: string;
-  category: string;
-}
+// Export for backward compatibility
+export type { FilterState };
 
 interface AdvancedFiltersProps {
   filters: FilterState;

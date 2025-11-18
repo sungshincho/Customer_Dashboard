@@ -10,11 +10,8 @@ export interface PathPoint {
   timestamp?: number;
 }
 
-export interface HeatPoint {
-  x: number;
-  z: number;
-  intensity: number; // 0-1 범위의 강도 값
-}
+// Re-export HeatPoint from iot.types to avoid duplication
+export type { HeatPoint } from './iot.types';
 
 export interface ProductInfo {
   id: string;

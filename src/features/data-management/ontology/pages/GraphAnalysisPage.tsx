@@ -17,6 +17,7 @@ import { CorrelationAnalysis } from "@/features/data-management/analysis/compone
 import { WTPAnalysisView } from "@/features/data-management/analysis/components/WTPAnalysisView";
 import { GraphQueryBuilder } from "@/features/data-management/ontology/components/GraphQueryBuilder";
 import { AdvancedAIInference } from "@/features/data-management/analysis/components/AdvancedAIInference";
+import type { GraphInsight } from "@/types/analysis.types";
 
 interface Node {
   id: string;
@@ -34,17 +35,10 @@ interface Edge {
   properties?: any;
 }
 
-interface Insight {
-  title: string;
-  description: string;
-  impact: string;
-  recommendation: string;
-}
-
 interface AnalysisResult {
   nodes: Node[];
   edges: Edge[];
-  insights: Insight[];
+  insights: GraphInsight[];
   correlations?: any[];
   wtpAnalysis?: any;
   timeSeriesPatterns?: any[];
