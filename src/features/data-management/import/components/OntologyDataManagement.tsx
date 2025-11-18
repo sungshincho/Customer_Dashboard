@@ -77,6 +77,22 @@ export function OntologyDataManagement({ storeId }: OntologyDataManagementProps)
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("로그인이 필요합니다");
 
+      // 온톨로지 타입 확인
+      const { data: entityTypes } = await supabase
+        .from('ontology_entity_types')
+        .select('id')
+        .limit(1);
+
+      if (!entityTypes || entityTypes.length === 0) {
+        toast({
+          title: "온톨로지 타입 없음",
+          description: "먼저 Entity Type과 Relation Type을 생성해주세요",
+          variant: "destructive",
+        });
+        setIsBulkConverting(false);
+        return;
+      }
+
       // CSV 파일만 필터링 (3d_model 제외)
       let query = supabase
         .from('user_data_imports')
@@ -101,6 +117,7 @@ export function OntologyDataManagement({ storeId }: OntologyDataManagementProps)
         return;
       }
 
+      console.log('🚀 Starting bulk conversion for', csvImports.length, 'files');
       setBulkProgress({ current: 0, total: csvImports.length, currentFile: '' });
 
       let successCount = 0;
@@ -114,11 +131,21 @@ export function OntologyDataManagement({ storeId }: OntologyDataManagementProps)
           currentFile: importItem.file_name 
         });
 
+        console.log(`📄 Processing ${i + 1}/${csvImports.length}: ${importItem.file_name}`);
+
         try {
           // 1. AI 자동 매핑
           const rawData = importItem.raw_data as any[];
-          const dataSample = Array.isArray(rawData) ? rawData.slice(0, 5) : [];
-          const columns = rawData?.[0] ? Object.keys(rawData[0]) : [];
+          
+          if (!Array.isArray(rawData) || rawData.length === 0) {
+            throw new Error('데이터가 비어있습니다');
+          }
+
+          const dataSample = rawData.slice(0, 5);
+          const columns = Object.keys(rawData[0]);
+
+          console.log(`  📊 Columns: ${columns.join(', ')}`);
+          console.log(`  📝 Sample rows: ${dataSample.length}`);
 
           const { data: mappingData, error: mappingError } = await supabase.functions.invoke(
             'auto-map-etl',
@@ -131,7 +158,16 @@ export function OntologyDataManagement({ storeId }: OntologyDataManagementProps)
             }
           );
 
-          if (mappingError) throw mappingError;
+          if (mappingError) {
+            console.error('  ❌ Mapping error:', mappingError);
+            throw new Error(`매핑 실패: ${mappingError.message}`);
+          }
+
+          if (!mappingData || !mappingData.entity_mappings) {
+            throw new Error('매핑 결과가 없습니다');
+          }
+
+          console.log(`  ✅ Mapped ${mappingData.entity_mappings.length} entities`);
 
           // 2. ETL 실행
           const { data: etlData, error: etlError } = await supabase.functions.invoke(
@@ -140,19 +176,24 @@ export function OntologyDataManagement({ storeId }: OntologyDataManagementProps)
               body: {
                 import_id: importItem.id,
                 store_id: storeId,
-                entity_mappings: mappingData.entity_mappings || [],
+                entity_mappings: mappingData.entity_mappings,
                 relation_mappings: mappingData.relation_mappings || [],
               }
             }
           );
 
-          if (etlError) throw etlError;
+          if (etlError) {
+            console.error('  ❌ ETL error:', etlError);
+            throw new Error(`ETL 실패: ${etlError.message}`);
+          }
+
+          console.log(`  ✅ Created ${etlData?.entities_created || 0} entities`);
 
           successCount++;
           sonnerToast.success(`${importItem.file_name} 변환 완료`);
         } catch (error: any) {
           failCount++;
-          console.error(`${importItem.file_name} 변환 실패:`, error);
+          console.error(`  ❌ ${importItem.file_name} 변환 실패:`, error);
           sonnerToast.error(`${importItem.file_name} 변환 실패: ${error.message}`);
         }
       }
@@ -163,8 +204,9 @@ export function OntologyDataManagement({ storeId }: OntologyDataManagementProps)
       });
 
       // 통계 새로고침
-      loadStatistics();
+      await loadStatistics();
     } catch (error: any) {
+      console.error('Bulk conversion error:', error);
       toast({
         title: "오류",
         description: "일괄 변환 실패: " + error.message,
