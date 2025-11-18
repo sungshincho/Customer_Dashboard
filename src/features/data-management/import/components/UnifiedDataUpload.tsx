@@ -111,7 +111,7 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
   };
 
   // 자동 매핑 실행
-  const runAutoMapping = async (uploadFile: UploadFile, rawData: any[]) => {
+  const runAutoMapping = async (uploadFile: UploadFile, rawData: any[], filePath?: string) => {
     if (rawData.length === 0) return null;
 
     try {
@@ -131,6 +131,7 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
           row_count: rawData.length,
           store_id: storeId || null,
           user_id: user.id,
+          file_path: filePath || null,
         })
         .select()
         .single();
@@ -234,17 +235,26 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
         }
         
       } else if (uploadFile.type === 'csv' || uploadFile.type === 'excel') {
-        // CSV/Excel은 파싱 후 자동 매핑
-        updateFileStatus(uploadFile.id, 'processing', undefined, 30);
+        // CSV/Excel은 먼저 스토리지에 업로드 후 파싱
+        updateFileStatus(uploadFile.id, 'processing', '파일 업로드 중...', 20);
+        
+        const filePath = `${user.id}/${storeId}/${safeFileName}`;
+        const { error: uploadError } = await supabase.storage
+          .from('store-data')
+          .upload(filePath, uploadFile.file, { upsert: true });
+
+        if (uploadError) throw uploadError;
+        
+        updateFileStatus(uploadFile.id, 'processing', '데이터 파싱 중...', 40);
         const rawData = await parseDataFile(uploadFile.file);
         
-        updateFileStatus(uploadFile.id, 'mapping', undefined, 50);
-        const mappingResult = await runAutoMapping(uploadFile, rawData);
+        updateFileStatus(uploadFile.id, 'mapping', '자동 매핑 중...', 60);
+        const mappingResult = await runAutoMapping(uploadFile, rawData, filePath);
         
         if (mappingResult && mappingResult.importId && storeId) {
           // 자동 매핑 성공 시 ETL 자동 실행
           try {
-            updateFileStatus(uploadFile.id, 'processing', '온톨로지 생성 중...', 75);
+            updateFileStatus(uploadFile.id, 'processing', '온톨로지 생성 중...', 80);
             
             const { data: etlResult, error: etlError } = await supabase.functions.invoke('schema-etl', {
               body: {
@@ -261,18 +271,20 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
               ...mappingResult,
               autoMapped: true,
               entitiesCreated: etlResult?.entities_created || 0,
-              relationsCreated: etlResult?.relations_created || 0
+              relationsCreated: etlResult?.relations_created || 0,
+              filePath
             });
           } catch (etlError) {
             console.error('Auto ETL error:', etlError);
             updateFileStatus(uploadFile.id, 'success', undefined, 100, {
               ...mappingResult,
               autoMapped: true,
-              etlFailed: true
+              etlFailed: true,
+              filePath
             });
           }
         } else {
-          updateFileStatus(uploadFile.id, 'success', undefined, 100, mappingResult);
+          updateFileStatus(uploadFile.id, 'success', undefined, 100, { ...mappingResult, filePath });
         }
         
       } else if (uploadFile.type === 'wifi') {

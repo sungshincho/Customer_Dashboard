@@ -800,6 +800,7 @@ export type Database = {
           created_at: string
           data_type: string
           file_name: string
+          file_path: string | null
           file_type: string
           id: string
           raw_data: Json
@@ -812,6 +813,7 @@ export type Database = {
           created_at?: string
           data_type: string
           file_name: string
+          file_path?: string | null
           file_type: string
           id?: string
           raw_data: Json
@@ -824,6 +826,7 @@ export type Database = {
           created_at?: string
           data_type?: string
           file_name?: string
+          file_path?: string | null
           file_type?: string
           id?: string
           raw_data?: Json
