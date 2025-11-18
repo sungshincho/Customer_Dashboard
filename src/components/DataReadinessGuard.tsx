@@ -15,6 +15,7 @@ export function DataReadinessGuard({ children, requireWifiData = false }: DataRe
   const navigate = useNavigate();
   const { toast } = useToast();
   const hasShownToast = useRef(false);
+  const [dismissed, setDismissed] = useState(false);
   const {
     isReady,
     isLoading,
@@ -93,15 +94,23 @@ export function DataReadinessGuard({ children, requireWifiData = false }: DataRe
     );
   }
 
-  // 데이터가 없을 때는 무조건 가이드 표시 (dismissed 무시)
-  if (!isReady || (requireWifiData && !hasWifiData)) {
+  // 데이터가 없을 때만 가이드 표시
+  if ((!isReady || (requireWifiData && !hasWifiData)) && !dismissed) {
     const status = getStatusMessage();
     
     return (
       <div className="container mx-auto py-8 px-4 max-w-4xl">
         <Card className="border-amber-500/20 bg-amber-500/5">
-          <CardHeader>
-            <div className="flex items-center gap-3">
+          <CardHeader className="relative">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-4 top-4 h-8 w-8"
+              onClick={() => setDismissed(true)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+            <div className="flex items-center gap-3 pr-12">
               <AlertCircle className="w-8 h-8 text-amber-500" />
               <div>
                 <CardTitle className="text-2xl">{status.title}</CardTitle>
