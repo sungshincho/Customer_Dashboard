@@ -181,3 +181,18 @@ export function getZoneId(x: number, z: number, metadata: StoreSpaceMetadata): s
   
   return zone?.zone_id;
 }
+
+/**
+ * Convert zone bounds from real-world to model coordinates
+ */
+export function getZoneBoundsInModel(zone: { bounds: { min_x: number; max_x: number; min_z: number; max_z: number } }, metadata: StoreSpaceMetadata) {
+  const minModel = realToModel(zone.bounds.min_x, zone.bounds.min_z, metadata);
+  const maxModel = realToModel(zone.bounds.max_x, zone.bounds.max_z, metadata);
+  
+  return {
+    minX: minModel.x,
+    maxX: maxModel.x,
+    minZ: minModel.z,
+    maxZ: maxModel.z
+  };
+}

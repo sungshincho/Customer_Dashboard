@@ -47,11 +47,25 @@ export interface StoreZone {
   zone_id: string;
   zone_name: string;
   zone_type: 'entrance' | 'checkout' | 'display' | 'storage' | 'cafe' | 'fitting_room';
+  zone_color?: string;
   bounds: {
     min_x: number;
     max_x: number;
     min_z: number;
     max_z: number;
+  };
+}
+
+// Heat Point for 3D visualization
+export interface HeatPoint {
+  x: number;           // 3D model coordinates
+  z: number;           // 3D model coordinates
+  intensity: number;   // 0-1
+  zone_id?: string;
+  timestamp?: string;
+  realCoords?: {
+    x: number;
+    z: number;
   };
 }
 
