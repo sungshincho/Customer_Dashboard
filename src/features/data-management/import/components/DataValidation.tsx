@@ -79,7 +79,68 @@ export function DataValidation({ storeId }: Props) {
         const issues: ValidationIssue[] = [];
         let score = 100;
 
-        // 데이터 타입 확인
+        // 3D 모델 파일 검증
+        if (imp.data_type === '3d-model') {
+          // 파일 경로 확인
+          if (!imp.file_path) {
+            issues.push({
+              severity: "error",
+              message: "3D 모델 파일 경로가 없습니다",
+            });
+            score -= 50;
+          } else {
+            // 스토리지에서 파일 존재 여부 확인
+            const { data: fileExists, error: storageError } = await supabase
+              .storage
+              .from('3d-models')
+              .list(imp.file_path.split('/').slice(0, -1).join('/'), {
+                search: imp.file_path.split('/').pop()
+              });
+
+            if (storageError || !fileExists || fileExists.length === 0) {
+              issues.push({
+                severity: "error",
+                message: "스토리지에서 3D 모델 파일을 찾을 수 없습니다",
+              });
+              score -= 40;
+            }
+          }
+
+          // 온톨로지 연결 확인
+          const { data: entityTypes } = await supabase
+            .from('ontology_entity_types')
+            .select('id, name, model_3d_url')
+            .eq('user_id', user.id)
+            .like('model_3d_url', `%${imp.file_name}%`);
+
+          if (!entityTypes || entityTypes.length === 0) {
+            issues.push({
+              severity: "info",
+              message: "온톨로지 엔티티 타입과 연결되지 않았습니다",
+            });
+            score -= 10;
+          } else {
+            issues.push({
+              severity: "info",
+              message: `${entityTypes.length}개의 엔티티 타입에 연결되어 있습니다`,
+            });
+          }
+
+          validationResults.push({
+            importId: imp.id,
+            fileName: imp.file_name,
+            dataType: imp.data_type,
+            rowCount: 1,
+            status: score >= 80 ? "valid" : score >= 50 ? "warning" : "error",
+            score,
+            issues,
+            createdAt: imp.created_at,
+          });
+
+          continue; // 다음 import로
+        }
+
+        // CSV/엑셀 데이터 검증
         const schema = SCHEMA_MAP[imp.data_type] || ENTERPRISE_SCHEMA_MAP[imp.data_type];
         if (!schema) {
           issues.push({
@@ -150,21 +211,21 @@ export function DataValidation({ storeId }: Props) {
             });
             score -= Math.min(15, duplicates / 5);
           }
-        }
 
-        // 온톨로지 매핑 확인
-        const { data: entities } = await supabase
-          .from("graph_entities")
-          .select("id")
-          .eq("user_id", user.id)
-          .eq("properties->>import_id", imp.id);
+          // 온톨로지 매핑 확인
+          const { data: entities } = await supabase
+            .from("graph_entities")
+            .select("id")
+            .eq("user_id", user.id)
+            .eq("properties->>import_id", imp.id);
 
-        if (!entities || entities.length === 0) {
-          issues.push({
-            severity: "info",
-            message: "온톨로지 매핑이 아직 완료되지 않았습니다",
-          });
-          score -= 5;
+          if (!entities || entities.length === 0) {
+            issues.push({
+              severity: "info",
+              message: "온톨로지 매핑이 아직 완료되지 않았습니다",
+            });
+            score -= 5;
+          }
         }
 
         score = Math.max(0, Math.round(score));
