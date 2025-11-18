@@ -28,26 +28,18 @@ const CustomerRecommendationsPage = () => {
       if (segments.length > 0) setSelectedSegment(segments[0]);
       
       const behavior = segments.map((seg: any) => ({
-              segment: seg.name,
-              구매력: (seg.avgSpend / 3000),
-              방문빈도: seg.visitFrequency * 15,
-              전환율: seg.conversionRate,
-              체류시간: seg.size > 1000 ? 65 : seg.size > 700 ? 75 : 85
-            }));
-            setBehaviorData(behavior);
-            
-            const recommendations = generateRealtimeRecommendations(data);
-            setRealtimeRecommendations(recommendations);
-          }
-          
-          setLoading(false);
-        })
-        .catch(error => {
-          console.error('Failed to load store data:', error);
-          setLoading(false);
-        });
+        segment: seg.name,
+        구매력: (seg.avgSpend / 3000),
+        방문빈도: seg.visitFrequency * 15,
+        전환율: seg.conversionRate,
+        체류시간: seg.size > 1000 ? 65 : seg.size > 700 ? 75 : 85
+      }));
+      setBehaviorData(behavior);
+      
+      const recommendations = generateRealtimeRecommendations(storeData);
+      setRealtimeRecommendations(recommendations);
     }
-  }, [selectedStore, user, refreshKey]);
+  }, [storeData]);
 
   const generateCustomerSegments = (data: any) => {
     if (!data.customers || data.customers.length === 0) return [];
@@ -142,7 +134,7 @@ const CustomerRecommendationsPage = () => {
   };
 
   const handleRefresh = () => {
-    setRefreshKey(prev => prev + 1);
+    refetch();
   };
 
   const totalSize = customerSegments.reduce((sum, seg) => sum + seg.size, 0);
