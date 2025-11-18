@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { insertSample3DData, checkSampleDataExists, deleteSampleData } from "../utils/sampleDataGenerator";
+import { verifyAndCleanupModelUrls } from "../utils/verifyAndCleanupModelUrls";
 import { toast } from "sonner";
-import { Database, Check, Loader2, Upload, ArrowRight, Trash2 } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Database, Check, Loader2, Upload, ArrowRight, Trash2, RefreshCw, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ModelUploader } from "../components/ModelUploader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -17,6 +18,8 @@ export default function Setup3DDataPage() {
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
   const [dataExists, setDataExists] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<any>(null);
 
   useEffect(() => {
     checkData();
@@ -87,6 +90,35 @@ export default function Setup3DDataPage() {
     }
   };
 
+  const handleSyncStorage = async () => {
+    if (!user) return;
+
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const result = await verifyAndCleanupModelUrls(user.id, selectedStore?.id);
+      
+      if (result.success) {
+        setSyncResult(result);
+        
+        if (result.cleaned === 0 && result.cleanedEntities === 0) {
+          toast.success('모든 데이터가 스토리지와 동기화되어 있습니다');
+        } else {
+          toast.success(
+            `스토리지 동기화 완료: 엔티티 타입 ${result.cleaned}개, 그래프 엔티티 ${result.cleanedEntities}개 정리됨`
+          );
+        }
+      } else {
+        throw new Error(result.error || '동기화 실패');
+      }
+    } catch (error: any) {
+      console.error('Storage sync error:', error);
+      toast.error(`스토리지 동기화 실패: ${error.message}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6 max-w-6xl mx-auto">
@@ -98,7 +130,7 @@ export default function Setup3DDataPage() {
         </div>
 
         <Tabs defaultValue="sample-data" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="sample-data">
               <Database className="w-4 h-4 mr-2" />
               샘플 데이터
@@ -106,6 +138,10 @@ export default function Setup3DDataPage() {
             <TabsTrigger value="3d-models">
               <Upload className="w-4 h-4 mr-2" />
               3D 모델 업로드
+            </TabsTrigger>
+            <TabsTrigger value="storage-sync">
+              <RefreshCw className="w-4 h-4 mr-2" />
+              스토리지 동기화
             </TabsTrigger>
           </TabsList>
 
@@ -262,6 +298,94 @@ export default function Setup3DDataPage() {
                 </Alert>
               </Card>
             </div>
+          </TabsContent>
+
+          <TabsContent value="storage-sync">
+            <Card className="p-6">
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-xl font-semibold mb-2">스토리지 동기화</h2>
+                  <p className="text-sm text-muted-foreground">
+                    스토리지에서 삭제된 3D 모델 파일을 참조하는 엔티티 타입과 그래프 엔티티를 자동으로 정리합니다.
+                  </p>
+                </div>
+
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>동기화 작업 내용</AlertTitle>
+                  <AlertDescription>
+                    <ul className="list-disc list-inside space-y-1 mt-2">
+                      <li>스토리지에 없는 3D 모델을 참조하는 엔티티 타입의 model_3d_url 제거</li>
+                      <li>해당 엔티티 타입을 사용하는 그래프 엔티티의 3D 정보(위치, 회전, 스케일) 제거</li>
+                      <li>참조되지 않는 스토리지 파일 목록 표시</li>
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+
+                <div className="flex justify-center">
+                  <Button
+                    onClick={handleSyncStorage}
+                    disabled={syncing}
+                    size="lg"
+                  >
+                    {syncing ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        동기화 중...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        스토리지 동기화 실행
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {syncResult && (
+                  <div className="space-y-4 mt-6 border-t pt-6">
+                    <h3 className="font-semibold">동기화 결과</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="border rounded-lg p-4">
+                        <div className="text-2xl font-bold text-primary">{syncResult.checked}</div>
+                        <div className="text-sm text-muted-foreground">검사한 엔티티 타입</div>
+                      </div>
+                      
+                      <div className="border rounded-lg p-4">
+                        <div className="text-2xl font-bold text-destructive">{syncResult.cleaned}</div>
+                        <div className="text-sm text-muted-foreground">정리된 엔티티 타입</div>
+                      </div>
+                      
+                      <div className="border rounded-lg p-4">
+                        <div className="text-2xl font-bold text-destructive">{syncResult.cleanedEntities}</div>
+                        <div className="text-sm text-muted-foreground">정리된 그래프 엔티티</div>
+                      </div>
+                    </div>
+
+                    {syncResult.orphanedFiles > 0 && (
+                      <Alert>
+                        <AlertDescription>
+                          ℹ️ 스토리지에 {syncResult.orphanedFiles}개의 참조되지 않는 파일이 있습니다. 
+                          필요 없는 파일은 수동으로 삭제할 수 있습니다.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    {syncResult.invalidUrls && syncResult.invalidUrls.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="font-semibold text-sm">정리된 엔티티 타입:</h4>
+                        <ul className="text-sm space-y-1 text-muted-foreground">
+                          {syncResult.invalidUrls.map((item: any, idx: number) => (
+                            <li key={idx}>• {item.name}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>
