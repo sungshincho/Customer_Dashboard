@@ -150,7 +150,7 @@ const Dashboard = () => {
           </Card>
 
           {/* Recent Purchases */}
-          {storeData.purchases && storeData.purchases.length > 0 && (
+          {storeData?.purchases && storeData.purchases.length > 0 && (
             <Card className="hover-lift">
               <CardHeader>
                 <CardTitle>최근 구매 내역</CardTitle>
