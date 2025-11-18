@@ -40,11 +40,51 @@ const StaffEfficiencyPage = () => {
     ? (storeData.staff.reduce((sum: number, s: any) => sum + (parseFloat(s.performance_score) || 0), 0) / totalStaff)
     : 0;
 
-  const insights: Insight[] = [
-    { type: "trend", title: "생산성 향상", description: "직원 평균 생산성이 12% 증가했습니다.", impact: "high" },
-    { type: "recommendation", title: "교대 근무 조정", description: "피크 타임에 인력을 25% 더 배치하세요.", impact: "high" },
-    { type: "warning", title: "휴게 시간 부족", description: "일부 직원의 휴게 시간이 부족합니다.", impact: "medium" }
-  ];
+  // 실제 데이터 기반 인사이트 생성
+  const insights: Insight[] = [];
+  
+  if (storeData?.staff && storeData?.purchases) {
+    // 평균 성과 계산
+    if (avgPerformance > 70) {
+      insights.push({ 
+        type: "trend", 
+        title: "높은 생산성", 
+        description: `직원 평균 성과점수가 ${avgPerformance.toFixed(1)}점으로 양호합니다.`, 
+        impact: "high" 
+      });
+    } else if (avgPerformance < 50) {
+      insights.push({ 
+        type: "warning", 
+        title: "생산성 저하", 
+        description: `직원 평균 성과점수가 ${avgPerformance.toFixed(1)}점으로 낮습니다. 개선이 필요합니다.`, 
+        impact: "high" 
+      });
+    }
+    
+    // 직원당 처리 건수 계산
+    const avgPurchasesPerStaff = totalStaff > 0 ? Math.round(totalPurchases / totalStaff) : 0;
+    if (avgPurchasesPerStaff > 20) {
+      insights.push({ 
+        type: "recommendation", 
+        title: "높은 업무량", 
+        description: `직원당 평균 ${avgPurchasesPerStaff}건을 처리하고 있습니다. 추가 인력 배치를 고려하세요.`, 
+        impact: "high" 
+      });
+    }
+    
+    // 성과가 낮은 직원 확인
+    const lowPerformers = storeData.staff.filter((s: any) => 
+      (parseFloat(s.performance_score) || 0) < 50
+    );
+    if (lowPerformers.length > 0) {
+      insights.push({ 
+        type: "warning", 
+        title: "교육 필요", 
+        description: `${lowPerformers.length}명의 직원이 낮은 성과를 보이고 있습니다. 교육 및 지원이 필요합니다.`, 
+        impact: "medium" 
+      });
+    }
+  }
 
   const comparisonData = [
     { label: "총 직원수", current: totalStaff, previous: Math.round(totalStaff * 0.95), unit: "명" },

@@ -34,15 +34,72 @@ const InventoryOptimizerPage = () => {
   const totalPurchases = storeData?.purchases?.length || 0;
   const turnoverRate = totalProducts > 0 ? (totalPurchases / totalProducts).toFixed(1) : '0';
 
-  const insights: Insight[] = [
-    { type: "trend", title: "재고 회전 개선", description: `${selectedStore?.store_name || '매장'}의 재고 회전율이 지난달 대비 18% 향상되었습니다.`, impact: "high" },
-    { type: "recommendation", title: "발주 필요", description: "상품 A, B, C의 재고가 부족합니다. 즉시 발주하세요.", impact: "high" },
-    { type: "warning", title: "과다 재고", description: "상품 D의 재고가 과다합니다. 프로모션을 검토하세요.", impact: "medium" }
-  ];
+  // 실제 데이터 기반 인사이트 생성
+  const insights: Insight[] = [];
+  
+  if (storeData?.products && storeData?.purchases) {
+    // 재고 회전율 분석
+    const turnoverRateNum = parseFloat(turnoverRate);
+    if (turnoverRateNum > 5) {
+      insights.push({ 
+        type: "trend", 
+        title: "높은 재고 회전율", 
+        description: `${selectedStore?.store_name || '매장'}의 재고 회전율이 ${turnoverRate}회로 우수합니다.`, 
+        impact: "high" 
+      });
+    } else if (turnoverRateNum < 2) {
+      insights.push({ 
+        type: "warning", 
+        title: "낮은 재고 회전율", 
+        description: `재고 회전율이 ${turnoverRate}회로 낮습니다. 재고 관리 개선이 필요합니다.`, 
+        impact: "high" 
+      });
+    }
+    
+    // 재고 부족 상품 확인
+    const lowStockProducts = storeData.products.filter((p: any) => 
+      (parseInt(p.stock_quantity) || 0) < 10
+    );
+    if (lowStockProducts.length > 0) {
+      const productNames = lowStockProducts.slice(0, 3).map((p: any) => p.product_name || '알 수 없음').join(', ');
+      insights.push({ 
+        type: "recommendation", 
+        title: "발주 필요", 
+        description: `${productNames} 등 ${lowStockProducts.length}개 상품의 재고가 부족합니다. 즉시 발주하세요.`, 
+        impact: "high" 
+      });
+    }
+    
+    // 과다 재고 상품 확인
+    const overStockProducts = storeData.products.filter((p: any) => {
+      const stock = parseInt(p.stock_quantity) || 0;
+      const productSales = storeData.purchases?.filter((pur: any) => 
+        pur.product_name === p.product_name
+      ).length || 0;
+      return stock > 50 && productSales < 5;
+    });
+    if (overStockProducts.length > 0) {
+      insights.push({ 
+        type: "warning", 
+        title: "과다 재고", 
+        description: `${overStockProducts.length}개 상품의 재고가 과다합니다. 프로모션을 검토하세요.`, 
+        impact: "medium" 
+      });
+    }
+  }
+
+  // 평균 재고일 계산 (실제 데이터 기반)
+  const avgInventoryDays = storeData?.products && storeData?.purchases 
+    ? Math.round(
+        (storeData.products.reduce((sum: number, p: any) => 
+          sum + (parseInt(p.stock_quantity) || 0), 0
+        ) / (storeData.purchases.length || 1)) * 30
+      )
+    : 0;
 
   const comparisonData = [
     { label: "재고 회전율", current: parseFloat(turnoverRate), previous: parseFloat(turnoverRate) * 0.85, unit: "회" },
-    { label: "평균 재고일", current: 12, previous: 15, unit: "일" },
+    { label: "평균 재고일", current: avgInventoryDays, previous: Math.round(avgInventoryDays * 1.15), unit: "일" },
     { label: "총 상품수", current: totalProducts, previous: Math.round(totalProducts * 0.95), unit: "개" }
   ];
 
