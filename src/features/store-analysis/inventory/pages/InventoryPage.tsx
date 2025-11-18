@@ -13,47 +13,32 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
-import { useAuth } from "@/hooks/useAuth";
-import { useState, useEffect } from "react";
-import { loadStoreFile } from "@/utils/storageDataLoader";
+import { useProducts } from "@/hooks/useStoreData";
+import { useState, useEffect, useMemo } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const Inventory = () => {
   const { selectedStore } = useSelectedStore();
-  const { user } = useAuth();
-  const [productsData, setProductsData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  // 매장별 상품 데이터 로드
-  useEffect(() => {
-    if (selectedStore && user) {
-      setLoading(true);
-      loadStoreFile(user.id, selectedStore.id, 'products.csv')
-        .then(data => {
-          console.log(`${selectedStore.store_name} 재고 데이터:`, data.length, '개');
-          // 재고 상태 계산
-          const productsWithStock = data.map((p: any, idx: number) => ({
-            id: idx + 1,
-            name: p.name || p.product_name,
-            sku: p.sku || `SKU-${String(idx + 1).padStart(3, '0')}`,
-            stock: Math.floor(Math.random() * 100),
-            minStock: 20 + Math.floor(Math.random() * 30),
-            status: '',
-            store: selectedStore.store_name
-          })).map((p: any) => ({
-            ...p,
-            status: p.stock < 10 ? '긴급' : p.stock < p.minStock ? '부족' : '정상'
-          }));
-          setProductsData(productsWithStock);
-          setLoading(false);
-        })
-        .catch(error => {
-          console.error('Failed to load products:', error);
-          setProductsData([]);
-          setLoading(false);
-        });
-    }
-  }, [selectedStore, user]);
+  
+  // 새로운 Hook 사용
+  const { data: productsResult, isLoading: loading } = useProducts();
+  
+  // 재고 상태 계산
+  const productsData = useMemo(() => {
+    const data = productsResult?.data || [];
+    return data.map((p: any, idx: number) => ({
+      id: idx + 1,
+      name: p.name || p.product_name,
+      sku: p.sku || `SKU-${String(idx + 1).padStart(3, '0')}`,
+      stock: Math.floor(Math.random() * 100),
+      minStock: 20 + Math.floor(Math.random() * 30),
+      status: '',
+      store: selectedStore?.store_name || ''
+    })).map((p: any) => ({
+      ...p,
+      status: p.stock < 10 ? '긴급' : p.stock < p.minStock ? '부족' : '정상'
+    }));
+  }, [productsResult, selectedStore]);
 
   const lowStockCount = productsData.filter(item => item.status === "부족" || item.status === "긴급").length;
 

@@ -15,35 +15,53 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useOntologyEntities, useOntologyRelations, transformToGraphData } from "@/hooks/useOntologyData";
 import { Alert as AlertUI, AlertDescription } from "@/components/ui/alert";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
-import { useAuth } from "@/hooks/useAuth";
-import { loadStoreDataset } from "@/utils/storageDataLoader";
+import { useStoreDataset } from "@/hooks/useStoreData";
 
 const DemandForecastPage = () => {
   const { selectedStore } = useSelectedStore();
-  const { user } = useAuth();
-  const [refreshKey, setRefreshKey] = useState(0);
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
   const [historyRefresh, setHistoryRefresh] = useState(0);
-  const [storeData, setStoreData] = useState<any>({});
-  const [loading, setLoading] = useState(false);
-
-  // 매장 데이터 로드
+  const [salesForecast, setSalesForecast] = useState<any[]>([]);
+  const [visitorForecast, setVisitorForecast] = useState<any[]>([]);
+  
+  // 새로운 통합 Hook 사용
+  const { data: storeData, isLoading: loading, refetch } = useStoreDataset();
+  
+  // 예측 생성
   useEffect(() => {
-    if (selectedStore && user) {
-      setLoading(true);
-      loadStoreDataset(user.id, selectedStore.id)
-        .then(data => {
-          setStoreData(data);
-          setLoading(false);
-        })
-        .catch(error => {
-          console.error('Failed to load store data:', error);
-          setLoading(false);
-        });
+    if (storeData?.purchases) {
+      setSalesForecast(generateSalesForecast(storeData.purchases));
     }
-  }, [selectedStore, user, refreshKey]);
+    if (storeData?.visits) {
+      setVisitorForecast(generateVisitorForecast(storeData.visits));
+    }
+  }, [storeData]);
+  
+  const generateSalesForecast = (purchases: any[]) => {
+    const monthlyData = [
+      { date: "1월", actual: purchases.length * 100, predicted: purchases.length * 98 },
+      { date: "2월", actual: purchases.length * 90, predicted: purchases.length * 93 },
+      { date: "3월", actual: purchases.length * 120, predicted: purchases.length * 118 },
+      { date: "4월", actual: purchases.length * 105, predicted: purchases.length * 108 },
+      { date: "5월", actual: null, predicted: purchases.length * 122 },
+      { date: "6월", actual: null, predicted: purchases.length * 130 },
+    ];
+    return monthlyData;
+  };
+  
+  const generateVisitorForecast = (visits: any[]) => {
+    const weeklyData = [
+      { date: "1주", actual: visits.length * 0.8, predicted: visits.length * 0.78 },
+      { date: "2주", actual: visits.length * 0.9, predicted: visits.length * 0.88 },
+      { date: "3주", actual: visits.length * 0.85, predicted: visits.length * 0.87 },
+      { date: "4주", actual: visits.length, predicted: visits.length * 0.98 },
+      { date: "5주", actual: null, predicted: visits.length * 1.1 },
+      { date: "6주", actual: null, predicted: visits.length * 1.2 },
+    ];
+    return weeklyData;
+  };
 
   // 온톨로지 데이터 로드
   const { data: visitEntities = [], isLoading: visitsLoading } = useOntologyEntities('visit');
@@ -57,14 +75,14 @@ const DemandForecastPage = () => {
   }, [visitEntities, storeEntities, relations]);
 
   const handleRefresh = () => {
-    setRefreshKey(prev => prev + 1);
+    refetch();
   };
 
   // 매장 데이터 기반 통계
-  const totalVisits = storeData.visits?.length || 0;
-  const totalPurchases = storeData.purchases?.length || 0;
+  const totalVisits = storeData?.visits?.length || 0;
+  const totalPurchases = storeData?.purchases?.length || 0;
   const conversionRate = totalVisits > 0 ? Math.round((totalPurchases / totalVisits) * 100) : 0;
-  const totalRevenue = storeData.purchases?.reduce((sum: number, p: any) => 
+  const totalRevenue = storeData?.purchases?.reduce((sum: number, p: any) => 
     sum + (parseFloat(p.unit_price) || 0) * (parseInt(p.quantity) || 0), 0) || 0;
 
   const insights: Insight[] = [
@@ -142,12 +160,10 @@ const DemandForecastPage = () => {
                 onAnalysisComplete={() => setHistoryRefresh(prev => prev + 1)}
                 graphData={graphData}
               />
-              <div key={refreshKey}>
-                <DemandForecast 
-                  visitsData={storeData.visits}
-                  purchasesData={storeData.purchases}
-                />
-              </div>
+              <DemandForecast 
+                visitsData={storeData?.visits}
+                purchasesData={storeData?.purchases}
+              />
             </TabsContent>
             
             <TabsContent value="comparison">

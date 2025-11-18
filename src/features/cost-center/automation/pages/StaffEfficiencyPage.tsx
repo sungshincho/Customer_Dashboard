@@ -13,48 +13,30 @@ import { AIAnalysisButton } from "@/features/data-management/analysis/components
 import { AnalysisHistory } from "@/features/data-management/analysis/components/AnalysisHistory";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
-import { useAuth } from "@/hooks/useAuth";
-import { loadStoreDataset } from "@/utils/storageDataLoader";
+import { useStoreDataset } from "@/hooks/useStoreData";
 import { DataReadinessGuard } from "@/components/DataReadinessGuard";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useStoreScene } from "@/hooks/useStoreScene";
 
 const StaffEfficiencyPage = () => {
-  const [refreshKey, setRefreshKey] = useState(0);
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
   const [alerts, setAlerts] = useState<AlertType[]>([]);
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
   const [historyRefresh, setHistoryRefresh] = useState(0);
   const { selectedStore } = useSelectedStore();
-  const { user } = useAuth();
   const { activeScene } = useStoreScene();
-  const [storeData, setStoreData] = useState<any>({});
-  const [loading, setLoading] = useState(false);
-
-  // 매장 데이터 로드
-  useEffect(() => {
-    if (selectedStore && user) {
-      setLoading(true);
-      loadStoreDataset(user.id, selectedStore.id)
-        .then(data => {
-          setStoreData(data);
-          setLoading(false);
-        })
-        .catch(error => {
-          console.error('Failed to load store data:', error);
-          setLoading(false);
-        });
-    }
-  }, [selectedStore, user, refreshKey]);
+  
+  // 새로운 통합 Hook 사용
+  const { data: storeData, isLoading: loading, refetch } = useStoreDataset();
 
   const handleRefresh = () => {
-    setRefreshKey(prev => prev + 1);
+    refetch();
   };
 
   // 직원 통계 계산
-  const totalStaff = storeData.staff?.length || 0;
-  const totalPurchases = storeData.purchases?.length || 0;
-  const avgPerformance = totalStaff > 0 && storeData.staff
+  const totalStaff = storeData?.staff?.length || 0;
+  const totalPurchases = storeData?.purchases?.length || 0;
+  const avgPerformance = totalStaff > 0 && storeData?.staff
     ? (storeData.staff.reduce((sum: number, s: any) => sum + (parseFloat(s.performance_score) || 0), 0) / totalStaff)
     : 0;
 
@@ -136,12 +118,10 @@ const StaffEfficiencyPage = () => {
                   title="AI 직원 효율성 분석"
                   onAnalysisComplete={() => setHistoryRefresh(prev => prev + 1)}
                 />
-                <div key={refreshKey}>
-                  <StaffEfficiency 
-                    staffData={storeData.staff}
-                    purchasesData={storeData.purchases}
-                  />
-                </div>
+                <StaffEfficiency 
+                  staffData={storeData?.staff}
+                  purchasesData={storeData?.purchases}
+                />
               </TabsContent>
               
               <TabsContent value="comparison">

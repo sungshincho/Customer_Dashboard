@@ -5,46 +5,26 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { TrendingUp, TrendingDown, Activity } from "lucide-react";
 import { DataReadinessGuard } from "@/components/DataReadinessGuard";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
-import { useAuth } from "@/hooks/useAuth";
+import { useStoreDataset } from "@/hooks/useStoreData";
 import { useState, useEffect } from "react";
-import { loadStoreDataset } from "@/utils/storageDataLoader";
 
 const Forecasts = () => {
   const { selectedStore } = useSelectedStore();
-  const { user } = useAuth();
-  const [storeData, setStoreData] = useState<any>({});
-  const [loading, setLoading] = useState(false);
   const [salesForecast, setSalesForecast] = useState<any[]>([]);
   const [visitorForecast, setVisitorForecast] = useState<any[]>([]);
+  
+  // 새로운 통합 Hook 사용
+  const { data: storeData, isLoading: loading } = useStoreDataset();
 
-  // 매장 데이터 로드 및 예측 생성
+  // 예측 생성
   useEffect(() => {
-    if (selectedStore && user) {
-      setLoading(true);
-      loadStoreDataset(user.id, selectedStore.id)
-        .then(data => {
-          setStoreData(data);
-          
-          // 판매 예측 생성
-          if (data.purchases) {
-            const forecast = generateSalesForecast(data.purchases);
-            setSalesForecast(forecast);
-          }
-          
-          // 방문자 예측 생성
-          if (data.visits) {
-            const forecast = generateVisitorForecast(data.visits);
-            setVisitorForecast(forecast);
-          }
-          
-          setLoading(false);
-        })
-        .catch(error => {
-          console.error('Failed to load store data:', error);
-          setLoading(false);
-        });
+    if (storeData?.purchases) {
+      setSalesForecast(generateSalesForecast(storeData.purchases));
     }
-  }, [selectedStore, user]);
+    if (storeData?.visits) {
+      setVisitorForecast(generateVisitorForecast(storeData.visits));
+    }
+  }, [storeData]);
 
   const generateSalesForecast = (purchases: any[]) => {
     const monthlyData = [

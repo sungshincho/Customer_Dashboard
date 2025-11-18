@@ -13,15 +13,13 @@ import { Store3DViewer } from "@/features/digital-twin/components";
 import { ProductInfoOverlay } from "@/features/digital-twin/components/overlays";
 import { convertToProductInfo } from "@/features/digital-twin/utils/overlayDataConverter";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
-import { useAuth } from "@/hooks/useAuth";
-import { loadStoreDataset } from "@/utils/storageDataLoader";
+import { useStoreDataset } from "@/hooks/useStoreData";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { DataReadinessGuard } from "@/components/DataReadinessGuard";
 import { useStoreScene } from "@/hooks/useStoreScene";
 
 const ProfitCenterPage = () => {
   const { selectedStore } = useSelectedStore();
-  const { user } = useAuth();
   const { activeScene } = useStoreScene();
   const { 
     inventoryLevels, 
@@ -32,31 +30,13 @@ const ProfitCenterPage = () => {
   } = useRealtimeInventory();
   
   const [isMonitoring, setIsMonitoring] = useState(false);
-  const [storeData, setStoreData] = useState<any>({});
-  const [loadingData, setLoadingData] = useState(false);
-
-  // 매장 데이터 로드
-  useEffect(() => {
-    if (selectedStore && user) {
-      setLoadingData(true);
-      loadStoreDataset(user.id, selectedStore.id)
-        .then(data => {
-          setStoreData(data);
-          setLoadingData(false);
-        })
-        .catch(error => {
-          console.error('Failed to load store data:', error);
-          setStoreData({});
-          setLoadingData(false);
-        });
-    } else {
-      setStoreData({});
-    }
-  }, [selectedStore, user]);
+  
+  // 새로운 통합 Hook 사용
+  const { data: storeData, isLoading: loadingData } = useStoreDataset();
 
   // 통합 데이터 - 실제 데이터 기반 생성
   const integratedData = useMemo(() => {
-    if (!storeData.products || storeData.products.length === 0) return [];
+    if (!storeData?.products || storeData.products.length === 0) return [];
     
     return storeData.products.slice(0, 10).map((product: any) => {
       const stock = parseInt(product.stock_quantity) || 50;
@@ -80,11 +60,11 @@ const ProfitCenterPage = () => {
         urgency: stock < 10 ? "긴급" : stock < 30 ? "높음" : "보통"
       };
     });
-  }, [storeData.products]);
+  }, [storeData]);
 
   // 주간 수요-재고 트렌드 - 실제 데이터 기반
   const weeklyTrend = useMemo(() => {
-    if (!storeData.purchases || storeData.purchases.length === 0) return [];
+    if (!storeData?.purchases || storeData.purchases.length === 0) return [];
     
     const totalRevenue = storeData.purchases.reduce((sum: number, p: any) => 
       sum + (parseFloat(p.unit_price || p.price) || 0) * (parseInt(p.quantity) || 1), 0

@@ -11,8 +11,7 @@ import { ComparisonView } from "@/features/data-management/analysis/components/C
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
-import { loadStoreFile } from "@/utils/storageDataLoader";
-import { useAuth } from "@/hooks/useAuth";
+import { useMultipleStoreDataFiles } from "@/hooks/useStoreData";
 import { DataReadinessGuard } from "@/components/DataReadinessGuard";
 import { SceneComposer } from "@/features/digital-twin/components/SceneComposer";
 import { CustomerPathOverlay, CustomerAvatarOverlay, ZoneBoundaryOverlay } from "@/features/digital-twin/components/overlays";
@@ -22,15 +21,18 @@ import type { StoreSpaceMetadata } from "@/features/digital-twin/types/iot.types
 import type { CustomerAvatar } from "@/features/digital-twin/types/avatar.types";
 
 const CustomerJourneyPage = () => {
-  const { user } = useAuth();
   const { selectedStore } = useSelectedStore();
   const { activeScene } = useStoreScene();
-  const [refreshKey, setRefreshKey] = useState(0);
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
-  const [visitsData, setVisitsData] = useState<any[]>([]);
-  const [purchasesData, setPurchasesData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  
+  // 여러 파일 동시 로드
+  const dataQueries = useMultipleStoreDataFiles(['visits', 'purchases']);
+  const [visitsQuery, purchasesQuery] = dataQueries;
+  
+  const visitsData = visitsQuery.data?.data || [];
+  const purchasesData = purchasesQuery.data?.data || [];
+  const loading = visitsQuery.isLoading || purchasesQuery.isLoading;
 
   // 3D Journey Controls
   const [timeOfDay, setTimeOfDay] = useState(14);
@@ -59,29 +61,6 @@ const CustomerJourneyPage = () => {
     lastUpdated: new Date(pos.timestamp).getTime()
   }));
 
-  // 매장별 방문 및 구매 데이터 로드 (2D 분석용)
-  useEffect(() => {
-    if (selectedStore && user) {
-      setLoading(true);
-      Promise.all([
-        loadStoreFile(user.id, selectedStore.id, 'visits.csv'),
-        loadStoreFile(user.id, selectedStore.id, 'purchases.csv')
-      ])
-        .then(([visits, purchases]) => {
-          console.log(`${selectedStore.store_name} 고객 여정 데이터:`, visits.length, '방문,', purchases.length, '구매');
-          setVisitsData(visits);
-          setPurchasesData(purchases);
-          setLoading(false);
-        })
-        .catch(error => {
-          console.error('Failed to load journey data:', error);
-          setVisitsData([]);
-          setPurchasesData([]);
-          setLoading(false);
-        });
-    }
-  }, [selectedStore, user, refreshKey]);
-
   // 시간대 애니메이션
   useEffect(() => {
     if (!isPlaying) return;
@@ -94,7 +73,8 @@ const CustomerJourneyPage = () => {
   }, [isPlaying]);
 
   const handleRefresh = () => {
-    setRefreshKey(prev => prev + 1);
+    visitsQuery.refetch();
+    purchasesQuery.refetch();
   };
 
   const handleReset = () => {
@@ -354,9 +334,7 @@ const CustomerJourneyPage = () => {
 
           {/* 2D 여정 분석 */}
           <TabsContent value="analysis" className="space-y-6">
-            <div key={refreshKey}>
-              <CustomerJourney visitsData={visitsData} purchasesData={purchasesData} />
-            </div>
+            <CustomerJourney visitsData={visitsData} purchasesData={purchasesData} />
           </TabsContent>
           
           <TabsContent value="comparison">

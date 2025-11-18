@@ -7,11 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ScatterChart, Scatter } from "recharts";
-import { useOntologyEntities, useOntologyRelations, transformToGraphData } from "@/hooks/useOntologyData";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
-import { useAuth } from "@/hooks/useAuth";
-import { loadStoreDataset } from "@/utils/storageDataLoader";
+import { useStoreDataset } from "@/hooks/useStoreData";
 import { DataReadinessGuard } from "@/components/DataReadinessGuard";
 
 const generateSimulation = (basePrice: number, elasticity: number, baseSales: number) => {
@@ -34,10 +31,6 @@ const generateSimulation = (basePrice: number, elasticity: number, baseSales: nu
 
 const PricingOptimizerPage = () => {
   const { selectedStore } = useSelectedStore();
-  const { user } = useAuth();
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [storeData, setStoreData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const [pricingData, setPricingData] = useState<any[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [simulationPrice, setSimulationPrice] = useState(0);
@@ -45,24 +38,17 @@ const PricingOptimizerPage = () => {
   const { data: productEntities = [] } = useOntologyEntities('product');
   const { data: customerEntities = [] } = useOntologyEntities('customer');
   const { data: relations = [] } = useOntologyRelations();
+  
+  // 새로운 통합 Hook 사용
+  const { data: storeData, isLoading: loading, refetch } = useStoreDataset();
 
   useEffect(() => {
-    const loadData = async () => {
-      if (!user || !selectedStore) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const data = await loadStoreDataset(user.id, selectedStore.id);
-        setStoreData(data);
-        
-        if (data.products && data.products.length > 0) {
-          const productPricing = data.products.slice(0, 10).map((product: any, idx: number) => {
-            const currentPrice = parseFloat(product.price) || 100000;
-            const cost = currentPrice * 0.5;
-            const avgWTP = currentPrice * 1.25;
-            const competitorPrice = currentPrice * 1.1;
+    if (storeData?.products && storeData.products.length > 0) {
+      const productPricing = storeData.products.slice(0, 10).map((product: any, idx: number) => {
+        const currentPrice = parseFloat(product.price) || 100000;
+        const cost = currentPrice * 0.5;
+        const avgWTP = currentPrice * 1.25;
+        const competitorPrice = currentPrice * 1.1;
             const currentSales = Math.floor(Math.random() * 100) + 20;
             const optimalPrice = avgWTP * 0.95;
             const projectedSales = currentSales * 1.4;
