@@ -35,11 +35,6 @@ export async function loadFileFromStorage<T = any[]>(
       .download(path);
     
     if (error) {
-      // Fallback to sample
-      if (options.fallbackToSample) {
-        console.log(`Loading fallback sample: ${fileName}`);
-        return await loadSampleFile<T>(fileName);
-      }
       throw error;
     }
     
@@ -68,11 +63,6 @@ export async function loadFileFromStorage<T = any[]>(
   } catch (error: any) {
     console.error(`Failed to load ${fileName}:`, error);
     
-    // Fallback to sample
-    if (options.fallbackToSample) {
-      return await loadSampleFile<T>(fileName);
-    }
-    
     return {
       data: [] as T,
       source: 'storage',
@@ -82,47 +72,6 @@ export async function loadFileFromStorage<T = any[]>(
   }
 }
 
-/**
- * public/samples에서 샘플 파일 로드
- */
-async function loadSampleFile<T = any[]>(fileName: string): Promise<LoadResult<T>> {
-  try {
-    const response = await fetch(`/samples/${fileName}`);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    
-    const text = await response.text();
-    const fileType = detectFileType(fileName);
-    let parsedData: any;
-    
-    switch (fileType) {
-      case 'csv':
-        parsedData = parseCSV(text);
-        break;
-      case 'json':
-        parsedData = parseJSON(text);
-        break;
-      default:
-        throw new Error(`Unsupported file type: ${fileType}`);
-    }
-    
-    return {
-      data: parsedData as T,
-      source: 'sample',
-      loadedAt: Date.now(),
-    };
-    
-  } catch (error: any) {
-    console.error(`Failed to load sample ${fileName}:`, error);
-    return {
-      data: [] as T,
-      source: 'sample',
-      loadedAt: Date.now(),
-      error: error.message
-    };
-  }
-}
 
 /**
  * 특정 데이터 타입 로드

@@ -147,7 +147,6 @@ export interface StorageFileMetadata {
 
 // 파일 로드 옵션
 export interface LoadOptions {
-  fallbackToSample?: boolean; // public/samples에서 로드
   skipCache?: boolean;         // 캐시 스킵
   signal?: AbortSignal;        // 취소 시그널
 }
@@ -155,7 +154,7 @@ export interface LoadOptions {
 // 파일 로드 결과
 export interface LoadResult<T = any[]> {
   data: T;
-  source: 'storage' | 'sample' | 'cache';
+  source: 'storage' | 'cache';
   loadedAt: number;
   error?: string;
 }
