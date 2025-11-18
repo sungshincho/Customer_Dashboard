@@ -32,8 +32,14 @@ export function useStoreDataFile<K extends DataFileType>(
         options
       );
       
-      if (result.error && !result.data.length) {
-        throw new Error(result.error);
+      // 404/빈 상태는 에러가 아니라 정상 상태로 처리
+      // 실제 에러만 throw (네트워크 에러, 권한 에러 등)
+      if (result.error && result.data.length === 0) {
+        const isNotFound = result.error.includes('not found') || 
+                          result.error.includes('404');
+        if (!isNotFound) {
+          throw new Error(result.error);
+        }
       }
       
       return result;
@@ -118,8 +124,13 @@ export function useMultipleStoreDataFiles<K extends DataFileType>(
           options
         );
         
-        if (result.error && !result.data.length) {
-          throw new Error(result.error);
+        // 404/빈 상태는 에러가 아니라 정상 상태로 처리
+        if (result.error && result.data.length === 0) {
+          const isNotFound = result.error.includes('not found') || 
+                            result.error.includes('404');
+          if (!isNotFound) {
+            throw new Error(result.error);
+          }
         }
         
         return result;
