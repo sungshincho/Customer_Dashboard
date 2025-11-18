@@ -12,40 +12,22 @@ import { AIAnalysisButton } from "@/features/data-management/analysis/components
 import { AnalysisHistory } from "@/features/data-management/analysis/components/AnalysisHistory";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Store3DViewer } from "@/features/digital-twin/components";
-import { useAuth } from "@/hooks/useAuth";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
-import { loadStoreDataset } from "@/utils/storageDataLoader";
+import { useStoreDataset } from "@/hooks/useStoreData";
 import { DataReadinessGuard } from "@/components/DataReadinessGuard";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useStoreScene } from "@/hooks/useStoreScene";
 
 const LayoutSimulatorPage = () => {
-  const { user } = useAuth();
   const { selectedStore } = useSelectedStore();
   const { activeScene } = useStoreScene();
-  const [refreshKey, setRefreshKey] = useState(0);
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
   const [alerts, setAlerts] = useState<AlertType[]>([]);
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
   const [historyRefresh, setHistoryRefresh] = useState(0);
-  const [storeData, setStoreData] = useState<any>({});
-  const [loading, setLoading] = useState(false);
-
-  // 매장 데이터 로드
-  useEffect(() => {
-    if (selectedStore && user) {
-      setLoading(true);
-      loadStoreDataset(user.id, selectedStore.id)
-        .then(data => {
-          setStoreData(data);
-          setLoading(false);
-        })
-        .catch(error => {
-          console.error('Failed to load store data:', error);
-          setLoading(false);
-        });
-    }
-  }, [selectedStore, user, refreshKey]);
+  
+  // 새로운 통합 Hook 사용
+  const { data: storeData, isLoading: loading, refetch } = useStoreDataset();
 
   const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);

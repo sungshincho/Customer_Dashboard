@@ -13,37 +13,19 @@ import { AnalysisHistory } from "@/features/data-management/analysis/components/
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useOntologyEntities, useOntologyRelations, transformToGraphData } from "@/hooks/useOntologyData";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
-import { useAuth } from "@/hooks/useAuth";
-import { loadStoreDataset } from "@/utils/storageDataLoader";
+import { useStoreDataset } from "@/hooks/useStoreData";
 import { DataReadinessGuard } from "@/components/DataReadinessGuard";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const ProductPerformancePage = () => {
-  const [refreshKey, setRefreshKey] = useState(0);
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
   const [alerts, setAlerts] = useState<AlertType[]>([]);
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
   const [historyRefresh, setHistoryRefresh] = useState(0);
   const { selectedStore } = useSelectedStore();
-  const { user } = useAuth();
-  const [storeData, setStoreData] = useState<any>({});
-  const [loading, setLoading] = useState(false);
-
-  // 매장 데이터 로드
-  useEffect(() => {
-    if (selectedStore && user) {
-      setLoading(true);
-      loadStoreDataset(user.id, selectedStore.id)
-        .then(data => {
-          setStoreData(data);
-          setLoading(false);
-        })
-        .catch(error => {
-          console.error('Failed to load store data:', error);
-          setLoading(false);
-        });
-    }
-  }, [selectedStore, user, refreshKey]);
+  
+  // 새로운 통합 Hook 사용
+  const { data: storeData, isLoading: loading, refetch } = useStoreDataset();
 
   // 온톨로지 데이터: 상품, 구매, 재고
   const { data: productEntities = [] } = useOntologyEntities('product');
@@ -56,13 +38,13 @@ const ProductPerformancePage = () => {
   }, [productEntities, purchaseEntities, relations]);
 
   const handleRefresh = () => {
-    setRefreshKey(prev => prev + 1);
+    refetch();
   };
 
   // 상품 데이터 통계
-  const totalProducts = storeData.products?.length || 0;
-  const totalPurchases = storeData.purchases?.length || 0;
-  const totalRevenue = storeData.purchases?.reduce((sum: number, p: any) => 
+  const totalProducts = storeData?.products?.length || 0;
+  const totalPurchases = storeData?.purchases?.length || 0;
+  const totalRevenue = storeData?.purchases?.reduce((sum: number, p: any) => 
     sum + (parseFloat(p.unit_price) || 0) * (parseInt(p.quantity) || 0), 0) || 0;
 
   const insights: Insight[] = [
@@ -148,12 +130,10 @@ const ProductPerformancePage = () => {
                   title="AI 상품 성과 분석"
                   onAnalysisComplete={() => setHistoryRefresh(prev => prev + 1)}
                 />
-                <div key={refreshKey}>
-                  <ProductPerformance 
-                    productsData={storeData.products}
-                    purchasesData={storeData.purchases}
-                  />
-                </div>
+                <ProductPerformance 
+                  productsData={storeData?.products}
+                  purchasesData={storeData?.purchases}
+                />
               </TabsContent>
               
               <TabsContent value="comparison">

@@ -5,57 +5,35 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, R
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Store, Loader2 } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
 import { useState, useEffect } from "react";
-import { loadStoreFile } from "@/utils/storageDataLoader";
+import { useVisits } from "@/hooks/useStoreData";
 import { DataReadinessGuard } from "@/components/DataReadinessGuard";
 
 const COLORS = ["hsl(var(--primary))", "hsl(var(--accent))", "#8884d8", "#82ca9d", "#ffc658"];
 
 const Analytics = () => {
   const { selectedStore } = useSelectedStore();
-  const { user } = useAuth();
-  const [visitsData, setVisitsData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { data: visitsResult, isLoading: loading } = useVisits();
+  const visitsData = visitsResult?.data || [];
+  
   const [hourlyData, setHourlyData] = useState<any[]>([]);
   const [weeklyData, setWeeklyData] = useState<any[]>([]);
   const [ageGroupData, setAgeGroupData] = useState<any[]>([]);
 
-  // 매장별 방문 데이터 로드
+  // 데이터 변환
   useEffect(() => {
-    if (selectedStore && user) {
-      setLoading(true);
-      loadStoreFile(user.id, selectedStore.id, 'visits.csv')
-        .then(data => {
-          console.log(`${selectedStore.store_name} 분석 데이터:`, data.length, '건');
-          setVisitsData(data);
-          
-          // 시간대별 데이터 생성
-          const hourly = generateHourlyData(data);
-          setHourlyData(hourly);
-          
-          // 요일별 데이터 생성
-          const weekly = generateWeeklyData(data);
-          setWeeklyData(weekly);
-          
-          // 연령대별 데이터 생성 (샘플)
-          setAgeGroupData([
-            { name: "10대", value: 15 },
-            { name: "20대", value: 35 },
-            { name: "30대", value: 28 },
-            { name: "40대", value: 15 },
-            { name: "50대+", value: 7 },
-          ]);
-          
-          setLoading(false);
-        })
-        .catch(error => {
-          console.error('Failed to load visits data:', error);
-          setVisitsData([]);
-          setLoading(false);
-        });
+    if (visitsData.length > 0) {
+      setHourlyData(generateHourlyData(visitsData));
+      setWeeklyData(generateWeeklyData(visitsData));
+      setAgeGroupData([
+        { name: "10대", value: 15 },
+        { name: "20대", value: 35 },
+        { name: "30대", value: 28 },
+        { name: "40대", value: 15 },
+        { name: "50대+", value: 7 },
+      ]);
     }
-  }, [selectedStore, user]);
+  }, [visitsData]);
 
   const generateHourlyData = (visits: any[]) => {
     const hours = ["06:00", "09:00", "12:00", "15:00", "18:00", "21:00"];

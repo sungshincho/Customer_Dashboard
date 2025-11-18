@@ -11,9 +11,8 @@ import { ExportButton } from "@/features/data-management/analysis/components/Exp
 import { ComparisonView } from "@/features/data-management/analysis/components/ComparisonView";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { useAuth } from "@/hooks/useAuth";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
-import { loadStoreFile } from "@/utils/storageDataLoader";
+import { useVisits } from "@/hooks/useStoreData";
 import { SceneComposer } from "@/features/digital-twin/components/SceneComposer";
 import { HeatmapOverlay3D, ZoneBoundaryOverlay } from "@/features/digital-twin/components/overlays";
 import { useStoreScene } from "@/hooks/useStoreScene";
@@ -21,14 +20,14 @@ import { useTrafficHeatmap, useZoneStatistics } from "@/hooks/useTrafficHeatmap"
 import type { StoreSpaceMetadata } from "@/features/digital-twin/types/iot.types";
 
 const TrafficHeatmapPage = () => {
-  const { user } = useAuth();
   const { selectedStore } = useSelectedStore();
   const { activeScene } = useStoreScene();
-  const [refreshKey, setRefreshKey] = useState(0);
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
-  const [visitsData, setVisitsData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  
+  // 새로운 Hook 사용
+  const { data: visitsResult, isLoading: loading, refetch } = useVisits();
+  const visitsData = visitsResult?.data || [];
   
   // 3D Heatmap Controls
   const [timeOfDay, setTimeOfDay] = useState(14);
@@ -40,24 +39,6 @@ const TrafficHeatmapPage = () => {
   const heatPoints = useTrafficHeatmap(selectedStore?.id, timeOfDay);
   const metadata = selectedStore?.metadata?.storeSpaceMetadata as StoreSpaceMetadata | undefined;
   const zoneStats = useZoneStatistics(heatPoints, metadata);
-
-  // 매장별 방문 데이터 로드 (2D 히트맵용)
-  useEffect(() => {
-    if (selectedStore && user) {
-      setLoading(true);
-      loadStoreFile(user.id, selectedStore.id, 'visits.csv')
-        .then(data => {
-          console.log(`${selectedStore.store_name} 방문 데이터:`, data.length, '건');
-          setVisitsData(data);
-          setLoading(false);
-        })
-        .catch(error => {
-          console.error('Failed to load visits data:', error);
-          setVisitsData([]);
-          setLoading(false);
-        });
-    }
-  }, [selectedStore, user, refreshKey]);
 
   // 시간대 애니메이션
   useEffect(() => {
@@ -71,7 +52,7 @@ const TrafficHeatmapPage = () => {
   }, [isPlaying]);
 
   const handleRefresh = () => {
-    setRefreshKey(prev => prev + 1);
+    refetch();
   };
 
   const handleReset = () => {
@@ -292,9 +273,7 @@ const TrafficHeatmapPage = () => {
 
           {/* 2D 히트맵 분석 */}
           <TabsContent value="analysis" className="space-y-6">
-            <div key={refreshKey}>
-              <TrafficHeatmap visitsData={visitsData} />
-            </div>
+            <TrafficHeatmap visitsData={visitsData} />
           </TabsContent>
           
           <TabsContent value="comparison">

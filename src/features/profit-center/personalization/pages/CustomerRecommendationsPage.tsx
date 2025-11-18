@@ -8,36 +8,26 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
-import { useAuth } from "@/hooks/useAuth";
-import { loadStoreDataset } from "@/utils/storageDataLoader";
+import { useStoreDataset } from "@/hooks/useStoreData";
 import { DataReadinessGuard } from "@/components/DataReadinessGuard";
 
 const CustomerRecommendationsPage = () => {
   const { selectedStore } = useSelectedStore();
-  const { user } = useAuth();
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [storeData, setStoreData] = useState<any>({});
-  const [loading, setLoading] = useState(false);
   const [customerSegments, setCustomerSegments] = useState<any[]>([]);
   const [realtimeRecommendations, setRealtimeRecommendations] = useState<any[]>([]);
   const [selectedSegment, setSelectedSegment] = useState<any>(null);
   const [behaviorData, setBehaviorData] = useState<any[]>([]);
+  
+  // 새로운 통합 Hook 사용
+  const { data: storeData, isLoading: loading, refetch } = useStoreDataset();
 
   useEffect(() => {
-    if (selectedStore && user) {
-      setLoading(true);
-      loadStoreDataset(user.id, selectedStore.id)
-        .then(data => {
-          setStoreData(data);
-          
-          if (data.customers && data.purchases && data.visits) {
-            const segments = generateCustomerSegments(data);
-            setCustomerSegments(segments);
-            if (segments.length > 0) {
-              setSelectedSegment(segments[0]);
-            }
-            
-            const behavior = segments.map((seg: any) => ({
+    if (storeData?.customers && storeData?.purchases && storeData?.visits) {
+      const segments = generateCustomerSegments(storeData);
+      setCustomerSegments(segments);
+      if (segments.length > 0) setSelectedSegment(segments[0]);
+      
+      const behavior = segments.map((seg: any) => ({
               segment: seg.name,
               구매력: (seg.avgSpend / 3000),
               방문빈도: seg.visitFrequency * 15,

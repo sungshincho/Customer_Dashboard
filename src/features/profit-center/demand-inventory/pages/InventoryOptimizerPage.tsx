@@ -12,44 +12,26 @@ import { AIAnalysisButton } from "@/features/data-management/analysis/components
 import { AnalysisHistory } from "@/features/data-management/analysis/components/AnalysisHistory";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
-import { useAuth } from "@/hooks/useAuth";
-import { loadStoreDataset } from "@/utils/storageDataLoader";
+import { useStoreDataset } from "@/hooks/useStoreData";
 import { Alert as AlertUI, AlertDescription } from "@/components/ui/alert";
 
 const InventoryOptimizerPage = () => {
   const { selectedStore } = useSelectedStore();
-  const { user } = useAuth();
-  const [refreshKey, setRefreshKey] = useState(0);
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
   const [historyRefresh, setHistoryRefresh] = useState(0);
-  const [storeData, setStoreData] = useState<any>({});
-  const [loading, setLoading] = useState(false);
-
-  // 매장 데이터 로드
-  useEffect(() => {
-    if (selectedStore && user) {
-      setLoading(true);
-      loadStoreDataset(user.id, selectedStore.id)
-        .then(data => {
-          setStoreData(data);
-          setLoading(false);
-        })
-        .catch(error => {
-          console.error('Failed to load store data:', error);
-          setLoading(false);
-        });
-    }
-  }, [selectedStore, user, refreshKey]);
+  
+  // 새로운 통합 Hook 사용
+  const { data: storeData, isLoading: loading, refetch } = useStoreDataset();
 
   const handleRefresh = () => {
-    setRefreshKey(prev => prev + 1);
+    refetch();
   };
 
   // 재고 통계 계산
-  const totalProducts = storeData.products?.length || 0;
-  const totalPurchases = storeData.purchases?.length || 0;
+  const totalProducts = storeData?.products?.length || 0;
+  const totalPurchases = storeData?.purchases?.length || 0;
   const turnoverRate = totalProducts > 0 ? (totalPurchases / totalProducts).toFixed(1) : '0';
 
   const insights: Insight[] = [
@@ -130,12 +112,10 @@ const InventoryOptimizerPage = () => {
               title="AI 재고 최적화 제안"
               onAnalysisComplete={() => setHistoryRefresh(prev => prev + 1)}
             />
-            <div key={refreshKey}>
               <InventoryOptimizer 
-                productsData={storeData.products}
-                purchasesData={storeData.purchases}
+                productsData={storeData?.products}
+                purchasesData={storeData?.purchases}
               />
-            </div>
           </TabsContent>
           
           <TabsContent value="comparison">
