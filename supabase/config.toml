@@ -36,3 +36,6 @@ verify_jwt = true
 [functions.auto-fix-data]
 verify_jwt = true
 
+[functions.cleanup-ontology-data]
+verify_jwt = true
+

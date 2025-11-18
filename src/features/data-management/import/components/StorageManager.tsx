@@ -211,6 +211,25 @@ export function StorageManager({ storeId }: StorageManagerProps) {
       for (const [bucket, paths] of filesByBucket.entries()) {
         console.log(`🗑️ Deleting from bucket "${bucket}":`, paths);
         
+        // store-data 버킷인 경우 온톨로지 데이터 정리
+        if (bucket === 'store-data') {
+          for (const filePath of paths) {
+            try {
+              const { error: cleanupError } = await supabase.functions.invoke('cleanup-ontology-data', {
+                body: { filePath }
+              });
+              
+              if (cleanupError) {
+                console.error('Ontology cleanup error:', cleanupError);
+              } else {
+                console.log('Ontology data cleaned for:', filePath);
+              }
+            } catch (cleanupErr) {
+              console.error('Cleanup failed:', cleanupErr);
+            }
+          }
+        }
+        
         const { data, error } = await supabase.storage
           .from(bucket)
           .remove(paths);

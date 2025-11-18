@@ -241,7 +241,39 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
         updateFileStatus(uploadFile.id, 'mapping', undefined, 50);
         const mappingResult = await runAutoMapping(uploadFile, rawData);
         
-        updateFileStatus(uploadFile.id, 'success', undefined, 100, mappingResult);
+        if (mappingResult && mappingResult.importId && storeId) {
+          // 자동 매핑 성공 시 ETL 자동 실행
+          try {
+            updateFileStatus(uploadFile.id, 'processing', '온톨로지 생성 중...', 75);
+            
+            const { data: etlResult, error: etlError } = await supabase.functions.invoke('schema-etl', {
+              body: {
+                import_id: mappingResult.importId,
+                store_id: storeId,
+                entity_mappings: mappingResult.entity_mappings || [],
+                relation_mappings: mappingResult.relation_mappings || []
+              }
+            });
+
+            if (etlError) throw etlError;
+            
+            updateFileStatus(uploadFile.id, 'success', undefined, 100, {
+              ...mappingResult,
+              autoMapped: true,
+              entitiesCreated: etlResult?.entities_created || 0,
+              relationsCreated: etlResult?.relations_created || 0
+            });
+          } catch (etlError) {
+            console.error('Auto ETL error:', etlError);
+            updateFileStatus(uploadFile.id, 'success', undefined, 100, {
+              ...mappingResult,
+              autoMapped: true,
+              etlFailed: true
+            });
+          }
+        } else {
+          updateFileStatus(uploadFile.id, 'success', undefined, 100, mappingResult);
+        }
         
       } else if (uploadFile.type === 'wifi') {
         // WiFi 데이터는 store-data 버킷에 업로드
