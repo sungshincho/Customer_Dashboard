@@ -6,6 +6,7 @@ import { Slider } from '@/components/ui/slider';
 import { Play, Pause, RotateCcw } from 'lucide-react';
 import { Store3DViewer } from '../components/Store3DViewer';
 import { WiFiTrackingOverlay } from '../components/overlays/WiFiTrackingOverlay';
+import { SampleDataDownloader } from '../components/SampleDataDownloader';
 import { filterByTimeRange, convertToHeatmapData, extractCustomerPaths, groupBySession, estimateUniqueVisitors } from '../utils/wifiDataProcessing';
 import { trilaterate } from '../utils/coordinateMapper';
 import type { TrackingData, SensorPosition } from '../types/iot.types';
@@ -129,6 +130,9 @@ export default function WiFiTrackingDemoPage() {
         <h1 className="text-3xl font-bold mb-2">WiFi Probe Request 시각화</h1>
         <p className="text-muted-foreground">라즈베리파이 WiFi 트래킹 데이터 3D 시각화</p>
       </div>
+
+      {/* 샘플 데이터 다운로드 */}
+      <SampleDataDownloader />
 
       {/* 통계 카드 */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
