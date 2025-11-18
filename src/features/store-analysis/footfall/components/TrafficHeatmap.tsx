@@ -66,28 +66,34 @@ const generateHeatmapData = (
 
   // WiFi 데이터가 없으면 방문 데이터 기반으로 생성
   const timeVisits = visitsData.filter((v: any) => {
-    const hour = v.visit_hour ? parseInt(v.visit_hour) : Math.floor(Math.random() * 14) + 9;
+    const hour = v.visit_hour ? parseInt(v.visit_hour) : 12;
     return Math.abs(hour - timeOfDay) <= 1;
   });
 
-  for (let x = 0; x < gridSize; x++) {
-    for (let y = 0; y < gridSize; y++) {
-      // Entrance area (top) has higher traffic
-      const entranceBoost = y < 3 ? 0.5 : 0;
-      // Center aisle has higher traffic
-      const aisleBoost = x > 7 && x < 12 ? 0.3 : 0;
-      // Time-based variation
-      const timeMultiplier = Math.sin((timeOfDay / 24) * Math.PI) * 0.5 + 0.5;
-      // Data-based boost
-      const dataBoost = timeVisits.length > 0 ? Math.min(0.4, timeVisits.length / visitsData.length) : 0;
-
-      const baseIntensity = Math.random() * 0.3;
-      const intensity = Math.min(
-        1,
-        (baseIntensity + entranceBoost + aisleBoost + dataBoost) * timeMultiplier
-      );
-
-      data.push({ x, y, intensity });
+  // 방문 데이터가 있으면 실제 데이터 기반으로 히트맵 생성
+  if (visitsData.length > 0) {
+    // 시간대별 방문자 수로 전체 밀도 계산
+    const timeMultiplier = timeVisits.length / Math.max(1, visitsData.length);
+    
+    for (let x = 0; x < gridSize; x++) {
+      for (let y = 0; y < gridSize; y++) {
+        // 입구 영역 (상단) - 방문 데이터 기반 밀도
+        const entranceBoost = y < 3 ? timeMultiplier * 0.6 : 0;
+        // 중앙 통로 - 이동 경로 밀도
+        const aisleBoost = (x > 7 && x < 12) ? timeMultiplier * 0.4 : 0;
+        // 상품 진열 구역 - 체류 시간 기반
+        const displayBoost = ((x < 7 || x > 12) && y > 3 && y < 17) ? timeMultiplier * 0.3 : 0;
+        
+        const intensity = Math.min(1, entranceBoost + aisleBoost + displayBoost);
+        data.push({ x, y, intensity });
+      }
+    }
+  } else {
+    // 데이터가 없으면 기본 패턴
+    for (let x = 0; x < gridSize; x++) {
+      for (let y = 0; y < gridSize; y++) {
+        data.push({ x, y, intensity: 0 });
+      }
     }
   }
 
@@ -113,6 +119,82 @@ export const TrafficHeatmap = ({
   useEffect(() => {
     setHeatmapData(generateHeatmapData(timeOfDay, visitsData, heatPoints));
   }, [timeOfDay, visitsData, heatPoints]);
+
+  // 실제 데이터 기반 시간대별 통계 계산
+  const timeSlotStats = useMemo(() => {
+    if (visitsData.length === 0) {
+      return {
+        morning: 0,
+        lunch: 0,
+        afternoon: 0,
+        evening: 0
+      };
+    }
+
+    const slots = {
+      morning: visitsData.filter((v: any) => {
+        const hour = v.visit_hour ? parseInt(v.visit_hour) : 12;
+        return hour >= 9 && hour < 12;
+      }).length,
+      lunch: visitsData.filter((v: any) => {
+        const hour = v.visit_hour ? parseInt(v.visit_hour) : 12;
+        return hour >= 12 && hour < 15;
+      }).length,
+      afternoon: visitsData.filter((v: any) => {
+        const hour = v.visit_hour ? parseInt(v.visit_hour) : 12;
+        return hour >= 15 && hour < 18;
+      }).length,
+      evening: visitsData.filter((v: any) => {
+        const hour = v.visit_hour ? parseInt(v.visit_hour) : 12;
+        return hour >= 18 && hour <= 23;
+      }).length,
+    };
+
+    // 비율로 변환 (최대값 대비)
+    const maxVisits = Math.max(slots.morning, slots.lunch, slots.afternoon, slots.evening, 1);
+    return {
+      morning: Math.round((slots.morning / maxVisits) * 100),
+      lunch: Math.round((slots.lunch / maxVisits) * 100),
+      afternoon: Math.round((slots.afternoon / maxVisits) * 100),
+      evening: Math.round((slots.evening / maxVisits) * 100),
+    };
+  }, [visitsData]);
+
+  // 실제 데이터 기반 인사이트 생성
+  const insight = useMemo(() => {
+    if (visitsData.length === 0) {
+      return "데이터가 없습니다. 방문 데이터를 업로드해주세요.";
+    }
+
+    const peakSlot = Object.entries(timeSlotStats).reduce((max, [key, value]) => 
+      value > max.value ? { key, value } : max
+    , { key: 'lunch', value: 0 });
+
+    const slotNames: Record<string, string> = {
+      morning: '오전(09-12시)',
+      lunch: '점심(12-15시)',
+      afternoon: '오후(15-18시)',
+      evening: '저녁(18-23시)'
+    };
+
+    const peakName = slotNames[peakSlot.key] || '점심시간';
+    
+    // 핫스팟 위치 분석
+    const hotspotCells = heatmapData.filter(d => d.intensity > 0.7);
+    let locationHint = "매장 전체에 고르게 분포";
+    
+    if (hotspotCells.length > 0) {
+      const avgX = hotspotCells.reduce((sum, cell) => sum + cell.x, 0) / hotspotCells.length;
+      const avgY = hotspotCells.reduce((sum, cell) => sum + cell.y, 0) / hotspotCells.length;
+      
+      if (avgY < 7) locationHint = "입구 근처에 집중";
+      else if (avgX > 12) locationHint = "우측 구역에 집중";
+      else if (avgX < 8) locationHint = "좌측 구역에 집중";
+      else locationHint = "중앙 통로에 집중";
+    }
+
+    return `${peakName} 트래픽 집중. ${locationHint}되어 있어 해당 구역에 인기 상품 배치를 권장합니다.`;
+  }, [visitsData, timeSlotStats, heatmapData]);
 
   const updateHeatmap = (newTime: number) => {
     setInternalTimeOfDay(newTime);
@@ -278,27 +360,34 @@ export const TrafficHeatmap = ({
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">오전 (09-12)</span>
-                <span className="font-medium">35%</span>
+                <span className={`font-medium ${timeSlotStats.morning === Math.max(timeSlotStats.morning, timeSlotStats.lunch, timeSlotStats.afternoon, timeSlotStats.evening) ? 'text-primary' : ''}`}>
+                  {timeSlotStats.morning}%
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">점심 (12-15)</span>
-                <span className="font-medium text-primary">72%</span>
+                <span className={`font-medium ${timeSlotStats.lunch === Math.max(timeSlotStats.morning, timeSlotStats.lunch, timeSlotStats.afternoon, timeSlotStats.evening) ? 'text-primary' : ''}`}>
+                  {timeSlotStats.lunch}%
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">오후 (15-18)</span>
-                <span className="font-medium">68%</span>
+                <span className={`font-medium ${timeSlotStats.afternoon === Math.max(timeSlotStats.morning, timeSlotStats.lunch, timeSlotStats.afternoon, timeSlotStats.evening) ? 'text-primary' : ''}`}>
+                  {timeSlotStats.afternoon}%
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">저녁 (18-23)</span>
-                <span className="font-medium">45%</span>
+                <span className={`font-medium ${timeSlotStats.evening === Math.max(timeSlotStats.morning, timeSlotStats.lunch, timeSlotStats.afternoon, timeSlotStats.evening) ? 'text-primary' : ''}`}>
+                  {timeSlotStats.evening}%
+                </span>
               </div>
             </div>
           </Card>
 
           <Card className="glass p-4 bg-primary/5 border-primary/20">
             <p className="text-xs">
-              <span className="font-semibold">인사이트:</span> 점심시간(12-15시) 트래픽 집중.
-              입구 우측 구역에 인기 상품 배치 권장.
+              <span className="font-semibold">인사이트:</span> {insight}
             </p>
           </Card>
         </div>
