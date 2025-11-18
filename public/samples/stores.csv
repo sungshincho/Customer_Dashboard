@@ -1,6 +1,0 @@
-store_id,store_name,location,city,district,manager_name,open_date,store_type,monthly_revenue,employee_count,floor_area_sqm,parking_available
-S001,URBANSTYLE 강남플래그십,서울 강남구 테헤란로 427,서울,강남구,김서현,2020-03-15,Flagship,125000000,18,380,Y
-S002,URBANSTYLE 잠실롯데백화점,서울 송파구 올림픽로 240,서울,송파구,이민준,2021-06-20,Department,82000000,12,280,Y
-S003,URBANSTYLE 홍대거리점,서울 마포구 양화로 160,서울,마포구,박지우,2022-02-10,Street,48000000,8,180,N
-S004,URBANSTYLE 파주아울렛,경기 파주시 탄현면 필승로 59,경기,파주시,최수아,2020-11-05,Outlet,58000000,10,320,Y
-S005,URBANSTYLE 성수팝업,서울 성동구 연무장길 84,서울,성동구,정현우,2023-09-01,Popup,32000000,6,120,N
