@@ -253,8 +253,25 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
         if (uploadError) throw uploadError;
         
         updateFileStatus(uploadFile.id, 'processing', undefined, 50);
-        // TODO: WiFi 데이터 자동 처리 로직
-        updateFileStatus(uploadFile.id, 'success', undefined, 100);
+        
+        // WiFi 데이터 자동 처리
+        const { data: processResult, error: processError } = await supabase.functions.invoke('process-wifi-data', {
+          body: {
+            filePath,
+            storeId
+          }
+        });
+
+        if (processError) throw processError;
+
+        if (processResult?.success) {
+          updateFileStatus(uploadFile.id, 'success', undefined, 100, {
+            processedCount: processResult.processedCount,
+            metadataGenerated: !!processResult.metadata
+          });
+        } else {
+          throw new Error(processResult?.error || 'WiFi 데이터 처리 실패');
+        }
         
       } else {
         throw new Error('지원하지 않는 파일 타입');
