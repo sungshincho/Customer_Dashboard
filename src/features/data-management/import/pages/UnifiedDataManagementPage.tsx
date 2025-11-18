@@ -58,27 +58,24 @@ export default function UnifiedDataManagementPage() {
         )}
 
         {/* 데이터 통계 대시보드 */}
-        <div className="grid md:grid-cols-2 gap-6">
-          <DataStatistics key={`stats-${refreshTrigger}`} storeId={selectedStore?.id} />
-          <IntegratedImportStatus key={`integration-${refreshTrigger}`} storeId={selectedStore?.id} />
-        </div>
+        <DataStatistics key={`stats-${refreshTrigger}`} storeId={selectedStore?.id} />
 
         {/* 메인 탭 */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="unified">
+          <TabsList className="inline-flex h-12 items-center justify-start rounded-lg bg-muted p-1 w-full overflow-x-auto">
+            <TabsTrigger value="unified" className="flex-shrink-0">
               <Upload className="w-4 h-4 mr-2" />
               통합 업로드
             </TabsTrigger>
-            <TabsTrigger value="validation">
+            <TabsTrigger value="validation" className="flex-shrink-0">
               <CheckCircle2 className="w-4 h-4 mr-2" />
               유효성 검사
             </TabsTrigger>
-            <TabsTrigger value="storage">
+            <TabsTrigger value="storage" className="flex-shrink-0">
               <Database className="w-4 h-4 mr-2" />
               스토리지
             </TabsTrigger>
-            <TabsTrigger value="ontology">
+            <TabsTrigger value="ontology" className="flex-shrink-0">
               <Network className="w-4 h-4 mr-2" />
               온톨로지
             </TabsTrigger>
@@ -111,6 +108,9 @@ export default function UnifiedDataManagementPage() {
             <OntologyDataManagement key={`ontology-${refreshTrigger}`} storeId={selectedStore?.id} />
           </TabsContent>
         </Tabs>
+
+        {/* 데이터 통합 상태 */}
+        <IntegratedImportStatus key={`integration-${refreshTrigger}`} storeId={selectedStore?.id} />
       </div>
     </DashboardLayout>
   );
