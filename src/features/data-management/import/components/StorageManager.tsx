@@ -132,151 +132,112 @@ export function StorageManager({ storeId }: StorageManagerProps) {
   };
 
   const handleDeleteFile = async (bucket: string, path: string, name: string) => {
-    if (!confirm(`"${name}" 파일을 삭제하시겠습니까?`)) return;
+    if (!confirm(`"${name}" 파일 및 관련 데이터를 삭제하시겠습니까?`)) return;
 
     try {
-      console.log(`🗑️ Deleting file from bucket "${bucket}": ${path}`);
+      setLoading(true);
       
-      // 삭제 전 URL 저장 (엔티티 참조 정리용)
-      const { data: { publicUrl } } = supabase.storage
-        .from(bucket)
-        .getPublicUrl(path);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
 
-      const { data, error } = await supabase.storage
-        .from(bucket)
-        .remove([path]);
+      // 통합 삭제 Edge Function 호출
+      const { data, error } = await supabase.functions.invoke('cleanup-integrated-data', {
+        body: { filePaths: [path] },
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
 
-      if (error) {
-        console.error(`❌ Delete error:`, error);
-        throw error;
-      }
-
-      console.log(`✅ Successfully deleted:`, data);
-
-      // 3D 모델 파일인 경우 엔티티 참조 정리
-      if (bucket === '3d-models' && (name.endsWith('.glb') || name.endsWith('.gltf'))) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user && publicUrl) {
-          const { cleanupEntityReferences } = await import('@/features/digital-twin/utils/cleanupEntityReferences');
-          const result = await cleanupEntityReferences(publicUrl, user.id);
-          
-          if (result.success && (result.entityTypesUpdated > 0 || result.entitiesUpdated > 0)) {
-            console.log(`🧹 Cleaned up ${result.entityTypesUpdated} entity types and ${result.entitiesUpdated} instances`);
-          }
-        }
-      }
+      if (error) throw error;
 
       toast({
-        title: "파일 삭제 완료",
-        description: `${name}이 삭제되었습니다`,
+        title: "통합 삭제 완료",
+        description: `${name} 및 관련 데이터 삭제 완료 (엔티티: ${data.entitiesDeleted}, 관계: ${data.relationsDeleted})`,
       });
 
       await loadAllFiles();
     } catch (error: any) {
-      console.error(`❌ Delete failed:`, error);
+      console.error('Delete error:', error);
       toast({
         title: "삭제 실패",
-        description: error.message || "파일 삭제 권한이 없거나 파일을 찾을 수 없습니다",
+        description: error.message || "파일 삭제 중 오류가 발생했습니다",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleBulkDelete = async () => {
     if (selectedFiles.size === 0) return;
     
-    if (!confirm(`선택한 ${selectedFiles.size}개의 파일을 삭제하시겠습니까?`)) return;
+    if (!confirm(`선택한 ${selectedFiles.size}개 파일 및 관련 데이터를 삭제하시겠습니까?`)) return;
 
     setLoading(true);
     try {
-      const filesByBucket = new Map<string, string[]>();
-      const urlsToCleanup: string[] = [];
-      
-      files.forEach(file => {
-        if (selectedFiles.has(file.path)) {
-          const paths = filesByBucket.get(file.bucket) || [];
-          paths.push(file.path);
-          filesByBucket.set(file.bucket, paths);
-          
-          // 3D 모델 파일인 경우 URL 저장
-          if (file.bucket === '3d-models' && (file.name.endsWith('.glb') || file.name.endsWith('.gltf'))) {
-            urlsToCleanup.push(file.url);
-          }
-        }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      const filePaths = Array.from(selectedFiles);
+
+      // 통합 삭제 Edge Function 호출
+      const { data, error } = await supabase.functions.invoke('cleanup-integrated-data', {
+        body: { filePaths },
+        headers: { Authorization: `Bearer ${session.access_token}` }
       });
 
-      let successCount = 0;
-      let failedFiles: string[] = [];
+      if (error) throw error;
 
-      for (const [bucket, paths] of filesByBucket.entries()) {
-        console.log(`🗑️ Deleting from bucket "${bucket}":`, paths);
-        
-        // store-data 버킷인 경우 온톨로지 데이터 정리
-        if (bucket === 'store-data') {
-          for (const filePath of paths) {
-            try {
-              const { error: cleanupError } = await supabase.functions.invoke('cleanup-ontology-data', {
-                body: { filePath }
-              });
-              
-              if (cleanupError) {
-                console.error('Ontology cleanup error:', cleanupError);
-              } else {
-                console.log('Ontology data cleaned for:', filePath);
-              }
-            } catch (cleanupErr) {
-              console.error('Cleanup failed:', cleanupErr);
-            }
-          }
-        }
-        
-        const { data, error } = await supabase.storage
-          .from(bucket)
-          .remove(paths);
-        
-        if (error) {
-          console.error(`❌ Delete error in bucket "${bucket}":`, error);
-          failedFiles.push(`${bucket}: ${error.message}`);
-        } else {
-          console.log(`✅ Successfully deleted from "${bucket}":`, data);
-          successCount += paths.length;
-        }
-      }
-
-      // 3D 모델 파일에 대한 엔티티 참조 정리
-      if (urlsToCleanup.length > 0) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { cleanupEntityReferences } = await import('@/features/digital-twin/utils/cleanupEntityReferences');
-          
-          for (const url of urlsToCleanup) {
-            await cleanupEntityReferences(url, user.id);
-          }
-          
-          console.log(`🧹 Cleaned up entity references for ${urlsToCleanup.length} models`);
-        }
-      }
-
-      if (failedFiles.length > 0) {
-        toast({
-          title: "일부 파일 삭제 실패",
-          description: `성공: ${successCount}개, 실패: ${failedFiles.length}개\n${failedFiles.join('\n')}`,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "일괄 삭제 완료",
-          description: `${successCount}개 파일이 삭제되었습니다`,
-        });
-      }
+      toast({
+        title: "일괄 삭제 완료",
+        description: `${data.storageFilesDeleted}개 파일 및 관련 데이터 삭제 (엔티티: ${data.entitiesDeleted}, 관계: ${data.relationsDeleted})`,
+      });
 
       setSelectedFiles(new Set());
       await loadAllFiles();
     } catch (error: any) {
-      console.error(`❌ Bulk delete failed:`, error);
+      console.error('Bulk delete error:', error);
       toast({
         title: "삭제 실패",
         description: error.message || "파일 삭제 중 오류가 발생했습니다",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteAllData = async () => {
+    if (!confirm("⚠️ 모든 데이터를 삭제하시겠습니까?\n\n삭제 항목:\n- 스토리지 파일 (CSV, 3D 모델)\n- 데이터베이스 엔티티 및 관계\n- 3D 씬\n- 업로드 기록\n\n이 작업은 되돌릴 수 없습니다.")) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      // 전체 데이터 삭제
+      const { data, error } = await supabase.functions.invoke('cleanup-integrated-data', {
+        body: { 
+          deleteAllData: true,
+          storeId: storeId || undefined
+        },
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "전체 데이터 초기화 완료",
+        description: `스토리지: ${data.storageFilesDeleted}개, 엔티티: ${data.entitiesDeleted}개, 관계: ${data.relationsDeleted}개, 씬: ${data.scenesDeleted}개`,
+      });
+
+      setSelectedFiles(new Set());
+      await loadAllFiles();
+    } catch (error: any) {
+      console.error('Delete all error:', error);
+      toast({
+        title: "초기화 실패",
+        description: error.message || "데이터 초기화 중 오류가 발생했습니다",
         variant: "destructive",
       });
     } finally {
@@ -371,11 +332,25 @@ export function StorageManager({ storeId }: StorageManagerProps) {
               variant="destructive"
               size="sm"
               onClick={handleBulkDelete}
+              disabled={loading}
             >
               <Trash2 className="w-4 h-4 mr-2" />
               삭제 ({selectedFiles.size})
             </Button>
           )}
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={handleDeleteAllData}
+            disabled={loading}
+          >
+            {loading ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Trash2 className="w-4 h-4 mr-2" />
+            )}
+            전체 초기화
+          </Button>
         </div>
 
         {/* 통계 */}
