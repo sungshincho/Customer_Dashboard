@@ -179,28 +179,65 @@ export function CSVDataImport({ storeId }: CSVDataImportProps) {
       const parsedData = await parseFile(file);
       const detectedType = dataType || detectDataType(parsedData[0]);
 
-      const { error: dbError } = await supabase
+      // user_data_imports에 저장
+      const { data: importRecord, error: dbError } = await supabase
         .from("user_data_imports")
         .insert({
           user_id: user.id,
           store_id: storeId,
-          file_name: fileName, // 실제 Storage 파일명 저장
+          file_name: fileName,
+          file_path: filePath,
           file_type: file.name.split(".").pop(),
           data_type: detectedType,
           raw_data: parsedData,
           row_count: parsedData.length,
-        });
+        })
+        .select()
+        .single();
 
       if (dbError) throw dbError;
 
-      toast({
-        title: "업로드 완료",
-        description: `${parsedData.length}개 행이 업로드되었습니다`,
-      });
+      // 온톨로지 통합: 자동으로 엔티티 생성
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session && importRecord) {
+        try {
+          const { data: ontologyResult, error: ontologyError } = await supabase.functions.invoke(
+            'import-with-ontology',
+            {
+              body: { 
+                importId: importRecord.id,
+                createEntities: true
+              },
+              headers: { Authorization: `Bearer ${session.access_token}` }
+            }
+          );
+
+          if (ontologyError) {
+            console.error('Ontology creation error:', ontologyError);
+            toast({
+              title: "온톨로지 생성 경고",
+              description: "파일은 업로드되었으나 엔티티 생성 중 오류가 발생했습니다.",
+              variant: "destructive",
+            });
+          } else if (ontologyResult) {
+            toast({
+              title: "통합 업로드 완료",
+              description: `${parsedData.length}개 행 업로드 및 ${ontologyResult.entitiesCreated}개 엔티티, ${ontologyResult.relationsCreated}개 관계 생성`,
+            });
+          }
+        } catch (ontologyErr) {
+          console.error('Ontology error:', ontologyErr);
+        }
+      } else {
+        toast({
+          title: "업로드 완료",
+          description: `${parsedData.length}개 행이 업로드되었습니다`,
+        });
+      }
 
       setFile(null);
       setDataType("");
-      loadStorageFiles(); // 파일 목록 새로고침
+      loadStorageFiles();
     } catch (error: any) {
       toast({
         title: "업로드 실패",
