@@ -6,22 +6,22 @@ import { Slider } from '@/components/ui/slider';
 import { Play, Pause, RotateCcw } from 'lucide-react';
 import { Store3DViewer } from '../components/Store3DViewer';
 import { WiFiTrackingOverlay } from '../components/overlays/WiFiTrackingOverlay';
-import { loadWiFiTrackingData, filterByTimeRange, convertToHeatmapData, extractCustomerPaths, groupBySession, estimateUniqueVisitors } from '@/utils/wifiDataLoader';
+import { filterByTimeRange, convertToHeatmapData, extractCustomerPaths, groupBySession, estimateUniqueVisitors } from '../utils/wifiDataProcessing';
 import { trilaterate } from '../utils/coordinateMapper';
 import type { TrackingData, SensorPosition } from '../types/iot.types';
-import { useAuth } from '@/hooks/useAuth';
+import { useWiFiTracking } from '@/hooks/useWiFiTracking';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { useStoreScene } from '@/hooks/useStoreScene';
 
 export default function WiFiTrackingDemoPage() {
-  const { user } = useAuth();
   const { selectedStore } = useSelectedStore();
   const { activeScene } = useStoreScene();
+  const { zones, trackingData, loading } = useWiFiTracking(selectedStore?.id);
   
-  const [sensors, setSensors] = useState<SensorPosition[]>([]);
-  const [trackingData, setTrackingData] = useState<TrackingData[]>([]);
+  // zones를 sensors로 사용 (SensorPosition 타입 호환)
+  const sensors = zones;
+  
   const [processedData, setProcessedData] = useState<TrackingData[]>([]);
-  const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<'realtime' | 'heatmap' | 'paths'>('realtime');
   
   // 재생 컨트롤
@@ -29,55 +29,41 @@ export default function WiFiTrackingDemoPage() {
   const [currentTime, setCurrentTime] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
 
-  // 데이터 로드
+  // 데이터 처리
   useEffect(() => {
-    loadData();
-  }, [user, selectedStore]);
-
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const data = await loadWiFiTrackingData(
-        user?.id,
-        selectedStore?.id
+    if (!trackingData || trackingData.length === 0) {
+      setProcessedData([]);
+      return;
+    }
+    
+    // 좌표가 없는 데이터는 Trilateration으로 추정
+    const processed = trackingData.map(point => {
+      if (point.x !== undefined && point.z !== undefined) {
+        return point;
+      }
+      
+      // 같은 시간대의 다른 센서 데이터 찾기
+      const relatedData = trackingData.filter(
+        d => d.customer_id === point.customer_id &&
+             Math.abs(d.timestamp - point.timestamp) < 2000
       );
       
-      setSensors(data.sensors);
-      setTrackingData(data.trackingData);
+      const position = trilaterate(relatedData, sensors);
       
-      // 좌표가 없는 데이터는 Trilateration으로 추정
-      const processed = data.trackingData.map(point => {
-        if (point.x !== undefined && point.z !== undefined) {
-          return point;
-        }
-        
-        // 같은 시간대의 다른 센서 데이터 찾기
-        const relatedData = data.trackingData.filter(
-          d => d.customer_id === point.customer_id &&
-               Math.abs(d.timestamp - point.timestamp) < 2000
-        );
-        
-        const position = trilaterate(relatedData, data.sensors);
-        
-        return {
-          ...point,
-          x: position?.x || 5,
-          z: position?.z || 5,
-          accuracy: position?.accuracy || 10
-        };
-      });
-      
-      setProcessedData(processed);
-      
-      if (processed.length > 0) {
-        setCurrentTime(processed[0].timestamp);
-      }
-    } catch (error) {
-      console.error('WiFi 데이터 로드 실패:', error);
-    } finally {
-      setLoading(false);
+      return {
+        ...point,
+        x: position?.x || 5,
+        z: position?.z || 5,
+        accuracy: position?.accuracy || 10
+      };
+    });
+    
+    setProcessedData(processed);
+    
+    if (processed.length > 0) {
+      setCurrentTime(processed[0].timestamp);
     }
-  };
+  }, [trackingData, sensors]);
 
   // 재생 애니메이션
   useEffect(() => {
