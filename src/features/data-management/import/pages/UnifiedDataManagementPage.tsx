@@ -6,7 +6,8 @@ import {
   Upload, 
   History, 
   Network,
-  Database
+  Database,
+  CheckCircle2
 } from "lucide-react";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { useToast } from "@/hooks/use-toast";
@@ -17,6 +18,7 @@ import { StorageManager } from "../components/StorageManager";
 import { OntologyDataManagement } from "../components/OntologyDataManagement";
 import { DataImportHistory } from "../components/DataImportHistory";
 import { DataStatistics } from "../components/DataStatistics";
+import { DataValidation } from "../components/DataValidation";
 
 export default function UnifiedDataManagementPage() {
   const { selectedStore } = useSelectedStore();
@@ -51,10 +53,14 @@ export default function UnifiedDataManagementPage() {
 
         {/* 메인 탭 */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="unified">
               <Upload className="w-4 h-4 mr-2" />
               통합 업로드
+            </TabsTrigger>
+            <TabsTrigger value="validation">
+              <CheckCircle2 className="w-4 h-4 mr-2" />
+              유효성 검사
             </TabsTrigger>
             <TabsTrigger value="storage">
               <Database className="w-4 h-4 mr-2" />
@@ -81,6 +87,11 @@ export default function UnifiedDataManagementPage() {
                 });
               }}
             />
+          </TabsContent>
+
+          {/* 유효성 검사 탭 */}
+          <TabsContent value="validation" className="space-y-6">
+            <DataValidation storeId={selectedStore?.id} />
           </TabsContent>
 
           {/* 스토리지 관리 탭 */}
