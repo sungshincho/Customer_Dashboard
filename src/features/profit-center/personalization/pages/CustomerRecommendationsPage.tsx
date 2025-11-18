@@ -45,20 +45,46 @@ const CustomerRecommendationsPage = () => {
     if (!data.customers || data.customers.length === 0) return [];
     
     const totalCustomers = data.customers.length;
+    const purchases = data.purchases || [];
+    const visits = data.visits || [];
     
-    return [
+    // 고객별 구매/방문 데이터 집계
+    const customerStats = data.customers.map((customer: any) => {
+      const customerPurchases = purchases.filter((p: any) => p.customer_id === customer.customer_id || p.customer_id === customer.id);
+      const customerVisits = visits.filter((v: any) => v.customer_id === customer.customer_id || v.customer_id === customer.id);
+      
+      const totalSpend = customerPurchases.reduce((sum: number, p: any) => 
+        sum + (parseFloat(p.total_amount || p.amount) || 0), 0);
+      const avgSpend = customerPurchases.length > 0 ? totalSpend / customerPurchases.length : 0;
+      const visitCount = customerVisits.length;
+      const purchaseCount = customerPurchases.length;
+      const conversionRate = visitCount > 0 ? (purchaseCount / visitCount) * 100 : 0;
+      const avgDwellTime = customerVisits.length > 0 
+        ? customerVisits.reduce((sum: number, v: any) => sum + (parseInt(v.dwell_time) || 0), 0) / customerVisits.length
+        : 0;
+      
+      return { customer, avgSpend, visitCount, conversionRate, avgDwellTime, purchaseCount };
+    });
+    
+    // 세그먼트 분류
+    const premium = customerStats.filter(s => s.avgSpend > 200000).slice(0, Math.ceil(totalCustomers * 0.15));
+    const trend = customerStats.filter(s => s.visitCount > 3 && s.avgSpend > 80000 && s.avgSpend <= 200000).slice(0, Math.ceil(totalCustomers * 0.28));
+    const value = customerStats.filter(s => s.avgSpend <= 80000 && s.conversionRate > 40).slice(0, Math.ceil(totalCustomers * 0.4));
+    const impulse = customerStats.filter(s => s.visitCount > 4 && s.avgDwellTime < 20).slice(0, Math.ceil(totalCustomers * 0.17));
+    
+    const segments = [
       {
         id: 1,
         name: "프리미엄 구매자",
-        size: Math.floor(totalCustomers * 0.15),
-        avgSpend: 285000,
-        visitFrequency: 2.5,
-        conversionRate: 68,
+        size: premium.length,
+        avgSpend: premium.length > 0 ? Math.round(premium.reduce((sum, s) => sum + s.avgSpend, 0) / premium.length) : 285000,
+        visitFrequency: premium.length > 0 ? Math.round((premium.reduce((sum, s) => sum + s.visitCount, 0) / premium.length) * 10) / 10 : 2.5,
+        conversionRate: premium.length > 0 ? Math.round(premium.reduce((sum, s) => sum + s.conversionRate, 0) / premium.length) : 68,
         preferredCategories: ["가죽 제품", "프리미엄 운동화"],
-        behaviorPattern: "매장 후반부 집중, 30분+ 체류",
+        behaviorPattern: `평균 ${premium.length > 0 ? Math.round(premium.reduce((sum, s) => sum + s.avgDwellTime, 0) / premium.length) : 30}분 체류`,
         recommendedProducts: data.products?.slice(0, 3).map((p: any) => ({
           name: p.product_name || p.name,
-          confidence: 90 + Math.floor(Math.random() * 10),
+          confidence: 90,
           reason: "세그먼트 선호도 매칭"
         })) || [],
         marketingStrategy: "VIP 프로그램, 신상품 우선 공개"
@@ -66,15 +92,15 @@ const CustomerRecommendationsPage = () => {
       {
         id: 2,
         name: "트렌드 추종자",
-        size: Math.floor(totalCustomers * 0.28),
-        avgSpend: 125000,
-        visitFrequency: 4.2,
-        conversionRate: 45,
+        size: trend.length,
+        avgSpend: trend.length > 0 ? Math.round(trend.reduce((sum, s) => sum + s.avgSpend, 0) / trend.length) : 125000,
+        visitFrequency: trend.length > 0 ? Math.round((trend.reduce((sum, s) => sum + s.visitCount, 0) / trend.length) * 10) / 10 : 4.2,
+        conversionRate: trend.length > 0 ? Math.round(trend.reduce((sum, s) => sum + s.conversionRate, 0) / trend.length) : 45,
         preferredCategories: ["캐주얼 의류", "스니커즈"],
-        behaviorPattern: "입구 진열 집중, SNS 체크 빈번",
+        behaviorPattern: `평균 ${trend.length > 0 ? Math.round(trend.reduce((sum, s) => sum + s.avgDwellTime, 0) / trend.length) : 25}분 체류`,
         recommendedProducts: data.products?.slice(3, 6).map((p: any) => ({
           name: p.product_name || p.name,
-          confidence: 85 + Math.floor(Math.random() * 10),
+          confidence: 85,
           reason: "트렌드 매칭"
         })) || [],
         marketingStrategy: "SNS 이벤트, 인플루언서 협업"
@@ -82,55 +108,82 @@ const CustomerRecommendationsPage = () => {
       {
         id: 3,
         name: "가치 중시형",
-        size: Math.floor(totalCustomers * 0.4),
-        avgSpend: 68000,
-        visitFrequency: 2.8,
-        conversionRate: 52,
+        size: value.length,
+        avgSpend: value.length > 0 ? Math.round(value.reduce((sum, s) => sum + s.avgSpend, 0) / value.length) : 68000,
+        visitFrequency: value.length > 0 ? Math.round((value.reduce((sum, s) => sum + s.visitCount, 0) / value.length) * 10) / 10 : 2.8,
+        conversionRate: value.length > 0 ? Math.round(value.reduce((sum, s) => sum + s.conversionRate, 0) / value.length) : 52,
         preferredCategories: ["베이직 의류", "할인 상품"],
-        behaviorPattern: "할인 섹션 우선 방문",
+        behaviorPattern: `평균 ${value.length > 0 ? Math.round(value.reduce((sum, s) => sum + s.avgDwellTime, 0) / value.length) : 20}분 체류`,
         recommendedProducts: data.products?.slice(6, 9).map((p: any) => ({
           name: p.product_name || p.name,
-          confidence: 85 + Math.floor(Math.random() * 10),
-          reason: "실용성 중시"
+          confidence: 85,
+          reason: "가격 대비 가치"
         })) || [],
-        marketingStrategy: "번들 할인, 멤버십 포인트"
+        marketingStrategy: "할인 쿠폰, 멤버십 혜택"
       },
       {
         id: 4,
-        name: "충동 구매자",
-        size: Math.floor(totalCustomers * 0.17),
-        avgSpend: 95000,
-        visitFrequency: 5.5,
-        conversionRate: 38,
-        preferredCategories: ["소품", "액세서리"],
-        behaviorPattern: "매장 전체 탐색",
+        name: "충동 구매형",
+        size: impulse.length,
+        avgSpend: impulse.length > 0 ? Math.round(impulse.reduce((sum, s) => sum + s.avgSpend, 0) / impulse.length) : 95000,
+        visitFrequency: impulse.length > 0 ? Math.round((impulse.reduce((sum, s) => sum + s.visitCount, 0) / impulse.length) * 10) / 10 : 5.8,
+        conversionRate: impulse.length > 0 ? Math.round(impulse.reduce((sum, s) => sum + s.conversionRate, 0) / impulse.length) : 38,
+        preferredCategories: ["신상품", "한정 상품"],
+        behaviorPattern: `평균 ${impulse.length > 0 ? Math.round(impulse.reduce((sum, s) => sum + s.avgDwellTime, 0) / impulse.length) : 15}분 체류`,
         recommendedProducts: data.products?.slice(9, 12).map((p: any) => ({
           name: p.product_name || p.name,
-          confidence: 80 + Math.floor(Math.random() * 10),
-          reason: "충동 구매 패턴"
+          confidence: 80,
+          reason: "신상품/한정판"
         })) || [],
-        marketingStrategy: "계산대 근처 진열"
+        marketingStrategy: "긴급 할인, 타임세일"
       }
     ];
+    
+    return segments.filter(s => s.size > 0);
   };
 
   const generateRealtimeRecommendations = (data: any) => {
     if (!data.visits || data.visits.length === 0) return [];
     
-    const segments = ["프리미엄 구매자", "트렌드 추종자", "가치 중시형"];
+    const purchases = data.purchases || [];
+    const recentVisits = data.visits.slice(-20);
     
-    return data.visits.slice(0, 5).map((visit: any, index: number) => ({
-      customer: `고객 #${visit.customer_id || index + 1000}`,
-      segment: segments[index % segments.length],
-      currentLocation: "매장 내",
-      dwellTime: parseInt(visit.dwell_time) || 10,
-      recommendedAction: index % 2 === 0 ? "VIP 라운지 안내" : "상품 추천",
-      products: data.products?.slice(index, index + 2).map((p: any) => 
-        `${p.product_name || p.name} (₩${parseFloat(p.price).toLocaleString()})`
-      ) || [],
-      expectedRevenue: 100000 + Math.floor(Math.random() * 400000),
-      confidence: 80 + Math.floor(Math.random() * 20)
-    }));
+    return recentVisits.map((visit: any, idx: number) => {
+      const dwellTime = parseInt(visit.dwell_time) || 5;
+      const customerPurchases = purchases.filter((p: any) => p.customer_id === visit.customer_id);
+      const avgPurchase = customerPurchases.length > 0 
+        ? customerPurchases.reduce((sum: number, p: any) => sum + (parseFloat(p.total_amount || p.amount) || 0), 0) / customerPurchases.length
+        : 50000;
+      
+      let predictedIntent = "둘러보는 중";
+      let recommendedAction = "상품 추천";
+      let priority = "low";
+      let confidence = 60;
+      
+      if (dwellTime > 20) {
+        predictedIntent = "구매 고려중";
+        recommendedAction = "프로모션 알림";
+        priority = "high";
+        confidence = 85;
+      } else if (dwellTime > 10) {
+        predictedIntent = "목적 상품 찾는 중";
+        recommendedAction = "직원 안내";
+        priority = "medium";
+        confidence = 75;
+      }
+      
+      return {
+        id: idx + 1,
+        customerId: visit.customer_id || `Customer-${idx + 1}`,
+        currentZone: visit.zone_name || visit.location || "입구",
+        dwellTime,
+        predictedIntent,
+        recommendedAction,
+        priority,
+        estimatedValue: Math.round(avgPurchase),
+        confidence
+      };
+    });
   };
 
   const handleRefresh = () => {
