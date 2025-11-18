@@ -42,10 +42,11 @@ export function DataStatistics({ storeId }: DataStatisticsProps) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // CSV 임포트 수
+      // CSV 임포트 수 (3D 모델 제외)
       let csvQuery = supabase
         .from('user_data_imports')
-        .select('id', { count: 'exact', head: true });
+        .select('id', { count: 'exact', head: true })
+        .neq('data_type', '3d_model');
       
       if (storeId) csvQuery = csvQuery.eq('store_id', storeId);
       const { count: csvCount } = await csvQuery;
