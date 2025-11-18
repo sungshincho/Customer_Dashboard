@@ -39,11 +39,53 @@ const LayoutSimulatorPage = () => {
     ? (storeData.visits.reduce((sum: number, v: any) => sum + (parseInt(v.dwell_time) || 0), 0) / totalVisits).toFixed(0)
     : '0';
 
-  const insights: Insight[] = [
-    { type: "trend", title: "레이아웃 효율성", description: `${selectedStore?.store_name || '매장'}의 현재 레이아웃이 전월 대비 15% 더 효율적입니다.`, impact: "high" },
-    { type: "recommendation", title: "동선 최적화", description: "계산대를 중앙으로 이동하면 대기 시간이 감소합니다.", impact: "high" },
-    { type: "warning", title: "공간 활용", description: "매장 후면 공간이 저활용되고 있습니다.", impact: "medium" }
-  ];
+  // 실제 데이터 기반 인사이트 생성
+  const insights: Insight[] = [];
+  
+  if (storeData.visits && storeData.visits.length > 0) {
+    const zones = storeData.visits.reduce((acc: any, v: any) => {
+      const zone = v.zone_name || v.location || '미분류';
+      acc[zone] = (acc[zone] || 0) + 1;
+      return acc;
+    }, {});
+    
+    const sortedZones = Object.entries(zones).sort((a: any, b: any) => b[1] - a[1]);
+    const totalVisits = storeData.visits.length;
+    
+    if (sortedZones.length > 0) {
+      const topZone = sortedZones[0];
+      const topZonePercent = Math.round((topZone[1] as number / totalVisits) * 100);
+      insights.push({
+        type: "trend",
+        title: "인기 구역 분석",
+        description: `'${topZone[0]}' 구역이 전체 방문의 ${topZonePercent}%를 차지합니다.`,
+        impact: "high"
+      });
+    }
+    
+    if (sortedZones.length > 1) {
+      const lowZone = sortedZones[sortedZones.length - 1];
+      const lowZonePercent = Math.round((lowZone[1] as number / totalVisits) * 100);
+      if (lowZonePercent < 10) {
+        insights.push({
+          type: "warning",
+          title: "저활용 구역 발견",
+          description: `'${lowZone[0]}' 구역은 방문율이 ${lowZonePercent}%로 낮습니다. 레이아웃 개선이 필요합니다.`,
+          impact: "medium"
+        });
+      }
+    }
+    
+    const avgDwell = storeData.visits.reduce((sum: number, v: any) => sum + (parseInt(v.dwell_time) || 0), 0) / totalVisits;
+    if (avgDwell > 20) {
+      insights.push({
+        type: "recommendation",
+        title: "동선 최적화",
+        description: `평균 체류시간 ${Math.round(avgDwell)}분. 주요 동선을 단순화하면 쇼핑 경험이 개선됩니다.`,
+        impact: "high"
+      });
+    }
+  }
 
   const comparisonData = [
     { label: "고객 동선 효율", current: 92, previous: 85, unit: "%" },
