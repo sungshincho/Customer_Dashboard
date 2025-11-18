@@ -39,11 +39,12 @@ export function IntegratedImportStatus({ storeId }: IntegratedImportStatusProps)
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // 1. 전체 임포트 수
+      // 1. CSV 임포트 수 (3D 모델 제외)
       let importQuery = supabase
         .from('user_data_imports')
         .select('id, file_path', { count: 'exact' })
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .neq('data_type', '3d_model');
       
       if (storeId) importQuery = importQuery.eq('store_id', storeId);
       
