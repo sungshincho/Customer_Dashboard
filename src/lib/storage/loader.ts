@@ -35,7 +35,23 @@ export async function loadFileFromStorage<T = any[]>(
       .download(path);
     
     if (error) {
-      throw error;
+      // 404는 정상적인 "데이터 없음" 상태로 처리
+      const isNotFound = error.message?.includes('not found') || 
+                        error.message?.includes('404') ||
+                        error.name === 'StorageUnknownError';
+      
+      if (isNotFound) {
+        console.info(`No data file found: ${fileName} (this is normal for empty state)`);
+      } else {
+        console.error(`Failed to load ${fileName}:`, error);
+      }
+      
+      return {
+        data: [] as T,
+        source: 'storage',
+        loadedAt: Date.now(),
+        error: isNotFound ? undefined : error.message
+      };
     }
     
     // 파일 타입별 파싱
