@@ -91,7 +91,7 @@ const Dashboard = () => {
           </p>
         </div>
 
-        {storeData.visits?.length > 0 && (
+        {storeData?.visits?.length && storeData.visits.length > 0 && (
           <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
             <AlertCircle className="h-4 w-4 text-blue-600" />
             <AlertDescription>
