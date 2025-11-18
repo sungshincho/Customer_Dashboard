@@ -204,7 +204,9 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
         
         updateFileStatus(uploadFile.id, 'processing', undefined, 50);
         
-        // 자동 처리 (AI 분석 + 엔티티 타입 생성/매핑 + 인스턴스 생성)
+        // 자동 처리 (AI 분석 + 엔티티 타입 생성/매핑)
+        updateFileStatus(uploadFile.id, 'processing', 'AI 분석 중...', 60);
+        
         try {
           const { data: processResult, error: processError } = await supabase.functions.invoke('auto-process-3d-models', {
             body: {
@@ -221,7 +223,7 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
           if (processResult?.success) {
             const result = processResult.results?.[0];
             
-            // user_data_imports에 기록 추가 (히스토리 표시용)
+            // user_data_imports에 기록 추가
             await supabase.from('user_data_imports').insert({
               user_id: user.id,
               store_id: storeId,
@@ -238,11 +240,27 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
               }
             });
             
+            // 온톨로지 연결 (엔티티 타입에 3D 모델 URL 연결)
+            updateFileStatus(uploadFile.id, 'processing', '온톨로지 연결 중...', 80);
+            
+            const { data: linkResult, error: linkError } = await supabase.functions.invoke('import-with-ontology', {
+              body: {
+                modelUrl: publicUrl,
+                entityTypeName: result?.entityType,
+                autoCreateEntityType: true
+              }
+            });
+            
+            if (linkError) {
+              console.warn('Failed to link 3D model to ontology:', linkError);
+            }
+            
             updateFileStatus(uploadFile.id, 'success', undefined, 100, {
               autoMapped: true,
               entityType: result?.entityType || '자동 생성됨',
               instanceLabel: result?.instanceLabel,
-              position: result?.position
+              position: result?.position,
+              linkedToOntology: !linkError
             });
           } else {
             throw new Error(processResult?.error || '자동 처리 실패');
