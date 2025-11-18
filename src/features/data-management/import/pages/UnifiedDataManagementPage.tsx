@@ -24,6 +24,15 @@ export default function UnifiedDataManagementPage() {
   const { selectedStore } = useSelectedStore();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("unified");
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const handleUploadSuccess = () => {
+    setRefreshTrigger(prev => prev + 1);
+    toast({
+      title: "업로드 완료",
+      description: "데이터가 성공적으로 업로드되고 자동 매핑되었습니다",
+    });
+  };
 
   return (
     <DashboardLayout>
@@ -49,7 +58,7 @@ export default function UnifiedDataManagementPage() {
         )}
 
         {/* 데이터 통계 대시보드 */}
-        <DataStatistics storeId={selectedStore?.id} />
+        <DataStatistics key={`stats-${refreshTrigger}`} storeId={selectedStore?.id} />
 
         {/* 메인 탭 */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -80,33 +89,31 @@ export default function UnifiedDataManagementPage() {
           <TabsContent value="unified" className="space-y-6">
             <UnifiedDataUpload 
               storeId={selectedStore?.id}
-              onUploadSuccess={() => {
-                toast({
-                  title: "업로드 완료",
-                  description: "데이터가 성공적으로 업로드되고 자동 매핑되었습니다",
-                });
-              }}
+              onUploadSuccess={handleUploadSuccess}
             />
           </TabsContent>
 
           {/* 유효성 검사 탭 */}
           <TabsContent value="validation" className="space-y-6">
-            <DataValidation storeId={selectedStore?.id} />
+            <DataValidation key={`validation-${refreshTrigger}`} storeId={selectedStore?.id} />
           </TabsContent>
 
           {/* 스토리지 관리 탭 */}
           <TabsContent value="storage" className="space-y-6">
-            <StorageManager storeId={selectedStore?.id} />
+            <StorageManager 
+              key={`storage-${refreshTrigger}`} 
+              storeId={selectedStore?.id} 
+            />
           </TabsContent>
 
           {/* 온톨로지 관리 탭 */}
           <TabsContent value="ontology" className="space-y-6">
-            <OntologyDataManagement storeId={selectedStore?.id} />
+            <OntologyDataManagement key={`ontology-${refreshTrigger}`} storeId={selectedStore?.id} />
           </TabsContent>
 
           {/* 히스토리 탭 */}
           <TabsContent value="history" className="space-y-6">
-            <DataImportHistory storeId={selectedStore?.id} />
+            <DataImportHistory key={`history-${refreshTrigger}`} storeId={selectedStore?.id} />
           </TabsContent>
         </Tabs>
       </div>
