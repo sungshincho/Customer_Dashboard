@@ -1,125 +1,73 @@
+/**
+ * WiFi 데이터 로더 - 새로운 중앙 집중식 시스템 사용
+ */
+
 import { supabase } from '@/integrations/supabase/client';
+import { loadDataFile } from '@/lib/storage/loader';
 import type { SensorPosition, TrackingData } from '@/features/digital-twin/types/iot.types';
+import type { WiFiSensorData, WiFiTrackingData } from '@/lib/storage/types';
 
-// CSV 파싱 함수
-function parseCSV(csvText: string): any[] {
-  const lines = csvText.trim().split('\n');
-  if (lines.length < 2) return [];
-  
-  const headers = lines[0].split(',').map(h => h.trim());
-  const data = [];
-  
-  for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(',').map(v => v.trim());
-    const row: any = {};
-    headers.forEach((header, index) => {
-      row[header] = values[index] || '';
-    });
-    data.push(row);
-  }
-  
-  return data;
-}
-
-// Storage에서 CSV 다운로드
-async function loadCSVFromStorage(userId: string, storeId: string, filename: string): Promise<any[]> {
-  try {
-    const filePath = `${userId}/${storeId}/${filename}`;
-    
-    const { data, error } = await supabase.storage
-      .from('store-data')
-      .download(filePath);
-    
-    if (error) {
-      console.error(`Failed to download ${filename}:`, error);
-      return [];
-    }
-    
-    const csvText = await data.text();
-    return parseCSV(csvText);
-  } catch (error) {
-    console.error(`Error loading ${filename}:`, error);
-    return [];
-  }
-}
-
-// public/samples에서 CSV 로드 (테스트용)
-async function loadCSVFromPublic(filename: string): Promise<any[]> {
-  try {
-    const response = await fetch(`/samples/${filename}`);
-    if (!response.ok) {
-      console.error(`Failed to load /samples/${filename}`);
-      return [];
-    }
-    const csvText = await response.text();
-    return parseCSV(csvText);
-  } catch (error) {
-    console.error(`Error loading /samples/${filename}:`, error);
-    return [];
-  }
-}
-
-// 센서 CSV를 SensorPosition 타입으로 변환
-function parseSensorData(rawData: any[]): SensorPosition[] {
+/**
+ * 센서 데이터를 SensorPosition 타입으로 변환
+ */
+function parseSensorData(rawData: WiFiSensorData[]): SensorPosition[] {
   return rawData.map(row => ({
-    sensor_id: row.sensor_id || row.id,
+    sensor_id: row.sensor_id || (row as any).id,
     sensor_type: 'wifi' as const,
-    x: parseFloat(row.x) || 0,
-    y: parseFloat(row.y) || 2.5,
-    z: parseFloat(row.z) || 0,
-    coverage_radius: parseFloat(row.coverage_radius) || 10
+    x: row.x || 0,
+    y: row.y || 2.5,
+    z: row.z || 0,
+    coverage_radius: row.coverage_radius || 10
   }));
 }
 
-// 트래킹 CSV를 TrackingData 타입으로 변환
-function parseTrackingData(rawData: any[]): TrackingData[] {
+/**
+ * 트래킹 데이터를 TrackingData 타입으로 변환
+ */
+function parseTrackingData(rawData: WiFiTrackingData[]): TrackingData[] {
   return rawData.map(row => ({
-    customer_id: row.mac_address || row.customer_id,
+    customer_id: row.mac_address || (row as any).customer_id,
     timestamp: new Date(row.timestamp).getTime(),
     sensor_id: row.sensor_id,
-    signal_strength: parseFloat(row.rssi) || -100,
-    x: row.x ? parseFloat(row.x) : undefined,
-    z: row.z ? parseFloat(row.z) : undefined,
-    accuracy: row.accuracy ? parseFloat(row.accuracy) : undefined,
-    status: row.status || 'browsing'
+    signal_strength: row.rssi || -100,
+    x: row.x,
+    z: row.z,
+    accuracy: row.accuracy,
+    status: (row.status as any) || 'browsing'
   }));
 }
 
-// WiFi 트래킹 데이터 로드 (메인 함수)
+/**
+ * WiFi 트래킹 데이터 로드 (통합 버전)
+ */
 export async function loadWiFiTrackingData(
   userId?: string,
   storeId?: string
 ): Promise<{ sensors: SensorPosition[]; trackingData: TrackingData[] }> {
-  let sensorData: any[] = [];
-  let trackingRawData: any[] = [];
-
+  
   // Storage에서 로드 시도
   if (userId && storeId) {
-    const [sensors, tracking] = await Promise.all([
-      loadCSVFromStorage(userId, storeId, 'wifi_sensors.csv'),
-      loadCSVFromStorage(userId, storeId, 'wifi_tracking.csv')
-    ]);
-    
-    if (sensors.length > 0 && tracking.length > 0) {
-      sensorData = sensors;
-      trackingRawData = tracking;
+    try {
+      const [sensorsResult, trackingResult] = await Promise.all([
+        loadDataFile(userId, storeId, 'wifi_sensors', { fallbackToSample: true }),
+        loadDataFile(userId, storeId, 'wifi_tracking', { fallbackToSample: true })
+      ]);
+      
+      if (sensorsResult.data.length > 0 && trackingResult.data.length > 0) {
+        return {
+          sensors: parseSensorData(sensorsResult.data),
+          trackingData: parseTrackingData(trackingResult.data)
+        };
+      }
+    } catch (error) {
+      console.error('Failed to load WiFi data from storage:', error);
     }
   }
-
-  // Storage에 없으면 public/samples에서 로드 (테스트/데모용)
-  if (sensorData.length === 0 || trackingRawData.length === 0) {
-    console.log('Loading WiFi data from /public/samples...');
-    const [sensors, tracking] = await Promise.all([
-      loadCSVFromPublic('wifi_sensors.csv'),
-      loadCSVFromPublic('wifi_tracking.csv')
-    ]);
-    sensorData = sensors;
-    trackingRawData = tracking;
-  }
-
+  
+  // Fallback은 이미 loadDataFile에서 처리됨
   return {
-    sensors: parseSensorData(sensorData),
-    trackingData: parseTrackingData(trackingRawData)
+    sensors: [],
+    trackingData: []
   };
 }
 

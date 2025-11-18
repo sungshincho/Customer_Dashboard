@@ -2,7 +2,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { FootfallVisualizer } from "@/features/store-analysis/footfall/components/FootfallVisualizer";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Loader2, Store } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { AdvancedFilters, FilterState } from "@/features/data-management/analysis/components/AdvancedFilters";
 import { ExportButton } from "@/features/data-management/analysis/components/ExportButton";
 import { ComparisonView } from "@/features/data-management/analysis/components/ComparisonView";
@@ -12,8 +12,7 @@ import { useStoreScene } from "@/hooks/useStoreScene";
 import { useAutoAnalysis } from "@/hooks/useAutoAnalysis";
 import { SceneViewer } from "@/features/digital-twin/components/SceneViewer";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
-import { loadStoreFile } from "@/utils/storageDataLoader";
-import { useAuth } from "@/hooks/useAuth";
+import { useVisits } from "@/hooks/useStoreData";
 import { DataReadinessGuard } from "@/components/DataReadinessGuard";
 import { Store3DViewer } from "@/features/digital-twin/components/Store3DViewer";
 import { CustomerPathOverlay, CustomerAvatarOverlay, RealtimeCustomerOverlay } from "@/features/digital-twin/components/overlays";
@@ -21,12 +20,9 @@ import { generateCustomerPaths, generateCustomerAvatars } from "@/features/digit
 
 const FootfallAnalysis = () => {
   const { selectedStore } = useSelectedStore();
-  const { user } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
-  const [visitsData, setVisitsData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
   const [showRealtimeIoT, setShowRealtimeIoT] = useState(false);
   const [showAvatars, setShowAvatars] = useState(true);
   const [showPaths, setShowPaths] = useState(false);
@@ -34,28 +30,14 @@ const FootfallAnalysis = () => {
   const { activeScene, isLoading: sceneLoading } = useStoreScene();
   const { latestAnalysis, analyzing } = useAutoAnalysis('visitor', true);
   
+  // 새로운 Hook 사용 (자동 캐싱 + 타입 안전)
+  const { data: visitsResult, isLoading: loading, refetch } = useVisits();
+  const visitsData = visitsResult?.data || [];
+  
   const sceneRecipe = activeScene?.recipe_data;
 
-  // 매장별 방문 데이터 로드
-  useEffect(() => {
-    if (selectedStore && user) {
-      setLoading(true);
-      loadStoreFile(user.id, selectedStore.id, 'visits.csv')
-        .then(data => {
-          console.log(`${selectedStore.store_name} 방문 데이터 로드됨:`, data.length, '건');
-          setVisitsData(data);
-          setLoading(false);
-        })
-        .catch(error => {
-          console.error('Failed to load visits data:', error);
-          setVisitsData([]);
-          setLoading(false);
-        });
-    }
-  }, [selectedStore, user, refreshKey]);
-
   const handleRefresh = () => {
-    setRefreshKey(prev => prev + 1);
+    refetch();
   };
 
   const totalVisits = visitsData.length;

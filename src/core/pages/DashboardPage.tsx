@@ -3,82 +3,66 @@ import { StatCard } from "@/components/StatCard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, TrendingUp, Package, DollarSign, AlertCircle } from "lucide-react";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
-import { useEffect, useState, useMemo } from "react";
+import { useMemo } from "react";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
-import { useAuth } from "@/hooks/useAuth";
-import { loadStoreDataset } from "@/utils/storageDataLoader";
+import { useStoreDataset } from "@/hooks/useStoreData";
 import { DataReadinessGuard } from "@/components/DataReadinessGuard";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const Dashboard = () => {
   const { selectedStore } = useSelectedStore();
-  const { user } = useAuth();
-  const [stats, setStats] = useState<any[]>([]);
-  const [recentActivities, setRecentActivities] = useState<any[]>([]);
-  const [storeData, setStoreData] = useState<any>({});
-  const [loading, setLoading] = useState(false);
+  
+  // 새로운 통합 Hook 사용 (React Query 기반 캐싱)
+  const { data: storeData, isLoading: loading, error } = useStoreDataset();
 
-  // 매장 데이터 로드
-  useEffect(() => {
-    if (selectedStore && user) {
-      setLoading(true);
-      loadStoreDataset(user.id, selectedStore.id)
-        .then(data => {
-          setStoreData(data);
-          
-          // 실제 데이터로 stats 업데이트
-          const totalVisits = data.visits?.length || 0;
-          const totalPurchases = data.purchases?.length || 0;
-          const totalRevenue = data.purchases?.reduce((sum: number, p: any) => 
-            sum + (parseFloat(p.unit_price) || 0) * (parseInt(p.quantity) || 0), 0) || 0;
-          const conversionRate = totalVisits > 0 ? ((totalPurchases / totalVisits) * 100).toFixed(1) : '0.0';
-          const lowStockProducts = data.products?.filter((p: any) => 
-            (parseInt(p.stock_quantity) || 0) < 10
-          ).length || 0;
+  // 실제 데이터로 stats 생성
+  const stats = useMemo(() => {
+    if (!storeData) return [];
+    
+    const totalVisits = storeData.visits?.length || 0;
+    const totalPurchases = storeData.purchases?.length || 0;
+    const totalRevenue = storeData.purchases?.reduce((sum: number, p: any) => 
+      sum + (parseFloat(p.unit_price) || 0) * (parseInt(p.quantity) || 0), 0) || 0;
+    const conversionRate = totalVisits > 0 ? ((totalPurchases / totalVisits) * 100).toFixed(1) : '0.0';
+    const lowStockProducts = storeData.products?.filter((p: any) => 
+      (parseInt(p.stock_quantity) || 0) < 10
+    ).length || 0;
 
-          setStats([
-            {
-              title: "오늘 방문자",
-              value: totalVisits.toString(),
-              change: "+12.5% 어제 대비",
-              changeType: "positive" as const,
-              icon: Users,
-            },
-            {
-              title: "총 매출",
-              value: `₩${totalRevenue.toLocaleString()}`,
-              change: "+8.2% 지난주 대비",
-              changeType: "positive" as const,
-              icon: DollarSign,
-            },
-            {
-              title: "재고 알림",
-              value: lowStockProducts.toString(),
-              change: `${lowStockProducts}개 품목 부족`,
-              changeType: lowStockProducts > 0 ? "negative" as const : "positive" as const,
-              icon: Package,
-            },
-            {
-              title: "전환율",
-              value: `${conversionRate}%`,
-              change: "+2.4% 지난주 대비",
-              changeType: "positive" as const,
-              icon: TrendingUp,
-            },
-          ]);
-          
-          setLoading(false);
-        })
-        .catch(error => {
-          console.error('Failed to load store data:', error);
-          setLoading(false);
-        });
-    }
-  }, [selectedStore, user]);
+    return [
+      {
+        title: "오늘 방문자",
+        value: totalVisits.toString(),
+        change: "+12.5% 어제 대비",
+        changeType: "positive" as const,
+        icon: Users,
+      },
+      {
+        title: "총 매출",
+        value: `₩${totalRevenue.toLocaleString()}`,
+        change: "+8.2% 지난주 대비",
+        changeType: "positive" as const,
+        icon: DollarSign,
+      },
+      {
+        title: "재고 알림",
+        value: lowStockProducts.toString(),
+        change: `${lowStockProducts}개 품목 부족`,
+        changeType: lowStockProducts > 0 ? "negative" as const : "positive" as const,
+        icon: Package,
+      },
+      {
+        title: "전환율",
+        value: `${conversionRate}%`,
+        change: "+2.4% 지난주 대비",
+        changeType: "positive" as const,
+        icon: TrendingUp,
+      },
+    ];
+  }, [storeData]);
 
   // 시간대별 방문자 데이터 생성
   const visitorData = useMemo(() => {
-    if (!storeData.visits || storeData.visits.length === 0) return [];
+    if (!storeData?.visits || storeData.visits.length === 0) return [];
     
     const hourlyVisits = new Map<number, number>();
     storeData.visits.forEach((visit: any) => {
@@ -93,7 +77,7 @@ const Dashboard = () => {
         visitors: hourlyVisits.get(hour) || 0
       };
     });
-  }, [storeData.visits]);
+  }, [storeData]);
 
   return (
     <DataReadinessGuard>

@@ -1,3 +1,14 @@
+/**
+ * @deprecated Use src/lib/storage/loader.ts and src/hooks/useStoreData.ts instead
+ * 
+ * 이 파일은 하위 호환성을 위해 유지되지만, 새로운 코드에서는 사용하지 마세요.
+ * 
+ * 마이그레이션 가이드:
+ * - loadStoreDataset() → useStoreDataset() Hook 사용
+ * - loadStoreFile() → useStoreDataFile() Hook 사용
+ */
+
+import { loadDataFile, loadMultipleFiles } from '@/lib/storage/loader';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface StoreDataset {
@@ -8,68 +19,43 @@ export interface StoreDataset {
   staff?: any[];
 }
 
-// CSV 파싱 함수
-function parseCSV(csvText: string): any[] {
-  const lines = csvText.trim().split('\n');
-  if (lines.length < 2) return [];
-  
-  const headers = lines[0].split(',').map(h => h.trim());
-  const data = [];
-  
-  for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(',').map(v => v.trim());
-    const row: any = {};
-    headers.forEach((header, index) => {
-      row[header] = values[index] || '';
-    });
-    data.push(row);
-  }
-  
-  return data;
-}
-
-// Storage에서 CSV 다운로드 및 파싱
-async function loadCSVFromStorage(userId: string, storeId: string, filename: string): Promise<any[]> {
-  try {
-    const filePath = `${userId}/${storeId}/${filename}`;
-    
-    const { data, error } = await supabase.storage
-      .from('store-data')
-      .download(filePath);
-    
-    if (error) {
-      console.error(`Failed to download ${filename}:`, error);
-      return [];
-    }
-    
-    const csvText = await data.text();
-    return parseCSV(csvText);
-  } catch (error) {
-    console.error(`Error loading ${filename}:`, error);
-    return [];
-  }
-}
-
-// 매장의 모든 데이터셋 로드
+/**
+ * @deprecated Use useStoreDataset() from src/hooks/useStoreData.ts
+ */
 export async function loadStoreDataset(userId: string, storeId: string): Promise<StoreDataset> {
-  const [customers, products, purchases, visits, staff] = await Promise.all([
-    loadCSVFromStorage(userId, storeId, 'customers.csv'),
-    loadCSVFromStorage(userId, storeId, 'products.csv'),
-    loadCSVFromStorage(userId, storeId, 'purchases.csv'),
-    loadCSVFromStorage(userId, storeId, 'visits.csv'),
-    loadCSVFromStorage(userId, storeId, 'staff.csv'),
-  ]);
+  console.warn('loadStoreDataset is deprecated. Use useStoreDataset() Hook instead.');
+  
+  const results = await loadMultipleFiles(
+    userId,
+    storeId,
+    ['customers', 'products', 'purchases', 'visits', 'staff'],
+    { fallbackToSample: true }
+  );
   
   return {
-    customers,
-    products,
-    purchases,
-    visits,
-    staff,
+    customers: results.customers?.data || [],
+    products: results.products?.data || [],
+    purchases: results.purchases?.data || [],
+    visits: results.visits?.data || [],
+    staff: results.staff?.data || [],
   };
 }
 
-// 특정 파일만 로드
+/**
+ * @deprecated Use useStoreDataFile() from src/hooks/useStoreData.ts
+ */
 export async function loadStoreFile(userId: string, storeId: string, filename: string): Promise<any[]> {
-  return loadCSVFromStorage(userId, storeId, filename);
+  console.warn('loadStoreFile is deprecated. Use useStoreDataFile() Hook instead.');
+  
+  // filename에서 확장자 제거하여 타입 추론
+  const fileType = filename.replace(/\.(csv|xlsx)$/i, '') as any;
+  
+  const result = await loadDataFile(
+    userId,
+    storeId,
+    fileType,
+    { fallbackToSample: true }
+  );
+  
+  return result.data || [];
 }
