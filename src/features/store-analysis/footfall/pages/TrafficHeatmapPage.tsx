@@ -4,7 +4,7 @@ import { DataReadinessGuard } from "@/components/DataReadinessGuard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
-import { RefreshCw, Play, Pause, RotateCcw } from "lucide-react";
+import { RefreshCw, Play, Pause, RotateCcw, Layers, Box } from "lucide-react";
 import { useState, useEffect } from "react";
 import { AdvancedFilters, FilterState } from "@/features/data-management/analysis/components/AdvancedFilters";
 import { ExportButton } from "@/features/data-management/analysis/components/ExportButton";
@@ -18,6 +18,7 @@ import { HeatmapOverlay3D, ZoneBoundaryOverlay } from "@/features/digital-twin/c
 import { useStoreScene } from "@/hooks/useStoreScene";
 import { useTrafficHeatmap, useZoneStatistics } from "@/hooks/useTrafficHeatmap";
 import type { StoreSpaceMetadata } from "@/features/digital-twin/types/iot.types";
+import { cn } from "@/lib/utils";
 
 const TrafficHeatmapPage = () => {
   const { selectedStore } = useSelectedStore();
@@ -28,6 +29,9 @@ const TrafficHeatmapPage = () => {
   // 새로운 Hook 사용
   const { data: visitsResult, isLoading: loading, refetch } = useVisits();
   const visitsData = visitsResult?.data || [];
+  
+  // View Mode State
+  const [viewMode, setViewMode] = useState<"2d" | "3d">("2d");
   
   // 3D Heatmap Controls
   const [timeOfDay, setTimeOfDay] = useState(14);
@@ -86,6 +90,34 @@ const TrafficHeatmapPage = () => {
               </p>
             </div>
             <div className="flex gap-2">
+              {/* 2D/3D Toggle */}
+              <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+                <Button
+                  size="sm"
+                  variant={viewMode === "2d" ? "default" : "ghost"}
+                  onClick={() => setViewMode("2d")}
+                  className={cn(
+                    "gap-2 transition-all duration-200",
+                    viewMode === "2d" && "shadow-sm"
+                  )}
+                >
+                  <Layers className="w-4 h-4" />
+                  2D
+                </Button>
+                <Button
+                  size="sm"
+                  variant={viewMode === "3d" ? "default" : "ghost"}
+                  onClick={() => setViewMode("3d")}
+                  className={cn(
+                    "gap-2 transition-all duration-200",
+                    viewMode === "3d" && "shadow-sm"
+                  )}
+                >
+                  <Box className="w-4 h-4" />
+                  3D
+                </Button>
+              </div>
+              
               <ExportButton data={exportData} filename="traffic-heatmap" title="매장 동선 히트맵" />
               <Button onClick={handleRefresh} variant="outline" size="sm">
                 <RefreshCw className="w-4 h-4 mr-2" />
@@ -95,195 +127,186 @@ const TrafficHeatmapPage = () => {
           </div>
             <AdvancedFilters filters={filters} onFiltersChange={setFilters} />
             
-            <Tabs defaultValue="digital-twin" className="w-full">
-              <TabsList>
-                <TabsTrigger value="digital-twin">3D 디지털트윈 히트맵</TabsTrigger>
-                <TabsTrigger value="analysis">2D 히트맵 분석</TabsTrigger>
-                <TabsTrigger value="comparison">비교 분석</TabsTrigger>
-              </TabsList>
-          
-          {/* 3D 디지털트윈 히트맵 */}
-          <TabsContent value="digital-twin" className="space-y-6">
-            <div className="grid md:grid-cols-4 gap-6">
-              {/* 좌측: 컨트롤 및 통계 */}
-              <Card className="md:col-span-1">
+          {/* Hybrid View with smooth transition */}
+          <div className="space-y-4 animate-fade-in">
+            {/* 2D View */}
+            <div 
+              className={cn(
+                "transition-all duration-500",
+                viewMode === "2d" ? "opacity-100 scale-100" : "opacity-0 scale-95 h-0 overflow-hidden"
+              )}
+            >
+              <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">시간대 컨트롤</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* 시간 표시 */}
-                  <div className="flex items-center justify-center">
-                    <Badge variant="secondary" className="text-2xl px-6 py-3">
-                      {String(timeOfDay).padStart(2, "0")}:00
-                    </Badge>
-                  </div>
-
-                  {/* 재생 컨트롤 */}
-                  <div className="flex gap-2">
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      onClick={handleReset}
-                      className="flex-1"
-                    >
-                      <RotateCcw className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      onClick={() => setIsPlaying(!isPlaying)}
-                      className="flex-1"
-                    >
-                      {isPlaying ? (
-                        <><Pause className="w-4 h-4 mr-2" /> 정지</>
-                      ) : (
-                        <><Play className="w-4 h-4 mr-2" /> 재생</>
-                      )}
-                    </Button>
-                  </div>
-
-                  {/* 시간 슬라이더 */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">시간대 선택</label>
-                    <Slider
-                      value={[timeOfDay]}
-                      onValueChange={([value]) => setTimeOfDay(value)}
-                      min={9}
-                      max={23}
-                      step={1}
-                      disabled={isPlaying}
-                    />
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>09:00</span>
-                      <span>23:00</span>
-                    </div>
-                  </div>
-
-                  {/* 레이어 토글 */}
-                  <div className="space-y-2 pt-4 border-t">
-                    <label className="text-sm font-medium">레이어</label>
-                    <div className="space-y-2">
-                      <Button
-                        variant={showZones ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setShowZones(!showZones)}
-                        className="w-full justify-start"
-                      >
-                        {showZones ? "✓" : ""} Zone 경계선
-                      </Button>
-                      <Button
-                        variant={showHeatmap ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setShowHeatmap(!showHeatmap)}
-                        className="w-full justify-start"
-                      >
-                        {showHeatmap ? "✓" : ""} 히트맵
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Zone 통계 */}
-                  {zoneStats.length > 0 && (
-                    <div className="space-y-2 pt-4 border-t">
-                      <label className="text-sm font-medium">Zone 통계</label>
-                      <div className="space-y-2">
-                        {zoneStats.map((zone) => (
-                          <div 
-                            key={zone.zone_id}
-                            className="p-2 rounded text-xs bg-muted"
-                          >
-                            <div className="flex items-center justify-between mb-1">
-                              <span 
-                                className="font-semibold"
-                                style={{ color: zone.zone_color }}
-                              >
-                                {zone.zone_name}
-                              </span>
-                              <Badge variant="secondary">{zone.visitCount}</Badge>
-                            </div>
-                            <div className="text-muted-foreground">
-                              평균 강도: {(zone.avgIntensity * 100).toFixed(0)}%
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* 우측: 3D 뷰어 */}
-              <Card className="md:col-span-3">
-                <CardHeader>
-                  <CardTitle>3D 디지털트윈 매장 프리뷰</CardTitle>
+                  <CardTitle>2D 히트맵 분석</CardTitle>
                   <CardDescription>
-                    {heatPoints.length > 0 
-                      ? `${timeOfDay}시 트래킹 데이터: ${heatPoints.length}개 포인트`
-                      : '실시간 WiFi 트래킹 데이터를 3D 공간에 시각화합니다'
-                    }
+                    시간대별 매장 내 고객 밀집도를 한눈에 파악하세요
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-[600px] bg-muted rounded-lg overflow-hidden">
-                    {activeScene?.recipe_data ? (
+                  <TrafficHeatmap visitsData={visitsData} heatPoints={heatPoints} timeOfDay={timeOfDay} />
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* 3D View */}
+            <div 
+              className={cn(
+                "transition-all duration-500",
+                viewMode === "3d" ? "opacity-100 scale-100" : "opacity-0 scale-95 h-0 overflow-hidden"
+              )}
+            >
+              {activeScene && selectedStore ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>3D 디지털 트윈 히트맵</CardTitle>
+                    <CardDescription>
+                      실제 매장 공간에서 고객 동선을 3D로 확인하세요
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Time Controls */}
+                    <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-lg font-semibold">
+                            {String(timeOfDay).padStart(2, '0')}:00
+                          </Badge>
+                          <span className="text-sm text-muted-foreground">시간대</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleReset}
+                          >
+                            <RotateCcw className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant={isPlaying ? "secondary" : "default"}
+                            onClick={() => setIsPlaying(!isPlaying)}
+                          >
+                            {isPlaying ? (
+                              <>
+                                <Pause className="w-4 h-4 mr-2" />
+                                일시정지
+                              </>
+                            ) : (
+                              <>
+                                <Play className="w-4 h-4 mr-2" />
+                                재생
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Slider
+                          value={[timeOfDay]}
+                          onValueChange={([value]) => setTimeOfDay(value)}
+                          min={9}
+                          max={23}
+                          step={1}
+                          className="w-full"
+                        />
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>09:00</span>
+                          <span>16:00</span>
+                          <span>23:00</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 3D Scene */}
+                    <div className="relative h-[600px] rounded-lg overflow-hidden bg-background border">
                       <SceneComposer
                         recipe={activeScene.recipe_data}
                         overlay={
                           <>
-                            {showZones && metadata?.zones && (
+                            {showZones && metadata && (
                               <ZoneBoundaryOverlay
-                                zones={metadata.zones}
+                                zones={metadata.zones || []}
                                 metadata={metadata}
-                                showLabels={true}
-                                opacity={0.6}
                               />
                             )}
                             {showHeatmap && heatPoints.length > 0 && (
                               <HeatmapOverlay3D
                                 heatPoints={heatPoints}
                                 gridSize={20}
-                                heightScale={2}
                               />
                             )}
                           </>
                         }
                       />
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-muted-foreground">
-                        디지털트윈 씬을 먼저 구성해주세요
+                      
+                      {/* Overlay Controls */}
+                      <div className="absolute top-4 right-4 flex flex-col gap-2">
+                        <Button
+                          size="sm"
+                          variant={showHeatmap ? "default" : "outline"}
+                          onClick={() => setShowHeatmap(!showHeatmap)}
+                          className="backdrop-blur-sm bg-background/80"
+                        >
+                          히트맵 {showHeatmap ? 'ON' : 'OFF'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={showZones ? "default" : "outline"}
+                          onClick={() => setShowZones(!showZones)}
+                          className="backdrop-blur-sm bg-background/80"
+                        >
+                          Zone {showZones ? 'ON' : 'OFF'}
+                        </Button>
                       </div>
-                    )}
-                  </div>
 
-                  {/* 범례 */}
-                  {showHeatmap && (
-                    <div className="mt-4 p-4 bg-muted rounded-lg space-y-2">
-                      <h4 className="font-semibold text-sm">히트맵 색상</h4>
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        <div className="flex items-center gap-2">
-                          <div className="w-24 h-4 rounded" style={{ background: 'linear-gradient(to right, #0000FF, #00FFFF, #00FF00, #FFFF00, #FF0000)' }} />
-                          <span>낮음 → 높음</span>
-                        </div>
+                      {/* Statistics Overlay */}
+                      <div className="absolute bottom-4 left-4 right-4 grid grid-cols-3 gap-2">
+                        {zoneStats.slice(0, 3).map((zone) => (
+                          <Card key={zone.zone_id} className="backdrop-blur-sm bg-background/80">
+                            <CardContent className="p-3">
+                              <div className="text-xs text-muted-foreground">{zone.zone_name}</div>
+                              <div className="text-lg font-bold">{zone.visitCount}</div>
+                              <div className="text-xs">방문</div>
+                            </CardContent>
+                          </Card>
+                        ))}
                       </div>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardContent className="py-12 text-center">
+                    <p className="text-muted-foreground">
+                      3D 히트맵을 보려면 매장을 선택하고 3D 씬을 설정해주세요.
+                    </p>
+                    <Button variant="outline" className="mt-4">
+                      3D 설정 페이지로 이동
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
             </div>
-          </TabsContent>
 
-          {/* 2D 히트맵 분석 */}
-          <TabsContent value="analysis" className="space-y-6">
-            <TrafficHeatmap visitsData={visitsData} />
-          </TabsContent>
-          
-          <TabsContent value="comparison">
-            <ComparisonView
-              data={comparisonData}
-              comparisonType={comparisonType}
-              onComparisonTypeChange={setComparisonType}
-            />
-          </TabsContent>
-        </Tabs>
+            {/* Comparison Analysis */}
+            <Card className="animate-fade-in">
+              <CardHeader>
+                <CardTitle>비교 분석</CardTitle>
+                <CardDescription>
+                  이전 기간 대비 트래픽 변화 추이
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ComparisonView
+                  data={comparisonData}
+                  comparisonType={comparisonType}
+                  onComparisonTypeChange={setComparisonType}
+                />
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </DataReadinessGuard>
     </DashboardLayout>

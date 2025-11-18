@@ -1,12 +1,15 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Play, Pause, RotateCcw } from "lucide-react";
+import type { HeatPoint } from "@/features/digital-twin/types/iot.types";
 
 interface TrafficHeatmapProps {
   visitsData?: any[];
+  heatPoints?: HeatPoint[];
+  timeOfDay?: number;
 }
 
 interface HeatmapCell {
@@ -15,11 +18,53 @@ interface HeatmapCell {
   intensity: number;
 }
 
-const generateHeatmapData = (timeOfDay: number, visitsData: any[]): HeatmapCell[] => {
+const generateHeatmapData = (
+  timeOfDay: number, 
+  visitsData: any[], 
+  heatPoints?: HeatPoint[]
+): HeatmapCell[] => {
   const data: HeatmapCell[] = [];
-  const gridSize = 10;
+  const gridSize = 20; // 더 세밀한 그리드
 
-  // 해당 시간대의 방문 데이터 필터링
+  // WiFi 히트 포인트가 있으면 우선 사용
+  if (heatPoints && heatPoints.length > 0) {
+    // 그리드 셀별로 히트 포인트를 집계
+    const cellMap = new Map<string, number[]>();
+    
+    heatPoints.forEach(point => {
+      // 실제 좌표를 그리드 좌표로 변환 (0-20 범위)
+      const gridX = Math.floor((point.realCoords.x / 20) * gridSize);
+      const gridZ = Math.floor((point.realCoords.z / 20) * gridSize);
+      const key = `${gridX},${gridZ}`;
+      
+      if (!cellMap.has(key)) {
+        cellMap.set(key, []);
+      }
+      cellMap.get(key)!.push(point.intensity);
+    });
+    
+    // 모든 그리드 셀 생성
+    for (let x = 0; x < gridSize; x++) {
+      for (let y = 0; y < gridSize; y++) {
+        const key = `${x},${y}`;
+        const intensities = cellMap.get(key);
+        
+        let intensity = 0;
+        if (intensities && intensities.length > 0) {
+          // 해당 셀의 평균 밀도
+          intensity = intensities.reduce((a, b) => a + b, 0) / intensities.length;
+          // 방문 횟수에 따라 가중치 추가
+          intensity = Math.min(1, intensity + (intensities.length * 0.05));
+        }
+        
+        data.push({ x, y, intensity });
+      }
+    }
+    
+    return data;
+  }
+
+  // WiFi 데이터가 없으면 방문 데이터 기반으로 생성
   const timeVisits = visitsData.filter((v: any) => {
     const hour = v.visit_hour ? parseInt(v.visit_hour) : Math.floor(Math.random() * 14) + 9;
     return Math.abs(hour - timeOfDay) <= 1;
@@ -28,9 +73,9 @@ const generateHeatmapData = (timeOfDay: number, visitsData: any[]): HeatmapCell[
   for (let x = 0; x < gridSize; x++) {
     for (let y = 0; y < gridSize; y++) {
       // Entrance area (top) has higher traffic
-      const entranceBoost = y < 2 ? 0.5 : 0;
+      const entranceBoost = y < 3 ? 0.5 : 0;
       // Center aisle has higher traffic
-      const aisleBoost = x > 3 && x < 6 ? 0.3 : 0;
+      const aisleBoost = x > 7 && x < 12 ? 0.3 : 0;
       // Time-based variation
       const timeMultiplier = Math.sin((timeOfDay / 24) * Math.PI) * 0.5 + 0.5;
       // Data-based boost
@@ -49,14 +94,29 @@ const generateHeatmapData = (timeOfDay: number, visitsData: any[]): HeatmapCell[
   return data;
 };
 
-export const TrafficHeatmap = ({ visitsData = [] }: TrafficHeatmapProps) => {
-  const [timeOfDay, setTimeOfDay] = useState(14); // 2 PM
+export const TrafficHeatmap = ({ 
+  visitsData = [], 
+  heatPoints = [],
+  timeOfDay: externalTimeOfDay 
+}: TrafficHeatmapProps) => {
+  const [internalTimeOfDay, setInternalTimeOfDay] = useState(14);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [heatmapData, setHeatmapData] = useState(() => generateHeatmapData(14, visitsData));
+  
+  // 외부에서 timeOfDay를 제공하면 그것을 사용, 아니면 내부 상태 사용
+  const timeOfDay = externalTimeOfDay !== undefined ? externalTimeOfDay : internalTimeOfDay;
+  
+  const [heatmapData, setHeatmapData] = useState(() => 
+    generateHeatmapData(timeOfDay, visitsData, heatPoints)
+  );
+
+  // timeOfDay나 heatPoints가 변경되면 히트맵 재생성
+  useEffect(() => {
+    setHeatmapData(generateHeatmapData(timeOfDay, visitsData, heatPoints));
+  }, [timeOfDay, visitsData, heatPoints]);
 
   const updateHeatmap = (newTime: number) => {
-    setTimeOfDay(newTime);
-    setHeatmapData(generateHeatmapData(newTime, visitsData));
+    setInternalTimeOfDay(newTime);
+    setHeatmapData(generateHeatmapData(newTime, visitsData, heatPoints));
   };
 
   const handlePlay = () => {
@@ -68,19 +128,19 @@ export const TrafficHeatmap = ({ visitsData = [] }: TrafficHeatmapProps) => {
     updateHeatmap(14);
   };
 
-  useState(() => {
-    if (!isPlaying) return;
+  // 애니메이션 효과 (외부 timeOfDay가 없을 때만)
+  useEffect(() => {
+    if (!isPlaying || externalTimeOfDay !== undefined) return;
 
     const interval = setInterval(() => {
-      setTimeOfDay((prev) => {
+      setInternalTimeOfDay((prev) => {
         const next = prev >= 23 ? 9 : prev + 1;
-        setHeatmapData(generateHeatmapData(next, visitsData));
         return next;
       });
     }, 500);
 
     return () => clearInterval(interval);
-  });
+  }, [isPlaying, externalTimeOfDay]);
 
   const getHeatColor = (intensity: number) => {
     if (intensity < 0.2) return "bg-blue-500/10";
@@ -96,76 +156,99 @@ export const TrafficHeatmap = ({ visitsData = [] }: TrafficHeatmapProps) => {
 
   return (
     <div className="space-y-6">
+      {/* Controls - 외부에서 timeOfDay를 제공하지 않을 때만 표시 */}
+      {externalTimeOfDay === undefined && (
+        <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+          <div className="flex items-center gap-4 flex-1">
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="text-lg font-semibold">
+                {String(timeOfDay).padStart(2, "0")}:00
+              </Badge>
+            </div>
+            <Slider
+              value={[timeOfDay]}
+              onValueChange={([value]) => updateHeatmap(value)}
+              min={9}
+              max={23}
+              step={1}
+              className="flex-1 max-w-md"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={handleReset}>
+              <RotateCcw className="w-4 h-4" />
+            </Button>
+            <Button size="sm" onClick={handlePlay} variant={isPlaying ? "secondary" : "default"}>
+              {isPlaying ? (
+                <>
+                  <Pause className="w-4 h-4 mr-2" />
+                  정지
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4 mr-2" />
+                  재생
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="grid md:grid-cols-3 gap-6">
         {/* Heatmap Visualization */}
         <div className="md:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
-            <h4 className="font-semibold">실시간 히트맵</h4>
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary">
-                {String(timeOfDay).padStart(2, "0")}:00
-              </Badge>
-              <Button size="sm" variant="outline" onClick={handleReset}>
-                <RotateCcw className="w-4 h-4" />
-              </Button>
-              <Button size="sm" onClick={handlePlay}>
-                {isPlaying ? (
-                  <Pause className="w-4 h-4" />
-                ) : (
-                  <Play className="w-4 h-4" />
-                )}
-              </Button>
-            </div>
+            <h4 className="font-semibold">매장 히트맵</h4>
+            {heatPoints && heatPoints.length > 0 && (
+              <Badge variant="outline">WiFi 트래킹: {heatPoints.length}개 포인트</Badge>
+            )}
           </div>
 
-          <Card className="glass p-6">
-            <div className="relative aspect-square max-w-md mx-auto">
-              <div className="absolute inset-0 grid grid-cols-10 gap-1">
-                {heatmapData.map((cell, idx) => (
-                  <div
-                    key={idx}
-                    className={`rounded-sm transition-all duration-300 ${getHeatColor(
-                      cell.intensity
-                    )}`}
-                  />
-                ))}
-              </div>
-              <div className="absolute top-2 left-2 text-xs bg-background/80 px-2 py-1 rounded">
-                입구
-              </div>
+          <Card className="p-4">
+            <div
+              className="grid gap-0.5"
+              style={{
+                gridTemplateColumns: `repeat(20, 1fr)`,
+                aspectRatio: "1",
+              }}
+            >
+              {heatmapData.map((cell, i) => (
+                <div
+                  key={i}
+                  className={`${getHeatColor(
+                    cell.intensity
+                  )} rounded-[1px] transition-all duration-300 hover:scale-125 hover:z-10 cursor-pointer hover:shadow-lg`}
+                  title={`위치: (${cell.x}, ${cell.y})\n밀집도: ${(cell.intensity * 100).toFixed(0)}%`}
+                />
+              ))}
             </div>
-
-            <div className="mt-4 flex items-center justify-between text-xs">
-              <span className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-blue-500/10 rounded" />
-                낮음
-              </span>
-              <span className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-yellow-500/50 rounded" />
-                중간
-              </span>
-              <span className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-red-500/90 rounded" />
-                높음
-              </span>
+            
+            {/* Legend */}
+            <div className="flex items-center justify-center gap-4 mt-4 pt-4 border-t">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded bg-blue-500/10" />
+                <span className="text-xs text-muted-foreground">낮음</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded bg-cyan-500/30" />
+                <span className="text-xs text-muted-foreground">보통</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded bg-yellow-500/50" />
+                <span className="text-xs text-muted-foreground">높음</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded bg-orange-500/70" />
+                <span className="text-xs text-muted-foreground">매우 높음</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded bg-red-500/90" />
+                <span className="text-xs text-muted-foreground">최고</span>
+              </div>
             </div>
           </Card>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">시간대 선택</label>
-            <Slider
-              value={[timeOfDay]}
-              onValueChange={(v) => updateHeatmap(v[0])}
-              min={9}
-              max={23}
-              step={1}
-              disabled={isPlaying}
-            />
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>09:00</span>
-              <span>23:00</span>
-            </div>
-          </div>
         </div>
 
         {/* Analytics */}
