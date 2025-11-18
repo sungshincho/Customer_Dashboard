@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Trash2, Download, Search, RefreshCw, FileIcon, Loader2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useClearCache } from "@/hooks/useClearCache";
 
 interface StorageManagerProps {
   storeId?: string;
@@ -25,6 +26,7 @@ interface StorageFile {
 
 export function StorageManager({ storeId }: StorageManagerProps) {
   const { toast } = useToast();
+  const { clearAllCache, clearStoreDataCache } = useClearCache();
   const [files, setFiles] = useState<StorageFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -191,6 +193,13 @@ export function StorageManager({ storeId }: StorageManagerProps) {
         description: `${data.storageFilesDeleted}개 파일 및 관련 데이터 삭제 (엔티티: ${data.entitiesDeleted}, 관계: ${data.relationsDeleted})`,
       });
 
+      // React Query 캐시 초기화
+      if (storeId) {
+        clearStoreDataCache(storeId);
+      } else {
+        clearStoreDataCache();
+      }
+
       setSelectedFiles(new Set());
       await loadAllFiles();
     } catch (error: any) {
@@ -230,6 +239,13 @@ export function StorageManager({ storeId }: StorageManagerProps) {
         title: "전체 데이터 초기화 완료",
         description: `스토리지: ${data.storageFilesDeleted}개, 엔티티: ${data.entitiesDeleted}개, 관계: ${data.relationsDeleted}개, 씬: ${data.scenesDeleted}개`,
       });
+
+      // React Query 캐시 전체 초기화
+      if (storeId) {
+        clearStoreDataCache(storeId);
+      } else {
+        clearAllCache();
+      }
 
       setSelectedFiles(new Set());
       await loadAllFiles();

@@ -88,6 +88,8 @@ export function useStoreDataset(
     enabled: !!selectedStore,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
+    refetchOnMount: 'always', // 마운트 시 항상 새로 가져오기
+    refetchOnWindowFocus: true, // 윈도우 포커스 시 새로 가져오기
   });
 }
 

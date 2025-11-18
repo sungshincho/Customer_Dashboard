@@ -1,19 +1,22 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatCard } from "@/components/StatCard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, TrendingUp, Package, DollarSign, AlertCircle } from "lucide-react";
+import { Users, TrendingUp, Package, DollarSign, AlertCircle, RefreshCw } from "lucide-react";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 import { useMemo } from "react";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { useStoreDataset } from "@/hooks/useStoreData";
 import { DataReadinessGuard } from "@/components/DataReadinessGuard";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { useClearCache } from "@/hooks/useClearCache";
 
 const Dashboard = () => {
   const { selectedStore } = useSelectedStore();
+  const { invalidateStoreData } = useClearCache();
   
   // 새로운 통합 Hook 사용 (React Query 기반 캐싱)
-  const { data: storeData, isLoading: loading, error } = useStoreDataset();
+  const { data: storeData, isLoading: loading, error, refetch } = useStoreDataset();
 
   // 실제 데이터로 stats 생성
   const stats = useMemo(() => {
@@ -84,11 +87,25 @@ const Dashboard = () => {
       <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="animate-fade-in">
-          <h1 className="text-3xl font-bold gradient-text">실시간 대시보드</h1>
-          <p className="mt-2 text-muted-foreground">
-            {selectedStore ? `${selectedStore.store_name} - 매장 운영 현황 및 주요 지표` : '매장 운영 현황 및 주요 지표'}
-          </p>
+        <div className="animate-fade-in flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold gradient-text">실시간 대시보드</h1>
+            <p className="mt-2 text-muted-foreground">
+              {selectedStore ? `${selectedStore.store_name} - 매장 운영 현황 및 주요 지표` : '매장 운영 현황 및 주요 지표'}
+            </p>
+          </div>
+          <Button
+            onClick={() => {
+              invalidateStoreData(selectedStore?.id);
+              refetch();
+            }}
+            variant="outline"
+            size="sm"
+            className="gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            데이터 새로고침
+          </Button>
         </div>
 
         {storeData?.visits?.length && storeData.visits.length > 0 && (
