@@ -35,9 +35,7 @@ export default function DigitalTwin3DPage() {
     try {
       const loadedModels = await loadUserModels(user.id, selectedStore?.id);
       setModels(loadedModels);
-      if (loadedModels.length > 0 && activeLayers.length === 0) {
-        setActiveLayers(loadedModels.map(m => m.id));
-      }
+      // activeLayers는 activeScene이 로드될 때 설정되므로 여기서 초기화하지 않음
     } catch (error) {
       toast.error('모델 로드 실패');
     } finally {
@@ -68,6 +66,7 @@ export default function DigitalTwin3DPage() {
 
   useEffect(() => {
     if (activeScene?.recipe_data) {
+      // 저장된 씬에서 레이어 복원
       const recipe = activeScene.recipe_data;
       const layerIds: string[] = [];
       if (recipe.space) layerIds.push(recipe.space.id);
@@ -75,8 +74,11 @@ export default function DigitalTwin3DPage() {
       recipe.products?.forEach(p => layerIds.push(p.id));
       setActiveLayers(layerIds);
       setSceneName(activeScene.name || '');
+    } else if (models.length > 0 && activeLayers.length === 0) {
+      // 저장된 씬이 없으면 모든 모델을 활성화 (초기 상태)
+      setActiveLayers(models.map(m => m.id));
     }
-  }, [activeScene]);
+  }, [activeScene, models]);
 
   const currentRecipe = useMemo<SceneRecipe | null>(() => {
     const activeModels = models.filter(m => activeLayers.includes(m.id));
@@ -183,9 +185,29 @@ export default function DigitalTwin3DPage() {
                 <CardHeader><CardTitle>씬 저장</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
                   <Input placeholder="씬 이름" value={sceneName} onChange={(e) => setSceneName(e.target.value)} />
-                  <Button onClick={() => saveScene(currentRecipe!, sceneName || `씬 ${Date.now()}`).then(() => toast.success('저장됨'))} disabled={!currentRecipe || isSaving} className="w-full">
-                    <Save className="w-4 h-4 mr-2" />{isSaving ? '저장 중...' : '씬 저장'}
+                  <Button 
+                    onClick={() => {
+                      if (!currentRecipe) return;
+                      const finalSceneName = sceneName || activeScene?.name || `씬 ${Date.now()}`;
+                      saveScene(currentRecipe, finalSceneName, activeScene?.id)
+                        .then(() => {
+                          toast.success('씬이 저장되었습니다');
+                        })
+                        .catch((err) => {
+                          toast.error('씬 저장 실패: ' + err.message);
+                        });
+                    }} 
+                    disabled={!currentRecipe || isSaving} 
+                    className="w-full"
+                  >
+                    <Save className="w-4 h-4 mr-2" />
+                    {isSaving ? '저장 중...' : (activeScene ? '씬 업데이트' : '새 씬 저장')}
                   </Button>
+                  {activeScene && (
+                    <p className="text-xs text-muted-foreground">
+                      현재 활성 씬: {activeScene.name}
+                    </p>
+                  )}
                 </CardContent>
               </Card>
               <Card>
