@@ -220,6 +220,24 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
           
           if (processResult?.success) {
             const result = processResult.results?.[0];
+            
+            // user_data_imports에 기록 추가 (히스토리 표시용)
+            await supabase.from('user_data_imports').insert({
+              user_id: user.id,
+              store_id: storeId,
+              file_name: safeFileName,
+              file_type: '3d-model',
+              data_type: '3d-model',
+              file_path: filePath,
+              row_count: 1,
+              raw_data: {
+                entityType: result?.entityType,
+                instanceLabel: result?.instanceLabel,
+                position: result?.position,
+                publicUrl: publicUrl
+              }
+            });
+            
             updateFileStatus(uploadFile.id, 'success', undefined, 100, {
               autoMapped: true,
               entityType: result?.entityType || '자동 생성됨',

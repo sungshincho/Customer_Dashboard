@@ -221,8 +221,10 @@ export function DataImportHistory({ storeId }: DataImportHistoryProps) {
 
       // Storage에서도 삭제 시도
       if (record?.file_path) {
+        // 파일 타입에 따라 버킷 선택
+        const bucket = record.file_type === '3d-model' ? '3d-models' : 'store-data';
         const { error: storageError } = await supabase.storage
-          .from('store-data')
+          .from(bucket)
           .remove([record.file_path]);
         
         if (storageError) {
@@ -269,11 +271,26 @@ export function DataImportHistory({ storeId }: DataImportHistoryProps) {
       customers: "bg-yellow-100 text-yellow-800",
       inventory: "bg-orange-100 text-orange-800",
       stores: "bg-pink-100 text-pink-800",
+      '3d-model': "bg-amber-100 text-amber-800",
+      'wifi_tracking': "bg-indigo-100 text-indigo-800",
+      'wifi_sensor': "bg-cyan-100 text-cyan-800",
+    };
+
+    const labels: Record<string, string> = {
+      '3d-model': '3D 모델',
+      'wifi_tracking': 'WiFi 추적',
+      'wifi_sensor': 'WiFi 센서',
+      'visits': '방문',
+      'purchases': '구매',
+      'products': '상품',
+      'customers': '고객',
+      'inventory': '재고',
+      'stores': '매장',
     };
 
     return (
       <Badge className={colors[dataType] || "bg-gray-100 text-gray-800"}>
-        {dataType}
+        {labels[dataType] || dataType}
       </Badge>
     );
   };
