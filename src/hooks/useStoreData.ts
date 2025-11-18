@@ -13,7 +13,7 @@ import type { DataFileType, DataFileMap, LoadOptions, StoreDataset } from '@/lib
  */
 export function useStoreDataFile<K extends DataFileType>(
   fileType: K,
-  options: LoadOptions = { fallbackToSample: true }
+  options: LoadOptions = {}
 ) {
   const { selectedStore } = useSelectedStore();
   
@@ -48,7 +48,7 @@ export function useStoreDataFile<K extends DataFileType>(
  * 전체 데이터셋 로드 Hook
  */
 export function useStoreDataset(
-  options: LoadOptions = { fallbackToSample: true }
+  options: LoadOptions = {}
 ) {
   const { selectedStore } = useSelectedStore();
   
@@ -96,7 +96,7 @@ export function useStoreDataset(
  */
 export function useMultipleStoreDataFiles<K extends DataFileType>(
   fileTypes: K[],
-  options: LoadOptions = { fallbackToSample: true }
+  options: LoadOptions = {}
 ) {
   const { selectedStore } = useSelectedStore();
   
