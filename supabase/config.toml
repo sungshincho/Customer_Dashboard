@@ -33,3 +33,6 @@ verify_jwt = true
 [functions.auto-process-3d-models]
 verify_jwt = true
 
+[functions.auto-fix-data]
+verify_jwt = true
+
