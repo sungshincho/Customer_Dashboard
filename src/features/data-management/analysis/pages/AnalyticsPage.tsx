@@ -6,7 +6,7 @@ import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Store, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useVisits } from "@/hooks/useStoreData";
+import { useVisits, useCustomers } from "@/hooks/useStoreData";
 import { DataReadinessGuard } from "@/components/DataReadinessGuard";
 
 const COLORS = ["hsl(var(--primary))", "hsl(var(--accent))", "#8884d8", "#82ca9d", "#ffc658"];
@@ -14,40 +14,95 @@ const COLORS = ["hsl(var(--primary))", "hsl(var(--accent))", "#8884d8", "#82ca9d
 const Analytics = () => {
   const { selectedStore } = useSelectedStore();
   const { data: visitsResult, isLoading: loading } = useVisits();
+  const { data: customersResult } = useCustomers();
   const visitsData = visitsResult?.data || [];
+  const customersData = customersResult?.data || [];
   
   const [hourlyData, setHourlyData] = useState<any[]>([]);
   const [weeklyData, setWeeklyData] = useState<any[]>([]);
   const [ageGroupData, setAgeGroupData] = useState<any[]>([]);
 
-  // 데이터 변환
+  // 실제 데이터 변환
   useEffect(() => {
     if (visitsData.length > 0) {
       setHourlyData(generateHourlyData(visitsData));
       setWeeklyData(generateWeeklyData(visitsData));
-      setAgeGroupData([
-        { name: "10대", value: 15 },
-        { name: "20대", value: 35 },
-        { name: "30대", value: 28 },
-        { name: "40대", value: 15 },
-        { name: "50대+", value: 7 },
-      ]);
     }
-  }, [visitsData]);
+    
+    // 고객 연령대 데이터 추출
+    if (customersData.length > 0) {
+      setAgeGroupData(generateAgeGroupData(customersData));
+    }
+  }, [visitsData, customersData]);
+
+  const generateAgeGroupData = (customers: any[]) => {
+    const ageGroups = new Map<string, number>();
+    
+    customers.forEach(customer => {
+      const age = customer.age ? parseInt(customer.age) : null;
+      if (age) {
+        let group = "50대+";
+        if (age < 20) group = "10대";
+        else if (age < 30) group = "20대";
+        else if (age < 40) group = "30대";
+        else if (age < 50) group = "40대";
+        
+        ageGroups.set(group, (ageGroups.get(group) || 0) + 1);
+      }
+    });
+    
+    // 데이터가 없으면 기본값 반환
+    if (ageGroups.size === 0) {
+      return [
+        { name: "데이터 없음", value: 1 }
+      ];
+    }
+    
+    const groups = ["10대", "20대", "30대", "40대", "50대+"];
+    return groups
+      .filter(group => ageGroups.has(group))
+      .map(group => ({
+        name: group,
+        value: ageGroups.get(group) || 0
+      }));
+  };
 
   const generateHourlyData = (visits: any[]) => {
+    const hourlyVisits = new Map<string, number>();
+    
+    // 실제 방문 데이터에서 시간대별 집계
+    visits.forEach(visit => {
+      const hour = visit.visit_hour ? parseInt(visit.visit_hour) : 12;
+      const hourKey = `${String(hour).padStart(2, '0')}:00`;
+      hourlyVisits.set(hourKey, (hourlyVisits.get(hourKey) || 0) + 1);
+    });
+
+    // 3시간 간격으로 데이터 생성
     const hours = ["06:00", "09:00", "12:00", "15:00", "18:00", "21:00"];
     return hours.map(hour => ({
       hour,
-      visitors: Math.floor(Math.random() * 200) + 50
+      visitors: hourlyVisits.get(hour) || 0
     }));
   };
 
   const generateWeeklyData = (visits: any[]) => {
+    const weeklyVisits = new Map<string, number>();
+    
+    // 실제 방문 데이터에서 요일별 집계
+    visits.forEach(visit => {
+      if (visit.visit_date) {
+        const date = new Date(visit.visit_date);
+        const dayIndex = date.getDay(); // 0 = 일요일
+        const days = ["일", "월", "화", "수", "목", "금", "토"];
+        const day = days[dayIndex];
+        weeklyVisits.set(day, (weeklyVisits.get(day) || 0) + 1);
+      }
+    });
+
     const days = ["월", "화", "수", "목", "금", "토", "일"];
     return days.map(day => ({
       day,
-      visitors: Math.floor(Math.random() * 2000) + 1000
+      visitors: weeklyVisits.get(day) || 0
     }));
   };
 

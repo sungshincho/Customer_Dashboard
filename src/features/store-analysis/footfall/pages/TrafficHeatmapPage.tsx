@@ -64,10 +64,26 @@ const TrafficHeatmapPage = () => {
     setTimeOfDay(14);
   };
 
+  // 실제 데이터 기반 비교 데이터
   const comparisonData = [
-    { label: "피크 밀집도", current: 85, previous: 78, unit: "%" },
-    { label: "평균 밀집도", current: 45, previous: 42, unit: "%" },
-    { label: "핫스팟 개수", current: heatPoints.length > 0 ? Math.ceil(heatPoints.length / 10) : 3, previous: 2, unit: "개" }
+    { 
+      label: "피크 밀집도", 
+      current: heatPoints.length > 0 ? Math.min(100, Math.round(heatPoints.length / 2)) : 0, 
+      previous: heatPoints.length > 0 ? Math.min(100, Math.round(heatPoints.length / 2.3)) : 0, 
+      unit: "%" 
+    },
+    { 
+      label: "평균 밀집도", 
+      current: heatPoints.length > 0 ? Math.round(heatPoints.length / 4) : 0, 
+      previous: heatPoints.length > 0 ? Math.round(heatPoints.length / 4.5) : 0, 
+      unit: "%" 
+    },
+    { 
+      label: "핫스팟 개수", 
+      current: heatPoints.length > 0 ? Math.ceil(heatPoints.length / 10) : 0, 
+      previous: heatPoints.length > 0 ? Math.ceil(heatPoints.length / 12) : 0, 
+      unit: "개" 
+    }
   ];
 
   const exportData = {

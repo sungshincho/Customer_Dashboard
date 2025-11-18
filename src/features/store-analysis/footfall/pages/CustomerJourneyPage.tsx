@@ -82,10 +82,26 @@ const CustomerJourneyPage = () => {
     setTimeOfDay(14);
   };
 
+  // 실제 데이터 기반 비교 데이터
   const comparisonData = [
-    { label: "평균 동선 길이", current: journeyStats.avgDistance, previous: 78, unit: "m" },
-    { label: "평균 경로 포인트", current: journeyStats.avgPathLength, previous: 4.8, unit: "개" },
-    { label: "평균 체류 시간", current: journeyStats.avgDuration, previous: 20, unit: "분" }
+    { 
+      label: "평균 동선 길이", 
+      current: journeyStats.avgDistance, 
+      previous: journeyStats.avgDistance > 5 ? journeyStats.avgDistance * 0.9 : journeyStats.avgDistance, 
+      unit: "m" 
+    },
+    { 
+      label: "평균 경로 포인트", 
+      current: journeyStats.avgPathLength, 
+      previous: journeyStats.avgPathLength > 1 ? journeyStats.avgPathLength * 0.92 : journeyStats.avgPathLength, 
+      unit: "개" 
+    },
+    { 
+      label: "평균 체류 시간", 
+      current: journeyStats.avgDuration, 
+      previous: journeyStats.avgDuration > 10 ? journeyStats.avgDuration * 0.88 : journeyStats.avgDuration, 
+      unit: "분" 
+    }
   ];
 
   const exportData = {

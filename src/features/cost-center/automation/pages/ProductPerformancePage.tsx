@@ -47,11 +47,55 @@ const ProductPerformancePage = () => {
   const totalRevenue = storeData?.purchases?.reduce((sum: number, p: any) => 
     sum + (parseFloat(p.unit_price) || 0) * (parseInt(p.quantity) || 0), 0) || 0;
 
-  const insights: Insight[] = [
-    { type: "trend", title: "베스트셀러 급상승", description: "상품 A의 판매량이 지난주 대비 45% 증가했습니다.", impact: "high" },
-    { type: "recommendation", title: "재고 부족 예상", description: "인기 상품 B의 재고가 3일 내 소진될 예정입니다.", impact: "high" },
-    { type: "warning", title: "저성과 상품", description: "상품 C의 판매가 감소하고 있습니다. 프로모션을 고려하세요.", impact: "medium" }
-  ];
+  // 실제 데이터 기반 인사이트 생성
+  const insights: Insight[] = [];
+  
+  if (storeData?.products && storeData?.purchases) {
+    // 상품별 판매량 집계
+    const productSales = new Map<string, number>();
+    storeData.purchases.forEach((p: any) => {
+      const productName = p.product_name || 'Unknown';
+      productSales.set(productName, (productSales.get(productName) || 0) + (parseInt(p.quantity) || 1));
+    });
+    
+    // 베스트셀러 찾기
+    const sortedProducts = Array.from(productSales.entries()).sort((a, b) => b[1] - a[1]);
+    if (sortedProducts.length > 0) {
+      const topProduct = sortedProducts[0];
+      insights.push({ 
+        type: "trend", 
+        title: "베스트셀러", 
+        description: `${topProduct[0]}이(가) 총 ${topProduct[1]}개 판매되어 가장 높은 판매량을 기록했습니다.`, 
+        impact: "high" 
+      });
+    }
+    
+    // 재고 부족 상품 찾기
+    const lowStockProducts = storeData.products.filter((p: any) => 
+      (parseInt(p.stock_quantity) || 0) < 10
+    );
+    if (lowStockProducts.length > 0) {
+      insights.push({ 
+        type: "recommendation", 
+        title: "재고 부족 예상", 
+        description: `${lowStockProducts.length}개 상품의 재고가 10개 미만입니다. 재발주를 고려하세요.`, 
+        impact: "high" 
+      });
+    }
+    
+    // 저성과 상품 찾기
+    if (sortedProducts.length > 0) {
+      const lowPerformers = sortedProducts.slice(-3).filter(([_, sales]) => sales < 5);
+      if (lowPerformers.length > 0) {
+        insights.push({ 
+          type: "warning", 
+          title: "저성과 상품", 
+          description: `일부 상품의 판매가 저조합니다. 프로모션이나 진열 위치 변경을 고려하세요.`, 
+          impact: "medium" 
+        });
+      }
+    }
+  }
 
   const comparisonData = [
     { label: "총 판매량", current: totalPurchases, previous: Math.round(totalPurchases * 0.87), unit: "개" },
