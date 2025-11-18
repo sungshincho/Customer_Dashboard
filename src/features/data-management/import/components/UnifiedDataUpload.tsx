@@ -232,13 +232,13 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
           if (processResult?.success) {
             const result = processResult.results?.[0];
             
-            // user_data_imports에 기록 추가
+            // user_data_imports에 기록 추가 (data_type: 3d_model로 통일)
             await supabase.from('user_data_imports').insert({
               user_id: user.id,
               store_id: storeId,
               file_name: safeFileName,
-              file_type: '3d-model',
-              data_type: '3d-model',
+              file_type: '3d_model',
+              data_type: '3d_model',
               file_path: filePath,
               row_count: 1,
               raw_data: {
