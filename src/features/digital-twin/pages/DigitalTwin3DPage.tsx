@@ -28,9 +28,6 @@ export default function DigitalTwin3DPage() {
   const [loading, setLoading] = useState(true);
   const [sceneName, setSceneName] = useState('');
   const [entityTypes, setEntityTypes] = useState<Array<{ id: string; name: string; label: string }>>([]);
-  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
-  const [editMode, setEditMode] = useState(false);
-  const [pendingPositions, setPendingPositions] = useState<Record<string, { x: number; y: number; z: number }>>({});
 
   const loadModels = async () => {
     if (!user) return;
@@ -138,49 +135,6 @@ export default function DigitalTwin3DPage() {
     };
   }, [models, activeLayers]);
 
-  const handlePositionChange = (assetId: string, position: { x: number; y: number; z: number }) => {
-    setPendingPositions(prev => ({
-      ...prev,
-      [assetId]: position
-    }));
-  };
-
-  const savePositions = async () => {
-    if (Object.keys(pendingPositions).length === 0) {
-      toast.info('변경된 위치가 없습니다');
-      return;
-    }
-
-    try {
-      const updates = Object.entries(pendingPositions).map(async ([assetId, position]) => {
-        // entity- 접두사 제거
-        const entityId = assetId.replace('entity-', '');
-        
-        const { error } = await supabase
-          .from('graph_entities')
-          .update({ model_3d_position: position })
-          .eq('id', entityId);
-        
-        if (error) throw error;
-      });
-
-      await Promise.all(updates);
-      toast.success(`${Object.keys(pendingPositions).length}개 모델 위치 저장 완료`);
-      setPendingPositions({});
-      loadModels(); // 새로고침
-    } catch (error) {
-      console.error('Position save error:', error);
-      toast.error('위치 저장 실패');
-    }
-  };
-
-  const handleAssetClick = (assetId: string, assetType: string) => {
-    if (editMode) {
-      setSelectedAssetId(assetId);
-      console.log('Selected asset:', assetId, assetType);
-    }
-  };
-
   if (!selectedStore) {
     return (
       <DashboardLayout>
@@ -252,57 +206,12 @@ export default function DigitalTwin3DPage() {
                 </CardContent>
               </Card>
             </div>
-            <div className="lg:col-span-2 space-y-4">
-              {/* 편집 모드 컨트롤 */}
-              {currentRecipe && (
-                <Card>
-                  <CardContent className="py-4">
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-4">
-                        <Button
-                          variant={editMode ? "default" : "outline"}
-                          onClick={() => {
-                            setEditMode(!editMode);
-                            if (editMode) setSelectedAssetId(null);
-                          }}
-                        >
-                          {editMode ? '편집 모드 종료' : '편집 모드 시작'}
-                        </Button>
-                        {editMode && selectedAssetId && (
-                          <Badge variant="secondary">
-                            선택됨: {models.find(m => m.id === selectedAssetId)?.name}
-                          </Badge>
-                        )}
-                      </div>
-                      {Object.keys(pendingPositions).length > 0 && (
-                        <div className="flex items-center gap-2">
-                          <Badge variant="destructive">
-                            {Object.keys(pendingPositions).length}개 변경
-                          </Badge>
-                          <Button onClick={savePositions} size="sm">
-                            <Save className="w-4 h-4 mr-2" />
-                            위치 저장
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-              
+            <div className="lg:col-span-2">
               <Card>
                 <CardHeader><CardTitle><Layers className="w-5 h-5 inline mr-2" />3D 프리뷰</CardTitle></CardHeader>
                 <CardContent>
                   {currentRecipe ? (
-                    <div style={{ height: '600px' }}>
-                      <SceneComposer 
-                        recipe={currentRecipe} 
-                        selectedAssetId={selectedAssetId}
-                        onAssetClick={handleAssetClick}
-                        onPositionChange={handlePositionChange}
-                        editMode={editMode}
-                      />
-                    </div>
+                    <div style={{ height: '600px' }}><SceneComposer recipe={currentRecipe} /></div>
                   ) : (
                     <div className="text-center py-20"><Layers className="w-16 h-16 mx-auto opacity-20" /><p>레이어를 선택하세요</p></div>
                   )}
