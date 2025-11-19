@@ -3,6 +3,8 @@ import { useWiFiTracking } from './useWiFiTracking';
 import { useSelectedStore } from './useSelectedStore';
 import { realToModel } from '@/features/digital-twin/utils/coordinateMapper';
 import type { HeatPoint, StoreSpaceMetadata, StoreZone } from '@/features/digital-twin/types/iot.types';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 /**
  * Determine which zone a coordinate falls into (using real-world coordinates)
@@ -21,12 +23,53 @@ function getZoneId(x: number, z: number, zones?: StoreZone[]): string | undefine
 }
 
 /**
- * Convert WiFi tracking data to 3D heatmap points
+ * Fetch external context data (weather, holidays, events)
+ */
+function useContextData(storeId: string | undefined) {
+  return useQuery({
+    queryKey: ['context-data', storeId],
+    queryFn: async () => {
+      if (!storeId) return { weather: [], holidays: [], regional: [] };
+      
+      const [weatherRes, holidaysRes, regionalRes] = await Promise.all([
+        supabase
+          .from('weather_data')
+          .select('*')
+          .eq('store_id', storeId)
+          .order('date', { ascending: false })
+          .limit(30),
+        supabase
+          .from('holidays_events')
+          .select('*')
+          .eq('store_id', storeId)
+          .order('date', { ascending: false })
+          .limit(30),
+        supabase
+          .from('regional_data')
+          .select('*')
+          .eq('store_id', storeId)
+          .order('date', { ascending: false })
+          .limit(30)
+      ]);
+
+      return {
+        weather: weatherRes.data || [],
+        holidays: holidaysRes.data || [],
+        regional: regionalRes.data || []
+      };
+    },
+    enabled: !!storeId
+  });
+}
+
+/**
+ * Convert WiFi tracking data to 3D heatmap points with context
  * Handles coordinate transformation and zone mapping
  */
 export function useTrafficHeatmap(storeId: string | undefined, timeOfDay?: number) {
   const wifiData = useWiFiTracking(storeId);
   const { selectedStore } = useSelectedStore();
+  const { data: contextData } = useContextData(storeId);
   
   return useMemo(() => {
     if (!selectedStore?.metadata?.storeSpaceMetadata) {
@@ -90,4 +133,66 @@ export function useZoneStatistics(heatPoints: HeatPoint[], metadata?: StoreSpace
       };
     });
   }, [heatPoints, metadata]);
+}
+
+/**
+ * Analyze traffic patterns with context (weather, holidays, events)
+ */
+export function useTrafficContext(storeId: string | undefined) {
+  const { data: contextData } = useContextData(storeId);
+  
+  return useMemo(() => {
+    if (!contextData) return [];
+    
+    const insights: string[] = [];
+    
+    // 날씨 패턴 분석
+    if (contextData.weather.length > 0) {
+      const rainyDays = contextData.weather.filter(w => w.weather_condition?.includes('rain')).length;
+      const totalDays = contextData.weather.length;
+      
+      if (rainyDays > 0) {
+        const rainyRatio = (rainyDays / totalDays * 100).toFixed(0);
+        insights.push(`🌧️ 비 오는 날 (${rainyRatio}%): 평균 유입 -15~25% 예상`);
+      }
+      
+      const hotDays = contextData.weather.filter(w => w.temperature && w.temperature > 30).length;
+      if (hotDays > 0) {
+        insights.push(`☀️ 폭염일 (${hotDays}일): 오전·저녁 시간대 유입 집중 패턴`);
+      }
+    }
+    
+    // 공휴일/이벤트 패턴 분석
+    if (contextData.holidays.length > 0) {
+      const highImpactEvents = contextData.holidays.filter(h => 
+        h.impact_level === 'high' || h.event_type === 'local_festival'
+      );
+      
+      if (highImpactEvents.length > 0) {
+        insights.push(`🎉 주요 이벤트 (${highImpactEvents.length}건): 주말 유입 +30~50% 증가 예상`);
+      }
+      
+      const holidays = contextData.holidays.filter(h => h.event_type === 'national_holiday');
+      if (holidays.length > 0) {
+        insights.push(`🏖️ 공휴일 (${holidays.length}일): 점심~오후 시간대 피크 이동`);
+      }
+    }
+    
+    // 상권 데이터 패턴 분석
+    if (contextData.regional.length > 0) {
+      const footfallData = contextData.regional.filter(r => r.data_type === 'footfall');
+      if (footfallData.length > 1) {
+        const recent = footfallData[0].value;
+        const prev = footfallData[1].value;
+        const change = ((recent - prev) / prev * 100).toFixed(0);
+        
+        if (Math.abs(Number(change)) > 10) {
+          const trend = Number(change) > 0 ? '증가' : '감소';
+          insights.push(`🏘️ 상권 유동인구: 전주 대비 ${Math.abs(Number(change))}% ${trend}`);
+        }
+      }
+    }
+    
+    return insights;
+  }, [contextData]);
 }
