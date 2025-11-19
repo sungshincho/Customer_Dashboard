@@ -1,253 +1,320 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { FootfallVisualizer } from "@/features/store-analysis/footfall/components/FootfallVisualizer";
-import { Button } from "@/components/ui/button";
-import { RefreshCw, Loader2, Store } from "lucide-react";
-import { useState, useMemo } from "react";
-import { AdvancedFilters, FilterState } from "@/features/data-management/analysis/components/AdvancedFilters";
-import { ExportButton } from "@/features/data-management/analysis/components/ExportButton";
-import { ComparisonView } from "@/features/data-management/analysis/components/ComparisonView";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useStoreScene } from "@/hooks/useStoreScene";
-import { useAutoAnalysis } from "@/hooks/useAutoAnalysis";
-import { SceneViewer } from "@/features/digital-twin/components/SceneViewer";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
-import { useVisits } from "@/hooks/useStoreData";
-import { DataReadinessGuard } from "@/components/DataReadinessGuard";
+import { useFootfallAnalysis, useHourlyFootfall } from "@/hooks/useFootfallAnalysis";
 import { Store3DViewer } from "@/features/digital-twin/components/Store3DViewer";
-import { CustomerPathOverlay, CustomerAvatarOverlay, RealtimeCustomerOverlay } from "@/features/digital-twin/components/overlays";
-import { generateCustomerPaths, generateCustomerAvatars } from "@/features/digital-twin/utils/overlayDataConverter";
+import { HeatmapOverlay3D } from "@/features/digital-twin/components/overlays/HeatmapOverlay3D";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarIcon, Users, TrendingUp, Clock, Activity } from "lucide-react";
+import { format, subDays } from "date-fns";
+import { ko } from "date-fns/locale";
+import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { Badge } from "@/components/ui/badge";
 
-const FootfallAnalysis = () => {
+const FootfallAnalysisPage = () => {
   const { selectedStore } = useSelectedStore();
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
-  const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
-  const [showRealtimeIoT, setShowRealtimeIoT] = useState(false);
-  const [showAvatars, setShowAvatars] = useState(true);
-  const [showPaths, setShowPaths] = useState(false);
-  
-  const { activeScene, isLoading: sceneLoading } = useStoreScene();
-  const { latestAnalysis, analyzing } = useAutoAnalysis('visitor', true);
-  
-  // 새로운 Hook 사용 (자동 캐싱 + 타입 안전)
-  const { data: visitsResult, isLoading: loading, refetch } = useVisits();
-  const visitsData = visitsResult?.data || [];
-  
-  const sceneRecipe = activeScene?.recipe_data;
+  const [dateRange, setDateRange] = useState<{ start: Date; end: Date }>({
+    start: subDays(new Date(), 7),
+    end: new Date(),
+  });
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [show3D, setShow3D] = useState(true);
 
-  const handleRefresh = () => {
-    refetch();
-  };
+  const { data: analysisData, isLoading } = useFootfallAnalysis(
+    selectedStore?.id,
+    dateRange.start,
+    dateRange.end
+  );
 
-  // 실제 데이터 기반 통계 계산
-  const totalVisits = visitsData.length;
-  const totalPurchased = visitsData.filter(v => v.purchased === 'Y').length;
-  const conversionRate = totalVisits > 0 ? ((totalPurchased / totalVisits) * 100).toFixed(1) : '0';
-  
-  // 평균 체류시간 계산 (실제 데이터 기반)
-  const avgDwellTime = useMemo(() => {
-    if (visitsData.length === 0) return 0;
-    
-    // dwell_time 필드가 있으면 사용, 없으면 visit_duration으로 계산
-    const totalDwellTime = visitsData.reduce((sum, visit) => {
-      const dwellTime = visit.dwell_time 
-        ? parseFloat(visit.dwell_time) 
-        : visit.visit_duration 
-          ? parseFloat(visit.visit_duration) 
-          : 0;
-      return sum + dwellTime;
-    }, 0);
-    
-    return Math.round(totalDwellTime / visitsData.length);
-  }, [visitsData]);
+  const { data: hourlyData = [] } = useHourlyFootfall(selectedStore?.id, selectedDate);
 
-  const comparisonData = [
-    { 
-      label: "총 방문자", 
-      current: totalVisits, 
-      previous: Math.round(totalVisits * 0.85), 
-      unit: "명" 
-    },
-    { 
-      label: "평균 체류시간", 
-      current: avgDwellTime, 
-      previous: avgDwellTime > 5 ? Math.round(avgDwellTime * 0.88) : avgDwellTime, 
-      unit: "분" 
-    },
-    { 
-      label: "전환율", 
-      current: parseFloat(conversionRate), 
-      previous: parseFloat(conversionRate) > 1 ? parseFloat(conversionRate) * 0.9 : 0, 
-      unit: "%" 
+  const stats = analysisData?.stats;
+  const footfallData = analysisData?.data || [];
+
+  // 일별 집계
+  const dailyData = footfallData.reduce((acc, curr) => {
+    const existing = acc.find(d => d.date === curr.date);
+    if (existing) {
+      existing.visits += curr.visit_count;
+      existing.unique_visitors += curr.unique_visitors;
+    } else {
+      acc.push({
+        date: curr.date,
+        visits: curr.visit_count,
+        unique_visitors: curr.unique_visitors,
+        displayDate: format(new Date(curr.date), 'MM/dd'),
+      });
     }
-  ];
-
-  const exportData = {
-    filters,
-    totalVisitors: totalVisits,
-    avgDwellTime: avgDwellTime,
-    peakHours: "14:00-16:00",
-    comparisonData
-  };
+    return acc;
+  }, [] as Array<{ date: string; visits: number; unique_visitors: number; displayDate: string }>);
 
   return (
-    <DataReadinessGuard>
-      <DashboardLayout>
-        <div className="space-y-6">
-
+    <DashboardLayout>
+      <div className="space-y-6">
+        {/* Header */}
         <div className="flex items-center justify-between animate-fade-in">
           <div>
-            <h1 className="text-3xl font-bold gradient-text">방문객 유입 분석</h1>
+            <h1 className="text-3xl font-bold gradient-text">유동인구 분석</h1>
             <p className="mt-2 text-muted-foreground">
-              {selectedStore ? `${selectedStore.store_name} - 방문 데이터: ${totalVisits}건` : '시간대별 방문자 패턴 및 트렌드 분석'}
-              {analyzing && <span className="ml-2 text-primary">(AI 분석 중...)</span>}
+              {selectedStore ? `${selectedStore.store_name} - 시간대별 방문객 유입 분석` : '시간대별 방문객 유입 분석'}
             </p>
           </div>
-          <div className="flex gap-2">
-            <ExportButton data={exportData} filename="footfall-analysis" title="방문객 유입 분석" />
-            <Button onClick={handleRefresh} variant="outline" size="sm" disabled={loading}>
-              {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-              새로고침
+          <div className="flex items-center gap-2">
+            <Button
+              variant={show3D ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShow3D(!show3D)}
+            >
+              {show3D ? '2D 보기' : '3D 보기'}
             </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <CalendarIcon className="h-4 w-4" />
+                  {format(selectedDate, "PPP", { locale: ko })}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => date && setSelectedDate(date)}
+                  locale={ko}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
-        
-        {selectedStore && (
-          <>
-            <AdvancedFilters filters={filters} onFiltersChange={setFilters} />
-            
-            <Tabs defaultValue="analysis" className="w-full">
-              <TabsList>
-                <TabsTrigger value="analysis">분석</TabsTrigger>
-                <TabsTrigger value="digital-twin">디지털트윈 매장 프리뷰</TabsTrigger>
-                <TabsTrigger value="comparison">비교 분석</TabsTrigger>
-              </TabsList>
-          
-          <TabsContent value="analysis" className="space-y-6">
-            <div key={refreshKey}>
-              <FootfallVisualizer visitsData={visitsData} />
-            </div>
-          </TabsContent>
 
-          <TabsContent value="digital-twin" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>디지털트윈 매장 프리뷰</CardTitle>
-                <CardDescription>
-                  3D 매장 모델에서 실시간 고객 데이터를 시각화합니다
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* 토글 컨트롤 */}
-                <div className="flex flex-wrap gap-2 p-4 bg-muted rounded-lg">
-                  <Button
-                    variant={showRealtimeIoT ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setShowRealtimeIoT(!showRealtimeIoT)}
-                  >
-                    {showRealtimeIoT ? "✓" : ""} 실시간 IoT
-                  </Button>
-                  <Button
-                    variant={showAvatars ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setShowAvatars(!showAvatars)}
-                  >
-                    {showAvatars ? "✓" : ""} 고객 아바타
-                  </Button>
-                  <Button
-                    variant={showPaths ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setShowPaths(!showPaths)}
-                  >
-                    {showPaths ? "✓" : ""} 동선
-                  </Button>
-                  <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>방문 데이터: {visitsData.length}건</span>
-                  </div>
+        {/* KPI Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">총 방문</p>
+                  <p className="text-2xl font-bold">{stats?.total_visits.toLocaleString() || 0}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    기간 내 전체 방문
+                  </p>
                 </div>
+                <Users className="w-8 h-8 text-primary opacity-50" />
+              </div>
+            </CardContent>
+          </Card>
 
-                {/* 단일 3D 뷰 */}
-                {selectedStore && (
-                  <Store3DViewer 
-                    key={`${selectedStore.id}-${refreshKey}`}
-                    height="600px"
-                    sceneRecipe={sceneRecipe}
-                    overlay={
-                      <>
-                        {showRealtimeIoT && (
-                          <RealtimeCustomerOverlay
-                            storeId={selectedStore.id}
-                            maxInstances={200}
-                            showDebugInfo={false}
-                          />
-                        )}
-                        {showAvatars && (
-                          <CustomerAvatarOverlay
-                            customers={generateCustomerAvatars(visitsData, 100)}
-                            maxInstances={150}
-                            animationSpeed={1.5}
-                            showTrails={false}
-                          />
-                        )}
-                        {showPaths && (
-                          <CustomerPathOverlay
-                            paths={generateCustomerPaths(visitsData)}
-                            animate
-                            color="#1B6BFF"
-                          />
-                        )}
-                      </>
-                    }
-                  />
-                )}
-
-                {/* 범례 */}
-                <div className="p-4 bg-muted rounded-lg space-y-2">
-                  <h4 className="font-semibold text-sm">범례</h4>
-                  <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                    {showAvatars && (
-                      <>
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#1B6BFF' }} />
-                          <span>탐색 중</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#10B981' }} />
-                          <span>구매 중</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#6B7280' }} />
-                          <span>퇴장 중</span>
-                        </div>
-                      </>
-                    )}
-                    {showPaths && (
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-0.5" style={{ backgroundColor: '#1B6BFF' }} />
-                        <span>고객 동선</span>
-                      </div>
-                    )}
-                  </div>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">고유 방문자</p>
+                  <p className="text-2xl font-bold">{stats?.unique_visitors.toLocaleString() || 0}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    중복 제거 방문자
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="comparison">
-            <ComparisonView
-              data={comparisonData}
-              comparisonType={comparisonType}
-              onComparisonTypeChange={setComparisonType}
-            />
-          </TabsContent>
-        </Tabs>
-          </>
+                <Activity className="w-8 h-8 text-blue-500 opacity-50" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">시간당 평균</p>
+                  <p className="text-2xl font-bold">{Math.round(stats?.avg_visits_per_hour || 0)}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    시간당 방문 수
+                  </p>
+                </div>
+                <TrendingUp className="w-8 h-8 text-green-500 opacity-50" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">피크 시간</p>
+                  <p className="text-2xl font-bold">{stats?.peak_hour.toString().padStart(2, '0')}:00</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {stats?.peak_hour_visits || 0}명 방문
+                  </p>
+                </div>
+                <Clock className="w-8 h-8 text-orange-500 opacity-50" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* 3D View with Heatmap */}
+        {show3D && selectedStore && (
+          <Card className="overflow-hidden">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>3D 매장 유동인구 히트맵</CardTitle>
+                  <CardDescription>실시간 방문 패턴 시각화</CardDescription>
+                </div>
+                <Badge variant="secondary" className="gap-1">
+                  <Activity className="w-3 h-3" />
+                  실시간
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="h-[500px] bg-muted/20 rounded-lg flex items-center justify-center">
+                <p className="text-muted-foreground">3D 뷰는 Scene이 설정된 후 표시됩니다</p>
+              </div>
+            </CardContent>
+          </Card>
         )}
+
+        {/* Charts */}
+        <div className="grid lg:grid-cols-2 gap-6">
+          {/* Daily Trend */}
+          <Card>
+            <CardHeader>
+              <CardTitle>일별 방문 추이</CardTitle>
+              <CardDescription>
+                {format(dateRange.start, 'M/d', { locale: ko })} - {format(dateRange.end, 'M/d', { locale: ko })}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={dailyData}>
+                  <defs>
+                    <linearGradient id="colorVisits" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="colorUnique" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(var(--chart-2))" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="displayDate" className="text-xs" />
+                  <YAxis className="text-xs" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "var(--radius)"
+                    }}
+                  />
+                  <Legend />
+                  <Area
+                    type="monotone"
+                    dataKey="visits"
+                    stroke="hsl(var(--primary))"
+                    fillOpacity={1}
+                    fill="url(#colorVisits)"
+                    name="총 방문"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="unique_visitors"
+                    stroke="hsl(var(--chart-2))"
+                    fillOpacity={1}
+                    fill="url(#colorUnique)"
+                    name="고유 방문자"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Hourly Distribution */}
+          <Card>
+            <CardHeader>
+              <CardTitle>시간대별 분포</CardTitle>
+              <CardDescription>
+                {format(selectedDate, 'PPP', { locale: ko })}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={hourlyData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis 
+                    dataKey="time" 
+                    className="text-xs"
+                    interval={2}
+                  />
+                  <YAxis className="text-xs" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "var(--radius)"
+                    }}
+                  />
+                  <Bar 
+                    dataKey="visits" 
+                    fill="hsl(var(--primary))"
+                    name="방문 수"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Detailed Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>상세 시간대별 데이터</CardTitle>
+            <CardDescription>시간대별 방문 상세 정보</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-2 text-sm font-medium">날짜</th>
+                    <th className="text-left p-2 text-sm font-medium">시간</th>
+                    <th className="text-right p-2 text-sm font-medium">방문 수</th>
+                    <th className="text-right p-2 text-sm font-medium">고유 방문자</th>
+                    <th className="text-right p-2 text-sm font-medium">평균 체류시간</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {footfallData.slice(0, 20).map((row, idx) => (
+                    <tr key={idx} className="border-b hover:bg-muted/50">
+                      <td className="p-2 text-sm">{format(new Date(row.date), 'M/d (E)', { locale: ko })}</td>
+                      <td className="p-2 text-sm">{row.hour.toString().padStart(2, '0')}:00</td>
+                      <td className="p-2 text-sm text-right font-medium">{row.visit_count}</td>
+                      <td className="p-2 text-sm text-right">{row.unique_visitors}</td>
+                      <td className="p-2 text-sm text-right">
+                        {row.avg_duration_minutes > 0 
+                          ? `${Math.round(row.avg_duration_minutes)}분`
+                          : '-'
+                        }
+                      </td>
+                    </tr>
+                  ))}
+                  {footfallData.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                        데이터가 없습니다
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </DashboardLayout>
-    </DataReadinessGuard>
   );
 };
 
-export default FootfallAnalysis;
+export default FootfallAnalysisPage;
