@@ -22,19 +22,13 @@ import ConversionFunnelPage from "@/features/store-analysis/footfall/pages/Conve
 import Stores from "@/features/store-analysis/stores/pages/StoresPage";
 import HQStoreSyncPage from "@/features/store-analysis/stores/pages/HQStoreSyncPage";
 import Inventory from "@/features/store-analysis/inventory/pages/InventoryPage";
+import CustomerAnalysisPage from "@/features/store-analysis/customer/pages/CustomerAnalysisPage";
 
 // Profit Center pages
 import ProfitCenterPage from "@/features/profit-center/demand-inventory/pages/ProfitCenterPage";
-import DemandForecastPage from "@/features/profit-center/demand-inventory/pages/DemandForecastPage";
-import Forecasts from "@/features/profit-center/demand-inventory/pages/ForecastsPage";
-import InventoryOptimizerPage from "@/features/profit-center/demand-inventory/pages/InventoryOptimizerPage";
-import PricingOptimizerPage from "@/features/profit-center/pricing/pages/PricingOptimizerPage";
-import CustomerRecommendationsPage from "@/features/profit-center/personalization/pages/CustomerRecommendationsPage";
-import LayoutSimulatorPage from "@/features/profit-center/personalization/pages/LayoutSimulatorPage";
 
 // Cost Center pages
 import ProductPerformancePage from "@/features/cost-center/automation/pages/ProductPerformancePage";
-import StaffEfficiencyPage from "@/features/cost-center/automation/pages/StaffEfficiencyPage";
 
 // Data Management pages
 import UnifiedDataManagementPage from "@/features/data-management/import/pages/UnifiedDataManagementPage";
@@ -92,14 +86,6 @@ const App = () => (
               }
             />
             <Route
-              path="/forecasts"
-              element={
-                <ProtectedRoute>
-                  <Forecasts />
-                </ProtectedRoute>
-              }
-            />
-            <Route
               path="/settings"
               element={
                 <ProtectedRoute>
@@ -112,14 +98,6 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <FootfallAnalysis />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/demand-forecast"
-              element={
-                <ProtectedRoute>
-                  <DemandForecastPage />
                 </ProtectedRoute>
               }
             />
@@ -140,30 +118,6 @@ const App = () => (
               }
             />
             <Route
-              path="/inventory-optimizer"
-              element={
-                <ProtectedRoute>
-                  <InventoryOptimizerPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/layout-simulator"
-              element={
-                <ProtectedRoute>
-                  <LayoutSimulatorPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/staff-efficiency"
-              element={
-                <ProtectedRoute>
-                  <StaffEfficiencyPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
               path="/customer-journey"
               element={
                 <ProtectedRoute>
@@ -176,6 +130,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <ConversionFunnelPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/customer-analysis"
+              element={
+                <ProtectedRoute>
+                  <CustomerAnalysisPage />
                 </ProtectedRoute>
               }
             />
@@ -216,22 +178,6 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <ProfitCenterPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/pricing-optimizer"
-              element={
-                <ProtectedRoute>
-                  <PricingOptimizerPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/customer-recommendations"
-              element={
-                <ProtectedRoute>
-                  <CustomerRecommendationsPage />
                 </ProtectedRoute>
               }
             />
