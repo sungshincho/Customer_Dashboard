@@ -1,7 +1,7 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatCard } from "@/components/StatCard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, TrendingUp, Package, DollarSign, AlertCircle, RefreshCw, AlertTriangle, Clock, TrendingDown } from "lucide-react";
+import { Users, TrendingUp, Package, DollarSign, AlertCircle, RefreshCw, AlertTriangle, Clock, TrendingDown, Sparkles } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useMemo } from "react";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
@@ -11,12 +11,39 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useClearCache } from "@/hooks/useClearCache";
 import { isToday, parseISO } from "date-fns";
+import { FunnelVisualization } from "@/components/dashboard/FunnelVisualization";
+import { AIRecommendationCard } from "@/components/dashboard/AIRecommendationCard";
+import { useDashboardKPI } from "@/hooks/useDashboardKPI";
+import { useAIRecommendations } from "@/hooks/useAIRecommendations";
+import { supabase } from "@/integrations/supabase/client";
 
 const Dashboard = () => {
   const { selectedStore } = useSelectedStore();
   const { invalidateStoreData } = useClearCache();
   
   const { data: storeData, isLoading: loading, error, refetch } = useStoreDataset();
+  
+  // 대시보드 KPI와 AI 추천 가져오기
+  const { data: dashboardKPI } = useDashboardKPI(selectedStore?.id);
+  const { 
+    data: recommendations, 
+    dismissRecommendation, 
+    generateRecommendations 
+  } = useAIRecommendations(selectedStore?.id);
+
+  const handleGenerateRecommendations = async () => {
+    if (selectedStore?.id) {
+      // 먼저 KPI 집계
+      await supabase.functions.invoke('aggregate-dashboard-kpis', {
+        body: { 
+          store_id: selectedStore.id,
+          date: new Date().toISOString().split('T')[0]
+        },
+      });
+      // 그 다음 AI 추천 생성
+      generateRecommendations.mutate(selectedStore.id);
+    }
+  };
 
   // 오늘 날짜로 필터링된 데이터
   const todayData = useMemo(() => {
@@ -245,6 +272,61 @@ const Dashboard = () => {
               <StatCard {...stat} />
             </div>
           ))}
+        </div>
+
+        {/* AI 추천 및 퍼널 섹션 */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* AI 추천 */}
+          <div className="animate-slide-up">
+            <AIRecommendationCard 
+              recommendations={recommendations || []}
+              onDismiss={(id) => dismissRecommendation.mutate(id)}
+            />
+            {selectedStore && (
+              <Button
+                onClick={handleGenerateRecommendations}
+                variant="outline"
+                size="sm"
+                className="mt-4 w-full gap-2"
+                disabled={generateRecommendations.isPending}
+              >
+                <Sparkles className="w-4 h-4" />
+                {generateRecommendations.isPending ? 'AI 분석 중...' : 'AI 추천 생성'}
+              </Button>
+            )}
+          </div>
+
+          {/* 고객 퍼널 */}
+          {dashboardKPI && (
+            <div className="animate-slide-up" style={{ animationDelay: '100ms' }}>
+              <FunnelVisualization
+                data={{
+                  funnel_entry: dashboardKPI.funnel_entry,
+                  funnel_browse: dashboardKPI.funnel_browse,
+                  funnel_fitting: dashboardKPI.funnel_fitting,
+                  funnel_purchase: dashboardKPI.funnel_purchase,
+                  funnel_return: dashboardKPI.funnel_return,
+                }}
+              />
+            </div>
+          )}
+
+          {/* 퍼널 데이터가 없을 때 */}
+          {!dashboardKPI && (
+            <Card className="hover-lift animate-slide-up" style={{ animationDelay: '100ms' }}>
+              <CardHeader>
+                <CardTitle>고객 퍼널</CardTitle>
+                <CardDescription>유입부터 재방문까지의 고객 여정</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-12 text-muted-foreground">
+                  <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>퍼널 데이터가 없습니다.</p>
+                  <p className="text-sm mt-1">데이터를 집계하려면 위의 AI 추천 생성 버튼을 클릭하세요.</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Charts Section */}
