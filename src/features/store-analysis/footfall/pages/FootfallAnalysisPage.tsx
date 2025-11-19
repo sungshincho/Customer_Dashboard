@@ -150,6 +150,25 @@ const FootfallAnalysisPage = () => {
           </Card>
         )}
 
+        {/* 컨텍스트 인사이트 카드 */}
+        {(stats?.weather_impact || stats?.holiday_impact || stats?.regional_comparison) && (
+          <Card className="col-span-full border-primary/20 bg-primary/5">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <Activity className="w-5 h-5 text-primary mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-medium">컨텍스트 인사이트</p>
+                  <div className="text-sm text-muted-foreground space-y-1">
+                    {stats.weather_impact && <p>🌤️ {stats.weather_impact}</p>}
+                    {stats.holiday_impact && <p>🎉 {stats.holiday_impact}</p>}
+                    {stats.regional_comparison && <p>📍 {stats.regional_comparison}</p>}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
@@ -354,6 +373,7 @@ const FootfallAnalysisPage = () => {
                     <th className="text-right p-2 text-sm font-medium">방문 수</th>
                     <th className="text-right p-2 text-sm font-medium">고유 방문자</th>
                     <th className="text-right p-2 text-sm font-medium">평균 체류시간</th>
+                    <th className="text-left p-2 text-sm font-medium">컨텍스트</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -369,11 +389,33 @@ const FootfallAnalysisPage = () => {
                           : '-'
                         }
                       </td>
+                      <td className="p-2 text-sm">
+                        <div className="flex gap-1 flex-wrap">
+                          {row.weather_condition && (
+                            <Badge variant="outline" className="text-xs">
+                              {row.weather_condition === 'rainy' && '🌧️'}
+                              {row.weather_condition === 'sunny' && '☀️'}
+                              {row.weather_condition === 'cloudy' && '☁️'}
+                              {row.temperature && ` ${row.temperature}°C`}
+                            </Badge>
+                          )}
+                          {row.is_holiday && (
+                            <Badge variant="secondary" className="text-xs">
+                              🎉 {row.event_name}
+                            </Badge>
+                          )}
+                          {row.regional_traffic && (
+                            <Badge variant="outline" className="text-xs">
+                              📍 {row.regional_traffic.toLocaleString()}
+                            </Badge>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                   {footfallData.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                      <td colSpan={6} className="text-center py-8 text-muted-foreground">
                         선택한 기간의 방문 데이터가 없습니다. WiFi 트래킹 데이터를 업로드해주세요.
                       </td>
                     </tr>

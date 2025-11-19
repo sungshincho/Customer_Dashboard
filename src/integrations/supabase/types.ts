@@ -394,6 +394,48 @@ export type Database = {
           },
         ]
       }
+      economic_indicators: {
+        Row: {
+          created_at: string | null
+          date: string
+          id: string
+          indicator_type: string
+          indicator_value: number
+          metadata: Json | null
+          region: string | null
+          source: string | null
+          unit: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          id?: string
+          indicator_type: string
+          indicator_value: number
+          metadata?: Json | null
+          region?: string | null
+          source?: string | null
+          unit?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          id?: string
+          indicator_type?: string
+          indicator_value?: number
+          metadata?: Json | null
+          region?: string | null
+          source?: string | null
+          unit?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       external_data_sources: {
         Row: {
           api_key_encrypted: string | null
@@ -604,6 +646,56 @@ export type Database = {
             columns: ["target_entity_id"]
             isOneToOne: false
             referencedRelation: "graph_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      holidays_events: {
+        Row: {
+          created_at: string | null
+          date: string
+          description: string | null
+          event_name: string
+          event_type: string
+          id: string
+          impact_level: string | null
+          metadata: Json | null
+          store_id: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          description?: string | null
+          event_name: string
+          event_type: string
+          id?: string
+          impact_level?: string | null
+          metadata?: Json | null
+          store_id?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          description?: string | null
+          event_name?: string
+          event_type?: string
+          id?: string
+          impact_level?: string | null
+          metadata?: Json | null
+          store_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "holidays_events_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
             referencedColumns: ["id"]
           },
         ]
@@ -985,6 +1077,56 @@ export type Database = {
         }
         Relationships: []
       }
+      regional_data: {
+        Row: {
+          comparison_value: number | null
+          created_at: string | null
+          data_type: string
+          date: string
+          id: string
+          metadata: Json | null
+          store_id: string | null
+          unit: string | null
+          updated_at: string | null
+          user_id: string
+          value: number
+        }
+        Insert: {
+          comparison_value?: number | null
+          created_at?: string | null
+          data_type: string
+          date: string
+          id?: string
+          metadata?: Json | null
+          store_id?: string | null
+          unit?: string | null
+          updated_at?: string | null
+          user_id: string
+          value: number
+        }
+        Update: {
+          comparison_value?: number | null
+          created_at?: string | null
+          data_type?: string
+          date?: string
+          id?: string
+          metadata?: Json | null
+          store_id?: string | null
+          unit?: string | null
+          updated_at?: string | null
+          user_id?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "regional_data_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       store_mappings: {
         Row: {
           created_at: string
@@ -1204,6 +1346,62 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "user_data_imports_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      weather_data: {
+        Row: {
+          created_at: string | null
+          date: string
+          hour: number | null
+          humidity: number | null
+          id: string
+          metadata: Json | null
+          precipitation: number | null
+          store_id: string | null
+          temperature: number | null
+          updated_at: string | null
+          user_id: string
+          weather_condition: string | null
+          wind_speed: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          hour?: number | null
+          humidity?: number | null
+          id?: string
+          metadata?: Json | null
+          precipitation?: number | null
+          store_id?: string | null
+          temperature?: number | null
+          updated_at?: string | null
+          user_id: string
+          weather_condition?: string | null
+          wind_speed?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          hour?: number | null
+          humidity?: number | null
+          id?: string
+          metadata?: Json | null
+          precipitation?: number | null
+          store_id?: string | null
+          temperature?: number | null
+          updated_at?: string | null
+          user_id?: string
+          weather_condition?: string | null
+          wind_speed?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weather_data_store_id_fkey"
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
