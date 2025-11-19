@@ -27,6 +27,149 @@ NEURALTWIN APP
 
 ---
 
+## 🔄 섹션별 데이터 처리 로직
+
+### 1️⃣ Overview & 2️⃣ Analysis
+**데이터 흐름**: 임포트 데이터 → 통계 분석 → 시각화
+
+```mermaid
+graph LR
+    A[임포트된 데이터] --> B[데이터 집계/분석]
+    B --> C[통계 계산]
+    C --> D[차트/테이블 렌더링]
+```
+
+**특징**:
+- ✅ 실제 업로드된 데이터 기반
+- ✅ SQL 쿼리 및 통계 연산
+- ✅ 실시간 대시보드
+- ❌ AI 추론 불필요 (단순 집계)
+
+**데이터 소스**:
+- `user_data_imports` (업로드 데이터)
+- `wifi_tracking` (WiFi 트래킹)
+- `stores` (매장 마스터)
+- `graph_entities` / `graph_relations` (온톨로지 데이터)
+
+**주요 기술**:
+- TanStack Query (데이터 페칭)
+- Recharts (시각화)
+- Supabase Select (읽기)
+
+---
+
+### 3️⃣ Simulation
+**데이터 흐름**: 임포트 데이터 + 온톨로지 스키마 → AI 고급추론 → What-if 예측
+
+```mermaid
+graph LR
+    A[임포트된 데이터] --> D[AI 추론 엔진]
+    B[온톨로지 스키마] --> D
+    C[시뮬레이션 파라미터] --> D
+    D --> E[AI 예측 결과]
+    E --> F[KPI 변화량 시각화]
+```
+
+**특징**:
+- ✅ AI 고급 추론 필요
+- ✅ 온톨로지 그래프 기반 컨텍스트
+- ✅ What-if 시나리오 생성
+- ✅ 미래 예측 (ΔCVR, ΔATV, ΔSales 등)
+
+**데이터 소스**:
+- `user_data_imports` (기존 데이터)
+- `ontology_entity_types` / `ontology_relation_types` (스키마)
+- `graph_entities` / `graph_relations` (그래프 데이터)
+- `ai_scene_analysis` (AI 분석 이력)
+
+**주요 기술**:
+- Lovable AI (`google/gemini-2.5-pro` 또는 `openai/gpt-5`)
+- Edge Functions (AI 추론 백엔드)
+- Graph Query (온톨로지 컨텍스트 구축)
+- 3D Digital Twin (시뮬레이션 베이스)
+
+**AI Edge Function 예시**:
+```typescript
+// supabase/functions/simulate-scenario/index.ts
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
+serve(async (req) => {
+  const { scenarioType, parameters, storeId } = await req.json();
+  
+  // 1. 기존 데이터 조회
+  const historicalData = await supabase
+    .from('user_data_imports')
+    .select('*')
+    .eq('store_id', storeId);
+  
+  // 2. 온톨로지 스키마 조회
+  const ontologyContext = await supabase.rpc('graph_n_hop_query', {
+    p_start_entity_id: storeId,
+    p_max_hops: 3
+  });
+  
+  // 3. AI에 시뮬레이션 요청
+  const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${Deno.env.get('LOVABLE_API_KEY')}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-2.5-pro',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a retail simulation expert. 
+          Predict KPI changes based on scenario changes.`
+        },
+        {
+          role: 'user',
+          content: `Scenario: ${scenarioType}
+          Parameters: ${JSON.stringify(parameters)}
+          Historical Data: ${JSON.stringify(historicalData)}
+          Ontology Context: ${JSON.stringify(ontologyContext)}
+          
+          Predict: ΔCVR, ΔATV, ΔSales/㎡, ΔProfit`
+        }
+      ]
+    })
+  });
+  
+  const prediction = await aiResponse.json();
+  
+  // 4. 예측 결과 저장
+  await supabase.from('ai_scene_analysis').insert({
+    analysis_type: 'simulation',
+    scene_data: { scenarioType, parameters },
+    insights: prediction,
+    store_id: storeId
+  });
+  
+  return new Response(JSON.stringify(prediction));
+});
+```
+
+---
+
+### 4️⃣ Data Management
+**데이터 흐름**: 외부 데이터 → ETL → 온톨로지 매핑 → 저장
+
+```mermaid
+graph LR
+    A[외부 데이터 소스] --> B[ETL/변환]
+    B --> C[온톨로지 매핑]
+    C --> D[Supabase 저장]
+```
+
+**특징**:
+- ✅ 데이터 수집 및 변환
+- ✅ 스키마 설계 및 관리
+- ✅ API 연동
+- ⚠️ AI는 데이터 자동 분류에만 사용
+
+---
+
 ## 1️⃣ Overview (4 pages)
 
 **역할**: "지금 우리 비즈니스가 어떻게 돌아가고 있는지" + "매장/기본 설정 관리"
@@ -266,25 +409,82 @@ const sectionStyles = {
 ### Phase 1: 기반 작업 (Week 1)
 1. ✅ 새 IA 구조 문서화 (PROPOSED_IA_ARCHITECTURE.md)
 2. ⬜ App.tsx 라우트 재구성
-3. ⬜ AppSidebar.tsx 메뉴 재구성
-4. ⬜ NavLink 경로 업데이트
+3. ⬜ AppSidebar.tsx 메뉴 재구성 (4개 섹션)
+4. ⬜ 섹션별 데이터 처리 아키텍처 검토
 
-### Phase 2: Analysis 섹션 마이그레이션 (Week 2)
-1. ⬜ 기존 페이지 경로 변경 (8개)
-2. ⬜ 브레드크럼/네비게이션 업데이트
-3. ⬜ 사이드바 활성화 상태 수정
+### Phase 2: Overview & Analysis 섹션 (Week 2)
+1. ⬜ 기존 분석 페이지 경로 변경 (8개)
+2. ⬜ 실제 데이터 기반 분석 로직 검증
+3. ⬜ 통계/집계 쿼리 최적화
+4. ⬜ 차트 렌더링 성능 개선
+
+**데이터 처리 특징**:
+- 임포트 데이터 → SQL 집계 → 시각화
+- AI 추론 불필요 (단순 통계)
 
 ### Phase 3: Simulation 섹션 구축 (Week 3-4)
-1. ⬜ Digital Twin 3D 섹션 이동
-2. ⬜ ScenarioLabPage 신규 생성 (HIGH)
-3. ⬜ LayoutSimulationPage 신규 생성 (HIGH)
-4. ⬜ DemandInventorySimPage 신규 생성 (MEDIUM)
+1. ⬜ AI Edge Function 인프라 구축
+   - `simulate-scenario` (시나리오 시뮬레이션)
+   - `predict-layout-impact` (레이아웃 변경 예측)
+   - `optimize-inventory` (재고 최적화)
+2. ⬜ Digital Twin 3D 섹션 이동
+3. ⬜ ScenarioLabPage 신규 생성 (HIGH)
+4. ⬜ LayoutSimulationPage 신규 생성 (HIGH)
+5. ⬜ 온톨로지 컨텍스트 통합
 
-### Phase 4: 추가 기능 (Week 5-6)
-1. ⬜ PriceOptimizationPage 신규 생성 (LOW)
-2. ⬜ RecommendationStrategyPage 신규 생성 (LOW)
-3. ⬜ 전체 UI/UX 통일성 검토
-4. ⬜ 성능 최적화
+**데이터 처리 특징**:
+- 임포트 데이터 + 온톨로지 스키마 → AI 추론 → What-if 예측
+- Lovable AI (`gemini-2.5-pro` 또는 `gpt-5`)
+
+### Phase 4: 추가 Simulation 기능 (Week 5-6)
+1. ⬜ DemandInventorySimPage (MEDIUM)
+2. ⬜ PriceOptimizationPage (LOW)
+3. ⬜ RecommendationStrategyPage (LOW)
+4. ⬜ AI 추론 결과 캐싱 (`ai_scene_analysis`)
+
+### Phase 5: 최적화 & QA (Week 7-8)
+1. ⬜ AI 추론 비용 최적화
+2. ⬜ 전체 UI/UX 통일성 검토
+3. ⬜ 성능 테스트 및 개선
+4. ⬜ 사용자 가이드 작성
+
+---
+
+## 🧠 AI 활용 전략
+
+### Overview & Analysis: AI 불필요
+- **데이터 소스**: 실제 업로드 데이터
+- **처리 방식**: SQL 집계, 통계 연산
+- **출력**: 차트, 테이블, 대시보드
+- **예시**: "지난 주 매출이 전주 대비 15% 증가했습니다"
+
+### Simulation: AI 필수
+- **데이터 소스**: 업로드 데이터 + 온톨로지 스키마
+- **처리 방식**: AI 고급 추론 (Gemini Pro / GPT-5)
+- **출력**: 예측 KPI, What-if 시나리오, 추천 액션
+- **예시**: "A존을 입구 근처로 이동하면 CVR이 12% 증가할 것으로 예상됩니다"
+
+### 필요한 Edge Functions
+
+1. **simulate-scenario** (시나리오 시뮬레이션)
+   - 입력: 시나리오 타입, 파라미터, 매장 ID
+   - AI 모델: `google/gemini-2.5-pro`
+   - 출력: ΔCVR, ΔATV, ΔSales/㎡, ΔProfit
+
+2. **predict-layout-impact** (레이아웃 변경 예측)
+   - 입력: 3D 모델, 존 변경 사항
+   - AI 모델: `google/gemini-2.5-pro`
+   - 출력: 동선 변화, 체류시간 예측
+
+3. **optimize-inventory** (재고 최적화)
+   - 입력: 현재 재고, 판매 이력, 리드타임
+   - AI 모델: `google/gemini-2.5-flash`
+   - 출력: 최적 발주량, 품절 위험도
+
+4. **optimize-pricing** (가격 최적화)
+   - 입력: 현재 가격, 판매 이력, 경쟁사 가격
+   - AI 모델: `google/gemini-2.5-flash`
+   - 출력: 최적 가격, 매출/마진 예측
 
 ---
 
