@@ -84,14 +84,6 @@ const menuSections: MenuSection[] = [
       { title: "고객 여정", url: "/analysis/customer-journey", icon: Map },
       { title: "전환 퍼널", url: "/analysis/conversion-funnel", icon: Filter },
       { title: "고객 분석", url: "/analysis/customer-analysis", icon: UserCheck },
-    ],
-  },
-  {
-    id: "operationalAnalysis",
-    label: "운영 분석",
-    emoji: "📦",
-    defaultOpen: true,
-    items: [
       { title: "재고 현황", url: "/analysis/inventory", icon: Package },
       { title: "수익 센터 개요", url: "/analysis/profit-center", icon: DollarSign },
       { title: "상품 성과 분석", url: "/analysis/product-performance", icon: TrendingUp },
