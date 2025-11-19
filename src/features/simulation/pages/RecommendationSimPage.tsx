@@ -8,8 +8,8 @@ export default function RecommendationSimPage() {
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">🎯 추천 전략 시뮬레이션</h1>
-          <p className="text-muted-foreground mt-2">고객 세그먼트별 맞춤 추천 전략</p>
+          <h1 className="text-3xl font-bold">🎯 Recommendation Strategy</h1>
+          <p className="text-muted-foreground mt-2">AI 고객 추천 정책 실험 | 슬롯 수/위치/룰 변경 → uplift 예측</p>
         </div>
         <Alert>
           <Target className="h-4 w-4" />
@@ -20,9 +20,9 @@ export default function RecommendationSimPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>추천 전략 시뮬레이션</CardTitle>
+            <CardTitle>Recommendation Strategy Simulation</CardTitle>
             <CardDescription>
-              고객 세그먼트별 맞춤 추천 전략 효과 예측
+              AI 고객 추천 정책 실험 (슬롯 수/위치/룰 변경 → uplift 예측)
             </CardDescription>
           </CardHeader>
           <CardContent>

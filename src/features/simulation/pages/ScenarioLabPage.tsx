@@ -8,21 +8,21 @@ export default function ScenarioLabPage() {
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">🧪 시나리오 랩</h1>
-          <p className="text-muted-foreground mt-2">복합 시나리오 설정 및 What-if 분석</p>
+          <h1 className="text-3xl font-bold">🧪 Scenario Lab</h1>
+          <p className="text-muted-foreground mt-2">시나리오 생성: 레이아웃, 스태핑, 프로모션, 가격/재고 | KPI 예측: ΔCVR, ΔATV, ΔSales/㎡, ΔOpex, ΔProfit</p>
         </div>
         <Alert>
           <TestTube className="h-4 w-4" />
           <AlertDescription>
-            다양한 비즈니스 시나리오를 설정하고 AI 기반으로 결과를 시뮬레이션합니다.
+            다양한 비즈니스 시나리오를 설정하고 AI 기반으로 KPI 변화량을 예측합니다.
           </AlertDescription>
         </Alert>
 
         <Card>
           <CardHeader>
-            <CardTitle>시나리오 랩</CardTitle>
+            <CardTitle>Scenario Lab</CardTitle>
             <CardDescription>
-              복합 시나리오 설정 및 What-if 분석
+              시나리오 생성, KPI 예측, 시나리오 비교 & 추천안 선택
             </CardDescription>
           </CardHeader>
           <CardContent>
