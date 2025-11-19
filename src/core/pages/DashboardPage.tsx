@@ -3,28 +3,34 @@ import { StatCard } from "@/components/StatCard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, TrendingUp, Package, DollarSign, AlertCircle, RefreshCw, AlertTriangle, Clock, TrendingDown, Sparkles } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { useStoreDataset } from "@/hooks/useStoreData";
 import { DataReadinessGuard } from "@/components/DataReadinessGuard";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useClearCache } from "@/hooks/useClearCache";
-import { isToday, parseISO } from "date-fns";
+import { isToday, parseISO, format } from "date-fns";
 import { FunnelVisualization } from "@/components/dashboard/FunnelVisualization";
 import { AIRecommendationCard } from "@/components/dashboard/AIRecommendationCard";
-import { useDashboardKPI } from "@/hooks/useDashboardKPI";
+import { DashboardFilters } from "@/components/dashboard/DashboardFilters";
+import { useDashboardKPI, useLatestKPIs } from "@/hooks/useDashboardKPI";
 import { useAIRecommendations } from "@/hooks/useAIRecommendations";
 import { supabase } from "@/integrations/supabase/client";
 
 const Dashboard = () => {
   const { selectedStore } = useSelectedStore();
   const { invalidateStoreData } = useClearCache();
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   
   const { data: storeData, isLoading: loading, error, refetch } = useStoreDataset();
   
-  // 대시보드 KPI와 AI 추천 가져오기
-  const { data: dashboardKPI } = useDashboardKPI(selectedStore?.id);
+  // 선택된 날짜의 KPI 데이터
+  const dateStr = format(selectedDate, 'yyyy-MM-dd');
+  const { data: dashboardKPI } = useDashboardKPI(selectedStore?.id, dateStr);
+  const { data: latestKPIs } = useLatestKPIs(selectedStore?.id, 7);
+  
+  // AI 추천 가져오기
   const { 
     data: recommendations, 
     dismissRecommendation, 
@@ -33,11 +39,11 @@ const Dashboard = () => {
 
   const handleGenerateRecommendations = async () => {
     if (selectedStore?.id) {
-      // 먼저 KPI 집계
+      // 먼저 선택된 날짜의 KPI 집계
       await supabase.functions.invoke('aggregate-dashboard-kpis', {
         body: { 
           store_id: selectedStore.id,
-          date: new Date().toISOString().split('T')[0]
+          date: dateStr
         },
       });
       // 그 다음 AI 추천 생성
@@ -74,77 +80,99 @@ const Dashboard = () => {
     return { visits: todayVisits, purchases: todayPurchases };
   }, [storeData]);
 
-  // 실제 오늘 데이터로 stats 생성
+  // KPI 데이터 기반 stats 생성
   const stats = useMemo(() => {
-    if (!storeData) return [];
-    
-    const todayVisits = todayData.visits.length;
-    const todayPurchases = todayData.purchases.length;
-    const todayRevenue = todayData.purchases.reduce((sum: number, p: any) => 
-      sum + (parseFloat(p.unit_price) || 0) * (parseInt(p.quantity) || 0), 0);
-    const conversionRate = todayVisits > 0 ? ((todayPurchases / todayVisits) * 100).toFixed(1) : '0.0';
-    const lowStockProducts = storeData.products?.filter((p: any) => 
-      (parseInt(p.stock_quantity) || 0) < 10
-    ).length || 0;
+    if (!dashboardKPI) {
+      // KPI 데이터가 없으면 기본값
+      return [
+        {
+          title: "방문자",
+          value: "0",
+          change: "데이터 없음",
+          changeType: "neutral" as const,
+          icon: Users,
+        },
+        {
+          title: "매출",
+          value: "₩0",
+          change: "0건 구매",
+          changeType: "neutral" as const,
+          icon: DollarSign,
+        },
+        {
+          title: "평당 매출",
+          value: "₩0",
+          change: "데이터 없음",
+          changeType: "neutral" as const,
+          icon: Package,
+        },
+        {
+          title: "전환율",
+          value: "0%",
+          change: "데이터 없음",
+          changeType: "neutral" as const,
+          icon: TrendingUp,
+        },
+      ];
+    }
 
-    // 어제와 비교를 위한 간단한 로직
-    const yesterdayVisits = Math.floor(todayVisits * 0.89);
-    const visitChange = yesterdayVisits > 0 
-      ? (((todayVisits - yesterdayVisits) / yesterdayVisits) * 100).toFixed(1)
+    // 이전 날짜와 비교 (latestKPIs 사용)
+    const previousKPI = latestKPIs && latestKPIs.length > 1 ? latestKPIs[1] : null;
+    const visitChange = previousKPI 
+      ? (((dashboardKPI.total_visits || 0) - (previousKPI.total_visits || 0)) / (previousKPI.total_visits || 1) * 100).toFixed(1)
+      : '0.0';
+    const revenueChange = previousKPI
+      ? (((dashboardKPI.total_revenue || 0) - (previousKPI.total_revenue || 0)) / (previousKPI.total_revenue || 1) * 100).toFixed(1)
       : '0.0';
 
     return [
       {
-        title: "오늘 방문자",
-        value: todayVisits.toString(),
-        change: `${visitChange}% 어제 대비`,
+        title: "방문자",
+        value: (dashboardKPI.total_visits || 0).toLocaleString(),
+        change: `${visitChange}% 이전 대비`,
         changeType: parseFloat(visitChange) >= 0 ? "positive" as const : "negative" as const,
         icon: Users,
       },
       {
-        title: "오늘 매출",
-        value: `₩${todayRevenue.toLocaleString()}`,
-        change: `${todayPurchases}건 구매`,
-        changeType: todayPurchases > 0 ? "positive" as const : "neutral" as const,
+        title: "매출",
+        value: `₩${(dashboardKPI.total_revenue || 0).toLocaleString()}`,
+        change: `${revenueChange}% 이전 대비`,
+        changeType: parseFloat(revenueChange) >= 0 ? "positive" as const : "negative" as const,
         icon: DollarSign,
       },
       {
-        title: "재고 알림",
-        value: lowStockProducts.toString(),
-        change: lowStockProducts > 0 ? `${lowStockProducts}개 품목 부족` : "정상",
-        changeType: lowStockProducts > 0 ? "negative" as const : "positive" as const,
+        title: "평당 매출",
+        value: `₩${Math.round(dashboardKPI.sales_per_sqm || 0).toLocaleString()}`,
+        change: `면적당 효율`,
+        changeType: (dashboardKPI.sales_per_sqm || 0) > 1000 ? "positive" as const : "neutral" as const,
         icon: Package,
       },
       {
         title: "전환율",
-        value: `${conversionRate}%`,
-        change: todayVisits > 0 ? `${todayVisits}명 중 ${todayPurchases}명 구매` : "데이터 없음",
-        changeType: parseFloat(conversionRate) >= 3 ? "positive" as const : "neutral" as const,
+        value: `${(dashboardKPI.conversion_rate || 0).toFixed(1)}%`,
+        change: `${dashboardKPI.total_purchases || 0}건 구매`,
+        changeType: (dashboardKPI.conversion_rate || 0) >= 3 ? "positive" as const : "neutral" as const,
         icon: TrendingUp,
       },
     ];
-  }, [storeData, todayData]);
+  }, [dashboardKPI, latestKPIs]);
 
-  // 오늘 시간대별 방문자 데이터 생성
+  // 최근 7일 트렌드 데이터 (latestKPIs 기반)
   const visitorData = useMemo(() => {
-    if (!todayData.visits || todayData.visits.length === 0) {
-      return Array.from({ length: 24 }, (_, i) => ({
-        time: `${String(i).padStart(2, '0')}:00`,
-        visitors: 0
+    if (!latestKPIs || latestKPIs.length === 0) {
+      return Array.from({ length: 7 }, (_, i) => ({
+        date: `Day ${i + 1}`,
+        visitors: 0,
+        revenue: 0
       }));
     }
     
-    const hourlyVisits = new Map<number, number>();
-    todayData.visits.forEach((visit: any) => {
-      const hour = visit.visit_hour ? parseInt(visit.visit_hour) : 12;
-      hourlyVisits.set(hour, (hourlyVisits.get(hour) || 0) + 1);
-    });
-
-    return Array.from({ length: 24 }, (_, i) => ({
-      time: `${String(i).padStart(2, '0')}:00`,
-      visitors: hourlyVisits.get(i) || 0
+    return latestKPIs.slice(0, 7).reverse().map(kpi => ({
+      date: format(new Date(kpi.date), 'MM/dd'),
+      visitors: kpi.total_visits || 0,
+      revenue: Math.round((kpi.total_revenue || 0) / 1000) // 천원 단위
     }));
-  }, [todayData]);
+  }, [latestKPIs]);
 
   // 실제 데이터 기반 알림 생성
   const alerts = useMemo(() => {
@@ -238,29 +266,34 @@ const Dashboard = () => {
           <div>
             <h1 className="text-3xl font-bold gradient-text">실시간 대시보드</h1>
             <p className="mt-2 text-muted-foreground">
-              {selectedStore ? `${selectedStore.store_name} - 오늘 매장 운영 현황 및 주요 지표` : '오늘 매장 운영 현황 및 주요 지표'}
+              {selectedStore ? `${selectedStore.store_name} - 매장 운영 현황 및 주요 지표` : '매장 운영 현황 및 주요 지표'}
             </p>
           </div>
-          <Button
-            onClick={() => {
-              invalidateStoreData(selectedStore?.id);
-              refetch();
-            }}
-            variant="outline"
-            size="sm"
-            className="gap-2"
-          >
-            <RefreshCw className="h-4 w-4" />
-            데이터 새로고침
-          </Button>
+          <div className="flex items-center gap-2">
+            <DashboardFilters 
+              selectedDate={selectedDate}
+              onDateChange={(date) => date && setSelectedDate(date)}
+            />
+            <Button
+              onClick={() => {
+                invalidateStoreData(selectedStore?.id);
+                refetch();
+              }}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              새로고침
+            </Button>
+          </div>
         </div>
 
-        {todayData.visits.length > 0 && (
+        {dashboardKPI && (
           <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
             <AlertCircle className="h-4 w-4 text-blue-600" />
             <AlertDescription>
-              {selectedStore ? `${selectedStore.store_name} 오늘 데이터: ` : '오늘 데이터: '}
-              {todayData.visits.length}건 방문, {todayData.purchases.length}건 구매
+              {format(selectedDate, 'yyyy년 M월 d일')} 데이터: {dashboardKPI.total_visits || 0}건 방문, {dashboardKPI.total_purchases || 0}건 구매, ₩{(dashboardKPI.total_revenue || 0).toLocaleString()} 매출
             </AlertDescription>
           </Alert>
         )}
@@ -331,11 +364,11 @@ const Dashboard = () => {
 
         {/* Charts Section */}
         <div className="grid gap-6 lg:grid-cols-2 animate-slide-up">
-          {/* Visitor Chart */}
+          {/* Visitor & Revenue Trend */}
           <Card className="hover-lift">
             <CardHeader>
-              <CardTitle>실시간 방문자</CardTitle>
-              <CardDescription>오늘 시간대별 방문자 수</CardDescription>
+              <CardTitle>최근 7일 트렌드</CardTitle>
+              <CardDescription>방문자 수 및 매출 추이</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -345,10 +378,15 @@ const Dashboard = () => {
                       <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
                       <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                     </linearGradient>
+                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(var(--chart-2))" stopOpacity={0} />
+                    </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="time" className="text-xs" />
-                  <YAxis className="text-xs" />
+                  <XAxis dataKey="date" className="text-xs" />
+                  <YAxis yAxisId="left" className="text-xs" />
+                  <YAxis yAxisId="right" orientation="right" className="text-xs" />
                   <Tooltip 
                     contentStyle={{ 
                       backgroundColor: "hsl(var(--card))", 
@@ -357,11 +395,22 @@ const Dashboard = () => {
                     }} 
                   />
                   <Area 
+                    yAxisId="left"
                     type="monotone" 
                     dataKey="visitors" 
                     stroke="hsl(var(--primary))" 
                     fillOpacity={1} 
                     fill="url(#colorVisitors)" 
+                    name="방문자"
+                  />
+                  <Area 
+                    yAxisId="right"
+                    type="monotone" 
+                    dataKey="revenue" 
+                    stroke="hsl(var(--chart-2))" 
+                    fillOpacity={1} 
+                    fill="url(#colorRevenue)" 
+                    name="매출 (천원)"
                   />
                 </AreaChart>
               </ResponsiveContainer>
