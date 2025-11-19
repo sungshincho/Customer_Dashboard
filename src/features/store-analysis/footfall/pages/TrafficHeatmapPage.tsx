@@ -161,7 +161,12 @@ const TrafficHeatmapPage = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <TrafficHeatmap visitsData={visitsData} heatPoints={heatPoints} timeOfDay={timeOfDay} />
+                  <TrafficHeatmap 
+                    visitsData={visitsData} 
+                    heatPoints={heatPoints} 
+                    timeOfDay={timeOfDay}
+                    contextInsights={contextInsights}
+                  />
                 </CardContent>
               </Card>
             </div>
@@ -185,11 +190,27 @@ const TrafficHeatmapPage = () => {
                     {/* Time Controls */}
                     <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <Badge variant="outline" className="text-lg font-semibold">
                             {String(timeOfDay).padStart(2, '0')}:00
                           </Badge>
-                          <span className="text-sm text-muted-foreground">시간대</span>
+                          {/* Context Badges for 3D View */}
+                          {contextInsights.length > 0 && (
+                            <>
+                              {contextInsights.some(i => i.includes('🌧️') || i.includes('비')) && (
+                                <Badge variant="secondary" className="text-xs">🌧️ 비</Badge>
+                              )}
+                              {contextInsights.some(i => i.includes('☀️') || i.includes('폭염')) && (
+                                <Badge variant="destructive" className="text-xs">☀️ 폭염</Badge>
+                              )}
+                              {contextInsights.some(i => i.includes('🎉') || i.includes('이벤트')) && (
+                                <Badge variant="default" className="text-xs">🎉 이벤트</Badge>
+                              )}
+                              {contextInsights.some(i => i.includes('🏖️') || i.includes('공휴일')) && (
+                                <Badge variant="outline" className="text-xs">🏖️ 공휴일</Badge>
+                              )}
+                            </>
+                          )}
                         </div>
                         <div className="flex gap-2">
                           <Button
