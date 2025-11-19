@@ -14,6 +14,74 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_recommendations: {
+        Row: {
+          action_category: string | null
+          created_at: string
+          data_source: string | null
+          description: string
+          dismissed_at: string | null
+          displayed_at: string | null
+          evidence: Json | null
+          expected_impact: Json | null
+          id: string
+          is_displayed: boolean | null
+          priority: string
+          recommendation_type: string
+          status: string | null
+          store_id: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          action_category?: string | null
+          created_at?: string
+          data_source?: string | null
+          description: string
+          dismissed_at?: string | null
+          displayed_at?: string | null
+          evidence?: Json | null
+          expected_impact?: Json | null
+          id?: string
+          is_displayed?: boolean | null
+          priority: string
+          recommendation_type: string
+          status?: string | null
+          store_id?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          action_category?: string | null
+          created_at?: string
+          data_source?: string | null
+          description?: string
+          dismissed_at?: string | null
+          displayed_at?: string | null
+          evidence?: Json | null
+          expected_impact?: Json | null
+          id?: string
+          is_displayed?: boolean | null
+          priority?: string
+          recommendation_type?: string
+          status?: string | null
+          store_id?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_recommendations_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_scene_analysis: {
         Row: {
           analysis_type: string
@@ -142,6 +210,86 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dashboard_kpis: {
+        Row: {
+          consumer_sentiment_index: number | null
+          conversion_rate: number | null
+          created_at: string
+          date: string
+          funnel_browse: number | null
+          funnel_entry: number | null
+          funnel_fitting: number | null
+          funnel_purchase: number | null
+          funnel_return: number | null
+          id: string
+          is_holiday: boolean | null
+          labor_hours: number | null
+          sales_per_sqm: number | null
+          special_event: string | null
+          store_id: string | null
+          total_purchases: number | null
+          total_revenue: number | null
+          total_visits: number | null
+          updated_at: string
+          user_id: string
+          weather_condition: string | null
+        }
+        Insert: {
+          consumer_sentiment_index?: number | null
+          conversion_rate?: number | null
+          created_at?: string
+          date: string
+          funnel_browse?: number | null
+          funnel_entry?: number | null
+          funnel_fitting?: number | null
+          funnel_purchase?: number | null
+          funnel_return?: number | null
+          id?: string
+          is_holiday?: boolean | null
+          labor_hours?: number | null
+          sales_per_sqm?: number | null
+          special_event?: string | null
+          store_id?: string | null
+          total_purchases?: number | null
+          total_revenue?: number | null
+          total_visits?: number | null
+          updated_at?: string
+          user_id: string
+          weather_condition?: string | null
+        }
+        Update: {
+          consumer_sentiment_index?: number | null
+          conversion_rate?: number | null
+          created_at?: string
+          date?: string
+          funnel_browse?: number | null
+          funnel_entry?: number | null
+          funnel_fitting?: number | null
+          funnel_purchase?: number | null
+          funnel_return?: number | null
+          id?: string
+          is_holiday?: boolean | null
+          labor_hours?: number | null
+          sales_per_sqm?: number | null
+          special_event?: string | null
+          store_id?: string | null
+          total_purchases?: number | null
+          total_revenue?: number | null
+          total_visits?: number | null
+          updated_at?: string
+          user_id?: string
+          weather_condition?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dashboard_kpis_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
             referencedColumns: ["id"]
           },
         ]
@@ -287,6 +435,53 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      funnel_metrics: {
+        Row: {
+          count: number
+          created_at: string
+          customer_segment: string | null
+          date: string
+          duration_seconds: number | null
+          hour: number | null
+          id: string
+          stage: string
+          store_id: string | null
+          user_id: string
+        }
+        Insert: {
+          count: number
+          created_at?: string
+          customer_segment?: string | null
+          date: string
+          duration_seconds?: number | null
+          hour?: number | null
+          id?: string
+          stage: string
+          store_id?: string | null
+          user_id: string
+        }
+        Update: {
+          count?: number
+          created_at?: string
+          customer_segment?: string | null
+          date?: string
+          duration_seconds?: number | null
+          hour?: number | null
+          id?: string
+          stage?: string
+          store_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funnel_metrics_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       graph_entities: {
         Row: {
