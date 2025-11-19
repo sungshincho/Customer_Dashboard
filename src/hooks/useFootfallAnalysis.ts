@@ -9,6 +9,13 @@ export interface FootfallData {
   visit_count: number;
   unique_visitors: number;
   avg_duration_minutes: number;
+  // 컨텍스트 데이터
+  weather_condition?: string;
+  temperature?: number;
+  is_holiday?: boolean;
+  event_name?: string;
+  event_type?: string;
+  regional_traffic?: number;
 }
 
 export interface FootfallStats {
@@ -18,6 +25,10 @@ export interface FootfallStats {
   peak_hour: number;
   peak_hour_visits: number;
   daily_trend: number; // % change from previous period
+  // 컨텍스트 인사이트
+  weather_impact?: string;
+  holiday_impact?: string;
+  regional_comparison?: string;
 }
 
 export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?: Date) {
@@ -71,7 +82,36 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
         throw new Error('방문 데이터를 불러오는데 실패했습니다.');
       }
 
-      // 시간대별 집계
+      // 외부 컨텍스트 데이터 가져오기 (날씨, 공휴일, 상권 데이터)
+      const [weatherResult, holidaysResult, regionalResult] = await Promise.all([
+        supabase
+          .from('weather_data')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('store_id', storeId)
+          .gte('date', format(start, 'yyyy-MM-dd'))
+          .lte('date', format(end, 'yyyy-MM-dd')),
+        supabase
+          .from('holidays_events')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('store_id', storeId)
+          .gte('date', format(start, 'yyyy-MM-dd'))
+          .lte('date', format(end, 'yyyy-MM-dd')),
+        supabase
+          .from('regional_data')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('store_id', storeId)
+          .gte('date', format(start, 'yyyy-MM-dd'))
+          .lte('date', format(end, 'yyyy-MM-dd'))
+      ]);
+
+      const weatherData = weatherResult.data || [];
+      const holidaysData = holidaysResult.data || [];
+      const regionalData = regionalResult.data || [];
+
+      // 시간대별 집계 (컨텍스트 데이터 포함)
       const hourlyData = new Map<string, FootfallData>();
       
       visits?.forEach((visit) => {
@@ -81,12 +121,27 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
         const key = `${dateKey}-${hour}`;
 
         if (!hourlyData.has(key)) {
+          // 해당 시간의 컨텍스트 데이터 찾기
+          const weather = weatherData.find(w => 
+            w.date === dateKey && (w.hour === hour || w.hour === null)
+          );
+          const holiday = holidaysData.find(h => h.date === dateKey);
+          const regional = regionalData.find(r => 
+            r.date === dateKey && r.data_type === 'foot_traffic'
+          );
+
           hourlyData.set(key, {
             date: dateKey,
             hour,
             visit_count: 0,
             unique_visitors: 0,
             avg_duration_minutes: 0,
+            weather_condition: weather?.weather_condition,
+            temperature: weather?.temperature ? Number(weather.temperature) : undefined,
+            is_holiday: !!holiday,
+            event_name: holiday?.event_name,
+            event_type: holiday?.event_type,
+            regional_traffic: regional?.value ? Number(regional.value) : undefined,
           });
         }
 
@@ -144,6 +199,11 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
         d.visit_count > max.visit_count ? d : max
       , footfallData[0] || { hour: 14, visit_count: 0 });
 
+      // 컨텍스트 기반 인사이트 생성
+      const weatherImpact = generateWeatherImpact(footfallData);
+      const holidayImpact = generateHolidayImpact(footfallData);
+      const regionalComparison = generateRegionalComparison(footfallData);
+
       const stats: FootfallStats = {
         total_visits: totalVisits,
         unique_visitors: totalUniqueVisitors,
@@ -151,6 +211,9 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
         peak_hour: peakData.hour,
         peak_hour_visits: peakData.visit_count,
         daily_trend: 0, // TODO: 이전 기간과 비교
+        weather_impact: weatherImpact,
+        holiday_impact: holidayImpact,
+        regional_comparison: regionalComparison,
       };
 
       return {
@@ -160,6 +223,57 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
     },
     enabled: !!user && !!storeId,
   });
+}
+
+// 컨텍스트 인사이트 생성 함수들
+function generateWeatherImpact(data: FootfallData[]): string | undefined {
+  const rainyDays = data.filter(d => d.weather_condition === 'rainy');
+  const sunnyDays = data.filter(d => d.weather_condition === 'sunny');
+  
+  if (rainyDays.length === 0 || sunnyDays.length === 0) return undefined;
+  
+  const rainyAvg = rainyDays.reduce((sum, d) => sum + d.visit_count, 0) / rainyDays.length;
+  const sunnyAvg = sunnyDays.reduce((sum, d) => sum + d.visit_count, 0) / sunnyDays.length;
+  const diff = ((rainyAvg - sunnyAvg) / sunnyAvg) * 100;
+  
+  if (Math.abs(diff) < 5) return undefined;
+  
+  return diff < 0
+    ? `비 오는 날 방문 ${Math.abs(diff).toFixed(0)}% 감소`
+    : `비 오는 날 방문 ${diff.toFixed(0)}% 증가`;
+}
+
+function generateHolidayImpact(data: FootfallData[]): string | undefined {
+  const holidays = data.filter(d => d.is_holiday);
+  const regularDays = data.filter(d => !d.is_holiday);
+  
+  if (holidays.length === 0 || regularDays.length === 0) return undefined;
+  
+  const holidayAvg = holidays.reduce((sum, d) => sum + d.visit_count, 0) / holidays.length;
+  const regularAvg = regularDays.reduce((sum, d) => sum + d.visit_count, 0) / regularDays.length;
+  const diff = ((holidayAvg - regularAvg) / regularAvg) * 100;
+  
+  if (Math.abs(diff) < 10) return undefined;
+  
+  const eventName = holidays[0]?.event_name || '공휴일/이벤트';
+  return diff < 0
+    ? `${eventName} 기간 방문 ${Math.abs(diff).toFixed(0)}% 감소`
+    : `${eventName} 기간 방문 ${diff.toFixed(0)}% 증가`;
+}
+
+function generateRegionalComparison(data: FootfallData[]): string | undefined {
+  const withRegional = data.filter(d => d.regional_traffic);
+  
+  if (withRegional.length === 0) return undefined;
+  
+  const avgStoreVisits = withRegional.reduce((sum, d) => sum + d.visit_count, 0) / withRegional.length;
+  const avgRegionalTraffic = withRegional.reduce((sum, d) => sum + (d.regional_traffic || 0), 0) / withRegional.length;
+  
+  if (avgRegionalTraffic === 0) return undefined;
+  
+  const captureRate = (avgStoreVisits / avgRegionalTraffic) * 100;
+  
+  return `상권 유동인구 대비 ${captureRate.toFixed(1)}% 유입률`;
 }
 
 export function useHourlyFootfall(storeId?: string, date?: Date) {
