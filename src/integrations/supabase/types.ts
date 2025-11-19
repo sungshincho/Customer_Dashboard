@@ -608,6 +608,120 @@ export type Database = {
           },
         ]
       }
+      hq_store_master: {
+        Row: {
+          address: string | null
+          area_sqm: number | null
+          created_at: string
+          district: string | null
+          email: string | null
+          external_system_id: string | null
+          external_system_name: string | null
+          hq_store_code: string
+          hq_store_name: string
+          id: string
+          last_synced_at: string | null
+          manager_name: string | null
+          metadata: Json | null
+          opening_date: string | null
+          phone: string | null
+          region: string | null
+          status: string | null
+          store_format: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          area_sqm?: number | null
+          created_at?: string
+          district?: string | null
+          email?: string | null
+          external_system_id?: string | null
+          external_system_name?: string | null
+          hq_store_code: string
+          hq_store_name: string
+          id?: string
+          last_synced_at?: string | null
+          manager_name?: string | null
+          metadata?: Json | null
+          opening_date?: string | null
+          phone?: string | null
+          region?: string | null
+          status?: string | null
+          store_format?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          area_sqm?: number | null
+          created_at?: string
+          district?: string | null
+          email?: string | null
+          external_system_id?: string | null
+          external_system_name?: string | null
+          hq_store_code?: string
+          hq_store_name?: string
+          id?: string
+          last_synced_at?: string | null
+          manager_name?: string | null
+          metadata?: Json | null
+          opening_date?: string | null
+          phone?: string | null
+          region?: string | null
+          status?: string | null
+          store_format?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      hq_sync_logs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          metadata: Json | null
+          records_failed: number | null
+          records_processed: number | null
+          records_synced: number | null
+          started_at: string
+          status: string
+          sync_type: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          records_failed?: number | null
+          records_processed?: number | null
+          records_synced?: number | null
+          started_at?: string
+          status: string
+          sync_type: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          records_failed?: number | null
+          records_processed?: number | null
+          records_synced?: number | null
+          started_at?: string
+          status?: string
+          sync_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       inventory_levels: {
         Row: {
           created_at: string | null
@@ -870,6 +984,63 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      store_mappings: {
+        Row: {
+          created_at: string
+          hq_store_id: string
+          id: string
+          last_synced_at: string | null
+          local_store_id: string
+          mapping_status: string | null
+          metadata: Json | null
+          sync_direction: string | null
+          sync_enabled: boolean | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          hq_store_id: string
+          id?: string
+          last_synced_at?: string | null
+          local_store_id: string
+          mapping_status?: string | null
+          metadata?: Json | null
+          sync_direction?: string | null
+          sync_enabled?: boolean | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          hq_store_id?: string
+          id?: string
+          last_synced_at?: string | null
+          local_store_id?: string
+          mapping_status?: string | null
+          metadata?: Json | null
+          sync_direction?: string | null
+          sync_enabled?: boolean | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_mappings_hq_store_id_fkey"
+            columns: ["hq_store_id"]
+            isOneToOne: false
+            referencedRelation: "hq_store_master"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_mappings_local_store_id_fkey"
+            columns: ["local_store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       store_scenes: {
         Row: {
