@@ -8,8 +8,8 @@ export default function DemandInventorySimPage() {
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">📦 수요 & 재고 예측 시뮬레이션</h1>
-          <p className="text-muted-foreground mt-2">AI 기반 미래 수요 예측 및 최적 재고 시뮬레이션</p>
+          <h1 className="text-3xl font-bold">📦 Demand & Inventory Sim</h1>
+          <p className="text-muted-foreground mt-2">발주정책/안전재고/리드타임 변경 → 매출·품절·폐기 예측</p>
         </div>
         <Alert>
           <Lightbulb className="h-4 w-4" />
@@ -20,9 +20,9 @@ export default function DemandInventorySimPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>수요 & 재고 시뮬레이션</CardTitle>
+            <CardTitle>Demand & Inventory Simulation</CardTitle>
             <CardDescription>
-              날씨 예보, 이벤트 캘린더, 경제 지표를 기반으로 미래 수요 예측
+              발주정책/안전재고/리드타임 변경에 따른 매출·품절·폐기 예측
             </CardDescription>
           </CardHeader>
           <CardContent>

@@ -8,21 +8,21 @@ export default function LayoutSimPage() {
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">🗺️ 레이아웃 시뮬레이션</h1>
-          <p className="text-muted-foreground mt-2">매장 레이아웃 변경 시 매출 영향 예측</p>
+          <h1 className="text-3xl font-bold">🗺️ Layout Simulation</h1>
+          <p className="text-muted-foreground mt-2">Digital Twin 3D 모델 위 레이아웃 What-if | 존 이동/페이싱 변경에 대한 KPI 예측</p>
         </div>
         <Alert>
           <Grid3x3 className="h-4 w-4" />
           <AlertDescription>
-            매장 레이아웃 변경 시 동선 흐름과 매출 영향을 3D로 시뮬레이션합니다.
+            Digital Twin 3D 모델에서 레이아웃을 변경하면 동선 흐름과 매출 영향을 실시간으로 시뮬레이션합니다.
           </AlertDescription>
         </Alert>
 
         <Card>
           <CardHeader>
-            <CardTitle>레이아웃 시뮬레이션</CardTitle>
+            <CardTitle>Layout Simulation</CardTitle>
             <CardDescription>
-              가구 배치, 동선 변경에 따른 매출 영향 예측
+              Digital Twin 3D 모델 위 레이아웃 What-if, 존 이동/페이싱 변경 KPI 예측
             </CardDescription>
           </CardHeader>
           <CardContent>

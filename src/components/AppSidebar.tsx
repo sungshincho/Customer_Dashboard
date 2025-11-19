@@ -63,12 +63,12 @@ interface MenuSection {
   defaultOpen: boolean;
 }
 
-// 1️⃣ Overview
+// 1️⃣ Overview (4 pages)
 const overviewItems: MenuItem[] = [
   { title: "대시보드", url: "/", icon: LayoutDashboard },
   { title: "매장 관리", url: "/stores", icon: Store },
+  { title: "HQ-매장 동기화", url: "/hq-store-sync", icon: Network },
   { title: "설정", url: "/settings", icon: Settings },
-  { title: "디지털 트윈 3D", url: "/digital-twin-3d", icon: Boxes },
 ];
 
 // 2️⃣ Analysis, 3️⃣ Simulation, 4️⃣ Data Management 섹션
@@ -79,11 +79,11 @@ const menuSections: MenuSection[] = [
     emoji: "📊",
     defaultOpen: true,
     items: [
-      { title: "방문자 현황", url: "/analysis/footfall", icon: Users },
-      { title: "동선 히트맵", url: "/analysis/traffic-heatmap", icon: Activity },
-      { title: "고객 여정", url: "/analysis/customer-journey", icon: Map },
-      { title: "전환 퍼널", url: "/analysis/conversion-funnel", icon: Filter },
-      { title: "고객 분석", url: "/analysis/customer-analysis", icon: UserCheck },
+      { title: "Footfall Analysis", url: "/analysis/footfall", icon: Users },
+      { title: "Traffic Heatmap", url: "/analysis/traffic-heatmap", icon: Activity },
+      { title: "Customer Journey", url: "/analysis/customer-journey", icon: Map },
+      { title: "Conversion Funnel", url: "/analysis/conversion-funnel", icon: Filter },
+      { title: "Customer Analysis", url: "/analysis/customer-analysis", icon: UserCheck },
     ],
   },
   {
@@ -92,9 +92,9 @@ const menuSections: MenuSection[] = [
     emoji: "📦",
     defaultOpen: true,
     items: [
-      { title: "재고 현황", url: "/analysis/inventory", icon: Package },
-      { title: "수익 센터 개요", url: "/analysis/profit-center", icon: DollarSign },
-      { title: "고급 분석", url: "/analysis/analytics", icon: TrendingUp },
+      { title: "Inventory Status", url: "/analysis/inventory", icon: Package },
+      { title: "Profit Center Overview", url: "/analysis/profit-center", icon: DollarSign },
+      { title: "Product Performance", url: "/analysis/product-performance", icon: TrendingUp },
     ],
   },
   {
@@ -103,12 +103,12 @@ const menuSections: MenuSection[] = [
     emoji: "🔮",
     defaultOpen: true,
     items: [
-      { title: "수요 & 재고 예측", url: "/simulation/demand-inventory", icon: TrendingUp },
-      { title: "가격 최적화", url: "/simulation/pricing", icon: DollarSign },
-      { title: "추천 전략", url: "/simulation/recommendation", icon: Target },
-      { title: "시나리오 랩", url: "/simulation/scenario-lab", icon: TestTube },
-      { title: "레이아웃 시뮬레이션", url: "/simulation/layout", icon: Grid3x3 },
-      { title: "직원 효율성", url: "/simulation/staff-efficiency", icon: UserCheck },
+      { title: "Digital Twin 3D", url: "/digital-twin-3d", icon: Boxes },
+      { title: "Scenario Lab", url: "/simulation/twin-lab", icon: TestTube },
+      { title: "Layout Simulation", url: "/simulation/layout", icon: Grid3x3 },
+      { title: "Demand & Inventory Sim", url: "/simulation/demand-inventory", icon: TrendingUp },
+      { title: "Price Optimization Sim", url: "/simulation/pricing", icon: DollarSign },
+      { title: "Recommendation Strategy", url: "/simulation/recommendation", icon: Target },
     ],
   },
   {
@@ -117,11 +117,11 @@ const menuSections: MenuSection[] = [
     emoji: "🗄️",
     defaultOpen: true,
     items: [
-      { title: "통합 데이터 임포트", url: "/data-import", icon: Upload },
-      { title: "스키마 빌더", url: "/schema-builder", icon: Network },
-      { title: "그래프 분석", url: "/graph-analysis", icon: Database },
-      { title: "빅데이터 API", url: "/bigdata-api", icon: Zap },
-      { title: "NeuralSense 설정", url: "/neuralsense-settings", icon: Cpu },
+      { title: "Unified Data Import", url: "/data-import", icon: Upload },
+      { title: "Schema Builder", url: "/schema-builder", icon: Network },
+      { title: "Graph Analysis", url: "/graph-analysis", icon: Database },
+      { title: "BigData API", url: "/bigdata-api", icon: Zap },
+      { title: "Analytics Backend", url: "/analytics", icon: Cpu },
     ],
   },
 ];
