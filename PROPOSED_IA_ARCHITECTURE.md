@@ -29,8 +29,29 @@ NEURALTWIN APP
 
 ## 🔄 섹션별 데이터 처리 로직
 
-### 1️⃣ Overview & 2️⃣ Analysis
-**데이터 흐름**: 임포트 데이터 → 통계 분석 → 시각화
+### 1️⃣ Overview
+**데이터 흐름**: Analysis/Simulation 결과 요약 → 대시보드 시각화
+
+```mermaid
+graph LR
+    A[Analysis 분석 결과] --> C[KPI 집계]
+    B[Simulation 예측 결과] --> C
+    C --> D[대시보드 렌더링]
+```
+
+**특징**:
+- ✅ Analysis/Simulation에서 계산된 결과 표시
+- ✅ 외부 API는 간접 활용 (컨텍스트 반영된 KPI 요약)
+- ❌ 직접 API 호출 없음
+
+**외부 API 활용**:
+- 날씨/공휴일/이벤트/경제지표는 Analysis/Simulation에서 계산 후 요약값만 표시
+- 예: "이번 주 매출 △12% (↘︎, 우천 + 연휴 후 비수기 영향 포함)"
+
+---
+
+### 2️⃣ Analysis
+**데이터 흐름**: 임포트 데이터 + 외부 API 컨텍스트 → 통계 분석 → 시각화
 
 ```mermaid
 graph LR
@@ -42,14 +63,27 @@ graph LR
 **특징**:
 - ✅ 실제 업로드된 데이터 기반
 - ✅ SQL 쿼리 및 통계 연산
+- ✅ 외부 API 컨텍스트 조인 (날씨, 공휴일, 경제지표 등)
 - ✅ 실시간 대시보드
-- ❌ AI 추론 불필요 (단순 집계)
+- ❌ AI 추론 불필요 (단순 집계 + 컨텍스트)
 
 **데이터 소스**:
 - `user_data_imports` (업로드 데이터)
 - `wifi_tracking` (WiFi 트래킹)
 - `stores` (매장 마스터)
 - `graph_entities` / `graph_relations` (온톨로지 데이터)
+- **외부 API**: 날씨, 공휴일/이벤트, 지역/상권, 경제지표
+
+**외부 API 활용 예시**:
+- **Footfall Analysis**: 날씨·공휴일·상권 데이터로 유입률 분석
+  - "비 오는 날 퇴근시간 유입 -23%"
+  - "지역 축제 주간 토요일 유입 +41%"
+- **Customer Journey**: 날씨/이벤트별 여정 패턴 분석
+  - "폭우 시 '입구→핫존→캐시 바로 이동' 패턴 증가"
+- **Conversion Funnel**: 경제지표별 퍼널 비교
+  - "소비자심리지수↓ 구간에서 CVR -0.7%p"
+- **Inventory Status**: 날씨 예측 기반 재고 위험 판단
+  - "예상 폭염 주간 대비 썬크림 재고 부족 위험"
 
 **주요 기술**:
 - TanStack Query (데이터 페칭)
@@ -59,22 +93,40 @@ graph LR
 ---
 
 ### 3️⃣ Simulation
-**데이터 흐름**: 임포트 데이터 + 온톨로지 스키마 → AI 고급추론 → What-if 예측
+**데이터 흐름**: 임포트 데이터 + 온톨로지 스키마 + 외부 API 예측 → AI 고급추론 → What-if 예측
 
 ```mermaid
 graph LR
     A[임포트된 데이터] --> D[AI 추론 엔진]
     B[온톨로지 스키마] --> D
     C[시뮬레이션 파라미터] --> D
-    D --> E[AI 예측 결과]
-    E --> F[KPI 변화량 시각화]
+    E[외부 API 예측<br/>날씨예보/이벤트/경제지표] --> D
+    D --> F[AI 예측 결과]
+    F --> G[KPI 변화량 시각화]
 ```
 
 **특징**:
 - ✅ AI 고급 추론 필요
 - ✅ 온톨로지 그래프 기반 컨텍스트
+- ✅ 외부 API 예측 데이터 활용 (날씨 예보, 이벤트 일정, 경제 전망)
 - ✅ What-if 시나리오 생성
 - ✅ 미래 예측 (ΔCVR, ΔATV, ΔSales 등)
+
+**데이터 소스**:
+- `user_data_imports` (기존 데이터)
+- `ontology_entity_types` / `ontology_relation_types` (스키마)
+- `graph_entities` / `graph_relations` (그래프 데이터)
+- `ai_scene_analysis` (AI 분석 이력)
+- **외부 API**: 날씨 예보, 공휴일/이벤트 일정, 경제지표 전망
+
+**외부 API 활용 예시**:
+- **Demand & Inventory Sim**: 날씨 예보 + 이벤트로 수요 예측
+  - "다음주 장마전선 → 우산/레인코트 수요 +65%"
+  - "추석 전주 3일, 한복/선물세트 수요 피크 예측"
+- **Price Optimization Sim**: 경제지표로 가격 탄력성 모델링
+  - "경기 위축기에는 동일 할인률에서도 매출 uplift 감소"
+- **Recommendation Strategy**: 트렌드/소셜 데이터 반영
+  - "TikTok 버즈 증가 아이템 → 추천 리스트 상단 배치"
 
 **데이터 소스**:
 - `user_data_imports` (기존 데이터)
@@ -153,20 +205,33 @@ serve(async (req) => {
 ---
 
 ### 4️⃣ Data Management
-**데이터 흐름**: 외부 데이터 → ETL → 온톨로지 매핑 → 저장
+**데이터 흐름**: 외부 데이터 (내부 + 외부 API) → ETL → 온톨로지 매핑 → 저장
 
 ```mermaid
 graph LR
     A[외부 데이터 소스] --> B[ETL/변환]
-    B --> C[온톨로지 매핑]
-    C --> D[Supabase 저장]
+    C[외부 API<br/>날씨/이벤트/경제] --> B
+    B --> D[온톨로지 매핑]
+    D --> E[Supabase 저장]
 ```
 
 **특징**:
 - ✅ 데이터 수집 및 변환
+- ✅ 외부 API 연결 및 스케줄링
 - ✅ 스키마 설계 및 관리
-- ✅ API 연동
+- ✅ API 연동 (Weather, Calendar, Economic Indicators 등)
 - ⚠️ AI는 데이터 자동 분류에만 사용
+
+**외부 API 연결 포인트**:
+- **Unified Data Import**: 모든 외부 API의 실제 연결 지점
+  - Weather Connector (기상청/세계날씨 API)
+  - Calendar/Holiday Connector (국가별 공휴일, 로컬 이벤트)
+  - Economic Indicators Connector (통계청/OECD/World Bank)
+  - Regional/Demographic Connector (상권, 인구, 소득, 교통량)
+- **Schema Builder**: 외부 API 데이터를 Context 엔티티로 모델링
+  - `WeatherContext`, `EconomicContext`, `EventContext`
+- **Graph Analysis**: 외부 컨텍스트를 그래프에 포함
+  - `Store` –LOCATED_IN→ `Region` –HAS_CONTEXT→ `EconomicContext`
 
 ---
 
@@ -542,3 +607,139 @@ const sectionStyles = {
 4. **4-6주 내**: Phase 4 (추가 기능)
 
 각 단계별로 사용자 피드백을 받아 조정합니다.
+
+---
+
+## 🌐 외부 API 활용 전략
+
+### 📊 사용하는 외부 API 종류
+
+#### 1. Weather API (날씨 데이터)
+- **제공 데이터**: 기온, 강수량, 체감온도, 날씨 상태(맑음/비/눈/폭염 등)
+- **활용 페이지**:
+  - Footfall Analysis: 날씨별 유입 패턴 분석
+  - Customer Journey: 날씨별 동선 변화
+  - Inventory Status: 날씨 민감 SKU 재고 예측
+  - Demand & Inventory Sim: 날씨 예보 기반 수요 시뮬레이션
+- **API 예시**: 기상청 API, OpenWeatherMap, WeatherAPI
+
+#### 2. Calendar/Holiday API (공휴일/이벤트 데이터)
+- **제공 데이터**: 공휴일, 대체휴일, 쇼핑데이(블프, 광군제), 지역축제, 급여일
+- **활용 페이지**:
+  - Footfall Analysis: 이벤트별 유입 증감
+  - Conversion Funnel: 공휴일/평일 퍼널 비교
+  - Demand & Inventory Sim: 이벤트 기반 수요 예측
+- **API 예시**: Calendarific, Holiday API, 한국천문연구원 API
+
+#### 3. Economic Indicators API (경제지표)
+- **제공 데이터**: 소비자심리지수, 소매판매지수, 물가상승률, 실업률, GDP
+- **활용 페이지**:
+  - Customer Analysis: 경제 상황별 고객 세그먼트
+  - Profit Center Overview: 경기 vs 운영 요인 분리
+  - Conversion Funnel: 경제지표별 CVR 변화
+  - Price Optimization Sim: 경제 상황별 가격 탄력성
+- **API 예시**: 통계청 API, OECD API, World Bank API
+
+#### 4. Regional/Demographic API (지역/상권 데이터)
+- **제공 데이터**: 상권 유동인구, 경쟁 매장 수, 유사 업종 밀도, 소득 수준
+- **활용 페이지**:
+  - Footfall Analysis: 상권 대비 유입률
+  - Customer Analysis: 지역별 고객 페르소나
+- **API 예시**: 서울열린데이터광장, 소상공인시장진흥공단 상권분석시스템
+
+#### 5. Trend/Social API (트렌드 데이터) - 옵션
+- **제공 데이터**: 검색 트렌드, SNS 버즈, 인기 키워드
+- **활용 페이지**:
+  - Recommendation Strategy: 트렌드 기반 추천 전략
+- **API 예시**: Google Trends API, Naver DataLab, Social Media APIs
+
+### 🔄 API 연동 아키텍처
+
+```mermaid
+graph TD
+    A[외부 API Sources] --> B[Data Management<br/>Unified Data Import]
+    B --> C[ETL & Schema Mapping]
+    C --> D[Supabase Storage<br/>Context Tables]
+    D --> E[Analysis Pages<br/>컨텍스트 조인 분석]
+    D --> F[Simulation Pages<br/>AI 예측 with 컨텍스트]
+    E --> G[Overview Dashboard<br/>요약 표시]
+    F --> G
+```
+
+### 📋 API 데이터 모델 예시
+
+#### WeatherContext Table
+```sql
+CREATE TABLE weather_context (
+  id UUID PRIMARY KEY,
+  region_code TEXT,
+  datetime TIMESTAMP,
+  temperature DECIMAL,
+  precipitation DECIMAL,
+  condition TEXT, -- 'sunny', 'rainy', 'snowy', 'cloudy'
+  feels_like DECIMAL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+#### EconomicContext Table
+```sql
+CREATE TABLE economic_context (
+  id UUID PRIMARY KEY,
+  region_code TEXT,
+  year_month TEXT,
+  consumer_sentiment_index DECIMAL,
+  retail_sales_index DECIMAL,
+  inflation_rate DECIMAL,
+  unemployment_rate DECIMAL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+#### EventContext Table
+```sql
+CREATE TABLE event_context (
+  id UUID PRIMARY KEY,
+  region_code TEXT,
+  event_date DATE,
+  event_type TEXT, -- 'holiday', 'festival', 'shopping_day', 'payday'
+  event_name TEXT,
+  intensity TEXT, -- 'low', 'medium', 'high'
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+### 🎯 페이지별 외부 API 활용 매트릭스
+
+| 페이지 | Weather | Calendar | Economic | Regional | Trend |
+|-------|---------|----------|----------|----------|-------|
+| **Analysis** |
+| Footfall Analysis | ✅ | ✅ | - | ✅ | - |
+| Traffic Heatmap | ✅ | - | - | - | - |
+| Customer Journey | ✅ | ✅ | - | - | - |
+| Conversion Funnel | ✅ | ✅ | ✅ | - | - |
+| Customer Analysis | - | - | ✅ | ✅ | - |
+| Inventory Status | ✅ | ✅ | - | - | - |
+| Profit Center | - | - | ✅ | - | - |
+| **Simulation** |
+| Demand & Inventory | ✅✅ | ✅✅ | ✅ | - | - |
+| Price Optimization | - | - | ✅✅ | - | - |
+| Recommendation | - | - | - | - | ✅ |
+| Scenario Lab | ✅ | ✅ | ✅ | - | - |
+
+✅✅ = 핵심 활용 / ✅ = 부가 활용
+
+### 🔧 구현 우선순위
+
+**Phase 1: 필수 API (High Priority)**
+1. Weather API - 가장 많은 페이지에서 활용
+2. Calendar/Holiday API - 이벤트 컨텍스트 필수
+
+**Phase 2: 중요 API (Medium Priority)**
+3. Economic Indicators API - Simulation에서 핵심
+4. Regional/Demographic API - 지역 기반 분석
+
+**Phase 3: 선택 API (Low Priority)**
+5. Trend/Social API - 추천 전략 고도화
+
+---
