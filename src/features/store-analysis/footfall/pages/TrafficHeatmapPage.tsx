@@ -16,7 +16,7 @@ import { useVisits } from "@/hooks/useStoreData";
 import { SceneComposer } from "@/features/digital-twin/components/SceneComposer";
 import { HeatmapOverlay3D, ZoneBoundaryOverlay } from "@/features/digital-twin/components/overlays";
 import { useStoreScene } from "@/hooks/useStoreScene";
-import { useTrafficHeatmap, useZoneStatistics } from "@/hooks/useTrafficHeatmap";
+import { useTrafficHeatmap, useZoneStatistics, useTrafficContext } from "@/hooks/useTrafficHeatmap";
 import type { StoreSpaceMetadata } from "@/features/digital-twin/types/iot.types";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +43,7 @@ const TrafficHeatmapPage = () => {
   const heatPoints = useTrafficHeatmap(selectedStore?.id, timeOfDay);
   const metadata = selectedStore?.metadata?.storeSpaceMetadata as StoreSpaceMetadata | undefined;
   const zoneStats = useZoneStatistics(heatPoints, metadata);
+  const contextInsights = useTrafficContext(selectedStore?.id);
 
   // 시간대 애니메이션
   useEffect(() => {
@@ -305,6 +306,30 @@ const TrafficHeatmapPage = () => {
                 </Card>
               )}
             </div>
+
+            {/* Context Insights */}
+            {contextInsights.length > 0 && (
+              <Card className="animate-fade-in">
+                <CardHeader>
+                  <CardTitle>컨텍스트 인사이트</CardTitle>
+                  <CardDescription>
+                    날씨, 이벤트, 상권 데이터 기반 트래픽 패턴 분석
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {contextInsights.map((insight, idx) => (
+                      <div 
+                        key={idx}
+                        className="p-4 rounded-lg bg-muted/50 border border-border/50"
+                      >
+                        <p className="text-sm leading-relaxed">{insight}</p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Comparison Analysis */}
             <Card className="animate-fade-in">
