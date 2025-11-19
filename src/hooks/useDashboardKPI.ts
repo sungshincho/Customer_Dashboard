@@ -69,3 +69,27 @@ export function useLatestKPIs(storeId?: string, limit: number = 7) {
     enabled: !!user && !!storeId,
   });
 }
+
+export function useKPIsByDateRange(storeId?: string, startDate?: string, endDate?: string) {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['dashboard-kpis-range', storeId, startDate, endDate],
+    queryFn: async () => {
+      if (!user || !storeId || !startDate || !endDate) return [];
+
+      const { data, error } = await supabase
+        .from('dashboard_kpis')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('store_id', storeId)
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: true });
+
+      if (error) throw error;
+      return (data || []) as DashboardKPI[];
+    },
+    enabled: !!user && !!storeId && !!startDate && !!endDate,
+  });
+}
