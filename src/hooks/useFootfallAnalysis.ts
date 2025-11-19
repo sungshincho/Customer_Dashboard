@@ -26,12 +26,24 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
   return useQuery({
     queryKey: ['footfall-analysis', storeId, startDate, endDate],
     queryFn: async () => {
-      if (!user || !storeId) return null;
+      if (!user || !storeId) {
+        return {
+          data: [],
+          stats: {
+            total_visits: 0,
+            unique_visitors: 0,
+            avg_visits_per_hour: 0,
+            peak_hour: 14,
+            peak_hour_visits: 0,
+            daily_trend: 0,
+          }
+        };
+      }
 
       const start = startDate || subDays(new Date(), 7);
       const end = endDate || new Date();
 
-      // wifi_tracking 데이터에서 유입 분석
+      // wifi_tracking 데이터에서 유입 분석 (실제 임포트된 데이터만 사용)
       const { data: trackingData, error: trackingError } = await supabase
         .from('wifi_tracking')
         .select('*')
@@ -40,9 +52,12 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
         .gte('timestamp', startOfDay(start).toISOString())
         .lte('timestamp', endOfDay(end).toISOString());
 
-      if (trackingError) throw trackingError;
+      if (trackingError) {
+        console.error('WiFi tracking data fetch error:', trackingError);
+        throw new Error('WiFi 트래킹 데이터를 불러오는데 실패했습니다.');
+      }
 
-      // graph_entities에서 방문 데이터 가져오기
+      // graph_entities에서 방문 데이터 가져오기 (실제 임포트된 온톨로지 데이터만 사용)
       const { data: visits, error: visitsError } = await supabase
         .from('graph_entities')
         .select('properties, created_at')
@@ -51,7 +66,10 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
         .gte('created_at', startOfDay(start).toISOString())
         .lte('created_at', endOfDay(end).toISOString());
 
-      if (visitsError) throw visitsError;
+      if (visitsError) {
+        console.error('Graph entities data fetch error:', visitsError);
+        throw new Error('방문 데이터를 불러오는데 실패했습니다.');
+      }
 
       // 시간대별 집계
       const hourlyData = new Map<string, FootfallData>();

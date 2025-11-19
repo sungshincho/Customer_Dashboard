@@ -23,16 +23,19 @@ const FootfallAnalysisPage = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [show3D, setShow3D] = useState(true);
 
-  const { data: analysisData, isLoading } = useFootfallAnalysis(
+  const { data: analysisData, isLoading, error } = useFootfallAnalysis(
     selectedStore?.id,
     dateRange.start,
     dateRange.end
   );
 
-  const { data: hourlyData = [] } = useHourlyFootfall(selectedStore?.id, selectedDate);
+  const { data: hourlyData = [], isLoading: isLoadingHourly } = useHourlyFootfall(selectedStore?.id, selectedDate);
 
   const stats = analysisData?.stats;
   const footfallData = analysisData?.data || [];
+
+  // 데이터 없음 체크
+  const hasData = footfallData.length > 0;
 
   // 일별 집계
   const dailyData = footfallData.reduce((acc, curr) => {
@@ -50,6 +53,47 @@ const FootfallAnalysisPage = () => {
     }
     return acc;
   }, [] as Array<{ date: string; visits: number; unique_visitors: number; displayDate: string }>);
+
+  // 로딩 중
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-[60vh]">
+          <div className="text-center space-y-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="text-muted-foreground">데이터를 불러오는 중...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // 에러 처리
+  if (error) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-[60vh]">
+          <div className="text-center space-y-4">
+            <p className="text-destructive">데이터 로딩 중 오류가 발생했습니다.</p>
+            <p className="text-sm text-muted-foreground">{error.message}</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // 매장 선택 안됨
+  if (!selectedStore) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-[60vh]">
+          <div className="text-center space-y-4">
+            <p className="text-muted-foreground">매장을 먼저 선택해주세요.</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -88,6 +132,23 @@ const FootfallAnalysisPage = () => {
             </Popover>
           </div>
         </div>
+
+        {/* 데이터 없음 알림 */}
+        {!hasData && (
+          <Card className="border-orange-500/50 bg-orange-500/10">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <Activity className="w-5 h-5 text-orange-500" />
+                <div>
+                  <p className="font-medium">분석 데이터가 없습니다</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    WiFi 트래킹 데이터를 업로드하거나 NeuralSense 장치를 설정하여 데이터를 수집해주세요.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -239,7 +300,16 @@ const FootfallAnalysisPage = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
+              {isLoadingHourly ? (
+                <div className="h-[300px] flex items-center justify-center">
+                  <p className="text-muted-foreground">로딩 중...</p>
+                </div>
+              ) : hourlyData.length === 0 ? (
+                <div className="h-[300px] flex items-center justify-center">
+                  <p className="text-muted-foreground">해당 날짜의 데이터가 없습니다</p>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={hourlyData}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                   <XAxis 
@@ -263,6 +333,7 @@ const FootfallAnalysisPage = () => {
                   />
                 </BarChart>
               </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -303,7 +374,7 @@ const FootfallAnalysisPage = () => {
                   {footfallData.length === 0 && (
                     <tr>
                       <td colSpan={5} className="text-center py-8 text-muted-foreground">
-                        데이터가 없습니다
+                        선택한 기간의 방문 데이터가 없습니다. WiFi 트래킹 데이터를 업로드해주세요.
                       </td>
                     </tr>
                   )}
