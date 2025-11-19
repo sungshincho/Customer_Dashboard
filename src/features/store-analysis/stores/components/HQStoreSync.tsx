@@ -1,229 +1,330 @@
 import { useState } from "react";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Send, CheckCircle2, Clock, Building2, Store } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
-
-interface Message {
-  id: string;
-  from: "store" | "hq";
-  content: string;
-  status: "pending" | "approved" | "rejected";
-  timestamp: Date;
-}
+import { 
+  RefreshCw, 
+  CheckCircle2, 
+  Clock, 
+  Building2, 
+  Store, 
+  AlertCircle,
+  ArrowRight,
+  Link2
+} from "lucide-react";
+import { useHQStoreMaster, useStoreMappings, useHQSyncLogs, useSyncHQStores, useMapStore } from "@/hooks/useHQSync";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { format } from "date-fns";
+import { ko } from "date-fns/locale";
 
 export const HQStoreSync = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      from: "store",
-      content: "신상품 진열 위치 변경 요청",
-      status: "approved",
-      timestamp: new Date(Date.now() - 3600000),
+  const { user } = useAuth();
+  const [selectedHQStore, setSelectedHQStore] = useState<string>("");
+  const [selectedLocalStore, setSelectedLocalStore] = useState<string>("");
+
+  const { data: hqStores = [], isLoading: hqLoading } = useHQStoreMaster();
+  const { data: mappings = [], isLoading: mappingsLoading } = useStoreMappings();
+  const { data: syncLogs = [], isLoading: logsLoading } = useHQSyncLogs(5);
+  const syncHQStores = useSyncHQStores();
+  const mapStore = useMapStore();
+
+  // 로컬 매장 목록 가져오기
+  const { data: localStores = [] } = useQuery({
+    queryKey: ['stores', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data, error } = await supabase
+        .from('stores')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('store_name', { ascending: true });
+      
+      if (error) throw error;
+      return data || [];
     },
-  ]);
-  const [newMessage, setNewMessage] = useState("");
-  const [syncProgress, setSyncProgress] = useState(0);
-  const [isSyncing, setIsSyncing] = useState(false);
+    enabled: !!user,
+  });
 
-  const handleSendMessage = () => {
-    if (!newMessage.trim()) return;
-
-    const message: Message = {
-      id: Date.now().toString(),
-      from: "store",
-      content: newMessage,
-      status: "pending",
-      timestamp: new Date(),
-    };
-
-    setMessages((prev) => [...prev, message]);
-    setNewMessage("");
-    setIsSyncing(true);
-    setSyncProgress(0);
-
-    const interval = setInterval(() => {
-      setSyncProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setIsSyncing(false);
-          setMessages((msgs) =>
-            msgs.map((m) =>
-              m.id === message.id ? { ...m, status: "approved" } : m
-            )
-          );
-          return 100;
-        }
-        return prev + 10;
-      });
-    }, 100);
+  const handleSync = () => {
+    syncHQStores.mutate({ external_system_id: 'demo' });
   };
 
-  const getStatusBadge = (status: Message["status"]) => {
+  const handleMapStores = () => {
+    if (!selectedHQStore || !selectedLocalStore) {
+      return;
+    }
+    mapStore.mutate({
+      hq_store_id: selectedHQStore,
+      local_store_id: selectedLocalStore,
+      sync_enabled: true,
+    });
+    setSelectedHQStore("");
+    setSelectedLocalStore("");
+  };
+
+  const getStatusBadge = (status: string) => {
     switch (status) {
-      case "pending":
+      case 'in_progress':
         return (
           <Badge variant="outline" className="gap-1">
-            <Clock className="w-3 h-3" />
-            대기중
+            <Clock className="w-3 h-3 animate-spin" />
+            진행중
           </Badge>
         );
-      case "approved":
+      case 'completed':
         return (
           <Badge className="gap-1 bg-green-500/20 text-green-500 border-green-500/50">
             <CheckCircle2 className="w-3 h-3" />
-            승인
+            완료
           </Badge>
         );
-      case "rejected":
+      case 'failed':
         return (
           <Badge variant="destructive" className="gap-1">
-            거절
+            <AlertCircle className="w-3 h-3" />
+            실패
           </Badge>
         );
+      default:
+        return <Badge variant="secondary">{status}</Badge>;
     }
   };
 
-  const getTimeAgo = (date: Date) => {
-    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-    if (seconds < 60) return `${seconds}초 전`;
-    const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes}분 전`;
-    const hours = Math.floor(minutes / 60);
-    return `${hours}시간 전`;
-  };
+  const unmappedHQStores = hqStores.filter(
+    hq => !mappings.some((m: any) => m.hq_store_id === hq.id)
+  );
+
+  const unmappedLocalStores = localStores.filter(
+    local => !mappings.some((m: any) => m.local_store_id === local.id)
+  );
 
   return (
     <div className="space-y-6">
+      {/* 동기화 상태 요약 */}
+      <div className="grid md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">HQ 매장</p>
+                <p className="text-2xl font-bold">{hqStores.length}</p>
+              </div>
+              <Building2 className="w-8 h-8 text-primary opacity-50" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">로컬 매장</p>
+                <p className="text-2xl font-bold">{localStores.length}</p>
+              </div>
+              <Store className="w-8 h-8 text-blue-500 opacity-50" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">매핑됨</p>
+                <p className="text-2xl font-bold">{mappings.length}</p>
+              </div>
+              <Link2 className="w-8 h-8 text-green-500 opacity-50" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">미매핑</p>
+                <p className="text-2xl font-bold">{unmappedHQStores.length}</p>
+              </div>
+              <AlertCircle className="w-8 h-8 text-orange-500 opacity-50" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="grid md:grid-cols-2 gap-6">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h4 className="font-semibold">실시간 커뮤니케이션</h4>
-            <Badge variant="secondary" className="gap-1">
-              <Clock className="w-3 h-3" />
-              평균 1분 내 승인
-            </Badge>
-          </div>
-
-          <div className="glass rounded-xl p-4 space-y-4 max-h-[400px] overflow-y-auto">
-            {messages.map((message) => (
-              <Card
-                key={message.id}
-                className={`p-4 space-y-3 ${
-                  message.from === "store" ? "ml-4" : "mr-4"
-                }`}
+        {/* HQ 동기화 */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>본사 매장 마스터</CardTitle>
+                <CardDescription>외부 시스템에서 매장 정보 동기화</CardDescription>
+              </div>
+              <Button 
+                onClick={handleSync} 
+                disabled={syncHQStores.isPending}
+                size="sm"
+                className="gap-2"
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2">
-                    {message.from === "store" ? (
-                      <Store className="w-4 h-4 text-primary" />
-                    ) : (
-                      <Building2 className="w-4 h-4 text-amber-500" />
-                    )}
-                    <span className="text-sm font-semibold">
-                      {message.from === "store" ? "매장" : "본사"}
-                    </span>
+                <RefreshCw className={`w-4 h-4 ${syncHQStores.isPending ? 'animate-spin' : ''}`} />
+                동기화
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3 max-h-[400px] overflow-y-auto">
+              {hqStores.map((store) => (
+                <div
+                  key={store.id}
+                  className="flex items-center justify-between p-3 rounded-lg border bg-card"
+                >
+                  <div className="flex items-center gap-3">
+                    <Building2 className="w-4 h-4 text-primary" />
+                    <div>
+                      <p className="font-medium">{store.hq_store_name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {store.hq_store_code} • {store.region} {store.district}
+                      </p>
+                    </div>
                   </div>
-                  {getStatusBadge(message.status)}
+                  <Badge variant="secondary" className="text-xs">
+                    {store.store_format || '표준'}
+                  </Badge>
                 </div>
-
-                <p className="text-sm">{message.content}</p>
-
-                <div className="text-xs text-muted-foreground">
-                  {getTimeAgo(message.timestamp)}
+              ))}
+              {hqStores.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Building2 className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <p>HQ 매장이 없습니다</p>
+                  <p className="text-sm">동기화 버튼을 눌러 데이터를 가져오세요</p>
                 </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
-                {message.status === "pending" && isSyncing && (
-                  <div className="space-y-2">
-                    <Progress value={syncProgress} className="h-1" />
+        {/* 매장 매핑 */}
+        <Card>
+          <CardHeader>
+            <CardTitle>매장 매핑</CardTitle>
+            <CardDescription>HQ 매장과 로컬 매장 연결</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Select value={selectedHQStore} onValueChange={setSelectedHQStore}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="HQ 매장 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {unmappedHQStores.map((store) => (
+                      <SelectItem key={store.id} value={store.id}>
+                        {store.hq_store_name} ({store.hq_store_code})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <ArrowRight className="w-4 h-4 text-muted-foreground" />
+
+                <Select value={selectedLocalStore} onValueChange={setSelectedLocalStore}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="로컬 매장 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {unmappedLocalStores.map((store: any) => (
+                      <SelectItem key={store.id} value={store.id}>
+                        {store.store_name} ({store.store_code})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Button 
+                onClick={handleMapStores} 
+                disabled={!selectedHQStore || !selectedLocalStore || mapStore.isPending}
+                className="w-full"
+              >
+                <Link2 className="w-4 h-4 mr-2" />
+                매장 연결
+              </Button>
+
+              <div className="border-t pt-4 space-y-2">
+                <p className="text-sm font-medium">매핑된 매장</p>
+                <div className="space-y-2 max-h-[250px] overflow-y-auto">
+                  {mappings.map((mapping: any) => (
+                    <div
+                      key={mapping.id}
+                      className="flex items-center justify-between p-2 rounded-lg border bg-card text-sm"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Building2 className="w-3 h-3 text-primary" />
+                        <span className="font-medium">{mapping.hq_store_master.hq_store_name}</span>
+                      </div>
+                      <ArrowRight className="w-3 h-3 text-muted-foreground" />
+                      <div className="flex items-center gap-2">
+                        <Store className="w-3 h-3 text-blue-500" />
+                        <span>{mapping.stores.store_name}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {mappings.length === 0 && (
+                    <p className="text-center text-sm text-muted-foreground py-4">
+                      매핑된 매장이 없습니다
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 동기화 로그 */}
+      <Card>
+        <CardHeader>
+          <CardTitle>동기화 이력</CardTitle>
+          <CardDescription>최근 동기화 작업 내역</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {syncLogs.map((log) => (
+              <div
+                key={log.id}
+                className="flex items-center justify-between p-4 rounded-lg border bg-card"
+              >
+                <div className="flex items-center gap-4">
+                  {getStatusBadge(log.status)}
+                  <div>
+                    <p className="font-medium">{log.sync_type}</p>
                     <p className="text-xs text-muted-foreground">
-                      본사 승인 대기중... {syncProgress}%
+                      {format(new Date(log.started_at), 'PPp', { locale: ko })}
                     </p>
                   </div>
-                )}
-              </Card>
-            ))}
-          </div>
-
-          <div className="flex gap-2">
-            <Input
-              placeholder="변경 요청 메시지 입력..."
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
-              disabled={isSyncing}
-            />
-            <Button onClick={handleSendMessage} disabled={isSyncing || !newMessage.trim()}>
-              <Send className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <h4 className="font-semibold">개선 효과</h4>
-
-          <div className="grid grid-cols-2 gap-4">
-            <Card className="glass p-4">
-              <div className="text-sm text-muted-foreground mb-1">기존 프로세스</div>
-              <div className="text-3xl font-bold text-muted-foreground line-through">
-                24h
+                </div>
+                <div className="text-right text-sm">
+                  <p className="font-medium">
+                    {log.records_synced}/{log.records_processed}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {log.records_failed > 0 && `${log.records_failed}건 실패`}
+                  </p>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                이메일/전화 → 회의 → 승인
-              </p>
-            </Card>
-
-            <Card className="glass p-4 border-primary/50">
-              <div className="text-sm text-muted-foreground mb-1">NEURALTWIN</div>
-              <div className="text-3xl font-bold text-primary">1분</div>
-              <p className="text-xs text-muted-foreground mt-2">
-                실시간 동기화 & 자동 승인
-              </p>
-            </Card>
-
-            <Card className="glass p-4">
-              <div className="text-sm text-muted-foreground mb-1">월간 요청 건수</div>
-              <div className="text-2xl font-bold">245건</div>
-            </Card>
-
-            <Card className="glass p-4">
-              <div className="text-sm text-muted-foreground mb-1">시간 절감</div>
-              <div className="text-2xl font-bold text-green-500">98.9%</div>
-            </Card>
+            ))}
+            {syncLogs.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                <Clock className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>동기화 이력이 없습니다</p>
+              </div>
+            )}
           </div>
-
-          <Card className="glass p-4 space-y-3">
-            <h5 className="text-sm font-semibold">주요 기능</h5>
-            <ul className="space-y-2 text-sm">
-              <li className="flex items-start gap-2">
-                <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                <span>레이아웃 변경 요청 & 즉시 승인</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                <span>재고 이동 및 프로모션 조율</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                <span>실시간 KPI 공유 & 피드백</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                <span>AI 기반 자동 의사결정 제안</span>
-              </li>
-            </ul>
-          </Card>
-
-          <Card className="glass p-4 bg-primary/5 border-primary/20">
-            <p className="text-sm">
-              <span className="font-semibold">ROI:</span> 매장당 연간{" "}
-              <span className="text-primary font-bold">3,500만원</span> 운영비 절감
-            </p>
-          </Card>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
