@@ -10,6 +10,7 @@ interface TrafficHeatmapProps {
   visitsData?: any[];
   heatPoints?: HeatPoint[];
   timeOfDay?: number;
+  contextInsights?: string[];
 }
 
 interface HeatmapCell {
@@ -103,13 +104,36 @@ const generateHeatmapData = (
 export const TrafficHeatmap = ({ 
   visitsData = [], 
   heatPoints = [],
-  timeOfDay: externalTimeOfDay 
+  timeOfDay: externalTimeOfDay,
+  contextInsights = []
 }: TrafficHeatmapProps) => {
   const [internalTimeOfDay, setInternalTimeOfDay] = useState(14);
   const [isPlaying, setIsPlaying] = useState(false);
   
   // 외부에서 timeOfDay를 제공하면 그것을 사용, 아니면 내부 상태 사용
   const timeOfDay = externalTimeOfDay !== undefined ? externalTimeOfDay : internalTimeOfDay;
+
+  // 현재 시간대에 해당하는 컨텍스트 정보 필터링
+  const currentTimeContexts = useMemo(() => {
+    const contexts: { icon: string; text: string; variant: "default" | "secondary" | "destructive" | "outline" }[] = [];
+    
+    contextInsights.forEach(insight => {
+      if (insight.includes('🌧️') || insight.includes('비')) {
+        contexts.push({ icon: '🌧️', text: '비 오는 날', variant: 'secondary' });
+      }
+      if (insight.includes('☀️') || insight.includes('폭염')) {
+        contexts.push({ icon: '☀️', text: '폭염', variant: 'destructive' });
+      }
+      if (insight.includes('🎉') || insight.includes('이벤트')) {
+        contexts.push({ icon: '🎉', text: '이벤트', variant: 'default' });
+      }
+      if (insight.includes('🏖️') || insight.includes('공휴일')) {
+        contexts.push({ icon: '🏖️', text: '공휴일', variant: 'outline' });
+      }
+    });
+    
+    return contexts;
+  }, [contextInsights]);
   
   const [heatmapData, setHeatmapData] = useState(() => 
     generateHeatmapData(timeOfDay, visitsData, heatPoints)
@@ -246,6 +270,12 @@ export const TrafficHeatmap = ({
               <Badge variant="secondary" className="text-lg font-semibold">
                 {String(timeOfDay).padStart(2, "0")}:00
               </Badge>
+              {/* Context Badges */}
+              {currentTimeContexts.map((ctx, idx) => (
+                <Badge key={idx} variant={ctx.variant} className="text-xs">
+                  {ctx.icon} {ctx.text}
+                </Badge>
+              ))}
             </div>
             <Slider
               value={[timeOfDay]}
@@ -390,6 +420,18 @@ export const TrafficHeatmap = ({
               <span className="font-semibold">인사이트:</span> {insight}
             </p>
           </Card>
+
+          {/* Context Insights */}
+          {contextInsights.length > 0 && (
+            <div className="space-y-2">
+              <h5 className="text-sm font-semibold">컨텍스트 분석</h5>
+              {contextInsights.map((contextInsight, idx) => (
+                <Card key={idx} className="glass p-3">
+                  <p className="text-xs leading-relaxed">{contextInsight}</p>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
