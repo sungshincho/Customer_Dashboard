@@ -6,7 +6,7 @@ import { RefreshCw, Play, Pause, RotateCcw, Users, TrendingUp, Clock } from "luc
 import { useState, useEffect } from "react";
 import { AdvancedFilters, FilterState } from "@/features/data-management/analysis/components/AdvancedFilters";
 import { ExportButton } from "@/features/data-management/analysis/components/ExportButton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { DataReadinessGuard } from "@/components/DataReadinessGuard";
@@ -29,6 +29,8 @@ const CustomerJourneyPage = () => {
   const [showPaths, setShowPaths] = useState(true);
   const [showAvatars, setShowAvatars] = useState(true);
   const [showZones, setShowZones] = useState(true);
+  const [showZoneTransitions, setShowZoneTransitions] = useState(false);
+  const [showDwellTime, setShowDwellTime] = useState(false);
   const [animatePaths, setAnimatePaths] = useState(true);
 
   // WiFi 트래킹 데이터를 고객 경로로 변환
