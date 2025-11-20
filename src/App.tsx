@@ -18,8 +18,10 @@ import NotFound from "@/core/pages/NotFoundPage";
 import Stores from "@/features/store-analysis/stores/pages/StoresPage";
 import HQStoreSyncPage from "@/features/store-analysis/stores/pages/HQStoreSyncPage";
 
-// Analysis - Integrated Store Analysis page
+// Analysis - Integrated pages
 import StoreAnalysisPage from "@/features/store-analysis/pages/StoreAnalysisPage";
+import CustomerAnalysisIntegratedPage from "@/features/store-analysis/pages/CustomerAnalysisIntegratedPage";
+import ProductAnalysisPage from "@/features/store-analysis/pages/ProductAnalysisPage";
 
 // Simulation pages
 import DigitalTwin3DPage from "@/features/digital-twin/pages/DigitalTwin3DPage";
@@ -55,8 +57,10 @@ const App = () => (
               <Route path="/hq-store-sync" element={<ProtectedRoute><HQStoreSyncPage /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
-              {/* 2️⃣ Analysis - Integrated Store Analysis (1 unified page) */}
+              {/* 2️⃣ Analysis - Integrated Store Analysis (3 pages) */}
               <Route path="/analysis/store" element={<ProtectedRoute><StoreAnalysisPage /></ProtectedRoute>} />
+              <Route path="/analysis/customer" element={<ProtectedRoute><CustomerAnalysisIntegratedPage /></ProtectedRoute>} />
+              <Route path="/analysis/product" element={<ProtectedRoute><ProductAnalysisPage /></ProtectedRoute>} />
 
               {/* 3️⃣ Simulation (6 pages) */}
               <Route path="/digital-twin-3d" element={<ProtectedRoute><DigitalTwin3DPage /></ProtectedRoute>} />
