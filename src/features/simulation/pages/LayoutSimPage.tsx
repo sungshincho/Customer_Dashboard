@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Grid3x3, Play } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Grid3x3, Play, Eye, EyeOff } from "lucide-react";
 import { SharedDigitalTwinScene } from "@/features/digital-twin/components";
 import { LayoutParamsForm } from "../components/params/LayoutParamsForm";
 import { PredictionResultCard, BeforeAfterComparison, KpiDeltaChart } from "../components";
@@ -13,6 +15,7 @@ import { useAIInference, useScenarioManager } from "../hooks";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { LayoutParams, KpiSnapshot } from "../types";
 import { toast } from "sonner";
+import { LayoutChangeOverlay } from "@/features/digital-twin/components/overlays/LayoutChangeOverlay";
 
 export default function LayoutSimPage() {
   const location = useLocation();
@@ -29,6 +32,8 @@ export default function LayoutSimPage() {
   const [predictedKpi, setPredictedKpi] = useState<KpiSnapshot | null>(null);
   const [confidenceScore, setConfidenceScore] = useState<number | null>(null);
   const [aiInsights, setAiInsights] = useState<string>("");
+  const [showPreview, setShowPreview] = useState(true);
+  const [isSimulating, setIsSimulating] = useState(false);
 
   const recommendation = location.state?.recommendation;
   const goalText = location.state?.goalText;
@@ -39,25 +44,49 @@ export default function LayoutSimPage() {
       return;
     }
 
-    // Mock baseline KPI
-    const baseline: KpiSnapshot = {
-      conversionRate: 0.12,
-      averageTransactionValue: 45000,
-      salesPerSqm: 850000,
-      opex: 12000000,
-      netProfit: 18000000,
-      inventoryTurnover: 4.5,
-      customerSatisfaction: 4.2,
-    };
-    setBaselineKpi(baseline);
+    if (!params.changedZones || params.changedZones.length === 0) {
+      toast.error("최소 하나의 존 변경을 추가해주세요");
+      return;
+    }
 
-    const result = await infer("layout", params, selectedStore.id);
+    setIsSimulating(true);
 
-    if (result) {
-      setPredictedKpi(result.predictedKpi);
-      setConfidenceScore(result.confidenceScore);
-      setAiInsights(result.aiInsights);
-      toast.success("레이아웃 시뮬레이션 완료");
+    try {
+      // Mock baseline KPI
+      const baseline: KpiSnapshot = {
+        conversionRate: 0.12,
+        averageTransactionValue: 45000,
+        salesPerSqm: 850000,
+        opex: 12000000,
+        netProfit: 18000000,
+        inventoryTurnover: 4.5,
+        customerSatisfaction: 4.2,
+      };
+      setBaselineKpi(baseline);
+
+      // AI Inference with layout context
+      const enrichedParams = {
+        ...params,
+        storeContext: {
+          storeId: selectedStore.id,
+          storeName: selectedStore.store_name,
+          goalText: goalText || "레이아웃 최적화를 통한 매출 증대",
+        },
+      };
+
+      const result = await infer("layout", enrichedParams, selectedStore.id);
+
+      if (result) {
+        setPredictedKpi(result.predictedKpi);
+        setConfidenceScore(result.confidenceScore);
+        setAiInsights(result.aiInsights);
+        toast.success("레이아웃 시뮬레이션 완료");
+      }
+    } catch (error) {
+      console.error("Simulation error:", error);
+      toast.error("시뮬레이션 실행 중 오류가 발생했습니다");
+    } finally {
+      setIsSimulating(false);
     }
   };
 
@@ -115,12 +144,12 @@ export default function LayoutSimPage() {
                 <LayoutParamsForm params={params} onChange={setParams} />
                 <Button
                   onClick={handleRunSimulation}
-                  disabled={isInferring || !selectedStore}
+                  disabled={isInferring || isSimulating || !selectedStore || !params.changedZones?.length}
                   className="w-full gap-2"
                   size="lg"
                 >
                   <Play className="w-4 h-4" />
-                  {isInferring ? "시뮬레이션 중..." : "시뮬레이션 실행"}
+                  {isInferring || isSimulating ? "AI 추론 중..." : "시뮬레이션 실행"}
                 </Button>
                 {predictedKpi && (
                   <Button
@@ -140,11 +169,74 @@ export default function LayoutSimPage() {
           <div className="lg:col-span-2 space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>3D 시뮬레이션</CardTitle>
-                <CardDescription>레이아웃 변경을 3D로 시각화</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>3D 레이아웃 시뮬레이션</CardTitle>
+                    <CardDescription>레이아웃 변경을 3D로 시각화하고 예측합니다</CardDescription>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        id="preview-mode"
+                        checked={showPreview}
+                        onCheckedChange={setShowPreview}
+                      />
+                      <Label htmlFor="preview-mode" className="cursor-pointer">
+                        {showPreview ? (
+                          <span className="flex items-center gap-1">
+                            <Eye className="w-4 h-4" />
+                            미리보기
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1">
+                            <EyeOff className="w-4 h-4" />
+                            꺼짐
+                          </span>
+                        )}
+                      </Label>
+                    </div>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
-                <SharedDigitalTwinScene overlayType="layout" height="400px" />
+                <div className="relative">
+                  <SharedDigitalTwinScene
+                    overlayType="none"
+                    height="500px"
+                    customOverlay={
+                      <LayoutChangeOverlay
+                        zoneChanges={params.changedZones}
+                        furnitureMoves={params.movedFurniture}
+                        showPreview={showPreview}
+                      />
+                    }
+                  />
+                  
+                  {/* Simulation Status Overlay */}
+                  {isSimulating && (
+                    <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center rounded-lg">
+                      <div className="text-center space-y-2">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
+                        <p className="text-sm text-muted-foreground">AI 추론 중...</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Layout Info Overlay */}
+                  {showPreview && (params.changedZones?.length || 0) > 0 && (
+                    <div className="absolute top-4 left-4 bg-background/90 backdrop-blur-sm p-3 rounded-lg border shadow-lg">
+                      <div className="space-y-1 text-sm">
+                        <div className="font-semibold">레이아웃 변경 요약</div>
+                        <div className="text-muted-foreground">
+                          • 존 변경: {params.changedZones?.length || 0}개
+                        </div>
+                        <div className="text-muted-foreground">
+                          • 가구 이동: {params.movedFurniture?.length || 0}개
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
 

@@ -6,3 +6,4 @@ export { RealtimeCustomerOverlay } from './RealtimeCustomerOverlay';
 export { ZoneBoundaryOverlay } from './ZoneBoundaryOverlay';
 export { ZoneTransitionOverlay } from './ZoneTransitionOverlay';
 export { DwellTimeOverlay } from './DwellTimeOverlay';
+export { LayoutChangeOverlay } from './LayoutChangeOverlay';
