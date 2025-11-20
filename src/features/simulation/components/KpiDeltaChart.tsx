@@ -1,14 +1,18 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { KpiDelta } from '../types/scenario.types';
+import { KpiSnapshot } from '../types/scenario.types';
+import { useKpiComparison } from '../hooks/useKpiComparison';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface KpiDeltaChartProps {
-  deltas: KpiDelta[];
+  baseline: KpiSnapshot;
+  predicted: KpiSnapshot;
   title?: string;
   description?: string;
 }
 
-export function KpiDeltaChart({ deltas, title = 'KPI 변화량', description }: KpiDeltaChartProps) {
+export function KpiDeltaChart({ baseline, predicted, title = 'KPI 변화량', description }: KpiDeltaChartProps) {
+  const { deltas } = useKpiComparison(baseline, predicted);
+
   if (!deltas || deltas.length === 0) {
     return null;
   }
