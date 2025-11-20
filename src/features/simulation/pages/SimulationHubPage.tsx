@@ -614,16 +614,56 @@ export default function SimulationHubPage() {
               </Card>
             )}
 
-            {/* Parameters + 3D Scene */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Left: Parameters */}
+            {/* Parameters + 3D Scene (3D는 레이아웃만) */}
+            {activeTab === 'layout' ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Left: Parameters */}
+                <div className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>시뮬레이션 파라미터</CardTitle>
+                      <CardDescription>
+                        {layoutScenarios.length > 0 ? '위에서 시나리오를 선택하거나 직접 설정하세요' : '시뮬레이션에 필요한 파라미터를 입력하세요'}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {renderParamsForm()}
+                    </CardContent>
+                  </Card>
+
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={handleRunSimulation}
+                      disabled={isAnalyzing || !selectedStore}
+                      className="flex-1"
+                    >
+                      <Play className="h-4 w-4 mr-2" />
+                      {isAnalyzing ? '실행 중...' : '시뮬레이션 실행'}
+                    </Button>
+                    <Button 
+                      onClick={handleSave}
+                      disabled={!predictedKpi || isCreating}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      {isCreating ? '저장 중...' : '시나리오 저장'}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Right: 3D Scene (레이아웃만) */}
+                <SharedDigitalTwinScene 
+                  overlayType={getOverlayType() as any}
+                  height="500px"
+                />
+              </div>
+            ) : (
               <div className="space-y-4">
                 <Card>
                   <CardHeader>
                     <CardTitle>시뮬레이션 파라미터</CardTitle>
                     <CardDescription>
-                      {activeTab === 'layout' && layoutScenarios.length > 0 && '위에서 시나리오를 선택하거나 직접 설정하세요'}
-                      {activeTab !== 'layout' && '시뮬레이션에 필요한 파라미터를 입력하세요'}
+                      시뮬레이션에 필요한 파라미터를 입력하세요
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -650,13 +690,7 @@ export default function SimulationHubPage() {
                   </Button>
                 </div>
               </div>
-
-              {/* Right: 3D Scene */}
-              <SharedDigitalTwinScene 
-                overlayType={getOverlayType() as any}
-                height="500px"
-              />
-            </div>
+            )}
 
             {/* Results */}
             {predictedKpi && (
