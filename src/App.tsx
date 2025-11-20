@@ -59,7 +59,7 @@ const App = () => (
               <Route path="/analysis/product" element={<ProtectedRoute><ProductAnalysisPage /></ProtectedRoute>} />
 
               {/* 3️⃣ Simulation (2 pages) */}
-              <Route path="/digital-twin-3d" element={<ProtectedRoute><DigitalTwin3DPage /></ProtectedRoute>} />
+              <Route path="/digital-twin/3d" element={<ProtectedRoute><DigitalTwin3DPage /></ProtectedRoute>} />
               <Route path="/simulation/hub" element={<ProtectedRoute><SimulationHubPage /></ProtectedRoute>} />
 
               {/* 4️⃣ Data Management (5 pages) */}
