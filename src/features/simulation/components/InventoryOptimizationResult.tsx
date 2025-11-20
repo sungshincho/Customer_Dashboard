@@ -1,7 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Package, TrendingDown, DollarSign, BarChart3 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 
 interface InventoryOptimizationResultProps {
   recommendations?: {
@@ -36,26 +35,13 @@ export function InventoryOptimizationResult({ recommendations, summary }: Invent
     );
   }
 
-  const urgencyColors = {
-    high: 'hsl(var(--destructive))',
-    medium: 'hsl(var(--chart-3))',
-    low: 'hsl(var(--chart-1))',
-  };
-
-  const chartData = recommendations.slice(0, 10).map((rec) => ({
-    name: rec.productName.length > 15 ? rec.productName.slice(0, 12) + '...' : rec.productName,
-    current: rec.currentStock,
-    optimal: rec.optimalStock,
-    urgency: rec.urgency,
-  }));
-
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader>
           <CardTitle>재고 최적화 요약</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">전체 상품</p>
@@ -75,7 +61,7 @@ export function InventoryOptimizationResult({ recommendations, summary }: Invent
             </div>
           </div>
           
-          <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t">
+          <div className="grid grid-cols-2 gap-4 pt-4 border-t">
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground flex items-center gap-1">
                 <DollarSign className="w-4 h-4" />
@@ -93,36 +79,41 @@ export function InventoryOptimizationResult({ recommendations, summary }: Invent
               <p className="text-xl font-bold">{summary.expectedTurnover.toFixed(1)}회/년</p>
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>상품별 재고 현황 vs 최적 재고</CardTitle>
-          <CardDescription>상위 10개 상품의 현재 재고와 권장 재고 수준</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis dataKey="name" className="text-xs" angle={-45} textAnchor="end" height={100} />
-              <YAxis className="text-xs" />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: 'hsl(var(--background))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '6px',
-                }}
-              />
-              <Legend />
-              <Bar dataKey="current" fill="hsl(var(--muted))" name="현재 재고" />
-              <Bar dataKey="optimal" name="권장 재고">
-                {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={urgencyColors[entry.urgency]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="pt-4 border-t">
+            <h4 className="text-sm font-medium mb-3">상품별 재고 현황 (상위 10개)</h4>
+            <div className="space-y-2">
+              {recommendations.slice(0, 10).map((rec, idx) => (
+                <div key={idx} className="flex items-center justify-between py-2 px-3 bg-muted/50 rounded-lg">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{rec.productName}</p>
+                    <p className="text-xs text-muted-foreground">SKU: {rec.productSku}</p>
+                  </div>
+                  <div className="flex items-center gap-4 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">현재: </span>
+                      <span className="font-medium">{rec.currentStock}개</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">권장: </span>
+                      <span className={`font-medium ${
+                        rec.urgency === 'high' ? 'text-destructive' : 
+                        rec.urgency === 'medium' ? 'text-orange-500' : 
+                        'text-green-500'
+                      }`}>{rec.optimalStock}개</span>
+                    </div>
+                    <Badge variant={
+                      rec.urgency === 'high' ? 'destructive' : 
+                      rec.urgency === 'medium' ? 'outline' : 
+                      'secondary'
+                    } className="text-xs">
+                      {rec.urgency === 'high' ? '긴급' : rec.urgency === 'medium' ? '주의' : '양호'}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </CardContent>
       </Card>
 

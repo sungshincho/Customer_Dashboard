@@ -1,7 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, DollarSign, Percent, Target } from 'lucide-react';
-import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ZAxis } from 'recharts';
 
 interface PricingOptimizationResultProps {
   recommendations?: {
@@ -36,20 +35,13 @@ export function PricingOptimizationResult({ recommendations, summary }: PricingO
     );
   }
 
-  const chartData = recommendations.map((rec) => ({
-    name: rec.productName,
-    priceChange: rec.priceChange,
-    revenueChange: rec.expectedRevenueChange,
-    elasticity: Math.abs(rec.elasticity) * 100,
-  }));
-
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader>
           <CardTitle>가격 최적화 요약</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">분석 상품</p>
@@ -68,7 +60,7 @@ export function PricingOptimizationResult({ recommendations, summary }: PricingO
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t">
+          <div className="grid grid-cols-2 gap-4 pt-4 border-t">
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground flex items-center gap-1">
                 <TrendingUp className="w-4 h-4" />
@@ -88,47 +80,41 @@ export function PricingOptimizationResult({ recommendations, summary }: PricingO
               </p>
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>가격 변화 vs 매출 효과</CardTitle>
-          <CardDescription>상품별 가격 변화와 예상 매출 변화의 관계</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <ScatterChart>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis 
-                type="number" 
-                dataKey="priceChange" 
-                name="가격 변화 (%)" 
-                className="text-xs"
-                label={{ value: '가격 변화 (%)', position: 'bottom' }}
-              />
-              <YAxis 
-                type="number" 
-                dataKey="revenueChange" 
-                name="매출 변화 (%)" 
-                className="text-xs"
-                label={{ value: '매출 변화 (%)', angle: -90, position: 'left' }}
-              />
-              <ZAxis type="number" dataKey="elasticity" range={[50, 400]} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: 'hsl(var(--background))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '6px',
-                }}
-                cursor={{ strokeDasharray: '3 3' }}
-              />
-              <Scatter name="상품" data={chartData} fill="hsl(var(--primary))" />
-            </ScatterChart>
-          </ResponsiveContainer>
-          <p className="text-xs text-muted-foreground mt-2 text-center">
-            💡 점의 크기는 가격 탄력성을 나타냅니다
-          </p>
+          <div className="pt-4 border-t">
+            <h4 className="text-sm font-medium mb-3">상품별 가격 변화 효과</h4>
+            <div className="space-y-2 max-h-[300px] overflow-y-auto">
+              {recommendations.map((rec, idx) => (
+                <div key={idx} className="py-2 px-3 bg-muted/50 rounded-lg">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm font-medium">{rec.productName}</p>
+                    <Badge variant={rec.priceChange < 0 ? 'destructive' : 'default'} className="text-xs">
+                      {rec.priceChange > 0 ? '인상' : '할인'}
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <span className="text-muted-foreground">가격 변화: </span>
+                      <span className={rec.priceChange > 0 ? 'text-red-500' : 'text-green-500'}>
+                        {rec.priceChange > 0 && '+'}
+                        {rec.priceChange.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">매출 효과: </span>
+                      <span className="text-green-500">
+                        +{rec.expectedRevenueChange.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">탄력성: </span>
+                      <span>{Math.abs(rec.elasticity).toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </CardContent>
       </Card>
 

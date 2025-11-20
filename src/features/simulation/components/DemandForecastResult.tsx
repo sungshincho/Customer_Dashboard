@@ -1,7 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, TrendingDown, Calendar, AlertTriangle } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface DemandForecastResultProps {
   forecastData?: {
@@ -31,12 +30,6 @@ export function DemandForecastResult({ forecastData, summary }: DemandForecastRe
     );
   }
 
-  const chartData = forecastData.dates.map((date, idx) => ({
-    date: new Date(date).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }),
-    demand: forecastData.predictedDemand[idx],
-    confidence: forecastData.confidence[idx] * 100,
-  }));
-
   return (
     <div className="space-y-4">
       <Card>
@@ -50,7 +43,7 @@ export function DemandForecastResult({ forecastData, summary }: DemandForecastRe
             </Badge>
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">평균 일일 수요</p>
@@ -65,31 +58,27 @@ export function DemandForecastResult({ forecastData, summary }: DemandForecastRe
               <p className="text-2xl font-bold">{summary.totalForecast.toFixed(0)}건</p>
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>수요 예측 그래프</CardTitle>
-          <CardDescription>예측 기간 동안의 예상 수요 변화</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis dataKey="date" className="text-xs" />
-              <YAxis className="text-xs" />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: 'hsl(var(--background))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '6px',
-                }}
-              />
-              <Legend />
-              <Line type="monotone" dataKey="demand" stroke="hsl(var(--primary))" strokeWidth={2} name="예측 수요" />
-            </LineChart>
-          </ResponsiveContainer>
+          <div className="pt-4 border-t">
+            <h4 className="text-sm font-medium mb-3">일별 예측 수요</h4>
+            <div className="space-y-2 max-h-[300px] overflow-y-auto">
+              {forecastData.dates.map((date, idx) => (
+                <div key={idx} className="flex items-center justify-between py-2 px-3 bg-muted/50 rounded-lg">
+                  <span className="text-sm">
+                    {new Date(date).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
+                  </span>
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm font-medium">
+                      {forecastData.predictedDemand[idx].toFixed(0)}건
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      신뢰도: {(forecastData.confidence[idx] * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </CardContent>
       </Card>
 
