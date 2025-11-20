@@ -79,7 +79,9 @@ const menuSections: MenuSection[] = [
     emoji: "📊",
     defaultOpen: true,
     items: [
-      { title: "통합 분석 대시보드", url: "/analysis/store", icon: Activity },
+      { title: "매장 분석", url: "/analysis/store", icon: Activity },
+      { title: "고객 분석", url: "/analysis/customer", icon: Users },
+      { title: "상품 분석", url: "/analysis/product", icon: Package },
     ],
   },
   {
