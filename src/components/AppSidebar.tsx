@@ -91,11 +91,7 @@ const menuSections: MenuSection[] = [
     defaultOpen: true,
     items: [
       { title: "디지털 트윈 3D", url: "/digital-twin-3d", icon: Boxes },
-      { title: "시나리오 랩", url: "/simulation/twin-lab", icon: TestTube },
-      { title: "레이아웃 시뮬레이션", url: "/simulation/layout", icon: Grid3x3 },
-      { title: "수요 & 재고 시뮬레이션", url: "/simulation/demand-inventory", icon: TrendingUp },
-      { title: "가격 최적화 시뮬레이션", url: "/simulation/pricing", icon: DollarSign },
-      { title: "추천 전략 시뮬레이션", url: "/simulation/recommendation", icon: Target },
+      { title: "시뮬레이션 허브", url: "/simulation/hub", icon: TestTube },
     ],
   },
   {

@@ -25,11 +25,7 @@ import ProductAnalysisPage from "@/features/store-analysis/pages/ProductAnalysis
 
 // Simulation pages
 import DigitalTwin3DPage from "@/features/digital-twin/pages/DigitalTwin3DPage";
-import ScenarioLabPage from "@/features/simulation/pages/ScenarioLabPage";
-import LayoutSimPage from "@/features/simulation/pages/LayoutSimPage";
-import DemandInventorySimPage from "@/features/simulation/pages/DemandInventorySimPage";
-import PricingSimPage from "@/features/simulation/pages/PricingSimPage";
-import RecommendationSimPage from "@/features/simulation/pages/RecommendationSimPage";
+import SimulationHubPage from "@/features/simulation/pages/SimulationHubPage";
 
 // Data Management pages
 import UnifiedDataManagementPage from "@/features/data-management/import/pages/UnifiedDataManagementPage";
@@ -62,13 +58,9 @@ const App = () => (
               <Route path="/analysis/customer" element={<ProtectedRoute><CustomerAnalysisIntegratedPage /></ProtectedRoute>} />
               <Route path="/analysis/product" element={<ProtectedRoute><ProductAnalysisPage /></ProtectedRoute>} />
 
-              {/* 3️⃣ Simulation (6 pages) */}
+              {/* 3️⃣ Simulation (2 pages) */}
               <Route path="/digital-twin-3d" element={<ProtectedRoute><DigitalTwin3DPage /></ProtectedRoute>} />
-              <Route path="/simulation/twin-lab" element={<ProtectedRoute><ScenarioLabPage /></ProtectedRoute>} />
-              <Route path="/simulation/layout" element={<ProtectedRoute><LayoutSimPage /></ProtectedRoute>} />
-              <Route path="/simulation/demand-inventory" element={<ProtectedRoute><DemandInventorySimPage /></ProtectedRoute>} />
-              <Route path="/simulation/pricing" element={<ProtectedRoute><PricingSimPage /></ProtectedRoute>} />
-              <Route path="/simulation/recommendation" element={<ProtectedRoute><RecommendationSimPage /></ProtectedRoute>} />
+              <Route path="/simulation/hub" element={<ProtectedRoute><SimulationHubPage /></ProtectedRoute>} />
 
               {/* 4️⃣ Data Management (5 pages) */}
               <Route path="/data-import" element={<ProtectedRoute><UnifiedDataManagementPage /></ProtectedRoute>} />
