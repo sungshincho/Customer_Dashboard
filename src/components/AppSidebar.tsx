@@ -90,7 +90,7 @@ const menuSections: MenuSection[] = [
     emoji: "🔮",
     defaultOpen: true,
     items: [
-      { title: "디지털 트윈 3D", url: "/digital-twin-3d", icon: Boxes },
+      { title: "디지털 트윈 3D", url: "/digital-twin/3d", icon: Boxes },
       { title: "시뮬레이션 허브", url: "/simulation/hub", icon: TestTube },
     ],
   },
