@@ -11,15 +11,13 @@ import { ComparisonView } from "@/features/data-management/analysis/components/C
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { useVisits } from "@/hooks/useStoreData";
-import { SceneComposer } from "@/features/digital-twin/components/SceneComposer";
+import { SharedDigitalTwinScene } from "@/features/digital-twin/components";
 import { HeatmapOverlay3D, ZoneBoundaryOverlay } from "@/features/digital-twin/components/overlays";
-import { useStoreScene } from "@/hooks/useStoreScene";
 import { useTrafficHeatmap, useZoneStatistics, useTrafficContext } from "@/hooks/useTrafficHeatmap";
 import type { StoreSpaceMetadata } from "@/features/digital-twin/types/iot.types";
 
 const TrafficHeatmapPage = () => {
   const { selectedStore } = useSelectedStore();
-  const { activeScene } = useStoreScene();
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
   

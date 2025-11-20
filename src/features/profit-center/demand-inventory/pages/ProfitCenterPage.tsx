@@ -9,18 +9,16 @@ import { Progress } from "@/components/ui/progress";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { useRealtimeInventory } from "@/hooks/useRealtimeInventory";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Store3DViewer } from "@/features/digital-twin/components";
+import { SharedDigitalTwinScene } from "@/features/digital-twin/components";
 import { ProductInfoOverlay } from "@/features/digital-twin/components/overlays";
 import { convertToProductInfo } from "@/features/digital-twin/utils/overlayDataConverter";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { useStoreDataset } from "@/hooks/useStoreData";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { DataReadinessGuard } from "@/components/DataReadinessGuard";
-import { useStoreScene } from "@/hooks/useStoreScene";
 
 const ProfitCenterPage = () => {
   const { selectedStore } = useSelectedStore();
-  const { activeScene } = useStoreScene();
   const { 
     inventoryLevels, 
     orderSuggestions, 
@@ -240,12 +238,12 @@ const ProfitCenterPage = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Store3DViewer 
-                  height="600px"
-                  sceneRecipe={activeScene?.recipe_data}
-                  overlay={
+                <SharedDigitalTwinScene
+                  overlayType="profit"
+                  customOverlay={
                     <ProductInfoOverlay products={productInfoData} />
                   }
+                  height="600px"
                 />
               </CardContent>
             </Card>

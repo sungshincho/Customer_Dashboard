@@ -13,16 +13,14 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { useMultipleStoreDataFiles } from "@/hooks/useStoreData";
 import { DataReadinessGuard } from "@/components/DataReadinessGuard";
-import { SceneComposer } from "@/features/digital-twin/components/SceneComposer";
+import { SharedDigitalTwinScene } from "@/features/digital-twin/components";
 import { CustomerPathOverlay, CustomerAvatarOverlay, ZoneBoundaryOverlay } from "@/features/digital-twin/components/overlays";
-import { useStoreScene } from "@/hooks/useStoreScene";
 import { useCustomerJourney, useJourneyStatistics } from "@/hooks/useCustomerJourney";
 import type { StoreSpaceMetadata } from "@/features/digital-twin/types/iot.types";
 import type { CustomerAvatar } from "@/features/digital-twin/types/avatar.types";
 
 const CustomerJourneyPage = () => {
   const { selectedStore } = useSelectedStore();
-  const { activeScene } = useStoreScene();
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
   
