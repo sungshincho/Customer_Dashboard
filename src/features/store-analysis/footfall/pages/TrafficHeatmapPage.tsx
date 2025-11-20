@@ -110,18 +110,17 @@ const TrafficHeatmapPage = () => {
             
           {/* 3D Digital Twin Heatmap */}
           <div className="space-y-4 animate-fade-in">
-            {activeScene && selectedStore ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle>3D 디지털 트윈 히트맵</CardTitle>
-                  <CardDescription>
-                    실제 매장 공간에서 고객 동선을 3D로 확인하세요
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Time Controls */}
-                  <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
-                    <div className="flex items-center justify-between">
+<Card>
+              <CardHeader>
+                <CardTitle>3D 디지털 트윈 히트맵</CardTitle>
+                <CardDescription>
+                  실제 매장 공간에서 고객 동선을 3D로 확인하세요
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Time Controls */}
+                <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
+                  <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 flex-wrap">
                         <Badge variant="outline" className="text-lg font-semibold">
                           {String(timeOfDay).padStart(2, '0')}:00
@@ -191,9 +190,9 @@ const TrafficHeatmapPage = () => {
 
                   {/* 3D Scene */}
                   <div className="relative h-[600px] rounded-lg overflow-hidden bg-background border">
-                    <SceneComposer
-                      recipe={activeScene.recipe_data}
-                      overlay={
+<SharedDigitalTwinScene
+                      overlayType="heatmap"
+                      customOverlay={
                         <>
                           {showZones && metadata && (
                             <ZoneBoundaryOverlay
@@ -204,11 +203,11 @@ const TrafficHeatmapPage = () => {
                           {showHeatmap && heatPoints.length > 0 && (
                             <HeatmapOverlay3D
                               heatPoints={heatPoints}
-                              gridSize={20}
                             />
                           )}
                         </>
                       }
+                      height="600px"
                     />
                     
                     {/* Overlay Controls */}
@@ -245,19 +244,7 @@ const TrafficHeatmapPage = () => {
                     </div>
                   </div>
                 </CardContent>
-              </Card>
-            ) : (
-              <Card>
-                <CardContent className="py-12 text-center">
-                  <p className="text-muted-foreground">
-                    3D 히트맵을 보려면 매장을 선택하고 3D 씬을 설정해주세요.
-                  </p>
-                  <Button variant="outline" className="mt-4">
-                    3D 설정 페이지로 이동
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
+            </Card>
 
             {/* Context Insights */}
           {contextInsights.length > 0 && (
