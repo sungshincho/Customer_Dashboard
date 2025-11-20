@@ -3,6 +3,7 @@ import { DashboardLayout } from '@/components/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { TestTube, Sparkles, Play, Grid3x3, TrendingUp, DollarSign, Target } from 'lucide-react';
@@ -16,6 +17,10 @@ import { InventoryParamsForm } from '../components/params/InventoryParamsForm';
 import { PricingParamsForm } from '../components/params/PricingParamsForm';
 import { RecommendationParamsForm } from '../components/params/RecommendationParamsForm';
 import { PredictionResultCard, BeforeAfterComparison, KpiDeltaChart } from '../components';
+import { DemandForecastResult } from '../components/DemandForecastResult';
+import { InventoryOptimizationResult } from '../components/InventoryOptimizationResult';
+import { PricingOptimizationResult } from '../components/PricingOptimizationResult';
+import { RecommendationStrategyResult } from '../components/RecommendationStrategyResult';
 import { LayoutParams, DemandParams, InventoryParams, PricingParams, RecommendationParams, KpiSnapshot } from '../types';
 
 type SimType = 'layout' | 'demand' | 'inventory' | 'pricing' | 'recommendation';
@@ -29,6 +34,18 @@ interface AISimulationRecommendation {
   expectedImpact: string;
 }
 
+interface LayoutScenario {
+  id: string;
+  name: string;
+  description: string;
+  changes: string[];
+  expectedImpact: {
+    conversionRate?: number;
+    dwellTime?: number;
+    salesPerSqm?: number;
+  };
+}
+
 export default function SimulationHubPage() {
   const { selectedStore } = useSelectedStore();
   const { analyzeGoal, infer, loading: isAnalyzing } = useAIInference();
@@ -37,6 +54,8 @@ export default function SimulationHubPage() {
   // Scenario Lab state
   const [goalText, setGoalText] = useState('');
   const [recommendations, setRecommendations] = useState<AISimulationRecommendation[]>([]);
+  const [layoutScenarios, setLayoutScenarios] = useState<LayoutScenario[]>([]);
+  const [selectedScenarioId, setSelectedScenarioId] = useState<string | null>(null);
 
   // Active simulation state
   const [activeTab, setActiveTab] = useState<SimType>('layout');
@@ -51,6 +70,12 @@ export default function SimulationHubPage() {
   const [predictedKpi, setPredictedKpi] = useState<KpiSnapshot | null>(null);
   const [confidenceScore, setConfidenceScore] = useState<number | null>(null);
   const [aiInsights, setAiInsights] = useState<string>("");
+  
+  // Specialized simulation results
+  const [demandForecastData, setDemandForecastData] = useState<any>(null);
+  const [inventoryOptimizationData, setInventoryOptimizationData] = useState<any>(null);
+  const [pricingOptimizationData, setPricingOptimizationData] = useState<any>(null);
+  const [recommendationStrategyData, setRecommendationStrategyData] = useState<any>(null);
 
   const handleAnalyze = async () => {
     if (!goalText.trim()) {
@@ -67,6 +92,24 @@ export default function SimulationHubPage() {
     
     if (result) {
       setRecommendations(result);
+      
+      // 레이아웃 추천이 포함된 경우 5개 시나리오 생성
+      const layoutRec = result.find(r => r.type === 'layout');
+      if (layoutRec) {
+        const scenarios: LayoutScenario[] = layoutRec.suggestedActions.slice(0, 5).map((action, idx) => ({
+          id: `scenario-${idx + 1}`,
+          name: `레이아웃 시나리오 ${idx + 1}`,
+          description: action,
+          changes: [action],
+          expectedImpact: {
+            conversionRate: 0.1 + (idx * 0.02),
+            dwellTime: 1.5 + (idx * 0.3),
+            salesPerSqm: 50000 + (idx * 10000)
+          }
+        }));
+        setLayoutScenarios(scenarios);
+      }
+      
       toast.success('AI 분석이 완료되었습니다');
       
       // Auto-switch to first recommended simulation type
@@ -134,6 +177,112 @@ export default function SimulationHubPage() {
       setPredictedKpi(result.predictedKpi);
       setConfidenceScore(result.confidenceScore);
       setAiInsights(result.aiInsights || '');
+      
+      // 각 시뮬레이션 타입별 특화 데이터 설정 (Mock 데이터)
+      if (activeTab === 'demand') {
+        setDemandForecastData({
+          forecastData: {
+            dates: Array.from({ length: 30 }, (_, i) => {
+              const date = new Date();
+              date.setDate(date.getDate() + i);
+              return date.toISOString();
+            }),
+            predictedDemand: Array.from({ length: 30 }, () => Math.floor(Math.random() * 50) + 100),
+            confidence: Array.from({ length: 30 }, () => 0.7 + Math.random() * 0.2),
+            peakDays: [
+              new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+              new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString(),
+            ],
+          },
+          summary: {
+            avgDailyDemand: 125,
+            peakDemand: 180,
+            totalForecast: 3750,
+            trend: 'increasing' as const,
+          },
+        });
+      } else if (activeTab === 'inventory') {
+        setInventoryOptimizationData({
+          recommendations: Array.from({ length: 15 }, (_, i) => ({
+            productSku: `SKU-${1000 + i}`,
+            productName: `상품 ${i + 1}`,
+            currentStock: Math.floor(Math.random() * 100) + 20,
+            optimalStock: Math.floor(Math.random() * 80) + 40,
+            reorderPoint: Math.floor(Math.random() * 30) + 20,
+            safetyStock: Math.floor(Math.random() * 20) + 10,
+            orderQuantity: Math.floor(Math.random() * 50) + 30,
+            urgency: ['high', 'medium', 'low'][Math.floor(Math.random() * 3)] as 'high' | 'medium' | 'low',
+          })),
+          summary: {
+            totalProducts: 15,
+            overstocked: 3,
+            understocked: 5,
+            optimal: 7,
+            potentialSavings: 2500000,
+            expectedTurnover: 6.5,
+          },
+        });
+      } else if (activeTab === 'pricing') {
+        setPricingOptimizationData({
+          recommendations: Array.from({ length: 12 }, (_, i) => ({
+            productSku: `SKU-${2000 + i}`,
+            productName: `상품 ${i + 1}`,
+            currentPrice: 50000 + Math.floor(Math.random() * 50000),
+            optimalPrice: 50000 + Math.floor(Math.random() * 50000),
+            priceChange: (Math.random() - 0.5) * 20,
+            expectedDemandChange: (Math.random() - 0.3) * 15,
+            expectedRevenueChange: Math.random() * 20 + 5,
+            elasticity: Math.random() * 2 + 0.5,
+          })),
+          summary: {
+            totalProducts: 12,
+            avgPriceChange: -3.5,
+            expectedRevenueIncrease: 4500000,
+            expectedMarginIncrease: 2.3,
+            recommendedDiscounts: 7,
+            recommendedIncreases: 5,
+          },
+        });
+      } else if (activeTab === 'recommendation') {
+        setRecommendationStrategyData({
+          strategies: [
+            {
+              strategyName: '교차 판매 전략 A',
+              strategyType: 'cross-sell' as const,
+              targetSegment: '신규 고객',
+              expectedCTR: 15.3,
+              expectedCVR: 8.2,
+              expectedAOVIncrease: 12.5,
+              productPairs: [
+                { product1: '상품 A', product2: '상품 B', affinity: 0.85 },
+                { product1: '상품 C', product2: '상품 D', affinity: 0.78 },
+              ],
+            },
+            {
+              strategyName: '개인화 추천 전략',
+              strategyType: 'personalized' as const,
+              targetSegment: 'VIP 고객',
+              expectedCTR: 22.1,
+              expectedCVR: 12.8,
+              expectedAOVIncrease: 18.3,
+              productPairs: [],
+            },
+          ],
+          summary: {
+            totalStrategies: 2,
+            avgCTRIncrease: 18.7,
+            avgCVRIncrease: 10.5,
+            avgAOVIncrease: 15.4,
+            expectedRevenueImpact: 8500000,
+          },
+          performanceMetrics: [
+            { metric: 'CTR', current: 5.2, predicted: 6.2 },
+            { metric: 'CVR', current: 2.8, predicted: 3.1 },
+            { metric: 'AOV', current: 45000, predicted: 52000 },
+          ],
+        });
+      }
+      
       toast.success('시뮬레이션이 완료되었습니다');
     }
   };
@@ -288,7 +437,7 @@ export default function SimulationHubPage() {
               <div className="space-y-3 mt-4">
                 <h3 className="font-semibold">AI 추천 전략</h3>
                 {recommendations.map((rec, idx) => (
-                  <Alert key={idx} className="cursor-pointer hover:bg-accent/50" onClick={() => {
+                  <Alert key={idx} className="cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => {
                     if (rec.type === 'demand-inventory') {
                       setActiveTab('demand');
                     } else if (rec.type === 'layout' || rec.type === 'pricing' || rec.type === 'recommendation') {
@@ -296,9 +445,31 @@ export default function SimulationHubPage() {
                     }
                   }}>
                     <AlertDescription>
-                      <div className="space-y-1">
-                        <div className="font-semibold">{rec.title}</div>
-                        <div className="text-sm">{rec.description}</div>
+                      <div className="space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="font-semibold flex items-center gap-2">
+                              {rec.title}
+                              <Badge variant={rec.priority === 'high' ? 'default' : 'secondary'}>
+                                {rec.priority === 'high' ? '높음' : rec.priority === 'medium' ? '중간' : '낮음'}
+                              </Badge>
+                            </div>
+                            <div className="text-sm mt-1">{rec.description}</div>
+                          </div>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          💡 예상 효과: {rec.expectedImpact}
+                        </div>
+                        {rec.suggestedActions.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            <div className="text-xs font-medium">제안 액션:</div>
+                            <ul className="text-xs text-muted-foreground space-y-0.5">
+                              {rec.suggestedActions.slice(0, 3).map((action, i) => (
+                                <li key={i}>• {action}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                       </div>
                     </AlertDescription>
                   </Alert>
@@ -385,6 +556,64 @@ export default function SimulationHubPage() {
               </CardContent>
             </Card>
 
+            {/* Layout Scenarios Selection (레이아웃 탭에서만 표시) */}
+            {activeTab === 'layout' && layoutScenarios.length > 0 && (
+              <Card className="border-primary/20 bg-primary/5">
+                <CardHeader>
+                  <CardTitle>AI 제안 레이아웃 시나리오 (5가지)</CardTitle>
+                  <CardDescription>
+                    시나리오를 선택하면 자동으로 파라미터가 설정됩니다
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {layoutScenarios.map((scenario) => (
+                      <Card 
+                        key={scenario.id}
+                        className={`cursor-pointer transition-all ${
+                          selectedScenarioId === scenario.id 
+                            ? 'border-primary bg-primary/10 shadow-md' 
+                            : 'hover:border-primary/50 hover:shadow'
+                        }`}
+                        onClick={() => {
+                          setSelectedScenarioId(scenario.id);
+                          // 시나리오 선택 시 레이아웃 파라미터 자동 설정
+                          toast.success(`${scenario.name}이(가) 선택되었습니다`);
+                        }}
+                      >
+                        <CardContent className="p-4">
+                          <div className="space-y-2">
+                            <div className="font-semibold">{scenario.name}</div>
+                            <div className="text-sm text-muted-foreground">{scenario.description}</div>
+                            <div className="pt-2 space-y-1 text-xs">
+                              <div className="flex justify-between">
+                                <span>전환율 향상:</span>
+                                <span className="text-green-500 font-medium">
+                                  +{(scenario.expectedImpact.conversionRate! * 100).toFixed(1)}%
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>체류시간 증가:</span>
+                                <span className="text-green-500 font-medium">
+                                  +{scenario.expectedImpact.dwellTime?.toFixed(1)}분
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>평당매출 증가:</span>
+                                <span className="text-green-500 font-medium">
+                                  +{(scenario.expectedImpact.salesPerSqm! / 10000).toFixed(0)}만원
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Parameters + 3D Scene */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Left: Parameters */}
@@ -392,6 +621,10 @@ export default function SimulationHubPage() {
                 <Card>
                   <CardHeader>
                     <CardTitle>시뮬레이션 파라미터</CardTitle>
+                    <CardDescription>
+                      {activeTab === 'layout' && layoutScenarios.length > 0 && '위에서 시나리오를 선택하거나 직접 설정하세요'}
+                      {activeTab !== 'layout' && '시뮬레이션에 필요한 파라미터를 입력하세요'}
+                    </CardDescription>
                   </CardHeader>
                   <CardContent>
                     {renderParamsForm()}
@@ -405,7 +638,7 @@ export default function SimulationHubPage() {
                     className="flex-1"
                   >
                     <Play className="h-4 w-4 mr-2" />
-                    시뮬레이션 실행
+                    {isAnalyzing ? '실행 중...' : '시뮬레이션 실행'}
                   </Button>
                   <Button 
                     onClick={handleSave}
@@ -413,7 +646,7 @@ export default function SimulationHubPage() {
                     variant="outline"
                     className="flex-1"
                   >
-                    시나리오 저장
+                    {isCreating ? '저장 중...' : '시나리오 저장'}
                   </Button>
                 </div>
               </div>
@@ -427,39 +660,77 @@ export default function SimulationHubPage() {
 
             {/* Results */}
             {predictedKpi && (
-              <Tabs defaultValue="prediction" className="w-full">
-                <TabsList>
-                  <TabsTrigger value="prediction">예측 결과</TabsTrigger>
-                  <TabsTrigger value="comparison">Before/After</TabsTrigger>
-                  <TabsTrigger value="chart">KPI 변화</TabsTrigger>
-                </TabsList>
+              <div className="space-y-4">
+                {/* AI Insights 별도 표시 */}
+                {aiInsights && (
+                  <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Sparkles className="h-5 w-5" />
+                        AI 인사이트
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="prose prose-sm max-w-none">
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{aiInsights}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
-                <TabsContent value="prediction" className="mt-4">
-                  <PredictionResultCard
-                    predictedKpi={predictedKpi}
-                    confidenceScore={confidenceScore || 0}
-                    aiInsights={aiInsights}
-                  />
-                </TabsContent>
+                {/* 시뮬레이션 타입별 특화 결과 표시 */}
+                {activeTab === 'demand' && demandForecastData && (
+                  <DemandForecastResult {...demandForecastData} />
+                )}
 
-                <TabsContent value="comparison" className="mt-4">
-                  {baselineKpi && (
-                    <BeforeAfterComparison
-                      baseline={baselineKpi}
-                      predicted={predictedKpi}
+                {activeTab === 'inventory' && inventoryOptimizationData && (
+                  <InventoryOptimizationResult {...inventoryOptimizationData} />
+                )}
+
+                {activeTab === 'pricing' && pricingOptimizationData && (
+                  <PricingOptimizationResult {...pricingOptimizationData} />
+                )}
+
+                {activeTab === 'recommendation' && recommendationStrategyData && (
+                  <RecommendationStrategyResult {...recommendationStrategyData} />
+                )}
+
+                {/* 공통 KPI 비교 결과 */}
+                <Tabs defaultValue="prediction" className="w-full">
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="prediction">예측 KPI</TabsTrigger>
+                    <TabsTrigger value="comparison">Before/After</TabsTrigger>
+                    <TabsTrigger value="chart">KPI 변화</TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="prediction" className="mt-4">
+                    <PredictionResultCard
+                      predictedKpi={predictedKpi}
+                      baselineKpi={baselineKpi || undefined}
+                      confidenceScore={confidenceScore || 0}
+                      aiInsights={aiInsights}
                     />
-                  )}
-                </TabsContent>
+                  </TabsContent>
 
-                <TabsContent value="chart" className="mt-4">
-                  {baselineKpi && (
-                    <KpiDeltaChart
-                      baseline={baselineKpi}
-                      predicted={predictedKpi}
-                    />
-                  )}
-                </TabsContent>
-              </Tabs>
+                  <TabsContent value="comparison" className="mt-4">
+                    {baselineKpi && (
+                      <BeforeAfterComparison
+                        baseline={baselineKpi}
+                        predicted={predictedKpi}
+                      />
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="chart" className="mt-4">
+                    {baselineKpi && (
+                      <KpiDeltaChart
+                        baseline={baselineKpi}
+                        predicted={predictedKpi}
+                      />
+                    )}
+                  </TabsContent>
+                </Tabs>
+              </div>
             )}
           </div>
         </Tabs>
