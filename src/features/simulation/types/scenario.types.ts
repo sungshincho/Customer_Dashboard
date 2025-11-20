@@ -2,6 +2,8 @@
  * 시뮬레이션 시나리오 공통 타입
  */
 
+import { ZoneChange, FurnitureMove, LayoutFeatures } from './layout.types';
+
 export type ScenarioType = 
   | 'layout' 
   | 'pricing' 
@@ -53,24 +55,9 @@ export interface KpiDelta {
 
 // 레이아웃 시뮬레이션 파라미터
 export interface LayoutParams {
-  changedZones?: Array<{
-    zoneId: string;
-    zoneName: string;
-    newPosition?: { x: number; y: number; z: number };
-    newSize?: { width: number; depth: number };
-    facingCount?: number;
-  }>;
-  movedFurniture?: Array<{
-    furnitureId: string;
-    fromPosition: { x: number; y: number; z: number };
-    toPosition: { x: number; y: number; z: number };
-  }>;
-  layoutFeatures?: {
-    totalArea?: number;
-    entranceDistance?: Record<string, number>;
-    cashierDistance?: Record<string, number>;
-    pathComplexity?: number;
-  };
+  changedZones?: ZoneChange[];
+  movedFurniture?: FurnitureMove[];
+  layoutFeatures?: Partial<LayoutFeatures>;
 }
 
 // 가격 최적화 파라미터
