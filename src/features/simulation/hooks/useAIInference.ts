@@ -61,7 +61,8 @@ export function useAIInference() {
   const infer = async (
     scenarioType: ScenarioType,
     params: Record<string, any>,
-    storeId?: string
+    storeId?: string,
+    storeContext?: any
   ): Promise<PredictionResult | null> => {
     setLoading(true);
     setError(null);
@@ -81,6 +82,7 @@ export function useAIInference() {
             data: [request],
             parameters: {
               scenario_type: scenarioType,
+              store_context: storeContext, // 실제 매장 컨텍스트 전달
               ...params,
             },
           },
