@@ -29,7 +29,7 @@ export function useAIInference() {
         'advanced-ai-inference',
         {
           body: {
-            inference_type: 'pattern_discovery',
+            inference_type: 'pattern',
             data: [{ goal: goalText, storeId }],
             parameters: {
               analysis_type: 'business_goal_analysis',
@@ -77,7 +77,7 @@ export function useAIInference() {
         'advanced-ai-inference',
         {
           body: {
-            inference_type: 'predictive_modeling',
+            inference_type: 'prediction',
             data: [request],
             parameters: {
               scenario_type: scenarioType,
