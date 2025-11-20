@@ -1,36 +1,27 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { CustomerJourney } from "@/features/store-analysis/footfall/components/CustomerJourney";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
-import { RefreshCw, Play, Pause, RotateCcw, Users } from "lucide-react";
+import { RefreshCw, Play, Pause, RotateCcw, Users, TrendingUp, Clock } from "lucide-react";
 import { useState, useEffect } from "react";
 import { AdvancedFilters, FilterState } from "@/features/data-management/analysis/components/AdvancedFilters";
 import { ExportButton } from "@/features/data-management/analysis/components/ExportButton";
-import { ComparisonView } from "@/features/data-management/analysis/components/ComparisonView";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
-import { useMultipleStoreDataFiles } from "@/hooks/useStoreData";
 import { DataReadinessGuard } from "@/components/DataReadinessGuard";
 import { SharedDigitalTwinScene } from "@/features/digital-twin/components";
-import { CustomerPathOverlay, CustomerAvatarOverlay, ZoneBoundaryOverlay } from "@/features/digital-twin/components/overlays";
+import { CustomerPathOverlay, CustomerAvatarOverlay, ZoneBoundaryOverlay, ZoneTransitionOverlay, DwellTimeOverlay } from "@/features/digital-twin/components/overlays";
 import { useCustomerJourney, useJourneyStatistics } from "@/hooks/useCustomerJourney";
+import { useZoneTransition } from "@/hooks/useZoneTransition";
+import { useDwellTime } from "@/hooks/useDwellTime";
 import type { StoreSpaceMetadata } from "@/features/digital-twin/types/iot.types";
 import type { CustomerAvatar } from "@/features/digital-twin/types/avatar.types";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 const CustomerJourneyPage = () => {
   const { selectedStore } = useSelectedStore();
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
-  const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
-  
-  // 여러 파일 동시 로드
-  const dataQueries = useMultipleStoreDataFiles(['visits', 'purchases']);
-  const [visitsQuery, purchasesQuery] = dataQueries;
-  
-  const visitsData = visitsQuery.data?.data || [];
-  const purchasesData = purchasesQuery.data?.data || [];
-  const loading = visitsQuery.isLoading || purchasesQuery.isLoading;
 
   // 3D Journey Controls
   const [timeOfDay, setTimeOfDay] = useState(14);
@@ -43,7 +34,12 @@ const CustomerJourneyPage = () => {
   // WiFi 트래킹 데이터를 고객 경로로 변환
   const { paths, currentPositions } = useCustomerJourney(selectedStore?.id, timeOfDay);
   const metadata = selectedStore?.metadata?.storeSpaceMetadata as StoreSpaceMetadata | undefined;
+  const zones = metadata?.zones || [];
   const journeyStats = useJourneyStatistics(paths);
+  
+  // 존 전환 및 체류 시간 데이터
+  const zoneTransitionStats = useZoneTransition(selectedStore?.id, zones);
+  const dwellTimeStats = useDwellTime(selectedStore?.id, zones);
 
   // Convert paths to PathPoint[][] format for CustomerPathOverlay
   const pathPoints = paths.map(path => 
@@ -71,8 +67,7 @@ const CustomerJourneyPage = () => {
   }, [isPlaying]);
 
   const handleRefresh = () => {
-    visitsQuery.refetch();
-    purchasesQuery.refetch();
+    window.location.reload();
   };
 
   const handleReset = () => {
@@ -80,34 +75,14 @@ const CustomerJourneyPage = () => {
     setTimeOfDay(14);
   };
 
-  // 실제 데이터 기반 비교 데이터
-  const comparisonData = [
-    { 
-      label: "평균 동선 길이", 
-      current: journeyStats.avgDistance, 
-      previous: journeyStats.avgDistance > 5 ? journeyStats.avgDistance * 0.9 : journeyStats.avgDistance, 
-      unit: "m" 
-    },
-    { 
-      label: "평균 경로 포인트", 
-      current: journeyStats.avgPathLength, 
-      previous: journeyStats.avgPathLength > 1 ? journeyStats.avgPathLength * 0.92 : journeyStats.avgPathLength, 
-      unit: "개" 
-    },
-    { 
-      label: "평균 체류 시간", 
-      current: journeyStats.avgDuration, 
-      previous: journeyStats.avgDuration > 10 ? journeyStats.avgDuration * 0.88 : journeyStats.avgDuration, 
-      unit: "분" 
-    }
-  ];
 
   const exportData = {
     filters,
-    journeyMetrics: comparisonData,
     timeOfDay,
     totalPaths: paths.length,
-    currentCustomers: currentPositions.length
+    currentCustomers: currentPositions.length,
+    zoneTransitions: zoneTransitionStats,
+    dwellTimes: dwellTimeStats
   };
 
   return (
@@ -135,15 +110,15 @@ const CustomerJourneyPage = () => {
         
         <AdvancedFilters filters={filters} onFiltersChange={setFilters} />
         
-        <Tabs defaultValue="3d-journey" className="w-full">
+        <Tabs defaultValue="path-pattern" className="w-full">
           <TabsList>
-            <TabsTrigger value="3d-journey">3D 고객 동선</TabsTrigger>
-            <TabsTrigger value="analysis">2D 여정 분석</TabsTrigger>
-            <TabsTrigger value="comparison">비교 분석</TabsTrigger>
+            <TabsTrigger value="path-pattern">고객 동선 패턴</TabsTrigger>
+            <TabsTrigger value="zone-transition">존 전환 확률</TabsTrigger>
+            <TabsTrigger value="dwell-time">체류 시간 분석</TabsTrigger>
           </TabsList>
 
-          {/* 3D 고객 동선 */}
-          <TabsContent value="3d-journey" className="space-y-6">
+          {/* 고객 동선 패턴 */}
+          <TabsContent value="path-pattern" className="space-y-6">
             <div className="grid md:grid-cols-4 gap-6">
               {/* 좌측: 컨트롤 및 통계 */}
               <Card className="md:col-span-1">
@@ -330,17 +305,183 @@ const CustomerJourneyPage = () => {
             </div>
           </TabsContent>
 
-          {/* 2D 여정 분석 */}
-          <TabsContent value="analysis" className="space-y-6">
-            <CustomerJourney visitsData={visitsData} purchasesData={purchasesData} />
+          {/* 존 전환 확률 */}
+          <TabsContent value="zone-transition" className="space-y-6">
+            <div className="grid md:grid-cols-4 gap-6">
+              <Card className="md:col-span-1">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4" />
+                    존 전환 통계
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="text-sm text-muted-foreground">총 전환 수</div>
+                    <div className="text-2xl font-bold">{zoneTransitionStats.totalTransitions}</div>
+                  </div>
+                  
+                  <div className="space-y-2 pt-4 border-t">
+                    <div className="text-sm font-medium">주요 전환 경로</div>
+                    {zoneTransitionStats.topTransitions.map((t, idx) => (
+                      <div key={idx} className="p-2 rounded bg-muted text-xs">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-medium">{t.fromZone} → {t.toZone}</span>
+                          <Badge variant="secondary">{t.probability.toFixed(1)}%</Badge>
+                        </div>
+                        <div className="text-muted-foreground">전환 {t.count}회</div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="md:col-span-3">
+                <CardHeader>
+                  <CardTitle>존 전환 3D 시각화</CardTitle>
+                  <CardDescription>
+                    화살표 두께와 색상으로 전환 확률 표시 (진할수록 높은 확률)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[600px] bg-muted rounded-lg overflow-hidden">
+                    <SharedDigitalTwinScene
+                      overlayType="none"
+                      customOverlay={
+                        <>
+                          {metadata && (
+                            <ZoneBoundaryOverlay
+                              zones={zones}
+                              metadata={metadata}
+                            />
+                          )}
+                          <ZoneTransitionOverlay
+                            transitions={zoneTransitionStats.transitions}
+                            zones={zones}
+                          />
+                        </>
+                      }
+                      height="600px"
+                    />
+                  </div>
+
+                  <div className="mt-4 p-4 bg-muted rounded-lg">
+                    <h4 className="font-semibold text-sm mb-3">전환 확률 분포</h4>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={zoneTransitionStats.topTransitions.slice(0, 8)}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis 
+                          dataKey={(d) => `${d.fromZone}→${d.toZone}`} 
+                          angle={-45}
+                          textAnchor="end"
+                          height={80}
+                          fontSize={11}
+                        />
+                        <YAxis label={{ value: '확률 (%)', angle: -90, position: 'insideLeft' }} />
+                        <Tooltip />
+                        <Bar dataKey="probability" fill="hsl(var(--primary))">
+                          {zoneTransitionStats.topTransitions.slice(0, 8).map((_, index) => (
+                            <Cell key={`cell-${index}`} fill={`hsl(${220 - index * 20}, 70%, 50%)`} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
-          
-          <TabsContent value="comparison">
-            <ComparisonView
-              data={comparisonData}
-              comparisonType={comparisonType}
-              onComparisonTypeChange={setComparisonType}
-            />
+
+          {/* 체류 시간 분석 */}
+          <TabsContent value="dwell-time" className="space-y-6">
+            <div className="grid md:grid-cols-4 gap-6">
+              <Card className="md:col-span-1">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    체류 시간 통계
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="text-sm text-muted-foreground">전체 평균</div>
+                    <div className="text-2xl font-bold">{Math.round(dwellTimeStats.overallAvgDwellTime / 60)}분</div>
+                  </div>
+                  
+                  <div className="space-y-2 pt-4 border-t">
+                    <div className="text-sm font-medium">존별 체류 시간</div>
+                    {dwellTimeStats.zoneDwellTimes.slice(0, 5).map((d, idx) => (
+                      <div key={idx} className="p-2 rounded bg-muted text-xs">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-medium">{d.zoneName}</span>
+                          <Badge variant="secondary">{Math.round(d.avgDwellTime / 60)}분</Badge>
+                        </div>
+                        <div className="text-muted-foreground">방문 {d.totalVisits}회</div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="md:col-span-3">
+                <CardHeader>
+                  <CardTitle>존별 체류 시간 3D 시각화</CardTitle>
+                  <CardDescription>
+                    원기둥 높이와 색상으로 체류 시간 표시 (높고 붉을수록 긴 체류)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[600px] bg-muted rounded-lg overflow-hidden">
+                    <SharedDigitalTwinScene
+                      overlayType="none"
+                      customOverlay={
+                        <>
+                          {metadata && (
+                            <ZoneBoundaryOverlay
+                              zones={zones}
+                              metadata={metadata}
+                            />
+                          )}
+                          <DwellTimeOverlay
+                            dwellTimes={dwellTimeStats.zoneDwellTimes}
+                            zones={zones}
+                          />
+                        </>
+                      }
+                      height="600px"
+                    />
+                  </div>
+
+                  <div className="mt-4 p-4 bg-muted rounded-lg">
+                    <h4 className="font-semibold text-sm mb-3">체류 시간 분포</h4>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={dwellTimeStats.zoneDwellTimes}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis 
+                          dataKey="zoneName" 
+                          angle={-45}
+                          textAnchor="end"
+                          height={80}
+                          fontSize={11}
+                        />
+                        <YAxis label={{ value: '평균 체류 시간 (초)', angle: -90, position: 'insideLeft' }} />
+                        <Tooltip 
+                          formatter={(value: number) => `${Math.round(value / 60)}분 ${value % 60}초`}
+                        />
+                        <Bar dataKey="avgDwellTime" fill="hsl(var(--primary))">
+                          {dwellTimeStats.zoneDwellTimes.map((entry, index) => {
+                            const maxTime = Math.max(...dwellTimeStats.zoneDwellTimes.map(d => d.avgDwellTime));
+                            const intensity = entry.avgDwellTime / maxTime;
+                            const hue = 220 - intensity * 100;
+                            return <Cell key={`cell-${index}`} fill={`hsl(${hue}, 70%, 50%)`} />;
+                          })}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </div>

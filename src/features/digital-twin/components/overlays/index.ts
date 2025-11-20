@@ -4,3 +4,5 @@ export { ProductInfoOverlay } from './ProductInfoOverlay';
 export { CustomerAvatarOverlay } from './CustomerAvatarOverlay';
 export { RealtimeCustomerOverlay } from './RealtimeCustomerOverlay';
 export { ZoneBoundaryOverlay } from './ZoneBoundaryOverlay';
+export { ZoneTransitionOverlay } from './ZoneTransitionOverlay';
+export { DwellTimeOverlay } from './DwellTimeOverlay';
