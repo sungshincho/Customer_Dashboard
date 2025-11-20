@@ -133,7 +133,7 @@ export default function SimulationHubPage() {
     if (result) {
       setPredictedKpi(result.predictedKpi);
       setConfidenceScore(result.confidenceScore);
-      setAiInsights(result.aiInsights);
+      setAiInsights(result.aiInsights || '');
       toast.success('시뮬레이션이 완료되었습니다');
     }
   };
@@ -334,6 +334,57 @@ export default function SimulationHubPage() {
           </TabsList>
 
           <div className="mt-6 space-y-6">
+            {/* Tab Description */}
+            <Card className="border-primary/20 bg-primary/5">
+              <CardContent className="pt-6">
+                {activeTab === 'layout' && (
+                  <div>
+                    <h3 className="font-semibold text-lg mb-2">레이아웃 최적화 시뮬레이션</h3>
+                    <p className="text-sm text-muted-foreground">
+                      매장 내 구역 배치와 가구 이동을 시뮬레이션하여 고객 동선, 체류시간, 전환율에 미치는 영향을 예측합니다.
+                      AI가 5가지 레이아웃 시나리오를 제안하고 각각의 예상 효과를 분석합니다.
+                    </p>
+                  </div>
+                )}
+                {activeTab === 'demand' && (
+                  <div>
+                    <h3 className="font-semibold text-lg mb-2">수요 예측 시뮬레이션</h3>
+                    <p className="text-sm text-muted-foreground">
+                      날씨, 이벤트, 경제 지표 등 외부 요인을 고려하여 향후 수요를 예측합니다.
+                      예측 결과를 바탕으로 재고 준비와 인력 배치를 최적화할 수 있습니다.
+                    </p>
+                  </div>
+                )}
+                {activeTab === 'inventory' && (
+                  <div>
+                    <h3 className="font-semibold text-lg mb-2">재고 최적화 시뮬레이션</h3>
+                    <p className="text-sm text-muted-foreground">
+                      서비스 수준 목표, 리드타임, 발주 주기 등을 고려하여 최적의 재고 수준을 계산합니다.
+                      재고 회전율을 높이고 재고 비용을 절감하면서도 품절을 최소화하는 전략을 제안합니다.
+                    </p>
+                  </div>
+                )}
+                {activeTab === 'pricing' && (
+                  <div>
+                    <h3 className="font-semibold text-lg mb-2">가격 최적화 시뮬레이션</h3>
+                    <p className="text-sm text-muted-foreground">
+                      가격 변동, 할인 전략, 목표 마진 등을 시뮬레이션하여 매출과 수익에 미치는 영향을 예측합니다.
+                      수요 탄력성과 경쟁 상황을 고려한 최적 가격 전략을 제안합니다.
+                    </p>
+                  </div>
+                )}
+                {activeTab === 'recommendation' && (
+                  <div>
+                    <h3 className="font-semibold text-lg mb-2">추천 전략 시뮬레이션</h3>
+                    <p className="text-sm text-muted-foreground">
+                      상품 추천 알고리즘, 프로모션 전략, 마케팅 캠페인의 효과를 시뮬레이션합니다.
+                      교차 판매율, 객단가, 고객 만족도 향상 효과를 예측하고 최적의 추천 전략을 제안합니다.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Parameters + 3D Scene */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Left: Parameters */}
