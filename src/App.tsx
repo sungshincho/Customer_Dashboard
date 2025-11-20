@@ -18,16 +18,8 @@ import NotFound from "@/core/pages/NotFoundPage";
 import Stores from "@/features/store-analysis/stores/pages/StoresPage";
 import HQStoreSyncPage from "@/features/store-analysis/stores/pages/HQStoreSyncPage";
 
-// Analysis - Store Analysis pages
-import FootfallAnalysis from "@/features/store-analysis/footfall/pages/FootfallAnalysisPage";
-import TrafficHeatmapPage from "@/features/store-analysis/footfall/pages/TrafficHeatmapPage";
-import CustomerJourneyPage from "@/features/store-analysis/footfall/pages/CustomerJourneyPage";
-import ConversionFunnelPage from "@/features/store-analysis/footfall/pages/ConversionFunnelPage";
-import CustomerAnalysisPage from "@/features/store-analysis/customer/pages/CustomerAnalysisPage";
-
-// Analysis - Operational Analysis pages
-import Inventory from "@/features/store-analysis/inventory/pages/InventoryPage";
-import ProductPerformancePage from "@/features/cost-center/automation/pages/ProductPerformancePage";
+// Analysis - Integrated Store Analysis page
+import StoreAnalysisPage from "@/features/store-analysis/pages/StoreAnalysisPage";
 
 // Simulation pages
 import DigitalTwin3DPage from "@/features/digital-twin/pages/DigitalTwin3DPage";
@@ -63,16 +55,8 @@ const App = () => (
               <Route path="/hq-store-sync" element={<ProtectedRoute><HQStoreSyncPage /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
-              {/* 2️⃣ Analysis - Store Analysis (5 pages) */}
-              <Route path="/analysis/footfall" element={<ProtectedRoute><FootfallAnalysis /></ProtectedRoute>} />
-              <Route path="/analysis/traffic-heatmap" element={<ProtectedRoute><TrafficHeatmapPage /></ProtectedRoute>} />
-              <Route path="/analysis/customer-journey" element={<ProtectedRoute><CustomerJourneyPage /></ProtectedRoute>} />
-              <Route path="/analysis/conversion-funnel" element={<ProtectedRoute><ConversionFunnelPage /></ProtectedRoute>} />
-              <Route path="/analysis/customer-analysis" element={<ProtectedRoute><CustomerAnalysisPage /></ProtectedRoute>} />
-
-              {/* 2️⃣ Analysis - Operational Analysis (2 pages) */}
-              <Route path="/analysis/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
-              <Route path="/analysis/product-performance" element={<ProtectedRoute><ProductPerformancePage /></ProtectedRoute>} />
+              {/* 2️⃣ Analysis - Integrated Store Analysis (1 unified page) */}
+              <Route path="/analysis/store" element={<ProtectedRoute><StoreAnalysisPage /></ProtectedRoute>} />
 
               {/* 3️⃣ Simulation (6 pages) */}
               <Route path="/digital-twin-3d" element={<ProtectedRoute><DigitalTwin3DPage /></ProtectedRoute>} />

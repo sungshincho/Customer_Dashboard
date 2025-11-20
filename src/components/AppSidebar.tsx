@@ -79,13 +79,7 @@ const menuSections: MenuSection[] = [
     emoji: "📊",
     defaultOpen: true,
     items: [
-      { title: "방문자 분석", url: "/analysis/footfall", icon: Users },
-      { title: "동선 히트맵", url: "/analysis/traffic-heatmap", icon: Activity },
-      { title: "고객 여정", url: "/analysis/customer-journey", icon: Map },
-      { title: "전환 퍼널", url: "/analysis/conversion-funnel", icon: Filter },
-      { title: "고객 분석", url: "/analysis/customer-analysis", icon: UserCheck },
-      { title: "재고 현황", url: "/analysis/inventory", icon: Package },
-      { title: "상품 성과 분석", url: "/analysis/product-performance", icon: TrendingUp },
+      { title: "통합 분석 대시보드", url: "/analysis/store", icon: Activity },
     ],
   },
   {
