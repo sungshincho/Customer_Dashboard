@@ -27,7 +27,6 @@ import CustomerAnalysisPage from "@/features/store-analysis/customer/pages/Custo
 
 // Analysis - Operational Analysis pages
 import Inventory from "@/features/store-analysis/inventory/pages/InventoryPage";
-import ProfitCenterPage from "@/features/profit-center/demand-inventory/pages/ProfitCenterPage";
 import ProductPerformancePage from "@/features/cost-center/automation/pages/ProductPerformancePage";
 
 // Simulation pages
@@ -71,9 +70,8 @@ const App = () => (
               <Route path="/analysis/conversion-funnel" element={<ProtectedRoute><ConversionFunnelPage /></ProtectedRoute>} />
               <Route path="/analysis/customer-analysis" element={<ProtectedRoute><CustomerAnalysisPage /></ProtectedRoute>} />
 
-              {/* 2️⃣ Analysis - Operational Analysis (3 pages) */}
+              {/* 2️⃣ Analysis - Operational Analysis (2 pages) */}
               <Route path="/analysis/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
-              <Route path="/analysis/profit-center" element={<ProtectedRoute><ProfitCenterPage /></ProtectedRoute>} />
               <Route path="/analysis/product-performance" element={<ProtectedRoute><ProductPerformancePage /></ProtectedRoute>} />
 
               {/* 3️⃣ Simulation (6 pages) */}
