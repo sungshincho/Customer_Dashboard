@@ -285,42 +285,26 @@ const CustomerJourneyPage = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="h-[600px] bg-muted rounded-lg overflow-hidden">
-                    {activeScene?.recipe_data ? (
-                      <SceneComposer
-                        recipe={activeScene.recipe_data}
-                        overlay={
-                          <>
-                            {showZones && metadata?.zones && (
-                              <ZoneBoundaryOverlay
-                                zones={metadata.zones}
-                                metadata={metadata}
-                                showLabels={true}
-                                opacity={0.3}
-                              />
-                            )}
-                            {showPaths && pathPoints.length > 0 && (
-                              <CustomerPathOverlay
-                                paths={pathPoints}
-                                animate={animatePaths}
-                                color="#1B6BFF"
-                              />
-                            )}
-                            {showAvatars && customerAvatars.length > 0 && (
-                              <CustomerAvatarOverlay
-                                customers={customerAvatars}
-                                maxInstances={200}
-                                animationSpeed={1.0}
-                                showTrails={false}
-                              />
-                            )}
-                          </>
-                        }
-                      />
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-muted-foreground">
-                        디지털트윈 씬을 먼저 구성해주세요
-                      </div>
-                    )}
+<SharedDigitalTwinScene
+                      overlayType="journey"
+                      customOverlay={
+                        <>
+                          {showZones && metadata && (
+                            <ZoneBoundaryOverlay
+                              zones={metadata.zones || []}
+                              metadata={metadata}
+                            />
+                          )}
+                          {showPaths && pathPoints.length > 0 && (
+                            <CustomerPathOverlay paths={pathPoints} animate={animatePaths} />
+                          )}
+                          {showAvatars && customerAvatars.length > 0 && (
+                            <CustomerAvatarOverlay customers={customerAvatars} />
+                          )}
+                        </>
+                      }
+                      height="600px"
+                    />
                   </div>
 
                   {/* 범례 */}
