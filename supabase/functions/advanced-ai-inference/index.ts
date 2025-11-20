@@ -543,8 +543,31 @@ Provide 3-5 recommendations, prioritized by potential impact on the stated goal.
 // Demand Forecast: 수요 예측
 async function performDemandForecast(request: InferenceRequest, apiKey: string) {
   const { parameters = {} } = request;
+  const storeContext = parameters.store_context;
+  
+  // 실제 매장 데이터 요약
+  let contextSummary = '';
+  if (storeContext) {
+    const avgRevenue = storeContext.recentKpis?.length > 0
+      ? storeContext.recentKpis.reduce((sum: number, k: any) => sum + k.totalRevenue, 0) / storeContext.recentKpis.length
+      : 0;
+    const avgVisits = storeContext.recentKpis?.length > 0
+      ? storeContext.recentKpis.reduce((sum: number, k: any) => sum + k.totalVisits, 0) / storeContext.recentKpis.length
+      : 0;
+    
+    contextSummary = `
+ACTUAL STORE DATA (Last 30 Days):
+- Store: ${storeContext.storeInfo?.name || 'N/A'}
+- Average Daily Revenue: ${Math.round(avgRevenue).toLocaleString()}원
+- Average Daily Visits: ${Math.round(avgVisits)}명
+- Total Products: ${storeContext.products?.length || 0}개
+- Total Inventory Items: ${storeContext.inventory?.length || 0}개
+- Product Categories: ${[...new Set(storeContext.products?.map((p: any) => p.category) || [])].join(', ')}
+`;
+  }
   
   const prompt = `You are an expert in demand forecasting and predictive analytics for retail.
+${contextSummary}
 
 FORECAST PARAMETERS:
 - Forecast Horizon: ${parameters.forecastHorizonDays || 30} days
@@ -616,8 +639,28 @@ Provide realistic predictions based on retail analytics best practices.`;
 // Inventory Optimization: 재고 최적화
 async function performInventoryOptimization(request: InferenceRequest, apiKey: string) {
   const { parameters = {} } = request;
+  const storeContext = parameters.store_context;
+  
+  // 실제 재고 데이터 요약
+  let contextSummary = '';
+  if (storeContext?.inventory) {
+    const totalStock = storeContext.inventory.reduce((sum: number, i: any) => sum + i.currentStock, 0);
+    const lowStock = storeContext.inventory.filter((i: any) => i.currentStock < i.optimalStock * 0.5).length;
+    const overStock = storeContext.inventory.filter((i: any) => i.currentStock > i.optimalStock * 1.5).length;
+    
+    contextSummary = `
+ACTUAL INVENTORY DATA:
+- Store: ${storeContext.storeInfo?.name || 'N/A'}
+- Total Inventory Items: ${storeContext.inventory.length}개
+- Total Current Stock: ${totalStock.toLocaleString()}개
+- Low Stock Items (< 50% optimal): ${lowStock}개
+- Overstock Items (> 150% optimal): ${overStock}개
+- Average Weekly Demand: ${Math.round(storeContext.inventory.reduce((sum: number, i: any) => sum + i.weeklyDemand, 0) / storeContext.inventory.length)}개
+`;
+  }
   
   const prompt = `You are an expert in inventory management and supply chain optimization for retail.
+${contextSummary}
 
 INVENTORY PARAMETERS:
 - Target Service Level: ${parameters.targetServiceLevel || 95}%
@@ -686,8 +729,30 @@ Provide realistic optimization based on inventory management best practices.`;
 // Pricing Optimization: 가격 최적화
 async function performPricingOptimization(request: InferenceRequest, apiKey: string) {
   const { parameters = {} } = request;
+  const storeContext = parameters.store_context;
+  
+  // 실제 상품 가격 데이터 요약
+  let contextSummary = '';
+  if (storeContext?.products) {
+    const avgPrice = storeContext.products.reduce((sum: number, p: any) => sum + p.sellingPrice, 0) / storeContext.products.length;
+    const avgMargin = storeContext.products.reduce((sum: number, p: any) => {
+      const margin = ((p.sellingPrice - p.costPrice) / p.sellingPrice) * 100;
+      return sum + margin;
+    }, 0) / storeContext.products.length;
+    
+    contextSummary = `
+ACTUAL PRODUCT PRICING DATA:
+- Store: ${storeContext.storeInfo?.name || 'N/A'}
+- Total Products: ${storeContext.products.length}개
+- Average Selling Price: ${Math.round(avgPrice).toLocaleString()}원
+- Average Margin: ${avgMargin.toFixed(1)}%
+- Price Range: ${Math.round(Math.min(...storeContext.products.map((p: any) => p.sellingPrice))).toLocaleString()}원 ~ ${Math.round(Math.max(...storeContext.products.map((p: any) => p.sellingPrice))).toLocaleString()}원
+- Categories: ${[...new Set(storeContext.products.map((p: any) => p.category))].join(', ')}
+`;
+  }
   
   const prompt = `You are an expert in pricing strategy and revenue optimization for retail.
+${contextSummary}
 
 PRICING PARAMETERS:
 - Price Change: ${parameters.priceChangePercent || 0}%
@@ -757,8 +822,31 @@ Provide realistic pricing optimization based on retail economics and consumer be
 // Recommendation Strategy: 추천 전략
 async function performRecommendationStrategy(request: InferenceRequest, apiKey: string) {
   const { parameters = {} } = request;
+  const storeContext = parameters.store_context;
+  
+  // 실제 매장 및 상품 데이터 요약
+  let contextSummary = '';
+  if (storeContext) {
+    const avgRevenue = storeContext.recentKpis?.length > 0
+      ? storeContext.recentKpis.reduce((sum: number, k: any) => sum + k.totalRevenue, 0) / storeContext.recentKpis.length
+      : 0;
+    const avgConversion = storeContext.recentKpis?.length > 0
+      ? storeContext.recentKpis.reduce((sum: number, k: any) => sum + k.conversionRate, 0) / storeContext.recentKpis.length
+      : 0;
+    
+    contextSummary = `
+ACTUAL STORE PERFORMANCE DATA:
+- Store: ${storeContext.storeInfo?.name || 'N/A'}
+- Average Daily Revenue: ${Math.round(avgRevenue).toLocaleString()}원
+- Average Conversion Rate: ${(avgConversion * 100).toFixed(1)}%
+- Total Products: ${storeContext.products?.length || 0}개
+- Product Categories: ${[...new Set(storeContext.products?.map((p: any) => p.category) || [])].join(', ')}
+- Ontology Entities: ${storeContext.entities?.length || 0}개 (매장 내 물리적 요소들)
+`;
+  }
   
   const prompt = `You are an expert in retail marketing, customer analytics, and recommendation systems.
+${contextSummary}
 
 RECOMMENDATION PARAMETERS:
 - Algorithm: ${parameters.algorithm || 'collaborative'}
