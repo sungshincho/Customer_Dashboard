@@ -44,10 +44,14 @@ export interface StoreSpaceMetadata {
 
 // 매장 구역 정의
 export interface StoreZone {
+  id: string;
   zone_id: string;
+  name: string;
   zone_name: string;
   zone_type: 'entrance' | 'checkout' | 'display' | 'storage' | 'cafe' | 'fitting_room';
   zone_color?: string;
+  center: { x: number; z: number };
+  radius: number;
   bounds: {
     min_x: number;
     max_x: number;
