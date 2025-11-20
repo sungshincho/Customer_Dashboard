@@ -1301,6 +1301,130 @@ export type Database = {
         }
         Relationships: []
       }
+      scenario_comparisons: {
+        Row: {
+          comparison_type: string | null
+          created_at: string | null
+          id: string
+          name: string
+          scenario_ids: string[]
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          comparison_type?: string | null
+          created_at?: string | null
+          id?: string
+          name: string
+          scenario_ids: string[]
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          comparison_type?: string | null
+          created_at?: string | null
+          id?: string
+          name?: string
+          scenario_ids?: string[]
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      scenarios: {
+        Row: {
+          ai_insights: string | null
+          baseline_kpi: Json | null
+          confidence_score: number | null
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          params: Json
+          predicted_kpi: Json | null
+          scenario_type: string
+          status: string | null
+          store_id: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          ai_insights?: string | null
+          baseline_kpi?: Json | null
+          confidence_score?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          params?: Json
+          predicted_kpi?: Json | null
+          scenario_type: string
+          status?: string | null
+          store_id?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          ai_insights?: string | null
+          baseline_kpi?: Json | null
+          confidence_score?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          params?: Json
+          predicted_kpi?: Json | null
+          scenario_type?: string
+          status?: string | null
+          store_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scenarios_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      simulation_results: {
+        Row: {
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          result_data: Json
+          result_type: string
+          scenario_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          result_data?: Json
+          result_type: string
+          scenario_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          result_data?: Json
+          result_type?: string
+          scenario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "simulation_results_scenario_id_fkey"
+            columns: ["scenario_id"]
+            isOneToOne: false
+            referencedRelation: "scenarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       store_mappings: {
         Row: {
           created_at: string
