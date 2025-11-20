@@ -1,96 +1,90 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { TestTube, Play, History } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { TestTube, Sparkles, ArrowRight } from 'lucide-react';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
-import {
-  ScenarioTypeSelector,
-  PredictionResultCard,
-  BeforeAfterComparison,
-  KpiDeltaChart,
-  ScenarioSaveDialog,
-} from '../components';
-import {
-  useAIInference,
-  useScenarioManager,
-  useKpiComparison,
-} from '../hooks';
-import { ScenarioType, KpiSnapshot } from '../types';
-import { LayoutParamsForm } from '../components/params/LayoutParamsForm';
-import { PricingParamsForm } from '../components/params/PricingParamsForm';
-import { InventoryParamsForm } from '../components/params/InventoryParamsForm';
-import { DemandParamsForm } from '../components/params/DemandParamsForm';
-import { RecommendationParamsForm } from '../components/params/RecommendationParamsForm';
-import { ScenarioList } from '../components/ScenarioList';
+import { useAIInference } from '../hooks';
+import { toast } from 'sonner';
+
+interface SimulationRecommendation {
+  type: 'layout' | 'pricing' | 'demand-inventory' | 'recommendation';
+  title: string;
+  description: string;
+  priority: 'high' | 'medium' | 'low';
+  suggestedActions: string[];
+  expectedImpact: string;
+}
 
 export default function ScenarioLabPage() {
   const { selectedStore } = useSelectedStore();
-  const [scenarioType, setScenarioType] = useState<ScenarioType>('layout');
-  const [params, setParams] = useState<Record<string, any>>({});
-  const [baselineKpi, setBaselineKpi] = useState<KpiSnapshot | undefined>();
-  const [predictedKpi, setPredictedKpi] = useState<KpiSnapshot | undefined>();
-  const [confidenceScore, setConfidenceScore] = useState<number | undefined>();
-  const [aiInsights, setAiInsights] = useState<string | undefined>();
+  const navigate = useNavigate();
+  const [goalText, setGoalText] = useState('');
+  const [recommendations, setRecommendations] = useState<SimulationRecommendation[]>([]);
+  const { analyzeGoal, loading: isAnalyzing } = useAIInference();
 
-  const { infer, loading: isInferring } = useAIInference();
-  const { createScenario, updatePrediction, isCreating } = useScenarioManager(selectedStore?.id);
-  const { deltas } = useKpiComparison(baselineKpi, predictedKpi);
-
-  const handleRunSimulation = async () => {
-    if (!selectedStore) {
+  const handleAnalyze = async () => {
+    if (!goalText.trim()) {
+      toast.error('목표를 입력해주세요');
       return;
     }
 
-    // Mock baseline KPI
-    const mockBaseline: KpiSnapshot = {
-      conversionRate: 15.5,
-      totalVisits: 1000,
-      totalPurchases: 155,
-      totalRevenue: 15500000,
-      averageTransactionValue: 100000,
-      salesPerSqm: 450000,
-      opex: 5000000,
-      netProfit: 3500000,
+    if (!selectedStore) {
+      toast.error('매장을 선택해주세요');
+      return;
+    }
+
+    const result = await analyzeGoal(goalText, selectedStore.id);
+    
+    if (result) {
+      setRecommendations(result);
+      toast.success('AI 분석이 완료되었습니다');
+    }
+  };
+
+  const handleNavigateToSimulation = (type: SimulationRecommendation['type'], recommendation: SimulationRecommendation) => {
+    const routes = {
+      'layout': '/simulation/layout',
+      'pricing': '/simulation/pricing',
+      'demand-inventory': '/simulation/demand-inventory',
+      'recommendation': '/simulation/recommendation',
     };
 
-    setBaselineKpi(mockBaseline);
-
-    const result = await infer(scenarioType, params, selectedStore.id);
-
-    if (result) {
-      setPredictedKpi(result.predictedKpi);
-      setConfidenceScore(result.confidenceScore);
-      setAiInsights(result.aiInsights);
-    }
-  };
-
-  const handleSaveScenario = async (name: string, description?: string) => {
-    if (!selectedStore) return;
-
-    const scenario = await createScenario({
-      scenarioType,
-      name,
-      description,
-      params,
-      storeId: selectedStore.id,
+    navigate(routes[type], { 
+      state: { 
+        goalText,
+        recommendation,
+        storeId: selectedStore?.id 
+      } 
     });
+  };
 
-    if (scenario && predictedKpi && confidenceScore && aiInsights) {
-      await updatePrediction({
-        id: scenario.id,
-        predictedKpi,
-        confidenceScore,
-        aiInsights,
-      });
+  const getPriorityColor = (priority: SimulationRecommendation['priority']) => {
+    switch (priority) {
+      case 'high': return 'text-destructive';
+      case 'medium': return 'text-warning';
+      case 'low': return 'text-muted-foreground';
     }
   };
 
-  const handleLoadScenario = (loadedParams: Record<string, any>, loadedType: ScenarioType) => {
-    setScenarioType(loadedType);
-    setParams(loadedParams);
+  const getPriorityLabel = (priority: SimulationRecommendation['priority']) => {
+    switch (priority) {
+      case 'high': return '높음';
+      case 'medium': return '중간';
+      case 'low': return '낮음';
+    }
+  };
+
+  const getTypeLabel = (type: SimulationRecommendation['type']) => {
+    switch (type) {
+      case 'layout': return '레이아웃 최적화';
+      case 'pricing': return '가격 최적화';
+      case 'demand-inventory': return '수요 & 재고 최적화';
+      case 'recommendation': return '추천 전략';
+    }
   };
 
   return (
@@ -118,109 +112,90 @@ export default function ScenarioLabPage() {
           </Alert>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* 좌측: 시나리오 설정 */}
-          <div className="lg:col-span-2 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>시나리오 설정</CardTitle>
-                <CardDescription>시뮬레이션할 시나리오 타입과 파라미터를 설정하세요</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* 시나리오 타입 선택 */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">시나리오 타입</label>
-                  <ScenarioTypeSelector value={scenarioType} onChange={setScenarioType} />
-                </div>
+        <div className="max-w-4xl mx-auto space-y-6">
+          {/* 목표 입력 */}
+          <Card>
+            <CardHeader>
+              <CardTitle>비즈니스 목표 입력</CardTitle>
+              <CardDescription>
+                달성하고 싶은 목표나 현재 상황을 자유롭게 입력하세요. AI가 분석하여 최적의 시뮬레이션 전략을 추천합니다.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Textarea
+                value={goalText}
+                onChange={(e) => setGoalText(e.target.value)}
+                placeholder="예시: 전년 동기 대비 매출 5% 감소, 매출 5% 증가시키고 싶어"
+                className="min-h-[120px] text-base"
+              />
+              <Button
+                onClick={handleAnalyze}
+                disabled={!selectedStore || isAnalyzing || !goalText.trim()}
+                className="w-full gap-2"
+                size="lg"
+              >
+                <Sparkles className="w-5 h-5" />
+                {isAnalyzing ? 'AI 분석 중...' : 'AI 분석 시작'}
+              </Button>
+            </CardContent>
+          </Card>
 
-                {/* 타입별 파라미터 폼 */}
-                <div className="border rounded-lg p-4 bg-muted/50">
-                  {scenarioType === 'layout' && (
-                    <LayoutParamsForm params={params} onChange={setParams} />
-                  )}
-                  {scenarioType === 'pricing' && (
-                    <PricingParamsForm params={params} onChange={setParams} />
-                  )}
-                  {scenarioType === 'inventory' && (
-                    <InventoryParamsForm params={params} onChange={setParams} />
-                  )}
-                  {scenarioType === 'demand' && (
-                    <DemandParamsForm params={params} onChange={setParams} />
-                  )}
-                  {scenarioType === 'recommendation' && (
-                    <RecommendationParamsForm params={params} onChange={setParams} />
-                  )}
-                  {(scenarioType === 'staffing' || scenarioType === 'promotion') && (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <p>{scenarioType === 'staffing' ? '스태핑' : '프로모션'} 시뮬레이션 파라미터는 곧 추가됩니다.</p>
-                    </div>
-                  )}
-                </div>
+          {/* AI 분석 결과 */}
+          {recommendations.length > 0 && (
+            <div className="space-y-4">
+              <h2 className="text-xl font-semibold">AI 추천 시뮬레이션 전략</h2>
+              <div className="grid gap-4">
+                {recommendations.map((rec, index) => (
+                  <Card key={index} className="overflow-hidden">
+                    <CardHeader className="pb-4">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <CardTitle className="text-lg">{rec.title}</CardTitle>
+                            <span className={`text-xs font-medium ${getPriorityColor(rec.priority)}`}>
+                              우선순위: {getPriorityLabel(rec.priority)}
+                            </span>
+                          </div>
+                          <CardDescription>{getTypeLabel(rec.type)}</CardDescription>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <p className="text-sm text-muted-foreground">{rec.description}</p>
+                      
+                      <div>
+                        <h4 className="text-sm font-medium mb-2">추천 액션</h4>
+                        <ul className="space-y-1">
+                          {rec.suggestedActions.map((action, i) => (
+                            <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
+                              <span className="text-primary mt-1">•</span>
+                              <span>{action}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
 
-                {/* 실행 버튼 */}
-                <div className="flex gap-2">
-                  <Button
-                    onClick={handleRunSimulation}
-                    disabled={!selectedStore || isInferring}
-                    className="flex-1 gap-2"
-                  >
-                    <Play className="w-4 h-4" />
-                    {isInferring ? '시뮬레이션 실행 중...' : '시뮬레이션 실행'}
-                  </Button>
-                  {predictedKpi && (
-                    <ScenarioSaveDialog
-                      onSave={handleSaveScenario}
-                      isSaving={isCreating}
-                    />
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                      <div className="pt-2">
+                        <p className="text-sm">
+                          <span className="font-medium">예상 효과:</span>{' '}
+                          <span className="text-primary">{rec.expectedImpact}</span>
+                        </p>
+                      </div>
 
-            {/* 예측 결과 */}
-            {predictedKpi && (
-              <Tabs defaultValue="result" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="result">예측 결과</TabsTrigger>
-                  <TabsTrigger value="comparison">Before/After</TabsTrigger>
-                  <TabsTrigger value="delta">변화량 차트</TabsTrigger>
-                </TabsList>
-                <TabsContent value="result" className="mt-4">
-                  <PredictionResultCard
-                    predictedKpi={predictedKpi}
-                    baselineKpi={baselineKpi}
-                    confidenceScore={confidenceScore}
-                    aiInsights={aiInsights}
-                  />
-                </TabsContent>
-                <TabsContent value="comparison" className="mt-4">
-                  <BeforeAfterComparison baseline={baselineKpi} predicted={predictedKpi} />
-                </TabsContent>
-                <TabsContent value="delta" className="mt-4">
-                  <KpiDeltaChart deltas={deltas} />
-                </TabsContent>
-              </Tabs>
-            )}
-          </div>
-
-          {/* 우측: 저장된 시나리오 */}
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <History className="w-5 h-5" />
-                  <CardTitle>저장된 시나리오</CardTitle>
-                </div>
-                <CardDescription>이전에 저장한 시나리오를 불러올 수 있습니다</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ScenarioList
-                  storeId={selectedStore?.id}
-                  onLoad={handleLoadScenario}
-                />
-              </CardContent>
-            </Card>
-          </div>
+                      <Button
+                        onClick={() => handleNavigateToSimulation(rec.type, rec)}
+                        className="w-full gap-2"
+                        variant="outline"
+                      >
+                        {getTypeLabel(rec.type)} 시뮬레이션 시작
+                        <ArrowRight className="w-4 h-4" />
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </DashboardLayout>
