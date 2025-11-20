@@ -256,9 +256,19 @@ Return a JSON object:
 async function performPredictiveModeling(request: InferenceRequest, apiKey: string) {
   const { data, time_series_data, graph_data, parameters = {} } = request;
   
-  // Layout simulation specific handling
-  if (parameters.scenarioType === 'layout') {
+  // Scenario-specific handling
+  const scenarioType = parameters.scenario_type;
+  
+  if (scenarioType === 'layout') {
     return performLayoutSimulation(request, apiKey);
+  } else if (scenarioType === 'demand') {
+    return performDemandForecast(request, apiKey);
+  } else if (scenarioType === 'inventory') {
+    return performInventoryOptimization(request, apiKey);
+  } else if (scenarioType === 'pricing') {
+    return performPricingOptimization(request, apiKey);
+  } else if (scenarioType === 'recommendation') {
+    return performRecommendationStrategy(request, apiKey);
   }
   
   const dataSummary = summarizeData(data, graph_data);
@@ -468,9 +478,363 @@ Focus on realistic, actionable insights based on retail psychology and spatial p
   };
 }
 
+// Business Goal Analysis: 비즈니스 목표 분석 및 시나리오 추천
+async function performBusinessGoalAnalysis(request: InferenceRequest, apiKey: string) {
+  const { parameters = {} } = request;
+  const goalText = parameters.goal_text || '';
+  
+  const prompt = `You are an expert retail strategy consultant and data analyst.
+
+BUSINESS GOAL: ${goalText}
+
+Your task is to analyze this business goal and recommend 3-5 actionable simulation scenarios.
+Each recommendation should specify which type of simulation would be most effective and why.
+
+Consider:
+1. Layout optimization - for improving customer flow, product placement, zone efficiency
+2. Demand forecasting - for predicting customer demand, seasonal patterns, inventory needs
+3. Inventory optimization - for reducing stockouts, optimizing reorder points, minimizing holding costs
+4. Pricing optimization - for maximizing revenue, competitive positioning, promotional strategies
+5. Recommendation strategies - for cross-selling, upselling, personalization, marketing campaigns
+
+Return a JSON object with this structure:
+{
+  "recommendations": [
+    {
+      "type": "layout|pricing|demand-inventory|recommendation",
+      "title": "Clear, actionable recommendation title (Korean)",
+      "description": "Detailed explanation of the recommended approach (Korean)",
+      "priority": "high|medium|low",
+      "suggestedActions": [
+        "Specific action step 1 (Korean)",
+        "Specific action step 2 (Korean)"
+      ],
+      "expectedImpact": "Expected business impact and metrics (Korean)"
+    }
+  ]
+}
+
+Provide 3-5 recommendations, prioritized by potential impact on the stated goal.`;
+
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-2.5-flash',
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`AI API error: ${error}`);
+  }
+
+  const result = await response.json();
+  const analysis = JSON.parse(result.choices[0].message.content);
+  
+  return analysis;
+}
+
+// Demand Forecast: 수요 예측
+async function performDemandForecast(request: InferenceRequest, apiKey: string) {
+  const { parameters = {} } = request;
+  
+  const prompt = `You are an expert in demand forecasting and predictive analytics for retail.
+
+FORECAST PARAMETERS:
+- Forecast Horizon: ${parameters.forecastHorizonDays || 30} days
+- Weather Consideration: ${parameters.includeWeather ? 'Yes' : 'No'}
+- Event Consideration: ${parameters.includeEvents ? 'Yes' : 'No'}
+- Economic Indicators: ${parameters.includeEconomicIndicators ? 'Yes' : 'No'}
+- Weather Scenario: ${parameters.weatherScenario || 'normal'}
+
+Your task is to predict future demand and provide actionable insights.
+
+Return a JSON object:
+{
+  "predictedKpi": {
+    "conversionRate": 0.14,
+    "totalRevenue": 45000000,
+    "totalVisits": 1200,
+    "totalPurchases": 168,
+    "averageTransactionValue": 47000,
+    "salesPerSqm": 890000,
+    "netProfit": 19500000
+  },
+  "confidenceScore": 85,
+  "aiInsights": "Detailed Korean explanation of demand predictions, key drivers, seasonal patterns, and recommended actions for inventory and staffing",
+  "demandDrivers": [
+    {
+      "factor": "Weather conditions",
+      "impact": "positive",
+      "magnitude": 15,
+      "explanation": "Korean explanation"
+    }
+  ],
+  "recommendations": [
+    "Increase inventory of high-demand items by 20%",
+    "Schedule additional staff during peak hours"
+  ]
+}
+
+IMPORTANT: confidenceScore should be between 0-100 (percentage).
+Provide realistic predictions based on retail analytics best practices.`;
+
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-2.5-flash',
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`AI API error: ${error}`);
+  }
+
+  const result = await response.json();
+  const prediction = JSON.parse(result.choices[0].message.content);
+  
+  return {
+    type: 'demand_forecast',
+    timestamp: new Date().toISOString(),
+    ...prediction,
+  };
+}
+
+// Inventory Optimization: 재고 최적화
+async function performInventoryOptimization(request: InferenceRequest, apiKey: string) {
+  const { parameters = {} } = request;
+  
+  const prompt = `You are an expert in inventory management and supply chain optimization for retail.
+
+INVENTORY PARAMETERS:
+- Target Service Level: ${parameters.targetServiceLevel || 95}%
+- Lead Time: ${parameters.leadTimeDays || 7} days
+- Order Frequency: ${parameters.orderFrequencyDays || 14} days
+- Safety Stock Multiplier: ${parameters.safetyStockMultiplier || 1.5}
+- Order Policy: ${parameters.orderPolicy || 'periodic'}
+
+Your task is to optimize inventory levels and provide actionable recommendations.
+
+Return a JSON object:
+{
+  "predictedKpi": {
+    "inventoryTurnover": 5.2,
+    "stockoutRate": 0.02,
+    "totalRevenue": 46000000,
+    "netProfit": 20500000
+  },
+  "confidenceScore": 88,
+  "aiInsights": "Detailed Korean explanation of inventory optimization strategy, cost-benefit analysis, risk mitigation, and implementation plan",
+  "optimizationResults": {
+    "optimalOrderQuantity": 450,
+    "reorderPoint": 180,
+    "safetyStock": 85,
+    "expectedStockouts": 3,
+    "annualSavings": 3500000
+  },
+  "recommendations": [
+    "Implement automated reorder triggers at 180 units",
+    "Review slow-moving items quarterly",
+    "Consider vendor-managed inventory for top SKUs"
+  ]
+}
+
+IMPORTANT: confidenceScore should be between 0-100 (percentage).
+Provide realistic optimization based on inventory management best practices.`;
+
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-2.5-flash',
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`AI API error: ${error}`);
+  }
+
+  const result = await response.json();
+  const prediction = JSON.parse(result.choices[0].message.content);
+  
+  return {
+    type: 'inventory_optimization',
+    timestamp: new Date().toISOString(),
+    ...prediction,
+  };
+}
+
+// Pricing Optimization: 가격 최적화
+async function performPricingOptimization(request: InferenceRequest, apiKey: string) {
+  const { parameters = {} } = request;
+  
+  const prompt = `You are an expert in pricing strategy and revenue optimization for retail.
+
+PRICING PARAMETERS:
+- Price Change: ${parameters.priceChangePercent || 0}%
+- Target Margin: ${parameters.targetMarginPercent || 30}%
+- Discount Strategy: ${parameters.discountStrategy || 'none'}
+- Duration: ${parameters.durationDays || 30} days
+- Inventory Consideration: ${parameters.considerInventory ? 'Yes' : 'No'}
+
+Your task is to optimize pricing strategy and predict revenue impact.
+
+Return a JSON object:
+{
+  "predictedKpi": {
+    "conversionRate": 0.15,
+    "averageTransactionValue": 52000,
+    "totalRevenue": 52000000,
+    "grossMargin": 0.32,
+    "netProfit": 22500000
+  },
+  "confidenceScore": 86,
+  "aiInsights": "Detailed Korean explanation of pricing strategy, competitive positioning, demand elasticity, margin impact, and recommended pricing tactics",
+  "pricingAnalysis": {
+    "optimalPrice": 48500,
+    "revenueImpact": 15,
+    "volumeImpact": -8,
+    "marginImpact": 12,
+    "competitivePosition": "premium"
+  },
+  "recommendations": [
+    "Test 10% discount on slow-moving items",
+    "Implement dynamic pricing during peak hours",
+    "Bundle complementary products at 15% discount"
+  ]
+}
+
+IMPORTANT: confidenceScore should be between 0-100 (percentage).
+Provide realistic pricing optimization based on retail economics and consumer behavior.`;
+
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-2.5-flash',
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`AI API error: ${error}`);
+  }
+
+  const result = await response.json();
+  const prediction = JSON.parse(result.choices[0].message.content);
+  
+  return {
+    type: 'pricing_optimization',
+    timestamp: new Date().toISOString(),
+    ...prediction,
+  };
+}
+
+// Recommendation Strategy: 추천 전략
+async function performRecommendationStrategy(request: InferenceRequest, apiKey: string) {
+  const { parameters = {} } = request;
+  
+  const prompt = `You are an expert in retail marketing, customer analytics, and recommendation systems.
+
+RECOMMENDATION PARAMETERS:
+- Algorithm: ${parameters.algorithm || 'collaborative'}
+- Max Recommendations: ${parameters.maxRecommendations || 10}
+- Trend Weight: ${parameters.trendWeight || 0.5}
+- Diversity Weight: ${parameters.diversityWeight || 0.3}
+- Boost New Products: ${parameters.boostNewProducts ? 'Yes' : 'No'}
+- Boost High Margin: ${parameters.boostHighMargin ? 'Yes' : 'No'}
+
+Your task is to design an optimal recommendation strategy and predict its impact.
+
+Return a JSON object:
+{
+  "predictedKpi": {
+    "conversionRate": 0.16,
+    "averageTransactionValue": 54000,
+    "totalRevenue": 48500000,
+    "netProfit": 21800000,
+    "customerSatisfaction": 4.6
+  },
+  "confidenceScore": 84,
+  "aiInsights": "Detailed Korean explanation of recommendation strategy, personalization approach, expected customer behavior changes, revenue opportunities, and implementation roadmap",
+  "strategyDetails": {
+    "primaryTactic": "collaborative_filtering",
+    "targetSegments": ["high-value", "frequent", "new"],
+    "channels": ["in-store", "mobile", "email"],
+    "expectedUplift": 22,
+    "recommendationAccuracy": 0.78
+  },
+  "recommendations": [
+    "Launch personalized email campaigns with product recommendations",
+    "Implement in-store digital signage with trending items",
+    "Create loyalty program with smart rewards",
+    "A/B test recommendation algorithms monthly"
+  ]
+}
+
+IMPORTANT: confidenceScore should be between 0-100 (percentage).
+Provide realistic strategy based on modern retail marketing and data science best practices.`;
+
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-2.5-flash',
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`AI API error: ${error}`);
+  }
+
+  const result = await response.json();
+  const prediction = JSON.parse(result.choices[0].message.content);
+  
+  return {
+    type: 'recommendation_strategy',
+    timestamp: new Date().toISOString(),
+    ...prediction,
+  };
+}
+
 // Pattern Discovery: 자동 패턴 발견
 async function performPatternDiscovery(request: InferenceRequest, apiKey: string) {
   const { data, graph_data, time_series_data, parameters = {} } = request;
+  
+  // Special handling for business goal analysis
+  if (parameters.analysis_type === 'business_goal_analysis') {
+    return performBusinessGoalAnalysis(request, apiKey);
+  }
   
   const dataSummary = summarizeData(data, graph_data);
   const timeSeriesSummary = time_series_data ? summarizeTimeSeries(time_series_data) : null;
