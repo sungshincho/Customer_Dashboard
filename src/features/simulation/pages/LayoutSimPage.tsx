@@ -2,6 +2,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Grid3x3 } from "lucide-react";
+import { SharedDigitalTwinScene } from "@/features/digital-twin/components";
 
 export default function LayoutSimPage() {
   return (
@@ -26,7 +27,10 @@ export default function LayoutSimPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground">시뮬레이션 기능이 곧 추가됩니다.</p>
+            <SharedDigitalTwinScene
+              overlayType="layout"
+              height="600px"
+            />
           </CardContent>
         </Card>
       </div>

@@ -2,6 +2,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Target } from "lucide-react";
+import { SharedDigitalTwinScene } from "@/features/digital-twin/components";
 
 export default function RecommendationSimPage() {
   return (
@@ -26,7 +27,10 @@ export default function RecommendationSimPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground">시뮬레이션 기능이 곧 추가됩니다.</p>
+            <SharedDigitalTwinScene
+              overlayType="recommendation"
+              height="600px"
+            />
           </CardContent>
         </Card>
       </div>

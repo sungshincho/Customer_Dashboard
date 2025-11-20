@@ -8,15 +8,13 @@ import { AdvancedFilters, FilterState } from "@/features/data-management/analysi
 import { ExportButton } from "@/features/data-management/analysis/components/ExportButton";
 import { ComparisonView } from "@/features/data-management/analysis/components/ComparisonView";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Store3DViewer } from "@/features/digital-twin/components";
+import { SharedDigitalTwinScene } from "@/features/digital-twin/components";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { useMultipleStoreDataFiles } from "@/hooks/useStoreData";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useStoreScene } from "@/hooks/useStoreScene";
 
 const ConversionFunnelPage = () => {
   const { selectedStore } = useSelectedStore();
-  const { activeScene } = useStoreScene();
   const [refreshKey, setRefreshKey] = useState(0);
   const [filters, setFilters] = useState<FilterState>({ dateRange: undefined, store: "전체", category: "전체" });
   const [comparisonType, setComparisonType] = useState<"period" | "store">("period");
@@ -100,8 +98,11 @@ const ConversionFunnelPage = () => {
               <TabsTrigger value="comparison">비교 분석</TabsTrigger>
             </TabsList>
             
-            <TabsContent value="3d" className="space-y-6">
-              <Store3DViewer height="600px" sceneRecipe={activeScene?.recipe_data} />
+            <TabsContent value="3d">
+              <SharedDigitalTwinScene
+                overlayType="funnel"
+                height="600px"
+              />
             </TabsContent>
             
             <TabsContent value="analysis" className="space-y-6">
