@@ -5,3 +5,4 @@ export { KpiDeltaChart } from './KpiDeltaChart';
 export { ConfidenceIndicator } from './ConfidenceIndicator';
 export { ScenarioSaveDialog } from './ScenarioSaveDialog';
 export { ScenarioList } from './ScenarioList';
+export { BeforeAfterSceneComparison } from './BeforeAfterSceneComparison';

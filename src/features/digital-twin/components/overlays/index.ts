@@ -7,3 +7,4 @@ export { ZoneBoundaryOverlay } from './ZoneBoundaryOverlay';
 export { ZoneTransitionOverlay } from './ZoneTransitionOverlay';
 export { DwellTimeOverlay } from './DwellTimeOverlay';
 export { LayoutChangeOverlay } from './LayoutChangeOverlay';
+export { CustomerFlowOverlay } from './CustomerFlowOverlay';

@@ -10,12 +10,13 @@ import { Label } from "@/components/ui/label";
 import { Grid3x3, Play, Eye, EyeOff } from "lucide-react";
 import { SharedDigitalTwinScene } from "@/features/digital-twin/components";
 import { LayoutParamsForm } from "../components/params/LayoutParamsForm";
-import { PredictionResultCard, BeforeAfterComparison, KpiDeltaChart } from "../components";
+import { PredictionResultCard, BeforeAfterComparison, KpiDeltaChart, BeforeAfterSceneComparison } from "../components";
 import { useAIInference, useScenarioManager } from "../hooks";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { LayoutParams, KpiSnapshot } from "../types";
 import { toast } from "sonner";
 import { LayoutChangeOverlay } from "@/features/digital-twin/components/overlays/LayoutChangeOverlay";
+import { CustomerFlowOverlay } from "@/features/digital-twin/components/overlays/CustomerFlowOverlay";
 
 export default function LayoutSimPage() {
   const location = useLocation();
@@ -34,6 +35,7 @@ export default function LayoutSimPage() {
   const [aiInsights, setAiInsights] = useState<string>("");
   const [showPreview, setShowPreview] = useState(true);
   const [isSimulating, setIsSimulating] = useState(false);
+  const [predictedFlowData, setPredictedFlowData] = useState<any>(null);
 
   const recommendation = location.state?.recommendation;
   const goalText = location.state?.goalText;
@@ -80,6 +82,51 @@ export default function LayoutSimPage() {
         setPredictedKpi(result.predictedKpi);
         setConfidenceScore(result.confidenceScore);
         setAiInsights(result.aiInsights);
+        
+        // Extract flow prediction data from AI response
+        const metadata = result.metadata as any;
+        if (metadata?.flowPrediction) {
+          setPredictedFlowData(metadata.flowPrediction);
+        } else {
+          // Generate mock flow data for demonstration
+          setPredictedFlowData({
+            paths: [
+              {
+                points: [
+                  { x: 0, z: 0, intensity: 1 },
+                  { x: 2, z: 1, intensity: 0.8 },
+                  { x: 4, z: 2, intensity: 0.6 },
+                  { x: 5, z: 4, intensity: 0.9 },
+                ],
+                weight: 0.8,
+              },
+              {
+                points: [
+                  { x: 0, z: 0, intensity: 1 },
+                  { x: 1, z: 3, intensity: 0.7 },
+                  { x: 3, z: 5, intensity: 0.5 },
+                ],
+                weight: 0.6,
+              },
+            ],
+            heatmap: [
+              { x: 2, z: 1, intensity: 0.9 },
+              { x: 4, z: 2, intensity: 0.7 },
+              { x: 5, z: 4, intensity: 0.95 },
+              { x: 3, z: 3, intensity: 0.6 },
+            ],
+            dwellZones: [
+              { x: 4, z: 2, radius: 1.5, time: 3.2 },
+              { x: 5, z: 4, radius: 1.2, time: 2.8 },
+            ],
+            kpiChanges: {
+              conversionRate: 2.5,
+              dwellTime: 1.2,
+              flowEfficiency: 85,
+            },
+          });
+        }
+        
         toast.success("레이아웃 시뮬레이션 완료");
       }
     } catch (error) {
@@ -241,26 +288,45 @@ export default function LayoutSimPage() {
             </Card>
 
             {predictedKpi && baselineKpi && (
-              <Tabs defaultValue="result" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="result">예측 결과</TabsTrigger>
-                  <TabsTrigger value="comparison">비교 분석</TabsTrigger>
-                  <TabsTrigger value="chart">KPI 변화</TabsTrigger>
-                </TabsList>
-                <TabsContent value="result">
-                  <PredictionResultCard
-                    predictedKpi={predictedKpi}
-                    confidenceScore={confidenceScore || 0}
-                    aiInsights={aiInsights}
-                  />
-                </TabsContent>
-                <TabsContent value="comparison">
-                  <BeforeAfterComparison baseline={baselineKpi} predicted={predictedKpi} />
-                </TabsContent>
-                <TabsContent value="chart">
-                  <KpiDeltaChart baseline={baselineKpi} predicted={predictedKpi} />
-                </TabsContent>
-              </Tabs>
+              <>
+                {/* Before/After 3D Scene Comparison */}
+                <BeforeAfterSceneComparison
+                  beforeZones={params.changedZones?.map(z => ({
+                    ...z,
+                    newPosition: z.originalPosition,
+                    newSize: z.originalSize,
+                  }))}
+                  afterZones={params.changedZones}
+                  beforeFurniture={params.movedFurniture?.map(f => ({
+                    ...f,
+                    toPosition: f.fromPosition,
+                  }))}
+                  afterFurniture={params.movedFurniture}
+                  predictedFlowData={predictedFlowData}
+                />
+
+                {/* KPI Analysis Tabs */}
+                <Tabs defaultValue="result" className="w-full">
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="result">예측 결과</TabsTrigger>
+                    <TabsTrigger value="comparison">비교 분석</TabsTrigger>
+                    <TabsTrigger value="chart">KPI 변화</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="result">
+                    <PredictionResultCard
+                      predictedKpi={predictedKpi}
+                      confidenceScore={confidenceScore || 0}
+                      aiInsights={aiInsights}
+                    />
+                  </TabsContent>
+                  <TabsContent value="comparison">
+                    <BeforeAfterComparison baseline={baselineKpi} predicted={predictedKpi} />
+                  </TabsContent>
+                  <TabsContent value="chart">
+                    <KpiDeltaChart baseline={baselineKpi} predicted={predictedKpi} />
+                  </TabsContent>
+                </Tabs>
+              </>
             )}
           </div>
         </div>

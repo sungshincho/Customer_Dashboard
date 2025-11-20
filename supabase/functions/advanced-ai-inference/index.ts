@@ -256,6 +256,11 @@ Return a JSON object:
 async function performPredictiveModeling(request: InferenceRequest, apiKey: string) {
   const { data, time_series_data, graph_data, parameters = {} } = request;
   
+  // Layout simulation specific handling
+  if (parameters.scenarioType === 'layout') {
+    return performLayoutSimulation(request, apiKey);
+  }
+  
   const dataSummary = summarizeData(data, graph_data);
   const timeSeriesSummary = time_series_data ? summarizeTimeSeries(time_series_data) : null;
   
@@ -353,6 +358,113 @@ Return a JSON object:
     type: 'predictive_modeling',
     timestamp: new Date().toISOString(),
     analysis,
+  };
+}
+
+// Layout Simulation: 레이아웃 시뮬레이션
+async function performLayoutSimulation(request: InferenceRequest, apiKey: string) {
+  const { parameters = {} } = request;
+  const { changedZones = [], movedFurniture = [], storeContext = {} } = parameters;
+  
+  const prompt = `You are an expert retail space planner and customer behavior analyst.
+
+LAYOUT CHANGE REQUEST:
+Store: ${storeContext.storeName || 'Unknown'}
+Goal: ${storeContext.goalText || 'Optimize layout for better performance'}
+
+ZONE CHANGES (${changedZones.length}):
+${JSON.stringify(changedZones, null, 2)}
+
+FURNITURE MOVES (${movedFurniture.length}):
+${JSON.stringify(movedFurniture, null, 2)}
+
+Your task is to analyze the layout changes and predict:
+1. Customer flow patterns after the change
+2. Expected impact on KPIs (CVR, dwell time, sales per sqm)
+3. Optimal customer paths through the store
+4. High-dwell zones and their characteristics
+5. Potential bottlenecks or dead zones
+
+Return a comprehensive JSON object:
+{
+  "predictedKpi": {
+    "conversionRate": 0.145,
+    "averageTransactionValue": 48500,
+    "salesPerSqm": 920000,
+    "opex": 12000000,
+    "netProfit": 21000000,
+    "inventoryTurnover": 4.8,
+    "customerSatisfaction": 4.5
+  },
+  "confidenceScore": 0.85,
+  "aiInsights": "Detailed analysis of why these predictions make sense...",
+  "flowPrediction": {
+    "paths": [
+      {
+        "points": [
+          {"x": 0, "z": 0, "intensity": 1},
+          {"x": 2, "z": 1, "intensity": 0.8}
+        ],
+        "weight": 0.8
+      }
+    ],
+    "heatmap": [
+      {"x": 2, "z": 1, "intensity": 0.9}
+    ],
+    "dwellZones": [
+      {"x": 4, "z": 2, "radius": 1.5, "time": 3.2}
+    ],
+    "kpiChanges": {
+      "conversionRate": 2.5,
+      "dwellTime": 1.2,
+      "flowEfficiency": 85
+    }
+  },
+  "recommendations": [
+    "Consider adding signage at zone X",
+    "Optimize lighting in high-traffic areas"
+  ],
+  "warnings": [
+    "Potential congestion near entrance",
+    "Low visibility for sale zone"
+  ]
+}
+
+Focus on realistic, actionable insights based on retail psychology and spatial planning principles.`;
+
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-2.5-pro',
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error('Layout simulation AI error:', error);
+    throw new Error(`AI API error: ${error}`);
+  }
+
+  const result = await response.json();
+  const prediction = JSON.parse(result.choices[0].message.content);
+  
+  console.log('Layout simulation completed:', prediction);
+  
+  return {
+    type: 'layout_simulation',
+    timestamp: new Date().toISOString(),
+    ...prediction,
+    metadata: {
+      modelVersion: 'gemini-2.5-pro',
+      processingTime: Date.now(),
+      flowPrediction: prediction.flowPrediction,
+    },
   };
 }
 
