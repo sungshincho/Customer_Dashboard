@@ -109,7 +109,7 @@ export function SharedDigitalTwinScene({
               }
             </p>
           </div>
-          <Button onClick={() => navigate('/digital-twin')}>
+          <Button onClick={() => navigate('/digital-twin/3d')}>
             3D 씬 생성하러 가기
           </Button>
         </div>
