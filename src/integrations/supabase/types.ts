@@ -858,6 +858,63 @@ export type Database = {
           },
         ]
       }
+      license_management: {
+        Row: {
+          api_calls_limit: number
+          billing_cycle_end: string
+          billing_cycle_start: string
+          created_at: string
+          current_hq_users: number
+          current_stores: number
+          id: string
+          is_active: boolean | null
+          max_hq_users: number
+          max_stores: number
+          plan_type: string
+          storage_limit_gb: number
+          updated_at: string
+          usage_api_calls: number | null
+          usage_storage_gb: number | null
+          user_id: string
+        }
+        Insert: {
+          api_calls_limit?: number
+          billing_cycle_end?: string
+          billing_cycle_start?: string
+          created_at?: string
+          current_hq_users?: number
+          current_stores?: number
+          id?: string
+          is_active?: boolean | null
+          max_hq_users?: number
+          max_stores?: number
+          plan_type: string
+          storage_limit_gb?: number
+          updated_at?: string
+          usage_api_calls?: number | null
+          usage_storage_gb?: number | null
+          user_id: string
+        }
+        Update: {
+          api_calls_limit?: number
+          billing_cycle_end?: string
+          billing_cycle_start?: string
+          created_at?: string
+          current_hq_users?: number
+          current_stores?: number
+          id?: string
+          is_active?: boolean | null
+          max_hq_users?: number
+          max_stores?: number
+          plan_type?: string
+          storage_limit_gb?: number
+          updated_at?: string
+          usage_api_calls?: number | null
+          usage_storage_gb?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       neuralsense_devices: {
         Row: {
           created_at: string
@@ -912,6 +969,39 @@ export type Database = {
           updated_at?: string
           user_id?: string
           wifi_probe_enabled?: boolean | null
+        }
+        Relationships: []
+      }
+      notification_settings: {
+        Row: {
+          created_at: string
+          email_enabled: boolean | null
+          id: string
+          notification_types: Json | null
+          slack_enabled: boolean | null
+          slack_webhook_url: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email_enabled?: boolean | null
+          id?: string
+          notification_types?: Json | null
+          slack_enabled?: boolean | null
+          slack_webhook_url?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email_enabled?: boolean | null
+          id?: string
+          notification_types?: Json | null
+          slack_enabled?: boolean | null
+          slack_webhook_url?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -1035,6 +1125,42 @@ export type Database = {
         }
         Relationships: []
       }
+      organization_settings: {
+        Row: {
+          brand_color: string | null
+          created_at: string
+          currency: string
+          default_kpi_set: Json | null
+          id: string
+          logo_url: string | null
+          timezone: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          brand_color?: string | null
+          created_at?: string
+          currency?: string
+          default_kpi_set?: Json | null
+          id?: string
+          logo_url?: string | null
+          timezone?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          brand_color?: string | null
+          created_at?: string
+          currency?: string
+          default_kpi_set?: Json | null
+          id?: string
+          logo_url?: string | null
+          timezone?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           category: string | null
@@ -1126,6 +1252,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      report_schedules: {
+        Row: {
+          created_at: string
+          day_of_month: number | null
+          day_of_week: number | null
+          frequency: string
+          id: string
+          is_enabled: boolean | null
+          last_sent_at: string | null
+          recipients: Json
+          report_name: string
+          report_type: string
+          time_of_day: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_month?: number | null
+          day_of_week?: number | null
+          frequency: string
+          id?: string
+          is_enabled?: boolean | null
+          last_sent_at?: string | null
+          recipients?: Json
+          report_name: string
+          report_type: string
+          time_of_day?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          day_of_month?: number | null
+          day_of_week?: number | null
+          frequency?: string
+          id?: string
+          is_enabled?: boolean | null
+          last_sent_at?: string | null
+          recipients?: Json
+          report_name?: string
+          report_type?: string
+          time_of_day?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       store_mappings: {
         Row: {
@@ -1352,6 +1526,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_roles: {
+        Row: {
+          assigned_by: string | null
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assigned_by?: string | null
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          assigned_by?: string | null
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       weather_data: {
         Row: {
@@ -1649,9 +1850,17 @@ export type Database = {
         Args: { p_end_id: string; p_start_id: string; p_user_id: string }
         Returns: Json
       }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "manager" | "analyst" | "viewer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1778,6 +1987,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "manager", "analyst", "viewer"],
+    },
   },
 } as const
