@@ -6,3 +6,7 @@ export { ConfidenceIndicator } from './ConfidenceIndicator';
 export { ScenarioSaveDialog } from './ScenarioSaveDialog';
 export { ScenarioList } from './ScenarioList';
 export { BeforeAfterSceneComparison } from './BeforeAfterSceneComparison';
+export { DemandForecastResult } from './DemandForecastResult';
+export { InventoryOptimizationResult } from './InventoryOptimizationResult';
+export { PricingOptimizationResult } from './PricingOptimizationResult';
+export { RecommendationStrategyResult } from './RecommendationStrategyResult';
