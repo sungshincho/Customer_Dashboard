@@ -161,6 +161,54 @@ export type Database = {
           },
         ]
       }
+      api_connections: {
+        Row: {
+          auth_type: string | null
+          auth_value: string | null
+          created_at: string
+          headers: Json | null
+          id: string
+          is_active: boolean | null
+          last_sync: string | null
+          method: string | null
+          name: string
+          type: string
+          updated_at: string
+          url: string
+          user_id: string
+        }
+        Insert: {
+          auth_type?: string | null
+          auth_value?: string | null
+          created_at?: string
+          headers?: Json | null
+          id?: string
+          is_active?: boolean | null
+          last_sync?: string | null
+          method?: string | null
+          name: string
+          type: string
+          updated_at?: string
+          url: string
+          user_id: string
+        }
+        Update: {
+          auth_type?: string | null
+          auth_value?: string | null
+          created_at?: string
+          headers?: Json | null
+          id?: string
+          is_active?: boolean | null
+          last_sync?: string | null
+          method?: string | null
+          name?: string
+          type?: string
+          updated_at?: string
+          url?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       auto_order_suggestions: {
         Row: {
           created_at: string | null

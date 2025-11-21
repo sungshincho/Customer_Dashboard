@@ -18,12 +18,15 @@ interface APIConnection {
   name: string;
   type: 'rest' | 'graphql' | 'webhook';
   url: string;
-  method?: string;
-  headers?: Record<string, string>;
-  auth_type?: 'none' | 'api_key' | 'bearer' | 'basic';
+  method?: string | null;
+  headers?: any;
+  auth_type?: string;
+  auth_value?: string | null;
   is_active: boolean;
-  last_sync?: string;
+  last_sync?: string | null;
   created_at: string;
+  updated_at: string;
+  user_id: string;
 }
 
 export default function APIIntegrationPage() {
@@ -57,7 +60,7 @@ export default function APIIntegrationPage() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setConnections(data || []);
+      setConnections((data || []) as APIConnection[]);
     } catch (error: any) {
       toast.error('API 연동 목록 로딩 실패: ' + error.message);
     } finally {
