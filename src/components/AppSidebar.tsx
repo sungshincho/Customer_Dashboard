@@ -102,9 +102,9 @@ const menuSections: MenuSection[] = [
     items: [
       { title: "통합 데이터 임포트", url: "/data-import", icon: Upload },
       { title: "스키마 빌더", url: "/schema-builder", icon: Network },
-      { title: "그래프 분석", url: "/graph-analysis", icon: Database },
-      { title: "빅데이터 API", url: "/bigdata-api", icon: Zap },
-      { title: "분석 백엔드", url: "/analytics", icon: Cpu },
+      // 그래프 분석은 숨김 처리 (코드는 유지)
+      // { title: "그래프 분석", url: "/graph-analysis", icon: Database },
+      { title: "API 연동", url: "/api-integration", icon: Zap },
     ],
   },
 ];
