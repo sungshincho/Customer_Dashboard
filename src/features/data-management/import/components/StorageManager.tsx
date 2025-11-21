@@ -393,7 +393,8 @@ export function StorageManager({ storeId }: StorageManagerProps) {
 
       if (error) throw error;
 
-      const successCount = data?.results?.filter((r: any) => r.success).length || 0;
+      // 성공 카운트 계산 (fileName이 있으면 성공)
+      const successCount = data?.results?.length || 0;
       const failCount = modelFiles.length - successCount;
 
       toast({
