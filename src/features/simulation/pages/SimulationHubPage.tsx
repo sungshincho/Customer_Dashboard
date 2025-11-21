@@ -138,7 +138,7 @@ export default function SimulationHubPage() {
           </div>
           <Button 
             onClick={runAllSimulations}
-            disabled={!selectedStore || !contextData || contextLoading || isInferring}
+            disabled={isInferring || Object.values(loadingStates).some(v => v)}
             size="lg"
           >
             {contextLoading ? (
@@ -190,7 +190,7 @@ export default function SimulationHubPage() {
                 size="sm"
                 variant="ghost"
                 onClick={() => runSimulation('layout')}
-                disabled={loadingStates.layout || !contextData}
+                disabled={loadingStates.layout}
               >
                 {loadingStates.layout ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -237,7 +237,7 @@ export default function SimulationHubPage() {
                   size="sm"
                   variant="ghost"
                   onClick={() => runSimulation('demand')}
-                  disabled={loadingStates.demand || !contextData}
+                  disabled={loadingStates.demand}
                 >
                   {loadingStates.demand ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -283,7 +283,7 @@ export default function SimulationHubPage() {
                   size="sm"
                   variant="ghost"
                   onClick={() => runSimulation('inventory')}
-                  disabled={loadingStates.inventory || !contextData}
+                  disabled={loadingStates.inventory}
                 >
                   {loadingStates.inventory ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -329,7 +329,7 @@ export default function SimulationHubPage() {
                   size="sm"
                   variant="ghost"
                   onClick={() => runSimulation('pricing')}
-                  disabled={loadingStates.pricing || !contextData}
+                  disabled={loadingStates.pricing}
                 >
                   {loadingStates.pricing ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -375,7 +375,7 @@ export default function SimulationHubPage() {
                   size="sm"
                   variant="ghost"
                   onClick={() => runSimulation('recommendation')}
-                  disabled={loadingStates.recommendation || !contextData}
+                  disabled={loadingStates.recommendation}
                 >
                   {loadingStates.recommendation ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
