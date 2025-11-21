@@ -55,6 +55,7 @@ Deno.serve(async (req) => {
         body: {
           import_id,
           auto_fix,
+          user_id: user.id, // user_id 전달
         },
       });
 
@@ -87,6 +88,7 @@ Deno.serve(async (req) => {
         import_id,
         id_columns: result.validation?.id_columns || [],
         foreign_key_columns: result.validation?.foreign_key_columns || {},
+        user_id: user.id, // user_id 전달
       },
     });
 

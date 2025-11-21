@@ -8,6 +8,7 @@ const corsHeaders = {
 interface ValidationRequest {
   import_id: string;
   auto_fix: boolean;
+  user_id?: string; // optional, for when called from pipeline
 }
 
 interface ValidationIssue {
@@ -29,14 +30,21 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) throw new Error('Authorization required');
+    const { import_id, auto_fix, user_id } = await req.json() as ValidationRequest;
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) throw new Error('Unauthorized');
+    // user_id가 제공되면 그것을 사용, 아니면 Authorization header에서 가져오기
+    let userId: string;
+    if (user_id) {
+      userId = user_id;
+    } else {
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader) throw new Error('Authorization required');
 
-    const { import_id, auto_fix } = await req.json() as ValidationRequest;
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+      if (authError || !user) throw new Error('Unauthorized');
+      userId = user.id;
+    }
 
     console.log('🔍 Validating CSV data for import:', import_id);
 
@@ -45,7 +53,7 @@ Deno.serve(async (req) => {
       .from('user_data_imports')
       .select('*')
       .eq('id', import_id)
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .single();
 
     if (fetchError || !importData) {
@@ -340,7 +348,7 @@ ${issues.map(i => `- ${i.message}${i.suggestion ? ': ' + i.suggestion : ''}`).jo
           row_count: fixedData.length
         })
         .eq('id', import_id)
-        .eq('user_id', user.id);
+        .eq('user_id', userId);
 
       if (updateError) {
         console.error('Failed to update data:', updateError);
