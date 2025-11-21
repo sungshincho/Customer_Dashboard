@@ -621,7 +621,12 @@ FORECAST PARAMETERS:
 - Economic Indicators: ${parameters.includeEconomicIndicators ? 'Yes' : 'No'}
 - Weather Scenario: ${parameters.weatherScenario || 'normal'}
 
-Your task is to predict future demand and provide actionable insights.
+Your task is to predict future demand and provide actionable insights including:
+1. Time-series forecast with confidence intervals
+2. Key insight summaries (demand surges, seasonal patterns)
+3. Impact factor analysis (weather, events, trends)
+4. Top 10 product forecasts
+5. Actionable recommendations
 
 Return a JSON object:
 {
@@ -638,20 +643,52 @@ Return a JSON object:
   "aiInsights": "Detailed Korean explanation of demand predictions, key drivers, seasonal patterns, and recommended actions for inventory and staffing",
   "demandDrivers": [
     {
-      "factor": "Weather conditions",
+      "factor": "날씨 조건",
       "impact": "positive",
       "magnitude": 15,
-      "explanation": "Korean explanation"
+      "explanation": "평균 기온 상승으로 여름 제품 수요 증가 예상"
+    },
+    {
+      "factor": "계절 트렌드",
+      "impact": "positive",
+      "magnitude": 22,
+      "explanation": "성수기 진입으로 전반적인 수요 증가"
+    }
+  ],
+  "demandForecast": {
+    "forecastData": {
+      "dates": ["2025-01-01", "2025-01-02", ...],
+      "predictedDemand": [150, 165, 180, ...],
+      "confidence": [0.85, 0.87, 0.82, ...],
+      "peakDays": ["2025-01-15", "2025-01-25"],
+      "lowDays": ["2025-01-10"]
+    },
+    "summary": {
+      "avgDailyDemand": 170,
+      "peakDemand": 250,
+      "totalForecast": 5100,
+      "trend": "increasing"
+    }
+  },
+  "topProducts": [
+    {
+      "sku": "PROD001",
+      "name": "베스트셀러 상품명",
+      "predictedDemand": 450,
+      "trend": "up",
+      "confidence": 0.88
     }
   ],
   "recommendations": [
-    "Increase inventory of high-demand items by 20%",
-    "Schedule additional staff during peak hours"
+    "주요 상품의 재고를 20% 증가시키세요",
+    "피크 시간대에 추가 직원을 배치하세요",
+    "프로모션을 1월 15일 전에 준비하세요"
   ]
 }
 
 IMPORTANT: confidenceScore should be between 0-100 (percentage).
-Provide realistic predictions based on retail analytics best practices.`;
+Provide realistic predictions based on retail analytics best practices.
+Generate 30 days of forecast data with realistic daily variations.`;
 
   const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
@@ -715,7 +752,12 @@ INVENTORY PARAMETERS:
 - Safety Stock Multiplier: ${parameters.safetyStockMultiplier || 1.5}
 - Order Policy: ${parameters.orderPolicy || 'periodic'}
 
-Your task is to optimize inventory levels and provide actionable recommendations.
+Your task is to optimize inventory levels and provide actionable recommendations including:
+1. Current stock status dashboard
+2. Urgent reorder list with expected depletion dates
+3. Optimal stock levels vs current
+4. Cost savings estimates
+5. Inventory turnover rates
 
 Return a JSON object:
 {
@@ -734,15 +776,38 @@ Return a JSON object:
     "expectedStockouts": 3,
     "annualSavings": 3500000
   },
+  "inventoryOptimization": {
+    "recommendations": [
+      {
+        "productSku": "PROD001",
+        "productName": "상품명",
+        "currentStock": 50,
+        "optimalStock": 120,
+        "reorderPoint": 80,
+        "safetyStock": 30,
+        "orderQuantity": 70,
+        "urgency": "high"
+      }
+    ],
+    "summary": {
+      "totalProducts": 50,
+      "overstocked": 8,
+      "understocked": 12,
+      "optimal": 30,
+      "potentialSavings": 2500000,
+      "expectedTurnover": 5.8
+    }
+  },
   "recommendations": [
-    "Implement automated reorder triggers at 180 units",
-    "Review slow-moving items quarterly",
-    "Consider vendor-managed inventory for top SKUs"
+    "180개 재고 도달 시 자동 발주 트리거 설정",
+    "분기별로 느린 판매 상품 검토",
+    "주요 SKU에 대해 공급업체 관리 재고 고려"
   ]
 }
 
 IMPORTANT: confidenceScore should be between 0-100 (percentage).
-Provide realistic optimization based on inventory management best practices.`;
+Provide realistic optimization based on inventory management best practices.
+Generate at least 10-20 product recommendations with varied urgency levels.`;
 
   const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
@@ -808,7 +873,12 @@ PRICING PARAMETERS:
 - Duration: ${parameters.durationDays || 30} days
 - Inventory Consideration: ${parameters.considerInventory ? 'Yes' : 'No'}
 
-Your task is to optimize pricing strategy and predict revenue impact.
+Your task is to optimize pricing strategy and provide actionable recommendations including:
+1. Price scenario comparisons (current vs recommended)
+2. Product-specific recommended prices based on elasticity
+3. Competitor comparisons
+4. Bundling opportunities
+5. Expected impact on sales and margin
 
 Return a JSON object:
 {
@@ -828,15 +898,38 @@ Return a JSON object:
     "marginImpact": 12,
     "competitivePosition": "premium"
   },
+  "pricingOptimization": {
+    "recommendations": [
+      {
+        "productSku": "PROD001",
+        "productName": "상품명",
+        "currentPrice": 45000,
+        "optimalPrice": 47500,
+        "priceChange": 5.6,
+        "expectedDemandChange": -3.2,
+        "expectedRevenueChange": 12.5,
+        "elasticity": -0.8
+      }
+    ],
+    "summary": {
+      "totalProducts": 50,
+      "avgPriceChange": 3.5,
+      "expectedRevenueIncrease": 5500000,
+      "expectedMarginIncrease": 2.3,
+      "recommendedDiscounts": 12,
+      "recommendedIncreases": 28
+    }
+  },
   "recommendations": [
-    "Test 10% discount on slow-moving items",
-    "Implement dynamic pricing during peak hours",
-    "Bundle complementary products at 15% discount"
+    "느린 판매 상품에 10% 할인 테스트",
+    "피크 시간대 동적 가격 책정 구현",
+    "보완 제품 15% 할인으로 번들링"
   ]
 }
 
 IMPORTANT: confidenceScore should be between 0-100 (percentage).
-Provide realistic pricing optimization based on retail economics and consumer behavior.`;
+Provide realistic pricing optimization based on retail best practices.
+Generate at least 10-20 product pricing recommendations with varied strategies.`;
 
   const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
@@ -904,7 +997,12 @@ RECOMMENDATION PARAMETERS:
 - Boost New Products: ${parameters.boostNewProducts ? 'Yes' : 'No'}
 - Boost High Margin: ${parameters.boostHighMargin ? 'Yes' : 'No'}
 
-Your task is to design an optimal recommendation strategy and predict its impact.
+Your task is to design an optimal recommendation strategy and provide actionable insights including:
+1. Segment-specific strategies
+2. Recommended campaign types with estimated ROI
+3. Optimal timing
+4. Targeted products
+5. Budget allocation by channel
 
 Return a JSON object:
 {
@@ -924,16 +1022,44 @@ Return a JSON object:
     "expectedUplift": 22,
     "recommendationAccuracy": 0.78
   },
+  "recommendationStrategy": {
+    "strategies": [
+      {
+        "strategyName": "고가치 고객 교차 판매",
+        "strategyType": "cross-sell",
+        "targetSegment": "고가치 고객 (상위 20%)",
+        "expectedCTR": 8.5,
+        "expectedCVR": 12.3,
+        "expectedAOVIncrease": 15.2,
+        "productPairs": [
+          { "product1": "제품A", "product2": "제품B", "affinity": 0.82 }
+        ]
+      }
+    ],
+    "summary": {
+      "totalStrategies": 5,
+      "avgCTRIncrease": 6.8,
+      "avgCVRIncrease": 9.5,
+      "avgAOVIncrease": 12.3,
+      "expectedRevenueImpact": 8500000
+    },
+    "performanceMetrics": [
+      { "metric": "클릭률 (CTR)", "current": 3.2, "predicted": 9.8 },
+      { "metric": "전환율 (CVR)", "current": 2.5, "predicted": 11.8 },
+      { "metric": "평균 주문액 (AOV)", "current": 42000, "predicted": 52500 }
+    ]
+  },
   "recommendations": [
-    "Launch personalized email campaigns with product recommendations",
-    "Implement in-store digital signage with trending items",
-    "Create loyalty program with smart rewards",
-    "A/B test recommendation algorithms monthly"
+    "개인화된 이메일 캠페인 시작",
+    "매장 내 디지털 사이니지 구현",
+    "스마트 리워드 로열티 프로그램 생성",
+    "월별 추천 알고리즘 A/B 테스트"
   ]
 }
 
 IMPORTANT: confidenceScore should be between 0-100 (percentage).
-Provide realistic strategy based on modern retail marketing and data science best practices.`;
+Provide realistic strategy based on modern retail marketing and data science best practices.
+Generate at least 4-6 different recommendation strategies with varied approaches.`;
 
   const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',

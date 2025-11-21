@@ -261,8 +261,11 @@ export default function SimulationHubPage() {
               )}
               {!loadingStates.demand && demandForecast && (
                 <DemandForecastResult 
-                  forecastData={demandForecast.forecastData}
-                  summary={demandForecast.summary}
+                  forecastData={demandForecast.demandForecast?.forecastData}
+                  summary={demandForecast.demandForecast?.summary}
+                  demandDrivers={demandForecast.demandDrivers}
+                  topProducts={demandForecast.topProducts}
+                  recommendations={demandForecast.recommendations}
                 />
               )}
               {!loadingStates.demand && !demandForecast && contextData && (
