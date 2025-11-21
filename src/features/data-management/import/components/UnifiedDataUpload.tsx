@@ -550,6 +550,90 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
             throw new Error(`Pipeline failed: ${pipelineError.message}`);
           }
 
+          // 백그라운드 처리 감지
+          if (pipelineResult?.processing_in_background) {
+            console.log('⏰ Large dataset - processing in background');
+            updateFileStatus(uploadFile.id, 'processing', '대용량 데이터 백그라운드 처리 중...', 50);
+            
+            // 폴링으로 상태 확인 (최대 5분)
+            const maxAttempts = 60; // 60 x 5초 = 5분
+            let attempt = 0;
+            
+            const pollStatus = async (): Promise<boolean> => {
+              attempt++;
+              checkPauseAndCancel();
+              
+              const { data: importStatus } = await supabase
+                .from('user_data_imports')
+                .select('data_type, raw_data')
+                .eq('id', importRecord.id)
+                .single();
+              
+              if (importStatus?.data_type === 'completed') {
+                const result = (importStatus.raw_data as any)?.pipeline_result;
+                if (result) {
+                  console.log('✅ Background processing completed:', result);
+                  
+                  updateFileStatus(uploadFile.id, 'success', 'AI 완전 자동화 완료!', 100, {
+                    validation: result.validation || {},
+                    mapping: result.mapping || {},
+                    etl: result.etl || {},
+                    dataQualityScore: result.validation?.data_quality_score,
+                    entitiesCreated: result.etl?.entities_created || 0,
+                    entitiesReused: result.etl?.entities_reused || 0,
+                    relationsCreated: result.etl?.relations_created || 0,
+                    aiPowered: true,
+                    fullyAutomated: true,
+                    backgroundProcessed: true,
+                    filePath
+                  });
+                  
+                  toast({ 
+                    title: `✅ ${safeFileName} 완전 자동화 완료!`,
+                    description: `대용량 데이터 처리 완료` 
+                  });
+                  
+                  return true;
+                }
+              } else if (importStatus?.data_type === 'failed') {
+                const error = (importStatus.raw_data as any)?.error;
+                throw new Error(`Background processing failed: ${error || 'Unknown error'}`);
+              }
+              
+              // 아직 처리 중
+              if (attempt >= maxAttempts) {
+                throw new Error('Background processing timeout (5 minutes)');
+              }
+              
+              updateFileStatus(uploadFile.id, 'processing', `백그라운드 처리 중... (${attempt}/${maxAttempts})`, 50 + (attempt / maxAttempts) * 35);
+              
+              // 5초 대기 후 재시도
+              await new Promise(resolve => setTimeout(resolve, 5000));
+              return await pollStatus();
+            };
+            
+            await pollStatus();
+            
+            // 백그라운드 KPI 작업
+            (async () => {
+              try {
+                console.log('📊 Background: KPI aggregation...');
+                await supabase.functions.invoke('aggregate-all-kpis', {
+                  body: { store_id: storeId, user_id: user.id },
+                });
+                
+                console.log('🤖 Background: AI recommendations...');
+                await supabase.functions.invoke('generate-ai-recommendations', {
+                  body: { store_id: storeId },
+                });
+              } catch (bgError) {
+                console.warn('⚠️ Background tasks failed (non-critical):', bgError);
+              }
+            })();
+            
+            return; // 여기서 종료
+          }
+
           if (!pipelineResult?.success) {
             throw new Error(pipelineResult?.error || 'Pipeline failed');
           }
