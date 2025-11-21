@@ -50,6 +50,8 @@ export function StorageManager({ storeId }: StorageManagerProps) {
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [analyzing, setAnalyzing] = useState(false);
   const [pendingAnalysis, setPendingAnalysis] = useState<ModelAnalysis | null>(null);
+  const [batchProcessing, setBatchProcessing] = useState(false);
+  const [processedCount, setProcessedCount] = useState(0);
 
   useEffect(() => {
     if (storeId) {
@@ -348,6 +350,71 @@ export function StorageManager({ storeId }: StorageManagerProps) {
     }
   };
 
+  const batchAutoMap3DModels = async () => {
+    const modelFiles = filteredFiles.filter(f => is3DModel(f.name) && f.bucket === '3d-models');
+    
+    if (modelFiles.length === 0) {
+      toast({
+        title: "3D 모델 없음",
+        description: "자동 매핑할 3D 모델 파일이 없습니다",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!confirm(`${modelFiles.length}개의 3D 모델을 자동으로 AI 분석 및 온톨로지 매핑하시겠습니까?`)) {
+      return;
+    }
+
+    setBatchProcessing(true);
+    setProcessedCount(0);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("인증 필요");
+
+      // auto-process-3d-models 호출
+      const fileData = modelFiles.map(f => ({
+        fileName: f.name,
+        publicUrl: f.url
+      }));
+
+      toast({
+        title: "일괄 처리 시작",
+        description: `${modelFiles.length}개 파일 처리 중...`,
+      });
+
+      const { data, error } = await supabase.functions.invoke('auto-process-3d-models', {
+        body: {
+          files: fileData,
+          storeId: storeId
+        }
+      });
+
+      if (error) throw error;
+
+      const successCount = data?.results?.filter((r: any) => r.success).length || 0;
+      const failCount = modelFiles.length - successCount;
+
+      toast({
+        title: "일괄 처리 완료",
+        description: `성공: ${successCount}개, 실패: ${failCount}개`,
+      });
+
+      loadAllFiles();
+    } catch (error) {
+      console.error('Batch processing error:', error);
+      toast({
+        title: "일괄 처리 실패",
+        description: error instanceof Error ? error.message : "처리 중 오류가 발생했습니다",
+        variant: "destructive",
+      });
+    } finally {
+      setBatchProcessing(false);
+      setProcessedCount(0);
+    }
+  };
+
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -409,8 +476,8 @@ export function StorageManager({ storeId }: StorageManagerProps) {
           </Card>
         )}
         {/* 검색 및 액션 */}
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="파일명 검색..."
@@ -426,6 +493,24 @@ export function StorageManager({ storeId }: StorageManagerProps) {
             disabled={loading}
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+          <Button
+            variant="default"
+            size="sm"
+            onClick={batchAutoMap3DModels}
+            disabled={batchProcessing || loading}
+          >
+            {batchProcessing ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                AI 자동 매핑 ({processedCount}/{filteredFiles.filter(f => is3DModel(f.name)).length})
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 mr-2" />
+                3D 일괄 자동 매핑
+              </>
+            )}
           </Button>
           {selectedFiles.size > 0 && (
             <Button
