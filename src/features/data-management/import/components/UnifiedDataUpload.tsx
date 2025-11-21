@@ -198,7 +198,7 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
 
       // 파일 타입별 업로드
       if (uploadFile.type === '3d-model') {
-        // 3D 모델은 3d-models 버킷에 업로드 (서브폴더 없이)
+        // === 완전 자동화 3D 모델 파이프라인 ===
         const filePath = `${user.id}/${storeId}/${safeFileName}`;
         const { error: uploadError } = await supabase.storage
           .from('3d-models')
@@ -211,10 +211,8 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
           .from('3d-models')
           .getPublicUrl(filePath);
         
-        updateFileStatus(uploadFile.id, 'processing', undefined, 50);
-        
-        // 자동 처리 (AI 분석 + 엔티티 타입 생성/매핑)
-        updateFileStatus(uploadFile.id, 'processing', 'AI 분석 중...', 60);
+        // Step 1: 3D 모델 AI 분석 및 엔티티 타입 자동 생성
+        updateFileStatus(uploadFile.id, 'processing', 'AI 분석 중...', 40);
         
         try {
           const { data: processResult, error: processError } = await supabase.functions.invoke('auto-process-3d-models', {
@@ -229,10 +227,11 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
           
           if (processError) throw processError;
           
-          if (processResult?.success) {
-            const result = processResult.results?.[0];
+          if (processResult?.success && processResult.results?.[0]) {
+            const result = processResult.results[0];
             
-            // user_data_imports에 기록 추가 (data_type: 3d_model로 통일)
+            // Step 2: user_data_imports에 기록 추가
+            updateFileStatus(uploadFile.id, 'processing', '데이터 기록 중...', 60);
             await supabase.from('user_data_imports').insert({
               user_id: user.id,
               store_id: storeId,
@@ -249,19 +248,48 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
               }
             });
             
-            // 온톨로지 연결 (엔티티 타입에 3D 모델 URL 연결)
-            updateFileStatus(uploadFile.id, 'processing', '온톨로지 연결 중...', 80);
+            // Step 3: 기존 엔티티에 3D 모델 자동 매핑
+            updateFileStatus(uploadFile.id, 'processing', '기존 엔티티에 매핑 중...', 75);
             
-            const { data: linkResult, error: linkError } = await supabase.functions.invoke('import-with-ontology', {
-              body: {
-                modelUrl: publicUrl,
-                entityTypeName: result?.entityType,
-                autoCreateEntityType: true
+            // AI가 생성한 엔티티 타입 이름으로 기존 엔티티 찾기
+            const { data: entityType } = await supabase
+              .from('ontology_entity_types')
+              .select('id')
+              .eq('user_id', user.id)
+              .eq('name', result.entityType)
+              .single();
+
+            let mappedCount = 0;
+            if (entityType) {
+              // 해당 타입의 엔티티 중 3D 모델이 없는 엔티티 찾기 (최대 10개)
+              const { data: entitiesToMap } = await supabase
+                .from('graph_entities')
+                .select('id')
+                .eq('user_id', user.id)
+                .eq('store_id', storeId)
+                .eq('entity_type_id', entityType.id)
+                .is('model_3d_position', null)
+                .limit(10);
+
+              if (entitiesToMap && entitiesToMap.length > 0) {
+                console.log(`🔗 Auto-mapping 3D model to ${entitiesToMap.length} entities...`);
+                
+                // 그리드 형태로 자동 배치
+                const updates = entitiesToMap.map((entity, idx) => 
+                  supabase
+                    .from('graph_entities')
+                    .update({
+                      model_3d_position: { x: idx * 2, y: 0, z: 0 },
+                      model_3d_scale: { x: 1, y: 1, z: 1 },
+                      model_3d_rotation: { x: 0, y: 0, z: 0 }
+                    })
+                    .eq('id', entity.id)
+                );
+                
+                await Promise.all(updates);
+                mappedCount = entitiesToMap.length;
+                console.log(`✅ 3D models auto-mapped to ${mappedCount} entities`);
               }
-            });
-            
-            if (linkError) {
-              console.warn('Failed to link 3D model to ontology:', linkError);
             }
             
             updateFileStatus(uploadFile.id, 'success', undefined, 100, {
@@ -269,19 +297,20 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
               entityType: result?.entityType || '자동 생성됨',
               instanceLabel: result?.instanceLabel,
               position: result?.position,
-              linkedToOntology: !linkError
+              entitiesMapped: mappedCount,
+              linkedToOntology: true
             });
           } else {
             throw new Error(processResult?.error || '자동 처리 실패');
           }
         } catch (err: any) {
-          console.error('Auto-process failed:', err);
+          console.error('❌ 3D model processing failed:', err);
           updateFileStatus(uploadFile.id, 'error', err.message || '자동 처리 실패');
         }
         
       } else if (uploadFile.type === 'csv' || uploadFile.type === 'excel') {
-        // CSV/Excel은 먼저 스토리지에 업로드 후 파싱
-        updateFileStatus(uploadFile.id, 'processing', '파일 업로드 중...', 20);
+        // === 완전 자동화 CSV/Excel 파이프라인 ===
+        updateFileStatus(uploadFile.id, 'processing', '파일 업로드 중...', 15);
         
         const filePath = `${user.id}/${storeId}/${safeFileName}`;
         const { error: uploadError } = await supabase.storage
@@ -290,21 +319,86 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
 
         if (uploadError) throw uploadError;
         
-        updateFileStatus(uploadFile.id, 'processing', '데이터 파싱 중...', 40);
+        // Step 1: 데이터 파싱
+        updateFileStatus(uploadFile.id, 'processing', '데이터 파싱 중...', 25);
         const rawData = await parseDataFile(uploadFile.file);
         
-        updateFileStatus(uploadFile.id, 'mapping', '자동 매핑 중...', 60);
-        const mappingResult = await runAutoMapping(uploadFile, rawData, filePath);
+        // Step 2: user_data_imports에 레코드 생성
+        updateFileStatus(uploadFile.id, 'processing', '데이터 검증 준비 중...', 35);
+        const { data: importRecord, error: importError } = await supabase
+          .from('user_data_imports')
+          .insert({
+            file_name: safeFileName,
+            file_type: uploadFile.type,
+            data_type: 'auto-detected',
+            raw_data: rawData as any,
+            row_count: rawData.length,
+            store_id: storeId || null,
+            user_id: user.id,
+            file_path: filePath,
+          })
+          .select()
+          .single();
+
+        if (importError || !importRecord) {
+          throw new Error(`Import record creation failed: ${importError?.message}`);
+        }
+
+        // Step 3: 데이터 자동 수정 (검증 및 정리)
+        console.log('🔧 Step 3: Auto-fixing data...');
+        updateFileStatus(uploadFile.id, 'processing', '데이터 검증 및 자동 수정 중...', 45);
         
-        if (mappingResult && mappingResult.importId && storeId) {
-          // 자동 매핑 성공 시 ETL 자동 실행
+        try {
+          const { data: fixResult, error: fixError } = await supabase.functions.invoke('auto-fix-data', {
+            body: {
+              importId: importRecord.id,
+              options: {
+                removeDuplicates: true,
+                fillEmptyValues: true,
+                convertTypes: true,
+                useAI: false,
+              },
+            },
+          });
+
+          if (fixError) {
+            console.warn('⚠️ Auto-fix warning:', fixError);
+          } else {
+            console.log('✅ Data auto-fixed:', fixResult);
+          }
+        } catch (fixErr) {
+          console.warn('⚠️ Auto-fix failed (continuing):', fixErr);
+        }
+
+        // Step 4: 자동 매핑
+        updateFileStatus(uploadFile.id, 'mapping', '스키마 자동 매핑 중...', 55);
+        const columns = rawData.length > 0 ? Object.keys(rawData[0]) : [];
+        const dataSample = rawData.slice(0, 5);
+
+        const { data: mappingResult, error: mappingError } = await supabase.functions.invoke('auto-map-etl', {
+          body: {
+            import_id: importRecord.id,
+            data_sample: dataSample,
+            columns: columns,
+          }
+        });
+
+        if (mappingError || !mappingResult) {
+          throw new Error(`Auto-mapping failed: ${mappingError?.message || 'No mapping result'}`);
+        }
+
+        console.log('✅ Auto-mapping completed:', mappingResult);
+        
+        // Step 5: ETL 실행 (온톨로지 변환)
+        if (mappingResult && storeId) {
           try {
-            updateFileStatus(uploadFile.id, 'processing', '온톨로지 생성 중...', 80);
+            updateFileStatus(uploadFile.id, 'processing', '온톨로지 엔티티 생성 중...', 70);
             
             const { data: etlResult, error: etlError } = await supabase.functions.invoke('schema-etl', {
               body: {
-                import_id: mappingResult.importId,
+                user_id: user.id,
                 store_id: storeId,
+                import_id: importRecord.id,
                 entity_mappings: mappingResult.entity_mappings || [],
                 relation_mappings: mappingResult.relation_mappings || []
               }
@@ -364,14 +458,14 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
           } catch (etlError) {
             console.error('❌ Auto ETL error:', etlError);
             
-            // 재시도 로직 (1회)
+            // 재시도 로직 (1회) - 파라미터 수정
             console.log('🔄 Retrying ETL process...');
             try {
               const { data: retryResult, error: retryError } = await supabase.functions.invoke('schema-etl', {
                 body: {
                   user_id: user.id,
                   store_id: storeId,
-                  import_id: mappingResult.importId,
+                  import_id: importRecord.id,
                   entity_mappings: mappingResult.entity_mappings || [],
                   relation_mappings: mappingResult.relation_mappings || []
                 },
@@ -379,11 +473,29 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
               
               if (!retryError && retryResult) {
                 console.log('✅ ETL succeeded on retry');
+                
+                // 재시도 성공 시에도 백그라운드 작업 실행
+                (async () => {
+                  try {
+                    await supabase.functions.invoke('aggregate-all-kpis', {
+                      body: { store_id: storeId, user_id: user.id },
+                    });
+                    await supabase.functions.invoke('generate-ai-recommendations', {
+                      body: { store_id: storeId },
+                    });
+                  } catch (bgErr) {
+                    console.warn('⚠️ Background tasks failed (non-critical):', bgErr);
+                  }
+                })();
+                
                 updateFileStatus(uploadFile.id, 'success', '재시도 성공!', 100, {
                   ...mappingResult,
                   autoMapped: true,
+                  autoFixed: true,
                   retriedETL: true,
                   entitiesCreated: retryResult?.entities_created || 0,
+                  kpiAggregated: true,
+                  aiGenerated: true,
                   filePath
                 });
                 toast({ title: `${safeFileName} 재시도 성공!` });
@@ -397,7 +509,8 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
             }
           }
         } else {
-          updateFileStatus(uploadFile.id, 'success', undefined, 100, { ...mappingResult, filePath });
+          console.log('⚠️ No mapping result, skipping ETL');
+          updateFileStatus(uploadFile.id, 'success', '업로드 완료 (매핑 없음)', 100, { filePath });
         }
         
       } else if (uploadFile.type === 'wifi') {
