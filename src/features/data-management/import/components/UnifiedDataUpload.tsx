@@ -1,9 +1,9 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Upload, FileSpreadsheet, Box, Wifi, Loader2, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import { Upload, FileSpreadsheet, Box, Wifi, Loader2, CheckCircle2, XCircle, AlertCircle, Pause, Play, X } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -18,7 +18,7 @@ interface UploadFile {
   file: File;
   id: string;
   type: 'csv' | 'excel' | '3d-model' | 'wifi' | 'json' | 'unknown';
-  status: 'pending' | 'uploading' | 'processing' | 'mapping' | 'success' | 'error';
+  status: 'pending' | 'uploading' | 'processing' | 'mapping' | 'success' | 'error' | 'cancelled' | 'paused';
   progress: number;
   error?: string;
   mappingResult?: any;
@@ -28,6 +28,8 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
   const { toast } = useToast();
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const cancelFlagsRef = useRef<Map<string, boolean>>(new Map());
 
   // 파일 타입 자동 감지
   const detectFileType = (file: File): UploadFile['type'] => {
@@ -193,6 +195,64 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
     return safeName + ext;
   };
 
+  // 업로드 취소
+  const cancelUpload = (fileId: string) => {
+    cancelFlagsRef.current.set(fileId, true);
+    updateFileStatus(fileId, 'cancelled', '사용자가 취소함');
+    toast({
+      title: "업로드 취소됨",
+      description: "파일 업로드가 취소되었습니다",
+    });
+  };
+
+  // 전체 일시중지
+  const pauseAll = () => {
+    setIsPaused(true);
+    files.forEach(file => {
+      if (file.status === 'uploading' || file.status === 'processing' || file.status === 'mapping') {
+        updateFileStatus(file.id, 'paused');
+      }
+    });
+    toast({
+      title: "업로드 일시중지",
+      description: "모든 업로드가 일시중지되었습니다",
+    });
+  };
+
+  // 전체 재개
+  const resumeAll = () => {
+    setIsPaused(false);
+    const pausedFiles = files.filter(f => f.status === 'paused');
+    pausedFiles.forEach(file => {
+      updateFileStatus(file.id, 'pending');
+    });
+    toast({
+      title: "업로드 재개",
+      description: "일시중지된 업로드를 재개합니다",
+    });
+    // 재개 후 자동으로 업로드 시작
+    setTimeout(() => {
+      pausedFiles.forEach(file => uploadFile(file));
+    }, 100);
+  };
+
+  // 모든 업로드 취소
+  const cancelAll = () => {
+    files.forEach(file => {
+      if (file.status === 'pending' || file.status === 'uploading' || 
+          file.status === 'processing' || file.status === 'mapping' || file.status === 'paused') {
+        cancelFlagsRef.current.set(file.id, true);
+        updateFileStatus(file.id, 'cancelled', '전체 취소됨');
+      }
+    });
+    setIsPaused(false);
+    toast({
+      title: "전체 취소됨",
+      description: "모든 업로드가 취소되었습니다",
+      variant: "destructive",
+    });
+  };
+
   // 개별 파일 업로드 처리
   const uploadFile = async (uploadFile: UploadFile) => {
     if (!storeId) {
@@ -200,10 +260,24 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
       return;
     }
 
+    // 취소 플래그 초기화
+    cancelFlagsRef.current.set(uploadFile.id, false);
+
     try {
+      // 일시중지 체크
+      const checkPauseAndCancel = () => {
+        if (cancelFlagsRef.current.get(uploadFile.id)) {
+          throw new Error('CANCELLED');
+        }
+        if (isPaused) {
+          updateFileStatus(uploadFile.id, 'paused');
+          throw new Error('PAUSED');
+        }
+      };
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('인증되지 않은 사용자');
 
+      checkPauseAndCancel();
       updateFileStatus(uploadFile.id, 'uploading', undefined, 10);
 
       // 파일명 sanitize
@@ -212,12 +286,14 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
       // 파일 타입별 업로드
       if (uploadFile.type === '3d-model') {
         // === 완전 자동화 3D 모델 파이프라인 ===
+        checkPauseAndCancel();
         const filePath = `${user.id}/${storeId}/${safeFileName}`;
         const { error: uploadError } = await supabase.storage
           .from('3d-models')
           .upload(filePath, uploadFile.file, { upsert: true });
 
         if (uploadError) throw uploadError;
+        checkPauseAndCancel();
         
         // 업로드된 URL 가져오기
         const { data: { publicUrl } } = supabase.storage
@@ -225,9 +301,11 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
           .getPublicUrl(filePath);
         
         // Step 1: 3D 모델 AI 분석 및 엔티티 타입 자동 생성
+        checkPauseAndCancel();
         updateFileStatus(uploadFile.id, 'processing', 'AI 분석 중...', 40);
         
         try {
+          checkPauseAndCancel();
           const { data: processResult, error: processError } = await supabase.functions.invoke('auto-process-3d-models', {
             body: {
               files: [{
@@ -323,6 +401,7 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
         
       } else if (uploadFile.type === 'csv' || uploadFile.type === 'excel') {
         // === 완전 자동화 CSV/Excel 파이프라인 ===
+        checkPauseAndCancel();
         updateFileStatus(uploadFile.id, 'processing', '파일 업로드 중...', 15);
         
         const filePath = `${user.id}/${storeId}/${safeFileName}`;
@@ -331,12 +410,15 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
           .upload(filePath, uploadFile.file, { upsert: true });
 
         if (uploadError) throw uploadError;
+        checkPauseAndCancel();
         
         // Step 1: 데이터 파싱
+        checkPauseAndCancel();
         updateFileStatus(uploadFile.id, 'processing', '데이터 파싱 중...', 25);
         const rawData = await parseDataFile(uploadFile.file);
         
         // Step 2: user_data_imports에 레코드 생성
+        checkPauseAndCancel();
         updateFileStatus(uploadFile.id, 'processing', '데이터 검증 준비 중...', 35);
         const { data: importRecord, error: importError } = await supabase
           .from('user_data_imports')
@@ -358,10 +440,12 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
         }
 
         // === 🤖 AI 기반 완전 자동화 파이프라인 ===
+        checkPauseAndCancel();
         console.log('🚀 Starting AI-powered automated pipeline...');
         updateFileStatus(uploadFile.id, 'processing', 'AI가 데이터를 분석하고 있습니다...', 45);
         
         try {
+          checkPauseAndCancel();
           // 통합 파이프라인 한 번 호출로 모든 작업 자동 처리
           const { data: pipelineResult, error: pipelineError } = await supabase.functions.invoke('integrated-data-pipeline', {
             body: {
@@ -515,12 +599,24 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
       });
 
     } catch (error: any) {
+      // 취소나 일시중지는 에러로 표시하지 않음
+      if (error.message === 'CANCELLED') {
+        // 이미 cancelled 상태로 설정됨
+        return;
+      }
+      if (error.message === 'PAUSED') {
+        // 이미 paused 상태로 설정됨
+        return;
+      }
+      
       updateFileStatus(uploadFile.id, 'error', error.message);
       toast({
         title: "업로드 실패",
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      cancelFlagsRef.current.delete(uploadFile.id);
     }
   };
 
@@ -540,7 +636,16 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
 
   const uploadAllFiles = async () => {
     const pendingFiles = files.filter(f => f.status === 'pending');
+    if (pendingFiles.length === 0) {
+      toast({
+        title: "업로드할 파일 없음",
+        description: "대기 중인 파일이 없습니다",
+      });
+      return;
+    }
+    
     for (const file of pendingFiles) {
+      if (isPaused) break; // 일시중지 상태면 중단
       await uploadFile(file);
     }
     onUploadSuccess?.();
@@ -551,7 +656,7 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
   };
 
   const clearCompleted = () => {
-    setFiles(prev => prev.filter(f => f.status !== 'success'));
+    setFiles(prev => prev.filter(f => f.status !== 'success' && f.status !== 'cancelled'));
   };
 
   const getFileTypeIcon = (type: UploadFile['type']) => {
@@ -633,10 +738,16 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
       processing: '처리 중...',
       mapping: '자동 매핑 중...',
       success: '완료',
-      error: uploadFile.error || '실패'
+      error: uploadFile.error || '실패',
+      cancelled: '취소됨',
+      paused: '일시중지됨'
     };
     return statusMap[uploadFile.status];
   };
+
+  const hasActiveUploads = files.some(f => 
+    f.status === 'uploading' || f.status === 'processing' || f.status === 'mapping'
+  );
 
   return (
     <Card>
@@ -694,19 +805,57 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
         {files.length > 0 && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">업로드 대기 중인 파일 ({files.length})</h3>
+              <h3 className="text-lg font-semibold">
+                파일 목록 ({files.length})
+                {hasActiveUploads && (
+                  <Badge variant="outline" className="ml-2 bg-primary/10 text-primary">
+                    업로드 중
+                  </Badge>
+                )}
+              </h3>
               <div className="flex gap-2">
+                {hasActiveUploads && (
+                  <>
+                    {isPaused ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={resumeAll}
+                      >
+                        <Play className="w-4 h-4 mr-2" />
+                        재개
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={pauseAll}
+                      >
+                        <Pause className="w-4 h-4 mr-2" />
+                        일시중지
+                      </Button>
+                    )}
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={cancelAll}
+                    >
+                      <X className="w-4 h-4 mr-2" />
+                      전체 취소
+                    </Button>
+                  </>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={clearCompleted}
-                  disabled={!files.some(f => f.status === 'success')}
+                  disabled={!files.some(f => f.status === 'success' || f.status === 'cancelled')}
                 >
-                  완료된 항목 제거
+                  완료/취소 항목 제거
                 </Button>
                 <Button
                   onClick={uploadAllFiles}
-                  disabled={!files.some(f => f.status === 'pending')}
+                  disabled={!files.some(f => f.status === 'pending') || isPaused}
                 >
                   <Upload className="w-4 h-4 mr-2" />
                   모두 업로드
@@ -740,8 +889,20 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
                           variant="ghost"
                           size="sm"
                           onClick={() => removeFile(file.id)}
+                          title="제거"
                         >
                           <XCircle className="w-4 h-4" />
+                        </Button>
+                      )}
+                      {(file.status === 'uploading' || file.status === 'processing' || 
+                        file.status === 'mapping' || file.status === 'paused') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => cancelUpload(file.id)}
+                          title="취소"
+                        >
+                          <X className="w-4 h-4 text-destructive" />
                         </Button>
                       )}
                     </div>
@@ -761,6 +922,19 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
 
                   {file.status === 'success' && (
                     <div className="text-sm text-green-600 dark:text-green-400">
+                      {getStatusText(file)}
+                    </div>
+                  )}
+
+                  {file.status === 'cancelled' && (
+                    <div className="text-sm text-muted-foreground">
+                      {getStatusText(file)}
+                    </div>
+                  )}
+
+                  {file.status === 'paused' && (
+                    <div className="text-sm text-orange-600 dark:text-orange-400 flex items-center gap-2">
+                      <Pause className="w-4 h-4" />
                       {getStatusText(file)}
                     </div>
                   )}
