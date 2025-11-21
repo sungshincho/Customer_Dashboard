@@ -312,18 +312,35 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
 
             if (etlError) throw etlError;
             
-            // 자동 KPI 집계 (오늘 날짜 기준)
+            // 자동 KPI 집계 (CSV 데이터의 전체 날짜 범위)
             try {
-              const today = new Date().toISOString().split('T')[0];
-              await supabase.functions.invoke('aggregate-dashboard-kpis', {
+              console.log('🔄 Starting KPI aggregation for all dates...');
+              const { data: aggregateResult, error: aggregateError } = await supabase.functions.invoke('aggregate-all-kpis', {
                 body: { 
                   store_id: storeId,
-                  date: today
+                  user_id: user.id
                 },
               });
-              console.log('✅ Dashboard KPIs aggregated for', today);
+              
+              if (aggregateError) {
+                console.warn('⚠️ KPI aggregation warning:', aggregateError);
+              } else {
+                console.log('✅ Dashboard KPIs aggregated:', aggregateResult);
+              }
+              
+              // AI 추천 자동 생성
+              console.log('🤖 Generating AI recommendations...');
+              const { error: aiError } = await supabase.functions.invoke('generate-ai-recommendations', {
+                body: { store_id: storeId },
+              });
+              
+              if (aiError) {
+                console.warn('⚠️ AI recommendations warning:', aiError);
+              } else {
+                console.log('✅ AI recommendations generated');
+              }
             } catch (kpiError) {
-              console.warn('⚠️ KPI aggregation failed (non-critical):', kpiError);
+              console.warn('⚠️ Background processing failed (non-critical):', kpiError);
             }
             
             updateFileStatus(uploadFile.id, 'success', undefined, 100, {
