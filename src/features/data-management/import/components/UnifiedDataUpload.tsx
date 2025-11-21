@@ -357,173 +357,84 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
           throw new Error(`Import record creation failed: ${importError?.message}`);
         }
 
-        // Step 3: 데이터 자동 수정 (검증 및 정리)
-        console.log('🔧 Step 3: Auto-fixing data...');
-        updateFileStatus(uploadFile.id, 'processing', '데이터 검증 및 자동 수정 중...', 45);
+        // === 🤖 AI 기반 완전 자동화 파이프라인 ===
+        console.log('🚀 Starting AI-powered automated pipeline...');
+        updateFileStatus(uploadFile.id, 'processing', 'AI가 데이터를 분석하고 있습니다...', 45);
         
         try {
-          const { data: fixResult, error: fixError } = await supabase.functions.invoke('auto-fix-data', {
+          // 통합 파이프라인 한 번 호출로 모든 작업 자동 처리
+          const { data: pipelineResult, error: pipelineError } = await supabase.functions.invoke('integrated-data-pipeline', {
             body: {
-              importId: importRecord.id,
-              options: {
-                removeDuplicates: true,
-                fillEmptyValues: true,
-                convertTypes: true,
-                useAI: false,
-              },
+              import_id: importRecord.id,
+              store_id: storeId,
+              auto_fix: true,
+              skip_validation: false,
             },
           });
 
-          if (fixError) {
-            console.warn('⚠️ Auto-fix warning:', fixError);
-          } else {
-            console.log('✅ Data auto-fixed:', fixResult);
+          if (pipelineError) {
+            throw new Error(`Pipeline failed: ${pipelineError.message}`);
           }
-        } catch (fixErr) {
-          console.warn('⚠️ Auto-fix failed (continuing):', fixErr);
-        }
 
-        // Step 4: 자동 매핑
-        updateFileStatus(uploadFile.id, 'mapping', '스키마 자동 매핑 중...', 55);
-        const columns = rawData.length > 0 ? Object.keys(rawData[0]) : [];
-        const dataSample = rawData.slice(0, 5);
-
-        const { data: mappingResult, error: mappingError } = await supabase.functions.invoke('auto-map-etl', {
-          body: {
-            import_id: importRecord.id,
-            data_sample: dataSample,
-            columns: columns,
+          if (!pipelineResult?.success) {
+            throw new Error(pipelineResult?.error || 'Pipeline failed');
           }
-        });
 
-        if (mappingError || !mappingResult) {
-          throw new Error(`Auto-mapping failed: ${mappingError?.message || 'No mapping result'}`);
-        }
+          console.log('✅ AI Pipeline completed:', pipelineResult);
+          
+          const validation = pipelineResult.validation || {};
+          const mapping = pipelineResult.mapping || {};
+          const etl = pipelineResult.etl || {};
 
-        console.log('✅ Auto-mapping completed:', mappingResult);
-        
-        // Step 5: ETL 실행 (온톨로지 변환)
-        if (mappingResult && storeId) {
-          try {
-            updateFileStatus(uploadFile.id, 'processing', '온톨로지 엔티티 생성 중...', 70);
-            
-            const { data: etlResult, error: etlError } = await supabase.functions.invoke('schema-etl', {
-              body: {
-                user_id: user.id,
-                store_id: storeId,
-                import_id: importRecord.id,
-                entity_mappings: mappingResult.entity_mappings || [],
-                relation_mappings: mappingResult.relation_mappings || []
-              }
-            });
-
-            if (etlError) throw etlError;
-            
-            updateFileStatus(uploadFile.id, 'processing', 'KPI 집계 및 AI 분석 중...', 85);
-
-            // Step 4: 백그라운드 작업 (KPI 집계 + AI 추천)
-            // 비동기로 실행하여 사용자 경험 개선
-            (async () => {
-              try {
-                console.log('📊 Step 4: KPI aggregation for all dates...');
-                const { data: aggregateResult, error: aggregateError } = await supabase.functions.invoke('aggregate-all-kpis', {
-                  body: { 
-                    store_id: storeId,
-                    user_id: user.id
-                  },
-                });
-                
-                if (aggregateError) {
-                  console.warn('⚠️ KPI aggregation warning:', aggregateError);
-                } else {
-                  console.log('✅ Dashboard KPIs aggregated:', aggregateResult);
-                }
-                
-                // Step 5: AI 추천 자동 생성
-                console.log('🤖 Step 5: Generating AI recommendations...');
-                const { error: aiError } = await supabase.functions.invoke('generate-ai-recommendations', {
-                  body: { store_id: storeId },
-                });
-                
-                if (aiError) {
-                  console.warn('⚠️ AI recommendations warning:', aiError);
-                } else {
-                  console.log('✅ AI recommendations generated');
-                }
-              } catch (bgError) {
-                console.warn('⚠️ Background processing failed (non-critical):', bgError);
-              }
-            })();
-            
-            updateFileStatus(uploadFile.id, 'success', '모든 자동화 프로세스 완료!', 100, {
-              ...mappingResult,
-              autoMapped: true,
-              autoFixed: true,
-              entitiesCreated: etlResult?.entities_created || 0,
-              relationsCreated: etlResult?.relations_created || 0,
-              kpiAggregated: true,
-              aiGenerated: true,
-              filePath
-            });
-            
-            console.log('🎉 CSV 완전 자동화 파이프라인 완료!');
-            toast({ title: `${safeFileName} 업로드 및 분석 완료!` });
-          } catch (etlError) {
-            console.error('❌ Auto ETL error:', etlError);
-            
-            // 재시도 로직 (1회) - 파라미터 수정
-            console.log('🔄 Retrying ETL process...');
+          updateFileStatus(uploadFile.id, 'processing', 'KPI 집계 및 AI 분석 중...', 85);
+          
+          // Step 6: 백그라운드 작업 (KPI 집계 + AI 추천)
+          (async () => {
             try {
-              const { data: retryResult, error: retryError } = await supabase.functions.invoke('schema-etl', {
-                body: {
-                  user_id: user.id,
-                  store_id: storeId,
-                  import_id: importRecord.id,
-                  entity_mappings: mappingResult.entity_mappings || [],
-                  relation_mappings: mappingResult.relation_mappings || []
-                },
+              console.log('📊 Background: KPI aggregation...');
+              await supabase.functions.invoke('aggregate-all-kpis', {
+                body: { store_id: storeId, user_id: user.id },
               });
               
-              if (!retryError && retryResult) {
-                console.log('✅ ETL succeeded on retry');
-                
-                // 재시도 성공 시에도 백그라운드 작업 실행
-                (async () => {
-                  try {
-                    await supabase.functions.invoke('aggregate-all-kpis', {
-                      body: { store_id: storeId, user_id: user.id },
-                    });
-                    await supabase.functions.invoke('generate-ai-recommendations', {
-                      body: { store_id: storeId },
-                    });
-                  } catch (bgErr) {
-                    console.warn('⚠️ Background tasks failed (non-critical):', bgErr);
-                  }
-                })();
-                
-                updateFileStatus(uploadFile.id, 'success', '재시도 성공!', 100, {
-                  ...mappingResult,
-                  autoMapped: true,
-                  autoFixed: true,
-                  retriedETL: true,
-                  entitiesCreated: retryResult?.entities_created || 0,
-                  kpiAggregated: true,
-                  aiGenerated: true,
-                  filePath
-                });
-                toast({ title: `${safeFileName} 재시도 성공!` });
-              } else {
-                throw retryError || new Error('Retry failed');
-              }
-            } catch (retryErr) {
-              console.error('❌ ETL retry also failed:', retryErr);
-              updateFileStatus(uploadFile.id, 'error', `ETL 실패: ${(etlError as Error).message}`);
-              toast({ title: `${safeFileName} 변환 실패`, description: '수동 확인 필요', variant: 'destructive' });
+              console.log('🤖 Background: AI recommendations...');
+              await supabase.functions.invoke('generate-ai-recommendations', {
+                body: { store_id: storeId },
+              });
+              
+              console.log('✅ Background tasks completed');
+            } catch (bgError) {
+              console.warn('⚠️ Background processing failed (non-critical):', bgError);
             }
-          }
-        } else {
-          console.log('⚠️ No mapping result, skipping ETL');
-          updateFileStatus(uploadFile.id, 'success', '업로드 완료 (매핑 없음)', 100, { filePath });
+          })();
+          
+          updateFileStatus(uploadFile.id, 'success', 'AI 완전 자동화 완료!', 100, {
+            validation,
+            mapping,
+            etl,
+            dataQualityScore: validation.data_quality_score,
+            entitiesCreated: etl.entities_created || 0,
+            entitiesReused: etl.entities_reused || 0,
+            relationsCreated: etl.relations_created || 0,
+            aiPowered: true,
+            fullyAutomated: true,
+            filePath
+          });
+          
+          console.log('🎉 AI 완전 자동화 파이프라인 완료!');
+          toast({ 
+            title: `✅ ${safeFileName} 완전 자동화 완료!`,
+            description: `데이터 품질: ${validation.data_quality_score}/100, 엔티티: ${etl.entities_created}, 관계: ${etl.relations_created}` 
+          });
+          
+        } catch (pipelineError: any) {
+          console.error('❌ AI Pipeline error:', pipelineError);
+          updateFileStatus(uploadFile.id, 'error', pipelineError.message || 'AI 자동화 실패');
+          
+          toast({
+            title: '❌ 자동화 처리 실패',
+            description: pipelineError.message,
+            variant: 'destructive'
+          });
         }
         
       } else if (uploadFile.type === 'wifi') {
