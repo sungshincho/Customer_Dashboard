@@ -248,9 +248,20 @@ ${relationTypes?.map(rt => `- ${rt.name}: ${rt.source_entity_type} -> ${rt.targe
     }
 
     const aiData = await aiResponse.json();
+    
+    // AI 응답 상세 로깅
+    console.log('📝 AI Response structure:', {
+      hasChoices: !!aiData.choices,
+      choicesLength: aiData.choices?.length,
+      hasMessage: !!aiData.choices?.[0]?.message,
+      hasToolCalls: !!aiData.choices?.[0]?.message?.tool_calls,
+      messageKeys: Object.keys(aiData.choices?.[0]?.message || {})
+    });
+    
     const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall) {
-      throw new Error('AI did not return mapping results');
+      console.error('❌ AI response without tool_calls:', JSON.stringify(aiData, null, 2));
+      throw new Error('AI did not return mapping results. Check the AI response format.');
     }
 
     const mappingResult = JSON.parse(toolCall.function.arguments);
