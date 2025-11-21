@@ -1,6 +1,22 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, TrendingDown, Calendar, AlertTriangle } from 'lucide-react';
+import { TrendingUp, TrendingDown, Calendar, AlertTriangle, Package, Zap } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
+
+interface DemandDriver {
+  factor: string;
+  impact: 'positive' | 'negative';
+  magnitude: number;
+  explanation: string;
+}
+
+interface TopProduct {
+  sku: string;
+  name: string;
+  predictedDemand: number;
+  trend: 'up' | 'down' | 'stable';
+  confidence: number;
+}
 
 interface DemandForecastResultProps {
   forecastData?: {
@@ -16,9 +32,18 @@ interface DemandForecastResultProps {
     totalForecast: number;
     trend: 'increasing' | 'decreasing' | 'stable';
   };
+  demandDrivers?: DemandDriver[];
+  topProducts?: TopProduct[];
+  recommendations?: string[];
 }
 
-export function DemandForecastResult({ forecastData, summary }: DemandForecastResultProps) {
+export function DemandForecastResult({ 
+  forecastData, 
+  summary, 
+  demandDrivers,
+  topProducts,
+  recommendations 
+}: DemandForecastResultProps) {
   if (!forecastData || !summary) {
     return (
       <Card>
@@ -60,27 +85,110 @@ export function DemandForecastResult({ forecastData, summary }: DemandForecastRe
           </div>
 
           <div className="pt-4 border-t">
-            <h4 className="text-sm font-medium mb-3">일별 예측 수요</h4>
-            <div className="space-y-2 max-h-[300px] overflow-y-auto">
-              {forecastData.dates.map((date, idx) => (
+            <h4 className="text-sm font-medium mb-3">일별 수요 예측 차트</h4>
+            <ResponsiveContainer width="100%" height={200}>
+              <AreaChart data={forecastData.dates.map((date, idx) => ({
+                date: new Date(date).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }),
+                demand: forecastData.predictedDemand[idx],
+                confidence: forecastData.confidence[idx] * 100
+              }))}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip />
+                <Area type="monotone" dataKey="demand" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.3} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      {demandDrivers && demandDrivers.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-orange-500" />
+              수요 영향 요인 분석
+            </CardTitle>
+            <CardDescription>예측된 수요에 영향을 미치는 주요 요인들</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {demandDrivers.map((driver, idx) => (
+                <div key={idx} className="p-3 bg-muted/50 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-medium text-sm">{driver.factor}</span>
+                    <Badge variant={driver.impact === 'positive' ? 'default' : 'destructive'}>
+                      {driver.impact === 'positive' ? `+${driver.magnitude}%` : `${driver.magnitude}%`}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{driver.explanation}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {topProducts && topProducts.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="w-5 h-5 text-primary" />
+              Top 10 상품별 수요 예측
+            </CardTitle>
+            <CardDescription>높은 수요가 예상되는 상품들</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {topProducts.slice(0, 10).map((product, idx) => (
                 <div key={idx} className="flex items-center justify-between py-2 px-3 bg-muted/50 rounded-lg">
-                  <span className="text-sm">
-                    {new Date(date).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
-                  </span>
-                  <div className="flex items-center gap-4">
-                    <span className="text-sm font-medium">
-                      {forecastData.predictedDemand[idx].toFixed(0)}건
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      신뢰도: {(forecastData.confidence[idx] * 100).toFixed(0)}%
-                    </span>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{product.name}</p>
+                    <p className="text-xs text-muted-foreground">SKU: {product.sku}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <p className="text-sm font-bold">{product.predictedDemand}개</p>
+                      <p className="text-xs text-muted-foreground">신뢰도 {(product.confidence * 100).toFixed(0)}%</p>
+                    </div>
+                    <Badge variant={
+                      product.trend === 'up' ? 'default' : 
+                      product.trend === 'down' ? 'destructive' : 
+                      'secondary'
+                    }>
+                      {product.trend === 'up' && <TrendingUp className="w-3 h-3 mr-1" />}
+                      {product.trend === 'down' && <TrendingDown className="w-3 h-3 mr-1" />}
+                      {product.trend === 'up' ? '증가' : product.trend === 'down' ? '감소' : '안정'}
+                    </Badge>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
+
+      {recommendations && recommendations.length > 0 && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-primary" />
+              권장 액션
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {recommendations.map((rec, idx) => (
+                <li key={idx} className="flex items-start gap-2 text-sm">
+                  <span className="text-primary mt-0.5">•</span>
+                  <span>{rec}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
 
       {(forecastData.peakDays && forecastData.peakDays.length > 0) && (
         <Card className="border-orange-200 bg-orange-50 dark:bg-orange-950/20">
