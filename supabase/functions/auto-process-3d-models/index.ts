@@ -139,9 +139,10 @@ Important Type Guidelines:
 
       // 4. 엔티티 타입 생성 또는 가져오기
       let entityTypeId: string;
+      const firstFileUrl = groupFiles[0].publicUrl;
       
       if (analysis.is_new_type) {
-        // 새 엔티티 타입 생성
+        // 새 엔티티 타입 생성 (첫 번째 파일을 대표 모델로 설정)
         const { data: newType, error: createError } = await supabase
           .from('ontology_entity_types')
           .insert({
@@ -151,6 +152,7 @@ Important Type Guidelines:
             description: `AI-generated from ${baseName}`,
             model_3d_type: analysis.type,
             model_3d_dimensions: analysis.suggested_dimensions,
+            model_3d_url: firstFileUrl,
             properties: []
           })
           .select()
@@ -158,14 +160,29 @@ Important Type Guidelines:
 
         if (createError) throw createError;
         entityTypeId = newType.id;
-        console.log(`Created new entity type: ${analysis.entity_type_label} (${entityTypeId})`);
+        console.log(`Created new entity type: ${analysis.entity_type_label} (${entityTypeId}) with model URL`);
       } else {
-        // 기존 타입 사용
+        // 기존 타입 사용 (model_3d_url이 없으면 업데이트)
         const existingType = existingTypes?.find(t => t.name === analysis.entity_type_name);
         if (!existingType) {
           throw new Error(`Entity type ${analysis.entity_type_name} not found`);
         }
         entityTypeId = existingType.id;
+        
+        // model_3d_url이 없으면 첫 번째 파일로 설정
+        if (!existingType.model_3d_url) {
+          const { error: updateError } = await supabase
+            .from('ontology_entity_types')
+            .update({ 
+              model_3d_url: firstFileUrl,
+              model_3d_dimensions: analysis.suggested_dimensions 
+            })
+            .eq('id', entityTypeId);
+          
+          if (updateError) console.error('Failed to update model_3d_url:', updateError);
+          else console.log(`Updated entity type ${existingType.label} with model URL`);
+        }
+        
         console.log(`Using existing entity type: ${existingType.label} (${entityTypeId})`);
       }
 
