@@ -127,21 +127,54 @@ export const SchemaGraphVisualization = () => {
   useEffect(() => {
     if (!entities || !relations) return;
 
-    const links: GraphLink[] = relations.map(relation => {
-      // weight 속성 추출 (properties에서 찾거나 기본값 1.0)
-      const weightProp = relation.properties.find(p => p.name === 'weight');
-      const weight = relation.weight || (weightProp ? 1.0 : 0.5);
-      
+    // 먼저 노드 생성 (엔티티 이름을 ID로 사용)
+    const nodes: GraphNode[] = entities.map(entity => {
       return {
-        source: relation.source_entity_type,
-        target: relation.target_entity_type,
-        label: relation.label,
-        color: "#6366f1",
-        properties: relation.properties,
-        directionality: relation.directionality || "directed",
-        weight,
+        id: entity.name,
+        name: entity.name,
+        label: entity.label,
+        color: entity.color || "#3b82f6",
+        properties: entity.properties,
+        val: 20 + (entity.properties.length * 2), // 임시 크기
       };
     });
+
+    // 존재하는 노드 이름 집합
+    const existingNodeNames = new Set(nodes.map(n => n.id));
+
+    // links 생성 시 존재하는 노드만 참조하도록 필터링
+    const links: GraphLink[] = relations
+      .filter(relation => {
+        // source와 target이 모두 존재하는 노드인지 확인
+        const sourceExists = existingNodeNames.has(relation.source_entity_type);
+        const targetExists = existingNodeNames.has(relation.target_entity_type);
+        
+        if (!sourceExists || !targetExists) {
+          console.warn(`⚠️ Skipping relation "${relation.label}": missing node`, {
+            source: relation.source_entity_type,
+            target: relation.target_entity_type,
+            sourceExists,
+            targetExists
+          });
+          return false;
+        }
+        return true;
+      })
+      .map(relation => {
+        // weight 속성 추출 (properties에서 찾거나 기본값 1.0)
+        const weightProp = relation.properties.find(p => p.name === 'weight');
+        const weight = relation.weight || (weightProp ? 1.0 : 0.5);
+        
+        return {
+          source: relation.source_entity_type,
+          target: relation.target_entity_type,
+          label: relation.label,
+          color: "#6366f1",
+          properties: relation.properties,
+          directionality: relation.directionality || "directed",
+          weight,
+        };
+      });
 
     // 노드별 연결된 관계의 총 weight 계산 (중심성)
     const nodeWeights = new Map<string, number>();
@@ -156,20 +189,12 @@ export const SchemaGraphVisualization = () => {
       );
     });
 
-    const nodes: GraphNode[] = entities.map(entity => {
-      const connectionWeight = nodeWeights.get(entity.name) || 0;
-      // 노드 크기는 속성 개수 + 연결 가중치 합산으로 결정
-      const baseSize = 20 + (entity.properties.length * 2);
+    // 노드 크기 재계산 (연결 가중치 반영)
+    nodes.forEach(node => {
+      const connectionWeight = nodeWeights.get(node.id) || 0;
+      const baseSize = 20 + (node.properties.length * 2);
       const sizeBonus = connectionWeight * 3;
-      
-      return {
-        id: entity.name,
-        name: entity.name,
-        label: entity.label,
-        color: entity.color || "#3b82f6",
-        properties: entity.properties,
-        val: Math.min(baseSize + sizeBonus, 60), // 최대 크기 제한
-      };
+      node.val = Math.min(baseSize + sizeBonus, 60); // 최대 크기 제한
     });
 
     setGraphData({ nodes, links });
