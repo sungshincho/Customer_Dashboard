@@ -68,13 +68,33 @@ Deno.serve(async (req) => {
     const createdEntities: any[] = [];
 
     for (const mapping of body.entity_mappings) {
-      const { data: entityType } = await supabase
-        .from('ontology_entity_types')
-        .select('*')
-        .eq('id', mapping.entity_type_id)
-        .single();
+      // entity_type_id가 UUID인지 확인, 아니면 name으로 조회
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(mapping.entity_type_id);
+      
+      let entityType: any;
+      if (isUUID) {
+        const { data } = await supabase
+          .from('ontology_entity_types')
+          .select('*')
+          .eq('id', mapping.entity_type_id)
+          .eq('user_id', user.id)
+          .single();
+        entityType = data;
+      } else {
+        // entity_type_id가 name인 경우
+        const { data } = await supabase
+          .from('ontology_entity_types')
+          .select('*')
+          .eq('name', mapping.entity_type_id)
+          .eq('user_id', user.id)
+          .single();
+        entityType = data;
+      }
 
-      if (!entityType) continue;
+      if (!entityType) {
+        console.warn(`Entity type not found: ${mapping.entity_type_id}`);
+        continue;
+      }
 
       console.log(`Creating entities for type: ${entityType.name}`);
 
