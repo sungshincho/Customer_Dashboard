@@ -312,11 +312,26 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
 
             if (etlError) throw etlError;
             
+            // 자동 KPI 집계 (오늘 날짜 기준)
+            try {
+              const today = new Date().toISOString().split('T')[0];
+              await supabase.functions.invoke('aggregate-dashboard-kpis', {
+                body: { 
+                  store_id: storeId,
+                  date: today
+                },
+              });
+              console.log('✅ Dashboard KPIs aggregated for', today);
+            } catch (kpiError) {
+              console.warn('⚠️ KPI aggregation failed (non-critical):', kpiError);
+            }
+            
             updateFileStatus(uploadFile.id, 'success', undefined, 100, {
               ...mappingResult,
               autoMapped: true,
               entitiesCreated: etlResult?.entities_created || 0,
               relationsCreated: etlResult?.relations_created || 0,
+              kpiAggregated: true,
               filePath
             });
           } catch (etlError) {
