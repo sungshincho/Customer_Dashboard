@@ -340,6 +340,27 @@ Deno.serve(async (req) => {
           if (targetEntityId) break;
         }
 
+        // entityMap에 없으면 DB에서 직접 조회 (이전에 생성된 엔티티 찾기)
+        if (!targetEntityId && targetValue) {
+          const { data: existingTarget } = await supabase
+            .from('graph_entities')
+            .select('id')
+            .eq('entity_type_id', (await supabase
+              .from('ontology_entity_types')
+              .select('id')
+              .eq('name', targetEntityTypeName)
+              .eq('user_id', user.id)
+              .single()
+            ).data?.id || '')
+            .or(`label.eq.${targetValue},properties->>brand_id.eq.${targetValue}`)
+            .eq('user_id', user.id)
+            .maybeSingle();
+          
+          if (existingTarget) {
+            targetEntityId = existingTarget.id;
+          }
+        }
+
         if (!sourceEntityId || !targetEntityId) {
           console.warn(`Missing entity for relation: ${relMapping.source_key}=${sourceValue} -> ${relMapping.target_key}=${targetValue}`);
           continue;
