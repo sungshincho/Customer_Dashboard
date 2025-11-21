@@ -99,18 +99,25 @@ ${relationTypes?.map(rt => `- ${rt.name}: ${rt.source_entity_type} -> ${rt.targe
    - 의미 있는 이름 컬럼 사용
    - 예: {product_id}, {customer_name}, {store_code}
 
-3. **Properties 매핑**:
-   - **중요**: 모든 ID 컬럼은 반드시 properties에 포함
-   - 외래 키 컬럼도 properties에 포함
-   - 원본 컬럼명 그대로 사용
+3. **Column Mappings (CRITICAL!)**:
+   - **반드시 모든 컬럼을 매핑해야 합니다**
+   - column_mappings 형식: { "속성명": "원본_컬럼명" }
+   - **예시**: 컬럼이 [store_id, product_id, current_stock, minimum_stock]이면
+     column_mappings는 {
+       "store_id": "store_id",
+       "product_id": "product_id", 
+       "current_stock": "current_stock",
+       "minimum_stock": "minimum_stock"
+     }
+   - ID 컬럼과 외래 키는 반드시 포함!
+   - 속성명과 컬럼명은 동일하게 사용 (특별한 이유가 없으면)
 
 4. **관계 생성**:
    - 외래 키를 기반으로 관계 자동 생성
    - source_key와 target_key는 실제 컬럼명 사용
    - 기존 관계 타입 재사용, 없으면 생성
 
-**응답 예시:**
-entity_type_id가 기존 타입 ID면 재사용, "NEW"면 생성 필요`;
+**중요: column_mappings를 빈 객체 {}로 반환하지 마세요! 모든 컬럼을 매핑하세요!**`;
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -168,7 +175,8 @@ entity_type_id가 기존 타입 ID면 재사용, "NEW"면 생성 필요`;
                         },
                         column_mappings: {
                           type: 'object',
-                          description: '속성명 -> 컬럼명 매핑 (모든 ID 컬럼 포함!)'
+                          description: 'REQUIRED! 모든 컬럼을 매핑. 형식: {"prop_name": "column_name"}. 예: {"store_id": "store_id", "product_id": "product_id", "quantity": "quantity"}. 빈 객체 금지!',
+                          additionalProperties: { type: 'string' }
                         },
                         label_template: { type: 'string' },
                         confidence: { type: 'number' }
@@ -228,6 +236,18 @@ entity_type_id가 기존 타입 ID면 재사용, "NEW"면 생성 필요`;
 
     const mappingResult = JSON.parse(toolCall.function.arguments);
     console.log('✅ AI mapping generated');
+
+    // Fallback: column_mappings가 비어있으면 자동으로 모든 컬럼 매핑
+    mappingResult.entity_mappings.forEach((em: any) => {
+      if (!em.column_mappings || Object.keys(em.column_mappings).length === 0) {
+        console.warn(`⚠️ Empty column_mappings for ${em.entity_type_name}, auto-mapping all columns...`);
+        em.column_mappings = {};
+        columns.forEach((col: string) => {
+          em.column_mappings[col] = col;
+        });
+        console.log(`✅ Auto-mapped ${columns.length} columns for ${em.entity_type_name}`);
+      }
+    });
 
     // 새로운 엔티티 타입 생성
     const createdEntityTypes: Record<string, string> = {};
