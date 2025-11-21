@@ -7,11 +7,11 @@ const corsHeaders = {
 
 interface ETLRequest {
   import_id: string;
-  store_id: string; // 매장 ID 추가
+  store_id: string;
   entity_mappings: Array<{
     entity_type_id: string;
-    column_mappings: Record<string, string>; // property_name -> column_name
-    label_template: string; // e.g., "{name}" or "{customer_id}"
+    column_mappings: Record<string, string>;
+    label_template: string;
   }>;
   relation_mappings: Array<{
     relation_type_id: string;
@@ -63,9 +63,11 @@ Deno.serve(async (req) => {
     const rawData = importData.raw_data as any[];
     console.log(`Processing ${rawData.length} records`);
 
-    // 2. 엔티티 생성 (배치 처리)
-    const entityMap = new Map<string, string>(); // original_key -> entity_id
-    const createdEntities: any[] = [];
+    // 2. 엔티티 생성 (중복 방지)
+    const entityMap = new Map<string, string>(); // lookup_key -> entity_id
+    const labelCache = new Map<string, string>(); // entity_type:label -> entity_id
+    let totalCreated = 0;
+    let totalReused = 0;
 
     for (const mapping of body.entity_mappings) {
       // entity_type_id가 UUID인지 확인, 아니면 name으로 조회
@@ -81,7 +83,6 @@ Deno.serve(async (req) => {
           .single();
         entityType = data;
       } else {
-        // entity_type_id가 name인 경우
         const { data } = await supabase
           .from('ontology_entity_types')
           .select('*')
@@ -96,15 +97,36 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      console.log(`Creating entities for type: ${entityType.name}`);
+      console.log(`Processing entities for type: ${entityType.name}`);
 
-      // 배치 데이터 준비
-      const entitiesToInsert: any[] = [];
-      const recordMappings: Array<{ record: any; tempId: number }> = [];
+      // 이 타입의 기존 엔티티를 모두 가져와서 캐시
+      const { data: existingEntities } = await supabase
+        .from('graph_entities')
+        .select('id, label, properties')
+        .eq('user_id', user.id)
+        .eq('store_id', body.store_id)
+        .eq('entity_type_id', entityType.id);
 
-      for (let i = 0; i < rawData.length; i++) {
-        const record = rawData[i];
-        
+      if (existingEntities) {
+        for (const entity of existingEntities) {
+          const cacheKey = `${entityType.id}:${entity.label}`;
+          labelCache.set(cacheKey, entity.id);
+          
+          // entityMap에도 추가 (properties 기반 조회용)
+          const props = entity.properties as any;
+          for (const [propName, columnName] of Object.entries(mapping.column_mappings)) {
+            if (props && props[propName] !== undefined) {
+              const lookupKey = `${mapping.entity_type_id}:${columnName}:${props[propName]}`;
+              entityMap.set(lookupKey, entity.id);
+            }
+          }
+        }
+      }
+
+      // 각 레코드에서 유니크한 엔티티만 추출
+      const uniqueEntities = new Map<string, any>();
+      
+      for (const record of rawData) {
         // 속성 매핑
         const properties: Record<string, any> = {};
         for (const [propName, columnName] of Object.entries(mapping.column_mappings)) {
@@ -135,39 +157,76 @@ Deno.serve(async (req) => {
           label = firstValue ? String(firstValue) : `Entity ${Object.values(record)[0] || ''}`;
         }
 
-        entitiesToInsert.push({
-          user_id: user.id,
-          store_id: body.store_id,
-          entity_type_id: entityType.id,  // 실제 UUID 사용
-          label,
-          properties: { ...properties, source_import_id: body.import_id },
-        });
+        const cacheKey = `${entityType.id}:${label}`;
+        
+        // 이미 존재하는지 확인
+        if (labelCache.has(cacheKey)) {
+          totalReused++;
+          const entityId = labelCache.get(cacheKey)!;
+          
+          // entityMap 업데이트
+          for (const [propName, columnName] of Object.entries(mapping.column_mappings)) {
+            if (record[columnName] !== undefined && record[columnName] !== null) {
+              const lookupKey = `${mapping.entity_type_id}:${columnName}:${record[columnName]}`;
+              entityMap.set(lookupKey, entityId);
+            }
+          }
+          continue;
+        }
 
-        recordMappings.push({ record, tempId: i });
+        // 유니크 엔티티로 추가
+        if (!uniqueEntities.has(cacheKey)) {
+          uniqueEntities.set(cacheKey, {
+            user_id: user.id,
+            store_id: body.store_id,
+            entity_type_id: entityType.id,
+            label,
+            properties: { ...properties, source_import_id: body.import_id },
+            cacheKey,
+            rawRecord: record,
+            mapping,
+          });
+        }
       }
 
-      // 배치 삽입 (1000개씩)
+      console.log(`Found ${uniqueEntities.size} unique entities to create (${totalReused} reused)`);
+
+      // 유니크 엔티티만 배치 삽입
+      const entitiesToInsert = Array.from(uniqueEntities.values());
       const BATCH_SIZE = 1000;
+      
       for (let i = 0; i < entitiesToInsert.length; i += BATCH_SIZE) {
         const batch = entitiesToInsert.slice(i, i + BATCH_SIZE);
-        const batchRecordMappings = recordMappings.slice(i, i + BATCH_SIZE);
+        
+        const insertData = batch.map(e => ({
+          user_id: e.user_id,
+          store_id: e.store_id,
+          entity_type_id: e.entity_type_id,
+          label: e.label,
+          properties: e.properties,
+        }));
 
         const { data: entities, error: batchError } = await supabase
           .from('graph_entities')
-          .insert(batch)
+          .insert(insertData)
           .select();
 
         if (!batchError && entities) {
-          // 삽입된 엔티티들을 매핑
+          totalCreated += entities.length;
+          
           entities.forEach((entity, idx) => {
-            createdEntities.push(entity);
-            const { record } = batchRecordMappings[idx];
+            const originalData = batch[idx];
+            const cacheKey = originalData.cacheKey;
             
-            // entityMap 구성
-            for (const [propName, columnName] of Object.entries(mapping.column_mappings)) {
-              if (record[columnName] !== undefined && record[columnName] !== null) {
-                const key = `${mapping.entity_type_id}:${columnName}:${record[columnName]}`;
-                entityMap.set(key, entity.id);
+            // 캐시 업데이트
+            labelCache.set(cacheKey, entity.id);
+            
+            // entityMap 업데이트
+            for (const [propName, columnName] of Object.entries(originalData.mapping.column_mappings)) {
+              const value = (originalData.rawRecord as Record<string, any>)[columnName as string];
+              if (value !== undefined && value !== null) {
+                const lookupKey = `${originalData.mapping.entity_type_id}:${columnName}:${value}`;
+                entityMap.set(lookupKey, entity.id);
               }
             }
           });
@@ -177,15 +236,14 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`Created ${createdEntities.length} entities`);
+    console.log(`Created ${totalCreated} new entities, reused ${totalReused} existing entities`);
 
     // 3. 관계 생성 (배치 처리)
-    const createdRelations: any[] = [];
+    const relationsToInsert: any[] = [];
+    const relationSet = new Set<string>(); // 중복 방지
 
     for (const relMapping of body.relation_mappings) {
-      console.log(`Creating relations for type: ${relMapping.relation_type_id}`);
-
-      const relationsToInsert: any[] = [];
+      console.log(`Processing relations for type: ${relMapping.relation_type_id}`);
 
       for (const record of rawData) {
         const sourceKey = `${relMapping.source_entity_type_id}:${relMapping.source_key}:${record[relMapping.source_key]}`;
@@ -194,7 +252,15 @@ Deno.serve(async (req) => {
         const sourceEntityId = entityMap.get(sourceKey);
         const targetEntityId = entityMap.get(targetKey);
 
-        if (!sourceEntityId || !targetEntityId) continue;
+        if (!sourceEntityId || !targetEntityId) {
+          console.warn(`Missing entity for relation: ${sourceKey} -> ${targetKey}`);
+          continue;
+        }
+
+        // 중복 체크
+        const relationKey = `${sourceEntityId}:${relMapping.relation_type_id}:${targetEntityId}`;
+        if (relationSet.has(relationKey)) continue;
+        relationSet.add(relationKey);
 
         // 관계 속성 매핑
         const properties: Record<string, any> = {};
@@ -216,31 +282,36 @@ Deno.serve(async (req) => {
           weight: 1.0,
         });
       }
+    }
 
-      // 배치 삽입 (1000개씩)
-      const BATCH_SIZE = 1000;
-      for (let i = 0; i < relationsToInsert.length; i += BATCH_SIZE) {
-        const batch = relationsToInsert.slice(i, i + BATCH_SIZE);
+    console.log(`Inserting ${relationsToInsert.length} unique relations`);
 
-        const { data: relations, error: batchError } = await supabase
-          .from('graph_relations')
-          .insert(batch)
-          .select();
+    // 관계 배치 삽입
+    let totalRelations = 0;
+    const BATCH_SIZE = 1000;
+    
+    for (let i = 0; i < relationsToInsert.length; i += BATCH_SIZE) {
+      const batch = relationsToInsert.slice(i, i + BATCH_SIZE);
 
-        if (!batchError && relations) {
-          createdRelations.push(...relations);
-        } else if (batchError) {
-          console.error(`Batch relation insert error: ${batchError.message}`);
-        }
+      const { data: relations, error: batchError } = await supabase
+        .from('graph_relations')
+        .insert(batch)
+        .select();
+
+      if (!batchError && relations) {
+        totalRelations += relations.length;
+      } else if (batchError) {
+        console.error(`Batch relation insert error: ${batchError.message}`);
       }
     }
 
-    console.log(`Created ${createdRelations.length} relations`);
+    console.log(`Created ${totalRelations} relations`);
 
     return new Response(JSON.stringify({
       success: true,
-      entities_created: createdEntities.length,
-      relations_created: createdRelations.length,
+      entities_created: totalCreated,
+      entities_reused: totalReused,
+      relations_created: totalRelations,
       summary: {
         total_records: rawData.length,
         entity_types: body.entity_mappings.length,
