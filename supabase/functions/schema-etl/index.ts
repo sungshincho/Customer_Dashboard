@@ -245,6 +245,27 @@ Deno.serve(async (req) => {
     for (const relMapping of body.relation_mappings) {
       console.log(`Processing relations for type: ${relMapping.relation_type_id}`);
 
+      // relation_type_id를 UUID로 변환
+      const isRelationTypeUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(relMapping.relation_type_id);
+      
+      let relationTypeId = relMapping.relation_type_id;
+      if (!isRelationTypeUUID) {
+        // name으로 UUID 조회
+        const { data: relationType } = await supabase
+          .from('ontology_relation_types')
+          .select('id')
+          .eq('name', relMapping.relation_type_id)
+          .eq('user_id', user.id)
+          .single();
+        
+        if (relationType) {
+          relationTypeId = relationType.id;
+        } else {
+          console.warn(`Relation type not found: ${relMapping.relation_type_id}`);
+          continue;
+        }
+      }
+
       // source/target entity type ID를 name으로 변환
       let sourceEntityTypeName = relMapping.source_entity_type_id;
       let targetEntityTypeName = relMapping.target_entity_type_id;
@@ -321,7 +342,7 @@ Deno.serve(async (req) => {
         relationsToInsert.push({
           user_id: user.id,
           store_id: body.store_id,
-          relation_type_id: relMapping.relation_type_id,
+          relation_type_id: relationTypeId, // 변환된 UUID 사용
           source_entity_id: sourceEntityId,
           target_entity_id: targetEntityId,
           properties,
