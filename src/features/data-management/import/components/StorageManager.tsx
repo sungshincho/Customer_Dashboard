@@ -5,9 +5,12 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Trash2, Download, Search, RefreshCw, FileIcon, Loader2 } from "lucide-react";
+import { Trash2, Download, Search, RefreshCw, FileIcon, Loader2, Eye, Sparkles } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useClearCache } from "@/hooks/useClearCache";
+import { AutoModelMapper } from "@/features/digital-twin/components/AutoModelMapper";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Model3DPreview } from "@/features/digital-twin/components/Model3DPreview";
 
 interface StorageManagerProps {
   storeId?: string;
@@ -24,6 +27,20 @@ interface StorageFile {
   storeId?: string;
 }
 
+interface ModelAnalysis {
+  matched_entity_type: any;
+  confidence: number;
+  inferred_type: string;
+  suggested_dimensions: {
+    width: number;
+    height: number;
+    depth: number;
+  };
+  reasoning: string;
+  fileName: string;
+  fileUrl: string;
+}
+
 export function StorageManager({ storeId }: StorageManagerProps) {
   const { toast } = useToast();
   const { clearAllCache, clearStoreDataCache } = useClearCache();
@@ -31,6 +48,8 @@ export function StorageManager({ storeId }: StorageManagerProps) {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+  const [analyzing, setAnalyzing] = useState(false);
+  const [pendingAnalysis, setPendingAnalysis] = useState<ModelAnalysis | null>(null);
 
   useEffect(() => {
     if (storeId) {
@@ -300,12 +319,45 @@ export function StorageManager({ storeId }: StorageManagerProps) {
     }
   };
 
+  const analyzeModel = async (file: StorageFile) => {
+    setAnalyzing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('analyze-3d-model', {
+        body: {
+          fileName: file.name,
+          fileUrl: file.url
+        }
+      });
+
+      if (error) throw error;
+
+      setPendingAnalysis(data);
+      toast({
+        title: "AI 분석 완료",
+        description: "자동 매핑 제안을 검토해주세요",
+      });
+    } catch (error) {
+      console.error('Analysis error:', error);
+      toast({
+        title: "분석 실패",
+        description: error instanceof Error ? error.message : "AI 분석에 실패했습니다",
+        variant: "destructive",
+      });
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  };
+
+  const is3DModel = (fileName: string) => {
+    return fileName.toLowerCase().endsWith('.glb') || fileName.toLowerCase().endsWith('.gltf');
   };
 
   const filteredFiles = files.filter(file => 
@@ -324,6 +376,38 @@ export function StorageManager({ storeId }: StorageManagerProps) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* AI 분석 결과 */}
+        {pendingAnalysis && (
+          <AutoModelMapper
+            analysis={pendingAnalysis}
+            onAccept={() => {
+              setPendingAnalysis(null);
+              loadAllFiles();
+              toast({
+                title: "매핑 완료",
+                description: "3D 모델이 온톨로지에 자동으로 연결되었습니다",
+              });
+            }}
+            onReject={() => {
+              setPendingAnalysis(null);
+              toast({
+                title: "매핑 거부",
+                description: "수동으로 스키마 빌더에서 연결할 수 있습니다",
+              });
+            }}
+          />
+        )}
+
+        {analyzing && (
+          <Card className="border-primary">
+            <CardContent className="flex items-center justify-center py-8">
+              <div className="text-center space-y-2">
+                <Sparkles className="w-8 h-8 animate-pulse text-primary mx-auto" />
+                <p className="text-sm text-muted-foreground">AI가 3D 모델을 분석하고 있습니다...</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
         {/* 검색 및 액션 */}
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
@@ -435,6 +519,36 @@ export function StorageManager({ storeId }: StorageManagerProps) {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
+                        {is3DModel(file.name) && (
+                          <>
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  title="3D 미리보기"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-4xl h-[600px]">
+                                <DialogHeader>
+                                  <DialogTitle>{file.name}</DialogTitle>
+                                </DialogHeader>
+                                <Model3DPreview modelUrl={file.url} className="h-[500px]" />
+                              </DialogContent>
+                            </Dialog>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => analyzeModel(file)}
+                              title="AI 자동 매핑"
+                              disabled={analyzing}
+                            >
+                              <Sparkles className="w-4 h-4" />
+                            </Button>
+                          </>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
