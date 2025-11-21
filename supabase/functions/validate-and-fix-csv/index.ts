@@ -201,8 +201,9 @@ ${JSON.stringify(sampleData, null, 2)}
 
     if (auto_fix && issues.length > 0) {
       console.log('🔧 Auto-fixing data based on AI suggestions...');
-
-      // AI에게 수정된 데이터 요청
+ 
+      try {
+        // AI에게 수정된 데이터 요청
       const fixPrompt = `다음 데이터의 문제를 수정해주세요. 원본 데이터와 같은 구조를 유지하되, 발견된 문제들을 해결하세요.
 
 **원본 데이터 샘플:**
@@ -337,6 +338,10 @@ ${issues.map(i => `- ${i.message}${i.suggestion ? ': ' + i.suggestion : ''}`).jo
           console.log('✅ Data auto-fixed');
         }
       }
+    } catch (autoFixError) {
+      console.error('❌ Auto-fix failed, returning validation result without modifications:', autoFixError);
+      // 최소한의 정리: 잘못된 레코드만 제거
+      fixedData = rawData.filter(row => row && typeof row === 'object');
     }
 
     // 수정된 데이터 저장 (auto_fix가 true인 경우에만)
