@@ -101,6 +101,8 @@ ${relationTypes?.map(rt => `- ${rt.name}: ${rt.source_entity_type} -> ${rt.targe
    - 기존 엔티티 타입을 최대한 재사용
    - 필요하면 새로운 엔티티 타입 생성 (create_new: true)
    - 각 엔티티에 모든 관련 properties 매핑
+   - **중요: 외래 키 컬럼(${Object.keys(foreign_key_columns).join(', ')})은 새로운 엔티티 타입을 만들지 마세요!**
+   - 외래 키는 기존 엔티티와의 관계로만 처리
 
 2. **Label 템플릿**:
    - ID 컬럼을 우선 사용
@@ -121,7 +123,8 @@ ${relationTypes?.map(rt => `- ${rt.name}: ${rt.source_entity_type} -> ${rt.targe
    - 속성명과 컬럼명은 동일하게 사용 (특별한 이유가 없으면)
 
 4. **관계 생성**:
-   - 외래 키를 기반으로 관계 자동 생성
+   - 외래 키(${Object.keys(foreign_key_columns).join(', ')})를 기반으로 관계만 생성
+   - 외래 키 컬럼이 참조하는 엔티티 타입은 기존 타입 사용
    - source_key와 target_key는 실제 컬럼명 사용
    - 기존 관계 타입 재사용, 없으면 생성
 
