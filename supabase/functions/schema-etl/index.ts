@@ -164,12 +164,23 @@ Deno.serve(async (req) => {
           totalReused++;
           const entityId = labelCache.get(cacheKey)!;
           
-          // entityMap 업데이트
+          // entityMap 업데이트 - 모든 컬럼과 label로 저장
           for (const [propName, columnName] of Object.entries(mapping.column_mappings)) {
             if (record[columnName] !== undefined && record[columnName] !== null) {
               const lookupKey = `${mapping.entity_type_id}:${columnName}:${record[columnName]}`;
               entityMap.set(lookupKey, entityId);
             }
+          }
+          // label로도 추가 (다른 파일에서 참조할 때 사용)
+          const entity = await supabase
+            .from('graph_entities')
+            .select('label, entity_type_id')
+            .eq('id', entityId)
+            .single();
+          
+          if (entity.data) {
+            const labelKey = `${entity.data.entity_type_id}:label:${entity.data.label}`;
+            entityMap.set(labelKey, entityId);
           }
           continue;
         }
@@ -221,7 +232,7 @@ Deno.serve(async (req) => {
             // 캐시 업데이트
             labelCache.set(cacheKey, entity.id);
             
-            // entityMap 업데이트
+            // entityMap 업데이트 - 모든 컬럼과 label로 저장
             for (const [propName, columnName] of Object.entries(originalData.mapping.column_mappings)) {
               const value = (originalData.rawRecord as Record<string, any>)[columnName as string];
               if (value !== undefined && value !== null) {
@@ -229,6 +240,9 @@ Deno.serve(async (req) => {
                 entityMap.set(lookupKey, entity.id);
               }
             }
+            // label로도 추가 (다른 파일에서 참조할 때 사용)
+            const labelKey = `${entity.entity_type_id}:label:${entity.label}`;
+            entityMap.set(labelKey, entity.id);
           });
         } else if (batchError) {
           console.error(`Batch insert error: ${batchError.message}`);
@@ -293,15 +307,22 @@ Deno.serve(async (req) => {
       }
 
       for (const record of rawData) {
-        // 여러 가지 키 조합으로 시도
+        // 여러 가지 키로 엔티티 찾기 시도
+        const sourceValue = record[relMapping.source_key];
+        const targetValue = record[relMapping.target_key];
+        
         const possibleSourceKeys = [
-          `${sourceEntityTypeName}:${relMapping.source_key}:${record[relMapping.source_key]}`,
-          `${relMapping.source_entity_type_id}:${relMapping.source_key}:${record[relMapping.source_key]}`,
+          `${relMapping.source_entity_type_id}:${relMapping.source_key}:${sourceValue}`,
+          `${relMapping.source_entity_type_id}:label:${sourceValue}`,
+          `${sourceEntityTypeName}:${relMapping.source_key}:${sourceValue}`,
+          `${sourceEntityTypeName}:label:${sourceValue}`,
         ];
 
         const possibleTargetKeys = [
-          `${targetEntityTypeName}:${relMapping.target_key}:${record[relMapping.target_key]}`,
-          `${relMapping.target_entity_type_id}:${relMapping.target_key}:${record[relMapping.target_key]}`,
+          `${relMapping.target_entity_type_id}:${relMapping.target_key}:${targetValue}`,
+          `${relMapping.target_entity_type_id}:label:${targetValue}`,
+          `${targetEntityTypeName}:${relMapping.target_key}:${targetValue}`,
+          `${targetEntityTypeName}:label:${targetValue}`,
         ];
 
         let sourceEntityId: string | undefined;
@@ -320,7 +341,7 @@ Deno.serve(async (req) => {
         }
 
         if (!sourceEntityId || !targetEntityId) {
-          console.warn(`Missing entity for relation: ${relMapping.source_key}=${record[relMapping.source_key]} -> ${relMapping.target_key}=${record[relMapping.target_key]}`);
+          console.warn(`Missing entity for relation: ${relMapping.source_key}=${sourceValue} -> ${relMapping.target_key}=${targetValue}`);
           continue;
         }
 
