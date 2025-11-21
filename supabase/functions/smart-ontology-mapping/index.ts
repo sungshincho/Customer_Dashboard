@@ -56,6 +56,7 @@ Deno.serve(async (req) => {
     const rawData = importData.raw_data as any[];
     const columns = Object.keys(rawData[0] || {});
     const dataSample = rawData.slice(0, 10);
+    const fileName = importData.file_name.toLowerCase();
 
     // 기존 온톨로지 스키마 가져오기
     const { data: entityTypes } = await supabase
@@ -96,6 +97,12 @@ ${entityTypes?.map(et => `- ${et.name} (${et.label})`).join('\n') || '없음'}
 **기존 관계 타입:**
 ${relationTypes?.map(rt => `- ${rt.name}: ${rt.source_entity_type} -> ${rt.target_entity_type}`).join('\n') || '없음'}
 
+**파일명 기반 제약:**
+- 현재 파일: ${importData.file_name}
+- **CRITICAL 규칙: 파일명에 "brand"가 포함되지 않으면 절대 Brand 엔티티를 생성하지 마세요!**
+- Brand 관련 외래 키(brand_id 등)가 있어도 관계만 생성하고 엔티티는 생성 금지
+- Brand 엔티티는 오직 파일명에 "brand"가 포함된 파일(예: brand_master.csv, brand.csv)에서만 생성
+
 **매핑 지침:**
 1. **엔티티 타입 결정**:
    - 기존 엔티티 타입을 최대한 재사용
@@ -103,6 +110,7 @@ ${relationTypes?.map(rt => `- ${rt.name}: ${rt.source_entity_type} -> ${rt.targe
    - 각 엔티티에 모든 관련 properties 매핑
    - **중요: 외래 키 컬럼(${Object.keys(foreign_key_columns).join(', ')})은 새로운 엔티티 타입을 만들지 마세요!**
    - 외래 키는 기존 엔티티와의 관계로만 처리
+   - **특히 Brand 엔티티: 파일명에 "brand"가 없으면 절대 생성 금지!**
 
 2. **Label 템플릿**:
    - ID 컬럼을 우선 사용
@@ -248,7 +256,23 @@ ${relationTypes?.map(rt => `- ${rt.name}: ${rt.source_entity_type} -> ${rt.targe
     const mappingResult = JSON.parse(toolCall.function.arguments);
     console.log('✅ AI mapping generated');
 
-    // Fallback: column_mappings가 비어있으면 자동으로 모든 컬럼 매핑
+    // Fallback 1: 파일명 기반 Brand 엔티티 필터링
+    if (!fileName.includes('brand')) {
+      const originalLength = mappingResult.entity_mappings.length;
+      mappingResult.entity_mappings = mappingResult.entity_mappings.filter((em: any) => {
+        const entityName = em.entity_type_name.toLowerCase();
+        if (entityName === 'brand' || entityName.includes('brand')) {
+          console.warn(`⚠️ Filtered out Brand entity from non-brand file: ${importData.file_name}`);
+          return false;
+        }
+        return true;
+      });
+      if (originalLength !== mappingResult.entity_mappings.length) {
+        console.log(`✅ Removed ${originalLength - mappingResult.entity_mappings.length} Brand entity mappings`);
+      }
+    }
+
+    // Fallback 2: column_mappings가 비어있으면 자동으로 모든 컬럼 매핑
     mappingResult.entity_mappings.forEach((em: any) => {
       if (!em.column_mappings || Object.keys(em.column_mappings).length === 0) {
         console.warn(`⚠️ Empty column_mappings for ${em.entity_type_name}, auto-mapping all columns...`);
