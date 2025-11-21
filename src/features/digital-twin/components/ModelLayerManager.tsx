@@ -326,12 +326,12 @@ export function ModelLayerManager({
                           {isInstance && (
                             <Badge variant="secondary" className="text-xs">인스턴스</Badge>
                           )}
-                          {item.dimensions && (
+                          {item.dimensions && item.dimensions.width !== undefined && item.dimensions.height !== undefined && item.dimensions.depth !== undefined && (
                             <span className="text-xs text-muted-foreground ml-2">
                               {item.dimensions.width.toFixed(1)}×{item.dimensions.height.toFixed(1)}×{item.dimensions.depth.toFixed(1)}
                             </span>
                           )}
-                          {item.position && (item.position.x !== 0 || item.position.z !== 0) && (
+                          {item.position && item.position.x !== undefined && item.position.z !== undefined && (item.position.x !== 0 || item.position.z !== 0) && (
                             <span className="text-xs text-muted-foreground ml-2">
                               ({item.position.x.toFixed(1)}, {item.position.z.toFixed(1)})
                             </span>
