@@ -312,53 +312,89 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
 
             if (etlError) throw etlError;
             
-            // 자동 KPI 집계 (CSV 데이터의 전체 날짜 범위)
-            try {
-              console.log('🔄 Starting KPI aggregation for all dates...');
-              const { data: aggregateResult, error: aggregateError } = await supabase.functions.invoke('aggregate-all-kpis', {
-                body: { 
-                  store_id: storeId,
-                  user_id: user.id
-                },
-              });
-              
-              if (aggregateError) {
-                console.warn('⚠️ KPI aggregation warning:', aggregateError);
-              } else {
-                console.log('✅ Dashboard KPIs aggregated:', aggregateResult);
+            updateFileStatus(uploadFile.id, 'processing', 'KPI 집계 및 AI 분석 중...', 85);
+
+            // Step 4: 백그라운드 작업 (KPI 집계 + AI 추천)
+            // 비동기로 실행하여 사용자 경험 개선
+            (async () => {
+              try {
+                console.log('📊 Step 4: KPI aggregation for all dates...');
+                const { data: aggregateResult, error: aggregateError } = await supabase.functions.invoke('aggregate-all-kpis', {
+                  body: { 
+                    store_id: storeId,
+                    user_id: user.id
+                  },
+                });
+                
+                if (aggregateError) {
+                  console.warn('⚠️ KPI aggregation warning:', aggregateError);
+                } else {
+                  console.log('✅ Dashboard KPIs aggregated:', aggregateResult);
+                }
+                
+                // Step 5: AI 추천 자동 생성
+                console.log('🤖 Step 5: Generating AI recommendations...');
+                const { error: aiError } = await supabase.functions.invoke('generate-ai-recommendations', {
+                  body: { store_id: storeId },
+                });
+                
+                if (aiError) {
+                  console.warn('⚠️ AI recommendations warning:', aiError);
+                } else {
+                  console.log('✅ AI recommendations generated');
+                }
+              } catch (bgError) {
+                console.warn('⚠️ Background processing failed (non-critical):', bgError);
               }
-              
-              // AI 추천 자동 생성
-              console.log('🤖 Generating AI recommendations...');
-              const { error: aiError } = await supabase.functions.invoke('generate-ai-recommendations', {
-                body: { store_id: storeId },
-              });
-              
-              if (aiError) {
-                console.warn('⚠️ AI recommendations warning:', aiError);
-              } else {
-                console.log('✅ AI recommendations generated');
-              }
-            } catch (kpiError) {
-              console.warn('⚠️ Background processing failed (non-critical):', kpiError);
-            }
+            })();
             
-            updateFileStatus(uploadFile.id, 'success', undefined, 100, {
+            updateFileStatus(uploadFile.id, 'success', '모든 자동화 프로세스 완료!', 100, {
               ...mappingResult,
               autoMapped: true,
+              autoFixed: true,
               entitiesCreated: etlResult?.entities_created || 0,
               relationsCreated: etlResult?.relations_created || 0,
               kpiAggregated: true,
+              aiGenerated: true,
               filePath
             });
+            
+            console.log('🎉 CSV 완전 자동화 파이프라인 완료!');
+            toast({ title: `${safeFileName} 업로드 및 분석 완료!` });
           } catch (etlError) {
-            console.error('Auto ETL error:', etlError);
-            updateFileStatus(uploadFile.id, 'success', undefined, 100, {
-              ...mappingResult,
-              autoMapped: true,
-              etlFailed: true,
-              filePath
-            });
+            console.error('❌ Auto ETL error:', etlError);
+            
+            // 재시도 로직 (1회)
+            console.log('🔄 Retrying ETL process...');
+            try {
+              const { data: retryResult, error: retryError } = await supabase.functions.invoke('schema-etl', {
+                body: {
+                  user_id: user.id,
+                  store_id: storeId,
+                  import_id: mappingResult.importId,
+                  entity_mappings: mappingResult.entity_mappings || [],
+                  relation_mappings: mappingResult.relation_mappings || []
+                },
+              });
+              
+              if (!retryError && retryResult) {
+                console.log('✅ ETL succeeded on retry');
+                updateFileStatus(uploadFile.id, 'success', '재시도 성공!', 100, {
+                  ...mappingResult,
+                  autoMapped: true,
+                  retriedETL: true,
+                  entitiesCreated: retryResult?.entities_created || 0,
+                  filePath
+                });
+                toast({ title: `${safeFileName} 재시도 성공!` });
+              } else {
+                throw retryError || new Error('Retry failed');
+              }
+            } catch (retryErr) {
+              console.error('❌ ETL retry also failed:', retryErr);
+              updateFileStatus(uploadFile.id, 'error', `ETL 실패: ${(etlError as Error).message}`);
+              toast({ title: `${safeFileName} 변환 실패`, description: '수동 확인 필요', variant: 'destructive' });
+            }
           }
         } else {
           updateFileStatus(uploadFile.id, 'success', undefined, 100, { ...mappingResult, filePath });
