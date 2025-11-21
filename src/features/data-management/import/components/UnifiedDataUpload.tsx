@@ -399,7 +399,14 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
             }
           });
           
-          if (processError) throw processError;
+          if (processError) {
+            console.error('❌ Edge Function invoke error:', processError);
+            throw new Error(`Edge Function 호출 실패: ${processError.message || JSON.stringify(processError)}`);
+          }
+          
+          if (!processResult) {
+            throw new Error('Edge Function에서 응답이 없습니다');
+          }
           
           if (processResult?.success && processResult.results?.[0]) {
             const result = processResult.results[0];
