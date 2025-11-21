@@ -50,31 +50,37 @@ export function IntegratedImportStatus({ storeId }: IntegratedImportStatusProps)
       
       const { count: totalImports, data: imports } = await importQuery;
 
-      // 2. 엔티티가 있는 임포트 수 (source_import_id로 연결)
-      let entityQuery = supabase
-        .from('graph_entities')
-        .select('properties', { count: 'exact' })
-        .eq('user_id', user.id);
+      // 2. 엔티티가 있는 임포트 수 계산
+      // 각 import의 엔티티 개수를 확인
+      const importsWithEntitiesSet = new Set<string>();
       
-      if (storeId) entityQuery = entityQuery.eq('store_id', storeId);
-      
-      const { data: entities } = await entityQuery;
+      if (imports && imports.length > 0) {
+        for (const imp of imports) {
+          const { count } = await supabase
+            .from('graph_entities')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .eq('properties->>source_import_id', imp.id);
+          
+          if (count && count > 0) {
+            importsWithEntitiesSet.add(imp.id);
+          }
+        }
+      }
 
-      // source_import_id가 있는 엔티티만
-      const entitiesWithImport = entities?.filter(e => 
-        (e.properties as any)?.source_import_id
-      ) || [];
-
-      // 고유한 import_id들
-      const uniqueImportIds = new Set(
-        entitiesWithImport.map(e => (e.properties as any).source_import_id)
-      );
-
-      const importsWithEntities = uniqueImportIds.size;
+      const importsWithEntities = importsWithEntitiesSet.size;
       const orphanedImports = (totalImports || 0) - importsWithEntities;
 
       // 3. 임포트 없는 엔티티 (수동 생성)
-      const orphanedEntities = (entities?.length || 0) - entitiesWithImport.length;
+      let orphanedEntityQuery = supabase
+        .from('graph_entities')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .is('properties->>source_import_id', null);
+      
+      if (storeId) orphanedEntityQuery = orphanedEntityQuery.eq('store_id', storeId);
+      
+      const { count: orphanedEntities } = await orphanedEntityQuery;
 
       // 4. 3D 모델 통계
       const { count: models3D } = await supabase
