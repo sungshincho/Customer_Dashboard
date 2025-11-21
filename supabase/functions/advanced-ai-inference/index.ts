@@ -508,6 +508,20 @@ Focus on realistic, actionable insights based on retail psychology and spatial p
   const cleanedContent = cleanJsonResponse(result.choices[0].message.content);
   const prediction = JSON.parse(cleanedContent);
   
+  // Ensure numeric values are properly typed
+  if (prediction.confidenceScore !== undefined) {
+    prediction.confidenceScore = Number(prediction.confidenceScore);
+  }
+  
+  // Validate predictedKpi
+  if (prediction.predictedKpi) {
+    Object.keys(prediction.predictedKpi).forEach(key => {
+      if (prediction.predictedKpi[key] !== undefined) {
+        prediction.predictedKpi[key] = Number(prediction.predictedKpi[key]);
+      }
+    });
+  }
+  
   console.log('Layout simulation completed:', prediction);
   
   return {
@@ -712,6 +726,11 @@ Generate 30 days of forecast data with realistic daily variations.`;
   const cleanedContent = cleanJsonResponse(result.choices[0].message.content);
   const prediction = JSON.parse(cleanedContent);
   
+  // Ensure numeric values are properly typed
+  if (prediction.confidenceScore !== undefined) {
+    prediction.confidenceScore = Number(prediction.confidenceScore);
+  }
+  
   return {
     type: 'demand_forecast',
     timestamp: new Date().toISOString(),
@@ -830,6 +849,22 @@ Generate at least 10-20 product recommendations with varied urgency levels.`;
   const result = await response.json();
   const cleanedContent = cleanJsonResponse(result.choices[0].message.content);
   const prediction = JSON.parse(cleanedContent);
+  
+  // Ensure numeric values are properly typed
+  if (prediction.confidenceScore !== undefined) {
+    prediction.confidenceScore = Number(prediction.confidenceScore);
+  }
+  
+  // Validate and ensure inventory optimization summary has correct types
+  if (prediction.inventoryOptimization?.summary) {
+    const summary = prediction.inventoryOptimization.summary;
+    summary.totalProducts = Number(summary.totalProducts || 0);
+    summary.overstocked = Number(summary.overstocked || 0);
+    summary.understocked = Number(summary.understocked || 0);
+    summary.optimal = Number(summary.optimal || 0);
+    summary.potentialSavings = Number(summary.potentialSavings || 0);
+    summary.expectedTurnover = Number(summary.expectedTurnover || 0);
+  }
   
   return {
     type: 'inventory_optimization',
@@ -952,6 +987,11 @@ Generate at least 10-20 product pricing recommendations with varied strategies.`
   const result = await response.json();
   const cleanedContent = cleanJsonResponse(result.choices[0].message.content);
   const prediction = JSON.parse(cleanedContent);
+  
+  // Ensure numeric values are properly typed
+  if (prediction.confidenceScore !== undefined) {
+    prediction.confidenceScore = Number(prediction.confidenceScore);
+  }
   
   return {
     type: 'pricing_optimization',
@@ -1082,6 +1122,11 @@ Generate at least 4-6 different recommendation strategies with varied approaches
   const result = await response.json();
   const cleanedContent = cleanJsonResponse(result.choices[0].message.content);
   const prediction = JSON.parse(cleanedContent);
+  
+  // Ensure numeric values are properly typed
+  if (prediction.confidenceScore !== undefined) {
+    prediction.confidenceScore = Number(prediction.confidenceScore);
+  }
   
   return {
     type: 'recommendation_strategy',

@@ -68,7 +68,7 @@ export function InventoryOptimizationResult({ recommendations, summary }: Invent
                 예상 비용 절감
               </p>
               <p className="text-xl font-bold text-green-500">
-                {(summary.potentialSavings / 10000).toFixed(0)}만원/월
+                {(Number(summary.potentialSavings || 0) / 10000).toFixed(0)}만원/월
               </p>
             </div>
             <div className="space-y-1">
@@ -76,7 +76,9 @@ export function InventoryOptimizationResult({ recommendations, summary }: Invent
                 <BarChart3 className="w-4 h-4" />
                 예상 회전율
               </p>
-              <p className="text-xl font-bold">{summary.expectedTurnover.toFixed(1)}회/년</p>
+              <p className="text-xl font-bold">
+                {Number(summary.expectedTurnover || 0).toFixed(1)}회/년
+              </p>
             </div>
           </div>
 
