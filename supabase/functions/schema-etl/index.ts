@@ -342,54 +342,75 @@ Deno.serve(async (req) => {
 
         // entityMap에 없으면 DB에서 직접 조회 (이전에 생성된 엔티티 찾기)
         if (!targetEntityId && targetValue) {
-          // 먼저 target entity type ID를 가져옴
-          const { data: targetEntityType, error: typeError } = await supabase
-            .from('ontology_entity_types')
-            .select('id')
-            .eq('name', targetEntityTypeName)
-            .eq('user_id', user.id)
-            .maybeSingle();
-          
-          if (typeError) {
-            console.error(`❌ Error fetching target entity type: ${typeError.message}`);
-          }
-          
-          if (targetEntityType) {
-            console.log(`🔍 Searching for entity: type=${targetEntityTypeName}, value=${targetValue}`);
-            
-            // 1. 먼저 label로 조회
-            let { data: existingTarget, error: labelError } = await supabase
+          // 1) 브랜드 전용 처리: brand_id 기반 직접 매칭
+          if (relMapping.target_key === 'brand_id') {
+            const { data: brandTarget, error: brandLookupError } = await supabase
               .from('graph_entities')
               .select('id')
-              .eq('entity_type_id', targetEntityType.id)
               .eq('user_id', user.id)
-              .eq('label', targetValue)
+              .eq('properties->>brand_id', targetValue)
               .maybeSingle();
-            
-            // 2. label로 못 찾으면 properties->brand_id로 조회
-            if (!existingTarget) {
-              const { data: brandTarget, error: brandError } = await supabase
+
+            if (brandLookupError) {
+              console.error(`❌ Error searching Brand by brand_id=${targetValue}: ${brandLookupError.message}`);
+            }
+
+            if (brandTarget) {
+              targetEntityId = brandTarget.id;
+              console.log(`✅ Found Brand entity by brand_id: ${targetValue} -> ${targetEntityId}`);
+            }
+          }
+
+          // 2) 브랜드 전용 매칭에 실패하면, 일반적인 타입 기반 조회
+          if (!targetEntityId) {
+            const { data: targetEntityType, error: typeError } = await supabase
+              .from('ontology_entity_types')
+              .select('id')
+              .eq('name', targetEntityTypeName)
+              .eq('user_id', user.id)
+              .maybeSingle();
+
+            if (typeError) {
+              console.error(`❌ Error fetching target entity type: ${typeError.message}`);
+            }
+
+            if (targetEntityType) {
+              console.log(`🔍 Searching for entity: type=${targetEntityTypeName}, value=${targetValue}`);
+
+              // 2-1) label 기준
+              let { data: existingTarget, error: labelError } = await supabase
                 .from('graph_entities')
                 .select('id')
                 .eq('entity_type_id', targetEntityType.id)
                 .eq('user_id', user.id)
-                .eq('properties->>brand_id', targetValue)
+                .eq('label', targetValue)
                 .maybeSingle();
-              
-              existingTarget = brandTarget;
-              if (brandError) {
-                console.error(`❌ Error searching by brand_id: ${brandError.message}`);
+
+              // 2-2) label 로 못 찾으면 brand_id 기준 한 번 더 시도
+              if (!existingTarget) {
+                const { data: brandTarget2, error: brandError2 } = await supabase
+                  .from('graph_entities')
+                  .select('id')
+                  .eq('entity_type_id', targetEntityType.id)
+                  .eq('user_id', user.id)
+                  .eq('properties->>brand_id', targetValue)
+                  .maybeSingle();
+
+                existingTarget = brandTarget2;
+                if (brandError2) {
+                  console.error(`❌ Error searching by brand_id (fallback): ${brandError2.message}`);
+                }
               }
-            }
-            
-            if (existingTarget) {
-              targetEntityId = existingTarget.id;
-              console.log(`✅ Found existing target entity: ${targetValue} -> ${targetEntityId}`);
+
+              if (existingTarget) {
+                targetEntityId = existingTarget.id;
+                console.log(`✅ Found existing target entity: ${targetValue} -> ${targetEntityId}`);
+              } else {
+                console.warn(`❌ Target entity not found in DB: type=${targetEntityTypeName}, value=${targetValue}`);
+              }
             } else {
-              console.warn(`❌ Target entity not found in DB: type=${targetEntityTypeName}, value=${targetValue}`);
+              console.warn(`❌ Target entity type not found: ${targetEntityTypeName}`);
             }
-          } else {
-            console.warn(`❌ Target entity type not found: ${targetEntityTypeName}`);
           }
         }
 
