@@ -22,6 +22,7 @@ interface UploadFile {
   progress: number;
   error?: string;
   mappingResult?: any;
+  isRestored?: boolean; // localStorage에서 복원된 항목
 }
 
 interface StoredUploadFile {
@@ -33,6 +34,7 @@ interface StoredUploadFile {
   progress: number;
   error?: string;
   mappingResult?: any;
+  isRestored?: boolean;
 }
 
 const STORAGE_KEY_PREFIX = 'upload-history-';
@@ -57,10 +59,11 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
         
         // File 객체는 복원 불가능하므로 빈 File 객체로 대체
         const restoredFiles: UploadFile[] = storedFiles.map(stored => {
-          // 진행 중이던 업로드는 pending 상태로 복원
-          const status = ['uploading', 'processing', 'mapping'].includes(stored.status) 
-            ? 'pending' 
-            : stored.status;
+          // 진행 중이던 업로드는 cancelled 상태로 복원 (파일 데이터가 없으므로)
+          let status = stored.status;
+          if (['uploading', 'processing', 'mapping', 'pending'].includes(stored.status)) {
+            status = 'cancelled';
+          }
           
           // 빈 File 객체 생성 (UI 표시용)
           const dummyFile = new File([], stored.fileName, { type: 'application/octet-stream' });
@@ -71,9 +74,10 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
             id: stored.id,
             type: stored.type,
             status,
-            progress: status === 'pending' ? 0 : stored.progress,
+            progress: stored.progress,
             error: stored.error,
             mappingResult: stored.mappingResult,
+            isRestored: true, // 복원된 항목 표시
           };
         });
         
@@ -714,7 +718,8 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
   };
 
   const uploadAllFiles = async () => {
-    const pendingFiles = files.filter(f => f.status === 'pending');
+    // 복원된 파일이 아닌, 실제 파일만 업로드
+    const pendingFiles = files.filter(f => f.status === 'pending' && !f.isRestored);
     if (pendingFiles.length === 0) {
       toast({
         title: "업로드할 파일 없음",
@@ -736,6 +741,27 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
 
   const clearCompleted = () => {
     setFiles(prev => prev.filter(f => f.status !== 'success' && f.status !== 'cancelled'));
+    // localStorage에서도 제거
+    if (storeId) {
+      try {
+        const storageKey = STORAGE_KEY_PREFIX + storeId;
+        const remaining = files.filter(f => f.status !== 'success' && f.status !== 'cancelled');
+        const toStore: StoredUploadFile[] = remaining.map(file => ({
+          id: file.id,
+          fileName: file.file.name,
+          fileSize: file.file.size,
+          type: file.type,
+          status: file.status,
+          progress: file.progress,
+          error: file.error,
+          mappingResult: file.mappingResult,
+          isRestored: file.isRestored,
+        }));
+        localStorage.setItem(storageKey, JSON.stringify(toStore));
+      } catch (error) {
+        console.error('Failed to update localStorage:', error);
+      }
+    }
   };
 
   const getFileTypeIcon = (type: UploadFile['type']) => {
@@ -955,6 +981,11 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
                         <div className="flex items-center gap-2 mb-1">
                           <p className="font-medium truncate">{file.file.name}</p>
                           {getFileTypeBadge(file.type)}
+                          {file.isRestored && (
+                            <Badge variant="outline" className="bg-muted text-muted-foreground text-xs">
+                              이전 기록
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-sm text-muted-foreground">
                           {(file.file.size / 1024).toFixed(1)} KB
