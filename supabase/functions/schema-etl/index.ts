@@ -342,22 +342,30 @@ Deno.serve(async (req) => {
 
         // entityMap에 없으면 DB에서 직접 조회 (이전에 생성된 엔티티 찾기)
         if (!targetEntityId && targetValue) {
-          const { data: existingTarget } = await supabase
-            .from('graph_entities')
+          // 먼저 target entity type ID를 가져옴
+          const { data: targetEntityType } = await supabase
+            .from('ontology_entity_types')
             .select('id')
-            .eq('entity_type_id', (await supabase
-              .from('ontology_entity_types')
-              .select('id')
-              .eq('name', targetEntityTypeName)
-              .eq('user_id', user.id)
-              .single()
-            ).data?.id || '')
-            .or(`label.eq.${targetValue},properties->>brand_id.eq.${targetValue}`)
+            .eq('name', targetEntityTypeName)
             .eq('user_id', user.id)
             .maybeSingle();
           
-          if (existingTarget) {
-            targetEntityId = existingTarget.id;
+          if (targetEntityType) {
+            // label 또는 properties->brand_id로 조회
+            const { data: existingTarget } = await supabase
+              .from('graph_entities')
+              .select('id')
+              .eq('entity_type_id', targetEntityType.id)
+              .eq('user_id', user.id)
+              .or(`label.eq.${targetValue},properties->>brand_id.eq.${targetValue}`)
+              .maybeSingle();
+            
+            if (existingTarget) {
+              targetEntityId = existingTarget.id;
+              console.log(`✅ Found existing target entity: ${targetValue} -> ${targetEntityId}`);
+            } else {
+              console.warn(`❌ Target entity not found in DB: ${targetValue}`);
+            }
           }
         }
 
