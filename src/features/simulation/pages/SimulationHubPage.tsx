@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, Grid3x3, TrendingUp, DollarSign, Target, Package, RefreshCw, ArrowRight, Loader2 } from 'lucide-react';
+import { Sparkles, Grid3x3, TrendingUp, DollarSign, Target, Package, RefreshCw, Loader2 } from 'lucide-react';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { useAIInference, useStoreContext } from '../hooks';
 import { toast } from 'sonner';
@@ -13,14 +13,6 @@ import { DemandForecastResult } from '../components/DemandForecastResult';
 import { InventoryOptimizationResult } from '../components/InventoryOptimizationResult';
 import { PricingOptimizationResult } from '../components/PricingOptimizationResult';
 import { RecommendationStrategyResult } from '../components/RecommendationStrategyResult';
-
-interface SimulationResult {
-  type: 'demand' | 'layout' | 'inventory' | 'pricing' | 'recommendation';
-  title: string;
-  icon: React.ReactNode;
-  data: any;
-  loading: boolean;
-}
 
 export default function SimulationHubPage() {
   const { selectedStore } = useSelectedStore();
@@ -265,22 +257,22 @@ export default function SimulationHubPage() {
 
         {/* 나머지 4개 시뮬레이션 - 2x2 그리드 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* 1. 수요 예측 */}
+          {/* 1. 향후 수요 예측 */}
           <Card className="relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-cyan-500/20 to-transparent rounded-bl-full" />
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-primary/20 to-transparent rounded-bl-full" />
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span className="flex items-center gap-2">
-                  <Grid3x3 className="h-5 w-5 text-cyan-500" />
-                  레이아웃 최적화
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                  향후 수요 예측
                 </span>
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => runSimulation('layout')}
-                  disabled={loadingStates.layout || !contextData}
+                  onClick={() => runSimulation('demand')}
+                  disabled={loadingStates.demand || !contextData}
                 >
-                  {loadingStates.layout ? (
+                  {loadingStates.demand ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <RefreshCw className="h-4 w-4" />
@@ -288,45 +280,22 @@ export default function SimulationHubPage() {
                 </Button>
               </CardTitle>
               <CardDescription>
-                고객 동선 분석을 기반으로 최적의 매장 레이아웃을 3D로 제안합니다
+                과거 데이터와 외부 요인을 분석하여 향후 30일간의 수요를 예측합니다
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {loadingStates.layout && (
+              {loadingStates.demand && (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-cyan-500" />
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
               )}
-              {!loadingStates.layout && layoutOptimization && (
-                <div className="space-y-4">
-                  <div className="h-64 bg-muted rounded-lg">
-                    <SharedDigitalTwinScene overlayType="layout" />
-                  </div>
-                  <div className="space-y-2">
-                    <h4 className="font-semibold">추천 변경사항</h4>
-                    <p className="text-sm text-muted-foreground">
-                      {layoutOptimization.aiInsights || '레이아웃 최적화 제안을 생성 중입니다...'}
-                    </p>
-                    {layoutOptimization.predictedKpi && (
-                      <div className="grid grid-cols-2 gap-2 mt-3">
-                        <div className="p-3 bg-muted rounded-lg">
-                          <div className="text-xs text-muted-foreground">전환율</div>
-                          <div className="text-lg font-bold text-green-500">
-                            +{((layoutOptimization.predictedKpi.conversionRate - 0.12) * 100).toFixed(1)}%
-                          </div>
-                        </div>
-                        <div className="p-3 bg-muted rounded-lg">
-                          <div className="text-xs text-muted-foreground">매출/㎡</div>
-                          <div className="text-lg font-bold text-green-500">
-                            +{((layoutOptimization.predictedKpi.salesPerSqm - 850000) / 1000).toFixed(0)}K
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
+              {!loadingStates.demand && demandForecast && (
+                <DemandForecastResult 
+                  forecastData={demandForecast.forecastData}
+                  summary={demandForecast.summary}
+                />
               )}
-              {!loadingStates.layout && !layoutOptimization && contextData && (
+              {!loadingStates.demand && !demandForecast && contextData && (
                 <div className="text-center py-8 text-muted-foreground">
                   <p>분석을 시작하려면 새로고침 버튼을 클릭하세요</p>
                 </div>
@@ -334,7 +303,7 @@ export default function SimulationHubPage() {
             </CardContent>
           </Card>
 
-          {/* 3. 재고 최적화 */}
+          {/* 2. 재고 최적화 */}
           <Card className="relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-500/20 to-transparent rounded-bl-full" />
             <CardHeader>
@@ -426,8 +395,8 @@ export default function SimulationHubPage() {
             </CardContent>
           </Card>
 
-          {/* 4. 마케팅/프로모션 전략 */}
-          <Card className="relative overflow-hidden lg:col-span-2">
+          {/* 4. 추천 마케팅/프로모션 전략 */}
+          <Card className="relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-500/20 to-transparent rounded-bl-full" />
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
