@@ -82,12 +82,30 @@ export function IntegratedImportStatus({ storeId }: IntegratedImportStatusProps)
       
       const { count: orphanedEntities } = await orphanedEntityQuery;
 
-      // 4. 3D 모델 통계
-      const { count: models3D } = await supabase
-        .from('user_data_imports')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('data_type', '3d_model');
+      // 4. 3D 모델 통계 (스토리지에서 직접 카운트)
+      const modelPath = storeId ? `${user.id}/${storeId}` : user.id;
+      let models3DCount = 0;
+
+      // 3d-models 서브폴더 조회
+      const modelSubPath = `${modelPath}/3d-models`;
+      const { data: modelSubFiles, error: subError } = await supabase.storage
+        .from('3d-models')
+        .list(modelSubPath);
+
+      if (modelSubFiles && !subError) {
+        models3DCount += modelSubFiles.filter(f => f.id && (f.name.endsWith('.glb') || f.name.endsWith('.gltf'))).length;
+      }
+      
+      // 루트 레벨의 .glb/.gltf 파일들도 확인
+      const { data: modelRootFiles } = await supabase.storage
+        .from('3d-models')
+        .list(modelPath);
+
+      if (modelRootFiles) {
+        models3DCount += modelRootFiles.filter(f => 
+          f.id && (f.name.endsWith('.glb') || f.name.endsWith('.gltf'))
+        ).length;
+      }
 
       // 5. 엔티티 타입에 연결된 3D 모델
       const { data: entityTypes } = await supabase
@@ -97,14 +115,14 @@ export function IntegratedImportStatus({ storeId }: IntegratedImportStatusProps)
         .not('model_3d_url', 'is', null);
 
       const modelsLinkedToTypes = entityTypes?.length || 0;
-      const orphanedModels = (models3D || 0) - modelsLinkedToTypes;
+      const orphanedModels = models3DCount - modelsLinkedToTypes;
 
       setStats({
         totalImports: totalImports || 0,
         importsWithEntities,
         orphanedImports,
         orphanedEntities,
-        models3D: models3D || 0,
+        models3D: models3DCount,
         modelsLinkedToTypes,
         orphanedModels
       });
