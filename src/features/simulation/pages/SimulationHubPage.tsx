@@ -219,32 +219,8 @@ export default function SimulationHubPage() {
               </div>
             )}
             {!loadingStates.layout && layoutOptimization && (
-              <div className="space-y-4">
-                <div className="h-96 bg-muted rounded-lg">
-                  <SharedDigitalTwinScene overlayType="layout" />
-                </div>
-                <div className="space-y-2">
-                  <h4 className="font-semibold">추천 변경사항</h4>
-                  <p className="text-sm text-muted-foreground">
-                    {layoutOptimization.aiInsights || '레이아웃 최적화 제안을 생성 중입니다...'}
-                  </p>
-                  {layoutOptimization.predictedKpi && (
-                    <div className="grid grid-cols-2 gap-2 mt-3">
-                      <div className="p-3 bg-muted rounded-lg">
-                        <div className="text-xs text-muted-foreground">전환율</div>
-                        <div className="text-lg font-bold text-green-500">
-                          +{((layoutOptimization.predictedKpi.conversionRate - 0.12) * 100).toFixed(1)}%
-                        </div>
-                      </div>
-                      <div className="p-3 bg-muted rounded-lg">
-                        <div className="text-xs text-muted-foreground">매출/㎡</div>
-                        <div className="text-lg font-bold text-green-500">
-                          +{((layoutOptimization.predictedKpi.salesPerSqm - 850000) / 1000).toFixed(0)}K
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
+              <div className="h-96 bg-muted rounded-lg">
+                <SharedDigitalTwinScene overlayType="layout" />
               </div>
             )}
             {!loadingStates.layout && !layoutOptimization && contextData && (
