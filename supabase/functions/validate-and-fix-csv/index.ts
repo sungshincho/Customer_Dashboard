@@ -274,10 +274,12 @@ ${issues.map(i => `- ${i.message}${i.suggestion ? ': ' + i.suggestion : ''}`).jo
             console.log('⚠️ AI fixed only sample data, applying fixes to all data...');
             
             // 규칙 기반으로 전체 데이터 수정
-            fixedData = rawData.map(row => {
-              const fixedRow: any = {};
-              
-              Object.entries(row).forEach(([key, value]) => {
+            fixedData = rawData
+              .filter(row => row && typeof row === 'object') // undefined/null 제거
+              .map(row => {
+                const fixedRow: any = {};
+                
+                Object.entries(row).forEach(([key, value]) => {
                 // ID 컬럼은 그대로 유지
                 if (validationResult.id_columns.includes(key)) {
                   fixedRow[key] = value;
