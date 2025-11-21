@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -24,12 +24,91 @@ interface UploadFile {
   mappingResult?: any;
 }
 
+interface StoredUploadFile {
+  id: string;
+  fileName: string;
+  fileSize: number;
+  type: UploadFile['type'];
+  status: UploadFile['status'];
+  progress: number;
+  error?: string;
+  mappingResult?: any;
+}
+
+const STORAGE_KEY_PREFIX = 'upload-history-';
+
 export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploadProps) {
   const { toast } = useToast();
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const cancelFlagsRef = useRef<Map<string, boolean>>(new Map());
+
+  // localStorage에서 업로드 내역 복원
+  useEffect(() => {
+    if (!storeId) return;
+    
+    try {
+      const storageKey = STORAGE_KEY_PREFIX + storeId;
+      const storedData = localStorage.getItem(storageKey);
+      
+      if (storedData) {
+        const storedFiles: StoredUploadFile[] = JSON.parse(storedData);
+        
+        // File 객체는 복원 불가능하므로 빈 File 객체로 대체
+        const restoredFiles: UploadFile[] = storedFiles.map(stored => {
+          // 진행 중이던 업로드는 pending 상태로 복원
+          const status = ['uploading', 'processing', 'mapping'].includes(stored.status) 
+            ? 'pending' 
+            : stored.status;
+          
+          // 빈 File 객체 생성 (UI 표시용)
+          const dummyFile = new File([], stored.fileName, { type: 'application/octet-stream' });
+          Object.defineProperty(dummyFile, 'size', { value: stored.fileSize });
+          
+          return {
+            file: dummyFile,
+            id: stored.id,
+            type: stored.type,
+            status,
+            progress: status === 'pending' ? 0 : stored.progress,
+            error: stored.error,
+            mappingResult: stored.mappingResult,
+          };
+        });
+        
+        setFiles(restoredFiles);
+        console.log(`📋 Restored ${restoredFiles.length} upload records from localStorage`);
+      }
+    } catch (error) {
+      console.error('Failed to restore upload history:', error);
+    }
+  }, [storeId]);
+
+  // files 상태 변경 시 localStorage에 저장
+  useEffect(() => {
+    if (!storeId || files.length === 0) return;
+    
+    try {
+      const storageKey = STORAGE_KEY_PREFIX + storeId;
+      
+      // File 객체를 제외한 정보만 저장
+      const filesToStore: StoredUploadFile[] = files.map(file => ({
+        id: file.id,
+        fileName: file.file.name,
+        fileSize: file.file.size,
+        type: file.type,
+        status: file.status,
+        progress: file.progress,
+        error: file.error,
+        mappingResult: file.mappingResult,
+      }));
+      
+      localStorage.setItem(storageKey, JSON.stringify(filesToStore));
+    } catch (error) {
+      console.error('Failed to save upload history:', error);
+    }
+  }, [files, storeId]);
 
   // 파일 타입 자동 감지
   const detectFileType = (file: File): UploadFile['type'] => {
