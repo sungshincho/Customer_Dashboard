@@ -5,6 +5,25 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Helper function to clean AI response and extract valid JSON
+function cleanJsonResponse(content: string): string {
+  // Remove markdown code blocks
+  let cleaned = content.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+  
+  // Trim whitespace
+  cleaned = cleaned.trim();
+  
+  // Find the first { and last }
+  const firstBrace = cleaned.indexOf('{');
+  const lastBrace = cleaned.lastIndexOf('}');
+  
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+  }
+  
+  return cleaned;
+}
+
 interface InferenceRequest {
   inference_type: 'causal' | 'anomaly' | 'prediction' | 'pattern';
   data: any[];
@@ -148,7 +167,8 @@ Return a JSON object with this structure:
   }
 
   const result = await response.json();
-  const analysis = JSON.parse(result.choices[0].message.content);
+  const cleanedContent = cleanJsonResponse(result.choices[0].message.content);
+  const analysis = JSON.parse(cleanedContent);
   
   return {
     type: 'causal_inference',
@@ -242,7 +262,8 @@ Return a JSON object:
   }
 
   const result = await response.json();
-  const analysis = JSON.parse(result.choices[0].message.content);
+  const cleanedContent = cleanJsonResponse(result.choices[0].message.content);
+  const analysis = JSON.parse(cleanedContent);
   
   return {
     type: 'anomaly_detection',
@@ -362,7 +383,8 @@ Return a JSON object:
   }
 
   const result = await response.json();
-  const analysis = JSON.parse(result.choices[0].message.content);
+  const cleanedContent = cleanJsonResponse(result.choices[0].message.content);
+  const analysis = JSON.parse(cleanedContent);
   
   return {
     type: 'predictive_modeling',
@@ -462,7 +484,8 @@ Focus on realistic, actionable insights based on retail psychology and spatial p
   }
 
   const result = await response.json();
-  const prediction = JSON.parse(result.choices[0].message.content);
+  const cleanedContent = cleanJsonResponse(result.choices[0].message.content);
+  const prediction = JSON.parse(cleanedContent);
   
   console.log('Layout simulation completed:', prediction);
   
@@ -535,7 +558,8 @@ Provide 3-5 recommendations, prioritized by potential impact on the stated goal.
   }
 
   const result = await response.json();
-  const analysis = JSON.parse(result.choices[0].message.content);
+  const cleanedContent = cleanJsonResponse(result.choices[0].message.content);
+  const analysis = JSON.parse(cleanedContent);
   
   return analysis;
 }
@@ -627,7 +651,8 @@ Provide realistic predictions based on retail analytics best practices.`;
   }
 
   const result = await response.json();
-  const prediction = JSON.parse(result.choices[0].message.content);
+  const cleanedContent = cleanJsonResponse(result.choices[0].message.content);
+  const prediction = JSON.parse(cleanedContent);
   
   return {
     type: 'demand_forecast',
@@ -717,7 +742,8 @@ Provide realistic optimization based on inventory management best practices.`;
   }
 
   const result = await response.json();
-  const prediction = JSON.parse(result.choices[0].message.content);
+  const cleanedContent = cleanJsonResponse(result.choices[0].message.content);
+  const prediction = JSON.parse(cleanedContent);
   
   return {
     type: 'inventory_optimization',
@@ -810,7 +836,8 @@ Provide realistic pricing optimization based on retail economics and consumer be
   }
 
   const result = await response.json();
-  const prediction = JSON.parse(result.choices[0].message.content);
+  const cleanedContent = cleanJsonResponse(result.choices[0].message.content);
+  const prediction = JSON.parse(cleanedContent);
   
   return {
     type: 'pricing_optimization',
@@ -906,7 +933,8 @@ Provide realistic strategy based on modern retail marketing and data science bes
   }
 
   const result = await response.json();
-  const prediction = JSON.parse(result.choices[0].message.content);
+  const cleanedContent = cleanJsonResponse(result.choices[0].message.content);
+  const prediction = JSON.parse(cleanedContent);
   
   return {
     type: 'recommendation_strategy',
@@ -1019,7 +1047,8 @@ Return a JSON object:
   }
 
   const result = await response.json();
-  const analysis = JSON.parse(result.choices[0].message.content);
+  const cleanedContent = cleanJsonResponse(result.choices[0].message.content);
+  const analysis = JSON.parse(cleanedContent);
   
   return {
     type: 'pattern_discovery',
