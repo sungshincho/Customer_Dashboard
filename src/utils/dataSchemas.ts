@@ -1,9 +1,21 @@
-// 표준 데이터 스키마 정의
+// ============================================================================
+// 데이터 아키텍처 분류
+// ============================================================================
+// 
+// 📥 RAW_DATA: 외부에서 업로드하는 원천 데이터 (Unified Data Import 대상)
+// 📊 DERIVED_DATA: 백엔드 ETL/AI 파이프라인이 자동 생성하는 파생 데이터
+//
+// ⚠️ DERIVED_DATA는 CSV로 업로드하지 않고, 백엔드에서 자동 생성됩니다.
+// ============================================================================
+
+export type DataCategory = 'RAW_DATA' | 'DERIVED_DATA';
 
 export interface DataSchema {
   type: string;
+  category: DataCategory;
   columns: ColumnSchema[];
   relations?: string[];
+  description?: string;
 }
 
 export interface ColumnSchema {
@@ -14,9 +26,14 @@ export interface ColumnSchema {
   examples?: string[];
 }
 
+// ============================================================================
+// RAW DATA SCHEMAS (외부에서 업로드하는 원천 데이터)
+// ============================================================================
+
 // 판매/거래 데이터 표준 스키마
 export const SALES_SCHEMA: DataSchema = {
   type: 'sales',
+  category: 'RAW_DATA',
   columns: [
     { name: 'transaction_id', type: 'string', required: false, description: '거래 고유 ID 주문번호 order', examples: ['주문번호', 'order_id', 'transaction', 'id'] },
     { name: 'timestamp', type: 'date', required: false, description: '거래 시간 기간 날짜 date', examples: ['기간', '날짜', 'date', 'time', '주문시각', 'timestamp'] },
@@ -36,6 +53,7 @@ export const SALES_SCHEMA: DataSchema = {
 // Zone 위치 데이터 표준 스키마
 export const ZONE_SCHEMA: DataSchema = {
   type: 'zone',
+  category: 'RAW_DATA',
   columns: [
     { name: 'zone_id', type: 'string', required: true, description: 'Zone 고유 ID' },
     { name: 'zone_name', type: 'string', required: true, description: 'Zone 이름' },
@@ -51,6 +69,7 @@ export const ZONE_SCHEMA: DataSchema = {
 // 고객 동선 데이터 표준 스키마
 export const TRAFFIC_SCHEMA: DataSchema = {
   type: 'traffic',
+  category: 'RAW_DATA',
   columns: [
     { name: 'person_id', type: 'string', required: true, description: '고객/방문자 ID' },
     { name: 'zones', type: 'array', required: true, description: '방문한 Zone 순서 배열' },
@@ -64,6 +83,7 @@ export const TRAFFIC_SCHEMA: DataSchema = {
 // 상품 데이터 표준 스키마
 export const PRODUCT_SCHEMA: DataSchema = {
   type: 'product',
+  category: 'RAW_DATA',
   columns: [
     { name: 'product_id', type: 'string', required: true, description: '상품 고유 ID' },
     { name: 'product_name', type: 'string', required: true, description: '상품명' },
@@ -79,6 +99,7 @@ export const PRODUCT_SCHEMA: DataSchema = {
 // 고객 데이터 표준 스키마
 export const CUSTOMER_SCHEMA: DataSchema = {
   type: 'customer',
+  category: 'RAW_DATA',
   columns: [
     { name: 'customer_id', type: 'string', required: true, description: '고객 고유 ID' },
     { name: 'segment', type: 'string', required: false, description: '고객 세그먼트' },
@@ -92,6 +113,7 @@ export const CUSTOMER_SCHEMA: DataSchema = {
 // 재고 데이터 표준 스키마
 export const INVENTORY_SCHEMA: DataSchema = {
   type: 'inventory',
+  category: 'RAW_DATA',
   columns: [
     { name: 'product_id', type: 'string', required: true, description: '상품 ID' },
     { name: 'timestamp', type: 'date', required: true, description: '재고 기록 시간' },
@@ -105,6 +127,7 @@ export const INVENTORY_SCHEMA: DataSchema = {
 // 브랜드 데이터 표준 스키마
 export const BRAND_SCHEMA: DataSchema = {
   type: 'brand',
+  category: 'RAW_DATA',
   columns: [
     { name: 'brand_id', type: 'string', required: true, description: '브랜드 고유 ID', examples: ['brand_id', 'id', '브랜드코드'] },
     { name: 'brand_name', type: 'string', required: true, description: '브랜드명', examples: ['brand_name', 'name', '브랜드', '브랜드명'] },
@@ -118,6 +141,7 @@ export const BRAND_SCHEMA: DataSchema = {
 // 매장 데이터 표준 스키마
 export const STORE_SCHEMA: DataSchema = {
   type: 'store',
+  category: 'RAW_DATA',
   columns: [
     { name: 'store_id', type: 'string', required: true, description: '매장 고유 ID', examples: ['store_id', 'id', '매장코드', '지점코드'] },
     { name: 'store_name', type: 'string', required: true, description: '매장명', examples: ['store_name', 'name', '매장명', '지점명'] },
@@ -132,6 +156,7 @@ export const STORE_SCHEMA: DataSchema = {
 // 직원 데이터 표준 스키마
 export const STAFF_SCHEMA: DataSchema = {
   type: 'staff',
+  category: 'RAW_DATA',
   columns: [
     { name: 'staff_id', type: 'string', required: true, description: '직원 고유 ID', examples: ['staff_id', 'id', '직원코드', '사원번호'] },
     { name: 'staff_name', type: 'string', required: true, description: '직원명', examples: ['staff_name', 'name', '직원명', '이름', '사원명'] },
@@ -146,7 +171,52 @@ export const STAFF_SCHEMA: DataSchema = {
   relations: ['store', 'sales']
 };
 
-export const SCHEMA_MAP: Record<string, DataSchema> = {
+// ============================================================================
+// DERIVED DATA SCHEMAS (백엔드 ETL/AI가 자동 생성하는 파생 데이터)
+// ============================================================================
+
+// Dashboard KPIs (집계 테이블)
+// 생성 방식: aggregate-all-kpis Edge Function (Batch ETL)
+// 입력: visits, purchases, stores, context data
+export const DASHBOARD_KPI_SCHEMA: DataSchema = {
+  type: 'dashboard_kpi',
+  category: 'DERIVED_DATA',
+  description: '원천 데이터에서 자동 집계되는 대시보드 KPI (백엔드 생성)',
+  columns: [
+    { name: 'date', type: 'date', required: true, description: '집계 날짜' },
+    { name: 'store_id', type: 'string', required: true, description: '매장 ID' },
+    { name: 'total_revenue', type: 'number', required: true, description: '총 매출' },
+    { name: 'total_visits', type: 'number', required: true, description: '총 방문자 수' },
+    { name: 'total_purchases', type: 'number', required: true, description: '총 구매 건수' },
+    { name: 'conversion_rate', type: 'number', required: true, description: '전환율 (%)' },
+    { name: 'sales_per_sqm', type: 'number', required: false, description: '평당 매출' },
+  ],
+  relations: ['stores', 'visits', 'purchases']
+};
+
+// AI Recommendations (AI 출력 결과 테이블)
+// 생성 방식: generate-ai-recommendations Edge Function (AI Inference)
+// 입력: inventory_levels, sales, context data
+export const AI_RECOMMENDATION_SCHEMA: DataSchema = {
+  type: 'ai_recommendation',
+  category: 'DERIVED_DATA',
+  description: 'AI가 자동 생성하는 추천 사항 (백엔드 생성)',
+  columns: [
+    { name: 'recommendation_type', type: 'string', required: true, description: '추천 유형 (재고, 레이아웃, 프로모션 등)' },
+    { name: 'priority', type: 'string', required: true, description: '우선순위 (high, medium, low)' },
+    { name: 'title', type: 'string', required: true, description: '추천 제목' },
+    { name: 'description', type: 'string', required: true, description: '추천 내용' },
+    { name: 'expected_impact', type: 'object', required: false, description: '예상 영향 (매출, CVR 등)' },
+  ],
+  relations: ['inventory_levels', 'products', 'dashboard_kpis']
+};
+
+// ============================================================================
+// SCHEMA MAPS
+// ============================================================================
+
+// 원천 데이터 스키마 맵 (업로드 대상)
+export const RAW_DATA_SCHEMA_MAP: Record<string, DataSchema> = {
   sales: SALES_SCHEMA,
   zone: ZONE_SCHEMA,
   traffic: TRAFFIC_SCHEMA,
@@ -157,4 +227,16 @@ export const SCHEMA_MAP: Record<string, DataSchema> = {
   brand: BRAND_SCHEMA,
   store: STORE_SCHEMA,
   staff: STAFF_SCHEMA,
+};
+
+// 파생 데이터 스키마 맵 (백엔드 생성)
+export const DERIVED_DATA_SCHEMA_MAP: Record<string, DataSchema> = {
+  dashboard_kpi: DASHBOARD_KPI_SCHEMA,
+  ai_recommendation: AI_RECOMMENDATION_SCHEMA,
+};
+
+// 전체 스키마 맵 (하위 호환성)
+export const SCHEMA_MAP: Record<string, DataSchema> = {
+  ...RAW_DATA_SCHEMA_MAP,
+  ...DERIVED_DATA_SCHEMA_MAP,
 };

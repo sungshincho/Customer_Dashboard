@@ -51,16 +51,29 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
   // 파일 선택/드롭 처리
   const handleFiles = useCallback((newFiles: FileList | File[]) => {
     const fileArray = Array.from(newFiles);
-    const uploadFiles: UploadFile[] = fileArray.map(file => ({
-      file,
-      id: Math.random().toString(36).substr(2, 9),
-      type: detectFileType(file),
-      status: 'pending',
-      progress: 0,
-    }));
+    const uploadFiles: UploadFile[] = fileArray.map(file => {
+      const fileName = file.name.toLowerCase();
+      
+      // 파생 데이터 파일 감지 및 경고
+      if (fileName.includes('dashboard_kpi') || fileName.includes('ai_recommendation')) {
+        toast({
+          title: '⚠️ 자동 생성 데이터',
+          description: `${file.name}는 백엔드에서 자동 생성되는 파일입니다. 원천 데이터를 업로드하면 자동으로 집계됩니다.`,
+          variant: 'destructive',
+        });
+      }
+      
+      return {
+        file,
+        id: Math.random().toString(36).substr(2, 9),
+        type: detectFileType(file),
+        status: 'pending' as const,
+        progress: 0,
+      };
+    });
 
     setFiles(prev => [...prev, ...uploadFiles]);
-  }, []);
+  }, [toast]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
