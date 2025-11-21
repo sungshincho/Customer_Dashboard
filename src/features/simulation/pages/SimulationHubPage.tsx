@@ -104,15 +104,6 @@ export default function SimulationHubPage() {
     return titles[type] || type;
   };
 
-  // 매장 선택 시 자동으로 전체 시뮬레이션 실행
-  useEffect(() => {
-    if (selectedStore && contextData && !contextLoading) {
-      // 이미 실행된 시뮬레이션이 없을 때만 자동 실행
-      if (!demandForecast && !layoutOptimization && !inventoryOptimization && !pricingOptimization && !recommendationStrategy) {
-        runAllSimulations();
-      }
-    }
-  }, [selectedStore, contextData, contextLoading]);
 
   return (
     <DashboardLayout>
@@ -219,7 +210,7 @@ export default function SimulationHubPage() {
               </div>
             )}
             {!loadingStates.layout && layoutOptimization && (
-              <div className="h-96 bg-muted rounded-lg">
+              <div className="h-[500px] bg-muted rounded-lg">
                 <SharedDigitalTwinScene overlayType="layout" />
               </div>
             )}
