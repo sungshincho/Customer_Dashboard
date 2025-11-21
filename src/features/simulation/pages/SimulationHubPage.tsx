@@ -209,9 +209,12 @@ export default function SimulationHubPage() {
                 <Loader2 className="h-8 w-8 animate-spin text-cyan-500" />
               </div>
             )}
-            {!loadingStates.layout && layoutOptimization && (
+            {!loadingStates.layout && (
               <div className="h-[500px] bg-muted rounded-lg">
-                <SharedDigitalTwinScene overlayType="layout" />
+                <SharedDigitalTwinScene 
+                  overlayType="layout"
+                  layoutSimulationData={layoutOptimization?.sceneRecipe}
+                />
               </div>
             )}
             {!loadingStates.layout && !layoutOptimization && contextData && (
