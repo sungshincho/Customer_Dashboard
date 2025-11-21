@@ -343,29 +343,53 @@ Deno.serve(async (req) => {
         // entityMap에 없으면 DB에서 직접 조회 (이전에 생성된 엔티티 찾기)
         if (!targetEntityId && targetValue) {
           // 먼저 target entity type ID를 가져옴
-          const { data: targetEntityType } = await supabase
+          const { data: targetEntityType, error: typeError } = await supabase
             .from('ontology_entity_types')
             .select('id')
             .eq('name', targetEntityTypeName)
             .eq('user_id', user.id)
             .maybeSingle();
           
+          if (typeError) {
+            console.error(`❌ Error fetching target entity type: ${typeError.message}`);
+          }
+          
           if (targetEntityType) {
-            // label 또는 properties->brand_id로 조회
-            const { data: existingTarget } = await supabase
+            console.log(`🔍 Searching for entity: type=${targetEntityTypeName}, value=${targetValue}`);
+            
+            // 1. 먼저 label로 조회
+            let { data: existingTarget, error: labelError } = await supabase
               .from('graph_entities')
               .select('id')
               .eq('entity_type_id', targetEntityType.id)
               .eq('user_id', user.id)
-              .or(`label.eq.${targetValue},properties->>brand_id.eq.${targetValue}`)
+              .eq('label', targetValue)
               .maybeSingle();
+            
+            // 2. label로 못 찾으면 properties->brand_id로 조회
+            if (!existingTarget) {
+              const { data: brandTarget, error: brandError } = await supabase
+                .from('graph_entities')
+                .select('id')
+                .eq('entity_type_id', targetEntityType.id)
+                .eq('user_id', user.id)
+                .eq('properties->>brand_id', targetValue)
+                .maybeSingle();
+              
+              existingTarget = brandTarget;
+              if (brandError) {
+                console.error(`❌ Error searching by brand_id: ${brandError.message}`);
+              }
+            }
             
             if (existingTarget) {
               targetEntityId = existingTarget.id;
               console.log(`✅ Found existing target entity: ${targetValue} -> ${targetEntityId}`);
             } else {
-              console.warn(`❌ Target entity not found in DB: ${targetValue}`);
+              console.warn(`❌ Target entity not found in DB: type=${targetEntityTypeName}, value=${targetValue}`);
             }
+          } else {
+            console.warn(`❌ Target entity type not found: ${targetEntityTypeName}`);
           }
         }
 
