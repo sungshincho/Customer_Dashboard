@@ -994,16 +994,6 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
                     </div>
                     <div className="flex items-center gap-2">
                       {getStatusIcon(file.status)}
-                      {file.status === 'pending' && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeFile(file.id)}
-                          title="제거"
-                        >
-                          <XCircle className="w-4 h-4" />
-                        </Button>
-                      )}
                       {(file.status === 'uploading' || file.status === 'processing' || 
                         file.status === 'mapping' || file.status === 'paused') && (
                         <Button
@@ -1013,6 +1003,17 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
                           title="취소"
                         >
                           <X className="w-4 h-4 text-destructive" />
+                        </Button>
+                      )}
+                      {(file.status === 'pending' || file.status === 'success' || 
+                        file.status === 'error' || file.status === 'cancelled') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeFile(file.id)}
+                          title="제거"
+                        >
+                          <XCircle className="w-4 h-4" />
                         </Button>
                       )}
                     </div>
