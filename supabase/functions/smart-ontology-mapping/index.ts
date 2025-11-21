@@ -9,6 +9,7 @@ interface SmartMappingRequest {
   import_id: string;
   id_columns: string[];
   foreign_key_columns: Record<string, string>;
+  user_id?: string; // optional, for when called from pipeline
 }
 
 Deno.serve(async (req) => {
@@ -22,14 +23,21 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) throw new Error('Authorization required');
+    const { import_id, id_columns, foreign_key_columns, user_id } = await req.json() as SmartMappingRequest;
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) throw new Error('Unauthorized');
+    // user_id가 제공되면 그것을 사용, 아니면 Authorization header에서 가져오기
+    let userId: string;
+    if (user_id) {
+      userId = user_id;
+    } else {
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader) throw new Error('Authorization required');
 
-    const { import_id, id_columns, foreign_key_columns } = await req.json() as SmartMappingRequest;
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+      if (authError || !user) throw new Error('Unauthorized');
+      userId = user.id;
+    }
 
     console.log('🧠 Smart ontology mapping for import:', import_id);
 
@@ -38,7 +46,7 @@ Deno.serve(async (req) => {
       .from('user_data_imports')
       .select('*')
       .eq('id', import_id)
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .single();
 
     if (fetchError || !importData) {
@@ -53,12 +61,12 @@ Deno.serve(async (req) => {
     const { data: entityTypes } = await supabase
       .from('ontology_entity_types')
       .select('*')
-      .eq('user_id', user.id);
+      .eq('user_id', userId);
 
     const { data: relationTypes } = await supabase
       .from('ontology_relation_types')
       .select('*')
-      .eq('user_id', user.id);
+      .eq('user_id', userId);
 
     console.log(`📋 Existing: ${entityTypes?.length || 0} entity types, ${relationTypes?.length || 0} relation types`);
 
@@ -262,7 +270,7 @@ ${relationTypes?.map(rt => `- ${rt.name}: ${rt.source_entity_type} -> ${rt.targe
             name: entityMapping.entity_type_name,
             label: entityMapping.entity_type_label || entityMapping.entity_type_name,
             properties: entityMapping.properties_definition || [],
-            user_id: user.id,
+            user_id: userId,
           })
           .select('id')
           .single();
@@ -296,7 +304,7 @@ ${relationTypes?.map(rt => `- ${rt.name}: ${rt.source_entity_type} -> ${rt.targe
             source_entity_type: sourceEntityId,
             target_entity_type: targetEntityId,
             directionality: relationMapping.directionality || 'directed',
-            user_id: user.id,
+            user_id: userId,
           })
           .select('id')
           .single();
