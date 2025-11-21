@@ -31,8 +31,7 @@ import SimulationHubPage from "@/features/simulation/pages/SimulationHubPage";
 import UnifiedDataManagementPage from "@/features/data-management/import/pages/UnifiedDataManagementPage";
 import SchemaBuilder from "@/features/data-management/ontology/pages/SchemaBuilderPage";
 import GraphAnalysis from "@/features/data-management/ontology/pages/GraphAnalysisPage";
-import BigDataAPIPage from "@/features/data-management/bigdata/pages/BigDataAPIPage";
-import Analytics from "@/features/data-management/analysis/pages/AnalyticsPage";
+import APIIntegrationPage from "@/features/data-management/api/pages/APIIntegrationPage";
 
 const queryClient = new QueryClient();
 
@@ -62,12 +61,12 @@ const App = () => (
               <Route path="/digital-twin/3d" element={<ProtectedRoute><DigitalTwin3DPage /></ProtectedRoute>} />
               <Route path="/simulation/hub" element={<ProtectedRoute><SimulationHubPage /></ProtectedRoute>} />
 
-              {/* 4️⃣ Data Management (5 pages) */}
+              {/* 4️⃣ Data Management (3 pages + 1 hidden) */}
               <Route path="/data-import" element={<ProtectedRoute><UnifiedDataManagementPage /></ProtectedRoute>} />
               <Route path="/schema-builder" element={<ProtectedRoute><SchemaBuilder /></ProtectedRoute>} />
+              {/* 그래프 분석 - 숨김 처리되었지만 URL로는 접근 가능 */}
               <Route path="/graph-analysis" element={<ProtectedRoute><GraphAnalysis /></ProtectedRoute>} />
-              <Route path="/bigdata-api" element={<ProtectedRoute><BigDataAPIPage /></ProtectedRoute>} />
-              <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
+              <Route path="/api-integration" element={<ProtectedRoute><APIIntegrationPage /></ProtectedRoute>} />
 
               <Route path="*" element={<NotFound />} />
             </Routes>
