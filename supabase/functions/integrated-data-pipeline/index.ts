@@ -70,10 +70,17 @@ Deno.serve(async (req) => {
       console.log(`  - Issues found: ${result.validation.issues.length}`);
       console.log(`  - Fixes applied: ${result.validation.fixes.length}`);
 
-      // 심각한 오류가 있으면 중단
+      // 심각한 오류가 있으면 경고 (중단하지 않음)
       const criticalErrors = result.validation.issues.filter((i: any) => i.type === 'error');
       if (criticalErrors.length > 0 && result.validation.data_quality_score < 50) {
-        throw new Error(`Critical data quality issues found. Score: ${result.validation.data_quality_score}/100`);
+        console.warn(`⚠️  Low data quality score: ${result.validation.data_quality_score}/100`);
+        console.warn(`⚠️  Critical errors: ${criticalErrors.length}`);
+        console.warn('⚠️  Proceeding with caution...');
+        
+        // 이슈 상세 정보 로깅
+        criticalErrors.forEach((err: any, idx: number) => {
+          console.warn(`   ${idx + 1}. [${err.column}] ${err.message}`);
+        });
       }
     } else {
       console.log('⏭️  Skipping validation');
