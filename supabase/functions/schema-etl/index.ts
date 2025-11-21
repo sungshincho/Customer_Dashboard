@@ -245,15 +245,61 @@ Deno.serve(async (req) => {
     for (const relMapping of body.relation_mappings) {
       console.log(`Processing relations for type: ${relMapping.relation_type_id}`);
 
-      for (const record of rawData) {
-        const sourceKey = `${relMapping.source_entity_type_id}:${relMapping.source_key}:${record[relMapping.source_key]}`;
-        const targetKey = `${relMapping.target_entity_type_id}:${relMapping.target_key}:${record[relMapping.target_key]}`;
+      // source/target entity type ID를 name으로 변환
+      let sourceEntityTypeName = relMapping.source_entity_type_id;
+      let targetEntityTypeName = relMapping.target_entity_type_id;
 
-        const sourceEntityId = entityMap.get(sourceKey);
-        const targetEntityId = entityMap.get(targetKey);
+      // UUID 형식이면 name으로 변환
+      const isSourceUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sourceEntityTypeName);
+      const isTargetUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetEntityTypeName);
+
+      if (isSourceUUID) {
+        const { data: sourceType } = await supabase
+          .from('ontology_entity_types')
+          .select('name')
+          .eq('id', sourceEntityTypeName)
+          .single();
+        if (sourceType) sourceEntityTypeName = sourceType.name;
+      }
+
+      if (isTargetUUID) {
+        const { data: targetType } = await supabase
+          .from('ontology_entity_types')
+          .select('name')
+          .eq('id', targetEntityTypeName)
+          .single();
+        if (targetType) targetEntityTypeName = targetType.name;
+      }
+
+      for (const record of rawData) {
+        // 여러 가지 키 조합으로 시도
+        const possibleSourceKeys = [
+          `${sourceEntityTypeName}:${relMapping.source_key}:${record[relMapping.source_key]}`,
+          `${relMapping.source_entity_type_id}:${relMapping.source_key}:${record[relMapping.source_key]}`,
+        ];
+
+        const possibleTargetKeys = [
+          `${targetEntityTypeName}:${relMapping.target_key}:${record[relMapping.target_key]}`,
+          `${relMapping.target_entity_type_id}:${relMapping.target_key}:${record[relMapping.target_key]}`,
+        ];
+
+        let sourceEntityId: string | undefined;
+        let targetEntityId: string | undefined;
+
+        // source 찾기
+        for (const key of possibleSourceKeys) {
+          sourceEntityId = entityMap.get(key);
+          if (sourceEntityId) break;
+        }
+
+        // target 찾기
+        for (const key of possibleTargetKeys) {
+          targetEntityId = entityMap.get(key);
+          if (targetEntityId) break;
+        }
 
         if (!sourceEntityId || !targetEntityId) {
-          console.warn(`Missing entity for relation: ${sourceKey} -> ${targetKey}`);
+          console.warn(`Missing entity for relation: ${relMapping.source_key}=${record[relMapping.source_key]} -> ${relMapping.target_key}=${record[relMapping.target_key]}`);
           continue;
         }
 
