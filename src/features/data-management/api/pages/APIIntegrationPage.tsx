@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -178,9 +178,9 @@ export default function APIIntegrationPage() {
     }
   };
 
-  useState(() => {
+  useEffect(() => {
     loadConnections();
-  });
+  }, []);
 
   return (
     <DashboardLayout>
