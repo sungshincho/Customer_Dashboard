@@ -138,7 +138,7 @@ Deno.serve(async (req) => {
         entitiesToInsert.push({
           user_id: user.id,
           store_id: body.store_id,
-          entity_type_id: mapping.entity_type_id,
+          entity_type_id: entityType.id,  // 실제 UUID 사용
           label,
           properties: { ...properties, source_import_id: body.import_id },
         });
