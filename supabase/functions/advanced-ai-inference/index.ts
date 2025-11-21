@@ -416,6 +416,7 @@ Your task is to analyze the layout changes and predict:
 3. Optimal customer paths through the store
 4. High-dwell zones and their characteristics
 5. Potential bottlenecks or dead zones
+6. Generate a new 3D scene recipe for the optimized layout
 
 Return a comprehensive JSON object:
 {
@@ -450,6 +451,26 @@ Return a comprehensive JSON object:
       "conversionRate": 2.5,
       "dwellTime": 1.2,
       "flowEfficiency": 85
+    }
+  },
+  "sceneRecipe": {
+    "metadata": {
+      "name": "Optimized Layout",
+      "description": "AI-optimized store layout",
+      "version": "1.0"
+    },
+    "layers": {
+      "floor": { "url": "floor_model_url", "position": [0, 0, 0] },
+      "fixtures": [
+        { "url": "fixture_url", "position": [x, y, z], "rotation": [0, 0, 0], "scale": [1, 1, 1] }
+      ],
+      "products": [
+        { "url": "product_url", "position": [x, y, z], "rotation": [0, 0, 0], "scale": [1, 1, 1] }
+      ]
+    },
+    "lighting": {
+      "ambient": { "intensity": 0.5 },
+      "directional": { "position": [10, 10, 10], "intensity": 1 }
     }
   },
   "recommendations": [

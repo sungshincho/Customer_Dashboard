@@ -36,6 +36,11 @@ interface SharedDigitalTwinSceneProps {
   customOverlay?: ReactNode;
   
   /**
+   * 레이아웃 시뮬레이션 데이터 (layout overlayType 사용 시)
+   */
+  layoutSimulationData?: any;
+  
+  /**
    * 3D 뷰어 높이
    */
   height?: string;
@@ -60,6 +65,7 @@ interface SharedDigitalTwinSceneProps {
 export function SharedDigitalTwinScene({
   overlayType = 'none',
   customOverlay,
+  layoutSimulationData,
   height = '600px',
   showControls = true,
   className = ''
@@ -118,10 +124,15 @@ export function SharedDigitalTwinScene({
   }
 
   // 정상 렌더링: SceneComposer 사용
+  // 레이아웃 시뮬레이션 데이터가 있으면 그것을 사용, 없으면 기본 씬 사용
+  const sceneData = (overlayType === 'layout' && layoutSimulationData) 
+    ? layoutSimulationData 
+    : activeScene.recipe_data;
+
   return (
     <div style={{ height }} className={`w-full ${className}`}>
       <SceneComposer 
-        recipe={activeScene.recipe_data}
+        recipe={sceneData}
         overlay={customOverlay || getOverlayByType(overlayType)}
       />
     </div>
