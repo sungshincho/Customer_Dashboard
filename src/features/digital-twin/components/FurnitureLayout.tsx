@@ -6,10 +6,13 @@ interface FurnitureLayoutProps {
   onClick?: (id: string) => void;
 }
 
-export function FurnitureLayout({ furniture, onClick }: FurnitureLayoutProps) {
+export function FurnitureLayout({ furniture = [], onClick }: FurnitureLayoutProps) {
+  // Guard against undefined or null
+  const safeFurniture = Array.isArray(furniture) ? furniture : [];
+  
   return (
     <group>
-      {furniture.map((item) => (
+      {safeFurniture.map((item) => (
         <FurnitureItem key={item.id} asset={item} onClick={() => onClick?.(item.id)} />
       ))}
     </group>
