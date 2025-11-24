@@ -213,23 +213,38 @@ export function ModelUploader() {
     setUploading(true);
 
     try {
+      // GLB/GLTF와 JSON 파일 분리
+      const modelFiles = Array.from(files).filter(f => 
+        f.name.toLowerCase().endsWith('.glb') || f.name.toLowerCase().endsWith('.gltf')
+      );
+      const jsonFiles = Array.from(files).filter(f => 
+        f.name.toLowerCase().endsWith('.json')
+      );
+
+      // 모든 파일 업로드 (원본 파일명 유지)
       const uploadPromises = Array.from(files).map(async (file) => {
-        const fileExt = file.name.split('.').pop();
-        // 매장별 경로: {userId}/{storeId}/3d-models/{filename}
-        const fileName = `${user.id}/${selectedStore.id}/3d-models/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const filePath = `${user.id}/${selectedStore.id}/${file.name}`;
 
         const { error: uploadError } = await supabase.storage
           .from('3d-models')
-          .upload(fileName, file);
+          .upload(filePath, file, {
+            upsert: true // 같은 이름이면 덮어쓰기
+          });
 
         if (uploadError) throw uploadError;
 
         const { data: { publicUrl } } = supabase.storage
           .from('3d-models')
-          .getPublicUrl(fileName);
+          .getPublicUrl(filePath);
 
-        return { name: file.name, url: publicUrl };
+        return { 
+          name: file.name, 
+          url: publicUrl,
+          type: file.type
+        };
       });
+
+      console.log(`Uploading ${modelFiles.length} model files and ${jsonFiles.length} metadata files`);
 
       const results = await Promise.all(uploadPromises);
       
@@ -362,7 +377,7 @@ export function ModelUploader() {
           3D 모델 업로드
         </CardTitle>
         <CardDescription>
-          .glb 또는 .gltf 파일을 드래그하거나 클릭하여 업로드하세요
+          GLB/GLTF 파일과 메타데이터 JSON을 함께 업로드하세요. 같은 이름의 파일을 페어로 선택하면 자동으로 인식됩니다.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -380,7 +395,7 @@ export function ModelUploader() {
           <input
             id="model-upload"
             type="file"
-            accept=".glb,.gltf"
+            accept=".glb,.gltf,.json"
             multiple
             onChange={handleFileUpload}
             disabled={uploading}
@@ -401,7 +416,10 @@ export function ModelUploader() {
                     파일을 여기에 드래그하거나 클릭하여 선택
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    .glb, .gltf 파일 지원 (최대 100MB)
+                    GLB/GLTF + JSON 파일 지원 (최대 100MB)
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    예: Rack_Main_2.0x1.8x0.6.glb + Rack_Main_2.0x1.8x0.6.json
                   </p>
                 </div>
                 {selectedStore && (
