@@ -179,7 +179,16 @@ export default function StoreAnalysisPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">피크 시간대</p>
-                  <p className="text-2xl font-bold">{stats?.peak_hour || 14}<span className="text-sm">시</span></p>
+                  <p className="text-2xl font-bold">
+                    {stats?.peak_hour !== undefined && stats?.peak_hour !== null ? (
+                      <>
+                        {stats.peak_hour}
+                        <span className="text-sm">시</span>
+                      </>
+                    ) : (
+                      <span className="text-base text-muted-foreground">데이터 없음</span>
+                    )}
+                  </p>
                   <p className="text-xs text-muted-foreground mt-1">최대 방문 시간</p>
                 </div>
                 <TrendingUp className="w-8 h-8 text-blue-500 opacity-50" />
