@@ -19,6 +19,7 @@ import { DataImportHistory } from "../components/DataImportHistory";
 import { DataStatistics } from "../components/DataStatistics";
 import { IntegratedImportStatus } from "../components/IntegratedImportStatus";
 import { DataValidation } from "../components/DataValidation";
+import { DemoReadinessChecker } from "../components/DemoReadinessChecker";
 
 export default function UnifiedDataManagementPage() {
   const { selectedStore } = useSelectedStore();
@@ -79,6 +80,10 @@ export default function UnifiedDataManagementPage() {
               <Network className="w-4 h-4 mr-2" />
               온톨로지
             </TabsTrigger>
+            <TabsTrigger value="demo" className="flex-shrink-0">
+              <CheckCircle2 className="w-4 h-4 mr-2" />
+              데모 준비상태
+            </TabsTrigger>
           </TabsList>
 
           {/* 통합 업로드 탭 */}
@@ -106,6 +111,11 @@ export default function UnifiedDataManagementPage() {
           {/* 온톨로지 관리 탭 */}
           <TabsContent value="ontology" className="space-y-6">
             <OntologyDataManagement key={`ontology-${refreshTrigger}`} storeId={selectedStore?.id} />
+          </TabsContent>
+
+          {/* 데모 준비상태 탭 */}
+          <TabsContent value="demo" className="space-y-6">
+            <DemoReadinessChecker />
           </TabsContent>
         </Tabs>
 
