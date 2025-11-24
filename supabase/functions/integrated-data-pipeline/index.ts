@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.79.0';
+import { parseCSVFromStorage } from './csv-parser.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -27,9 +28,34 @@ async function runPipeline(
   import_id: string,
   store_id: string,
   auto_fix: boolean,
-  skip_validation: boolean
+  skip_validation: boolean,
+  filePath?: string,
+  fileType?: string
 ): Promise<PipelineResult> {
   const result: PipelineResult = { success: false };
+  
+  // Storage에서 데이터 로드 (파일 경로가 있는 경우)
+  if (filePath && (fileType === 'csv' || fileType === 'excel')) {
+    console.log('📂 Loading data from Storage...');
+    
+    try {
+      const rawData = await parseCSVFromStorage(supabase, filePath, 'store-data');
+      
+      // user_data_imports의 raw_data를 실제 데이터로 업데이트
+      await supabase
+        .from('user_data_imports')
+        .update({ 
+          raw_data: rawData,
+          row_count: rawData.length 
+        })
+        .eq('id', import_id);
+      
+      console.log(`✅ Loaded ${rawData.length} rows from Storage`);
+    } catch (error: any) {
+      console.error('❌ Failed to load data from Storage:', error);
+      throw new Error(`Storage data load failed: ${error.message}`);
+    }
+  }
 
   // Step 1: 데이터 검증 및 수정
   if (!skip_validation) {
@@ -172,15 +198,17 @@ Deno.serve(async (req) => {
     console.log(`📦 Import ID: ${import_id}`);
     console.log(`🏪 Store ID: ${store_id}`);
 
-    // 데이터 크기 확인
+    // 데이터 크기 및 파일 경로 확인
     const { data: importData } = await supabase
       .from('user_data_imports')
-      .select('row_count, raw_data')
+      .select('row_count, raw_data, file_path, file_type')
       .eq('id', import_id)
       .single();
     
     const rowCount = importData?.row_count || 0;
+    const filePath = importData?.file_path;
     console.log(`📊 Row count: ${rowCount}`);
+    console.log(`📁 File path: ${filePath || 'N/A (data in raw_data)'}`);
 
     // 큰 데이터셋(100개 이상)은 백그라운드 처리
     if (rowCount >= 100) {
@@ -197,7 +225,16 @@ Deno.serve(async (req) => {
       // 백그라운드 처리 시작
       const backgroundTask = async () => {
         try {
-          const result = await runPipeline(supabase, user, import_id, store_id, auto_fix, skip_validation);
+          const result = await runPipeline(
+            supabase, 
+            user, 
+            import_id, 
+            store_id, 
+            auto_fix, 
+            skip_validation,
+            importData?.file_path,
+            importData?.file_type
+          );
           
           // 완료 상태 업데이트
           await supabase
@@ -244,7 +281,16 @@ Deno.serve(async (req) => {
     }
 
     // 작은 데이터셋은 동기 처리
-    const result = await runPipeline(supabase, user, import_id, store_id, auto_fix, skip_validation);
+    const result = await runPipeline(
+      supabase, 
+      user, 
+      import_id, 
+      store_id, 
+      auto_fix, 
+      skip_validation,
+      importData?.file_path,
+      importData?.file_type
+    );
 
     return new Response(
       JSON.stringify(result),

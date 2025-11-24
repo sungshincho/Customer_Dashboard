@@ -502,25 +502,26 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
         if (uploadError) throw uploadError;
         checkPauseAndCancel();
         
-        // Step 1: 데이터 파싱
+        // Step 1: 데이터 샘플만 파싱 (전체 파일은 Edge Function에서 처리)
         checkPauseAndCancel();
-        updateFileStatus(uploadFile.id, 'processing', '데이터 파싱 중...', 25);
-        const rawData = await parseDataFile(uploadFile.file);
+        updateFileStatus(uploadFile.id, 'processing', '데이터 샘플 추출 중...', 25);
+        const sampleData = await parseDataFile(uploadFile.file);
+        const dataSample = sampleData.slice(0, 5); // 처음 5개 행만
         
-        // Step 2: user_data_imports에 레코드 생성
+        // Step 2: user_data_imports에 메타데이터만 저장
         checkPauseAndCancel();
-        updateFileStatus(uploadFile.id, 'processing', '데이터 검증 준비 중...', 35);
+        updateFileStatus(uploadFile.id, 'processing', '메타데이터 저장 중...', 35);
         const { data: importRecord, error: importError } = await supabase
           .from('user_data_imports')
           .insert({
             file_name: safeFileName,
             file_type: uploadFile.type,
             data_type: 'auto-detected',
-            raw_data: rawData as any,
-            row_count: rawData.length,
+            raw_data: dataSample as any, // 샘플만 저장
+            row_count: sampleData.length, // 전체 행 수는 저장
             store_id: storeId || null,
             user_id: user.id,
-            file_path: filePath,
+            file_path: filePath, // Storage 경로
           })
           .select()
           .single();
