@@ -53,17 +53,18 @@ const App = () => (
               
               {/* 1️⃣ Overview (4 pages) */}
               <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-              <Route path="/stores" element={<ProtectedRoute><Stores /></ProtectedRoute>} />
-              <Route path="/hq-store-sync" element={<ProtectedRoute><HQStoreSyncPage /></ProtectedRoute>} />
-              <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              <Route path="/overview/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/overview/stores" element={<ProtectedRoute><Stores /></ProtectedRoute>} />
+              <Route path="/overview/hq-sync" element={<ProtectedRoute><HQStoreSyncPage /></ProtectedRoute>} />
+              <Route path="/overview/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
               {/* 2️⃣ Analysis - Integrated Store Analysis (3 pages) */}
               <Route path="/analysis/store" element={<ProtectedRoute><StoreAnalysisPage /></ProtectedRoute>} />
               <Route path="/analysis/customer" element={<ProtectedRoute><CustomerAnalysisIntegratedPage /></ProtectedRoute>} />
               <Route path="/analysis/product" element={<ProtectedRoute><ProductAnalysisPage /></ProtectedRoute>} />
 
-              {/* 3️⃣ Simulation (7 pages) */}
-              <Route path="/digital-twin/3d" element={<ProtectedRoute><DigitalTwin3DPage /></ProtectedRoute>} />
+              {/* 3️⃣ Simulation (6 pages) */}
+              <Route path="/simulation/digital-twin" element={<ProtectedRoute><DigitalTwin3DPage /></ProtectedRoute>} />
               <Route path="/simulation/hub" element={<ProtectedRoute><SimulationHubPage /></ProtectedRoute>} />
               <Route path="/simulation/layout" element={<ProtectedRoute><LayoutSimPage /></ProtectedRoute>} />
               <Route path="/simulation/demand-inventory" element={<ProtectedRoute><DemandInventorySimPage /></ProtectedRoute>} />
@@ -72,11 +73,11 @@ const App = () => (
               <Route path="/simulation/scenario-lab" element={<ProtectedRoute><ScenarioLabPage /></ProtectedRoute>} />
 
               {/* 4️⃣ Data Management (3 pages + 1 hidden) */}
-              <Route path="/data-import" element={<ProtectedRoute><UnifiedDataManagementPage /></ProtectedRoute>} />
-              <Route path="/schema-builder" element={<ProtectedRoute><SchemaBuilder /></ProtectedRoute>} />
+              <Route path="/data-management/import" element={<ProtectedRoute><UnifiedDataManagementPage /></ProtectedRoute>} />
+              <Route path="/data-management/schema" element={<ProtectedRoute><SchemaBuilder /></ProtectedRoute>} />
               {/* 그래프 분석 - 숨김 처리되었지만 URL로는 접근 가능 */}
-              <Route path="/graph-analysis" element={<ProtectedRoute><GraphAnalysis /></ProtectedRoute>} />
-              <Route path="/api-integration" element={<ProtectedRoute><APIIntegrationPage /></ProtectedRoute>} />
+              <Route path="/data-management/graph-analysis" element={<ProtectedRoute><GraphAnalysis /></ProtectedRoute>} />
+              <Route path="/data-management/api" element={<ProtectedRoute><APIIntegrationPage /></ProtectedRoute>} />
 
               <Route path="*" element={<NotFound />} />
             </Routes>
