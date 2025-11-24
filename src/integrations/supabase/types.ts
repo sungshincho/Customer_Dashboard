@@ -1104,6 +1104,48 @@ export type Database = {
         }
         Relationships: []
       }
+      ontology_mapping_cache: {
+        Row: {
+          confidence_score: number | null
+          created_at: string | null
+          data_type: string
+          entity_mappings: Json
+          file_name_pattern: string
+          id: string
+          last_used_at: string | null
+          relation_mappings: Json
+          updated_at: string | null
+          usage_count: number | null
+          user_id: string
+        }
+        Insert: {
+          confidence_score?: number | null
+          created_at?: string | null
+          data_type: string
+          entity_mappings: Json
+          file_name_pattern: string
+          id?: string
+          last_used_at?: string | null
+          relation_mappings: Json
+          updated_at?: string | null
+          usage_count?: number | null
+          user_id: string
+        }
+        Update: {
+          confidence_score?: number | null
+          created_at?: string | null
+          data_type?: string
+          entity_mappings?: Json
+          file_name_pattern?: string
+          id?: string
+          last_used_at?: string | null
+          relation_mappings?: Json
+          updated_at?: string | null
+          usage_count?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       ontology_relation_types: {
         Row: {
           created_at: string | null
@@ -1613,6 +1655,53 @@ export type Database = {
         }
         Relationships: []
       }
+      upload_sessions: {
+        Row: {
+          completed_at: string | null
+          completed_files: number
+          created_at: string | null
+          failed_files: number
+          id: string
+          started_at: string | null
+          status: string | null
+          store_id: string | null
+          total_files: number
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          completed_files?: number
+          created_at?: string | null
+          failed_files?: number
+          id?: string
+          started_at?: string | null
+          status?: string | null
+          store_id?: string | null
+          total_files?: number
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          completed_files?: number
+          created_at?: string | null
+          failed_files?: number
+          id?: string
+          started_at?: string | null
+          status?: string | null
+          store_id?: string | null
+          total_files?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "upload_sessions_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_classification_patterns: {
         Row: {
           classified_as: string
@@ -1651,45 +1740,76 @@ export type Database = {
       }
       user_data_imports: {
         Row: {
+          can_pause: boolean | null
+          can_resume: boolean | null
           created_at: string
           data_type: string
+          error_details: string | null
           file_name: string
           file_path: string | null
           file_type: string
           id: string
+          processing_completed_at: string | null
+          processing_started_at: string | null
+          progress: Json | null
           raw_data: Json
           row_count: number
+          session_id: string | null
           sheet_name: string | null
+          status: string | null
           store_id: string | null
           user_id: string
         }
         Insert: {
+          can_pause?: boolean | null
+          can_resume?: boolean | null
           created_at?: string
           data_type: string
+          error_details?: string | null
           file_name: string
           file_path?: string | null
           file_type: string
           id?: string
+          processing_completed_at?: string | null
+          processing_started_at?: string | null
+          progress?: Json | null
           raw_data: Json
           row_count: number
+          session_id?: string | null
           sheet_name?: string | null
+          status?: string | null
           store_id?: string | null
           user_id: string
         }
         Update: {
+          can_pause?: boolean | null
+          can_resume?: boolean | null
           created_at?: string
           data_type?: string
+          error_details?: string | null
           file_name?: string
           file_path?: string | null
           file_type?: string
           id?: string
+          processing_completed_at?: string | null
+          processing_started_at?: string | null
+          progress?: Json | null
           raw_data?: Json
           row_count?: number
+          session_id?: string | null
           sheet_name?: string | null
+          status?: string | null
           store_id?: string | null
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "user_data_imports_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "upload_sessions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "user_data_imports_store_id_fkey"
             columns: ["store_id"]
