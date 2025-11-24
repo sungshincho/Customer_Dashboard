@@ -398,19 +398,36 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
   const { parameters = {} } = request;
   const { changedZones = [], movedFurniture = [], storeContext = {} } = parameters;
   
-  const prompt = `You are an expert retail space planner and customer behavior analyst.
+  // 실제 매장 데이터 컨텍스트 구축
+  let storeDataContext = '';
+  if (storeContext?.storeInfo) {
+    storeDataContext = `
+STORE INFORMATION:
+- Name: ${storeContext.storeInfo.name}
+- Area: ${storeContext.storeInfo.areaSqm}㎡
+- Current Layout: ${storeContext.storeInfo.district || 'Standard retail'}
 
-LAYOUT CHANGE REQUEST:
-Store: ${storeContext.storeName || 'Unknown'}
-Goal: ${storeContext.goalText || 'Optimize layout for better performance'}
+CURRENT PERFORMANCE METRICS (Recent 30 Days):
+- Average Daily Revenue: ${storeContext.recentKpis?.[0]?.totalRevenue?.toLocaleString() || 'N/A'}원
+- Average Conversion Rate: ${((storeContext.recentKpis?.[0]?.conversionRate || 0) * 100).toFixed(1)}%
+- Total Products: ${storeContext.products?.length || 0}개
+- Total Entities in 3D Scene: ${storeContext.entities?.length || 0}개
+`;
+  }
+  
+  const prompt = `You are a world-class retail space design expert with 20+ years of experience optimizing store layouts for maximum revenue and customer satisfaction. You specialize in data-driven layout optimization using customer flow analysis, spatial psychology, and retail best practices.
 
-ZONE CHANGES (${changedZones.length}):
-${JSON.stringify(changedZones, null, 2)}
+${storeDataContext}
 
-FURNITURE MOVES (${movedFurniture.length}):
-${JSON.stringify(movedFurniture, null, 2)}
+PROPOSED LAYOUT CHANGES:
+${changedZones.length > 0 ? `Zone Modifications (${changedZones.length}):
+${JSON.stringify(changedZones, null, 2)}` : 'No zone changes specified'}
 
-Your task is to analyze the layout changes and predict:
+${movedFurniture.length > 0 ? `Furniture Relocations (${movedFurniture.length}):
+${JSON.stringify(movedFurniture, null, 2)}` : 'No furniture moves specified'}
+
+ANALYSIS REQUIREMENTS:
+Based on retail psychology, customer flow patterns, and the actual store data provided above, you must predict:
 1. Customer flow patterns after the change
 2. Expected impact on KPIs (CVR, dwell time, sales per sqm)
 3. Optimal customer paths through the store
@@ -493,8 +510,15 @@ Focus on realistic, actionable insights based on retail psychology and spatial p
     },
     body: JSON.stringify({
       model: 'google/gemini-2.5-pro',
-      messages: [{ role: 'user', content: prompt }],
+      messages: [
+        { 
+          role: 'system', 
+          content: 'You are an elite retail analytics consultant with deep expertise in store layout optimization, customer behavior analysis, and data-driven decision making. Provide precise, actionable insights based on retail industry best practices.' 
+        },
+        { role: 'user', content: prompt }
+      ],
       response_format: { type: 'json_object' },
+      temperature: 0.7,
     }),
   });
 
@@ -635,14 +659,27 @@ FORECAST PARAMETERS:
 - Economic Indicators: ${parameters.includeEconomicIndicators ? 'Yes' : 'No'}
 - Weather Scenario: ${parameters.weatherScenario || 'normal'}
 
-Your task is to predict future demand and provide actionable insights including:
-1. Time-series forecast with confidence intervals
-2. Key insight summaries (demand surges, seasonal patterns)
-3. Impact factor analysis (weather, events, trends)
-4. Top 10 product forecasts
-5. Actionable recommendations
+CRITICAL ANALYSIS FRAMEWORK:
+You are a senior demand forecasting analyst with expertise in retail predictive analytics. Use advanced forecasting methodologies including:
+- Time series analysis with seasonality decomposition
+- External factor regression (weather, events, economic indicators)
+- Product lifecycle modeling
+- Category-specific demand patterns
 
-Return a JSON object:
+Your comprehensive forecast must include:
+1. Daily demand predictions for the next ${parameters.forecastHorizonDays || 30} days with 95% confidence intervals
+2. Peak demand identification with specific dates and magnitudes
+3. Demand driver analysis with quantified impact percentages
+4. Product-level forecasts for top-selling items
+5. Actionable inventory and staffing recommendations
+
+FORECASTING METHODOLOGY:
+- Use the store's historical performance as baseline
+- Apply ${parameters.weatherScenario || 'realistic'} weather scenarios
+- ${parameters.includeEvents ? 'Factor in upcoming holidays and promotional events' : 'Exclude event impacts'}
+- ${parameters.includeEconomicIndicators ? 'Consider macroeconomic trends and consumer sentiment' : 'Exclude economic factors'}
+
+Return a comprehensive JSON object:
 {
   "predictedKpi": {
     "conversionRate": 0.14,
@@ -711,9 +748,16 @@ Generate 30 days of forecast data with realistic daily variations.`;
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'google/gemini-2.5-flash',
-      messages: [{ role: 'user', content: prompt }],
+      model: 'google/gemini-2.5-pro',
+      messages: [
+        { 
+          role: 'system', 
+          content: 'You are a world-class demand forecasting expert specializing in retail predictive analytics. Your forecasts are data-driven, realistic, and actionable. Always provide specific numbers with confidence intervals.' 
+        },
+        { role: 'user', content: prompt }
+      ],
       response_format: { type: 'json_object' },
+      temperature: 0.6,
     }),
   });
 
@@ -771,14 +815,31 @@ INVENTORY PARAMETERS:
 - Safety Stock Multiplier: ${parameters.safetyStockMultiplier || 1.5}
 - Order Policy: ${parameters.orderPolicy || 'periodic'}
 
-Your task is to optimize inventory levels and provide actionable recommendations including:
-1. Current stock status dashboard
-2. Urgent reorder list with expected depletion dates
-3. Optimal stock levels vs current
-4. Cost savings estimates
-5. Inventory turnover rates
+EXPERT OPTIMIZATION FRAMEWORK:
+You are an expert supply chain and inventory management consultant specializing in retail optimization. Apply advanced inventory management principles:
+- Economic Order Quantity (EOQ) optimization
+- Safety stock calculation using service level targets
+- ABC analysis for product prioritization
+- Demand variability and lead time considerations
+- Just-in-Time vs Safety Stock trade-offs
 
-Return a JSON object:
+Your comprehensive optimization must provide:
+1. Product-by-product stock status with urgency classification
+2. Reorder point calculations with expected stockout dates
+3. Optimal vs current stock gap analysis
+4. Annual cost savings projections from optimization
+5. Inventory turnover improvement strategies
+
+OPTIMIZATION CRITERIA:
+- Target Service Level: ${parameters.targetServiceLevel || 95}%
+- Average Lead Time: ${parameters.leadTimeDays || 7} days
+- Order Frequency: ${parameters.orderFrequencyDays || 14} days
+- Safety Stock Buffer: ${parameters.safetyStockMultiplier || 1.5}x standard deviation
+- Order Policy: ${parameters.orderPolicy || 'Periodic Review'}
+
+Generate detailed, implementable recommendations with specific SKU-level actions.
+
+Return a comprehensive JSON object:
 {
   "predictedKpi": {
     "inventoryTurnover": 5.2,
@@ -835,9 +896,16 @@ Generate at least 10-20 product recommendations with varied urgency levels.`;
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'google/gemini-2.5-flash',
-      messages: [{ role: 'user', content: prompt }],
+      model: 'google/gemini-2.5-pro',
+      messages: [
+        { 
+          role: 'system', 
+          content: 'You are an expert supply chain consultant specializing in inventory optimization for retail. Your recommendations are grounded in proven inventory management theories (EOQ, Safety Stock, ABC Analysis) and tailored to real-world constraints.' 
+        },
+        { role: 'user', content: prompt }
+      ],
       response_format: { type: 'json_object' },
+      temperature: 0.5,
     }),
   });
 
@@ -908,14 +976,31 @@ PRICING PARAMETERS:
 - Duration: ${parameters.durationDays || 30} days
 - Inventory Consideration: ${parameters.considerInventory ? 'Yes' : 'No'}
 
-Your task is to optimize pricing strategy and provide actionable recommendations including:
-1. Price scenario comparisons (current vs recommended)
-2. Product-specific recommended prices based on elasticity
-3. Competitor comparisons
-4. Bundling opportunities
-5. Expected impact on sales and margin
+ADVANCED PRICING STRATEGY FRAMEWORK:
+You are a revenue optimization expert specializing in retail pricing strategy. Apply sophisticated pricing methodologies:
+- Price elasticity analysis and demand curve modeling
+- Competitive positioning and market dynamics
+- Psychological pricing thresholds (e.g., ₩9,900 vs ₩10,000)
+- Dynamic pricing based on inventory levels and demand forecasts
+- Cross-price elasticity for bundling opportunities
 
-Return a JSON object:
+Your comprehensive pricing optimization must deliver:
+1. Product-level optimal pricing with elasticity-based justification
+2. Revenue and margin impact projections
+3. Competitive positioning analysis (value/premium/discount)
+4. Bundle and promotion recommendations
+5. Implementation timeline with A/B testing suggestions
+
+PRICING PARAMETERS:
+- Proposed Price Adjustment: ${parameters.priceChangePercent || 0}% ${parameters.priceChangePercent > 0 ? 'increase' : 'decrease'}
+- Target Gross Margin: ${parameters.targetMarginPercent || 30}%
+- Discount Strategy: ${parameters.discountStrategy || 'None'}
+- Campaign Duration: ${parameters.durationDays || 30} days
+- ${parameters.considerInventory ? 'Prioritize high-inventory items for discounting' : 'Ignore inventory levels in pricing'}
+
+Apply retail pricing best practices and provide data-driven, actionable recommendations.
+
+Return a comprehensive JSON object:
 {
   "predictedKpi": {
     "conversionRate": 0.15,
@@ -973,9 +1058,16 @@ Generate at least 10-20 product pricing recommendations with varied strategies.`
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'google/gemini-2.5-flash',
-      messages: [{ role: 'user', content: prompt }],
+      model: 'google/gemini-2.5-pro',
+      messages: [
+        { 
+          role: 'system', 
+          content: 'You are a revenue optimization strategist with expertise in retail pricing, demand elasticity, and competitive positioning. Your pricing recommendations balance revenue maximization with market realities and customer psychology.' 
+        },
+        { role: 'user', content: prompt }
+      ],
       response_format: { type: 'json_object' },
+      temperature: 0.6,
     }),
   });
 
@@ -991,6 +1083,15 @@ Generate at least 10-20 product pricing recommendations with varied strategies.`
   // Ensure numeric values are properly typed
   if (prediction.confidenceScore !== undefined) {
     prediction.confidenceScore = Number(prediction.confidenceScore);
+  }
+  
+  // Ensure pricing optimization summary has correct types
+  if (prediction.pricingOptimization?.summary) {
+    const summary = prediction.pricingOptimization.summary;
+    summary.totalProducts = Number(summary.totalProducts || 0);
+    summary.avgPriceChange = Number(summary.avgPriceChange || 0);
+    summary.expectedRevenueIncrease = Number(summary.expectedRevenueIncrease || 0);
+    summary.expectedMarginIncrease = Number(summary.expectedMarginIncrease || 0);
   }
   
   return {
