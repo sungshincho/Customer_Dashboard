@@ -175,7 +175,35 @@ async function cleanupAllUserData(
     result.errors.push(`Relations cleanup error: ${errorMessage}`);
   }
 
-  // 3. graph_entities 삭제
+  // 3. graph_entities의 3D 위치 정보 제거 (전체 정리 시)
+  try {
+    const posQuery = supabase
+      .from('graph_entities')
+      .update({
+        model_3d_position: null,
+        model_3d_rotation: null,
+        model_3d_scale: null
+      })
+      .eq('user_id', userId)
+      .not('model_3d_position', 'is', null);
+    
+    if (storeId) {
+      posQuery.eq('store_id', storeId);
+    }
+    
+    const { error: posError, count: posCount } = await posQuery;
+    
+    if (posError) {
+      result.errors.push(`3D position clear error: ${posError.message}`);
+    } else {
+      console.log(`✅ Cleared 3D positions from ${posCount} entities`);
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    result.errors.push(`3D position cleanup error: ${errorMessage}`);
+  }
+
+  // 4. graph_entities 삭제
   try {
     const entQuery = supabase
       .from('graph_entities')
@@ -198,7 +226,7 @@ async function cleanupAllUserData(
     result.errors.push(`Entities cleanup error: ${errorMessage}`);
   }
 
-  // 4. store_scenes 삭제
+  // 5. store_scenes 삭제
   try {
     const sceneQuery = supabase
       .from('store_scenes')
@@ -221,7 +249,7 @@ async function cleanupAllUserData(
     result.errors.push(`Scenes cleanup error: ${errorMessage}`);
   }
 
-  // 5. user_data_imports 삭제
+  // 6. user_data_imports 삭제
   try {
     const importQuery = supabase
       .from('user_data_imports')
@@ -244,7 +272,7 @@ async function cleanupAllUserData(
     result.errors.push(`Imports cleanup error: ${errorMessage}`);
   }
 
-  // 6. ontology_entity_types의 3D 모델 참조 제거
+  // 7. ontology_entity_types의 3D 모델 참조 제거
   try {
     const { error: typeError, count } = await supabase
       .from('ontology_entity_types')
@@ -353,10 +381,11 @@ async function cleanupSpecificFiles(
         }
       }
 
-      // 7. 3D 모델인 경우 ontology_entity_types 정리
+      // 7. 3D 모델인 경우 ontology_entity_types 및 graph_entities 정리
       if (is3DModel) {
         const fileUrl = `${supabase.storage.url}/object/public/${bucket}/${filePath}`;
         
+        // ontology_entity_types의 model_3d_url 제거
         const { error: typeError, count: typeCount } = await supabase
           .from('ontology_entity_types')
           .update({ 
@@ -370,6 +399,21 @@ async function cleanupSpecificFiles(
 
         if (!typeError) {
           result.entityTypesUpdated += typeCount || 0;
+        }
+        
+        // graph_entities의 3D 위치 정보 제거
+        const { error: posError, count: posCount } = await supabase
+          .from('graph_entities')
+          .update({
+            model_3d_position: null,
+            model_3d_rotation: null,
+            model_3d_scale: null
+          })
+          .eq('user_id', userId)
+          .not('model_3d_position', 'is', null);
+        
+        if (!posError) {
+          console.log(`✅ Cleared 3D positions from ${posCount} entities`);
         }
       }
 
