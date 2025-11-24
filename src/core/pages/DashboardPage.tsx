@@ -3,7 +3,7 @@ import { StatCard } from "@/components/StatCard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, TrendingUp, Package, DollarSign, AlertCircle, RefreshCw, AlertTriangle, Clock, TrendingDown, Sparkles } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { useStoreDataset } from "@/hooks/useStoreData";
 import { DataReadinessGuard } from "@/components/DataReadinessGuard";
@@ -37,17 +37,47 @@ const Dashboard = () => {
     generateRecommendations 
   } = useAIRecommendations(selectedStore?.id);
 
+  // 페이지 로드 시 KPI 자동 집계
+  useEffect(() => {
+    if (selectedStore?.id && selectedDate) {
+      handleAutoAggregate();
+    }
+  }, [selectedStore?.id, dateStr]);
+
   const handleGenerateRecommendations = async () => {
     if (selectedStore?.id) {
-      // 먼저 선택된 날짜의 KPI 집계
-      await supabase.functions.invoke('aggregate-dashboard-kpis', {
-        body: { 
-          store_id: selectedStore.id,
-          date: dateStr
-        },
-      });
-      // 그 다음 AI 추천 생성
-      generateRecommendations.mutate(selectedStore.id);
+      try {
+        // 1. 선택된 날짜의 KPI 집계
+        const { error: kpiError } = await supabase.functions.invoke('aggregate-dashboard-kpis', {
+          body: { 
+            store_id: selectedStore.id,
+            date: dateStr
+          },
+        });
+        
+        if (kpiError) throw kpiError;
+        
+        // 2. AI 추천 생성
+        generateRecommendations.mutate(selectedStore.id);
+      } catch (error) {
+        console.error('KPI 집계 실패:', error);
+      }
+    }
+  };
+
+  // 페이지 로드 시 자동 집계
+  const handleAutoAggregate = async () => {
+    if (selectedStore?.id) {
+      try {
+        await supabase.functions.invoke('aggregate-dashboard-kpis', {
+          body: { 
+            store_id: selectedStore.id,
+            date: dateStr
+          },
+        });
+      } catch (error) {
+        console.error('자동 KPI 집계 실패:', error);
+      }
     }
   };
 
