@@ -272,7 +272,110 @@ async function cleanupAllUserData(
     result.errors.push(`Imports cleanup error: ${errorMessage}`);
   }
 
-  // 7. ontology_entity_types의 3D 모델 참조 제거
+  // 7. KPI 및 분석 데이터 삭제 (대시보드/전환 퍼널)
+  try {
+    // dashboard_kpis
+    const kpiQuery = supabase
+      .from('dashboard_kpis')
+      .delete()
+      .eq('user_id', userId);
+    if (storeId) {
+      kpiQuery.eq('store_id', storeId);
+    }
+    const { error: kpiError } = await kpiQuery;
+    if (kpiError) {
+      result.errors.push(`dashboard_kpis delete error: ${kpiError.message}`);
+    }
+
+    // funnel_metrics
+    const funnelQuery = supabase
+      .from('funnel_metrics')
+      .delete()
+      .eq('user_id', userId);
+    if (storeId) {
+      funnelQuery.eq('store_id', storeId);
+    }
+    const { error: funnelError } = await funnelQuery;
+    if (funnelError) {
+      result.errors.push(`funnel_metrics delete error: ${funnelError.message}`);
+    }
+
+    // analysis_history
+    const analysisQuery = supabase
+      .from('analysis_history')
+      .delete()
+      .eq('user_id', userId);
+    if (storeId) {
+      analysisQuery.eq('store_id', storeId);
+    }
+    const { error: analysisError } = await analysisQuery;
+    if (analysisError) {
+      result.errors.push(`analysis_history delete error: ${analysisError.message}`);
+    }
+
+    // ai_recommendations
+    const recQuery = supabase
+      .from('ai_recommendations')
+      .delete()
+      .eq('user_id', userId);
+    if (storeId) {
+      recQuery.eq('store_id', storeId);
+    }
+    const { error: recError } = await recQuery;
+    if (recError) {
+      result.errors.push(`ai_recommendations delete error: ${recError.message}`);
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    result.errors.push(`KPI & analysis cleanup error: ${errorMessage}`);
+  }
+
+  // 8. WiFi 트래킹 및 캐시 데이터 삭제
+  try {
+    // wifi_heatmap_cache
+    const heatQuery = supabase
+      .from('wifi_heatmap_cache')
+      .delete()
+      .eq('user_id', userId);
+    if (storeId) {
+      heatQuery.eq('store_id', storeId);
+    }
+    const { error: heatError } = await heatQuery;
+    if (heatError) {
+      result.errors.push(`wifi_heatmap_cache delete error: ${heatError.message}`);
+    }
+
+    // wifi_tracking
+    const trackingQuery = supabase
+      .from('wifi_tracking')
+      .delete()
+      .eq('user_id', userId);
+    if (storeId) {
+      trackingQuery.eq('store_id', storeId);
+    }
+    const { error: trackingError } = await trackingQuery;
+    if (trackingError) {
+      result.errors.push(`wifi_tracking delete error: ${trackingError.message}`);
+    }
+
+    // wifi_raw_signals
+    const rawQuery = supabase
+      .from('wifi_raw_signals')
+      .delete()
+      .eq('user_id', userId);
+    if (storeId) {
+      rawQuery.eq('store_id', storeId);
+    }
+    const { error: rawError } = await rawQuery;
+    if (rawError) {
+      result.errors.push(`wifi_raw_signals delete error: ${rawError.message}`);
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    result.errors.push(`WiFi cleanup error: ${errorMessage}`);
+  }
+
+  // 9. ontology_entity_types의 3D 모델 참조 제거
   try {
     const { error: typeError, count } = await supabase
       .from('ontology_entity_types')

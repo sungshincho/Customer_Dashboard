@@ -12,6 +12,16 @@ export function useClearCache() {
   const clearAllCache = () => {
     // 모든 쿼리 캐시 초기화
     queryClient.clear();
+
+    // 업로드 기록(localStorage)도 함께 초기화
+    if (typeof window !== 'undefined' && window.localStorage) {
+      Object.keys(window.localStorage).forEach((key) => {
+        if (key.startsWith('upload-history-')) {
+          window.localStorage.removeItem(key);
+        }
+      });
+    }
+
     toast.success('캐시가 초기화되었습니다');
   };
 
