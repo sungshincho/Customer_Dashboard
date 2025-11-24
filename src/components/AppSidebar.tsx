@@ -3,18 +3,22 @@ import {
   Store, 
   Settings,
   Users,
+  Activity,
+  Map,
+  Filter,
+  UserCheck,
   Package,
+  DollarSign,
+  Target,
   TrendingUp,
   Grid3x3,
-  Zap,
+  TestTube,
+  Boxes,
   Upload,
+  Network,
   Database,
-  Plug,
-  Box,
-  FlaskConical,
-  DollarSign,
-  Sparkles,
-  RefreshCw,
+  Zap,
+  Cpu,
   ChevronDown,
   LucideIcon
 } from "lucide-react";
@@ -61,21 +65,21 @@ interface MenuSection {
 
 // 1️⃣ Overview (4 pages)
 const overviewItems: MenuItem[] = [
-  { title: "개요", url: "/overview/dashboard", icon: LayoutDashboard },
-  { title: "매장 관리", url: "/overview/stores", icon: Store },
-  { title: "HQ 매장 동기화", url: "/overview/sync", icon: RefreshCw },
+  { title: "대시보드", url: "/", icon: LayoutDashboard },
+  { title: "매장 관리", url: "/stores", icon: Store },
+  { title: "HQ-매장 동기화", url: "/hq-store-sync", icon: Network },
   { title: "설정", url: "/settings", icon: Settings },
 ];
 
 // 2️⃣ Analysis, 3️⃣ Simulation, 4️⃣ Data Management 섹션
 const menuSections: MenuSection[] = [
   {
-    id: "analysis",
-    label: "분석",
+    id: "storeAnalysis",
+    label: "매장 현황 분석",
     emoji: "📊",
     defaultOpen: true,
     items: [
-      { title: "매장 분석", url: "/analysis/store", icon: TrendingUp },
+      { title: "매장 분석", url: "/analysis/store", icon: Activity },
       { title: "고객 분석", url: "/analysis/customer", icon: Users },
       { title: "상품 분석", url: "/analysis/product", icon: Package },
     ],
@@ -83,27 +87,24 @@ const menuSections: MenuSection[] = [
   {
     id: "simulation",
     label: "시뮬레이션",
-    emoji: "🎯",
+    emoji: "🔮",
     defaultOpen: true,
     items: [
-      { title: "시뮬레이션 허브", url: "/simulation/hub", icon: Zap },
-      { title: "레이아웃 최적화", url: "/simulation/layout", icon: Grid3x3 },
-      { title: "수요·재고 예측", url: "/simulation/demand-inventory", icon: TrendingUp },
-      { title: "가격 최적화", url: "/simulation/pricing", icon: DollarSign },
-      { title: "프로모션 최적화", url: "/simulation/recommendation", icon: Sparkles },
-      { title: "시나리오 실험실", url: "/simulation/scenario-lab", icon: FlaskConical },
+      { title: "디지털 트윈 3D", url: "/digital-twin/3d", icon: Boxes },
+      { title: "시뮬레이션 허브", url: "/simulation/hub", icon: TestTube },
     ],
   },
   {
-    id: "data",
+    id: "dataManagement",
     label: "데이터 관리",
-    emoji: "💾",
+    emoji: "🗄️",
     defaultOpen: true,
     items: [
-      { title: "통합 데이터 가져오기", url: "/data-management/import", icon: Upload },
-      { title: "Digital Twin 3D", url: "/data-management/digital-twin", icon: Box },
-      { title: "스키마 빌더", url: "/data-management/ontology/schema", icon: Database },
-      { title: "API 연동", url: "/data-management/api", icon: Plug },
+      { title: "통합 데이터 임포트", url: "/data-import", icon: Upload },
+      { title: "스키마 빌더", url: "/schema-builder", icon: Network },
+      // 그래프 분석은 숨김 처리 (코드는 유지)
+      // { title: "그래프 분석", url: "/graph-analysis", icon: Database },
+      { title: "API 연동", url: "/api-integration", icon: Zap },
     ],
   },
 ];
@@ -175,7 +176,7 @@ export function AppSidebar() {
         {/* 2️⃣ Analysis & 3️⃣ Simulation & 4️⃣ Data Management */}
         {menuSections.map((section) => {
           const hasActiveItem = section.items.some((item) => isActive(item.url));
-          const sectionNumber = section.id === "analysis" ? "2️⃣" 
+          const sectionNumber = section.id === "storeAnalysis" || section.id === "operationalAnalysis" ? "2️⃣" 
             : section.id === "simulation" ? "3️⃣" 
             : "4️⃣";
 

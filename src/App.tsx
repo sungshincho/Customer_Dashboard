@@ -51,19 +51,19 @@ const App = () => (
             <Routes>
               <Route path="/auth" element={<Auth />} />
               
-              {/* 1️⃣ Overview Section */}
+              {/* 1️⃣ Overview (4 pages) */}
               <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-              <Route path="/overview/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-              <Route path="/overview/stores" element={<ProtectedRoute><Stores /></ProtectedRoute>} />
-              <Route path="/overview/sync" element={<ProtectedRoute><HQStoreSyncPage /></ProtectedRoute>} />
+              <Route path="/stores" element={<ProtectedRoute><Stores /></ProtectedRoute>} />
+              <Route path="/hq-store-sync" element={<ProtectedRoute><HQStoreSyncPage /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
-              {/* 2️⃣ Analysis Section */}
+              {/* 2️⃣ Analysis - Integrated Store Analysis (3 pages) */}
               <Route path="/analysis/store" element={<ProtectedRoute><StoreAnalysisPage /></ProtectedRoute>} />
               <Route path="/analysis/customer" element={<ProtectedRoute><CustomerAnalysisIntegratedPage /></ProtectedRoute>} />
               <Route path="/analysis/product" element={<ProtectedRoute><ProductAnalysisPage /></ProtectedRoute>} />
 
-              {/* 3️⃣ Simulation Section */}
+              {/* 3️⃣ Simulation (7 pages) */}
+              <Route path="/digital-twin/3d" element={<ProtectedRoute><DigitalTwin3DPage /></ProtectedRoute>} />
               <Route path="/simulation/hub" element={<ProtectedRoute><SimulationHubPage /></ProtectedRoute>} />
               <Route path="/simulation/layout" element={<ProtectedRoute><LayoutSimPage /></ProtectedRoute>} />
               <Route path="/simulation/demand-inventory" element={<ProtectedRoute><DemandInventorySimPage /></ProtectedRoute>} />
@@ -71,12 +71,12 @@ const App = () => (
               <Route path="/simulation/recommendation" element={<ProtectedRoute><RecommendationSimPage /></ProtectedRoute>} />
               <Route path="/simulation/scenario-lab" element={<ProtectedRoute><ScenarioLabPage /></ProtectedRoute>} />
 
-              {/* 4️⃣ Data Management Section */}
-              <Route path="/data-management/import" element={<ProtectedRoute><UnifiedDataManagementPage /></ProtectedRoute>} />
-              <Route path="/data-management/digital-twin" element={<ProtectedRoute><DigitalTwin3DPage /></ProtectedRoute>} />
-              <Route path="/data-management/ontology/schema" element={<ProtectedRoute><SchemaBuilder /></ProtectedRoute>} />
-              <Route path="/data-management/ontology/graph" element={<ProtectedRoute><GraphAnalysis /></ProtectedRoute>} />
-              <Route path="/data-management/api" element={<ProtectedRoute><APIIntegrationPage /></ProtectedRoute>} />
+              {/* 4️⃣ Data Management (3 pages + 1 hidden) */}
+              <Route path="/data-import" element={<ProtectedRoute><UnifiedDataManagementPage /></ProtectedRoute>} />
+              <Route path="/schema-builder" element={<ProtectedRoute><SchemaBuilder /></ProtectedRoute>} />
+              {/* 그래프 분석 - 숨김 처리되었지만 URL로는 접근 가능 */}
+              <Route path="/graph-analysis" element={<ProtectedRoute><GraphAnalysis /></ProtectedRoute>} />
+              <Route path="/api-integration" element={<ProtectedRoute><APIIntegrationPage /></ProtectedRoute>} />
 
               <Route path="*" element={<NotFound />} />
             </Routes>
