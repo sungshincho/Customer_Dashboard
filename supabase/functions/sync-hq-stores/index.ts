@@ -29,6 +29,20 @@ Deno.serve(async (req) => {
       throw new Error('Not authenticated');
     }
 
+    // Verify NEURALTWIN_ADMIN role for internal admin operations
+    const { data: isAdmin, error: adminCheckError } = await supabaseClient
+      .rpc('is_neuraltwin_admin', { _user_id: user.id });
+
+    if (adminCheckError || !isAdmin) {
+      return new Response(
+        JSON.stringify({ error: 'Forbidden: NEURALTWIN_ADMIN access required' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 403,
+        }
+      );
+    }
+
     const { external_system_id, external_api_url, api_key } = await req.json();
     console.log('Syncing HQ stores for:', { user_id: user.id, external_system_id });
 

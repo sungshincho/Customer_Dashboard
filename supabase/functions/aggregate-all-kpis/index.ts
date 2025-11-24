@@ -29,6 +29,9 @@ Deno.serve(async (req) => {
       throw new Error('Not authenticated');
     }
 
+    // Note: This function aggregates KPIs from user data, not admin-only
+    // No NEURALTWIN_ADMIN check needed - regular users can aggregate their own data
+
     const { store_id, user_id, start_date, end_date } = await req.json();
     console.log('📊 Aggregating KPIs for store:', { store_id, user_id, start_date, end_date });
 
