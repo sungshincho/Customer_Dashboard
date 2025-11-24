@@ -24,7 +24,7 @@ interface SelectedStoreContextType {
 const SelectedStoreContext = createContext<SelectedStoreContextType | undefined>(undefined);
 
 export function SelectedStoreProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, orgId } = useAuth();
   const [selectedStore, setSelectedStore] = useState<Store | null>(null);
   const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,11 +38,19 @@ export function SelectedStoreProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('stores')
         .select('*')
-        .eq('user_id', user.id)
         .order('created_at', { ascending: true });
+
+      // Filter by org_id if available, otherwise fallback to user_id
+      if (orgId) {
+        query = query.eq('org_id', orgId);
+      } else {
+        query = query.eq('user_id', user.id);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -67,11 +75,16 @@ export function SelectedStoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     fetchStores();
-  }, [user]);
+  }, [user, orgId]);
 
   // Realtime subscription
   useEffect(() => {
     if (!user) return;
+
+    // Filter for realtime based on org_id if available
+    const filter = orgId 
+      ? `org_id=eq.${orgId}`
+      : `user_id=eq.${user.id}`;
 
     const channel = supabase
       .channel('stores-changes')
@@ -81,7 +94,7 @@ export function SelectedStoreProvider({ children }: { children: ReactNode }) {
           event: '*',
           schema: 'public',
           table: 'stores',
-          filter: `user_id=eq.${user.id}`
+          filter
         },
         () => {
           fetchStores();
@@ -92,7 +105,7 @@ export function SelectedStoreProvider({ children }: { children: ReactNode }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user, orgId]);
 
   return (
     <SelectedStoreContext.Provider value={{ selectedStore, setSelectedStore, stores, loading, refreshStores }}>

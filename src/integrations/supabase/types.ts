@@ -2753,6 +2753,10 @@ export type Database = {
         Args: { _org_id: string; _user_id: string }
         Returns: boolean
       }
+      migrate_user_to_organization: {
+        Args: { p_user_id: string }
+        Returns: string
+      }
     }
     Enums: {
       app_role:
