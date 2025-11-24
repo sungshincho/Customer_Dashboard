@@ -5,9 +5,12 @@ interface LightingPresetProps {
 }
 
 export function LightingPreset({ preset }: LightingPresetProps) {
+  // Guard against undefined or null
+  const safeLights = Array.isArray(preset?.lights) ? preset.lights : [];
+  
   return (
     <group>
-      {preset.lights.map((light, idx) => {
+      {safeLights.map((light, idx) => {
         switch (light.type) {
           case 'ambient':
             return <ambientLight key={idx} color={light.color} intensity={light.intensity} />;

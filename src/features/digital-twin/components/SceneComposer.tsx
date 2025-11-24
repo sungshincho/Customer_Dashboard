@@ -15,13 +15,41 @@ interface SceneComposerProps {
 }
 
 export function SceneComposer({ recipe, onAssetClick, overlay }: SceneComposerProps) {
+  // Provide safe defaults for all required fields
+  const safeRecipe: SceneRecipe = {
+    space: recipe?.space || {
+      id: 'default-space',
+      type: 'space' as const,
+      model_url: '',
+      position: { x: 0, y: 0, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+      scale: { x: 1, y: 1, z: 1 }
+    },
+    furniture: recipe?.furniture || [],
+    products: recipe?.products || [],
+    lighting: recipe?.lighting || {
+      name: 'Default Lighting',
+      description: 'Basic ambient and directional lighting',
+      lights: [
+        { type: 'ambient', color: '#ffffff', intensity: 0.5 },
+        { type: 'directional', color: '#ffffff', intensity: 0.8, position: { x: 5, y: 10, z: 5 } }
+      ]
+    },
+    effects: recipe?.effects || [],
+    camera: recipe?.camera || {
+      position: { x: 0, y: 10, z: 15 },
+      target: { x: 0, y: 0, z: 0 },
+      fov: 50
+    }
+  };
+
   return (
     <div className="w-full h-full">
       <Canvas shadows>
         <PerspectiveCamera
           makeDefault
-          position={[recipe.camera?.position.x || 0, recipe.camera?.position.y || 10, recipe.camera?.position.z || 15]}
-          fov={recipe.camera?.fov || 50}
+          position={[safeRecipe.camera.position.x, safeRecipe.camera.position.y, safeRecipe.camera.position.z]}
+          fov={safeRecipe.camera.fov}
         />
         
         <Suspense fallback={null}>
@@ -29,28 +57,28 @@ export function SceneComposer({ recipe, onAssetClick, overlay }: SceneComposerPr
           <Environment preset="apartment" />
           
           {/* Custom Lighting */}
-          <LightingPreset preset={recipe.lighting} />
+          <LightingPreset preset={safeRecipe.lighting} />
           
           {/* Space/Store Model */}
           <StoreSpace 
-            asset={recipe.space}
-            onClick={() => onAssetClick?.(recipe.space.id, 'space')}
+            asset={safeRecipe.space}
+            onClick={() => onAssetClick?.(safeRecipe.space.id, 'space')}
           />
           
           {/* Furniture Layer */}
           <FurnitureLayout 
-            furniture={recipe.furniture}
+            furniture={safeRecipe.furniture}
             onClick={(id) => onAssetClick?.(id, 'furniture')}
           />
           
           {/* Product Layer */}
           <ProductPlacement 
-            products={recipe.products}
+            products={safeRecipe.products}
             onClick={(id) => onAssetClick?.(id, 'product')}
           />
           
           {/* Effect Layers */}
-          {recipe.effects?.map((effect, idx) => {
+          {safeRecipe.effects?.map((effect, idx) => {
             if (effect.type === 'heatmap') {
               return (
                 <HeatmapOverlay 
@@ -69,9 +97,9 @@ export function SceneComposer({ recipe, onAssetClick, overlay }: SceneComposerPr
         
         <OrbitControls 
           target={[
-            recipe.camera?.target.x || 0,
-            recipe.camera?.target.y || 0,
-            recipe.camera?.target.z || 0
+            safeRecipe.camera.target.x,
+            safeRecipe.camera.target.y,
+            safeRecipe.camera.target.z
           ]}
           enableDamping
           dampingFactor={0.05}

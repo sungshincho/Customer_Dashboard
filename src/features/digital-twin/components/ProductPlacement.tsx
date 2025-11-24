@@ -6,10 +6,13 @@ interface ProductPlacementProps {
   onClick?: (id: string) => void;
 }
 
-export function ProductPlacement({ products, onClick }: ProductPlacementProps) {
+export function ProductPlacement({ products = [], onClick }: ProductPlacementProps) {
+  // Guard against undefined or null
+  const safeProducts = Array.isArray(products) ? products : [];
+  
   return (
     <group>
-      {products.map((item) => (
+      {safeProducts.map((item) => (
         <ProductItem key={item.id} asset={item} onClick={() => onClick?.(item.id)} />
       ))}
     </group>
