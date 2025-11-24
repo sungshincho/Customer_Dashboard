@@ -2110,42 +2110,63 @@ export type Database = {
       stores: {
         Row: {
           address: string | null
+          area_sqm: number | null
           created_at: string
+          district: string | null
           email: string | null
+          hq_store_code: string | null
           id: string
           manager_name: string | null
           metadata: Json | null
+          opening_date: string | null
           org_id: string | null
           phone: string | null
+          region: string | null
+          status: string | null
           store_code: string
+          store_format: string | null
           store_name: string
           updated_at: string
           user_id: string
         }
         Insert: {
           address?: string | null
+          area_sqm?: number | null
           created_at?: string
+          district?: string | null
           email?: string | null
+          hq_store_code?: string | null
           id?: string
           manager_name?: string | null
           metadata?: Json | null
+          opening_date?: string | null
           org_id?: string | null
           phone?: string | null
+          region?: string | null
+          status?: string | null
           store_code: string
+          store_format?: string | null
           store_name: string
           updated_at?: string
           user_id: string
         }
         Update: {
           address?: string | null
+          area_sqm?: number | null
           created_at?: string
+          district?: string | null
           email?: string | null
+          hq_store_code?: string | null
           id?: string
           manager_name?: string | null
           metadata?: Json | null
+          opening_date?: string | null
           org_id?: string | null
           phone?: string | null
+          region?: string | null
+          status?: string | null
           store_code?: string
+          store_format?: string | null
           store_name?: string
           updated_at?: string
           user_id?: string
