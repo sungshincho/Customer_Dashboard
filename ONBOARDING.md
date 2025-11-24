@@ -1,108 +1,107 @@
 # NEURALTWIN 온보딩 가이드
 
-## 프로젝트 소개
+> **최종 업데이트**: 2025-11-24  
+> **버전**: 2.0
 
-NEURALTWIN은 AI 기반 실시간 매장 분석 관리자 대시보드입니다. 방문자 분석, 재고 관리, AI 예측을 통해 비즈니스 인사이트를 제공합니다.
+---
 
-## 기술 스택
+## 🚀 프로젝트 소개
 
-- **Frontend**: React 18, TypeScript, Vite
-- **UI Framework**: Tailwind CSS, shadcn/ui
-- **Backend**: Supabase (PostgreSQL, Auth, Realtime)
-- **Charts**: Recharts
-- **State Management**: TanStack Query (React Query)
-- **Routing**: React Router v6
+NEURALTWIN은 AI 기반 리테일 데이터 분석 플랫폼으로, 매장의 디지털 트윈을 구축하고 다양한 시뮬레이션을 통해 최적의 의사결정을 지원합니다.
 
-## 디자인 시스템
+### 핵심 가치
+- 🎯 **데이터 기반 의사결정**: 실시간 데이터 분석 및 AI 추천
+- 🏬 **3D 디지털 트윈**: 매장의 3D 시각화 및 시뮬레이션
+- 🤖 **AI 시뮬레이션**: 레이아웃, 가격, 재고, 수요 예측
+- 📊 **통합 온톨로지**: 유연한 데이터 스키마 관리
+- 🔄 **실시간 추적**: WiFi 기반 고객 동선 분석
 
-### 컬러 팔레트
-- **Primary**: Neural Blue-Purple Gradient (#1B6BFF → #9B59FF)
-- **Background**: Dark Navy (#0A1020)
-- **Surface**: Glassmorphism (rgba(255, 255, 255, 0.05))
+---
 
-### 주요 유틸리티
-- `gradient-text`: 그라디언트 텍스트 효과
-- `hover-lift`: 호버 시 카드 리프트 효과
-- `bg-gradient-primary`: 메인 그라디언트 배경
-- `shadow-glow`: 글로우 효과 섀도우
+## 🛠 기술 스택
 
-### 애니메이션
-- `animate-fade-in`: 페이드인 효과
-- `animate-slide-up`: 슬라이드 업 효과
-- `animate-scale-in`: 스케일 인 효과
-- `animate-pulse-glow`: 펄스 글로우 효과
+### Frontend
+- **Framework**: React 18.3.1 + TypeScript 5.x
+- **Build Tool**: Vite 5.x
+- **Routing**: React Router DOM 6.30.1
+- **UI**: shadcn/ui + Tailwind CSS 3.x
+- **State**: TanStack Query 5.83.0
+- **3D**: Three.js + React Three Fiber + drei
+- **Charts**: Recharts 2.15.4
 
-자세한 내용은 `src/index.css`와 `tailwind.config.ts`를 참고하세요.
+### Backend (Lovable Cloud)
+- **Platform**: Lovable Cloud (Supabase)
+- **Database**: PostgreSQL 15+
+- **Auth**: Supabase Auth
+- **Storage**: Supabase Storage
+- **Functions**: Supabase Edge Functions (Deno)
+- **AI**: Lovable AI (Gemini, GPT)
 
-## 프로젝트 구조 (2025-11-14 업데이트)
+---
 
-**Feature-based 아키텍처 완전 적용**
+## 📁 프로젝트 구조
 
 ```
 src/
-├── components/           # 공유 컴포넌트만 유지
-│   ├── ui/              # shadcn/ui 컴포넌트
-│   ├── AppSidebar.tsx   # 사이드바 네비게이션
-│   ├── DashboardLayout.tsx  # 공통 레이아웃
-│   ├── DataReadinessGuard.tsx  # 데이터 준비 가드
-│   ├── ProtectedRoute.tsx   # 인증 보호 라우트
-│   ├── NavLink.tsx      # 네비게이션 링크
-│   ├── StatCard.tsx     # 통계 카드 컴포넌트
-│   └── ThemeToggle.tsx  # 다크모드 토글
+├── components/              # 공유 컴포넌트
+│   ├── ui/                 # shadcn/ui
+│   ├── AppSidebar.tsx
+│   ├── DashboardLayout.tsx
+│   ├── DataReadinessGuard.tsx
+│   └── ProtectedRoute.tsx
 │
-├── core/                # 핵심 페이지
+├── core/                    # 핵심 페이지
 │   └── pages/
-│       ├── AuthPage.tsx       # 로그인/회원가입
-│       ├── DashboardPage.tsx  # 메인 대시보드
-│       ├── SettingsPage.tsx   # 설정
-│       └── NotFoundPage.tsx   # 404
+│       ├── AuthPage.tsx
+│       ├── DashboardPage.tsx
+│       ├── SettingsPage.tsx
+│       └── NotFoundPage.tsx
 │
-├── features/            # Feature-based 모듈
-│   ├── data-management/
-│   │   ├── import/      # CSV/Excel 임포트
-│   │   ├── analysis/    # 데이터 분석 (AI)
-│   │   ├── ontology/    # 온톨로지 스키마
-│   │   ├── bigdata/     # 외부 API 연동
-│   │   └── neuralsense/ # WiFi 센서 관리
-│   │
-│   ├── store-analysis/
-│   │   ├── stores/      # 매장 관리
-│   │   ├── footfall/    # 고객 동선 분석
-│   │   └── inventory/   # 재고 관리
-│   │
-│   ├── profit-center/
-│   │   ├── demand-inventory/  # 수요 예측
-│   │   ├── pricing/           # 가격 최적화
-│   │   └── personalization/   # 개인화 추천
-│   │
-│   ├── cost-center/
-│   │   └── automation/        # 인력/제품 효율성
-│   │
-│   └── digital-twin/
-│       ├── components/  # 3D 컴포넌트
-│       ├── pages/      # 3D 페이지
-│       ├── utils/      # 3D 유틸리티
-│       └── types/      # 3D 타입
+├── features/                # Feature-based 모듈
+│   ├── data-management/    # 데이터 관리
+│   ├── store-analysis/     # 매장 분석
+│   ├── simulation/         # AI 시뮬레이션
+│   ├── digital-twin/       # 3D Digital Twin
+│   ├── profit-center/      # 수익 센터
+│   └── cost-center/        # 비용 센터
 │
-├── hooks/              # 공유 커스텀 훅
-├── utils/              # 공유 유틸리티
-├── types/              # 공유 타입 정의
-└── integrations/       # 외부 통합 (Supabase)
+├── hooks/                   # 커스텀 훅
+├── utils/                   # 유틸리티
+├── types/                   # 타입 정의
+└── integrations/           # 외부 통합 (Supabase)
 ```
 
-**상세 구조:** [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md)  
-**클린업 보고서:** [CLEANUP_2025_11_14.md](./CLEANUP_2025_11_14.md)
-│   ├── Analytics.tsx    # 방문자 분석
-│   ├── Inventory.tsx    # 재고 관리
-│   ├── Forecasts.tsx    # AI 예측
-│   └── Settings.tsx     # 설정
-├── hooks/
-│   └── useAuth.tsx      # 인증 훅
-└── integrations/
-    └── supabase/        # Supabase 클라이언트
-```
+상세 구조: [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md)  
+완전한 아키텍처: [NEURALTWIN_COMPLETE_ARCHITECTURE.md](./NEURALTWIN_COMPLETE_ARCHITECTURE.md)
 
-## 시작하기
+---
+
+## 🎨 디자인 시스템
+
+### 컬러 팔레트
+- **Primary**: Electric Blue (#1B6BFF)
+- **Background**: Dark Navy (#0A1020)
+- **Accent**: Neural Purple (#9B59FF)
+- **Surface**: Glassmorphism (rgba)
+
+### 주요 유틸리티 클래스
+- `gradient-text` - 그라디언트 텍스트
+- `hover-lift` - 호버 리프트 효과
+- `bg-gradient-primary` - 메인 그라디언트 배경
+- `shadow-glow` - 글로우 효과
+
+### 애니메이션
+- `animate-fade-in` - 페이드인
+- `animate-slide-up` - 슬라이드 업
+- `animate-scale-in` - 스케일 인
+
+**💡 중요**: 항상 디자인 시스템의 semantic tokens를 사용하세요!
+- ❌ `text-white`, `bg-blue-500` (하드코딩)
+- ✅ `text-foreground`, `bg-primary` (시맨틱 토큰)
+
+---
+
+## 🚦 시작하기
 
 ### 1. 개발 환경 설정
 
@@ -114,62 +113,57 @@ npm install
 npm run dev
 ```
 
-### 2. Supabase 설정
+### 2. Lovable Cloud 설정
 
-1. Supabase 프로젝트 생성 (또는 Lovable Cloud 활성화)
-2. 환경 변수 설정:
-   - `VITE_SUPABASE_URL`
-   - `VITE_SUPABASE_ANON_KEY`
+Lovable Cloud가 자동으로 설정됩니다:
+- Supabase 프로젝트 자동 연결
+- 환경 변수 자동 관리
+- 데이터베이스 마이그레이션 자동 적용
 
-3. 데이터베이스 마이그레이션 실행:
-   ```sql
-   -- user_roles 테이블 생성
-   -- stores, inventory, visitors, sales 테이블 생성
-   ```
+### 3. 첫 매장 등록
 
-### 3. 역할 기반 접근 제어 (RBAC)
+1. `/stores` 페이지로 이동
+2. "매장 추가" 버튼 클릭
+3. 매장 정보 입력 후 저장
+4. 사이드바에서 매장 선택
 
-프로젝트는 세 가지 역할을 지원합니다:
-- **admin**: 모든 기능 접근 가능
-- **editor**: 데이터 편집 가능
-- **viewer**: 읽기 전용
+### 4. 데이터 임포트
 
-기본적으로 신규 사용자는 `viewer` 역할로 시작합니다.
+1. `/data-import` 페이지로 이동
+2. CSV 파일 업로드 (customers, products, purchases, visits)
+3. 데이터 검증 후 저장
+4. 온톨로지 자동 매핑 확인
 
-## 주요 페이지 소개
+---
 
-### 1. Dashboard (`/`)
-- 실시간 방문자 수, 매출, 재고 현황
-- 시간대별 방문자 차트
-- 최근 알림
+## 📄 주요 페이지 소개
 
-### 2. Stores (`/stores`)
-- 매장 목록 및 상세 정보
-- 매장 추가/편집
-- 운영 상태 관리
+### 대시보드 (`/`)
+- 실시간 KPI (방문자, 매출, 전환율)
+- 주간 트렌드 차트
+- AI 추천 카드
+- 퍼널 시각화
 
-### 3. Analytics (`/analytics`)
-- 방문자 히트맵
-- 이동 경로 분석
-- 체류 시간 분석
-- 전환 퍼널
+### 매장 분석
+- **Footfall Analysis** (`/footfall-analysis`) - 고객 동선 분석
+- **Traffic Heatmap** (`/traffic-heatmap`) - 히트맵 시각화
+- **Customer Journey** (`/customer-journey`) - 고객 여정
+- **Conversion Funnel** (`/conversion-funnel`) - 전환 퍼널
 
-### 4. Inventory (`/inventory`)
-- 재고 현황 테이블
-- 발주 요청 기능
-- 재고 알림
+### 데이터 관리
+- **Unified Data Import** (`/data-import`) - 데이터 임포트
+- **Schema Builder** (`/schema-builder`) - 온톨로지 스키마
+- **Graph Analysis** (`/graph-analysis`) - 그래프 분석
 
-### 5. Forecasts (`/forecasts`)
-- AI 기반 방문자 예측
-- 매출 예측
-- 추천 인사이트
+### 3D Digital Twin
+- **Digital Twin 3D** (`/digital-twin-3d`) - 3D 매장 시각화
+- 히트맵 오버레이
+- 고객 동선 오버레이
+- WiFi 트래킹 오버레이
 
-### 6. Settings (`/settings`)
-- 프로필 설정
-- 알림 설정
-- 계정 관리
+---
 
-## 인증 시스템
+## 🔐 인증 시스템
 
 ### 로그인
 - 이메일/비밀번호 인증
@@ -177,137 +171,170 @@ npm run dev
 - Protected Routes로 보호
 
 ### 회원가입
-- 이메일 검증
-- 자동으로 `viewer` 역할 부여
-- `user_roles` 테이블에 기록
+- 이메일 자동 검증 (auto-confirm 활성화)
+- 자동 프로필 생성
 
 ### 보호된 라우트
-모든 대시보드 페이지는 `ProtectedRoute` 컴포넌트로 보호됩니다.
-로그인하지 않은 사용자는 `/auth`로 자동 리다이렉트됩니다.
+모든 대시보드 페이지는 `ProtectedRoute`로 보호됩니다.
 
-## 개발 가이드
+---
+
+## 💻 개발 가이드
 
 ### 새 페이지 추가
 
-1. `src/pages/NewPage.tsx` 생성
-2. `src/App.tsx`에 라우트 추가:
-   ```tsx
-   <Route
-     path="/new-page"
-     element={
-       <ProtectedRoute>
-         <NewPage />
-       </ProtectedRoute>
-     }
-   />
-   ```
-3. `src/components/AppSidebar.tsx`에 메뉴 아이템 추가
+```typescript
+// 1. 페이지 생성
+// src/features/my-feature/pages/MyPage.tsx
+export default function MyPage() {
+  return <div>My Page</div>;
+}
+
+// 2. 라우트 추가 (src/App.tsx)
+<Route
+  path="/my-page"
+  element={
+    <ProtectedRoute>
+      <MyPage />
+    </ProtectedRoute>
+  }
+/>
+
+// 3. 메뉴 추가 (src/components/AppSidebar.tsx)
+<NavLink to="/my-page" icon={Icon}>
+  My Page
+</NavLink>
+```
 
 ### 새 컴포넌트 생성
 
-1. 재사용 가능한 컴포넌트는 `src/components/`에 생성
-2. 페이지별 컴포넌트는 해당 페이지 파일 내에 정의
-3. 디자인 시스템의 유틸리티 클래스 활용
+```typescript
+// Feature 특화 컴포넌트
+// src/features/my-feature/components/MyComponent.tsx
+
+// 공유 컴포넌트
+// src/components/MySharedComponent.tsx
+```
 
 ### 스타일링 가이드
 
-✅ **좋은 예시**:
 ```tsx
+// ✅ 좋은 예시
 <Button className="bg-gradient-primary hover:shadow-glow">
   <span className="gradient-text">클릭</span>
 </Button>
-```
 
-❌ **나쁜 예시**:
-```tsx
+// ❌ 나쁜 예시
 <Button className="bg-blue-500 hover:bg-blue-600">
   <span className="text-white">클릭</span>
 </Button>
 ```
 
-항상 디자인 시스템의 semantic tokens를 사용하세요!
+---
 
-## 데이터베이스 스키마
+## 🗄 데이터베이스 구조
 
-### user_roles
+### 주요 테이블
+
+#### 매장 관리
+- `stores` - 매장 정보
+- `hq_store_master` - 본사 매장 마스터
+- `store_mappings` - 매장 매핑
+
+#### 데이터 임포트 & 온톨로지
+- `user_data_imports` - 업로드 데이터
+- `ontology_entity_types` - 엔티티 타입
+- `ontology_relation_types` - 관계 타입
+- `graph_entities` - 엔티티 인스턴스
+- `graph_relations` - 관계
+
+#### WiFi 추적
+- `neuralsense_devices` - WiFi 센서
+- `wifi_tracking` - 트래킹 데이터
+- `wifi_zones` - 존 정의
+
+#### 분석 & KPI
+- `dashboard_kpis` - KPI 집계
+- `funnel_metrics` - 퍼널 메트릭
+- `analysis_history` - 분석 이력
+
+#### AI & 시뮬레이션
+- `scenarios` - 시나리오
+- `simulation_results` - 시뮬레이션 결과
+- `ai_recommendations` - AI 추천
+
+### RLS (Row Level Security)
+모든 테이블에 사용자별 데이터 격리 정책 적용:
 ```sql
-- id: uuid (PK)
-- user_id: uuid (FK to auth.users)
-- role: app_role (admin | editor | viewer)
-- created_at: timestamp
+auth.uid() = user_id
 ```
 
-### stores
-```sql
-- id: uuid (PK)
-- name: text
-- location: text
-- status: text
-- created_at: timestamp
-```
+---
 
-### inventory
-```sql
-- id: uuid (PK)
-- store_id: uuid (FK)
-- product_name: text
-- quantity: integer
-- min_quantity: integer
-- updated_at: timestamp
-```
-
-### visitors
-```sql
-- id: uuid (PK)
-- store_id: uuid (FK)
-- timestamp: timestamp
-- count: integer
-```
-
-### sales
-```sql
-- id: uuid (PK)
-- store_id: uuid (FK)
-- timestamp: timestamp
-- amount: decimal
-```
-
-## RLS (Row Level Security) 정책
-
-모든 테이블에 RLS가 활성화되어 있습니다:
-- **admin**: 모든 작업 가능 (SELECT, INSERT, UPDATE, DELETE)
-- **editor**: SELECT, INSERT, UPDATE만 가능
-- **viewer**: SELECT만 가능
-
-## 트러블슈팅
+## 🔧 트러블슈팅
 
 ### 로그인 후 대시보드가 로딩되지 않음
-- Supabase 환경 변수 확인
 - 브라우저 콘솔에서 에러 확인
-- `user_roles` 테이블에 사용자 역할이 있는지 확인
+- Lovable Cloud 연결 상태 확인
+- 페이지 새로고침 (Ctrl+F5)
+
+### 데이터가 표시되지 않음
+1. 매장이 선택되었는지 확인
+2. 데이터가 임포트되었는지 확인 (`/data-import`)
+3. 온톨로지 스키마가 설정되었는지 확인 (`/schema-builder`)
+
+### 3D 모델이 로딩되지 않음
+- Supabase Storage에 모델 업로드 확인
+- 파일명 규칙 준수 확인 (`Entity_Name_WxDxH.glb`)
+- 브라우저 콘솔에서 에러 확인
 
 ### 차트가 표시되지 않음
-- 데이터가 있는지 확인
-- Recharts 컴포넌트의 데이터 형식 확인
+- 데이터 형식 확인
+- Recharts 컴포넌트 props 확인
+- 브라우저 호환성 확인
 
-### 스타일이 적용되지 않음
-- Tailwind 클래스 이름 확인
-- 다크모드 설정 확인
-- `index.css`의 커스텀 유틸리티 확인
+---
 
-## 다음 단계
+## 📚 추가 문서
 
-1. ✅ 기본 인증 시스템 완료
-2. ✅ 디자인 시스템 적용 완료
-3. ⏳ Supabase Realtime 연동
-4. ⏳ 실제 데이터 연동
-5. ⏳ AI 예측 모델 통합
+### 필수 문서
+- **[PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md)** - 프로젝트 구조 및 개발 로드맵
+- **[NEURALTWIN_COMPLETE_ARCHITECTURE.md](./NEURALTWIN_COMPLETE_ARCHITECTURE.md)** - 완전한 시스템 아키텍처
+- **[COLLABORATION_GUIDE.md](./COLLABORATION_GUIDE.md)** - 협업 가이드
 
-## 도움이 필요하신가요?
+### 기술 문서 (docs/)
+- `3D_MODEL_FILENAME_SPECIFICATION.md` - 3D 모델 파일명 규칙
+- `DEMO_DATASET_REQUIREMENTS.md` - 데모 데이터셋 요구사항
+- `WIFI_TRACKING_CSV_GUIDE.md` - WiFi 트래킹 데이터 가이드
+- `SIMULATION_GUIDE.md` - 시뮬레이션 가이드
 
+### 통합 가이드
+- **[DIGITAL_TWIN_3D_INTEGRATION.md](./DIGITAL_TWIN_3D_INTEGRATION.md)** - 3D 디지털 트윈 통합 가이드
+
+---
+
+## 🎓 학습 리소스
+
+### 외부 문서
+- [Lovable 문서](https://docs.lovable.dev)
 - [Supabase 문서](https://supabase.com/docs)
 - [shadcn/ui 문서](https://ui.shadcn.com)
 - [Tailwind CSS 문서](https://tailwindcss.com/docs)
-- [React Router 문서](https://reactrouter.com)
+- [React Three Fiber](https://docs.pmnd.rs/react-three-fiber)
 
-협업 가이드는 `COLLABORATION_GUIDE.md`를 참고하세요.
+---
+
+## ✅ 다음 단계
+
+1. ✅ 기본 인증 시스템
+2. ✅ Feature-based 아키텍처
+3. ✅ 디자인 시스템
+4. ✅ 3D Digital Twin 통합
+5. ⏳ AI 시뮬레이션 통합
+6. ⏳ 외부 API 연동
+
+---
+
+**최종 업데이트**: 2025-11-24  
+**작성자**: NEURALTWIN Development Team  
+**버전**: 2.0
