@@ -17,8 +17,11 @@ import { DashboardFilters } from "@/components/dashboard/DashboardFilters";
 import { useDashboardKPI, useLatestKPIs } from "@/hooks/useDashboardKPI";
 import { useAIRecommendations } from "@/hooks/useAIRecommendations";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
 const Dashboard = () => {
+  const { user } = useAuth();
   const { selectedStore } = useSelectedStore();
   const { invalidateStoreData } = useClearCache();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -303,6 +306,29 @@ const Dashboard = () => {
             <DashboardFilters 
               selectedDate={selectedDate}
               onDateChange={(date) => date && setSelectedDate(date)}
+              onAggregateRange={async (startDate, endDate) => {
+                if (selectedStore?.id) {
+                  try {
+                    const { error } = await supabase.functions.invoke('aggregate-all-kpis', {
+                      body: {
+                        store_id: selectedStore.id,
+                        user_id: user?.id,
+                        start_date: startDate,
+                        end_date: endDate
+                      }
+                    });
+                    
+                    if (error) throw error;
+                    
+                    // KPI 데이터 새로고침
+                    refetch();
+                    toast.success(`${startDate}부터 ${endDate}까지 KPI 집계 완료`);
+                  } catch (error) {
+                    console.error('날짜 범위 KPI 집계 실패:', error);
+                    toast.error('KPI 집계에 실패했습니다');
+                  }
+                }
+              }}
             />
             <Button
               onClick={() => {

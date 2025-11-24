@@ -29,8 +29,8 @@ Deno.serve(async (req) => {
       throw new Error('Not authenticated');
     }
 
-    const { store_id, user_id } = await req.json();
-    console.log('📊 Aggregating all KPIs for store:', { store_id, user_id });
+    const { store_id, user_id, start_date, end_date } = await req.json();
+    console.log('📊 Aggregating KPIs for store:', { store_id, user_id, start_date, end_date });
 
     // 온톨로지에서 모든 방문/구매 데이터의 날짜 범위 파악
     const { data: entityTypes } = await supabaseClient
@@ -95,9 +95,13 @@ Deno.serve(async (req) => {
     const storeMetadata = storeData?.metadata as any;
     const storeArea = storeMetadata?.area || 100;
 
-    // 각 날짜별로 KPI 집계
+    // 각 날짜별로 KPI 집계 (날짜 범위 필터링)
     const kpiResults = [];
     for (const [date, data] of dateMap.entries()) {
+      // 날짜 범위 필터 적용
+      if (start_date && date < start_date) continue;
+      if (end_date && date > end_date) continue;
+      
       const totalVisits = data.visits.length;
       const totalPurchases = data.purchases.length;
       const totalRevenue = data.purchases.reduce((sum, p) => {
