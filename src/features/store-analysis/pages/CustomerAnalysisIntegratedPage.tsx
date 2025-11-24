@@ -37,19 +37,19 @@ export default function CustomerAnalysisIntegratedPage() {
   const visitsData = visitsQuery.data?.data || [];
   const purchasesData = purchasesQuery.data?.data || [];
 
-  const totalVisits = visitsData.length || 1;
+  const totalVisits = visitsData.length;
   const browsing = Math.round(totalVisits * 0.75);
   const fitting = Math.round(totalVisits * 0.45);
   const purchases = purchasesData.length;
   const returns = Math.round(purchases * 0.3);
 
-  const funnelData = [
+  const funnelData = totalVisits > 0 ? [
     { stage: "Entry", label: "유입", count: totalVisits, rate: 100, color: "hsl(var(--primary))" },
     { stage: "Browse", label: "체류", count: browsing, rate: Math.round((browsing / totalVisits) * 100), color: "#3b82f6" },
     { stage: "Fitting", label: "체험", count: fitting, rate: Math.round((fitting / totalVisits) * 100), color: "#10b981" },
     { stage: "Purchase", label: "구매", count: purchases, rate: Math.round((purchases / totalVisits) * 100), color: "#f59e0b" },
     { stage: "Return", label: "재방문", count: returns, rate: Math.round((returns / totalVisits) * 100), color: "#8b5cf6" },
-  ];
+  ] : [];
 
   // 시간대 애니메이션
   useEffect(() => {
@@ -114,7 +114,11 @@ export default function CustomerAnalysisIntegratedPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">총 고객</p>
-                  <p className="text-2xl font-bold">{segments.length.toLocaleString()}</p>
+                  <p className="text-2xl font-bold">
+                    {segments.length > 0 ? segments.length.toLocaleString() : (
+                      <span className="text-base text-muted-foreground">데이터 없음</span>
+                    )}
+                  </p>
                   <p className="text-xs text-muted-foreground mt-1">전체 고객 수</p>
                 </div>
                 <Users className="w-8 h-8 text-primary opacity-50" />
@@ -127,7 +131,11 @@ export default function CustomerAnalysisIntegratedPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">전환율</p>
-                  <p className="text-2xl font-bold">{Math.round((purchases / totalVisits) * 100)}%</p>
+                  <p className="text-2xl font-bold">
+                    {totalVisits > 0 ? `${Math.round((purchases / totalVisits) * 100)}%` : (
+                      <span className="text-base text-muted-foreground">데이터 없음</span>
+                    )}
+                  </p>
                   <p className="text-xs text-muted-foreground mt-1">방문 대비 구매</p>
                 </div>
                 <TrendingUp className="w-8 h-8 text-green-500 opacity-50" />
@@ -140,7 +148,11 @@ export default function CustomerAnalysisIntegratedPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">평균 객단가</p>
-                  <p className="text-2xl font-bold">₩{Math.round(segmentStats[0]?.avgRevenue || 0).toLocaleString()}</p>
+                  <p className="text-2xl font-bold">
+                    {segmentStats[0]?.avgRevenue ? `₩${Math.round(segmentStats[0].avgRevenue).toLocaleString()}` : (
+                      <span className="text-base text-muted-foreground">데이터 없음</span>
+                    )}
+                  </p>
                   <p className="text-xs text-muted-foreground mt-1">고객당 평균</p>
                 </div>
                 <DollarSign className="w-8 h-8 text-orange-500 opacity-50" />
@@ -217,24 +229,32 @@ export default function CustomerAnalysisIntegratedPage() {
               <CardDescription>고객 여정 단계별 전환율</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {funnelData.map((item, idx) => (
-                <div key={item.stage} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{item.label}</span>
-                      <Badge variant="outline">{item.count.toLocaleString()}명</Badge>
-                    </div>
-                    <span className="text-sm text-muted-foreground">{item.rate}%</span>
-                  </div>
-                  <Progress value={item.rate} className="h-3" />
-                  {idx < funnelData.length - 1 && (
-                    <div className="flex items-center gap-2 ml-4 text-xs text-muted-foreground">
-                      <ChevronRight className="w-3 h-3" />
-                      <span>다음 단계로 {Math.round((funnelData[idx + 1].count / item.count) * 100)}% 전환</span>
-                    </div>
-                  )}
+              {funnelData.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <TrendingUp className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>퍼널 데이터가 없습니다</p>
+                  <p className="text-sm mt-1">방문 및 구매 데이터를 업로드해주세요</p>
                 </div>
-              ))}
+              ) : (
+                funnelData.map((item, idx) => (
+                  <div key={item.stage} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{item.label}</span>
+                        <Badge variant="outline">{item.count.toLocaleString()}명</Badge>
+                      </div>
+                      <span className="text-sm text-muted-foreground">{item.rate}%</span>
+                    </div>
+                    <Progress value={item.rate} className="h-3" />
+                    {idx < funnelData.length - 1 && (
+                      <div className="flex items-center gap-2 ml-4 text-xs text-muted-foreground">
+                        <ChevronRight className="w-3 h-3" />
+                        <span>다음 단계로 {Math.round((funnelData[idx + 1].count / item.count) * 100)}% 전환</span>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </CardContent>
           </Card>
         </div>

@@ -193,11 +193,7 @@ const Dashboard = () => {
   // 최근 7일 트렌드 데이터 (latestKPIs 기반)
   const visitorData = useMemo(() => {
     if (!latestKPIs || latestKPIs.length === 0) {
-      return Array.from({ length: 7 }, (_, i) => ({
-        date: `Day ${i + 1}`,
-        visitors: 0,
-        revenue: 0
-      }));
+      return [];
     }
     
     return latestKPIs.slice(0, 7).reverse().map(kpi => ({
@@ -427,49 +423,59 @@ const Dashboard = () => {
               <CardDescription>방문자 수 및 매출 추이</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={visitorData}>
-                  <defs>
-                    <linearGradient id="colorVisitors" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(var(--chart-2))" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="date" className="text-xs" />
-                  <YAxis yAxisId="left" className="text-xs" />
-                  <YAxis yAxisId="right" orientation="right" className="text-xs" />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: "hsl(var(--card))", 
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "var(--radius)"
-                    }} 
-                  />
-                  <Area 
-                    yAxisId="left"
-                    type="monotone" 
-                    dataKey="visitors" 
-                    stroke="hsl(var(--primary))" 
-                    fillOpacity={1} 
-                    fill="url(#colorVisitors)" 
-                    name="방문자"
-                  />
-                  <Area 
-                    yAxisId="right"
-                    type="monotone" 
-                    dataKey="revenue" 
-                    stroke="hsl(var(--chart-2))" 
-                    fillOpacity={1} 
-                    fill="url(#colorRevenue)" 
-                    name="매출 (천원)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+              {visitorData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <AreaChart data={visitorData}>
+                    <defs>
+                      <linearGradient id="colorVisitors" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="hsl(var(--chart-2))" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="date" className="text-xs" />
+                    <YAxis yAxisId="left" className="text-xs" />
+                    <YAxis yAxisId="right" orientation="right" className="text-xs" />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: "hsl(var(--card))", 
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "var(--radius)"
+                      }} 
+                    />
+                    <Area 
+                      yAxisId="left"
+                      type="monotone" 
+                      dataKey="visitors" 
+                      stroke="hsl(var(--primary))" 
+                      fillOpacity={1} 
+                      fill="url(#colorVisitors)" 
+                      name="방문자"
+                    />
+                    <Area 
+                      yAxisId="right"
+                      type="monotone" 
+                      dataKey="revenue" 
+                      stroke="hsl(var(--chart-2))" 
+                      fillOpacity={1} 
+                      fill="url(#colorRevenue)" 
+                      name="매출 (천원)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                  <div className="text-center">
+                    <TrendingUp className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>트렌드 데이터가 없습니다</p>
+                    <p className="text-sm mt-1">KPI를 집계하면 데이터가 표시됩니다</p>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
