@@ -59,11 +59,8 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
         
         // File 객체는 복원 불가능하므로 빈 File 객체로 대체
         const restoredFiles: UploadFile[] = storedFiles.map(stored => {
-          // 진행 중이던 업로드는 cancelled 상태로 복원 (파일 데이터가 없으므로)
+          // 진행 중이던 업로드는 상태 그대로 유지 (백그라운드 진행 추적)
           let status = stored.status;
-          if (['uploading', 'processing', 'mapping', 'pending'].includes(stored.status)) {
-            status = 'cancelled';
-          }
           
           // 빈 File 객체 생성 (UI 표시용)
           const dummyFile = new File([], stored.fileName, { type: 'application/octet-stream' });
@@ -83,6 +80,9 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
         
         setFiles(restoredFiles);
         console.log(`📋 Restored ${restoredFiles.length} upload records from localStorage`);
+        
+        // 진행 중인 업로드의 실제 상태 확인
+        checkBackgroundUploads(restoredFiles);
       }
     } catch (error) {
       console.error('Failed to restore upload history:', error);
@@ -113,6 +113,54 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
       console.error('Failed to save upload history:', error);
     }
   }, [files, storeId]);
+
+  // 백그라운드 업로드 상태 확인
+  const checkBackgroundUploads = async (restoredFiles: UploadFile[]) => {
+    const processingFiles = restoredFiles.filter(f => 
+      ['uploading', 'processing', 'mapping'].includes(f.status)
+    );
+    
+    if (processingFiles.length === 0) return;
+    
+    console.log(`🔍 Checking ${processingFiles.length} background uploads...`);
+    
+    for (const file of processingFiles) {
+      try {
+        // user_data_imports 테이블에서 실제 상태 확인
+        const { data: importRecord } = await supabase
+          .from('user_data_imports')
+          .select('data_type, raw_data')
+          .eq('file_name', file.file.name)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+        
+        if (importRecord) {
+          const dataType = importRecord.data_type;
+          
+          if (dataType === 'completed') {
+            // 완료됨
+            const rawData = importRecord.raw_data as any;
+            updateFileStatus(file.id, 'success', undefined, 100, rawData?.pipeline_result);
+            console.log(`✅ Background upload completed: ${file.file.name}`);
+          } else if (dataType === 'failed') {
+            // 실패
+            const rawData = importRecord.raw_data as any;
+            const errorMsg = rawData?.error || '백그라운드 처리 실패';
+            updateFileStatus(file.id, 'error', errorMsg);
+            console.log(`❌ Background upload failed: ${file.file.name}`);
+          } else if (dataType === 'processing_pipeline') {
+            // 여전히 진행 중
+            console.log(`⏳ Background upload still processing: ${file.file.name}`);
+            // 상태 유지, 5초 후 다시 확인
+            setTimeout(() => checkBackgroundUploads([file]), 5000);
+          }
+        }
+      } catch (error) {
+        console.error(`Failed to check background upload for ${file.file.name}:`, error);
+      }
+    }
+  };
 
   // 파일 타입 자동 감지
   const detectFileType = (file: File): UploadFile['type'] => {
@@ -158,7 +206,7 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
     });
 
     setFiles(prev => [...prev, ...uploadFiles]);
-  }, [toast]);
+  }, [toast, storeId]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
