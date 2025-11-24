@@ -165,7 +165,16 @@ export default function CustomerAnalysisIntegratedPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">평균 여정 시간</p>
-                  <p className="text-2xl font-bold">{journeyStats.avgDuration.toFixed(0)}<span className="text-sm">분</span></p>
+                  <p className="text-2xl font-bold">
+                    {journeyStats.avgDuration > 0 ? (
+                      <>
+                        {journeyStats.avgDuration.toFixed(0)}
+                        <span className="text-sm">분</span>
+                      </>
+                    ) : (
+                      <span className="text-base text-muted-foreground">데이터 없음</span>
+                    )}
+                  </p>
                   <p className="text-xs text-muted-foreground mt-1">매장 체류</p>
                 </div>
                 <Clock className="w-8 h-8 text-blue-500 opacity-50" />

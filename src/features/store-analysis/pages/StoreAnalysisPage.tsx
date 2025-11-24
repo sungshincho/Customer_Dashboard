@@ -140,7 +140,13 @@ export default function StoreAnalysisPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">총 방문</p>
-                  <p className="text-2xl font-bold">{stats?.total_visits.toLocaleString() || 0}</p>
+                  <p className="text-2xl font-bold">
+                    {stats?.total_visits && stats.total_visits > 0 ? (
+                      stats.total_visits.toLocaleString()
+                    ) : (
+                      <span className="text-base text-muted-foreground">데이터 없음</span>
+                    )}
+                  </p>
                   <p className="text-xs text-muted-foreground mt-1">기간 내 전체 방문</p>
                 </div>
                 <Users className="w-8 h-8 text-primary opacity-50" />
@@ -153,7 +159,16 @@ export default function StoreAnalysisPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">고유 방문자</p>
-                  <p className="text-2xl font-bold">{stats?.unique_visitors.toLocaleString() || 0}</p>
+                  <p className="text-2xl font-bold">
+                    {stats?.unique_visitors && stats.unique_visitors > 0 ? (
+                      <>
+                        {stats.unique_visitors.toLocaleString()}
+                        <span className="text-sm">명</span>
+                      </>
+                    ) : (
+                      <span className="text-base text-muted-foreground">데이터 없음</span>
+                    )}
+                  </p>
                   <p className="text-xs text-muted-foreground mt-1">중복 제거 방문자</p>
                 </div>
                 <Users className="w-8 h-8 text-green-500 opacity-50" />
@@ -166,7 +181,16 @@ export default function StoreAnalysisPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">시간당 평균 방문</p>
-                  <p className="text-2xl font-bold">{stats?.avg_visits_per_hour.toFixed(0) || 0}<span className="text-sm">명</span></p>
+                  <p className="text-2xl font-bold">
+                    {stats?.avg_visits_per_hour && stats.avg_visits_per_hour > 0 ? (
+                      <>
+                        {stats.avg_visits_per_hour.toFixed(0)}
+                        <span className="text-sm">명</span>
+                      </>
+                    ) : (
+                      <span className="text-base text-muted-foreground">데이터 없음</span>
+                    )}
+                  </p>
                   <p className="text-xs text-muted-foreground mt-1">매장 평균</p>
                 </div>
                 <Clock className="w-8 h-8 text-orange-500 opacity-50" />
