@@ -113,78 +113,43 @@ const Dashboard = () => {
     return { visits: todayVisits, purchases: todayPurchases };
   }, [storeData]);
 
-  // KPI 데이터 기반 stats 생성
+  // KPI 데이터 기반 stats 생성 - 실제 데이터만 사용
   const stats = useMemo(() => {
-    if (!dashboardKPI) {
-      // KPI 데이터가 없으면 기본값
-      return [
-        {
-          title: "방문자",
-          value: "0",
-          change: "데이터 없음",
-          changeType: "neutral" as const,
-          icon: Users,
-        },
-        {
-          title: "매출",
-          value: "₩0",
-          change: "0건 구매",
-          changeType: "neutral" as const,
-          icon: DollarSign,
-        },
-        {
-          title: "평당 매출",
-          value: "₩0",
-          change: "데이터 없음",
-          changeType: "neutral" as const,
-          icon: Package,
-        },
-        {
-          title: "전환율",
-          value: "0%",
-          change: "데이터 없음",
-          changeType: "neutral" as const,
-          icon: TrendingUp,
-        },
-      ];
-    }
+    // 실제 DB 데이터만 사용, 없으면 0 표시
+    const totalVisits = dashboardKPI?.total_visits || 0;
+    const totalRevenue = dashboardKPI?.total_revenue || 0;
+    const salesPerSqm = dashboardKPI?.sales_per_sqm || 0;
+    const conversionRate = dashboardKPI?.conversion_rate || 0;
+    const totalPurchases = dashboardKPI?.total_purchases || 0;
 
-    // 이전 날짜와 비교 (latestKPIs 사용)
-    const previousKPI = latestKPIs && latestKPIs.length > 1 ? latestKPIs[1] : null;
-    const visitChange = previousKPI 
-      ? (((dashboardKPI.total_visits || 0) - (previousKPI.total_visits || 0)) / (previousKPI.total_visits || 1) * 100).toFixed(1)
-      : '0.0';
-    const revenueChange = previousKPI
-      ? (((dashboardKPI.total_revenue || 0) - (previousKPI.total_revenue || 0)) / (previousKPI.total_revenue || 1) * 100).toFixed(1)
-      : '0.0';
 
     return [
       {
         title: "방문자",
-        value: (dashboardKPI.total_visits || 0).toLocaleString(),
-        change: `${visitChange}% 이전 대비`,
-        changeType: parseFloat(visitChange) >= 0 ? "positive" as const : "negative" as const,
+        value: totalVisits.toLocaleString(),
+        change: totalVisits > 0 ? "실제 데이터" : "데이터 없음",
+        changeType: totalVisits > 0 ? "positive" as const : "neutral" as const,
         icon: Users,
       },
       {
         title: "매출",
-        value: `₩${(dashboardKPI.total_revenue || 0).toLocaleString()}`,
-        change: `${revenueChange}% 이전 대비`,
-        changeType: parseFloat(revenueChange) >= 0 ? "positive" as const : "negative" as const,
+        value: `₩${totalRevenue.toLocaleString()}`,
+        change: `${totalPurchases}건 구매`,
+        changeType: totalRevenue > 0 ? "positive" as const : "neutral" as const,
         icon: DollarSign,
       },
       {
         title: "평당 매출",
-        value: `₩${Math.round(dashboardKPI.sales_per_sqm || 0).toLocaleString()}`,
-        change: `면적당 효율`,
-        changeType: (dashboardKPI.sales_per_sqm || 0) > 1000 ? "positive" as const : "neutral" as const,
+        value: `₩${Math.round(salesPerSqm).toLocaleString()}`,
+        change: salesPerSqm > 0 ? "면적당 효율" : "데이터 없음",
+        changeType: salesPerSqm > 1000 ? "positive" as const : "neutral" as const,
         icon: Package,
       },
       {
         title: "전환율",
-        value: `${(dashboardKPI.conversion_rate || 0).toFixed(1)}%`,
-        change: `${dashboardKPI.total_purchases || 0}건 구매`,
-        changeType: (dashboardKPI.conversion_rate || 0) >= 3 ? "positive" as const : "neutral" as const,
+        value: `${conversionRate.toFixed(1)}%`,
+        change: conversionRate > 0 ? "실제 데이터" : "데이터 없음",
+        changeType: conversionRate >= 3 ? "positive" as const : "neutral" as const,
         icon: TrendingUp,
       },
     ];
@@ -203,7 +168,7 @@ const Dashboard = () => {
     }));
   }, [latestKPIs]);
 
-  // 실제 데이터 기반 알림 생성
+  // 실제 데이터 기반 알림 생성 - 데이터가 없으면 빈 배열
   const alerts = useMemo(() => {
     if (!storeData) return [];
 
@@ -214,9 +179,9 @@ const Dashboard = () => {
       time: string;
     }> = [];
 
-    // 재고 부족 알림
+    // 재고 부족 알림 - 실제 재고 데이터만
     const lowStockProducts = storeData.products?.filter((p: any) => 
-      (parseInt(p.stock_quantity) || 0) < 10
+      (parseInt(p.stock_quantity) || 0) > 0 && (parseInt(p.stock_quantity) || 0) < 10
     ) || [];
     
     lowStockProducts.slice(0, 2).forEach((product: any) => {
@@ -228,7 +193,7 @@ const Dashboard = () => {
       });
     });
 
-    // 높은 방문자 알림
+    // 높은 방문자 알림 - 실제 방문 데이터만
     if (todayData.visits.length > 50) {
       alertList.push({
         type: 'info',
@@ -238,7 +203,7 @@ const Dashboard = () => {
       });
     }
 
-    // 높은 매출 알림
+    // 높은 매출 알림 - 실제 구매 데이터만
     const todayRevenue = todayData.purchases.reduce((sum: number, p: any) => 
       sum + (parseFloat(p.unit_price) || 0) * (parseInt(p.quantity) || 0), 0);
     
