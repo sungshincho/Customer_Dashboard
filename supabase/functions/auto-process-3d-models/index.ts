@@ -217,19 +217,50 @@ Important Type Guidelines:
         store_bounds: { width: 20, depth: 15 } // 기본 매장 크기
       };
 
-      // 6. 각 파일을 AI 기반 배치로 인스턴스 생성
+      // 6. 메타데이터 JSON 확인 (As-Is 배치용)
+      const metadataCache: Record<string, any> = {};
+      for (const file of groupFiles) {
+        const metadataFileName = file.fileName.replace(/\.(glb|gltf)$/i, '.json');
+        try {
+          const { data: metadataFile } = await supabase.storage
+            .from('3d-models')
+            .download(`${userId}/${storeId}/${metadataFileName}`);
+          
+          if (metadataFile) {
+            const metadataText = await metadataFile.text();
+            metadataCache[file.fileName] = JSON.parse(metadataText);
+            console.log(`Found metadata for ${file.fileName}`);
+          }
+        } catch (e) {
+          // 메타데이터 없음 - AI 배치 사용
+        }
+      }
+
+      // 7. 각 파일을 인스턴스로 생성 (As-Is or AI 배치)
       for (let i = 0; i < groupFiles.length; i++) {
         const file = groupFiles[i];
         const instanceLabel = groupFiles.length > 1 
           ? `${analysis.entity_type_label} ${i + 1}`
           : analysis.entity_type_label;
 
-        // AI 배치 추론 요청
-        let aiPosition = { x: 0, y: 0, z: 0 };
-        let reasoning = "기본 배치";
+        const metadata = metadataCache[file.fileName];
+        let finalPosition = { x: 0, y: 0, z: 0 };
+        let finalRotation = { x: 0, y: 0, z: 0 };
+        let reasoning = "";
+        let placementMode = "ai";
 
-        try {
-          const placementPrompt = `
+        // Scenario 1: As-Is 배치 (current_position이 있으면)
+        if (metadata?.current_position) {
+          finalPosition = metadata.current_position;
+          finalRotation = metadata.current_rotation || { x: 0, y: 0, z: 0 };
+          reasoning = "As-Is 레이아웃: 현재 매장 배치 그대로 구현";
+          placementMode = "as-is";
+          console.log(`As-Is Placement: ${instanceLabel} at (${finalPosition.x}, ${finalPosition.z})`);
+        } 
+        // Scenario 2: AI 기반 지능형 배치
+        else {
+          try {
+            const placementPrompt = `
 You are an AI assistant that optimizes furniture placement in retail stores.
 
 New Furniture:
@@ -251,75 +282,80 @@ Placement Guidelines:
 
 Return optimal position using tool call.`;
 
-          const placementResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: 'google/gemini-2.5-flash',
-              messages: [
-                { role: 'system', content: 'You optimize furniture placement in retail stores.' },
-                { role: 'user', content: placementPrompt }
-              ],
-              tools: [{
-                type: "function",
-                function: {
-                  name: "suggest_placement",
-                  description: "Suggest optimal 3D position for furniture placement",
-                  parameters: {
-                    type: "object",
-                    properties: {
-                      position: {
-                        type: "object",
-                        properties: {
-                          x: { type: "number", description: "X coordinate in meters" },
-                          y: { type: "number", description: "Y coordinate in meters (usually 0)" },
-                          z: { type: "number", description: "Z coordinate in meters" }
+            const placementResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: 'google/gemini-2.5-flash',
+                messages: [
+                  { role: 'system', content: 'You optimize furniture placement in retail stores.' },
+                  { role: 'user', content: placementPrompt }
+                ],
+                tools: [{
+                  type: "function",
+                  function: {
+                    name: "suggest_placement",
+                    description: "Suggest optimal 3D position for furniture placement",
+                    parameters: {
+                      type: "object",
+                      properties: {
+                        position: {
+                          type: "object",
+                          properties: {
+                            x: { type: "number", description: "X coordinate in meters" },
+                            y: { type: "number", description: "Y coordinate in meters (usually 0)" },
+                            z: { type: "number", description: "Z coordinate in meters" }
+                          },
+                          required: ["x", "y", "z"]
                         },
-                        required: ["x", "y", "z"]
+                        reasoning: {
+                          type: "string",
+                          description: "Explanation for this placement decision"
+                        }
                       },
-                      reasoning: {
-                        type: "string",
-                        description: "Explanation for this placement decision"
-                      }
-                    },
-                    required: ["position", "reasoning"]
+                      required: ["position", "reasoning"]
+                    }
                   }
-                }
-              }],
-              tool_choice: { type: "function", function: { name: "suggest_placement" } }
-            }),
-          });
+                }],
+                tool_choice: { type: "function", function: { name: "suggest_placement" } }
+              }),
+            });
 
-          if (placementResponse.ok) {
-            const placementData = await placementResponse.json();
-            const toolCall = placementData.choices[0].message.tool_calls?.[0];
-            if (toolCall) {
-              const args = JSON.parse(toolCall.function.arguments);
-              aiPosition = args.position;
-              reasoning = args.reasoning;
-              console.log(`AI Placement: ${instanceLabel} at (${aiPosition.x}, ${aiPosition.z}) - ${reasoning}`);
+            if (placementResponse.ok) {
+              const placementData = await placementResponse.json();
+              const toolCall = placementData.choices[0].message.tool_calls?.[0];
+              if (toolCall) {
+                const args = JSON.parse(toolCall.function.arguments);
+                finalPosition = args.position;
+                reasoning = args.reasoning;
+                placementMode = "ai";
+                console.log(`AI Placement: ${instanceLabel} at (${finalPosition.x}, ${finalPosition.z}) - ${reasoning}`);
+              }
+            } else {
+              console.warn('AI placement failed, using fallback grid');
+              // Fallback: Grid 배치
+              finalPosition = {
+                x: (i % 5) * 3,
+                y: 0,
+                z: Math.floor(i / 5) * 3
+              };
+              reasoning = "AI 추론 실패, 기본 그리드 배치";
+              placementMode = "fallback";
             }
-          } else {
-            console.warn('AI placement failed, using fallback grid');
+          } catch (placementError) {
+            console.error('AI placement error:', placementError);
             // Fallback: Grid 배치
-            aiPosition = {
+            finalPosition = {
               x: (i % 5) * 3,
               y: 0,
               z: Math.floor(i / 5) * 3
             };
+            reasoning = "AI 추론 실패, 기본 그리드 배치";
+            placementMode = "fallback";
           }
-        } catch (placementError) {
-          console.error('AI placement error:', placementError);
-          // Fallback: Grid 배치
-          aiPosition = {
-            x: (i % 5) * 3,
-            y: 0,
-            z: Math.floor(i / 5) * 3
-          };
-          reasoning = "AI 추론 실패, 기본 그리드 배치";
         }
 
         const { error: instanceError } = await supabase
@@ -329,25 +365,28 @@ Return optimal position using tool call.`;
             store_id: storeId,
             entity_type_id: entityTypeId,
             label: instanceLabel,
-            model_3d_position: aiPosition,
-            model_3d_rotation: { x: 0, y: 0, z: 0 },
-            model_3d_scale: { x: 1, y: 1, z: 1 },
+            model_3d_position: finalPosition,
+            model_3d_rotation: finalRotation,
+            model_3d_scale: metadata?.scale || { x: 1, y: 1, z: 1 },
             properties: {
               source: 'auto_upload',
               original_file: file.fileName,
               model_url: file.publicUrl,
-              placement_reasoning: reasoning
+              placement_mode: placementMode,
+              placement_reasoning: reasoning,
+              ...(metadata?.properties || {})
             }
           });
 
         if (instanceError) throw instanceError;
-        console.log(`Created instance: ${instanceLabel} at (${aiPosition.x}, ${aiPosition.z})`);
+        console.log(`Created instance: ${instanceLabel} at (${finalPosition.x}, ${finalPosition.z})`);
 
         results.push({
           fileName: file.fileName,
           entityType: analysis.entity_type_label,
           instanceLabel,
-          position: aiPosition,
+          position: finalPosition,
+          placementMode,
           reasoning
         });
       }
