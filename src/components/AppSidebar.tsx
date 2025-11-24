@@ -65,10 +65,10 @@ interface MenuSection {
 
 // 1️⃣ Overview (4 pages)
 const overviewItems: MenuItem[] = [
-  { title: "대시보드", url: "/", icon: LayoutDashboard },
-  { title: "매장 관리", url: "/stores", icon: Store },
-  { title: "HQ-매장 동기화", url: "/hq-store-sync", icon: Network },
-  { title: "설정", url: "/settings", icon: Settings },
+  { title: "대시보드", url: "/overview/dashboard", icon: LayoutDashboard },
+  { title: "매장 관리", url: "/overview/stores", icon: Store },
+  { title: "HQ-매장 동기화", url: "/overview/hq-sync", icon: Network },
+  { title: "설정", url: "/overview/settings", icon: Settings },
 ];
 
 // 2️⃣ Analysis, 3️⃣ Simulation, 4️⃣ Data Management 섹션
@@ -90,7 +90,7 @@ const menuSections: MenuSection[] = [
     emoji: "🔮",
     defaultOpen: true,
     items: [
-      { title: "디지털 트윈 3D", url: "/digital-twin/3d", icon: Boxes },
+      { title: "디지털 트윈 3D", url: "/simulation/digital-twin", icon: Boxes },
       { title: "시뮬레이션 허브", url: "/simulation/hub", icon: TestTube },
     ],
   },
@@ -100,11 +100,11 @@ const menuSections: MenuSection[] = [
     emoji: "🗄️",
     defaultOpen: true,
     items: [
-      { title: "통합 데이터 임포트", url: "/data-import", icon: Upload },
-      { title: "스키마 빌더", url: "/schema-builder", icon: Network },
+      { title: "통합 데이터 임포트", url: "/data-management/import", icon: Upload },
+      { title: "스키마 빌더", url: "/data-management/schema", icon: Network },
       // 그래프 분석은 숨김 처리 (코드는 유지)
-      // { title: "그래프 분석", url: "/graph-analysis", icon: Database },
-      { title: "API 연동", url: "/api-integration", icon: Zap },
+      // { title: "그래프 분석", url: "/data-management/graph-analysis", icon: Database },
+      { title: "API 연동", url: "/data-management/api", icon: Zap },
     ],
   },
 ];
@@ -116,7 +116,7 @@ export function AppSidebar() {
   const { stores, selectedStore, setSelectedStore } = useSelectedStore();
 
   const isActive = (path: string) => {
-    if (path === "/") return location.pathname === "/";
+    if (path === "/overview/dashboard") return location.pathname === "/" || location.pathname === "/overview/dashboard";
     return location.pathname.startsWith(path);
   };
 
