@@ -1516,7 +1516,7 @@ export type Database = {
           created_at: string
           id: string
           joined_at: string
-          org_id: string
+          org_id: string | null
           permissions: Json | null
           role: Database["public"]["Enums"]["app_role"]
           updated_at: string
@@ -1526,7 +1526,7 @@ export type Database = {
           created_at?: string
           id?: string
           joined_at?: string
-          org_id: string
+          org_id?: string | null
           permissions?: Json | null
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
@@ -1536,7 +1536,7 @@ export type Database = {
           created_at?: string
           id?: string
           joined_at?: string
-          org_id?: string
+          org_id?: string | null
           permissions?: Json | null
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
