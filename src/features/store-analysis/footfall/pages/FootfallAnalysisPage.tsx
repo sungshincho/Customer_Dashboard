@@ -221,9 +221,17 @@ const FootfallAnalysisPage = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">피크 시간</p>
-                  <p className="text-2xl font-bold">{stats?.peak_hour.toString().padStart(2, '0')}:00</p>
+                  <p className="text-2xl font-bold">
+                    {stats?.peak_hour !== undefined && stats?.peak_hour !== null ? (
+                      `${stats.peak_hour.toString().padStart(2, '0')}:00`
+                    ) : (
+                      <span className="text-base text-muted-foreground">데이터 없음</span>
+                    )}
+                  </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {stats?.peak_hour_visits || 0}명 방문
+                    {stats?.peak_hour !== undefined && stats?.peak_hour !== null
+                      ? `${stats.peak_hour_visits || 0}명 방문`
+                      : '방문 데이터 없음'}
                   </p>
                 </div>
                 <Clock className="w-8 h-8 text-orange-500 opacity-50" />

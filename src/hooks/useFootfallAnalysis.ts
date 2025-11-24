@@ -22,7 +22,7 @@ export interface FootfallStats {
   total_visits: number;
   unique_visitors: number;
   avg_visits_per_hour: number;
-  peak_hour: number;
+  peak_hour: number | null;
   peak_hour_visits: number;
   daily_trend: number; // % change from previous period
   // 컨텍스트 인사이트
@@ -44,7 +44,7 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
             total_visits: 0,
             unique_visitors: 0,
             avg_visits_per_hour: 0,
-            peak_hour: 14,
+            peak_hour: null,
             peak_hour_visits: 0,
             daily_trend: 0,
           }
@@ -194,10 +194,18 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
       const totalUniqueVisitors = footfallData.reduce((sum, d) => sum + d.unique_visitors, 0);
       const hoursWithData = footfallData.filter(d => d.visit_count > 0).length;
       
-      // 피크 시간대 찾기
-      const peakData = footfallData.reduce((max, d) => 
-        d.visit_count > max.visit_count ? d : max
-      , footfallData[0] || { hour: 14, visit_count: 0 });
+      // 피크 시간대 찾기 (데이터가 없으면 null 처리)
+      let peakHour: number | null = null;
+      let peakHourVisits = 0;
+
+      if (footfallData.length > 0) {
+        const peakData = footfallData.reduce(
+          (max, d) => (d.visit_count > max.visit_count ? d : max),
+          footfallData[0]
+        );
+        peakHour = peakData.hour;
+        peakHourVisits = peakData.visit_count;
+      }
 
       // 컨텍스트 기반 인사이트 생성
       const weatherImpact = generateWeatherImpact(footfallData);
@@ -208,8 +216,8 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
         total_visits: totalVisits,
         unique_visitors: totalUniqueVisitors,
         avg_visits_per_hour: hoursWithData > 0 ? totalVisits / hoursWithData : 0,
-        peak_hour: peakData.hour,
-        peak_hour_visits: peakData.visit_count,
+        peak_hour: peakHour,
+        peak_hour_visits: peakHourVisits,
         daily_trend: 0, // TODO: 이전 기간과 비교
         weather_impact: weatherImpact,
         holiday_impact: holidayImpact,
