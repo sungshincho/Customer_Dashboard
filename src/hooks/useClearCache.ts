@@ -20,10 +20,16 @@ export function useClearCache() {
       // 특정 매장의 데이터 캐시만 초기화
       queryClient.removeQueries({ queryKey: ['store-data', storeId] });
       queryClient.removeQueries({ queryKey: ['store-dataset', storeId] });
+      queryClient.removeQueries({ queryKey: ['dashboard-kpis', storeId] });
+      queryClient.removeQueries({ queryKey: ['ai-recommendations', storeId] });
+      queryClient.removeQueries({ queryKey: ['ontology-data', storeId] });
     } else {
       // 모든 매장 데이터 캐시 초기화
       queryClient.removeQueries({ queryKey: ['store-data'] });
       queryClient.removeQueries({ queryKey: ['store-dataset'] });
+      queryClient.removeQueries({ queryKey: ['dashboard-kpis'] });
+      queryClient.removeQueries({ queryKey: ['ai-recommendations'] });
+      queryClient.removeQueries({ queryKey: ['ontology-data'] });
     }
     toast.success('데이터 캐시가 초기화되었습니다');
   };
@@ -33,9 +39,15 @@ export function useClearCache() {
     if (storeId) {
       queryClient.invalidateQueries({ queryKey: ['store-data', storeId] });
       queryClient.invalidateQueries({ queryKey: ['store-dataset', storeId] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-kpis', storeId] });
+      queryClient.invalidateQueries({ queryKey: ['ai-recommendations', storeId] });
+      queryClient.invalidateQueries({ queryKey: ['ontology-data', storeId] });
     } else {
       queryClient.invalidateQueries({ queryKey: ['store-data'] });
       queryClient.invalidateQueries({ queryKey: ['store-dataset'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-kpis'] });
+      queryClient.invalidateQueries({ queryKey: ['ai-recommendations'] });
+      queryClient.invalidateQueries({ queryKey: ['ontology-data'] });
     }
   };
 
