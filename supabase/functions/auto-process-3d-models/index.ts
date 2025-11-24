@@ -186,16 +186,141 @@ Important Type Guidelines:
         console.log(`Using existing entity type: ${existingType.label} (${entityTypeId})`);
       }
 
-      // 5. 각 파일을 인스턴스로 생성
+      // 5. 매장 컨텍스트 수집 (AI 배치를 위한 정보)
+      const { data: storeEntities, error: storeError } = await supabase
+        .from('graph_entities')
+        .select(`
+          id,
+          label,
+          model_3d_position,
+          entity_type_id,
+          entity_types:entity_type_id (
+            name,
+            label,
+            model_3d_type,
+            model_3d_dimensions
+          )
+        `)
+        .eq('store_id', storeId)
+        .eq('user_id', userId);
+
+      if (storeError) console.error('Failed to fetch store context:', storeError);
+
+      const storeContext = {
+        existing_furniture: storeEntities?.map(e => ({
+          label: e.label,
+          position: e.model_3d_position,
+          type: e.entity_types?.name,
+          dimensions: e.entity_types?.model_3d_dimensions
+        })) || [],
+        entrance_position: { x: 0, y: 0, z: 0 }, // 기본 출입구
+        store_bounds: { width: 20, depth: 15 } // 기본 매장 크기
+      };
+
+      // 6. 각 파일을 AI 기반 배치로 인스턴스 생성
       for (let i = 0; i < groupFiles.length; i++) {
         const file = groupFiles[i];
         const instanceLabel = groupFiles.length > 1 
           ? `${analysis.entity_type_label} ${i + 1}`
           : analysis.entity_type_label;
 
-        // 그리드 형태로 자동 배치 (0.5m 간격)
-        const gridX = (i % 5) * 0.5;
-        const gridZ = Math.floor(i / 5) * 0.5;
+        // AI 배치 추론 요청
+        let aiPosition = { x: 0, y: 0, z: 0 };
+        let reasoning = "기본 배치";
+
+        try {
+          const placementPrompt = `
+You are an AI assistant that optimizes furniture placement in retail stores.
+
+New Furniture:
+- Type: ${analysis.entity_type_label}
+- Dimensions: ${JSON.stringify(analysis.suggested_dimensions)}
+- Category: ${analysis.type}
+
+Store Context:
+- Entrance: ${JSON.stringify(storeContext.entrance_position)}
+- Store Size: ${JSON.stringify(storeContext.store_bounds)}
+- Existing Furniture: ${JSON.stringify(storeContext.existing_furniture.slice(0, 20))}
+
+Placement Guidelines:
+1. 고객 동선 최적화 (출입구에서 자연스러운 흐름)
+2. 가시성 극대화 (주요 위치 우선 배치)
+3. 기존 가구와 안전 거리 유지 (최소 1.5m)
+4. Zone별 밀도 균형 (과밀 방지)
+5. ${analysis.type === 'furniture' ? '판매 구역에 배치' : analysis.type === 'product' ? '진열대 근처 배치' : '매장 구조에 맞게 배치'}
+
+Return optimal position using tool call.`;
+
+          const placementResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'google/gemini-2.5-flash',
+              messages: [
+                { role: 'system', content: 'You optimize furniture placement in retail stores.' },
+                { role: 'user', content: placementPrompt }
+              ],
+              tools: [{
+                type: "function",
+                function: {
+                  name: "suggest_placement",
+                  description: "Suggest optimal 3D position for furniture placement",
+                  parameters: {
+                    type: "object",
+                    properties: {
+                      position: {
+                        type: "object",
+                        properties: {
+                          x: { type: "number", description: "X coordinate in meters" },
+                          y: { type: "number", description: "Y coordinate in meters (usually 0)" },
+                          z: { type: "number", description: "Z coordinate in meters" }
+                        },
+                        required: ["x", "y", "z"]
+                      },
+                      reasoning: {
+                        type: "string",
+                        description: "Explanation for this placement decision"
+                      }
+                    },
+                    required: ["position", "reasoning"]
+                  }
+                }
+              }],
+              tool_choice: { type: "function", function: { name: "suggest_placement" } }
+            }),
+          });
+
+          if (placementResponse.ok) {
+            const placementData = await placementResponse.json();
+            const toolCall = placementData.choices[0].message.tool_calls?.[0];
+            if (toolCall) {
+              const args = JSON.parse(toolCall.function.arguments);
+              aiPosition = args.position;
+              reasoning = args.reasoning;
+              console.log(`AI Placement: ${instanceLabel} at (${aiPosition.x}, ${aiPosition.z}) - ${reasoning}`);
+            }
+          } else {
+            console.warn('AI placement failed, using fallback grid');
+            // Fallback: Grid 배치
+            aiPosition = {
+              x: (i % 5) * 3,
+              y: 0,
+              z: Math.floor(i / 5) * 3
+            };
+          }
+        } catch (placementError) {
+          console.error('AI placement error:', placementError);
+          // Fallback: Grid 배치
+          aiPosition = {
+            x: (i % 5) * 3,
+            y: 0,
+            z: Math.floor(i / 5) * 3
+          };
+          reasoning = "AI 추론 실패, 기본 그리드 배치";
+        }
 
         const { error: instanceError } = await supabase
           .from('graph_entities')
@@ -204,24 +329,26 @@ Important Type Guidelines:
             store_id: storeId,
             entity_type_id: entityTypeId,
             label: instanceLabel,
-            model_3d_position: { x: gridX, y: 0, z: gridZ },
+            model_3d_position: aiPosition,
             model_3d_rotation: { x: 0, y: 0, z: 0 },
             model_3d_scale: { x: 1, y: 1, z: 1 },
             properties: {
               source: 'auto_upload',
               original_file: file.fileName,
-              model_url: file.publicUrl
+              model_url: file.publicUrl,
+              placement_reasoning: reasoning
             }
           });
 
         if (instanceError) throw instanceError;
-        console.log(`Created instance: ${instanceLabel} at (${gridX}, ${gridZ})`);
+        console.log(`Created instance: ${instanceLabel} at (${aiPosition.x}, ${aiPosition.z})`);
 
         results.push({
           fileName: file.fileName,
           entityType: analysis.entity_type_label,
           instanceLabel,
-          position: { x: gridX, z: gridZ }
+          position: aiPosition,
+          reasoning
         });
       }
     }
