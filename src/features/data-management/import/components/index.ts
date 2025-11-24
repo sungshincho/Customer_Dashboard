@@ -6,3 +6,4 @@ export { IntegratedImportStatus } from './IntegratedImportStatus';
 export { StorageManager } from './StorageManager';
 export { UnifiedDataUpload } from './UnifiedDataUpload';
 export { DataValidation } from './DataValidation';
+export { DemoReadinessChecker } from './DemoReadinessChecker';
