@@ -4,8 +4,8 @@ import { useAuth } from './useAuth';
 import { useSelectedStore } from './useSelectedStore';
 
 /**
- * 실제 업로드된 샘플 데이터를 가져오는 Hook
- * 하드코딩 금지 - 실제 user_data_imports 테이블에서 데이터 조회
+ * 실제 업로드된 데이터만 조회
+ * 샘플 데이터 생성 금지 - 데이터 없으면 빈 배열 반환
  */
 
 export function useRealCustomers() {
@@ -30,7 +30,6 @@ export function useRealCustomers() {
       const { data, error } = await query;
       if (error) throw error;
 
-      // raw_data에서 실제 고객 데이터 추출
       const customers = data?.flatMap(item => item.raw_data as any[]) || [];
       return customers;
     },
@@ -134,7 +133,6 @@ export function useRealWiFiTracking() {
     queryFn: async () => {
       if (!user) return [];
 
-      // wifi_tracking 테이블에서 직접 조회
       const query = supabase
         .from('wifi_tracking')
         .select('*')
@@ -181,7 +179,7 @@ export function useRealZones() {
 }
 
 /**
- * 전체 데이터 통계
+ * 전체 데이터 통계 - 실제 데이터 카운트만
  */
 export function useRealDataSummary() {
   const customers = useRealCustomers();
