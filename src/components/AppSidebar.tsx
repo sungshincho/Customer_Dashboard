@@ -67,7 +67,7 @@ interface MenuSection {
 const overviewItems: MenuItem[] = [
   { title: "대시보드", url: "/overview/dashboard", icon: LayoutDashboard },
   { title: "매장 관리", url: "/overview/stores", icon: Store },
-  { title: "HQ-매장 동기화", url: "/overview/hq-sync", icon: Network },
+  { title: "HQ-매장 커뮤니케이션", url: "/overview/hq-communication", icon: Network },
   { title: "설정", url: "/overview/settings", icon: Settings },
 ];
 

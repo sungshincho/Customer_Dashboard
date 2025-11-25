@@ -938,125 +938,163 @@ export type Database = {
           },
         ]
       }
-      hq_store_master: {
+      hq_guidelines: {
         Row: {
-          address: string | null
-          area_sqm: number | null
-          created_at: string
-          district: string | null
-          email: string | null
-          external_system_id: string | null
-          external_system_name: string | null
-          hq_store_code: string
-          hq_store_name: string
+          attachments: Json | null
+          category: string
+          content: string
+          created_at: string | null
+          effective_date: string | null
+          expiry_date: string | null
           id: string
-          last_synced_at: string | null
-          manager_name: string | null
-          metadata: Json | null
-          opening_date: string | null
-          org_id: string | null
-          phone: string | null
-          region: string | null
-          status: string | null
-          store_format: string | null
-          updated_at: string
+          is_active: boolean | null
+          org_id: string
+          priority: string | null
+          target_stores: string[] | null
+          title: string
+          updated_at: string | null
           user_id: string
         }
         Insert: {
-          address?: string | null
-          area_sqm?: number | null
-          created_at?: string
-          district?: string | null
-          email?: string | null
-          external_system_id?: string | null
-          external_system_name?: string | null
-          hq_store_code: string
-          hq_store_name: string
+          attachments?: Json | null
+          category: string
+          content: string
+          created_at?: string | null
+          effective_date?: string | null
+          expiry_date?: string | null
           id?: string
-          last_synced_at?: string | null
-          manager_name?: string | null
-          metadata?: Json | null
-          opening_date?: string | null
-          org_id?: string | null
-          phone?: string | null
-          region?: string | null
-          status?: string | null
-          store_format?: string | null
-          updated_at?: string
+          is_active?: boolean | null
+          org_id: string
+          priority?: string | null
+          target_stores?: string[] | null
+          title: string
+          updated_at?: string | null
           user_id: string
         }
         Update: {
-          address?: string | null
-          area_sqm?: number | null
-          created_at?: string
-          district?: string | null
-          email?: string | null
-          external_system_id?: string | null
-          external_system_name?: string | null
-          hq_store_code?: string
-          hq_store_name?: string
+          attachments?: Json | null
+          category?: string
+          content?: string
+          created_at?: string | null
+          effective_date?: string | null
+          expiry_date?: string | null
           id?: string
-          last_synced_at?: string | null
-          manager_name?: string | null
-          metadata?: Json | null
-          opening_date?: string | null
-          org_id?: string | null
-          phone?: string | null
-          region?: string | null
-          status?: string | null
-          store_format?: string | null
-          updated_at?: string
+          is_active?: boolean | null
+          org_id?: string
+          priority?: string | null
+          target_stores?: string[] | null
+          title?: string
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: []
       }
-      hq_sync_logs: {
+      hq_notifications: {
         Row: {
-          completed_at: string | null
-          created_at: string
-          error_message: string | null
+          created_at: string | null
           id: string
-          metadata: Json | null
-          org_id: string | null
-          records_failed: number | null
-          records_processed: number | null
-          records_synced: number | null
-          started_at: string
-          status: string
-          sync_type: string
+          is_read: boolean | null
+          message: string
+          notification_type: string
+          org_id: string
+          read_at: string | null
+          reference_id: string | null
+          reference_type: string | null
+          title: string
           user_id: string
         }
         Insert: {
-          completed_at?: string | null
-          created_at?: string
-          error_message?: string | null
+          created_at?: string | null
           id?: string
-          metadata?: Json | null
-          org_id?: string | null
-          records_failed?: number | null
-          records_processed?: number | null
-          records_synced?: number | null
-          started_at?: string
-          status: string
-          sync_type: string
+          is_read?: boolean | null
+          message: string
+          notification_type: string
+          org_id: string
+          read_at?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
+          title: string
           user_id: string
         }
         Update: {
-          completed_at?: string | null
-          created_at?: string
-          error_message?: string | null
+          created_at?: string | null
           id?: string
-          metadata?: Json | null
-          org_id?: string | null
-          records_failed?: number | null
-          records_processed?: number | null
-          records_synced?: number | null
-          started_at?: string
-          status?: string
-          sync_type?: string
+          is_read?: boolean | null
+          message?: string
+          notification_type?: string
+          org_id?: string
+          read_at?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
+          title?: string
           user_id?: string
         }
         Relationships: []
+      }
+      hq_store_messages: {
+        Row: {
+          attachments: Json | null
+          content: string
+          created_at: string | null
+          id: string
+          is_read: boolean | null
+          message_type: string
+          org_id: string
+          priority: string | null
+          read_at: string | null
+          recipient_role: Database["public"]["Enums"]["app_role"] | null
+          recipient_store_id: string | null
+          sender_name: string
+          sender_role: Database["public"]["Enums"]["app_role"]
+          subject: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          attachments?: Json | null
+          content: string
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message_type?: string
+          org_id: string
+          priority?: string | null
+          read_at?: string | null
+          recipient_role?: Database["public"]["Enums"]["app_role"] | null
+          recipient_store_id?: string | null
+          sender_name: string
+          sender_role: Database["public"]["Enums"]["app_role"]
+          subject?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          attachments?: Json | null
+          content?: string
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message_type?: string
+          org_id?: string
+          priority?: string | null
+          read_at?: string | null
+          recipient_role?: Database["public"]["Enums"]["app_role"] | null
+          recipient_store_id?: string | null
+          sender_name?: string
+          sender_role?: Database["public"]["Enums"]["app_role"]
+          subject?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hq_store_messages_recipient_store_id_fkey"
+            columns: ["recipient_store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inventory_levels: {
         Row: {
@@ -2085,54 +2123,57 @@ export type Database = {
           },
         ]
       }
-      store_mappings: {
+      store_comments: {
         Row: {
+          author_name: string
+          author_role: Database["public"]["Enums"]["app_role"]
+          comment: string
           created_at: string | null
-          hq_store_id: string | null
           id: string
-          last_synced_at: string | null
-          local_store_id: string | null
-          metadata: Json | null
-          org_id: string | null
-          sync_status: string | null
+          is_pinned: boolean | null
+          org_id: string
+          parent_comment_id: string | null
+          store_id: string | null
           updated_at: string | null
           user_id: string
         }
         Insert: {
+          author_name: string
+          author_role: Database["public"]["Enums"]["app_role"]
+          comment: string
           created_at?: string | null
-          hq_store_id?: string | null
           id?: string
-          last_synced_at?: string | null
-          local_store_id?: string | null
-          metadata?: Json | null
-          org_id?: string | null
-          sync_status?: string | null
+          is_pinned?: boolean | null
+          org_id: string
+          parent_comment_id?: string | null
+          store_id?: string | null
           updated_at?: string | null
           user_id: string
         }
         Update: {
+          author_name?: string
+          author_role?: Database["public"]["Enums"]["app_role"]
+          comment?: string
           created_at?: string | null
-          hq_store_id?: string | null
           id?: string
-          last_synced_at?: string | null
-          local_store_id?: string | null
-          metadata?: Json | null
-          org_id?: string | null
-          sync_status?: string | null
+          is_pinned?: boolean | null
+          org_id?: string
+          parent_comment_id?: string | null
+          store_id?: string | null
           updated_at?: string | null
           user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "store_mappings_hq_store_id_fkey"
-            columns: ["hq_store_id"]
+            foreignKeyName: "store_comments_parent_comment_id_fkey"
+            columns: ["parent_comment_id"]
             isOneToOne: false
-            referencedRelation: "hq_store_master"
+            referencedRelation: "store_comments"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "store_mappings_local_store_id_fkey"
-            columns: ["local_store_id"]
+            foreignKeyName: "store_comments_store_id_fkey"
+            columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
             referencedColumns: ["id"]

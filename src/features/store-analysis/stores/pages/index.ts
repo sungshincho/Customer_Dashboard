@@ -1,2 +1,2 @@
 export { default as StoresPage } from './StoresPage';
-export { default as HQStoreSyncPage } from './HQStoreSyncPage';
+export { default as HQCommunicationPage } from './HQCommunicationPage';
