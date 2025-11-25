@@ -27,11 +27,31 @@ export function useWeatherForecast(storeId?: string, horizonDays = 7) {
   return useQuery({
     queryKey: ['weather-forecast', storeId, horizonDays],
     queryFn: async () => {
-      // TODO: Implement weather_data table
-      // Returning empty array for now
-      return [] as WeatherForecast[];
+      if (!storeId) return [];
+
+      const startDate = new Date();
+      const endDate = new Date();
+      endDate.setDate(endDate.getDate() + horizonDays);
+
+      const { data, error } = await supabase
+        .from('weather_data')
+        .select('*')
+        .eq('store_id', storeId)
+        .gte('date', startDate.toISOString().split('T')[0])
+        .lte('date', endDate.toISOString().split('T')[0])
+        .order('date', { ascending: true });
+
+      if (error) throw error;
+
+      return (data || []).map((d) => ({
+        date: d.date,
+        temperature: Number(d.temperature) || 0,
+        condition: d.weather_condition || 'unknown',
+        precipitation: Number(d.precipitation) || 0,
+        humidity: Number(d.humidity) || 0,
+      })) as WeatherForecast[];
     },
-    enabled: false, // Disabled until weather_data table is created
+    enabled: !!storeId,
   });
 }
 

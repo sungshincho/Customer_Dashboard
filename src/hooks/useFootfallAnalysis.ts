@@ -82,10 +82,20 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
         throw new Error('방문 데이터를 불러오는데 실패했습니다.');
       }
 
-      // Skip weather and regional data until tables are created
-      // TODO: Implement weather_data and regional_data tables
-      const weatherData: any[] = [];
-      const regionalData: any[] = [];
+      // Fetch weather data
+      const { data: weatherData } = await supabase
+        .from('weather_data')
+        .select('*')
+        .eq('store_id', storeId)
+        .gte('date', format(start, 'yyyy-MM-dd'))
+        .lte('date', format(end, 'yyyy-MM-dd'));
+
+      // Fetch regional data
+      const { data: regionalData } = await supabase
+        .from('regional_data')
+        .select('*')
+        .gte('date', format(start, 'yyyy-MM-dd'))
+        .lte('date', format(end, 'yyyy-MM-dd'));
       
       // Fetch holidays
       const { data: holidaysData } = await supabase
@@ -106,9 +116,9 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
         const key = `${dateKey}-${hour}`;
 
         if (!hourlyData.has(key)) {
-          const weather = null; // weatherData disabled
+          const weather = weatherData?.find(w => w.date === dateKey);
           const holiday = holidaysData?.find(h => h.date === dateKey);
-          const regional = null; // regionalData disabled
+          const regional = regionalData?.find(r => r.date === dateKey);
 
           hourlyData.set(key, {
             date: dateKey,
@@ -121,7 +131,7 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
             is_holiday: !!holiday,
             event_name: holiday?.event_name,
             event_type: holiday?.event_type,
-            regional_traffic: regional?.value ? Number(regional.value) : undefined,
+            regional_traffic: regional?.population ? Number(regional.population) : undefined,
           });
         }
 
