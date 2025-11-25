@@ -1,0 +1,275 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { analysisType, data, userId, graphData } = await req.json();
+    
+    console.log("=== AI Analysis Request Started ===");
+    console.log("Analysis Type:", analysisType);
+    console.log("User ID:", userId);
+    console.log("Data received:", data ? "Yes" : "No");
+    console.log("Graph Data received:", graphData ? `${graphData.nodes?.length || 0} nodes, ${graphData.edges?.length || 0} edges` : "No");
+    
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    
+    if (!LOVABLE_API_KEY) {
+      throw new Error("LOVABLE_API_KEY is not configured");
+    }
+
+    // Initialize Supabase client
+    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+
+    // Fetch user's imported data for context
+    let historicalContext = "";
+    if (userId) {
+      console.log(`✅ Fetching imported data for user: ${userId}`);
+      
+      // Map analysis types to relevant data types
+      const dataTypeMapping: Record<string, string[]> = {
+        "traffic-heatmap": ["traffic", "customer"],
+        "conversion-funnel": ["sales", "customer", "transaction"],
+        "customer-journey": ["customer", "traffic"],
+        "product-performance": ["sales", "product", "inventory"],
+        "demand-forecast": ["sales", "product", "inventory", "traffic"],
+        "layout-simulator": ["traffic", "customer", "sales"],
+        "inventory-optimizer": ["inventory", "product", "sales"],
+      };
+
+      const relevantDataTypes = dataTypeMapping[analysisType] || ["sales", "customer", "inventory", "traffic"];
+      
+      console.log(`📊 Querying data types:`, relevantDataTypes);
+      
+      const { data: importedData, error: importError } = await supabase
+        .from("user_data_imports")
+        .select("data_type, raw_data, row_count, created_at, file_name")
+        .eq("user_id", userId)
+        .in("data_type", relevantDataTypes)
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      if (!importError && importedData && importedData.length > 0) {
+        console.log(`✅ Found ${importedData.length} relevant imported datasets`);
+        console.log("Dataset details:", importedData.map(d => ({
+          type: d.data_type,
+          file: d.file_name,
+          rows: d.row_count,
+          date: d.created_at
+        })));
+        
+        // Summarize historical data for AI context
+        const dataSummaries = importedData.map(item => {
+          const sampleData = Array.isArray(item.raw_data) 
+            ? item.raw_data.slice(0, 3) 
+            : [item.raw_data];
+          
+          return `
+데이터 타입: ${item.data_type}
+파일명: ${item.file_name}
+데이터 행 수: ${item.row_count}
+업로드 일시: ${new Date(item.created_at).toLocaleDateString('ko-KR')}
+샘플 데이터: ${JSON.stringify(sampleData, null, 2)}
+          `.trim();
+        }).join('\n\n---\n\n');
+
+        historicalContext = `\n\n## 고객사 임포트 데이터 컨텍스트\n아래는 고객이 이전에 업로드한 실제 비즈니스 데이터입니다. 이 과거 데이터를 참고하여 더욱 정확하고 맞춤화된 분석을 제공하세요:\n\n${dataSummaries}\n\n위 데이터의 패턴과 트렌드를 고려하여 분석하세요.`;
+        console.log("📝 Historical context prepared, length:", historicalContext.length);
+      } else {
+        console.log("❌ No relevant imported data found");
+        if (importError) {
+          console.error("Database error:", importError);
+        }
+      }
+    } else {
+      console.log("⚠️ No userId provided, skipping imported data fetch");
+    }
+
+    // 온톨로지 그래프 컨텍스트 준비
+    let graphContext = "";
+    if (graphData && graphData.nodes && graphData.nodes.length > 0) {
+      console.log(`🔗 Ontology graph data: ${graphData.nodes.length} nodes, ${graphData.edges.length} edges`);
+      
+      // 엔티티 타입별 통계
+      const nodesByType = graphData.nodes.reduce((acc: any, node: any) => {
+        acc[node.type] = (acc[node.type] || 0) + 1;
+        return acc;
+      }, {});
+      
+      // 관계 타입별 통계
+      const edgesByType = graphData.edges.reduce((acc: any, edge: any) => {
+        acc[edge.type] = (acc[edge.type] || 0) + 1;
+        return acc;
+      }, {});
+      
+      const nodeTypeSummary = Object.entries(nodesByType)
+        .map(([type, count]) => `  - ${type}: ${count}개`)
+        .join('\n');
+      
+      const edgeTypeSummary = Object.entries(edgesByType)
+        .map(([type, count]) => `  - ${type}: ${count}개`)
+        .join('\n');
+      
+      // 샘플 엔티티 (타입별로 다양하게)
+      const sampleNodesByType: any = {};
+      graphData.nodes.forEach((node: any) => {
+        if (!sampleNodesByType[node.type]) {
+          sampleNodesByType[node.type] = [];
+        }
+        if (sampleNodesByType[node.type].length < 3) {
+          sampleNodesByType[node.type].push(node);
+        }
+      });
+      
+      const nodeSampleSummary = Object.entries(sampleNodesByType)
+        .map(([type, nodes]: [string, any]) => {
+          const nodeList = nodes.map((n: any) => 
+            `    • ${n.label} (속성: ${JSON.stringify(n.properties)})`
+          ).join('\n');
+          return `  ${type} 예시:\n${nodeList}`;
+        })
+        .join('\n\n');
+      
+      // 샘플 관계
+      const relationSummary = graphData.edges.slice(0, 15).map((edge: any) => {
+        const sourceNode = graphData.nodes.find((n: any) => n.id === edge.source);
+        const targetNode = graphData.nodes.find((n: any) => n.id === edge.target);
+        return `  - [${edge.type}] ${sourceNode?.label || edge.source} → ${targetNode?.label || edge.target}`;
+      }).join('\n');
+      
+      graphContext = `
+
+## 📊 온톨로지 기반 지식 그래프 구조
+
+**이 데이터는 실제로 시스템에 저장된 구조화된 비즈니스 지식입니다. 반드시 이 정보를 활용하여 분석하세요.**
+
+### 엔티티 통계 (총 ${graphData.nodes.length}개)
+${nodeTypeSummary}
+
+### 관계 통계 (총 ${graphData.edges.length}개)
+${edgeTypeSummary}
+
+### 주요 엔티티 샘플
+${nodeSampleSummary}
+
+### 주요 관계 샘플
+${relationSummary}
+
+**중요**: 위 온톨로지 그래프는 실제 비즈니스 구조를 나타냅니다. 엔티티 간 관계를 추적하여:
+1. 연결된 데이터 포인트 간의 숨겨진 패턴 발견
+2. 관계 강도(weight)를 고려한 중요 경로 식별
+3. 타입별 엔티티 분포에서 비즈니스 인사이트 도출
+반드시 구체적인 엔티티 이름과 관계 타입을 언급하며 분석하세요.`;
+      
+      console.log("🔗 Graph context prepared, length:", graphContext.length);
+    } else {
+      console.log("⚠️ No graph data provided");
+    }
+
+    let systemPrompt = "";
+    
+    switch (analysisType) {
+      case "traffic-heatmap":
+        systemPrompt = "당신은 매장 레이아웃 최적화 전문가입니다. 트래픽 히트맵 데이터를 분석하여 최적의 상품 배치와 레이아웃 개선안을 제안하세요. 고객사의 과거 데이터 패턴을 참고하여 구체적이고 실행 가능한 3-5개의 제안을 해주세요.";
+        break;
+      case "conversion-funnel":
+        systemPrompt = "당신은 전환율 최적화 전문가입니다. 고객의 매장 내 전환 퍼널 데이터를 분석하여 각 단계별 이탈을 줄이고 전환율을 높이는 구체적인 방법을 제안하세요. 고객사의 과거 거래 및 고객 데이터를 고려하세요.";
+        break;
+      case "customer-journey":
+        systemPrompt = "당신은 고객 경험 최적화 전문가입니다. 고객 동선 데이터를 분석하여 매장 내 고객 경험을 개선하고 구매 전환율을 높이는 방법을 제안하세요. 고객사의 과거 고객 행동 패턴을 활용하세요.";
+        break;
+      case "product-performance":
+        systemPrompt = "당신은 상품 관리 및 머천다이징 전문가입니다. 상품별 판매 데이터를 분석하여 재고 관리, 진열 전략, 프로모션 계획을 제안하세요. 고객사의 과거 판매 및 재고 데이터를 참고하세요.";
+        break;
+      case "demand-forecast":
+        systemPrompt = "당신은 수요 예측 전문가입니다. 과거 데이터와 외부 요인을 고려하여 미래 수요를 예측하고 준비해야 할 사항을 제안하세요. 고객사의 과거 판매 추세와 재고 회전율을 분석에 반영하세요.";
+        break;
+      case "layout-simulator":
+        systemPrompt = `당신은 매장 레이아웃 시뮬레이션 전문가입니다. 다양한 레이아웃 옵션을 분석하여 최적의 레이아웃과 그 효과를 예측하세요. 고객사의 과거 트래픽 데이터와 판매 패턴을 고려하세요.
+
+**이동 가능한 가구(movable=true) 위치 최적화 규칙:**
+1. 온톨로지 그래프에서 movable 속성이 true인 엔티티(Rack, Shelf, DisplayTable, CheckoutCounter, Kiosk, Product 등)는 위치 변경 제안이 가능합니다.
+2. movable=false이거나 movable 속성이 없는 엔티티(Store, Zone, Camera, Beacon 등)는 고정된 구조물이므로 위치 변경을 제안하지 마세요.
+3. 위치 변경 제안 시 다음 형식으로 응답하세요:
+   - furniture_id: 가구 ID
+   - entity_type: 엔티티 타입명
+   - movable: true
+   - current_position: 현재 위치 {x, y, z}
+   - suggested_position: 제안 위치 {x, y, z}
+   - suggested_rotation: 제안 회전 {x, y, z} (degree)
+   - optimization_reason: 최적화 이유 (예: "높은 유동 인구 지역으로 이동하여 가시성 향상")
+
+4. 트래픽 히트맵, 구매 전환율, 고객 동선 데이터를 고려하여 가구 배치를 최적화하세요.
+5. 각 제안에는 예상 효과(매출 증가율, 체류 시간 증가 등)를 포함하세요.`;
+        break;
+      case "inventory-optimizer":
+        systemPrompt = "당신은 재고 최적화 전문가입니다. 판매 데이터와 재고 수준을 분석하여 최적의 재고 수준과 발주 시점을 제안하세요. 고객사의 과거 재고 및 판매 데이터를 기반으로 하세요.";
+        break;
+      default:
+        systemPrompt = "당신은 매장 분석 전문가입니다. 제공된 데이터를 분석하여 실행 가능한 인사이트를 제공하세요. 고객사의 과거 데이터를 참고하여 맞춤형 제안을 하세요.";
+    }
+
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { 
+            role: "user", 
+            content: `다음은 현재 분석할 데이터입니다:\n\n${JSON.stringify(data, null, 2)}${historicalContext}${graphContext}\n\n위의 현재 데이터, 과거 임포트된 데이터, 그리고 온톨로지 그래프 구조를 종합적으로 분석하여, 구체적이고 실행 가능한 인사이트를 한국어로 제공해주세요. 온톨로지 관계를 통해 발견할 수 있는 숨겨진 패턴이나 인사이트가 있다면 반드시 언급하세요.` 
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      if (response.status === 429) {
+        return new Response(
+          JSON.stringify({ error: "요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요." }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (response.status === 402) {
+        return new Response(
+          JSON.stringify({ error: "크레딧이 부족합니다. Lovable 워크스페이스에 크레딧을 추가해주세요." }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const errorText = await response.text();
+      console.error("AI gateway error:", response.status, errorText);
+      throw new Error("AI 분석 요청 실패");
+    }
+
+    const aiResponse = await response.json();
+    const analysis = aiResponse.choices[0].message.content;
+    
+    console.log("✅ AI Analysis completed successfully");
+    console.log("=== AI Analysis Request Completed ===");
+
+    return new Response(
+      JSON.stringify({ analysis }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } catch (error) {
+    console.error("분석 오류:", error);
+    return new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : "분석 중 오류가 발생했습니다" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+});

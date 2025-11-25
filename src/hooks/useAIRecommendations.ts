@@ -1,0 +1,110 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from './useAuth';
+import { toast } from 'sonner';
+
+export interface AIRecommendation {
+  id: string;
+  recommendation_type: string;
+  priority: string;
+  title: string;
+  description: string;
+  action_category?: string;
+  expected_impact?: any;
+  data_source?: string;
+  evidence?: any;
+  status: string;
+  is_displayed: boolean;
+  displayed_at?: string;
+  created_at: string;
+}
+
+export function useAIRecommendations(storeId?: string) {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  const query = useQuery({
+    queryKey: ['ai-recommendations', storeId],
+    queryFn: async () => {
+      if (!user || !storeId) return [];
+
+      const { data, error } = await supabase
+        .from('ai_recommendations')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('store_id', storeId)
+        .eq('is_displayed', true)
+        .order('priority', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(3);
+
+      if (error) throw error;
+      return (data || []) as AIRecommendation[];
+    },
+    enabled: !!user && !!storeId,
+  });
+
+  const dismissRecommendation = useMutation({
+    mutationFn: async (recommendationId: string) => {
+      const { error } = await supabase
+        .from('ai_recommendations')
+        .update({
+          status: 'dismissed',
+          is_displayed: false,
+          dismissed_at: new Date().toISOString(),
+        })
+        .eq('id', recommendationId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ai-recommendations'] });
+      toast.success('추천이 숨겨졌습니다');
+    },
+    onError: (error) => {
+      console.error('Error dismissing recommendation:', error);
+      toast.error('추천 숨기기에 실패했습니다');
+    },
+  });
+
+  const updateStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const { error } = await supabase
+        .from('ai_recommendations')
+        .update({ status })
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ai-recommendations'] });
+      toast.success('상태가 업데이트되었습니다');
+    },
+  });
+
+  const generateRecommendations = useMutation({
+    mutationFn: async (storeId: string) => {
+      const { data, error } = await supabase.functions.invoke('generate-ai-recommendations', {
+        body: { store_id: storeId },
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ai-recommendations'] });
+      toast.success('AI 추천이 생성되었습니다');
+    },
+    onError: (error) => {
+      console.error('Error generating recommendations:', error);
+      toast.error('AI 추천 생성에 실패했습니다');
+    },
+  });
+
+  return {
+    ...query,
+    dismissRecommendation,
+    updateStatus,
+    generateRecommendations,
+  };
+}
