@@ -10,14 +10,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Bell, Users, CreditCard, Plus, Trash2 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { Building2, Bell, Users, CreditCard, Plus, Trash2, Mail } from "lucide-react";
 
 const Settings = () => {
   const { toast } = useToast();
+  const { user, orgId, orgName, role, licenseType, licenseStatus, isOrgHQ, isOrgStore } = useAuth();
   const [loading, setLoading] = useState(false);
+  
+  // Organization Info
+  const [organizationInfo, setOrganizationInfo] = useState<any>(null);
   
   // Organization Settings
   const [orgSettings, setOrgSettings] = useState({
@@ -47,11 +53,16 @@ const Settings = () => {
     reportType: 'sales',
   });
 
-  // License Info
-  const [licenseInfo, setLicenseInfo] = useState<any>(null);
+  // License & Subscription Info
+  const [subscriptionInfo, setSubscriptionInfo] = useState<any>(null);
+  const [licenses, setLicenses] = useState<any[]>([]);
 
-  // User Roles
-  const [userRoles, setUserRoles] = useState<any[]>([]);
+  // Organization Members
+  const [orgMembers, setOrgMembers] = useState<any[]>([]);
+  
+  // Invite Dialog
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
 
   useEffect(() => {
     fetchSettings();
@@ -59,37 +70,36 @@ const Settings = () => {
 
   const fetchSettings = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user || !orgId) return;
 
-      // Get org_id from organization_members
-      const { data: memberData } = await supabase
-        .from('organization_members')
-        .select('org_id')
-        .eq('user_id', user.id)
+      // Fetch organization info
+      const { data: orgData } = await supabase
+        .from('organizations')
+        .select('*')
+        .eq('id', orgId)
         .single();
 
-      const orgId = memberData?.org_id;
+      if (orgData) {
+        setOrganizationInfo(orgData);
+      }
 
       // Fetch organization settings
-      if (orgId) {
-        const { data: orgData } = await supabase
-          .from('organization_settings')
-          .select('*')
-          .eq('org_id', orgId)
-          .single();
+      const { data: orgSettingsData } = await supabase
+        .from('organization_settings')
+        .select('*')
+        .eq('org_id', orgId)
+        .single();
 
-        if (orgData) {
-          setOrgSettings({
-            timezone: orgData.timezone || 'Asia/Seoul',
-            currency: orgData.currency || 'KRW',
-            defaultKpiSet: Array.isArray(orgData.default_kpi_set) 
-              ? orgData.default_kpi_set 
-              : ['totalVisits', 'totalRevenue', 'conversionRate'],
-            logoUrl: orgData.logo_url || '',
-            brandColor: orgData.brand_color || '#1B6BFF',
-          });
-        }
+      if (orgSettingsData) {
+        setOrgSettings({
+          timezone: orgSettingsData.timezone || 'Asia/Seoul',
+          currency: orgSettingsData.currency || 'KRW',
+          defaultKpiSet: Array.isArray(orgSettingsData.default_kpi_set) 
+            ? orgSettingsData.default_kpi_set 
+            : ['totalVisits', 'totalRevenue', 'conversionRate'],
+          logoUrl: orgSettingsData.logo_url || '',
+          brandColor: orgSettingsData.brand_color || '#1B6BFF',
+        });
       }
 
       // Fetch notification settings
@@ -121,37 +131,44 @@ const Settings = () => {
         setReportSchedules(schedulesData);
       }
 
-      // Fetch license info
-      if (orgId) {
-        const { data: licenseData } = await supabase
-          .from('licenses')
-          .select('*')
-          .eq('org_id', orgId)
-          .eq('assigned_to', user.id)
-          .single();
+      // Fetch subscription info
+      const { data: subscriptionData } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('org_id', orgId)
+        .single();
 
-        if (licenseData) {
-          setLicenseInfo(licenseData);
-        }
+      if (subscriptionData) {
+        setSubscriptionInfo(subscriptionData);
       }
 
-      // Fetch user roles from organization_members
-      if (orgId) {
-        const { data: rolesData } = await supabase
-          .from('organization_members')
-          .select(`
-            *,
-            licenses (
-              license_type,
-              status
-            )
-          `)
-          .eq('org_id', orgId)
-          .order('created_at', { ascending: false });
+      // Fetch all licenses for the organization
+      const { data: licensesData } = await supabase
+        .from('licenses')
+        .select('*')
+        .eq('org_id', orgId)
+        .order('created_at', { ascending: false });
 
-        if (rolesData) {
-          setUserRoles(rolesData);
-        }
+      if (licensesData) {
+        setLicenses(licensesData);
+      }
+
+      // Fetch organization members
+      const { data: membersData } = await supabase
+        .from('organization_members')
+        .select(`
+          *,
+          licenses (
+            license_type,
+            status,
+            license_key
+          )
+        `)
+        .eq('org_id', orgId)
+        .order('created_at', { ascending: false });
+
+      if (membersData) {
+        setOrgMembers(membersData);
       }
     } catch (error) {
       console.error('Error fetching settings:', error);
@@ -312,14 +329,75 @@ const Settings = () => {
     setNotificationSettings({ ...notificationSettings, notificationTypes: types });
   };
 
-  const getPlanBadge = (planType: string) => {
+  const sendViewerInvitation = async () => {
+    if (!inviteEmail || !orgId || !user) return;
+
+    setLoading(true);
+    try {
+      // Generate invitation token
+      const token = Math.random().toString(36).substring(2, 15);
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiry
+
+      const { error } = await supabase
+        .from('invitations')
+        .insert({
+          org_id: orgId,
+          email: inviteEmail,
+          role: 'ORG_VIEWER',
+          invited_by: user.id,
+          token: token,
+          expires_at: expiresAt.toISOString(),
+          status: 'pending'
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "초대 전송 완료",
+        description: `${inviteEmail}에게 Viewer 초대가 전송되었습니다.`,
+      });
+
+      setInviteEmail('');
+      setInviteDialogOpen(false);
+    } catch (error: any) {
+      toast({
+        title: "초대 전송 실패",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getRoleBadge = (roleType: string) => {
     const badges = {
-      free: <Badge variant="secondary">무료</Badge>,
-      starter: <Badge variant="default">스타터</Badge>,
-      professional: <Badge variant="default" className="bg-primary">프로페셔널</Badge>,
-      enterprise: <Badge variant="default" className="bg-gradient-to-r from-primary to-secondary">엔터프라이즈</Badge>,
+      'NEURALTWIN_MASTER': <Badge className="bg-gradient-to-r from-primary to-accent">마스터</Badge>,
+      'ORG_HQ': <Badge variant="default" className="bg-primary">본사</Badge>,
+      'ORG_STORE': <Badge variant="default">매장</Badge>,
+      'ORG_VIEWER': <Badge variant="secondary">뷰어</Badge>,
     };
-    return badges[planType as keyof typeof badges] || badges.free;
+    return badges[roleType as keyof typeof badges] || <Badge variant="secondary">{roleType}</Badge>;
+  };
+
+  const getLicenseTypeBadge = (licenseType: string) => {
+    const badges = {
+      'HQ_SEAT': <Badge className="bg-primary">HQ 라이선스</Badge>,
+      'STORE': <Badge className="bg-accent">Store 라이선스</Badge>,
+    };
+    return badges[licenseType as keyof typeof badges] || <Badge variant="secondary">{licenseType}</Badge>;
+  };
+
+  const getStatusBadge = (status: string) => {
+    const badges = {
+      'active': <Badge variant="default" className="bg-green-600">활성</Badge>,
+      'assigned': <Badge variant="default" className="bg-blue-600">할당됨</Badge>,
+      'suspended': <Badge variant="destructive">정지</Badge>,
+      'expired': <Badge variant="secondary">만료</Badge>,
+      'revoked': <Badge variant="destructive">취소</Badge>,
+    };
+    return badges[status as keyof typeof badges] || <Badge variant="secondary">{status}</Badge>;
   };
 
   return (
@@ -353,6 +431,47 @@ const Settings = () => {
 
           {/* 1. Organization Settings */}
           <TabsContent value="organization" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>조직 정보</CardTitle>
+                <CardDescription>현재 조직의 기본 정보</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>조직 이름</Label>
+                    <p className="text-sm font-medium">{orgName || '조직 없음'}</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>내 역할</Label>
+                    <div>{getRoleBadge(role || '')}</div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>라이선스 타입</Label>
+                    <div>{licenseType ? getLicenseTypeBadge(licenseType) : <Badge variant="secondary">없음</Badge>}</div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>라이선스 상태</Label>
+                    <div>{licenseStatus ? getStatusBadge(licenseStatus) : <Badge variant="secondary">없음</Badge>}</div>
+                  </div>
+                  {organizationInfo && (
+                    <>
+                      <div className="space-y-2">
+                        <Label>멤버 수</Label>
+                        <p className="text-sm font-medium">{organizationInfo.member_count || 0}명</p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>생성일</Label>
+                        <p className="text-sm font-medium">
+                          {new Date(organizationInfo.created_at).toLocaleDateString('ko-KR')}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle>조직/브랜드 기본 설정</CardTitle>
@@ -638,45 +757,99 @@ const Settings = () => {
           <TabsContent value="users" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>사용자/역할/권한 관리</CardTitle>
-                <CardDescription>계정 생성/초대, 역할(Role) 템플릿, RBAC 정책</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>조직 멤버</CardTitle>
+                    <CardDescription>조직에 속한 사용자 및 역할 관리</CardDescription>
+                  </div>
+                  {(isOrgHQ() || isOrgStore()) && (
+                    <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm">
+                          <Mail className="w-4 h-4 mr-2" />
+                          Viewer 초대
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Viewer 초대</DialogTitle>
+                          <DialogDescription>
+                            읽기 전용 권한을 가진 Viewer를 초대합니다
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="inviteEmail">이메일</Label>
+                            <Input
+                              id="inviteEmail"
+                              type="email"
+                              placeholder="viewer@example.com"
+                              value={inviteEmail}
+                              onChange={(e) => setInviteEmail(e.target.value)}
+                            />
+                          </div>
+                          <Button 
+                            onClick={sendViewerInvitation} 
+                            disabled={loading || !inviteEmail}
+                            className="w-full"
+                          >
+                            {loading ? '전송 중...' : '초대 전송'}
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="space-y-2">
-                  <Label>내 역할</Label>
-                  <div className="flex gap-2">
-                    {userRoles.map((role) => (
-                      <Badge key={role.id} variant="default">
-                        {role.role === 'admin' && '관리자'}
-                        {role.role === 'manager' && '매니저'}
-                        {role.role === 'analyst' && '분석가'}
-                        {role.role === 'viewer' && '뷰어'}
-                      </Badge>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>사용자 ID</TableHead>
+                      <TableHead>역할</TableHead>
+                      <TableHead>라이선스</TableHead>
+                      <TableHead>가입일</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {orgMembers.map((member) => (
+                      <TableRow key={member.id}>
+                        <TableCell className="font-mono text-xs">
+                          {member.user_id.substring(0, 8)}...
+                        </TableCell>
+                        <TableCell>
+                          {getRoleBadge(member.role)}
+                        </TableCell>
+                        <TableCell>
+                          {member.licenses ? (
+                            <div className="space-y-1">
+                              {getLicenseTypeBadge(member.licenses.license_type)}
+                              <div className="text-xs text-muted-foreground">
+                                {member.licenses.license_key}
+                              </div>
+                            </div>
+                          ) : (
+                            <Badge variant="secondary">없음</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {new Date(member.joined_at).toLocaleDateString('ko-KR')}
+                        </TableCell>
+                      </TableRow>
                     ))}
-                    {userRoles.length === 0 && (
-                      <Badge variant="secondary">역할 없음</Badge>
-                    )}
-                  </div>
-                </div>
+                  </TableBody>
+                </Table>
 
                 <Separator />
 
                 <div className="space-y-2">
                   <Label>역할 설명</Label>
                   <div className="space-y-2 text-sm text-muted-foreground">
-                    <div><strong>관리자 (Admin):</strong> 모든 권한 보유, 사용자 관리 및 시스템 설정 가능</div>
-                    <div><strong>매니저 (Manager):</strong> 데이터 관리 및 리포트 생성 가능</div>
-                    <div><strong>분석가 (Analyst):</strong> 데이터 분석 및 조회 가능</div>
-                    <div><strong>뷰어 (Viewer):</strong> 읽기 전용 권한</div>
+                    <div><strong>마스터 (NEURALTWIN_MASTER):</strong> 시스템 전체 관리 권한</div>
+                    <div><strong>본사 (ORG_HQ):</strong> 조직 관리, 모든 매장 데이터 접근, HQ 라이선스 필요 ($500/월)</div>
+                    <div><strong>매장 (ORG_STORE):</strong> 매장 관리 및 데이터 분석, Store 라이선스 필요 ($250/월)</div>
+                    <div><strong>뷰어 (ORG_VIEWER):</strong> 읽기 전용 권한, 무료 (초대 필요)</div>
                   </div>
-                </div>
-
-                <Separator />
-
-                <div className="bg-muted p-4 rounded-lg">
-                  <p className="text-sm text-muted-foreground">
-                    역할 관리는 관리자(Admin) 권한이 필요합니다. 새로운 사용자를 초대하거나 역할을 변경하려면 관리자에게 문의하세요.
-                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -686,85 +859,104 @@ const Settings = () => {
           <TabsContent value="license" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>플랜/라이선스 관리</CardTitle>
-                <CardDescription>Store/HQ 라이선스 수, 청구 정보, 사용량 모니터링</CardDescription>
+                <CardTitle>구독 정보</CardTitle>
+                <CardDescription>조직의 구독 및 라이선스 현황</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {licenseInfo ? (
+                {subscriptionInfo ? (
                   <>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label>현재 플랜</Label>
-                        <div className="mt-2">
-                          {getPlanBadge(licenseInfo.plan_type)}
-                        </div>
-                      </div>
-                      <Button variant="outline">플랜 업그레이드</Button>
-                    </div>
-
-                    <Separator />
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-2">
-                        <Label>매장 수</Label>
-                        <div className="flex items-center gap-2">
-                          <Progress value={(licenseInfo.current_stores / licenseInfo.max_stores) * 100} />
-                          <span className="text-sm text-muted-foreground">
-                            {licenseInfo.current_stores} / {licenseInfo.max_stores}
-                          </span>
-                        </div>
+                        <Label>HQ 라이선스</Label>
+                        <div className="text-2xl font-bold">{subscriptionInfo.hq_license_count || 0}개</div>
+                        <p className="text-xs text-muted-foreground">$500/월 × {subscriptionInfo.hq_license_count || 0}</p>
                       </div>
-
                       <div className="space-y-2">
-                        <Label>본사 사용자 수</Label>
-                        <div className="flex items-center gap-2">
-                          <Progress value={(licenseInfo.current_hq_users / licenseInfo.max_hq_users) * 100} />
-                          <span className="text-sm text-muted-foreground">
-                            {licenseInfo.current_hq_users} / {licenseInfo.max_hq_users}
-                          </span>
-                        </div>
+                        <Label>Store 라이선스</Label>
+                        <div className="text-2xl font-bold">{subscriptionInfo.store_license_count || 0}개</div>
+                        <p className="text-xs text-muted-foreground">$250/월 × {subscriptionInfo.store_license_count || 0}</p>
                       </div>
-
                       <div className="space-y-2">
-                        <Label>스토리지 사용량</Label>
-                        <div className="flex items-center gap-2">
-                          <Progress value={(parseFloat(licenseInfo.usage_storage_gb) / licenseInfo.storage_limit_gb) * 100} />
-                          <span className="text-sm text-muted-foreground">
-                            {licenseInfo.usage_storage_gb} GB / {licenseInfo.storage_limit_gb} GB
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>API 호출 수</Label>
-                        <div className="flex items-center gap-2">
-                          <Progress value={(licenseInfo.usage_api_calls / licenseInfo.api_calls_limit) * 100} />
-                          <span className="text-sm text-muted-foreground">
-                            {licenseInfo.usage_api_calls.toLocaleString()} / {licenseInfo.api_calls_limit.toLocaleString()}
-                          </span>
-                        </div>
+                        <Label>Viewer</Label>
+                        <div className="text-2xl font-bold">{subscriptionInfo.viewer_count || 0}명</div>
+                        <p className="text-xs text-muted-foreground">무료</p>
                       </div>
                     </div>
 
                     <Separator />
 
-                    <div className="space-y-2">
-                      <Label>청구 주기</Label>
-                      <p className="text-sm text-muted-foreground">
-                        {new Date(licenseInfo.billing_cycle_start).toLocaleDateString('ko-KR')} ~ {new Date(licenseInfo.billing_cycle_end).toLocaleDateString('ko-KR')}
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>라이선스 상태</Label>
-                      <Badge variant={licenseInfo.is_active ? "default" : "destructive"}>
-                        {licenseInfo.is_active ? '활성' : '비활성'}
-                      </Badge>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <Label>월 비용</Label>
+                        <div className="text-2xl font-bold text-primary">
+                          ${subscriptionInfo.monthly_cost?.toLocaleString() || 0}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label>구독 상태</Label>
+                        {getStatusBadge(subscriptionInfo.status || 'active')}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label>다음 결제일</Label>
+                        <p className="text-sm text-muted-foreground">
+                          {subscriptionInfo.next_billing_date 
+                            ? new Date(subscriptionInfo.next_billing_date).toLocaleDateString('ko-KR')
+                            : '-'}
+                        </p>
+                      </div>
                     </div>
                   </>
                 ) : (
                   <div className="text-center py-8">
-                    <p className="text-muted-foreground">라이선스 정보를 불러오는 중...</p>
+                    <p className="text-muted-foreground">구독 정보 없음</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>라이선스 목록</CardTitle>
+                <CardDescription>조직에서 발급된 모든 라이선스</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>라이선스 키</TableHead>
+                      <TableHead>타입</TableHead>
+                      <TableHead>상태</TableHead>
+                      <TableHead>월 비용</TableHead>
+                      <TableHead>유효기간</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {licenses.map((license) => (
+                      <TableRow key={license.id}>
+                        <TableCell className="font-mono text-xs">
+                          {license.license_key || 'N/A'}
+                        </TableCell>
+                        <TableCell>
+                          {getLicenseTypeBadge(license.license_type)}
+                        </TableCell>
+                        <TableCell>
+                          {getStatusBadge(license.status)}
+                        </TableCell>
+                        <TableCell className="font-semibold">
+                          ${license.monthly_price || 0}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {license.expiry_date 
+                            ? new Date(license.expiry_date).toLocaleDateString('ko-KR')
+                            : '무제한'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {licenses.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    발급된 라이선스가 없습니다
                   </div>
                 )}
               </CardContent>
