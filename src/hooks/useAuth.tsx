@@ -20,6 +20,12 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<{ error: any }>;
   signInWithKakao: () => Promise<{ error: any }>;
   loading: boolean;
+  getDefaultDashboard: () => string;
+  isNeuralTwinMaster: () => boolean;
+  isOrgHQ: () => boolean;
+  isOrgStore: () => boolean;
+  isOrgViewer: () => boolean;
+  canAccessFeature: (feature: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -54,6 +60,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Error calling migrate_user_to_organization:', err);
       return null;
     }
+  };
+
+  // Function to get default dashboard based on role
+  const getDefaultDashboard = () => {
+    switch (role) {
+      case 'NEURALTWIN_MASTER':
+        return '/overview/dashboard';
+      case 'ORG_HQ':
+        return '/overview/dashboard';
+      case 'ORG_STORE':
+        return '/analysis/store';
+      case 'ORG_VIEWER':
+        return '/overview/dashboard';
+      default:
+        return '/overview/dashboard';
+    }
+  };
+
+  // Role checking helpers
+  const isNeuralTwinMaster = () => role === 'NEURALTWIN_MASTER';
+  const isOrgHQ = () => role === 'ORG_HQ';
+  const isOrgStore = () => role === 'ORG_STORE';
+  const isOrgViewer = () => role === 'ORG_VIEWER';
+
+  // Feature access control
+  const canAccessFeature = (feature: string): boolean => {
+    if (!role) return false;
+    
+    // NEURALTWIN_MASTER has access to everything
+    if (role === 'NEURALTWIN_MASTER') return true;
+    
+    // Define feature access by role
+    const featureAccess: Record<string, string[]> = {
+      'hq-sync': ['ORG_HQ'],
+      'advanced-analytics': ['ORG_HQ', 'ORG_STORE'],
+      'simulation': ['ORG_HQ', 'ORG_STORE'],
+      'data-management': ['ORG_HQ', 'ORG_STORE'],
+      'basic-analytics': ['ORG_HQ', 'ORG_STORE', 'ORG_VIEWER'],
+      'dashboard': ['ORG_HQ', 'ORG_STORE', 'ORG_VIEWER'],
+    };
+    
+    const allowedRoles = featureAccess[feature];
+    return allowedRoles ? allowedRoles.includes(role) : false;
   };
 
   // Function to fetch organization context
@@ -107,6 +156,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
+    let redirectTimeout: NodeJS.Timeout;
+    
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
@@ -118,8 +169,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         // Fetch organization context when user signs in
         if (session?.user) {
-          setTimeout(() => {
-            fetchOrganizationContext(session.user.id);
+          setTimeout(async () => {
+            await fetchOrganizationContext(session.user.id);
+            
+            // Redirect to role-based dashboard after context is loaded
+            if (event === "SIGNED_IN") {
+              redirectTimeout = setTimeout(() => {
+                const defaultPath = getDefaultDashboard();
+                navigate(defaultPath);
+              }, 500);
+            }
           }, 0);
         } else {
           setOrgId(null);
@@ -129,11 +188,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setLicenseType(null);
           setLicenseStatus(null);
           setInvitedBy(null);
-        }
-        
-        // Redirect to dashboard after successful sign in
-        if (event === "SIGNED_IN" && session) {
-          navigate("/");
         }
       }
     );
@@ -152,7 +206,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      if (redirectTimeout) {
+        clearTimeout(redirectTimeout);
+      }
+    };
   }, [navigate]);
 
   const signIn = async (email: string, password: string) => {
@@ -225,7 +284,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       resetPassword, 
       signInWithGoogle, 
       signInWithKakao, 
-      loading 
+      loading,
+      getDefaultDashboard,
+      isNeuralTwinMaster,
+      isOrgHQ,
+      isOrgStore,
+      isOrgViewer,
+      canAccessFeature
     }}>
       {children}
     </AuthContext.Provider>
