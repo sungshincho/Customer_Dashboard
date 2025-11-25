@@ -9,6 +9,10 @@ interface AuthContextType {
   orgId: string | null;
   orgName: string | null;
   role: string | null;
+  licenseId: string | null;
+  licenseType: string | null;
+  licenseStatus: string | null;
+  invitedBy: string | null;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
@@ -26,6 +30,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [orgId, setOrgId] = useState<string | null>(null);
   const [orgName, setOrgName] = useState<string | null>(null);
   const [role, setRole] = useState<string | null>(null);
+  const [licenseId, setLicenseId] = useState<string | null>(null);
+  const [licenseType, setLicenseType] = useState<string | null>(null);
+  const [licenseStatus, setLicenseStatus] = useState<string | null>(null);
+  const [invitedBy, setInvitedBy] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -54,14 +62,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Ensure user has organization
       const migrated_org_id = await ensureOrganization(userId);
 
-      // Fetch organization membership details
+      // Fetch organization membership details with license info
       const { data: membership, error: memberError } = await supabase
         .from('organization_members')
         .select(`
           role,
           org_id,
+          license_id,
+          invited_by,
           organizations (
             org_name
+          ),
+          licenses (
+            license_type,
+            status
           )
         `)
         .eq('user_id', userId)
@@ -75,6 +89,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setOrgId(membership.org_id);
       setOrgName((membership.organizations as any)?.org_name || null);
       setRole(membership.role);
+      setLicenseId(membership.license_id);
+      setInvitedBy(membership.invited_by);
+      
+      // Set license details if available
+      const licenseData = membership.licenses as any;
+      if (licenseData) {
+        setLicenseType(licenseData.license_type);
+        setLicenseStatus(licenseData.status);
+      } else {
+        setLicenseType(null);
+        setLicenseStatus(null);
+      }
     } catch (err) {
       console.error('Error fetching organization context:', err);
     }
@@ -99,6 +125,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setOrgId(null);
           setOrgName(null);
           setRole(null);
+          setLicenseId(null);
+          setLicenseType(null);
+          setLicenseStatus(null);
+          setInvitedBy(null);
         }
         
         // Redirect to dashboard after successful sign in
@@ -184,7 +214,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       session, 
       orgId, 
       orgName, 
-      role, 
+      role,
+      licenseId,
+      licenseType,
+      licenseStatus,
+      invitedBy,
       signIn, 
       signUp, 
       signOut, 
