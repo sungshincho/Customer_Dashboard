@@ -49,26 +49,9 @@ export function useRealtimeTracking({
 
     const loadStoreConfig = async () => {
       try {
-        // 매장 공간 메타데이터 로드
-        const { data: storeData, error: storeError } = await supabase
-          .from('stores')
-          .select('metadata')
-          .eq('id', storeId)
-          .single();
-
-        if (storeError) throw storeError;
-
-        // 메타데이터 파싱 (stores 테이블에 metadata JSONB 컬럼 필요)
-        const metadata = storeData?.metadata as any;
-        metadataRef.current = (metadata && typeof metadata === 'object') ? {
-          store_id: storeId,
-          real_width: metadata.real_width || 20,
-          real_depth: metadata.real_depth || 15,
-          real_height: metadata.real_height || 3,
-          model_scale: metadata.model_scale || 1.0,
-          origin_offset: metadata.origin_offset || { x: 0, y: 0, z: 0 },
-          zones: metadata.zones || []
-        } : {
+        // Use default metadata values
+        // TODO: Add metadata JSONB column to stores table
+        metadataRef.current = {
           store_id: storeId,
           real_width: 20,
           real_depth: 15,
