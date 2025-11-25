@@ -2734,6 +2734,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_membership: {
+        Args: { membership_org_id: string; membership_user_id: string }
+        Returns: boolean
+      }
       get_user_org_id: { Args: { _user_id: string }; Returns: string }
       get_user_role: {
         Args: { _user_id: string }
@@ -2760,6 +2764,7 @@ export type Database = {
         Args: { _org_id: string; _user_id: string }
         Returns: boolean
       }
+      is_org_admin_simple: { Args: { check_org_id: string }; Returns: boolean }
       is_org_member: {
         Args: { _org_id: string; _user_id: string }
         Returns: boolean
