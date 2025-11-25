@@ -1086,7 +1086,7 @@ export async function insertComprehensiveSchema(userId: string) {
 
     const { data: entityTypes, error: entityTypesError } = await supabase
       .from('ontology_entity_types')
-      .upsert(entityTypesWithUserId, { onConflict: 'user_id,name', ignoreDuplicates: false })
+      .insert(entityTypesWithUserId)
       .select();
 
     if (entityTypesError) {
@@ -1110,7 +1110,7 @@ export async function insertComprehensiveSchema(userId: string) {
 
     const { data: relationTypes, error: relationTypesError } = await supabase
       .from('ontology_relation_types')
-      .upsert(relationTypesWithUserId, { onConflict: 'user_id,name,source_entity_type,target_entity_type', ignoreDuplicates: false })
+      .insert(relationTypesWithUserId)
       .select();
 
     if (relationTypesError) {
@@ -1144,7 +1144,7 @@ export async function insertRelationsOnly(userId: string) {
 
     const { data: relationTypes, error: relationTypesError } = await supabase
       .from('ontology_relation_types')
-      .upsert(relationTypesWithUserId, { onConflict: 'user_id,name,source_entity_type,target_entity_type', ignoreDuplicates: false })
+      .insert(relationTypesWithUserId)
       .select();
 
     if (relationTypesError) {
