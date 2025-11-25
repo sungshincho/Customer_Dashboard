@@ -16,7 +16,7 @@ import NotFound from "@/core/pages/NotFoundPage";
 
 // Overview pages
 import Stores from "@/features/store-analysis/stores/pages/StoresPage";
-import HQStoreSyncPage from "@/features/store-analysis/stores/pages/HQStoreSyncPage";
+import HQCommunicationPage from "@/features/store-analysis/stores/pages/HQCommunicationPage";
 
 // Analysis - Integrated pages
 import StoreAnalysisPage from "@/features/store-analysis/pages/StoreAnalysisPage";
@@ -55,7 +55,7 @@ const App = () => (
               <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/overview/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/overview/stores" element={<ProtectedRoute><Stores /></ProtectedRoute>} />
-              <Route path="/overview/hq-sync" element={<ProtectedRoute><HQStoreSyncPage /></ProtectedRoute>} />
+              <Route path="/overview/hq-communication" element={<ProtectedRoute><HQCommunicationPage /></ProtectedRoute>} />
               <Route path="/overview/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
               {/* 2️⃣ Analysis - Integrated Store Analysis (3 pages) */}
