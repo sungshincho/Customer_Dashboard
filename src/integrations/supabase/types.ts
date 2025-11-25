@@ -1664,9 +1664,11 @@ export type Database = {
           description: string | null
           id: string
           min_stock_level: number | null
+          name: string
           org_id: string | null
           price: number | null
           product_name: string
+          selling_price: number | null
           sku: string | null
           stock: number | null
           store_id: string | null
@@ -1681,9 +1683,11 @@ export type Database = {
           description?: string | null
           id?: string
           min_stock_level?: number | null
+          name: string
           org_id?: string | null
           price?: number | null
           product_name: string
+          selling_price?: number | null
           sku?: string | null
           stock?: number | null
           store_id?: string | null
@@ -1698,9 +1702,11 @@ export type Database = {
           description?: string | null
           id?: string
           min_stock_level?: number | null
+          name?: string
           org_id?: string | null
           price?: number | null
           product_name?: string
+          selling_price?: number | null
           sku?: string | null
           stock?: number | null
           store_id?: string | null
@@ -1815,12 +1821,58 @@ export type Database = {
           },
         ]
       }
+      regional_data: {
+        Row: {
+          consumer_confidence: number | null
+          created_at: string | null
+          date: string
+          gdp: number | null
+          id: string
+          metadata: Json | null
+          org_id: string | null
+          population: number | null
+          region: string
+          unemployment_rate: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          consumer_confidence?: number | null
+          created_at?: string | null
+          date: string
+          gdp?: number | null
+          id?: string
+          metadata?: Json | null
+          org_id?: string | null
+          population?: number | null
+          region: string
+          unemployment_rate?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          consumer_confidence?: number | null
+          created_at?: string | null
+          date?: string
+          gdp?: number | null
+          id?: string
+          metadata?: Json | null
+          org_id?: string | null
+          population?: number | null
+          region?: string
+          unemployment_rate?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       scenarios: {
         Row: {
           created_at: string
           id: string
           org_id: string | null
           parameters: Json
+          predicted_kpi: Json | null
           results: Json | null
           scenario_name: string
           scenario_type: string
@@ -1833,6 +1885,7 @@ export type Database = {
           id?: string
           org_id?: string | null
           parameters: Json
+          predicted_kpi?: Json | null
           results?: Json | null
           scenario_name: string
           scenario_type: string
@@ -1845,6 +1898,7 @@ export type Database = {
           id?: string
           org_id?: string | null
           parameters?: Json
+          predicted_kpi?: Json | null
           results?: Json | null
           scenario_name?: string
           scenario_type?: string
@@ -1919,6 +1973,60 @@ export type Database = {
           },
         ]
       }
+      store_mappings: {
+        Row: {
+          created_at: string | null
+          hq_store_id: string | null
+          id: string
+          last_synced_at: string | null
+          local_store_id: string | null
+          metadata: Json | null
+          org_id: string | null
+          sync_status: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          hq_store_id?: string | null
+          id?: string
+          last_synced_at?: string | null
+          local_store_id?: string | null
+          metadata?: Json | null
+          org_id?: string | null
+          sync_status?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          hq_store_id?: string | null
+          id?: string
+          last_synced_at?: string | null
+          local_store_id?: string | null
+          metadata?: Json | null
+          org_id?: string | null
+          sync_status?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_mappings_hq_store_id_fkey"
+            columns: ["hq_store_id"]
+            isOneToOne: false
+            referencedRelation: "hq_store_master"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_mappings_local_store_id_fkey"
+            columns: ["local_store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stores: {
         Row: {
           address: string | null
@@ -1934,6 +2042,7 @@ export type Database = {
           license_id: string | null
           location: string | null
           manager_name: string | null
+          metadata: Json | null
           opening_date: string | null
           org_id: string | null
           phone: string | null
@@ -1961,6 +2070,7 @@ export type Database = {
           license_id?: string | null
           location?: string | null
           manager_name?: string | null
+          metadata?: Json | null
           opening_date?: string | null
           org_id?: string | null
           phone?: string | null
@@ -1988,6 +2098,7 @@ export type Database = {
           license_id?: string | null
           location?: string | null
           manager_name?: string | null
+          metadata?: Json | null
           opening_date?: string | null
           org_id?: string | null
           phone?: string | null
@@ -2134,6 +2245,7 @@ export type Database = {
       }
       user_data_imports: {
         Row: {
+          can_pause: boolean | null
           can_resume: boolean | null
           completed_at: string | null
           created_at: string
@@ -2154,6 +2266,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          can_pause?: boolean | null
           can_resume?: boolean | null
           completed_at?: string | null
           created_at?: string
@@ -2174,6 +2287,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          can_pause?: boolean | null
           can_resume?: boolean | null
           completed_at?: string | null
           created_at?: string
@@ -2254,6 +2368,59 @@ export type Database = {
           },
         ]
       }
+      weather_data: {
+        Row: {
+          created_at: string | null
+          date: string
+          humidity: number | null
+          id: string
+          metadata: Json | null
+          org_id: string | null
+          precipitation: number | null
+          store_id: string | null
+          temperature: number | null
+          updated_at: string | null
+          user_id: string
+          weather_condition: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          humidity?: number | null
+          id?: string
+          metadata?: Json | null
+          org_id?: string | null
+          precipitation?: number | null
+          store_id?: string | null
+          temperature?: number | null
+          updated_at?: string | null
+          user_id: string
+          weather_condition?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          humidity?: number | null
+          id?: string
+          metadata?: Json | null
+          org_id?: string | null
+          precipitation?: number | null
+          store_id?: string | null
+          temperature?: number | null
+          updated_at?: string | null
+          user_id?: string
+          weather_condition?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weather_data_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wifi_tracking: {
         Row: {
           created_at: string
@@ -2261,6 +2428,7 @@ export type Database = {
           id: string
           mac_address: string
           org_id: string | null
+          session_id: string | null
           signal_strength: number | null
           store_id: string
           timestamp: string
@@ -2273,6 +2441,7 @@ export type Database = {
           id?: string
           mac_address: string
           org_id?: string | null
+          session_id?: string | null
           signal_strength?: number | null
           store_id: string
           timestamp: string
@@ -2285,6 +2454,7 @@ export type Database = {
           id?: string
           mac_address?: string
           org_id?: string | null
+          session_id?: string | null
           signal_strength?: number | null
           store_id?: string
           timestamp?: string
