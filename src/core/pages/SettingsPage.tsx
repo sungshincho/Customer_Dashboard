@@ -62,26 +62,7 @@ const Settings = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch organization settings
-      const { data: orgData } = await supabase
-        .from('organization_settings')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (orgData) {
-        setOrgSettings({
-          timezone: orgData.timezone,
-          currency: orgData.currency,
-          defaultKpiSet: Array.isArray(orgData.default_kpi_set) 
-            ? orgData.default_kpi_set.filter((item): item is string => typeof item === 'string')
-            : ['totalVisits', 'totalRevenue', 'conversionRate'],
-          logoUrl: orgData.logo_url || '',
-          brandColor: orgData.brand_color,
-        });
-      }
-
-      // Fetch notification settings
+      // Fetch notification settings (only existing table)
       const { data: notifData } = await supabase
         .from('notification_settings')
         .select('*')
@@ -99,67 +80,21 @@ const Settings = () => {
         });
       }
 
-      // Fetch report schedules
-      const { data: scheduleData } = await supabase
-        .from('report_schedules')
-        .select('*')
-        .eq('user_id', user.id);
-
-      if (scheduleData) setReportSchedules(scheduleData);
-
-      // Fetch license info
-      const { data: licenseData } = await supabase
-        .from('license_management')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (licenseData) setLicenseInfo(licenseData);
-
-      // Fetch user roles
-      const { data: rolesData } = await supabase
-        .from('user_roles')
-        .select('*')
-        .eq('user_id', user.id);
-
-      if (rolesData) setUserRoles(rolesData);
+      // Note: organization_settings, report_schedules, license_management, user_roles tables not yet implemented
+      // TODO: Implement these tables in database migration
     } catch (error) {
       console.error('Error fetching settings:', error);
     }
   };
 
   const saveOrgSettings = async () => {
-    setLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not found');
-
-      const { error } = await supabase
-        .from('organization_settings')
-        .upsert({
-          user_id: user.id,
-          timezone: orgSettings.timezone,
-          currency: orgSettings.currency,
-          default_kpi_set: orgSettings.defaultKpiSet,
-          logo_url: orgSettings.logoUrl,
-          brand_color: orgSettings.brandColor,
-        });
-
-      if (error) throw error;
-
-      toast({
-        title: "설정 저장 완료",
-        description: "조직 설정이 성공적으로 저장되었습니다.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "설정 저장 실패",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
+    setLoading(false);
+    toast({
+      title: "준비 중",
+      description: "조직 설정 기능은 곧 제공될 예정입니다.",
+      variant: "default",
+    });
+    // TODO: Implement organization_settings table
   };
 
   const saveNotificationSettings = async () => {
@@ -196,81 +131,21 @@ const Settings = () => {
   };
 
   const addReportSchedule = async () => {
-    if (!newSchedule.reportName) {
-      toast({
-        title: "입력 오류",
-        description: "리포트 이름을 입력해주세요.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not found');
-
-      const { error } = await supabase
-        .from('report_schedules')
-        .insert({
-          user_id: user.id,
-          report_name: newSchedule.reportName,
-          frequency: newSchedule.frequency,
-          day_of_week: newSchedule.dayOfWeek,
-          time_of_day: newSchedule.timeOfDay,
-          recipients: newSchedule.recipients,
-          report_type: newSchedule.reportType,
-        });
-
-      if (error) throw error;
-
-      toast({
-        title: "리포트 스케줄 추가",
-        description: "새 리포트 스케줄이 추가되었습니다.",
-      });
-
-      fetchSettings();
-      setNewSchedule({
-        reportName: '',
-        frequency: 'weekly',
-        dayOfWeek: 1,
-        timeOfDay: '09:00',
-        recipients: [],
-        reportType: 'sales',
-      });
-    } catch (error: any) {
-      toast({
-        title: "스케줄 추가 실패",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
+    toast({
+      title: "준비 중",
+      description: "리포트 스케줄 기능은 곧 제공될 예정입니다.",
+      variant: "default",
+    });
+    // TODO: Implement report_schedules table
   };
 
   const deleteReportSchedule = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from('report_schedules')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      toast({
-        title: "리포트 스케줄 삭제",
-        description: "리포트 스케줄이 삭제되었습니다.",
-      });
-
-      fetchSettings();
-    } catch (error: any) {
-      toast({
-        title: "삭제 실패",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
+    toast({
+      title: "준비 중",
+      description: "리포트 스케줄 기능은 곧 제공될 예정입니다.",
+      variant: "default",
+    });
+    // TODO: Implement report_schedules table
   };
 
   const toggleNotificationType = (type: string) => {

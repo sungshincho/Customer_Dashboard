@@ -82,34 +82,19 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
         throw new Error('방문 데이터를 불러오는데 실패했습니다.');
       }
 
-      // 외부 컨텍스트 데이터 가져오기 (날씨, 공휴일, 상권 데이터)
-      const [weatherResult, holidaysResult, regionalResult] = await Promise.all([
-        supabase
-          .from('weather_data')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('store_id', storeId)
-          .gte('date', format(start, 'yyyy-MM-dd'))
-          .lte('date', format(end, 'yyyy-MM-dd')),
-        supabase
-          .from('holidays_events')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('store_id', storeId)
-          .gte('date', format(start, 'yyyy-MM-dd'))
-          .lte('date', format(end, 'yyyy-MM-dd')),
-        supabase
-          .from('regional_data')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('store_id', storeId)
-          .gte('date', format(start, 'yyyy-MM-dd'))
-          .lte('date', format(end, 'yyyy-MM-dd'))
-      ]);
-
-      const weatherData = weatherResult.data || [];
-      const holidaysData = holidaysResult.data || [];
-      const regionalData = regionalResult.data || [];
+      // Skip weather and regional data until tables are created
+      // TODO: Implement weather_data and regional_data tables
+      const weatherData: any[] = [];
+      const regionalData: any[] = [];
+      
+      // Fetch holidays
+      const { data: holidaysData } = await supabase
+        .from('holidays_events')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('store_id', storeId)
+        .gte('date', format(start, 'yyyy-MM-dd'))
+        .lte('date', format(end, 'yyyy-MM-dd'));
 
       // 시간대별 집계 (컨텍스트 데이터 포함)
       const hourlyData = new Map<string, FootfallData>();
@@ -121,14 +106,9 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
         const key = `${dateKey}-${hour}`;
 
         if (!hourlyData.has(key)) {
-          // 해당 시간의 컨텍스트 데이터 찾기
-          const weather = weatherData.find(w => 
-            w.date === dateKey && (w.hour === hour || w.hour === null)
-          );
-          const holiday = holidaysData.find(h => h.date === dateKey);
-          const regional = regionalData.find(r => 
-            r.date === dateKey && r.data_type === 'foot_traffic'
-          );
+          const weather = null; // weatherData disabled
+          const holiday = holidaysData?.find(h => h.date === dateKey);
+          const regional = null; // regionalData disabled
 
           hourlyData.set(key, {
             date: dateKey,

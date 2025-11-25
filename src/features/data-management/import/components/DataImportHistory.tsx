@@ -17,12 +17,10 @@ interface DataImportHistoryProps {
 interface ImportRecord {
   id: string;
   file_name: string;
-  file_type: string;
   data_type: string;
   row_count: number;
   created_at: string;
   raw_data: any;
-  file_path?: string;
 }
 
 export function DataImportHistory({ storeId }: DataImportHistoryProps) {
@@ -219,18 +217,8 @@ export function DataImportHistory({ storeId }: DataImportHistoryProps) {
 
       if (dbError) throw dbError;
 
-      // Storage에서도 삭제 시도
-      if (record?.file_path) {
-        // 파일 타입에 따라 버킷 선택
-        const bucket = record.file_type === '3d-model' ? '3d-models' : 'store-data';
-        const { error: storageError } = await supabase.storage
-          .from(bucket)
-          .remove([record.file_path]);
-        
-        if (storageError) {
-          console.warn('Storage 파일 삭제 실패:', storageError);
-        }
-      }
+      // Note: Storage cleanup requires file_path column in user_data_imports table
+      // TODO: Implement storage cleanup when file_path is available
 
       toast({
         title: "삭제 완료",
@@ -346,12 +334,9 @@ export function DataImportHistory({ storeId }: DataImportHistoryProps) {
                     <TableRow key={record.id}>
                       <TableCell className="font-medium">
                         {record.file_name}
-                        <span className="text-xs text-muted-foreground ml-2">
-                          (.{record.file_type})
-                        </span>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground max-w-xs truncate">
-                        {record.file_path || '-'}
+                        -
                       </TableCell>
                       <TableCell>
                         {getDataTypeBadge(record.data_type)}
