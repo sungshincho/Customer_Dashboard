@@ -49,16 +49,25 @@ export function useRealtimeTracking({
 
     const loadStoreConfig = async () => {
       try {
-        // Use default metadata values
-        // TODO: Add metadata JSONB column to stores table
+        // Fetch store metadata
+        const { data: storeData, error: storeError } = await supabase
+          .from('stores')
+          .select('metadata')
+          .eq('id', storeId)
+          .single();
+
+        if (storeError) throw storeError;
+
+        // Use metadata from database or fallback to defaults
+        const metadata = storeData?.metadata as any;
         metadataRef.current = {
           store_id: storeId,
-          real_width: 20,
-          real_depth: 15,
-          real_height: 3,
-          model_scale: 1.0,
-          origin_offset: { x: 0, y: 0, z: 0 },
-          zones: []
+          real_width: metadata?.real_width || 20,
+          real_depth: metadata?.real_depth || 15,
+          real_height: metadata?.real_height || 3,
+          model_scale: metadata?.model_scale || 1.0,
+          origin_offset: metadata?.origin_offset || { x: 0, y: 0, z: 0 },
+          zones: metadata?.zones || []
         };
 
         // 센서 위치 정보 로드 (iot_sensors 테이블 필요)

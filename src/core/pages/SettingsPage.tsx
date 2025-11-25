@@ -62,7 +62,37 @@ const Settings = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch notification settings (only existing table)
+      // Get org_id from organization_members
+      const { data: memberData } = await supabase
+        .from('organization_members')
+        .select('org_id')
+        .eq('user_id', user.id)
+        .single();
+
+      const orgId = memberData?.org_id;
+
+      // Fetch organization settings
+      if (orgId) {
+        const { data: orgData } = await supabase
+          .from('organization_settings')
+          .select('*')
+          .eq('org_id', orgId)
+          .single();
+
+        if (orgData) {
+          setOrgSettings({
+            timezone: orgData.timezone || 'Asia/Seoul',
+            currency: orgData.currency || 'KRW',
+            defaultKpiSet: Array.isArray(orgData.default_kpi_set) 
+              ? orgData.default_kpi_set 
+              : ['totalVisits', 'totalRevenue', 'conversionRate'],
+            logoUrl: orgData.logo_url || '',
+            brandColor: orgData.brand_color || '#1B6BFF',
+          });
+        }
+      }
+
+      // Fetch notification settings
       const { data: notifData } = await supabase
         .from('notification_settings')
         .select('*')
@@ -80,21 +110,95 @@ const Settings = () => {
         });
       }
 
-      // Note: organization_settings, report_schedules, license_management, user_roles tables not yet implemented
-      // TODO: Implement these tables in database migration
+      // Fetch report schedules
+      const { data: schedulesData } = await supabase
+        .from('report_schedules')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (schedulesData) {
+        setReportSchedules(schedulesData);
+      }
+
+      // Fetch license info
+      if (orgId) {
+        const { data: licenseData } = await supabase
+          .from('licenses')
+          .select('*')
+          .eq('org_id', orgId)
+          .eq('assigned_to', user.id)
+          .single();
+
+        if (licenseData) {
+          setLicenseInfo(licenseData);
+        }
+      }
+
+      // Fetch user roles from organization_members
+      if (orgId) {
+        const { data: rolesData } = await supabase
+          .from('organization_members')
+          .select(`
+            *,
+            licenses (
+              license_type,
+              status
+            )
+          `)
+          .eq('org_id', orgId)
+          .order('created_at', { ascending: false });
+
+        if (rolesData) {
+          setUserRoles(rolesData);
+        }
+      }
     } catch (error) {
       console.error('Error fetching settings:', error);
     }
   };
 
   const saveOrgSettings = async () => {
-    setLoading(false);
-    toast({
-      title: "준비 중",
-      description: "조직 설정 기능은 곧 제공될 예정입니다.",
-      variant: "default",
-    });
-    // TODO: Implement organization_settings table
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not found');
+
+      // Get org_id
+      const { data: memberData } = await supabase
+        .from('organization_members')
+        .select('org_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!memberData?.org_id) throw new Error('Organization not found');
+
+      const { error } = await supabase
+        .from('organization_settings')
+        .upsert({
+          org_id: memberData.org_id,
+          timezone: orgSettings.timezone,
+          currency: orgSettings.currency,
+          default_kpi_set: orgSettings.defaultKpiSet.join(','),
+          logo_url: orgSettings.logoUrl,
+          brand_color: orgSettings.brandColor,
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "조직 설정 저장 완료",
+        description: "조직 설정이 성공적으로 저장되었습니다.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "조직 설정 저장 실패",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const saveNotificationSettings = async () => {
@@ -131,21 +235,70 @@ const Settings = () => {
   };
 
   const addReportSchedule = async () => {
-    toast({
-      title: "준비 중",
-      description: "리포트 스케줄 기능은 곧 제공될 예정입니다.",
-      variant: "default",
-    });
-    // TODO: Implement report_schedules table
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not found');
+
+      // Get org_id
+      const { data: memberData } = await supabase
+        .from('organization_members')
+        .select('org_id')
+        .eq('user_id', user.id)
+        .single();
+
+      const { error } = await supabase
+        .from('report_schedules')
+        .insert({
+          user_id: user.id,
+          org_id: memberData?.org_id,
+          report_name: newSchedule.reportName,
+          report_type: newSchedule.reportType,
+          frequency: newSchedule.frequency,
+          recipients: newSchedule.recipients,
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "스케줄 추가 완료",
+        description: "리포트 스케줄이 추가되었습니다.",
+      });
+
+      fetchSettings();
+    } catch (error: any) {
+      toast({
+        title: "스케줄 추가 실패",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const deleteReportSchedule = async (id: string) => {
-    toast({
-      title: "준비 중",
-      description: "리포트 스케줄 기능은 곧 제공될 예정입니다.",
-      variant: "default",
-    });
-    // TODO: Implement report_schedules table
+    try {
+      const { error } = await supabase
+        .from('report_schedules')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "스케줄 삭제 완료",
+        description: "리포트 스케줄이 삭제되었습니다.",
+      });
+
+      fetchSettings();
+    } catch (error: any) {
+      toast({
+        title: "스케줄 삭제 실패",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   const toggleNotificationType = (type: string) => {

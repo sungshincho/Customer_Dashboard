@@ -1625,6 +1625,59 @@ export type Database = {
           },
         ]
       }
+      organization_settings: {
+        Row: {
+          brand_color: string | null
+          created_at: string | null
+          currency: string | null
+          default_kpi_set: string | null
+          email_notifications: boolean | null
+          id: string
+          logo_url: string | null
+          metadata: Json | null
+          org_id: string
+          slack_notifications: boolean | null
+          timezone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          brand_color?: string | null
+          created_at?: string | null
+          currency?: string | null
+          default_kpi_set?: string | null
+          email_notifications?: boolean | null
+          id?: string
+          logo_url?: string | null
+          metadata?: Json | null
+          org_id: string
+          slack_notifications?: boolean | null
+          timezone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          brand_color?: string | null
+          created_at?: string | null
+          currency?: string | null
+          default_kpi_set?: string | null
+          email_notifications?: boolean | null
+          id?: string
+          logo_url?: string | null
+          metadata?: Json | null
+          org_id?: string
+          slack_notifications?: boolean | null
+          timezone?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_settings_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
           created_at: string
@@ -1865,6 +1918,62 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      report_schedules: {
+        Row: {
+          created_at: string | null
+          filters: Json | null
+          frequency: string
+          id: string
+          is_enabled: boolean | null
+          last_run_at: string | null
+          next_run_at: string | null
+          org_id: string | null
+          recipients: string[] | null
+          report_name: string
+          report_type: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          filters?: Json | null
+          frequency: string
+          id?: string
+          is_enabled?: boolean | null
+          last_run_at?: string | null
+          next_run_at?: string | null
+          org_id?: string | null
+          recipients?: string[] | null
+          report_name: string
+          report_type: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          filters?: Json | null
+          frequency?: string
+          id?: string
+          is_enabled?: boolean | null
+          last_run_at?: string | null
+          next_run_at?: string | null
+          org_id?: string | null
+          recipients?: string[] | null
+          report_name?: string
+          report_type?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_schedules_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       scenarios: {
         Row: {
