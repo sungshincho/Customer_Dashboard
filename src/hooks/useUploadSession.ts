@@ -33,8 +33,17 @@ export function useUploadSession(storeId?: string) {
       .maybeSingle();
 
     if (existingSession) {
-      setSession(existingSession as UploadSession);
-      return existingSession as UploadSession;
+      const mappedSession: UploadSession = {
+        id: existingSession.id,
+        total_files: existingSession.total_files,
+        completed_files: existingSession.processed_files || 0,
+        failed_files: 0,
+        status: existingSession.status as 'active' | 'completed' | 'failed',
+        started_at: existingSession.created_at,
+        completed_at: existingSession.updated_at
+      };
+      setSession(mappedSession);
+      return mappedSession;
     }
 
     // 새 세션 생성
@@ -52,10 +61,19 @@ export function useUploadSession(storeId?: string) {
       .single();
 
     if (newSession) {
-      setSession(newSession as UploadSession);
+      const mappedSession: UploadSession = {
+        id: newSession.id,
+        total_files: 0,
+        completed_files: 0,
+        failed_files: 0,
+        status: 'active',
+        started_at: newSession.created_at,
+      };
+      setSession(mappedSession);
+      return mappedSession;
     }
 
-    return newSession as UploadSession;
+    return null;
   };
 
   // 세션 업데이트
@@ -70,7 +88,16 @@ export function useUploadSession(storeId?: string) {
       .single();
 
     if (data) {
-      setSession(data as UploadSession);
+      const mappedSession: UploadSession = {
+        id: data.id,
+        total_files: data.total_files,
+        completed_files: data.processed_files || 0,
+        failed_files: 0,
+        status: data.status as 'active' | 'completed' | 'failed',
+        started_at: data.created_at,
+        completed_at: data.updated_at
+      };
+      setSession(mappedSession);
     }
   };
 

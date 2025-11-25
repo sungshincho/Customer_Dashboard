@@ -47,6 +47,7 @@ export function useStoreScene() {
       if (error) throw error;
       return data ? {
         ...data,
+        name: data.scene_name,
         recipe_data: data.recipe_data as unknown as SceneRecipe
       } as StoreScene : null;
     },
@@ -76,6 +77,7 @@ export function useStoreScene() {
       if (error) throw error;
       return (data || []).map(scene => ({
         ...scene,
+        name: scene.scene_name,
         recipe_data: scene.recipe_data as unknown as SceneRecipe
       })) as StoreScene[];
     },
@@ -101,7 +103,7 @@ export function useStoreScene() {
           .from('store_scenes')
           .update({
             recipe_data: recipe as any,
-            name,
+            scene_name: name,
             updated_at: new Date().toISOString(),
           })
           .eq('id', sceneId)
@@ -132,7 +134,7 @@ export function useStoreScene() {
           .insert({
             user_id: user.id,
             store_id: selectedStoreId || null,
-            name,
+            scene_name: name,
             recipe_data: recipe as any,
             is_active: true,
           })

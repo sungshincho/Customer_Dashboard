@@ -94,17 +94,23 @@ export function OntologyDataManagement({ storeId }: OntologyDataManagementProps)
       }
 
       // CSV 파일만 필터링 (3d_model 제외)
-      let query = supabase
-        .from('user_data_imports')
-        .select('*')
-        .neq('data_type', '3d_model')
-        .neq('file_type', '3d_model');
-
-      if (storeId) {
-        query = query.eq('store_id', storeId);
-      }
-
-      const { data: csvImports, error } = await query.order('created_at', { ascending: false });
+      const query = storeId 
+        ? await supabase
+            .from('user_data_imports')
+            .select('*')
+            .eq('store_id', storeId)
+            .order('created_at', { ascending: false })
+        : await supabase
+            .from('user_data_imports')
+            .select('*')
+            .order('created_at', { ascending: false });
+      
+      const { data: allImports, error } = query;
+      
+      // JavaScript에서 3d_model 제외
+      const csvImports = allImports?.filter(item => 
+        item.data_type !== '3d_model'
+      ) || [];
       
       if (error) throw error;
 

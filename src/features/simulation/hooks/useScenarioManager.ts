@@ -69,12 +69,10 @@ export function useScenarioManager(storeId?: string) {
         .from('scenarios')
         .insert({
           user_id: user.user.id,
-          store_id: storeId,
+          store_id: storeId || null,
           scenario_type: scenarioType,
-          name,
-          description,
-          params: params as any,
-          status: 'draft',
+          scenario_name: name,
+          parameters: params as any,
         })
         .select()
         .single();

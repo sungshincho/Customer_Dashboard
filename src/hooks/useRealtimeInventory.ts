@@ -10,7 +10,6 @@ export interface Product {
   cost_price: number;
   selling_price: number;
   supplier: string | null;
-  lead_time_days: number;
 }
 
 export interface InventoryLevel {
@@ -61,8 +60,7 @@ export const useRealtimeInventory = () => {
             category,
             cost_price,
             selling_price,
-            supplier,
-            lead_time_days
+            supplier
           )
         `)
         .order('current_stock', { ascending: true });
@@ -81,8 +79,7 @@ export const useRealtimeInventory = () => {
             category,
             cost_price,
             selling_price,
-            supplier,
-            lead_time_days
+            supplier
           )
         `)
         .eq('status', 'pending')
@@ -134,15 +131,14 @@ export const useRealtimeInventory = () => {
                   category,
                   cost_price,
                   selling_price,
-                  supplier,
-                  lead_time_days
+                  supplier
                 )
               `)
               .eq('id', payload.new.id)
               .single()
               .then(({ data }) => {
                 if (data) {
-                  setInventoryLevels(prev => [...prev, data]);
+                  setInventoryLevels(prev => [...prev, data as any]);
                 }
               });
           } else if (payload.eventType === 'UPDATE') {
@@ -157,8 +153,7 @@ export const useRealtimeInventory = () => {
                   category,
                   cost_price,
                   selling_price,
-                  supplier,
-                  lead_time_days
+                  supplier
                 )
               `)
               .eq('id', payload.new.id)
@@ -166,7 +161,7 @@ export const useRealtimeInventory = () => {
               .then(({ data }) => {
                 if (data) {
                   setInventoryLevels(prev => 
-                    prev.map(item => item.id === data.id ? data : item)
+                    prev.map(item => item.id === data.id ? data as any : item)
                   );
                 }
               });
@@ -203,21 +198,20 @@ export const useRealtimeInventory = () => {
                   category,
                   cost_price,
                   selling_price,
-                  supplier,
-                  lead_time_days
+                  supplier
                 )
               `)
               .eq('id', payload.new.id)
               .single()
               .then(({ data }) => {
                 if (data) {
-                  setOrderSuggestions(prev => [data as OrderSuggestion, ...prev]);
+                  setOrderSuggestions(prev => [data as any, ...prev]);
                   
                   // Show toast notification for critical/high urgency
                   if (data.urgency_level === 'critical' || data.urgency_level === 'high') {
                     toast({
                       title: "긴급 발주 알림",
-                      description: `${data.products.name} - ${data.suggested_order_quantity}개 발주 필요`,
+                      description: `${(data.products as any).name} - ${data.suggested_order_quantity}개 발주 필요`,
                       variant: data.urgency_level === 'critical' ? 'destructive' : 'default'
                     });
                   }
@@ -235,8 +229,7 @@ export const useRealtimeInventory = () => {
                   category,
                   cost_price,
                   selling_price,
-                  supplier,
-                  lead_time_days
+                  supplier
                 )
               `)
               .eq('id', payload.new.id)
@@ -244,7 +237,7 @@ export const useRealtimeInventory = () => {
               .then(({ data }) => {
                 if (data) {
                   setOrderSuggestions(prev => 
-                    prev.map(item => item.id === data.id ? data as OrderSuggestion : item)
+                    prev.map(item => item.id === data.id ? data as any : item)
                   );
                 }
               });
