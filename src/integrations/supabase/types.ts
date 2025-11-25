@@ -603,6 +603,62 @@ export type Database = {
         }
         Relationships: []
       }
+      etl_pipelines: {
+        Row: {
+          config: Json
+          created_at: string
+          error_log: string | null
+          id: string
+          last_run_at: string | null
+          next_run_at: string | null
+          org_id: string
+          pipeline_name: string
+          schedule_cron: string | null
+          source_type: string
+          status: string
+          target_type: string
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          error_log?: string | null
+          id?: string
+          last_run_at?: string | null
+          next_run_at?: string | null
+          org_id: string
+          pipeline_name: string
+          schedule_cron?: string | null
+          source_type: string
+          status?: string
+          target_type: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          error_log?: string | null
+          id?: string
+          last_run_at?: string | null
+          next_run_at?: string | null
+          org_id?: string
+          pipeline_name?: string
+          schedule_cron?: string | null
+          source_type?: string
+          status?: string
+          target_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "etl_pipelines_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       external_data_sources: {
         Row: {
           api_key_encrypted: string | null
@@ -1051,36 +1107,51 @@ export type Database = {
       }
       licenses: {
         Row: {
+          activated_at: string | null
           created_at: string
           effective_date: string
           expiry_date: string | null
           id: string
-          is_active: boolean | null
+          issued_at: string | null
+          last_used_at: string | null
+          license_key: string | null
           license_type: string
           metadata: Json | null
           org_id: string
+          status: string | null
+          subscription_id: string | null
           updated_at: string
         }
         Insert: {
+          activated_at?: string | null
           created_at?: string
           effective_date: string
           expiry_date?: string | null
           id?: string
-          is_active?: boolean | null
+          issued_at?: string | null
+          last_used_at?: string | null
+          license_key?: string | null
           license_type: string
           metadata?: Json | null
           org_id: string
+          status?: string | null
+          subscription_id?: string | null
           updated_at?: string
         }
         Update: {
+          activated_at?: string | null
           created_at?: string
           effective_date?: string
           expiry_date?: string | null
           id?: string
-          is_active?: boolean | null
+          issued_at?: string | null
+          last_used_at?: string | null
+          license_key?: string | null
           license_type?: string
           metadata?: Json | null
           org_id?: string
+          status?: string | null
+          subscription_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1089,6 +1160,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "licenses_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
             referencedColumns: ["id"]
           },
         ]
@@ -1360,6 +1438,48 @@ export type Database = {
           schema_data?: Json
           user_id?: string
           version_number?: number
+        }
+        Relationships: []
+      }
+      ontology_schemas: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_master: boolean
+          schema_definition: Json
+          schema_name: string
+          schema_type: string
+          status: string
+          updated_at: string
+          version: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_master?: boolean
+          schema_definition: Json
+          schema_name: string
+          schema_type: string
+          status?: string
+          updated_at?: string
+          version: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_master?: boolean
+          schema_definition?: Json
+          schema_name?: string
+          schema_type?: string
+          status?: string
+          updated_at?: string
+          version?: string
         }
         Relationships: []
       }
@@ -1641,15 +1761,76 @@ export type Database = {
           },
         ]
       }
+      simulation_configs: {
+        Row: {
+          config_name: string
+          created_at: string
+          created_by: string | null
+          id: string
+          org_id: string
+          parameters: Json
+          results: Json | null
+          simulation_type: string
+          status: string
+          store_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          config_name: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          org_id: string
+          parameters?: Json
+          results?: Json | null
+          simulation_type: string
+          status?: string
+          store_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          config_name?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          org_id?: string
+          parameters?: Json
+          results?: Json | null
+          simulation_type?: string
+          status?: string
+          store_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "simulation_configs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "simulation_configs_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stores: {
         Row: {
           address: string | null
           area_sqm: number | null
+          city: string | null
+          country: string | null
           created_at: string
           district: string | null
           email: string | null
+          floor_area_sqm: number | null
           hq_store_code: string | null
           id: string
+          license_id: string | null
           location: string | null
           manager_name: string | null
           opening_date: string | null
@@ -1657,20 +1838,26 @@ export type Database = {
           phone: string | null
           region: string | null
           status: string | null
+          store_code: string | null
           store_format: string | null
           store_name: string
           store_type: string | null
+          timezone: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           address?: string | null
           area_sqm?: number | null
+          city?: string | null
+          country?: string | null
           created_at?: string
           district?: string | null
           email?: string | null
+          floor_area_sqm?: number | null
           hq_store_code?: string | null
           id?: string
+          license_id?: string | null
           location?: string | null
           manager_name?: string | null
           opening_date?: string | null
@@ -1678,20 +1865,26 @@ export type Database = {
           phone?: string | null
           region?: string | null
           status?: string | null
+          store_code?: string | null
           store_format?: string | null
           store_name: string
           store_type?: string | null
+          timezone?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           address?: string | null
           area_sqm?: number | null
+          city?: string | null
+          country?: string | null
           created_at?: string
           district?: string | null
           email?: string | null
+          floor_area_sqm?: number | null
           hq_store_code?: string | null
           id?: string
+          license_id?: string | null
           location?: string | null
           manager_name?: string | null
           opening_date?: string | null
@@ -1699,50 +1892,60 @@ export type Database = {
           phone?: string | null
           region?: string | null
           status?: string | null
+          store_code?: string | null
           store_format?: string | null
           store_name?: string
           store_type?: string | null
+          timezone?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "stores_license_id_fkey"
+            columns: ["license_id"]
+            isOneToOne: false
+            referencedRelation: "licenses"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subscriptions: {
         Row: {
-          billing_cycle_end: string
-          billing_cycle_start: string
           created_at: string
+          end_date: string | null
           hq_seat_quota: number
           id: string
           metadata: Json | null
           org_id: string
           plan_type: string
+          start_date: string | null
           status: string
           store_quota: number
           updated_at: string
         }
         Insert: {
-          billing_cycle_end?: string
-          billing_cycle_start?: string
           created_at?: string
+          end_date?: string | null
           hq_seat_quota: number
           id?: string
           metadata?: Json | null
           org_id: string
           plan_type: string
+          start_date?: string | null
           status: string
           store_quota: number
           updated_at?: string
         }
         Update: {
-          billing_cycle_end?: string
-          billing_cycle_start?: string
           created_at?: string
+          end_date?: string | null
           hq_seat_quota?: number
           id?: string
           metadata?: Json | null
           org_id?: string
           plan_type?: string
+          start_date?: string | null
           status?: string
           store_quota?: number
           updated_at?: string
