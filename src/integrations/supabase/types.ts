@@ -1105,9 +1105,75 @@ export type Database = {
           },
         ]
       }
+      invitations: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string
+          license_id: string | null
+          metadata: Json | null
+          org_id: string
+          role: Database["public"]["Enums"]["app_role"]
+          status: string
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          email: string
+          expires_at: string
+          id?: string
+          invited_by: string
+          license_id?: string | null
+          metadata?: Json | null
+          org_id: string
+          role: Database["public"]["Enums"]["app_role"]
+          status?: string
+          token: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string
+          license_id?: string | null
+          metadata?: Json | null
+          org_id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          status?: string
+          token?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invitations_license_id_fkey"
+            columns: ["license_id"]
+            isOneToOne: false
+            referencedRelation: "licenses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invitations_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       licenses: {
         Row: {
           activated_at: string | null
+          assigned_store_id: string | null
+          assigned_to: string | null
+          billing_history: Json | null
           created_at: string
           effective_date: string
           expiry_date: string | null
@@ -1117,6 +1183,8 @@ export type Database = {
           license_key: string | null
           license_type: string
           metadata: Json | null
+          monthly_price: number | null
+          next_billing_date: string | null
           org_id: string
           status: string | null
           subscription_id: string | null
@@ -1124,6 +1192,9 @@ export type Database = {
         }
         Insert: {
           activated_at?: string | null
+          assigned_store_id?: string | null
+          assigned_to?: string | null
+          billing_history?: Json | null
           created_at?: string
           effective_date: string
           expiry_date?: string | null
@@ -1133,6 +1204,8 @@ export type Database = {
           license_key?: string | null
           license_type: string
           metadata?: Json | null
+          monthly_price?: number | null
+          next_billing_date?: string | null
           org_id: string
           status?: string | null
           subscription_id?: string | null
@@ -1140,6 +1213,9 @@ export type Database = {
         }
         Update: {
           activated_at?: string | null
+          assigned_store_id?: string | null
+          assigned_to?: string | null
+          billing_history?: Json | null
           created_at?: string
           effective_date?: string
           expiry_date?: string | null
@@ -1149,12 +1225,21 @@ export type Database = {
           license_key?: string | null
           license_type?: string
           metadata?: Json | null
+          monthly_price?: number | null
+          next_billing_date?: string | null
           org_id?: string
           status?: string | null
           subscription_id?: string | null
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "licenses_assigned_store_id_fkey"
+            columns: ["assigned_store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "licenses_org_id_fkey"
             columns: ["org_id"]
@@ -1487,7 +1572,10 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          invitation_accepted_at: string | null
+          invited_by: string | null
           joined_at: string
+          license_id: string | null
           org_id: string | null
           permissions: Json | null
           role: Database["public"]["Enums"]["app_role"]
@@ -1497,7 +1585,10 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          invitation_accepted_at?: string | null
+          invited_by?: string | null
           joined_at?: string
+          license_id?: string | null
           org_id?: string | null
           permissions?: Json | null
           role?: Database["public"]["Enums"]["app_role"]
@@ -1507,7 +1598,10 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          invitation_accepted_at?: string | null
+          invited_by?: string | null
           joined_at?: string
+          license_id?: string | null
           org_id?: string | null
           permissions?: Json | null
           role?: Database["public"]["Enums"]["app_role"]
@@ -1515,6 +1609,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "organization_members_license_id_fkey"
+            columns: ["license_id"]
+            isOneToOne: false
+            referencedRelation: "licenses"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "organization_members_org_id_fkey"
             columns: ["org_id"]
@@ -1912,43 +2013,67 @@ export type Database = {
       }
       subscriptions: {
         Row: {
+          billing_cycle: string | null
           created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
           end_date: string | null
+          hq_license_count: number | null
           hq_seat_quota: number
           id: string
           metadata: Json | null
+          monthly_cost: number | null
           org_id: string
           plan_type: string
           start_date: string | null
           status: string
+          store_license_count: number | null
           store_quota: number
+          subscription_type: string | null
           updated_at: string
+          viewer_count: number | null
         }
         Insert: {
+          billing_cycle?: string | null
           created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
           end_date?: string | null
+          hq_license_count?: number | null
           hq_seat_quota: number
           id?: string
           metadata?: Json | null
+          monthly_cost?: number | null
           org_id: string
           plan_type: string
           start_date?: string | null
           status: string
+          store_license_count?: number | null
           store_quota: number
+          subscription_type?: string | null
           updated_at?: string
+          viewer_count?: number | null
         }
         Update: {
+          billing_cycle?: string | null
           created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
           end_date?: string | null
+          hq_license_count?: number | null
           hq_seat_quota?: number
           id?: string
           metadata?: Json | null
+          monthly_cost?: number | null
           org_id?: string
           plan_type?: string
           start_date?: string | null
           status?: string
+          store_license_count?: number | null
           store_quota?: number
+          subscription_type?: string | null
           updated_at?: string
+          viewer_count?: number | null
         }
         Relationships: [
           {
@@ -2245,6 +2370,10 @@ export type Database = {
         Args: { p_end_id: string; p_start_id: string; p_user_id: string }
         Returns: Json
       }
+      has_valid_license: {
+        Args: { _license_type: string; _user_id: string }
+        Returns: boolean
+      }
       is_neuraltwin_admin: { Args: { _user_id: string }; Returns: boolean }
       is_org_admin: {
         Args: { _org_id: string; _user_id: string }
@@ -2255,6 +2384,10 @@ export type Database = {
         Returns: boolean
       }
       is_org_member_simple: {
+        Args: { _org_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_org_member_with_license: {
         Args: { _org_id: string; _user_id: string }
         Returns: boolean
       }
