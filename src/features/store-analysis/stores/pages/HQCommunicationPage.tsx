@@ -1,12 +1,10 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessageList } from "../components/MessageList";
-import { MessageForm } from "../components/MessageForm";
-import { CommentThread } from "../components/CommentThread";
+import { UnifiedMessageThread } from "../components/UnifiedMessageThread";
 import { GuidelineList } from "../components/GuidelineList";
 import { GuidelineForm } from "../components/GuidelineForm";
 import { NotificationPanel } from "../components/NotificationPanel";
-import { MessageSquare, FileText, MessageCircle, Bell } from "lucide-react";
+import { MessageSquare, FileText, Bell } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 const HQCommunicationPage = () => {
@@ -23,14 +21,10 @@ const HQCommunicationPage = () => {
         </div>
 
         <Tabs defaultValue="messages" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="messages" className="gap-2">
               <MessageSquare className="w-4 h-4" />
-              메시지
-            </TabsTrigger>
-            <TabsTrigger value="comments" className="gap-2">
-              <MessageCircle className="w-4 h-4" />
-              코멘트
+              메시지 & 코멘트
             </TabsTrigger>
             <TabsTrigger value="guidelines" className="gap-2">
               <FileText className="w-4 h-4" />
@@ -43,20 +37,7 @@ const HQCommunicationPage = () => {
           </TabsList>
 
           <TabsContent value="messages" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2">
-                <MessageList />
-              </div>
-              {isOrgHQ && (
-                <div>
-                  <MessageForm />
-                </div>
-              )}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="comments" className="space-y-6">
-            <CommentThread />
+            <UnifiedMessageThread />
           </TabsContent>
 
           <TabsContent value="guidelines" className="space-y-6">

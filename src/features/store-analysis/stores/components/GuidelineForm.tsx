@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -13,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { FileText, Send } from "lucide-react";
 import { useCreateGuideline } from "@/hooks/useHQCommunication";
+import { useSelectedStore } from "@/hooks/useSelectedStore";
 
 export function GuidelineForm() {
   const [title, setTitle] = useState("");
@@ -21,8 +23,28 @@ export function GuidelineForm() {
   const [priority, setPriority] = useState<string>("normal");
   const [effectiveDate, setEffectiveDate] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
+  const [selectedStores, setSelectedStores] = useState<string[]>([]);
+  const [selectAll, setSelectAll] = useState(false);
 
+  const { stores } = useSelectedStore();
   const createGuideline = useCreateGuideline();
+
+  const handleStoreToggle = (storeId: string) => {
+    setSelectedStores(prev =>
+      prev.includes(storeId)
+        ? prev.filter(id => id !== storeId)
+        : [...prev, storeId]
+    );
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    setSelectAll(checked);
+    if (checked) {
+      setSelectedStores(stores?.map(s => s.id) || []);
+    } else {
+      setSelectedStores([]);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,6 +60,7 @@ export function GuidelineForm() {
       priority,
       effective_date: effectiveDate || undefined,
       expiry_date: expiryDate || undefined,
+      target_stores: selectedStores,
     });
 
     // Reset form
@@ -47,6 +70,8 @@ export function GuidelineForm() {
     setPriority("normal");
     setEffectiveDate("");
     setExpiryDate("");
+    setSelectedStores([]);
+    setSelectAll(false);
   };
 
   return (
@@ -118,6 +143,47 @@ export function GuidelineForm() {
               onChange={(e) => setExpiryDate(e.target.value)}
             />
           </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Label>대상 매장 선택</Label>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="select-all"
+                checked={selectAll}
+                onCheckedChange={handleSelectAll}
+              />
+              <label
+                htmlFor="select-all"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                전체 선택
+              </label>
+            </div>
+          </div>
+          <Card className="p-4 max-h-48 overflow-y-auto">
+            <div className="space-y-2">
+              {stores?.map((store) => (
+                <div key={store.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={store.id}
+                    checked={selectedStores.includes(store.id)}
+                    onCheckedChange={() => handleStoreToggle(store.id)}
+                  />
+                  <label
+                    htmlFor={store.id}
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    {store.store_name} ({store.store_code})
+                  </label>
+                </div>
+              ))}
+            </div>
+          </Card>
+          <p className="text-xs text-muted-foreground">
+            {selectedStores.length}개 매장 선택됨
+          </p>
         </div>
 
         <div className="space-y-2">
