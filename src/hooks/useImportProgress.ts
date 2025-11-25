@@ -30,13 +30,20 @@ export function useImportProgress(import_id?: string) {
 
       if (data) {
         const progressData = data.progress as any;
+        const errorDetails = data.error_details;
+        const errorMessage = typeof errorDetails === 'string' 
+          ? errorDetails 
+          : errorDetails 
+            ? JSON.stringify(errorDetails) 
+            : undefined;
+            
         setProgress({
           import_id: data.id,
           status: data.status as any,
           stage: progressData?.stage,
           percentage: progressData?.percentage,
           details: progressData,
-          error: data.error_details || undefined,
+          error: errorMessage,
           can_pause: data.can_pause || undefined,
           can_resume: data.can_resume || undefined
         });
@@ -59,13 +66,20 @@ export function useImportProgress(import_id?: string) {
         (payload) => {
           const data = payload.new as any;
           const progressData = data.progress;
+          const errorDetails = data.error_details;
+          const errorMessage = typeof errorDetails === 'string' 
+            ? errorDetails 
+            : errorDetails 
+              ? JSON.stringify(errorDetails) 
+              : undefined;
+              
           setProgress({
             import_id: data.id,
             status: data.status,
             stage: progressData?.stage,
             percentage: progressData?.percentage,
             details: progressData,
-            error: data.error_details || undefined,
+            error: errorMessage,
             can_pause: data.can_pause || undefined,
             can_resume: data.can_resume || undefined
           });

@@ -1725,6 +1725,7 @@ export type Database = {
           sku: string | null
           stock: number | null
           store_id: string | null
+          supplier: string | null
           updated_at: string
           user_id: string
         }
@@ -1744,6 +1745,7 @@ export type Database = {
           sku?: string | null
           stock?: number | null
           store_id?: string | null
+          supplier?: string | null
           updated_at?: string
           user_id: string
         }
@@ -1763,6 +1765,7 @@ export type Database = {
           sku?: string | null
           stock?: number | null
           store_id?: string | null
+          supplier?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -2130,6 +2133,60 @@ export type Database = {
           {
             foreignKeyName: "store_mappings_local_store_id_fkey"
             columns: ["local_store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      store_scenes: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          org_id: string | null
+          recipe_data: Json | null
+          scene_name: string
+          scene_type: string | null
+          store_id: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          org_id?: string | null
+          recipe_data?: Json | null
+          scene_name: string
+          scene_type?: string | null
+          store_id?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          org_id?: string | null
+          recipe_data?: Json | null
+          scene_name?: string
+          scene_type?: string | null
+          store_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_scenes_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_scenes_store_id_fkey"
+            columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
             referencedColumns: ["id"]
