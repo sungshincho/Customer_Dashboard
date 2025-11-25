@@ -2013,67 +2013,67 @@ export type Database = {
       }
       subscriptions: {
         Row: {
-          billing_cycle: string | null
+          billing_cycle: string
           created_at: string
           current_period_end: string | null
           current_period_start: string | null
           end_date: string | null
-          hq_license_count: number | null
-          hq_seat_quota: number
+          hq_license_count: number
+          hq_seat_quota: number | null
           id: string
           metadata: Json | null
-          monthly_cost: number | null
+          monthly_cost: number
           org_id: string
-          plan_type: string
+          plan_type: string | null
           start_date: string | null
           status: string
-          store_license_count: number | null
-          store_quota: number
-          subscription_type: string | null
+          store_license_count: number
+          store_quota: number | null
+          subscription_type: string
           updated_at: string
-          viewer_count: number | null
+          viewer_count: number
         }
         Insert: {
-          billing_cycle?: string | null
+          billing_cycle?: string
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
           end_date?: string | null
-          hq_license_count?: number | null
-          hq_seat_quota: number
+          hq_license_count?: number
+          hq_seat_quota?: number | null
           id?: string
           metadata?: Json | null
-          monthly_cost?: number | null
+          monthly_cost?: number
           org_id: string
-          plan_type: string
+          plan_type?: string | null
           start_date?: string | null
           status: string
-          store_license_count?: number | null
-          store_quota: number
-          subscription_type?: string | null
+          store_license_count?: number
+          store_quota?: number | null
+          subscription_type?: string
           updated_at?: string
-          viewer_count?: number | null
+          viewer_count?: number
         }
         Update: {
-          billing_cycle?: string | null
+          billing_cycle?: string
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
           end_date?: string | null
-          hq_license_count?: number | null
-          hq_seat_quota?: number
+          hq_license_count?: number
+          hq_seat_quota?: number | null
           id?: string
           metadata?: Json | null
-          monthly_cost?: number | null
+          monthly_cost?: number
           org_id?: string
-          plan_type?: string
+          plan_type?: string | null
           start_date?: string | null
           status?: string
-          store_license_count?: number | null
-          store_quota?: number
-          subscription_type?: string | null
+          store_license_count?: number
+          store_quota?: number | null
+          subscription_type?: string
           updated_at?: string
-          viewer_count?: number | null
+          viewer_count?: number
         }
         Relationships: [
           {
