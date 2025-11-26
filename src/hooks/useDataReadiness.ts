@@ -12,7 +12,7 @@ import { useSelectedStore } from './useSelectedStore';
  * 3. 온톨로지 스키마가 존재해야 함
  */
 export function useDataReadiness() {
-  const { user } = useAuth();
+  const { user, orgId } = useAuth();
   const { selectedStore } = useSelectedStore();
 
   // 1. 매장 선택 여부
@@ -22,12 +22,13 @@ export function useDataReadiness() {
   const { data: importsData, isLoading: importsLoading } = useQuery({
     queryKey: ['data-imports-check', user?.id, selectedStore?.id],
     queryFn: async () => {
-      if (!user) return null;
+      if (!user || !orgId) return null;
 
       const query = supabase
         .from('user_data_imports')
         .select('id, data_type, created_at')
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .eq('org_id', orgId);
 
       if (selectedStore) {
         query.eq('store_id', selectedStore.id);
@@ -45,12 +46,13 @@ export function useDataReadiness() {
   const { data: schemaData, isLoading: schemaLoading } = useQuery({
     queryKey: ['ontology-schema-check', user?.id],
     queryFn: async () => {
-      if (!user) return null;
+      if (!user || !orgId) return null;
 
       const { data, error } = await supabase
         .from('ontology_entity_types')
         .select('id')
         .eq('user_id', user.id)
+        .eq('org_id', orgId)
         .limit(1);
 
       if (error) throw error;
@@ -63,12 +65,13 @@ export function useDataReadiness() {
   const { data: wifiData, isLoading: wifiLoading } = useQuery({
     queryKey: ['wifi-tracking-check', user?.id, selectedStore?.id],
     queryFn: async () => {
-      if (!user) return null;
+      if (!user || !orgId) return null;
 
       const query = supabase
         .from('wifi_tracking' as any)
         .select('id')
         .eq('user_id', user.id)
+        .eq('org_id', orgId)
         .limit(1);
 
       if (selectedStore) {

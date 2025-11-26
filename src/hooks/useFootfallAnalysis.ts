@@ -32,7 +32,7 @@ export interface FootfallStats {
 }
 
 export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?: Date) {
-  const { user } = useAuth();
+  const { user, orgId } = useAuth();
 
   return useQuery({
     queryKey: ['footfall-analysis', storeId, startDate, endDate],
@@ -59,6 +59,7 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
         .from('wifi_tracking')
         .select('*')
         .eq('user_id', user.id)
+        .eq('org_id', orgId)
         .eq('store_id', storeId)
         .gte('timestamp', startOfDay(start).toISOString())
         .lte('timestamp', endOfDay(end).toISOString());
@@ -73,6 +74,7 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
         .from('graph_entities')
         .select('properties, created_at')
         .eq('user_id', user.id)
+        .eq('org_id', orgId)
         .eq('store_id', storeId)
         .gte('created_at', startOfDay(start).toISOString())
         .lte('created_at', endOfDay(end).toISOString());
@@ -102,6 +104,7 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
         .from('holidays_events')
         .select('*')
         .eq('user_id', user.id)
+        .eq('org_id', orgId)
         .eq('store_id', storeId)
         .gte('date', format(start, 'yyyy-MM-dd'))
         .lte('date', format(end, 'yyyy-MM-dd'));
@@ -275,12 +278,12 @@ function generateRegionalComparison(data: FootfallData[]): string | undefined {
 }
 
 export function useHourlyFootfall(storeId?: string, date?: Date) {
-  const { user } = useAuth();
+  const { user, orgId } = useAuth();
 
   return useQuery({
     queryKey: ['hourly-footfall', storeId, date],
     queryFn: async () => {
-      if (!user || !storeId) return [];
+      if (!user || !storeId || !orgId) return [];
 
       const targetDate = date || new Date();
       
@@ -288,6 +291,7 @@ export function useHourlyFootfall(storeId?: string, date?: Date) {
         .from('graph_entities')
         .select('properties, created_at')
         .eq('user_id', user.id)
+        .eq('org_id', orgId)
         .eq('store_id', storeId)
         .gte('created_at', startOfDay(targetDate).toISOString())
         .lte('created_at', endOfDay(targetDate).toISOString());

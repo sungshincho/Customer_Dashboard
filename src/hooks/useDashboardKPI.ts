@@ -23,12 +23,12 @@ export interface DashboardKPI {
 }
 
 export function useDashboardKPI(storeId?: string, date?: string) {
-  const { user } = useAuth();
+  const { user, orgId } = useAuth();
 
   return useQuery({
     queryKey: ['dashboard-kpi', storeId, date],
     queryFn: async () => {
-      if (!user || !storeId) return null;
+      if (!user || !storeId || !orgId) return null;
 
       const targetDate = date || new Date().toISOString().split('T')[0];
 
@@ -36,6 +36,7 @@ export function useDashboardKPI(storeId?: string, date?: string) {
         .from('dashboard_kpis')
         .select('*')
         .eq('user_id', user.id)
+        .eq('org_id', orgId)
         .eq('store_id', storeId)
         .eq('date', targetDate)
         .maybeSingle();
@@ -48,17 +49,18 @@ export function useDashboardKPI(storeId?: string, date?: string) {
 }
 
 export function useLatestKPIs(storeId?: string, limit: number = 7) {
-  const { user } = useAuth();
+  const { user, orgId } = useAuth();
 
   return useQuery({
     queryKey: ['dashboard-kpis-latest', storeId, limit],
     queryFn: async () => {
-      if (!user || !storeId) return [];
+      if (!user || !storeId || !orgId) return [];
 
       const { data, error } = await supabase
         .from('dashboard_kpis')
         .select('*')
         .eq('user_id', user.id)
+        .eq('org_id', orgId)
         .eq('store_id', storeId)
         .order('date', { ascending: false })
         .limit(limit);
@@ -71,17 +73,18 @@ export function useLatestKPIs(storeId?: string, limit: number = 7) {
 }
 
 export function useKPIsByDateRange(storeId?: string, startDate?: string, endDate?: string) {
-  const { user } = useAuth();
+  const { user, orgId } = useAuth();
 
   return useQuery({
     queryKey: ['dashboard-kpis-range', storeId, startDate, endDate],
     queryFn: async () => {
-      if (!user || !storeId || !startDate || !endDate) return [];
+      if (!user || !storeId || !startDate || !endDate || !orgId) return [];
 
       const { data, error } = await supabase
         .from('dashboard_kpis')
         .select('*')
         .eq('user_id', user.id)
+        .eq('org_id', orgId)
         .eq('store_id', storeId)
         .gte('date', startDate)
         .lte('date', endDate)

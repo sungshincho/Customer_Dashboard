@@ -319,6 +319,7 @@ export function useHQNotifications() {
         .from('hq_notifications')
         .select('*')
         .eq('user_id', user.id)
+        .eq('org_id', orgId)
         .order('created_at', { ascending: false })
         .limit(50);
 

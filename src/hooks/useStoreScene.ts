@@ -17,7 +17,7 @@ interface StoreScene {
 }
 
 export function useStoreScene() {
-  const { user } = useAuth();
+  const { user, orgId } = useAuth();
   const { selectedStore } = useSelectedStore();
   const queryClient = useQueryClient();
   const selectedStoreId = selectedStore?.id;
@@ -26,12 +26,13 @@ export function useStoreScene() {
   const { data: activeScene, isLoading, error } = useQuery({
     queryKey: ['store-scene', user?.id, selectedStoreId],
     queryFn: async () => {
-      if (!user?.id) return null;
+      if (!user?.id || !orgId) return null;
 
       const query = supabase
         .from('store_scenes')
         .select('*')
         .eq('user_id', user.id)
+        .eq('org_id', orgId)
         .eq('is_active', true)
         .order('updated_at', { ascending: false })
         .limit(1);
@@ -58,12 +59,13 @@ export function useStoreScene() {
   const { data: allScenes = [] } = useQuery({
     queryKey: ['store-scenes-all', user?.id, selectedStoreId],
     queryFn: async () => {
-      if (!user?.id) return [];
+      if (!user?.id || !orgId) return [];
 
       const query = supabase
         .from('store_scenes')
         .select('*')
         .eq('user_id', user.id)
+        .eq('org_id', orgId)
         .order('updated_at', { ascending: false });
 
       if (selectedStoreId) {
@@ -120,12 +122,14 @@ export function useStoreScene() {
             .from('store_scenes')
             .update({ is_active: false })
             .eq('user_id', user.id)
+            .eq('org_id', orgId)
             .eq('store_id', selectedStoreId);
         } else {
           await supabase
             .from('store_scenes')
             .update({ is_active: false })
             .eq('user_id', user.id)
+            .eq('org_id', orgId)
             .is('store_id', null);
         }
 
@@ -133,6 +137,7 @@ export function useStoreScene() {
           .from('store_scenes')
           .insert({
             user_id: user.id,
+            org_id: orgId,
             store_id: selectedStoreId || null,
             scene_name: name,
             recipe_data: recipe as any,
@@ -167,12 +172,14 @@ export function useStoreScene() {
           .from('store_scenes')
           .update({ is_active: false })
           .eq('user_id', user.id)
+          .eq('org_id', orgId)
           .eq('store_id', selectedStoreId);
       } else {
         await supabase
           .from('store_scenes')
           .update({ is_active: false })
           .eq('user_id', user.id)
+          .eq('org_id', orgId)
           .is('store_id', null);
       }
 
