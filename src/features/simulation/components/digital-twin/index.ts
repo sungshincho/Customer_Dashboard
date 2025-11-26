@@ -6,7 +6,6 @@ export { StoreSpace } from './StoreSpace';
 export { FurnitureLayout } from './FurnitureLayout';
 export { ProductPlacement } from './ProductPlacement';
 export { LightingPreset } from './LightingPreset';
-export { HeatmapOverlay } from './HeatmapOverlay';
 export { ModelLayerManager } from './ModelLayerManager';
 export { Model3DPreview } from './Model3DPreview';
 export { ModelUploader } from './ModelUploader';
