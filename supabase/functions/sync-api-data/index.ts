@@ -118,11 +118,14 @@ serve(async (req) => {
 
       console.log(`API call successful. Response time: ${apiResponseTime}s`);
 
-      // Get field mapping from sync_config
+      // Get field mapping and ontology options from sync_config
       const fieldMapping = schedule.sync_config?.field_mapping || {};
       const targetTable = schedule.sync_config?.target_table;
+      const convertToOntology = schedule.sync_config?.convert_to_ontology || false;
+      const ontologyEntityType = schedule.sync_config?.ontology_entity_type;
 
       let recordsSynced = 0;
+      let importId: string | null = null;
 
       // Process and insert data based on target table
       if (targetTable && fieldMapping && Object.keys(fieldMapping).length > 0) {
@@ -176,6 +179,57 @@ serve(async (req) => {
         }
 
         console.log(`Successfully synced ${recordsSynced} records to ${targetTable}`);
+
+        // 온톨로지 변환 옵션이 활성화된 경우
+        if (convertToOntology) {
+          console.log('🧠 Starting ontology conversion...');
+
+          // user_data_imports 레코드 생성
+          const { data: importRecord, error: importError } = await supabase
+            .from('user_data_imports')
+            .insert({
+              user_id: schedule.user_id,
+              org_id: schedule.org_id,
+              store_id: schedule.sync_config?.store_id || null,
+              file_name: `api_sync_${scheduleId}_${Date.now()}.json`,
+              file_type: 'json',
+              data_type: targetTable,
+              raw_data: dataArray,
+              row_count: dataArray.length,
+              status: 'pending',
+            })
+            .select()
+            .single();
+
+          if (importError) {
+            console.error('Failed to create import record:', importError);
+          } else if (importRecord) {
+            importId = importRecord.id;
+            console.log(`Created import record: ${importId}`);
+
+            // integrated-data-pipeline 호출하여 온톨로지 변환 실행
+            try {
+              const pipelineResponse = await supabase.functions.invoke('integrated-data-pipeline', {
+                body: {
+                  import_id: importId,
+                  store_id: schedule.sync_config?.store_id,
+                  auto_fix: true,
+                  skip_validation: false,
+                },
+              });
+
+              if (pipelineResponse.error) {
+                console.error('Ontology conversion error:', pipelineResponse.error);
+              } else {
+                console.log('✅ Ontology conversion completed');
+                console.log(`  - Entities created: ${pipelineResponse.data?.etl?.entities_created || 0}`);
+                console.log(`  - Relations created: ${pipelineResponse.data?.etl?.relations_created || 0}`);
+              }
+            } catch (pipelineError) {
+              console.error('Pipeline invocation error:', pipelineError);
+            }
+          }
+        }
       } else {
         console.log('No field mapping configured, skipping data insertion');
       }
@@ -192,7 +246,9 @@ serve(async (req) => {
             source_type: schedule.data_source.source_type,
             api_response_time: `${apiResponseTime}s`,
             target_table: targetTable,
-            records_processed: recordsSynced
+            records_processed: recordsSynced,
+            ontology_conversion: convertToOntology,
+            import_id: importId,
           }
         })
         .eq('id', syncLog.id);

@@ -101,6 +101,29 @@ export default function APIIntegrationPage() {
     [key: string]: string;
   }>({});
 
+  // Ontology conversion state
+  const [convertToOntology, setConvertToOntology] = useState(false);
+  const [selectedOntologyEntityType, setSelectedOntologyEntityType] = useState<string>('');
+  const [entityTypes, setEntityTypes] = useState<any[]>([]);
+
+  // Load entity types for ontology
+  const loadEntityTypes = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('ontology_entity_types')
+        .select('id, name, label, description')
+        .eq('user_id', user.id)
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+      setEntityTypes(data || []);
+    } catch (error: any) {
+      console.error('Failed to load entity types:', error);
+    }
+  };
+
   // Load connections
   const loadConnections = async () => {
     if (!user) return;
@@ -340,6 +363,8 @@ export default function APIIntegrationPage() {
             data_path: scheduleForm.data_path,
             field_mapping: fieldMappingConfig,
             store_id: selectedStore?.id,
+            convert_to_ontology: convertToOntology,
+            ontology_entity_type: selectedOntologyEntityType || null,
           },
           is_enabled: true,
         });
@@ -357,6 +382,8 @@ export default function APIIntegrationPage() {
       setFieldMappingConfig({});
       setShowFieldMapping(false);
       setApiPreviewData(null);
+      setConvertToOntology(false);
+      setSelectedOntologyEntityType('');
       loadSchedules();
     } catch (error: any) {
       toast.error('스케줄 생성 실패: ' + error.message);
@@ -449,6 +476,7 @@ export default function APIIntegrationPage() {
     loadConnections();
     loadSchedules();
     loadLogs();
+    loadEntityTypes();
   }, []);
 
   return (
@@ -827,6 +855,57 @@ export default function APIIntegrationPage() {
                       </p>
                     </div>
                   )}
+
+                  {/* Ontology Conversion Option */}
+                  <div className="space-y-4 p-4 border rounded-lg bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Database className="h-4 w-4 text-purple-600" />
+                        <Label className="text-base font-semibold">온톨로지 자동 변환</Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="convert_to_ontology"
+                          checked={convertToOntology}
+                          onChange={(e) => setConvertToOntology(e.target.checked)}
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                        <Label htmlFor="convert_to_ontology" className="text-sm cursor-pointer">
+                          활성화
+                        </Label>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-muted-foreground">
+                      API 데이터를 지식 그래프(Ontology)로 자동 변환하여 AI 분석에 활용합니다
+                    </p>
+
+                    {convertToOntology && (
+                      <div className="space-y-2">
+                        <Label htmlFor="ontology_entity_type">엔티티 타입 (선택사항)</Label>
+                        <Select 
+                          value={selectedOntologyEntityType} 
+                          onValueChange={setSelectedOntologyEntityType}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="자동 감지 또는 직접 선택" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">자동 감지</SelectItem>
+                            {entityTypes.map((et) => (
+                              <SelectItem key={et.id} value={et.id}>
+                                {et.label} ({et.name})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          기존 엔티티 타입을 선택하거나 비워두면 AI가 자동으로 생성합니다
+                        </p>
+                      </div>
+                    )}
+                  </div>
 
                   <Button 
                     onClick={createSchedule} 
