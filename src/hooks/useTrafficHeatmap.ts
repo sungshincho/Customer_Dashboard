@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { useWiFiTracking } from './useWiFiTracking';
 import { useSelectedStore } from './useSelectedStore';
-import { realToModel } from '@/features/digital-twin/utils/coordinateMapper';
-import type { HeatPoint, StoreSpaceMetadata, StoreZone } from '@/features/digital-twin/types/iot.types';
+import { realToModel } from '@/features/simulation/utils/coordinateMapper';
+import type { HeatPoint, StoreSpaceMetadata, StoreZone } from '@/features/simulation/types/iot.types';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 

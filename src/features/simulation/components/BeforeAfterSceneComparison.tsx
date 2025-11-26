@@ -3,9 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { SharedDigitalTwinScene } from '@/features/digital-twin/components';
-import { LayoutChangeOverlay } from '@/features/digital-twin/components/overlays/LayoutChangeOverlay';
-import { CustomerFlowOverlay } from '@/features/digital-twin/components/overlays/CustomerFlowOverlay';
+import { SharedDigitalTwinScene } from "@/features/simulation/components/digital-twin";
+import { LayoutChangeOverlay } from "@/features/simulation/components/overlays/LayoutChangeOverlay";
+import { CustomerFlowOverlay } from "@/features/simulation/components/overlays/CustomerFlowOverlay";
 import { ZoneChange, FurnitureMove } from '../types/layout.types';
 
 interface BeforeAfterSceneComparisonProps {

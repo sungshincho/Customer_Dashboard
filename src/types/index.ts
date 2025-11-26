@@ -9,13 +9,13 @@ export * from './scene3d';
 // Analysis 타입
 export * from './analysis.types';
 
-// Digital Twin 타입 (re-export)
+// Digital Twin types (re-export from simulation)
 export type {
   CustomerAvatar,
   CustomerAvatarOverlayProps,
   CustomerStatus,
   AvatarColors
-} from '@/features/digital-twin/types/avatar.types';
+} from '@/features/simulation/types/avatar.types';
 
 export type {
   SensorType,
@@ -25,9 +25,9 @@ export type {
   StoreZone,
   HeatPoint,
   CustomerPresenceState
-} from '@/features/digital-twin/types/iot.types';
+} from '@/features/simulation/types/iot.types';
 
 export type {
   PathPoint,
   ProductInfo
-} from '@/features/digital-twin/types/overlay.types';
+} from '@/features/simulation/types/overlay.types';

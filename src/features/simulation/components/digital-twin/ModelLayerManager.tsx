@@ -192,7 +192,7 @@ export function ModelLayerManager({
 
     if (result.success && result.publicUrl) {
       // 스토리지 파일 삭제 후, 엔티티 연결 정리
-      const { cleanupEntityReferences } = await import('@/features/digital-twin/utils/cleanupEntityReferences');
+      const { cleanupEntityReferences } = await import('@/features/simulation/utils/cleanupEntityReferences');
       const cleanupResult = await cleanupEntityReferences(result.publicUrl, userId);
       
       if (cleanupResult.success && (cleanupResult.entityTypesUpdated > 0 || cleanupResult.entitiesUpdated > 0)) {
