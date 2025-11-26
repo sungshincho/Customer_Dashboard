@@ -63,7 +63,7 @@ interface MenuSection {
   defaultOpen: boolean;
 }
 
-// 1️⃣ Overview (4 pages)
+// A. Overview (4 pages)
 const overviewItems: MenuItem[] = [
   { title: "대시보드", url: "/overview/dashboard", icon: LayoutDashboard },
   { title: "매장 관리", url: "/overview/stores", icon: Store },
@@ -71,10 +71,10 @@ const overviewItems: MenuItem[] = [
   { title: "설정", url: "/overview/settings", icon: Settings },
 ];
 
-// 2️⃣ Analysis, 3️⃣ Simulation, 4️⃣ Data Management 섹션
+// B, C, D 섹션
 const menuSections: MenuSection[] = [
   {
-    id: "storeAnalysis",
+    id: "analysis",
     label: "매장 현황 분석",
     emoji: "📊",
     defaultOpen: true,
@@ -102,8 +102,6 @@ const menuSections: MenuSection[] = [
     items: [
       { title: "통합 데이터 임포트", url: "/data-management/import", icon: Upload },
       { title: "스키마 빌더", url: "/data-management/schema", icon: Network },
-      // 그래프 분석은 숨김 처리 (코드는 유지)
-      // { title: "그래프 분석", url: "/data-management/graph-analysis", icon: Database },
       { title: "API 연동", url: "/data-management/api", icon: Zap },
     ],
   },
@@ -147,10 +145,10 @@ export function AppSidebar() {
           </div>
         )}
 
-        {/* 1️⃣ Overview Section */}
+        {/* A. Overview Section */}
         <SidebarGroup>
           {!collapsed && <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground px-2">
-            1️⃣ Overview
+            A. Overview
           </SidebarGroupLabel>}
           <SidebarGroupContent>
             <SidebarMenu>
@@ -173,12 +171,12 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* 2️⃣ Analysis & 3️⃣ Simulation & 4️⃣ Data Management */}
+        {/* B, C, D Sections */}
         {menuSections.map((section) => {
           const hasActiveItem = section.items.some((item) => isActive(item.url));
-          const sectionNumber = section.id === "storeAnalysis" || section.id === "operationalAnalysis" ? "2️⃣" 
-            : section.id === "simulation" ? "3️⃣" 
-            : "4️⃣";
+          const sectionNumber = section.id === "analysis" ? "B" 
+            : section.id === "simulation" ? "C" 
+            : "D";
 
           return (
             <Collapsible
@@ -191,7 +189,7 @@ export function AppSidebar() {
                     {!collapsed && (
                       <>
                         <span className="text-xs font-semibold">
-                          {sectionNumber} {section.emoji} {section.label}
+                          {sectionNumber}. {section.label}
                         </span>
                         <ChevronDown className="h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
                       </>
