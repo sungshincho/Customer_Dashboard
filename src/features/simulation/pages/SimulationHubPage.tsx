@@ -8,7 +8,7 @@ import { Sparkles, Grid3x3, TrendingUp, DollarSign, Target, Package, RefreshCw, 
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { useAIInference, useStoreContext } from '../hooks';
 import { toast } from 'sonner';
-import { SharedDigitalTwinScene } from '@/features/digital-twin/components';
+import { SharedDigitalTwinScene } from "@/features/simulation/components/digital-twin";
 import { DemandForecastResult } from '../components/DemandForecastResult';
 import { InventoryOptimizationResult } from '../components/InventoryOptimizationResult';
 import { PricingOptimizationResult } from '../components/PricingOptimizationResult';

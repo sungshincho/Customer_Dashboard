@@ -8,9 +8,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Trash2, Download, Search, RefreshCw, FileIcon, Loader2, Eye, Sparkles } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useClearCache } from "@/hooks/useClearCache";
-import { AutoModelMapper } from "@/features/digital-twin/components/AutoModelMapper";
+import { AutoModelMapper } from "@/features/simulation/components/digital-twin/AutoModelMapper";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Model3DPreview } from "@/features/digital-twin/components/Model3DPreview";
+import { Model3DPreview } from "@/features/simulation/components/digital-twin/Model3DPreview";
 
 interface StorageManagerProps {
   storeId?: string;

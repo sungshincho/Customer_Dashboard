@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Line, Text } from '@react-three/drei';
 import type { ZoneTransition } from '@/hooks/useZoneTransition';
-import type { StoreZone } from '@/features/digital-twin/types/iot.types';
+import type { StoreZone } from '@/features/simulation/types/iot.types';
 
 interface ZoneTransitionOverlayProps {
   transitions: ZoneTransition[];

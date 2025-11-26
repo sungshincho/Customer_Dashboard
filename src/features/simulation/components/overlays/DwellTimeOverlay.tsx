@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Text } from '@react-three/drei';
 import type { ZoneDwellTime } from '@/hooks/useDwellTime';
-import type { StoreZone } from '@/features/digital-twin/types/iot.types';
+import type { StoreZone } from '@/features/simulation/types/iot.types';
 
 interface DwellTimeOverlayProps {
   dwellTimes: ZoneDwellTime[];

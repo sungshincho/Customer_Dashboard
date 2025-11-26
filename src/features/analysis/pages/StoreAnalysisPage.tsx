@@ -8,9 +8,9 @@ import { useState, useEffect } from "react";
 import { Users, TrendingUp, Clock, Activity, RefreshCw, Play, Pause, RotateCcw } from "lucide-react";
 import { useFootfallAnalysis } from "@/hooks/useFootfallAnalysis";
 import { useTrafficHeatmap, useZoneStatistics, useTrafficContext } from "@/hooks/useTrafficHeatmap";
-import { SharedDigitalTwinScene } from "@/features/digital-twin/components";
-import { HeatmapOverlay3D, ZoneBoundaryOverlay } from "@/features/digital-twin/components/overlays";
-import type { StoreSpaceMetadata } from "@/features/digital-twin/types/iot.types";
+import { SharedDigitalTwinScene } from "@/features/simulation/components/digital-twin";
+import { HeatmapOverlay3D, ZoneBoundaryOverlay } from "@/features/simulation/components/overlays";
+import type { StoreSpaceMetadata } from "@/features/simulation/types/iot.types";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { subDays, format } from "date-fns";
 

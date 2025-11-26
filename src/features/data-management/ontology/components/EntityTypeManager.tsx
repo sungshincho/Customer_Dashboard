@@ -20,7 +20,7 @@ import {
   Navigation, Zap, Activity, AlertTriangle, CheckCircle, Loader2, FileCheck2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { verifyAndCleanupModelUrls } from "@/features/digital-twin/utils";
+import { verifyAndCleanupModelUrls } from "@/features/simulation/utils";
 
 interface PropertyField {
   id: string;

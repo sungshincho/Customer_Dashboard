@@ -1,6 +1,6 @@
 import { Line, Html } from '@react-three/drei';
-import { getZoneBoundsInModel } from '@/features/digital-twin/utils/coordinateMapper';
-import type { StoreZone, StoreSpaceMetadata } from '@/features/digital-twin/types/iot.types';
+import { getZoneBoundsInModel } from '@/features/simulation/utils/coordinateMapper';
+import type { StoreZone, StoreSpaceMetadata } from '@/features/simulation/types/iot.types';
 
 interface ZoneBoundaryOverlayProps {
   zones: StoreZone[];

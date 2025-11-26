@@ -11,10 +11,10 @@ import { useCustomerJourney, useJourneyStatistics } from "@/hooks/useCustomerJou
 import { useCustomerSegments } from "@/hooks/useCustomerSegments";
 import { usePurchasePatterns } from "@/hooks/usePurchasePatterns";
 import { useMultipleStoreDataFiles } from "@/hooks/useStoreData";
-import { SharedDigitalTwinScene } from "@/features/digital-twin/components";
-import { CustomerPathOverlay, CustomerAvatarOverlay, ZoneBoundaryOverlay } from "@/features/digital-twin/components/overlays";
-import type { StoreSpaceMetadata } from "@/features/digital-twin/types/iot.types";
-import type { CustomerAvatar } from "@/features/digital-twin/types/avatar.types";
+import { SharedDigitalTwinScene } from "@/features/simulation/components/digital-twin";
+import { CustomerPathOverlay, CustomerAvatarOverlay, ZoneBoundaryOverlay } from "@/features/simulation/components/overlays";
+import type { StoreSpaceMetadata } from "@/features/simulation/types/iot.types";
+import type { CustomerAvatar } from "@/features/simulation/types/avatar.types";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 export default function CustomerAnalysisIntegratedPage() {

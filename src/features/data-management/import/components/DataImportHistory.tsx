@@ -159,7 +159,7 @@ export function DataImportHistory({ storeId }: DataImportHistoryProps) {
 
       // 엔티티 참조 정리
       if (urlsToCleanup.length > 0) {
-        const { cleanupEntityReferences } = await import('@/features/digital-twin/utils/cleanupEntityReferences');
+        const { cleanupEntityReferences } = await import('@/features/simulation/utils/cleanupEntityReferences');
         for (const url of urlsToCleanup) {
           await cleanupEntityReferences(url, user.id);
         }

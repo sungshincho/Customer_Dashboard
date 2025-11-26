@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Html } from '@react-three/drei';
-import type { TrackingData } from '@/features/digital-twin/types/iot.types';
+import type { TrackingData } from '@/features/simulation/types/iot.types';
 
 interface WiFiTrackingOverlayProps {
   trackingData: TrackingData[];
