@@ -33,7 +33,7 @@ interface StoreFormProps {
 }
 
 export function StoreForm({ store, onSuccess, trigger }: StoreFormProps) {
-  const { user } = useAuth();
+  const { user, orgId } = useAuth();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   
@@ -60,7 +60,7 @@ export function StoreForm({ store, onSuccess, trigger }: StoreFormProps) {
         // Create
         const { error } = await supabase
           .from('stores')
-          .insert([{ ...data, user_id: user.id }]);
+          .insert([{ ...data, user_id: user.id, org_id: orgId }]);
 
         if (error) throw error;
         toast.success('매장이 추가되었습니다');
