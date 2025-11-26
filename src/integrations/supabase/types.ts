@@ -1209,12 +1209,58 @@ export type Database = {
           },
         ]
       }
+      license_billing_history: {
+        Row: {
+          amount: number
+          billing_date: string
+          created_at: string
+          id: string
+          license_id: string
+          notes: string | null
+          payment_method: string | null
+          status: string
+          transaction_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          billing_date: string
+          created_at?: string
+          id?: string
+          license_id: string
+          notes?: string | null
+          payment_method?: string | null
+          status?: string
+          transaction_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          billing_date?: string
+          created_at?: string
+          id?: string
+          license_id?: string
+          notes?: string | null
+          payment_method?: string | null
+          status?: string
+          transaction_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "license_billing_history_license_id_fkey"
+            columns: ["license_id"]
+            isOneToOne: false
+            referencedRelation: "licenses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       licenses: {
         Row: {
           activated_at: string | null
           assigned_store_id: string | null
           assigned_to: string | null
-          billing_history: Json | null
           created_at: string
           effective_date: string
           expiry_date: string | null
@@ -1232,7 +1278,6 @@ export type Database = {
           activated_at?: string | null
           assigned_store_id?: string | null
           assigned_to?: string | null
-          billing_history?: Json | null
           created_at?: string
           effective_date: string
           expiry_date?: string | null
@@ -1250,7 +1295,6 @@ export type Database = {
           activated_at?: string | null
           assigned_store_id?: string | null
           assigned_to?: string | null
-          billing_history?: Json | null
           created_at?: string
           effective_date?: string
           expiry_date?: string | null
