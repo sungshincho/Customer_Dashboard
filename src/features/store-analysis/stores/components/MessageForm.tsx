@@ -18,7 +18,7 @@ import { useSelectedStore } from "@/hooks/useSelectedStore";
 export function MessageForm() {
   const [subject, setSubject] = useState("");
   const [content, setContent] = useState("");
-  const [recipientStoreId, setRecipientStoreId] = useState<string>("");
+  const [recipientStoreId, setRecipientStoreId] = useState<string | undefined>(undefined);
   const [priority, setPriority] = useState<string>("normal");
   const [messageType, setMessageType] = useState<string>("general");
 
@@ -43,7 +43,7 @@ export function MessageForm() {
     // Reset form
     setSubject("");
     setContent("");
-    setRecipientStoreId("");
+    setRecipientStoreId(undefined);
     setPriority("normal");
     setMessageType("general");
   };
