@@ -565,6 +565,7 @@ export type Database = {
           id: string
           indicator_type: string
           indicator_value: number
+          is_global: boolean
           metadata: Json | null
           org_id: string | null
           region: string | null
@@ -579,6 +580,7 @@ export type Database = {
           id?: string
           indicator_type: string
           indicator_value: number
+          is_global?: boolean
           metadata?: Json | null
           org_id?: string | null
           region?: string | null
@@ -593,6 +595,7 @@ export type Database = {
           id?: string
           indicator_type?: string
           indicator_value?: number
+          is_global?: boolean
           metadata?: Json | null
           org_id?: string | null
           region?: string | null
@@ -894,6 +897,7 @@ export type Database = {
           event_type: string
           id: string
           impact_level: string | null
+          is_global: boolean
           metadata: Json | null
           org_id: string | null
           store_id: string | null
@@ -908,6 +912,7 @@ export type Database = {
           event_type: string
           id?: string
           impact_level?: string | null
+          is_global?: boolean
           metadata?: Json | null
           org_id?: string | null
           store_id?: string | null
@@ -922,6 +927,7 @@ export type Database = {
           event_type?: string
           id?: string
           impact_level?: string | null
+          is_global?: boolean
           metadata?: Json | null
           org_id?: string | null
           store_id?: string | null
@@ -1922,6 +1928,7 @@ export type Database = {
           date: string
           gdp: number | null
           id: string
+          is_global: boolean
           metadata: Json | null
           org_id: string | null
           population: number | null
@@ -1936,6 +1943,7 @@ export type Database = {
           date: string
           gdp?: number | null
           id?: string
+          is_global?: boolean
           metadata?: Json | null
           org_id?: string | null
           population?: number | null
@@ -1950,6 +1958,7 @@ export type Database = {
           date?: string
           gdp?: number | null
           id?: string
+          is_global?: boolean
           metadata?: Json | null
           org_id?: string | null
           population?: number | null
@@ -2581,6 +2590,7 @@ export type Database = {
           date: string
           humidity: number | null
           id: string
+          is_global: boolean
           metadata: Json | null
           org_id: string | null
           precipitation: number | null
@@ -2595,6 +2605,7 @@ export type Database = {
           date: string
           humidity?: number | null
           id?: string
+          is_global?: boolean
           metadata?: Json | null
           org_id?: string | null
           precipitation?: number | null
@@ -2609,6 +2620,7 @@ export type Database = {
           date?: string
           humidity?: number | null
           id?: string
+          is_global?: boolean
           metadata?: Json | null
           org_id?: string | null
           precipitation?: number | null
