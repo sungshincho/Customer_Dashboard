@@ -29,10 +29,38 @@ interface APIConnection {
   user_id: string;
 }
 
+interface DataSyncSchedule {
+  id: string;
+  schedule_name: string;
+  data_source_id: string;
+  cron_expression: string;
+  is_enabled: boolean;
+  last_run_at?: string | null;
+  last_status?: string | null;
+  next_run_at?: string | null;
+  error_message?: string | null;
+  sync_config?: any;
+  created_at: string;
+  updated_at: string;
+}
+
+interface DataSyncLog {
+  id: string;
+  schedule_id: string;
+  status: string;
+  started_at: string;
+  completed_at?: string | null;
+  records_synced?: number | null;
+  error_message?: string | null;
+  metadata?: any;
+}
+
 export default function APIIntegrationPage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("connections");
   const [connections, setConnections] = useState<APIConnection[]>([]);
+  const [schedules, setSchedules] = useState<DataSyncSchedule[]>([]);
+  const [logs, setLogs] = useState<DataSyncLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [testingId, setTestingId] = useState<string | null>(null);
 
@@ -45,6 +73,13 @@ export default function APIIntegrationPage() {
     headers: "{}",
     auth_type: "none" as 'none' | 'api_key' | 'bearer' | 'basic',
     auth_value: "",
+  });
+
+  const [scheduleForm, setScheduleForm] = useState({
+    schedule_name: "",
+    data_source_id: "",
+    cron_expression: "0 0 * * *", // Daily at midnight
+    sync_config: "{}",
   });
 
   // Load connections
@@ -178,8 +213,138 @@ export default function APIIntegrationPage() {
     }
   };
 
+  // Load schedules
+  const loadSchedules = async () => {
+    if (!user) return;
+    
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('data_sync_schedules')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setSchedules((data || []) as DataSyncSchedule[]);
+    } catch (error: any) {
+      toast.error('스케줄 목록 로딩 실패: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load logs
+  const loadLogs = async () => {
+    if (!user) return;
+    
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('data_sync_logs')
+        .select(`
+          *,
+          schedule:data_sync_schedules(schedule_name)
+        `)
+        .eq('user_id', user.id)
+        .order('started_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      setLogs((data || []) as DataSyncLog[]);
+    } catch (error: any) {
+      toast.error('로그 목록 로딩 실패: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Create schedule
+  const createSchedule = async () => {
+    if (!user) return;
+
+    if (!scheduleForm.schedule_name || !scheduleForm.data_source_id || !scheduleForm.cron_expression) {
+      toast.error('모든 필드를 입력해주세요');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      let syncConfig = {};
+      try {
+        syncConfig = JSON.parse(scheduleForm.sync_config);
+      } catch {
+        toast.error('동기화 설정은 유효한 JSON 형식이어야 합니다');
+        setLoading(false);
+        return;
+      }
+
+      const { error } = await supabase
+        .from('data_sync_schedules')
+        .insert({
+          user_id: user.id,
+          schedule_name: scheduleForm.schedule_name,
+          data_source_id: scheduleForm.data_source_id,
+          cron_expression: scheduleForm.cron_expression,
+          sync_config: syncConfig,
+          is_enabled: true,
+        });
+
+      if (error) throw error;
+
+      toast.success('스케줄이 생성되었습니다');
+      setScheduleForm({
+        schedule_name: "",
+        data_source_id: "",
+        cron_expression: "0 0 * * *",
+        sync_config: "{}",
+      });
+      loadSchedules();
+    } catch (error: any) {
+      toast.error('스케줄 생성 실패: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Toggle schedule enabled
+  const toggleSchedule = async (id: string, currentStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('data_sync_schedules')
+        .update({ is_enabled: !currentStatus })
+        .eq('id', id);
+
+      if (error) throw error;
+      toast.success(currentStatus ? '스케줄이 비활성화되었습니다' : '스케줄이 활성화되었습니다');
+      loadSchedules();
+    } catch (error: any) {
+      toast.error('상태 변경 실패: ' + error.message);
+    }
+  };
+
+  // Delete schedule
+  const deleteSchedule = async (id: string) => {
+    if (!confirm('정말 이 스케줄을 삭제하시겠습니까?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('data_sync_schedules')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      toast.success('스케줄이 삭제되었습니다');
+      loadSchedules();
+    } catch (error: any) {
+      toast.error('삭제 실패: ' + error.message);
+    }
+  };
+
   useEffect(() => {
     loadConnections();
+    loadSchedules();
+    loadLogs();
   }, []);
 
   return (
@@ -196,10 +361,14 @@ export default function APIIntegrationPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsList className="grid w-full grid-cols-3 max-w-2xl">
             <TabsTrigger value="connections" className="flex items-center gap-2">
               <Database className="w-4 h-4" />
               API 연결
+            </TabsTrigger>
+            <TabsTrigger value="schedules" className="flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              스케줄 관리
             </TabsTrigger>
             <TabsTrigger value="logs" className="flex items-center gap-2">
               <Clock className="w-4 h-4" />
@@ -420,19 +589,227 @@ export default function APIIntegrationPage() {
             </div>
           </TabsContent>
 
+          <TabsContent value="schedules" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Schedule Form */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Plus className="h-5 w-5" />
+                    새 스케줄 추가
+                  </CardTitle>
+                  <CardDescription>
+                    Cron 표현식으로 자동 동기화를 설정합니다
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="schedule_name">스케줄 이름</Label>
+                    <Input
+                      id="schedule_name"
+                      placeholder="예: 매일 밤 12시 고객 데이터 동기화"
+                      value={scheduleForm.schedule_name}
+                      onChange={(e) => setScheduleForm({ ...scheduleForm, schedule_name: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="data_source_id">API 연결 선택</Label>
+                    <Select value={scheduleForm.data_source_id} onValueChange={(value) => setScheduleForm({ ...scheduleForm, data_source_id: value })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="API 연결을 선택하세요" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {connections.map((conn) => (
+                          <SelectItem key={conn.id} value={conn.id}>
+                            {conn.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="cron_expression">Cron 표현식</Label>
+                    <Input
+                      id="cron_expression"
+                      placeholder="0 0 * * * (매일 자정)"
+                      value={scheduleForm.cron_expression}
+                      onChange={(e) => setScheduleForm({ ...scheduleForm, cron_expression: e.target.value })}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      예: 0 0 * * * (매일 자정), 0 */6 * * * (6시간마다)
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="sync_config">동기화 설정 (JSON)</Label>
+                    <Textarea
+                      id="sync_config"
+                      placeholder='{"filter": "active", "limit": 1000}'
+                      value={scheduleForm.sync_config}
+                      onChange={(e) => setScheduleForm({ ...scheduleForm, sync_config: e.target.value })}
+                      rows={3}
+                    />
+                  </div>
+
+                  <Button onClick={createSchedule} disabled={loading} className="w-full">
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        생성 중...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="h-4 w-4 mr-2" />
+                        스케줄 추가
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Schedules List */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>등록된 스케줄</CardTitle>
+                  <CardDescription>
+                    {schedules.length}개의 스케줄이 등록되어 있습니다
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loading && schedules.length === 0 ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : schedules.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <Clock className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                      <p>등록된 스케줄이 없습니다</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {schedules.map((schedule) => (
+                        <div key={schedule.id} className="p-4 border rounded-lg space-y-3">
+                          <div className="flex items-start justify-between">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-medium">{schedule.schedule_name}</h4>
+                                <Badge variant={schedule.is_enabled ? "default" : "secondary"}>
+                                  {schedule.is_enabled ? (
+                                    <>
+                                      <CheckCircle className="h-3 w-3 mr-1" />
+                                      활성
+                                    </>
+                                  ) : (
+                                    <>
+                                      <XCircle className="h-3 w-3 mr-1" />
+                                      비활성
+                                    </>
+                                  )}
+                                </Badge>
+                                {schedule.last_status && (
+                                  <Badge variant={schedule.last_status === 'success' ? 'default' : 'destructive'}>
+                                    {schedule.last_status}
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-sm text-muted-foreground">Cron: {schedule.cron_expression}</p>
+                              {schedule.last_run_at && (
+                                <p className="text-xs text-muted-foreground">
+                                  마지막 실행: {new Date(schedule.last_run_at).toLocaleString('ko-KR')}
+                                </p>
+                              )}
+                              {schedule.next_run_at && (
+                                <p className="text-xs text-muted-foreground">
+                                  다음 실행: {new Date(schedule.next_run_at).toLocaleString('ko-KR')}
+                                </p>
+                              )}
+                              {schedule.error_message && (
+                                <p className="text-xs text-destructive">오류: {schedule.error_message}</p>
+                              )}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => deleteSchedule(schedule.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => toggleSchedule(schedule.id, schedule.is_enabled)}
+                            >
+                              {schedule.is_enabled ? '비활성화' : '활성화'}
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
           <TabsContent value="logs" className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>동기화 로그</CardTitle>
                 <CardDescription>
-                  API 동기화 이력을 확인할 수 있습니다
+                  API 동기화 이력을 확인할 수 있습니다 (최근 50개)
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-12 text-muted-foreground">
-                  <Clock className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                  <p>동기화 로그 기능은 곧 제공됩니다</p>
-                </div>
+                {loading && logs.length === 0 ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : logs.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Clock className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                    <p>동기화 로그가 없습니다</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {logs.map((log) => (
+                      <div key={log.id} className="p-4 border rounded-lg space-y-2">
+                        <div className="flex items-start justify-between">
+                          <div className="space-y-1 flex-1">
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-medium text-sm">
+                                {(log as any).schedule?.schedule_name || 'Unknown Schedule'}
+                              </h4>
+                              <Badge variant={
+                                log.status === 'success' ? 'default' : 
+                                log.status === 'failed' ? 'destructive' : 
+                                'secondary'
+                              }>
+                                {log.status}
+                              </Badge>
+                            </div>
+                            <div className="text-xs text-muted-foreground space-y-1">
+                              <p>시작: {new Date(log.started_at).toLocaleString('ko-KR')}</p>
+                              {log.completed_at && (
+                                <p>완료: {new Date(log.completed_at).toLocaleString('ko-KR')}</p>
+                              )}
+                              {log.records_synced !== null && log.records_synced !== undefined && (
+                                <p>동기화된 레코드: {log.records_synced}개</p>
+                              )}
+                            </div>
+                            {log.error_message && (
+                              <p className="text-xs text-destructive mt-2">오류: {log.error_message}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
