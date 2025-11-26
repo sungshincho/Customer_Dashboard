@@ -1495,6 +1495,50 @@ export type Database = {
         }
         Relationships: []
       }
+      ontology_relation_inference_queue: {
+        Row: {
+          created_at: string
+          entity_id: string
+          error_message: string | null
+          id: string
+          org_id: string | null
+          processed_at: string | null
+          retry_count: number
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          entity_id: string
+          error_message?: string | null
+          id?: string
+          org_id?: string | null
+          processed_at?: string | null
+          retry_count?: number
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string
+          error_message?: string | null
+          id?: string
+          org_id?: string | null
+          processed_at?: string | null
+          retry_count?: number
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ontology_relation_inference_queue_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "graph_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ontology_relation_types: {
         Row: {
           created_at: string | null

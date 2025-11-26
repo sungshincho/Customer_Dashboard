@@ -5,3 +5,9 @@ verify_jwt = false
 
 [functions.schedule-runner]
 verify_jwt = false
+
+[functions.infer-entity-relations]
+verify_jwt = false
+
+[functions.ontology-inference-scheduler]
+verify_jwt = false
