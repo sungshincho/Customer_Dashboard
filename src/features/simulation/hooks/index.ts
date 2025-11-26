@@ -4,3 +4,6 @@ export { useContextData, useWeatherForecast, useEventCalendar, useEconomicIndica
 
 // Digital Twin hooks
 export { useRealtimeTracking } from './useRealtimeTracking';
+
+// Phase 3: Ontology AI Inference hooks (exported from root hooks)
+// Use: import { useOntologyInference } from '@/hooks/useOntologyInference';
