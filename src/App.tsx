@@ -14,23 +14,18 @@ import Auth from "@/core/pages/AuthPage";
 import Settings from "@/core/pages/SettingsPage";
 import NotFound from "@/core/pages/NotFoundPage";
 
-// Overview pages
-import Stores from "@/features/store-analysis/stores/pages/StoresPage";
-import HQCommunicationPage from "@/features/store-analysis/stores/pages/HQCommunicationPage";
+// A. Overview pages
+import { StoresPage, HQCommunicationPage } from "@/features/overview";
 
-// Analysis - Integrated pages
-import StoreAnalysisPage from "@/features/store-analysis/pages/StoreAnalysisPage";
-import CustomerAnalysisIntegratedPage from "@/features/store-analysis/pages/CustomerAnalysisIntegratedPage";
-import ProductAnalysisPage from "@/features/store-analysis/pages/ProductAnalysisPage";
+// B. Analysis pages
+import { StoreAnalysisPage, CustomerAnalysisPage, ProductAnalysisPage } from "@/features/analysis";
 
-// Simulation pages
-import DigitalTwin3DPage from "@/features/digital-twin/pages/DigitalTwin3DPage";
-import SimulationHubPage from "@/features/simulation/pages/SimulationHubPage";
+// C. Simulation pages
+import { DigitalTwin3DPage, SimulationHubPage } from "@/features/simulation";
 
-// Data Management pages
+// D. Data Management pages
 import UnifiedDataManagementPage from "@/features/data-management/import/pages/UnifiedDataManagementPage";
 import SchemaBuilder from "@/features/data-management/ontology/pages/SchemaBuilderPage";
-import GraphAnalysis from "@/features/data-management/ontology/pages/GraphAnalysisPage";
 import APIIntegrationPage from "@/features/data-management/api/pages/APIIntegrationPage";
 
 const queryClient = new QueryClient();
@@ -49,13 +44,13 @@ const App = () => (
               {/* A. Overview (4 pages) */}
               <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/overview/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-              <Route path="/overview/stores" element={<ProtectedRoute><Stores /></ProtectedRoute>} />
+              <Route path="/overview/stores" element={<ProtectedRoute><StoresPage /></ProtectedRoute>} />
               <Route path="/overview/hq-communication" element={<ProtectedRoute><HQCommunicationPage /></ProtectedRoute>} />
               <Route path="/overview/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
               {/* B. 매장 현황 분석 (3 pages) */}
               <Route path="/analysis/store" element={<ProtectedRoute><StoreAnalysisPage /></ProtectedRoute>} />
-              <Route path="/analysis/customer" element={<ProtectedRoute><CustomerAnalysisIntegratedPage /></ProtectedRoute>} />
+              <Route path="/analysis/customer" element={<ProtectedRoute><CustomerAnalysisPage /></ProtectedRoute>} />
               <Route path="/analysis/product" element={<ProtectedRoute><ProductAnalysisPage /></ProtectedRoute>} />
 
               {/* C. 시뮬레이션 (2 pages) */}
