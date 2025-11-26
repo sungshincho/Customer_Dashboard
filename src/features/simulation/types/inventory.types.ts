@@ -66,7 +66,7 @@ export interface OrderRecommendation {
   reasoning: string;
 }
 
-export interface InventoryOptimizationResult {
+export interface IInventoryOptimizationResult {
   productId: string;
   currentPolicy: Partial<InventoryPolicy>;
   recommendedPolicy: InventoryPolicy;

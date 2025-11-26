@@ -1,2 +1,0 @@
-export { ProductPerformance } from './ProductPerformance';
-

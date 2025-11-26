@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useWiFiTracking } from './useWiFiTracking';
-import type { StoreZone } from '@/features/digital-twin/types/iot.types';
+import type { StoreZone } from '@/features/simulation/types/iot.types';
 
 export interface ZoneTransition {
   fromZone: string;

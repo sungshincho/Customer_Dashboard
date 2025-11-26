@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import type { TrackingData, SensorPosition } from '@/features/digital-twin/types/iot.types';
+import type { TrackingData, SensorPosition } from '@/features/simulation/types/iot.types';
 
 interface WiFiZone {
   id: string;
