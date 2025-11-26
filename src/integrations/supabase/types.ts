@@ -1158,7 +1158,6 @@ export type Database = {
           id: string
           invited_by: string
           license_id: string | null
-          metadata: Json | null
           org_id: string
           role: Database["public"]["Enums"]["app_role"]
           status: string
@@ -1173,7 +1172,6 @@ export type Database = {
           id?: string
           invited_by: string
           license_id?: string | null
-          metadata?: Json | null
           org_id: string
           role: Database["public"]["Enums"]["app_role"]
           status?: string
@@ -1188,7 +1186,6 @@ export type Database = {
           id?: string
           invited_by?: string
           license_id?: string | null
-          metadata?: Json | null
           org_id?: string
           role?: Database["public"]["Enums"]["app_role"]
           status?: string
@@ -1222,11 +1219,8 @@ export type Database = {
           effective_date: string
           expiry_date: string | null
           id: string
-          issued_at: string | null
           last_used_at: string | null
-          license_key: string | null
           license_type: string
-          metadata: Json | null
           monthly_price: number | null
           next_billing_date: string | null
           org_id: string
@@ -1243,11 +1237,8 @@ export type Database = {
           effective_date: string
           expiry_date?: string | null
           id?: string
-          issued_at?: string | null
           last_used_at?: string | null
-          license_key?: string | null
           license_type: string
-          metadata?: Json | null
           monthly_price?: number | null
           next_billing_date?: string | null
           org_id: string
@@ -1264,11 +1255,8 @@ export type Database = {
           effective_date?: string
           expiry_date?: string | null
           id?: string
-          issued_at?: string | null
           last_used_at?: string | null
-          license_key?: string | null
           license_type?: string
-          metadata?: Json | null
           monthly_price?: number | null
           next_billing_date?: string | null
           org_id?: string
@@ -1660,12 +1648,9 @@ export type Database = {
         Row: {
           created_at: string
           id: string
-          invitation_accepted_at: string | null
-          invited_by: string | null
           joined_at: string
           license_id: string | null
           org_id: string | null
-          permissions: Json | null
           role: Database["public"]["Enums"]["app_role"]
           updated_at: string
           user_id: string
@@ -1673,12 +1658,9 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
-          invitation_accepted_at?: string | null
-          invited_by?: string | null
           joined_at?: string
           license_id?: string | null
           org_id?: string | null
-          permissions?: Json | null
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
           user_id: string
@@ -1686,12 +1668,9 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
-          invitation_accepted_at?: string | null
-          invited_by?: string | null
           joined_at?: string
           license_id?: string | null
           org_id?: string | null
-          permissions?: Json | null
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
           user_id?: string
