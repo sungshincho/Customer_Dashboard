@@ -22,7 +22,7 @@ import { ko } from "date-fns/locale";
 export function UnifiedMessageThread() {
   const [newMessage, setNewMessage] = useState("");
   const [subject, setSubject] = useState("");
-  const [recipientStoreId, setRecipientStoreId] = useState<string>("");
+  const [recipientStoreId, setRecipientStoreId] = useState<string | undefined>(undefined);
   const [priority, setPriority] = useState<string>("normal");
   const [messageType, setMessageType] = useState<string>("general");
 
@@ -49,6 +49,7 @@ export function UnifiedMessageThread() {
 
     setNewMessage("");
     setSubject("");
+    setRecipientStoreId(undefined);
     setPriority("normal");
     setMessageType("general");
   };
@@ -89,8 +90,12 @@ export function UnifiedMessageThread() {
                     <SelectValue placeholder={selectedStore?.store_name || "매장 선택"} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">현재 선택된 매장</SelectItem>
-                    {stores?.map((store) => (
+                    {selectedStore && (
+                      <SelectItem value={selectedStore.id}>
+                        {selectedStore.store_name} (현재 선택)
+                      </SelectItem>
+                    )}
+                    {stores?.filter(s => s.id !== selectedStore?.id).map((store) => (
                       <SelectItem key={store.id} value={store.id}>
                         {store.store_name}
                       </SelectItem>
