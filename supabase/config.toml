@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.ontology-inference-scheduler]
 verify_jwt = false
+
+[functions.ontology-ai-inference]
+verify_jwt = true
