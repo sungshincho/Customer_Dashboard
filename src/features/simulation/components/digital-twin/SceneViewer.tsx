@@ -6,7 +6,7 @@ import { StoreSpace } from './StoreSpace';
 import { FurnitureLayout } from './FurnitureLayout';
 import { ProductPlacement } from './ProductPlacement';
 import { LightingPreset } from './LightingPreset';
-import { HeatmapOverlay } from './HeatmapOverlay';
+import { HeatmapOverlay3D } from '../overlays/HeatmapOverlay3D';
 
 interface SceneViewerProps {
   recipe: SceneRecipe;
@@ -89,7 +89,7 @@ export function SceneViewer({ recipe, onAssetClick, overlay, overlayData }: Scen
           )}
 
           {overlay === 'heatmap' && overlayData && (
-            <HeatmapOverlay data={overlayData} opacity={0.7} />
+            <HeatmapOverlay3D heatPoints={overlayData.heatPoints || []} />
           )}
 
           {overlay === 'journey' && overlayData && (

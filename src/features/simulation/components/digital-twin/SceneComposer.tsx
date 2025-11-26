@@ -6,7 +6,7 @@ import { StoreSpace } from './StoreSpace';
 import { FurnitureLayout } from './FurnitureLayout';
 import { ProductPlacement } from './ProductPlacement';
 import { LightingPreset } from './LightingPreset';
-import { HeatmapOverlay } from './HeatmapOverlay';
+import { HeatmapOverlay3D } from '../overlays/HeatmapOverlay3D';
 
 interface SceneComposerProps {
   recipe: SceneRecipe;
@@ -81,10 +81,9 @@ export function SceneComposer({ recipe, onAssetClick, overlay }: SceneComposerPr
           {safeRecipe.effects?.map((effect, idx) => {
             if (effect.type === 'heatmap') {
               return (
-                <HeatmapOverlay 
+                <HeatmapOverlay3D 
                   key={idx}
-                  data={effect.data}
-                  opacity={effect.opacity}
+                  heatPoints={effect.data || []}
                 />
               );
             }
