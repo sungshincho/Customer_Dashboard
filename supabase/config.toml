@@ -1,1 +1,7 @@
 project_id = "bdrvowacecxnraaivlhr"
+
+[functions.sync-api-data]
+verify_jwt = false
+
+[functions.schedule-runner]
+verify_jwt = false

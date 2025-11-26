@@ -8,10 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Database, Clock, Zap, Plus, Trash2, CheckCircle, XCircle, Loader2, Play } from "lucide-react";
+import { Database, Clock, Zap, Plus, Trash2, CheckCircle, XCircle, Loader2, Play, Eye, Link2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
+import { useSelectedStore } from "@/hooks/useSelectedStore";
 
 interface APIConnection {
   id: string;
@@ -55,14 +56,24 @@ interface DataSyncLog {
   metadata?: any;
 }
 
+const TARGET_TABLES = [
+  { value: 'customers', label: '고객 (customers)' },
+  { value: 'products', label: '상품 (products)' },
+  { value: 'purchases', label: '구매 (purchases)' },
+  { value: 'visits', label: '방문 (visits)' },
+  { value: 'inventory_levels', label: '재고 (inventory_levels)' },
+];
+
 export default function APIIntegrationPage() {
-  const { user } = useAuth();
+  const { user, orgId } = useAuth();
+  const { selectedStore } = useSelectedStore();
   const [activeTab, setActiveTab] = useState("connections");
   const [connections, setConnections] = useState<APIConnection[]>([]);
   const [schedules, setSchedules] = useState<DataSyncSchedule[]>([]);
   const [logs, setLogs] = useState<DataSyncLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [testingId, setTestingId] = useState<string | null>(null);
+  const [runningScheduleId, setRunningScheduleId] = useState<string | null>(null);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -78,9 +89,17 @@ export default function APIIntegrationPage() {
   const [scheduleForm, setScheduleForm] = useState({
     schedule_name: "",
     data_source_id: "",
-    cron_expression: "0 0 * * *", // Daily at midnight
-    sync_config: "{}",
+    cron_expression: "0 0 * * *",
+    target_table: "",
+    data_path: "",
   });
+
+  // Field mapping state
+  const [showFieldMapping, setShowFieldMapping] = useState(false);
+  const [apiPreviewData, setApiPreviewData] = useState<any>(null);
+  const [fieldMappingConfig, setFieldMappingConfig] = useState<{
+    [key: string]: string;
+  }>({});
 
   // Load connections
   const loadConnections = async () => {
@@ -259,34 +278,69 @@ export default function APIIntegrationPage() {
     }
   };
 
+  // Preview API response for field mapping
+  const previewApiResponse = async () => {
+    if (!scheduleForm.data_source_id) {
+      toast.error("API 연결을 먼저 선택해주세요");
+      return;
+    }
+
+    toast.info("API 응답을 가져오는 중...");
+    setLoading(true);
+
+    try {
+      const { data: testResult, error } = await supabase.functions.invoke(
+        "test-api-connection",
+        {
+          body: { connectionId: scheduleForm.data_source_id },
+        }
+      );
+
+      if (error || !testResult?.success) {
+        toast.error("API 연결 실패: " + (error?.message || testResult?.message));
+        return;
+      }
+
+      setApiPreviewData(testResult.data);
+      setShowFieldMapping(true);
+      toast.success("API 응답을 가져왔습니다");
+    } catch (error: any) {
+      toast.error("API 응답 실패: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Create schedule
   const createSchedule = async () => {
     if (!user) return;
 
-    if (!scheduleForm.schedule_name || !scheduleForm.data_source_id || !scheduleForm.cron_expression) {
-      toast.error('모든 필드를 입력해주세요');
+    if (!scheduleForm.schedule_name || !scheduleForm.data_source_id) {
+      toast.error("스케줄 이름과 API 연결을 선택해주세요");
+      return;
+    }
+
+    if (!scheduleForm.target_table || Object.keys(fieldMappingConfig).length === 0) {
+      toast.error("대상 테이블과 필드 매핑을 설정해주세요");
       return;
     }
 
     setLoading(true);
     try {
-      let syncConfig = {};
-      try {
-        syncConfig = JSON.parse(scheduleForm.sync_config);
-      } catch {
-        toast.error('동기화 설정은 유효한 JSON 형식이어야 합니다');
-        setLoading(false);
-        return;
-      }
-
       const { error } = await supabase
         .from('data_sync_schedules')
         .insert({
           user_id: user.id,
+          org_id: orgId,
           schedule_name: scheduleForm.schedule_name,
           data_source_id: scheduleForm.data_source_id,
           cron_expression: scheduleForm.cron_expression,
-          sync_config: syncConfig,
+          sync_config: {
+            target_table: scheduleForm.target_table,
+            data_path: scheduleForm.data_path,
+            field_mapping: fieldMappingConfig,
+            store_id: selectedStore?.id,
+          },
           is_enabled: true,
         });
 
@@ -297,13 +351,43 @@ export default function APIIntegrationPage() {
         schedule_name: "",
         data_source_id: "",
         cron_expression: "0 0 * * *",
-        sync_config: "{}",
+        target_table: "",
+        data_path: "",
       });
+      setFieldMappingConfig({});
+      setShowFieldMapping(false);
+      setApiPreviewData(null);
       loadSchedules();
     } catch (error: any) {
       toast.error('스케줄 생성 실패: ' + error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Run schedule now
+  const runScheduleNow = async (scheduleId: string) => {
+    setRunningScheduleId(scheduleId);
+    toast.info("동기화를 시작합니다...");
+
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-api-data", {
+        body: { scheduleId, manualRun: true },
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        toast.success(`동기화 완료: ${data.records_synced}개 레코드 처리됨`);
+        loadLogs();
+        loadSchedules();
+      } else {
+        toast.error("동기화 실패: " + data.error);
+      }
+    } catch (error: any) {
+      toast.error("동기화 실패: " + error.message);
+    } finally {
+      setRunningScheduleId(null);
     }
   };
 
@@ -341,6 +425,26 @@ export default function APIIntegrationPage() {
     }
   };
 
+  // Extract field paths from nested object
+  const extractFields = (obj: any, prefix = ''): string[] => {
+    if (!obj || typeof obj !== 'object') return [];
+    
+    const fields: string[] = [];
+    
+    for (const key in obj) {
+      const path = prefix ? `${prefix}.${key}` : key;
+      const value = obj[key];
+      
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        fields.push(...extractFields(value, path));
+      } else {
+        fields.push(path);
+      }
+    }
+    
+    return fields;
+  };
+
   useEffect(() => {
     loadConnections();
     loadSchedules();
@@ -376,6 +480,7 @@ export default function APIIntegrationPage() {
             </TabsTrigger>
           </TabsList>
 
+          {/* API Connections Tab */}
           <TabsContent value="connections" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Create Form */}
@@ -589,6 +694,7 @@ export default function APIIntegrationPage() {
             </div>
           </TabsContent>
 
+          {/* Schedules Tab */}
           <TabsContent value="schedules" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Schedule Form */}
@@ -599,7 +705,7 @@ export default function APIIntegrationPage() {
                     새 스케줄 추가
                   </CardTitle>
                   <CardDescription>
-                    Cron 표현식으로 자동 동기화를 설정합니다
+                    API 데이터를 자동으로 동기화하는 스케줄을 설정합니다
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -615,7 +721,10 @@ export default function APIIntegrationPage() {
 
                   <div className="space-y-2">
                     <Label htmlFor="data_source_id">API 연결 선택</Label>
-                    <Select value={scheduleForm.data_source_id} onValueChange={(value) => setScheduleForm({ ...scheduleForm, data_source_id: value })}>
+                    <Select 
+                      value={scheduleForm.data_source_id} 
+                      onValueChange={(value) => setScheduleForm({ ...scheduleForm, data_source_id: value })}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="API 연결을 선택하세요" />
                       </SelectTrigger>
@@ -627,6 +736,38 @@ export default function APIIntegrationPage() {
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="target_table">대상 테이블</Label>
+                    <Select 
+                      value={scheduleForm.target_table} 
+                      onValueChange={(value) => setScheduleForm({ ...scheduleForm, target_table: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="데이터를 저장할 테이블 선택" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TARGET_TABLES.map((table) => (
+                          <SelectItem key={table.value} value={table.value}>
+                            {table.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="data_path">데이터 경로 (선택사항)</Label>
+                    <Input
+                      id="data_path"
+                      placeholder="예: data.items (중첩된 배열 경로)"
+                      value={scheduleForm.data_path}
+                      onChange={(e) => setScheduleForm({ ...scheduleForm, data_path: e.target.value })}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      API 응답에서 배열이 중첩되어 있는 경우 경로를 지정하세요
+                    </p>
                   </div>
 
                   <div className="space-y-2">
@@ -642,18 +783,56 @@ export default function APIIntegrationPage() {
                     </p>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="sync_config">동기화 설정 (JSON)</Label>
-                    <Textarea
-                      id="sync_config"
-                      placeholder='{"filter": "active", "limit": 1000}'
-                      value={scheduleForm.sync_config}
-                      onChange={(e) => setScheduleForm({ ...scheduleForm, sync_config: e.target.value })}
-                      rows={3}
-                    />
-                  </div>
+                  <Button 
+                    onClick={previewApiResponse} 
+                    disabled={!scheduleForm.data_source_id || loading}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    <Eye className="h-4 w-4 mr-2" />
+                    API 응답 미리보기 & 필드 매핑
+                  </Button>
 
-                  <Button onClick={createSchedule} disabled={loading} className="w-full">
+                  {/* Field Mapping Section */}
+                  {showFieldMapping && apiPreviewData && (
+                    <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
+                      <div className="flex items-center gap-2">
+                        <Link2 className="h-4 w-4" />
+                        <Label className="text-base font-semibold">필드 매핑 설정</Label>
+                      </div>
+                      
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {scheduleForm.target_table && extractFields(
+                          Array.isArray(apiPreviewData) ? apiPreviewData[0] : apiPreviewData
+                        ).map((fieldPath) => (
+                          <div key={fieldPath} className="grid grid-cols-2 gap-2 items-center">
+                            <Label className="text-xs truncate" title={fieldPath}>
+                              {fieldPath}
+                            </Label>
+                            <Input
+                              placeholder="DB 컬럼명"
+                              value={fieldMappingConfig[fieldPath] || ''}
+                              onChange={(e) => setFieldMappingConfig({
+                                ...fieldMappingConfig,
+                                [fieldPath]: e.target.value
+                              })}
+                              className="text-xs"
+                            />
+                          </div>
+                        ))}
+                      </div>
+
+                      <p className="text-xs text-muted-foreground">
+                        API 필드를 데이터베이스 컬럼에 매핑하세요
+                      </p>
+                    </div>
+                  )}
+
+                  <Button 
+                    onClick={createSchedule} 
+                    disabled={loading || !scheduleForm.target_table || Object.keys(fieldMappingConfig).length === 0} 
+                    className="w-full"
+                  >
                     {loading ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -715,6 +894,11 @@ export default function APIIntegrationPage() {
                                 )}
                               </div>
                               <p className="text-sm text-muted-foreground">Cron: {schedule.cron_expression}</p>
+                              {schedule.sync_config?.target_table && (
+                                <p className="text-xs text-muted-foreground">
+                                  대상: {schedule.sync_config.target_table}
+                                </p>
+                              )}
                               {schedule.last_run_at && (
                                 <p className="text-xs text-muted-foreground">
                                   마지막 실행: {new Date(schedule.last_run_at).toLocaleString('ko-KR')}
@@ -741,6 +925,24 @@ export default function APIIntegrationPage() {
                           <div className="flex gap-2">
                             <Button
                               size="sm"
+                              variant="default"
+                              onClick={() => runScheduleNow(schedule.id)}
+                              disabled={runningScheduleId === schedule.id}
+                            >
+                              {runningScheduleId === schedule.id ? (
+                                <>
+                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                  실행 중...
+                                </>
+                              ) : (
+                                <>
+                                  <Play className="h-3 w-3 mr-1" />
+                                  지금 동기화
+                                </>
+                              )}
+                            </Button>
+                            <Button
+                              size="sm"
                               variant="outline"
                               onClick={() => toggleSchedule(schedule.id, schedule.is_enabled)}
                             >
@@ -756,6 +958,7 @@ export default function APIIntegrationPage() {
             </div>
           </TabsContent>
 
+          {/* Logs Tab */}
           <TabsContent value="logs" className="space-y-6">
             <Card>
               <CardHeader>
@@ -799,6 +1002,9 @@ export default function APIIntegrationPage() {
                               )}
                               {log.records_synced !== null && log.records_synced !== undefined && (
                                 <p>동기화된 레코드: {log.records_synced}개</p>
+                              )}
+                              {log.metadata?.target_table && (
+                                <p>대상 테이블: {log.metadata.target_table}</p>
                               )}
                             </div>
                             {log.error_message && (
