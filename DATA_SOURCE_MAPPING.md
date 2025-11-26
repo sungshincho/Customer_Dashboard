@@ -111,6 +111,9 @@
 | `subscriptions` | 구독 및 라이선스 정보 | Direct Supabase Query |
 | `licenses` | 라이선스 상세 정보 | Direct Supabase Query |
 | `notification_settings` | 알림 설정 | Direct Supabase Query |
+| `organization_settings` | 조직 설정 (브랜드, 통화, 타임존 등) | Direct Supabase Query |
+| `report_schedules` | 리포트 스케줄 설정 | Direct Supabase Query |
+| `invitations` | 사용자 초대 내역 | Direct Supabase Query |
 
 #### 사용 Storage 버킷
 없음
@@ -382,16 +385,21 @@
 #### 사용 데이터베이스 테이블
 | 테이블명 | 용도 | 접근 방식 |
 |---------|------|-----------|
-| `api_connections` | API 연결 정보 (URL, 인증 등) | Direct Supabase Query |
+| `api_connections` | API 연결 정보 (URL, 인증, 헤더 등) | Direct Supabase Query |
 | `external_data_sources` | 외부 데이터 소스 정의 | Direct Supabase Query |
-| `data_sync_schedules` | 스케줄링 설정 (Cron) | Direct Supabase Query |
-| `data_sync_logs` | 동기화 로그 | Direct Supabase Query |
+| `data_sync_schedules` | 자동 동기화 스케줄 (Cron 표현식) | Direct Supabase Query |
+| `data_sync_logs` | 동기화 실행 로그 (성공/실패, 레코드 수 등) | Direct Supabase Query |
 
 #### 사용 Storage 버킷
 없음
 
 #### 관련 Hooks
 없음 (Direct Supabase Query 사용)
+
+#### 주요 기능
+- **API 연결 관리**: REST/GraphQL/Webhook API 등록, 테스트, 활성화/비활성화
+- **스케줄 관리**: Cron 표현식으로 자동 동기화 스케줄 설정
+- **동기화 로그**: 실행 이력, 성공/실패 상태, 동기화된 레코드 수 확인
 
 #### 관련 Edge Functions
 - `test-api-connection` - API 연결 테스트
