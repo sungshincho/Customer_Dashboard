@@ -2795,6 +2795,12 @@ export type Database = {
         Returns: boolean
       }
       get_user_org_id: { Args: { _user_id: string }; Returns: string }
+      get_user_orgs: {
+        Args: { _user_id: string }
+        Returns: {
+          org_id: string
+        }[]
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
