@@ -13,19 +13,20 @@ export interface UploadSession {
 }
 
 export function useUploadSession(storeId?: string) {
-  const { user } = useAuth();
+  const { user, orgId } = useAuth();
   const [session, setSession] = useState<UploadSession | null>(null);
   const [loading, setLoading] = useState(false);
 
   // 활성 세션 생성 또는 가져오기
   const getOrCreateSession = async () => {
-    if (!user || !storeId) return null;
+    if (!user || !storeId || !orgId) return null;
 
     // 활성 세션 조회
     const { data: existingSession } = await supabase
       .from('upload_sessions')
       .select('*')
       .eq('user_id', user.id)
+      .eq('org_id', orgId)
       .eq('store_id', storeId)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
@@ -51,6 +52,7 @@ export function useUploadSession(storeId?: string) {
       .from('upload_sessions')
       .insert({
         user_id: user.id,
+        org_id: orgId,
         store_id: storeId,
         total_files: 0,
         completed_files: 0,

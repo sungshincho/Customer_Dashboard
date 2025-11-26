@@ -20,18 +20,19 @@ export interface AIRecommendation {
 }
 
 export function useAIRecommendations(storeId?: string) {
-  const { user } = useAuth();
+  const { user, orgId } = useAuth();
   const queryClient = useQueryClient();
 
   const query = useQuery({
     queryKey: ['ai-recommendations', storeId],
     queryFn: async () => {
-      if (!user || !storeId) return [];
+      if (!user || !storeId || !orgId) return [];
 
       const { data, error } = await supabase
         .from('ai_recommendations')
         .select('*')
         .eq('user_id', user.id)
+        .eq('org_id', orgId)
         .eq('store_id', storeId)
         .eq('is_displayed', true)
         .order('priority', { ascending: false })

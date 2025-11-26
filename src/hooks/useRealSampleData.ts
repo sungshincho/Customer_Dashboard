@@ -9,18 +9,19 @@ import { useSelectedStore } from './useSelectedStore';
  */
 
 export function useRealCustomers() {
-  const { user } = useAuth();
+  const { user, orgId } = useAuth();
   const { selectedStore } = useSelectedStore();
 
   return useQuery({
     queryKey: ['real-customers', user?.id, selectedStore?.id],
     queryFn: async () => {
-      if (!user) return [];
+      if (!user || !orgId) return [];
 
       const query = supabase
         .from('user_data_imports')
         .select('raw_data')
         .eq('user_id', user.id)
+        .eq('org_id', orgId)
         .eq('data_type', 'customers');
 
       if (selectedStore) {
@@ -38,18 +39,19 @@ export function useRealCustomers() {
 }
 
 export function useRealPurchases() {
-  const { user } = useAuth();
+  const { user, orgId } = useAuth();
   const { selectedStore } = useSelectedStore();
 
   return useQuery({
     queryKey: ['real-purchases', user?.id, selectedStore?.id],
     queryFn: async () => {
-      if (!user) return [];
+      if (!user || !orgId) return [];
 
       const query = supabase
         .from('user_data_imports')
         .select('raw_data')
         .eq('user_id', user.id)
+        .eq('org_id', orgId)
         .eq('data_type', 'purchases');
 
       if (selectedStore) {
@@ -67,18 +69,19 @@ export function useRealPurchases() {
 }
 
 export function useRealProducts() {
-  const { user } = useAuth();
+  const { user, orgId } = useAuth();
   const { selectedStore } = useSelectedStore();
 
   return useQuery({
     queryKey: ['real-products', user?.id, selectedStore?.id],
     queryFn: async () => {
-      if (!user) return [];
+      if (!user || !orgId) return [];
 
       const query = supabase
         .from('user_data_imports')
         .select('raw_data')
         .eq('user_id', user.id)
+        .eq('org_id', orgId)
         .eq('data_type', 'products');
 
       if (selectedStore) {
@@ -96,18 +99,19 @@ export function useRealProducts() {
 }
 
 export function useRealVisits() {
-  const { user } = useAuth();
+  const { user, orgId } = useAuth();
   const { selectedStore } = useSelectedStore();
 
   return useQuery({
     queryKey: ['real-visits', user?.id, selectedStore?.id],
     queryFn: async () => {
-      if (!user) return [];
+      if (!user || !orgId) return [];
 
       const query = supabase
         .from('user_data_imports')
         .select('raw_data')
         .eq('user_id', user.id)
+        .eq('org_id', orgId)
         .eq('data_type', 'visits');
 
       if (selectedStore) {
@@ -125,18 +129,19 @@ export function useRealVisits() {
 }
 
 export function useRealWiFiTracking() {
-  const { user } = useAuth();
+  const { user, orgId } = useAuth();
   const { selectedStore } = useSelectedStore();
 
   return useQuery({
     queryKey: ['real-wifi-tracking', user?.id, selectedStore?.id],
     queryFn: async () => {
-      if (!user) return [];
+      if (!user || !orgId) return [];
 
       const query = supabase
         .from('wifi_tracking')
         .select('*')
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .eq('org_id', orgId);
 
       if (selectedStore) {
         query.eq('store_id', selectedStore.id);
@@ -152,18 +157,19 @@ export function useRealWiFiTracking() {
 }
 
 export function useRealZones() {
-  const { user } = useAuth();
+  const { user, orgId } = useAuth();
   const { selectedStore } = useSelectedStore();
 
   return useQuery({
     queryKey: ['real-zones', user?.id, selectedStore?.id],
     queryFn: async () => {
-      if (!user) return [];
+      if (!user || !orgId) return [];
 
       const query = supabase
         .from('wifi_zones')
         .select('*')
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .eq('org_id', orgId);
 
       if (selectedStore) {
         query.eq('store_id', selectedStore.id);
