@@ -12,7 +12,6 @@ interface AuthContextType {
   licenseId: string | null;
   licenseType: string | null;
   licenseStatus: string | null;
-  invitedBy: string | null;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
@@ -39,7 +38,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [licenseId, setLicenseId] = useState<string | null>(null);
   const [licenseType, setLicenseType] = useState<string | null>(null);
   const [licenseStatus, setLicenseStatus] = useState<string | null>(null);
-  const [invitedBy, setInvitedBy] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -118,7 +116,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           role,
           org_id,
           license_id,
-          invited_by,
           organizations (
             org_name
           ),
@@ -139,7 +136,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setOrgName((membership.organizations as any)?.org_name || null);
       setRole(membership.role);
       setLicenseId(membership.license_id);
-      setInvitedBy(membership.invited_by);
       
       // Set license details if available
       const licenseData = membership.licenses as any;
@@ -187,7 +183,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setLicenseId(null);
           setLicenseType(null);
           setLicenseStatus(null);
-          setInvitedBy(null);
         }
       }
     );
@@ -277,7 +272,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       licenseId,
       licenseType,
       licenseStatus,
-      invitedBy,
       signIn, 
       signUp, 
       signOut, 
