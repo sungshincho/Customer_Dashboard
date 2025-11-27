@@ -77,6 +77,16 @@ export default function SimulationHubPage() {
             setRecommendationStrategy((result as any).recommendationStrategy || result);
             break;
         }
+        
+        // Activity logging
+        logActivity('feature_use', {
+          feature: 'simulation_run',
+          simulation_type: type,
+          store_id: selectedStore.id,
+          store_name: selectedStore.store_name,
+          timestamp: new Date().toISOString()
+        });
+        
         toast.success(`${getSimulationTitle(type)} 완료`);
       }
     } catch (error) {

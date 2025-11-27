@@ -224,8 +224,25 @@ export default function APIIntegrationPage() {
 
       if (data.success) {
         toast.success('API 연결 테스트 성공!');
+        
+        // Activity logging
+        logActivity('feature_use', {
+          feature: 'api_connection_test',
+          connection_id: connectionId,
+          test_result: 'success',
+          timestamp: new Date().toISOString()
+        });
       } else {
         toast.error('API 연결 테스트 실패: ' + data.error);
+        
+        // Activity logging
+        logActivity('feature_use', {
+          feature: 'api_connection_test',
+          connection_id: connectionId,
+          test_result: 'failure',
+          error: data.error,
+          timestamp: new Date().toISOString()
+        });
       }
     } catch (error: any) {
       toast.error('테스트 실패: ' + error.message);
@@ -385,6 +402,17 @@ export default function APIIntegrationPage() {
       if (error) throw error;
 
       toast.success('스케줄이 생성되었습니다');
+      
+      // Activity logging
+      logActivity('feature_use', {
+        feature: 'api_schedule_create',
+        schedule_name: scheduleForm.schedule_name,
+        target_table: scheduleForm.target_table,
+        cron_expression: scheduleForm.cron_expression,
+        convert_to_ontology: convertToOntology,
+        timestamp: new Date().toISOString()
+      });
+      
       setScheduleForm({
         schedule_name: "",
         data_source_id: "",
@@ -419,6 +447,16 @@ export default function APIIntegrationPage() {
 
       if (data.success) {
         toast.success(`동기화 완료: ${data.records_synced}개 레코드 처리됨`);
+        
+        // Activity logging
+        logActivity('feature_use', {
+          feature: 'api_sync_run',
+          schedule_id: scheduleId,
+          records_synced: data.records_synced,
+          manual_run: true,
+          timestamp: new Date().toISOString()
+        });
+        
         loadLogs();
         loadSchedules();
       } else {
