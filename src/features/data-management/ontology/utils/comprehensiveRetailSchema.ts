@@ -1491,6 +1491,163 @@ export const COMPREHENSIVE_RELATION_TYPES = [
     target_entity_type: 'Promotion',
     directionality: 'directed',
     properties: []
+  },
+
+  // ==========================================
+  // ⚡ ADDITIONAL (추가 필수 관계) - 13개
+  // ==========================================
+
+  // 방문/거래 핵심 연결 (CRITICAL)
+  {
+    name: 'VISITED_STORE',
+    label: '매장 방문',
+    description: '방문이 특정 매장에서 발생',
+    source_entity_type: 'Visit',
+    target_entity_type: 'Store',
+    directionality: 'directed',
+    properties: [
+      { name: 'visit_date', type: 'string', required: false, description: '방문일' }
+    ]
+  },
+  {
+    name: 'OCCURRED_AT_STORE',
+    label: '매장 거래',
+    description: '거래가 특정 매장에서 발생',
+    source_entity_type: 'Transaction',
+    target_entity_type: 'Store',
+    directionality: 'directed',
+    properties: [
+      { name: 'transaction_date', type: 'string', required: false, description: '거래일' }
+    ]
+  },
+  {
+    name: 'ENTERED_THROUGH',
+    label: '출입구 진입',
+    description: '방문이 특정 출입구로 진입',
+    source_entity_type: 'Visit',
+    target_entity_type: 'Entrance',
+    directionality: 'directed',
+    properties: [
+      { name: 'entry_time', type: 'string', required: false, description: '진입 시간' }
+    ]
+  },
+
+  // 재고 연결 (CRITICAL)
+  {
+    name: 'STORED_AT',
+    label: '매장 재고',
+    description: '재고가 특정 매장에 보관',
+    source_entity_type: 'Inventory',
+    target_entity_type: 'Store',
+    directionality: 'directed',
+    properties: [
+      { name: 'stock_level', type: 'number', required: false, description: '재고 수준' }
+    ]
+  },
+
+  // 카테고리 계층 (CRITICAL)
+  {
+    name: 'HAS_SUBCATEGORY',
+    label: '하위 카테고리',
+    description: '카테고리가 하위 카테고리 보유',
+    source_entity_type: 'Category',
+    target_entity_type: 'Category',
+    directionality: 'directed',
+    properties: [
+      { name: 'hierarchy_level', type: 'number', required: false, description: '계층 레벨' }
+    ]
+  },
+
+  // 프로모션 타겟 (HIGH)
+  {
+    name: 'TARGETS_PRODUCT',
+    label: '제품 타겟',
+    description: '프로모션이 특정 제품 타겟',
+    source_entity_type: 'Promotion',
+    target_entity_type: 'Product',
+    directionality: 'directed',
+    properties: [
+      { name: 'discount_rate', type: 'number', required: false, description: '할인율' }
+    ]
+  },
+  {
+    name: 'TARGETS_ZONE',
+    label: '구역 타겟',
+    description: '프로모션이 특정 구역 타겟',
+    source_entity_type: 'Promotion',
+    target_entity_type: 'Zone',
+    directionality: 'directed',
+    properties: []
+  },
+
+  // 시계열 데이터 연결 (MEDIUM)
+  {
+    name: 'SALES_OF_STORE',
+    label: '매장 매출',
+    description: '일간 매출이 특정 매장의 데이터',
+    source_entity_type: 'DailySales',
+    target_entity_type: 'Store',
+    directionality: 'directed',
+    properties: [
+      { name: 'sales_date', type: 'string', required: false, description: '매출 날짜' }
+    ]
+  },
+  {
+    name: 'RECORDED_AT_STORE',
+    label: '매장 이력',
+    description: '재고 이력이 특정 매장에서 기록',
+    source_entity_type: 'InventoryHistory',
+    target_entity_type: 'Store',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'HISTORY_OF_PRODUCT',
+    label: '제품 이력',
+    description: '재고 이력이 특정 제품의 데이터',
+    source_entity_type: 'InventoryHistory',
+    target_entity_type: 'Product',
+    directionality: 'directed',
+    properties: [
+      { name: 'change_type', type: 'string', required: false, description: '변화 유형' }
+    ]
+  },
+  {
+    name: 'PERFORMANCE_OF_ZONE',
+    label: '구역 성과',
+    description: '성과 데이터가 특정 구역의 데이터',
+    source_entity_type: 'ZonePerformance',
+    target_entity_type: 'Zone',
+    directionality: 'directed',
+    properties: [
+      { name: 'performance_date', type: 'string', required: false, description: '성과 날짜' }
+    ]
+  },
+
+  // 운영 관계 (MEDIUM)
+  {
+    name: 'ASSIGNED_TO_STAFF',
+    label: '직원 배정',
+    description: '작업이 특정 직원에게 배정',
+    source_entity_type: 'Task',
+    target_entity_type: 'Staff',
+    directionality: 'directed',
+    properties: [
+      { name: 'assigned_date', type: 'string', required: false, description: '배정일' }
+    ]
+  },
+
+  // 외부 컨텍스트 (HIGH)
+  {
+    name: 'AFFECTS_STORE',
+    label: '매장 영향',
+    description: '날씨가 특정 매장에 영향',
+    source_entity_type: 'Weather',
+    target_entity_type: 'Store',
+    directionality: 'directed',
+    properties: [
+      { name: 'impact_level', type: 'string', required: false, description: '영향 수준' }
+    ]
   }
 ];
 
