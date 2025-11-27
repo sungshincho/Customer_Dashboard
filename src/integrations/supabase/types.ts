@@ -2598,6 +2598,47 @@ export type Database = {
           },
         ]
       }
+      user_activity_logs: {
+        Row: {
+          activity_data: Json | null
+          activity_type: string
+          created_at: string
+          id: string
+          ip_address: string | null
+          org_id: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          activity_data?: Json | null
+          activity_type: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          org_id?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          activity_data?: Json | null
+          activity_type?: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          org_id?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_activity_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_data_imports: {
         Row: {
           can_pause: boolean | null

@@ -933,143 +933,130 @@ export const COMPREHENSIVE_ENTITY_TYPES = [
   }
 ];
 
+/**
+ * 최적화된 온톨로지 관계 타입 (70개)
+ * 우선순위 Tier 구조:
+ * - CRITICAL (25개): AI 추론 핵심 기능
+ * - HIGH (20개): 고급 AI 기능
+ * - MEDIUM (15개): 특정 산업 및 고급 기능
+ * - LOW (10개): Nice-to-have 기능
+ */
 export const COMPREHENSIVE_RELATION_TYPES = [
-  // 공간 관계
+  // ==========================================
+  // CRITICAL TIER (25개) - AI 추론 핵심 기능
+  // ==========================================
+  
+  // 공간 계층 구조 (7개)
   { name: 'contains', label: '포함함', description: 'A가 B를 포함함', source_entity_type: 'Store', target_entity_type: 'Zone', directionality: 'directed' },
   { name: 'contains', label: '포함함', description: 'A가 B를 포함함', source_entity_type: 'Zone', target_entity_type: 'Shelf', directionality: 'directed' },
   { name: 'contains', label: '포함함', description: 'A가 B를 포함함', source_entity_type: 'Zone', target_entity_type: 'DisplayTable', directionality: 'directed' },
   { name: 'contains', label: '포함함', description: 'A가 B를 포함함', source_entity_type: 'Zone', target_entity_type: 'Rack', directionality: 'directed' },
   { name: 'contains', label: '포함함', description: 'A가 B를 포함함', source_entity_type: 'Zone', target_entity_type: 'CheckoutCounter', directionality: 'directed' },
-  { name: 'contains', label: '포함함', description: 'A가 B를 포함함', source_entity_type: 'Zone', target_entity_type: 'FittingRoom', directionality: 'directed' },
-  { name: 'bounded_by', label: '경계됨', description: 'A가 B에 의해 경계됨', source_entity_type: 'Zone', target_entity_type: 'Wall', directionality: 'directed' },
-  { name: 'connects_to', label: '연결됨', description: 'A가 B와 연결됨', source_entity_type: 'Zone', target_entity_type: 'Aisle', directionality: 'undirected' },
   { name: 'adjacent_to', label: '인접함', description: 'A가 B와 인접함', source_entity_type: 'Zone', target_entity_type: 'Zone', directionality: 'undirected' },
   { name: 'leads_to', label: '통함', description: 'A가 B로 통함', source_entity_type: 'Entrance', target_entity_type: 'Zone', directionality: 'directed' },
-
-  // 상품 진열 관계
+  
+  // 상품 진열 (6개)
   { name: 'displays', label: '진열함', description: 'A가 B를 진열함', source_entity_type: 'Shelf', target_entity_type: 'Product', directionality: 'directed' },
   { name: 'displays', label: '진열함', description: 'A가 B를 진열함', source_entity_type: 'DisplayTable', target_entity_type: 'Product', directionality: 'directed' },
   { name: 'displays', label: '진열함', description: 'A가 B를 진열함', source_entity_type: 'Rack', target_entity_type: 'Product', directionality: 'directed' },
-  { name: 'placed_at', label: '배치됨', description: 'A가 B에 배치됨', source_entity_type: 'Product', target_entity_type: 'ProductPlacement', directionality: 'directed' },
-  { name: 'featured_in', label: '특별진열', description: 'A가 B에서 특별 진열됨', source_entity_type: 'Product', target_entity_type: 'Display', directionality: 'directed' },
-  { name: 'placed_on', label: '위치함', description: 'A가 B 위에 위치함', source_entity_type: 'ProductPlacement', target_entity_type: 'Shelf', directionality: 'directed' },
-  { name: 'placed_on', label: '위치함', description: 'A가 B 위에 위치함', source_entity_type: 'ProductPlacement', target_entity_type: 'DisplayTable', directionality: 'directed' },
-
-  // IoT & 센서 관계
+  { name: 'belongs_to_category', label: '카테고리 소속', description: 'A가 B 카테고리에 속함', source_entity_type: 'Product', target_entity_type: 'Category', directionality: 'directed' },
+  { name: 'supplied_by', label: '공급됨', description: 'A가 B에게 공급됨', source_entity_type: 'Product', target_entity_type: 'Supplier', directionality: 'directed' },
+  { name: 'promoted_by', label: '프로모션 대상', description: 'A가 B 프로모션 대상', source_entity_type: 'Product', target_entity_type: 'Promotion', directionality: 'directed' },
+  
+  // 고객 & 거래 (7개)
+  { name: 'visited', label: '방문함', description: 'A가 B를 방문함', source_entity_type: 'Customer', target_entity_type: 'Store', directionality: 'directed' },
+  { name: 'purchased', label: '구매함', description: 'A가 B를 구매함', source_entity_type: 'Customer', target_entity_type: 'Product', directionality: 'directed' },
+  { name: 'has_purchase', label: '구매 기록', description: 'A의 구매 기록', source_entity_type: 'Customer', target_entity_type: 'Purchase', directionality: 'directed' },
+  { name: 'contains_product', label: '제품 포함', description: 'A가 B 제품 포함', source_entity_type: 'Purchase', target_entity_type: 'Product', directionality: 'directed' },
+  { name: 'occurred_at_store', label: '발생 매장', description: 'A가 B 매장에서 발생', source_entity_type: 'Purchase', target_entity_type: 'Store', directionality: 'directed' },
+  { name: 'made_during_visit', label: '방문 중 구매', description: 'A가 B 방문 중 발생', source_entity_type: 'Purchase', target_entity_type: 'Visit', directionality: 'directed' },
+  { name: 'visit_to_store', label: '매장 방문', description: 'A가 B 매장 방문', source_entity_type: 'Visit', target_entity_type: 'Store', directionality: 'directed' },
+  
+  // 재고 관리 (5개)
+  { name: 'has_inventory', label: '재고 보유', description: 'A가 B 재고 보유', source_entity_type: 'Product', target_entity_type: 'Inventory', directionality: 'directed' },
+  { name: 'stored_at', label: '보관됨', description: 'A가 B에 보관됨', source_entity_type: 'Inventory', target_entity_type: 'Store', directionality: 'directed' },
+  { name: 'triggers_alert', label: '알림 발생', description: 'A가 B 알림 발생', source_entity_type: 'Inventory', target_entity_type: 'Alert', directionality: 'directed' },
+  { name: 'stores', label: '보관함', description: 'A가 B를 보관함', source_entity_type: 'StorageRoom', target_entity_type: 'Product', directionality: 'directed' },
+  { name: 'restocked_from', label: '보충됨', description: 'A가 B에서 보충됨', source_entity_type: 'Shelf', target_entity_type: 'StorageRoom', directionality: 'directed' },
+  
+  // ==========================================
+  // HIGH TIER (20개) - 고급 AI 기능
+  // ==========================================
+  
+  // IoT & 센서 (6개)
   { name: 'monitors', label: '모니터함', description: 'A가 B를 모니터함', source_entity_type: 'Sensor', target_entity_type: 'Zone', directionality: 'directed' },
   { name: 'monitors', label: '모니터함', description: 'A가 B를 모니터함', source_entity_type: 'Camera', target_entity_type: 'Zone', directionality: 'directed' },
   { name: 'installed_in', label: '설치됨', description: 'A가 B에 설치됨', source_entity_type: 'Beacon', target_entity_type: 'Zone', directionality: 'directed' },
   { name: 'installed_in', label: '설치됨', description: 'A가 B에 설치됨', source_entity_type: 'WiFiProbe', target_entity_type: 'Zone', directionality: 'directed' },
-  { name: 'mounted_on', label: '장착됨', description: 'A가 B에 장착됨', source_entity_type: 'Sensor', target_entity_type: 'Wall', directionality: 'directed' },
-  { name: 'mounted_on', label: '장착됨', description: 'A가 B에 장착됨', source_entity_type: 'Camera', target_entity_type: 'Wall', directionality: 'directed' },
-  { name: 'mounted_on', label: '장착됨', description: 'A가 B에 장착됨', source_entity_type: 'DigitalSignage', target_entity_type: 'Wall', directionality: 'directed' },
-
-  // 환경 시스템 관계
+  { name: 'detected_by', label: '감지됨', description: 'A가 B에 의해 감지됨', source_entity_type: 'Customer', target_entity_type: 'WiFiProbe', directionality: 'directed' },
+  { name: 'tracked_in', label: '추적됨', description: 'A가 B에서 추적됨', source_entity_type: 'Customer', target_entity_type: 'Zone', directionality: 'directed' },
+  
+  // 직원 관리 (5개)
+  { name: 'works_at', label: '근무함', description: 'A가 B에서 근무함', source_entity_type: 'Staff', target_entity_type: 'Store', directionality: 'directed' },
+  { name: 'has_shift', label: '근무 시간', description: 'A가 B 근무 시간 보유', source_entity_type: 'Staff', target_entity_type: 'Shift', directionality: 'directed' },
+  { name: 'shift_at_store', label: '근무 매장', description: 'A가 B 매장 근무', source_entity_type: 'Shift', target_entity_type: 'Store', directionality: 'directed' },
+  { name: 'operates', label: '운영함', description: 'A가 B를 운영함', source_entity_type: 'Staff', target_entity_type: 'POS', directionality: 'directed' },
+  { name: 'managed_zone', label: '관리 구역', description: 'A가 B 구역 관리', source_entity_type: 'Staff', target_entity_type: 'Zone', directionality: 'directed' },
+  
+  // 고객 동선 & 분석 (5개)
+  { name: 'has_journey', label: '여정 기록', description: 'A의 B 여정', source_entity_type: 'Visit', target_entity_type: 'CustomerJourney', directionality: 'directed' },
+  { name: 'traveled_through', label: '이동함', description: 'A가 B를 통해 이동함', source_entity_type: 'CustomerJourney', target_entity_type: 'Zone', directionality: 'directed' },
+  { name: 'dwelled_at', label: '체류함', description: 'A가 B에 체류함', source_entity_type: 'Customer', target_entity_type: 'Zone', directionality: 'directed' },
+  { name: 'converted_to_purchase', label: '구매 전환', description: 'A가 B로 전환됨', source_entity_type: 'Visit', target_entity_type: 'Purchase', directionality: 'directed' },
+  { name: 'influenced_by_weather', label: '날씨 영향', description: 'A가 B 날씨 영향 받음', source_entity_type: 'Visit', target_entity_type: 'Weather', directionality: 'directed' },
+  
+  // 외부 환경 (4개)
+  { name: 'on_date', label: '날짜', description: 'A가 B 날짜 발생', source_entity_type: 'Weather', target_entity_type: 'Holiday', directionality: 'directed' },
+  { name: 'affected_by_holiday', label: '휴일 영향', description: 'A가 B 휴일 영향 받음', source_entity_type: 'Visit', target_entity_type: 'Holiday', directionality: 'directed' },
+  { name: 'economic_indicator_date', label: '경제지표 날짜', description: 'A가 B 날짜 지표', source_entity_type: 'EconomicIndicator', target_entity_type: 'Holiday', directionality: 'directed' },
+  { name: 'weather_at_store', label: '매장 날씨', description: 'A가 B 매장 날씨', source_entity_type: 'Weather', target_entity_type: 'Store', directionality: 'directed' },
+  
+  // ==========================================
+  // MEDIUM TIER (15개) - 특정 산업 및 고급 기능
+  // ==========================================
+  
+  // 환경 시스템 (5개)
   { name: 'illuminates', label: '조명함', description: 'A가 B를 조명함', source_entity_type: 'Lighting', target_entity_type: 'Zone', directionality: 'directed' },
   { name: 'illuminates', label: '조명함', description: 'A가 B를 조명함', source_entity_type: 'Lighting', target_entity_type: 'Display', directionality: 'directed' },
   { name: 'climate_controls', label: '온도제어', description: 'A가 B의 온도를 제어함', source_entity_type: 'HVAC', target_entity_type: 'Zone', directionality: 'directed' },
-  { name: 'plays_in', label: '재생됨', description: 'A가 B에서 재생됨', source_entity_type: 'AudioSystem', target_entity_type: 'Zone', directionality: 'directed' },
-  { name: 'plays', label: '재생함', description: 'A가 B를 재생함', source_entity_type: 'AudioSystem', target_entity_type: 'MusicPlaylist', directionality: 'directed' },
-  { name: 'diffuses_in', label: '확산됨', description: 'A가 B에서 확산됨', source_entity_type: 'ScentDiffuser', target_entity_type: 'Zone', directionality: 'directed' },
-
-  // 디지털 장비 관계
+  { name: 'mounted_on', label: '장착됨', description: 'A가 B에 장착됨', source_entity_type: 'Sensor', target_entity_type: 'Wall', directionality: 'directed' },
+  { name: 'mounted_on', label: '장착됨', description: 'A가 B에 장착됨', source_entity_type: 'Camera', target_entity_type: 'Wall', directionality: 'directed' },
+  
+  // 디지털 장비 (4개)
   { name: 'located_at', label: '위치함', description: 'A가 B에 위치함', source_entity_type: 'POS', target_entity_type: 'CheckoutCounter', directionality: 'directed' },
   { name: 'located_at', label: '위치함', description: 'A가 B에 위치함', source_entity_type: 'Kiosk', target_entity_type: 'Zone', directionality: 'directed' },
-  { name: 'located_at', label: '위치함', description: 'A가 B에 위치함', source_entity_type: 'SmartMirror', target_entity_type: 'FittingRoom', directionality: 'directed' },
   { name: 'displays_on', label: '표시됨', description: 'A가 B에 표시됨', source_entity_type: 'Product', target_entity_type: 'DigitalSignage', directionality: 'directed' },
-
-  // 직원 관계
-  { name: 'assigned_to', label: '할당됨', description: 'A가 B에 할당됨', source_entity_type: 'Staff', target_entity_type: 'StaffZone', directionality: 'directed' },
-  { name: 'manages', label: '관리함', description: 'A가 B를 관리함', source_entity_type: 'StaffZone', target_entity_type: 'Zone', directionality: 'directed' },
-  { name: 'works_at', label: '근무함', description: 'A가 B에서 근무함', source_entity_type: 'Staff', target_entity_type: 'Store', directionality: 'directed' },
-  { name: 'operates', label: '운영함', description: 'A가 B를 운영함', source_entity_type: 'Staff', target_entity_type: 'POS', directionality: 'directed' },
-
-  // 고객 관계
-  { name: 'visited', label: '방문함', description: 'A가 B를 방문함', source_entity_type: 'Customer', target_entity_type: 'Store', directionality: 'directed' },
-  { name: 'has_journey', label: '여정 기록', description: 'A의 B 여정', source_entity_type: 'Visit', target_entity_type: 'CustomerJourney', directionality: 'directed' },
-  { name: 'traveled_through', label: '이동함', description: 'A가 B를 통해 이동함', source_entity_type: 'CustomerJourney', target_entity_type: 'Zone', directionality: 'directed' },
-  { name: 'purchased_at', label: '구매함', description: 'A가 B에서 구매함', source_entity_type: 'Customer', target_entity_type: 'POS', directionality: 'directed' },
-
-  // 재고 관계
-  { name: 'stores', label: '보관함', description: 'A가 B를 보관함', source_entity_type: 'StorageRoom', target_entity_type: 'Product', directionality: 'directed' },
-  { name: 'restocked_from', label: '보충됨', description: 'A가 B에서 보충됨', source_entity_type: 'Shelf', target_entity_type: 'StorageRoom', directionality: 'directed' },
-
-  // 구조 관계
-  { name: 'has_window', label: '창문있음', description: 'A에 B 창문이 있음', source_entity_type: 'Wall', target_entity_type: 'Window', directionality: 'directed' },
-  { name: 'has_entrance', label: '출입구있음', description: 'A에 B 출입구가 있음', source_entity_type: 'Store', target_entity_type: 'Entrance', directionality: 'directed' },
-  { name: 'accesses', label: '접근함', description: 'A가 B에 접근함', source_entity_type: 'Entrance', target_entity_type: 'StorageRoom', directionality: 'directed' },
-
+  { name: 'mounted_on', label: '장착됨', description: 'A가 B에 장착됨', source_entity_type: 'DigitalSignage', target_entity_type: 'Wall', directionality: 'directed' },
+  
+  // 특수 구역 (3개)
+  { name: 'contains', label: '포함함', description: 'A가 B를 포함함', source_entity_type: 'Zone', target_entity_type: 'FittingRoom', directionality: 'directed' },
+  { name: 'connects_to', label: '연결됨', description: 'A가 B와 연결됨', source_entity_type: 'Zone', target_entity_type: 'Aisle', directionality: 'undirected' },
+  { name: 'bounded_by', label: '경계됨', description: 'A가 B에 의해 경계됨', source_entity_type: 'Zone', target_entity_type: 'Wall', directionality: 'directed' },
+  
+  // 수요 예측 (3개)
+  { name: 'forecast_for', label: '예측 대상', description: 'A가 B 예측', source_entity_type: 'DemandForecast', target_entity_type: 'Product', directionality: 'directed' },
+  { name: 'forecast_at_store', label: '예측 매장', description: 'A가 B 매장 예측', source_entity_type: 'DemandForecast', target_entity_type: 'Store', directionality: 'directed' },
+  { name: 'influences_inventory', label: '재고 영향', description: 'A가 B에 영향', source_entity_type: 'DemandForecast', target_entity_type: 'Inventory', directionality: 'directed' },
+  
   // ==========================================
-  // 비즈니스 인텔리전스 관계 (43개)
+  // LOW TIER (10개) - Nice-to-have 기능
   // ==========================================
   
-  // 고객 관련 관계
-  { name: 'customer_visits_store', label: '방문했다', description: '고객이 매장을 방문', source_entity_type: 'Customer', target_entity_type: 'Store', directionality: 'directed' },
-  { name: 'purchased', label: '구매했다', description: '고객이 제품을 구매', source_entity_type: 'Customer', target_entity_type: 'Product', directionality: 'directed' },
-  { name: 'has_segment', label: '세그먼트 소속', description: '같은 고객 세그먼트', source_entity_type: 'Customer', target_entity_type: 'Customer', directionality: 'undirected' },
+  // 가격 최적화 (3개)
+  { name: 'optimizes_price', label: '가격 최적화', description: 'A가 B 가격 최적화', source_entity_type: 'PriceOptimization', target_entity_type: 'Product', directionality: 'directed' },
+  { name: 'based_on_demand', label: '수요 기반', description: 'A가 B 기반', source_entity_type: 'PriceOptimization', target_entity_type: 'DemandForecast', directionality: 'directed' },
+  { name: 'price_at_store', label: '매장 가격', description: 'A가 B 매장 가격', source_entity_type: 'PriceOptimization', target_entity_type: 'Store', directionality: 'directed' },
   
-  // 매출/판매 관계
-  { name: 'sale_of', label: '판매 기록', description: '특정 제품의 판매', source_entity_type: 'Sale', target_entity_type: 'Product', directionality: 'directed' },
-  { name: 'occurred_at', label: '발생 위치', description: '매출이 발생한 매장', source_entity_type: 'Sale', target_entity_type: 'Store', directionality: 'directed' },
-  { name: 'made_by', label: '구매자', description: '매출을 발생시킨 고객', source_entity_type: 'Sale', target_entity_type: 'Customer', directionality: 'directed' },
+  // 프로모션 (4개)
+  { name: 'runs_at_store', label: '실행 매장', description: 'A가 B에서 실행', source_entity_type: 'Promotion', target_entity_type: 'Store', directionality: 'directed' },
+  { name: 'affects_sales', label: '매출 영향', description: 'A가 B에 영향', source_entity_type: 'Promotion', target_entity_type: 'Purchase', directionality: 'directed' },
+  { name: 'brand_of_product', label: '제품 브랜드', description: 'A가 B 브랜드', source_entity_type: 'Product', target_entity_type: 'Brand', directionality: 'directed' },
+  { name: 'subcategory_of', label: '하위 카테고리', description: 'A가 B의 하위', source_entity_type: 'Category', target_entity_type: 'Category', directionality: 'directed' },
   
-  // 방문 관계
-  { name: 'visit_to_store', label: '매장 방문', description: '방문한 매장', source_entity_type: 'Visit', target_entity_type: 'Store', directionality: 'directed' },
-  { name: 'visit_by_customer', label: '방문 고객', description: '방문한 고객', source_entity_type: 'Visit', target_entity_type: 'Customer', directionality: 'directed' },
-  { name: 'converted_to_sale', label: '전환됨', description: '방문이 매출로 전환', source_entity_type: 'Visit', target_entity_type: 'Sale', directionality: 'directed' },
-  
-  // 고객 동선 관계
-  { name: 'path_of_visit', label: '방문 경로', description: '방문의 이동 경로', source_entity_type: 'CustomerJourney', target_entity_type: 'Visit', directionality: 'directed' },
-  { name: 'passed_through_zone', label: '통과 구역', description: '동선이 통과한 구역', source_entity_type: 'CustomerJourney', target_entity_type: 'ZoneAnalysis', directionality: 'directed' },
-  
-  // 재고 관계
-  { name: 'inventory_of', label: '재고 제품', description: '재고 관리 대상 제품', source_entity_type: 'Inventory', target_entity_type: 'Product', directionality: 'directed' },
-  { name: 'stored_at_store', label: '보관 매장', description: '재고가 보관된 매장', source_entity_type: 'Inventory', target_entity_type: 'Store', directionality: 'directed' },
-  { name: 'triggers_alert', label: '알림 발생', description: '재고가 알림을 발생', source_entity_type: 'Inventory', target_entity_type: 'Alert', directionality: 'directed' },
-  
-  // 수요 예측 관계
-  { name: 'forecast_for', label: '예측 대상', description: '수요 예측 대상 제품', source_entity_type: 'DemandForecast', target_entity_type: 'Product', directionality: 'directed' },
-  { name: 'forecast_at_store', label: '예측 매장', description: '수요 예측 매장', source_entity_type: 'DemandForecast', target_entity_type: 'Store', directionality: 'directed' },
-  { name: 'influences_inventory', label: '재고 영향', description: '예측이 재고 계획에 영향', source_entity_type: 'DemandForecast', target_entity_type: 'Inventory', directionality: 'directed' },
-  
-  // 가격 최적화 관계
-  { name: 'optimizes_price', label: '가격 최적화', description: '가격 최적화 대상 제품', source_entity_type: 'PriceOptimization', target_entity_type: 'Product', directionality: 'directed' },
-  { name: 'based_on_demand', label: '수요 기반', description: '수요 예측 기반 가격 결정', source_entity_type: 'PriceOptimization', target_entity_type: 'DemandForecast', directionality: 'directed' },
-  { name: 'considers_wtp', label: 'WTP 고려', description: '고객 지불의향가격 반영', source_entity_type: 'PriceOptimization', target_entity_type: 'Customer', directionality: 'directed' },
-  
-  // 프로모션 관계
-  { name: 'promotes_product', label: '프로모션 제품', description: '프로모션 대상 제품', source_entity_type: 'Promotion', target_entity_type: 'Product', directionality: 'directed' },
-  { name: 'runs_at_store', label: '실행 매장', description: '프로모션 실행 매장', source_entity_type: 'Promotion', target_entity_type: 'Store', directionality: 'directed' },
-  { name: 'affects_sales', label: '매출 영향', description: '프로모션이 매출에 영향', source_entity_type: 'Promotion', target_entity_type: 'Sale', directionality: 'directed' },
-  { name: 'part_of_campaign', label: '캠페인 소속', description: '마케팅 캠페인의 일부', source_entity_type: 'Promotion', target_entity_type: 'MarketingCampaign', directionality: 'directed' },
-  
-  // 마케팅 캠페인 관계
-  { name: 'targets_customers', label: '타겟 고객', description: '캠페인 타겟 고객', source_entity_type: 'MarketingCampaign', target_entity_type: 'Customer', directionality: 'directed' },
-  { name: 'increases_visits', label: '방문 증가', description: '캠페인이 방문 증가', source_entity_type: 'MarketingCampaign', target_entity_type: 'Visit', directionality: 'directed' },
-  { name: 'deployed_at_store', label: '실행 매장', description: '캠페인 실행 매장', source_entity_type: 'MarketingCampaign', target_entity_type: 'Store', directionality: 'directed' },
-  
-  // 구매 전환 관계
-  { name: 'conversion_from_visit', label: '방문 전환', description: '방문에서의 전환 분석', source_entity_type: 'PurchaseConversion', target_entity_type: 'Visit', directionality: 'directed' },
-  { name: 'conversion_to_sale', label: '매출 전환', description: '매출로의 전환', source_entity_type: 'PurchaseConversion', target_entity_type: 'Sale', directionality: 'directed' },
-  { name: 'influenced_by_path', label: '동선 영향', description: '고객 동선이 전환에 영향', source_entity_type: 'PurchaseConversion', target_entity_type: 'CustomerJourney', directionality: 'directed' },
-  { name: 'in_zone_conversion', label: '구역 내 전환', description: '특정 구역에서의 전환', source_entity_type: 'PurchaseConversion', target_entity_type: 'ZoneAnalysis', directionality: 'directed' },
-  
-  // 직원 스케줄 관계
-  { name: 'schedule_at_store', label: '근무 매장', description: '직원 근무 매장', source_entity_type: 'StaffSchedule', target_entity_type: 'Store', directionality: 'directed' },
-  { name: 'manages_zone_schedule', label: '담당 구역', description: '직원이 담당하는 구역', source_entity_type: 'StaffSchedule', target_entity_type: 'ZoneAnalysis', directionality: 'directed' },
-  { name: 'impacts_sales', label: '매출 영향', description: '직원 배치가 매출에 영향', source_entity_type: 'StaffSchedule', target_entity_type: 'Sale', directionality: 'directed' },
-  { name: 'staff_has_schedule', label: '스케줄 보유', description: '직원이 스케줄 보유', source_entity_type: 'Staff', target_entity_type: 'StaffSchedule', directionality: 'directed' },
-  
-  // 구역 분석 관계
-  { name: 'zone_in_store', label: '매장 구역', description: '매장 내 구역', source_entity_type: 'ZoneAnalysis', target_entity_type: 'Store', directionality: 'directed' },
-  { name: 'zone_traffic', label: '구역 트래픽', description: '구역 방문 트래픽', source_entity_type: 'ZoneAnalysis', target_entity_type: 'Visit', directionality: 'directed' },
-  { name: 'zone_revenue', label: '구역 매출', description: '구역에서 발생한 매출', source_entity_type: 'ZoneAnalysis', target_entity_type: 'Sale', directionality: 'directed' },
-  { name: 'displays_product_zone', label: '제품 진열', description: '구역에 진열된 제품', source_entity_type: 'ZoneAnalysis', target_entity_type: 'Product', directionality: 'directed' },
-  
-  // 알림 관계
-  { name: 'alert_for_inventory', label: '재고 알림', description: '재고 관련 알림', source_entity_type: 'Alert', target_entity_type: 'Inventory', directionality: 'directed' },
-  { name: 'alert_for_store', label: '매장 알림', description: '매장 관련 알림', source_entity_type: 'Alert', target_entity_type: 'Store', directionality: 'directed' },
-  { name: 'alert_for_product', label: '제품 알림', description: '제품 관련 알림', source_entity_type: 'Alert', target_entity_type: 'Product', directionality: 'directed' }
+  // 알림 (3개)
+  { name: 'alert_for_store', label: '매장 알림', description: 'A가 B 매장 알림', source_entity_type: 'Alert', target_entity_type: 'Store', directionality: 'directed' },
+  { name: 'alert_for_product', label: '제품 알림', description: 'A가 B 제품 알림', source_entity_type: 'Alert', target_entity_type: 'Product', directionality: 'directed' },
+  { name: 'alert_for_zone', label: '구역 알림', description: 'A가 B 구역 알림', source_entity_type: 'Alert', target_entity_type: 'Zone', directionality: 'directed' }
 ];
 
 export async function insertComprehensiveSchema(userId: string) {
