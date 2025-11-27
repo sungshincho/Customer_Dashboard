@@ -1,174 +1,376 @@
 import { supabase } from "@/integrations/supabase/client";
 
 /**
- * 오프라인 리테일 매장의 모든 구성요소를 포함하는 정교한 디지털 트윈 온톨로지 스키마
+ * 최적화된 리테일 온톨로지 스키마 v2.1
+ * 43개 엔티티 (CRITICAL: 17, HIGH: 12, MEDIUM: 9, LOW: 5)
+ * 70개 관계 (CRITICAL: 25, HIGH: 20, MEDIUM: 15, LOW: 10)
  */
 
 export const COMPREHENSIVE_ENTITY_TYPES = [
   // ==========================================
-  // 1. 공간 구조 엔티티 (Space Structure)
+  // 🔴 CRITICAL (필수) - 17개
   // ==========================================
+  
+  // 1. 조직/매장 (2개)
+  {
+    name: 'Organization',
+    label: '조직',
+    description: '리테일 조직 (본사/프랜차이즈)',
+    icon: 'Building2',
+    color: '#3b82f6',
+    model_3d_type: null,
+    properties: [
+      { name: 'org_id', type: 'string', required: true, description: '조직 ID' },
+      { name: 'org_name', type: 'string', required: true, description: '조직명' },
+      { name: 'org_type', type: 'string', required: false, description: '조직 유형 (retail/franchise/enterprise)' },
+      { name: 'industry', type: 'string', required: false, description: '업종' },
+      { name: 'country', type: 'string', required: false, description: '국가' },
+      { name: 'created_at', type: 'string', required: false, description: '생성일' }
+    ]
+  },
+  {
+    name: 'Store',
+    label: '매장',
+    description: '물리적 리테일 매장',
+    icon: 'Store',
+    color: '#10b981',
+    model_3d_type: 'building',
+    model_3d_dimensions: { width: 20, height: 4, depth: 15 },
+    properties: [
+      { name: 'store_code', type: 'string', required: true, description: '매장 코드' },
+      { name: 'store_name', type: 'string', required: true, description: '매장명' },
+      { name: 'address', type: 'string', required: true, description: '주소' },
+      { name: 'area_sqm', type: 'number', required: true, description: '면적 (제곱미터)' },
+      { name: 'opening_date', type: 'string', required: false, description: '오픈일' },
+      { name: 'store_format', type: 'string', required: false, description: '매장 포맷 (flagship/standard/compact)' },
+      { name: 'region', type: 'string', required: false, description: '지역' },
+      { name: 'district', type: 'string', required: false, description: '구역' },
+      { name: 'manager_name', type: 'string', required: false, description: '매니저명' },
+      { name: 'org_id', type: 'string', required: true, description: '조직 ID' }
+    ]
+  },
+
+  // 2. 공간 구조 (3개)
   {
     name: 'Zone',
     label: '구역',
-    description: '매장 내 특정 기능을 가진 공간 영역',
+    description: '매장 내 특정 기능 영역',
     icon: 'BoxSelect',
-    color: '#10b981',
+    color: '#8b5cf6',
     model_3d_type: 'zone',
     model_3d_dimensions: { width: 5, height: 3, depth: 5 },
-    model_3d_metadata: {
-      supports_heatmap: true,
-      supports_pathflow: true,
-      zone_shape: 'polygon',
-      floor_level: 0
-    },
     properties: [
-      { name: 'zone_type', type: 'string', required: true, description: '구역 유형 (entrance/checkout/display/storage/fitting/aisle)' },
-      { name: 'zone_code', type: 'string', required: true, description: '구역 코드' },
-      { name: 'floor_area_sqm', type: 'number', required: true, description: '바닥 면적 (제곱미터)' },
-      { name: 'boundary_polygon', type: 'array', required: true, description: '경계선 좌표 배열' },
-      { name: 'traffic_capacity', type: 'number', required: false, description: '최대 수용 인원' },
-      { name: 'temperature_target', type: 'number', required: false, description: '목표 온도 (섭씨)' },
-      { name: 'lighting_target_lux', type: 'number', required: false, description: '목표 조도 (lux)' }
-    ]
-  },
-  {
-    name: 'Shelf',
-    label: '선반',
-    description: '상품을 진열하는 선반 유닛',
-    icon: 'Layers',
-    color: '#3b82f6',
-    model_3d_type: 'furniture',
-    model_3d_dimensions: { width: 1.2, height: 2.0, depth: 0.4 },
-    model_3d_metadata: {
-      stackable: true,
-      shelf_levels: 5,
-      max_weight_per_level_kg: 50,
-      material: 'metal'
-    },
-    properties: [
-      { name: 'shelf_type', type: 'string', required: true, description: '선반 유형 (wall_mounted/freestanding/gondola/pegboard)' },
-      { name: 'shelf_code', type: 'string', required: true, description: '선반 코드' },
-      { name: 'num_levels', type: 'number', required: true, description: '단 수' },
-      { name: 'level_height_cm', type: 'array', required: true, description: '각 단의 높이 배열 (cm)' },
-      { name: 'material', type: 'string', required: false, description: '재질 (metal/wood/glass)' },
-      { name: 'max_weight_kg', type: 'number', required: false, description: '최대 적재 하중 (kg)' },
-      { name: 'adjustable_levels', type: 'boolean', required: false, description: '단 높이 조절 가능 여부' }
-    ]
-  },
-  {
-    name: 'DisplayTable',
-    label: '디스플레이 테이블',
-    description: '상품을 진열하는 테이블',
-    icon: 'Table',
-    color: '#8b5cf6',
-    model_3d_type: 'furniture',
-    model_3d_dimensions: { width: 1.5, height: 0.9, depth: 1.0 },
-    model_3d_metadata: {
-      surface_type: 'flat',
-      supports_lighting: true,
-      display_capacity: 20
-    },
-    properties: [
-      { name: 'table_type', type: 'string', required: true, description: '테이블 유형 (feature/promotional/seasonal/clearance)' },
-      { name: 'table_code', type: 'string', required: true, description: '테이블 코드' },
-      { name: 'surface_area_sqm', type: 'number', required: true, description: '표면 면적 (제곱미터)' },
-      { name: 'shape', type: 'string', required: false, description: '형태 (rectangular/circular/oval/irregular)' },
-      { name: 'has_lighting', type: 'boolean', required: false, description: '조명 장착 여부' },
-      { name: 'material', type: 'string', required: false, description: '재질' }
-    ]
-  },
-  {
-    name: 'Rack',
-    label: '랙',
-    description: '의류나 상품을 걸어서 진열하는 랙',
-    icon: 'Minimize2',
-    color: '#06b6d4',
-    model_3d_type: 'furniture',
-    model_3d_dimensions: { width: 1.2, height: 1.8, depth: 0.5 },
-    model_3d_metadata: {
-      hanging_type: 'rail',
-      capacity_items: 50,
-      mobile: false
-    },
-    properties: [
-      { name: 'rack_type', type: 'string', required: true, description: '랙 유형 (clothing/accessory/shoe/mixed)' },
-      { name: 'rack_code', type: 'string', required: true, description: '랙 코드' },
-      { name: 'hanging_capacity', type: 'number', required: true, description: '걸 수 있는 최대 아이템 수' },
-      { name: 'rail_count', type: 'number', required: false, description: '레일 개수' },
-      { name: 'is_mobile', type: 'boolean', required: false, description: '이동 가능 여부' },
-      { name: 'has_wheels', type: 'boolean', required: false, description: '바퀴 장착 여부' }
-    ]
-  },
-  {
-    name: 'Wall',
-    label: '벽면',
-    description: '매장의 벽면 구조물',
-    icon: 'Square',
-    color: '#64748b',
-    model_3d_type: 'structure',
-    model_3d_dimensions: { width: 5, height: 3, depth: 0.2 },
-    model_3d_metadata: {
-      is_loadbearing: true,
-      surface_finish: 'paint',
-      mountable: true
-    },
-    properties: [
-      { name: 'wall_type', type: 'string', required: true, description: '벽 유형 (exterior/interior/partition/glass)' },
-      { name: 'wall_code', type: 'string', required: true, description: '벽 코드' },
-      { name: 'length_m', type: 'number', required: true, description: '길이 (미터)' },
-      { name: 'height_m', type: 'number', required: true, description: '높이 (미터)' },
-      { name: 'material', type: 'string', required: false, description: '재질 (concrete/drywall/glass/brick)' },
-      { name: 'color', type: 'string', required: false, description: '색상' },
-      { name: 'finish', type: 'string', required: false, description: '마감재 (paint/wallpaper/tile)' },
-      { name: 'can_mount_fixtures', type: 'boolean', required: false, description: '설비 장착 가능 여부' }
+      { name: 'zone_id', type: 'string', required: true, description: '구역 ID' },
+      { name: 'zone_type', type: 'string', required: true, description: '구역 유형 (entrance/product_display/checkout/storage/staff/fitting/rest)' },
+      { name: 'zone_name', type: 'string', required: true, description: '구역명' },
+      { name: 'area_sqm', type: 'number', required: false, description: '면적 (제곱미터)' },
+      { name: 'purpose', type: 'string', required: false, description: '목적' },
+      { name: 'traffic_level', type: 'string', required: false, description: '트래픽 레벨 (high/medium/low)' }
     ]
   },
   {
     name: 'Entrance',
     label: '출입구',
-    description: '매장 출입구 및 문',
+    description: '매장 출입구',
     icon: 'DoorOpen',
     color: '#f59e0b',
     model_3d_type: 'structure',
-    model_3d_dimensions: { width: 2.0, height: 2.5, depth: 0.1 },
-    model_3d_metadata: {
-      door_type: 'automatic',
-      traffic_counter: true,
-      security_gate: false
-    },
+    model_3d_dimensions: { width: 2, height: 2.5, depth: 0.1 },
     properties: [
-      { name: 'entrance_type', type: 'string', required: true, description: '출입구 유형 (main/side/emergency/staff)' },
-      { name: 'entrance_code', type: 'string', required: true, description: '출입구 코드' },
-      { name: 'door_type', type: 'string', required: false, description: '문 유형 (automatic/manual/revolving/sliding)' },
+      { name: 'entrance_id', type: 'string', required: true, description: '출입구 ID' },
+      { name: 'entrance_type', type: 'string', required: false, description: '유형 (main/side/emergency)' },
       { name: 'width_m', type: 'number', required: false, description: '너비 (미터)' },
-      { name: 'has_sensor', type: 'boolean', required: false, description: '센서 장착 여부' },
-      { name: 'has_security_gate', type: 'boolean', required: false, description: '보안 게이트 여부' },
-      { name: 'accessibility_compliant', type: 'boolean', required: false, description: '장애인 접근성 준수 여부' }
+      { name: 'is_primary', type: 'boolean', required: false, description: '메인 출입구 여부' }
     ]
   },
   {
     name: 'CheckoutCounter',
     label: '계산대',
-    description: '고객 결제를 처리하는 계산대',
+    description: '고객 결제 처리 계산대',
     icon: 'CreditCard',
     color: '#ef4444',
     model_3d_type: 'furniture',
-    model_3d_dimensions: { width: 1.5, height: 1.0, depth: 0.8 },
-    model_3d_metadata: {
-      has_pos: true,
-      has_scale: false,
-      payment_methods: ['card', 'cash', 'mobile']
-    },
+    model_3d_dimensions: { width: 1.5, height: 1, depth: 0.8 },
     properties: [
-      { name: 'counter_code', type: 'string', required: true, description: '계산대 코드' },
-      { name: 'counter_type', type: 'string', required: false, description: '계산대 유형 (regular/express/self_checkout)' },
-      { name: 'lane_number', type: 'number', required: false, description: '레인 번호' },
-      { name: 'has_conveyor', type: 'boolean', required: false, description: '컨베이어 벨트 장착 여부' },
-      { name: 'payment_terminals', type: 'array', required: false, description: '결제 단말기 목록' },
-      { name: 'max_queue_length', type: 'number', required: false, description: '최대 대기 줄 길이' }
+      { name: 'counter_id', type: 'string', required: true, description: '계산대 ID' },
+      { name: 'counter_number', type: 'number', required: true, description: '계산대 번호' },
+      { name: 'has_pos_terminal', type: 'boolean', required: false, description: 'POS 단말기 보유' },
+      { name: 'supports_mobile_payment', type: 'boolean', required: false, description: '모바일 결제 지원' },
+      { name: 'is_express_lane', type: 'boolean', required: false, description: '익스프레스 레인' }
     ]
   },
+
+  // 3. 제품 관련 (5개)
+  {
+    name: 'Category',
+    label: '카테고리',
+    description: '제품 카테고리',
+    icon: 'FolderTree',
+    color: '#06b6d4',
+    model_3d_type: null,
+    properties: [
+      { name: 'category_id', type: 'string', required: true, description: '카테고리 ID' },
+      { name: 'category_name', type: 'string', required: true, description: '카테고리명' },
+      { name: 'parent_category_id', type: 'string', required: false, description: '상위 카테고리' },
+      { name: 'category_level', type: 'number', required: false, description: '계층 레벨 (1/2/3)' },
+      { name: 'display_order', type: 'number', required: false, description: '표시 순서' }
+    ]
+  },
+  {
+    name: 'Product',
+    label: '제품',
+    description: '판매 제품',
+    icon: 'Package',
+    color: '#f97316',
+    model_3d_type: 'product',
+    model_3d_dimensions: { width: 0.1, height: 0.2, depth: 0.1 },
+    properties: [
+      { name: 'sku', type: 'string', required: true, description: 'SKU' },
+      { name: 'product_name', type: 'string', required: true, description: '제품명' },
+      { name: 'category_id', type: 'string', required: true, description: '카테고리 ID' },
+      { name: 'brand', type: 'string', required: false, description: '브랜드' },
+      { name: 'selling_price', type: 'number', required: true, description: '판매가' },
+      { name: 'cost_price', type: 'number', required: false, description: '원가' },
+      { name: 'supplier', type: 'string', required: false, description: '공급업체' },
+      { name: 'lead_time_days', type: 'number', required: false, description: '리드타임 (일)' }
+    ]
+  },
+  {
+    name: 'Inventory',
+    label: '재고',
+    description: '제품 재고',
+    icon: 'Archive',
+    color: '#78716c',
+    model_3d_type: null,
+    properties: [
+      { name: 'inventory_id', type: 'string', required: true, description: '재고 ID' },
+      { name: 'product_id', type: 'string', required: true, description: '제품 ID' },
+      { name: 'store_id', type: 'string', required: true, description: '매장 ID' },
+      { name: 'current_stock', type: 'number', required: true, description: '현재 재고' },
+      { name: 'minimum_stock', type: 'number', required: true, description: '최소 재고' },
+      { name: 'optimal_stock', type: 'number', required: true, description: '최적 재고' },
+      { name: 'weekly_demand', type: 'number', required: false, description: '주간 수요' },
+      { name: 'last_updated', type: 'string', required: false, description: '최종 업데이트' }
+    ]
+  },
+  {
+    name: 'Brand',
+    label: '브랜드',
+    description: '제품 브랜드',
+    icon: 'Award',
+    color: '#a855f7',
+    model_3d_type: null,
+    properties: [
+      { name: 'brand_id', type: 'string', required: true, description: '브랜드 ID' },
+      { name: 'brand_name', type: 'string', required: true, description: '브랜드명' },
+      { name: 'brand_tier', type: 'string', required: false, description: '브랜드 등급 (luxury/premium/standard/value)' },
+      { name: 'origin_country', type: 'string', required: false, description: '원산지' }
+    ]
+  },
+  {
+    name: 'Promotion',
+    label: '프로모션',
+    description: '마케팅 프로모션',
+    icon: 'Tag',
+    color: '#ec4899',
+    model_3d_type: null,
+    properties: [
+      { name: 'promotion_id', type: 'string', required: true, description: '프로모션 ID' },
+      { name: 'promotion_name', type: 'string', required: true, description: '프로모션명' },
+      { name: 'promotion_type', type: 'string', required: false, description: '유형 (discount/bogo/bundle/seasonal)' },
+      { name: 'start_date', type: 'string', required: true, description: '시작일' },
+      { name: 'end_date', type: 'string', required: true, description: '종료일' },
+      { name: 'discount_rate', type: 'number', required: false, description: '할인율' },
+      { name: 'target_products', type: 'array', required: false, description: '대상 제품 목록' },
+      { name: 'target_zones', type: 'array', required: false, description: '대상 구역 목록' }
+    ]
+  },
+
+  // 4. 고객/거래 (4개)
+  {
+    name: 'Customer',
+    label: '고객',
+    description: '고객 정보',
+    icon: 'User',
+    color: '#22c55e',
+    model_3d_type: null,
+    properties: [
+      { name: 'customer_id', type: 'string', required: true, description: '고객 ID' },
+      { name: 'age_group', type: 'string', required: false, description: '연령대 (10s/20s/30s/40s/50s/60s+)' },
+      { name: 'gender', type: 'string', required: false, description: '성별 (male/female/other)' },
+      { name: 'customer_segment', type: 'string', required: false, description: '고객 세그먼트 (VIP/regular/new/lapsed)' },
+      { name: 'signup_date', type: 'string', required: false, description: '가입일' },
+      { name: 'loyalty_tier', type: 'string', required: false, description: '로열티 등급 (platinum/gold/silver/bronze)' },
+      { name: 'total_purchases', type: 'number', required: false, description: '누적 구매액' },
+      { name: 'visit_frequency', type: 'string', required: false, description: '방문 빈도 (high/medium/low)' }
+    ]
+  },
+  {
+    name: 'Visit',
+    label: '방문',
+    description: '고객 매장 방문',
+    icon: 'UserCheck',
+    color: '#14b8a6',
+    model_3d_type: null,
+    properties: [
+      { name: 'visit_id', type: 'string', required: true, description: '방문 ID' },
+      { name: 'customer_id', type: 'string', required: true, description: '고객 ID' },
+      { name: 'store_id', type: 'string', required: true, description: '매장 ID' },
+      { name: 'visit_date', type: 'string', required: true, description: '방문일' },
+      { name: 'visit_time', type: 'string', required: true, description: '방문시간' },
+      { name: 'duration_minutes', type: 'number', required: false, description: '체류 시간 (분)' },
+      { name: 'zones_visited', type: 'array', required: false, description: '방문 구역 목록' },
+      { name: 'did_purchase', type: 'boolean', required: false, description: '구매 여부' },
+      { name: 'entry_point', type: 'string', required: false, description: '입구 ID' }
+    ]
+  },
+  {
+    name: 'Transaction',
+    label: '거래',
+    description: '판매 거래',
+    icon: 'Receipt',
+    color: '#dc2626',
+    model_3d_type: null,
+    properties: [
+      { name: 'transaction_id', type: 'string', required: true, description: '거래 ID' },
+      { name: 'customer_id', type: 'string', required: false, description: '고객 ID (비회원 null)' },
+      { name: 'store_id', type: 'string', required: true, description: '매장 ID' },
+      { name: 'transaction_date', type: 'string', required: true, description: '거래일' },
+      { name: 'transaction_time', type: 'string', required: true, description: '거래시간' },
+      { name: 'total_amount', type: 'number', required: true, description: '총 금액' },
+      { name: 'payment_method', type: 'string', required: false, description: '결제 방법 (cash/card/mobile/mixed)' },
+      { name: 'discount_amount', type: 'number', required: false, description: '할인 금액' },
+      { name: 'num_items', type: 'number', required: false, description: '구매 품목 수' },
+      { name: 'products_purchased', type: 'array', required: false, description: '구매 제품 목록' },
+      { name: 'counter_id', type: 'string', required: false, description: '계산대 ID' }
+    ]
+  },
+  {
+    name: 'Purchase',
+    label: '구매',
+    description: '개별 제품 구매 라인',
+    icon: 'ShoppingBag',
+    color: '#f59e0b',
+    model_3d_type: null,
+    properties: [
+      { name: 'purchase_id', type: 'string', required: true, description: '구매 ID' },
+      { name: 'transaction_id', type: 'string', required: true, description: '거래 ID' },
+      { name: 'product_id', type: 'string', required: true, description: '제품 ID' },
+      { name: 'quantity', type: 'number', required: true, description: '수량' },
+      { name: 'unit_price', type: 'number', required: true, description: '단가' },
+      { name: 'subtotal', type: 'number', required: true, description: '소계' },
+      { name: 'discount_applied', type: 'number', required: false, description: '적용 할인' }
+    ]
+  },
+
+  // 5. 직원/운영 (2개)
+  {
+    name: 'Staff',
+    label: '직원',
+    description: '매장 직원',
+    icon: 'Users',
+    color: '#6366f1',
+    model_3d_type: null,
+    properties: [
+      { name: 'staff_id', type: 'string', required: true, description: '직원 ID' },
+      { name: 'staff_name', type: 'string', required: true, description: '직원명' },
+      { name: 'role', type: 'string', required: true, description: '역할 (manager/sales/stockist/security)' },
+      { name: 'store_id', type: 'string', required: true, description: '소속 매장' },
+      { name: 'hire_date', type: 'string', required: false, description: '입사일' },
+      { name: 'employment_type', type: 'string', required: false, description: '고용 유형 (full_time/part_time/contract)' }
+    ]
+  },
+  {
+    name: 'Shift',
+    label: '근무 시간',
+    description: '직원 근무 시간',
+    icon: 'Clock',
+    color: '#84cc16',
+    model_3d_type: null,
+    properties: [
+      { name: 'shift_id', type: 'string', required: true, description: '근무 ID' },
+      { name: 'staff_id', type: 'string', required: true, description: '직원 ID' },
+      { name: 'shift_date', type: 'string', required: true, description: '근무일' },
+      { name: 'start_time', type: 'string', required: true, description: '시작 시간' },
+      { name: 'end_time', type: 'string', required: true, description: '종료 시간' },
+      { name: 'shift_type', type: 'string', required: false, description: '근무 유형 (morning/afternoon/evening/night)' }
+    ]
+  },
+
+  // 6. IoT/센서 (1개)
+  {
+    name: 'WiFiSensor',
+    label: 'WiFi 센서',
+    description: 'WiFi 신호 감지 센서',
+    icon: 'Wifi',
+    color: '#7c3aed',
+    model_3d_type: 'device',
+    model_3d_dimensions: { width: 0.2, height: 0.15, depth: 0.05 },
+    properties: [
+      { name: 'sensor_id', type: 'string', required: true, description: '센서 ID' },
+      { name: 'zone_id', type: 'string', required: true, description: '설치 구역' },
+      { name: 'mac_address', type: 'string', required: false, description: 'MAC 주소' },
+      { name: 'detection_range_m', type: 'number', required: false, description: '탐지 범위 (미터)' },
+      { name: 'status', type: 'string', required: false, description: '상태 (active/inactive/maintenance)' }
+    ]
+  },
+
+  // ==========================================
+  // 🟡 HIGH (고우선순위) - 12개
+  // ==========================================
+  
+  // 7. 외부 컨텍스트 (3개)
+  {
+    name: 'Weather',
+    label: '날씨',
+    description: '날씨 데이터',
+    icon: 'Cloud',
+    color: '#38bdf8',
+    model_3d_type: null,
+    properties: [
+      { name: 'weather_id', type: 'string', required: true, description: '날씨 ID' },
+      { name: 'date', type: 'string', required: true, description: '날짜' },
+      { name: 'store_id', type: 'string', required: true, description: '매장 ID' },
+      { name: 'condition', type: 'string', required: false, description: '날씨 상태 (sunny/cloudy/rainy/snowy)' },
+      { name: 'temperature_c', type: 'number', required: false, description: '기온 (섭씨)' },
+      { name: 'precipitation_mm', type: 'number', required: false, description: '강수량 (mm)' },
+      { name: 'is_extreme', type: 'boolean', required: false, description: '극한 날씨 여부' }
+    ]
+  },
+  {
+    name: 'Holiday',
+    label: '공휴일',
+    description: '공휴일 및 이벤트',
+    icon: 'Calendar',
+    color: '#fb923c',
+    model_3d_type: null,
+    properties: [
+      { name: 'holiday_id', type: 'string', required: true, description: '공휴일 ID' },
+      { name: 'date', type: 'string', required: true, description: '날짜' },
+      { name: 'holiday_name', type: 'string', required: true, description: '공휴일명' },
+      { name: 'holiday_type', type: 'string', required: false, description: '유형 (national/religious/commercial/regional)' },
+      { name: 'region', type: 'string', required: false, description: '지역 (전국/지역)' },
+      { name: 'impact_level', type: 'string', required: false, description: '영향도 (high/medium/low)' }
+    ]
+  },
+  {
+    name: 'EconomicIndicator',
+    label: '경제 지표',
+    description: '거시경제 지표',
+    icon: 'TrendingUp',
+    color: '#10b981',
+    model_3d_type: null,
+    properties: [
+      { name: 'indicator_id', type: 'string', required: true, description: '지표 ID' },
+      { name: 'date', type: 'string', required: true, description: '날짜' },
+      { name: 'indicator_type', type: 'string', required: false, description: '지표 유형 (cpi/unemployment/consumer_confidence)' },
+      { name: 'indicator_value', type: 'number', required: false, description: '지표 값' },
+      { name: 'region', type: 'string', required: false, description: '지역' },
+      { name: 'data_source', type: 'string', required: false, description: '데이터 출처' }
+    ]
+  },
+
+  // 8. 공간 구조 (3개)
   {
     name: 'Aisle',
     label: '통로',
@@ -177,200 +379,353 @@ export const COMPREHENSIVE_ENTITY_TYPES = [
     color: '#22c55e',
     model_3d_type: 'zone',
     model_3d_dimensions: { width: 1.5, height: 3, depth: 10 },
-    model_3d_metadata: {
-      pathflow_enabled: true,
-      traffic_direction: 'bidirectional'
-    },
     properties: [
       { name: 'aisle_code', type: 'string', required: true, description: '통로 코드' },
       { name: 'aisle_type', type: 'string', required: false, description: '통로 유형 (main/secondary/crossover)' },
       { name: 'width_m', type: 'number', required: true, description: '통로 너비 (미터)' },
       { name: 'length_m', type: 'number', required: true, description: '통로 길이 (미터)' },
-      { name: 'direction', type: 'string', required: false, description: '통행 방향 (bidirectional/oneway)' },
-      { name: 'flooring_type', type: 'string', required: false, description: '바닥재 유형' }
+      { name: 'connects_zones', type: 'array', required: false, description: '연결 구역 목록' }
     ]
   },
   {
     name: 'FittingRoom',
     label: '탈의실',
-    description: '고객이 의류를 착용해보는 공간',
-    icon: 'User',
+    description: '의류 착용 공간',
+    icon: 'Shirt',
     color: '#a855f7',
     model_3d_type: 'room',
     model_3d_dimensions: { width: 1.2, height: 2.5, depth: 1.5 },
-    model_3d_metadata: {
-      has_mirror: true,
-      has_seating: true,
-      privacy_level: 'high'
-    },
     properties: [
-      { name: 'room_code', type: 'string', required: true, description: '탈의실 코드' },
-      { name: 'occupancy_status', type: 'string', required: false, description: '점유 상태 (available/occupied/cleaning)' },
-      { name: 'has_smart_mirror', type: 'boolean', required: false, description: '스마트 미러 장착 여부' },
-      { name: 'max_items_allowed', type: 'number', required: false, description: '최대 반입 가능 아이템 수' },
-      { name: 'accessibility_features', type: 'array', required: false, description: '접근성 기능 목록' }
+      { name: 'fitting_room_id', type: 'string', required: true, description: '탈의실 ID' },
+      { name: 'zone_id', type: 'string', required: true, description: '소속 구역' },
+      { name: 'size_category', type: 'string', required: false, description: '크기 (small/medium/large)' },
+      { name: 'has_mirror', type: 'boolean', required: false, description: '거울 여부' },
+      { name: 'occupancy_sensor', type: 'boolean', required: false, description: '점유 센서' }
     ]
   },
   {
     name: 'StorageRoom',
     label: '창고',
     description: '재고 보관 공간',
-    icon: 'Package',
+    icon: 'Warehouse',
     color: '#78716c',
     model_3d_type: 'room',
     model_3d_dimensions: { width: 4, height: 3, depth: 5 },
-    model_3d_metadata: {
-      access_restricted: true,
-      temperature_controlled: false
-    },
     properties: [
-      { name: 'room_code', type: 'string', required: true, description: '창고 코드' },
-      { name: 'storage_type', type: 'string', required: false, description: '보관 유형 (dry/refrigerated/frozen/hazardous)' },
-      { name: 'capacity_cubic_m', type: 'number', required: false, description: '보관 용적 (세제곱미터)' },
-      { name: 'temperature_range', type: 'string', required: false, description: '온도 범위 (섭씨)' },
-      { name: 'humidity_range', type: 'string', required: false, description: '습도 범위 (%)' },
-      { name: 'security_level', type: 'string', required: false, description: '보안 레벨' }
-    ]
-  },
-  {
-    name: 'Window',
-    label: '창문',
-    description: '매장의 창문 및 유리면',
-    icon: 'Maximize2',
-    color: '#38bdf8',
-    model_3d_type: 'structure',
-    model_3d_dimensions: { width: 2, height: 2, depth: 0.05 },
-    model_3d_metadata: {
-      is_display_window: true,
-      tint_level: 0.3
-    },
-    properties: [
-      { name: 'window_code', type: 'string', required: true, description: '창문 코드' },
-      { name: 'window_type', type: 'string', required: false, description: '창문 유형 (display/skylight/standard/bay)' },
-      { name: 'glass_type', type: 'string', required: false, description: '유리 유형 (single/double/tempered)' },
-      { name: 'area_sqm', type: 'number', required: false, description: '면적 (제곱미터)' },
-      { name: 'tint_percentage', type: 'number', required: false, description: '틴팅 비율 (%)' },
-      { name: 'uv_protection', type: 'boolean', required: false, description: 'UV 차단 여부' }
+      { name: 'storage_id', type: 'string', required: true, description: '창고 ID' },
+      { name: 'storage_type', type: 'string', required: false, description: '보관 유형 (backstock/cold/hazmat)' },
+      { name: 'capacity_cbm', type: 'number', required: false, description: '용량 (세제곱미터)' },
+      { name: 'current_utilization', type: 'number', required: false, description: '사용률 (%)' }
     ]
   },
 
-  // ==========================================
-  // 2. 디지털/IoT 장비 (Digital & IoT Equipment)
-  // ==========================================
+  // 9. 가구/집기 (3개)
   {
-    name: 'Sensor',
-    label: '센서',
-    description: '환경 및 활동 감지 센서',
-    icon: 'Radio',
-    color: '#14b8a6',
-    model_3d_type: 'device',
-    model_3d_dimensions: { width: 0.1, height: 0.1, depth: 0.05 },
-    model_3d_metadata: {
-      wireless: true,
-      battery_powered: true,
-      data_frequency_hz: 1
-    },
+    name: 'Shelf',
+    label: '선반',
+    description: '상품 진열 선반',
+    icon: 'Layers',
+    color: '#3b82f6',
+    model_3d_type: 'furniture',
+    model_3d_dimensions: { width: 1.2, height: 2, depth: 0.4 },
     properties: [
-      { name: 'sensor_type', type: 'string', required: true, description: '센서 유형 (traffic/temperature/humidity/motion/proximity/occupancy)' },
-      { name: 'sensor_id', type: 'string', required: true, description: '센서 ID' },
-      { name: 'manufacturer', type: 'string', required: false, description: '제조사' },
-      { name: 'model_number', type: 'string', required: false, description: '모델 번호' },
-      { name: 'measurement_unit', type: 'string', required: false, description: '측정 단위' },
-      { name: 'sampling_rate_sec', type: 'number', required: false, description: '샘플링 주기 (초)' },
-      { name: 'accuracy', type: 'string', required: false, description: '정확도' },
-      { name: 'battery_level', type: 'number', required: false, description: '배터리 잔량 (%)' }
+      { name: 'shelf_id', type: 'string', required: true, description: '선반 ID' },
+      { name: 'zone_id', type: 'string', required: true, description: '소속 구역' },
+      { name: 'shelf_type', type: 'string', required: false, description: '선반 유형 (wall/gondola/endcap)' },
+      { name: 'num_levels', type: 'number', required: false, description: '단 수' },
+      { name: 'width_m', type: 'number', required: false, description: '너비 (미터)' },
+      { name: 'height_m', type: 'number', required: false, description: '높이 (미터)' },
+      { name: 'max_load_kg', type: 'number', required: false, description: '최대 하중 (kg)' }
     ]
   },
   {
+    name: 'Rack',
+    label: '랙',
+    description: '의류 걸이 랙',
+    icon: 'Minimize2',
+    color: '#06b6d4',
+    model_3d_type: 'furniture',
+    model_3d_dimensions: { width: 1.2, height: 1.8, depth: 0.5 },
+    properties: [
+      { name: 'rack_id', type: 'string', required: true, description: '랙 ID' },
+      { name: 'zone_id', type: 'string', required: true, description: '소속 구역' },
+      { name: 'rack_type', type: 'string', required: false, description: '랙 유형 (round/straight/4way)' },
+      { name: 'capacity_units', type: 'number', required: false, description: '수용 용량' },
+      { name: 'has_casters', type: 'boolean', required: false, description: '바퀴 여부' }
+    ]
+  },
+  {
+    name: 'DisplayTable',
+    label: '디스플레이 테이블',
+    description: '상품 진열 테이블',
+    icon: 'Table',
+    color: '#8b5cf6',
+    model_3d_type: 'furniture',
+    model_3d_dimensions: { width: 1.5, height: 0.9, depth: 1 },
+    properties: [
+      { name: 'table_id', type: 'string', required: true, description: '테이블 ID' },
+      { name: 'zone_id', type: 'string', required: true, description: '소속 구역' },
+      { name: 'table_shape', type: 'string', required: false, description: '형태 (rectangular/round/square)' },
+      { name: 'width_m', type: 'number', required: false, description: '너비 (미터)' },
+      { name: 'length_m', type: 'number', required: false, description: '길이 (미터)' }
+    ]
+  },
+
+  // 10. 제품 관련 (1개)
+  {
+    name: 'Supplier',
+    label: '공급업체',
+    description: '제품 공급업체',
+    icon: 'Truck',
+    color: '#059669',
+    model_3d_type: null,
+    properties: [
+      { name: 'supplier_id', type: 'string', required: true, description: '공급업체 ID' },
+      { name: 'supplier_name', type: 'string', required: true, description: '공급업체명' },
+      { name: 'contact_person', type: 'string', required: false, description: '담당자' },
+      { name: 'email', type: 'string', required: false, description: '이메일' },
+      { name: 'phone', type: 'string', required: false, description: '전화번호' },
+      { name: 'lead_time_days', type: 'number', required: false, description: '리드타임 (일)' },
+      { name: 'reliability_score', type: 'number', required: false, description: '신뢰도 점수 (0-100)' }
+    ]
+  },
+
+  // 11. IoT/센서 (2개)
+  {
     name: 'Camera',
     label: '카메라',
-    description: 'CCTV 및 비전 분석 카메라',
+    description: 'CCTV 카메라',
     icon: 'Video',
     color: '#dc2626',
     model_3d_type: 'device',
     model_3d_dimensions: { width: 0.15, height: 0.15, depth: 0.2 },
-    model_3d_metadata: {
-      resolution: '4K',
-      field_of_view_degrees: 110,
-      has_ai: true
-    },
     properties: [
-      { name: 'camera_type', type: 'string', required: true, description: '카메라 유형 (fixed/ptz/dome/bullet)' },
       { name: 'camera_id', type: 'string', required: true, description: '카메라 ID' },
-      { name: 'resolution', type: 'string', required: false, description: '해상도 (1080p/4K/8K)' },
-      { name: 'fps', type: 'number', required: false, description: '프레임 레이트' },
-      { name: 'field_of_view', type: 'number', required: false, description: '화각 (도)' },
-      { name: 'has_night_vision', type: 'boolean', required: false, description: '야간 촬영 기능' },
-      { name: 'ai_features', type: 'array', required: false, description: 'AI 기능 목록 (face_detection/people_counting/heatmap)' },
-      { name: 'recording_enabled', type: 'boolean', required: false, description: '녹화 활성화 여부' }
+      { name: 'zone_id', type: 'string', required: true, description: '설치 구역' },
+      { name: 'camera_type', type: 'string', required: false, description: '카메라 유형 (fixed/ptz/dome)' },
+      { name: 'resolution', type: 'string', required: false, description: '해상도 (1080p/4K)' },
+      { name: 'has_night_vision', type: 'boolean', required: false, description: '야간 촬영' },
+      { name: 'ai_features', type: 'array', required: false, description: 'AI 기능 (face_detection/people_counting)' }
     ]
   },
   {
     name: 'Beacon',
     label: '비콘',
-    description: 'Bluetooth 비콘 장치',
-    icon: 'Wifi',
+    description: 'Bluetooth 비콘',
+    icon: 'Bluetooth',
     color: '#2563eb',
     model_3d_type: 'device',
     model_3d_dimensions: { width: 0.05, height: 0.05, depth: 0.02 },
-    model_3d_metadata: {
-      protocol: 'BLE',
-      range_meters: 30,
-      battery_life_months: 12
-    },
     properties: [
       { name: 'beacon_id', type: 'string', required: true, description: '비콘 ID' },
+      { name: 'zone_id', type: 'string', required: true, description: '설치 구역' },
       { name: 'uuid', type: 'string', required: false, description: 'UUID' },
-      { name: 'major', type: 'number', required: false, description: 'Major 값' },
-      { name: 'minor', type: 'number', required: false, description: 'Minor 값' },
       { name: 'tx_power', type: 'number', required: false, description: '송신 출력 (dBm)' },
-      { name: 'advertising_interval_ms', type: 'number', required: false, description: '광고 주기 (ms)' },
+      { name: 'battery_level', type: 'number', required: false, description: '배터리 잔량 (%)' }
+    ]
+  },
+
+  // ==========================================
+  // 🟠 MEDIUM (중우선순위) - 9개
+  // ==========================================
+  
+  // 12. 시계열 집계 (3개)
+  {
+    name: 'DailySales',
+    label: '일간 매출',
+    description: '일간 매출 집계',
+    icon: 'BarChart3',
+    color: '#f59e0b',
+    model_3d_type: null,
+    properties: [
+      { name: 'daily_sales_id', type: 'string', required: true, description: '일간 매출 ID' },
+      { name: 'store_id', type: 'string', required: true, description: '매장 ID' },
+      { name: 'date', type: 'string', required: true, description: '날짜' },
+      { name: 'total_revenue', type: 'number', required: false, description: '총 매출' },
+      { name: 'total_transactions', type: 'number', required: false, description: '거래 건수' },
+      { name: 'total_customers', type: 'number', required: false, description: '고객 수' },
+      { name: 'avg_basket_size', type: 'number', required: false, description: '평균 구매액' },
+      { name: 'top_category', type: 'string', required: false, description: '최다 판매 카테고리' }
+    ]
+  },
+  {
+    name: 'InventoryHistory',
+    label: '재고 이력',
+    description: '재고 변동 이력',
+    icon: 'History',
+    color: '#78716c',
+    model_3d_type: null,
+    properties: [
+      { name: 'history_id', type: 'string', required: true, description: '이력 ID' },
+      { name: 'product_id', type: 'string', required: true, description: '제품 ID' },
+      { name: 'store_id', type: 'string', required: true, description: '매장 ID' },
+      { name: 'recorded_at', type: 'string', required: true, description: '기록 시간' },
+      { name: 'stock_level', type: 'number', required: false, description: '재고 수량' },
+      { name: 'stock_change', type: 'number', required: false, description: '변화량 (+/-)' },
+      { name: 'change_reason', type: 'string', required: false, description: '변동 사유 (sale/restock/return/adjustment)' }
+    ]
+  },
+  {
+    name: 'ZonePerformance',
+    label: '구역 성과',
+    description: '구역별 성과 지표',
+    icon: 'Target',
+    color: '#10b981',
+    model_3d_type: null,
+    properties: [
+      { name: 'performance_id', type: 'string', required: true, description: '성과 ID' },
+      { name: 'zone_id', type: 'string', required: true, description: '구역 ID' },
+      { name: 'date', type: 'string', required: true, description: '날짜' },
+      { name: 'total_visits', type: 'number', required: false, description: '방문 수' },
+      { name: 'avg_dwell_time', type: 'number', required: false, description: '평균 체류 시간' },
+      { name: 'conversion_rate', type: 'number', required: false, description: '전환율' },
+      { name: 'revenue_generated', type: 'number', required: false, description: '발생 매출' }
+    ]
+  },
+
+  // 13. 운영/직원 (1개)
+  {
+    name: 'Task',
+    label: '작업',
+    description: '직원 작업 태스크',
+    icon: 'CheckSquare',
+    color: '#6366f1',
+    model_3d_type: null,
+    properties: [
+      { name: 'task_id', type: 'string', required: true, description: '작업 ID' },
+      { name: 'staff_id', type: 'string', required: true, description: '직원 ID' },
+      { name: 'task_name', type: 'string', required: true, description: '작업명' },
+      { name: 'task_type', type: 'string', required: false, description: '작업 유형 (restock/cleaning/display/customer_service)' },
+      { name: 'priority', type: 'string', required: false, description: '우선순위 (high/medium/low)' },
+      { name: 'status', type: 'string', required: false, description: '상태 (pending/in_progress/completed)' },
+      { name: 'due_time', type: 'string', required: false, description: '마감 시간' }
+    ]
+  },
+
+  // 14. IoT/센서 (4개)
+  {
+    name: 'PeopleCounter',
+    label: '인원 카운터',
+    description: '출입 인원 카운터',
+    icon: 'Users2',
+    color: '#22c55e',
+    model_3d_type: 'device',
+    model_3d_dimensions: { width: 0.1, height: 0.1, depth: 0.05 },
+    properties: [
+      { name: 'counter_id', type: 'string', required: true, description: '카운터 ID' },
+      { name: 'entrance_id', type: 'string', required: true, description: '출입구 ID' },
+      { name: 'technology', type: 'string', required: false, description: '기술 (thermal/stereo/3D)' },
+      { name: 'accuracy_rate', type: 'number', required: false, description: '정확도' },
+      { name: 'bidirectional', type: 'boolean', required: false, description: '양방향 감지' }
+    ]
+  },
+  {
+    name: 'DoorSensor',
+    label: '도어 센서',
+    description: '출입문 센서',
+    icon: 'DoorClosed',
+    color: '#f97316',
+    model_3d_type: 'device',
+    model_3d_dimensions: { width: 0.05, height: 0.1, depth: 0.02 },
+    properties: [
+      { name: 'sensor_id', type: 'string', required: true, description: '센서 ID' },
+      { name: 'entrance_id', type: 'string', required: true, description: '출입구 ID' },
+      { name: 'sensor_type', type: 'string', required: false, description: '센서 유형 (magnetic/infrared)' },
       { name: 'battery_level', type: 'number', required: false, description: '배터리 잔량 (%)' }
     ]
   },
   {
-    name: 'WiFiProbe',
-    label: 'WiFi 프로브',
-    description: 'WiFi 신호 감지 장치',
-    icon: 'WifiIcon',
-    color: '#7c3aed',
+    name: 'TemperatureSensor',
+    label: '온도 센서',
+    description: '온도 측정 센서',
+    icon: 'Thermometer',
+    color: '#ef4444',
     model_3d_type: 'device',
-    model_3d_dimensions: { width: 0.2, height: 0.15, depth: 0.05 },
-    model_3d_metadata: {
-      detection_range_meters: 50,
-      supports_5ghz: true
-    },
+    model_3d_dimensions: { width: 0.05, height: 0.1, depth: 0.03 },
     properties: [
-      { name: 'probe_id', type: 'string', required: true, description: '프로브 ID' },
-      { name: 'mac_address', type: 'string', required: false, description: 'MAC 주소' },
-      { name: 'detection_range_m', type: 'number', required: false, description: '감지 범위 (미터)' },
-      { name: 'frequency_bands', type: 'array', required: false, description: '주파수 대역 (2.4GHz/5GHz)' },
-      { name: 'scan_interval_sec', type: 'number', required: false, description: '스캔 주기 (초)' }
+      { name: 'sensor_id', type: 'string', required: true, description: '센서 ID' },
+      { name: 'zone_id', type: 'string', required: true, description: '설치 구역' },
+      { name: 'current_temp_c', type: 'number', required: false, description: '현재 온도 (섭씨)' },
+      { name: 'min_range_c', type: 'number', required: false, description: '최소 범위' },
+      { name: 'max_range_c', type: 'number', required: false, description: '최대 범위' }
     ]
   },
   {
-    name: 'DigitalSignage',
-    label: '디지털 사이니지',
-    description: '디지털 디스플레이 광고판',
-    icon: 'Monitor',
-    color: '#f97316',
+    name: 'HumiditySensor',
+    label: '습도 센서',
+    description: '습도 측정 센서',
+    icon: 'Droplets',
+    color: '#06b6d4',
     model_3d_type: 'device',
-    model_3d_dimensions: { width: 1.2, height: 0.7, depth: 0.1 },
-    model_3d_metadata: {
-      screen_size_inch: 55,
-      orientation: 'landscape',
-      interactive: false
-    },
+    model_3d_dimensions: { width: 0.05, height: 0.1, depth: 0.03 },
     properties: [
-      { name: 'signage_id', type: 'string', required: true, description: '사이니지 ID' },
-      { name: 'screen_size_inch', type: 'number', required: false, description: '화면 크기 (인치)' },
-      { name: 'resolution', type: 'string', required: false, description: '해상도' },
-      { name: 'orientation', type: 'string', required: false, description: '방향 (landscape/portrait)' },
-      { name: 'is_touchscreen', type: 'boolean', required: false, description: '터치스크린 여부' },
-      { name: 'content_source', type: 'string', required: false, description: '콘텐츠 소스 URL' },
-      { name: 'brightness_nits', type: 'number', required: false, description: '밝기 (nits)' }
+      { name: 'sensor_id', type: 'string', required: true, description: '센서 ID' },
+      { name: 'zone_id', type: 'string', required: true, description: '설치 구역' },
+      { name: 'current_humidity', type: 'number', required: false, description: '현재 습도 (%)' },
+      { name: 'accuracy', type: 'number', required: false, description: '정확도 (%)' }
     ]
   },
+
+  // 15. 시스템 (1개)
+  {
+    name: 'Alert',
+    label: '알림',
+    description: '시스템 알림',
+    icon: 'AlertTriangle',
+    color: '#f59e0b',
+    model_3d_type: null,
+    properties: [
+      { name: 'alert_id', type: 'string', required: true, description: '알림 ID' },
+      { name: 'alert_type', type: 'string', required: false, description: '알림 유형 (inventory_low/sensor_offline/unusual_traffic/security)' },
+      { name: 'severity', type: 'string', required: false, description: '심각도 (critical/high/medium/low)' },
+      { name: 'message', type: 'string', required: true, description: '메시지' },
+      { name: 'triggered_at', type: 'string', required: true, description: '발생 시간' },
+      { name: 'resolved', type: 'boolean', required: false, description: '해결 여부' },
+      { name: 'target_entity_type', type: 'string', required: false, description: '대상 엔티티 유형' },
+      { name: 'target_entity_id', type: 'string', required: false, description: '대상 엔티티 ID' }
+    ]
+  },
+
+  // ==========================================
+  // 🟢 LOW (저우선순위) - 5개
+  // ==========================================
+  
+  // 16. AI/분석 (2개)
+  {
+    name: 'DemandForecast',
+    label: '수요 예측',
+    description: 'AI 수요 예측',
+    icon: 'TrendingUp',
+    color: '#10b981',
+    model_3d_type: null,
+    properties: [
+      { name: 'forecast_id', type: 'string', required: true, description: '예측 ID' },
+      { name: 'product_id', type: 'string', required: true, description: '제품 ID' },
+      { name: 'forecast_date', type: 'string', required: true, description: '예측일' },
+      { name: 'forecast_period', type: 'string', required: false, description: '예측 기간 (daily/weekly/monthly)' },
+      { name: 'predicted_demand', type: 'number', required: false, description: '예측 수요량' },
+      { name: 'confidence_level', type: 'number', required: false, description: '신뢰도 (0-1)' },
+      { name: 'model_version', type: 'string', required: false, description: '모델 버전' }
+    ]
+  },
+  {
+    name: 'PriceOptimization',
+    label: '가격 최적화',
+    description: 'AI 가격 최적화',
+    icon: 'DollarSign',
+    color: '#84cc16',
+    model_3d_type: null,
+    properties: [
+      { name: 'optimization_id', type: 'string', required: true, description: '최적화 ID' },
+      { name: 'product_id', type: 'string', required: true, description: '제품 ID' },
+      { name: 'optimized_price', type: 'number', required: true, description: '최적 가격' },
+      { name: 'original_price', type: 'number', required: false, description: '원래 가격' },
+      { name: 'expected_revenue_impact', type: 'number', required: false, description: '예상 매출 영향' },
+      { name: 'optimization_reason', type: 'string', required: false, description: '최적화 사유' }
+    ]
+  },
+
+  // 17. 시스템 (3개)
   {
     name: 'POS',
     label: 'POS 단말기',
@@ -379,774 +734,845 @@ export const COMPREHENSIVE_ENTITY_TYPES = [
     color: '#059669',
     model_3d_type: 'device',
     model_3d_dimensions: { width: 0.3, height: 0.4, depth: 0.3 },
-    model_3d_metadata: {
-      has_printer: true,
-      has_scanner: true,
-      payment_methods: ['card', 'cash', 'mobile']
-    },
     properties: [
       { name: 'pos_id', type: 'string', required: true, description: 'POS ID' },
-      { name: 'terminal_number', type: 'string', required: false, description: '단말기 번호' },
-      { name: 'software_version', type: 'string', required: false, description: '소프트웨어 버전' },
-      { name: 'payment_processors', type: 'array', required: false, description: '결제 프로세서 목록' },
-      { name: 'peripherals', type: 'array', required: false, description: '주변 장치 (printer/scanner/scale/card_reader)' },
-      { name: 'cloud_connected', type: 'boolean', required: false, description: '클라우드 연결 여부' }
+      { name: 'counter_id', type: 'string', required: true, description: '계산대 ID' },
+      { name: 'pos_type', type: 'string', required: false, description: 'POS 유형 (fixed/mobile/kiosk)' },
+      { name: 'has_touchscreen', type: 'boolean', required: false, description: '터치스크린 여부' },
+      { name: 'os_version', type: 'string', required: false, description: 'OS 버전' }
     ]
   },
   {
-    name: 'Kiosk',
-    label: '키오스크',
-    description: '셀프서비스 키오스크',
-    icon: 'Tablet',
-    color: '#0891b2',
+    name: 'DigitalSignage',
+    label: '디지털 사이니지',
+    description: '디지털 광고 디스플레이',
+    icon: 'Monitor',
+    color: '#f97316',
     model_3d_type: 'device',
-    model_3d_dimensions: { width: 0.6, height: 1.6, depth: 0.5 },
-    model_3d_metadata: {
-      screen_size_inch: 24,
-      has_payment: true,
-      accessibility_features: ['audio', 'height_adjustable']
-    },
+    model_3d_dimensions: { width: 1.2, height: 0.7, depth: 0.1 },
     properties: [
-      { name: 'kiosk_id', type: 'string', required: true, description: '키오스크 ID' },
-      { name: 'kiosk_type', type: 'string', required: false, description: '키오스크 유형 (checkout/information/product_lookup/ordering)' },
-      { name: 'screen_size_inch', type: 'number', required: false, description: '화면 크기 (인치)' },
-      { name: 'has_payment_terminal', type: 'boolean', required: false, description: '결제 단말기 장착 여부' },
-      { name: 'has_printer', type: 'boolean', required: false, description: '프린터 장착 여부' },
-      { name: 'languages_supported', type: 'array', required: false, description: '지원 언어 목록' },
-      { name: 'accessibility_compliant', type: 'boolean', required: false, description: '접근성 준수 여부' }
-    ]
-  },
-  {
-    name: 'SmartMirror',
-    label: '스마트 미러',
-    description: '인터랙티브 스마트 미러',
-    icon: 'Frame',
-    color: '#e11d48',
-    model_3d_type: 'device',
-    model_3d_dimensions: { width: 0.6, height: 1.8, depth: 0.1 },
-    model_3d_metadata: {
-      has_camera: true,
-      has_ar: true,
-      virtual_try_on: true
-    },
-    properties: [
-      { name: 'mirror_id', type: 'string', required: true, description: '미러 ID' },
-      { name: 'display_size_inch', type: 'number', required: false, description: '디스플레이 크기 (인치)' },
-      { name: 'has_ar_tryonon', type: 'boolean', required: false, description: 'AR 가상 착용 기능' },
-      { name: 'has_camera', type: 'boolean', required: false, description: '카메라 장착 여부' },
-      { name: 'supported_features', type: 'array', required: false, description: '지원 기능 목록 (outfit_recommendation/size_suggestion/style_match)' }
-    ]
-  },
-
-  // ==========================================
-  // 3. 환경 시스템 (Environmental Systems)
-  // ==========================================
-  {
-    name: 'Lighting',
-    label: '조명',
-    description: '매장 조명 시스템',
-    icon: 'Lightbulb',
-    color: '#facc15',
-    model_3d_type: 'device',
-    model_3d_dimensions: { width: 0.3, height: 0.15, depth: 0.3 },
-    model_3d_metadata: {
-      light_type: 'LED',
-      dimmable: true,
-      color_temperature_k: 4000
-    },
-    properties: [
-      { name: 'lighting_id', type: 'string', required: true, description: '조명 ID' },
-      { name: 'light_type', type: 'string', required: false, description: '조명 유형 (LED/fluorescent/halogen/spotlight)' },
-      { name: 'wattage', type: 'number', required: false, description: '전력 소비량 (W)' },
-      { name: 'lumens', type: 'number', required: false, description: '광속 (lm)' },
-      { name: 'color_temperature_k', type: 'number', required: false, description: '색온도 (K)' },
-      { name: 'is_dimmable', type: 'boolean', required: false, description: '조광 가능 여부' },
-      { name: 'current_brightness', type: 'number', required: false, description: '현재 밝기 (%)' },
-      { name: 'color_rgb', type: 'string', required: false, description: 'RGB 색상 (스마트 조명)' },
-      { name: 'smart_control_enabled', type: 'boolean', required: false, description: '스마트 제어 가능 여부' }
+      { name: 'signage_id', type: 'string', required: true, description: '사이니지 ID' },
+      { name: 'zone_id', type: 'string', required: true, description: '설치 구역' },
+      { name: 'screen_size_inches', type: 'number', required: false, description: '화면 크기 (인치)' },
+      { name: 'content_type', type: 'string', required: false, description: '콘텐츠 유형 (ad/info/wayfinding)' },
+      { name: 'current_content', type: 'string', required: false, description: '현재 콘텐츠' }
     ]
   },
   {
     name: 'HVAC',
-    label: '냉난방 시스템',
-    description: '냉난방 공조 시스템',
+    label: 'HVAC 시스템',
+    description: '냉난방 시스템',
     icon: 'Wind',
-    color: '#06b6d4',
+    color: '#38bdf8',
     model_3d_type: 'device',
-    model_3d_dimensions: { width: 1.0, height: 0.5, depth: 0.8 },
-    model_3d_metadata: {
-      cooling_capacity_btu: 24000,
-      heating_capacity_btu: 20000,
-      energy_efficiency: 'A++'
-    },
+    model_3d_dimensions: { width: 1, height: 0.5, depth: 0.5 },
     properties: [
       { name: 'hvac_id', type: 'string', required: true, description: 'HVAC ID' },
-      { name: 'system_type', type: 'string', required: false, description: '시스템 유형 (split/ducted/vrf/chiller)' },
-      { name: 'cooling_capacity_btu', type: 'number', required: false, description: '냉방 용량 (BTU)' },
-      { name: 'heating_capacity_btu', type: 'number', required: false, description: '난방 용량 (BTU)' },
-      { name: 'target_temperature', type: 'number', required: false, description: '목표 온도 (섭씨)' },
-      { name: 'current_temperature', type: 'number', required: false, description: '현재 온도 (섭씨)' },
-      { name: 'humidity_control', type: 'boolean', required: false, description: '습도 제어 기능' },
-      { name: 'air_quality_monitoring', type: 'boolean', required: false, description: '공기질 모니터링' },
-      { name: 'energy_rating', type: 'string', required: false, description: '에너지 등급' }
+      { name: 'zone_id', type: 'string', required: true, description: '설치 구역' },
+      { name: 'system_type', type: 'string', required: false, description: '시스템 유형 (central/split/vrf)' },
+      { name: 'current_mode', type: 'string', required: false, description: '현재 모드 (cooling/heating/auto/off)' },
+      { name: 'target_temp_c', type: 'number', required: false, description: '목표 온도 (섭씨)' }
+    ]
+  }
+];
+
+export const COMPREHENSIVE_RELATION_TYPES = [
+  // ==========================================
+  // 🔴 CRITICAL (필수) - 25개
+  // ==========================================
+  
+  // 공간 관계
+  {
+    name: 'CONTAINS',
+    label: '포함',
+    description: '공간이 다른 공간/객체를 포함',
+    source_entity_type: 'Store',
+    target_entity_type: 'Zone',
+    directionality: 'directed',
+    properties: [
+      { name: 'spatial_relationship', type: 'string', required: false, description: '공간 관계' }
     ]
   },
   {
-    name: 'AudioSystem',
-    label: '음향 시스템',
-    description: '매장 음향 재생 시스템',
-    icon: 'Music',
-    color: '#8b5cf6',
-    model_3d_type: 'device',
-    model_3d_dimensions: { width: 0.4, height: 0.3, depth: 0.3 },
-    model_3d_metadata: {
-      max_zones: 4,
-      supports_streaming: true,
-      audio_format: 'stereo'
-    },
+    name: 'CONNECTED_TO',
+    label: '연결됨',
+    description: '공간이 다른 공간과 연결',
+    source_entity_type: 'Zone',
+    target_entity_type: 'Zone',
+    directionality: 'bidirectional',
     properties: [
-      { name: 'audio_system_id', type: 'string', required: true, description: '음향 시스템 ID' },
-      { name: 'system_type', type: 'string', required: false, description: '시스템 유형 (zone/distributed/pa)' },
-      { name: 'num_speakers', type: 'number', required: false, description: '스피커 개수' },
-      { name: 'total_power_watts', type: 'number', required: false, description: '총 출력 (W)' },
-      { name: 'current_volume', type: 'number', required: false, description: '현재 볼륨 (%)' },
-      { name: 'supports_zones', type: 'boolean', required: false, description: '구역별 제어 지원' },
-      { name: 'audio_sources', type: 'array', required: false, description: '오디오 소스 (streaming/radio/local)' },
-      { name: 'currently_playing', type: 'string', required: false, description: '현재 재생 중인 콘텐츠' }
+      { name: 'connection_type', type: 'string', required: false, description: '연결 유형' }
     ]
   },
   {
-    name: 'MusicPlaylist',
-    label: '음악 재생목록',
-    description: '매장 배경 음악 재생목록',
-    icon: 'ListMusic',
-    color: '#ec4899',
-    model_3d_type: null,
-    model_3d_dimensions: null,
-    model_3d_metadata: {},
+    name: 'HAS_ENTRANCE',
+    label: '출입구 보유',
+    description: '매장/구역이 출입구 보유',
+    source_entity_type: 'Store',
+    target_entity_type: 'Entrance',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'HAS_CHECKOUT',
+    label: '계산대 보유',
+    description: '구역이 계산대 보유',
+    source_entity_type: 'Zone',
+    target_entity_type: 'CheckoutCounter',
+    directionality: 'directed',
+    properties: []
+  },
+
+  // 상품 관계
+  {
+    name: 'BELONGS_TO_CATEGORY',
+    label: '카테고리 소속',
+    description: '제품이 카테고리에 소속',
+    source_entity_type: 'Product',
+    target_entity_type: 'Category',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'SOLD_BY',
+    label: '판매자',
+    description: '제품이 브랜드에 의해 판매됨',
+    source_entity_type: 'Product',
+    target_entity_type: 'Brand',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'IN_STOCK',
+    label: '재고 보유',
+    description: '매장이 제품 재고 보유',
+    source_entity_type: 'Store',
+    target_entity_type: 'Inventory',
+    directionality: 'directed',
     properties: [
-      { name: 'playlist_id', type: 'string', required: true, description: '재생목록 ID' },
-      { name: 'playlist_name', type: 'string', required: true, description: '재생목록 이름' },
-      { name: 'genre', type: 'string', required: false, description: '장르' },
-      { name: 'mood', type: 'string', required: false, description: '분위기 (energetic/calm/upbeat/relaxing)' },
-      { name: 'total_duration_minutes', type: 'number', required: false, description: '총 재생 시간 (분)' },
-      { name: 'track_count', type: 'number', required: false, description: '트랙 개수' },
-      { name: 'shuffle_enabled', type: 'boolean', required: false, description: '셔플 모드' },
-      { name: 'repeat_mode', type: 'string', required: false, description: '반복 모드 (none/single/all)' },
-      { name: 'schedule', type: 'array', required: false, description: '재생 스케줄 (시간대별)' }
+      { name: 'stock_level', type: 'number', required: false, description: '재고 수준' }
     ]
   },
   {
-    name: 'ScentDiffuser',
-    label: '향기 디퓨저',
-    description: '매장 향기 시스템',
-    icon: 'Sparkles',
-    color: '#f472b6',
-    model_3d_type: 'device',
-    model_3d_dimensions: { width: 0.2, height: 0.3, depth: 0.2 },
-    model_3d_metadata: {
-      coverage_sqm: 100,
-      refill_interval_days: 30
-    },
+    name: 'SUPPLIED_BY',
+    label: '공급받음',
+    description: '제품이 공급업체로부터 공급',
+    source_entity_type: 'Product',
+    target_entity_type: 'Supplier',
+    directionality: 'directed',
     properties: [
-      { name: 'diffuser_id', type: 'string', required: true, description: '디퓨저 ID' },
-      { name: 'scent_type', type: 'string', required: false, description: '향 종류' },
-      { name: 'intensity_level', type: 'number', required: false, description: '강도 레벨 (1-10)' },
-      { name: 'coverage_area_sqm', type: 'number', required: false, description: '커버 면적 (제곱미터)' },
-      { name: 'refill_level', type: 'number', required: false, description: '리필 잔량 (%)' },
-      { name: 'schedule_active', type: 'boolean', required: false, description: '스케줄 활성화 여부' },
-      { name: 'operating_hours', type: 'array', required: false, description: '작동 시간대' }
+      { name: 'lead_time_days', type: 'number', required: false, description: '리드타임' }
+    ]
+  },
+  {
+    name: 'HAS_PROMOTION',
+    label: '프로모션 적용',
+    description: '제품에 프로모션 적용',
+    source_entity_type: 'Product',
+    target_entity_type: 'Promotion',
+    directionality: 'directed',
+    properties: [
+      { name: 'discount_rate', type: 'number', required: false, description: '할인율' }
     ]
   },
 
-  // ==========================================
-  // 4. 상품 진열 관련 (Product Display)
-  // ==========================================
+  // 고객/거래 관계
   {
-    name: 'ProductPlacement',
-    label: '상품 배치',
-    description: '상품의 구체적인 진열 위치',
-    icon: 'MapPin',
-    color: '#f59e0b',
-    model_3d_type: null,
-    model_3d_dimensions: null,
-    model_3d_metadata: {},
+    name: 'VISITED',
+    label: '방문함',
+    description: '고객이 매장 방문',
+    source_entity_type: 'Customer',
+    target_entity_type: 'Visit',
+    directionality: 'directed',
     properties: [
-      { name: 'placement_id', type: 'string', required: true, description: '배치 ID' },
-      { name: 'shelf_level', type: 'number', required: false, description: '선반 단 번호 (아래부터 1)' },
-      { name: 'position_index', type: 'number', required: false, description: '선반 내 위치 인덱스' },
-      { name: 'facing_count', type: 'number', required: false, description: '전면 진열 개수 (페이싱)' },
-      { name: 'stock_depth', type: 'number', required: false, description: '후면 재고 깊이' },
-      { name: 'display_orientation', type: 'string', required: false, description: '진열 방향 (front/side/angled)' },
-      { name: 'is_featured', type: 'boolean', required: false, description: '프로모션 진열 여부' },
-      { name: 'visibility_score', type: 'number', required: false, description: '가시성 점수 (1-10)' }
+      { name: 'visit_date', type: 'string', required: false, description: '방문일' }
     ]
   },
   {
-    name: 'Display',
-    label: '디스플레이',
-    description: '특별 상품 디스플레이',
-    icon: 'Gift',
-    color: '#fb923c',
-    model_3d_type: 'furniture',
-    model_3d_dimensions: { width: 1.0, height: 1.5, depth: 0.8 },
-    model_3d_metadata: {
-      display_type: 'endcap',
-      seasonal: false
-    },
+    name: 'PURCHASED',
+    label: '구매함',
+    description: '고객이 제품 구매',
+    source_entity_type: 'Customer',
+    target_entity_type: 'Purchase',
+    directionality: 'directed',
     properties: [
-      { name: 'display_id', type: 'string', required: true, description: '디스플레이 ID' },
-      { name: 'display_type', type: 'string', required: false, description: '디스플레이 유형 (endcap/power_wing/dump_bin/pallet)' },
-      { name: 'theme', type: 'string', required: false, description: '테마 (seasonal/promotional/clearance/new_arrival)' },
-      { name: 'start_date', type: 'string', required: false, description: '시작 날짜' },
-      { name: 'end_date', type: 'string', required: false, description: '종료 날짜' },
-      { name: 'product_capacity', type: 'number', required: false, description: '상품 수용 개수' }
-    ]
-  },
-
-  // ==========================================
-  // 5. 인력 & 고객 (Staff & Customer)
-  // ==========================================
-  {
-    name: 'StaffZone',
-    label: '직원 구역 할당',
-    description: '직원의 담당 구역 정보',
-    icon: 'UserCheck',
-    color: '#4ade80',
-    model_3d_type: null,
-    model_3d_dimensions: null,
-    model_3d_metadata: {},
-    properties: [
-      { name: 'assignment_id', type: 'string', required: true, description: '할당 ID' },
-      { name: 'shift_start', type: 'string', required: false, description: '근무 시작 시간' },
-      { name: 'shift_end', type: 'string', required: false, description: '근무 종료 시간' },
-      { name: 'role_in_zone', type: 'string', required: false, description: '구역 내 역할 (sales/restocking/cleaning/security)' },
-      { name: 'is_primary', type: 'boolean', required: false, description: '주 담당 구역 여부' }
+      { name: 'purchase_amount', type: 'number', required: false, description: '구매액' }
     ]
   },
   {
-    name: 'CustomerJourney',
-    label: '고객 여정',
-    description: '고객의 매장 내 이동 경로',
-    icon: 'Route',
-    color: '#fb7185',
-    model_3d_type: null,
-    model_3d_dimensions: null,
-    model_3d_metadata: {},
+    name: 'ENTERED_ZONE',
+    label: '구역 진입',
+    description: '방문이 특정 구역 진입',
+    source_entity_type: 'Visit',
+    target_entity_type: 'Zone',
+    directionality: 'directed',
     properties: [
-      { name: 'journey_id', type: 'string', required: true, description: '여정 ID' },
-      { name: 'path_coordinates', type: 'array', required: false, description: '이동 경로 좌표 배열' },
-      { name: 'dwell_times', type: 'array', required: false, description: '각 구역별 체류 시간 (초)' },
-      { name: 'zones_visited', type: 'array', required: false, description: '방문한 구역 목록' },
-      { name: 'total_distance_m', type: 'number', required: false, description: '총 이동 거리 (미터)' },
-      { name: 'journey_duration_sec', type: 'number', required: false, description: '총 여정 시간 (초)' },
-      { name: 'converted', type: 'boolean', required: false, description: '구매 전환 여부' }
+      { name: 'entry_time', type: 'string', required: false, description: '진입 시간' }
+    ]
+  },
+  {
+    name: 'SPENT_TIME_IN',
+    label: '체류함',
+    description: '고객이 구역에 체류',
+    source_entity_type: 'Customer',
+    target_entity_type: 'Zone',
+    directionality: 'directed',
+    properties: [
+      { name: 'dwell_time_minutes', type: 'number', required: false, description: '체류 시간' }
+    ]
+  },
+  {
+    name: 'CHECKED_OUT_AT',
+    label: '결제함',
+    description: '거래가 계산대에서 발생',
+    source_entity_type: 'Transaction',
+    target_entity_type: 'CheckoutCounter',
+    directionality: 'directed',
+    properties: [
+      { name: 'checkout_time', type: 'string', required: false, description: '결제 시간' }
     ]
   },
 
+  // 운영 관계
+  {
+    name: 'WORKS_AT',
+    label: '근무함',
+    description: '직원이 매장에서 근무',
+    source_entity_type: 'Staff',
+    target_entity_type: 'Store',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'ASSIGNED_TO_SHIFT',
+    label: '근무 배정',
+    description: '직원이 근무 시간에 배정',
+    source_entity_type: 'Staff',
+    target_entity_type: 'Shift',
+    directionality: 'directed',
+    properties: []
+  },
+
+  // IoT 관계
+  {
+    name: 'MONITORED_BY',
+    label: '모니터링됨',
+    description: '구역이 센서로 모니터링됨',
+    source_entity_type: 'Zone',
+    target_entity_type: 'WiFiSensor',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'DETECTED_BY',
+    label: '감지됨',
+    description: '고객이 센서에 감지됨',
+    source_entity_type: 'Customer',
+    target_entity_type: 'WiFiSensor',
+    directionality: 'directed',
+    properties: [
+      { name: 'detection_time', type: 'string', required: false, description: '감지 시간' }
+    ]
+  },
+
+  // 분석 관계
+  {
+    name: 'GENERATED_SALES',
+    label: '매출 발생',
+    description: '매장이 일간 매출 발생',
+    source_entity_type: 'Store',
+    target_entity_type: 'DailySales',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'HAS_TRANSACTION',
+    label: '거래 발생',
+    description: '방문이 거래로 전환',
+    source_entity_type: 'Visit',
+    target_entity_type: 'Transaction',
+    directionality: 'directed',
+    properties: []
+  },
+
+  // 조직 관계
+  {
+    name: 'OPERATES',
+    label: '운영함',
+    description: '조직이 매장을 운영',
+    source_entity_type: 'Organization',
+    target_entity_type: 'Store',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'HAS_INVENTORY',
+    label: '재고 보유',
+    description: '제품이 재고 보유',
+    source_entity_type: 'Product',
+    target_entity_type: 'Inventory',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'PART_OF_TRANSACTION',
+    label: '거래 구성',
+    description: '구매가 거래의 일부',
+    source_entity_type: 'Purchase',
+    target_entity_type: 'Transaction',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'PURCHASED_PRODUCT',
+    label: '제품 구매',
+    description: '구매가 특정 제품',
+    source_entity_type: 'Purchase',
+    target_entity_type: 'Product',
+    directionality: 'directed',
+    properties: [
+      { name: 'quantity', type: 'number', required: false, description: '수량' }
+    ]
+  },
+  {
+    name: 'HAS_CATEGORY',
+    label: '카테고리 보유',
+    description: '조직이 카테고리 보유',
+    source_entity_type: 'Organization',
+    target_entity_type: 'Category',
+    directionality: 'directed',
+    properties: []
+  },
+
   // ==========================================
-  // 6. 비즈니스 인텔리전스 (Business Intelligence)
+  // 🟡 HIGH (고우선순위) - 20개
   // ==========================================
+  
+  // 공간 관계
   {
-    name: 'Store',
-    label: '매장',
-    description: '물리적 매장 위치',
-    icon: 'Store',
-    color: '#3b82f6',
-    model_3d_type: 'space',
-    model_3d_dimensions: { width: 20, height: 3.5, depth: 15 },
-    model_3d_metadata: {
-      supports_heatmap: true,
-      supports_pathflow: true,
-      contains_zones: true
-    },
+    name: 'HAS_ZONE',
+    label: '구역 보유',
+    description: '매장이 구역 보유',
+    source_entity_type: 'Store',
+    target_entity_type: 'Zone',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'HAS_AISLE',
+    label: '통로 보유',
+    description: '구역이 통로 보유',
+    source_entity_type: 'Zone',
+    target_entity_type: 'Aisle',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'HAS_FITTING_ROOM',
+    label: '탈의실 보유',
+    description: '구역이 탈의실 보유',
+    source_entity_type: 'Zone',
+    target_entity_type: 'FittingRoom',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'HAS_STORAGE_ROOM',
+    label: '창고 보유',
+    description: '매장이 창고 보유',
+    source_entity_type: 'Store',
+    target_entity_type: 'StorageRoom',
+    directionality: 'directed',
+    properties: []
+  },
+
+  // 상품 관계
+  {
+    name: 'DISPLAYED_ON',
+    label: '진열됨',
+    description: '제품이 진열대에 진열',
+    source_entity_type: 'Product',
+    target_entity_type: 'Shelf',
+    directionality: 'directed',
     properties: [
-      { name: 'store_code', type: 'string', required: true, description: '매장 코드' },
-      { name: 'name', type: 'string', required: true, description: '매장명' },
-      { name: 'location', type: 'string', required: true, description: '주소' },
-      { name: 'area_sqm', type: 'number', required: false, description: '매장 면적(㎡)' },
-      { name: 'opening_date', type: 'string', required: false, description: '오픈일' },
-      { name: 'daily_traffic', type: 'number', required: false, description: '일일 방문객 수' },
-      { name: 'floor_plan_url', type: 'string', required: false, description: '평면도 URL' },
-      { name: 'ceiling_height', type: 'number', required: false, description: '천장 높이 (미터)' }
+      { name: 'display_date', type: 'string', required: false, description: '진열일' }
     ]
   },
   {
-    name: 'Customer',
-    label: '고객',
-    description: '고객 정보',
-    icon: 'Users',
-    color: '#8b5cf6',
-    model_3d_type: null,
-    model_3d_dimensions: null,
-    model_3d_metadata: {},
+    name: 'STORED_IN',
+    label: '보관됨',
+    description: '재고가 창고에 보관',
+    source_entity_type: 'Inventory',
+    target_entity_type: 'StorageRoom',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'PROMOTED_IN',
+    label: '프로모션 진행',
+    description: '프로모션이 구역에서 진행',
+    source_entity_type: 'Promotion',
+    target_entity_type: 'Zone',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'REPLENISHED',
+    label: '재입고됨',
+    description: '제품이 재입고됨',
+    source_entity_type: 'Product',
+    target_entity_type: 'InventoryHistory',
+    directionality: 'directed',
     properties: [
-      { name: 'customer_id', type: 'string', required: true, description: '고객 ID' },
-      { name: 'name', type: 'string', required: false, description: '고객명' },
-      { name: 'segment', type: 'string', required: false, description: '고객 세그먼트' },
-      { name: 'loyalty_level', type: 'string', required: false, description: '로열티 등급' },
-      { name: 'lifetime_value', type: 'number', required: false, description: '고객 생애 가치(LTV)' },
-      { name: 'churn_risk_score', type: 'number', required: false, description: '이탈 위험 점수' }
+      { name: 'replenish_date', type: 'string', required: false, description: '재입고일' }
+    ]
+  },
+
+  // 고객 관계
+  {
+    name: 'TRIED_ON',
+    label: '착용해봄',
+    description: '고객이 탈의실에서 착용',
+    source_entity_type: 'Customer',
+    target_entity_type: 'FittingRoom',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'RETURNED_PRODUCT',
+    label: '반품함',
+    description: '고객이 제품 반품',
+    source_entity_type: 'Customer',
+    target_entity_type: 'Product',
+    directionality: 'directed',
+    properties: [
+      { name: 'return_date', type: 'string', required: false, description: '반품일' }
     ]
   },
   {
-    name: 'Product',
-    label: '제품',
-    description: '판매 제품 정보',
-    icon: 'Package',
-    color: '#10b981',
-    model_3d_type: 'product',
-    model_3d_dimensions: { width: 0.15, height: 0.25, depth: 0.10 },
-    model_3d_metadata: {
-      default_orientation: 'front',
-      stackable: true,
-      display_mode: 'shelf'
-    },
+    name: 'BELONGS_TO_SEGMENT',
+    label: '세그먼트 소속',
+    description: '고객이 특정 세그먼트 소속',
+    source_entity_type: 'Customer',
+    target_entity_type: 'Customer',
+    directionality: 'directed',
     properties: [
-      { name: 'sku', type: 'string', required: true, description: 'SKU 코드' },
-      { name: 'name', type: 'string', required: true, description: '제품명' },
-      { name: 'category', type: 'string', required: false, description: '카테고리' },
-      { name: 'price', type: 'number', required: true, description: '가격' },
-      { name: 'cost', type: 'number', required: false, description: '원가' },
-      { name: 'margin_rate', type: 'number', required: false, description: '마진율(%)' },
-      { name: 'price_elasticity', type: 'number', required: false, description: '가격 탄력성' },
-      { name: 'optimal_price', type: 'number', required: false, description: '최적 가격' },
-      { name: 'package_type', type: 'string', required: false, description: '포장 유형' },
-      { name: 'display_priority', type: 'number', required: false, description: '진열 우선순위' }
+      { name: 'segment_type', type: 'string', required: false, description: '세그먼트 유형' }
     ]
   },
+
+  // 외부 컨텍스트 관계
   {
-    name: 'Sale',
-    label: '매출',
-    description: '판매 트랜잭션',
-    icon: 'ShoppingCart',
-    color: '#f59e0b',
-    model_3d_type: null,
-    model_3d_dimensions: null,
-    model_3d_metadata: {},
-    properties: [
-      { name: 'transaction_id', type: 'string', required: true, description: '거래 ID' },
-      { name: 'amount', type: 'number', required: true, description: '거래 금액' },
-      { name: 'timestamp', type: 'string', required: true, description: '거래 시간' },
-      { name: 'payment_method', type: 'string', required: false, description: '결제 수단' },
-      { name: 'discount_applied', type: 'number', required: false, description: '할인 금액' },
-      { name: 'profit', type: 'number', required: false, description: '순이익' }
-    ]
+    name: 'AFFECTED_BY_WEATHER',
+    label: '날씨 영향',
+    description: '매장이 날씨의 영향 받음',
+    source_entity_type: 'Store',
+    target_entity_type: 'Weather',
+    directionality: 'directed',
+    properties: []
   },
   {
-    name: 'Visit',
-    label: '방문',
-    description: '고객 매장 방문 기록',
-    icon: 'MapPin',
-    color: '#ec4899',
-    model_3d_type: null,
-    model_3d_dimensions: null,
-    model_3d_metadata: {},
-    properties: [
-      { name: 'visit_id', type: 'string', required: true, description: '방문 ID' },
-      { name: 'entry_time', type: 'string', required: true, description: '입장 시간' },
-      { name: 'exit_time', type: 'string', required: false, description: '퇴장 시간' },
-      { name: 'dwell_time_minutes', type: 'number', required: false, description: '체류 시간(분)' },
-      { name: 'zones_visited', type: 'array', required: false, description: '방문 구역' },
-      { name: 'converted_to_sale', type: 'boolean', required: false, description: '구매 전환 여부' }
-    ]
+    name: 'AFFECTED_BY_HOLIDAY',
+    label: '공휴일 영향',
+    description: '매장이 공휴일 영향 받음',
+    source_entity_type: 'Store',
+    target_entity_type: 'Holiday',
+    directionality: 'directed',
+    properties: []
   },
   {
-    name: 'Inventory',
-    label: '재고',
-    description: '제품 재고 정보',
-    icon: 'Box',
-    color: '#f97316',
-    model_3d_type: null,
-    model_3d_dimensions: null,
-    model_3d_metadata: {},
-    properties: [
-      { name: 'inventory_id', type: 'string', required: true, description: '재고 ID' },
-      { name: 'current_stock', type: 'number', required: true, description: '현재 재고' },
-      { name: 'optimal_stock', type: 'number', required: false, description: '최적 재고' },
-      { name: 'reorder_point', type: 'number', required: false, description: '재주문 시점' },
-      { name: 'stockout_risk', type: 'number', required: false, description: '품절 위험도(%)' },
-      { name: 'turnover_rate', type: 'number', required: false, description: '재고 회전율' },
-      { name: 'holding_cost', type: 'number', required: false, description: '재고 유지 비용' }
-    ]
+    name: 'INFLUENCED_BY_ECONOMIC',
+    label: '경제 영향',
+    description: '매장이 경제 지표 영향 받음',
+    source_entity_type: 'Store',
+    target_entity_type: 'EconomicIndicator',
+    directionality: 'directed',
+    properties: []
+  },
+
+  // 분석 관계
+  {
+    name: 'TRACKED_IN_DAILY_SALES',
+    label: '일간 매출 추적',
+    description: '거래가 일간 매출에 집계',
+    source_entity_type: 'Transaction',
+    target_entity_type: 'DailySales',
+    directionality: 'directed',
+    properties: []
   },
   {
-    name: 'DemandForecast',
+    name: 'RECORDED_IN_INVENTORY_HISTORY',
+    label: '재고 이력 기록',
+    description: '재고 변동이 이력에 기록',
+    source_entity_type: 'Inventory',
+    target_entity_type: 'InventoryHistory',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'HAS_ZONE_PERFORMANCE',
+    label: '구역 성과 보유',
+    description: '구역이 성과 기록 보유',
+    source_entity_type: 'Zone',
+    target_entity_type: 'ZonePerformance',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'SUPPLIES',
+    label: '공급함',
+    description: '공급업체가 제품 공급',
+    source_entity_type: 'Supplier',
+    target_entity_type: 'Product',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'HAS_CAMERA',
+    label: '카메라 보유',
+    description: '구역이 카메라 보유',
+    source_entity_type: 'Zone',
+    target_entity_type: 'Camera',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'HAS_BEACON',
+    label: '비콘 보유',
+    description: '구역이 비콘 보유',
+    source_entity_type: 'Zone',
+    target_entity_type: 'Beacon',
+    directionality: 'directed',
+    properties: []
+  },
+
+  // ==========================================
+  // 🟠 MEDIUM (중우선순위) - 15개
+  // ==========================================
+  
+  // 공간/가구 관계
+  {
+    name: 'HAS_SHELF',
+    label: '선반 보유',
+    description: '구역이 선반 보유',
+    source_entity_type: 'Zone',
+    target_entity_type: 'Shelf',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'HAS_RACK',
+    label: '랙 보유',
+    description: '구역이 랙 보유',
+    source_entity_type: 'Zone',
+    target_entity_type: 'Rack',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'HAS_DISPLAY_TABLE',
+    label: '디스플레이 테이블 보유',
+    description: '구역이 디스플레이 테이블 보유',
+    source_entity_type: 'Zone',
+    target_entity_type: 'DisplayTable',
+    directionality: 'directed',
+    properties: []
+  },
+
+  // IoT 관계
+  {
+    name: 'HAS_PEOPLE_COUNTER',
+    label: '인원 카운터 보유',
+    description: '출입구가 인원 카운터 보유',
+    source_entity_type: 'Entrance',
+    target_entity_type: 'PeopleCounter',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'HAS_DOOR_SENSOR',
+    label: '도어 센서 보유',
+    description: '출입구가 도어 센서 보유',
+    source_entity_type: 'Entrance',
+    target_entity_type: 'DoorSensor',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'HAS_TEMPERATURE_SENSOR',
+    label: '온도 센서 보유',
+    description: '구역이 온도 센서 보유',
+    source_entity_type: 'Zone',
+    target_entity_type: 'TemperatureSensor',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'HAS_HUMIDITY_SENSOR',
+    label: '습도 센서 보유',
+    description: '구역이 습도 센서 보유',
+    source_entity_type: 'Zone',
+    target_entity_type: 'HumiditySensor',
+    directionality: 'directed',
+    properties: []
+  },
+
+  // 운영 관계
+  {
+    name: 'ASSIGNED_TO_TASK',
+    label: '작업 배정',
+    description: '직원이 작업에 배정',
+    source_entity_type: 'Staff',
+    target_entity_type: 'Task',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'TRIGGERED_ALERT',
+    label: '알림 발생',
+    description: '이벤트가 알림 발생',
+    source_entity_type: 'Inventory',
+    target_entity_type: 'Alert',
+    directionality: 'directed',
+    properties: []
+  },
+
+  // 분석 관계
+  {
+    name: 'MEASURED_IN_ZONE_PERFORMANCE',
+    label: '구역 성과 측정',
+    description: '방문이 구역 성과에 측정',
+    source_entity_type: 'Visit',
+    target_entity_type: 'ZonePerformance',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'FORECASTED_DEMAND',
     label: '수요 예측',
-    description: '미래 수요 예측',
-    icon: 'TrendingUp',
-    color: '#84cc16',
-    model_3d_type: null,
-    model_3d_dimensions: null,
-    model_3d_metadata: {},
-    properties: [
-      { name: 'forecast_id', type: 'string', required: true, description: '예측 ID' },
-      { name: 'forecast_date', type: 'string', required: true, description: '예측 날짜' },
-      { name: 'predicted_demand', type: 'number', required: true, description: '예측 수요량' },
-      { name: 'confidence_level', type: 'number', required: false, description: '신뢰도(%)' },
-      { name: 'seasonality_factor', type: 'number', required: false, description: '계절성 요인' },
-      { name: 'trend_factor', type: 'number', required: false, description: '트렌드 요인' }
-    ]
+    description: '제품이 수요 예측됨',
+    source_entity_type: 'Product',
+    target_entity_type: 'DemandForecast',
+    directionality: 'directed',
+    properties: []
   },
   {
-    name: 'PriceOptimization',
+    name: 'PLACED_ON_SHELF',
+    label: '선반 배치',
+    description: '제품이 선반에 배치',
+    source_entity_type: 'Product',
+    target_entity_type: 'Shelf',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'PLACED_ON_RACK',
+    label: '랙 배치',
+    description: '제품이 랙에 배치',
+    source_entity_type: 'Product',
+    target_entity_type: 'Rack',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'PLACED_ON_TABLE',
+    label: '테이블 배치',
+    description: '제품이 테이블에 배치',
+    source_entity_type: 'Product',
+    target_entity_type: 'DisplayTable',
+    directionality: 'directed',
+    properties: []
+  },
+  {
+    name: 'MANAGES_INVENTORY',
+    label: '재고 관리',
+    description: '직원이 재고 관리',
+    source_entity_type: 'Staff',
+    target_entity_type: 'Inventory',
+    directionality: 'directed',
+    properties: []
+  },
+
+  // ==========================================
+  // 🟢 LOW (저우선순위) - 10개
+  // ==========================================
+  
+  // 시뮬레이션 관계
+  {
+    name: 'OPTIMIZED_PRICE_FOR',
     label: '가격 최적화',
-    description: '동적 가격 최적화',
-    icon: 'DollarSign',
-    color: '#eab308',
-    model_3d_type: null,
-    model_3d_dimensions: null,
-    model_3d_metadata: {},
-    properties: [
-      { name: 'optimization_id', type: 'string', required: true, description: '최적화 ID' },
-      { name: 'current_price', type: 'number', required: true, description: '현재 가격' },
-      { name: 'recommended_price', type: 'number', required: true, description: '권장 가격' },
-      { name: 'expected_revenue_lift', type: 'number', required: false, description: '예상 매출 증가율(%)' },
-      { name: 'competitor_price', type: 'number', required: false, description: '경쟁사 가격' },
-      { name: 'wtp_average', type: 'number', required: false, description: '평균 지불의향가격' }
-    ]
+    description: '제품이 가격 최적화됨',
+    source_entity_type: 'Product',
+    target_entity_type: 'PriceOptimization',
+    directionality: 'directed',
+    properties: []
+  },
+
+  // IoT 관계
+  {
+    name: 'HAS_POS',
+    label: 'POS 보유',
+    description: '계산대가 POS 보유',
+    source_entity_type: 'CheckoutCounter',
+    target_entity_type: 'POS',
+    directionality: 'directed',
+    properties: []
   },
   {
-    name: 'Promotion',
-    label: '프로모션',
-    description: '오프라인 프로모션',
-    icon: 'Percent',
-    color: '#ef4444',
-    model_3d_type: null,
-    model_3d_dimensions: null,
-    model_3d_metadata: {},
-    properties: [
-      { name: 'promotion_id', type: 'string', required: true, description: '프로모션 ID' },
-      { name: 'name', type: 'string', required: true, description: '프로모션명' },
-      { name: 'discount_rate', type: 'number', required: false, description: '할인율(%)' },
-      { name: 'start_date', type: 'string', required: true, description: '시작일' },
-      { name: 'end_date', type: 'string', required: true, description: '종료일' },
-      { name: 'effectiveness_score', type: 'number', required: false, description: '효과성 점수' },
-      { name: 'roi', type: 'number', required: false, description: 'ROI(%)' }
-    ]
+    name: 'HAS_DIGITAL_SIGNAGE',
+    label: '디지털 사이니지 보유',
+    description: '구역이 디지털 사이니지 보유',
+    source_entity_type: 'Zone',
+    target_entity_type: 'DigitalSignage',
+    directionality: 'directed',
+    properties: []
   },
   {
-    name: 'MarketingCampaign',
-    label: '마케팅 캠페인',
-    description: '오프라인 마케팅 캠페인',
-    icon: 'Zap',
-    color: '#a855f7',
-    model_3d_type: null,
-    model_3d_dimensions: null,
-    model_3d_metadata: {},
-    properties: [
-      { name: 'campaign_id', type: 'string', required: true, description: '캠페인 ID' },
-      { name: 'name', type: 'string', required: true, description: '캠페인명' },
-      { name: 'budget', type: 'number', required: false, description: '예산' },
-      { name: 'reach', type: 'number', required: false, description: '도달 수' },
-      { name: 'conversion_rate', type: 'number', required: false, description: '전환율(%)' },
-      { name: 'cost_per_acquisition', type: 'number', required: false, description: '고객 획득 비용' },
-      { name: 'suitability_score', type: 'number', required: false, description: '적합성 점수' }
-    ]
+    name: 'CONTROLLED_BY_HVAC',
+    label: 'HVAC 제어',
+    description: '구역이 HVAC로 제어됨',
+    source_entity_type: 'Zone',
+    target_entity_type: 'HVAC',
+    directionality: 'directed',
+    properties: []
+  },
+
+  // 분석 관계
+  {
+    name: 'GENERATES_FORECAST',
+    label: '예측 생성',
+    description: '이력이 예측 생성',
+    source_entity_type: 'InventoryHistory',
+    target_entity_type: 'DemandForecast',
+    directionality: 'directed',
+    properties: []
   },
   {
-    name: 'PurchaseConversion',
-    label: '구매 전환',
-    description: '방문-구매 전환 분석',
-    icon: 'CheckCircle',
-    color: '#14b8a6',
-    model_3d_type: null,
-    model_3d_dimensions: null,
-    model_3d_metadata: {},
-    properties: [
-      { name: 'conversion_id', type: 'string', required: true, description: '전환 ID' },
-      { name: 'conversion_rate', type: 'number', required: true, description: '전환율(%)' },
-      { name: 'average_basket_size', type: 'number', required: false, description: '평균 장바구니 크기' },
-      { name: 'conversion_factors', type: 'array', required: false, description: '전환 영향 요인' },
-      { name: 'abandonment_rate', type: 'number', required: false, description: '이탈율(%)' }
-    ]
+    name: 'INFLUENCES_PRICING',
+    label: '가격 영향',
+    description: '수요 예측이 가격 영향',
+    source_entity_type: 'DemandForecast',
+    target_entity_type: 'PriceOptimization',
+    directionality: 'directed',
+    properties: []
   },
   {
-    name: 'ZoneAnalysis',
-    label: '구역 분석',
-    description: '매장 구역별 분석',
-    icon: 'Target',
-    color: '#64748b',
-    model_3d_type: null,
-    model_3d_dimensions: null,
-    model_3d_metadata: {},
-    properties: [
-      { name: 'zone_id', type: 'string', required: true, description: '구역 ID' },
-      { name: 'zone_name', type: 'string', required: true, description: '구역명' },
-      { name: 'traffic_density', type: 'number', required: false, description: '트래픽 밀도' },
-      { name: 'dwell_time_avg', type: 'number', required: false, description: '평균 체류 시간' },
-      { name: 'conversion_rate', type: 'number', required: false, description: '전환율(%)' },
-      { name: 'revenue_per_sqm', type: 'number', required: false, description: '평당 매출' }
-    ]
+    name: 'CAPTURED_BY_CAMERA',
+    label: '카메라 촬영',
+    description: '고객이 카메라에 촬영됨',
+    source_entity_type: 'Customer',
+    target_entity_type: 'Camera',
+    directionality: 'directed',
+    properties: []
   },
   {
-    name: 'StaffSchedule',
-    label: '직원 스케줄',
-    description: '직원 근무 스케줄링',
-    icon: 'Calendar',
-    color: '#6366f1',
-    model_3d_type: null,
-    model_3d_dimensions: null,
-    model_3d_metadata: {},
-    properties: [
-      { name: 'schedule_id', type: 'string', required: true, description: '스케줄 ID' },
-      { name: 'shift_start', type: 'string', required: true, description: '근무 시작' },
-      { name: 'shift_end', type: 'string', required: true, description: '근무 종료' },
-      { name: 'efficiency_score', type: 'number', required: false, description: '효율성 점수' },
-      { name: 'labor_cost', type: 'number', required: false, description: '인건비' }
-    ]
+    name: 'DETECTED_BY_BEACON',
+    label: '비콘 감지',
+    description: '고객이 비콘에 감지됨',
+    source_entity_type: 'Customer',
+    target_entity_type: 'Beacon',
+    directionality: 'directed',
+    properties: []
   },
   {
-    name: 'Alert',
-    label: '알림',
-    description: '비즈니스 알림 및 경고',
-    icon: 'AlertTriangle',
-    color: '#dc2626',
-    model_3d_type: null,
-    model_3d_dimensions: null,
-    model_3d_metadata: {},
-    properties: [
-      { name: 'alert_id', type: 'string', required: true, description: '알림 ID' },
-      { name: 'type', type: 'string', required: true, description: '알림 유형' },
-      { name: 'severity', type: 'string', required: true, description: '심각도' },
-      { name: 'message', type: 'string', required: true, description: '메시지' },
-      { name: 'triggered_at', type: 'string', required: true, description: '발생 시간' },
-      { name: 'resolved', type: 'boolean', required: false, description: '해결 여부' }
-    ]
+    name: 'PROCESSES_TRANSACTION',
+    label: '거래 처리',
+    description: 'POS가 거래 처리',
+    source_entity_type: 'POS',
+    target_entity_type: 'Transaction',
+    directionality: 'directed',
+    properties: []
   },
   {
-    name: 'Staff',
-    label: '직원',
-    description: '매장 직원 정보',
-    icon: 'UserCheck',
-    color: '#4ade80',
-    model_3d_type: null,
-    model_3d_dimensions: null,
-    model_3d_metadata: {},
-    properties: [
-      { name: 'staff_id', type: 'string', required: true, description: '직원 ID' },
-      { name: 'name', type: 'string', required: true, description: '직원명' },
-      { name: 'role', type: 'string', required: false, description: '역할' },
-      { name: 'department', type: 'string', required: false, description: '부서' },
-      { name: 'performance_score', type: 'number', required: false, description: '성과 점수' }
-    ]
+    name: 'DISPLAYS_PROMOTION',
+    label: '프로모션 표시',
+    description: '사이니지가 프로모션 표시',
+    source_entity_type: 'DigitalSignage',
+    target_entity_type: 'Promotion',
+    directionality: 'directed',
+    properties: []
   }
 ];
 
 /**
- * 최적화된 온톨로지 관계 타입 (70개)
- * 우선순위 Tier 구조:
- * - CRITICAL (25개): AI 추론 핵심 기능
- * - HIGH (20개): 고급 AI 기능
- * - MEDIUM (15개): 특정 산업 및 고급 기능
- * - LOW (10개): Nice-to-have 기능
+ * 프리셋을 데이터베이스에 적용하는 함수
  */
-export const COMPREHENSIVE_RELATION_TYPES = [
-  // ==========================================
-  // CRITICAL TIER (25개) - AI 추론 핵심 기능
-  // ==========================================
-  
-  // 공간 계층 구조 (7개)
-  { name: 'contains', label: '포함함', description: 'A가 B를 포함함', source_entity_type: 'Store', target_entity_type: 'Zone', directionality: 'directed' },
-  { name: 'contains', label: '포함함', description: 'A가 B를 포함함', source_entity_type: 'Zone', target_entity_type: 'Shelf', directionality: 'directed' },
-  { name: 'contains', label: '포함함', description: 'A가 B를 포함함', source_entity_type: 'Zone', target_entity_type: 'DisplayTable', directionality: 'directed' },
-  { name: 'contains', label: '포함함', description: 'A가 B를 포함함', source_entity_type: 'Zone', target_entity_type: 'Rack', directionality: 'directed' },
-  { name: 'contains', label: '포함함', description: 'A가 B를 포함함', source_entity_type: 'Zone', target_entity_type: 'CheckoutCounter', directionality: 'directed' },
-  { name: 'adjacent_to', label: '인접함', description: 'A가 B와 인접함', source_entity_type: 'Zone', target_entity_type: 'Zone', directionality: 'undirected' },
-  { name: 'leads_to', label: '통함', description: 'A가 B로 통함', source_entity_type: 'Entrance', target_entity_type: 'Zone', directionality: 'directed' },
-  
-  // 상품 진열 (6개)
-  { name: 'displays', label: '진열함', description: 'A가 B를 진열함', source_entity_type: 'Shelf', target_entity_type: 'Product', directionality: 'directed' },
-  { name: 'displays', label: '진열함', description: 'A가 B를 진열함', source_entity_type: 'DisplayTable', target_entity_type: 'Product', directionality: 'directed' },
-  { name: 'displays', label: '진열함', description: 'A가 B를 진열함', source_entity_type: 'Rack', target_entity_type: 'Product', directionality: 'directed' },
-  { name: 'belongs_to_category', label: '카테고리 소속', description: 'A가 B 카테고리에 속함', source_entity_type: 'Product', target_entity_type: 'Category', directionality: 'directed' },
-  { name: 'supplied_by', label: '공급됨', description: 'A가 B에게 공급됨', source_entity_type: 'Product', target_entity_type: 'Supplier', directionality: 'directed' },
-  { name: 'promoted_by', label: '프로모션 대상', description: 'A가 B 프로모션 대상', source_entity_type: 'Product', target_entity_type: 'Promotion', directionality: 'directed' },
-  
-  // 고객 & 거래 (7개)
-  { name: 'visited', label: '방문함', description: 'A가 B를 방문함', source_entity_type: 'Customer', target_entity_type: 'Store', directionality: 'directed' },
-  { name: 'purchased', label: '구매함', description: 'A가 B를 구매함', source_entity_type: 'Customer', target_entity_type: 'Product', directionality: 'directed' },
-  { name: 'has_purchase', label: '구매 기록', description: 'A의 구매 기록', source_entity_type: 'Customer', target_entity_type: 'Purchase', directionality: 'directed' },
-  { name: 'contains_product', label: '제품 포함', description: 'A가 B 제품 포함', source_entity_type: 'Purchase', target_entity_type: 'Product', directionality: 'directed' },
-  { name: 'occurred_at_store', label: '발생 매장', description: 'A가 B 매장에서 발생', source_entity_type: 'Purchase', target_entity_type: 'Store', directionality: 'directed' },
-  { name: 'made_during_visit', label: '방문 중 구매', description: 'A가 B 방문 중 발생', source_entity_type: 'Purchase', target_entity_type: 'Visit', directionality: 'directed' },
-  { name: 'visit_to_store', label: '매장 방문', description: 'A가 B 매장 방문', source_entity_type: 'Visit', target_entity_type: 'Store', directionality: 'directed' },
-  
-  // 재고 관리 (5개)
-  { name: 'has_inventory', label: '재고 보유', description: 'A가 B 재고 보유', source_entity_type: 'Product', target_entity_type: 'Inventory', directionality: 'directed' },
-  { name: 'stored_at', label: '보관됨', description: 'A가 B에 보관됨', source_entity_type: 'Inventory', target_entity_type: 'Store', directionality: 'directed' },
-  { name: 'triggers_alert', label: '알림 발생', description: 'A가 B 알림 발생', source_entity_type: 'Inventory', target_entity_type: 'Alert', directionality: 'directed' },
-  { name: 'stores', label: '보관함', description: 'A가 B를 보관함', source_entity_type: 'StorageRoom', target_entity_type: 'Product', directionality: 'directed' },
-  { name: 'restocked_from', label: '보충됨', description: 'A가 B에서 보충됨', source_entity_type: 'Shelf', target_entity_type: 'StorageRoom', directionality: 'directed' },
-  
-  // ==========================================
-  // HIGH TIER (20개) - 고급 AI 기능
-  // ==========================================
-  
-  // IoT & 센서 (6개)
-  { name: 'monitors', label: '모니터함', description: 'A가 B를 모니터함', source_entity_type: 'Sensor', target_entity_type: 'Zone', directionality: 'directed' },
-  { name: 'monitors', label: '모니터함', description: 'A가 B를 모니터함', source_entity_type: 'Camera', target_entity_type: 'Zone', directionality: 'directed' },
-  { name: 'installed_in', label: '설치됨', description: 'A가 B에 설치됨', source_entity_type: 'Beacon', target_entity_type: 'Zone', directionality: 'directed' },
-  { name: 'installed_in', label: '설치됨', description: 'A가 B에 설치됨', source_entity_type: 'WiFiProbe', target_entity_type: 'Zone', directionality: 'directed' },
-  { name: 'detected_by', label: '감지됨', description: 'A가 B에 의해 감지됨', source_entity_type: 'Customer', target_entity_type: 'WiFiProbe', directionality: 'directed' },
-  { name: 'tracked_in', label: '추적됨', description: 'A가 B에서 추적됨', source_entity_type: 'Customer', target_entity_type: 'Zone', directionality: 'directed' },
-  
-  // 직원 관리 (5개)
-  { name: 'works_at', label: '근무함', description: 'A가 B에서 근무함', source_entity_type: 'Staff', target_entity_type: 'Store', directionality: 'directed' },
-  { name: 'has_shift', label: '근무 시간', description: 'A가 B 근무 시간 보유', source_entity_type: 'Staff', target_entity_type: 'Shift', directionality: 'directed' },
-  { name: 'shift_at_store', label: '근무 매장', description: 'A가 B 매장 근무', source_entity_type: 'Shift', target_entity_type: 'Store', directionality: 'directed' },
-  { name: 'operates', label: '운영함', description: 'A가 B를 운영함', source_entity_type: 'Staff', target_entity_type: 'POS', directionality: 'directed' },
-  { name: 'managed_zone', label: '관리 구역', description: 'A가 B 구역 관리', source_entity_type: 'Staff', target_entity_type: 'Zone', directionality: 'directed' },
-  
-  // 고객 동선 & 분석 (5개)
-  { name: 'has_journey', label: '여정 기록', description: 'A의 B 여정', source_entity_type: 'Visit', target_entity_type: 'CustomerJourney', directionality: 'directed' },
-  { name: 'traveled_through', label: '이동함', description: 'A가 B를 통해 이동함', source_entity_type: 'CustomerJourney', target_entity_type: 'Zone', directionality: 'directed' },
-  { name: 'dwelled_at', label: '체류함', description: 'A가 B에 체류함', source_entity_type: 'Customer', target_entity_type: 'Zone', directionality: 'directed' },
-  { name: 'converted_to_purchase', label: '구매 전환', description: 'A가 B로 전환됨', source_entity_type: 'Visit', target_entity_type: 'Purchase', directionality: 'directed' },
-  { name: 'influenced_by_weather', label: '날씨 영향', description: 'A가 B 날씨 영향 받음', source_entity_type: 'Visit', target_entity_type: 'Weather', directionality: 'directed' },
-  
-  // 외부 환경 (4개)
-  { name: 'on_date', label: '날짜', description: 'A가 B 날짜 발생', source_entity_type: 'Weather', target_entity_type: 'Holiday', directionality: 'directed' },
-  { name: 'affected_by_holiday', label: '휴일 영향', description: 'A가 B 휴일 영향 받음', source_entity_type: 'Visit', target_entity_type: 'Holiday', directionality: 'directed' },
-  { name: 'economic_indicator_date', label: '경제지표 날짜', description: 'A가 B 날짜 지표', source_entity_type: 'EconomicIndicator', target_entity_type: 'Holiday', directionality: 'directed' },
-  { name: 'weather_at_store', label: '매장 날씨', description: 'A가 B 매장 날씨', source_entity_type: 'Weather', target_entity_type: 'Store', directionality: 'directed' },
-  
-  // ==========================================
-  // MEDIUM TIER (15개) - 특정 산업 및 고급 기능
-  // ==========================================
-  
-  // 환경 시스템 (5개)
-  { name: 'illuminates', label: '조명함', description: 'A가 B를 조명함', source_entity_type: 'Lighting', target_entity_type: 'Zone', directionality: 'directed' },
-  { name: 'illuminates', label: '조명함', description: 'A가 B를 조명함', source_entity_type: 'Lighting', target_entity_type: 'Display', directionality: 'directed' },
-  { name: 'climate_controls', label: '온도제어', description: 'A가 B의 온도를 제어함', source_entity_type: 'HVAC', target_entity_type: 'Zone', directionality: 'directed' },
-  { name: 'mounted_on', label: '장착됨', description: 'A가 B에 장착됨', source_entity_type: 'Sensor', target_entity_type: 'Wall', directionality: 'directed' },
-  { name: 'mounted_on', label: '장착됨', description: 'A가 B에 장착됨', source_entity_type: 'Camera', target_entity_type: 'Wall', directionality: 'directed' },
-  
-  // 디지털 장비 (4개)
-  { name: 'located_at', label: '위치함', description: 'A가 B에 위치함', source_entity_type: 'POS', target_entity_type: 'CheckoutCounter', directionality: 'directed' },
-  { name: 'located_at', label: '위치함', description: 'A가 B에 위치함', source_entity_type: 'Kiosk', target_entity_type: 'Zone', directionality: 'directed' },
-  { name: 'displays_on', label: '표시됨', description: 'A가 B에 표시됨', source_entity_type: 'Product', target_entity_type: 'DigitalSignage', directionality: 'directed' },
-  { name: 'mounted_on', label: '장착됨', description: 'A가 B에 장착됨', source_entity_type: 'DigitalSignage', target_entity_type: 'Wall', directionality: 'directed' },
-  
-  // 특수 구역 (3개)
-  { name: 'contains', label: '포함함', description: 'A가 B를 포함함', source_entity_type: 'Zone', target_entity_type: 'FittingRoom', directionality: 'directed' },
-  { name: 'connects_to', label: '연결됨', description: 'A가 B와 연결됨', source_entity_type: 'Zone', target_entity_type: 'Aisle', directionality: 'undirected' },
-  { name: 'bounded_by', label: '경계됨', description: 'A가 B에 의해 경계됨', source_entity_type: 'Zone', target_entity_type: 'Wall', directionality: 'directed' },
-  
-  // 수요 예측 (3개)
-  { name: 'forecast_for', label: '예측 대상', description: 'A가 B 예측', source_entity_type: 'DemandForecast', target_entity_type: 'Product', directionality: 'directed' },
-  { name: 'forecast_at_store', label: '예측 매장', description: 'A가 B 매장 예측', source_entity_type: 'DemandForecast', target_entity_type: 'Store', directionality: 'directed' },
-  { name: 'influences_inventory', label: '재고 영향', description: 'A가 B에 영향', source_entity_type: 'DemandForecast', target_entity_type: 'Inventory', directionality: 'directed' },
-  
-  // ==========================================
-  // LOW TIER (10개) - Nice-to-have 기능
-  // ==========================================
-  
-  // 가격 최적화 (3개)
-  { name: 'optimizes_price', label: '가격 최적화', description: 'A가 B 가격 최적화', source_entity_type: 'PriceOptimization', target_entity_type: 'Product', directionality: 'directed' },
-  { name: 'based_on_demand', label: '수요 기반', description: 'A가 B 기반', source_entity_type: 'PriceOptimization', target_entity_type: 'DemandForecast', directionality: 'directed' },
-  { name: 'price_at_store', label: '매장 가격', description: 'A가 B 매장 가격', source_entity_type: 'PriceOptimization', target_entity_type: 'Store', directionality: 'directed' },
-  
-  // 프로모션 (4개)
-  { name: 'runs_at_store', label: '실행 매장', description: 'A가 B에서 실행', source_entity_type: 'Promotion', target_entity_type: 'Store', directionality: 'directed' },
-  { name: 'affects_sales', label: '매출 영향', description: 'A가 B에 영향', source_entity_type: 'Promotion', target_entity_type: 'Purchase', directionality: 'directed' },
-  { name: 'brand_of_product', label: '제품 브랜드', description: 'A가 B 브랜드', source_entity_type: 'Product', target_entity_type: 'Brand', directionality: 'directed' },
-  { name: 'subcategory_of', label: '하위 카테고리', description: 'A가 B의 하위', source_entity_type: 'Category', target_entity_type: 'Category', directionality: 'directed' },
-  
-  // 알림 (3개)
-  { name: 'alert_for_store', label: '매장 알림', description: 'A가 B 매장 알림', source_entity_type: 'Alert', target_entity_type: 'Store', directionality: 'directed' },
-  { name: 'alert_for_product', label: '제품 알림', description: 'A가 B 제품 알림', source_entity_type: 'Alert', target_entity_type: 'Product', directionality: 'directed' },
-  { name: 'alert_for_zone', label: '구역 알림', description: 'A가 B 구역 알림', source_entity_type: 'Alert', target_entity_type: 'Zone', directionality: 'directed' }
-];
-
-export async function insertComprehensiveSchema(userId: string) {
+export async function applyRetailSchemaPreset(
+  userId: string,
+  orgId: string | null,
+  mode: 'replace' | 'merge' = 'replace'
+) {
   try {
-    // 1. Insert Entity Types
-    console.log('Inserting comprehensive entity types...');
-    const entityTypesWithUserId = COMPREHENSIVE_ENTITY_TYPES.map(et => ({
-      ...et,
+    // 1. Replace 모드일 경우 기존 타입 삭제
+    if (mode === 'replace') {
+      const { error: deleteRelError } = await supabase
+        .from('ontology_relation_types')
+        .delete()
+        .eq('user_id', userId);
+      
+      if (deleteRelError) throw deleteRelError;
+
+      const { error: deleteEntError } = await supabase
+        .from('ontology_entity_types')
+        .delete()
+        .eq('user_id', userId);
+      
+      if (deleteEntError) throw deleteEntError;
+    }
+
+    // 2. 엔티티 타입 삽입
+    const entityInserts = COMPREHENSIVE_ENTITY_TYPES.map(entity => ({
       user_id: userId,
-      properties: JSON.stringify(et.properties),
-      model_3d_dimensions: et.model_3d_dimensions ? JSON.stringify(et.model_3d_dimensions) : null,
-      model_3d_metadata: et.model_3d_metadata ? JSON.stringify(et.model_3d_metadata) : null
+      org_id: orgId,
+      name: entity.name,
+      label: entity.label,
+      description: entity.description,
+      icon: entity.icon,
+      color: entity.color,
+      model_3d_type: entity.model_3d_type || null,
+      model_3d_dimensions: (entity as any).model_3d_dimensions || null,
+      model_3d_metadata: (entity as any).model_3d_metadata || null,
+      properties: entity.properties
     }));
 
-    const { data: entityTypes, error: entityTypesError } = await supabase
+    const { data: insertedEntities, error: entError } = await supabase
       .from('ontology_entity_types')
-      .insert(entityTypesWithUserId)
-      .select();
-
-    if (entityTypesError) {
-      console.error('Entity types error:', entityTypesError);
-      throw entityTypesError;
-    }
-
-    console.log(`✅ Inserted ${entityTypes?.length || 0} entity types`);
-
-    // 2. Insert Relation Types
-    console.log('Inserting comprehensive relation types...');
-    console.log('Total relation types to insert:', COMPREHENSIVE_RELATION_TYPES.length);
+      .insert(entityInserts)
+      .select('id, name');
     
-    const relationTypesWithUserId = COMPREHENSIVE_RELATION_TYPES.map(rt => ({
-      ...rt,
+    if (entError) throw entError;
+
+    // 3. 관계 타입 삽입
+    const relationInserts = COMPREHENSIVE_RELATION_TYPES.map(relation => ({
       user_id: userId,
-      properties: JSON.stringify([])
+      org_id: orgId,
+      name: relation.name,
+      label: relation.label,
+      description: relation.description,
+      source_entity_type: relation.source_entity_type,
+      target_entity_type: relation.target_entity_type,
+      directionality: relation.directionality,
+      properties: relation.properties
     }));
 
-    console.log('Sample relation:', relationTypesWithUserId[0]);
-
-    const { data: relationTypes, error: relationTypesError } = await supabase
+    const { error: relError } = await supabase
       .from('ontology_relation_types')
-      .insert(relationTypesWithUserId)
-      .select();
-
-    if (relationTypesError) {
-      console.error('Relation types error:', relationTypesError);
-      throw relationTypesError;
-    }
-
-    console.log(`✅ Inserted ${relationTypes?.length || 0} relation types`);
+      .insert(relationInserts);
+    
+    if (relError) throw relError;
 
     return {
       success: true,
-      entityTypesCount: entityTypes?.length || 0,
-      relationTypesCount: relationTypes?.length || 0
+      entitiesCount: COMPREHENSIVE_ENTITY_TYPES.length,
+      relationsCount: COMPREHENSIVE_RELATION_TYPES.length,
+      message: `${COMPREHENSIVE_ENTITY_TYPES.length}개 엔티티, ${COMPREHENSIVE_RELATION_TYPES.length}개 관계 적용 완료`
     };
-  } catch (error: any) {
-    console.error('Insert comprehensive schema error:', error);
-    throw error;
-  }
-}
 
-export async function insertRelationsOnly(userId: string) {
-  try {
-    console.log('Inserting relation types only...');
-    console.log('Total relation types to insert:', COMPREHENSIVE_RELATION_TYPES.length);
-    
-    const relationTypesWithUserId = COMPREHENSIVE_RELATION_TYPES.map(rt => ({
-      ...rt,
-      user_id: userId,
-      properties: JSON.stringify([])
-    }));
-
-    const { data: relationTypes, error: relationTypesError } = await supabase
-      .from('ontology_relation_types')
-      .insert(relationTypesWithUserId)
-      .select();
-
-    if (relationTypesError) {
-      console.error('Relation types error:', relationTypesError);
-      throw relationTypesError;
-    }
-
-    console.log(`✅ Inserted ${relationTypes?.length || 0} relation types`);
-
+  } catch (error) {
+    console.error('스키마 프리셋 적용 오류:', error);
     return {
-      success: true,
-      relationTypesCount: relationTypes?.length || 0
+      success: false,
+      error: error instanceof Error ? error.message : '알 수 없는 오류'
     };
-  } catch (error: any) {
-    console.error('Insert relations error:', error);
-    throw error;
   }
 }
