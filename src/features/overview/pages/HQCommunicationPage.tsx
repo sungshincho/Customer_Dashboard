@@ -6,9 +6,23 @@ import { GuidelineForm } from "../components/GuidelineForm";
 import { NotificationPanel } from "../components/NotificationPanel";
 import { MessageSquare, FileText, Bell } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useActivityLogger } from "@/hooks/useActivityLogger";
+import { useLocation } from "react-router-dom";
+import { useEffect } from "react";
 
 const HQCommunicationPage = () => {
   const { isOrgHQ } = useAuth();
+  const { logActivity } = useActivityLogger();
+  const location = useLocation();
+
+  // 페이지 방문 로깅
+  useEffect(() => {
+    logActivity('page_view', { 
+      page: location.pathname,
+      page_name: 'HQ Communication',
+      timestamp: new Date().toISOString() 
+    });
+  }, [location.pathname]);
 
   return (
     <DashboardLayout>

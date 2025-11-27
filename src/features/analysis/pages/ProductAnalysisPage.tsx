@@ -11,14 +11,27 @@ import { useRealtimeInventory } from "@/hooks/useRealtimeInventory";
 import { supabase } from "@/integrations/supabase/client";
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useActivityLogger } from "@/hooks/useActivityLogger";
+import { useLocation } from "react-router-dom";
 
 const COLORS = ['#1B6BFF', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
 export default function ProductAnalysisPage() {
   const { selectedStore } = useSelectedStore();
+  const { logActivity } = useActivityLogger();
+  const location = useLocation();
   const { data: storeData, isLoading, refetch } = useStoreDataset();
   const { inventoryLevels } = useRealtimeInventory();
   const [products, setProducts] = useState<any[]>([]);
+
+  // 페이지 방문 로깅
+  useEffect(() => {
+    logActivity('page_view', { 
+      page: location.pathname,
+      page_name: 'Product Analysis',
+      timestamp: new Date().toISOString() 
+    });
+  }, [location.pathname]);
 
   useEffect(() => {
     const fetchProducts = async () => {

@@ -16,9 +16,22 @@ import { CustomerPathOverlay, CustomerAvatarOverlay, ZoneBoundaryOverlay } from 
 import type { StoreSpaceMetadata } from "@/features/simulation/types/iot.types";
 import type { CustomerAvatar } from "@/features/simulation/types/avatar.types";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { useActivityLogger } from "@/hooks/useActivityLogger";
+import { useLocation } from "react-router-dom";
 
 export default function CustomerAnalysisIntegratedPage() {
   const { selectedStore } = useSelectedStore();
+  const { logActivity } = useActivityLogger();
+  const location = useLocation();
+  
+  // 페이지 방문 로깅
+  useEffect(() => {
+    logActivity('page_view', { 
+      page: location.pathname,
+      page_name: 'Customer Analysis',
+      timestamp: new Date().toISOString() 
+    });
+  }, [location.pathname]);
   
   // 3D Journey Controls
   const [timeOfDay, setTimeOfDay] = useState(14);

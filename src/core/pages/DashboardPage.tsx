@@ -19,14 +19,27 @@ import { useAIRecommendations } from "@/hooks/useAIRecommendations";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { useActivityLogger } from "@/hooks/useActivityLogger";
+import { useLocation } from "react-router-dom";
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const { logActivity } = useActivityLogger();
+  const location = useLocation();
   const { selectedStore } = useSelectedStore();
   const { invalidateStoreData } = useClearCache();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   
   const { data: storeData, isLoading: loading, error, refetch } = useStoreDataset();
+
+  // 페이지 방문 로깅
+  useEffect(() => {
+    logActivity('page_view', { 
+      page: location.pathname,
+      page_name: 'Dashboard',
+      timestamp: new Date().toISOString() 
+    });
+  }, [location.pathname]);
   
   // 선택된 날짜의 KPI 데이터
   const dateStr = format(selectedDate, 'yyyy-MM-dd');

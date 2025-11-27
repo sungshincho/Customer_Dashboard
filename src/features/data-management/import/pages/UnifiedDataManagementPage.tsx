@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { useToast } from "@/hooks/use-toast";
+import { useActivityLogger } from "@/hooks/useActivityLogger";
+import { useLocation } from "react-router-dom";
 
 // 통합 컴포넌트 임포트
 import { UnifiedDataUpload } from "../components/UnifiedDataUpload";
@@ -24,8 +26,19 @@ import { DemoReadinessChecker } from "../components/DemoReadinessChecker";
 export default function UnifiedDataManagementPage() {
   const { selectedStore } = useSelectedStore();
   const { toast } = useToast();
+  const { logActivity } = useActivityLogger();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState("unified");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // 페이지 방문 로깅
+  useEffect(() => {
+    logActivity('page_view', { 
+      page: location.pathname,
+      page_name: 'Data Management',
+      timestamp: new Date().toISOString() 
+    });
+  }, [location.pathname]);
 
   const handleUploadSuccess = () => {
     setRefreshTrigger(prev => prev + 1);

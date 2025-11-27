@@ -16,9 +16,13 @@ import { useToast } from "@/hooks/use-toast";
 import { Layers, Link2, History, ShieldCheck, Network, Download, Loader2, Calculator } from "lucide-react";
 import { RetailSchemaPreset } from "@/features/data-management/ontology/components/RetailSchemaPreset";
 import { OntologyVariableCalculator } from "@/features/data-management/ontology/components/OntologyVariableCalculator";
+import { useActivityLogger } from "@/hooks/useActivityLogger";
+import { useLocation } from "react-router-dom";
 
 const SchemaBuilder = () => {
   const { toast } = useToast();
+  const { logActivity } = useActivityLogger();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const [selectedVersion, setSelectedVersion] = useState<string>("");
   const [ontologyStats, setOntologyStats] = useState({
@@ -29,6 +33,15 @@ const SchemaBuilder = () => {
     totalEntityInstances: 0,
     totalRelationInstances: 0,
   });
+
+  // 페이지 방문 로깅
+  useEffect(() => {
+    logActivity('page_view', { 
+      page: location.pathname,
+      page_name: 'Schema Builder',
+      timestamp: new Date().toISOString() 
+    });
+  }, [location.pathname]);
 
   // 온톨로지 통계 가져오기
   useEffect(() => {

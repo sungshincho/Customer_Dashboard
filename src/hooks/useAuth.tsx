@@ -210,10 +210,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [navigate]);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
+    
+    // 로그인 성공 시 활동 로깅
+    if (!error && data.user) {
+      setTimeout(async () => {
+        try {
+          const { data: membership } = await supabase
+            .from('organization_members')
+            .select('org_id')
+            .eq('user_id', data.user.id)
+            .single();
+
+          await supabase
+            .from('user_activity_logs')
+            .insert({
+              user_id: data.user.id,
+              org_id: membership?.org_id || null,
+              activity_type: 'login',
+              activity_data: { 
+                timestamp: new Date().toISOString(),
+                method: 'email_password'
+              },
+            });
+        } catch (err) {
+          console.debug('Login activity logging skipped:', err);
+        }
+      }, 0);
+    }
+    
     return { error };
   };
 
@@ -231,6 +259,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    // 로그아웃 전 활동 로깅
+    if (user?.id && orgId) {
+      try {
+        await supabase
+          .from('user_activity_logs')
+          .insert({
+            user_id: user.id,
+            org_id: orgId,
+            activity_type: 'logout',
+            activity_data: { 
+              timestamp: new Date().toISOString()
+            },
+          });
+      } catch (err) {
+        console.debug('Logout activity logging skipped:', err);
+      }
+    }
+    
     await supabase.auth.signOut();
     navigate("/auth");
   };

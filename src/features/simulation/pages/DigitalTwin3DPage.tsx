@@ -17,11 +17,24 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, Save, Trash2, Layers, Eye, RefreshCw, AlertCircle, ArrowRight } from "lucide-react";
 import type { SceneRecipe, LightingPreset } from "@/types/scene3d";
+import { useActivityLogger } from "@/hooks/useActivityLogger";
+import { useLocation } from "react-router-dom";
 
 export default function DigitalTwin3DPage() {
   const { user } = useAuth();
+  const { logActivity } = useActivityLogger();
+  const location = useLocation();
   const { selectedStore } = useSelectedStore();
   const { activeScene, allScenes, saveScene, setActiveScene, deleteScene, isSaving } = useStoreScene();
+
+  // 페이지 방문 로깅
+  useEffect(() => {
+    logActivity('page_view', { 
+      page: location.pathname,
+      page_name: 'Digital Twin 3D',
+      timestamp: new Date().toISOString() 
+    });
+  }, [location.pathname]);
 
   const [models, setModels] = useState<ModelLayer[]>([]);
   const [activeLayers, setActiveLayers] = useState<string[]>([]);
