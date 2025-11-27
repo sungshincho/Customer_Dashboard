@@ -61,13 +61,16 @@ export async function loadFileFromStorage<T = any[]>(
     };
     
   } catch (error: any) {
-    console.error(`Failed to load ${fileName}:`, error);
+    // 파일이 없는 경우는 정상적인 상황이므로 조용히 처리
+    if (error.message !== '{}' && error.name !== 'StorageUnknownError') {
+      console.error(`Failed to load ${fileName}:`, error);
+    }
     
     return {
       data: [] as T,
       source: 'storage',
       loadedAt: Date.now(),
-      error: error.message
+      error: error.message || 'File not found'
     };
   }
 }

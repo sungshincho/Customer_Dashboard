@@ -32,10 +32,7 @@ export function useStoreDataFile<K extends DataFileType>(
         options
       );
       
-      if (result.error && !result.data.length) {
-        throw new Error(result.error);
-      }
-      
+      // 파일이 없어도 빈 배열로 처리 (에러 발생시키지 않음)
       return result;
     },
     enabled: !!selectedStore,
@@ -118,10 +115,7 @@ export function useMultipleStoreDataFiles<K extends DataFileType>(
           options
         );
         
-        if (result.error && !result.data.length) {
-          throw new Error(result.error);
-        }
-        
+        // 파일이 없어도 빈 배열로 처리 (에러 발생시키지 않음)
         return result;
       },
       enabled: !!selectedStore,
