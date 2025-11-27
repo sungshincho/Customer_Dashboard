@@ -9,7 +9,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Store, Loader2, Sparkles, AlertTriangle, CheckCircle, Plus, RefreshCw, Link2 } from "lucide-react";
-import { insertComprehensiveSchema, insertRelationsOnly } from "../utils/comprehensiveRetailSchema";
+import { applyRetailSchemaPreset } from "../utils/comprehensiveRetailSchema";
 
 type SchemaMode = 'merge' | 'replace';
 
@@ -115,80 +115,54 @@ export const RetailSchemaPreset = () => {
     },
   });
 
-  // 정교한 디지털 트윈 스키마 생성
+  // 최적화된 리테일 온톨로지 스키마 적용
   const createRetailSchemaMutation = useMutation({
     mutationFn: async () => {
       const userId = (await supabase.auth.getUser()).data.user?.id;
+      const orgId = (await supabase.auth.getUser()).data.user?.user_metadata?.org_id || null;
       if (!userId) throw new Error("로그인이 필요합니다");
 
       let backupVersion = null;
 
-      // 프리셋으로 초기화 모드인 경우 먼저 백업 후 삭제
+      // 프리셋으로 초기화 모드인 경우 먼저 백업
       if (schemaMode === 'replace') {
-        // 1. 현재 스키마를 버전으로 백업
         backupVersion = await backupCurrentSchemaMutation.mutateAsync();
-        
-        // 2. 기존 스키마 삭제
-        await clearSchemaMutation.mutateAsync();
       }
       
-      // 정교한 디지털 트윈 스키마 적용
-      const result = await insertComprehensiveSchema(userId);
+      // 최적화된 리테일 온톨로지 스키마 적용
+      const result = await applyRetailSchemaPreset(userId, orgId, schemaMode);
       
-      return { backupVersion, ...result };
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+      
+      return { backupVersion, entitiesCount: result.entitiesCount, relationsCount: result.relationsCount };
     },
-    onSuccess: ({ backupVersion, entityTypesCount, relationTypesCount }) => {
+    onSuccess: ({ backupVersion, entitiesCount, relationsCount }) => {
       queryClient.invalidateQueries({ queryKey: ['entity-types'] });
       queryClient.invalidateQueries({ queryKey: ['relation-types'] });
       queryClient.invalidateQueries({ queryKey: ['schema-versions'] });
       
       const message = schemaMode === 'merge' 
-        ? "기존 스키마에 정교한 디지털 트윈 스키마가 추가되었습니다."
+        ? "기존 스키마에 최적화된 리테일 온톨로지 스키마가 추가되었습니다."
         : "이전 스키마는 버전으로 안전하게 백업되었습니다. '스키마 불러오기'에서 복원할 수 있습니다.";
       
       toast({
-        title: "정교한 디지털 트윈 스키마 적용 완료",
-        description: `${entityTypesCount}개 엔티티 타입과 ${relationTypesCount}개 관계 타입이 추가되었습니다. ${message}`,
+        title: "최적화된 리테일 온톨로지 스키마 적용 완료",
+        description: `${entitiesCount}개 엔티티와 ${relationsCount}개 관계가 적용되었습니다. ${message}`,
       });
     },
     onError: (error: any) => {
-      console.error("스키마 생성 오류:", error);
+      console.error("스키마 적용 오류:", error);
       toast({
-        title: "스키마 생성 실패",
+        title: "스키마 적용 실패",
         description: error.message || "알 수 없는 오류가 발생했습니다.",
         variant: "destructive",
       });
     },
   });
 
-  // 관계만 추가
-  const addRelationsMutation = useMutation({
-    mutationFn: async () => {
-      const userId = (await supabase.auth.getUser()).data.user?.id;
-      if (!userId) throw new Error("로그인이 필요합니다");
-      
-      const result = await insertRelationsOnly(userId);
-      return result;
-    },
-    onSuccess: ({ relationTypesCount }) => {
-      queryClient.invalidateQueries({ queryKey: ['relation-types'] });
-      
-      toast({
-        title: "관계 타입 추가 완료",
-        description: `${relationTypesCount}개 관계 타입이 추가되었습니다.`,
-      });
-    },
-    onError: (error: any) => {
-      console.error("관계 추가 오류:", error);
-      toast({
-        title: "관계 추가 실패",
-        description: error.message || "알 수 없는 오류가 발생했습니다.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const isLoading = createRetailSchemaMutation.isPending || clearSchemaMutation.isPending || backupCurrentSchemaMutation.isPending || addRelationsMutation.isPending;
+  const isLoading = createRetailSchemaMutation.isPending || clearSchemaMutation.isPending || backupCurrentSchemaMutation.isPending;
 
   return (
     <Card className="glass-card border-primary/20">
@@ -199,14 +173,14 @@ export const RetailSchemaPreset = () => {
           </div>
           <div className="flex-1">
             <CardTitle className="flex items-center gap-2">
-              통합 디지털 트윈 & 비즈니스 인텔리전스 스키마
+              최적화된 리테일 온톨로지 스키마 v2.1
               <Badge variant="default" className="ml-2">
                 <Sparkles className="h-3 w-3 mr-1" />
-                Complete
+                Optimized
               </Badge>
             </CardTitle>
             <CardDescription className="mt-1.5">
-              디지털 트윈(29) + 비즈니스 인텔리전스(15) = 총 44개 엔티티, 93개 관계
+              43개 엔티티 (CRITICAL: 17, HIGH: 12, MEDIUM: 9, LOW: 5) + 70개 관계 (CRITICAL: 25, HIGH: 20, MEDIUM: 15, LOW: 10)
             </CardDescription>
           </div>
         </div>
@@ -216,51 +190,41 @@ export const RetailSchemaPreset = () => {
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-              <span className="text-sm font-medium">공간 구조 (11개)</span>
+              <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+              <span className="text-sm font-medium">🔴 CRITICAL - 17개</span>
             </div>
             <p className="text-xs text-muted-foreground pl-4">
-              Zone, Shelf, DisplayTable, Rack, Wall, Entrance, CheckoutCounter, Aisle, FittingRoom, StorageRoom, Window
+              조직/매장(2), 공간구조(3), 제품(5), 고객/거래(4), 직원/운영(2), IoT센서(1)
             </p>
           </div>
           
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-              <span className="text-sm font-medium">IoT & 디지털 장비 (9개)</span>
+              <div className="h-2 w-2 rounded-full bg-yellow-500 animate-pulse" />
+              <span className="text-sm font-medium">🟡 HIGH - 12개</span>
             </div>
             <p className="text-xs text-muted-foreground pl-4">
-              Sensor, Camera, Beacon, WiFiProbe, DigitalSignage, POS, Kiosk, SmartMirror
+              외부컨텍스트(3), 공간구조(3), 가구/집기(3), 제품(1), IoT센서(2)
             </p>
           </div>
           
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-              <span className="text-sm font-medium">환경 시스템 (5개)</span>
+              <div className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
+              <span className="text-sm font-medium">🟠 MEDIUM - 9개</span>
             </div>
             <p className="text-xs text-muted-foreground pl-4">
-              Lighting, HVAC, AudioSystem, MusicPlaylist, ScentDiffuser
+              시계열집계(3), 운영/직원(1), IoT센서(4), 시스템(1)
             </p>
           </div>
           
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-              <span className="text-sm font-medium">상품 진열 (4개)</span>
+              <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-sm font-medium">🟢 LOW - 5개</span>
             </div>
             <p className="text-xs text-muted-foreground pl-4">
-              ProductPlacement, Display, StaffZone, CustomerJourney
-            </p>
-          </div>
-          
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-secondary animate-pulse" />
-              <span className="text-sm font-medium">비즈니스 인텔리전스 (15개)</span>
-            </div>
-            <p className="text-xs text-muted-foreground pl-4">
-              Store, Customer, Product, Sale, Visit, Inventory, DemandForecast, PriceOptimization, Promotion, MarketingCampaign, PurchaseConversion, ZoneAnalysis, StaffSchedule, Alert, Staff
+              AI/분석(2), 시스템(3)
             </p>
           </div>
         </div>
@@ -293,7 +257,7 @@ export const RetailSchemaPreset = () => {
                 기존 스키마에 추가 (병합)
               </Label>
               <p className="text-sm text-muted-foreground">
-                현재 작업 중인 스키마를 유지하고 정교한 디지털 트윈 엔티티와 관계를 추가합니다.
+                현재 작업 중인 스키마를 유지하고 최적화된 리테일 온톨로지를 추가합니다.
               </p>
             </div>
           </div>
@@ -306,7 +270,7 @@ export const RetailSchemaPreset = () => {
                 새로 시작 (자동 백업)
               </Label>
               <p className="text-sm text-muted-foreground">
-                현재 스키마를 버전으로 자동 백업한 후 정교한 디지털 트윈 스키마로 전환합니다.
+                현재 스키마를 버전으로 자동 백업한 후 최적화된 리테일 온톨로지 스키마로 전환합니다.
               </p>
               {schemaMode === 'replace' && (
                 <div className="flex items-center gap-2 mt-2 p-2 rounded bg-primary/10 text-sm text-primary">
@@ -335,37 +299,18 @@ export const RetailSchemaPreset = () => {
               {schemaMode === 'replace' ? (
                 <>
                   <RefreshCw className="mr-2 h-5 w-5" />
-                  백업 후 스키마로 전환
+                  최적화된 스키마로 전환
                 </>
               ) : (
                 <>
                   <Plus className="mr-2 h-5 w-5" />
-                  정교한 디지털 트윈 스키마 추가
+                  최적화된 스키마 추가
                 </>
               )}
             </>
           )}
         </Button>
 
-        <Button
-          className="w-full"
-          size="default"
-          variant="outline"
-          onClick={() => addRelationsMutation.mutate()}
-          disabled={isLoading}
-        >
-          {addRelationsMutation.isPending ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              관계 추가 중...
-            </>
-          ) : (
-            <>
-              <Link2 className="mr-2 h-4 w-4" />
-              관계 93개만 추가 (엔티티는 유지)
-            </>
-          )}
-        </Button>
       </CardContent>
     </Card>
   );
