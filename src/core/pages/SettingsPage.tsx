@@ -174,7 +174,9 @@ const Settings = () => {
           licenses (
             license_type,
             status,
-            license_key
+            monthly_price,
+            effective_date,
+            expiry_date
           )
         `)
         .eq('org_id', orgId)
