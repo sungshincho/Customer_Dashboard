@@ -1,8 +1,8 @@
-# NEURALTWIN 온톨로지 스키마 v2.0 (중요도 기반 구조)
+# NEURALTWIN 온톨로지 스키마 v2.1 (최적화 완료)
 
 > **최종 업데이트**: 2025-01-27  
 > **엔티티 타입**: 43개 (CRITICAL 17 | HIGH 12 | MEDIUM 9 | LOW 5)  
-> **관계 타입**: 95개  
+> **관계 타입**: 70개 (95개 → 70개, 26% 최적화)  
 > **용도**: AI 추론 규칙 엔진 및 데이터 모델링  
 > **호환성**: 실제 데이터베이스 구조 100% 반영
 
@@ -14,7 +14,7 @@
 2. [🟡 HIGH 엔티티 (12개)](#-high-엔티티-12개)
 3. [🟠 MEDIUM 엔티티 (9개)](#-medium-엔티티-9개)
 4. [🟢 LOW 엔티티 (5개)](#-low-엔티티-5개)
-5. [관계 타입 (95개)](#관계-타입-95개)
+5. [관계 타입 (70개)](#관계-타입-70개)
 6. [데이터 생성 가이드](#데이터-생성-가이드)
 
 ---
@@ -758,321 +758,349 @@
 
 ---
 
-## 관계 타입 (95개)
+## 🔗 관계 타입 (70개)
 
-### 1. 조직 관계 (3개)
-
-1. **belongs_to_org** (소속됨)
-   - Source: Store → Target: Organization
-   - Directionality: directed
-   - Description: 매장이 조직에 소속됨
-
-2. **member_of** (멤버임)
-   - Source: Staff → Target: Organization
-   - Directionality: directed
-   - Description: 직원이 조직 멤버임
-
-3. **customer_of_org** (조직 고객)
-   - Source: Customer → Target: Organization
-   - Directionality: directed
-   - Description: 고객이 조직의 고객임
+> **최적화 완료**: 95개 → 70개 (25개 제거, AI 추론 핵심 중심)
 
 ---
 
-### 2. 공간 관계 (15개)
+### ⭐ CRITICAL (25개) - AI 추론 엔진 필수
 
-4. **contains** (포함함)
-   - Source: Store → Target: Zone
+#### 공간/레이아웃 (4개)
+
+1. **CONTAINS** (포함함)
+   - Source: Store → Zone, Zone → Shelf/Rack/DisplayTable
+   - Reverse: PART_OF
    - Directionality: directed
-   - Description: 매장이 구역을 포함함
+   - Description: 공간 계층 구조
 
-5. **contains** (포함함)
-   - Source: Zone → Target: Shelf/Rack/DisplayTable/CheckoutCounter/FittingRoom
-   - Directionality: directed
-
-6. **adjacent_to** (인접함)
-   - Source: Zone → Target: Zone
+2. **CONNECTED_TO** (연결됨)
+   - Source: Zone ↔ Zone, Entrance ↔ Zone
    - Directionality: undirected
-   - Description: 구역이 인접함
+   - Description: 구역 간 연결성
 
-7. **connects_to** (연결됨)
-   - Source: Zone → Target: Aisle
-   - Directionality: undirected
-   - Description: 구역이 통로와 연결됨
-
-8. **leads_to** (연결함)
-   - Source: Entrance → Target: Zone
+3. **HAS_ENTRANCE** (입구 보유)
+   - Source: Store → Entrance
    - Directionality: directed
-   - Description: 입구가 구역으로 연결됨
 
-9. **accesses** (접근함)
-   - Source: Entrance → Target: StorageRoom
+4. **HAS_CHECKOUT** (계산대 보유)
+   - Source: Store → CheckoutCounter
    - Directionality: directed
 
 ---
 
-### 3. 제품 관계 (22개)
+#### 상품/재고 (5개)
 
-10. **belongs_to_category** (카테고리 소속) ⭐ NEW
-    - Source: Product → Target: Category
-    - Directionality: directed
-    - Description: 제품이 카테고리에 소속됨
+5. **BELONGS_TO_CATEGORY** (카테고리 소속)
+   - Source: Product → Category
+   - Directionality: directed
 
-11. **subcategory_of** (하위 카테고리) ⭐ NEW
-    - Source: Category → Target: Category
-    - Directionality: directed
-    - Description: 하위 카테고리 관계
+6. **SOLD_BY** (판매됨)
+   - Source: Product → Store
+   - Reverse: SELLS
+   - Directionality: directed
 
-12. **belongs_to_brand** (브랜드 소속)
-    - Source: Product → Target: Brand
-    - Directionality: directed
+7. **IN_STOCK** (재고 보유)
+   - Source: Product → Inventory
+   - Directionality: directed
 
-13. **displays** (진열함)
-    - Source: Shelf/Rack/DisplayTable → Target: Product
-    - Directionality: directed
+8. **SUPPLIED_BY** (공급받음)
+   - Source: Product → Supplier
+   - Reverse: SUPPLIES
+   - Directionality: directed
 
-14. **has_inventory** (재고 보유)
-    - Source: Product → Target: Inventory
-    - Directionality: directed
+9. **HAS_PROMOTION** (프로모션 적용)
+   - Source: Product → Promotion
+   - Directionality: directed
 
-15. **supplied_by** (공급받음)
-    - Source: Product → Target: Supplier
-    - Directionality: directed
+---
 
-16. **included_in_promotion** (프로모션 포함)
-    - Source: Product → Target: Promotion
-    - Directionality: directed
+#### 고객/방문 (5개)
 
-17. **active_in_zone** (구역 활성) ⭐ NEW
-    - Source: Promotion → Target: Zone
-    - Directionality: directed
-    - Description: 프로모션이 특정 구역에서 활성
-
-18. **replenished_from** (보충됨)
-    - Source: Inventory → Target: StorageRoom
+10. **VISITED** (방문함)
+    - Source: Customer → Store
     - Directionality: directed
 
-19. **recommends** (추천함)
-    - Source: Product → Target: Product
-    - Directionality: directed
-    - Description: 연관 상품 추천
-
-20. **substitutes** (대체함)
-    - Source: Product → Target: Product
+11. **PURCHASED** (구매함)
+    - Source: Customer → Product
     - Directionality: directed
 
-21. **complements** (보완함)
-    - Source: Product → Target: Product
+12. **ENTERED_ZONE** (구역 입장)
+    - Source: Visit → Zone
+    - Directionality: directed
+
+13. **SPENT_TIME_IN** (체류함)
+    - Source: Visit → Zone
+    - Properties: { duration_minutes: number }
+    - Directionality: directed
+
+14. **CHECKED_OUT_AT** (계산함)
+    - Source: Visit → CheckoutCounter
     - Directionality: directed
 
 ---
 
-### 4. 고객/거래 관계 (25개)
+#### 운영/인력 (2개)
 
-22. **visited_by** (방문받음)
-    - Source: Store → Target: Customer
+15. **WORKS_AT** (근무함)
+    - Source: Staff → Store
+    - Reverse: EMPLOYS
     - Directionality: directed
 
-23. **visits** (방문함)
-    - Source: Customer → Target: Visit
-    - Directionality: directed
-
-24. **visited_zone** (구역 방문)
-    - Source: Visit → Target: Zone
-    - Directionality: directed
-
-25. **entered_via** (입장함)
-    - Source: Visit → Target: Entrance
-    - Directionality: directed
-
-26. **used_fitting_room** (피팅룸 사용)
-    - Source: Visit → Target: FittingRoom
-    - Directionality: directed
-
-27. **made_transaction** (거래함) ⭐ NEW
-    - Source: Customer → Target: Transaction
-    - Directionality: directed
-
-28. **transaction_in_visit** (방문 내 거래) ⭐ NEW
-    - Source: Transaction → Target: Visit
-    - Directionality: directed
-
-29. **contains_purchase** (구매 포함) ⭐ NEW
-    - Source: Transaction → Target: Purchase
-    - Directionality: directed
-
-30. **purchased** (구매함)
-    - Source: Purchase → Target: Product
-    - Directionality: directed
-
-31. **checked_out_at** (계산함)
-    - Source: Transaction → Target: CheckoutCounter
-    - Directionality: directed
-
-32. **interacted_with** (상호작용함)
-    - Source: Customer → Target: Product
-    - Directionality: directed
-
-33. **influenced_by_promotion** (프로모션 영향)
-    - Source: Customer → Target: Promotion
-    - Directionality: directed
-
-34. **segment_belongs_to** (세그먼트 소속)
-    - Source: Customer → Target: Customer
-    - Directionality: directed
-
-35. **repeat_visitor** (재방문 고객)
-    - Source: Customer → Target: Store
+16. **ASSIGNED_TO_SHIFT** (시프트 배정)
+    - Source: Staff → Shift
     - Directionality: directed
 
 ---
 
-### 5. 직원/운영 관계 (12개)
+#### IoT/센서 (2개)
 
-36. **works_at** (근무함)
-    - Source: Staff → Target: Store
+17. **MONITORED_BY** (감시됨)
+    - Source: Zone → WiFiSensor/Camera/Beacon
     - Directionality: directed
 
-37. **has_shift** (시프트 보유)
-    - Source: Staff → Target: Shift
-    - Directionality: directed
-
-38. **performs_task** (업무 수행)
-    - Source: Staff → Target: Task
-    - Directionality: directed
-
-39. **manages** (관리함)
-    - Source: Staff → Target: Zone
-    - Directionality: directed
-
-40. **restocks** (재입고함)
-    - Source: Staff → Target: Shelf
-    - Directionality: directed
-
-41. **operates** (운영함)
-    - Source: Staff → Target: POS
-    - Directionality: directed
-
-42. **supervises** (감독함)
-    - Source: Staff → Target: Staff
-    - Directionality: directed
-
-43. **assists_customer** (고객 응대) ⭐ NEW
-    - Source: Staff → Target: Customer
-    - Directionality: directed
-
-44. **scheduled_for** (스케줄됨)
-    - Source: Shift → Target: Zone
-    - Directionality: directed
-
-45. **task_in_zone** (구역 내 업무)
-    - Source: Task → Target: Zone
+18. **DETECTED_BY** (감지됨)
+    - Source: Customer → WiFiSensor
     - Directionality: directed
 
 ---
 
-### 6. IoT/센서 관계 (10개)
+#### 분석/성과 (2개)
 
-46. **installed_in** (설치됨)
-    - Source: WiFiSensor/Beacon/Camera/DoorSensor/PeopleCounter/TemperatureSensor/HumiditySensor → Target: Zone/Entrance
+19. **GENERATED_SALES** (매출 발생)
+    - Source: Store → DailySales
     - Directionality: directed
 
-47. **tracked_by** (추적됨)
-    - Source: Customer → Target: WiFiSensor
-    - Directionality: directed
-
-48. **detected_by** (감지됨)
-    - Source: Customer → Target: Beacon
-    - Directionality: directed
-
-49. **counted_by** (계수됨)
-    - Source: Visit → Target: PeopleCounter
-    - Directionality: directed
-
-50. **recorded_by** (기록됨)
-    - Source: Visit → Target: Camera
-    - Directionality: directed
-
-51. **climate_controls** (온도제어)
-    - Source: HVAC → Target: Zone
-    - Directionality: directed
-
-52. **mounted_on** (설치됨)
-    - Source: DigitalSignage → Target: Zone
-    - Directionality: directed
-
-53. **monitors** (감시함)
-    - Source: Camera → Target: Zone
+20. **HAS_TRANSACTION** (거래 발생)
+    - Source: Visit → Transaction
     - Directionality: directed
 
 ---
 
-### 7. 외부 컨텍스트 관계 (8개) ⭐ NEW
+### 🔵 HIGH (20개) - 고급 AI 추론용
 
-54. **weather_on_day** (날씨 영향)
-    - Source: Store → Target: Weather
-    - Directionality: directed
-    - Description: 매장이 날씨 영향을 받음
+#### 공간/레이아웃 (4개)
 
-55. **affected_by_holiday** (공휴일 영향)
-    - Source: Store → Target: Holiday
+21. **HAS_ZONE** (구역 보유)
+    - Source: Store → Zone
     - Directionality: directed
 
-56. **economic_context** (경제 맥락)
-    - Source: Store → Target: EconomicIndicator
+22. **HAS_AISLE** (통로 보유)
+    - Source: Zone → Aisle
     - Directionality: directed
 
-57. **daily_aggregation** (일별 집계) ⭐ NEW
-    - Source: Store → Target: DailySales
+23. **HAS_FITTING_ROOM** (피팅룸 보유)
+    - Source: Zone → FittingRoom
     - Directionality: directed
 
-58. **inventory_snapshot** (재고 스냅샷) ⭐ NEW
-    - Source: Inventory → Target: InventoryHistory
-    - Directionality: directed
-
-59. **zone_metrics** (구역 지표) ⭐ NEW
-    - Source: Zone → Target: ZonePerformance
+24. **HAS_STORAGE_ROOM** (창고 보유)
+    - Source: Store → StorageRoom
     - Directionality: directed
 
 ---
 
-### 8. AI/분석 관계 (10개)
+#### 상품/재고 (4개)
 
-60. **forecast_for_product** (제품 수요 예측)
-    - Source: DemandForecast → Target: Product
+25. **PLACED_ON** (배치됨)
+    - Source: Product → Shelf/Rack/DisplayTable
+    - Directionality: directed
+    - Note: DISPLAYED_ON + STORED_IN 통합
+
+26. **PROMOTED_IN** (프로모션 활성)
+    - Source: Promotion → Zone
     - Directionality: directed
 
-61. **forecast_for_zone** (구역 수요 예측)
-    - Source: DemandForecast → Target: Zone
+27. **REPLENISHED** (보충됨)
+    - Source: Inventory → Product
     - Directionality: directed
 
-62. **optimizes_price_for** (가격 최적화 대상)
-    - Source: PriceOptimization → Target: Product
+28. **BELONGS_TO_BRAND** (브랜드 소속)
+    - Source: Product → Brand
     - Directionality: directed
 
-63. **based_on_demand** (수요 기반)
-    - Source: PriceOptimization → Target: DemandForecast
+---
+
+#### 고객/방문 (3개)
+
+29. **TRIED_ON** (착용 시도)
+    - Source: Customer → Product
     - Directionality: directed
 
-64. **promotion_drives_forecast** (프로모션 수요 증가)
-    - Source: Promotion → Target: DemandForecast
+30. **RETURNED_PRODUCT** (제품 반품)
+    - Source: Customer → Product
     - Directionality: directed
 
-65. **seasonality_affects** (계절성 영향)
-    - Source: DemandForecast → Target: Inventory
+31. **BELONGS_TO_SEGMENT** (세그먼트 소속)
+    - Source: Customer → CustomerSegment
     - Directionality: directed
 
-66. **stock_optimization** (재고 최적화)
-    - Source: DemandForecast → Target: Inventory
+---
+
+#### 외부 데이터 (3개)
+
+32. **AFFECTED_BY_WEATHER** (날씨 영향)
+    - Source: Store → Weather
+    - Reverse: AFFECTS
     - Directionality: directed
 
-67. **alert_for_inventory** (재고 알림)
-    - Source: Alert → Target: Inventory
+33. **AFFECTED_BY_HOLIDAY** (공휴일 영향)
+    - Source: Store → Holiday
+    - Reverse: AFFECTS
     - Directionality: directed
 
-68. **alert_for_sensor** (센서 알림)
-    - Source: Alert → Target: WiFiSensor/TemperatureSensor/HumiditySensor
+34. **INFLUENCED_BY_ECONOMIC** (경제 영향)
+    - Source: Store → EconomicIndicator
+    - Reverse: AFFECTS
     - Directionality: directed
+
+---
+
+#### 분석/성과 (2개)
+
+35. **TRACKED_IN_DAILY_SALES** (일별 매출 추적)
+    - Source: Product → DailySales
+    - Directionality: directed
+
+36. **RECORDED_IN_INVENTORY_HISTORY** (재고 이력 기록)
+    - Source: Product → InventoryHistory
+    - Directionality: directed
+
+---
+
+#### 운영/인력 (4개)
+
+37. **ASSIGNED_TO_ZONE** (구역 배정)
+    - Source: Staff → Zone
+    - Directionality: directed
+
+38. **MANAGES** (관리함)
+    - Source: Staff → Store
+    - Directionality: directed
+
+---
+
+### 🟡 MEDIUM (15개) - 특정 업종/고급 기능
+
+#### 공간/레이아웃 (3개)
+
+39. **HAS_SHELF** (선반 보유)
+    - Source: Zone → Shelf
+    - Directionality: directed
+
+40. **HAS_RACK** (랙 보유)
+    - Source: Zone → Rack
+    - Directionality: directed
+
+41. **HAS_DISPLAY_TABLE** (테이블 보유)
+    - Source: Zone → DisplayTable
+    - Directionality: directed
+
+---
+
+#### IoT/센서 (2개)
+
+42. **EQUIPPED_WITH** (장비 설치)
+    - Source: Zone → Camera/Beacon/PeopleCounter
+    - Directionality: directed
+    - Note: HAS_CAMERA + HAS_BEACON + HAS_PEOPLE_COUNTER 통합
+
+43. **HAS_WIFI_SENSOR** (WiFi 센서 설치)
+    - Source: Zone → WiFiSensor
+    - Directionality: directed
+
+---
+
+#### 운영/인력 (2개)
+
+44. **ASSIGNED_TO_TASK** (업무 배정)
+    - Source: Staff → Task
+    - Directionality: directed
+
+45. **TRIGGERED_ALERT** (알림 발생)
+    - Source: Alert → Staff
+    - Directionality: directed
+
+---
+
+#### 분석/성과 (2개)
+
+46. **MEASURED_IN_ZONE_PERFORMANCE** (구역 성과 측정)
+    - Source: Zone → ZonePerformance
+    - Directionality: directed
+
+47. **OPTIMIZED_FOR** (최적화 대상)
+    - Source: Product → DemandForecast/PriceOptimization
+    - Directionality: directed
+    - Note: FORECASTED_DEMAND + RECOMMENDED_PRICE_OPTIMIZATION 통합
+
+---
+
+### 🟢 LOW (10개) - 나이스투해브
+
+#### 시뮬레이션 (2개)
+
+48. **SIMULATED_IN** (시뮬레이션 대상)
+    - Source: Product → Scenario
+    - Directionality: directed
+
+49. **OPTIMIZED_LAYOUT** (레이아웃 최적화)
+    - Source: Zone → LayoutOptimization
+    - Directionality: directed
+
+---
+
+#### IoT/센서 (3개)
+
+50. **HAS_POS** (POS 보유)
+    - Source: CheckoutCounter → POS
+    - Directionality: directed
+
+51. **HAS_DIGITAL_SIGNAGE** (사이니지 설치)
+    - Source: Zone → DigitalSignage
+    - Directionality: directed
+
+52. **CONTROLLED_BY_HVAC** (공조 제어)
+    - Source: Zone → HVAC
+    - Directionality: directed
+
+---
+
+#### 추천/최적화 (2개)
+
+53. **RECOMMENDED_PRODUCT** (제품 추천)
+    - Source: Customer → Product
+    - Directionality: directed
+
+54. **RECOMMENDED_PROMOTION** (프로모션 추천)
+    - Source: Customer → Promotion
+    - Directionality: directed
+
+---
+
+### ❌ 제거된 관계 (25개)
+
+**불필요한 공간 세부사항:**
+- HAS_WINDOW, HAS_WALL, HAS_STAFF_ZONE, HAS_RESTROOM, HAS_MANNEQUIN
+
+**중복 IoT 센서:**
+- HAS_DOOR_SENSOR (Entrance로 통합)
+- HAS_TEMPERATURE_SENSOR, HAS_HUMIDITY_SENSOR (Weather로 충분)
+- HAS_AUDIO_SYSTEM, MONITORED_BY_LIGHTING_SENSOR (핵심 AI 추론 불필요)
+
+**중복/통합된 관계:**
+- DISPLAYED_ON, STORED_IN → PLACED_ON으로 통합
+- HAS_CAMERA, HAS_BEACON, HAS_PEOPLE_COUNTER → EQUIPPED_WITH으로 통합
+- FORECASTED_DEMAND, RECOMMENDED_PRICE_OPTIMIZATION → OPTIMIZED_FOR로 통합
+
+**측정 불가능한 관계:**
+- INFLUENCED_BY_CUSTOMER_WTP (고객 지불의향 측정 불가)
+- CONVERTED_IN_PURCHASE (PURCHASED로 충분)
+
+**조직 관계 (중복):**
+- belongs_to_org, member_of, customer_of_org (org_id로 충분)
+
+**기타 세부 관계:**
+- adjacent_to, accesses, restocks, operates, supervises, assists_customer, scheduled_for, task_in_zone, tracked_by, counted_by, recorded_by, subcategory_of, recommends, substitutes, complements
 
 ---
 
@@ -1157,12 +1185,13 @@ WiFiSensor → Zone → Customer
 
 ## 버전 정보
 
-- **Version**: 2.0
+- **Version**: 2.1 (관계 최적화 완료)
 - **Last Updated**: 2025-01-27
 - **Total Entity Types**: 43 (CRITICAL 17 | HIGH 12 | MEDIUM 9 | LOW 5)
-- **Total Relation Types**: 95
+- **Total Relation Types**: 70 (95개 → 70개, 26% 최적화)
 - **Database Compatibility**: 47% (8개 완벽 매칭 / 17개 CRITICAL)
 - **Compatible with**: NEURALTWIN v3.0+
+- **Optimization**: AI 추론 엔진 필수 관계 집중, 중복/불필요 관계 제거
 
 ---
 
