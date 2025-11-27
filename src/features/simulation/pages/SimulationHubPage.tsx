@@ -13,11 +13,24 @@ import { DemandForecastResult } from '../components/DemandForecastResult';
 import { InventoryOptimizationResult } from '../components/InventoryOptimizationResult';
 import { PricingOptimizationResult } from '../components/PricingOptimizationResult';
 import { RecommendationStrategyResult } from '../components/RecommendationStrategyResult';
+import { useActivityLogger } from "@/hooks/useActivityLogger";
+import { useLocation } from "react-router-dom";
 
 export default function SimulationHubPage() {
   const { selectedStore } = useSelectedStore();
+  const { logActivity } = useActivityLogger();
+  const location = useLocation();
   const { infer, loading: isInferring } = useAIInference();
   const { contextData, loading: contextLoading } = useStoreContext(selectedStore?.id);
+
+  // 페이지 방문 로깅
+  useEffect(() => {
+    logActivity('page_view', { 
+      page: location.pathname,
+      page_name: 'Simulation Hub',
+      timestamp: new Date().toISOString() 
+    });
+  }, [location.pathname]);
 
   // Simulation results
   const [demandForecast, setDemandForecast] = useState<any>(null);

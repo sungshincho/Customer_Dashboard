@@ -13,13 +13,26 @@ import { HeatmapOverlay3D, ZoneBoundaryOverlay } from "@/features/simulation/com
 import type { StoreSpaceMetadata } from "@/features/simulation/types/iot.types";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { subDays, format } from "date-fns";
+import { useActivityLogger } from "@/hooks/useActivityLogger";
+import { useLocation } from "react-router-dom";
 
 export default function StoreAnalysisPage() {
   const { selectedStore } = useSelectedStore();
+  const { logActivity } = useActivityLogger();
+  const location = useLocation();
   const [dateRange] = useState<{ start: Date; end: Date }>({
     start: subDays(new Date(), 7),
     end: new Date(),
   });
+
+  // 페이지 방문 로깅
+  useEffect(() => {
+    logActivity('page_view', { 
+      page: location.pathname,
+      page_name: 'Store Analysis',
+      timestamp: new Date().toISOString() 
+    });
+  }, [location.pathname]);
   
   // 3D Controls
   const [timeOfDay, setTimeOfDay] = useState(14);

@@ -9,6 +9,8 @@ import { StoreForm } from "../components/StoreForm";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { useActivityLogger } from "@/hooks/useActivityLogger";
+import { useLocation } from "react-router-dom";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,8 +25,19 @@ import {
 
 const Stores = () => {
   const { user } = useAuth();
+  const { logActivity } = useActivityLogger();
+  const location = useLocation();
   const { stores, loading, refreshStores, selectedStore, setSelectedStore } = useSelectedStore();
   const [deleting, setDeleting] = useState<string | null>(null);
+
+  // 페이지 방문 로깅
+  useEffect(() => {
+    logActivity('page_view', { 
+      page: location.pathname,
+      page_name: 'Stores',
+      timestamp: new Date().toISOString() 
+    });
+  }, [location.pathname]);
 
   const handleDelete = async (storeId: string) => {
     if (!user) return;

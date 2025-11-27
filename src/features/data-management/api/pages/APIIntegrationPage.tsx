@@ -13,6 +13,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
+import { useActivityLogger } from "@/hooks/useActivityLogger";
+import { useLocation } from "react-router-dom";
 
 interface APIConnection {
   id: string;
@@ -66,6 +68,8 @@ const TARGET_TABLES = [
 
 export default function APIIntegrationPage() {
   const { user, orgId } = useAuth();
+  const { logActivity } = useActivityLogger();
+  const location = useLocation();
   const { selectedStore } = useSelectedStore();
   const [activeTab, setActiveTab] = useState("connections");
   const [connections, setConnections] = useState<APIConnection[]>([]);
@@ -74,6 +78,15 @@ export default function APIIntegrationPage() {
   const [loading, setLoading] = useState(false);
   const [testingId, setTestingId] = useState<string | null>(null);
   const [runningScheduleId, setRunningScheduleId] = useState<string | null>(null);
+
+  // 페이지 방문 로깅
+  useEffect(() => {
+    logActivity('page_view', { 
+      page: location.pathname,
+      page_name: 'API Integration',
+      timestamp: new Date().toISOString() 
+    });
+  }, [location.pathname]);
 
   // Form states
   const [formData, setFormData] = useState({

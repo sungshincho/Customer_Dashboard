@@ -16,11 +16,24 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { Building2, Bell, Users, CreditCard, Plus, Trash2, Mail } from "lucide-react";
+import { useActivityLogger } from "@/hooks/useActivityLogger";
+import { useLocation } from "react-router-dom";
 
 const Settings = () => {
   const { toast } = useToast();
+  const { logActivity } = useActivityLogger();
+  const location = useLocation();
   const { user, orgId, orgName, role, licenseType, licenseStatus, isOrgHQ, isOrgStore } = useAuth();
   const [loading, setLoading] = useState(false);
+
+  // 페이지 방문 로깅
+  useEffect(() => {
+    logActivity('page_view', { 
+      page: location.pathname,
+      page_name: 'Settings',
+      timestamp: new Date().toISOString() 
+    });
+  }, [location.pathname]);
   
   // Organization Info
   const [organizationInfo, setOrganizationInfo] = useState<any>(null);
