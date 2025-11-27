@@ -216,9 +216,25 @@ export const EntityTypeManager = () => {
       if (error) throw error;
       return result;
     },
-    onSuccess: () => {
+    onSuccess: async (result) => {
       queryClient.invalidateQueries({ queryKey: ["entity-types"] });
       toast({ title: "엔티티 타입이 생성되었습니다" });
+      
+      // Activity logging
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from('user_activity_logs').insert({
+          user_id: user.id,
+          activity_type: 'feature_use',
+          activity_data: {
+            feature: 'entity_type_create',
+            entity_name: result.name,
+            entity_label: result.label,
+            timestamp: new Date().toISOString()
+          }
+        });
+      }
+      
       setIsOpen(false);
       resetForm();
     },
@@ -246,9 +262,25 @@ export const EntityTypeManager = () => {
       if (error) throw error;
       return result;
     },
-    onSuccess: () => {
+    onSuccess: async (result) => {
       queryClient.invalidateQueries({ queryKey: ["entity-types"] });
       toast({ title: "엔티티 타입이 수정되었습니다" });
+      
+      // Activity logging
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from('user_activity_logs').insert({
+          user_id: user.id,
+          activity_type: 'feature_use',
+          activity_data: {
+            feature: 'entity_type_update',
+            entity_id: result.id,
+            entity_name: result.name,
+            timestamp: new Date().toISOString()
+          }
+        });
+      }
+      
       setIsOpen(false);
       setEditingEntity(null);
       resetForm();
@@ -264,9 +296,22 @@ export const EntityTypeManager = () => {
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ["entity-types"] });
       toast({ title: "엔티티 타입이 삭제되었습니다" });
+      
+      // Activity logging
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from('user_activity_logs').insert({
+          user_id: user.id,
+          activity_type: 'feature_use',
+          activity_data: {
+            feature: 'entity_type_delete',
+            timestamp: new Date().toISOString()
+          }
+        });
+      }
     },
   });
 

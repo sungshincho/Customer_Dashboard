@@ -205,6 +205,15 @@ export default function DigitalTwin3DPage() {
                       saveScene(currentRecipe, finalSceneName, activeScene?.id)
                         .then(() => {
                           toast.success('씬이 저장되었습니다');
+                          
+                          // Activity logging
+                          logActivity('feature_use', {
+                            feature: 'scene_save',
+                            scene_name: finalSceneName,
+                            layer_count: activeLayers.length,
+                            store_id: selectedStore?.id,
+                            timestamp: new Date().toISOString()
+                          });
                         })
                         .catch((err) => {
                           toast.error('씬 저장 실패: ' + err.message);

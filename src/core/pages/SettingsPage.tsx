@@ -222,6 +222,13 @@ const Settings = () => {
         title: "조직 설정 저장 완료",
         description: "조직 설정이 성공적으로 저장되었습니다.",
       });
+      
+      // Activity logging
+      logActivity('feature_use', {
+        feature: 'settings_change',
+        setting_type: 'organization',
+        timestamp: new Date().toISOString()
+      });
     } catch (error: any) {
       toast({
         title: "조직 설정 저장 실패",
@@ -254,6 +261,13 @@ const Settings = () => {
       toast({
         title: "알림 설정 저장 완료",
         description: "알림 설정이 성공적으로 저장되었습니다.",
+      });
+      
+      // Activity logging
+      logActivity('feature_use', {
+        feature: 'settings_change',
+        setting_type: 'notifications',
+        timestamp: new Date().toISOString()
       });
     } catch (error: any) {
       toast({
@@ -371,6 +385,13 @@ const Settings = () => {
       toast({
         title: "초대 전송 완료",
         description: `${inviteEmail}에게 Viewer 초대가 전송되었습니다.`,
+      });
+      
+      // Activity logging
+      logActivity('feature_use', {
+        feature: 'viewer_invitation_send',
+        invitee_email: inviteEmail,
+        timestamp: new Date().toISOString()
       });
 
       setInviteEmail('');

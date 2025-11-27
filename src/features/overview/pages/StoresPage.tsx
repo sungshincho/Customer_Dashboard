@@ -44,6 +44,8 @@ const Stores = () => {
 
     setDeleting(storeId);
     try {
+      const storeToDelete = stores?.find(s => s.id === storeId);
+      
       const { error } = await supabase
         .from('stores')
         .delete()
@@ -53,6 +55,14 @@ const Stores = () => {
       if (error) throw error;
 
       toast.success('매장이 삭제되었습니다');
+      
+      // Activity logging
+      logActivity('feature_use', {
+        feature: 'store_delete',
+        store_id: storeId,
+        store_name: storeToDelete?.store_name,
+        timestamp: new Date().toISOString()
+      });
       
       // 선택된 매장이 삭제된 경우 선택 해제
       if (selectedStore?.id === storeId) {

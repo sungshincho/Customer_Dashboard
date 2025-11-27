@@ -294,6 +294,14 @@ const Dashboard = () => {
                     
                     if (error) throw error;
                     
+                    // Activity logging
+                    logActivity('feature_use', {
+                      feature: 'kpi_aggregate',
+                      date_range: { start: startDate, end: endDate },
+                      store_id: selectedStore.id,
+                      timestamp: new Date().toISOString()
+                    });
+                    
                     // KPI 데이터 새로고침
                     refetch();
                     toast.success(`${startDate}부터 ${endDate}까지 KPI 집계 완료`);
@@ -308,6 +316,13 @@ const Dashboard = () => {
               onClick={() => {
                 invalidateStoreData(selectedStore?.id);
                 refetch();
+                
+                // Activity logging
+                logActivity('feature_use', {
+                  feature: 'data_refresh',
+                  store_id: selectedStore?.id,
+                  timestamp: new Date().toISOString()
+                });
               }}
               variant="outline"
               size="sm"
@@ -347,7 +362,16 @@ const Dashboard = () => {
             />
             {selectedStore && (
               <Button
-                onClick={handleGenerateRecommendations}
+                onClick={async () => {
+                  await handleGenerateRecommendations();
+                  
+                  // Activity logging
+                  logActivity('feature_use', {
+                    feature: 'ai_recommendation_generate',
+                    store_id: selectedStore?.id,
+                    timestamp: new Date().toISOString()
+                  });
+                }}
                 variant="outline"
                 size="sm"
                 className="mt-4 w-full gap-2"
