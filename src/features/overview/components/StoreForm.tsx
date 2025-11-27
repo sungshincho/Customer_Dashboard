@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useActivityLogger } from '@/hooks/useActivityLogger';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,6 +35,7 @@ interface StoreFormProps {
 
 export function StoreForm({ store, onSuccess, trigger }: StoreFormProps) {
   const { user, orgId } = useAuth();
+  const { logActivity } = useActivityLogger();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   
@@ -56,6 +58,14 @@ export function StoreForm({ store, onSuccess, trigger }: StoreFormProps) {
 
         if (error) throw error;
         toast.success('매장 정보가 수정되었습니다');
+        
+        // Activity logging
+        logActivity('feature_use', {
+          feature: 'store_update',
+          store_id: store.id,
+          store_name: data.store_name,
+          timestamp: new Date().toISOString()
+        });
       } else {
         // Create
         const { error } = await supabase
@@ -64,6 +74,14 @@ export function StoreForm({ store, onSuccess, trigger }: StoreFormProps) {
 
         if (error) throw error;
         toast.success('매장이 추가되었습니다');
+        
+        // Activity logging
+        logActivity('feature_use', {
+          feature: 'store_create',
+          store_name: data.store_name,
+          store_code: data.store_code,
+          timestamp: new Date().toISOString()
+        });
       }
 
       setOpen(false);

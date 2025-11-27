@@ -1,8 +1,9 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useActivityLogger } from "@/hooks/useActivityLogger";
 import { Upload, FileSpreadsheet, Box, Wifi, Loader2, CheckCircle2, XCircle, AlertCircle, Pause, Play, X } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +42,7 @@ const STORAGE_KEY_PREFIX = 'upload-history-';
 
 export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploadProps) {
   const { toast } = useToast();
+  const { logActivity } = useActivityLogger();
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -733,6 +735,18 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
             description: `데이터 품질: ${validation.data_quality_score}/100, 엔티티: ${etl.entities_created}, 관계: ${etl.relations_created}` 
           });
           
+          // Activity logging
+          logActivity('data_upload', {
+            file_name: safeFileName,
+            file_type: uploadFile.type,
+            data_quality_score: validation.data_quality_score,
+            entities_created: etl.entities_created,
+            relations_created: etl.relations_created,
+            store_id: storeId,
+            ai_powered: true,
+            timestamp: new Date().toISOString()
+          });
+          
         } catch (pipelineError: any) {
           console.error('❌ AI Pipeline error:', pipelineError);
           updateFileStatus(uploadFile.id, 'error', pipelineError.message || 'AI 자동화 실패');
@@ -769,6 +783,15 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
           updateFileStatus(uploadFile.id, 'success', undefined, 100, {
             processedCount: processResult.processedCount,
             metadataGenerated: !!processResult.metadata
+          });
+          
+          // Activity logging
+          logActivity('data_upload', {
+            file_name: safeFileName,
+            file_type: 'wifi',
+            processed_count: processResult.processedCount,
+            store_id: storeId,
+            timestamp: new Date().toISOString()
           });
         } else {
           throw new Error(processResult?.error || 'WiFi 데이터 처리 실패');
@@ -810,6 +833,15 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
           importId: importData.id,
           recordCount: rawData.length,
           filePath
+        });
+        
+        // Activity logging
+        logActivity('data_upload', {
+          file_name: safeFileName,
+          file_type: 'json',
+          record_count: rawData.length,
+          store_id: storeId,
+          timestamp: new Date().toISOString()
         });
         
       } else {

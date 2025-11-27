@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useActivityLogger } from "@/hooks/useActivityLogger";
 import {
   Select,
   SelectContent,
@@ -28,6 +29,7 @@ export function UnifiedMessageThread() {
 
   const { stores, selectedStore } = useSelectedStore();
   const { isOrgHQ } = useAuth();
+  const { logActivity } = useActivityLogger();
   const { data: messages, isLoading } = useHQMessages(selectedStore?.id);
   const sendMessage = useSendMessage();
   const markAsRead = useMarkMessageAsRead();
@@ -45,6 +47,16 @@ export function UnifiedMessageThread() {
       content: newMessage.trim(),
       priority,
       message_type: messageType,
+    });
+
+    // Activity logging
+    logActivity('feature_use', {
+      feature: 'message_send',
+      message_type: messageType,
+      priority,
+      has_subject: !!subject.trim(),
+      recipient_store_id: recipientStoreId || selectedStore?.id,
+      timestamp: new Date().toISOString()
     });
 
     setNewMessage("");

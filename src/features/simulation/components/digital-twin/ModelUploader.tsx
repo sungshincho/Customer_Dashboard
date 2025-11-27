@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useActivityLogger } from '@/hooks/useActivityLogger';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,6 +38,7 @@ export function ModelUploader() {
   const { user } = useAuth();
   const { selectedStore } = useSelectedStore();
   const { toast } = useToast();
+  const { logActivity } = useActivityLogger();
   const [uploading, setUploading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
@@ -301,10 +303,27 @@ export function ModelUploader() {
           title: "통합 업로드 완료",
           description: `${results.length}개 모델 업로드 및 ${linkedCount}개 엔티티 타입 연결`,
         });
+        
+        // Activity logging
+        logActivity('data_upload', {
+          file_count: results.length,
+          entity_types_linked: linkedCount,
+          upload_type: '3d_model',
+          store_id: selectedStore.id,
+          timestamp: new Date().toISOString()
+        });
       } else {
         toast({
           title: "업로드 완료",
           description: `${results.length}개의 3D 모델이 업로드되었습니다.`,
+        });
+        
+        // Activity logging
+        logActivity('data_upload', {
+          file_count: results.length,
+          upload_type: '3d_model',
+          store_id: selectedStore.id,
+          timestamp: new Date().toISOString()
         });
       }
 

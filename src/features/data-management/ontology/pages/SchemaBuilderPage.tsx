@@ -149,9 +149,21 @@ const SchemaBuilder = () => {
       queryClient.invalidateQueries({ queryKey: ["entity-types"] });
       queryClient.invalidateQueries({ queryKey: ["relation-types"] });
       setSelectedVersion("");
+      
+      const schemaData = version.schema_data as any;
+      
       toast({
         title: "스키마 불러오기 완료",
         description: `버전 ${version.version_number} 스키마가 적용되었습니다.`,
+      });
+      
+      // Activity logging
+      logActivity('feature_use', {
+        feature: 'schema_version_load',
+        version_number: version.version_number,
+        entity_count: schemaData.entities?.length || 0,
+        relation_count: schemaData.relations?.length || 0,
+        timestamp: new Date().toISOString()
       });
     },
     onError: (error: any) => {

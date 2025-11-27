@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useActivityLogger } from "@/hooks/useActivityLogger";
 import {
   Select,
   SelectContent,
@@ -28,6 +29,7 @@ export function GuidelineForm() {
 
   const { stores } = useSelectedStore();
   const createGuideline = useCreateGuideline();
+  const { logActivity } = useActivityLogger();
 
   const handleStoreToggle = (storeId: string) => {
     setSelectedStores(prev =>
@@ -61,6 +63,15 @@ export function GuidelineForm() {
       effective_date: effectiveDate || undefined,
       expiry_date: expiryDate || undefined,
       target_stores: selectedStores,
+    });
+
+    // Activity logging
+    logActivity('feature_use', {
+      feature: 'guideline_create',
+      category,
+      priority,
+      target_store_count: selectedStores.length,
+      timestamp: new Date().toISOString()
     });
 
     // Reset form
