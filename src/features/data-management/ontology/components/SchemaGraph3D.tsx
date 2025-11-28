@@ -121,8 +121,9 @@ function useForceSimulation(
 
       const activeTypes = typeOrder.filter((t) => nodesCopy.some((n) => (n.nodeType ?? "entity") === t));
 
-      const xSpacing = 28; // ⬅️ 레이어 간 X 간격 줄이기 (기존 50)
-      const ySpacing = 6; // ⬅️ 레이어 내 Y 간격 줄이기 (기존 10)
+      const xSpacing = 35; // ⬅️ 레이어 간 X 간격 줄이기 (기존 50)
+      const ySpacing = 8; // ⬅️ 레이어 내 Y 간격 줄이기 (기존 10)
+      const zJitter = 8; // Z 깊이 분산 정도
 
       activeTypes.forEach((type, idx) => {
         const layerNodes = nodesCopy.filter((n) => (n.nodeType ?? "entity") === type);
