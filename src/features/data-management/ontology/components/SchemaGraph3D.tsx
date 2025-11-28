@@ -171,7 +171,7 @@ function Node3D({
   );
 }
 
-// 3D 링크 컴포넌트 (그라데이션 효과)
+// 3D 링크 컴포넌트 (더 명확하게)
 function Link3D({ link }: { link: GraphLink }) {
   const source = link.source as GraphNode;
   const target = link.target as GraphNode;
@@ -183,50 +183,36 @@ function Link3D({ link }: { link: GraphLink }) {
 
   const intensity = Math.min(link.weight, 1.0);
 
-  // 가중치에 따른 색상 변화 (청록색~초록색 그라데이션)
-  const sourceColor = useMemo(() => {
-    const hue = 180 + (intensity * 40); // 180 (cyan) ~ 220 (cyan-green)
-    return new THREE.Color().setHSL(hue / 360, 0.8, 0.5 + intensity * 0.2);
-  }, [intensity]);
-  
-  const targetColor = useMemo(() => {
-    const hue = 120 + (intensity * 60); // 120 (green) ~ 180 (cyan)
-    return new THREE.Color().setHSL(hue / 360, 0.7, 0.4 + intensity * 0.2);
+  // 더 밝고 명확한 색상
+  const linkColor = useMemo(() => {
+    const hue = 180 + (intensity * 40);
+    return new THREE.Color().setHSL(hue / 360, 0.8, 0.6);
   }, [intensity]);
 
-  const lineWidth = 0.5 + (link.weight * 2);
-  const opacity = 0.4 + intensity * 0.4;
+  const lineWidth = 1 + (link.weight * 2);
+  const opacity = 0.6 + intensity * 0.3;
 
   return (
     <group>
-      {/* 메인 라인 */}
+      {/* 메인 라인 - 더 두껍고 명확하게 */}
       <DreiLine
         points={points}
-        color={sourceColor}
+        color={linkColor}
         lineWidth={lineWidth}
         transparent
         opacity={opacity}
       />
       
-      {/* 글로우 효과 라인 */}
-      <DreiLine
-        points={points}
-        color={targetColor}
-        lineWidth={lineWidth * 2}
-        transparent
-        opacity={opacity * 0.3}
-      />
-      
-      {/* 방향 화살표 - 더 작고 미묘하게 */}
+      {/* 방향 화살표 */}
       {link.directionality === 'bidirectional' && (
         <>
           <mesh position={[target.x || 0, target.y || 0, target.z || 0]}>
-            <coneGeometry args={[0.3, 1, 6]} />
-            <meshBasicMaterial color={targetColor} transparent opacity={opacity} />
+            <coneGeometry args={[0.5, 1.5, 8]} />
+            <meshBasicMaterial color={linkColor} transparent opacity={opacity} />
           </mesh>
           <mesh position={[source.x || 0, source.y || 0, source.z || 0]}>
-            <coneGeometry args={[0.3, 1, 6]} />
-            <meshBasicMaterial color={sourceColor} transparent opacity={opacity} />
+            <coneGeometry args={[0.5, 1.5, 8]} />
+            <meshBasicMaterial color={linkColor} transparent opacity={opacity} />
           </mesh>
         </>
       )}
@@ -365,23 +351,15 @@ function Scene({
 
   return (
     <>
-      {/* 다크 배경 */}
-      <color attach="background" args={['#0a0a0f']} />
-      <fog attach="fog" args={['#0a0a0f', 50, 300]} />
+      {/* 투명 배경 */}
+      <color attach="background" args={['transparent']} />
       
-      {/* 고급 조명 설정 */}
-      <ambientLight intensity={0.2} />
-      <pointLight position={[0, 0, 0]} intensity={1} color="#4080ff" />
-      <pointLight position={[50, 50, 50]} intensity={0.5} color="#00ffaa" />
-      <pointLight position={[-50, -50, -50]} intensity={0.5} color="#ff00aa" />
-      <spotLight 
-        position={[0, 100, 0]} 
-        intensity={0.8} 
-        angle={0.5} 
-        penumbra={1}
-        color="#ffffff"
-        castShadow
-      />
+      {/* 조명 설정 - 더 밝게 */}
+      <ambientLight intensity={0.5} />
+      <directionalLight position={[10, 10, 10]} intensity={1} />
+      <pointLight position={[0, 0, 0]} intensity={0.8} color="#ffffff" />
+      <pointLight position={[50, 50, 50]} intensity={0.6} color="#00ffaa" />
+      <pointLight position={[-50, -50, -50]} intensity={0.6} color="#4080ff" />
 
       {/* 링크 렌더링 (노드보다 먼저) */}
       {simulatedLinks.length > 0 && simulatedLinks.map((link, i) => (
@@ -397,8 +375,8 @@ function Scene({
         />
       ))}
 
-      {/* 미묘한 그리드 (선택적) */}
-      <gridHelper args={[300, 30, "#1a1a2e", "#0f0f1a"]} position={[0, -50, 0]} />
+      {/* 참조용 그리드 */}
+      <gridHelper args={[200, 20, "#555555", "#333333"]} position={[0, -60, 0]} />
     </>
   );
 }
@@ -411,8 +389,8 @@ export function SchemaGraph3D({
   layoutType = "force"
 }: SchemaGraph3DProps) {
   return (
-    <div style={{ width: "100%", height: "600px", background: "#0a0a0f", borderRadius: "0.5rem" }}>
-      <Canvas gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}>
+    <div style={{ width: "100%", height: "600px", background: "transparent", borderRadius: "0.5rem" }}>
+      <Canvas gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}>
         <PerspectiveCamera makeDefault position={[0, 0, 150]} fov={75} />
         <OrbitControls 
           enableDamping 
