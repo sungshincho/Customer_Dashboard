@@ -162,7 +162,7 @@ function Node3D({
   const radius = baseRadius * maxBoost;
 
   const connectionIntensity = Math.min(node.val / 40, 1); // 허브일수록 강함
-  const baseOpacity = dimmed ? 0.18 : 0.9;
+  const baseOpacity = dimmed ? 0.5 : 1.0; // 더 선명하게
 
   useFrame((state) => {
     const t = state.clock.elapsedTime;
@@ -194,7 +194,7 @@ function Node3D({
         <meshBasicMaterial
           color={baseColor}
           transparent
-          opacity={(hovered || focused ? 0.4 : 0.2) * (0.4 + connectionIntensity * 0.8)}
+          opacity={(hovered || focused ? 0.6 : 0.35) * (0.5 + connectionIntensity * 0.8)}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
@@ -211,9 +211,9 @@ function Node3D({
         <meshPhysicalMaterial
           color={baseColor}
           emissive={baseColor}
-          emissiveIntensity={(focused ? 2.3 : hovered ? 1.7 : 0.9) * (0.6 + connectionIntensity * 0.8)}
+          emissiveIntensity={(focused ? 2.5 : hovered ? 2.0 : 1.3) * (0.8 + connectionIntensity * 0.6)}
           metalness={0.7}
-          roughness={0.25}
+          roughness={0.2}
           clearcoat={1}
           clearcoatRoughness={0.1}
           transparent
@@ -224,38 +224,34 @@ function Node3D({
       {/* 안쪽 코어 */}
       <mesh ref={coreRef}>
         <sphereGeometry args={[radius * 0.55, 20, 20]} />
-        <meshBasicMaterial color={baseColor} transparent opacity={dimmed ? 0.25 : 0.6} />
+        <meshBasicMaterial color={baseColor} transparent opacity={dimmed ? 0.5 : 0.8} />
       </mesh>
 
-      {/* 라벨: hover 또는 focused 상태에서만 노출 */}
-      {(hovered || focused) && (
-        <>
-          <Text
-            position={[node.x || 0, (node.y || 0) + radius + 3, (node.z || 0) + 0.1]}
-            fontSize={1.7}
-            color="white"
-            anchorX="center"
-            anchorY="middle"
-            outlineWidth={0.25}
-            outlineColor="#000000"
-          >
-            {node.label}
-          </Text>
+      {/* 라벨: 항상 표시 */}
+      <Text
+        position={[node.x || 0, (node.y || 0) + radius + 3, (node.z || 0) + 0.1]}
+        fontSize={1.8}
+        color="white"
+        anchorX="center"
+        anchorY="middle"
+        outlineWidth={0.4}
+        outlineColor="#000000"
+      >
+        {node.label}
+      </Text>
 
-          {node.properties?.length > 0 && (
-            <Text
-              position={[node.x || 0, (node.y || 0) + radius + 5, (node.z || 0) + 0.1]}
-              fontSize={1.1}
-              color="#98a0c0"
-              anchorX="center"
-              anchorY="middle"
-              outlineWidth={0.15}
-              outlineColor="#000000"
-            >
-              {node.properties.length} properties
-            </Text>
-          )}
-        </>
+      {node.properties?.length > 0 && (
+        <Text
+          position={[node.x || 0, (node.y || 0) + radius + 5, (node.z || 0) + 0.1]}
+          fontSize={1.2}
+          color="#a8b5d1"
+          anchorX="center"
+          anchorY="middle"
+          outlineWidth={0.3}
+          outlineColor="#000000"
+        >
+          {node.properties.length} properties
+        </Text>
       )}
     </group>
   );
@@ -275,23 +271,45 @@ function Link3D({ link, dimmed, isNeighborLink }: { link: GraphLink; dimmed: boo
   );
 
   const weightNorm = Math.min(link.weight ?? 0.7, 2);
-  const intensity = (isNeighborLink ? 1.0 : 0.4) * (0.4 + 0.6 * (weightNorm / 2));
+  const intensity = (isNeighborLink ? 1.0 : 0.6) * (0.6 + 0.4 * (weightNorm / 2));
 
   const color = useMemo(() => {
-    // weight / 방향성에 따라 청록~연두 계열
+    // weight / 방향성에 따라 청록~연두 계열 - 더 밝게
     const baseHue = 190 + (link.weight || 0.4) * 40;
-    return new THREE.Color().setHSL(baseHue / 360, 0.6, 0.5);
+    return new THREE.Color().setHSL(baseHue / 360, 0.8, 0.6);
   }, [link.weight]);
 
-  const width = 0.4 + intensity * 1.8;
-  const opacity = (dimmed ? 0.12 : 0.45) * (isNeighborLink ? 1.3 : 0.8);
+  const width = 0.5 + intensity * 2.0;
+  const opacity = (dimmed ? 0.4 : 0.75) * (isNeighborLink ? 1.2 : 1.0); // 항상 선명하게
+
+  const midPoint = useMemo(
+    () => [
+      (source.x || 0) * 0.5 + (target.x || 0) * 0.5,
+      (source.y || 0) * 0.5 + (target.y || 0) * 0.5,
+      (source.z || 0) * 0.5 + (target.z || 0) * 0.5,
+    ] as [number, number, number],
+    [source.x, source.y, source.z, target.x, target.y, target.z],
+  );
 
   return (
     <group>
       <DreiLine points={points} color={color} lineWidth={width} transparent opacity={opacity} />
 
-      {/* 단방향/양방향 표시용 작은 화살표 (너무 과하면 지저분해서 은은하게) */}
-      {link.directionality !== "undirected" && isNeighborLink && (
+      {/* 관계 라벨 - 항상 표시 */}
+      <Text
+        position={midPoint}
+        fontSize={1.0}
+        color={color}
+        anchorX="center"
+        anchorY="middle"
+        outlineWidth={0.3}
+        outlineColor="#000000"
+      >
+        {link.label}
+      </Text>
+
+      {/* 단방향/양방향 표시용 작은 화살표 */}
+      {link.directionality !== "undirected" && (
         <mesh
           position={[
             (source.x || 0) * 0.6 + (target.x || 0) * 0.4,
@@ -299,8 +317,8 @@ function Link3D({ link, dimmed, isNeighborLink }: { link: GraphLink; dimmed: boo
             (source.z || 0) * 0.6 + (target.z || 0) * 0.4,
           ]}
         >
-          <coneGeometry args={[0.5, 1.4, 8]} />
-          <meshBasicMaterial color={color} transparent opacity={opacity * 1.5} blending={THREE.AdditiveBlending} />
+          <coneGeometry args={[0.6, 1.6, 8]} />
+          <meshBasicMaterial color={color} transparent opacity={opacity * 1.2} blending={THREE.AdditiveBlending} />
         </mesh>
       )}
     </group>
