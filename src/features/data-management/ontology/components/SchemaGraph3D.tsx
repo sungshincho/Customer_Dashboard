@@ -123,7 +123,7 @@ function useForceSimulation(
 
       const xSpacing = 35; // ⬅️ 레이어 간 X 간격 줄이기 (기존 50)
       const ySpacing = 8; // ⬅️ 레이어 내 Y 간격 줄이기 (기존 10)
-      const zJitter = 8; // Z 깊이 분산 정도
+      const zJitter = 10; // Z 깊이 분산 정도
 
       activeTypes.forEach((type, idx) => {
         const layerNodes = nodesCopy.filter((n) => (n.nodeType ?? "entity") === type);
@@ -141,7 +141,7 @@ function useForceSimulation(
       });
 
       // 전체를 한 번 더 축소해서 화면 안에 넣기
-      normalizeLayout(nodesCopy, 55);
+      normalizeLayout(nodesCopy, 80);
 
       setSimulatedNodes([...nodesCopy]);
       setSimulatedLinks([...linksCopy]);
