@@ -143,16 +143,20 @@ function Node3D({
   focused,
   dimmed,
   onClick,
+  onDrag,
 }: {
   node: GraphNode;
   focused: boolean;
   dimmed: boolean;
   onClick: (node: GraphNode) => void;
+  onDrag: (nodeId: string, x: number, y: number, z: number) => void;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
   const coreRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const { camera, raycaster, pointer } = useThree();
 
   const baseColor = useMemo(() => new THREE.Color(node.color || "#6ac8ff"), [node.color]);
 
@@ -164,15 +168,45 @@ function Node3D({
   const connectionIntensity = Math.min(node.val / 40, 1); // 허브일수록 강함
   const baseOpacity = dimmed ? 0.5 : 1.0; // 더 선명하게
 
+  const handlePointerDown = (e: any) => {
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handlePointerMove = (e: any) => {
+    if (!isDragging) return;
+    e.stopPropagation();
+
+    // 카메라 거리에 따라 이동 스케일 조정
+    const distance = camera.position.distanceTo(meshRef.current?.position || new THREE.Vector3());
+    const scale = distance / 100;
+
+    // 마우스 이동량을 3D 공간으로 변환
+    const dx = e.movementX * scale * 0.5;
+    const dy = -e.movementY * scale * 0.5;
+
+    const newX = (node.x || 0) + dx;
+    const newY = (node.y || 0) + dy;
+    const newZ = node.z || 0;
+
+    onDrag(node.id, newX, newY, newZ);
+  };
+
+  const handlePointerUp = () => {
+    setIsDragging(false);
+  };
+
   useFrame((state) => {
     const t = state.clock.elapsedTime;
 
     if (meshRef.current) {
       meshRef.current.position.set(node.x || 0, node.y || 0, node.z || 0);
 
-      // 허브 노드에 살짝 펄스
-      const pulse = 1 + (0.04 + connectionIntensity * 0.08) * Math.sin(t * 2.0 + node.id.length);
-      meshRef.current.scale.setScalar(pulse);
+      // 드래그 중이 아닐 때만 펄스 애니메이션
+      if (!isDragging) {
+        const pulse = 1 + (0.04 + connectionIntensity * 0.08) * Math.sin(t * 2.0 + node.id.length);
+        meshRef.current.scale.setScalar(pulse);
+      }
     }
 
     if (glowRef.current) {
@@ -203,9 +237,12 @@ function Node3D({
       {/* 메인 구체 */}
       <mesh
         ref={meshRef}
-        onClick={() => onClick(node)}
+        onClick={() => !isDragging && onClick(node)}
         onPointerOver={() => setHovered(true)}
         onPointerOut={() => setHovered(false)}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
       >
         <sphereGeometry args={[radius, 32, 32]} />
         <meshPhysicalMaterial
@@ -368,6 +405,7 @@ function Scene({ nodes, links, onNodeClick, layoutType }: SchemaGraph3DProps) {
 
   // hover / focus 상태 관리
   const [focusedId, setFocusedId] = useState<string | null>(null);
+  const [draggedNodes, setDraggedNodes] = useState<Map<string, { x: number; y: number; z: number }>>(new Map());
 
   useEffect(() => {
     // 카메라 초기 위치
@@ -394,6 +432,25 @@ function Scene({ nodes, links, onNodeClick, layoutType }: SchemaGraph3DProps) {
     onNodeClick?.(n);
   };
 
+  const handleNodeDrag = (nodeId: string, x: number, y: number, z: number) => {
+    setDraggedNodes((prev) => {
+      const newMap = new Map(prev);
+      newMap.set(nodeId, { x, y, z });
+      return newMap;
+    });
+  };
+
+  // 드래그된 위치를 반영한 노드 목록
+  const displayNodes = useMemo(() => {
+    return simNodes.map((node) => {
+      const dragged = draggedNodes.get(node.id);
+      if (dragged) {
+        return { ...node, x: dragged.x, y: dragged.y, z: dragged.z };
+      }
+      return node;
+    });
+  }, [simNodes, draggedNodes]);
+
   return (
     <>
       {/* 조명 – 중심부는 살짝 밝게, 주변은 어둡게 */}
@@ -416,13 +473,22 @@ function Scene({ nodes, links, onNodeClick, layoutType }: SchemaGraph3DProps) {
         return <Link3D key={`link-${i}-${s}-${t}`} link={link} dimmed={dimmed} isNeighborLink={isNeighborLink} />;
       })}
 
-      {simNodes.map((node) => {
+      {displayNodes.map((node) => {
         const isFocused = focusedId === node.id;
         const neighbors = neighborMap.get(focusedId || "") ?? new Set();
         const isNeighbor = neighbors.has(node.id);
         const dimmed = !!focusedId && !isFocused && !isNeighbor; // 초점 밖은 살짝 어둡게
 
-        return <Node3D key={node.id} node={node} focused={isFocused} dimmed={dimmed} onClick={handleNodeClick} />;
+        return (
+          <Node3D
+            key={node.id}
+            node={node}
+            focused={isFocused}
+            dimmed={dimmed}
+            onClick={handleNodeClick}
+            onDrag={handleNodeDrag}
+          />
+        );
       })}
     </>
   );
@@ -441,7 +507,7 @@ export function SchemaGraph3D({ nodes, links, onNodeClick, layoutType = "force" 
       <Canvas
         gl={{
           antialias: true,
-          alpha: false,
+          alpha: true,
           powerPreference: "high-performance",
         }}
       >
