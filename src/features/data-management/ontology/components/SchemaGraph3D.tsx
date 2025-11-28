@@ -408,6 +408,7 @@ function Scene({ nodes, links, onNodeClick, layoutType }: SchemaGraph3DProps) {
 
   // hover / focus 상태 관리
   const [focusedId, setFocusedId] = useState<string | null>(null);
+  const [nodePositions, setNodePositions] = useState<Map<string, [number, number, number]>>(new Map());
 
   useEffect(() => {
     // 카메라 초기 위치
@@ -434,6 +435,25 @@ function Scene({ nodes, links, onNodeClick, layoutType }: SchemaGraph3DProps) {
     onNodeClick?.(n);
   };
 
+  const handleNodeDrag = (node: GraphNode, position: [number, number, number]) => {
+    setNodePositions((prev) => {
+      const newMap = new Map(prev);
+      newMap.set(node.id, position);
+      return newMap;
+    });
+  };
+
+  // 업데이트된 노드 위치 적용
+  const updatedNodes = useMemo(() => {
+    return simNodes.map((node) => {
+      const pos = nodePositions.get(node.id);
+      if (pos) {
+        return { ...node, x: pos[0], y: pos[1], z: pos[2] };
+      }
+      return node;
+    });
+  }, [simNodes, nodePositions]);
+
   return (
     <>
       {/* 조명 – 중심부는 살짝 밝게, 주변은 어둡게 */}
@@ -453,16 +473,30 @@ function Scene({ nodes, links, onNodeClick, layoutType }: SchemaGraph3DProps) {
         const isNeighborLink = !focusedId || s === focusedId || t === focusedId;
         const dimmed = !!focusedId && !isNeighborLink;
 
-        return <Link3D key={`link-${i}-${s}-${t}`} link={link} dimmed={dimmed} isNeighborLink={isNeighborLink} />;
+        // 업데이트된 노드 위치 사용
+        const sourceNode = updatedNodes.find((n) => n.id === s) || (link.source as GraphNode);
+        const targetNode = updatedNodes.find((n) => n.id === t) || (link.target as GraphNode);
+        const updatedLink = { ...link, source: sourceNode, target: targetNode };
+
+        return <Link3D key={`link-${i}-${s}-${t}`} link={updatedLink} dimmed={dimmed} isNeighborLink={isNeighborLink} />;
       })}
 
-      {simNodes.map((node) => {
+      {updatedNodes.map((node) => {
         const isFocused = focusedId === node.id;
         const neighbors = neighborMap.get(focusedId || "") ?? new Set();
         const isNeighbor = neighbors.has(node.id);
         const dimmed = !!focusedId && !isFocused && !isNeighbor; // 초점 밖은 살짝 어둡게
 
-        return <Node3D key={node.id} node={node} focused={isFocused} dimmed={dimmed} onClick={handleNodeClick} />;
+        return (
+          <Node3D
+            key={node.id}
+            node={node}
+            focused={isFocused}
+            dimmed={dimmed}
+            onClick={handleNodeClick}
+            onDrag={handleNodeDrag}
+          />
+        );
       })}
     </>
   );
@@ -481,9 +515,10 @@ export function SchemaGraph3D({ nodes, links, onNodeClick, layoutType = "force" 
       <Canvas
         gl={{
           antialias: true,
-          alpha: false,
+          alpha: true,
           powerPreference: "high-performance",
         }}
+        style={{ background: 'transparent' }}
       >
         <PerspectiveCamera makeDefault position={[0, 0, 160]} fov={70} />
         <OrbitControls
