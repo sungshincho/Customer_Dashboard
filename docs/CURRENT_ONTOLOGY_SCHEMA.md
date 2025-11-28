@@ -1,8 +1,8 @@
-# NEURALTWIN 온톨로지 스키마 v2.1 (최적화 완료)
+# NEURALTWIN 온톨로지 스키마 v2.2 (완전 관계 확장)
 
-> **최종 업데이트**: 2025-01-27  
+> **최종 업데이트**: 2025-01-28  
 > **엔티티 타입**: 43개 (CRITICAL 17 | HIGH 12 | MEDIUM 9 | LOW 5)  
-> **관계 타입**: 70개 (95개 → 70개, 26% 최적화)  
+> **관계 타입**: 83개 (70개 → 83개, 추가 13개 CRITICAL 관계 확장)  
 > **용도**: AI 추론 규칙 엔진 및 데이터 모델링  
 > **호환성**: 실제 데이터베이스 구조 100% 반영
 
@@ -14,7 +14,7 @@
 2. [🟡 HIGH 엔티티 (12개)](#-high-엔티티-12개)
 3. [🟠 MEDIUM 엔티티 (9개)](#-medium-엔티티-9개)
 4. [🟢 LOW 엔티티 (5개)](#-low-엔티티-5개)
-5. [관계 타입 (70개)](#관계-타입-70개)
+5. [관계 타입 (83개)](#관계-타입-83개)
 6. [데이터 생성 가이드](#데이터-생성-가이드)
 
 ---
@@ -758,9 +758,9 @@
 
 ---
 
-## 🔗 관계 타입 (70개)
+## 🔗 관계 타입 (83개)
 
-> **최적화 완료**: 95개 → 70개 (25개 제거, AI 추론 핵심 중심)
+> **완전 확장 완료**: 95개 → 70개 → 83개 (추가 13개 CRITICAL 관계로 완전한 그래프 커버리지 구현)
 
 ---
 
@@ -1077,6 +1077,110 @@
 
 ---
 
+### ⚡ ADDITIONAL (추가 필수 관계) - 13개
+
+> **2025-01-28 추가**: 완전한 그래프 커버리지를 위한 핵심 관계 확장
+
+#### 방문/거래 핵심 연결 (4개)
+
+55. **VISITED_STORE** (매장 방문)
+    - Source: Visit → Store
+    - Directionality: directed
+    - Properties: { visit_date: string }
+    - Description: 방문이 특정 매장에서 발생
+
+56. **OCCURRED_AT_STORE** (매장 거래)
+    - Source: Transaction → Store
+    - Directionality: directed
+    - Properties: { transaction_date: string }
+    - Description: 거래가 특정 매장에서 발생
+
+57. **ENTERED_THROUGH** (출입구 진입)
+    - Source: Visit → Entrance
+    - Directionality: directed
+    - Properties: { entry_time: string }
+    - Description: 방문이 특정 출입구로 진입
+
+58. **STORED_AT** (매장 재고)
+    - Source: Inventory → Store
+    - Directionality: directed
+    - Properties: { stock_level: number }
+    - Description: 재고가 특정 매장에 보관
+
+---
+
+#### 카테고리 계층 (1개)
+
+59. **HAS_SUBCATEGORY** (하위 카테고리)
+    - Source: Category → Category
+    - Directionality: directed
+    - Properties: { hierarchy_level: number }
+    - Description: 카테고리가 하위 카테고리 보유
+
+---
+
+#### 프로모션 타겟 (2개)
+
+60. **TARGETS_PRODUCT** (제품 타겟)
+    - Source: Promotion → Product
+    - Directionality: directed
+    - Properties: { discount_rate: number }
+    - Description: 프로모션이 특정 제품 타겟
+
+61. **TARGETS_ZONE** (구역 타겟)
+    - Source: Promotion → Zone
+    - Directionality: directed
+    - Description: 프로모션이 특정 구역 타겟
+
+---
+
+#### 시계열 데이터 연결 (4개)
+
+62. **SALES_OF_STORE** (매장 매출)
+    - Source: DailySales → Store
+    - Directionality: directed
+    - Properties: { sales_date: string }
+    - Description: 일간 매출이 특정 매장의 데이터
+
+63. **RECORDED_AT_STORE** (매장 이력)
+    - Source: InventoryHistory → Store
+    - Directionality: directed
+    - Description: 재고 이력이 특정 매장에서 기록
+
+64. **HISTORY_OF_PRODUCT** (제품 이력)
+    - Source: InventoryHistory → Product
+    - Directionality: directed
+    - Properties: { change_type: string }
+    - Description: 재고 이력이 특정 제품의 데이터
+
+65. **PERFORMANCE_OF_ZONE** (구역 성과)
+    - Source: ZonePerformance → Zone
+    - Directionality: directed
+    - Properties: { performance_date: string }
+    - Description: 성과 데이터가 특정 구역의 데이터
+
+---
+
+#### 운영 관계 (1개)
+
+66. **ASSIGNED_TO_STAFF** (직원 배정)
+    - Source: Task → Staff
+    - Directionality: directed
+    - Properties: { assigned_date: string }
+    - Description: 작업이 특정 직원에게 배정
+
+---
+
+#### 외부 컨텍스트 (1개)
+
+67. **AFFECTS_STORE** (매장 영향)
+    - Source: Weather → Store
+    - Directionality: directed
+    - Properties: { impact_level: string }
+    - Description: 날씨가 특정 매장에 영향
+
+---
+
 ### ❌ 제거된 관계 (25개)
 
 **불필요한 공간 세부사항:**
@@ -1185,13 +1289,13 @@ WiFiSensor → Zone → Customer
 
 ## 버전 정보
 
-- **Version**: 2.1 (관계 최적화 완료)
-- **Last Updated**: 2025-01-27
+- **Version**: 2.2 (완전 관계 확장 완료)
+- **Last Updated**: 2025-01-28
 - **Total Entity Types**: 43 (CRITICAL 17 | HIGH 12 | MEDIUM 9 | LOW 5)
-- **Total Relation Types**: 70 (95개 → 70개, 26% 최적화)
+- **Total Relation Types**: 83 (95개 → 70개 → 83개, 추가 13개 핵심 관계 확장)
 - **Database Compatibility**: 47% (8개 완벽 매칭 / 17개 CRITICAL)
 - **Compatible with**: NEURALTWIN v3.0+
-- **Optimization**: AI 추론 엔진 필수 관계 집중, 중복/불필요 관계 제거
+- **Optimization**: AI 추론 엔진 필수 관계 집중 + 완전한 그래프 커버리지 구현
 
 ---
 
