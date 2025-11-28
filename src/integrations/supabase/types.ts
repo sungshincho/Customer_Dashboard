@@ -890,6 +890,7 @@ export type Database = {
       }
       holidays_events: {
         Row: {
+          country_code: string | null
           created_at: string | null
           date: string
           description: string | null
@@ -900,11 +901,15 @@ export type Database = {
           is_global: boolean
           metadata: Json | null
           org_id: string | null
+          raw_payload: Json | null
+          region_code: string | null
+          source_provider: string | null
           store_id: string | null
           updated_at: string | null
           user_id: string
         }
         Insert: {
+          country_code?: string | null
           created_at?: string | null
           date: string
           description?: string | null
@@ -915,11 +920,15 @@ export type Database = {
           is_global?: boolean
           metadata?: Json | null
           org_id?: string | null
+          raw_payload?: Json | null
+          region_code?: string | null
+          source_provider?: string | null
           store_id?: string | null
           updated_at?: string | null
           user_id: string
         }
         Update: {
+          country_code?: string | null
           created_at?: string | null
           date?: string
           description?: string | null
@@ -930,6 +939,9 @@ export type Database = {
           is_global?: boolean
           metadata?: Json | null
           org_id?: string | null
+          raw_payload?: Json | null
+          region_code?: string | null
+          source_provider?: string | null
           store_id?: string | null
           updated_at?: string | null
           user_id?: string
@@ -2361,6 +2373,63 @@ export type Database = {
           },
         ]
       }
+      store_trade_area_context: {
+        Row: {
+          categories: Json | null
+          created_at: string | null
+          id: string
+          org_id: string | null
+          provider: string
+          radius_m: number
+          raw_payload: Json | null
+          stats: Json | null
+          store_id: string | null
+          total_pois: number
+          updated_at: string | null
+        }
+        Insert: {
+          categories?: Json | null
+          created_at?: string | null
+          id?: string
+          org_id?: string | null
+          provider: string
+          radius_m: number
+          raw_payload?: Json | null
+          stats?: Json | null
+          store_id?: string | null
+          total_pois?: number
+          updated_at?: string | null
+        }
+        Update: {
+          categories?: Json | null
+          created_at?: string | null
+          id?: string
+          org_id?: string | null
+          provider?: string
+          radius_m?: number
+          raw_payload?: Json | null
+          stats?: Json | null
+          store_id?: string | null
+          total_pois?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_trade_area_context_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_trade_area_context_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stores: {
         Row: {
           address: string | null
@@ -2544,6 +2613,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "subscriptions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trend_signals: {
+        Row: {
+          created_at: string | null
+          date: string
+          id: string
+          index_value: number
+          key: string
+          metadata: Json | null
+          org_id: string | null
+          raw_payload: Json | null
+          scope: string
+          source_provider: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          id?: string
+          index_value: number
+          key: string
+          metadata?: Json | null
+          org_id?: string | null
+          raw_payload?: Json | null
+          scope: string
+          source_provider: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          id?: string
+          index_value?: number
+          key?: string
+          metadata?: Json | null
+          org_id?: string | null
+          raw_payload?: Json | null
+          scope?: string
+          source_provider?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trend_signals_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
