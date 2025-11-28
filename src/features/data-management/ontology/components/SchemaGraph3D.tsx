@@ -1,12 +1,12 @@
 import React, { useRef, useEffect, useMemo, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { 
-  OrbitControls, 
-  Text, 
-  PerspectiveCamera, 
-  GizmoHelper, 
-  GizmoViewport, 
-  Line as DreiLine
+import {
+  OrbitControls,
+  Text,
+  PerspectiveCamera,
+  GizmoHelper,
+  GizmoViewport,
+  Line as DreiLine,
 } from "@react-three/drei";
 import * as THREE from "three";
 import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide } from "d3-force";
@@ -51,60 +51,156 @@ interface SchemaGraph3DProps {
   layoutType?: "force" | "radial" | "hierarchical";
 }
 
-// 3D 노드 컴포넌트 (고품질 발광 효과)
-function Node3D({ 
-  node, 
-  onClick 
-}: { 
-  node: GraphNode; 
+/** ===================== 공통 유틸 & 레이아웃 ===================== **/
+
+// 포스 시뮬레이션 훅 – 한 번 러닝해서 최종 위치만 사용 (깜빡임 방지)
+function useForceSimulation(nodes: GraphNode[], links: GraphLink[], layoutType: "force" | "radial" | "hierarchical") {
+  const [simulatedNodes, setSimulatedNodes] = useState<GraphNode[]>([]);
+  const [simulatedLinks, setSimulatedLinks] = useState<GraphLink[]>([]);
+
+  useEffect(() => {
+    if (!nodes.length) {
+      setSimulatedNodes([]);
+      setSimulatedLinks([]);
+      return;
+    }
+
+    // 노드/링크 복사 (원본 뮤테이션 방지)
+    const nodesCopy: GraphNode[] = nodes.map((n) => ({
+      ...n,
+      x: n.x ?? (Math.random() - 0.5) * 80,
+      y: n.y ?? (Math.random() - 0.5) * 80,
+      z: n.z ?? (Math.random() - 0.5) * 80,
+    }));
+
+    const linksCopy: GraphLink[] = links.map((l) => ({
+      ...l,
+      source:
+        typeof l.source === "string"
+          ? nodesCopy.find((n) => n.id === l.source)!
+          : nodesCopy.find((n) => n.id === l.source.id)!,
+      target:
+        typeof l.target === "string"
+          ? nodesCopy.find((n) => n.id === l.target)!
+          : nodesCopy.find((n) => n.id === l.target.id)!,
+    }));
+
+    if (layoutType === "radial") {
+      const angleStep = (2 * Math.PI) / nodesCopy.length;
+      const radius = 60;
+      nodesCopy.forEach((node, i) => {
+        node.x = radius * Math.cos(i * angleStep);
+        node.y = radius * Math.sin(i * angleStep);
+        node.z = (Math.random() - 0.5) * 10;
+      });
+      setSimulatedNodes([...nodesCopy]);
+      setSimulatedLinks([...linksCopy]);
+      return;
+    }
+
+    // force / hierarchical 둘 다 D3 포스 사용
+    const sim = forceSimulation(nodesCopy as any)
+      .force(
+        "link",
+        forceLink(linksCopy as any)
+          .id((d: any) => d.id)
+          .distance(35)
+          .strength(0.8),
+      )
+      .force("charge", forceManyBody().strength(layoutType === "hierarchical" ? -220 : -420))
+      .force("center", forceCenter(0, 0))
+      .force(
+        "collision",
+        forceCollide().radius((d: any) => Math.max(d.val / 4, 3)),
+      );
+
+    // 적당한 틱 수만큼 돌린 뒤 정지
+    const TICKS = layoutType === "hierarchical" ? 180 : 240;
+    for (let i = 0; i < TICKS; i++) sim.tick();
+    sim.stop();
+
+    // 약간의 3D 깊이감
+    nodesCopy.forEach((n, i) => {
+      n.z = n.z ?? (Math.sin(i * 0.37) * 0.5 + (Math.random() - 0.5) * 0.5) * 80; // -40~40 근사
+    });
+
+    setSimulatedNodes([...nodesCopy]);
+    setSimulatedLinks([...linksCopy]);
+
+    return () => {
+      sim.stop();
+    };
+  }, [nodes, links, layoutType]);
+
+  return { nodes: simulatedNodes, links: simulatedLinks };
+}
+
+/** ===================== 3D 요소들 ===================== **/
+
+// 노드 3D – 글로우 / 코어 / 라벨 / hover dim 처리
+function Node3D({
+  node,
+  focused,
+  dimmed,
+  onClick,
+}: {
+  node: GraphNode;
+  focused: boolean;
+  dimmed: boolean;
   onClick: (node: GraphNode) => void;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
+  const coreRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
 
+  const baseColor = useMemo(() => new THREE.Color(node.color || "#6ac8ff"), [node.color]);
+
+  // val을 기반으로 노드 크기/밝기 결정
+  const baseRadius = Math.max(node.val / 7, 1.2);
+  const maxBoost = focused ? 1.5 : hovered ? 1.25 : 1;
+  const radius = baseRadius * maxBoost;
+
+  const connectionIntensity = Math.min(node.val / 40, 1); // 허브일수록 강함
+  const baseOpacity = dimmed ? 0.18 : 0.9;
+
   useFrame((state) => {
-    if (meshRef.current && node.x !== undefined && node.y !== undefined && node.z !== undefined) {
-      meshRef.current.position.x = node.x;
-      meshRef.current.position.y = node.y;
-      meshRef.current.position.z = node.z;
-      
-      // 미묘한 펄스 애니메이션
-      const pulse = 1 + Math.sin(state.clock.elapsedTime * 2 + node.id.length) * 0.05;
+    const t = state.clock.elapsedTime;
+
+    if (meshRef.current) {
+      meshRef.current.position.set(node.x || 0, node.y || 0, node.z || 0);
+
+      // 허브 노드에 살짝 펄스
+      const pulse = 1 + (0.04 + connectionIntensity * 0.08) * Math.sin(t * 2.0 + node.id.length);
       meshRef.current.scale.setScalar(pulse);
     }
-    
-    if (glowRef.current && node.x !== undefined) {
-      glowRef.current.position.x = node.x;
-      glowRef.current.position.y = node.y || 0;
-      glowRef.current.position.z = node.z || 0;
-      
-      // 글로우 펄스
-      const glowPulse = 1 + Math.sin(state.clock.elapsedTime * 3 + node.id.length) * 0.1;
-      glowRef.current.scale.setScalar(glowPulse);
+
+    if (glowRef.current) {
+      glowRef.current.position.set(node.x || 0, node.y || 0, node.z || 0);
+      const glowPulse = 1 + (0.06 + connectionIntensity * 0.12) * Math.sin(t * 2.5 + node.id.length * 1.37);
+      glowRef.current.scale.setScalar(glowPulse * (focused ? 1.4 : 1.0));
+    }
+
+    if (coreRef.current) {
+      coreRef.current.position.set(node.x || 0, node.y || 0, node.z || 0);
     }
   });
 
-  const radius = node.val / 6;
-  const color = new THREE.Color(node.color);
-  
-  // 연결 수에 따라 밝기 조정
-  const connectionIntensity = Math.min(node.val / 40, 1);
-
   return (
     <group>
-      {/* 외부 글로우 */}
+      {/* 외곽 글로우 */}
       <mesh ref={glowRef}>
-        <sphereGeometry args={[radius * 2.5, 16, 16]} />
-        <meshBasicMaterial 
-          color={color}
+        <sphereGeometry args={[radius * 2.8, 24, 24]} />
+        <meshBasicMaterial
+          color={baseColor}
           transparent
-          opacity={hovered ? 0.3 : 0.15 * connectionIntensity}
+          opacity={(hovered || focused ? 0.4 : 0.2) * (0.4 + connectionIntensity * 0.8)}
+          blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
       </mesh>
-      
-      {/* 메인 노드 */}
+
+      {/* 메인 구체 */}
       <mesh
         ref={meshRef}
         onClick={() => onClick(node)}
@@ -112,54 +208,48 @@ function Node3D({
         onPointerOut={() => setHovered(false)}
       >
         <sphereGeometry args={[radius, 32, 32]} />
-        <meshPhysicalMaterial 
-          color={color}
-          emissive={color}
-          emissiveIntensity={hovered ? 1.5 : 0.8}
-          metalness={0.6}
-          roughness={0.2}
+        <meshPhysicalMaterial
+          color={baseColor}
+          emissive={baseColor}
+          emissiveIntensity={(focused ? 2.3 : hovered ? 1.7 : 0.9) * (0.6 + connectionIntensity * 0.8)}
+          metalness={0.7}
+          roughness={0.25}
           clearcoat={1}
           clearcoatRoughness={0.1}
           transparent
-          opacity={0.95}
+          opacity={baseOpacity}
         />
       </mesh>
-      
-      {/* 내부 코어 */}
-      <mesh position={[node.x || 0, node.y || 0, node.z || 0]}>
-        <sphereGeometry args={[radius * 0.6, 16, 16]} />
-        <meshBasicMaterial 
-          color={color}
-          transparent
-          opacity={0.6}
-        />
+
+      {/* 안쪽 코어 */}
+      <mesh ref={coreRef}>
+        <sphereGeometry args={[radius * 0.55, 20, 20]} />
+        <meshBasicMaterial color={baseColor} transparent opacity={dimmed ? 0.25 : 0.6} />
       </mesh>
-      
-      {/* 노드 라벨 - 호버 시에만 표시 */}
-      {hovered && (
+
+      {/* 라벨: hover 또는 focused 상태에서만 노출 */}
+      {(hovered || focused) && (
         <>
           <Text
-            position={[node.x || 0, (node.y || 0) + radius + 3, node.z || 0]}
-            fontSize={1.8}
+            position={[node.x || 0, (node.y || 0) + radius + 3, (node.z || 0) + 0.1]}
+            fontSize={1.7}
             color="white"
             anchorX="center"
             anchorY="middle"
-            outlineWidth={0.15}
+            outlineWidth={0.25}
             outlineColor="#000000"
-            fontWeight="bold"
           >
             {node.label}
           </Text>
-          
-          {/* 속성 개수 표시 */}
-          {node.properties.length > 0 && (
+
+          {node.properties?.length > 0 && (
             <Text
-              position={[node.x || 0, (node.y || 0) + radius + 5, node.z || 0]}
-              fontSize={1.2}
-              color="#aaaaaa"
+              position={[node.x || 0, (node.y || 0) + radius + 5, (node.z || 0) + 0.1]}
+              fontSize={1.1}
+              color="#98a0c0"
               anchorX="center"
               anchorY="middle"
-              outlineWidth={0.1}
+              outlineWidth={0.15}
               outlineColor="#000000"
             >
               {node.properties.length} properties
@@ -171,250 +261,191 @@ function Node3D({
   );
 }
 
-// 3D 링크 컴포넌트 (더 명확하게)
-function Link3D({ link }: { link: GraphLink }) {
+// 링크 3D – 허브 주변이 밝고 두껍게 보이도록
+function Link3D({ link, dimmed, isNeighborLink }: { link: GraphLink; dimmed: boolean; isNeighborLink: boolean }) {
   const source = link.source as GraphNode;
   const target = link.target as GraphNode;
-  
-  const points = useMemo(() => [
-    [source.x || 0, source.y || 0, source.z || 0] as [number, number, number],
-    [target.x || 0, target.y || 0, target.z || 0] as [number, number, number],
-  ], [source.x, source.y, source.z, target.x, target.y, target.z]);
 
-  const intensity = Math.min(link.weight, 1.0);
+  const points = useMemo(
+    () => [
+      [source.x || 0, source.y || 0, source.z || 0] as [number, number, number],
+      [target.x || 0, target.y || 0, target.z || 0] as [number, number, number],
+    ],
+    [source.x, source.y, source.z, target.x, target.y, target.z],
+  );
 
-  // 더 밝고 명확한 색상
-  const linkColor = useMemo(() => {
-    const hue = 180 + (intensity * 40);
-    return new THREE.Color().setHSL(hue / 360, 0.8, 0.6);
-  }, [intensity]);
+  const weightNorm = Math.min(link.weight ?? 0.7, 2);
+  const intensity = (isNeighborLink ? 1.0 : 0.4) * (0.4 + 0.6 * (weightNorm / 2));
 
-  const lineWidth = 1 + (link.weight * 2);
-  const opacity = 0.6 + intensity * 0.3;
+  const color = useMemo(() => {
+    // weight / 방향성에 따라 청록~연두 계열
+    const baseHue = 190 + (link.weight || 0.4) * 40;
+    return new THREE.Color().setHSL(baseHue / 360, 0.6, 0.5);
+  }, [link.weight]);
+
+  const width = 0.4 + intensity * 1.8;
+  const opacity = (dimmed ? 0.12 : 0.45) * (isNeighborLink ? 1.3 : 0.8);
 
   return (
     <group>
-      {/* 메인 라인 - 더 두껍고 명확하게 */}
-      <DreiLine
-        points={points}
-        color={linkColor}
-        lineWidth={lineWidth}
-        transparent
-        opacity={opacity}
-      />
-      
-      {/* 방향 화살표 */}
-      {link.directionality === 'bidirectional' && (
-        <>
-          <mesh position={[target.x || 0, target.y || 0, target.z || 0]}>
-            <coneGeometry args={[0.5, 1.5, 8]} />
-            <meshBasicMaterial color={linkColor} transparent opacity={opacity} />
-          </mesh>
-          <mesh position={[source.x || 0, source.y || 0, source.z || 0]}>
-            <coneGeometry args={[0.5, 1.5, 8]} />
-            <meshBasicMaterial color={linkColor} transparent opacity={opacity} />
-          </mesh>
-        </>
+      <DreiLine points={points} color={color} lineWidth={width} transparent opacity={opacity} />
+
+      {/* 단방향/양방향 표시용 작은 화살표 (너무 과하면 지저분해서 은은하게) */}
+      {link.directionality !== "undirected" && isNeighborLink && (
+        <mesh
+          position={[
+            (source.x || 0) * 0.6 + (target.x || 0) * 0.4,
+            (source.y || 0) * 0.6 + (target.y || 0) * 0.4,
+            (source.z || 0) * 0.6 + (target.z || 0) * 0.4,
+          ]}
+        >
+          <coneGeometry args={[0.5, 1.4, 8]} />
+          <meshBasicMaterial color={color} transparent opacity={opacity * 1.5} blending={THREE.AdditiveBlending} />
+        </mesh>
       )}
     </group>
   );
 }
 
-// 포스 시뮬레이션 훅
-function useForceSimulation(
-  nodes: GraphNode[], 
-  links: GraphLink[], 
-  layoutType: "force" | "radial" | "hierarchical"
-) {
-  const [simulatedNodes, setSimulatedNodes] = useState<GraphNode[]>([]);
-  const [simulatedLinks, setSimulatedLinks] = useState<GraphLink[]>([]);
+// 배경 파티클 – 전체 네뷸라 느낌을 강화
+function BackgroundParticles({ count = 800 }) {
+  const pointsRef = useRef<THREE.Points>(null);
 
-  useEffect(() => {
-    if (nodes.length === 0) return;
-
-    // 노드 복사 (뮤테이션 방지) - 초기 위치 명확히 설정
-    const nodesCopy = nodes.map(n => ({ 
-      ...n, 
-      x: n.x || (Math.random() - 0.5) * 100,
-      y: n.y || (Math.random() - 0.5) * 100,
-      z: n.z || (Math.random() - 0.5) * 100,
-    }));
-
-    // 링크 복사
-    const linksCopy = links.map(l => ({
-      ...l,
-      source: nodesCopy.find(n => n.id === (typeof l.source === 'string' ? l.source : l.source.id))!,
-      target: nodesCopy.find(n => n.id === (typeof l.target === 'string' ? l.target : l.target.id))!,
-    }));
-
-    // 레이아웃 타입에 따른 시뮬레이션 설정
-    if (layoutType === "radial") {
-      // 방사형 레이아웃
-      const angleStep = (2 * Math.PI) / nodesCopy.length;
-      const radius = 50;
-      nodesCopy.forEach((node, i) => {
-        node.x = radius * Math.cos(i * angleStep);
-        node.y = radius * Math.sin(i * angleStep);
-        node.z = 0;
-      });
-      setSimulatedNodes(nodesCopy);
-      setSimulatedLinks(linksCopy);
-      return;
-    } else if (layoutType === "hierarchical") {
-      // 계층형 레이아웃
-      const simulation = forceSimulation(nodesCopy as any)
-        .force("link", forceLink(linksCopy as any).id((d: any) => d.id).distance(30))
-        .force("charge", forceManyBody().strength(-200))
-        .force("center", forceCenter(0, 0))
-        .force("collision", forceCollide().radius((d: any) => d.val / 4));
-
-      // 시뮬레이션 틱 핸들러
-      simulation.on("tick", () => {
-        setSimulatedNodes([...nodesCopy]);
-        setSimulatedLinks([...linksCopy]);
-      });
-
-      // 충분한 시간 시뮬레이션 실행
-      for (let i = 0; i < 150; i++) {
-        simulation.tick();
-      }
-      simulation.stop();
-
-      return () => {
-        simulation.stop();
-      };
-    } else {
-      // Force 레이아웃 (3D)
-      const simulation = forceSimulation(nodesCopy as any)
-        .force("link", forceLink(linksCopy as any).id((d: any) => d.id).distance(40))
-        .force("charge", forceManyBody().strength(-400))
-        .force("center", forceCenter(0, 0))
-        .force("collision", forceCollide().radius((d: any) => d.val / 4));
-
-      // 시뮬레이션 틱 핸들러
-      simulation.on("tick", () => {
-        // 3D 레이아웃을 위해 z 좌표도 랜덤하게 조정
-        nodesCopy.forEach(node => {
-          if (!node.z || Math.abs(node.z) < 1) {
-            node.z = (Math.random() - 0.5) * 80;
-          }
-        });
-        setSimulatedNodes([...nodesCopy]);
-        setSimulatedLinks([...linksCopy]);
-      });
-
-      // 충분한 시간 시뮬레이션 실행
-      for (let i = 0; i < 200; i++) {
-        simulation.tick();
-      }
-      
-      // 초기 상태 설정
-      setSimulatedNodes([...nodesCopy]);
-      setSimulatedLinks([...linksCopy]);
-      
-      simulation.stop();
-
-      return () => {
-        simulation.stop();
-      };
+  const positions = useMemo(() => {
+    const arr = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      const r = 120 * Math.pow(Math.random(), 0.7); // 중심에 더 밀집
+      const theta = Math.random() * 2 * Math.PI;
+      const phi = Math.acos(2 * Math.random() - 1);
+      arr[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+      arr[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+      arr[i * 3 + 2] = r * Math.cos(phi);
     }
-  }, [nodes, links, layoutType]);
+    return arr;
+  }, [count]);
 
-  return { nodes: simulatedNodes, links: simulatedLinks };
-}
-
-// 메인 Scene 컴포넌트
-function Scene({ 
-  nodes, 
-  links, 
-  onNodeClick, 
-  layoutType 
-}: SchemaGraph3DProps) {
-  const { camera } = useThree();
-  const { nodes: simulatedNodes, links: simulatedLinks } = useForceSimulation(nodes, links, layoutType);
-
-  useEffect(() => {
-    // 카메라 초기 위치
-    camera.position.set(0, 0, 150);
-    camera.lookAt(0, 0, 0);
-  }, [camera]);
-
-  // 디버깅 로그
-  console.log('Rendering 3D graph:', {
-    totalNodes: nodes.length,
-    simulatedNodes: simulatedNodes.length,
-    totalLinks: links.length,
-    simulatedLinks: simulatedLinks.length,
-    layoutType,
-    sampleNode: simulatedNodes[0]
+  useFrame((state) => {
+    const t = state.clock.elapsedTime * 0.03;
+    if (pointsRef.current) {
+      pointsRef.current.rotation.y = t;
+    }
   });
 
   return (
+    <points ref={pointsRef}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" count={count} array={positions} itemSize={3} />
+      </bufferGeometry>
+      <pointsMaterial size={0.6} sizeAttenuation color="#5f7fb0" transparent opacity={0.25} depthWrite={false} />
+    </points>
+  );
+}
+
+/** ===================== Scene & 메인 컴포넌트 ===================== **/
+
+function Scene({ nodes, links, onNodeClick, layoutType }: SchemaGraph3DProps) {
+  const { camera } = useThree();
+
+  const { nodes: simNodes, links: simLinks } = useForceSimulation(nodes, links, layoutType);
+
+  // hover / focus 상태 관리
+  const [focusedId, setFocusedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    // 카메라 초기 위치
+    camera.position.set(0, 0, 160);
+    camera.lookAt(0, 0, 0);
+  }, [camera]);
+
+  // 인접 노드/링크 계산
+  const neighborMap = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    simLinks.forEach((l) => {
+      const s = (l.source as GraphNode).id;
+      const t = (l.target as GraphNode).id;
+      if (!map.has(s)) map.set(s, new Set());
+      if (!map.has(t)) map.set(t, new Set());
+      map.get(s)!.add(t);
+      map.get(t)!.add(s);
+    });
+    return map;
+  }, [simLinks]);
+
+  const handleNodeClick = (n: GraphNode) => {
+    setFocusedId((prev) => (prev === n.id ? null : n.id));
+    onNodeClick?.(n);
+  };
+
+  return (
     <>
-      {/* 투명 배경 */}
-      <color attach="background" args={['transparent']} />
-      
-      {/* 조명 설정 - 더 밝게 */}
-      <ambientLight intensity={0.5} />
-      <directionalLight position={[10, 10, 10]} intensity={1} />
-      <pointLight position={[0, 0, 0]} intensity={0.8} color="#ffffff" />
-      <pointLight position={[50, 50, 50]} intensity={0.6} color="#00ffaa" />
-      <pointLight position={[-50, -50, -50]} intensity={0.6} color="#4080ff" />
+      {/* 배경 & Fog */}
+      <color attach="background" args={["#020410"]} />
+      <fog attach="fog" args={["#020410", 80, 280]} />
 
-      {/* 링크 렌더링 (노드보다 먼저) */}
-      {simulatedLinks.length > 0 && simulatedLinks.map((link, i) => (
-        <Link3D key={`link-${i}`} link={link} />
-      ))}
+      {/* 조명 – 중심부는 살짝 밝게, 주변은 어둡게 */}
+      <ambientLight intensity={0.35} />
+      <directionalLight position={[40, 40, 80]} intensity={1.0} color="#d0ffff" />
+      <pointLight position={[0, 0, 0]} intensity={0.8} color="#7fe8ff" />
+      <pointLight position={[-60, -40, -60]} intensity={0.5} color="#2050ff" />
 
-      {/* 노드 렌더링 */}
-      {simulatedNodes.length > 0 && simulatedNodes.map((node) => (
-        <Node3D 
-          key={node.id} 
-          node={node} 
-          onClick={onNodeClick || (() => {})} 
-        />
-      ))}
+      {/* 네뷸라 파티클 */}
+      <BackgroundParticles count={900} />
 
-      {/* 참조용 그리드 */}
-      <gridHelper args={[200, 20, "#555555", "#333333"]} position={[0, -60, 0]} />
+      {/* 링크 → 노드 순서로 렌더 */}
+      {simLinks.map((link, i) => {
+        const s = (link.source as GraphNode).id;
+        const t = (link.target as GraphNode).id;
+
+        const isNeighborLink = !focusedId || s === focusedId || t === focusedId;
+        const dimmed = !!focusedId && !isNeighborLink;
+
+        return <Link3D key={`link-${i}-${s}-${t}`} link={link} dimmed={dimmed} isNeighborLink={isNeighborLink} />;
+      })}
+
+      {simNodes.map((node) => {
+        const isFocused = focusedId === node.id;
+        const neighbors = neighborMap.get(focusedId || "") ?? new Set();
+        const isNeighbor = neighbors.has(node.id);
+        const dimmed = !!focusedId && !isFocused && !isNeighbor; // 초점 밖은 살짝 어둡게
+
+        return <Node3D key={node.id} node={node} focused={isFocused} dimmed={dimmed} onClick={handleNodeClick} />;
+      })}
     </>
   );
 }
 
-// 메인 3D 그래프 컴포넌트
-export function SchemaGraph3D({ 
-  nodes, 
-  links, 
-  onNodeClick,
-  layoutType = "force"
-}: SchemaGraph3DProps) {
+export function SchemaGraph3D({ nodes, links, onNodeClick, layoutType = "force" }: SchemaGraph3DProps) {
   return (
-    <div style={{ width: "100%", height: "600px", background: "transparent", borderRadius: "0.5rem" }}>
-      <Canvas gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}>
-        <PerspectiveCamera makeDefault position={[0, 0, 150]} fov={75} />
-        <OrbitControls 
-          enableDamping 
+    <div
+      style={{
+        width: "100%",
+        height: "650px",
+        background: "radial-gradient(circle at top, #050818 0, #020308 60%, #000000 100%)",
+        borderRadius: "0.75rem",
+        overflow: "hidden",
+      }}
+    >
+      <Canvas
+        gl={{
+          antialias: true,
+          alpha: false,
+          powerPreference: "high-performance",
+        }}
+      >
+        <PerspectiveCamera makeDefault position={[0, 0, 160]} fov={70} />
+        <OrbitControls
+          enableDamping
           dampingFactor={0.08}
-          minDistance={30}
-          maxDistance={400}
-          maxPolarAngle={Math.PI}
+          minDistance={60}
+          maxDistance={320}
           autoRotate
-          autoRotateSpeed={0.5}
-        />
-        
-        <Scene 
-          nodes={nodes} 
-          links={links} 
-          onNodeClick={onNodeClick}
-          layoutType={layoutType}
+          autoRotateSpeed={0.35}
         />
 
-        {/* Gizmo (축 표시) */}
+        <Scene nodes={nodes} links={links} onNodeClick={onNodeClick} layoutType={layoutType} />
+
         <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
-          <GizmoViewport 
-            axisColors={['#ff4444', '#44ff44', '#4444ff']} 
-            labelColor="white"
-          />
+          <GizmoViewport axisColors={["#ff5555", "#55ff99", "#5599ff"]} labelColor="#ffffff" />
         </GizmoHelper>
       </Canvas>
     </div>
