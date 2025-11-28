@@ -1,15 +1,13 @@
 import React, { useRef, useEffect, useMemo, useState } from "react";
-import { Canvas, useFrame, useThree, extend } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { 
   OrbitControls, 
   Text, 
   PerspectiveCamera, 
   GizmoHelper, 
   GizmoViewport, 
-  Line as DreiLine,
-  Sphere
+  Line as DreiLine
 } from "@react-three/drei";
-import { EffectComposer, Bloom, DepthOfField } from '@react-three/postprocessing';
 import * as THREE from "three";
 import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide } from "d3-force";
 
@@ -376,8 +374,8 @@ export function SchemaGraph3D({
   layoutType = "force"
 }: SchemaGraph3DProps) {
   return (
-    <div style={{ width: "100%", height: "600px", background: "#0a0a0f" }}>
-      <Canvas shadows gl={{ antialias: true, alpha: false }}>
+    <div style={{ width: "100%", height: "600px", background: "#0a0a0f", borderRadius: "0.5rem" }}>
+      <Canvas gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}>
         <PerspectiveCamera makeDefault position={[0, 0, 150]} fov={75} />
         <OrbitControls 
           enableDamping 
@@ -386,7 +384,7 @@ export function SchemaGraph3D({
           maxDistance={400}
           maxPolarAngle={Math.PI}
           autoRotate
-          autoRotateSpeed={0.3}
+          autoRotateSpeed={0.5}
         />
         
         <Scene 
@@ -395,22 +393,6 @@ export function SchemaGraph3D({
           onNodeClick={onNodeClick}
           layoutType={layoutType}
         />
-
-        {/* 후처리 효과 - Bloom으로 발광 효과 */}
-        <EffectComposer>
-          <Bloom 
-            intensity={1.5}
-            luminanceThreshold={0.2}
-            luminanceSmoothing={0.9}
-            height={300}
-            opacity={1}
-          />
-          <DepthOfField 
-            focusDistance={0.02}
-            focalLength={0.05}
-            bokehScale={3}
-          />
-        </EffectComposer>
 
         {/* Gizmo (축 표시) */}
         <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
