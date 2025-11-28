@@ -56,6 +56,53 @@ export interface SchemaGraph3DProps {
 
 /** ===================== 공통 유틸 & 레이아웃 ===================== **/
 
+/**
+ * Normalizes node positions to fit within a target box size and centers them at origin
+ */
+function normalizeAndCenter(nodes: GraphNode[], targetSize: number) {
+  if (!nodes.length) return;
+
+  // Find bounding box
+  let minX = Infinity, maxX = -Infinity;
+  let minY = Infinity, maxY = -Infinity;
+  let minZ = Infinity, maxZ = -Infinity;
+
+  nodes.forEach((n) => {
+    if (n.x !== undefined) {
+      minX = Math.min(minX, n.x);
+      maxX = Math.max(maxX, n.x);
+    }
+    if (n.y !== undefined) {
+      minY = Math.min(minY, n.y);
+      maxY = Math.max(maxY, n.y);
+    }
+    if (n.z !== undefined) {
+      minZ = Math.min(minZ, n.z);
+      maxZ = Math.max(maxZ, n.z);
+    }
+  });
+
+  const rangeX = maxX - minX || 1;
+  const rangeY = maxY - minY || 1;
+  const rangeZ = maxZ - minZ || 1;
+  const maxRange = Math.max(rangeX, rangeY, rangeZ);
+
+  // Scale factor to fit within targetSize
+  const scale = maxRange > 0 ? targetSize / maxRange : 1;
+
+  // Center of current bounding box
+  const centerX = (minX + maxX) / 2;
+  const centerY = (minY + maxY) / 2;
+  const centerZ = (minZ + maxZ) / 2;
+
+  // Normalize and center all nodes
+  nodes.forEach((n) => {
+    if (n.x !== undefined) n.x = (n.x - centerX) * scale;
+    if (n.y !== undefined) n.y = (n.y - centerY) * scale;
+    if (n.z !== undefined) n.z = (n.z - centerZ) * scale;
+  });
+}
+
 function useForceSimulation(
   nodes: GraphNode[],
   links: GraphLink[],
