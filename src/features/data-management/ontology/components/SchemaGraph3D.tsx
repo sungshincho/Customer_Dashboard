@@ -143,16 +143,19 @@ function Node3D({
   focused,
   dimmed,
   onClick,
+  onDrag,
 }: {
   node: GraphNode;
   focused: boolean;
   dimmed: boolean;
   onClick: (node: GraphNode) => void;
+  onDrag: (node: GraphNode, position: [number, number, number]) => void;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
   const coreRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const baseColor = useMemo(() => new THREE.Color(node.color || "#6ac8ff"), [node.color]);
 
@@ -167,7 +170,7 @@ function Node3D({
   useFrame((state) => {
     const t = state.clock.elapsedTime;
 
-    if (meshRef.current) {
+    if (meshRef.current && !isDragging) {
       meshRef.current.position.set(node.x || 0, node.y || 0, node.z || 0);
 
       // 허브 노드에 살짝 펄스
@@ -175,13 +178,13 @@ function Node3D({
       meshRef.current.scale.setScalar(pulse);
     }
 
-    if (glowRef.current) {
+    if (glowRef.current && !isDragging) {
       glowRef.current.position.set(node.x || 0, node.y || 0, node.z || 0);
       const glowPulse = 1 + (0.06 + connectionIntensity * 0.12) * Math.sin(t * 2.5 + node.id.length * 1.37);
       glowRef.current.scale.setScalar(glowPulse * (focused ? 1.4 : 1.0));
     }
 
-    if (coreRef.current) {
+    if (coreRef.current && !isDragging) {
       coreRef.current.position.set(node.x || 0, node.y || 0, node.z || 0);
     }
   });
@@ -203,9 +206,46 @@ function Node3D({
       {/* 메인 구체 */}
       <mesh
         ref={meshRef}
-        onClick={() => onClick(node)}
-        onPointerOver={() => setHovered(true)}
-        onPointerOut={() => setHovered(false)}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick(node);
+        }}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          setHovered(true);
+          document.body.style.cursor = 'grab';
+        }}
+        onPointerOut={() => {
+          setHovered(false);
+          if (!isDragging) {
+            document.body.style.cursor = 'auto';
+          }
+        }}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          setIsDragging(true);
+          document.body.style.cursor = 'grabbing';
+        }}
+        onPointerUp={() => {
+          setIsDragging(false);
+          document.body.style.cursor = 'grab';
+        }}
+        onPointerMove={(e) => {
+          if (isDragging) {
+            e.stopPropagation();
+            const newPos: [number, number, number] = [e.point.x, e.point.y, e.point.z];
+            onDrag(node, newPos);
+            if (meshRef.current) {
+              meshRef.current.position.set(newPos[0], newPos[1], newPos[2]);
+            }
+            if (glowRef.current) {
+              glowRef.current.position.set(newPos[0], newPos[1], newPos[2]);
+            }
+            if (coreRef.current) {
+              coreRef.current.position.set(newPos[0], newPos[1], newPos[2]);
+            }
+          }
+        }}
       >
         <sphereGeometry args={[radius, 32, 32]} />
         <meshPhysicalMaterial
