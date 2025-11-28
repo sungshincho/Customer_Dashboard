@@ -78,11 +78,11 @@ function useForceSimulation(nodes: GraphNode[], links: GraphLink[], layoutType: 
       source:
         typeof l.source === "string"
           ? nodesCopy.find((n) => n.id === l.source)!
-          : nodesCopy.find((n) => n.id === l.source.id)!,
+          : nodesCopy.find((n) => n.id === (l.source as GraphNode).id)!,
       target:
         typeof l.target === "string"
           ? nodesCopy.find((n) => n.id === l.target)!
-          : nodesCopy.find((n) => n.id === l.target.id)!,
+          : nodesCopy.find((n) => n.id === (l.target as GraphNode).id)!,
     }));
 
     if (layoutType === "radial") {
