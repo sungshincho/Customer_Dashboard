@@ -71,15 +71,12 @@ function useForceSimulation(
       return;
     }
 
-    // ✅ 초기 분산 범위: 원래 80 → 45 정도로 살짝 줄이기
-    const INITIAL_SPREAD_XY = 45;
-    const INITIAL_SPREAD_Z = 30;
-
+    // 초기 분산은 그대로 두어도 됨 (원래 코드)
     const nodesCopy: GraphNode[] = nodes.map((n) => ({
       ...n,
-      x: n.x ?? (Math.random() - 0.5) * INITIAL_SPREAD_XY,
-      y: n.y ?? (Math.random() - 0.5) * INITIAL_SPREAD_XY,
-      z: n.z ?? (Math.random() - 0.5) * INITIAL_SPREAD_Z,
+      x: n.x ?? (Math.random() - 0.5) * 80,
+      y: n.y ?? (Math.random() - 0.5) * 80,
+      z: n.z ?? (Math.random() - 0.5) * 80,
     }));
 
     const linksCopy: GraphLink[] = links.map((l) => ({
@@ -94,14 +91,13 @@ function useForceSimulation(
           : nodesCopy.find((n) => n.id === (l.target as GraphNode).id)!,
     }));
 
-    /** ---------- 레이어 레이아웃 (엔티티 / 속성 / 관계) ---------- **/
+    /** ---- 레이어 레이아웃 (엔티티 / 속성 / 관계) ---- **/
     if (layoutType === "layered") {
       const typeOrder: NodeType[] = ["entity", "property", "relation", "other"];
       const activeTypes = typeOrder.filter((t) => nodesCopy.some((n) => (n.nodeType ?? "entity") === t));
 
-      // ✅ 레이어 모드용 간격 (너무 붙지도, 너무 멀지도 않게 중간값)
-      const xSpacing = 35; // 레이어 간 거리
-      const ySpacing = 8; // 레이어 내 노드 간 거리
+      const xSpacing = 35;
+      const ySpacing = 8;
 
       activeTypes.forEach((type, idx) => {
         const layerNodes = nodesCopy.filter((n) => (n.nodeType ?? "entity") === type);
@@ -118,54 +114,58 @@ function useForceSimulation(
         });
       });
 
+      // 🔹 레이어 레이아웃 결과를 항상 동일 크기로 맞춰줌
+      normalizeAndCenter(nodesCopy, 110);
+
       setSimulatedNodes([...nodesCopy]);
       setSimulatedLinks([...linksCopy]);
       return;
     }
 
-    /** ---------- 방사형 레이아웃 ---------- **/
+    /** ---- 방사형 레이아웃 ---- **/
     if (layoutType === "radial") {
       const angleStep = (2 * Math.PI) / nodesCopy.length;
-      const radius = 45; // 원래 60 → 살짝 줄이기
+      const radius = 60;
       nodesCopy.forEach((node, i) => {
         node.x = radius * Math.cos(i * angleStep);
         node.y = radius * Math.sin(i * angleStep);
-        node.z = (Math.random() - 0.5) * 15;
+        node.z = (Math.random() - 0.5) * 20;
       });
+
+      normalizeAndCenter(nodesCopy, 110);
+
       setSimulatedNodes([...nodesCopy]);
       setSimulatedLinks([...linksCopy]);
       return;
     }
 
-    /** ---------- force / hierarchical 공통 ---------- **/
-    // ✅ force 계수들: 원래 값과 극단 값의 중간 정도
-    const LINK_DISTANCE = layoutType === "hierarchical" ? 32 : 26; // 기본 35, 극단 20의 중간
-    const CHARGE_STRENGTH = layoutType === "hierarchical" ? -260 : -320; // 기본 -220/-420 → 중간값
-    const DEPTH_SCALE = 45; // z축 깊이: 기본 80 → 절반 조금 넘게
-
+    /** ---- force / hierarchical 둘 다 D3 포스 사용 ---- **/
     const sim = forceSimulation(nodesCopy as any)
       .force(
         "link",
         forceLink(linksCopy as any)
           .id((d: any) => d.id)
-          .distance(LINK_DISTANCE)
-          .strength(0.9),
+          .distance(30) // 원래 35 → 살짝만 줄였음
+          .strength(0.8),
       )
-      .force("charge", forceManyBody().strength(CHARGE_STRENGTH))
+      .force("charge", forceManyBody().strength(layoutType === "hierarchical" ? -260 : -340))
       .force("center", forceCenter(0, 0))
       .force(
         "collision",
-        forceCollide().radius((d: any) => Math.max(d.val / 5, 2.5)),
+        forceCollide().radius((d: any) => Math.max(d.val / 4, 3)),
       );
 
-    const TICKS = layoutType === "hierarchical" ? 180 : 230;
+    const TICKS = layoutType === "hierarchical" ? 200 : 260;
     for (let i = 0; i < TICKS; i++) sim.tick();
     sim.stop();
 
-    // ✅ 3D 깊이: 너무 퍼지지 않게만 살짝
+    // 깊이감은 적당히만
     nodesCopy.forEach((n, i) => {
-      n.z = n.z ?? (Math.sin(i * 0.37) * 0.5 + (Math.random() - 0.5) * 0.5) * DEPTH_SCALE;
+      n.z = n.z ?? (Math.sin(i * 0.37) * 0.5 + (Math.random() - 0.5) * 0.5) * 40;
     });
+
+    // 🔹 force/hierarchical 결과도 항상 같은 박스 크기로 축소 + 센터링
+    normalizeAndCenter(nodesCopy, 110);
 
     setSimulatedNodes([...nodesCopy]);
     setSimulatedLinks([...linksCopy]);
