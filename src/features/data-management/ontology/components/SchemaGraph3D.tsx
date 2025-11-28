@@ -246,12 +246,12 @@ function useForceSimulation(
   useEffect(() => {
     if (nodes.length === 0) return;
 
-    // 노드 복사 (뮤테이션 방지)
+    // 노드 복사 (뮤테이션 방지) - 초기 위치 명확히 설정
     const nodesCopy = nodes.map(n => ({ 
       ...n, 
-      x: n.x || Math.random() * 100 - 50,
-      y: n.y || Math.random() * 100 - 50,
-      z: n.z || Math.random() * 100 - 50,
+      x: n.x || (Math.random() - 0.5) * 100,
+      y: n.y || (Math.random() - 0.5) * 100,
+      z: n.z || (Math.random() - 0.5) * 100,
     }));
 
     // 링크 복사
@@ -262,8 +262,6 @@ function useForceSimulation(
     }));
 
     // 레이아웃 타입에 따른 시뮬레이션 설정
-    let simulation;
-    
     if (layoutType === "radial") {
       // 방사형 레이아웃
       const angleStep = (2 * Math.PI) / nodesCopy.length;
@@ -278,33 +276,62 @@ function useForceSimulation(
       return;
     } else if (layoutType === "hierarchical") {
       // 계층형 레이아웃
-      simulation = forceSimulation(nodesCopy as any)
+      const simulation = forceSimulation(nodesCopy as any)
         .force("link", forceLink(linksCopy as any).id((d: any) => d.id).distance(30))
         .force("charge", forceManyBody().strength(-200))
         .force("center", forceCenter(0, 0))
         .force("collision", forceCollide().radius((d: any) => d.val / 4));
+
+      // 시뮬레이션 틱 핸들러
+      simulation.on("tick", () => {
+        setSimulatedNodes([...nodesCopy]);
+        setSimulatedLinks([...linksCopy]);
+      });
+
+      // 충분한 시간 시뮬레이션 실행
+      for (let i = 0; i < 150; i++) {
+        simulation.tick();
+      }
+      simulation.stop();
+
+      return () => {
+        simulation.stop();
+      };
     } else {
       // Force 레이아웃 (3D)
-      simulation = forceSimulation(nodesCopy as any)
+      const simulation = forceSimulation(nodesCopy as any)
         .force("link", forceLink(linksCopy as any).id((d: any) => d.id).distance(40))
         .force("charge", forceManyBody().strength(-400))
         .force("center", forceCenter(0, 0))
         .force("collision", forceCollide().radius((d: any) => d.val / 4));
-    }
 
-    // 시뮬레이션 실행
-    simulation.on("tick", () => {
+      // 시뮬레이션 틱 핸들러
+      simulation.on("tick", () => {
+        // 3D 레이아웃을 위해 z 좌표도 랜덤하게 조정
+        nodesCopy.forEach(node => {
+          if (!node.z || Math.abs(node.z) < 1) {
+            node.z = (Math.random() - 0.5) * 80;
+          }
+        });
+        setSimulatedNodes([...nodesCopy]);
+        setSimulatedLinks([...linksCopy]);
+      });
+
+      // 충분한 시간 시뮬레이션 실행
+      for (let i = 0; i < 200; i++) {
+        simulation.tick();
+      }
+      
+      // 초기 상태 설정
       setSimulatedNodes([...nodesCopy]);
       setSimulatedLinks([...linksCopy]);
-    });
-
-    // 약간의 틱 후 자동 정지
-    simulation.tick(100);
-    simulation.stop();
-
-    return () => {
+      
       simulation.stop();
-    };
+
+      return () => {
+        simulation.stop();
+      };
+    }
   }, [nodes, links, layoutType]);
 
   return { nodes: simulatedNodes, links: simulatedLinks };
@@ -325,6 +352,16 @@ function Scene({
     camera.position.set(0, 0, 150);
     camera.lookAt(0, 0, 0);
   }, [camera]);
+
+  // 디버깅 로그
+  console.log('Rendering 3D graph:', {
+    totalNodes: nodes.length,
+    simulatedNodes: simulatedNodes.length,
+    totalLinks: links.length,
+    simulatedLinks: simulatedLinks.length,
+    layoutType,
+    sampleNode: simulatedNodes[0]
+  });
 
   return (
     <>
@@ -347,12 +384,12 @@ function Scene({
       />
 
       {/* 링크 렌더링 (노드보다 먼저) */}
-      {simulatedLinks.map((link, i) => (
+      {simulatedLinks.length > 0 && simulatedLinks.map((link, i) => (
         <Link3D key={`link-${i}`} link={link} />
       ))}
 
       {/* 노드 렌더링 */}
-      {simulatedNodes.map((node) => (
+      {simulatedNodes.length > 0 && simulatedNodes.map((node) => (
         <Node3D 
           key={node.id} 
           node={node} 
