@@ -396,10 +396,6 @@ function Scene({ nodes, links, onNodeClick, layoutType }: SchemaGraph3DProps) {
 
   return (
     <>
-      {/* 배경 & Fog */}
-      <color attach="background" args={["#020410"]} />
-      <fog attach="fog" args={["#020410", 80, 280]} />
-
       {/* 조명 – 중심부는 살짝 밝게, 주변은 어둡게 */}
       <ambientLight intensity={0.35} />
       <directionalLight position={[40, 40, 80]} intensity={1.0} color="#d0ffff" />
@@ -438,7 +434,6 @@ export function SchemaGraph3D({ nodes, links, onNodeClick, layoutType = "force" 
       style={{
         width: "100%",
         height: "650px",
-        background: "radial-gradient(circle at top, #050818 0, #020308 60%, #000000 100%)",
         borderRadius: "0.75rem",
         overflow: "hidden",
       }}
