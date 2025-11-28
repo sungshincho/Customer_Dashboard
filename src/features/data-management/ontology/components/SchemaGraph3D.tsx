@@ -56,50 +56,48 @@ export interface SchemaGraph3DProps {
 
 /** ===================== 공통 유틸 & 레이아웃 ===================== **/
 
-/**
- * Normalizes node positions to fit within a target box size and centers them at origin
- */
-function normalizeAndCenter(nodes: GraphNode[], targetSize: number) {
-  if (!nodes.length) return;
+// 모든 노드를 targetSize 크기의 박스 안에 들어오도록 스케일 + 가운데 정렬
+function normalizeAndCenter(nodesCopy: GraphNode[], targetSize = 120) {
+  if (!nodesCopy.length) return;
 
-  // Find bounding box
-  let minX = Infinity, maxX = -Infinity;
-  let minY = Infinity, maxY = -Infinity;
-  let minZ = Infinity, maxZ = -Infinity;
+  let minX = Infinity,
+    maxX = -Infinity,
+    minY = Infinity,
+    maxY = -Infinity,
+    minZ = Infinity,
+    maxZ = -Infinity;
 
-  nodes.forEach((n) => {
-    if (n.x !== undefined) {
-      minX = Math.min(minX, n.x);
-      maxX = Math.max(maxX, n.x);
-    }
-    if (n.y !== undefined) {
-      minY = Math.min(minY, n.y);
-      maxY = Math.max(maxY, n.y);
-    }
-    if (n.z !== undefined) {
-      minZ = Math.min(minZ, n.z);
-      maxZ = Math.max(maxZ, n.z);
-    }
+  nodesCopy.forEach((n) => {
+    const x = n.x ?? 0;
+    const y = n.y ?? 0;
+    const z = n.z ?? 0;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+    if (z < minZ) minZ = z;
+    if (z > maxZ) maxZ = z;
   });
 
-  const rangeX = maxX - minX || 1;
-  const rangeY = maxY - minY || 1;
-  const rangeZ = maxZ - minZ || 1;
-  const maxRange = Math.max(rangeX, rangeY, rangeZ);
+  const width = maxX - minX || 1;
+  const height = maxY - minY || 1;
+  const depth = maxZ - minZ || 1;
+  const longest = Math.max(width, height, depth);
 
-  // Scale factor to fit within targetSize
-  const scale = maxRange > 0 ? targetSize / maxRange : 1;
+  // targetSize 박스 안에 들어오도록 스케일
+  const scale = targetSize / longest;
 
-  // Center of current bounding box
-  const centerX = (minX + maxX) / 2;
-  const centerY = (minY + maxY) / 2;
-  const centerZ = (minZ + maxZ) / 2;
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  const cz = (minZ + maxZ) / 2;
 
-  // Normalize and center all nodes
-  nodes.forEach((n) => {
-    if (n.x !== undefined) n.x = (n.x - centerX) * scale;
-    if (n.y !== undefined) n.y = (n.y - centerY) * scale;
-    if (n.z !== undefined) n.z = (n.z - centerZ) * scale;
+  nodesCopy.forEach((n) => {
+    const x = n.x ?? 0;
+    const y = n.y ?? 0;
+    const z = n.z ?? 0;
+    n.x = (x - cx) * scale;
+    n.y = (y - cy) * scale;
+    n.z = (z - cz) * scale;
   });
 }
 
