@@ -19,6 +19,8 @@ interface PropertyField {
   required: boolean;
 }
 
+type NodeType = "entity" | "property" | "relation" | "other";
+
 interface GraphNode {
   id: string;
   name: string;
@@ -26,6 +28,7 @@ interface GraphNode {
   color: string;
   properties: PropertyField[];
   val: number;
+  nodeType?: NodeType; // 🔹 엔티티 / 속성 / 관계 레이어 구분용
   x?: number;
   y?: number;
   z?: number;
@@ -48,13 +51,17 @@ interface SchemaGraph3DProps {
   nodes: GraphNode[];
   links: GraphLink[];
   onNodeClick?: (node: GraphNode) => void;
-  layoutType?: "force" | "radial" | "hierarchical";
+  layoutType?: "force" | "radial" | "hierarchical" | "layered";
 }
 
 /** ===================== 공통 유틸 & 레이아웃 ===================== **/
 
 // 포스 시뮬레이션 훅 – 한 번 러닝해서 최종 위치만 사용 (깜빡임 방지)
-function useForceSimulation(nodes: GraphNode[], links: GraphLink[], layoutType: "force" | "radial" | "hierarchical") {
+function useForceSimulation(
+  nodes: GraphNode[],
+  links: GraphLink[],
+  layoutType: "force" | "radial" | "hierarchical" | "layered",
+) {
   const [simulatedNodes, setSimulatedNodes] = useState<GraphNode[]>([]);
   const [simulatedLinks, setSimulatedLinks] = useState<GraphLink[]>([]);
 
@@ -85,6 +92,36 @@ function useForceSimulation(nodes: GraphNode[], links: GraphLink[], layoutType: 
           : nodesCopy.find((n) => n.id === (l.target as GraphNode).id)!,
     }));
 
+    /** ---- 레이어 레이아웃 (엔티티 / 속성 / 관계) ---- **/
+    if (layoutType === "layered") {
+      const typeOrder: NodeType[] = ["entity", "property", "relation", "other"];
+
+      const activeTypes = typeOrder.filter((t) => nodesCopy.some((n) => (n.nodeType ?? "entity") === t));
+
+      const xSpacing = 50;
+      const ySpacing = 10;
+
+      activeTypes.forEach((type, idx) => {
+        const layerNodes = nodesCopy.filter((n) => (n.nodeType ?? "entity") === type);
+        if (!layerNodes.length) return;
+
+        const count = layerNodes.length;
+        const mid = (count - 1) / 2;
+        const xPos = (idx - (activeTypes.length - 1) / 2) * xSpacing;
+
+        layerNodes.forEach((n, i) => {
+          n.x = xPos;
+          n.y = (i - mid) * ySpacing;
+          n.z = (Math.random() - 0.5) * 15;
+        });
+      });
+
+      setSimulatedNodes([...nodesCopy]);
+      setSimulatedLinks([...linksCopy]);
+      return;
+    }
+
+    /** ---- 방사형 레이아웃 ---- **/
     if (layoutType === "radial") {
       const angleStep = (2 * Math.PI) / nodesCopy.length;
       const radius = 60;
@@ -98,7 +135,7 @@ function useForceSimulation(nodes: GraphNode[], links: GraphLink[], layoutType: 
       return;
     }
 
-    // force / hierarchical 둘 다 D3 포스 사용
+    /** ---- force / hierarchical 둘 다 D3 포스 사용 ---- **/
     const sim = forceSimulation(nodesCopy as any)
       .force(
         "link",
@@ -114,7 +151,6 @@ function useForceSimulation(nodes: GraphNode[], links: GraphLink[], layoutType: 
         forceCollide().radius((d: any) => Math.max(d.val / 4, 3)),
       );
 
-    // 적당한 틱 수만큼 돌린 뒤 정지
     const TICKS = layoutType === "hierarchical" ? 180 : 240;
     for (let i = 0; i < TICKS; i++) sim.tick();
     sim.stop();
@@ -137,7 +173,7 @@ function useForceSimulation(nodes: GraphNode[], links: GraphLink[], layoutType: 
 
 /** ===================== 3D 요소들 ===================== **/
 
-// 노드 3D – 글로우 / 코어 / 라벨 / hover dim 처리
+// 노드 3D – 글로우 / 코어 / 라벨 / 클릭&드래그
 function Node3D({
   node,
   focused,
@@ -156,7 +192,7 @@ function Node3D({
   const coreRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const { camera, raycaster, pointer } = useThree();
+  const { camera } = useThree();
 
   const baseColor = useMemo(() => new THREE.Color(node.color || "#6ac8ff"), [node.color]);
 
@@ -177,11 +213,10 @@ function Node3D({
     if (!isDragging) return;
     e.stopPropagation();
 
-    // 카메라 거리에 따라 이동 스케일 조정
-    const distance = camera.position.distanceTo(meshRef.current?.position || new THREE.Vector3());
+    if (!meshRef.current) return;
+    const distance = camera.position.distanceTo(meshRef.current.position);
     const scale = distance / 100;
 
-    // 마우스 이동량을 3D 공간으로 변환
     const dx = e.movementX * scale * 0.5;
     const dy = -e.movementY * scale * 0.5;
 
@@ -192,7 +227,8 @@ function Node3D({
     onDrag(node.id, newX, newY, newZ);
   };
 
-  const handlePointerUp = () => {
+  const handlePointerUp = (e: any) => {
+    e.stopPropagation();
     setIsDragging(false);
   };
 
@@ -264,7 +300,7 @@ function Node3D({
         <meshBasicMaterial color={baseColor} transparent opacity={dimmed ? 0.5 : 0.8} />
       </mesh>
 
-      {/* 라벨: 항상 표시 */}
+      {/* 라벨 – 항상 표시 */}
       <Text
         position={[node.x || 0, (node.y || 0) + radius + 3, (node.z || 0) + 0.1]}
         fontSize={1.8}
@@ -311,20 +347,20 @@ function Link3D({ link, dimmed, isNeighborLink }: { link: GraphLink; dimmed: boo
   const intensity = (isNeighborLink ? 1.0 : 0.6) * (0.6 + 0.4 * (weightNorm / 2));
 
   const color = useMemo(() => {
-    // weight / 방향성에 따라 청록~연두 계열 - 더 밝게
     const baseHue = 190 + (link.weight || 0.4) * 40;
     return new THREE.Color().setHSL(baseHue / 360, 0.8, 0.6);
   }, [link.weight]);
 
   const width = 0.5 + intensity * 2.0;
-  const opacity = (dimmed ? 0.4 : 0.75) * (isNeighborLink ? 1.2 : 1.0); // 항상 선명하게
+  const opacity = (dimmed ? 0.4 : 0.75) * (isNeighborLink ? 1.2 : 1.0);
 
   const midPoint = useMemo(
-    () => [
-      (source.x || 0) * 0.5 + (target.x || 0) * 0.5,
-      (source.y || 0) * 0.5 + (target.y || 0) * 0.5,
-      (source.z || 0) * 0.5 + (target.z || 0) * 0.5,
-    ] as [number, number, number],
+    () =>
+      [
+        (source.x || 0) * 0.5 + (target.x || 0) * 0.5,
+        (source.y || 0) * 0.5 + (target.y || 0) * 0.5,
+        (source.z || 0) * 0.5 + (target.z || 0) * 0.5,
+      ] as [number, number, number],
     [source.x, source.y, source.z, target.x, target.y, target.z],
   );
 
@@ -332,7 +368,7 @@ function Link3D({ link, dimmed, isNeighborLink }: { link: GraphLink; dimmed: boo
     <group>
       <DreiLine points={points} color={color} lineWidth={width} transparent opacity={opacity} />
 
-      {/* 관계 라벨 - 항상 표시 */}
+      {/* 관계 라벨 */}
       <Text
         position={midPoint}
         fontSize={1.0}
@@ -345,7 +381,7 @@ function Link3D({ link, dimmed, isNeighborLink }: { link: GraphLink; dimmed: boo
         {link.label}
       </Text>
 
-      {/* 단방향/양방향 표시용 작은 화살표 */}
+      {/* 방향 화살표 */}
       {link.directionality !== "undirected" && (
         <mesh
           position={[
@@ -362,14 +398,14 @@ function Link3D({ link, dimmed, isNeighborLink }: { link: GraphLink; dimmed: boo
   );
 }
 
-// 배경 파티클 – 전체 네뷸라 느낌을 강화
+// 배경 파티클 – 전체 네뷸라 느낌을 강화 (배경색은 투명)
 function BackgroundParticles({ count = 800 }) {
   const pointsRef = useRef<THREE.Points>(null);
 
   const positions = useMemo(() => {
     const arr = new Float32Array(count * 3);
     for (let i = 0; i < count; i++) {
-      const r = 120 * Math.pow(Math.random(), 0.7); // 중심에 더 밀집
+      const r = 120 * Math.pow(Math.random(), 0.7);
       const theta = Math.random() * 2 * Math.PI;
       const phi = Math.acos(2 * Math.random() - 1);
       arr[i * 3] = r * Math.sin(phi) * Math.cos(theta);
@@ -396,6 +432,97 @@ function BackgroundParticles({ count = 800 }) {
   );
 }
 
+/** 레이어 패널 (엔티티 / 속성 / 관계) **/
+function LayerPanels({ nodes }: { nodes: GraphNode[] }) {
+  const layers = useMemo(() => {
+    const groups = new Map<NodeType, GraphNode[]>();
+
+    nodes.forEach((n) => {
+      const type = n.nodeType ?? "entity";
+      if (!groups.has(type)) groups.set(type, []);
+      groups.get(type)!.push(n);
+    });
+
+    const entries: {
+      type: NodeType;
+      x: number;
+      minY: number;
+      maxY: number;
+      color: string;
+      label: string;
+    }[] = [];
+
+    const labelByType: Record<NodeType, string> = {
+      entity: "Entities",
+      property: "Properties",
+      relation: "Relations",
+      other: "Other",
+    };
+
+    const colorByType: Record<NodeType, string> = {
+      entity: "#3b82f6",
+      property: "#22c55e",
+      relation: "#eab308",
+      other: "#a855f7",
+    };
+
+    (["entity", "property", "relation", "other"] as NodeType[]).forEach((type) => {
+      const group = groups.get(type);
+      if (!group || !group.length) return;
+
+      const xs = group.map((n) => n.x ?? 0);
+      const ys = group.map((n) => n.y ?? 0);
+      const x = xs.reduce((a, b) => a + b, 0) / xs.length;
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+
+      entries.push({
+        type,
+        x,
+        minY,
+        maxY,
+        color: colorByType[type],
+        label: labelByType[type],
+      });
+    });
+
+    return entries;
+  }, [nodes]);
+
+  return (
+    <>
+      {layers.map((layer) => {
+        const height = (layer.maxY - layer.minY || 40) + 30;
+        const centerY = (layer.maxY + layer.minY) / 2;
+        const width = 35;
+
+        return (
+          <group key={layer.type}>
+            {/* 반투명 패널 (배경) */}
+            <mesh position={[layer.x, centerY, -5]}>
+              <planeGeometry args={[width, height]} />
+              <meshBasicMaterial color={layer.color} transparent opacity={0.08} />
+            </mesh>
+
+            {/* 레이어 라벨 */}
+            <Text
+              position={[layer.x, layer.maxY + 10, -4.9]}
+              fontSize={2.2}
+              color={layer.color}
+              anchorX="center"
+              anchorY="middle"
+              outlineWidth={0.4}
+              outlineColor="#000000"
+            >
+              {layer.label}
+            </Text>
+          </group>
+        );
+      })}
+    </>
+  );
+}
+
 /** ===================== Scene & 메인 컴포넌트 ===================== **/
 
 function Scene({ nodes, links, onNodeClick, layoutType }: SchemaGraph3DProps) {
@@ -403,12 +530,10 @@ function Scene({ nodes, links, onNodeClick, layoutType }: SchemaGraph3DProps) {
 
   const { nodes: simNodes, links: simLinks } = useForceSimulation(nodes, links, layoutType);
 
-  // hover / focus 상태 관리
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [draggedNodes, setDraggedNodes] = useState<Map<string, { x: number; y: number; z: number }>>(new Map());
 
   useEffect(() => {
-    // 카메라 초기 위치
     camera.position.set(0, 0, 160);
     camera.lookAt(0, 0, 0);
   }, [camera]);
@@ -440,7 +565,7 @@ function Scene({ nodes, links, onNodeClick, layoutType }: SchemaGraph3DProps) {
     });
   };
 
-  // 드래그된 위치를 반영한 노드 목록
+  // 드래그된 위치 반영
   const displayNodes = useMemo(() => {
     return simNodes.map((node) => {
       const dragged = draggedNodes.get(node.id);
@@ -453,7 +578,8 @@ function Scene({ nodes, links, onNodeClick, layoutType }: SchemaGraph3DProps) {
 
   return (
     <>
-      {/* 조명 – 중심부는 살짝 밝게, 주변은 어둡게 */}
+      {/* 배경색 없음 / 투명 Canvas */}
+      {/* 조명 */}
       <ambientLight intensity={0.35} />
       <directionalLight position={[40, 40, 80]} intensity={1.0} color="#d0ffff" />
       <pointLight position={[0, 0, 0]} intensity={0.8} color="#7fe8ff" />
@@ -462,7 +588,10 @@ function Scene({ nodes, links, onNodeClick, layoutType }: SchemaGraph3DProps) {
       {/* 네뷸라 파티클 */}
       <BackgroundParticles count={900} />
 
-      {/* 링크 → 노드 순서로 렌더 */}
+      {/* 레이어 패널 (layered 모드일 때) */}
+      {layoutType === "layered" && <LayerPanels nodes={displayNodes} />}
+
+      {/* 링크 → 노드 순으로 렌더 */}
       {simLinks.map((link, i) => {
         const s = (link.source as GraphNode).id;
         const t = (link.target as GraphNode).id;
@@ -477,7 +606,7 @@ function Scene({ nodes, links, onNodeClick, layoutType }: SchemaGraph3DProps) {
         const isFocused = focusedId === node.id;
         const neighbors = neighborMap.get(focusedId || "") ?? new Set();
         const isNeighbor = neighbors.has(node.id);
-        const dimmed = !!focusedId && !isFocused && !isNeighbor; // 초점 밖은 살짝 어둡게
+        const dimmed = !!focusedId && !isFocused && !isNeighbor;
 
         return (
           <Node3D
@@ -502,12 +631,13 @@ export function SchemaGraph3D({ nodes, links, onNodeClick, layoutType = "force" 
         height: "650px",
         borderRadius: "0.75rem",
         overflow: "hidden",
+        // 배경색 없음 → 상위 레이아웃 배경이 그대로 비침
       }}
     >
       <Canvas
         gl={{
           antialias: true,
-          alpha: true,
+          alpha: true, // 🔹 투명 캔버스
           powerPreference: "high-performance",
         }}
       >
