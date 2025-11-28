@@ -1,6 +1,4 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RefreshCw, Network } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SchemaGraph3D } from "./SchemaGraph3D";
+import { buildRetailOntologyGraphData } from "./buildRetailOntologyGraph";
 
 interface PropertyField {
   id: string;
@@ -17,24 +16,7 @@ interface PropertyField {
   required: boolean;
 }
 
-interface EntityType {
-  id: string;
-  name: string;
-  label: string;
-  color: string | null;
-  properties: PropertyField[];
-}
-
-interface RelationType {
-  id: string;
-  name: string;
-  label: string;
-  source_entity_type: string;
-  target_entity_type: string;
-  directionality: string | null;
-  properties: PropertyField[];
-  weight?: number;
-}
+type NodeType = "entity" | "property" | "relation" | "other";
 
 interface GraphNode {
   id: string;
@@ -43,6 +25,7 @@ interface GraphNode {
   color: string;
   properties: PropertyField[];
   val: number;
+  nodeType?: NodeType;
 }
 
 interface GraphLink {
@@ -66,139 +49,11 @@ export const SchemaGraphVisualization = () => {
   const [layoutType, setLayoutType] = useState<"force" | "radial" | "hierarchical">("force");
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const { data: entities } = useQuery({
-    queryKey: ["entity-types"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("ontology_entity_types")
-        .select("*");
-
-      if (error) throw error;
-      return (data || []).map(item => {
-        let properties: PropertyField[] = [];
-        
-        if (typeof item.properties === 'string') {
-          try {
-            properties = JSON.parse(item.properties);
-          } catch (e) {
-            console.error('Failed to parse properties:', e);
-          }
-        } else if (Array.isArray(item.properties)) {
-          properties = item.properties as unknown as PropertyField[];
-        }
-        
-        return {
-          ...item,
-          properties
-        };
-      }) as EntityType[];
-    },
-  });
-
-  const { data: relations } = useQuery({
-    queryKey: ["relation-types"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("ontology_relation_types")
-        .select("*");
-
-      if (error) throw error;
-      return (data || []).map(item => {
-        let properties: PropertyField[] = [];
-        
-        if (typeof item.properties === 'string') {
-          try {
-            properties = JSON.parse(item.properties);
-          } catch (e) {
-            console.error('Failed to parse properties:', e);
-          }
-        } else if (Array.isArray(item.properties)) {
-          properties = item.properties as unknown as PropertyField[];
-        }
-        
-        return {
-          ...item,
-          properties
-        };
-      }) as RelationType[];
-    },
-  });
-
+  // buildRetailOntologyGraph()에서 직접 데이터 로드
   useEffect(() => {
-    if (!entities || !relations) return;
-
-    // 먼저 노드 생성 (엔티티 이름을 ID로 사용)
-    const nodes: GraphNode[] = entities.map(entity => {
-      return {
-        id: entity.name,
-        name: entity.name,
-        label: entity.label,
-        color: entity.color || "#3b82f6",
-        properties: entity.properties,
-        val: 20 + (entity.properties.length * 2), // 임시 크기
-      };
-    });
-
-    // 존재하는 노드 이름 집합
-    const existingNodeNames = new Set(nodes.map(n => n.id));
-
-    // links 생성 시 존재하는 노드만 참조하도록 필터링
-    const links: GraphLink[] = relations
-      .filter(relation => {
-        // source와 target이 모두 존재하는 노드인지 확인
-        const sourceExists = existingNodeNames.has(relation.source_entity_type);
-        const targetExists = existingNodeNames.has(relation.target_entity_type);
-        
-        if (!sourceExists || !targetExists) {
-          console.warn(`⚠️ Skipping relation "${relation.label}": missing node`, {
-            source: relation.source_entity_type,
-            target: relation.target_entity_type,
-            sourceExists,
-            targetExists
-          });
-          return false;
-        }
-        return true;
-      })
-      .map(relation => {
-        // weight 속성 추출 (properties에서 찾거나 기본값 1.0)
-        const weightProp = relation.properties.find(p => p.name === 'weight');
-        const weight = relation.weight || (weightProp ? 1.0 : 0.5);
-        
-        return {
-          source: relation.source_entity_type,
-          target: relation.target_entity_type,
-          label: relation.label,
-          color: "#6366f1",
-          properties: relation.properties,
-          directionality: relation.directionality || "directed",
-          weight,
-        };
-      });
-
-    // 노드별 연결된 관계의 총 weight 계산 (중심성)
-    const nodeWeights = new Map<string, number>();
-    links.forEach(link => {
-      nodeWeights.set(
-        link.source,
-        (nodeWeights.get(link.source) || 0) + link.weight
-      );
-      nodeWeights.set(
-        link.target,
-        (nodeWeights.get(link.target) || 0) + link.weight
-      );
-    });
-
-    // 노드 크기 재계산 (연결 가중치 반영)
-    nodes.forEach(node => {
-      const connectionWeight = nodeWeights.get(node.id) || 0;
-      const baseSize = 20 + (node.properties.length * 2);
-      const sizeBonus = connectionWeight * 3;
-      node.val = Math.min(baseSize + sizeBonus, 60); // 최대 크기 제한
-    });
-
-    setGraphData({ nodes, links });
-  }, [entities, relations]);
+    const data = buildRetailOntologyGraphData();
+    setGraphData(data);
+  }, []);
 
   const handleNodeClick = useCallback((node: GraphNode) => {
     setSelectedNode(node);
@@ -261,41 +116,52 @@ export const SchemaGraphVisualization = () => {
             )}
           </div>
 
-          {/* 범례 */}
+          {/* 범례 - Entity 노드만 표시 */}
           <div className="mt-4 flex items-center gap-4 flex-wrap">
             <div className="text-sm text-muted-foreground">범례:</div>
-            {entities?.slice(0, 5).map((entity) => (
-              <div key={entity.id} className="flex items-center gap-2">
-                <div
-                  className="w-4 h-4 rounded-full"
-                  style={{ backgroundColor: entity.color || "#3b82f6" }}
-                />
-                <span className="text-sm">{entity.label}</span>
-              </div>
-            ))}
-            {entities && entities.length > 5 && (
+            {graphData.nodes
+              .filter(node => node.nodeType === "entity")
+              .slice(0, 5)
+              .map((node) => (
+                <div key={node.id} className="flex items-center gap-2">
+                  <div
+                    className="w-4 h-4 rounded-full"
+                    style={{ backgroundColor: node.color }}
+                  />
+                  <span className="text-sm">{node.label}</span>
+                </div>
+              ))}
+            {graphData.nodes.filter(n => n.nodeType === "entity").length > 5 && (
               <span className="text-sm text-muted-foreground">
-                +{entities.length - 5} more
+                +{graphData.nodes.filter(n => n.nodeType === "entity").length - 5} more
               </span>
             )}
           </div>
 
           {/* 통계 */}
           <div className="mt-4 pt-4 border-t">
-            <div className="grid grid-cols-3 gap-4 text-center">
+            <div className="grid grid-cols-4 gap-4 text-center">
               <div>
-                <div className="text-2xl font-bold">{graphData.nodes.length}</div>
-                <div className="text-xs text-muted-foreground">노드 (엔티티)</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold">{graphData.links.length}</div>
-                <div className="text-xs text-muted-foreground">엣지 (관계)</div>
+                <div className="text-2xl font-bold">
+                  {graphData.nodes.filter(n => n.nodeType === "entity").length}
+                </div>
+                <div className="text-xs text-muted-foreground">엔티티</div>
               </div>
               <div>
                 <div className="text-2xl font-bold">
-                  {graphData.nodes.reduce((sum, node) => sum + node.properties.length, 0)}
+                  {graphData.nodes.filter(n => n.nodeType === "relation").length}
                 </div>
-                <div className="text-xs text-muted-foreground">총 속성</div>
+                <div className="text-xs text-muted-foreground">관계</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold">
+                  {graphData.nodes.filter(n => n.nodeType === "property").length}
+                </div>
+                <div className="text-xs text-muted-foreground">속성</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold">{graphData.nodes.length}</div>
+                <div className="text-xs text-muted-foreground">총 노드</div>
               </div>
             </div>
           </div>

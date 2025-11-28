@@ -32,8 +32,8 @@ export interface GraphNode {
 }
 
 export interface GraphLink {
-  source: string | GraphNode;
-  target: string | GraphNode;
+  source: string;
+  target: string;
   label: string;
   color: string;
   properties: PropertyField[];
