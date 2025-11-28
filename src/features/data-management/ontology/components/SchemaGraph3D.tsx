@@ -1,6 +1,15 @@
 import React, { useRef, useEffect, useMemo, useState } from "react";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, Text, Html, PerspectiveCamera, Environment, GizmoHelper, GizmoViewport, Line as DreiLine } from "@react-three/drei";
+import { Canvas, useFrame, useThree, extend } from "@react-three/fiber";
+import { 
+  OrbitControls, 
+  Text, 
+  PerspectiveCamera, 
+  GizmoHelper, 
+  GizmoViewport, 
+  Line as DreiLine,
+  Sphere
+} from "@react-three/drei";
+import { EffectComposer, Bloom, DepthOfField } from '@react-three/postprocessing';
 import * as THREE from "three";
 import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide } from "d3-force";
 
@@ -44,7 +53,7 @@ interface SchemaGraph3DProps {
   layoutType?: "force" | "radial" | "hierarchical";
 }
 
-// 3D 노드 컴포넌트
+// 3D 노드 컴포넌트 (고품질 발광 효과)
 function Node3D({ 
   node, 
   onClick 
@@ -53,76 +62,118 @@ function Node3D({
   onClick: (node: GraphNode) => void;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
+  const glowRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
 
-  useFrame(() => {
+  useFrame((state) => {
     if (meshRef.current && node.x !== undefined && node.y !== undefined && node.z !== undefined) {
       meshRef.current.position.x = node.x;
       meshRef.current.position.y = node.y;
       meshRef.current.position.z = node.z;
+      
+      // 미묘한 펄스 애니메이션
+      const pulse = 1 + Math.sin(state.clock.elapsedTime * 2 + node.id.length) * 0.05;
+      meshRef.current.scale.setScalar(pulse);
+    }
+    
+    if (glowRef.current && node.x !== undefined) {
+      glowRef.current.position.x = node.x;
+      glowRef.current.position.y = node.y || 0;
+      glowRef.current.position.z = node.z || 0;
+      
+      // 글로우 펄스
+      const glowPulse = 1 + Math.sin(state.clock.elapsedTime * 3 + node.id.length) * 0.1;
+      glowRef.current.scale.setScalar(glowPulse);
     }
   });
 
-  const radius = node.val / 8;
-  const scale = hovered ? 1.2 : 1;
+  const radius = node.val / 6;
+  const color = new THREE.Color(node.color);
+  
+  // 연결 수에 따라 밝기 조정
+  const connectionIntensity = Math.min(node.val / 40, 1);
 
   return (
     <group>
+      {/* 외부 글로우 */}
+      <mesh ref={glowRef}>
+        <sphereGeometry args={[radius * 2.5, 16, 16]} />
+        <meshBasicMaterial 
+          color={color}
+          transparent
+          opacity={hovered ? 0.3 : 0.15 * connectionIntensity}
+          depthWrite={false}
+        />
+      </mesh>
+      
+      {/* 메인 노드 */}
       <mesh
         ref={meshRef}
         onClick={() => onClick(node)}
         onPointerOver={() => setHovered(true)}
         onPointerOut={() => setHovered(false)}
-        scale={scale}
       >
         <sphereGeometry args={[radius, 32, 32]} />
-        <meshStandardMaterial 
-          color={node.color} 
-          emissive={node.color}
-          emissiveIntensity={hovered ? 0.5 : 0.2}
-          metalness={0.3}
-          roughness={0.4}
+        <meshPhysicalMaterial 
+          color={color}
+          emissive={color}
+          emissiveIntensity={hovered ? 1.5 : 0.8}
+          metalness={0.6}
+          roughness={0.2}
+          clearcoat={1}
+          clearcoatRoughness={0.1}
+          transparent
+          opacity={0.95}
         />
       </mesh>
       
-      {/* 노드 라벨 */}
-      <Text
-        position={[node.x || 0, (node.y || 0) + radius + 2, node.z || 0]}
-        fontSize={1.5}
-        color="white"
-        anchorX="center"
-        anchorY="middle"
-        outlineWidth={0.1}
-        outlineColor="#000000"
-      >
-        {node.label}
-      </Text>
+      {/* 내부 코어 */}
+      <mesh position={[node.x || 0, node.y || 0, node.z || 0]}>
+        <sphereGeometry args={[radius * 0.6, 16, 16]} />
+        <meshBasicMaterial 
+          color={color}
+          transparent
+          opacity={0.6}
+        />
+      </mesh>
       
-      {/* 속성 개수 표시 */}
-      {node.properties.length > 0 && (
-        <Text
-          position={[node.x || 0, (node.y || 0) + radius + 3.5, node.z || 0]}
-          fontSize={1}
-          color="#888888"
-          anchorX="center"
-          anchorY="middle"
-        >
-          {node.properties.length} props
-        </Text>
-      )}
-      
-      {/* 호버 시 인터랙션 표시 */}
+      {/* 노드 라벨 - 호버 시에만 표시 */}
       {hovered && (
-        <mesh position={[node.x || 0, node.y || 0, node.z || 0]}>
-          <sphereGeometry args={[radius * 1.3, 32, 32]} />
-          <meshBasicMaterial color={node.color} transparent opacity={0.2} />
-        </mesh>
+        <>
+          <Text
+            position={[node.x || 0, (node.y || 0) + radius + 3, node.z || 0]}
+            fontSize={1.8}
+            color="white"
+            anchorX="center"
+            anchorY="middle"
+            outlineWidth={0.15}
+            outlineColor="#000000"
+            fontWeight="bold"
+          >
+            {node.label}
+          </Text>
+          
+          {/* 속성 개수 표시 */}
+          {node.properties.length > 0 && (
+            <Text
+              position={[node.x || 0, (node.y || 0) + radius + 5, node.z || 0]}
+              fontSize={1.2}
+              color="#aaaaaa"
+              anchorX="center"
+              anchorY="middle"
+              outlineWidth={0.1}
+              outlineColor="#000000"
+            >
+              {node.properties.length} properties
+            </Text>
+          )}
+        </>
       )}
     </group>
   );
 }
 
-// 3D 링크 컴포넌트
+// 3D 링크 컴포넌트 (그라데이션 효과)
 function Link3D({ link }: { link: GraphLink }) {
   const source = link.source as GraphNode;
   const target = link.target as GraphNode;
@@ -134,51 +185,50 @@ function Link3D({ link }: { link: GraphLink }) {
 
   const intensity = Math.min(link.weight, 1.0);
 
-  // 가중치에 따른 색상 (HSL)
-  const hue = 239;
-  const saturation = 84;
-  const lightness = 70 - intensity * 20;
-  const opacity = 0.5 + intensity * 0.5;
-  const color = useMemo(() => new THREE.Color().setHSL(hue / 360, saturation / 100, lightness / 100), [intensity]);
-  const lineWidth = 1 + (link.weight * 3);
+  // 가중치에 따른 색상 변화 (청록색~초록색 그라데이션)
+  const sourceColor = useMemo(() => {
+    const hue = 180 + (intensity * 40); // 180 (cyan) ~ 220 (cyan-green)
+    return new THREE.Color().setHSL(hue / 360, 0.8, 0.5 + intensity * 0.2);
+  }, [intensity]);
+  
+  const targetColor = useMemo(() => {
+    const hue = 120 + (intensity * 60); // 120 (green) ~ 180 (cyan)
+    return new THREE.Color().setHSL(hue / 360, 0.7, 0.4 + intensity * 0.2);
+  }, [intensity]);
+
+  const lineWidth = 0.5 + (link.weight * 2);
+  const opacity = 0.4 + intensity * 0.4;
 
   return (
     <group>
+      {/* 메인 라인 */}
       <DreiLine
         points={points}
-        color={color}
+        color={sourceColor}
         lineWidth={lineWidth}
         transparent
         opacity={opacity}
       />
       
-      {/* 링크 라벨 */}
-      <Text
-        position={[
-          ((source.x || 0) + (target.x || 0)) / 2,
-          ((source.y || 0) + (target.y || 0)) / 2,
-          ((source.z || 0) + (target.z || 0)) / 2,
-        ]}
-        fontSize={0.8}
-        color="white"
-        anchorX="center"
-        anchorY="middle"
-        outlineWidth={0.05}
-        outlineColor={color}
-      >
-        {`${link.label} [${link.weight.toFixed(1)}]`}
-      </Text>
-
-      {/* 방향 화살표 (양방향일 경우) */}
+      {/* 글로우 효과 라인 */}
+      <DreiLine
+        points={points}
+        color={targetColor}
+        lineWidth={lineWidth * 2}
+        transparent
+        opacity={opacity * 0.3}
+      />
+      
+      {/* 방향 화살표 - 더 작고 미묘하게 */}
       {link.directionality === 'bidirectional' && (
         <>
           <mesh position={[target.x || 0, target.y || 0, target.z || 0]}>
-            <coneGeometry args={[0.5, 1.5, 8]} />
-            <meshBasicMaterial color={color} />
+            <coneGeometry args={[0.3, 1, 6]} />
+            <meshBasicMaterial color={targetColor} transparent opacity={opacity} />
           </mesh>
           <mesh position={[source.x || 0, source.y || 0, source.z || 0]}>
-            <coneGeometry args={[0.5, 1.5, 8]} />
-            <meshBasicMaterial color={color} />
+            <coneGeometry args={[0.3, 1, 6]} />
+            <meshBasicMaterial color={sourceColor} transparent opacity={opacity} />
           </mesh>
         </>
       )}
@@ -280,13 +330,25 @@ function Scene({
 
   return (
     <>
-      {/* 조명 */}
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[10, 10, 10]} intensity={0.8} />
-      <pointLight position={[-10, -10, -10]} intensity={0.5} />
-      <spotLight position={[0, 50, 0]} intensity={0.5} angle={0.3} penumbra={1} />
+      {/* 다크 배경 */}
+      <color attach="background" args={['#0a0a0f']} />
+      <fog attach="fog" args={['#0a0a0f', 50, 300]} />
+      
+      {/* 고급 조명 설정 */}
+      <ambientLight intensity={0.2} />
+      <pointLight position={[0, 0, 0]} intensity={1} color="#4080ff" />
+      <pointLight position={[50, 50, 50]} intensity={0.5} color="#00ffaa" />
+      <pointLight position={[-50, -50, -50]} intensity={0.5} color="#ff00aa" />
+      <spotLight 
+        position={[0, 100, 0]} 
+        intensity={0.8} 
+        angle={0.5} 
+        penumbra={1}
+        color="#ffffff"
+        castShadow
+      />
 
-      {/* 링크 렌더링 */}
+      {/* 링크 렌더링 (노드보다 먼저) */}
       {simulatedLinks.map((link, i) => (
         <Link3D key={`link-${i}`} link={link} />
       ))}
@@ -300,11 +362,8 @@ function Scene({
         />
       ))}
 
-      {/* 그리드 헬퍼 */}
-      <gridHelper args={[200, 20, "#444444", "#222222"]} />
-      
-      {/* 축 헬퍼 */}
-      <axesHelper args={[50]} />
+      {/* 미묘한 그리드 (선택적) */}
+      <gridHelper args={[300, 30, "#1a1a2e", "#0f0f1a"]} position={[0, -50, 0]} />
     </>
   );
 }
@@ -317,17 +376,18 @@ export function SchemaGraph3D({
   layoutType = "force"
 }: SchemaGraph3DProps) {
   return (
-    <div style={{ width: "100%", height: "600px", background: "hsl(var(--background))" }}>
-      <Canvas>
-        <PerspectiveCamera makeDefault position={[0, 0, 150]} fov={60} />
+    <div style={{ width: "100%", height: "600px", background: "#0a0a0f" }}>
+      <Canvas shadows gl={{ antialias: true, alpha: false }}>
+        <PerspectiveCamera makeDefault position={[0, 0, 150]} fov={75} />
         <OrbitControls 
           enableDamping 
-          dampingFactor={0.05}
-          minDistance={50}
-          maxDistance={300}
+          dampingFactor={0.08}
+          minDistance={30}
+          maxDistance={400}
           maxPolarAngle={Math.PI}
+          autoRotate
+          autoRotateSpeed={0.3}
         />
-        <Environment preset="city" />
         
         <Scene 
           nodes={nodes} 
@@ -336,10 +396,26 @@ export function SchemaGraph3D({
           layoutType={layoutType}
         />
 
+        {/* 후처리 효과 - Bloom으로 발광 효과 */}
+        <EffectComposer>
+          <Bloom 
+            intensity={1.5}
+            luminanceThreshold={0.2}
+            luminanceSmoothing={0.9}
+            height={300}
+            opacity={1}
+          />
+          <DepthOfField 
+            focusDistance={0.02}
+            focalLength={0.05}
+            bokehScale={3}
+          />
+        </EffectComposer>
+
         {/* Gizmo (축 표시) */}
         <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
           <GizmoViewport 
-            axisColors={['#ff0000', '#00ff00', '#0000ff']} 
+            axisColors={['#ff4444', '#44ff44', '#4444ff']} 
             labelColor="white"
           />
         </GizmoHelper>
