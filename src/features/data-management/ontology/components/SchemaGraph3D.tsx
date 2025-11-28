@@ -57,6 +57,7 @@ export interface SchemaGraph3DProps {
 /** ===================== 공통 유틸 & 레이아웃 ===================== **/
 
 // 포스 시뮬레이션 훅 – 한 번 러닝해서 최종 위치만 사용 (깜빡임 방지)
+// 포스 시뮬레이션 훅 – 한 번 러닝해서 최종 위치만 사용 (깜빡임 방지)
 function useForceSimulation(
   nodes: GraphNode[],
   links: GraphLink[],
@@ -65,6 +66,29 @@ function useForceSimulation(
   const [simulatedNodes, setSimulatedNodes] = useState<GraphNode[]>([]);
   const [simulatedLinks, setSimulatedLinks] = useState<GraphLink[]>([]);
 
+  // 🔹 전체 노드를 targetRadius 안에 들어오도록 스케일 조정하는 헬퍼
+  const normalizeLayout = (nodesCopy: GraphNode[], targetRadius = 70) => {
+    if (!nodesCopy.length) return;
+
+    let maxR = 0;
+    nodesCopy.forEach((n) => {
+      const x = n.x ?? 0;
+      const y = n.y ?? 0;
+      const z = n.z ?? 0;
+      const r = Math.sqrt(x * x + y * y + z * z);
+      if (r > maxR) maxR = r;
+    });
+
+    if (!maxR || maxR <= targetRadius) return;
+
+    const scale = targetRadius / maxR;
+    nodesCopy.forEach((n) => {
+      n.x = (n.x ?? 0) * scale;
+      n.y = (n.y ?? 0) * scale;
+      n.z = (n.z ?? 0) * scale;
+    });
+  };
+
   useEffect(() => {
     if (!nodes.length) {
       setSimulatedNodes([]);
@@ -72,12 +96,12 @@ function useForceSimulation(
       return;
     }
 
-    // 노드/링크 복사 (원본 뮤테이션 방지)
+    // 🔹 초기 위치 범위를 확 줄임 (기존 80,80,80 → 30,30,20)
     const nodesCopy: GraphNode[] = nodes.map((n) => ({
       ...n,
-      x: n.x ?? (Math.random() - 0.5) * 80,
-      y: n.y ?? (Math.random() - 0.5) * 80,
-      z: n.z ?? (Math.random() - 0.5) * 80,
+      x: n.x ?? (Math.random() - 0.5) * 30,
+      y: n.y ?? (Math.random() - 0.5) * 30,
+      z: n.z ?? (Math.random() - 0.5) * 20,
     }));
 
     const linksCopy: GraphLink[] = links.map((l) => ({
@@ -95,11 +119,11 @@ function useForceSimulation(
     /** ---- 레이어 레이아웃 (엔티티 / 속성 / 관계) ---- **/
     if (layoutType === "layered") {
       const typeOrder: NodeType[] = ["entity", "property", "relation", "other"];
-
       const activeTypes = typeOrder.filter((t) => nodesCopy.some((n) => (n.nodeType ?? "entity") === t));
 
-      const xSpacing = 50;
-      const ySpacing = 10;
+      // 🔹 레이어 간/내 간격도 살짝 줄임
+      const xSpacing = 30; // 레이어 사이 거리 (기존 50)
+      const ySpacing = 7; // 레이어 내부 노드 간 세로 거리 (기존 10)
 
       activeTypes.forEach((type, idx) => {
         const layerNodes = nodesCopy.filter((n) => (n.nodeType ?? "entity") === type);
@@ -112,9 +136,12 @@ function useForceSimulation(
         layerNodes.forEach((n, i) => {
           n.x = xPos;
           n.y = (i - mid) * ySpacing;
-          n.z = (Math.random() - 0.5) * 15;
+          n.z = (Math.random() - 0.5) * 8; // 깊이 너무 안 퍼지게
         });
       });
+
+      // 🔹 최종적으로 반경 60 안으로 압축
+      normalizeLayout(nodesCopy, 60);
 
       setSimulatedNodes([...nodesCopy]);
       setSimulatedLinks([...linksCopy]);
@@ -124,12 +151,15 @@ function useForceSimulation(
     /** ---- 방사형 레이아웃 ---- **/
     if (layoutType === "radial") {
       const angleStep = (2 * Math.PI) / nodesCopy.length;
-      const radius = 60;
+      const radius = 35; // 기존 60 → 35
       nodesCopy.forEach((node, i) => {
         node.x = radius * Math.cos(i * angleStep);
         node.y = radius * Math.sin(i * angleStep);
         node.z = (Math.random() - 0.5) * 10;
       });
+
+      normalizeLayout(nodesCopy, 55);
+
       setSimulatedNodes([...nodesCopy]);
       setSimulatedLinks([...linksCopy]);
       return;
@@ -141,24 +171,33 @@ function useForceSimulation(
         "link",
         forceLink(linksCopy as any)
           .id((d: any) => d.id)
-          .distance(35)
-          .strength(0.8),
+          .distance(20) // 🔹 링크 길이 줄이기 (기존 35)
+          .strength(0.9),
       )
-      .force("charge", forceManyBody().strength(layoutType === "hierarchical" ? -220 : -420))
+      .force(
+        "charge",
+        forceManyBody().strength(
+          layoutType === "hierarchical" ? -150 : -220, // 🔹 밀어내는 힘 완화 (기존 -220/-420)
+        ),
+      )
       .force("center", forceCenter(0, 0))
       .force(
         "collision",
-        forceCollide().radius((d: any) => Math.max(d.val / 4, 3)),
+        forceCollide().radius((d: any) => Math.max(d.val / 5, 2.5)),
       );
 
-    const TICKS = layoutType === "hierarchical" ? 180 : 240;
+    const TICKS = layoutType === "hierarchical" ? 160 : 220;
     for (let i = 0; i < TICKS; i++) sim.tick();
     sim.stop();
 
-    // 약간의 3D 깊이감
+    // 🔹 깊이감도 기존보다 훨씬 좁게
     nodesCopy.forEach((n, i) => {
-      n.z = n.z ?? (Math.sin(i * 0.37) * 0.5 + (Math.random() - 0.5) * 0.5) * 80; // -40~40 근사
+      const baseZ = (Math.sin(i * 0.37) * 0.5 + (Math.random() - 0.5) * 0.5) * 25; // 기존 80 → 25
+      n.z = n.z ?? baseZ;
     });
+
+    // 🔹 force/hierarchical 결과를 반경 70 안으로 스케일
+    normalizeLayout(nodesCopy, 70);
 
     setSimulatedNodes([...nodesCopy]);
     setSimulatedLinks([...linksCopy]);
