@@ -2,7 +2,7 @@
 import {
   COMPREHENSIVE_ENTITY_TYPES,
   COMPREHENSIVE_RELATION_TYPES,
-} from "@/path/to/your/retail-ontology-preset"; // 실제 경로로 수정
+} from "@/features/data-management/ontology/utils/comprehensiveRetailSchema";
 
 // ⚠️ SchemaGraph3D에서 쓰고 있는 타입 정의와 동일하게 맞춰주세요.
 export interface PropertyField {
