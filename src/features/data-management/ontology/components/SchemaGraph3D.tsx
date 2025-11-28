@@ -75,9 +75,9 @@ function useForceSimulation(
     // 노드/링크 복사 (원본 뮤테이션 방지)
     const nodesCopy: GraphNode[] = nodes.map((n) => ({
       ...n,
-      x: n.x ?? (Math.random() - 0.5) * 80,
-      y: n.y ?? (Math.random() - 0.5) * 80,
-      z: n.z ?? (Math.random() - 0.5) * 80,
+      x: n.x ?? (Math.random() - 0.5) * 40,
+      y: n.y ?? (Math.random() - 0.5) * 40,
+      z: n.z ?? (Math.random() - 0.5) * 40,
     }));
 
     const linksCopy: GraphLink[] = links.map((l) => ({
@@ -98,8 +98,8 @@ function useForceSimulation(
 
       const activeTypes = typeOrder.filter((t) => nodesCopy.some((n) => (n.nodeType ?? "entity") === t));
 
-      const xSpacing = 50;
-      const ySpacing = 10;
+      const xSpacing = 30;
+      const ySpacing = 6;
 
       activeTypes.forEach((type, idx) => {
         const layerNodes = nodesCopy.filter((n) => (n.nodeType ?? "entity") === type);
@@ -124,11 +124,11 @@ function useForceSimulation(
     /** ---- 방사형 레이아웃 ---- **/
     if (layoutType === "radial") {
       const angleStep = (2 * Math.PI) / nodesCopy.length;
-      const radius = 60;
+      const radius = 35;
       nodesCopy.forEach((node, i) => {
         node.x = radius * Math.cos(i * angleStep);
         node.y = radius * Math.sin(i * angleStep);
-        node.z = (Math.random() - 0.5) * 10;
+        node.z = (Math.random() - 0.5) * 6;
       });
       setSimulatedNodes([...nodesCopy]);
       setSimulatedLinks([...linksCopy]);
@@ -141,10 +141,10 @@ function useForceSimulation(
         "link",
         forceLink(linksCopy as any)
           .id((d: any) => d.id)
-          .distance(35)
+          .distance(20)
           .strength(0.8),
       )
-      .force("charge", forceManyBody().strength(layoutType === "hierarchical" ? -220 : -420))
+      .force("charge", forceManyBody().strength(layoutType === "hierarchical" ? -100 : -200))
       .force("center", forceCenter(0, 0))
       .force(
         "collision",
@@ -157,7 +157,7 @@ function useForceSimulation(
 
     // 약간의 3D 깊이감
     nodesCopy.forEach((n, i) => {
-      n.z = n.z ?? (Math.sin(i * 0.37) * 0.5 + (Math.random() - 0.5) * 0.5) * 80; // -40~40 근사
+      n.z = n.z ?? (Math.sin(i * 0.37) * 0.5 + (Math.random() - 0.5) * 0.5) * 40; // -20~20 근사
     });
 
     setSimulatedNodes([...nodesCopy]);
@@ -534,7 +534,7 @@ function Scene({ nodes, links, onNodeClick, layoutType }: SchemaGraph3DProps) {
   const [draggedNodes, setDraggedNodes] = useState<Map<string, { x: number; y: number; z: number }>>(new Map());
 
   useEffect(() => {
-    camera.position.set(0, 0, 160);
+    camera.position.set(0, 0, 100);
     camera.lookAt(0, 0, 0);
   }, [camera]);
 
@@ -640,12 +640,12 @@ export function SchemaGraph3D({ nodes, links, onNodeClick, layoutType = "force" 
           powerPreference: "high-performance",
         }}
       >
-        <PerspectiveCamera makeDefault position={[0, 0, 160]} fov={70} />
+        <PerspectiveCamera makeDefault position={[0, 0, 100]} fov={70} />
         <OrbitControls
           enableDamping
           dampingFactor={0.08}
-          minDistance={60}
-          maxDistance={320}
+          minDistance={30}
+          maxDistance={200}
           autoRotate
           autoRotateSpeed={0.35}
         />
