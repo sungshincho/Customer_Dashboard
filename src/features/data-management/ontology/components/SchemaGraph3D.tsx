@@ -11,7 +11,7 @@ import {
 import * as THREE from "three";
 import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide } from "d3-force";
 
-interface PropertyField {
+export interface PropertyField {
   id: string;
   name: string;
   label: string;
@@ -19,16 +19,16 @@ interface PropertyField {
   required: boolean;
 }
 
-type NodeType = "entity" | "property" | "relation" | "other";
+export type NodeType = "entity" | "property" | "relation" | "other";
 
-interface GraphNode {
+export interface GraphNode {
   id: string;
   name: string;
   label: string;
   color: string;
   properties: PropertyField[];
   val: number;
-  nodeType?: NodeType; // 🔹 엔티티 / 속성 / 관계 레이어 구분용
+  nodeType?: NodeType; // 엔티티 / 속성 / 관계 레이어 구분용
   x?: number;
   y?: number;
   z?: number;
@@ -37,7 +37,7 @@ interface GraphNode {
   vz?: number;
 }
 
-interface GraphLink {
+export interface GraphLink {
   source: string | GraphNode;
   target: string | GraphNode;
   label: string;
@@ -47,7 +47,7 @@ interface GraphLink {
   weight: number;
 }
 
-interface SchemaGraph3DProps {
+export interface SchemaGraph3DProps {
   nodes: GraphNode[];
   links: GraphLink[];
   onNodeClick?: (node: GraphNode) => void;
@@ -202,7 +202,7 @@ function Node3D({
   const radius = baseRadius * maxBoost;
 
   const connectionIntensity = Math.min(node.val / 40, 1); // 허브일수록 강함
-  const baseOpacity = dimmed ? 0.5 : 1.0; // 더 선명하게
+  const baseOpacity = dimmed ? 0.5 : 1.0;
 
   const handlePointerDown = (e: any) => {
     e.stopPropagation();
@@ -398,7 +398,7 @@ function Link3D({ link, dimmed, isNeighborLink }: { link: GraphLink; dimmed: boo
   );
 }
 
-// 배경 파티클 – 전체 네뷸라 느낌을 강화 (배경색은 투명)
+// 배경 파티클 – 전체 네뷸라 느낌 (배경색은 투명)
 function BackgroundParticles({ count = 800 }) {
   const pointsRef = useRef<THREE.Points>(null);
 
@@ -498,7 +498,7 @@ function LayerPanels({ nodes }: { nodes: GraphNode[] }) {
 
         return (
           <group key={layer.type}>
-            {/* 반투명 패널 (배경) */}
+            {/* 반투명 패널 */}
             <mesh position={[layer.x, centerY, -5]}>
               <planeGeometry args={[width, height]} />
               <meshBasicMaterial color={layer.color} transparent opacity={0.08} />
@@ -578,8 +578,7 @@ function Scene({ nodes, links, onNodeClick, layoutType }: SchemaGraph3DProps) {
 
   return (
     <>
-      {/* 배경색 없음 / 투명 Canvas */}
-      {/* 조명 */}
+      {/* 투명 캔버스 + 조명 */}
       <ambientLight intensity={0.35} />
       <directionalLight position={[40, 40, 80]} intensity={1.0} color="#d0ffff" />
       <pointLight position={[0, 0, 0]} intensity={0.8} color="#7fe8ff" />
@@ -637,7 +636,7 @@ export function SchemaGraph3D({ nodes, links, onNodeClick, layoutType = "force" 
       <Canvas
         gl={{
           antialias: true,
-          alpha: true, // 🔹 투명 캔버스
+          alpha: true, // 투명 캔버스
           powerPreference: "high-performance",
         }}
       >
