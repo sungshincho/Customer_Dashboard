@@ -6,3 +6,4 @@ export { SchemaVersionManager } from './SchemaVersionManager';
 export { GraphQueryBuilder } from './GraphQueryBuilder';
 export { RetailSchemaPreset } from './RetailSchemaPreset';
 export { OntologyVariableCalculator } from './OntologyVariableCalculator';
+export { OntologyGraph3D } from './OntologyGraph3D';
