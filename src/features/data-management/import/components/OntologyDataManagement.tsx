@@ -31,10 +31,14 @@ export function OntologyDataManagement({ storeId }: OntologyDataManagementProps)
 
   const loadStatistics = async () => {
     try {
+      // Master account의 최신 ontology schema 참조 (v3.0)
+      const MASTER_ACCOUNT_ID = 'af316ab2-ffb5-4509-bd37-13aa31feb5ad';
+      
       // Entity Types
       const { count: etCount } = await supabase
         .from('ontology_entity_types')
-        .select('id', { count: 'exact', head: true });
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', MASTER_ACCOUNT_ID);
       
       setEntityTypeCount(etCount || 0);
 
@@ -50,7 +54,8 @@ export function OntologyDataManagement({ storeId }: OntologyDataManagementProps)
       // Relation Types
       const { count: rtCount } = await supabase
         .from('ontology_relation_types')
-        .select('id', { count: 'exact', head: true });
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', MASTER_ACCOUNT_ID);
       
       setRelationTypeCount(rtCount || 0);
 
