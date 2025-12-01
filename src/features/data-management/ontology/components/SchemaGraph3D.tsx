@@ -100,12 +100,11 @@ function useForceSimulation(
       const typeOrder: NodeType[] = ["entity", "relation", "property", "other"];
       const activeTypes = typeOrder.filter((t) => nodesCopy.some((n) => (n.nodeType ?? "entity") === t));
 
-      // 레이어 간 기본 X 오프셋
-      const layerOffsetX = 100;
+      // 레이어 간 기본 Z 오프셋 (z축 기준 정면 배치)
+      const layerOffsetZ = 100;
       // 레이어 내부 grid 간격
       const gridSpacingX = 20;
       const gridSpacingY = 20;
-      const gridSpacingZ = 20;
 
       activeTypes.forEach((type, layerIndex) => {
         const layerNodes = nodesCopy.filter((n) => (n.nodeType ?? "entity") === type);
@@ -116,7 +115,7 @@ function useForceSimulation(
         const rows = Math.ceil(count / columns);
 
         const centerLayerIndex = (activeTypes.length - 1) / 2;
-        const baseX = (layerIndex - centerLayerIndex) * layerOffsetX;
+        const baseZ = (layerIndex - centerLayerIndex) * layerOffsetZ;
 
         layerNodes.forEach((n, i) => {
           const col = i % columns;
@@ -125,9 +124,9 @@ function useForceSimulation(
           const offsetX = (col - (columns - 1) / 2) * gridSpacingX;
           const offsetY = (row - (rows - 1) / 2) * gridSpacingY;
 
-          n.x = baseX + offsetX;
+          n.x = offsetX;
           n.y = offsetY;
-          n.z = ((row % 3) - 1) * gridSpacingZ;
+          n.z = baseZ;
         });
       });
 
@@ -437,7 +436,7 @@ function LayerPanels({ nodes }: { nodes: GraphNode[] }) {
 
     const entries: {
       type: NodeType;
-      x: number;
+      z: number;
       minY: number;
       maxY: number;
       color: string;
@@ -453,24 +452,24 @@ function LayerPanels({ nodes }: { nodes: GraphNode[] }) {
 
     const colorByType: Record<NodeType, string> = {
       entity: "#3b82f6",
-      property: "#22c55e",
+      property: "#a855f7",
       relation: "#eab308",
-      other: "#a855f7",
+      other: "#6b7280",
     };
 
     (["entity", "relation", "property", "other"] as NodeType[]).forEach((type) => {
       const group = groups.get(type);
       if (!group || !group.length) return;
 
-      const xs = group.map((n) => n.x ?? 0);
+      const zs = group.map((n) => n.z ?? 0);
       const ys = group.map((n) => n.y ?? 0);
-      const x = xs.reduce((a, b) => a + b, 0) / xs.length;
+      const z = zs.reduce((a, b) => a + b, 0) / zs.length;
       const minY = Math.min(...ys);
       const maxY = Math.max(...ys);
 
       entries.push({
         type,
-        x,
+        z,
         minY,
         maxY,
         color: colorByType[type],
@@ -491,14 +490,14 @@ function LayerPanels({ nodes }: { nodes: GraphNode[] }) {
         return (
           <group key={layer.type}>
             {/* 반투명 패널 */}
-            <mesh position={[layer.x, centerY, -5]}>
+            <mesh position={[0, centerY, layer.z]} rotation={[0, 0, 0]}>
               <planeGeometry args={[width, height]} />
               <meshBasicMaterial color={layer.color} transparent opacity={0.08} />
             </mesh>
 
             {/* 레이어 라벨 */}
             <Text
-              position={[layer.x, layer.maxY + 12, -4.9]}
+              position={[0, layer.maxY + 12, layer.z + 0.1]}
               fontSize={2.2}
               color={layer.color}
               anchorX="center"
