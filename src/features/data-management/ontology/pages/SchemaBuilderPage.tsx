@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { OntologyGraph3D } from "@/features/data-management/ontology/components/OntologyGraph3D";
+import { MasterSchemaSync } from "@/features/data-management/ontology/components/MasterSchemaSync";
 import { Badge } from "@/components/ui/badge";
 import { useActivityLogger } from "@/hooks/useActivityLogger";
 import { useLocation } from "react-router-dom";
@@ -28,6 +29,8 @@ const SchemaBuilder = () => {
             리테일 비즈니스 도메인의 엔티티와 관계를 3D 그래프로 시각화합니다
           </p>
         </div>
+
+        <MasterSchemaSync />
 
         <Card className="glass-card">
           <CardHeader>
