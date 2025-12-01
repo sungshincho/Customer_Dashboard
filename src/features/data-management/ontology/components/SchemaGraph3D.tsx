@@ -177,15 +177,15 @@ function Node3D({
       const priority = (node as any).priority || "medium";
       switch (priority) {
         case "critical":
-          return new THREE.Color("#FF0000"); // 빨간색
+          return new THREE.Color("#FF0000"); // 레드
         case "high":
-          return new THREE.Color("FF4800"); // 주황색
+          return new THREE.Color("FF7B00"); // 오렌지
         case "medium":
-          return new THREE.Color("#FF8C00"); // 초록색
+          return new THREE.Color("#FFFB00"); // 옐로우
         case "low":
-          return new THREE.Color("#FFEA00"); // 파란색
+          return new THREE.Color("#95FF00"); // 그린
         case "additional":
-          return new THREE.Color("#C3FF00"); // 회색
+          return new THREE.Color("#919191"); // 그레이
         default:
           return new THREE.Color("#6b7280");
       }
@@ -195,11 +195,11 @@ function Node3D({
     const nodeType = node.nodeType ?? "entity";
     switch (nodeType) {
       case "entity":
-        return new THREE.Color("#0073FF"); // 파란색
+        return new THREE.Color("#0073FF"); // 블루
       case "property":
-        return new THREE.Color("#8C00FF"); // 보라색
+        return new THREE.Color("#8C00FF"); // 퍼플
       case "relation":
-        return new THREE.Color("#FF00A6"); // 노란색
+        return new THREE.Color("#FF00A6"); // 핑크
       case "other":
       default:
         return new THREE.Color("#6b7280"); // 그레이
