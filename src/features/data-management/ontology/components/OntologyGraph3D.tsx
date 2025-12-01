@@ -26,14 +26,25 @@ export function OntologyGraph3D() {
     return transformSchemaToGraphData(schemaData.entityTypes, schemaData.relationTypes);
   }, [schemaData]);
 
-  // 필터링된 노드 계산
-  const filteredData = useMemo(() => {
-    let filteredNodes = nodes;
+  // 검색 결과 하이라이트 및 필터링
+  const { filteredNodes, filteredLinks, highlightedNodeIds } = useMemo(() => {
+    let workingNodes = nodes;
 
-    // 검색 필터
+    // 노드 타입 필터
+    if (nodeTypeFilter !== "all") {
+      workingNodes = workingNodes.filter((n) => n.nodeType === nodeTypeFilter);
+    }
+
+    // 중요도 필터
+    if (priorityFilter !== "all") {
+      workingNodes = workingNodes.filter((n) => (n as any).priority === priorityFilter);
+    }
+
+    // 검색 하이라이트
+    const highlighted = new Set<string>();
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filteredNodes = filteredNodes.filter((n) => {
+      workingNodes.forEach((n) => {
         // 노드 이름으로 검색
         const labelMatch = n.label?.toLowerCase().includes(query);
         const nameMatch = n.name?.toLowerCase().includes(query);
@@ -43,39 +54,35 @@ export function OntologyGraph3D() {
           p.name?.toLowerCase().includes(query)
         );
         
-        return labelMatch || nameMatch || propertyMatch;
+        if (labelMatch || nameMatch || propertyMatch) {
+          highlighted.add(n.id);
+        }
       });
     }
 
-    // 노드 타입 필터
-    if (nodeTypeFilter !== "all") {
-      filteredNodes = filteredNodes.filter((n) => n.nodeType === nodeTypeFilter);
-    }
-
-    // 중요도 필터
-    if (priorityFilter !== "all") {
-      filteredNodes = filteredNodes.filter((n) => (n as any).priority === priorityFilter);
-    }
-
     // 필터링된 노드 ID 세트
-    const nodeIds = new Set(filteredNodes.map((n) => n.id));
+    const nodeIds = new Set(workingNodes.map((n) => n.id));
 
     // 필터링된 노드에 연결된 링크만 포함
-    const filteredLinks = links.filter((l) => {
+    const workingLinks = links.filter((l) => {
       const sourceId = typeof l.source === "string" ? l.source : l.source.id;
       const targetId = typeof l.target === "string" ? l.target : l.target.id;
       return nodeIds.has(sourceId) && nodeIds.has(targetId);
     });
 
-    return { nodes: filteredNodes, links: filteredLinks };
+    return { 
+      filteredNodes: workingNodes, 
+      filteredLinks: workingLinks,
+      highlightedNodeIds: highlighted.size > 0 ? highlighted : undefined
+    };
   }, [nodes, links, nodeTypeFilter, priorityFilter, searchQuery]);
 
   // 통계 계산
   const stats = useMemo(() => {
-    const entityCount = nodes.filter((n) => n.nodeType === "entity").length;
-    const propertyCount = nodes.filter((n) => n.nodeType === "property").length;
-    const relationCount = nodes.filter((n) => n.nodeType === "relation").length;
-    const totalCount = nodes.length;
+    const entityCount = filteredNodes.filter((n) => n.nodeType === "entity").length;
+    const propertyCount = filteredNodes.filter((n) => n.nodeType === "property").length;
+    const relationCount = filteredNodes.filter((n) => n.nodeType === "relation").length;
+    const totalCount = filteredNodes.length;
 
     return {
       entity: entityCount,
@@ -83,7 +90,7 @@ export function OntologyGraph3D() {
       relation: relationCount,
       total: totalCount,
     };
-  }, [nodes]);
+  }, [filteredNodes]);
 
   // 로딩 상태 표시
   if (isLoading) {
@@ -95,7 +102,7 @@ export function OntologyGraph3D() {
   }
 
   // 데이터가 없는 경우
-  if (nodes.length === 0) {
+  if (filteredNodes.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center gap-4">
         <p className="text-muted-foreground">온톨로지 스키마가 비어있습니다.</p>
@@ -198,10 +205,11 @@ export function OntologyGraph3D() {
 
         <div className="flex-1">
           <SchemaGraph3D
-            nodes={filteredData.nodes}
-            links={filteredData.links}
+            nodes={filteredNodes}
+            links={filteredLinks}
             layoutType={layoutType}
             priorityFilter={priorityFilter}
+            highlightedNodeIds={highlightedNodeIds}
             onNodeClick={(node) => setSelectedNode(node)}
           />
         </div>

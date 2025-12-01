@@ -52,6 +52,7 @@ export interface SchemaGraph3DProps {
   onNodeClick?: (node: GraphNode) => void;
   layoutType?: "layered" | "radial";
   priorityFilter?: string;
+  highlightedNodeIds?: Set<string>;
 }
 
 /** ===================== 공통 유틸 & 레이아웃 ===================== **/
@@ -159,12 +160,14 @@ function Node3D({
   dimmed,
   onClick,
   priorityFilter,
+  highlighted,
 }: {
   node: GraphNode;
   focused: boolean;
   dimmed: boolean;
   onClick: (node: GraphNode) => void;
   priorityFilter?: string;
+  highlighted?: boolean;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
@@ -207,11 +210,11 @@ function Node3D({
   }, [node.nodeType, node, priorityFilter]);
 
   const baseRadius = Math.max(node.val / 7, 1.2);
-  const maxBoost = focused ? 1.5 : hovered ? 1.25 : 1;
+  const maxBoost = focused ? 1.5 : hovered ? 1.25 : highlighted ? 1.4 : 1;
   const radius = baseRadius * maxBoost;
 
   const connectionIntensity = Math.min(node.val / 40, 1);
-  const baseOpacity = dimmed ? 0.5 : 1.0;
+  const baseOpacity = dimmed ? 0.5 : highlighted === false ? 0.3 : 1.0;
 
   useFrame((state) => {
     const t = state.clock.elapsedTime;
@@ -258,7 +261,7 @@ function Node3D({
         <meshPhysicalMaterial
           color={baseColor}
           emissive={baseColor}
-          emissiveIntensity={(focused ? 2.5 : hovered ? 2.0 : 1.3) * (0.8 + connectionIntensity * 0.6)}
+          emissiveIntensity={(focused ? 2.5 : hovered ? 2.0 : highlighted ? 2.2 : 1.3) * (0.8 + connectionIntensity * 0.6)}
           metalness={0.7}
           roughness={0.2}
           clearcoat={1}
@@ -499,7 +502,7 @@ function LayerPanels({ nodes }: { nodes: GraphNode[] }) {
 
 /** ===================== Scene & 메인 컴포넌트 ===================== **/
 
-function Scene({ nodes, links, onNodeClick, layoutType, priorityFilter }: SchemaGraph3DProps) {
+function Scene({ nodes, links, onNodeClick, layoutType, priorityFilter, highlightedNodeIds }: SchemaGraph3DProps) {
   const { camera } = useThree();
 
   const { nodes: simNodes, links: simLinks } = useForceSimulation(nodes, links, layoutType);
@@ -560,6 +563,9 @@ function Scene({ nodes, links, onNodeClick, layoutType, priorityFilter }: Schema
         const neighbors = neighborMap.get(focusedId || "") ?? new Set();
         const isNeighbor = neighbors.has(node.id);
         const dimmed = !!focusedId && !isFocused && !isNeighbor;
+        
+        // 검색 하이라이트 처리
+        const isHighlighted = highlightedNodeIds ? highlightedNodeIds.has(node.id) : undefined;
 
         return (
           <Node3D
@@ -569,6 +575,7 @@ function Scene({ nodes, links, onNodeClick, layoutType, priorityFilter }: Schema
             dimmed={dimmed}
             onClick={handleNodeClick}
             priorityFilter={priorityFilter}
+            highlighted={isHighlighted}
           />
         );
       })}
@@ -582,6 +589,7 @@ export function SchemaGraph3D({
   onNodeClick,
   layoutType = "layered",
   priorityFilter,
+  highlightedNodeIds,
 }: SchemaGraph3DProps) {
   return (
     <div
@@ -616,6 +624,7 @@ export function SchemaGraph3D({
           onNodeClick={onNodeClick}
           layoutType={layoutType}
           priorityFilter={priorityFilter}
+          highlightedNodeIds={highlightedNodeIds}
         />
 
         <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
