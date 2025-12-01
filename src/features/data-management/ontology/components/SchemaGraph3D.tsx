@@ -209,7 +209,20 @@ function Node3D({
   const coreRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
 
-  const baseColor = useMemo(() => new THREE.Color(node.color || "#6ac8ff"), [node.color]);
+  const baseColor = useMemo(() => {
+    const nodeType = node.nodeType ?? "entity";
+    switch (nodeType) {
+      case "entity":
+        return new THREE.Color("#3b82f6"); // 파란색
+      case "property":
+        return new THREE.Color("#a855f7"); // 보라색
+      case "relation":
+        return new THREE.Color("#eab308"); // 노란색
+      case "other":
+      default:
+        return new THREE.Color("#6b7280"); // 그레이
+    }
+  }, [node.nodeType]);
 
   const baseRadius = Math.max(node.val / 7, 1.2);
   const maxBoost = focused ? 1.5 : hovered ? 1.25 : 1;
