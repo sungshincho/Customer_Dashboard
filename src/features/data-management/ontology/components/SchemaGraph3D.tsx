@@ -127,7 +127,7 @@ function useForceSimulation(
 
           n.x = baseX + offsetX;
           n.y = offsetY;
-          n.z = offsetZ;
+          n.z = ((row % 3) - 1) * gridSpacingZ;
         });
       });
 
