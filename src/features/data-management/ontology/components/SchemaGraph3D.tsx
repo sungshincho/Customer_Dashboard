@@ -57,11 +57,7 @@ export interface SchemaGraph3DProps {
 /** ===================== 공통 유틸 & 레이아웃 ===================== **/
 
 // 포스 시뮬레이션 훅 – 온톨로지 스키마에 최적화된 버전
-function useForceSimulation(
-  nodes: GraphNode[],
-  links: GraphLink[],
-  layoutType: "layered" | "radial",
-) {
+function useForceSimulation(nodes: GraphNode[], links: GraphLink[], layoutType: "layered" | "radial") {
   const [simulatedNodes, setSimulatedNodes] = useState<GraphNode[]>([]);
   const [simulatedLinks, setSimulatedLinks] = useState<GraphLink[]>([]);
 
@@ -199,11 +195,11 @@ function Node3D({
     const nodeType = node.nodeType ?? "entity";
     switch (nodeType) {
       case "entity":
-        return new THREE.Color("#3b82f6"); // 파란색
+        return new THREE.Color("#0073FF"); // 파란색
       case "property":
-        return new THREE.Color("#a855f7"); // 보라색
+        return new THREE.Color("#8C00FF"); // 보라색
       case "relation":
-        return new THREE.Color("#eab308"); // 노란색
+        return new THREE.Color("#FF00A6"); // 노란색
       case "other":
       default:
         return new THREE.Color("#6b7280"); // 그레이
@@ -565,13 +561,28 @@ function Scene({ nodes, links, onNodeClick, layoutType, priorityFilter }: Schema
         const isNeighbor = neighbors.has(node.id);
         const dimmed = !!focusedId && !isFocused && !isNeighbor;
 
-        return <Node3D key={node.id} node={node} focused={isFocused} dimmed={dimmed} onClick={handleNodeClick} priorityFilter={priorityFilter} />;
+        return (
+          <Node3D
+            key={node.id}
+            node={node}
+            focused={isFocused}
+            dimmed={dimmed}
+            onClick={handleNodeClick}
+            priorityFilter={priorityFilter}
+          />
+        );
       })}
     </>
   );
 }
 
-export function SchemaGraph3D({ nodes, links, onNodeClick, layoutType = "layered", priorityFilter }: SchemaGraph3DProps) {
+export function SchemaGraph3D({
+  nodes,
+  links,
+  onNodeClick,
+  layoutType = "layered",
+  priorityFilter,
+}: SchemaGraph3DProps) {
   return (
     <div
       style={{
@@ -599,7 +610,13 @@ export function SchemaGraph3D({ nodes, links, onNodeClick, layoutType = "layered
           autoRotateSpeed={0.35}
         />
 
-        <Scene nodes={nodes} links={links} onNodeClick={onNodeClick} layoutType={layoutType} priorityFilter={priorityFilter} />
+        <Scene
+          nodes={nodes}
+          links={links}
+          onNodeClick={onNodeClick}
+          layoutType={layoutType}
+          priorityFilter={priorityFilter}
+        />
 
         <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
           <GizmoViewport axisColors={["#ff5555", "#55ff99", "#5599ff"]} labelColor="#ffffff" />
