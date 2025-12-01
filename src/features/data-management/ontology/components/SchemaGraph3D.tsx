@@ -101,10 +101,10 @@ function useForceSimulation(
       const activeTypes = typeOrder.filter((t) => nodesCopy.some((n) => (n.nodeType ?? "entity") === t));
 
       // 레이어 간 기본 X 오프셋
-      const layerOffsetX = 55;
+      const layerOffsetX = 100;
       // 레이어 내부 grid 간격
-      const gridSpacingX = 14;
-      const gridSpacingY = 10;
+      const gridSpacingX = 20;
+      const gridSpacingY = 20;
 
       activeTypes.forEach((type, layerIndex) => {
         const layerNodes = nodesCopy.filter((n) => (n.nodeType ?? "entity") === type);
