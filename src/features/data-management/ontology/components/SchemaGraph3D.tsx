@@ -9,7 +9,6 @@ import {
   Line as DreiLine,
 } from "@react-three/drei";
 import * as THREE from "three";
-import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide } from "d3-force";
 
 export interface PropertyField {
   id: string;
@@ -51,7 +50,7 @@ export interface SchemaGraph3DProps {
   nodes: GraphNode[];
   links: GraphLink[];
   onNodeClick?: (node: GraphNode) => void;
-  layoutType?: "force" | "radial" | "hierarchical" | "layered";
+  layoutType?: "layered" | "radial";
 }
 
 /** ===================== 공통 유틸 & 레이아웃 ===================== **/
@@ -60,7 +59,7 @@ export interface SchemaGraph3DProps {
 function useForceSimulation(
   nodes: GraphNode[],
   links: GraphLink[],
-  layoutType: "force" | "radial" | "hierarchical" | "layered",
+  layoutType: "layered" | "radial",
 ) {
   const [simulatedNodes, setSimulatedNodes] = useState<GraphNode[]>([]);
   const [simulatedLinks, setSimulatedLinks] = useState<GraphLink[]>([]);
@@ -72,7 +71,7 @@ function useForceSimulation(
       return;
     }
 
-    // 초기 분산 – 너무 넓지도, 너무 좁지도 않게
+    // 초기 분산
     const INITIAL_SPREAD_XY = 10;
     const INITIAL_SPREAD_Z = 10;
 
@@ -149,41 +148,6 @@ function useForceSimulation(
       setSimulatedLinks([...linksCopy]);
       return;
     }
-
-    /** ---------- force / hierarchical 공통 ---------- **/
-    const LINK_DISTANCE = layoutType === "hierarchical" ? 34 : 10;
-    const CHARGE_STRENGTH = layoutType === "hierarchical" ? -260 : -100;
-    const DEPTH_SCALE = 40;
-
-    const sim = forceSimulation(nodesCopy as any)
-      .force(
-        "link",
-        forceLink(linksCopy as any)
-          .id((d: any) => d.id)
-          .distance(LINK_DISTANCE)
-          .strength(0.9),
-      )
-      .force("charge", forceManyBody().strength(CHARGE_STRENGTH))
-      .force("center", forceCenter(0, 0))
-      .force(
-        "collision",
-        forceCollide().radius((d: any) => Math.max(d.val / 5, 2.5)),
-      );
-
-    const TICKS = layoutType === "hierarchical" ? 200 : 260;
-    for (let i = 0; i < TICKS; i++) sim.tick();
-    sim.stop();
-
-    nodesCopy.forEach((n, i) => {
-      n.z = n.z ?? (Math.sin(i * 0.37) * 0.5 + (Math.random() - 0.5) * 0.5) * DEPTH_SCALE;
-    });
-
-    setSimulatedNodes([...nodesCopy]);
-    setSimulatedLinks([...linksCopy]);
-
-    return () => {
-      sim.stop();
-    };
   }, [nodes, links, layoutType]);
 
   return { nodes: simulatedNodes, links: simulatedLinks };
@@ -584,7 +548,7 @@ function Scene({ nodes, links, onNodeClick, layoutType }: SchemaGraph3DProps) {
   );
 }
 
-export function SchemaGraph3D({ nodes, links, onNodeClick, layoutType = "force" }: SchemaGraph3DProps) {
+export function SchemaGraph3D({ nodes, links, onNodeClick, layoutType = "layered" }: SchemaGraph3DProps) {
   return (
     <div
       style={{
