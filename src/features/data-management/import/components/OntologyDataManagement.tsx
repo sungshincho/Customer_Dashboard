@@ -31,38 +31,45 @@ export function OntologyDataManagement({ storeId }: OntologyDataManagementProps)
 
   const loadStatistics = async () => {
     try {
-      // Master account의 최신 ontology schema 참조 (v3.0)
-      const MASTER_ACCOUNT_ID = 'af316ab2-ffb5-4509-bd37-13aa31feb5ad';
+      // 현재 로그인한 사용자의 ontology schema 조회
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('User not authenticated');
+        setLoading(false);
+        return;
+      }
       
-      // Entity Types
+      // Entity Types (현재 사용자)
       const { count: etCount } = await supabase
         .from('ontology_entity_types')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', MASTER_ACCOUNT_ID);
+        .eq('user_id', user.id);
       
       setEntityTypeCount(etCount || 0);
 
-      // Entities
+      // Entities (현재 사용자, 선택된 매장)
       let entityQuery = supabase
         .from('graph_entities')
-        .select('id', { count: 'exact', head: true });
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id);
       
       if (storeId) entityQuery = entityQuery.eq('store_id', storeId);
       const { count: eCount } = await entityQuery;
       setEntityCount(eCount || 0);
 
-      // Relation Types
+      // Relation Types (현재 사용자)
       const { count: rtCount } = await supabase
         .from('ontology_relation_types')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', MASTER_ACCOUNT_ID);
+        .eq('user_id', user.id);
       
       setRelationTypeCount(rtCount || 0);
 
-      // Relations
+      // Relations (현재 사용자, 선택된 매장)
       let relationQuery = supabase
         .from('graph_relations')
-        .select('id', { count: 'exact', head: true });
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id);
       
       if (storeId) relationQuery = relationQuery.eq('store_id', storeId);
       const { count: rCount } = await relationQuery;
