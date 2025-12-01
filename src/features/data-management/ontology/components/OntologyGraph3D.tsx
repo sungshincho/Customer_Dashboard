@@ -108,19 +108,19 @@ export function OntologyGraph3D() {
                 onChange={(e) => setPriorityFilter(e.target.value as PriorityFilter)}
               >
                 <option value="all">All</option>
-                <option value="critical" style={{ color: "#ef4444" }}>
+                <option value="critical" style={{ color: "#FF0000" }}>
                   Critical (빨간색)
                 </option>
-                <option value="high" style={{ color: "#f97316" }}>
+                <option value="high" style={{ color: "FF4800" }}>
                   High (주황색)
                 </option>
-                <option value="medium" style={{ color: "#22c55e" }}>
+                <option value="medium" style={{ color: "#FF8C00" }}>
                   Medium (초록색)
                 </option>
-                <option value="low" style={{ color: "#3b82f6" }}>
+                <option value="low" style={{ color: "#FFEA00" }}>
                   Low (파란색)
                 </option>
-                <option value="additional" style={{ color: "#6b7280" }}>
+                <option value="additional" style={{ color: "#C3FF00" }}>
                   Additional (회색)
                 </option>
               </select>
