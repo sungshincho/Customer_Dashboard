@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import { SchemaGraph3D, GraphNode, GraphLink } from "@/features/data-management/ontology/components/SchemaGraph3D";
 import { buildRetailOntologyGraphData } from "@/features/data-management/ontology/utils/buildRetailOntologyGraph";
 
-type LayoutType = "force" | "radial" | "hierarchical" | "layered";
+type LayoutType = "layered" | "radial";
 
 export function OntologyGraph3D() {
   const { nodes, links } = buildRetailOntologyGraphData();
@@ -40,10 +40,8 @@ export function OntologyGraph3D() {
                 setLayoutType(e.target.value as LayoutType)
               }
             >
-              <option value="force">Force</option>
-              <option value="layered">Layered (Entity / Property / Relation)</option>
+              <option value="layered">Layered (Property / Entity / Relation)</option>
               <option value="radial">Radial</option>
-              <option value="hierarchical">Hierarchical</option>
             </select>
           </div>
           {selectedNode && (
