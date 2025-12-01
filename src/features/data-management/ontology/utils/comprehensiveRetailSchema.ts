@@ -18,6 +18,7 @@ export const COMPREHENSIVE_ENTITY_TYPES = [
     description: "리테일 조직 (본사/프랜차이즈)",
     icon: "Building2",
     color: "#3b82f6",
+    priority: "critical",
     model_3d_type: null,
     properties: [
       { name: "org_id", type: "string", required: true, description: "조직 ID" },
@@ -34,6 +35,7 @@ export const COMPREHENSIVE_ENTITY_TYPES = [
     description: "물리적 리테일 매장",
     icon: "Store",
     color: "#10b981",
+    priority: "critical",
     model_3d_type: "building",
     model_3d_dimensions: { width: 20, height: 4, depth: 15 },
     properties: [
@@ -57,6 +59,7 @@ export const COMPREHENSIVE_ENTITY_TYPES = [
     description: "매장 내 특정 기능 영역",
     icon: "BoxSelect",
     color: "#8b5cf6",
+    priority: "critical",
     model_3d_type: "zone",
     model_3d_dimensions: { width: 5, height: 3, depth: 5 },
     properties: [
@@ -1203,6 +1206,7 @@ export const COMPREHENSIVE_RELATION_TYPES = [
     name: "CONTAINS",
     label: "포함",
     description: "공간이 다른 공간/객체를 포함",
+    priority: "critical",
     source_entity_type: "Store",
     target_entity_type: "Zone",
     directionality: "directed",
@@ -1212,6 +1216,7 @@ export const COMPREHENSIVE_RELATION_TYPES = [
     name: "CONNECTED_TO",
     label: "연결됨",
     description: "공간이 다른 공간과 연결",
+    priority: "critical",
     source_entity_type: "Zone",
     target_entity_type: "Zone",
     directionality: "bidirectional",
@@ -1221,6 +1226,7 @@ export const COMPREHENSIVE_RELATION_TYPES = [
     name: "HAS_ENTRANCE",
     label: "출입구 보유",
     description: "매장/구역이 출입구 보유",
+    priority: "critical",
     source_entity_type: "Store",
     target_entity_type: "Entrance",
     directionality: "directed",
