@@ -214,7 +214,10 @@ function Node3D({
   const radius = baseRadius * maxBoost;
 
   const connectionIntensity = Math.min(node.val / 40, 1);
-  const baseOpacity = dimmed ? 0.5 : highlighted === false ? 0.3 : 1.0;
+  // 초기 상태: 중립적인 opacity (0.6)
+  // dimmed: 어둡게 (0.3)
+  // highlighted: 밝게 (0.95)
+  const baseOpacity = dimmed ? 0.3 : highlighted ? 0.95 : 0.6;
 
   useFrame((state) => {
     const t = state.clock.elapsedTime;
@@ -261,7 +264,7 @@ function Node3D({
         <meshPhysicalMaterial
           color={baseColor}
           emissive={baseColor}
-          emissiveIntensity={(focused || highlighted ? 2.5 : hovered ? 2.0 : 1.3) * (0.8 + connectionIntensity * 0.6)}
+          emissiveIntensity={(focused || highlighted ? 2.5 : hovered ? 1.8 : 0.9) * (0.8 + connectionIntensity * 0.6)}
           metalness={0.7}
           roughness={0.2}
           clearcoat={1}
@@ -274,7 +277,7 @@ function Node3D({
       {/* 안쪽 코어 */}
       <mesh ref={coreRef}>
         <sphereGeometry args={[radius * 0.55, 20, 20]} />
-        <meshBasicMaterial color={baseColor} transparent opacity={dimmed ? 0.5 : 0.8} />
+        <meshBasicMaterial color={baseColor} transparent opacity={dimmed ? 0.4 : highlighted ? 0.8 : 0.6} />
       </mesh>
 
       {/* 라벨 – 항상 표시 */}
