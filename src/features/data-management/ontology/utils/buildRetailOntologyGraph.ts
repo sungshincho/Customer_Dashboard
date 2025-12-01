@@ -2,13 +2,13 @@
 import {
   COMPREHENSIVE_ENTITY_TYPES,
   COMPREHENSIVE_RELATION_TYPES,
-} from "src/features/data-management/ontology/utils/comprehensiveRetailSchema.ts"; // 실제 경로에 맞게 수정
+} from "@/features/data-management/ontology/utils/comprehensiveRetailSchema";
 
 import type {
   GraphNode,
   GraphLink,
   PropertyField,
-} from "src/features/data-management/ontology/components/SchemaGraph3D.tsx"; // SchemaGraph3D가 있는 경로에 맞게 수정
+} from "@/features/data-management/ontology/components/SchemaGraph3D";
 
 // NEURALTWIN 온톨로지 스키마 → 3D 그래프 데이터 변환
 export function buildRetailOntologyGraphData(): {
