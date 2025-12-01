@@ -56,50 +56,6 @@ export interface SchemaGraph3DProps {
 
 /** ===================== 공통 유틸 & 레이아웃 ===================== **/
 
-// 모든 노드를 일정 크기의 박스 안에 스케일링 + 중앙 정렬
-function normalizeAndCenter(nodesCopy: GraphNode[], targetSize = 150) {
-  if (!nodesCopy.length) return;
-
-  let minX = Infinity,
-    maxX = -Infinity,
-    minY = Infinity,
-    maxY = -Infinity,
-    minZ = Infinity,
-    maxZ = -Infinity;
-
-  nodesCopy.forEach((n) => {
-    const x = n.x ?? 0;
-    const y = n.y ?? 0;
-    const z = n.z ?? 0;
-    if (x < minX) minX = x;
-    if (x > maxX) maxX = x;
-    if (y < minY) minY = y;
-    if (y > maxY) maxY = y;
-    if (z < minZ) minZ = z;
-    if (z > maxZ) maxZ = z;
-  });
-
-  const width = maxX - minX || 1;
-  const height = maxY - minY || 1;
-  const depth = maxZ - minZ || 1;
-  const longest = Math.max(width, height, depth);
-
-  const scale = targetSize / longest;
-
-  const cx = (minX + maxX) / 2;
-  const cy = (minY + maxY) / 2;
-  const cz = (minZ + maxZ) / 2;
-
-  nodesCopy.forEach((n) => {
-    const x = n.x ?? 0;
-    const y = n.y ?? 0;
-    const z = n.z ?? 0;
-    n.x = (x - cx) * scale;
-    n.y = (y - cy) * scale;
-    n.z = (z - cz) * scale;
-  });
-}
-
 // 포스 시뮬레이션 훅 – 온톨로지 스키마에 최적화된 버전
 function useForceSimulation(
   nodes: GraphNode[],
@@ -174,9 +130,6 @@ function useForceSimulation(
         });
       });
 
-      // 결과를 항상 화면에 잘 들어오도록 정규화
-      normalizeAndCenter(nodesCopy, 110);
-
       setSimulatedNodes([...nodesCopy]);
       setSimulatedLinks([...linksCopy]);
       return;
@@ -191,8 +144,6 @@ function useForceSimulation(
         node.y = radius * Math.sin(i * angleStep);
         node.z = (Math.random() - 0.5) * 20;
       });
-
-      normalizeAndCenter(nodesCopy, 110);
 
       setSimulatedNodes([...nodesCopy]);
       setSimulatedLinks([...linksCopy]);
@@ -226,8 +177,6 @@ function useForceSimulation(
     nodesCopy.forEach((n, i) => {
       n.z = n.z ?? (Math.sin(i * 0.37) * 0.5 + (Math.random() - 0.5) * 0.5) * DEPTH_SCALE;
     });
-
-    normalizeAndCenter(nodesCopy, 110);
 
     setSimulatedNodes([...nodesCopy]);
     setSimulatedLinks([...linksCopy]);
