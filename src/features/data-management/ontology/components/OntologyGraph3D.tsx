@@ -17,44 +17,44 @@ export function OntologyGraph3D() {
   // 필터링된 노드 계산
   const filteredData = useMemo(() => {
     let filteredNodes = nodes;
-    
+
     // 노드 타입 필터
     if (nodeTypeFilter !== "all") {
-      filteredNodes = filteredNodes.filter(n => n.nodeType === nodeTypeFilter);
+      filteredNodes = filteredNodes.filter((n) => n.nodeType === nodeTypeFilter);
     }
-    
+
     // 중요도 필터
     if (priorityFilter !== "all") {
-      filteredNodes = filteredNodes.filter(n => (n as any).priority === priorityFilter);
+      filteredNodes = filteredNodes.filter((n) => (n as any).priority === priorityFilter);
     }
-    
+
     // 필터링된 노드 ID 세트
-    const nodeIds = new Set(filteredNodes.map(n => n.id));
-    
+    const nodeIds = new Set(filteredNodes.map((n) => n.id));
+
     // 필터링된 노드에 연결된 링크만 포함
-    const filteredLinks = links.filter(l => {
-      const sourceId = typeof l.source === 'string' ? l.source : l.source.id;
-      const targetId = typeof l.target === 'string' ? l.target : l.target.id;
+    const filteredLinks = links.filter((l) => {
+      const sourceId = typeof l.source === "string" ? l.source : l.source.id;
+      const targetId = typeof l.target === "string" ? l.target : l.target.id;
       return nodeIds.has(sourceId) && nodeIds.has(targetId);
     });
-    
+
     return { nodes: filteredNodes, links: filteredLinks };
   }, [nodes, links, nodeTypeFilter, priorityFilter]);
 
   // 통계 계산
   const stats = useMemo(() => {
-    const entityCount = nodes.filter(n => n.nodeType === "entity").length;
-    const propertyCount = nodes.filter(n => n.nodeType === "property").length;
-    const relationCount = nodes.filter(n => n.nodeType === "relation").length;
+    const entityCount = nodes.filter((n) => n.nodeType === "entity").length;
+    const propertyCount = nodes.filter((n) => n.nodeType === "property").length;
+    const relationCount = nodes.filter((n) => n.nodeType === "relation").length;
     const totalCount = nodes.length;
-    
+
     return {
       entity: entityCount,
       property: propertyCount,
       relation: relationCount,
       total: totalCount,
       // 실제 관계 타입 수 (시각화 링크 수가 아님)
-      linkCount: COMPREHENSIVE_RELATION_TYPES.length
+      linkCount: COMPREHENSIVE_RELATION_TYPES.length,
     };
   }, [nodes]);
 
@@ -87,9 +87,15 @@ export function OntologyGraph3D() {
                 onChange={(e) => setNodeTypeFilter(e.target.value as NodeTypeFilter)}
               >
                 <option value="all">All</option>
-                <option value="entity" style={{ color: '#3b82f6' }}>엔티티 (파란색)</option>
-                <option value="property" style={{ color: '#a855f7' }}>속성 (보라색)</option>
-                <option value="relation" style={{ color: '#eab308' }}>관계 (노란색)</option>
+                <option value="entity" style={{ color: "#0073FF" }}>
+                  엔티티 (파란색)
+                </option>
+                <option value="property" style={{ color: "#8C00FF" }}>
+                  속성 (보라색)
+                </option>
+                <option value="relation" style={{ color: "#FF00A6" }}>
+                  관계 (노란색)
+                </option>
               </select>
             </div>
 
@@ -102,11 +108,21 @@ export function OntologyGraph3D() {
                 onChange={(e) => setPriorityFilter(e.target.value as PriorityFilter)}
               >
                 <option value="all">All</option>
-                <option value="critical" style={{ color: '#ef4444' }}>Critical (빨간색)</option>
-                <option value="high" style={{ color: '#f97316' }}>High (주황색)</option>
-                <option value="medium" style={{ color: '#22c55e' }}>Medium (초록색)</option>
-                <option value="low" style={{ color: '#3b82f6' }}>Low (파란색)</option>
-                <option value="additional" style={{ color: '#6b7280' }}>Additional (회색)</option>
+                <option value="critical" style={{ color: "#ef4444" }}>
+                  Critical (빨간색)
+                </option>
+                <option value="high" style={{ color: "#f97316" }}>
+                  High (주황색)
+                </option>
+                <option value="medium" style={{ color: "#22c55e" }}>
+                  Medium (초록색)
+                </option>
+                <option value="low" style={{ color: "#3b82f6" }}>
+                  Low (파란색)
+                </option>
+                <option value="additional" style={{ color: "#6b7280" }}>
+                  Additional (회색)
+                </option>
               </select>
             </div>
           </div>
@@ -187,15 +203,11 @@ export function OntologyGraph3D() {
             </div>
             {selectedNode.properties?.length > 0 && (
               <div>
-                <div className="text-[10px] text-gray-400 mb-1">
-                  Properties ({selectedNode.properties.length})
-                </div>
+                <div className="text-[10px] text-gray-400 mb-1">Properties ({selectedNode.properties.length})</div>
                 <ul className="max-h-52 overflow-auto pr-1 space-y-0.5">
                   {selectedNode.properties.map((p) => (
                     <li key={p.id}>
-                      <span className="font-mono text-[11px] text-emerald-300">
-                        {p.name}
-                      </span>
+                      <span className="font-mono text-[11px] text-emerald-300">{p.name}</span>
                       <span className="text-[10px] text-gray-400">
                         {" "}
                         : {p.type} {p.required ? "(required)" : ""}
@@ -207,9 +219,7 @@ export function OntologyGraph3D() {
             )}
           </div>
         ) : (
-          <div className="text-gray-500 text-[11px]">
-            노드를 클릭하면 상세 정보가 여기에 표시됩니다.
-          </div>
+          <div className="text-gray-500 text-[11px]">노드를 클릭하면 상세 정보가 여기에 표시됩니다.</div>
         )}
       </div>
     </div>
