@@ -29,6 +29,9 @@ export function buildRetailOntologyGraphData(): {
         required: !!p.required,
       }));
 
+      // priority 정보 추출 (entity description에서 추론 또는 기본값)
+      const priority = (entity as any).priority || "medium";
+
       return {
         id: entity.name,
         name: entity.name,
@@ -37,7 +40,8 @@ export function buildRetailOntologyGraphData(): {
         properties: props,
         val: 10 + props.length * 0.8,
         nodeType: "entity",
-      };
+        priority,
+      } as any;
     },
   );
 
@@ -45,6 +49,7 @@ export function buildRetailOntologyGraphData(): {
   const propertyNodes: GraphNode[] = COMPREHENSIVE_ENTITY_TYPES.flatMap(
     (entity): GraphNode[] => {
       const baseColor = entity.color ?? "#6b7280";
+      const priority = (entity as any).priority || "medium";
 
       return entity.properties.map((p: any) => {
         const id = `${entity.name}.${p.name}`;
@@ -67,7 +72,8 @@ export function buildRetailOntologyGraphData(): {
           properties: fields,
           val: 5,
           nodeType: "property",
-        };
+          priority,
+        } as any;
       });
     },
   );
@@ -83,6 +89,8 @@ export function buildRetailOntologyGraphData(): {
         required: !!p.required,
       }));
 
+      const priority = (relation as any).priority || "medium";
+
       return {
         id: relation.name,
         name: relation.name,
@@ -91,7 +99,8 @@ export function buildRetailOntologyGraphData(): {
         properties: props,
         val: 12 + props.length * 0.5,
         nodeType: "relation",
-      };
+        priority,
+      } as any;
     },
   );
 
