@@ -1,9 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
 
 /**
- * 최적화된 리테일 온톨로지 스키마 v2.1
- * 43개 엔티티 (CRITICAL: 25, HIGH: 19, MEDIUM: 13, LOW: 5)
- * 70개 관계 (CRITICAL: 32, HIGH: 27, MEDIUM: 17, LOW: 10)
+ * 최적화된 리테일 온톨로지 스키마 v3.0
+ * 62개 엔티티 (CRITICAL: 25, HIGH: 19, MEDIUM: 13, LOW: 5)
+ * 86개 관계 (CRITICAL: 32, HIGH: 27, MEDIUM: 17, LOW: 10)
  */
 
 export const COMPREHENSIVE_ENTITY_TYPES = [
