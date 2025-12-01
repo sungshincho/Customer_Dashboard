@@ -60,7 +60,7 @@ export const MasterSchemaSync = () => {
     }
   });
 
-  // 마스터 스키마 병합
+  // 마스터 스키마 불러오기 (덮어쓰기)
   const syncMasterSchemaMutation = useMutation({
     mutationFn: async () => {
       const userId = (await supabase.auth.getUser()).data.user?.id;
@@ -68,7 +68,23 @@ export const MasterSchemaSync = () => {
       
       if (!userId) throw new Error("로그인이 필요합니다");
 
-      // 1. 마스터 계정의 모든 entity types 가져오기
+      // 1. 현재 사용자의 모든 relation types 삭제 (외래키 제약으로 먼저 삭제)
+      const { error: deleteRelError } = await supabase
+        .from('ontology_relation_types')
+        .delete()
+        .eq('user_id', userId);
+
+      if (deleteRelError) throw deleteRelError;
+
+      // 2. 현재 사용자의 모든 entity types 삭제
+      const { error: deleteEntError } = await supabase
+        .from('ontology_entity_types')
+        .delete()
+        .eq('user_id', userId);
+
+      if (deleteEntError) throw deleteEntError;
+
+      // 3. 마스터 계정의 모든 entity types 가져오기
       const { data: masterEntities, error: entError } = await supabase
         .from('ontology_entity_types')
         .select('*')
@@ -76,25 +92,12 @@ export const MasterSchemaSync = () => {
 
       if (entError) throw entError;
 
-      // 2. 현재 사용자의 entity types 가져오기
-      const { data: currentEntities, error: currentEntError } = await supabase
-        .from('ontology_entity_types')
-        .select('name')
-        .eq('user_id', userId);
-
-      if (currentEntError) throw currentEntError;
-
-      const currentEntityNames = new Set(currentEntities?.map(e => e.name) || []);
-
-      // 3. 중복되지 않는 entity types만 필터링
-      const newEntities = masterEntities?.filter(e => !currentEntityNames.has(e.name)) || [];
-
-      // 4. 새로운 entity types 삽입
-      if (newEntities.length > 0) {
+      // 4. 마스터 entity types를 현재 사용자 계정으로 복사
+      if (masterEntities && masterEntities.length > 0) {
         const { error: insertEntError } = await supabase
           .from('ontology_entity_types')
           .insert(
-            newEntities.map(e => ({
+            masterEntities.map(e => ({
               user_id: userId,
               org_id: orgId,
               name: e.name,
@@ -122,30 +125,12 @@ export const MasterSchemaSync = () => {
 
       if (relError) throw relError;
 
-      // 6. 현재 사용자의 relation types 가져오기
-      const { data: currentRelations, error: currentRelError } = await supabase
-        .from('ontology_relation_types')
-        .select('name, source_entity_type, target_entity_type')
-        .eq('user_id', userId);
-
-      if (currentRelError) throw currentRelError;
-
-      // 7. 중복 체크 (name + source + target 조합)
-      const currentRelationKeys = new Set(
-        currentRelations?.map(r => `${r.name}|${r.source_entity_type}|${r.target_entity_type}`) || []
-      );
-
-      // 8. 중복되지 않는 relation types만 필터링
-      const newRelations = masterRelations?.filter(
-        r => !currentRelationKeys.has(`${r.name}|${r.source_entity_type}|${r.target_entity_type}`)
-      ) || [];
-
-      // 9. 새로운 relation types 삽입
-      if (newRelations.length > 0) {
+      // 6. 마스터 relation types를 현재 사용자 계정으로 복사
+      if (masterRelations && masterRelations.length > 0) {
         const { error: insertRelError } = await supabase
           .from('ontology_relation_types')
           .insert(
-            newRelations.map(r => ({
+            masterRelations.map(r => ({
               user_id: userId,
               org_id: orgId,
               name: r.name,
@@ -163,14 +148,14 @@ export const MasterSchemaSync = () => {
       }
 
       return {
-        entitiesAdded: newEntities.length,
-        relationsAdded: newRelations.length
+        entityCount: masterEntities?.length || 0,
+        relationCount: masterRelations?.length || 0
       };
     },
     onSuccess: (result) => {
       toast({
-        title: "마스터 스키마 동기화 완료",
-        description: `${result.entitiesAdded}개의 엔티티 타입과 ${result.relationsAdded}개의 관계 타입이 추가되었습니다.`,
+        title: "마스터 스키마 불러오기 완료",
+        description: `${result.entityCount}개의 엔티티 타입과 ${result.relationCount}개의 관계 타입이 적용되었습니다.`,
       });
       
       queryClient.invalidateQueries({ queryKey: ['ontology-entity-types'] });
@@ -194,19 +179,19 @@ export const MasterSchemaSync = () => {
           <div>
             <CardTitle className="flex items-center gap-2">
               <Download className="w-5 h-5" />
-              마스터 스키마 동기화
+              마스터 스키마 불러오기
             </CardTitle>
             <CardDescription>
-              최신 온톨로지 스키마 v3.0을 현재 계정으로 불러옵니다
+              최신 온톨로지 스키마 v3.0으로 완전히 교체합니다
             </CardDescription>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Alert>
+        <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            마스터 계정의 최신 스키마를 현재 계정과 병합합니다. 중복된 엔티티와 관계는 자동으로 제외됩니다.
+            <strong>주의:</strong> 현재 계정의 모든 스키마가 삭제되고 마스터 스키마로 완전히 덮어씌워집니다.
           </AlertDescription>
         </Alert>
 
@@ -250,7 +235,7 @@ export const MasterSchemaSync = () => {
           ) : (
             <>
               <CheckCircle className="mr-2 h-4 w-4" />
-              최신 마스터 스키마 병합하기
+              최신 마스터 스키마 불러오기
             </>
           )}
         </Button>
