@@ -180,7 +180,7 @@ export const RetailSchemaPreset = () => {
               </Badge>
             </CardTitle>
             <CardDescription className="mt-1.5">
-              62개 엔티티 (CRITICAL: 25, HIGH: 19, MEDIUM: 13, LOW: 5) + 86개 관계 (CRITICAL: 32, HIGH: 27, MEDIUM: 17, LOW: 10)
+              62개 엔티티 (CRITICAL: 25, HIGH: 19, MEDIUM: 13, LOW: 5) + 99개 관계 (CRITICAL: 32, HIGH: 27, MEDIUM: 17, LOW: 10, ADDITIONAL: 13)
             </CardDescription>
           </div>
         </div>
