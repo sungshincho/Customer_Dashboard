@@ -280,6 +280,35 @@ export function OntologyGraph3D() {
                 </ul>
               </div>
             )}
+            {(selectedNode.nodeType === "entity" || selectedNode.nodeType === "relation") && (() => {
+              const connectedProperties = filteredLinks
+                .filter(link => {
+                  const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
+                  const targetId = typeof link.target === 'string' ? link.target : link.target.id;
+                  return (sourceId === selectedNode.id || targetId === selectedNode.id);
+                })
+                .map(link => {
+                  const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
+                  const targetId = typeof link.target === 'string' ? link.target : link.target.id;
+                  const connectedId = sourceId === selectedNode.id ? targetId : sourceId;
+                  return filteredNodes.find(n => n.id === connectedId && n.nodeType === 'property');
+                })
+                .filter(Boolean);
+              
+              return connectedProperties.length > 0 ? (
+                <div>
+                  <div className="text-[10px] text-gray-400 mb-1">Connected Properties ({connectedProperties.length})</div>
+                  <ul className="max-h-52 overflow-auto pr-1 space-y-0.5">
+                    {connectedProperties.map((p) => (
+                      <li key={p!.id}>
+                        <span className="font-mono text-[11px] text-purple-300">{p!.label}</span>
+                        <span className="text-[10px] text-gray-400"> (property node)</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null;
+            })()}
           </div>
         ) : (
           <div className="text-gray-500 text-[11px]">노드를 클릭하면 상세 정보가 여기에 표시됩니다.</div>
