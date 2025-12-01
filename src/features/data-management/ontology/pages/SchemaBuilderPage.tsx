@@ -6,7 +6,6 @@ import { EntityTypeManager } from "@/features/data-management/ontology/component
 import { RelationTypeManager } from "@/features/data-management/ontology/components/RelationTypeManager";
 import { SchemaVersionManager } from "@/features/data-management/ontology/components/SchemaVersionManager";
 import { SchemaValidator } from "@/features/data-management/ontology/components/SchemaValidator";
-import { SchemaGraphVisualization } from "@/features/data-management/ontology/components/SchemaGraphVisualization";
 import { OntologyGraph3D } from "@/features/data-management/ontology/components/OntologyGraph3D";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -297,22 +296,9 @@ const SchemaBuilder = () => {
               </TabsList>
 
               <TabsContent value="graph" className="space-y-4 mt-6">
-                <Tabs defaultValue="2d" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 max-w-md mb-4">
-                    <TabsTrigger value="2d">2D View</TabsTrigger>
-                    <TabsTrigger value="3d">3D View</TabsTrigger>
-                  </TabsList>
-                  
-                  <TabsContent value="2d">
-                    <SchemaGraphVisualization />
-                  </TabsContent>
-                  
-                  <TabsContent value="3d">
-                    <div className="w-full h-[800px] bg-background/50 backdrop-blur-sm rounded-lg border border-border/50 p-4">
-                      <OntologyGraph3D />
-                    </div>
-                  </TabsContent>
-                </Tabs>
+                <div className="w-full h-[800px] bg-background/50 backdrop-blur-sm rounded-lg border border-border/50 p-4">
+                  <OntologyGraph3D />
+                </div>
               </TabsContent>
 
               <TabsContent value="entities" className="space-y-4 mt-6">
