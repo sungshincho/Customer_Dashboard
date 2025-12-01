@@ -1641,25 +1641,70 @@ export const COMPREHENSIVE_RELATION_TYPES = [
 ];
 
 /**
- * 마스터 사용자 계정으로 온톨로지 엔티티 타입 생성
- * (user_id: af316ab2-ffb5-4509-bd37-13aa31feb5ad)
+ * 온톨로지 스키마 생성 함수
+ * @param userId - 사용자 ID
+ * @param orgId - 조직 ID
+ * @param mode - 'merge' (병합) 또는 'replace' (교체)
  */
-export async function createComprehensiveRetailOntology() {
-  const MASTER_USER_ID = "af316ab2-ffb5-4509-bd37-13aa31feb5ad";
-  const MASTER_ORG_ID = "e738e7b1-e4bd-49f1-bd96-6de4c257b5a0";
-
+export async function createComprehensiveRetailOntology(
+  userId: string,
+  orgId: string | null,
+  mode: 'merge' | 'replace' = 'merge'
+) {
   const results = {
     entities: { created: 0, failed: 0 },
     relations: { created: 0, failed: 0 },
     errors: [] as string[],
   };
 
+  // replace 모드인 경우 기존 스키마 삭제
+  if (mode === 'replace') {
+    try {
+      // 관계 타입 먼저 삭제
+      const { error: relError } = await supabase
+        .from('ontology_relation_types')
+        .delete()
+        .eq('user_id', userId);
+
+      if (relError) {
+        results.errors.push(`기존 관계 삭제 실패: ${relError.message}`);
+      }
+
+      // 엔티티 타입 삭제
+      const { error: entError } = await supabase
+        .from('ontology_entity_types')
+        .delete()
+        .eq('user_id', userId);
+
+      if (entError) {
+        results.errors.push(`기존 엔티티 삭제 실패: ${entError.message}`);
+      }
+    } catch (err) {
+      results.errors.push(`기존 스키마 삭제 중 오류: ${String(err)}`);
+    }
+  }
+
   // 1. 엔티티 타입 생성
   for (const entity of COMPREHENSIVE_ENTITY_TYPES) {
     try {
+      // merge 모드에서는 중복 체크
+      if (mode === 'merge') {
+        const { data: existing } = await supabase
+          .from("ontology_entity_types")
+          .select("id")
+          .eq('user_id', userId)
+          .eq('name', entity.name)
+          .maybeSingle();
+
+        if (existing) {
+          // 이미 존재하면 스킵
+          continue;
+        }
+      }
+
       const { error } = await supabase.from("ontology_entity_types").insert({
-        user_id: MASTER_USER_ID,
-        org_id: MASTER_ORG_ID,
+        user_id: userId,
+        org_id: orgId,
         name: entity.name,
         label: entity.label,
         description: entity.description,
@@ -1685,9 +1730,24 @@ export async function createComprehensiveRetailOntology() {
   // 2. 관계 타입 생성
   for (const relation of COMPREHENSIVE_RELATION_TYPES) {
     try {
+      // merge 모드에서는 중복 체크
+      if (mode === 'merge') {
+        const { data: existing } = await supabase
+          .from("ontology_relation_types")
+          .select("id")
+          .eq('user_id', userId)
+          .eq('name', relation.name)
+          .maybeSingle();
+
+        if (existing) {
+          // 이미 존재하면 스킵
+          continue;
+        }
+      }
+
       const { error } = await supabase.from("ontology_relation_types").insert({
-        user_id: MASTER_USER_ID,
-        org_id: MASTER_ORG_ID,
+        user_id: userId,
+        org_id: orgId,
         name: relation.name,
         label: relation.label,
         description: relation.description,
@@ -1714,7 +1774,35 @@ export async function createComprehensiveRetailOntology() {
 
 /**
  * 리테일 스키마 프리셋 적용
+ * @param userId - 사용자 ID
+ * @param orgId - 조직 ID
+ * @param mode - 'merge' (병합) 또는 'replace' (교체)
  */
-export async function applyRetailSchemaPreset() {
-  return await createComprehensiveRetailOntology();
+export async function applyRetailSchemaPreset(
+  userId: string,
+  orgId: string | null,
+  mode: 'merge' | 'replace' = 'merge'
+) {
+  try {
+    const results = await createComprehensiveRetailOntology(userId, orgId, mode);
+    
+    const success = results.errors.length === 0;
+    const entitiesCount = results.entities.created;
+    const relationsCount = results.relations.created;
+
+    return {
+      success,
+      error: success ? undefined : results.errors.join(', '),
+      entitiesCount,
+      relationsCount,
+      details: results,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: String(err),
+      entitiesCount: 0,
+      relationsCount: 0,
+    };
+  }
 }
