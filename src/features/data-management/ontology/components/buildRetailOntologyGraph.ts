@@ -43,7 +43,7 @@ export interface GraphLink {
 
 /**
  * NEURALTWIN 리테일 온톨로지 스키마 v2.1 을
- * 3D SchemaGraphVisualization 에서 쓸 수 있는 nodes/links로 변환
+ * OntologyGraph3D (3D 스키마 그래프)에서 쓸 수 있는 nodes/links로 변환
  *
  * - 엔티티 타입 1개당: nodeType: "entity"
  * - 각 엔티티의 속성마다 별도의 "property" 노드 + 엔티티 → 속성 링크
