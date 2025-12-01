@@ -111,7 +111,7 @@ export function OntologyGraph3D() {
                 <option value="critical" style={{ color: "#FF0000" }}>
                   Critical (레드)
                 </option>
-                <option value="high" style={{ color: "FF7B00" }}>
+                <option value="high" style={{ color: "#FF7B00" }}>
                   High (오렌지)
                 </option>
                 <option value="medium" style={{ color: "#FFFB00" }}>
