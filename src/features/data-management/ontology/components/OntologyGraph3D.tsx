@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { SchemaGraph3D, GraphNode, GraphLink } from "@/features/data-management/ontology/components/SchemaGraph3D";
 import { buildRetailOntologyGraphData } from "@/features/data-management/ontology/utils/buildRetailOntologyGraph";
 
@@ -9,10 +9,26 @@ export function OntologyGraph3D() {
   const [layoutType, setLayoutType] = useState<LayoutType>("layered");
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
 
+  // 통계 계산
+  const stats = useMemo(() => {
+    const entityCount = nodes.filter(n => n.nodeType === "entity").length;
+    const propertyCount = nodes.filter(n => n.nodeType === "property").length;
+    const relationCount = nodes.filter(n => n.nodeType === "relation").length;
+    const totalCount = nodes.length;
+    
+    return {
+      entity: entityCount,
+      property: propertyCount,
+      relation: relationCount,
+      total: totalCount,
+      linkCount: links.length
+    };
+  }, [nodes, links]);
+
   return (
     <div className="flex gap-4 w-full h-full">
       {/* 좌측 3D 그래프 영역 */}
-      <div className="flex-1 min-h-[650px]">
+      <div className="flex-1 min-h-[650px] flex flex-col">
         {/* 레이아웃 타입 선택 UI (예시, shadcn 없이 기본 select 사용) */}
         <div className="flex items-center justify-between mb-2">
           <div className="text-sm text-gray-400">
@@ -37,12 +53,53 @@ export function OntologyGraph3D() {
           )}
         </div>
 
-        <SchemaGraph3D
-          nodes={nodes}
-          links={links}
-          layoutType={layoutType}
-          onNodeClick={(node) => setSelectedNode(node)}
-        />
+        <div className="flex-1">
+          <SchemaGraph3D
+            nodes={nodes}
+            links={links}
+            layoutType={layoutType}
+            onNodeClick={(node) => setSelectedNode(node)}
+          />
+        </div>
+
+        {/* 통계 정보 */}
+        <div className="mt-4 grid grid-cols-5 gap-3 bg-black/60 border border-white/10 rounded-lg p-4">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-emerald-400" />
+            <div className="text-xs">
+              <div className="text-gray-400">엔티티</div>
+              <div className="text-white font-semibold">{stats.entity}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-orange-400" />
+            <div className="text-xs">
+              <div className="text-gray-400">속성</div>
+              <div className="text-white font-semibold">{stats.property}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-cyan-400" />
+            <div className="text-xs">
+              <div className="text-gray-400">관계</div>
+              <div className="text-white font-semibold">{stats.relation}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-purple-400" />
+            <div className="text-xs">
+              <div className="text-gray-400">총 노드</div>
+              <div className="text-white font-semibold">{stats.total}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400" />
+            <div className="text-xs">
+              <div className="text-gray-400">연결선</div>
+              <div className="text-white font-semibold">{stats.linkCount}</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* 우측 선택 노드 상세 패널 */}
