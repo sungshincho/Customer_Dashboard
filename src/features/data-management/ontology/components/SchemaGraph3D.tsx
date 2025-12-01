@@ -179,7 +179,7 @@ function Node3D({
         case "critical":
           return new THREE.Color("#FF0000"); // 레드
         case "high":
-          return new THREE.Color("FF7B00"); // 오렌지
+          return new THREE.Color("#FF7B00"); // 오렌지
         case "medium":
           return new THREE.Color("#FFFB00"); // 옐로우
         case "low":
