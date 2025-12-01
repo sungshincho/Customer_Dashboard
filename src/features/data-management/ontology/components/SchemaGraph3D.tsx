@@ -105,6 +105,7 @@ function useForceSimulation(
       // 레이어 내부 grid 간격
       const gridSpacingX = 20;
       const gridSpacingY = 20;
+      const gridSpacingZ = 20;
 
       activeTypes.forEach((type, layerIndex) => {
         const layerNodes = nodesCopy.filter((n) => (n.nodeType ?? "entity") === type);
@@ -126,7 +127,7 @@ function useForceSimulation(
 
           n.x = baseX + offsetX;
           n.y = offsetY;
-          n.z = (Math.random() - 0.5) * 10;
+          n.z = offsetZ;
         });
       });
 
