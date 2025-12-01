@@ -57,7 +57,8 @@ export function transformSchemaToGraphData(entityTypes: any[], relationTypes: an
       color: '#3b82f6', // 블루
       val: 8,
       properties: [],
-    });
+      priority: entityType.priority || 'medium',
+    } as any);
 
     // 속성(properties) 노드 추가
     if (entityType.properties && typeof entityType.properties === 'object') {
@@ -77,7 +78,8 @@ export function transformSchemaToGraphData(entityTypes: any[], relationTypes: an
           color: '#a855f7', // 퍼플
           val: 4,
           properties: [],
-        });
+          priority: entityType.priority || 'medium', // 부모 엔티티의 priority 상속
+        } as any);
 
         // 엔티티 → 속성 링크
         links.push({
@@ -106,7 +108,8 @@ export function transformSchemaToGraphData(entityTypes: any[], relationTypes: an
       color: '#eab308', // 옐로우
       val: 6,
       properties: [],
-    });
+      priority: relationType.priority || 'medium',
+    } as any);
 
     // source 엔티티 → 관계 링크
     const sourceEntityId = `entity-${relationType.source_entity_type}`;
