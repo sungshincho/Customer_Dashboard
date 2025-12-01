@@ -173,14 +173,14 @@ export const RetailSchemaPreset = () => {
           </div>
           <div className="flex-1">
             <CardTitle className="flex items-center gap-2">
-              최적화된 리테일 온톨로지 스키마 v2.1
+              최적화된 리테일 온톨로지 스키마 v3.0
               <Badge variant="default" className="ml-2">
                 <Sparkles className="h-3 w-3 mr-1" />
                 Optimized
               </Badge>
             </CardTitle>
             <CardDescription className="mt-1.5">
-              43개 엔티티 (CRITICAL: 17, HIGH: 12, MEDIUM: 9, LOW: 5) + 83개 관계 (CRITICAL: 30, HIGH: 22, MEDIUM: 21, LOW: 10)
+              62개 엔티티 (CRITICAL: 25, HIGH: 19, MEDIUM: 13, LOW: 5) + 86개 관계 (CRITICAL: 32, HIGH: 27, MEDIUM: 17, LOW: 10)
             </CardDescription>
           </div>
         </div>
@@ -191,30 +191,30 @@ export const RetailSchemaPreset = () => {
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-              <span className="text-sm font-medium">🔴 CRITICAL - 17개</span>
+              <span className="text-sm font-medium">🔴 CRITICAL - 25개</span>
             </div>
             <p className="text-xs text-muted-foreground pl-4">
-              조직/매장(2), 공간구조(3), 제품(5), 고객/거래(4), 직원/운영(2), IoT센서(1)
+              조직/매장(2), 공간(3), 제품(5), 고객/거래(4), 직원/운영(2), IoT(1), 데이터소스(3), 이벤트(3), 시뮬레이션(2)
             </p>
           </div>
           
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-yellow-500 animate-pulse" />
-              <span className="text-sm font-medium">🟡 HIGH - 12개</span>
+              <span className="text-sm font-medium">🟡 HIGH - 19개</span>
             </div>
             <p className="text-xs text-muted-foreground pl-4">
-              외부컨텍스트(3), 공간구조(3), 가구/집기(3), 제품(1), IoT센서(2)
+              외부컨텍스트(3), 공간구조(3), 가구/집기(3), 제품(1), IoT(2), AI모델(7)
             </p>
           </div>
           
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
-              <span className="text-sm font-medium">🟠 MEDIUM - 9개</span>
+              <span className="text-sm font-medium">🟠 MEDIUM - 13개</span>
             </div>
             <p className="text-xs text-muted-foreground pl-4">
-              시계열집계(3), 운영/직원(1), IoT센서(4), 시스템(1)
+              시계열집계(3), 운영/직원(1), IoT센서(4), 시스템(1), 비즈니스룰(4)
             </p>
           </div>
           
