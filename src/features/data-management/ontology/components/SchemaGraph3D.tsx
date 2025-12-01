@@ -528,6 +528,21 @@ function Scene({ nodes, links, onNodeClick, layoutType, priorityFilter, highligh
     return map;
   }, [simLinks]);
 
+  // 하이라이트된 노드들의 이웃 계산
+  const highlightedNeighbors = useMemo(() => {
+    if (!highlightedNodeIds || highlightedNodeIds.size === 0) return new Set<string>();
+    
+    const neighbors = new Set<string>();
+    highlightedNodeIds.forEach((nodeId) => {
+      const nodeNeighbors = neighborMap.get(nodeId);
+      if (nodeNeighbors) {
+        nodeNeighbors.forEach((n) => neighbors.add(n));
+      }
+      neighbors.add(nodeId); // 하이라이트된 노드 자체도 포함
+    });
+    return neighbors;
+  }, [highlightedNodeIds, neighborMap]);
+
   const handleNodeClick = (n: GraphNode) => {
     setFocusedId((prev) => (prev === n.id ? null : n.id));
     onNodeClick?.(n);
@@ -552,20 +567,36 @@ function Scene({ nodes, links, onNodeClick, layoutType, priorityFilter, highligh
         const s = (link.source as GraphNode).id;
         const t = (link.target as GraphNode).id;
 
-        const isNeighborLink = !focusedId || s === focusedId || t === focusedId;
-        const dimmed = !!focusedId && !isNeighborLink;
+        // 하이라이트가 있으면 하이라이트 기준으로, 없으면 포커스 기준으로
+        let isNeighborLink: boolean;
+        let dimmed: boolean;
+        
+        if (highlightedNodeIds && highlightedNodeIds.size > 0) {
+          isNeighborLink = highlightedNeighbors.has(s) && highlightedNeighbors.has(t);
+          dimmed = !isNeighborLink;
+        } else {
+          isNeighborLink = !focusedId || s === focusedId || t === focusedId;
+          dimmed = !!focusedId && !isNeighborLink;
+        }
 
         return <Link3D key={`link-${i}-${s}-${t}`} link={link} dimmed={dimmed} isNeighborLink={isNeighborLink} />;
       })}
 
       {simNodes.map((node) => {
         const isFocused = focusedId === node.id;
-        const neighbors = neighborMap.get(focusedId || "") ?? new Set();
-        const isNeighbor = neighbors.has(node.id);
-        const dimmed = !!focusedId && !isFocused && !isNeighbor;
         
         // 검색 하이라이트 처리
-        const isHighlighted = highlightedNodeIds ? highlightedNodeIds.has(node.id) : undefined;
+        const isHighlighted = highlightedNodeIds ? highlightedNodeIds.has(node.id) : false;
+        
+        // 하이라이트가 있으면 하이라이트 기준으로, 없으면 포커스 기준으로 dimmed 처리
+        let dimmed: boolean;
+        if (highlightedNodeIds && highlightedNodeIds.size > 0) {
+          dimmed = !highlightedNeighbors.has(node.id);
+        } else {
+          const neighbors = neighborMap.get(focusedId || "") ?? new Set();
+          const isNeighbor = neighbors.has(node.id);
+          dimmed = !!focusedId && !isFocused && !isNeighbor;
+        }
 
         return (
           <Node3D
