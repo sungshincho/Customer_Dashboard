@@ -177,15 +177,15 @@ function Node3D({
       const priority = (node as any).priority || "medium";
       switch (priority) {
         case "critical":
-          return new THREE.Color("#ef4444"); // 빨간색
+          return new THREE.Color("#FF0000"); // 빨간색
         case "high":
-          return new THREE.Color("#f97316"); // 주황색
+          return new THREE.Color("FF4800"); // 주황색
         case "medium":
-          return new THREE.Color("#22c55e"); // 초록색
+          return new THREE.Color("#FF8C00"); // 초록색
         case "low":
-          return new THREE.Color("#3b82f6"); // 파란색
+          return new THREE.Color("#FFEA00"); // 파란색
         case "additional":
-          return new THREE.Color("#6b7280"); // 회색
+          return new THREE.Color("#C3FF00"); // 회색
         default:
           return new THREE.Color("#6b7280");
       }
