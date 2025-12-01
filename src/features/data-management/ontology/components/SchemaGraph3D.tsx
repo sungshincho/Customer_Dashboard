@@ -95,9 +95,9 @@ function useForceSimulation(
           : nodesCopy.find((n) => n.id === (l.target as GraphNode).id)!,
     }));
 
-    /** ---------- 레이어 레이아웃 (엔티티 / 속성 / 관계) ---------- **/
+    /** ---------- 레이어 레이아웃 (엔티티 / 관계 / 속성) ---------- **/
     if (layoutType === "layered") {
-      const typeOrder: NodeType[] = ["entity", "property", "relation", "other"];
+      const typeOrder: NodeType[] = ["entity", "relation", "property", "other"];
       const activeTypes = typeOrder.filter((t) => nodesCopy.some((n) => (n.nodeType ?? "entity") === t));
 
       // 레이어 간 기본 X 오프셋
@@ -458,7 +458,7 @@ function LayerPanels({ nodes }: { nodes: GraphNode[] }) {
       other: "#a855f7",
     };
 
-    (["entity", "property", "relation", "other"] as NodeType[]).forEach((type) => {
+    (["entity", "relation", "property", "other"] as NodeType[]).forEach((type) => {
       const group = groups.get(type);
       if (!group || !group.length) return;
 
