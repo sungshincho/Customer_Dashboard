@@ -110,10 +110,11 @@ export function DataStatistics({ storeId }: DataStatisticsProps) {
       if (storeId) trackingQuery = trackingQuery.eq('store_id', storeId);
       const { count: trackingCount } = await trackingQuery;
 
-      // Entity Types 수
+      // Entity Types 수 (현재 사용자)
       const { count: entityTypeCount } = await supabase
         .from('ontology_entity_types')
-        .select('id', { count: 'exact', head: true });
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id);
 
       // Entities 수
       let entityQuery = supabase
