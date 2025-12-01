@@ -1484,6 +1484,7 @@ export type Database = {
           model_3d_url: string | null
           name: string
           org_id: string | null
+          priority: string | null
           properties: Json | null
           updated_at: string | null
           user_id: string
@@ -1501,6 +1502,7 @@ export type Database = {
           model_3d_url?: string | null
           name: string
           org_id?: string | null
+          priority?: string | null
           properties?: Json | null
           updated_at?: string | null
           user_id: string
@@ -1518,6 +1520,7 @@ export type Database = {
           model_3d_url?: string | null
           name?: string
           org_id?: string | null
+          priority?: string | null
           properties?: Json | null
           updated_at?: string | null
           user_id?: string
@@ -1622,6 +1625,7 @@ export type Database = {
           label: string
           name: string
           org_id: string | null
+          priority: string | null
           properties: Json | null
           source_entity_type: string
           target_entity_type: string
@@ -1636,6 +1640,7 @@ export type Database = {
           label: string
           name: string
           org_id?: string | null
+          priority?: string | null
           properties?: Json | null
           source_entity_type: string
           target_entity_type: string
@@ -1650,6 +1655,7 @@ export type Database = {
           label?: string
           name?: string
           org_id?: string | null
+          priority?: string | null
           properties?: Json | null
           source_entity_type?: string
           target_entity_type?: string
