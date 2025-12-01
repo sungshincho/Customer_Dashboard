@@ -65,35 +65,35 @@ export function OntologyGraph3D() {
         {/* 통계 정보 */}
         <div className="mt-4 grid grid-cols-5 gap-3 bg-black/60 border border-white/10 rounded-lg p-4">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-emerald-400" />
+            <div className="w-3 h-3 rounded-full bg-blue-400" />
             <div className="text-xs">
               <div className="text-gray-400">엔티티</div>
               <div className="text-white font-semibold">{stats.entity}</div>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-orange-400" />
+            <div className="w-3 h-3 rounded-full bg-purple-400" />
             <div className="text-xs">
               <div className="text-gray-400">속성</div>
               <div className="text-white font-semibold">{stats.property}</div>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-cyan-400" />
+            <div className="w-3 h-3 rounded-full bg-yellow-400" />
             <div className="text-xs">
               <div className="text-gray-400">관계</div>
               <div className="text-white font-semibold">{stats.relation}</div>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-purple-400" />
+            <div className="w-3 h-3 rounded-full bg-gray-400" />
             <div className="text-xs">
               <div className="text-gray-400">총 노드</div>
               <div className="text-white font-semibold">{stats.total}</div>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400" />
+            <div className="w-3 h-3 rounded-full bg-sky-400" />
             <div className="text-xs">
               <div className="text-gray-400">연결선</div>
               <div className="text-white font-semibold">{stats.linkCount}</div>
