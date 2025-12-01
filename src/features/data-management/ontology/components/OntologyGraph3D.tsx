@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { SchemaGraph3D, GraphNode, GraphLink } from "@/components/SchemaGraph3D"; // 경로에 맞게
+import { SchemaGraph3D, GraphNode, GraphLink } from "src/features/data-management/ontology/components/SchemaGraph3D.tsx"; // 경로에 맞게
 import { buildRetailOntologyGraphData } from "@/features/ontology/utils/buildRetailOntologyGraph";
 
 type LayoutType = "force" | "radial" | "hierarchical" | "layered";
