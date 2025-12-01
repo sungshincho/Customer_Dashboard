@@ -56,6 +56,51 @@ export interface SchemaGraph3DProps {
 
 /** ===================== 공통 유틸 & 레이아웃 ===================== **/
 
+// 모든 노드를 일정 크기의 박스 안에 스케일링 + 중앙 정렬
+function normalizeAndCenter(nodesCopy: GraphNode[], targetSize = 120) {
+  if (!nodesCopy.length) return;
+
+  let minX = Infinity,
+    maxX = -Infinity,
+    minY = Infinity,
+    maxY = -Infinity,
+    minZ = Infinity,
+    maxZ = -Infinity;
+
+  nodesCopy.forEach((n) => {
+    const x = n.x ?? 0;
+    const y = n.y ?? 0;
+    const z = n.z ?? 0;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+    if (z < minZ) minZ = z;
+    if (z > maxZ) maxZ = z;
+  });
+
+  const width = maxX - minX || 1;
+  const height = maxY - minY || 1;
+  const depth = maxZ - minZ || 1;
+  const longest = Math.max(width, height, depth);
+
+  const scale = targetSize / longest;
+
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  const cz = (minZ + maxZ) / 2;
+
+  nodesCopy.forEach((n) => {
+    const x = n.x ?? 0;
+    const y = n.y ?? 0;
+    const z = n.z ?? 0;
+    n.x = (x - cx) * scale;
+    n.y = (y - cy) * scale;
+    n.z = (z - cz) * scale;
+  });
+}
+
+// 포스 시뮬레이션 훅 – 온톨로지 스키마에 최적화된 버전
 function useForceSimulation(
   nodes: GraphNode[],
   links: GraphLink[],
@@ -71,9 +116,9 @@ function useForceSimulation(
       return;
     }
 
-    // ✅ 초기 분산 범위: 원래 80 → 45 정도로 살짝 줄이기
-    const INITIAL_SPREAD_XY = 45;
-    const INITIAL_SPREAD_Z = 30;
+    // 초기 분산 – 너무 넓지도, 너무 좁지도 않게
+    const INITIAL_SPREAD_XY = 40;
+    const INITIAL_SPREAD_Z = 25;
 
     const nodesCopy: GraphNode[] = nodes.map((n) => ({
       ...n,
@@ -99,24 +144,38 @@ function useForceSimulation(
       const typeOrder: NodeType[] = ["entity", "property", "relation", "other"];
       const activeTypes = typeOrder.filter((t) => nodesCopy.some((n) => (n.nodeType ?? "entity") === t));
 
-      // ✅ 레이어 모드용 간격 (너무 붙지도, 너무 멀지도 않게 중간값)
-      const xSpacing = 35; // 레이어 간 거리
-      const ySpacing = 8; // 레이어 내 노드 간 거리
+      // 레이어 간 기본 X 오프셋
+      const layerOffsetX = 55;
+      // 레이어 내부 grid 간격
+      const gridSpacingX = 14;
+      const gridSpacingY = 10;
 
-      activeTypes.forEach((type, idx) => {
+      activeTypes.forEach((type, layerIndex) => {
         const layerNodes = nodesCopy.filter((n) => (n.nodeType ?? "entity") === type);
         if (!layerNodes.length) return;
 
         const count = layerNodes.length;
-        const mid = (count - 1) / 2;
-        const xPos = (idx - (activeTypes.length - 1) / 2) * xSpacing;
+        const columns = Math.ceil(Math.sqrt(count)); // 대략 정사각형 그리드
+        const rows = Math.ceil(count / columns);
+
+        const centerLayerIndex = (activeTypes.length - 1) / 2;
+        const baseX = (layerIndex - centerLayerIndex) * layerOffsetX;
 
         layerNodes.forEach((n, i) => {
-          n.x = xPos;
-          n.y = (i - mid) * ySpacing;
-          n.z = (Math.random() - 0.5) * 12;
+          const col = i % columns;
+          const row = Math.floor(i / columns);
+
+          const offsetX = (col - (columns - 1) / 2) * gridSpacingX;
+          const offsetY = (row - (rows - 1) / 2) * gridSpacingY;
+
+          n.x = baseX + offsetX;
+          n.y = offsetY;
+          n.z = (Math.random() - 0.5) * 10;
         });
       });
+
+      // 결과를 항상 화면에 잘 들어오도록 정규화
+      normalizeAndCenter(nodesCopy, 110);
 
       setSimulatedNodes([...nodesCopy]);
       setSimulatedLinks([...linksCopy]);
@@ -126,22 +185,24 @@ function useForceSimulation(
     /** ---------- 방사형 레이아웃 ---------- **/
     if (layoutType === "radial") {
       const angleStep = (2 * Math.PI) / nodesCopy.length;
-      const radius = 45; // 원래 60 → 살짝 줄이기
+      const radius = 55;
       nodesCopy.forEach((node, i) => {
         node.x = radius * Math.cos(i * angleStep);
         node.y = radius * Math.sin(i * angleStep);
-        node.z = (Math.random() - 0.5) * 15;
+        node.z = (Math.random() - 0.5) * 20;
       });
+
+      normalizeAndCenter(nodesCopy, 110);
+
       setSimulatedNodes([...nodesCopy]);
       setSimulatedLinks([...linksCopy]);
       return;
     }
 
     /** ---------- force / hierarchical 공통 ---------- **/
-    // ✅ force 계수들: 원래 값과 극단 값의 중간 정도
-    const LINK_DISTANCE = layoutType === "hierarchical" ? 32 : 26; // 기본 35, 극단 20의 중간
-    const CHARGE_STRENGTH = layoutType === "hierarchical" ? -260 : -320; // 기본 -220/-420 → 중간값
-    const DEPTH_SCALE = 45; // z축 깊이: 기본 80 → 절반 조금 넘게
+    const LINK_DISTANCE = layoutType === "hierarchical" ? 34 : 28;
+    const CHARGE_STRENGTH = layoutType === "hierarchical" ? -260 : -340;
+    const DEPTH_SCALE = 40;
 
     const sim = forceSimulation(nodesCopy as any)
       .force(
@@ -158,14 +219,15 @@ function useForceSimulation(
         forceCollide().radius((d: any) => Math.max(d.val / 5, 2.5)),
       );
 
-    const TICKS = layoutType === "hierarchical" ? 180 : 230;
+    const TICKS = layoutType === "hierarchical" ? 200 : 260;
     for (let i = 0; i < TICKS; i++) sim.tick();
     sim.stop();
 
-    // ✅ 3D 깊이: 너무 퍼지지 않게만 살짝
     nodesCopy.forEach((n, i) => {
       n.z = n.z ?? (Math.sin(i * 0.37) * 0.5 + (Math.random() - 0.5) * 0.5) * DEPTH_SCALE;
     });
+
+    normalizeAndCenter(nodesCopy, 110);
 
     setSimulatedNodes([...nodesCopy]);
     setSimulatedLinks([...linksCopy]);
@@ -203,12 +265,11 @@ function Node3D({
 
   const baseColor = useMemo(() => new THREE.Color(node.color || "#6ac8ff"), [node.color]);
 
-  // val을 기반으로 노드 크기/밝기 결정
   const baseRadius = Math.max(node.val / 7, 1.2);
   const maxBoost = focused ? 1.5 : hovered ? 1.25 : 1;
   const radius = baseRadius * maxBoost;
 
-  const connectionIntensity = Math.min(node.val / 40, 1); // 허브일수록 강함
+  const connectionIntensity = Math.min(node.val / 40, 1);
   const baseOpacity = dimmed ? 0.5 : 1.0;
 
   const handlePointerDown = (e: any) => {
@@ -245,7 +306,6 @@ function Node3D({
     if (meshRef.current) {
       meshRef.current.position.set(node.x || 0, node.y || 0, node.z || 0);
 
-      // 드래그 중이 아닐 때만 펄스 애니메이션
       if (!isDragging) {
         const pulse = 1 + (0.04 + connectionIntensity * 0.08) * Math.sin(t * 2.0 + node.id.length);
         meshRef.current.scale.setScalar(pulse);
@@ -359,7 +419,7 @@ function Link3D({ link, dimmed, isNeighborLink }: { link: GraphLink; dimmed: boo
   }, [link.weight]);
 
   const width = 0.5 + intensity * 2.0;
-  const opacity = (dimmed ? 0.4 : 0.75) * (isNeighborLink ? 1.2 : 1.0);
+  const opacity = (dimmed ? 0.35 : 0.8) * (isNeighborLink ? 1.2 : 0.9);
 
   const midPoint = useMemo(
     () =>
@@ -501,7 +561,7 @@ function LayerPanels({ nodes }: { nodes: GraphNode[] }) {
       {layers.map((layer) => {
         const height = (layer.maxY - layer.minY || 40) + 30;
         const centerY = (layer.maxY + layer.minY) / 2;
-        const width = 35;
+        const width = 40;
 
         return (
           <group key={layer.type}>
@@ -513,7 +573,7 @@ function LayerPanels({ nodes }: { nodes: GraphNode[] }) {
 
             {/* 레이어 라벨 */}
             <Text
-              position={[layer.x, layer.maxY + 10, -4.9]}
+              position={[layer.x, layer.maxY + 12, -4.9]}
               fontSize={2.2}
               color={layer.color}
               anchorX="center"
@@ -585,7 +645,7 @@ function Scene({ nodes, links, onNodeClick, layoutType }: SchemaGraph3DProps) {
 
   return (
     <>
-      {/* 투명 캔버스 + 조명 */}
+      {/* 조명 */}
       <ambientLight intensity={0.35} />
       <directionalLight position={[40, 40, 80]} intensity={1.0} color="#d0ffff" />
       <pointLight position={[0, 0, 0]} intensity={0.8} color="#7fe8ff" />
