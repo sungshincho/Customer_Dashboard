@@ -57,7 +57,7 @@ export interface SchemaGraph3DProps {
 /** ===================== 공통 유틸 & 레이아웃 ===================== **/
 
 // 모든 노드를 일정 크기의 박스 안에 스케일링 + 중앙 정렬
-function normalizeAndCenter(nodesCopy: GraphNode[], targetSize = 120) {
+function normalizeAndCenter(nodesCopy: GraphNode[], targetSize = 150) {
   if (!nodesCopy.length) return;
 
   let minX = Infinity,
