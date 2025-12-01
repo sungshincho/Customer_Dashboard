@@ -95,9 +95,9 @@ function useForceSimulation(
           : nodesCopy.find((n) => n.id === (l.target as GraphNode).id)!,
     }));
 
-    /** ---------- 레이어 레이아웃 (엔티티 / 관계 / 속성) ---------- **/
+    /** ---------- 레이어 레이아웃 (속성 / 관계 / 엔티티) ---------- **/
     if (layoutType === "layered") {
-      const typeOrder: NodeType[] = ["entity", "relation", "property", "other"];
+      const typeOrder: NodeType[] = ["property", "relation", "entity", "other"];
       const activeTypes = typeOrder.filter((t) => nodesCopy.some((n) => (n.nodeType ?? "entity") === t));
 
       // 레이어 간 기본 Z 오프셋 (z축 기준 정면 배치)
@@ -457,7 +457,7 @@ function LayerPanels({ nodes }: { nodes: GraphNode[] }) {
       other: "#6b7280",
     };
 
-    (["entity", "relation", "property", "other"] as NodeType[]).forEach((type) => {
+    (["property", "relation", "entity", "other"] as NodeType[]).forEach((type) => {
       const group = groups.get(type);
       if (!group || !group.length) return;
 
