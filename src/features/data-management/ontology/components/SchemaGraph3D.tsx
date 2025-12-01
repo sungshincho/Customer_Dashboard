@@ -192,26 +192,22 @@ function useForceSimulation(
 
 /** ===================== 3D 요소들 ===================== **/
 
-// 노드 3D – 글로우 / 코어 / 라벨 / 클릭&드래그
+// 노드 3D – 글로우 / 코어 / 라벨 / 클릭
 function Node3D({
   node,
   focused,
   dimmed,
   onClick,
-  onDrag,
 }: {
   node: GraphNode;
   focused: boolean;
   dimmed: boolean;
   onClick: (node: GraphNode) => void;
-  onDrag: (nodeId: string, x: number, y: number, z: number) => void;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
   const coreRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const { camera } = useThree();
 
   const baseColor = useMemo(() => new THREE.Color(node.color || "#6ac8ff"), [node.color]);
 
@@ -222,44 +218,13 @@ function Node3D({
   const connectionIntensity = Math.min(node.val / 40, 1);
   const baseOpacity = dimmed ? 0.5 : 1.0;
 
-  const handlePointerDown = (e: any) => {
-    e.stopPropagation();
-    setIsDragging(true);
-  };
-
-  const handlePointerMove = (e: any) => {
-    if (!isDragging) return;
-    e.stopPropagation();
-
-    if (!meshRef.current) return;
-    const distance = camera.position.distanceTo(meshRef.current.position);
-    const scale = distance / 100;
-
-    const dx = e.movementX * scale * 0.5;
-    const dy = -e.movementY * scale * 0.5;
-
-    const newX = (node.x || 0) + dx;
-    const newY = (node.y || 0) + dy;
-    const newZ = node.z || 0;
-
-    onDrag(node.id, newX, newY, newZ);
-  };
-
-  const handlePointerUp = (e: any) => {
-    e.stopPropagation();
-    setIsDragging(false);
-  };
-
   useFrame((state) => {
     const t = state.clock.elapsedTime;
 
     if (meshRef.current) {
       meshRef.current.position.set(node.x || 0, node.y || 0, node.z || 0);
-
-      if (!isDragging) {
-        const pulse = 1 + (0.04 + connectionIntensity * 0.08) * Math.sin(t * 2.0 + node.id.length);
-        meshRef.current.scale.setScalar(pulse);
-      }
+      const pulse = 1 + (0.04 + connectionIntensity * 0.08) * Math.sin(t * 2.0 + node.id.length);
+      meshRef.current.scale.setScalar(pulse);
     }
 
     if (glowRef.current) {
@@ -290,12 +255,9 @@ function Node3D({
       {/* 메인 구체 */}
       <mesh
         ref={meshRef}
-        onClick={() => !isDragging && onClick(node)}
+        onClick={() => onClick(node)}
         onPointerOver={() => setHovered(true)}
         onPointerOut={() => setHovered(false)}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
       >
         <sphereGeometry args={[radius, 32, 32]} />
         <meshPhysicalMaterial
@@ -548,7 +510,6 @@ function Scene({ nodes, links, onNodeClick, layoutType }: SchemaGraph3DProps) {
   const { nodes: simNodes, links: simLinks } = useForceSimulation(nodes, links, layoutType);
 
   const [focusedId, setFocusedId] = useState<string | null>(null);
-  const [draggedNodes, setDraggedNodes] = useState<Map<string, { x: number; y: number; z: number }>>(new Map());
 
   useEffect(() => {
     camera.position.set(0, 0, 160);
@@ -574,25 +535,6 @@ function Scene({ nodes, links, onNodeClick, layoutType }: SchemaGraph3DProps) {
     onNodeClick?.(n);
   };
 
-  const handleNodeDrag = (nodeId: string, x: number, y: number, z: number) => {
-    setDraggedNodes((prev) => {
-      const newMap = new Map(prev);
-      newMap.set(nodeId, { x, y, z });
-      return newMap;
-    });
-  };
-
-  // 드래그된 위치 반영
-  const displayNodes = useMemo(() => {
-    return simNodes.map((node) => {
-      const dragged = draggedNodes.get(node.id);
-      if (dragged) {
-        return { ...node, x: dragged.x, y: dragged.y, z: dragged.z };
-      }
-      return node;
-    });
-  }, [simNodes, draggedNodes]);
-
   return (
     <>
       {/* 조명 */}
@@ -605,7 +547,7 @@ function Scene({ nodes, links, onNodeClick, layoutType }: SchemaGraph3DProps) {
       <BackgroundParticles count={900} />
 
       {/* 레이어 패널 (layered 모드일 때) */}
-      {layoutType === "layered" && <LayerPanels nodes={displayNodes} />}
+      {layoutType === "layered" && <LayerPanels nodes={simNodes} />}
 
       {/* 링크 → 노드 순으로 렌더 */}
       {simLinks.map((link, i) => {
@@ -618,7 +560,7 @@ function Scene({ nodes, links, onNodeClick, layoutType }: SchemaGraph3DProps) {
         return <Link3D key={`link-${i}-${s}-${t}`} link={link} dimmed={dimmed} isNeighborLink={isNeighborLink} />;
       })}
 
-      {displayNodes.map((node) => {
+      {simNodes.map((node) => {
         const isFocused = focusedId === node.id;
         const neighbors = neighborMap.get(focusedId || "") ?? new Set();
         const isNeighbor = neighbors.has(node.id);
@@ -631,7 +573,6 @@ function Scene({ nodes, links, onNodeClick, layoutType }: SchemaGraph3DProps) {
             focused={isFocused}
             dimmed={dimmed}
             onClick={handleNodeClick}
-            onDrag={handleNodeDrag}
           />
         );
       })}
