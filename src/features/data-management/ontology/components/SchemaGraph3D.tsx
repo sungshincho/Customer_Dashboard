@@ -151,8 +151,8 @@ function useForceSimulation(
     }
 
     /** ---------- force / hierarchical 공통 ---------- **/
-    const LINK_DISTANCE = layoutType === "hierarchical" ? 34 : 20;
-    const CHARGE_STRENGTH = layoutType === "hierarchical" ? -260 : -260;
+    const LINK_DISTANCE = layoutType === "hierarchical" ? 34 : 10;
+    const CHARGE_STRENGTH = layoutType === "hierarchical" ? -260 : -100;
     const DEPTH_SCALE = 40;
 
     const sim = forceSimulation(nodesCopy as any)
