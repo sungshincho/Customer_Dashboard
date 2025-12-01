@@ -53,8 +53,6 @@ export function OntologyGraph3D() {
       property: propertyCount,
       relation: relationCount,
       total: totalCount,
-      // 실제 관계 타입 수 (시각화 링크 수가 아님)
-      linkCount: COMPREHENSIVE_RELATION_TYPES.length,
     };
   }, [nodes]);
 
@@ -145,7 +143,7 @@ export function OntologyGraph3D() {
         </div>
 
         {/* 통계 정보 */}
-        <div className="mt-4 grid grid-cols-5 gap-3 bg-black/60 border border-white/10 rounded-lg p-4">
+        <div className="mt-4 grid grid-cols-4 gap-3 bg-black/60 border border-white/10 rounded-lg p-4">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-blue-400" />
             <div className="text-xs">
@@ -172,13 +170,6 @@ export function OntologyGraph3D() {
             <div className="text-xs">
               <div className="text-gray-400">총 노드</div>
               <div className="text-white font-semibold">{stats.total}</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-sky-400" />
-            <div className="text-xs">
-              <div className="text-gray-400">연결선</div>
-              <div className="text-white font-semibold">{stats.linkCount}</div>
             </div>
           </div>
         </div>
