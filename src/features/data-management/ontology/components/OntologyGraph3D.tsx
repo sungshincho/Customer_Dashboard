@@ -88,13 +88,13 @@ export function OntologyGraph3D() {
               >
                 <option value="all">All</option>
                 <option value="entity" style={{ color: "#0073FF" }}>
-                  엔티티 (파란색)
+                  엔티티 (블루)
                 </option>
                 <option value="property" style={{ color: "#8C00FF" }}>
-                  속성 (보라색)
+                  속성 (퍼플)
                 </option>
                 <option value="relation" style={{ color: "#FF00A6" }}>
-                  관계 (노란색)
+                  관계 (핑크)
                 </option>
               </select>
             </div>
@@ -109,19 +109,19 @@ export function OntologyGraph3D() {
               >
                 <option value="all">All</option>
                 <option value="critical" style={{ color: "#FF0000" }}>
-                  Critical (빨간색)
+                  Critical (레드)
                 </option>
-                <option value="high" style={{ color: "FF4800" }}>
-                  High (주황색)
+                <option value="high" style={{ color: "FF7B00" }}>
+                  High (오렌지)
                 </option>
-                <option value="medium" style={{ color: "#FF8C00" }}>
-                  Medium (초록색)
+                <option value="medium" style={{ color: "#FFFB00" }}>
+                  Medium (옐로우)
                 </option>
-                <option value="low" style={{ color: "#FFEA00" }}>
-                  Low (파란색)
+                <option value="low" style={{ color: "#95FF00" }}>
+                  Low (그린)
                 </option>
-                <option value="additional" style={{ color: "#C3FF00" }}>
-                  Additional (회색)
+                <option value="additional" style={{ color: "#919191" }}>
+                  Additional (그레이)
                 </option>
               </select>
             </div>
