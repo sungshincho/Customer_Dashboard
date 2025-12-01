@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { SchemaGraph3D, GraphNode, GraphLink } from "@/features/data-management/ontology/components/SchemaGraph3D";
 import { buildRetailOntologyGraphData } from "@/features/data-management/ontology/utils/buildRetailOntologyGraph";
+import { COMPREHENSIVE_RELATION_TYPES } from "@/features/data-management/ontology/utils/comprehensiveRetailSchema";
 
 type LayoutType = "layered" | "radial";
 
@@ -21,9 +22,10 @@ export function OntologyGraph3D() {
       property: propertyCount,
       relation: relationCount,
       total: totalCount,
-      linkCount: links.length
+      // 실제 관계 타입 수 (시각화 링크 수가 아님)
+      linkCount: COMPREHENSIVE_RELATION_TYPES.length
     };
-  }, [nodes, links]);
+  }, [nodes]);
 
   return (
     <div className="flex gap-4 w-full h-full">
