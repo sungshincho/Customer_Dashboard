@@ -101,7 +101,7 @@ function useForceSimulation(
       const activeTypes = typeOrder.filter((t) => nodesCopy.some((n) => (n.nodeType ?? "entity") === t));
 
       // 레이어 간 기본 Z 오프셋 (z축 기준 정면 배치)
-      const layerOffsetZ = 100;
+      const layerOffsetZ = 60;
       // 레이어 내부 grid 간격
       const gridSpacingX = 20;
       const gridSpacingY = 20;
@@ -578,15 +578,7 @@ function Scene({ nodes, links, onNodeClick, layoutType }: SchemaGraph3DProps) {
         const isNeighbor = neighbors.has(node.id);
         const dimmed = !!focusedId && !isFocused && !isNeighbor;
 
-        return (
-          <Node3D
-            key={node.id}
-            node={node}
-            focused={isFocused}
-            dimmed={dimmed}
-            onClick={handleNodeClick}
-          />
-        );
+        return <Node3D key={node.id} node={node} focused={isFocused} dimmed={dimmed} onClick={handleNodeClick} />;
       })}
     </>
   );
