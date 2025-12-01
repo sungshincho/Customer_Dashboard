@@ -73,8 +73,8 @@ function useForceSimulation(
     }
 
     // 초기 분산 – 너무 넓지도, 너무 좁지도 않게
-    const INITIAL_SPREAD_XY = 40;
-    const INITIAL_SPREAD_Z = 25;
+    const INITIAL_SPREAD_XY = 10;
+    const INITIAL_SPREAD_Z = 10;
 
     const nodesCopy: GraphNode[] = nodes.map((n) => ({
       ...n,
