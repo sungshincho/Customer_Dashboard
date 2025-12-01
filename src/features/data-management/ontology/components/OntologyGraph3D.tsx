@@ -1,18 +1,28 @@
 import React, { useState, useMemo } from "react";
 import { SchemaGraph3D, GraphNode, GraphLink } from "@/features/data-management/ontology/components/SchemaGraph3D";
-import { buildRetailOntologyGraphData } from "@/features/data-management/ontology/utils/buildRetailOntologyGraph";
-import { COMPREHENSIVE_RELATION_TYPES } from "@/features/data-management/ontology/utils/comprehensiveRetailSchema";
+import { useOntologySchema, transformSchemaToGraphData } from "@/hooks/useOntologySchema";
+import { Loader2 } from "lucide-react";
 
 type LayoutType = "layered" | "radial";
 type NodeTypeFilter = "entity" | "property" | "relation" | "all";
 type PriorityFilter = "critical" | "high" | "medium" | "low" | "additional" | "all";
 
 export function OntologyGraph3D() {
-  const { nodes, links } = buildRetailOntologyGraphData();
+  // 현재 로그인한 사용자의 온톨로지 스키마 가져오기
+  const { data: schemaData, isLoading } = useOntologySchema();
+  
   const [layoutType, setLayoutType] = useState<LayoutType>("layered");
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [nodeTypeFilter, setNodeTypeFilter] = useState<NodeTypeFilter>("all");
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("all");
+
+  // 스키마 데이터를 그래프 형식으로 변환
+  const { nodes, links } = useMemo(() => {
+    if (!schemaData) {
+      return { nodes: [], links: [] };
+    }
+    return transformSchemaToGraphData(schemaData.entityTypes, schemaData.relationTypes);
+  }, [schemaData]);
 
   // 필터링된 노드 계산
   const filteredData = useMemo(() => {
@@ -55,6 +65,27 @@ export function OntologyGraph3D() {
       total: totalCount,
     };
   }, [nodes]);
+
+  // 로딩 상태 표시
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // 데이터가 없는 경우
+  if (nodes.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center gap-4">
+        <p className="text-muted-foreground">온톨로지 스키마가 비어있습니다.</p>
+        <p className="text-sm text-muted-foreground">
+          "마스터 스키마 동기화" 기능을 사용하여 최신 스키마를 불러오세요.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex gap-4 w-full h-full">
