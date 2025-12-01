@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from "react";
 import { SchemaGraph3D, GraphNode, GraphLink } from "@/features/data-management/ontology/components/SchemaGraph3D";
 import { useOntologySchema, transformSchemaToGraphData } from "@/hooks/useOntologySchema";
-import { Loader2 } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 type LayoutType = "layered" | "radial";
 type NodeTypeFilter = "entity" | "property" | "relation" | "all";
@@ -15,6 +16,7 @@ export function OntologyGraph3D() {
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [nodeTypeFilter, setNodeTypeFilter] = useState<NodeTypeFilter>("all");
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("all");
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
   // 스키마 데이터를 그래프 형식으로 변환
   const { nodes, links } = useMemo(() => {
@@ -27,6 +29,23 @@ export function OntologyGraph3D() {
   // 필터링된 노드 계산
   const filteredData = useMemo(() => {
     let filteredNodes = nodes;
+
+    // 검색 필터
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filteredNodes = filteredNodes.filter((n) => {
+        // 노드 이름으로 검색
+        const labelMatch = n.label?.toLowerCase().includes(query);
+        const nameMatch = n.name?.toLowerCase().includes(query);
+        
+        // 속성 이름으로도 검색 (엔티티인 경우)
+        const propertyMatch = n.properties?.some((p) => 
+          p.name?.toLowerCase().includes(query)
+        );
+        
+        return labelMatch || nameMatch || propertyMatch;
+      });
+    }
 
     // 노드 타입 필터
     if (nodeTypeFilter !== "all") {
@@ -49,7 +68,7 @@ export function OntologyGraph3D() {
     });
 
     return { nodes: filteredNodes, links: filteredLinks };
-  }, [nodes, links, nodeTypeFilter, priorityFilter]);
+  }, [nodes, links, nodeTypeFilter, priorityFilter, searchQuery]);
 
   // 통계 계산
   const stats = useMemo(() => {
@@ -91,6 +110,20 @@ export function OntologyGraph3D() {
     <div className="flex gap-4 w-full h-full">
       {/* 좌측 3D 그래프 영역 */}
       <div className="flex-1 min-h-[650px] flex flex-col">
+        {/* 검색창 */}
+        <div className="mb-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="엔티티, 속성, 관계 이름으로 검색..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 bg-background/50 border-border/50"
+            />
+          </div>
+        </div>
+
         {/* 필터 및 레이아웃 선택 UI */}
         <div className="flex items-center justify-between mb-2 gap-4">
           <div className="flex items-center gap-4">
