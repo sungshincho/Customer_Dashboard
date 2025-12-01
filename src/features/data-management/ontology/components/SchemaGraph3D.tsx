@@ -210,7 +210,7 @@ function Node3D({
   }, [node.nodeType, node, priorityFilter]);
 
   const baseRadius = Math.max(node.val / 7, 1.2);
-  const maxBoost = focused ? 1.5 : hovered ? 1.25 : highlighted ? 1.4 : 1;
+  const maxBoost = focused || highlighted ? 1.5 : hovered ? 1.25 : 1;
   const radius = baseRadius * maxBoost;
 
   const connectionIntensity = Math.min(node.val / 40, 1);
@@ -228,7 +228,7 @@ function Node3D({
     if (glowRef.current) {
       glowRef.current.position.set(node.x || 0, node.y || 0, node.z || 0);
       const glowPulse = 1 + (0.06 + connectionIntensity * 0.12) * Math.sin(t * 2.5 + node.id.length * 1.37);
-      glowRef.current.scale.setScalar(glowPulse * (focused ? 1.4 : 1.0));
+      glowRef.current.scale.setScalar(glowPulse * (focused || highlighted ? 1.4 : 1.0));
     }
 
     if (coreRef.current) {
@@ -261,7 +261,7 @@ function Node3D({
         <meshPhysicalMaterial
           color={baseColor}
           emissive={baseColor}
-          emissiveIntensity={(focused ? 2.5 : hovered ? 2.0 : highlighted ? 2.2 : 1.3) * (0.8 + connectionIntensity * 0.6)}
+          emissiveIntensity={(focused || highlighted ? 2.5 : hovered ? 2.0 : 1.3) * (0.8 + connectionIntensity * 0.6)}
           metalness={0.7}
           roughness={0.2}
           clearcoat={1}
