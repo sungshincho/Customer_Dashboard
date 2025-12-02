@@ -330,11 +330,21 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
   const validateFiles = async (filesToValidate: UploadFile[]) => {
     if (!schema || filesToValidate.length === 0) return;
     
+    // 데이터 파일만 검증 (CSV, Excel만 해당)
+    const dataFilesToValidate = filesToValidate.filter(f => 
+      f.type === 'csv' || f.type === 'excel'
+    );
+    
+    if (dataFilesToValidate.length === 0) {
+      console.log('No data files to validate');
+      return;
+    }
+    
     setIsValidating(true);
     try {
       // 파일별로 데이터 파싱 및 테이블명 추출
       const filesData = await Promise.all(
-        filesToValidate.map(async (file) => {
+        dataFilesToValidate.map(async (file) => {
           try {
             const rawData = await parseDataFile(file.file);
             const tableName = inferTableName(file.file.name);
