@@ -132,6 +132,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      // Check subscription status
+      const { data: subscription, error: subError } = await supabase
+        .from('subscriptions')
+        .select('status')
+        .eq('org_id', membership.org_id)
+        .maybeSingle();
+
+      if (subError) {
+        console.error('Error fetching subscription:', subError);
+      }
+
+      // Block login if no subscription or inactive subscription
+      if (!subscription || subscription.status !== 'active') {
+        await supabase.auth.signOut();
+        throw new Error('NO_SUBSCRIPTION');
+      }
+
       setOrgId(membership.org_id);
       setOrgName((membership.organizations as any)?.org_name || null);
       setRole(membership.role);
@@ -148,6 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (err) {
       console.error('Error fetching organization context:', err);
+      throw err;
     }
   };
 
@@ -210,39 +228,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [navigate]);
 
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    
-    // 로그인 성공 시 활동 로깅
-    if (!error && data.user) {
-      setTimeout(async () => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
+      if (error) return { error };
+      
+      if (data.user) {
+        // Check subscription status
         try {
-          const { data: membership } = await supabase
-            .from('organization_members')
-            .select('org_id')
-            .eq('user_id', data.user.id)
-            .single();
+          await fetchOrganizationContext(data.user.id);
+          
+          // 로그인 성공 시 활동 로깅
+          setTimeout(async () => {
+            try {
+              const { data: membership } = await supabase
+                .from('organization_members')
+                .select('org_id')
+                .eq('user_id', data.user.id)
+                .single();
 
-          await supabase
-            .from('user_activity_logs')
-            .insert({
-              user_id: data.user.id,
-              org_id: membership?.org_id || null,
-              activity_type: 'login',
-              activity_data: { 
-                timestamp: new Date().toISOString(),
-                method: 'email_password'
-              },
-            });
-        } catch (err) {
-          console.debug('Login activity logging skipped:', err);
+              await supabase
+                .from('user_activity_logs')
+                .insert({
+                  user_id: data.user.id,
+                  org_id: membership?.org_id || null,
+                  activity_type: 'login',
+                  activity_data: { 
+                    timestamp: new Date().toISOString(),
+                    method: 'email_password'
+                  },
+                });
+            } catch (err) {
+              console.debug('Login activity logging skipped:', err);
+            }
+          }, 0);
+        } catch (err: any) {
+          // Return specific error for no subscription
+          if (err.message === 'NO_SUBSCRIPTION') {
+            return { error: { message: 'NO_SUBSCRIPTION' } };
+          }
+          throw err;
         }
-      }, 0);
+      }
+      
+      return { error: null };
+    } catch (error: any) {
+      return { error };
     }
-    
-    return { error };
   };
 
   const signUp = async (email: string, password: string) => {
