@@ -125,11 +125,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           )
         `)
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
-      if (memberError || !membership) {
+      if (memberError) {
         console.error('Error fetching organization membership:', memberError);
-        return;
+        await supabase.auth.signOut();
+        throw new Error('NO_SUBSCRIPTION');
+      }
+
+      if (!membership) {
+        console.error('No organization membership found for user');
+        await supabase.auth.signOut();
+        throw new Error('NO_SUBSCRIPTION');
       }
 
       // Check subscription status
@@ -145,6 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Block login if no subscription or inactive subscription
       if (!subscription || subscription.status !== 'active') {
+        console.error('No active subscription found for organization');
         await supabase.auth.signOut();
         throw new Error('NO_SUBSCRIPTION');
       }
