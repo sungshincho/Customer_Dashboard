@@ -14,6 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_insights: {
+        Row: {
+          category: string | null
+          created_at: string
+          id: string
+          insight_text: string
+          kpi_refs: Json | null
+          metadata: Json | null
+          org_id: string | null
+          severity: string | null
+          source: string | null
+          store_id: string | null
+          title: string
+          user_id: string | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          id?: string
+          insight_text: string
+          kpi_refs?: Json | null
+          metadata?: Json | null
+          org_id?: string | null
+          severity?: string | null
+          source?: string | null
+          store_id?: string | null
+          title: string
+          user_id?: string | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          id?: string
+          insight_text?: string
+          kpi_refs?: Json | null
+          metadata?: Json | null
+          org_id?: string | null
+          severity?: string | null
+          source?: string | null
+          store_id?: string | null
+          title?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_insights_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_insights_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_recommendations: {
         Row: {
           action_category: string | null
@@ -122,6 +182,72 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "ai_scene_analysis_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      alerts: {
+        Row: {
+          alert_type: string
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string
+          metadata: Json | null
+          org_id: string | null
+          resolved: boolean
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          source: string | null
+          store_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          alert_type: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message: string
+          metadata?: Json | null
+          org_id?: string | null
+          resolved?: boolean
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity: string
+          source?: string | null
+          store_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          alert_type?: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          metadata?: Json | null
+          org_id?: string | null
+          resolved?: boolean
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          source?: string | null
+          store_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alerts_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alerts_store_id_fkey"
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
@@ -277,6 +403,214 @@ export type Database = {
           },
         ]
       }
+      beacon_events: {
+        Row: {
+          beacon_id: string | null
+          created_at: string
+          device_id: string | null
+          event_ts: string
+          id: string
+          metadata: Json | null
+          org_id: string | null
+          rssi: number | null
+          store_id: string | null
+        }
+        Insert: {
+          beacon_id?: string | null
+          created_at?: string
+          device_id?: string | null
+          event_ts: string
+          id?: string
+          metadata?: Json | null
+          org_id?: string | null
+          rssi?: number | null
+          store_id?: string | null
+        }
+        Update: {
+          beacon_id?: string | null
+          created_at?: string
+          device_id?: string | null
+          event_ts?: string
+          id?: string
+          metadata?: Json | null
+          org_id?: string | null
+          rssi?: number | null
+          store_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "beacon_events_beacon_id_fkey"
+            columns: ["beacon_id"]
+            isOneToOne: false
+            referencedRelation: "beacons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beacon_events_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beacon_events_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      beacons: {
+        Row: {
+          beacon_code: string
+          created_at: string
+          id: string
+          location: string | null
+          metadata: Json | null
+          org_id: string | null
+          store_id: string | null
+          zone_id: string | null
+        }
+        Insert: {
+          beacon_code: string
+          created_at?: string
+          id?: string
+          location?: string | null
+          metadata?: Json | null
+          org_id?: string | null
+          store_id?: string | null
+          zone_id?: string | null
+        }
+        Update: {
+          beacon_code?: string
+          created_at?: string
+          id?: string
+          location?: string | null
+          metadata?: Json | null
+          org_id?: string | null
+          store_id?: string | null
+          zone_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "beacons_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beacons_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      camera_events: {
+        Row: {
+          camera_code: string | null
+          count: number | null
+          created_at: string
+          event_ts: string
+          event_type: string | null
+          id: string
+          metadata: Json | null
+          org_id: string | null
+          store_id: string | null
+          zone_id: string | null
+        }
+        Insert: {
+          camera_code?: string | null
+          count?: number | null
+          created_at?: string
+          event_ts: string
+          event_type?: string | null
+          id?: string
+          metadata?: Json | null
+          org_id?: string | null
+          store_id?: string | null
+          zone_id?: string | null
+        }
+        Update: {
+          camera_code?: string | null
+          count?: number | null
+          created_at?: string
+          event_ts?: string
+          event_type?: string | null
+          id?: string
+          metadata?: Json | null
+          org_id?: string | null
+          store_id?: string | null
+          zone_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "camera_events_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camera_events_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      column_mappings: {
+        Row: {
+          created_at: string
+          id: string
+          org_id: string | null
+          source_column: string
+          table_id: string
+          target_column: string
+          target_entity: string
+          transformation_rule: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          org_id?: string | null
+          source_column: string
+          table_id: string
+          target_column: string
+          target_entity: string
+          transformation_rule?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          org_id?: string | null
+          source_column?: string
+          table_id?: string
+          target_column?: string
+          target_entity?: string
+          transformation_rule?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "column_mappings_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "column_mappings_table_id_fkey"
+            columns: ["table_id"]
+            isOneToOne: false
+            referencedRelation: "data_source_tables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contact_submissions: {
         Row: {
           company: string
@@ -369,6 +703,60 @@ export type Database = {
           },
         ]
       }
+      daily_sales: {
+        Row: {
+          avg_transaction_value: number | null
+          created_at: string
+          date: string
+          id: string
+          metadata: Json | null
+          org_id: string | null
+          store_id: string | null
+          total_customers: number | null
+          total_revenue: number | null
+          total_transactions: number | null
+        }
+        Insert: {
+          avg_transaction_value?: number | null
+          created_at?: string
+          date: string
+          id?: string
+          metadata?: Json | null
+          org_id?: string | null
+          store_id?: string | null
+          total_customers?: number | null
+          total_revenue?: number | null
+          total_transactions?: number | null
+        }
+        Update: {
+          avg_transaction_value?: number | null
+          created_at?: string
+          date?: string
+          id?: string
+          metadata?: Json | null
+          org_id?: string | null
+          store_id?: string | null
+          total_customers?: number | null
+          total_revenue?: number | null
+          total_transactions?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_sales_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_sales_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dashboard_kpis: {
         Row: {
           consumer_sentiment_index: number | null
@@ -448,6 +836,110 @@ export type Database = {
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      data_source_tables: {
+        Row: {
+          created_at: string
+          entity_type: string
+          id: string
+          is_active: boolean
+          metadata: Json | null
+          org_id: string | null
+          source_id: string
+          sync_frequency: string | null
+          table_id_code: string | null
+          table_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          entity_type: string
+          id?: string
+          is_active?: boolean
+          metadata?: Json | null
+          org_id?: string | null
+          source_id: string
+          sync_frequency?: string | null
+          table_id_code?: string | null
+          table_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          entity_type?: string
+          id?: string
+          is_active?: boolean
+          metadata?: Json | null
+          org_id?: string | null
+          source_id?: string
+          sync_frequency?: string | null
+          table_id_code?: string | null
+          table_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_source_tables_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "data_source_tables_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "data_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      data_sources: {
+        Row: {
+          config: Json | null
+          connection_string: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          org_id: string | null
+          source_id_code: string | null
+          source_name: string
+          source_type: string
+          updated_at: string
+        }
+        Insert: {
+          config?: Json | null
+          connection_string?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          org_id?: string | null
+          source_id_code?: string | null
+          source_name: string
+          source_type: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json | null
+          connection_string?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          org_id?: string | null
+          source_id_code?: string | null
+          source_name?: string
+          source_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_sources_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -1144,6 +1636,131 @@ export type Database = {
           },
         ]
       }
+      inventory: {
+        Row: {
+          id: string
+          metadata: Json | null
+          org_id: string | null
+          product_id: string | null
+          quantity_on_hand: number
+          reorder_point: number | null
+          safety_stock: number | null
+          store_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          metadata?: Json | null
+          org_id?: string | null
+          product_id?: string | null
+          quantity_on_hand: number
+          reorder_point?: number | null
+          safety_stock?: number | null
+          store_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          metadata?: Json | null
+          org_id?: string | null
+          product_id?: string | null
+          quantity_on_hand?: number
+          reorder_point?: number | null
+          safety_stock?: number | null
+          store_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_history: {
+        Row: {
+          adjustment_qty: number | null
+          closing_qty: number | null
+          created_at: string
+          date: string
+          id: string
+          metadata: Json | null
+          opening_qty: number | null
+          org_id: string | null
+          product_id: string | null
+          received_qty: number | null
+          sold_qty: number | null
+          store_id: string | null
+        }
+        Insert: {
+          adjustment_qty?: number | null
+          closing_qty?: number | null
+          created_at?: string
+          date: string
+          id?: string
+          metadata?: Json | null
+          opening_qty?: number | null
+          org_id?: string | null
+          product_id?: string | null
+          received_qty?: number | null
+          sold_qty?: number | null
+          store_id?: string | null
+        }
+        Update: {
+          adjustment_qty?: number | null
+          closing_qty?: number | null
+          created_at?: string
+          date?: string
+          id?: string
+          metadata?: Json | null
+          opening_qty?: number | null
+          org_id?: string | null
+          product_id?: string | null
+          received_qty?: number | null
+          sold_qty?: number | null
+          store_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_history_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_history_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_history_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_levels: {
         Row: {
           created_at: string | null
@@ -1244,6 +1861,114 @@ export type Database = {
           },
           {
             foreignKeyName: "invitations_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kpi_values: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          kpi_id: string
+          metadata: Json | null
+          org_id: string | null
+          store_id: string | null
+          value: number | null
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          id?: string
+          kpi_id: string
+          metadata?: Json | null
+          org_id?: string | null
+          store_id?: string | null
+          value?: number | null
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          kpi_id?: string
+          metadata?: Json | null
+          org_id?: string | null
+          store_id?: string | null
+          value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kpi_values_kpi_id_fkey"
+            columns: ["kpi_id"]
+            isOneToOne: false
+            referencedRelation: "kpis"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kpi_values_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kpi_values_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kpis: {
+        Row: {
+          aggregation: string | null
+          category: string | null
+          code: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          metadata: Json | null
+          name: string
+          org_id: string | null
+          unit: string | null
+          updated_at: string
+        }
+        Insert: {
+          aggregation?: string | null
+          category?: string | null
+          code: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          metadata?: Json | null
+          name: string
+          org_id?: string | null
+          unit?: string | null
+          updated_at?: string
+        }
+        Update: {
+          aggregation?: string | null
+          category?: string | null
+          code?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          metadata?: Json | null
+          name?: string
+          org_id?: string | null
+          unit?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kpis_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -1374,6 +2099,107 @@ export type Database = {
           },
         ]
       }
+      model_runs: {
+        Row: {
+          created_at: string
+          finished_at: string | null
+          id: string
+          metric_name: string | null
+          metric_value: number | null
+          model_id: string
+          org_id: string | null
+          params: Json | null
+          started_at: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          metric_name?: string | null
+          metric_value?: number | null
+          model_id: string
+          org_id?: string | null
+          params?: Json | null
+          started_at: string
+          status: string
+        }
+        Update: {
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          metric_name?: string | null
+          metric_value?: number | null
+          model_id?: string
+          org_id?: string | null
+          params?: Json | null
+          started_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "model_runs_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "models"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "model_runs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      models: {
+        Row: {
+          config: Json | null
+          created_at: string
+          id: string
+          model_type: string
+          name: string
+          org_id: string | null
+          status: string
+          target_entity: string
+          updated_at: string
+          version: string
+        }
+        Insert: {
+          config?: Json | null
+          created_at?: string
+          id?: string
+          model_type: string
+          name: string
+          org_id?: string | null
+          status?: string
+          target_entity: string
+          updated_at?: string
+          version: string
+        }
+        Update: {
+          config?: Json | null
+          created_at?: string
+          id?: string
+          model_type?: string
+          name?: string
+          org_id?: string | null
+          status?: string
+          target_entity?: string
+          updated_at?: string
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "models_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       neuralsense_devices: {
         Row: {
           created_at: string
@@ -1469,6 +2295,47 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      online_traffic: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          org_id: string | null
+          pageviews: number | null
+          sessions: number | null
+          site: string
+          transactions: number | null
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          id?: string
+          org_id?: string | null
+          pageviews?: number | null
+          sessions?: number | null
+          site: string
+          transactions?: number | null
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          org_id?: string | null
+          pageviews?: number | null
+          sessions?: number | null
+          site?: string
+          transactions?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "online_traffic_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ontology_entity_types: {
         Row: {
@@ -1867,6 +2734,112 @@ export type Database = {
         }
         Relationships: []
       }
+      people_counter_logs: {
+        Row: {
+          count: number
+          counter_id: string | null
+          created_at: string
+          direction: string | null
+          id: string
+          log_ts: string
+          metadata: Json | null
+          org_id: string | null
+          store_id: string | null
+        }
+        Insert: {
+          count: number
+          counter_id?: string | null
+          created_at?: string
+          direction?: string | null
+          id?: string
+          log_ts: string
+          metadata?: Json | null
+          org_id?: string | null
+          store_id?: string | null
+        }
+        Update: {
+          count?: number
+          counter_id?: string | null
+          created_at?: string
+          direction?: string | null
+          id?: string
+          log_ts?: string
+          metadata?: Json | null
+          org_id?: string | null
+          store_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "people_counter_logs_counter_id_fkey"
+            columns: ["counter_id"]
+            isOneToOne: false
+            referencedRelation: "people_counters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "people_counter_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "people_counter_logs_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      people_counters: {
+        Row: {
+          counter_code: string
+          created_at: string
+          id: string
+          location: string | null
+          metadata: Json | null
+          org_id: string | null
+          store_id: string | null
+          zone_id: string | null
+        }
+        Insert: {
+          counter_code: string
+          created_at?: string
+          id?: string
+          location?: string | null
+          metadata?: Json | null
+          org_id?: string | null
+          store_id?: string | null
+          zone_id?: string | null
+        }
+        Update: {
+          counter_code?: string
+          created_at?: string
+          id?: string
+          location?: string | null
+          metadata?: Json | null
+          org_id?: string | null
+          store_id?: string | null
+          zone_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "people_counters_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "people_counters_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           brand: string | null
@@ -2204,6 +3177,63 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "scenarios_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sensor_events: {
+        Row: {
+          created_at: string
+          event_ts: string
+          event_type: string | null
+          id: string
+          metadata: Json | null
+          org_id: string | null
+          sensor_id: string | null
+          sensor_type: string
+          store_id: string | null
+          value_numeric: number | null
+          zone_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_ts: string
+          event_type?: string | null
+          id?: string
+          metadata?: Json | null
+          org_id?: string | null
+          sensor_id?: string | null
+          sensor_type: string
+          store_id?: string | null
+          value_numeric?: number | null
+          zone_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_ts?: string
+          event_type?: string | null
+          id?: string
+          metadata?: Json | null
+          org_id?: string | null
+          sensor_id?: string | null
+          sensor_type?: string
+          store_id?: string | null
+          value_numeric?: number | null
+          zone_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sensor_events_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sensor_events_store_id_fkey"
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
@@ -2626,6 +3656,155 @@ export type Database = {
           },
         ]
       }
+      tasks: {
+        Row: {
+          assigned_to: string | null
+          assigned_to_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          due_date: string | null
+          id: string
+          metadata: Json | null
+          org_id: string | null
+          priority: string
+          status: string
+          store_id: string | null
+          task_code: string | null
+          task_name: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          assigned_to_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          metadata?: Json | null
+          org_id?: string | null
+          priority?: string
+          status?: string
+          store_id?: string | null
+          task_code?: string | null
+          task_name: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          assigned_to_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          metadata?: Json | null
+          org_id?: string | null
+          priority?: string
+          status?: string
+          store_id?: string | null
+          task_code?: string | null
+          task_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transactions: {
+        Row: {
+          channel: string | null
+          created_at: string
+          customer_id: string | null
+          discount_amount: number | null
+          id: string
+          metadata: Json | null
+          net_amount: number | null
+          org_id: string | null
+          payment_method: string | null
+          store_id: string | null
+          total_amount: number | null
+          transaction_datetime: string
+          user_id: string | null
+          visit_id: string | null
+        }
+        Insert: {
+          channel?: string | null
+          created_at?: string
+          customer_id?: string | null
+          discount_amount?: number | null
+          id?: string
+          metadata?: Json | null
+          net_amount?: number | null
+          org_id?: string | null
+          payment_method?: string | null
+          store_id?: string | null
+          total_amount?: number | null
+          transaction_datetime: string
+          user_id?: string | null
+          visit_id?: string | null
+        }
+        Update: {
+          channel?: string | null
+          created_at?: string
+          customer_id?: string | null
+          discount_amount?: number | null
+          id?: string
+          metadata?: Json | null
+          net_amount?: number | null
+          org_id?: string | null
+          payment_method?: string | null
+          store_id?: string | null
+          total_amount?: number | null
+          transaction_datetime?: string
+          user_id?: string | null
+          visit_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_visit_id_fkey"
+            columns: ["visit_id"]
+            isOneToOne: false
+            referencedRelation: "visits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trend_signals: {
         Row: {
           created_at: string | null
@@ -2955,6 +4134,110 @@ export type Database = {
           },
         ]
       }
+      web_events: {
+        Row: {
+          created_at: string
+          event_ts: string
+          event_type: string | null
+          id: string
+          metadata: Json | null
+          org_id: string | null
+          page_path: string | null
+          referrer: string | null
+          session_id: string | null
+          site: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_ts: string
+          event_type?: string | null
+          id?: string
+          metadata?: Json | null
+          org_id?: string | null
+          page_path?: string | null
+          referrer?: string | null
+          session_id?: string | null
+          site?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_ts?: string
+          event_type?: string | null
+          id?: string
+          metadata?: Json | null
+          org_id?: string | null
+          page_path?: string | null
+          referrer?: string | null
+          session_id?: string | null
+          site?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "web_events_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wifi_events: {
+        Row: {
+          created_at: string
+          device_id: string | null
+          dwell_time_seconds: number | null
+          event_ts: string
+          event_type: string | null
+          id: string
+          metadata: Json | null
+          org_id: string | null
+          signal_strength: number | null
+          store_id: string | null
+          zone_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          device_id?: string | null
+          dwell_time_seconds?: number | null
+          event_ts: string
+          event_type?: string | null
+          id?: string
+          metadata?: Json | null
+          org_id?: string | null
+          signal_strength?: number | null
+          store_id?: string | null
+          zone_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          device_id?: string | null
+          dwell_time_seconds?: number | null
+          event_ts?: string
+          event_type?: string | null
+          id?: string
+          metadata?: Json | null
+          org_id?: string | null
+          signal_strength?: number | null
+          store_id?: string | null
+          zone_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wifi_events_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wifi_events_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wifi_tracking: {
         Row: {
           created_at: string
@@ -3056,9 +4339,88 @@ export type Database = {
           },
         ]
       }
+      zone_metrics: {
+        Row: {
+          conversion_rate: number | null
+          created_at: string
+          date: string
+          dwell_time_avg_min: number | null
+          id: string
+          metadata: Json | null
+          org_id: string | null
+          revenue: number | null
+          store_id: string | null
+          visitor_count: number | null
+          zone_id: string
+        }
+        Insert: {
+          conversion_rate?: number | null
+          created_at?: string
+          date: string
+          dwell_time_avg_min?: number | null
+          id?: string
+          metadata?: Json | null
+          org_id?: string | null
+          revenue?: number | null
+          store_id?: string | null
+          visitor_count?: number | null
+          zone_id: string
+        }
+        Update: {
+          conversion_rate?: number | null
+          created_at?: string
+          date?: string
+          dwell_time_avg_min?: number | null
+          id?: string
+          metadata?: Json | null
+          org_id?: string | null
+          revenue?: number | null
+          store_id?: string | null
+          visitor_count?: number | null
+          zone_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zone_metrics_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zone_metrics_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
-      [_ in never]: never
+      v_user_orgs: {
+        Row: {
+          org_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          org_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          org_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_members_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       can_access_membership: {
