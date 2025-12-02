@@ -70,25 +70,10 @@ export function useWiFiTracking(storeId?: string) {
       )
       .subscribe();
 
-    const heatmapChannel = supabase
-      .channel('wifi-heatmap-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'wifi_heatmap_cache',
-          filter: `store_id=eq.${storeId}`
-        },
-        () => {
-          loadHeatmapCache();
-        }
-      )
-      .subscribe();
+    // wifi_heatmap_cache 테이블이 존재하지 않으므로 구독 제거
 
     return () => {
       supabase.removeChannel(trackingChannel);
-      supabase.removeChannel(heatmapChannel);
     };
   }, [storeId]);
 
@@ -100,8 +85,9 @@ export function useWiFiTracking(storeId?: string) {
       await Promise.all([
         loadZones(),
         loadTrackingData(),
-        loadRawSignals(),
-        loadHeatmapCache()
+        // 존재하지 않는 테이블은 에러 무시
+        loadRawSignals().catch(() => console.warn('wifi_raw_signals table not found')),
+        loadHeatmapCache().catch(() => console.warn('wifi_heatmap_cache table not found'))
       ]);
     } catch (err) {
       console.error('Failed to load WiFi data:', err);
