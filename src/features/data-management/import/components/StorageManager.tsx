@@ -163,17 +163,31 @@ export function StorageManager({ storeId }: StorageManagerProps) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      console.log('🗑️ Deleting file:', { bucket, path, name });
+
       // 스토리지 파일 삭제
-      await supabase.storage
+      const { data: deleteData, error: deleteError } = await supabase.storage
         .from(bucket)
         .remove([path]);
 
+      if (deleteError) {
+        console.error('Storage delete error:', deleteError);
+        throw new Error(`스토리지 삭제 실패: ${deleteError.message}`);
+      }
+
+      console.log('✅ Storage delete result:', deleteData);
+
       // user_data_imports 삭제
-      await (supabase as any)
+      const { error: dbError } = await (supabase as any)
         .from('user_data_imports')
         .delete()
         .eq('user_id', user.id)
         .eq('file_path', path);
+
+      if (dbError) {
+        console.error('DB delete error:', dbError);
+        // DB 삭제 실패는 경고만 하고 계속 진행
+      }
 
       toast({
         title: "삭제 완료",
@@ -205,34 +219,61 @@ export function StorageManager({ storeId }: StorageManagerProps) {
 
       const filePaths = Array.from(selectedFiles);
       let deletedCount = 0;
+      let failedCount = 0;
+
+      console.log('🗑️ Bulk deleting files:', filePaths);
 
       for (const path of filePaths) {
         const file = files.find(f => f.path === path);
-        if (!file) continue;
+        if (!file) {
+          console.warn(`File not found: ${path}`);
+          continue;
+        }
 
         try {
           // 스토리지 파일 삭제
-          await supabase.storage
+          const { data: deleteData, error: deleteError } = await supabase.storage
             .from(file.bucket)
             .remove([path]);
 
+          if (deleteError) {
+            console.error(`Storage delete error for ${path}:`, deleteError);
+            failedCount++;
+            continue;
+          }
+
+          console.log(`✅ Deleted from storage: ${path}`, deleteData);
+
           // user_data_imports 삭제
-          await (supabase as any)
+          const { error: dbError } = await (supabase as any)
             .from('user_data_imports')
             .delete()
             .eq('user_id', user.id)
             .eq('file_path', path);
 
+          if (dbError) {
+            console.warn(`DB delete warning for ${path}:`, dbError);
+          }
+
           deletedCount++;
         } catch (err) {
           console.error(`Failed to delete ${path}:`, err);
+          failedCount++;
         }
       }
 
-      toast({
-        title: "일괄 삭제 완료",
-        description: `${deletedCount}개 파일이 삭제되었습니다`,
-      });
+      if (failedCount > 0) {
+        toast({
+          title: "일부 파일 삭제 실패",
+          description: `${deletedCount}개 성공, ${failedCount}개 실패`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "일괄 삭제 완료",
+          description: `${deletedCount}개 파일이 삭제되었습니다`,
+        });
+      }
 
       if (storeId) {
         clearStoreDataCache(storeId);
