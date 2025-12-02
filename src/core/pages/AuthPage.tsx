@@ -52,6 +52,26 @@ const Auth = () => {
       const { error } = await signIn(validatedData.email, validatedData.password);
 
       if (error) {
+        // Check for no subscription error
+        if (error.message === 'NO_SUBSCRIPTION') {
+          toast({
+            title: "구독 필요",
+            description: "활성화된 구독이 없습니다. 웹사이트에서 구독을 먼저 진행해주세요.",
+            variant: "destructive",
+            action: (
+              <a 
+                href="https://www.neuraltwin.ai/pricing" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="underline text-sm hover:opacity-80"
+              >
+                구독하기
+              </a>
+            ),
+          });
+          return;
+        }
+        
         if (error.message.includes("Invalid login credentials")) {
           toast({
             title: "로그인 실패",
