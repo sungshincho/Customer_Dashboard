@@ -265,16 +265,18 @@ export function IntegratedImportStatus({ storeId }: IntegratedImportStatusProps)
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>데이터베이스 초기화</AlertDialogTitle>
-                <AlertDialogDescription>
-                  다음 테이블의 모든 데이터가 삭제됩니다:
-                  <ul className="mt-2 list-disc list-inside text-sm">
-                    <li>user_data_imports (임포트 기록)</li>
-                    <li>graph_entities (엔티티)</li>
-                    <li>graph_relations (관계)</li>
-                    <li>store_scenes (3D 씬)</li>
-                    <li>dashboard_kpis (KPI 데이터)</li>
-                  </ul>
-                  스토리지 파일은 유지됩니다. 계속하시겠습니까?
+                <AlertDialogDescription asChild>
+                  <div>
+                    <p>다음 테이블의 모든 데이터가 삭제됩니다:</p>
+                    <ul className="mt-2 list-disc list-inside text-sm">
+                      <li>user_data_imports (임포트 기록)</li>
+                      <li>graph_entities (엔티티)</li>
+                      <li>graph_relations (관계)</li>
+                      <li>store_scenes (3D 씬)</li>
+                      <li>dashboard_kpis (KPI 데이터)</li>
+                    </ul>
+                    <p>스토리지 파일은 유지됩니다. 계속하시겠습니까?</p>
+                  </div>
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -300,21 +302,23 @@ export function IntegratedImportStatus({ storeId }: IntegratedImportStatusProps)
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>⚠️ 완전 초기화</AlertDialogTitle>
-                <AlertDialogDescription className="space-y-2">
-                  <p className="font-semibold text-destructive">
-                    스토리지와 데이터베이스의 모든 데이터가 영구적으로 삭제됩니다.
-                  </p>
-                  <p>삭제되는 항목:</p>
-                  <ul className="list-disc list-inside text-sm space-y-1">
-                    <li>모든 업로드 파일 (CSV, 3D 모델)</li>
-                    <li>모든 데이터베이스 레코드</li>
-                    <li>모든 엔티티 및 관계</li>
-                    <li>모든 KPI 데이터</li>
-                    <li>모든 3D 씬 설정</li>
-                  </ul>
-                  <p className="text-destructive font-semibold mt-3">
-                    이 작업은 되돌릴 수 없습니다!
-                  </p>
+                <AlertDialogDescription asChild>
+                  <div className="space-y-2">
+                    <p className="font-semibold text-destructive">
+                      스토리지와 데이터베이스의 모든 데이터가 영구적으로 삭제됩니다.
+                    </p>
+                    <p>삭제되는 항목:</p>
+                    <ul className="list-disc list-inside text-sm space-y-1">
+                      <li>모든 업로드 파일 (CSV, 3D 모델)</li>
+                      <li>모든 데이터베이스 레코드</li>
+                      <li>모든 엔티티 및 관계</li>
+                      <li>모든 KPI 데이터</li>
+                      <li>모든 3D 씬 설정</li>
+                    </ul>
+                    <p className="text-destructive font-semibold mt-3">
+                      이 작업은 되돌릴 수 없습니다!
+                    </p>
+                  </div>
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
