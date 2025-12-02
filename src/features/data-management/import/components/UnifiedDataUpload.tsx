@@ -404,26 +404,77 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
     }
   };
   
-  // 파일명에서 테이블명 추론
+  // 파일명에서 테이블명 추론 (개선된 버전)
   const inferTableName = (fileName: string): string => {
-    const name = fileName.toLowerCase().replace(/\.(csv|xlsx?|json)$/i, '');
+    const name = fileName.toLowerCase()
+      .replace(/\.(csv|xlsx?|json)$/i, '')
+      .replace(/[-\s]/g, '_'); // 하이픈과 공백을 언더스코어로 변환
     
-    // 일반적인 테이블명 매핑
+    // 포괄적인 테이블명 매핑 (우선순위 순)
     const tableMap: Record<string, string> = {
+      // 고객 관련
       'customer': 'customers',
+      'customers': 'customers',
+      '고객': 'customers',
+      
+      // 상품 관련
       'product': 'products',
+      'products': 'products',
+      '상품': 'products',
+      '제품': 'products',
+      
+      // 구매 관련
       'purchase': 'purchases',
+      'purchases': 'purchases',
+      'order': 'purchases',
+      'orders': 'purchases',
+      '구매': 'purchases',
+      '주문': 'purchases',
+      
+      // 방문 관련
       'visit': 'visits',
+      'visits': 'visits',
+      '방문': 'visits',
+      
+      // 직원 관련
       'staff': 'staff',
+      'employee': 'staff',
+      'employees': 'staff',
+      '직원': 'staff',
+      
+      // 매장 관련
       'store': 'stores',
+      'stores': 'stores',
+      'shop': 'stores',
+      '매장': 'stores',
+      
+      // WiFi 관련
+      'wifi_tracking': 'wifi_tracking',
+      'wifi_track': 'wifi_tracking',
       'wifi': 'wifi_tracking',
+      
+      // Zone 관련
+      'wifi_zone': 'wifi_zones',
+      'wifi_zones': 'wifi_zones',
+      'zone': 'wifi_zones',
+      'zones': 'wifi_zones',
       'sensor': 'wifi_zones'
     };
     
-    for (const [key, table] of Object.entries(tableMap)) {
-      if (name.includes(key)) return table;
+    // 정확히 매칭되는 키 우선 검색
+    if (tableMap[name]) {
+      return tableMap[name];
     }
     
+    // 부분 매칭 검색 (긴 키부터 검색하여 더 정확한 매칭)
+    const sortedKeys = Object.keys(tableMap).sort((a, b) => b.length - a.length);
+    for (const key of sortedKeys) {
+      if (name.includes(key)) {
+        return tableMap[key];
+      }
+    }
+    
+    // 매칭 실패 시 원래 이름 반환
     return name;
   };
 
