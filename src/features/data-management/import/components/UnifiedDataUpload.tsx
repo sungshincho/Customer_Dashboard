@@ -1289,24 +1289,107 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
         {/* 데이터 임포트 순서 가이드 */}
         <Alert className="border-primary/50 bg-primary/5">
           <AlertCircle className="h-4 w-4 text-primary" />
-          <AlertDescription className="space-y-2">
-            <div className="font-semibold text-primary">📋 데이터 임포트 권장 순서</div>
-            <div className="text-sm space-y-1">
-              <p>외래키(FK) 제약 조건으로 인해 다음 순서로 업로드하는 것을 권장합니다:</p>
-              <div className="flex items-center gap-2 font-mono text-xs bg-background/50 p-2 rounded">
-                <span className="font-semibold">1. Stores</span>
-                <span className="text-muted-foreground">→</span>
-                <span className="font-semibold">2. Customers</span>
-                <span className="text-muted-foreground">→</span>
-                <span className="font-semibold">3. Products</span>
-                <span className="text-muted-foreground">→</span>
-                <span className="font-semibold">4. Visits</span>
-                <span className="text-muted-foreground">→</span>
-                <span className="font-semibold">5. Purchases</span>
+          <AlertDescription className="space-y-3">
+            <div className="font-semibold text-primary text-base">📋 데이터 임포트 가이드</div>
+            
+            <div className="space-y-3 text-sm">
+              {/* 1단계: 필수 기본 데이터 */}
+              <div className="space-y-2">
+                <div className="font-semibold text-foreground">✅ 1단계: 필수 기본 데이터 (반드시 이 순서로 업로드)</div>
+                <div className="space-y-1.5 ml-4">
+                  <div className="flex items-start gap-2">
+                    <span className="font-mono text-xs bg-primary/10 px-2 py-0.5 rounded min-w-[28px] text-center">1</span>
+                    <div className="flex-1">
+                      <span className="font-semibold">매장 정보</span>
+                      <span className="text-muted-foreground ml-2">stores.csv, 매장.xlsx</span>
+                      <div className="text-xs text-muted-foreground mt-0.5">매장명, 주소, 면적, 매장코드 등</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="font-mono text-xs bg-primary/10 px-2 py-0.5 rounded min-w-[28px] text-center">2</span>
+                    <div className="flex-1">
+                      <span className="font-semibold">고객 정보</span>
+                      <span className="text-muted-foreground ml-2">customers.csv, 회원.xlsx</span>
+                      <div className="text-xs text-muted-foreground mt-0.5">고객명, 연락처, 이메일, 세그먼트 등</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="font-mono text-xs bg-primary/10 px-2 py-0.5 rounded min-w-[28px] text-center">3</span>
+                    <div className="flex-1">
+                      <span className="font-semibold">상품 정보</span>
+                      <span className="text-muted-foreground ml-2">products.csv, 제품.xlsx</span>
+                      <div className="text-xs text-muted-foreground mt-0.5">상품명, 가격, 카테고리, SKU, 브랜드 등</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="font-mono text-xs bg-primary/10 px-2 py-0.5 rounded min-w-[28px] text-center">4</span>
+                    <div className="flex-1">
+                      <span className="font-semibold">방문 기록</span>
+                      <span className="text-muted-foreground ml-2">visits.csv, 방문.xlsx</span>
+                      <div className="text-xs text-muted-foreground mt-0.5">고객별 매장 방문 일시, 체류시간 등</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="font-mono text-xs bg-primary/10 px-2 py-0.5 rounded min-w-[28px] text-center">5</span>
+                    <div className="flex-1">
+                      <span className="font-semibold">구매/판매 데이터</span>
+                      <span className="text-muted-foreground ml-2">purchases.csv, 주문.xlsx, transactions.csv</span>
+                      <div className="text-xs text-muted-foreground mt-0.5">거래일시, 구매상품, 수량, 금액 등</div>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <p className="text-muted-foreground">
-                자동 검증 시스템이 의존성을 분석하여 최적의 업로드 순서를 제안합니다.
-              </p>
+
+              {/* 2단계: 선택적 운영 데이터 */}
+              <div className="space-y-2 pt-2 border-t border-border/50">
+                <div className="font-semibold text-foreground">⚙️ 2단계: 선택적 운영 데이터 (있으면 더 정확한 분석)</div>
+                <div className="space-y-1.5 ml-4">
+                  <div className="flex items-start gap-2">
+                    <span className="text-muted-foreground">•</span>
+                    <div className="flex-1">
+                      <span className="font-semibold">재고 데이터</span>
+                      <span className="text-muted-foreground ml-2">inventory.csv, 재고.xlsx</span>
+                      <div className="text-xs text-muted-foreground mt-0.5">상품별 재고수량, 안전재고, 입출고 이력</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-muted-foreground">•</span>
+                    <div className="flex-1">
+                      <span className="font-semibold">직원 정보</span>
+                      <span className="text-muted-foreground ml-2">staff.csv, 직원.xlsx</span>
+                      <div className="text-xs text-muted-foreground mt-0.5">직원명, 근무시간, 배치 매장 등</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-muted-foreground">•</span>
+                    <div className="flex-1">
+                      <span className="font-semibold">WiFi 추적 데이터</span>
+                      <span className="text-muted-foreground ml-2">wifi_tracking.csv, sensor_data.csv</span>
+                      <div className="text-xs text-muted-foreground mt-0.5">고객 동선, 구역별 체류시간 (IoT 센서)</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-muted-foreground">•</span>
+                    <div className="flex-1">
+                      <span className="font-semibold">3D 매장 모델</span>
+                      <span className="text-muted-foreground ml-2">.glb, .gltf 파일</span>
+                      <div className="text-xs text-muted-foreground mt-0.5">디지털 트윈 시뮬레이션용 3D 매장 모델</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 주의사항 */}
+              <div className="pt-2 border-t border-border/50">
+                <div className="flex items-start gap-2 text-xs text-muted-foreground">
+                  <span>💡</span>
+                  <div className="flex-1 space-y-1">
+                    <p><strong>자동 검증:</strong> 파일을 추가하면 데이터 구조를 자동으로 검증하고 최적의 업로드 순서를 제안합니다.</p>
+                    <p><strong>파일명 자동 인식:</strong> 파일명(customers, 고객, products, 상품 등)으로 자동 분류되므로 알기 쉬운 이름을 사용하세요.</p>
+                    <p><strong>자동 생성 데이터:</strong> dashboard_kpi, ai_recommendation 등은 시스템이 자동 생성하므로 업로드하지 마세요.</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </AlertDescription>
         </Alert>
