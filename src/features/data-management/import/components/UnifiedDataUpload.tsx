@@ -9,6 +9,8 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import * as XLSX from "xlsx";
+import { useSchemaMetadata } from "@/hooks/useSchemaMetadata";
+import { DataValidationPreview } from "./DataValidationPreview";
 
 interface UnifiedDataUploadProps {
   storeId?: string;
@@ -47,6 +49,13 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
   const [isDragging, setIsDragging] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const cancelFlagsRef = useRef<Map<string, boolean>>(new Map());
+  
+  // 스키마 메타데이터 로드
+  const { data: schema, isLoading: isLoadingSchema } = useSchemaMetadata();
+  
+  // 검증 결과 상태
+  const [validationResults, setValidationResults] = useState<any>(null);
+  const [isValidating, setIsValidating] = useState(false);
 
   // localStorage에서 업로드 내역 복원
   useEffect(() => {
@@ -208,7 +217,12 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
     });
 
     setFiles(prev => [...prev, ...uploadFiles]);
-  }, [toast, storeId]);
+    
+    // 파일 추가 후 자동 검증 실행
+    if (schema && uploadFiles.length > 0) {
+      validateFiles(uploadFiles);
+    }
+  }, [toast, storeId, schema]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -310,6 +324,97 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
       console.error('Auto mapping error:', error);
       return null;
     }
+  };
+
+  // 배치 검증 실행
+  const validateFiles = async (filesToValidate: UploadFile[]) => {
+    if (!schema || filesToValidate.length === 0) return;
+    
+    setIsValidating(true);
+    try {
+      // 파일별로 데이터 파싱 및 테이블명 추출
+      const filesData = await Promise.all(
+        filesToValidate.map(async (file) => {
+          try {
+            const rawData = await parseDataFile(file.file);
+            const tableName = inferTableName(file.file.name);
+            const headers = rawData.length > 0 ? Object.keys(rawData[0]) : [];
+            const sampleRows = rawData.slice(0, 5);
+            
+            return {
+              fileName: file.file.name,
+              tableName,
+              headers,
+              sampleRows
+            };
+          } catch (error) {
+            console.error(`Error parsing file ${file.file.name}:`, error);
+            return null;
+          }
+        })
+      );
+      
+      const validFilesData = filesData.filter(f => f !== null);
+      
+      if (validFilesData.length === 0) {
+        toast({
+          title: "검증 실패",
+          description: "파일을 파싱할 수 없습니다",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Edge Function 호출
+      const { data, error } = await supabase.functions.invoke('validate-batch-files', {
+        body: {
+          files: validFilesData,
+          schema: schema
+        }
+      });
+      
+      if (error) throw error;
+      
+      if (data.success) {
+        setValidationResults(data);
+        toast({
+          title: "검증 완료",
+          description: `${data.summary.valid}개 파일 정상, ${data.summary.invalid}개 파일 오류 발견`
+        });
+      }
+    } catch (error: any) {
+      console.error('Validation error:', error);
+      toast({
+        title: "검증 오류",
+        description: error.message || "파일 검증 중 오류가 발생했습니다",
+        variant: "destructive"
+      });
+    } finally {
+      setIsValidating(false);
+    }
+  };
+  
+  // 파일명에서 테이블명 추론
+  const inferTableName = (fileName: string): string => {
+    const name = fileName.toLowerCase().replace(/\.(csv|xlsx?|json)$/i, '');
+    
+    // 일반적인 테이블명 매핑
+    const tableMap: Record<string, string> = {
+      'customer': 'customers',
+      'product': 'products',
+      'purchase': 'purchases',
+      'visit': 'visits',
+      'staff': 'staff',
+      'store': 'stores',
+      'wifi': 'wifi_tracking',
+      'sensor': 'wifi_zones'
+    };
+    
+    for (const [key, table] of Object.entries(tableMap)) {
+      if (name.includes(key)) return table;
+    }
+    
+    return name;
   };
 
   // 파일명 sanitize (특수문자 제거)
@@ -1042,6 +1147,37 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               매장을 먼저 선택해주세요
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        {/* 스키마 로딩 중 */}
+        {isLoadingSchema && (
+          <Alert className="mb-4">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <AlertDescription>
+              데이터베이스 스키마를 로드하는 중...
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        {/* 검증 결과 프리뷰 */}
+        {validationResults && (
+          <div className="mb-6">
+            <DataValidationPreview
+              results={validationResults.results}
+              uploadOrder={validationResults.uploadOrder}
+              summary={validationResults.summary}
+            />
+          </div>
+        )}
+        
+        {/* 검증 중 */}
+        {isValidating && (
+          <Alert className="mb-4">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <AlertDescription>
+              파일 검증 중... FK 의존성 및 스키마 매칭을 확인하고 있습니다.
             </AlertDescription>
           </Alert>
         )}
