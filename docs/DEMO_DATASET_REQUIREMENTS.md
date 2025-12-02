@@ -1,862 +1,1674 @@
-# NEURALTWIN 데모 데이터셋 요구사항
+# NEURALTWIN 데모 데이터셋 요구사항 v3.0
 
-> 최종 업데이트: 2025-11-17
-
-## 목차
-1. [데이터셋 개요](#1-데이터셋-개요)
-2. [CSV 데이터셋 형태](#2-csv-데이터셋-형태)
-3. [데이터셋 구조](#3-데이터셋-구조)
-4. [데이터셋 형식](#4-데이터셋-형식)
-5. [3D 모델 데이터](#5-3d-모델-데이터)
-6. [WiFi 트래킹 데이터](#6-wifi-트래킹-데이터)
-7. [온톨로지 데이터](#7-온톨로지-데이터)
-8. [데이터 검증 규칙](#8-데이터-검증-규칙)
+> **최종 업데이트**: 2025-12-02  
+> **온톨로지 스키마 버전**: v3.0 (62 Entities, 99 Relations)  
+> **대상**: 고객 대시보드 전체 기능 Demonstration
 
 ---
 
-## 1. 데이터셋 개요
+## 📋 목차
 
-### 1.1 필수 데이터셋 목록
-NEURALTWIN 데모를 위해 필요한 최소 데이터셋:
-
-| 데이터셋 | 파일명 | 최소 건수 | 우선순위 | 설명 |
-|---------|--------|----------|---------|------|
-| 매장 정보 | stores.csv | 1 | 필수 | 매장 기본 정보 |
-| 고객 정보 | customers.csv | 100 | 필수 | 고객 프로필 데이터 |
-| 상품 정보 | products.csv | 50 | 필수 | 상품 카탈로그 |
-| 구매 내역 | purchases.csv | 500 | 필수 | 거래 데이터 |
-| 방문 기록 | visits.csv | 1000 | 필수 | 고객 동선 데이터 |
-| 직원 정보 | staff.csv | 10 | 권장 | 직원 정보 및 성과 |
-| 브랜드 정보 | brands.csv | 20 | 선택 | 브랜드 메타데이터 |
-| WiFi 센서 | wifi_sensors.csv | 3 | 선택 | 센서 위치 정보 |
-| WiFi 신호 | wifi_tracking.csv | 5000 | 선택 | Raw signal 데이터 |
-| Zone 정보 | zones.csv | 10 | 선택 | 매장 Zone 좌표 |
-
-### 1.2 데이터셋 관계도
-```
-stores (매장)
-  ├─ customers (고객)
-  ├─ products (상품)
-  │   ├─ brands (브랜드)
-  │   └─ purchases (구매)
-  │       └─ customers
-  ├─ visits (방문)
-  │   └─ customers
-  ├─ staff (직원)
-  ├─ zones (Zone)
-  │   └─ wifi_sensors (센서)
-  └─ wifi_tracking (WiFi 데이터)
-      └─ zones
-```
-
-### 1.3 데이터 품질 기준
-- **완전성**: 필수 컬럼은 NULL 값 없음
-- **일관성**: 관계 데이터 간 참조 무결성 유지
-- **정확성**: 날짜, 숫자 형식 정확
-- **현실성**: 실제 비즈니스 데이터와 유사한 분포
+1. [개요](#1-개요)
+2. [온톨로지 스키마 v3.0 구조](#2-온톨로지-스키마-v30-구조)
+3. [대시보드 페이지별 필수 데이터](#3-대시보드-페이지별-필수-데이터)
+4. [CRITICAL 엔티티 CSV 데이터셋 (25개)](#4-critical-엔티티-csv-데이터셋-25개)
+5. [HIGH 엔티티 CSV 데이터셋 (19개)](#5-high-엔티티-csv-데이터셋-19개)
+6. [MEDIUM 엔티티 CSV 데이터셋 (13개)](#6-medium-엔티티-csv-데이터셋-13개)
+7. [LOW 엔티티 CSV 데이터셋 (5개)](#7-low-엔티티-csv-데이터셋-5개)
+8. [3D 모델 데이터](#8-3d-모델-데이터)
+9. [온톨로지 관계 데이터](#9-온톨로지-관계-데이터)
+10. [데이터 생성 가이드](#10-데이터-생성-가이드)
 
 ---
 
-## 2. CSV 데이터셋 형태
+## 1. 개요
 
-### 2.1 stores.csv (매장 정보)
-**목적**: 매장 기본 정보 및 메타데이터
+### 1.1 목적
+- 고객 대시보드 12개 페이지 전체 기능 demonstration
+- v3.0 온톨로지 스키마의 완전한 구현 및 검증
+- AI 추론 엔진 및 지식 그래프 활용 테스트
 
-#### 컬럼 정의
+### 1.2 데이터셋 우선순위
+
+| 우선순위 | 엔티티 수 | 최소 레코드 | 설명 |
+|---------|----------|------------|------|
+| 🔴 CRITICAL | 25 | 3,000+ | 기본 기능 필수 |
+| 🟡 HIGH | 19 | 1,500+ | AI 추론 필수 |
+| 🟢 MEDIUM | 13 | 500+ | 고급 분석 기능 |
+| ⚪ LOW | 5 | 100+ | 선택적 기능 |
+
+### 1.3 전체 데이터 구조 개요
+
+```
+Organization (1개)
+└── Store (1개)
+    ├── Zone (8개) ────────┐
+    │   ├── Entrance (2개)  │
+    │   ├── CheckoutCounter (3개)
+    │   ├── Aisle (6개)     │
+    │   ├── FittingRoom (2개) │
+    │   ├── StorageRoom (1개) │
+    │   ├── Shelf (12개)    │
+    │   ├── Rack (8개)      │
+    │   └── DisplayTable (6개)
+    │
+    ├── Category (20개 - 3 레벨 계층)
+    │   └── Product (200개)
+    │       ├── Brand (15개)
+    │       ├── Supplier (10개)
+    │       └── Inventory (200개)
+    │
+    ├── Customer (500명)
+    │   ├── Visit (2,000건)
+    │   ├── Transaction (1,000건)
+    │   └── Purchase (2,500건)
+    │
+    ├── Staff (15명)
+    │   └── Shift (450건 - 1개월)
+    │
+    ├── Promotion (10개)
+    ├── Weather (90일치)
+    ├── Holiday (30건)
+    ├── EconomicIndicator (90일치)
+    │
+    ├── WiFiSensor (6개)
+    │   └── SensorEvent (10,000건)
+    ├── Camera (8개)
+    ├── Beacon (4개)
+    ├── PeopleCounter (2개)
+    │
+    ├── DailySales (90일)
+    ├── InventoryHistory (6,000건)
+    ├── ZonePerformance (720건)
+    ├── Task (100건)
+    ├── Alert (50건)
+    │
+    ├── DataSource (3개)
+    │   ├── DataSourceTable (10개)
+    │   └── ColumnMapping (50개)
+    │
+    ├── Model (5개)
+    │   ├── ModelRun (50건)
+    │   ├── ModelEmbedding (1,000건)
+    │   └── AIInsight (200건)
+    │
+    ├── Scenario (10개)
+    │   └── SimulationResult (50건)
+    │
+    ├── KPI (15개)
+    │   └── KPIValue (1,350건)
+    │
+    ├── RetailConcept (20개)
+    └── BusinessRule (30개)
+```
+
+---
+
+## 2. 온톨로지 스키마 v3.0 구조
+
+### 2.1 엔티티 분류
+
+#### 🔴 CRITICAL (25개) - 기본 기능
+1. **조직/매장**: Organization, Store
+2. **공간 구조**: Zone, Entrance, CheckoutCounter
+3. **제품**: Category, Product, Inventory, Brand, Promotion
+4. **고객/거래**: Customer, Visit, Transaction, Purchase
+5. **직원/운영**: Staff, Shift
+6. **센서**: WiFiSensor
+7. **데이터 파이프라인**: DataSource, DataSourceTable, ColumnMapping
+8. **이벤트**: BaseEvent, CustomerEvent, SensorEvent
+9. **AI 모델**: Model, ModelRun, ModelEmbedding, AIInsight
+
+#### 🟡 HIGH (19개) - AI 추론 필수
+Weather, Holiday, EconomicIndicator, Aisle, FittingRoom, StorageRoom, Shelf, Rack, DisplayTable, Supplier, Camera, Beacon, Scenario, SimulationResult, KPI, KPIValue, RetailConcept, BusinessRule, DemandForecast
+
+#### 🟢 MEDIUM (13개) - 고급 분석
+DailySales, InventoryHistory, ZonePerformance, Task, PeopleCounter, DoorSensor, TemperatureSensor, HumiditySensor, Alert, PriceOptimization, POS, DigitalSignage, HVAC
+
+#### ⚪ LOW (5개) - 선택적 기능
+(현재 LOW tier는 MEDIUM과 통합)
+
+### 2.2 관계 분류 (99개)
+
+#### CRITICAL (32개)
+BELONGS_TO, HAS_ZONE, HAS_ENTRANCE, HAS_CHECKOUT, BELONGS_TO_CATEGORY, HAS_SUBCATEGORY, PARENT_OF, MANUFACTURED_BY, SOLD_AT, STORED_AT, PURCHASED_PRODUCT, MADE_TRANSACTION, VISITED_STORE, ENTERED_THROUGH, WORKS_AT, ASSIGNED_TO_STORE, CHECKED_OUT_AT, OCCURRED_AT_STORE, ASSIGNED_TO_STAFF 등
+
+#### HIGH (27개)
+AFFECTED_BY_WEATHER, AFFECTED_BY_HOLIDAY, INFLUENCED_BY_INDICATOR, HAS_SHELF, HAS_RACK, DISPLAYED_ON, SUPPLIED_BY, MONITORED_BY_CAMERA, TRACKED_BY_BEACON, TARGETS_PRODUCT, APPLIED_IN_ZONE 등
+
+#### MEDIUM (17개)
+SALES_OF_STORE, HISTORY_OF_PRODUCT, PERFORMANCE_OF_ZONE, COUNTED_BY, SENSED_BY_DOOR, MEASURED_TEMPERATURE, MEASURED_HUMIDITY, TARGETS_ENTITY 등
+
+#### ADDITIONAL (13개)
+VISITED_STORE, OCCURRED_AT_STORE, CHECKED_OUT_AT, ENTERED_THROUGH, STORED_AT, HAS_SUBCATEGORY, ASSIGNED_TO_STORE, AFFECTS_STORE, TARGETS_PRODUCT, APPLIED_IN_ZONE, SALES_OF_STORE, RECORDED_AT_STORE, HISTORY_OF_PRODUCT
+
+---
+
+## 3. 대시보드 페이지별 필수 데이터
+
+### (A) Overview - 개요
+
+#### 📊 DashboardPage
+**필수 엔티티**:
+- Store, Customer, Visit, Transaction, Purchase (KPI 계산)
+- DailySales (시계열 분석)
+- ZonePerformance (구역 성과)
+- AIInsight (AI 추천)
+- Alert (이상 탐지)
+
+**최소 데이터**:
+- Store: 1개
+- Customer: 500명
+- Visit: 2,000건 (3개월)
+- Transaction: 1,000건
+- Purchase: 2,500건
+- DailySales: 90일치
+- ZonePerformance: 720건 (8개 Zone × 90일)
+- AIInsight: 50건
+- Alert: 20건
+
+#### 🏪 StoresPage
+**필수 엔티티**:
+- Store, Zone, Staff, DailySales, ZonePerformance
+
+**최소 데이터**:
+- Store: 1개 (상세 정보 포함)
+- Zone: 8개
+- Staff: 15명
+- DailySales: 90일
+- ZonePerformance: 720건
+
+#### 💬 HQCommunicationPage
+**필수 엔티티**:
+- Organization, Store, Staff, Task
+
+**최소 데이터**:
+- Organization: 1개
+- Store: 1개
+- Staff: 15명 (역할별)
+- Task: 100건 (본사 지시사항)
+
+#### ⚙️ SettingsPage
+**필수 엔티티**:
+- Organization, DataSource, DataSourceTable
+
+**최소 데이터**:
+- Organization: 1개
+- DataSource: 3개 (POS, ERP, CRM)
+- DataSourceTable: 10개
+
+---
+
+### (B) Store Analysis - 매장 현황 분석
+
+#### 🏬 StoreAnalysisPage
+**필수 엔티티**:
+- Store, Zone, ZonePerformance, Traffic, DailySales, Staff, Shift
+
+**최소 데이터**:
+- Store: 1개
+- Zone: 8개
+- ZonePerformance: 720건
+- DailySales: 90일
+- Staff: 15명
+- Shift: 450건 (15명 × 30일)
+
+#### 👤 CustomerAnalysisPage
+**필수 엔티티**:
+- Customer, Visit, Purchase, Transaction, CustomerEvent
+
+**최소 데이터**:
+- Customer: 500명 (세그먼트별)
+- Visit: 2,000건
+- Purchase: 2,500건
+- Transaction: 1,000건
+- CustomerEvent: 5,000건
+
+#### 📦 ProductAnalysisPage
+**필수 엔티티**:
+- Product, Category, Brand, Inventory, Purchase, InventoryHistory
+
+**최소 데이터**:
+- Product: 200개
+- Category: 20개 (3 레벨)
+- Brand: 15개
+- Inventory: 200건
+- Purchase: 2,500건
+- InventoryHistory: 6,000건 (200개 × 30일)
+
+---
+
+### (C) Simulation - 시뮬레이션
+
+#### 🎯 DigitalTwin3DPage
+**필수 엔티티**:
+- Store, Zone, Product, Shelf, Rack, DisplayTable, Camera, WiFiSensor, CustomerEvent
+
+**최소 데이터**:
+- Store: 1개 (3D 모델)
+- Zone: 8개 (3D 모델)
+- Product: 200개 (카테고리별 대표 모델)
+- Shelf: 12개
+- Rack: 8개
+- DisplayTable: 6개
+- Camera: 8개
+- WiFiSensor: 6개
+- CustomerEvent: 5,000건 (동선 데이터)
+
+#### 🔬 SimulationHubPage
+**필수 엔티티**:
+- Scenario, SimulationResult, DemandForecast, PriceOptimization, Model, ModelRun
+
+**최소 데이터**:
+- Scenario: 10개 (레이아웃/수요/재고/가격/프로모션)
+- SimulationResult: 50건
+- DemandForecast: 200건
+- PriceOptimization: 200건
+- Model: 5개 (AI 모델)
+- ModelRun: 50건
+
+---
+
+### (D) Data Management - 데이터 관리
+
+#### 📂 UnifiedDataManagementPage
+**필수 엔티티**:
+- DataSource, DataSourceTable, ColumnMapping
+
+**최소 데이터**:
+- DataSource: 3개 (POS, ERP, CRM)
+- DataSourceTable: 10개
+- ColumnMapping: 50개
+
+#### 🧬 SchemaBuilderPage
+**필수 엔티티**:
+- ontology_entity_types (62개)
+- ontology_relation_types (99개)
+
+**최소 데이터**:
+- Entity Types: 62개 (v3.0 마스터 스키마)
+- Relation Types: 99개 (v3.0 마스터 스키마)
+
+#### 🔌 APIIntegrationPage
+**필수 엔티티**:
+- DataSource, DataSourceTable, ColumnMapping
+
+**최소 데이터**:
+- DataSource: 3개
+- DataSourceTable: 10개
+- ColumnMapping: 50개
+
+---
+
+## 4. CRITICAL 엔티티 CSV 데이터셋 (25개)
+
+### 4.1 Organization (조직)
+
+**파일명**: `organizations.csv`  
+**최소 레코드**: 1개
+
 | 컬럼명 | 타입 | 필수 | 설명 | 예시 |
 |--------|------|------|------|------|
-| store_id | string | ✅ | 매장 고유 ID | GN001 |
-| store_name | string | ✅ | 매장명 | 강남점 |
-| store_code | string | ✅ | 매장 코드 | GN001 |
-| address | string | ❌ | 주소 | 서울 강남구 테헤란로 123 |
-| area | number | ❌ | 면적 (sqm) | 200 |
-| open_date | date | ❌ | 오픈일 | 2023-01-15 |
-| manager_name | string | ❌ | 담당자명 | 김매니저 |
-| phone | string | ❌ | 연락처 | 02-1234-5678 |
-| email | string | ❌ | 이메일 | gangnam@example.com |
+| org_id | string | ✅ | 조직 ID | ORG-001 |
+| org_name | string | ✅ | 조직명 | NEURALTWIN Fashion |
+| org_type | string | ❌ | 조직 유형 | retail |
+| industry | string | ❌ | 업종 | fashion |
+| country | string | ❌ | 국가 | KR |
+| created_at | datetime | ❌ | 생성일 | 2024-01-01 |
 
-#### 샘플 데이터
+**샘플 데이터**:
 ```csv
-store_id,store_name,store_code,address,area,open_date,manager_name,phone,email
-GN001,강남점,GN001,서울 강남구 테헤란로 123,200,2023-01-15,김매니저,02-1234-5678,gangnam@example.com
-HD001,홍대점,HD001,서울 마포구 홍익로 45,150,2023-03-20,이매니저,02-2345-6789,hongdae@example.com
-SC001,신촌점,SC001,서울 서대문구 신촌로 67,180,2023-05-10,박매니저,02-3456-7890,sinchon@example.com
+org_id,org_name,org_type,industry,country,created_at
+ORG-001,NEURALTWIN Fashion,retail,fashion,KR,2024-01-01
 ```
 
 ---
 
-### 2.2 customers.csv (고객 정보)
-**목적**: 고객 프로필 및 세그먼트 정보
+### 4.2 Store (매장)
 
-#### 컬럼 정의
+**파일명**: `stores.csv`  
+**최소 레코드**: 1개
+
 | 컬럼명 | 타입 | 필수 | 설명 | 예시 |
 |--------|------|------|------|------|
-| customer_id | string | ✅ | 고객 고유 ID | C001 |
-| name | string | ❌ | 고객명 (익명화) | 고객A |
-| age_group | string | ❌ | 연령대 | 20대, 30대, 40대 |
-| gender | string | ❌ | 성별 | M, F |
-| segment | string | ❌ | 고객 세그먼트 | VIP, Regular, New |
-| join_date | date | ❌ | 가입일 | 2023-01-01 |
-| total_purchases | number | ❌ | 총 구매 횟수 | 15 |
-| lifetime_value | number | ❌ | 생애 가치 (원) | 1500000 |
-| preferred_category | string | ❌ | 선호 카테고리 | 의류, 전자제품 |
+| store_code | string | ✅ | 매장 코드 | NT-FLG-001 |
+| store_name | string | ✅ | 매장명 | NEURALTWIN Flagship Store |
+| address | string | ✅ | 주소 | 서울 강남구 테헤란로 427 |
+| area_sqm | number | ✅ | 면적 (제곱미터) | 200 |
+| opening_date | date | ❌ | 오픈일 | 2024-01-15 |
+| store_format | string | ❌ | 매장 포맷 | flagship |
+| region | string | ❌ | 지역 | Seoul |
+| district | string | ❌ | 구역 | Gangnam |
+| manager_name | string | ❌ | 매니저명 | 김매니저 |
+| org_id | string | ✅ | 조직 ID | ORG-001 |
 
-#### 샘플 데이터
+**샘플 데이터**:
 ```csv
-customer_id,name,age_group,gender,segment,join_date,total_purchases,lifetime_value,preferred_category
-C001,고객A,30대,F,VIP,2023-01-15,25,2500000,의류
-C002,고객B,20대,M,Regular,2023-02-20,10,800000,전자제품
-C003,고객C,40대,F,New,2023-11-01,2,150000,의류
-C004,고객D,30대,M,Regular,2023-03-10,15,1200000,신발
-C005,고객E,20대,F,VIP,2023-01-20,30,3000000,의류
+store_code,store_name,address,area_sqm,opening_date,store_format,region,district,manager_name,org_id
+NT-FLG-001,NEURALTWIN Flagship Store,서울 강남구 테헤란로 427,200,2024-01-15,flagship,Seoul,Gangnam,김매니저,ORG-001
 ```
-
-#### 데이터 분포 가이드
-- **연령대**: 20대(30%), 30대(40%), 40대(20%), 50대+(10%)
-- **성별**: 여성(60%), 남성(40%)
-- **세그먼트**: VIP(10%), Regular(60%), New(30%)
 
 ---
 
-### 2.3 products.csv (상품 정보)
-**목적**: 상품 카탈로그 및 재고 정보
+### 4.3 Zone (구역)
 
-#### 컬럼 정의
+**파일명**: `zones.csv`  
+**최소 레코드**: 8개
+
 | 컬럼명 | 타입 | 필수 | 설명 | 예시 |
 |--------|------|------|------|------|
-| product_id | string | ✅ | 상품 고유 ID | P001 |
-| product_name | string | ✅ | 상품명 | 청바지 |
-| category | string | ✅ | 카테고리 | 의류, 신발, 액세서리 |
-| brand | string | ❌ | 브랜드 | Nike, Adidas |
-| price | number | ✅ | 판매 가격 | 89000 |
-| cost_price | number | ❌ | 원가 | 45000 |
-| sku | string | ❌ | SKU 코드 | JEANS-BL-32 |
-| stock | number | ❌ | 재고 수량 | 50 |
-| zone | string | ❌ | 진열 Zone | 의류구역 |
-| x | number | ❌ | X 좌표 (m) | 5.2 |
-| z | number | ❌ | Z 좌표 (m) | 3.8 |
+| zone_id | string | ✅ | 구역 ID | ZONE-A |
+| zone_type | string | ✅ | 구역 유형 | entrance |
+| zone_name | string | ✅ | 구역명 | 존-A (입구) |
+| area_sqm | number | ❌ | 면적 | 16 |
+| purpose | string | ❌ | 목적 | 고객 입장 및 환영 |
+| traffic_level | string | ❌ | 트래픽 레벨 | high |
 
-#### 샘플 데이터
+**Zone Types**:
+- `entrance`: 입구 구역
+- `product_display`: 제품 진열 구역
+- `checkout`: 계산대 구역
+- `storage`: 창고/보관 구역
+- `staff`: 직원 전용 구역
+- `fitting`: 피팅룸 구역
+- `rest`: 휴게 구역
+
+**샘플 데이터**:
 ```csv
-product_id,product_name,category,brand,price,cost_price,sku,stock,zone,x,z
-P001,청바지,의류,Levi's,89000,45000,JEANS-BL-32,50,의류구역,5.2,3.8
-P002,운동화,신발,Nike,129000,70000,SHOE-WH-260,30,신발구역,8.5,2.1
-P003,티셔츠,의류,Uniqlo,29000,15000,SHIRT-WH-L,100,의류구역,6.0,4.5
-P004,가방,액세서리,Coach,299000,150000,BAG-BR-M,20,액세서리구역,12.3,5.6
-P005,모자,액세서리,New Era,45000,22000,CAP-BL-FR,60,액세서리구역,11.8,6.2
+zone_id,zone_type,zone_name,area_sqm,purpose,traffic_level
+ZONE-A,entrance,존-A (입구),16,고객 입장 및 환영,high
+ZONE-B,product_display,존-B (가방/액세서리),25,가방 및 액세서리 진열,medium
+ZONE-C,product_display,존-C (하의),25,하의 제품 진열,medium
+ZONE-D,product_display,존-D (상의),25,상의 제품 진열,high
+ZONE-E,product_display,존-E (신발),25,신발 제품 진열,medium
+ZONE-F,product_display,존-F (아우터),25,아우터 제품 진열,low
+ZONE-G,product_display,존-G (프리미엄),25,프리미엄 제품 진열,medium
+ZONE-H,checkout,존-H (계산대),16,결제 및 포장,high
 ```
-
-#### 데이터 분포 가이드
-- **카테고리**: 의류(50%), 신발(25%), 액세서리(25%)
-- **가격대**: 저가(30%, <50,000원), 중가(50%, 50,000-150,000원), 고가(20%, >150,000원)
-- **재고**: 정규 분포, 평균 50개, 표준편차 20
 
 ---
 
-### 2.4 purchases.csv (구매 내역)
-**목적**: 거래 데이터 및 매출 분석
+### 4.4 Entrance (출입구)
 
-#### 컬럼 정의
+**파일명**: `entrances.csv`  
+**최소 레코드**: 2개
+
 | 컬럼명 | 타입 | 필수 | 설명 | 예시 |
 |--------|------|------|------|------|
-| transaction_id | string | ✅ | 거래 고유 ID | T001 |
-| store_id | string | ✅ | 매장 ID | GN001 |
-| customer_id | string | ✅ | 고객 ID | C001 |
-| product_id | string | ✅ | 상품 ID | P001 |
-| timestamp | datetime | ✅ | 구매 시간 | 2024-11-15 14:35:00 |
-| quantity | number | ✅ | 수량 | 2 |
-| unit_price | number | ✅ | 단가 | 89000 |
+| entrance_id | string | ✅ | 출입구 ID | ENT-MAIN-01 |
+| entrance_type | string | ❌ | 유형 | main |
+| width_m | number | ❌ | 너비 (미터) | 3.0 |
+| is_primary | boolean | ❌ | 메인 출입구 여부 | true |
+
+**샘플 데이터**:
+```csv
+entrance_id,entrance_type,width_m,is_primary
+ENT-MAIN-01,main,3.0,true
+ENT-SIDE-01,side,2.0,false
+```
+
+---
+
+### 4.5 CheckoutCounter (계산대)
+
+**파일명**: `checkout_counters.csv`  
+**최소 레코드**: 3개
+
+| 컬럼명 | 타입 | 필수 | 설명 | 예시 |
+|--------|------|------|------|------|
+| counter_id | string | ✅ | 계산대 ID | CHK-01 |
+| counter_number | number | ✅ | 계산대 번호 | 1 |
+| has_pos_terminal | boolean | ❌ | POS 단말기 보유 | true |
+| supports_mobile_payment | boolean | ❌ | 모바일 결제 지원 | true |
+| is_express_lane | boolean | ❌ | 익스프레스 레인 | false |
+
+**샘플 데이터**:
+```csv
+counter_id,counter_number,has_pos_terminal,supports_mobile_payment,is_express_lane
+CHK-01,1,true,true,false
+CHK-02,2,true,true,false
+CHK-03,3,true,true,true
+```
+
+---
+
+### 4.6 Category (카테고리)
+
+**파일명**: `categories.csv`  
+**최소 레코드**: 20개 (3레벨 계층)
+
+| 컬럼명 | 타입 | 필수 | 설명 | 예시 |
+|--------|------|------|------|------|
+| category_id | string | ✅ | 카테고리 ID | CAT-001 |
+| category_name | string | ✅ | 카테고리명 | 의류 |
+| parent_category_id | string | ❌ | 상위 카테고리 | null |
+| category_level | number | ❌ | 계층 레벨 | 1 |
+| display_order | number | ❌ | 표시 순서 | 1 |
+
+**샘플 데이터** (3레벨 계층):
+```csv
+category_id,category_name,parent_category_id,category_level,display_order
+CAT-001,의류,,1,1
+CAT-002,신발,,1,2
+CAT-003,액세서리,,1,3
+CAT-004,상의,CAT-001,2,1
+CAT-005,하의,CAT-001,2,2
+CAT-006,아우터,CAT-001,2,3
+CAT-007,티셔츠,CAT-004,3,1
+CAT-008,셔츠,CAT-004,3,2
+CAT-009,청바지,CAT-005,3,1
+CAT-010,면바지,CAT-005,3,2
+CAT-011,자켓,CAT-006,3,1
+CAT-012,코트,CAT-006,3,2
+CAT-013,운동화,CAT-002,2,1
+CAT-014,구두,CAT-002,2,2
+CAT-015,가방,CAT-003,2,1
+CAT-016,지갑,CAT-003,2,2
+CAT-017,모자,CAT-003,2,3
+CAT-018,벨트,CAT-003,2,4
+CAT-019,스니커즈,CAT-013,3,1
+CAT-020,러닝화,CAT-013,3,2
+```
+
+---
+
+### 4.7 Product (제품)
+
+**파일명**: `products.csv`  
+**최소 레코드**: 200개
+
+| 컬럼명 | 타입 | 필수 | 설명 | 예시 |
+|--------|------|------|------|------|
+| sku | string | ✅ | SKU | SKU-TS-001 |
+| product_name | string | ✅ | 제품명 | 베이직 화이트 티셔츠 |
+| category_id | string | ✅ | 카테고리 ID | CAT-007 |
+| brand | string | ❌ | 브랜드 | NEURALTWIN Basic |
+| selling_price | number | ✅ | 판매가 | 29000 |
+| cost_price | number | ❌ | 원가 | 15000 |
+| supplier | string | ❌ | 공급업체 | SUP-001 |
+| lead_time_days | number | ❌ | 리드타임 (일) | 7 |
+
+**카테고리별 분포**:
+- 상의 (티셔츠/셔츠): 60개
+- 하의 (청바지/면바지): 40개
+- 아우터 (자켓/코트): 30개
+- 신발 (운동화/구두): 40개
+- 액세서리 (가방/지갑/모자/벨트): 30개
+
+**가격대 분포**:
+- 저가 (<50,000원): 60개 (30%)
+- 중가 (50,000-150,000원): 100개 (50%)
+- 고가 (>150,000원): 40개 (20%)
+
+**샘플 데이터**:
+```csv
+sku,product_name,category_id,brand,selling_price,cost_price,supplier,lead_time_days
+SKU-TS-001,베이직 화이트 티셔츠,CAT-007,NEURALTWIN Basic,29000,15000,SUP-001,7
+SKU-TS-002,베이직 블랙 티셔츠,CAT-007,NEURALTWIN Basic,29000,15000,SUP-001,7
+SKU-SH-001,옥스포드 화이트 셔츠,CAT-008,NEURALTWIN Premium,59000,30000,SUP-002,10
+SKU-JN-001,슬림핏 블루 청바지,CAT-009,Denim Master,89000,45000,SUP-003,14
+SKU-JK-001,레더 블랙 자켓,CAT-011,NEURALTWIN Premium,299000,150000,SUP-004,21
+SKU-SN-001,클래식 화이트 스니커즈,CAT-019,Footwear Plus,129000,70000,SUP-005,14
+```
+
+---
+
+### 4.8 Inventory (재고)
+
+**파일명**: `inventory.csv`  
+**최소 레코드**: 200개 (제품당 1개)
+
+| 컬럼명 | 타입 | 필수 | 설명 | 예시 |
+|--------|------|------|------|------|
+| inventory_id | string | ✅ | 재고 ID | INV-001 |
+| product_id | string | ✅ | 제품 ID (SKU) | SKU-TS-001 |
+| store_id | string | ✅ | 매장 ID | NT-FLG-001 |
+| current_stock | number | ✅ | 현재 재고 | 45 |
+| minimum_stock | number | ✅ | 최소 재고 | 10 |
+| optimal_stock | number | ✅ | 최적 재고 | 50 |
+| weekly_demand | number | ❌ | 주간 수요 | 12 |
+| last_updated | datetime | ❌ | 최종 업데이트 | 2024-12-01 09:00:00 |
+
+**재고 분포 가이드**:
+- 인기 제품 (20%): current_stock = optimal_stock × 0.5-0.7 (재주문 필요)
+- 정상 제품 (60%): current_stock = optimal_stock × 0.8-1.2
+- 저동 제품 (20%): current_stock = optimal_stock × 1.5-2.0 (과재고)
+
+**샘플 데이터**:
+```csv
+inventory_id,product_id,store_id,current_stock,minimum_stock,optimal_stock,weekly_demand,last_updated
+INV-001,SKU-TS-001,NT-FLG-001,25,10,50,12,2024-12-01 09:00:00
+INV-002,SKU-TS-002,NT-FLG-001,45,10,50,8,2024-12-01 09:00:00
+INV-003,SKU-SH-001,NT-FLG-001,18,5,25,6,2024-12-01 09:00:00
+INV-004,SKU-JN-001,NT-FLG-001,12,8,30,10,2024-12-01 09:00:00
+INV-005,SKU-JK-001,NT-FLG-001,8,3,15,2,2024-12-01 09:00:00
+```
+
+---
+
+### 4.9 Brand (브랜드)
+
+**파일명**: `brands.csv`  
+**최소 레코드**: 15개
+
+| 컬럼명 | 타입 | 필수 | 설명 | 예시 |
+|--------|------|------|------|------|
+| brand_id | string | ✅ | 브랜드 ID | BRD-001 |
+| brand_name | string | ✅ | 브랜드명 | NEURALTWIN Basic |
+| brand_tier | string | ❌ | 브랜드 등급 | standard |
+| origin_country | string | ❌ | 원산지 | KR |
+
+**Brand Tiers**:
+- `luxury`: 럭셔리 (2개)
+- `premium`: 프리미엄 (4개)
+- `standard`: 스탠다드 (6개)
+- `value`: 밸류 (3개)
+
+**샘플 데이터**:
+```csv
+brand_id,brand_name,brand_tier,origin_country
+BRD-001,NEURALTWIN Basic,standard,KR
+BRD-002,NEURALTWIN Premium,premium,KR
+BRD-003,Denim Master,standard,USA
+BRD-004,Footwear Plus,standard,KR
+BRD-005,Luxury Collection,luxury,IT
+BRD-006,Urban Style,standard,KR
+BRD-007,Active Wear,standard,USA
+BRD-008,Classic Elegance,premium,FR
+BRD-009,Street Fashion,value,KR
+BRD-010,Designer Line,luxury,IT
+BRD-011,Casual Comfort,value,KR
+BRD-012,Sport Elite,premium,DE
+BRD-013,Minimal Chic,premium,KR
+BRD-014,Budget Basics,value,CN
+BRD-015,Modern Trends,standard,KR
+```
+
+---
+
+### 4.10 Promotion (프로모션)
+
+**파일명**: `promotions.csv`  
+**최소 레코드**: 10개
+
+| 컬럼명 | 타입 | 필수 | 설명 | 예시 |
+|--------|------|------|------|------|
+| promotion_id | string | ✅ | 프로모션 ID | PROMO-001 |
+| promotion_name | string | ✅ | 프로모션명 | 겨울 세일 |
+| promotion_type | string | ❌ | 유형 | discount |
+| start_date | date | ✅ | 시작일 | 2024-12-01 |
+| end_date | date | ✅ | 종료일 | 2024-12-31 |
+| discount_rate | number | ❌ | 할인율 | 20 |
+| target_products | array | ❌ | 대상 제품 | ["SKU-TS-001","SKU-TS-002"] |
+| target_zones | array | ❌ | 대상 구역 | ["ZONE-D","ZONE-F"] |
+
+**Promotion Types**:
+- `discount`: 할인 (40%)
+- `bogo`: Buy One Get One (20%)
+- `bundle`: 묶음 할인 (20%)
+- `seasonal`: 시즌 세일 (20%)
+
+**샘플 데이터**:
+```csv
+promotion_id,promotion_name,promotion_type,start_date,end_date,discount_rate,target_products,target_zones
+PROMO-001,겨울 세일,seasonal,2024-12-01,2024-12-31,20,"[""SKU-TS-001"",""SKU-TS-002""]","[""ZONE-D"",""ZONE-F""]"
+PROMO-002,가방 2+1,bogo,2024-11-15,2024-12-15,0,"[""SKU-BAG-*""]","[""ZONE-B""]"
+PROMO-003,청바지 30% 할인,discount,2024-11-20,2024-12-20,30,"[""SKU-JN-*""]","[""ZONE-C""]"
+PROMO-004,신발 묶음 할인,bundle,2024-11-10,2024-12-10,15,"[""SKU-SN-*""]","[""ZONE-E""]"
+```
+
+---
+
+### 4.11 Customer (고객)
+
+**파일명**: `customers.csv`  
+**최소 레코드**: 500명
+
+| 컬럼명 | 타입 | 필수 | 설명 | 예시 |
+|--------|------|------|------|------|
+| customer_id | string | ✅ | 고객 ID | CUST-001 |
+| age_group | string | ❌ | 연령대 | 20s |
+| gender | string | ❌ | 성별 | F |
+| customer_segment | string | ❌ | 세그먼트 | VIP |
+| signup_date | date | ❌ | 가입일 | 2024-01-15 |
+| loyalty_tier | string | ❌ | 로열티 등급 | gold |
+| total_purchases | number | ❌ | 누적 구매액 | 1500000 |
+| visit_frequency | string | ❌ | 방문 빈도 | high |
+
+**고객 세그먼트 분포**:
+- VIP (10%): 50명 - total_purchases > 2,000,000원
+- Regular (60%): 300명 - 500,000원 < total_purchases < 2,000,000원
+- New (30%): 150명 - total_purchases < 500,000원
+
+**연령대 분포**:
+- 10s (5%): 25명
+- 20s (30%): 150명
+- 30s (35%): 175명
+- 40s (20%): 100명
+- 50s (7%): 35명
+- 60s+ (3%): 15명
+
+**성별 분포**:
+- Female (60%): 300명
+- Male (38%): 190명
+- Other (2%): 10명
+
+**샘플 데이터**:
+```csv
+customer_id,age_group,gender,customer_segment,signup_date,loyalty_tier,total_purchases,visit_frequency
+CUST-001,30s,F,VIP,2024-01-15,platinum,3500000,high
+CUST-002,20s,M,Regular,2024-02-20,silver,800000,medium
+CUST-003,40s,F,Regular,2024-03-10,gold,1200000,medium
+CUST-004,20s,F,New,2024-11-01,bronze,150000,low
+CUST-005,30s,M,VIP,2024-01-20,platinum,4200000,high
+```
+
+---
+
+### 4.12 Visit (방문)
+
+**파일명**: `visits.csv`  
+**최소 레코드**: 2,000건 (3개월)
+
+| 컬럼명 | 타입 | 필수 | 설명 | 예시 |
+|--------|------|------|------|------|
+| visit_id | string | ✅ | 방문 ID | VISIT-001 |
+| customer_id | string | ✅ | 고객 ID | CUST-001 |
+| store_id | string | ✅ | 매장 ID | NT-FLG-001 |
+| visit_date | date | ✅ | 방문일 | 2024-11-15 |
+| visit_time | time | ✅ | 방문시간 | 14:35:00 |
+| duration_minutes | number | ❌ | 체류 시간 (분) | 45 |
+| zones_visited | array | ❌ | 방문 구역 | ["ZONE-A","ZONE-D","ZONE-H"] |
+| did_purchase | boolean | ❌ | 구매 여부 | true |
+| entry_point | string | ❌ | 입구 ID | ENT-MAIN-01 |
+
+**방문 패턴**:
+- 평일 (60%): 1,200건
+- 주말 (40%): 800건
+- 시간대 분포: 오전 10-12시 (20%), 점심 12-14시 (15%), 오후 14-18시 (35%), 저녁 18-21시 (30%)
+- 전환율: 40% (800건이 구매로 이어짐)
+
+**샘플 데이터**:
+```csv
+visit_id,customer_id,store_id,visit_date,visit_time,duration_minutes,zones_visited,did_purchase,entry_point
+VISIT-001,CUST-001,NT-FLG-001,2024-11-15,14:35:00,45,"[""ZONE-A"",""ZONE-D"",""ZONE-E"",""ZONE-H""]",true,ENT-MAIN-01
+VISIT-002,CUST-002,NT-FLG-001,2024-11-15,15:20:00,25,"[""ZONE-A"",""ZONE-C"",""ZONE-H""]",true,ENT-MAIN-01
+VISIT-003,CUST-003,NT-FLG-001,2024-11-15,16:45:00,15,"[""ZONE-A"",""ZONE-B""]",false,ENT-MAIN-01
+VISIT-004,CUST-004,NT-FLG-001,2024-11-16,11:00:00,60,"[""ZONE-A"",""ZONE-B"",""ZONE-D"",""ZONE-F"",""ZONE-H""]",true,ENT-MAIN-01
+```
+
+---
+
+### 4.13 Transaction (거래)
+
+**파일명**: `transactions.csv`  
+**최소 레코드**: 1,000건
+
+| 컬럼명 | 타입 | 필수 | 설명 | 예시 |
+|--------|------|------|------|------|
+| transaction_id | string | ✅ | 거래 ID | TXN-001 |
+| customer_id | string | ❌ | 고객 ID | CUST-001 |
+| store_id | string | ✅ | 매장 ID | NT-FLG-001 |
+| transaction_date | date | ✅ | 거래일 | 2024-11-15 |
+| transaction_time | time | ✅ | 거래시간 | 14:50:00 |
 | total_amount | number | ✅ | 총 금액 | 178000 |
-| discount | number | ❌ | 할인 금액 | 10000 |
-| payment_method | string | ❌ | 결제 수단 | 카드, 현금, 페이 |
-| staff_id | string | ❌ | 판매 직원 ID | S001 |
+| payment_method | string | ❌ | 결제 방법 | card |
+| discount_amount | number | ❌ | 할인 금액 | 10000 |
+| num_items | number | ❌ | 구매 품목 수 | 3 |
+| products_purchased | array | ❌ | 구매 제품 | ["SKU-TS-001","SKU-JN-001"] |
+| counter_id | string | ❌ | 계산대 ID | CHK-01 |
 
-#### 샘플 데이터
+**결제 수단 분포**:
+- card (70%): 700건
+- mobile (25%): 250건
+- cash (5%): 50건
+
+**샘플 데이터**:
 ```csv
-transaction_id,store_id,customer_id,product_id,timestamp,quantity,unit_price,total_amount,discount,payment_method,staff_id
-T001,GN001,C001,P001,2024-11-15 14:35:00,2,89000,178000,10000,카드,S001
-T002,GN001,C002,P002,2024-11-15 15:20:00,1,129000,129000,0,페이,S002
-T003,HD001,C003,P003,2024-11-15 16:45:00,3,29000,87000,5000,카드,S003
-T004,GN001,C001,P004,2024-11-15 17:10:00,1,299000,299000,20000,카드,S001
-T005,SC001,C005,P005,2024-11-15 18:00:00,2,45000,90000,0,현금,S004
+transaction_id,customer_id,store_id,transaction_date,transaction_time,total_amount,payment_method,discount_amount,num_items,products_purchased,counter_id
+TXN-001,CUST-001,NT-FLG-001,2024-11-15,14:50:00,178000,card,10000,3,"[""SKU-TS-001"",""SKU-JN-001"",""SKU-SN-001""]",CHK-01
+TXN-002,CUST-002,NT-FLG-001,2024-11-15,15:35:00,129000,mobile,0,1,"[""SKU-SN-001""]",CHK-02
+TXN-003,CUST-003,NT-FLG-001,2024-11-15,16:55:00,87000,card,5000,2,"[""SKU-TS-001"",""SKU-TS-002""]",CHK-01
 ```
-
-#### 데이터 분포 가이드
-- **시간대**: 평일 오전(10%), 점심(20%), 오후(30%), 저녁(40%)
-- **요일**: 평일(60%), 주말(40%)
-- **결제 수단**: 카드(70%), 페이(25%), 현금(5%)
-- **할인**: 30%의 거래에서 평균 10% 할인
 
 ---
 
-### 2.5 visits.csv (방문 기록)
-**목적**: 고객 동선 및 체류 시간 분석
+### 4.14 Purchase (구매)
 
-#### 컬럼 정의
+**파일명**: `purchases.csv`  
+**최소 레코드**: 2,500건 (거래당 평균 2.5개 품목)
+
 | 컬럼명 | 타입 | 필수 | 설명 | 예시 |
 |--------|------|------|------|------|
-| visit_id | string | ✅ | 방문 고유 ID | V001 |
-| store_id | string | ✅ | 매장 ID | GN001 |
-| customer_id | string | ❌ | 고객 ID (추적 가능 시) | C001 |
-| session_id | string | ✅ | 세션 ID (WiFi MAC) | MAC_001 |
-| entry_time | datetime | ✅ | 입장 시간 | 2024-11-15 14:30:00 |
-| exit_time | datetime | ✅ | 퇴장 시간 | 2024-11-15 15:15:00 |
-| dwell_time | number | ✅ | 체류 시간 (분) | 45 |
-| visited_zones | string | ❌ | 방문 Zone 순서 | 입구,의류구역,신발구역,계산대 |
-| x_path | string | ❌ | X 좌표 경로 (JSON) | [0.5,2.3,5.2,8.1,10.0] |
-| z_path | string | ❌ | Z 좌표 경로 (JSON) | [0.2,1.5,3.8,2.1,1.0] |
-| timestamps | string | ❌ | 타임스탬프 경로 (JSON) | [14:30:00,14:35:00,14:42:00,14:50:00,15:15:00] |
-| purchased | boolean | ❌ | 구매 여부 | true, false |
+| purchase_id | string | ✅ | 구매 ID | PUR-001 |
+| transaction_id | string | ✅ | 거래 ID | TXN-001 |
+| product_id | string | ✅ | 제품 ID (SKU) | SKU-TS-001 |
+| quantity | number | ✅ | 수량 | 2 |
+| unit_price | number | ✅ | 단가 | 29000 |
+| subtotal | number | ✅ | 소계 | 58000 |
+| discount_applied | number | ❌ | 적용 할인 | 5000 |
 
-#### 샘플 데이터
+**샘플 데이터**:
 ```csv
-visit_id,store_id,customer_id,session_id,entry_time,exit_time,dwell_time,visited_zones,x_path,z_path,timestamps,purchased
-V001,GN001,C001,MAC_001,2024-11-15 14:30:00,2024-11-15 15:15:00,45,입구|의류구역|신발구역|계산대,"[0.5,2.3,5.2,8.1,10.0]","[0.2,1.5,3.8,2.1,1.0]","[14:30,14:35,14:42,14:50,15:15]",true
-V002,GN001,,MAC_002,2024-11-15 14:45:00,2024-11-15 15:00:00,15,입구|의류구역|입구,"[0.5,5.0,0.5]","[0.2,4.0,0.2]","[14:45,14:52,15:00]",false
-V003,HD001,C003,MAC_003,2024-11-15 15:00:00,2024-11-15 16:00:00,60,입구|전체순회|계산대,"[0.5,3.0,6.0,9.0,10.0]","[0.2,2.5,5.0,2.5,1.0]","[15:00,15:15,15:30,15:50,16:00]",true
+purchase_id,transaction_id,product_id,quantity,unit_price,subtotal,discount_applied
+PUR-001,TXN-001,SKU-TS-001,2,29000,58000,5000
+PUR-002,TXN-001,SKU-JN-001,1,89000,89000,5000
+PUR-003,TXN-001,SKU-SN-001,1,129000,129000,0
+PUR-004,TXN-002,SKU-SN-001,1,129000,129000,0
+PUR-005,TXN-003,SKU-TS-001,1,29000,29000,2500
+PUR-006,TXN-003,SKU-TS-002,2,29000,58000,2500
 ```
-
-#### 데이터 분포 가이드
-- **체류 시간**: 평균 25분, 표준편차 15분
-- **전환율**: 40% (구매한 방문 비율)
-- **Zone 방문**: 평균 3-5개 Zone
-- **좌표 포인트**: 5-20개 포인트 (1-3분 간격)
 
 ---
 
-### 2.6 staff.csv (직원 정보)
-**목적**: 직원 정보 및 성과 분석
+### 4.15 Staff (직원)
 
-#### 컬럼 정의
+**파일명**: `staff.csv`  
+**최소 레코드**: 15명
+
 | 컬럼명 | 타입 | 필수 | 설명 | 예시 |
 |--------|------|------|------|------|
-| staff_id | string | ✅ | 직원 고유 ID | S001 |
-| staff_name | string | ✅ | 직원명 | 김직원 |
-| store_id | string | ✅ | 소속 매장 ID | GN001 |
-| position | string | ❌ | 직책 | 매니저, 직원, 아르바이트 |
-| hire_date | date | ❌ | 입사일 | 2023-01-15 |
-| salary_level | number | ❌ | 급여 레벨 | 3 |
-| performance_score | number | ❌ | 성과 점수 (1-100) | 85 |
-| sales_count_monthly | number | ❌ | 월 판매 건수 | 120 |
-| customer_satisfaction | number | ❌ | 고객 만족도 (1-5) | 4.5 |
+| staff_id | string | ✅ | 직원 ID | STAFF-001 |
+| staff_name | string | ✅ | 직원명 | 김매니저 |
+| role | string | ✅ | 역할 | manager |
+| store_id | string | ✅ | 소속 매장 | NT-FLG-001 |
+| hire_date | date | ❌ | 입사일 | 2024-01-15 |
+| employment_type | string | ❌ | 고용 유형 | full_time |
 
-#### 샘플 데이터
+**역할 분포**:
+- manager (1명): 매장 매니저
+- sales (8명): 판매 직원
+- stockist (4명): 재고 관리
+- security (2명): 보안 직원
+
+**샘플 데이터**:
 ```csv
-staff_id,staff_name,store_id,position,hire_date,salary_level,performance_score,sales_count_monthly,customer_satisfaction
-S001,김직원,GN001,매니저,2023-01-15,5,92,150,4.8
-S002,이직원,GN001,직원,2023-03-20,3,85,120,4.5
-S003,박직원,HD001,직원,2023-05-10,3,78,100,4.2
-S004,최직원,SC001,아르바이트,2024-01-05,1,70,80,4.0
-S005,정직원,GN001,직원,2023-06-15,3,88,130,4.6
+staff_id,staff_name,role,store_id,hire_date,employment_type
+STAFF-001,김매니저,manager,NT-FLG-001,2024-01-15,full_time
+STAFF-002,이판매,sales,NT-FLG-001,2024-01-20,full_time
+STAFF-003,박판매,sales,NT-FLG-001,2024-02-01,full_time
+STAFF-004,최판매,sales,NT-FLG-001,2024-02-15,part_time
+STAFF-005,정재고,stockist,NT-FLG-001,2024-01-25,full_time
+STAFF-006,강재고,stockist,NT-FLG-001,2024-03-01,full_time
+STAFF-007,조보안,security,NT-FLG-001,2024-01-15,full_time
 ```
 
 ---
 
-### 2.7 brands.csv (브랜드 정보)
-**목적**: 브랜드 메타데이터
+### 4.16 Shift (근무 시간)
 
-#### 컬럼 정의
+**파일명**: `shifts.csv`  
+**최소 레코드**: 450건 (15명 × 30일)
+
 | 컬럼명 | 타입 | 필수 | 설명 | 예시 |
 |--------|------|------|------|------|
-| brand_id | string | ✅ | 브랜드 고유 ID | B001 |
-| brand_name | string | ✅ | 브랜드명 | Nike |
-| category | string | ❌ | 카테고리 | 스포츠, 패션, 럭셔리 |
-| country | string | ❌ | 원산지 | USA, Korea, Italy |
-| price_range | string | ❌ | 가격대 | Budget, Mid, Premium |
+| shift_id | string | ✅ | 근무 ID | SHF-001 |
+| staff_id | string | ✅ | 직원 ID | STAFF-002 |
+| shift_date | date | ✅ | 근무일 | 2024-11-15 |
+| start_time | time | ✅ | 시작 시간 | 09:00:00 |
+| end_time | time | ✅ | 종료 시간 | 18:00:00 |
+| shift_type | string | ❌ | 근무 유형 | morning |
 
-#### 샘플 데이터
+**Shift Types**:
+- morning (09:00-18:00): 아침 근무
+- afternoon (13:00-22:00): 오후 근무
+- evening (16:00-22:00): 저녁 근무
+- night (22:00-06:00): 야간 근무 (보안 직원)
+
+**샘플 데이터**:
 ```csv
-brand_id,brand_name,category,country,price_range
-B001,Nike,스포츠,USA,Mid
-B002,Adidas,스포츠,Germany,Mid
-B003,Levi's,패션,USA,Mid
-B004,Coach,럭셔리,USA,Premium
-B005,Uniqlo,패션,Japan,Budget
+shift_id,staff_id,shift_date,start_time,end_time,shift_type
+SHF-001,STAFF-002,2024-11-15,09:00:00,18:00:00,morning
+SHF-002,STAFF-003,2024-11-15,13:00:00,22:00:00,afternoon
+SHF-003,STAFF-004,2024-11-15,16:00:00,22:00:00,evening
+SHF-004,STAFF-007,2024-11-15,22:00:00,06:00:00,night
 ```
 
 ---
 
-## 3. 데이터셋 구조
+### 4.17 WiFiSensor (WiFi 센서)
 
-### 3.1 디렉토리 구조
+**파일명**: `wifi_sensors.csv`  
+**최소 레코드**: 6개
+
+| 컬럼명 | 타입 | 필수 | 설명 | 예시 |
+|--------|------|------|------|------|
+| sensor_id | string | ✅ | 센서 ID | WIFI-001 |
+| zone_id | string | ✅ | 설치 구역 | ZONE-A |
+| mac_address | string | ❌ | MAC 주소 | AA:BB:CC:DD:EE:01 |
+| detection_range_m | number | ❌ | 탐지 범위 | 10 |
+| status | string | ❌ | 상태 | active |
+
+**센서 배치**:
+- 입구 (ZONE-A): 2개
+- 주요 진열 구역 (ZONE-D, ZONE-E): 각 1개
+- 계산대 (ZONE-H): 2개
+
+**샘플 데이터**:
+```csv
+sensor_id,zone_id,mac_address,detection_range_m,status
+WIFI-001,ZONE-A,AA:BB:CC:DD:EE:01,10,active
+WIFI-002,ZONE-A,AA:BB:CC:DD:EE:02,10,active
+WIFI-003,ZONE-D,AA:BB:CC:DD:EE:03,8,active
+WIFI-004,ZONE-E,AA:BB:CC:DD:EE:04,8,active
+WIFI-005,ZONE-H,AA:BB:CC:DD:EE:05,10,active
+WIFI-006,ZONE-H,AA:BB:CC:DD:EE:06,10,active
 ```
-project-root/
-├── public/
-│   └── samples/                    # 샘플 데이터
-│       ├── stores.csv
-│       ├── customers.csv
-│       ├── products.csv
-│       ├── purchases.csv
-│       ├── visits.csv
-│       ├── staff.csv
-│       ├── brands.csv
-│       ├── wifi_sensors.csv
-│       ├── wifi_tracking.csv
-│       └── zones.csv
-│
-├── supabase/
-│   └── storage/
-│       └── store-data/            # 사용자 업로드 데이터
-│           └── {userId}/
-│               └── {storeId}/
-│                   ├── customers.csv
-│                   ├── products.csv
-│                   ├── purchases.csv
-│                   ├── visits.csv
-│                   └── staff.csv
-```
-
-### 3.2 Storage 저장 규칙
-- **경로 형식**: `{userId}/{storeId}/{filename}.csv`
-- **파일명**: 고정된 이름 사용 (customers.csv, products.csv 등)
-- **인코딩**: UTF-8
-- **줄바꿈**: LF (Unix style)
-- **구분자**: 쉼표 (,)
-- **따옴표**: 쌍따옴표 (") - 필드에 쉼표 포함 시 사용
-
-### 3.3 데이터 저장소 매핑
-| 데이터 타입 | 저장소 | 테이블/버킷 | 접근 방식 |
-|------------|--------|------------|----------|
-| CSV 원본 | Storage | store-data | storageDataLoader.ts |
-| 매장 정보 | Database | stores | Supabase Client |
-| 임포트 이력 | Database | user_data_imports | Supabase Client |
-| 온톨로지 엔티티 | Database | graph_entities | Supabase Client |
-| 3D 모델 | Storage | 3d-models | Store3DViewer.tsx |
-| WiFi 데이터 | Database | wifi_tracking | useWiFiTracking.ts |
 
 ---
 
-## 4. 데이터셋 형식
+### 4.18-4.25 데이터 파이프라인 & AI 관련 엔티티
 
-### 4.1 CSV 형식 규칙
+#### 4.18 DataSource (데이터 소스)
+
+**파일명**: `data_sources.csv`  
+**최소 레코드**: 3개
+
 ```csv
-# 헤더 (첫 줄 필수)
-column1,column2,column3
-
-# 데이터 행
-value1,value2,value3
-"value with, comma",value2,value3
-
-# 주의사항
-- BOM 없이 UTF-8 인코딩
-- 헤더는 영문 소문자 + 언더스코어
-- 빈 행 없음
-- 마지막 행 줄바꿈 있음
+source_id,system_name,source_type,connection_info,owner,refresh_frequency
+DS-001,POS System,db,"{""host"":""pos.example.com"",""port"":5432}",IT팀,real-time
+DS-002,ERP System,api,"{""endpoint"":""https://erp.example.com/api""}",운영팀,daily
+DS-003,CRM System,api,"{""endpoint"":""https://crm.example.com/api""}",마케팅팀,hourly
 ```
 
-### 4.2 날짜/시간 형식
-| 타입 | 형식 | 예시 |
-|------|------|------|
-| 날짜 | YYYY-MM-DD | 2024-11-15 |
-| 시간 | HH:MM:SS | 14:35:00 |
-| 날짜시간 | YYYY-MM-DD HH:MM:SS | 2024-11-15 14:35:00 |
-| ISO 8601 | YYYY-MM-DDTHH:MM:SS | 2024-11-15T14:35:00 |
+#### 4.19 DataSourceTable (데이터 테이블)
 
-### 4.3 숫자 형식
-| 타입 | 형식 | 예시 |
-|------|------|------|
-| 정수 | 쉼표 없음 | 1000 |
-| 소수 | 점(.) 구분자 | 1234.56 |
-| 통화 | 원화, 쉼표 없음 | 89000 |
-| 백분율 | 0-100 범위 | 85.5 |
+**파일명**: `data_source_tables.csv`  
+**최소 레코드**: 10개
 
-### 4.4 배열/JSON 형식
 ```csv
-# 배열 (파이프 구분)
-visited_zones
-입구|의류구역|신발구역|계산대
-
-# JSON 배열 (문자열로 저장)
-x_path
-"[0.5,2.3,5.2,8.1,10.0]"
-
-# JSON 객체 (문자열로 저장)
-metadata
-"{""wifi"":true,""sensor"":""NS001""}"
+table_id,source_id,table_name,schema_raw,row_count
+TBL-001,DS-001,sales_transactions,"{""columns"":[{""name"":""txn_id""},{""name"":""amount""}]}",50000
+TBL-002,DS-001,inventory_movements,"{""columns"":[{""name"":""product_id""},{""name"":""qty""}]}",20000
+TBL-003,DS-002,suppliers,"{""columns"":[{""name"":""supplier_id""},{""name"":""name""}]}",150
+TBL-004,DS-003,customer_profiles,"{""columns"":[{""name"":""customer_id""},{""name"":""segment""}]}",5000
 ```
 
-### 4.5 불리언 형식
-| 값 | 의미 |
-|----|------|
-| true, TRUE, 1 | 참 |
-| false, FALSE, 0 | 거짓 |
-| (빈 값) | NULL |
+#### 4.20 ColumnMapping (컬럼 매핑)
+
+**파일명**: `column_mappings.csv`  
+**최소 레코드**: 50개
+
+```csv
+mapping_id,table_id,source_column,target_entity,target_attribute,transformation
+MAP-001,TBL-001,txn_id,Transaction,transaction_id,direct
+MAP-002,TBL-001,amount,Transaction,total_amount,direct
+MAP-003,TBL-001,txn_date,Transaction,transaction_date,parse_date
+MAP-004,TBL-002,product_id,Product,sku,direct
+```
+
+#### 4.21 BaseEvent (기본 이벤트)
+
+**파일명**: `base_events.csv`  
+**최소 레코드**: 100개
+
+```csv
+event_id,event_type,timestamp,source_system,payload
+EVT-001,system_startup,2024-11-15 09:00:00,POS,"{""version"":""1.2.3""}"
+EVT-002,data_sync,2024-11-15 09:05:00,ERP,"{""records"":150}"
+```
+
+#### 4.22 CustomerEvent (고객 이벤트)
+
+**파일명**: `customer_events.csv`  
+**최소 레코드**: 5,000건
+
+```csv
+event_id,customer_id,event_type,timestamp,zone_id,product_id,metadata
+CEVT-001,CUST-001,zone_entry,2024-11-15 14:35:00,ZONE-A,,"{""entry_point"":""ENT-MAIN-01""}"
+CEVT-002,CUST-001,product_view,2024-11-15 14:37:00,ZONE-D,SKU-TS-001,"{""dwell_seconds"":45}"
+CEVT-003,CUST-001,product_pickup,2024-11-15 14:40:00,ZONE-D,SKU-JN-001,"{}"
+CEVT-004,CUST-001,zone_exit,2024-11-15 14:42:00,ZONE-D,,"{}"
+```
+
+#### 4.23 SensorEvent (센서 이벤트)
+
+**파일명**: `sensor_events.csv`  
+**최소 레코드**: 10,000건
+
+```csv
+event_id,sensor_id,event_type,timestamp,detected_mac,rssi,metadata
+SEVT-001,WIFI-001,mac_detected,2024-11-15 14:35:00,AA:11:22:33:44:55,-65,"{""first_seen"":true}"
+SEVT-002,WIFI-001,mac_tracked,2024-11-15 14:35:10,AA:11:22:33:44:55,-62,"{}"
+SEVT-003,WIFI-002,mac_detected,2024-11-15 14:35:15,AA:11:22:33:44:55,-70,"{}"
+```
+
+#### 4.24 Model (AI 모델)
+
+**파일명**: `models.csv`  
+**최소 레코드**: 5개
+
+```csv
+model_id,model_name,model_type,version,framework,created_at
+MODEL-001,고객 세그먼트 예측,classification,v1.0,scikit-learn,2024-10-01
+MODEL-002,수요 예측,regression,v2.1,tensorflow,2024-10-15
+MODEL-003,재고 최적화,optimization,v1.5,custom,2024-11-01
+MODEL-004,가격 추천,reinforcement_learning,v1.2,pytorch,2024-11-10
+MODEL-005,이상 탐지,anomaly_detection,v1.0,isolation_forest,2024-11-15
+```
+
+#### 4.25 ModelRun (모델 실행)
+
+**파일명**: `model_runs.csv`  
+**최소 레코드**: 50건
+
+```csv
+run_id,model_id,run_date,input_data,output_results,accuracy,runtime_seconds
+RUN-001,MODEL-001,2024-11-15,"{""customer_count"":500}","{""vip"":50,""regular"":300,""new"":150}",0.92,12.5
+RUN-002,MODEL-002,2024-11-15,"{""sku"":""SKU-TS-001"",""days"":30}","{""forecast"":[12,15,18,14]}",0.88,8.3
+```
 
 ---
 
-## 5. 3D 모델 데이터
+## 5. HIGH 엔티티 CSV 데이터셋 (19개)
 
-### 5.1 파일명 규칙
+### 5.1 Weather (날씨)
+
+**파일명**: `weather.csv`  
+**최소 레코드**: 90일치
+
+| 컬럼명 | 타입 | 필수 | 설명 | 예시 |
+|--------|------|------|------|------|
+| weather_id | string | ✅ | 날씨 ID | WTH-001 |
+| store_id | string | ✅ | 매장 ID | NT-FLG-001 |
+| date | date | ✅ | 날짜 | 2024-11-15 |
+| temperature_c | number | ❌ | 온도 (°C) | 15.5 |
+| condition | string | ❌ | 날씨 상태 | sunny |
+| precipitation_mm | number | ❌ | 강수량 (mm) | 0 |
+| humidity_percent | number | ❌ | 습도 (%) | 65 |
+
+**Weather Conditions**:
+- sunny (40%): 맑음
+- cloudy (30%): 흐림
+- rainy (20%): 비
+- snowy (10%): 눈
+
+**샘플 데이터**:
+```csv
+weather_id,store_id,date,temperature_c,condition,precipitation_mm,humidity_percent
+WTH-001,NT-FLG-001,2024-11-15,15.5,sunny,0,65
+WTH-002,NT-FLG-001,2024-11-16,12.3,cloudy,0,72
+WTH-003,NT-FLG-001,2024-11-17,8.7,rainy,15,85
+```
+
+---
+
+### 5.2 Holiday (공휴일)
+
+**파일명**: `holidays.csv`  
+**최소 레코드**: 30건 (1년치)
+
+| 컬럼명 | 타입 | 필수 | 설명 | 예시 |
+|--------|------|------|------|------|
+| holiday_id | string | ✅ | 공휴일 ID | HOL-001 |
+| date | date | ✅ | 날짜 | 2024-01-01 |
+| holiday_name | string | ✅ | 공휴일명 | 신정 |
+| holiday_type | string | ❌ | 유형 | national |
+| is_shopping_day | boolean | ❌ | 쇼핑 성수기 여부 | true |
+
+**샘플 데이터**:
+```csv
+holiday_id,date,holiday_name,holiday_type,is_shopping_day
+HOL-001,2024-01-01,신정,national,true
+HOL-002,2024-02-09,설날 전날,lunar,true
+HOL-003,2024-02-10,설날,lunar,false
+HOL-004,2024-03-01,삼일절,national,false
+HOL-005,2024-05-05,어린이날,national,true
+HOL-006,2024-06-06,현충일,national,false
+HOL-007,2024-08-15,광복절,national,false
+HOL-008,2024-09-16,추석 전날,lunar,true
+HOL-009,2024-09-17,추석,lunar,false
+HOL-010,2024-10-03,개천절,national,false
+HOL-011,2024-10-09,한글날,national,false
+HOL-012,2024-12-25,크리스마스,national,true
+```
+
+---
+
+### 5.3 EconomicIndicator (경제 지표)
+
+**파일명**: `economic_indicators.csv`  
+**최소 레코드**: 90일치 × 3개 지표 = 270건
+
+| 컬럼명 | 타입 | 필수 | 설명 | 예시 |
+|--------|------|------|------|------|
+| indicator_id | string | ✅ | 지표 ID | ECO-001 |
+| date | date | ✅ | 날짜 | 2024-11-15 |
+| indicator_type | string | ✅ | 지표 유형 | consumer_confidence |
+| value | number | ✅ | 지표 값 | 105.2 |
+| unit | string | ❌ | 단위 | index |
+
+**Indicator Types**:
+- consumer_confidence: 소비자 신뢰 지수
+- inflation_rate: 인플레이션율
+- retail_sales_index: 소매 판매 지수
+
+**샘플 데이터**:
+```csv
+indicator_id,date,indicator_type,value,unit
+ECO-001,2024-11-15,consumer_confidence,105.2,index
+ECO-002,2024-11-15,inflation_rate,2.8,percent
+ECO-003,2024-11-15,retail_sales_index,112.5,index
+ECO-004,2024-11-16,consumer_confidence,104.8,index
+```
+
+---
+
+### 5.4-5.10 공간 가구 엔티티
+
+#### 5.4 Aisle (통로)
+
+**파일명**: `aisles.csv`  
+**최소 레코드**: 6개
+
+```csv
+aisle_id,zone_id,aisle_name,width_m,length_m,traffic_level
+AISLE-001,ZONE-B,메인 통로 1,2.5,8.0,high
+AISLE-002,ZONE-C,메인 통로 2,2.5,8.0,high
+AISLE-003,ZONE-D,상의 구역 통로,2.0,6.0,medium
+```
+
+#### 5.5 FittingRoom (피팅룸)
+
+**파일명**: `fitting_rooms.csv`  
+**최소 레코드**: 2개
+
+```csv
+room_id,zone_id,room_number,is_available,capacity
+FIT-001,ZONE-F,1,true,1
+FIT-002,ZONE-F,2,true,1
+```
+
+#### 5.6 StorageRoom (창고)
+
+**파일명**: `storage_rooms.csv`  
+**최소 레코드**: 1개
+
+```csv
+storage_id,zone_id,storage_type,area_sqm,capacity_units
+STG-001,ZONE-BACK,backstock,30,5000
+```
+
+#### 5.7 Shelf (진열대)
+
+**파일명**: `shelves.csv`  
+**최소 레코드**: 12개
+
+```csv
+shelf_id,zone_id,shelf_type,width_m,height_m,depth_m,capacity
+SHF-001,ZONE-B,wall_mounted,3.0,2.0,0.5,50
+SHF-002,ZONE-C,wall_mounted,3.0,2.0,0.5,50
+SHF-003,ZONE-D,wall_mounted,3.0,2.0,0.5,50
+```
+
+#### 5.8 Rack (랙)
+
+**파일명**: `racks.csv`  
+**최소 레코드**: 8개
+
+```csv
+rack_id,zone_id,rack_type,width_m,height_m,depth_m,capacity
+RCK-001,ZONE-D,clothing,1.5,1.8,0.5,30
+RCK-002,ZONE-E,shoe,2.0,1.5,0.5,40
+```
+
+#### 5.9 DisplayTable (진열 테이블)
+
+**파일명**: `display_tables.csv`  
+**최소 레코드**: 6개
+
+```csv
+table_id,zone_id,table_type,width_m,depth_m,height_m,capacity
+TBL-001,ZONE-B,center,2.0,1.0,0.8,20
+TBL-002,ZONE-D,center,2.0,1.0,0.8,20
+```
+
+#### 5.10 Supplier (공급업체)
+
+**파일명**: `suppliers.csv`  
+**최소 레코드**: 10개
+
+```csv
+supplier_id,supplier_name,contact_person,email,phone,country,lead_time_days
+SUP-001,패션 기획,김담당,kim@supplier1.com,02-1111-1111,KR,7
+SUP-002,프리미엄 의류,이담당,lee@supplier2.com,02-2222-2222,KR,10
+SUP-003,데님 마스터,박담당,park@supplier3.com,02-3333-3333,USA,14
+```
+
+---
+
+### 5.11-5.13 IoT 장비
+
+#### 5.11 Camera (카메라)
+
+**파일명**: `cameras.csv`  
+**최소 레코드**: 8개
+
+```csv
+camera_id,zone_id,camera_type,position,resolution,status
+CAM-001,ZONE-A,ceiling,"{""x"":2,""y"":3,""z"":3.5}",1080p,active
+CAM-002,ZONE-D,ceiling,"{""x"":10,""y"":5,""z"":3.5}",1080p,active
+```
+
+#### 5.12 Beacon (비콘)
+
+**파일명**: `beacons.csv`  
+**최소 레코드**: 4개
+
+```csv
+beacon_id,zone_id,beacon_uuid,tx_power,range_m,status
+BCN-001,ZONE-B,UUID-001,-59,5,active
+BCN-002,ZONE-D,UUID-002,-59,5,active
+```
+
+---
+
+### 5.14-5.19 시뮬레이션 & 비즈니스 규칙
+
+#### 5.14 Scenario (시나리오)
+
+**파일명**: `scenarios.csv`  
+**최소 레코드**: 10개
+
+```csv
+scenario_id,scenario_name,scenario_type,description,parameters,created_at
+SCN-001,레이아웃 A 시뮬레이션,layout_optimization,입구 확장 및 동선 개선,"{""entrance_width"":4.0}",2024-11-01
+SCN-002,블랙프라이데이 수요 예측,demand_forecast,11월 넷째 주 수요 예측,"{""promotion"":""BLACK_FRIDAY""}",2024-11-05
+```
+
+#### 5.15 SimulationResult (시뮬레이션 결과)
+
+**파일명**: `simulation_results.csv`  
+**최소 레코드**: 50건
+
+```csv
+result_id,scenario_id,run_date,metrics,recommendations
+RES-001,SCN-001,2024-11-01,"{""traffic_improvement"":15,""conversion"":2.5}","[""입구 확장"",""동선 단순화""]"
+```
+
+#### 5.16 KPI (KPI 정의)
+
+**파일명**: `kpis.csv`  
+**최소 레코드**: 15개
+
+```csv
+kpi_id,kpi_name,category,unit,calculation_method,target_value
+KPI-001,일 매출,sales,KRW,sum(total_amount),10000000
+KPI-002,전환율,conversion,percent,purchases/visits*100,40
+KPI-003,객단가,sales,KRW,total_amount/num_customers,150000
+```
+
+#### 5.17 KPIValue (KPI 값)
+
+**파일명**: `kpi_values.csv`  
+**최소 레코드**: 1,350건 (15개 KPI × 90일)
+
+```csv
+value_id,kpi_id,date,value,variance_from_target
+VAL-001,KPI-001,2024-11-15,12500000,25
+VAL-002,KPI-002,2024-11-15,42.5,6.25
+```
+
+#### 5.18 RetailConcept (리테일 개념)
+
+**파일명**: `retail_concepts.csv`  
+**최소 레코드**: 20개
+
+```csv
+concept_id,concept_name,category,description
+RC-001,Zone 최적화,layout,고객 동선 기반 Zone 배치
+RC-002,Cross-selling,merchandising,연관 제품 묶음 진열
+```
+
+#### 5.19 BusinessRule (비즈니스 규칙)
+
+**파일명**: `business_rules.csv`  
+**최소 레코드**: 30개
+
+```csv
+rule_id,rule_name,entity_type,condition,action,priority
+BR-001,재고 부족 알림,Inventory,current_stock < minimum_stock,send_alert,high
+BR-002,VIP 할인,Customer,loyalty_tier == 'platinum',apply_discount_10,medium
+```
+
+#### 5.20 DemandForecast (수요 예측)
+
+**파일명**: `demand_forecasts.csv`  
+**최소 레코드**: 200건 (200개 제품)
+
+```csv
+forecast_id,product_id,forecast_date,forecast_range,predicted_demand,confidence
+FC-001,SKU-TS-001,2024-12-01,7_days,85,0.92
+FC-002,SKU-TS-001,2024-12-08,7_days,78,0.88
+```
+
+---
+
+## 6. MEDIUM 엔티티 CSV 데이터셋 (13개)
+
+### 6.1 DailySales (일일 매출)
+
+**파일명**: `daily_sales.csv`  
+**최소 레코드**: 90건
+
+```csv
+sales_id,store_id,date,total_revenue,total_transactions,total_customers,avg_basket_size
+DSALE-001,NT-FLG-001,2024-11-15,12500000,45,38,277777
+DSALE-002,NT-FLG-001,2024-11-16,8900000,32,28,278125
+```
+
+---
+
+### 6.2 InventoryHistory (재고 이력)
+
+**파일명**: `inventory_history.csv`  
+**최소 레코드**: 6,000건 (200개 제품 × 30일)
+
+```csv
+history_id,product_id,store_id,date,stock_level,movement_type,quantity,reason
+INVH-001,SKU-TS-001,NT-FLG-001,2024-11-15,45,sale,-2,customer_purchase
+INVH-002,SKU-TS-001,NT-FLG-001,2024-11-16,43,sale,-2,customer_purchase
+INVH-003,SKU-TS-001,NT-FLG-001,2024-11-17,53,restock,10,supplier_delivery
+```
+
+---
+
+### 6.3 ZonePerformance (구역 성과)
+
+**파일명**: `zone_performance.csv`  
+**최소 레코드**: 720건 (8개 Zone × 90일)
+
+```csv
+performance_id,zone_id,date,visitor_count,dwell_time_avg,conversion_rate,sales_amount
+ZPERF-001,ZONE-A,2024-11-15,120,5.2,0,0
+ZPERF-002,ZONE-D,2024-11-15,85,25.5,35,3500000
+```
+
+---
+
+### 6.4 Task (작업)
+
+**파일명**: `tasks.csv`  
+**최소 레코드**: 100건
+
+```csv
+task_id,task_name,assigned_to,created_date,due_date,status,priority
+TASK-001,재고 확인 - 티셔츠 라인,STAFF-005,2024-11-15,2024-11-16,in_progress,high
+TASK-002,프로모션 POP 교체,STAFF-002,2024-11-14,2024-11-15,completed,medium
+```
+
+---
+
+### 6.5-6.9 센서류
+
+#### 6.5 PeopleCounter (인원 카운터)
+
+**파일명**: `people_counters.csv`  
+**최소 레코드**: 2개
+
+```csv
+counter_id,entrance_id,counter_type,status
+PPC-001,ENT-MAIN-01,bidirectional,active
+PPC-002,ENT-SIDE-01,bidirectional,active
+```
+
+#### 6.6 DoorSensor (도어 센서)
+
+**파일명**: `door_sensors.csv`  
+**최소 레코드**: 2개
+
+```csv
+sensor_id,entrance_id,sensor_type,status
+DS-001,ENT-MAIN-01,magnetic,active
+DS-002,ENT-SIDE-01,magnetic,active
+```
+
+#### 6.7-6.8 온습도 센서
+
+**파일명**: `temperature_sensors.csv`, `humidity_sensors.csv`
+
+```csv
+sensor_id,zone_id,sensor_model,status
+TS-001,ZONE-A,DHT22,active
+HS-001,ZONE-A,DHT22,active
+```
+
+---
+
+### 6.10 Alert (알림)
+
+**파일명**: `alerts.csv`  
+**최소 레코드**: 50건
+
+```csv
+alert_id,alert_type,severity,message,created_at,status,target_entity
+ALT-001,stock_low,high,SKU-TS-001 재고 부족 (현재: 5),2024-11-15 09:00:00,active,SKU-TS-001
+ALT-002,anomaly_detected,medium,ZONE-D 이상 트래픽 탐지,2024-11-15 14:00:00,resolved,ZONE-D
+```
+
+---
+
+### 6.11-6.13 기타 시스템
+
+#### 6.11 PriceOptimization (가격 최적화)
+
+**파일명**: `price_optimizations.csv`  
+**최소 레코드**: 200건 (제품별)
+
+```csv
+optimization_id,product_id,current_price,recommended_price,expected_uplift,confidence
+PO-001,SKU-TS-001,29000,31000,8.5,0.85
+```
+
+#### 6.12 POS (POS 시스템)
+
+**파일명**: `pos_terminals.csv`  
+**최소 레코드**: 3개
+
+```csv
+pos_id,counter_id,model,software_version,status
+POS-001,CHK-01,VeriFone VX520,v2.5.1,active
+```
+
+#### 6.13 DigitalSignage (디지털 사이니지)
+
+**파일명**: `digital_signages.csv`  
+**최소 레코드**: 4개
+
+```csv
+signage_id,zone_id,display_type,content_url,status
+SIGN-001,ZONE-A,welcome_screen,https://cdn.example.com/welcome.mp4,active
+```
+
+---
+
+## 7. LOW 엔티티 CSV 데이터셋 (5개)
+
+### 7.1 HVAC (냉난방 시스템)
+
+**파일명**: `hvac_systems.csv`  
+**최소 레코드**: 2개
+
+```csv
+hvac_id,zone_id,system_type,target_temp_c,current_temp_c,status
+HVAC-001,ZONE-A,ceiling_ac,22,21.5,active
+HVAC-002,ZONE-D,ceiling_ac,22,22.3,active
+```
+
+---
+
+## 8. 3D 모델 데이터
+
+### 8.1 파일명 규칙
+
 **형식**: `{EntityType}_{Identifier}_{Width}x{Height}x{Depth}.glb`
 
-**규칙 설명**:
-- `EntityType`: ontology_entity_types.name과 정확히 일치해야 함
-- `Identifier`: 모델을 설명하는 식별자 (한글/영문 가능)
-- `Dimensions`: 미터 단위 (Width x Height x Depth)
+- `EntityType`: ontology_entity_types.name과 일치
+- `Identifier`: 식별자 (한글/영문)
+- `Dimensions`: 미터 단위
 
-#### 예시
+### 8.2 필수 3D 모델 리스트
+
+#### 8.2.1 매장 구조 (1개)
 ```
-Store_A매장_20.0x10.0x4.0.glb          # 메인 매장 공간
-Shelf_메인진열대_3.0x2.0x0.5.glb       # 벽면 진열대
-Product_청바지_0.3x0.4x0.1.glb         # 제품 모델
-Camera_천장카메라1_0.2x0.2x0.3.glb     # IoT 장비
-WiFiSensor_입구센서_0.15x0.15x0.1.glb  # WiFi 센서
+Store_NT매장_20.0x4.0x10.0.glb
 ```
 
-### 5.2 필수 3D 모델 리스트 (데모용)
-
-**업로드된 샘플 데이터 기준:**
-- 매장: 1개 (NEURALTWIN Flagship Store, NT-FLG-001)
-- Zone: 8개 (존-A ~ 존-H)
-- 제품 카테고리: 6개 (Bag, Bottom, Top, Shoes, Accessory, Outer)
-- 제품 SKU: 200개
-- 직원: 18명
-
-#### 5.2.1 고정 구조물 (Fixed Structures) - 9개
+#### 8.2.2 Zone (8개)
 ```
-Store_NT매장_20.0x10.0x4.0.glb         # NEURALTWIN Flagship Store (20m x 10m x 4m)
-Zone_존A_4.0x4.0x4.0.glb              # 존-A (입구 구역)
-Zone_존B_4.0x4.0x4.0.glb              # 존-B (진열 구역)
-Zone_존C_4.0x4.0x4.0.glb              # 존-C (진열 구역)
-Zone_존D_4.0x4.0x4.0.glb              # 존-D (진열 구역)
-Zone_존E_4.0x4.0x4.0.glb              # 존-E (진열 구역)
-Zone_존F_4.0x4.0x4.0.glb              # 존-F (진열 구역)
-Zone_존G_4.0x4.0x4.0.glb              # 존-G (진열 구역)
-Zone_존H_4.0x4.0x4.0.glb              # 존-H (계산대 구역)
+Zone_존A_4.0x4.0x4.0.glb
+Zone_존B_5.0x5.0x4.0.glb
+Zone_존C_5.0x5.0x4.0.glb
+Zone_존D_5.0x5.0x4.0.glb
+Zone_존E_5.0x5.0x4.0.glb
+Zone_존F_5.0x5.0x4.0.glb
+Zone_존G_5.0x5.0x4.0.glb
+Zone_존H_4.0x4.0x4.0.glb
 ```
 
-#### 5.2.2 이동 가능 가구 (Movable Furniture) - 8개
+#### 8.2.3 가구 (12개)
 ```
-Shelf_벽면진열대_3.0x2.0x0.5.glb       # 벽면 진열대
-Shelf_측면진열대_2.0x1.8x0.4.glb       # 측면 진열대
-DisplayTable_중앙테이블_2.0x1.0x0.8.glb  # 중앙 진열 테이블
-DisplayTable_원형테이블_1.5x1.5x0.9.glb  # 원형 테이블
-Rack_의류랙_1.5x1.5x1.8.glb            # 의류 랙 (Top, Bottom, Outer용)
-CheckoutCounter_계산대_2.5x1.0x1.1.glb  # 계산대 (존-H)
-Mannequin_전신마네킹_0.6x0.6x1.8.glb    # 전신 마네킹
-Mannequin_상반신_0.5x0.5x1.2.glb       # 상반신 마네킹
+Shelf_벽면진열대_3.0x2.0x0.5.glb
+Shelf_측면진열대_2.0x1.8x0.4.glb
+Rack_의류랙_1.5x1.8x0.5.glb
+DisplayTable_중앙테이블_2.0x1.0x0.8.glb
+CheckoutCounter_계산대_2.5x1.1x1.0.glb
+FittingRoom_피팅룸_2.0x2.5x2.0.glb
 ```
 
-#### 5.2.3 제품 (Products) - 6개 (카테고리별 대표 모델)
+#### 8.2.4 제품 (6개 - 카테고리별 대표)
 ```
-Product_가방_0.4x0.3x0.2.glb           # Bag (제품.csv: Bag 카테고리)
-Product_하의_0.3x0.4x0.1.glb           # Bottom (제품.csv: Bottom 카테고리)
-Product_상의_0.3x0.4x0.05.glb          # Top (제품.csv: Top 카테고리)
-Product_신발_0.3x0.3x0.15.glb          # Shoes (제품.csv: Shoes 카테고리)
-Product_액세서리_0.2x0.2x0.1.glb       # Accessory (제품.csv: Accessory 카테고리)
-Product_아우터_0.4x0.5x0.1.glb         # Outer (제품.csv: Outer 카테고리)
-```
-
-#### 5.2.4 IoT 장비 (Sensors & Cameras) - 3개
-```
-Camera_천장카메라_0.2x0.2x0.3.glb      # CCTV 카메라 (고객 추적용)
-WiFiSensor_입구센서_0.15x0.15x0.1.glb  # WiFi 센서 (존-A 입구)
-WiFiSensor_매장센서_0.15x0.15x0.1.glb  # WiFi 센서 (매장 중앙)
+Product_가방_0.4x0.3x0.2.glb
+Product_하의_0.3x0.4x0.1.glb
+Product_상의_0.3x0.4x0.05.glb
+Product_신발_0.3x0.15x0.3.glb
+Product_액세서리_0.2x0.2x0.1.glb
+Product_아우터_0.4x0.5x0.1.glb
 ```
 
-**총 필수 모델 수: 26개** (고정 9개 + 가구 8개 + 제품 6개 + IoT 3개)
-
-### 5.3 3D 모델 요구사항
-| 항목 | 요구사항 | 권장 | 설명 |
-|------|----------|------|------|
-| **파일 형식** | GLB, GLTF | `.glb` | 압축된 단일 파일 (권장) |
-| **단위** | 미터 (m) | Meters | 좌표계 통일 필수 |
-| **폴리곤 수** | < 20,000 | 5,000-20,000 | 실시간 렌더링 최적화 |
-| **파일 크기** | < 5MB | 1-2MB | 로딩 속도 최적화 |
-| **텍스처** | 임베디드 | 내장 (embedded) | GLB 파일에 포함 |
-| **좌표계** | Y-up | Y-up | Three.js 표준 |
-| **원점** | 중심 또는 하단 | 하단 중심 | 배치 편의성 |
-
-### 5.4 선택적 메타데이터 JSON
-
-#### 5.4.1 기존 가구 (현재 위치 포함)
-```json
-// Shelf_메인진열대_3.0x2.0x0.5.json
-{
-  "entity_type": "Shelf",
-  "movable": true,
-  "dimensions": {
-    "width": 3.0,
-    "height": 2.0,
-    "depth": 0.5
-  },
-  "current_position": { "x": -5.0, "y": 0, "z": -4.5 },
-  "current_rotation": { "x": 0, "y": 0, "z": 0 },
-  "properties": {
-    "material": "wood",
-    "color": "#8B4513",
-    "capacity": 50,
-    "manufacturer": "RetailFurniture Co."
-  },
-  "scale": { "x": 1, "y": 1, "z": 1 }
-}
+#### 8.2.5 IoT 장비 (6개)
+```
+Camera_천장카메라_0.2x0.3x0.2.glb
+WiFiSensor_입구센서_0.15x0.1x0.15.glb
+Beacon_비콘_0.1x0.1x0.05.glb
+PeopleCounter_인원카운터_0.3x0.3x0.2.glb
 ```
 
-#### 5.4.2 신규 가구 (배치 힌트 포함)
-```json
-// DisplayTable_중앙테이블_2.0x1.0x0.8.json
-{
-  "entity_type": "DisplayTable",
-  "movable": true,
-  "dimensions": {
-    "width": 2.0,
-    "height": 1.0,
-    "depth": 0.8
-  },
-  "position_hint": { "x": 0, "y": 0, "z": 0 },
-  "rotation_hint": { "x": 0, "y": 0, "z": 0 },
-  "properties": {
-    "material": "glass",
-    "color": "#FFFFFF",
-    "weight_kg": 35
-  }
-}
-```
-
-#### 5.4.3 고정 구조물 (Store)
-```json
-// Store_NT매장_20.0x10.0x4.0.json
-{
-  "entity_type": "Store",
-  "movable": false,
-  "dimensions": {
-    "width": 20.0,
-    "height": 10.0,
-    "depth": 4.0
-  },
-  "current_position": { "x": 0, "y": 0, "z": 0 },
-  "current_rotation": { "x": 0, "y": 0, "z": 0 },
-  "properties": {
-    "store_id": "1",
-    "store_code": "NT-FLG-001",
-    "store_name": "NEURALTWIN Flagship Store",
-    "total_area_sqm": 200,
-    "floor_type": "tile",
-    "manager": "Alex Kim"
-  }
-}
-```
-
-#### 5.4.4 Zone 구역
-```json
-// Zone_존A_4.0x4.0x4.0.json
-{
-  "entity_type": "Zone",
-  "movable": false,
-  "dimensions": {
-    "width": 4.0,
-    "height": 4.0,
-    "depth": 4.0
-  },
-  "current_position": { "x": 2.0, "y": 0, "z": 2.0 },
-  "current_rotation": { "x": 0, "y": 0, "z": 0 },
-  "properties": {
-    "zone_name": "존-A",
-    "zone_type": "entrance",
-    "description": "입구 구역"
-  }
-}
-```
-
-### 5.5 데모 시나리오별 필수 모델
-
-#### 시나리오 1: 기본 매장 구성 (최소 14개)
-- **고정 구조물**: Store x1, Zone x3 (존-A 입구, 존-G 진열, 존-H 계산대)
-- **가구**: Shelf x2, DisplayTable x1, CheckoutCounter x1
-- **제품**: Product x3 (가방, 상의, 신발)
-- **IoT**: Camera x1, WiFiSensor x1
-
-**목적**: 기본 3D 매장 시각화 및 제품 배치 확인
-
-**데이터 연동**: 
-- 매장.csv → Store 모델
-- 방문.csv → 존-A, 존-G, 존-H 방문 데이터
-- 제품.csv → Bag, Top, Shoes 카테고리
-
-#### 시나리오 2: WiFi 트래킹 + 히트맵 (18개)
-- **시나리오 1** + 추가 요소:
-  - Zone x3 (존-B, 존-C, 존-D 추가)
-  - Rack x1 (의류 랙)
-  - WiFiSensor x1 (추가 센서)
-  - Product x1 (하의 추가)
-
-**목적**: WiFi 기반 고객 동선 추적 및 히트맵 시각화
-
-**데이터 연동**:
-- 방문.csv → 8개 Zone 방문 분포 (10,000건)
-- wifi_tracking.csv → 센서별 신호 데이터
-
-#### 시나리오 3: 완전한 데모 (전체 26개)
-- **전체 모델** 포함:
-  - Fixed Structures: 9개 (Store x1 + Zone x8)
-  - Movable Furniture: 8개
-  - Products: 6개 (전체 카테고리)
-  - IoT Devices: 3개
-
-**목적**: 실제 매장 환경 완전 재현 + AI 레이아웃 최적화 + 실시간 분석
-
-**데이터 연동**:
-- 매장.csv → NT Flagship Store (1개)
-- 고객.csv → 500명 프로필
-- 제품.csv → 200개 SKU (6개 카테고리)
-- 구매.csv → 5,000건 거래
-- 방문.csv → 10,000건 방문 (8개 Zone)
-- 직원.csv → 18명 직원 성과
-- 소셜상태.csv → 11,586건 감정/상호작용 데이터
-
-### 5.6 AI 자동 인식 키워드
-
-3D 모델 파일명에서 AI가 자동으로 EntityType을 추론할 수 있는 키워드:
-
-| 키워드 (파일명) | 추론 EntityType | 비고 |
-|----------------|----------------|------|
-| shelf, 진열대 | Shelf | 벽면/독립형 진열대 |
-| table, 테이블 | DisplayTable | 진열 테이블 |
-| rack, 랙 | Rack | 의류 랙 |
-| counter, 계산대 | CheckoutCounter | POS 계산대 |
-| mannequin, 마네킹 | Mannequin | 전신/상반신 |
-| camera, 카메라 | Camera | CCTV |
-| sensor, 센서 | WiFiSensor | WiFi/IoT 센서 |
-| store, 매장 | Store | 매장 공간 |
-| zone, 구역 | Zone | 매장 내 구역 |
-| product, 상품 | Product | 판매 제품 |
-
-### 5.7 3D 모델 업로드 워크플로우
-
-```
-1. 파일명 검증
-   ├─ EntityType 추출 → ontology_entity_types 조회
-   ├─ Dimensions 파싱 → width, height, depth
-   └─ Identifier 추출
-
-2. AI 모델 분석 (선택)
-   ├─ 폴리곤 수 확인
-   ├─ 텍스처 크기 확인
-   └─ 3D 구조 검증
-
-3. 매핑 제안
-   ├─ 파일명 기반 EntityType 매칭
-   ├─ JSON 메타데이터 읽기 (있는 경우)
-   └─ graph_entities 테이블 Insert 준비
-
-4. 사용자 확인 및 저장
-   ├─ 매핑 결과 UI 표시
-   ├─ 사용자 승인
-   └─ Storage 업로드 + DB 저장
-
-5. 3D Scene 렌더링
-   └─ SceneViewer에서 자동 로드
-```
-
-### 5.8 체크리스트
-
-#### 파일명 검증
-- [ ] `{EntityType}_{Identifier}_{Width}x{Height}x{Depth}.glb` 형식
-- [ ] EntityType이 ontology_entity_types.name과 일치
-- [ ] Dimensions가 숫자 형식 (예: 3.0x2.0x0.5)
-- [ ] 파일 확장자가 `.glb` 또는 `.gltf`
-
-#### 메타데이터 (선택사항)
-- [ ] JSON 파일명이 GLB와 동일 (확장자만 .json)
-- [ ] `entity_type` 필드가 파일명의 EntityType과 일치
-- [ ] `movable` 필드가 true/false로 명시
-- [ ] `dimensions` 필드가 파일명과 일치
-
-#### 기존 가구 메타데이터
-- [ ] `current_position` 필드 포함 (x, y, z)
-- [ ] `current_rotation` 필드 포함 (x, y, z)
-
-#### 신규 가구 메타데이터
-- [ ] `position_hint` 필드 포함
-- [ ] `rotation_hint` 필드 포함
-```
+**총 33개 3D 모델 필요**
 
 ---
 
-## 6. WiFi 트래킹 데이터
+## 9. 온톨로지 관계 데이터
 
-### 6.1 wifi_sensors.csv (센서 정보)
+### 9.1 CRITICAL 관계 (32개)
+
+관계는 CSV 업로드 후 자동 생성되거나 수동으로 `graph_relations` 테이블에 삽입됩니다.
+
+**샘플 관계 데이터**:
 ```csv
-sensor_id,sensor_name,x,y,z,range_meters,store_id
-NS001,입구센서,0.5,2.5,0.2,10,GN001
-NS002,중앙센서,10.0,2.5,5.0,10,GN001
-NS003,계산대센서,19.5,2.5,9.8,10,GN001
+relation_id,source_entity_id,relation_type_id,target_entity_id,properties,weight
+REL-001,STORE-001,BELONGS_TO,ORG-001,{},1.0
+REL-002,ZONE-A,BELONGS_TO,STORE-001,{},1.0
+REL-003,CUST-001,VISITED_STORE,STORE-001,"{""visit_count"":25}",1.0
+REL-004,SKU-TS-001,BELONGS_TO_CATEGORY,CAT-007,{},1.0
+REL-005,TXN-001,OCCURRED_AT_STORE,STORE-001,{},1.0
 ```
 
-### 6.2 wifi_tracking.csv (위치 데이터)
-```csv
-session_id,timestamp,x,z,accuracy,sensor_id,rssi,store_id
-MAC_001,2024-11-15 14:30:00,0.5,0.2,0.8,NS001,-45,GN001
-MAC_001,2024-11-15 14:31:00,1.2,0.5,0.9,NS001,-42,GN001
-MAC_001,2024-11-15 14:32:00,2.3,1.5,0.85,NS002,-50,GN001
-MAC_001,2024-11-15 14:33:00,3.5,2.0,0.9,NS002,-48,GN001
-```
+**자동 생성 관계** (데이터베이스 트리거):
+- Customer → graph_entities (자동)
+- Visit → VISITED_STORE 관계 생성
+- Transaction → OCCURRED_AT_STORE 관계 생성
+- Purchase → PURCHASED_PRODUCT 관계 생성
 
-### 6.3 WiFi 데이터 생성 규칙
-- **RSSI 범위**: -30 (가까움) ~ -90 (멀음) dBm
-- **Accuracy**: 0.0 (부정확) ~ 1.0 (정확)
-- **샘플링 간격**: 5-10초
-- **세션 지속**: 평균 15-60분
+**AI 추론 관계** (infer-entity-relations Edge Function):
+- Customer ↔ Product (구매 패턴 기반)
+- Product ↔ Product (Cross-sell 패턴)
+- Customer ↔ Zone (방문 패턴)
 
 ---
 
-## 7. 온톨로지 데이터
+## 10. 데이터 생성 가이드
 
-### 7.1 엔티티 타입 JSON
-```json
-{
-  "name": "Product",
-  "label": "상품",
-  "description": "매장에서 판매하는 상품",
-  "icon": "Box",
-  "color": "#3b82f6",
-  "properties": [
-    { "name": "name", "type": "string", "required": true },
-    { "name": "price", "type": "number", "required": true },
-    { "name": "category", "type": "string", "required": true },
-    { "name": "stock", "type": "number", "required": false }
-  ],
-  "model_3d_type": "glb",
-  "model_3d_url": "Product_{identifier}_{dimensions}.glb",
-  "model_3d_dimensions": { "width": 0.3, "height": 0.4, "depth": 0.1 }
-}
+### 10.1 데이터 생성 순서
+
+1. **조직/매장 기본 데이터** (1일차)
+   - organizations.csv (1개)
+   - stores.csv (1개)
+   - zones.csv (8개)
+   - entrances.csv (2개)
+   - checkout_counters.csv (3개)
+
+2. **제품 관련 데이터** (2일차)
+   - categories.csv (20개 - 3레벨)
+   - brands.csv (15개)
+   - suppliers.csv (10개)
+   - products.csv (200개)
+   - inventory.csv (200개)
+   - promotions.csv (10개)
+
+3. **고객/거래 데이터** (3일차)
+   - customers.csv (500명)
+   - visits.csv (2,000건)
+   - transactions.csv (1,000건)
+   - purchases.csv (2,500건)
+
+4. **직원/운영 데이터** (4일차)
+   - staff.csv (15명)
+   - shifts.csv (450건)
+   - tasks.csv (100건)
+
+5. **IoT/센서 데이터** (5일차)
+   - wifi_sensors.csv (6개)
+   - cameras.csv (8개)
+   - beacons.csv (4개)
+   - sensor_events.csv (10,000건)
+   - customer_events.csv (5,000건)
+
+6. **환경/외부 데이터** (6일차)
+   - weather.csv (90일)
+   - holidays.csv (30건)
+   - economic_indicators.csv (270건)
+
+7. **분석/성과 데이터** (7일차)
+   - daily_sales.csv (90건)
+   - zone_performance.csv (720건)
+   - inventory_history.csv (6,000건)
+
+8. **AI/시뮬레이션 데이터** (8일차)
+   - models.csv (5개)
+   - model_runs.csv (50건)
+   - scenarios.csv (10개)
+   - simulation_results.csv (50건)
+   - demand_forecasts.csv (200건)
+   - price_optimizations.csv (200건)
+
+9. **데이터 파이프라인** (9일차)
+   - data_sources.csv (3개)
+   - data_source_tables.csv (10개)
+   - column_mappings.csv (50개)
+
+10. **비즈니스 규칙** (10일차)
+    - kpis.csv (15개)
+    - kpi_values.csv (1,350건)
+    - retail_concepts.csv (20개)
+    - business_rules.csv (30개)
+    - alerts.csv (50건)
+
+### 10.2 GPT Prompt 템플릿
+
+```
+다음 조건에 맞는 {entity_name} 데이터를 {count}개 생성해주세요:
+
+**컬럼 정의**:
+{column_definitions}
+
+**데이터 분포**:
+{distribution_rules}
+
+**관계 규칙**:
+{relationship_constraints}
+
+**출력 형식**: CSV (헤더 포함)
+**인코딩**: UTF-8
+**날짜 형식**: YYYY-MM-DD
+**시간 형식**: HH:MM:SS
 ```
 
-### 7.2 관계 타입 JSON
-```json
-{
-  "name": "displays",
-  "label": "진열",
-  "source_entity_type": "Shelf",
-  "target_entity_type": "Product",
-  "directionality": "directed",
-  "properties": [
-    { "name": "position", "type": "number" },
-    { "name": "quantity", "type": "number" }
-  ]
-}
+### 10.3 Python 생성 스크립트 예시
+
+```python
+import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
+
+# 고객 데이터 생성
+def generate_customers(count=500):
+    segments = ['VIP'] * 50 + ['Regular'] * 300 + ['New'] * 150
+    age_groups = np.random.choice(['10s','20s','30s','40s','50s','60s+'], 
+                                   count, 
+                                   p=[0.05,0.30,0.35,0.20,0.07,0.03])
+    genders = np.random.choice(['F','M','Other'], 
+                                count, 
+                                p=[0.60,0.38,0.02])
+    
+    customers = pd.DataFrame({
+        'customer_id': [f'CUST-{i:04d}' for i in range(1, count+1)],
+        'age_group': age_groups,
+        'gender': genders,
+        'customer_segment': segments,
+        'signup_date': [datetime(2024,1,15) + timedelta(days=np.random.randint(0,300)) 
+                        for _ in range(count)]
+    })
+    
+    return customers
+
+# 실행
+customers = generate_customers(500)
+customers.to_csv('customers.csv', index=False, encoding='utf-8')
+```
+
+### 10.4 데이터 검증 체크리스트
+
+#### 필수 검증 항목
+- [ ] 모든 CSV 파일이 UTF-8 인코딩
+- [ ] 헤더가 첫 줄에 존재
+- [ ] 필수 컬럼에 NULL 값 없음
+- [ ] 날짜 형식 일치 (YYYY-MM-DD)
+- [ ] 외래 키 참조 무결성 확인
+- [ ] 카테고리 계층 구조 검증
+- [ ] 재고 수량이 음수 아님
+- [ ] 가격이 양수
+- [ ] 전환율 40% 달성 (800/2,000)
+
+#### SQL 검증 쿼리
+
+```sql
+-- 고아 레코드 확인 (Visit without Customer)
+SELECT COUNT(*) FROM visits v
+LEFT JOIN customers c ON v.customer_id = c.customer_id
+WHERE c.customer_id IS NULL;
+
+-- 전환율 검증
+SELECT 
+  COUNT(DISTINCT CASE WHEN did_purchase THEN visit_id END) * 100.0 / COUNT(*) as conversion_rate
+FROM visits;
+
+-- 재고 부족 제품
+SELECT p.product_name, i.current_stock, i.minimum_stock
+FROM inventory i
+JOIN products p ON i.product_id = p.sku
+WHERE i.current_stock < i.minimum_stock;
 ```
 
 ---
 
-## 8. 데이터 검증 규칙
+## 부록 A: 전체 엔티티 요약
 
-### 8.1 필수 검증 항목
-✅ **파일 형식**
-- UTF-8 인코딩 확인
-- 헤더 존재 확인
-- 컬럼 수 일치 확인
-
-✅ **데이터 타입**
-- 숫자 필드: 숫자 형식 검증
-- 날짜 필드: 날짜 형식 검증
-- 불리언 필드: true/false 검증
-
-✅ **필수 값**
-- 필수 컬럼: NULL 값 없음
-- 외래키: 참조 무결성 확인
-
-✅ **범위 검증**
-- 숫자: 최소/최대 범위 확인
-- 날짜: 과거/미래 범위 확인
-- 좌표: 매장 범위 내 확인
-
-### 8.2 데이터 품질 체크리스트
-- [ ] 중복 데이터 없음
-- [ ] 일관된 형식 사용
-- [ ] 현실적인 값 범위
-- [ ] 관계 데이터 무결성
-- [ ] 충분한 데이터 양
-- [ ] 균형잡힌 분포
-
-### 8.3 자동 검증 도구
-프로젝트의 `SchemaMapper` 컴포넌트가 다음을 자동 검증:
-- 스키마 자동 분류
-- 컬럼 매핑 제안
-- 데이터 타입 검증
-- 예외 데이터 필터링
+| Priority | Count | Entities |
+|----------|-------|----------|
+| 🔴 CRITICAL | 25 | Organization, Store, Zone, Entrance, CheckoutCounter, Category, Product, Inventory, Brand, Promotion, Customer, Visit, Transaction, Purchase, Staff, Shift, WiFiSensor, DataSource, DataSourceTable, ColumnMapping, BaseEvent, CustomerEvent, SensorEvent, Model, ModelRun, ModelEmbedding, AIInsight |
+| 🟡 HIGH | 19 | Weather, Holiday, EconomicIndicator, Aisle, FittingRoom, StorageRoom, Shelf, Rack, DisplayTable, Supplier, Camera, Beacon, Scenario, SimulationResult, KPI, KPIValue, RetailConcept, BusinessRule, DemandForecast |
+| 🟢 MEDIUM | 13 | DailySales, InventoryHistory, ZonePerformance, Task, PeopleCounter, DoorSensor, TemperatureSensor, HumiditySensor, Alert, PriceOptimization, POS, DigitalSignage, HVAC |
+| **TOTAL** | **62** | |
 
 ---
 
-## 9. 샘플 데이터 생성 가이드
+## 부록 B: 최소 데이터셋 요약
 
-### 9.1 데이터 생성 도구
-프로젝트에 포함된 `scripts/generate-sample-data.js` 사용
-
-### 9.2 생성 파라미터
-```javascript
-const config = {
-  stores: 3,           // 매장 수
-  customers: 500,      // 고객 수
-  products: 100,       // 상품 수
-  purchases: 2000,     // 구매 건수
-  visits: 5000,        // 방문 건수
-  staff: 30,           // 직원 수
-  brands: 20,          // 브랜드 수
-  duration: 90         // 데이터 기간 (일)
-};
-```
-
-### 9.3 현실성 있는 데이터 패턴
-- **시간 패턴**: 주말/주중, 시간대별 트래픽 차이
-- **계절 패턴**: 계절별 카테고리 판매 비중
-- **고객 패턴**: 충성 고객의 재방문율 높음
-- **공간 패턴**: 입구-매장-계산대 동선 집중
+| Category | Records |
+|----------|---------|
+| 조직/매장 기본 | 15 |
+| 제품 관련 | 445 |
+| 고객/거래 | 4,000 |
+| 직원/운영 | 565 |
+| IoT/센서 | 15,018 |
+| 환경/외부 | 390 |
+| 분석/성과 | 6,810 |
+| AI/시뮬레이션 | 515 |
+| 데이터 파이프라인 | 63 |
+| 비즈니스 규칙 | 1,465 |
+| **TOTAL** | **~29,000 records** |
 
 ---
 
-## 10. 데이터 임포트 프로세스
-
-### 10.1 자동 ETL 플로우
-```
-1. CSV 업로드
-   ↓
-2. 인코딩 검증 및 변환
-   ↓
-3. 헤더 파싱
-   ↓
-4. AI 스키마 분류 (auto-map-etl 함수)
-   ↓
-5. 컬럼 매핑 제안
-   ↓
-6. 사용자 확인 및 수정
-   ↓
-7. 데이터 검증
-   ↓
-8. Storage 저장
-   ↓
-9. 메타데이터 DB 저장
-   ↓
-10. 온톨로지 그래프 생성 (선택)
-```
-
-### 10.2 에러 처리
-| 에러 타입 | 처리 방식 |
-|----------|----------|
-| 인코딩 오류 | 자동 UTF-8 변환 시도 |
-| 컬럼 누락 | 경고 표시, 기본값 사용 |
-| 타입 불일치 | 자동 형변환 시도 |
-| 중복 데이터 | 덮어쓰기/건너뛰기 선택 |
-| 참조 무결성 | 외래키 검증, 에러 표시 |
-
----
-
-## 부록: 전체 데이터셋 예시 다운로드
-
-모든 샘플 데이터는 다음 경로에서 확인:
-- **경로**: `public/samples/*.csv`
-- **사용법**: 앱 내 "샘플 데이터 다운로드" 버튼
-
-**포함 파일**:
-1. stores.csv
-2. customers.csv
-3. products.csv
-4. purchases.csv
-5. purchases_extended.csv (확장 구매 데이터)
-6. visits.csv
-7. visits_extended.csv (확장 방문 데이터)
-8. staff.csv
-9. brands.csv
-10. wifi_sensors.csv
-11. wifi_tracking.csv
-12. social_states.csv (소셜 상태 - 개발 중)
+**문서 끝**
