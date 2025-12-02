@@ -69,13 +69,21 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
         throw new Error('WiFi 트래킹 데이터를 불러오는데 실패했습니다.');
       }
 
-      // graph_entities에서 방문 데이터 가져오기 (실제 임포트된 온톨로지 데이터만 사용)
+      // graph_entities에서 Visit 엔티티만 가져오기 (실제 임포트된 온톨로지 데이터만 사용)
+      const { data: visitEntityType } = await supabase
+        .from('ontology_entity_types')
+        .select('id')
+        .eq('name', 'Visit')
+        .eq('user_id', user.id)
+        .single();
+
       const { data: visits, error: visitsError } = await supabase
         .from('graph_entities')
         .select('properties, created_at')
         .eq('user_id', user.id)
         .eq('org_id', orgId)
         .eq('store_id', storeId)
+        .eq('entity_type_id', visitEntityType?.id)
         .gte('created_at', startOfDay(start).toISOString())
         .lte('created_at', endOfDay(end).toISOString());
 
@@ -287,12 +295,20 @@ export function useHourlyFootfall(storeId?: string, date?: Date) {
 
       const targetDate = date || new Date();
       
+      const { data: visitEntityType } = await supabase
+        .from('ontology_entity_types')
+        .select('id')
+        .eq('name', 'Visit')
+        .eq('user_id', user.id)
+        .single();
+
       const { data: visits, error } = await supabase
         .from('graph_entities')
         .select('properties, created_at')
         .eq('user_id', user.id)
         .eq('org_id', orgId)
         .eq('store_id', storeId)
+        .eq('entity_type_id', visitEntityType?.id)
         .gte('created_at', startOfDay(targetDate).toISOString())
         .lte('created_at', endOfDay(targetDate).toISOString());
 
