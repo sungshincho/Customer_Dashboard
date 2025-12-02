@@ -32,6 +32,84 @@ export function IntegratedImportStatus({ storeId }: IntegratedImportStatusProps)
   const [isCleaningStorage, setIsCleaningStorage] = useState(false);
   const [isCleaningDatabase, setIsCleaningDatabase] = useState(false);
 
+  const cleanupDatabaseRecords = async (userId: string, storeId?: string) => {
+    const applyStoreFilter = (query: any) => {
+      if (storeId) {
+        return query.eq("store_id", storeId);
+      }
+      return query;
+    };
+
+    // 1. 관계 삭제
+    const { error: relError } = await applyStoreFilter(
+      supabase.from("graph_relations").delete().eq("user_id", userId)
+    );
+    if (relError) {
+      throw new Error(`graph_relations 삭제 실패: ${relError.message}`);
+    }
+
+    // 2. 엔티티 삭제
+    const { error: entError } = await applyStoreFilter(
+      supabase.from("graph_entities").delete().eq("user_id", userId)
+    );
+    if (entError) {
+      throw new Error(`graph_entities 삭제 실패: ${entError.message}`);
+    }
+
+    // 3. 3D 씬 삭제
+    const { error: sceneError } = await applyStoreFilter(
+      supabase.from("store_scenes").delete().eq("user_id", userId)
+    );
+    if (sceneError) {
+      throw new Error(`store_scenes 삭제 실패: ${sceneError.message}`);
+    }
+
+    // 4. 임포트 기록 삭제
+    const { error: importError } = await applyStoreFilter(
+      supabase.from("user_data_imports").delete().eq("user_id", userId)
+    );
+    if (importError) {
+      throw new Error(`user_data_imports 삭제 실패: ${importError.message}`);
+    }
+
+    // 5. KPI 및 퍼널 데이터 삭제
+    const { error: kpiError } = await applyStoreFilter(
+      supabase.from("dashboard_kpis").delete().eq("user_id", userId)
+    );
+    if (kpiError) {
+      throw new Error(`dashboard_kpis 삭제 실패: ${kpiError.message}`);
+    }
+
+    const { error: funnelError } = await applyStoreFilter(
+      supabase.from("funnel_metrics").delete().eq("user_id", userId)
+    );
+    if (funnelError) {
+      throw new Error(`funnel_metrics 삭제 실패: ${funnelError.message}`);
+    }
+
+    // 6. 분석/추천 및 WiFi 데이터 삭제
+    const { error: analysisError } = await applyStoreFilter(
+      supabase.from("analysis_history").delete().eq("user_id", userId)
+    );
+    if (analysisError) {
+      throw new Error(`analysis_history 삭제 실패: ${analysisError.message}`);
+    }
+
+    const { error: aiRecError } = await applyStoreFilter(
+      supabase.from("ai_recommendations").delete().eq("user_id", userId)
+    );
+    if (aiRecError) {
+      throw new Error(`ai_recommendations 삭제 실패: ${aiRecError.message}`);
+    }
+
+    const { error: wifiTrackingError } = await applyStoreFilter(
+      supabase.from("wifi_tracking").delete().eq("user_id", userId)
+    );
+    if (wifiTrackingError) {
+      throw new Error(`wifi_tracking 삭제 실패: ${wifiTrackingError.message}`);
+    }
+  };
+
   const handleCleanupStorage = async () => {
     if (!user) return;
     
@@ -73,15 +151,7 @@ export function IntegratedImportStatus({ storeId }: IntegratedImportStatusProps)
     
     setIsCleaningDatabase(true);
     try {
-      // Edge Function 호출하여 데이터베이스 전체 삭제
-      const { error } = await supabase.functions.invoke('cleanup-integrated-data', {
-        body: {
-          deleteAllData: true,
-          userId: user.id
-        }
-      });
-
-      if (error) throw error;
+      await cleanupDatabaseRecords(user.id, storeId);
 
       // 캐시 초기화
       clearAllCache();
@@ -89,7 +159,7 @@ export function IntegratedImportStatus({ storeId }: IntegratedImportStatusProps)
       toast.success('데이터베이스가 완전히 초기화되었습니다');
     } catch (error: any) {
       console.error('Database cleanup error:', error);
-      toast.error('데이터베이스 초기화 실패: ' + error.message);
+      toast.error('데이터베이스 초기화 실패: ' + (error.message ?? '알 수 없는 오류'));
     } finally {
       setIsCleaningDatabase(false);
     }
@@ -103,14 +173,7 @@ export function IntegratedImportStatus({ storeId }: IntegratedImportStatusProps)
 
     try {
       // 1. 데이터베이스 초기화
-      const { error: dbError } = await supabase.functions.invoke('cleanup-integrated-data', {
-        body: {
-          deleteAllData: true,
-          userId: user.id
-        }
-      });
-
-      if (dbError) throw dbError;
+      await cleanupDatabaseRecords(user.id, storeId);
 
       // 2. 스토리지 초기화
       const { data: storeDataFiles } = await supabase.storage
@@ -142,7 +205,7 @@ export function IntegratedImportStatus({ storeId }: IntegratedImportStatusProps)
       toast.success('모든 데이터가 완전히 초기화되었습니다. 페이지를 새로고침합니다...');
     } catch (error: any) {
       console.error('Complete reset error:', error);
-      toast.error('완전 초기화 실패: ' + error.message);
+      toast.error('완전 초기화 실패: ' + (error.message ?? '알 수 없는 오류'));
     } finally {
       setIsCleaningStorage(false);
       setIsCleaningDatabase(false);
