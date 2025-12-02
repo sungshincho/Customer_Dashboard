@@ -139,22 +139,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('NO_SUBSCRIPTION');
       }
 
-      // Check subscription status
-      const { data: subscription, error: subError } = await supabase
-        .from('subscriptions')
-        .select('status')
-        .eq('org_id', membership.org_id)
-        .maybeSingle();
+      // NEURALTWIN_MASTER bypasses subscription check
+      if (membership.role !== 'NEURALTWIN_MASTER') {
+        // Check subscription status for regular users
+        const { data: subscription, error: subError } = await supabase
+          .from('subscriptions')
+          .select('status')
+          .eq('org_id', membership.org_id)
+          .maybeSingle();
 
-      if (subError) {
-        console.error('Error fetching subscription:', subError);
-      }
+        if (subError) {
+          console.error('Error fetching subscription:', subError);
+        }
 
-      // Block login if no subscription or inactive subscription
-      if (!subscription || subscription.status !== 'active') {
-        console.error('No active subscription found for organization');
-        await supabase.auth.signOut();
-        throw new Error('NO_SUBSCRIPTION');
+        // Block login if no subscription or inactive subscription
+        if (!subscription || subscription.status !== 'active') {
+          console.error('No active subscription found for organization');
+          await supabase.auth.signOut();
+          throw new Error('NO_SUBSCRIPTION');
+        }
       }
 
       setOrgId(membership.org_id);
