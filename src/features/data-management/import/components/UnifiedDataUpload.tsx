@@ -1286,6 +1286,31 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
           </Alert>
         )}
         
+        {/* 데이터 임포트 순서 가이드 */}
+        <Alert className="border-primary/50 bg-primary/5">
+          <AlertCircle className="h-4 w-4 text-primary" />
+          <AlertDescription className="space-y-2">
+            <div className="font-semibold text-primary">📋 데이터 임포트 권장 순서</div>
+            <div className="text-sm space-y-1">
+              <p>외래키(FK) 제약 조건으로 인해 다음 순서로 업로드하는 것을 권장합니다:</p>
+              <div className="flex items-center gap-2 font-mono text-xs bg-background/50 p-2 rounded">
+                <span className="font-semibold">1. Stores</span>
+                <span className="text-muted-foreground">→</span>
+                <span className="font-semibold">2. Customers</span>
+                <span className="text-muted-foreground">→</span>
+                <span className="font-semibold">3. Products</span>
+                <span className="text-muted-foreground">→</span>
+                <span className="font-semibold">4. Visits</span>
+                <span className="text-muted-foreground">→</span>
+                <span className="font-semibold">5. Purchases</span>
+              </div>
+              <p className="text-muted-foreground">
+                자동 검증 시스템이 의존성을 분석하여 최적의 업로드 순서를 제안합니다.
+              </p>
+            </div>
+          </AlertDescription>
+        </Alert>
+        
         {/* 스키마 로딩 중 */}
         {isLoadingSchema && (
           <Alert className="mb-4">
