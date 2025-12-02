@@ -192,14 +192,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Fetch organization context when user signs in
         if (session?.user) {
           setTimeout(async () => {
-            await fetchOrganizationContext(session.user.id);
-            
-            // Redirect to role-based dashboard after context is loaded
-            if (event === "SIGNED_IN") {
-              redirectTimeout = setTimeout(() => {
-                const defaultPath = getDefaultDashboard();
-                navigate(defaultPath);
-              }, 500);
+            try {
+              await fetchOrganizationContext(session.user.id);
+              
+              // Only redirect if organization context loaded successfully
+              if (event === "SIGNED_IN") {
+                redirectTimeout = setTimeout(() => {
+                  const defaultPath = getDefaultDashboard();
+                  navigate(defaultPath);
+                }, 500);
+              }
+            } catch (error) {
+              // Don't redirect if organization context failed (e.g., no subscription)
+              console.error('Failed to load organization context:', error);
             }
           }, 0);
         } else {
