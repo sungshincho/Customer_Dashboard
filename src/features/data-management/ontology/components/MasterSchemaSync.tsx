@@ -4,10 +4,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Download, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { Download, Loader2, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { applyRetailSchemaPreset } from "../utils/comprehensiveRetailSchema";
 
 const MASTER_ACCOUNT_ID = 'af316ab2-ffb5-4509-bd37-13aa31feb5ad';
+const MASTER_ORG_ID = 'e738e7b1-e4bd-49f1-bd96-6de4c257b5a0';
 
 export const MasterSchemaSync = () => {
   const { toast } = useToast();
@@ -57,6 +59,32 @@ export const MasterSchemaSync = () => {
         entityCount: entitiesResult.count || 0,
         relationCount: relationsResult.count || 0
       };
+    }
+  });
+
+  // 마스터 스키마 초기화 (마스터 계정에 스키마 생성)
+  const initMasterSchemaMutation = useMutation({
+    mutationFn: async () => {
+      const result = await applyRetailSchemaPreset(MASTER_ACCOUNT_ID, MASTER_ORG_ID, "replace");
+      if (!result.success) {
+        throw new Error(result.error || "스키마 초기화 실패");
+      }
+      return result;
+    },
+    onSuccess: (result) => {
+      toast({
+        title: "마스터 스키마 초기화 완료",
+        description: `${result.entitiesCount}개의 엔티티 타입과 ${result.relationsCount}개의 관계 타입이 마스터 계정에 생성되었습니다.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['master-schema-info'] });
+    },
+    onError: (error) => {
+      console.error('마스터 스키마 초기화 오류:', error);
+      toast({
+        title: "초기화 실패",
+        description: error instanceof Error ? error.message : "마스터 스키마 초기화 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
     }
   });
 
@@ -221,9 +249,31 @@ export const MasterSchemaSync = () => {
           </div>
         </div>
 
+        {(masterSchema?.entityCount === 0 && masterSchema?.relationCount === 0) && (
+          <Button
+            onClick={() => initMasterSchemaMutation.mutate()}
+            disabled={initMasterSchemaMutation.isPending}
+            className="w-full mb-2"
+            size="lg"
+            variant="secondary"
+          >
+            {initMasterSchemaMutation.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                마스터 스키마 초기화 중...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                마스터 스키마 초기화 (관리자 전용)
+              </>
+            )}
+          </Button>
+        )}
+
         <Button
           onClick={() => syncMasterSchemaMutation.mutate()}
-          disabled={syncMasterSchemaMutation.isPending}
+          disabled={syncMasterSchemaMutation.isPending || (masterSchema?.entityCount === 0)}
           className="w-full"
           size="lg"
         >
