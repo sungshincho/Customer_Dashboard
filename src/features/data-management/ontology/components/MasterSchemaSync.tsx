@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Download, Loader2, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { applyRetailSchemaPreset } from "../utils/comprehensiveRetailSchema";
+import { useAuth } from "@/hooks/useAuth";
 
 const MASTER_ACCOUNT_ID = 'af316ab2-ffb5-4509-bd37-13aa31feb5ad';
 const MASTER_ORG_ID = 'e738e7b1-e4bd-49f1-bd96-6de4c257b5a0';
@@ -14,6 +15,9 @@ const MASTER_ORG_ID = 'e738e7b1-e4bd-49f1-bd96-6de4c257b5a0';
 export const MasterSchemaSync = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  
+  const isMasterAccount = user?.id === MASTER_ACCOUNT_ID;
 
   // 마스터 계정의 스키마 정보 조회
   const { data: masterSchema } = useQuery({
@@ -271,9 +275,18 @@ export const MasterSchemaSync = () => {
           </Button>
         )}
 
+        {isMasterAccount && (
+          <Alert className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              마스터 계정은 자기 자신의 스키마를 동기화할 수 없습니다. 일반 조직 계정으로 로그인하여 사용하세요.
+            </AlertDescription>
+          </Alert>
+        )}
+
         <Button
           onClick={() => syncMasterSchemaMutation.mutate()}
-          disabled={syncMasterSchemaMutation.isPending || (masterSchema?.entityCount === 0)}
+          disabled={syncMasterSchemaMutation.isPending || (masterSchema?.entityCount === 0) || isMasterAccount}
           className="w-full"
           size="lg"
         >
