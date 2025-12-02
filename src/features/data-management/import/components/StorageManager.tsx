@@ -166,16 +166,34 @@ export function StorageManager({ storeId }: StorageManagerProps) {
       console.log('🗑️ Deleting file:', { bucket, path, name });
 
       // 스토리지 파일 삭제
-      const { data: deleteData, error: deleteError } = await supabase.storage
-        .from(bucket)
-        .remove([path]);
+      let deleteError = null;
+
+      if (bucket === '3d-models') {
+        // 경로 문제가 있을 수 있어 전체 경로와 파일명 두 가지 방식으로 모두 시도
+        const { error: primaryError } = await supabase.storage
+          .from('3d-models')
+          .remove([path]);
+
+        if (primaryError) {
+          const { error: secondaryError } = await supabase.storage
+            .from('3d-models')
+            .remove([name]);
+
+          deleteError = secondaryError;
+        }
+      } else {
+        const { error } = await supabase.storage
+          .from(bucket)
+          .remove([path]);
+        deleteError = error;
+      }
 
       if (deleteError) {
         console.error('Storage delete error:', deleteError);
         throw new Error(`스토리지 삭제 실패: ${deleteError.message}`);
       }
 
-      console.log('✅ Storage delete result:', deleteData);
+      console.log('✅ Storage delete success:', { bucket, path });
 
       // user_data_imports 삭제 (파일명 기준)
       const { error: dbError } = await (supabase as any)
@@ -232,9 +250,27 @@ export function StorageManager({ storeId }: StorageManagerProps) {
 
         try {
           // 스토리지 파일 삭제
-          const { data: deleteData, error: deleteError } = await supabase.storage
-            .from(file.bucket)
-            .remove([path]);
+          let deleteError = null;
+
+          if (file.bucket === '3d-models') {
+            // 경로 문제가 있을 수 있어 전체 경로와 파일명 두 가지 방식으로 모두 시도
+            const { error: primaryError } = await supabase.storage
+              .from('3d-models')
+              .remove([path]);
+
+            if (primaryError) {
+              const { error: secondaryError } = await supabase.storage
+                .from('3d-models')
+                .remove([file.name]);
+
+              deleteError = secondaryError;
+            }
+          } else {
+            const { error } = await supabase.storage
+              .from(file.bucket)
+              .remove([path]);
+            deleteError = error;
+          }
 
           if (deleteError) {
             console.error(`Storage delete error for ${path}:`, deleteError);
@@ -242,7 +278,7 @@ export function StorageManager({ storeId }: StorageManagerProps) {
             continue;
           }
 
-          console.log(`✅ Deleted from storage: ${path}`, deleteData);
+          console.log(`✅ Deleted from storage: ${path}`);
 
           // user_data_imports 삭제 (파일명 기준)
           const { error: dbError } = await (supabase as any)
