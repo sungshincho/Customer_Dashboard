@@ -26,107 +26,179 @@ interface TableMetadata {
   primary_keys: string[];
 }
 
+// 핵심 테이블의 스키마를 하드코딩 (가장 안정적)
+const CORE_SCHEMA: Record<string, TableMetadata> = {
+  stores: {
+    table_name: 'stores',
+    columns: [
+      { column_name: 'id', data_type: 'uuid', is_nullable: false, column_default: 'gen_random_uuid()', is_primary_key: true },
+      { column_name: 'user_id', data_type: 'uuid', is_nullable: false, column_default: null, is_primary_key: false },
+      { column_name: 'org_id', data_type: 'uuid', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'store_name', data_type: 'text', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'location', data_type: 'text', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'store_type', data_type: 'text', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'area_sqm', data_type: 'numeric', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'created_at', data_type: 'timestamp with time zone', is_nullable: false, column_default: 'now()', is_primary_key: false },
+      { column_name: 'updated_at', data_type: 'timestamp with time zone', is_nullable: false, column_default: 'now()', is_primary_key: false },
+    ],
+    foreign_keys: [],
+    primary_keys: ['id']
+  },
+  customers: {
+    table_name: 'customers',
+    columns: [
+      { column_name: 'id', data_type: 'uuid', is_nullable: false, column_default: 'gen_random_uuid()', is_primary_key: true },
+      { column_name: 'user_id', data_type: 'uuid', is_nullable: false, column_default: null, is_primary_key: false },
+      { column_name: 'org_id', data_type: 'uuid', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'store_id', data_type: 'uuid', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'customer_name', data_type: 'text', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'email', data_type: 'text', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'phone', data_type: 'text', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'segment', data_type: 'text', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'total_purchases', data_type: 'integer', is_nullable: true, column_default: '0', is_primary_key: false },
+      { column_name: 'last_visit_date', data_type: 'date', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'created_at', data_type: 'timestamp with time zone', is_nullable: false, column_default: 'now()', is_primary_key: false },
+      { column_name: 'updated_at', data_type: 'timestamp with time zone', is_nullable: false, column_default: 'now()', is_primary_key: false },
+    ],
+    foreign_keys: [
+      { column_name: 'store_id', foreign_table: 'stores', foreign_column: 'id' }
+    ],
+    primary_keys: ['id']
+  },
+  products: {
+    table_name: 'products',
+    columns: [
+      { column_name: 'id', data_type: 'uuid', is_nullable: false, column_default: 'gen_random_uuid()', is_primary_key: true },
+      { column_name: 'user_id', data_type: 'uuid', is_nullable: false, column_default: null, is_primary_key: false },
+      { column_name: 'org_id', data_type: 'uuid', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'store_id', data_type: 'uuid', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'product_name', data_type: 'text', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'category', data_type: 'text', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'brand', data_type: 'text', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'price', data_type: 'numeric', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'stock', data_type: 'integer', is_nullable: true, column_default: '0', is_primary_key: false },
+      { column_name: 'created_at', data_type: 'timestamp with time zone', is_nullable: false, column_default: 'now()', is_primary_key: false },
+      { column_name: 'updated_at', data_type: 'timestamp with time zone', is_nullable: false, column_default: 'now()', is_primary_key: false },
+    ],
+    foreign_keys: [
+      { column_name: 'store_id', foreign_table: 'stores', foreign_column: 'id' }
+    ],
+    primary_keys: ['id']
+  },
+  purchases: {
+    table_name: 'purchases',
+    columns: [
+      { column_name: 'id', data_type: 'uuid', is_nullable: false, column_default: 'gen_random_uuid()', is_primary_key: true },
+      { column_name: 'user_id', data_type: 'uuid', is_nullable: false, column_default: null, is_primary_key: false },
+      { column_name: 'org_id', data_type: 'uuid', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'store_id', data_type: 'uuid', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'customer_id', data_type: 'uuid', is_nullable: false, column_default: null, is_primary_key: false },
+      { column_name: 'product_id', data_type: 'uuid', is_nullable: false, column_default: null, is_primary_key: false },
+      { column_name: 'quantity', data_type: 'integer', is_nullable: true, column_default: '1', is_primary_key: false },
+      { column_name: 'unit_price', data_type: 'numeric', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'total_price', data_type: 'numeric', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'purchase_date', data_type: 'timestamp with time zone', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'created_at', data_type: 'timestamp with time zone', is_nullable: false, column_default: 'now()', is_primary_key: false },
+    ],
+    foreign_keys: [
+      { column_name: 'store_id', foreign_table: 'stores', foreign_column: 'id' },
+      { column_name: 'customer_id', foreign_table: 'customers', foreign_column: 'id' },
+      { column_name: 'product_id', foreign_table: 'products', foreign_column: 'id' }
+    ],
+    primary_keys: ['id']
+  },
+  visits: {
+    table_name: 'visits',
+    columns: [
+      { column_name: 'id', data_type: 'uuid', is_nullable: false, column_default: 'gen_random_uuid()', is_primary_key: true },
+      { column_name: 'user_id', data_type: 'uuid', is_nullable: false, column_default: null, is_primary_key: false },
+      { column_name: 'org_id', data_type: 'uuid', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'store_id', data_type: 'uuid', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'customer_id', data_type: 'uuid', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'visit_date', data_type: 'timestamp with time zone', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'duration_minutes', data_type: 'integer', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'zones_visited', data_type: 'text[]', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'created_at', data_type: 'timestamp with time zone', is_nullable: false, column_default: 'now()', is_primary_key: false },
+    ],
+    foreign_keys: [
+      { column_name: 'store_id', foreign_table: 'stores', foreign_column: 'id' },
+      { column_name: 'customer_id', foreign_table: 'customers', foreign_column: 'id' }
+    ],
+    primary_keys: ['id']
+  },
+  staff: {
+    table_name: 'staff',
+    columns: [
+      { column_name: 'id', data_type: 'uuid', is_nullable: false, column_default: 'gen_random_uuid()', is_primary_key: true },
+      { column_name: 'user_id', data_type: 'uuid', is_nullable: false, column_default: null, is_primary_key: false },
+      { column_name: 'org_id', data_type: 'uuid', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'store_id', data_type: 'uuid', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'staff_name', data_type: 'text', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'position', data_type: 'text', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'shift_hours', data_type: 'text', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'created_at', data_type: 'timestamp with time zone', is_nullable: false, column_default: 'now()', is_primary_key: false },
+    ],
+    foreign_keys: [
+      { column_name: 'store_id', foreign_table: 'stores', foreign_column: 'id' }
+    ],
+    primary_keys: ['id']
+  },
+  wifi_tracking: {
+    table_name: 'wifi_tracking',
+    columns: [
+      { column_name: 'id', data_type: 'uuid', is_nullable: false, column_default: 'gen_random_uuid()', is_primary_key: true },
+      { column_name: 'user_id', data_type: 'uuid', is_nullable: false, column_default: null, is_primary_key: false },
+      { column_name: 'org_id', data_type: 'uuid', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'store_id', data_type: 'uuid', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'mac_address', data_type: 'text', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'detected_at', data_type: 'timestamp with time zone', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'zone_id', data_type: 'uuid', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'signal_strength', data_type: 'integer', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'created_at', data_type: 'timestamp with time zone', is_nullable: false, column_default: 'now()', is_primary_key: false },
+    ],
+    foreign_keys: [
+      { column_name: 'store_id', foreign_table: 'stores', foreign_column: 'id' },
+      { column_name: 'zone_id', foreign_table: 'wifi_zones', foreign_column: 'id' }
+    ],
+    primary_keys: ['id']
+  },
+  wifi_zones: {
+    table_name: 'wifi_zones',
+    columns: [
+      { column_name: 'id', data_type: 'uuid', is_nullable: false, column_default: 'gen_random_uuid()', is_primary_key: true },
+      { column_name: 'user_id', data_type: 'uuid', is_nullable: false, column_default: null, is_primary_key: false },
+      { column_name: 'org_id', data_type: 'uuid', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'store_id', data_type: 'uuid', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'zone_name', data_type: 'text', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'sensor_mac', data_type: 'text', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'position_x', data_type: 'numeric', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'position_y', data_type: 'numeric', is_nullable: true, column_default: null, is_primary_key: false },
+      { column_name: 'created_at', data_type: 'timestamp with time zone', is_nullable: false, column_default: 'now()', is_primary_key: false },
+    ],
+    foreign_keys: [
+      { column_name: 'store_id', foreign_table: 'stores', foreign_column: 'id' }
+    ],
+    primary_keys: ['id']
+  }
+};
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    console.log('Returning hardcoded schema metadata for core tables...');
 
-    console.log('Fetching database schema metadata...');
-
-    // 1. 모든 테이블 목록 가져오기
-    const tablesQuery = `
-      SELECT table_name
-      FROM information_schema.tables
-      WHERE table_schema = 'public'
-      AND table_type = 'BASE TABLE'
-      ORDER BY table_name;
-    `;
-
-    const { data: tables, error: tablesError } = await supabase.rpc('execute_sql', {
-      query: tablesQuery
-    });
-
-    if (tablesError) {
-      console.error('Error fetching tables:', tablesError);
-      throw tablesError;
-    }
-
-    const tableNames: string[] = tables.map((t: any) => t.table_name);
-    console.log(`Found ${tableNames.length} tables`);
-
-    // 2. 각 테이블의 메타데이터 가져오기
-    const schemaMetadata: Record<string, TableMetadata> = {};
-
-    for (const tableName of tableNames) {
-      // 컬럼 정보
-      const columnsQuery = `
-        SELECT 
-          c.column_name,
-          c.data_type,
-          c.is_nullable = 'YES' as is_nullable,
-          c.column_default,
-          CASE WHEN pk.column_name IS NOT NULL THEN true ELSE false END as is_primary_key
-        FROM information_schema.columns c
-        LEFT JOIN (
-          SELECT ku.column_name
-          FROM information_schema.table_constraints tc
-          JOIN information_schema.key_column_usage ku 
-            ON tc.constraint_name = ku.constraint_name
-          WHERE tc.constraint_type = 'PRIMARY KEY'
-          AND tc.table_name = '${tableName}'
-        ) pk ON c.column_name = pk.column_name
-        WHERE c.table_name = '${tableName}'
-        AND c.table_schema = 'public'
-        ORDER BY c.ordinal_position;
-      `;
-
-      const { data: columns } = await supabase.rpc('execute_sql', {
-        query: columnsQuery
-      });
-
-      // FK 정보
-      const fkQuery = `
-        SELECT
-          kcu.column_name,
-          ccu.table_name AS foreign_table,
-          ccu.column_name AS foreign_column
-        FROM information_schema.table_constraints AS tc
-        JOIN information_schema.key_column_usage AS kcu
-          ON tc.constraint_name = kcu.constraint_name
-        JOIN information_schema.constraint_column_usage AS ccu
-          ON ccu.constraint_name = tc.constraint_name
-        WHERE tc.constraint_type = 'FOREIGN KEY'
-        AND tc.table_name = '${tableName}';
-      `;
-
-      const { data: foreignKeys } = await supabase.rpc('execute_sql', {
-        query: fkQuery
-      });
-
-      const primaryKeys = columns
-        ?.filter((c: any) => c.is_primary_key)
-        .map((c: any) => c.column_name) || [];
-
-      schemaMetadata[tableName] = {
-        table_name: tableName,
-        columns: columns || [],
-        foreign_keys: foreignKeys || [],
-        primary_keys: primaryKeys
-      };
-    }
-
-    console.log('Schema metadata fetched successfully');
+    const schemaMetadata = { ...CORE_SCHEMA };
+    
+    console.log(`Schema loaded: ${Object.keys(schemaMetadata).length} tables`);
 
     return new Response(
       JSON.stringify({
         success: true,
         schema: schemaMetadata,
-        table_count: tableNames.length,
+        table_count: Object.keys(schemaMetadata).length,
         fetched_at: new Date().toISOString()
       }),
       {
