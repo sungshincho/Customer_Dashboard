@@ -160,20 +160,24 @@ export function StorageManager({ storeId }: StorageManagerProps) {
     try {
       setLoading(true);
       
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
 
-      // 통합 삭제 Edge Function 호출
-      const { data, error } = await supabase.functions.invoke('cleanup-integrated-data', {
-        body: { filePaths: [path] },
-        headers: { Authorization: `Bearer ${session.access_token}` }
-      });
+      // 스토리지 파일 삭제
+      await supabase.storage
+        .from(bucket)
+        .remove([path]);
 
-      if (error) throw error;
+      // user_data_imports 삭제
+      await (supabase as any)
+        .from('user_data_imports')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('file_path', path);
 
       toast({
-        title: "통합 삭제 완료",
-        description: `${name} 및 관련 데이터 삭제 완료 (엔티티: ${data.entitiesDeleted}, 관계: ${data.relationsDeleted})`,
+        title: "삭제 완료",
+        description: `${name}이(가) 삭제되었습니다`,
       });
 
       await loadAllFiles();
@@ -196,25 +200,40 @@ export function StorageManager({ storeId }: StorageManagerProps) {
 
     setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
 
       const filePaths = Array.from(selectedFiles);
+      let deletedCount = 0;
 
-      // 통합 삭제 Edge Function 호출
-      const { data, error } = await supabase.functions.invoke('cleanup-integrated-data', {
-        body: { filePaths },
-        headers: { Authorization: `Bearer ${session.access_token}` }
-      });
+      for (const path of filePaths) {
+        const file = files.find(f => f.path === path);
+        if (!file) continue;
 
-      if (error) throw error;
+        try {
+          // 스토리지 파일 삭제
+          await supabase.storage
+            .from(file.bucket)
+            .remove([path]);
+
+          // user_data_imports 삭제
+          await (supabase as any)
+            .from('user_data_imports')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('file_path', path);
+
+          deletedCount++;
+        } catch (err) {
+          console.error(`Failed to delete ${path}:`, err);
+        }
+      }
 
       toast({
         title: "일괄 삭제 완료",
-        description: `${data.storageFilesDeleted}개 파일 및 관련 데이터 삭제 (엔티티: ${data.entitiesDeleted}, 관계: ${data.relationsDeleted})`,
+        description: `${deletedCount}개 파일이 삭제되었습니다`,
       });
 
-      // React Query 캐시 초기화
       if (storeId) {
         clearStoreDataCache(storeId);
       } else {
@@ -242,26 +261,60 @@ export function StorageManager({ storeId }: StorageManagerProps) {
 
     setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
 
-      // 전체 데이터 삭제
-      const { data, error } = await supabase.functions.invoke('cleanup-integrated-data', {
-        body: { 
-          deleteAllData: true,
-          storeId: storeId || undefined
-        },
-        headers: { Authorization: `Bearer ${session.access_token}` }
-      });
+      let deletedFiles = 0;
 
-      if (error) throw error;
+      // 현재 사용자의 모든 파일 삭제
+      for (const file of files) {
+        try {
+          await supabase.storage
+            .from(file.bucket)
+            .remove([file.path]);
+          deletedFiles++;
+        } catch (err) {
+          console.error(`Failed to delete ${file.path}:`, err);
+        }
+      }
+
+      // user_data_imports 삭제
+      await (supabase as any)
+        .from('user_data_imports')
+        .delete()
+        .eq('user_id', user.id);
+
+      // graph_entities 및 relations 삭제
+      const { data: entities } = await (supabase as any)
+        .from('graph_entities')
+        .select('id')
+        .eq('user_id', user.id);
+
+      if (entities && entities.length > 0) {
+        const entityIds = entities.map((e: any) => e.id);
+        
+        await (supabase as any)
+          .from('graph_relations')
+          .delete()
+          .or(`source_entity_id.in.(${entityIds.join(',')}),target_entity_id.in.(${entityIds.join(',')})`);
+        
+        await (supabase as any)
+          .from('graph_entities')
+          .delete()
+          .in('id', entityIds);
+      }
+
+      // store_scenes 삭제
+      await (supabase as any)
+        .from('store_scenes')
+        .delete()
+        .eq('user_id', user.id);
 
       toast({
         title: "전체 데이터 초기화 완료",
-        description: `스토리지: ${data.storageFilesDeleted}개, 엔티티: ${data.entitiesDeleted}개, 관계: ${data.relationsDeleted}개, 씬: ${data.scenesDeleted}개`,
+        description: `${deletedFiles}개 파일 및 관련 데이터가 삭제되었습니다`,
       });
 
-      // React Query 캐시 전체 초기화
       if (storeId) {
         clearStoreDataCache(storeId);
       } else {
