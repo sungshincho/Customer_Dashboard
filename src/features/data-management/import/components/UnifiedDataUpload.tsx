@@ -1070,10 +1070,57 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
       return;
     }
     
-    for (const file of pendingFiles) {
-      if (isPaused) break; // 일시중지 상태면 중단
-      await uploadFile(file);
+    // 검증 결과에 권장 업로드 순서가 있으면 순서대로 업로드
+    if (validationResults && validationResults.uploadOrder && validationResults.uploadOrder.length > 0) {
+      toast({
+        title: "순서대로 업로드 시작",
+        description: `${validationResults.uploadOrder.length}단계로 나누어 업로드합니다`,
+      });
+      
+      // 각 레벨별로 순차 업로드
+      for (let levelIndex = 0; levelIndex < validationResults.uploadOrder.length; levelIndex++) {
+        const levelFileNames = validationResults.uploadOrder[levelIndex];
+        
+        toast({
+          title: `단계 ${levelIndex + 1}/${validationResults.uploadOrder.length} 업로드 중`,
+          description: `${levelFileNames.length}개 파일 업로드 중...`,
+        });
+        
+        // 해당 레벨의 파일들 찾기 (파일명으로 매칭)
+        const levelFiles = pendingFiles.filter(file => 
+          levelFileNames.includes(file.file.name)
+        );
+        
+        // 레벨 내 파일들을 순차 업로드
+        for (const file of levelFiles) {
+          if (isPaused) {
+            toast({
+              title: "업로드 일시중지",
+              description: "일시중지되었습니다. 재개 버튼을 눌러주세요.",
+            });
+            return;
+          }
+          await uploadFile(file);
+        }
+        
+        // 레벨 완료 후 잠시 대기 (다음 레벨 시작 전)
+        if (levelIndex < validationResults.uploadOrder.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+      
+      toast({
+        title: "순서대로 업로드 완료",
+        description: "모든 파일이 권장 순서대로 업로드되었습니다",
+      });
+    } else {
+      // 검증 순서가 없으면 기존 방식대로 순차 업로드
+      for (const file of pendingFiles) {
+        if (isPaused) break;
+        await uploadFile(file);
+      }
     }
+    
     onUploadSuccess?.();
   };
 
@@ -1361,7 +1408,7 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
                   disabled={!files.some(f => f.status === 'pending') || isPaused}
                 >
                   <Upload className="w-4 h-4 mr-2" />
-                  모두 업로드
+                  {validationResults ? '권장 순서로 업로드' : '모두 업로드'}
                 </Button>
               </div>
             </div>

@@ -4427,6 +4427,7 @@ export type Database = {
         Args: { membership_org_id: string; membership_user_id: string }
         Returns: boolean
       }
+      export_public_schema: { Args: never; Returns: Json }
       get_schema_metadata: { Args: never; Returns: Json }
       get_user_org_id: { Args: { _user_id: string }; Returns: string }
       get_user_orgs: {
