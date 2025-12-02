@@ -761,6 +761,8 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
               store_id: storeId,
               auto_fix: true,
               skip_validation: false,
+              filePath: filePath,
+              fileType: uploadFile.type,
             },
           });
 
