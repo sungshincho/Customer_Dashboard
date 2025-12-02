@@ -282,13 +282,14 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
         .from('user_data_imports')
         .insert({
           file_name: uploadFile.file.name,
-          file_type: uploadFile.type,
           data_type: 'auto-detected',
-          raw_data: rawData as any,
+          raw_data: {
+            data: rawData,
+            filePath: filePath || null // raw_data 내부에 저장
+          } as any,
           row_count: rawData.length,
           store_id: storeId || null,
           user_id: user.id,
-          file_path: filePath || null,
         })
         .select()
         .single();
@@ -467,15 +468,14 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
               user_id: user.id,
               store_id: storeId,
               file_name: safeFileName,
-              file_type: '3d_model',
-              data_type: '3d_model',
-              file_path: filePath,
+              data_type: '3d-model',
               row_count: 1,
               raw_data: {
                 entityType: result?.entityType,
                 instanceLabel: result?.instanceLabel,
                 position: result?.position,
-                publicUrl: publicUrl
+                publicUrl: publicUrl,
+                filePath: filePath // raw_data 내부에 저장
               }
             });
             
@@ -565,13 +565,14 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
           .from('user_data_imports')
           .insert({
             file_name: safeFileName,
-            file_type: uploadFile.type,
             data_type: 'auto-detected',
-            raw_data: dataSample as any, // 샘플만 저장
-            row_count: sampleData.length, // 전체 행 수는 저장
+            raw_data: {
+              sample: dataSample,
+              filePath: filePath // raw_data 내부에 저장
+            } as any,
+            row_count: sampleData.length,
             store_id: storeId || null,
             user_id: user.id,
-            file_path: filePath, // Storage 경로
           })
           .select()
           .single();
@@ -818,11 +819,12 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
             user_id: user.id,
             store_id: storeId,
             file_name: safeFileName,
-            file_type: 'json',
             data_type: 'metadata',
-            file_path: filePath,
             row_count: rawData.length,
-            raw_data: rawData
+            raw_data: {
+              data: rawData,
+              filePath: filePath // raw_data 내부에 저장
+            }
           })
           .select()
           .single();
