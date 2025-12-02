@@ -177,12 +177,12 @@ export function StorageManager({ storeId }: StorageManagerProps) {
 
       console.log('✅ Storage delete result:', deleteData);
 
-      // user_data_imports 삭제
+      // user_data_imports 삭제 (파일명 기준)
       const { error: dbError } = await (supabase as any)
         .from('user_data_imports')
         .delete()
         .eq('user_id', user.id)
-        .eq('file_path', path);
+        .eq('file_name', name);
 
       if (dbError) {
         console.error('DB delete error:', dbError);
@@ -244,12 +244,12 @@ export function StorageManager({ storeId }: StorageManagerProps) {
 
           console.log(`✅ Deleted from storage: ${path}`, deleteData);
 
-          // user_data_imports 삭제
+          // user_data_imports 삭제 (파일명 기준)
           const { error: dbError } = await (supabase as any)
             .from('user_data_imports')
             .delete()
             .eq('user_id', user.id)
-            .eq('file_path', path);
+            .eq('file_name', file.name);
 
           if (dbError) {
             console.warn(`DB delete warning for ${path}:`, dbError);
