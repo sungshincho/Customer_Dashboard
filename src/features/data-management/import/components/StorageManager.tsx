@@ -226,109 +226,105 @@ export function StorageManager({ storeId }: StorageManagerProps) {
   };
 
   const handleBulkDelete = async () => {
-    if (selectedFiles.size === 0) return;
+    if (selectedFiles.size === 0) {
+      console.log('❌ No files selected');
+      return;
+    }
     
-    if (!confirm(`선택한 ${selectedFiles.size}개 파일 및 관련 데이터를 삭제하시겠습니까?`)) return;
+    console.log('🗑️ handleBulkDelete called, selected files:', selectedFiles.size);
+    
+    if (!confirm(`선택한 ${selectedFiles.size}개 파일 및 관련 데이터를 삭제하시겠습니까?`)) {
+      console.log('❌ User cancelled deletion');
+      return;
+    }
 
     setLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+    
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast({
+        title: "인증 오류",
+        description: "로그인이 필요합니다",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
 
-      const filePaths = Array.from(selectedFiles);
-      let deletedCount = 0;
-      let failedCount = 0;
+    const filePaths = Array.from(selectedFiles);
+    let deletedCount = 0;
+    let failedCount = 0;
 
-      console.log('🗑️ Bulk deleting files:', filePaths);
+    console.log('🗑️ Starting bulk delete for paths:', filePaths);
 
-      for (const path of filePaths) {
-        const file = files.find(f => f.path === path);
-        if (!file) {
-          console.warn(`File not found: ${path}`);
+    for (const path of filePaths) {
+      const file = files.find(f => f.path === path);
+      if (!file) {
+        console.warn(`❌ File not found in state: ${path}`);
+        failedCount++;
+        continue;
+      }
+
+      console.log(`🗑️ Attempting to delete: ${file.bucket}/${path}`);
+
+      try {
+        // 스토리지 파일 삭제 - 실제 경로로 직접 삭제
+        const { data: deleteData, error: deleteError } = await supabase.storage
+          .from(file.bucket)
+          .remove([path]);
+
+        console.log(`Storage delete result for ${path}:`, { deleteData, deleteError });
+
+        if (deleteError) {
+          console.error(`❌ Storage delete failed for ${path}:`, deleteError);
+          failedCount++;
           continue;
         }
 
-        try {
-          // 스토리지 파일 삭제
-          let deleteError = null;
+        console.log(`✅ Successfully deleted from storage: ${path}`);
 
-          if (file.bucket === '3d-models') {
-            // 경로 문제가 있을 수 있어 전체 경로와 파일명 두 가지 방식으로 모두 시도
-            const { error: primaryError } = await supabase.storage
-              .from('3d-models')
-              .remove([path]);
+        // user_data_imports 삭제 (파일명 기준)
+        const { error: dbError } = await supabase
+          .from('user_data_imports')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('file_name', file.name);
 
-            if (primaryError) {
-              const { error: secondaryError } = await supabase.storage
-                .from('3d-models')
-                .remove([file.name]);
-
-              deleteError = secondaryError;
-            }
-          } else {
-            const { error } = await supabase.storage
-              .from(file.bucket)
-              .remove([path]);
-            deleteError = error;
-          }
-
-          if (deleteError) {
-            console.error(`Storage delete error for ${path}:`, deleteError);
-            failedCount++;
-            continue;
-          }
-
-          console.log(`✅ Deleted from storage: ${path}`);
-
-          // user_data_imports 삭제 (파일명 기준)
-          const { error: dbError } = await (supabase as any)
-            .from('user_data_imports')
-            .delete()
-            .eq('user_id', user.id)
-            .eq('file_name', file.name);
-
-          if (dbError) {
-            console.warn(`DB delete warning for ${path}:`, dbError);
-          }
-
-          deletedCount++;
-        } catch (err) {
-          console.error(`Failed to delete ${path}:`, err);
-          failedCount++;
+        if (dbError) {
+          console.warn(`⚠️ DB delete warning for ${file.name}:`, dbError);
         }
-      }
 
-      if (failedCount > 0) {
-        toast({
-          title: "일부 파일 삭제 실패",
-          description: `${deletedCount}개 성공, ${failedCount}개 실패`,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "일괄 삭제 완료",
-          description: `${deletedCount}개 파일이 삭제되었습니다`,
-        });
+        deletedCount++;
+      } catch (err) {
+        console.error(`❌ Exception while deleting ${path}:`, err);
+        failedCount++;
       }
+    }
 
-      if (storeId) {
-        clearStoreDataCache(storeId);
-      } else {
-        clearStoreDataCache();
-      }
+    console.log(`✅ Bulk delete complete: ${deletedCount} deleted, ${failedCount} failed`);
 
-      setSelectedFiles(new Set());
-      await loadAllFiles();
-    } catch (error: any) {
-      console.error('Bulk delete error:', error);
+    if (failedCount > 0) {
       toast({
-        title: "삭제 실패",
-        description: error.message || "파일 삭제 중 오류가 발생했습니다",
+        title: "일부 파일 삭제 실패",
+        description: `${deletedCount}개 성공, ${failedCount}개 실패`,
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
+    } else {
+      toast({
+        title: "일괄 삭제 완료",
+        description: `${deletedCount}개 파일이 삭제되었습니다`,
+      });
     }
+
+    if (storeId) {
+      clearStoreDataCache(storeId);
+    } else {
+      clearStoreDataCache();
+    }
+
+    setSelectedFiles(new Set());
+    await loadAllFiles();
+    setLoading(false);
   };
 
   const handleDeleteAllData = async () => {
