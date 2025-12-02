@@ -1076,7 +1076,32 @@ export function UnifiedDataUpload({ storeId, onUploadSuccess }: UnifiedDataUploa
   };
 
   const removeFile = (id: string) => {
-    setFiles(prev => prev.filter(f => f.id !== id));
+    setFiles(prev => {
+      const updatedFiles = prev.filter(f => f.id !== id);
+      
+      // localStorage도 동기화
+      if (storeId) {
+        try {
+          const storageKey = STORAGE_KEY_PREFIX + storeId;
+          const toStore: StoredUploadFile[] = updatedFiles.map(file => ({
+            id: file.id,
+            fileName: file.file.name,
+            fileSize: file.file.size,
+            type: file.type,
+            status: file.status,
+            progress: file.progress,
+            error: file.error,
+            mappingResult: file.mappingResult,
+            isRestored: file.isRestored,
+          }));
+          localStorage.setItem(storageKey, JSON.stringify(toStore));
+        } catch (error) {
+          console.error('Failed to update localStorage:', error);
+        }
+      }
+      
+      return updatedFiles;
+    });
   };
 
   const clearCompleted = () => {
