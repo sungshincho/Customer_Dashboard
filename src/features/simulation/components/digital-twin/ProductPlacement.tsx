@@ -1,6 +1,4 @@
 import { useGLTF } from '@react-three/drei';
-import { useEffect, useRef } from 'react';
-import * as THREE from 'three';
 import type { ProductAsset } from '@/types/scene3d';
 
 interface ProductPlacementProps {
@@ -22,7 +20,6 @@ export function ProductPlacement({ products = [], onClick }: ProductPlacementPro
 }
 
 function ProductItem({ asset, onClick }: { asset: ProductAsset; onClick: () => void }) {
-  const groupRef = useRef<THREE.Group>(null);
   const dimensions = asset.dimensions || { width: 0.3, height: 0.4, depth: 0.2 };
   
   // Render placeholder if no model URL
@@ -50,29 +47,14 @@ function ProductItem({ asset, onClick }: { asset: ProductAsset; onClick: () => v
   try {
     const { scene } = useGLTF(asset.model_url);
     
-    // 모델 중심 정렬을 위한 effect
-    useEffect(() => {
-      if (groupRef.current && scene) {
-        const box = new THREE.Box3().setFromObject(scene);
-        const center = box.getCenter(new THREE.Vector3());
-        
-        // 모델을 중심점으로 이동 (오프셋 조정)
-        scene.position.x = -center.x;
-        scene.position.y = -center.y;
-        scene.position.z = -center.z;
-      }
-    }, [scene]);
-    
     return (
-      <group
-        ref={groupRef}
+      <primitive
+        object={scene.clone()}
         position={[asset.position.x, asset.position.y, asset.position.z]}
         rotation={[asset.rotation.x, asset.rotation.y, asset.rotation.z]}
         scale={[asset.scale.x, asset.scale.y, asset.scale.z]}
         onClick={onClick}
-      >
-        <primitive object={scene.clone()} />
-      </group>
+      />
     );
   } catch (error) {
     console.warn('Failed to load product model:', asset.sku, error);
