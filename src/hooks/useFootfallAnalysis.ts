@@ -54,8 +54,23 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
       const start = startDate || subDays(new Date(), 7);
       const end = endDate || new Date();
 
-      // wifi_tracking 데이터에서 유입 분석 (실제 임포트된 데이터만 사용)
-      const { data: trackingData, error: trackingError } = await supabase
+      // L2 visits 테이블에서 직접 방문 데이터 조회 (3-Layer Architecture)
+      const { data: visits, error: visitsError } = await supabase
+        .from('visits')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('org_id', orgId)
+        .eq('store_id', storeId)
+        .gte('visit_date', startOfDay(start).toISOString())
+        .lte('visit_date', endOfDay(end).toISOString());
+
+      if (visitsError) {
+        console.error('Visits data fetch error:', visitsError);
+        throw new Error('방문 데이터를 불러오는데 실패했습니다.');
+      }
+
+      // wifi_tracking 데이터에서 추가 분석 (있는 경우에만)
+      const { data: trackingData } = await supabase
         .from('wifi_tracking')
         .select('*')
         .eq('user_id', user.id)
@@ -63,34 +78,6 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
         .eq('store_id', storeId)
         .gte('timestamp', startOfDay(start).toISOString())
         .lte('timestamp', endOfDay(end).toISOString());
-
-      if (trackingError) {
-        console.error('WiFi tracking data fetch error:', trackingError);
-        throw new Error('WiFi 트래킹 데이터를 불러오는데 실패했습니다.');
-      }
-
-      // graph_entities에서 Visit 엔티티만 가져오기 (실제 임포트된 온톨로지 데이터만 사용)
-      const { data: visitEntityType } = await supabase
-        .from('ontology_entity_types')
-        .select('id')
-        .eq('name', 'Visit')
-        .eq('user_id', user.id)
-        .single();
-
-      const { data: visits, error: visitsError } = await supabase
-        .from('graph_entities')
-        .select('properties, created_at')
-        .eq('user_id', user.id)
-        .eq('org_id', orgId)
-        .eq('store_id', storeId)
-        .eq('entity_type_id', visitEntityType?.id)
-        .gte('created_at', startOfDay(start).toISOString())
-        .lte('created_at', endOfDay(end).toISOString());
-
-      if (visitsError) {
-        console.error('Graph entities data fetch error:', visitsError);
-        throw new Error('방문 데이터를 불러오는데 실패했습니다.');
-      }
 
       // Fetch weather data
       const { data: weatherData } = await supabase
@@ -119,9 +106,10 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
 
       // 시간대별 집계 (컨텍스트 데이터 포함)
       const hourlyData = new Map<string, FootfallData>();
+      const uniqueVisitors = new Set<string>();
       
-      visits?.forEach((visit) => {
-        const timestamp = new Date(visit.created_at);
+      visits?.forEach((visit: any) => {
+        const timestamp = new Date(visit.visit_date);
         const dateKey = format(timestamp, 'yyyy-MM-dd');
         const hour = timestamp.getHours();
         const key = `${dateKey}-${hour}`;
@@ -148,6 +136,21 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
 
         const data = hourlyData.get(key)!;
         data.visit_count += 1;
+        
+        // 고유 방문자 카운트 (customer_id 또는 visitor_id 기반)
+        const visitorKey = visit.customer_id || visit.visitor_id || visit.id;
+        if (visitorKey && !uniqueVisitors.has(visitorKey)) {
+          uniqueVisitors.add(visitorKey);
+          data.unique_visitors += 1;
+        }
+        
+        // 체류 시간 계산 (duration_minutes 컬럼이 있는 경우)
+        if (visit.duration_minutes) {
+          const currentAvg = data.avg_duration_minutes;
+          data.avg_duration_minutes = currentAvg > 0 
+            ? (currentAvg + visit.duration_minutes) / 2 
+            : visit.duration_minutes;
+        }
       });
 
       // WiFi 트래킹으로 고유 방문자 및 체류시간 계산
@@ -295,22 +298,15 @@ export function useHourlyFootfall(storeId?: string, date?: Date) {
 
       const targetDate = date || new Date();
       
-      const { data: visitEntityType } = await supabase
-        .from('ontology_entity_types')
-        .select('id')
-        .eq('name', 'Visit')
-        .eq('user_id', user.id)
-        .single();
-
+      // L2 visits 테이블에서 직접 조회
       const { data: visits, error } = await supabase
-        .from('graph_entities')
-        .select('properties, created_at')
+        .from('visits')
+        .select('*')
         .eq('user_id', user.id)
         .eq('org_id', orgId)
         .eq('store_id', storeId)
-        .eq('entity_type_id', visitEntityType?.id)
-        .gte('created_at', startOfDay(targetDate).toISOString())
-        .lte('created_at', endOfDay(targetDate).toISOString());
+        .gte('visit_date', startOfDay(targetDate).toISOString())
+        .lte('visit_date', endOfDay(targetDate).toISOString());
 
       if (error) throw error;
 
@@ -321,8 +317,8 @@ export function useHourlyFootfall(storeId?: string, date?: Date) {
         time: `${hour.toString().padStart(2, '0')}:00`,
       }));
 
-      visits?.forEach((visit) => {
-        const hour = new Date(visit.created_at).getHours();
+      visits?.forEach((visit: any) => {
+        const hour = new Date(visit.visit_date).getHours();
         hourlyData[hour].visits += 1;
       });
 
