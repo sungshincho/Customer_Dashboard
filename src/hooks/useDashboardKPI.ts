@@ -32,10 +32,10 @@ export function useDashboardKPI(storeId?: string, date?: string) {
 
       const targetDate = date || new Date().toISOString().split('T')[0];
 
+      // org_id 기반 조회 (조직 내 데이터 공유)
       const { data, error } = await supabase
         .from('dashboard_kpis')
         .select('*')
-        .eq('user_id', user.id)
         .eq('org_id', orgId)
         .eq('store_id', storeId)
         .eq('date', targetDate)
@@ -56,10 +56,10 @@ export function useLatestKPIs(storeId?: string, limit: number = 7) {
     queryFn: async () => {
       if (!user || !storeId || !orgId) return [];
 
+      // org_id 기반 조회 (조직 내 데이터 공유)
       const { data, error } = await supabase
         .from('dashboard_kpis')
         .select('*')
-        .eq('user_id', user.id)
         .eq('org_id', orgId)
         .eq('store_id', storeId)
         .order('date', { ascending: false })
@@ -80,10 +80,10 @@ export function useKPIsByDateRange(storeId?: string, startDate?: string, endDate
     queryFn: async () => {
       if (!user || !storeId || !startDate || !endDate || !orgId) return [];
 
+      // org_id 기반 조회 (조직 내 데이터 공유)
       const { data, error } = await supabase
         .from('dashboard_kpis')
         .select('*')
-        .eq('user_id', user.id)
         .eq('org_id', orgId)
         .eq('store_id', storeId)
         .gte('date', startDate)
