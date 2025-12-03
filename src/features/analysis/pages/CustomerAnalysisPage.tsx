@@ -164,11 +164,11 @@ export default function CustomerAnalysisIntegratedPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">평균 객단가</p>
                   <p className="text-2xl font-bold">
-                    {segmentStats[0]?.avgRevenue ? `₩${Math.round(segmentStats[0].avgRevenue).toLocaleString()}` : (
+                    {segmentStats?.vip?.avgLTV ? `₩${Math.round(segmentStats.vip.avgLTV).toLocaleString()}` : (
                       <span className="text-base text-muted-foreground">데이터 없음</span>
                     )}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">고객당 평균</p>
+                  <p className="text-xs text-muted-foreground mt-1">VIP 고객 평균 LTV</p>
                 </div>
                 <DollarSign className="w-8 h-8 text-orange-500 opacity-50" />
               </div>
@@ -294,7 +294,7 @@ export default function CustomerAnalysisIntegratedPage() {
             <CardContent>
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={Object.entries(segmentStats).map(([segment, data]: any) => ({ segment, count: data.count }))}>
+                  <BarChart data={segmentStats ? Object.entries(segmentStats).map(([segment, data]: any) => ({ segment, count: data.count })) : []}>
                     <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                     <XAxis dataKey="segment" />
                     <YAxis />
