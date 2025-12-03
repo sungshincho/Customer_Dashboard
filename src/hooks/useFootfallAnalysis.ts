@@ -107,8 +107,9 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
       
       visits?.forEach((visit: any) => {
         const timestamp = new Date(visit.visit_date);
-        const dateKey = format(timestamp, 'yyyy-MM-dd');
-        const hour = timestamp.getHours();
+        // UTC 기반으로 날짜 추출 (DB가 UTC로 저장되어 있으므로)
+        const dateKey = visit.visit_date.split('T')[0] || format(timestamp, 'yyyy-MM-dd');
+        const hour = timestamp.getUTCHours();
         const key = `${dateKey}-${hour}`;
 
         if (!hourlyData.has(key)) {
@@ -153,8 +154,9 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
       // WiFi 트래킹으로 고유 방문자 및 체류시간 계산
       const sessionMap = new Map<string, { start: Date; end: Date }>();
       trackingData?.forEach((point) => {
-        const dateKey = format(new Date(point.timestamp), 'yyyy-MM-dd');
-        const hour = new Date(point.timestamp).getHours();
+        const timestamp = new Date(point.timestamp);
+        const dateKey = point.timestamp.split('T')[0] || format(timestamp, 'yyyy-MM-dd');
+        const hour = timestamp.getUTCHours();
         const key = `${dateKey}-${hour}-${point.session_id}`;
 
         if (!sessionMap.has(key)) {
@@ -173,8 +175,10 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
 
       // 세션 데이터를 hourlyData에 통합
       sessionMap.forEach((session, key) => {
-        const [dateKey, hourStr] = key.split('-');
-        const hour = parseInt(hourStr);
+        // key format: dateKey-hour-session_id (e.g., 2025-12-01-14-abc123)
+        const parts = key.split('-');
+        const dateKey = `${parts[0]}-${parts[1]}-${parts[2]}`; // yyyy-MM-dd
+        const hour = parseInt(parts[3]);
         const hourKey = `${dateKey}-${hour}`;
         
         if (hourlyData.has(hourKey)) {
@@ -314,7 +318,7 @@ export function useHourlyFootfall(storeId?: string, date?: Date) {
       }));
 
       visits?.forEach((visit: any) => {
-        const hour = new Date(visit.visit_date).getHours();
+        const hour = new Date(visit.visit_date).getUTCHours();
         hourlyData[hour].visits += 1;
       });
 
