@@ -4345,6 +4345,7 @@ export type Database = {
           created_at: string
           date: string
           dwell_time_avg_min: number | null
+          hour: number | null
           id: string
           metadata: Json | null
           org_id: string | null
@@ -4358,6 +4359,7 @@ export type Database = {
           created_at?: string
           date: string
           dwell_time_avg_min?: number | null
+          hour?: number | null
           id?: string
           metadata?: Json | null
           org_id?: string | null
@@ -4371,6 +4373,7 @@ export type Database = {
           created_at?: string
           date?: string
           dwell_time_avg_min?: number | null
+          hour?: number | null
           id?: string
           metadata?: Json | null
           org_id?: string | null
