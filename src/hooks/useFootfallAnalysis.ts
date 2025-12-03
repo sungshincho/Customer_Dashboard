@@ -1,7 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
-import { startOfDay, endOfDay, subDays, format } from 'date-fns';
+import { format, subDays } from 'date-fns';
+
+/**
+ * L3 hourly_metrics + daily_kpis_agg 테이블 기반 방문 분석 Hook
+ * Phase 3: 3-Layer Architecture - 모든 분석이 동일한 L3 데이터 소스 사용
+ */
 
 export interface FootfallData {
   date: string;
@@ -9,7 +14,6 @@ export interface FootfallData {
   visit_count: number;
   unique_visitors: number;
   avg_duration_minutes: number;
-  // 컨텍스트 데이터
   weather_condition?: string;
   temperature?: number;
   is_holiday?: boolean;
@@ -24,8 +28,7 @@ export interface FootfallStats {
   avg_visits_per_hour: number;
   peak_hour: number | null;
   peak_hour_visits: number;
-  daily_trend: number; // % change from previous period
-  // 컨텍스트 인사이트
+  daily_trend: number;
   weather_impact?: string;
   holiday_impact?: string;
   regional_comparison?: string;
@@ -35,9 +38,9 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
   const { user, orgId } = useAuth();
 
   return useQuery({
-    queryKey: ['footfall-analysis', storeId, startDate, endDate],
+    queryKey: ['footfall-analysis', storeId, startDate?.toISOString(), endDate?.toISOString()],
     queryFn: async () => {
-      if (!user || !storeId) {
+      if (!user || !storeId || !orgId) {
         return {
           data: [],
           stats: {
@@ -53,145 +56,64 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
 
       const start = startDate || subDays(new Date(), 7);
       const end = endDate || new Date();
+      const startStr = format(start, 'yyyy-MM-dd');
+      const endStr = format(end, 'yyyy-MM-dd');
 
-      // L2 visits 테이블에서 직접 방문 데이터 조회 (3-Layer Architecture)
-      // org_id 기반 조회 (조직 내 데이터 공유)
-      const { data: visits, error: visitsError } = await supabase
-        .from('visits')
+      // L3 hourly_metrics에서 시간대별 데이터 조회
+      const { data: hourlyMetrics, error: hourlyError } = await supabase
+        .from('hourly_metrics')
         .select('*')
         .eq('org_id', orgId)
         .eq('store_id', storeId)
-        .gte('visit_date', startOfDay(start).toISOString())
-        .lte('visit_date', endOfDay(end).toISOString());
+        .gte('date', startStr)
+        .lte('date', endStr)
+        .order('date', { ascending: true })
+        .order('hour', { ascending: true });
 
-      if (visitsError) {
-        console.error('Visits data fetch error:', visitsError);
+      if (hourlyError) {
+        console.error('Hourly metrics fetch error:', hourlyError);
         throw new Error('방문 데이터를 불러오는데 실패했습니다.');
       }
 
-      // wifi_tracking 데이터에서 추가 분석 (있는 경우에만)
-      const { data: trackingData } = await supabase
-        .from('wifi_tracking')
-        .select('*')
+      // L3 daily_kpis_agg에서 일별 컨텍스트 데이터 조회
+      const { data: dailyKpis } = await supabase
+        .from('daily_kpis_agg')
+        .select('date, weather_condition, temperature, is_holiday, special_event')
         .eq('org_id', orgId)
         .eq('store_id', storeId)
-        .gte('timestamp', startOfDay(start).toISOString())
-        .lte('timestamp', endOfDay(end).toISOString());
+        .gte('date', startStr)
+        .lte('date', endStr);
 
-      // Fetch weather data
-      const { data: weatherData } = await supabase
-        .from('weather_data')
-        .select('*')
-        .eq('store_id', storeId)
-        .gte('date', format(start, 'yyyy-MM-dd'))
-        .lte('date', format(end, 'yyyy-MM-dd'));
+      // 일별 컨텍스트 매핑
+      interface DailyContext {
+        weather_condition?: string | null;
+        temperature?: number | null;
+        is_holiday?: boolean | null;
+        special_event?: string | null;
+      }
+      const dailyContextMap = new Map<string, DailyContext>(
+        (dailyKpis || []).map(d => [d.date, {
+          weather_condition: d.weather_condition,
+          temperature: d.temperature,
+          is_holiday: d.is_holiday,
+          special_event: d.special_event,
+        }])
+      );
 
-      // Fetch regional data
-      const { data: regionalData } = await supabase
-        .from('regional_data')
-        .select('*')
-        .gte('date', format(start, 'yyyy-MM-dd'))
-        .lte('date', format(end, 'yyyy-MM-dd'));
-      
-      // Fetch holidays
-      const { data: holidaysData } = await supabase
-        .from('holidays_events')
-        .select('*')
-        .eq('org_id', orgId)
-        .gte('date', format(start, 'yyyy-MM-dd'))
-        .lte('date', format(end, 'yyyy-MM-dd'));
-
-      // 시간대별 집계 (컨텍스트 데이터 포함)
-      const hourlyData = new Map<string, FootfallData>();
-      const uniqueVisitors = new Set<string>();
-      
-      visits?.forEach((visit: any) => {
-        const timestamp = new Date(visit.visit_date);
-        // UTC 기반으로 날짜 추출 (DB가 UTC로 저장되어 있으므로)
-        const dateKey = visit.visit_date.split('T')[0] || format(timestamp, 'yyyy-MM-dd');
-        const hour = timestamp.getUTCHours();
-        const key = `${dateKey}-${hour}`;
-
-        if (!hourlyData.has(key)) {
-          const weather = weatherData?.find(w => w.date === dateKey);
-          const holiday = holidaysData?.find(h => h.date === dateKey);
-          const regional = regionalData?.find(r => r.date === dateKey);
-
-          hourlyData.set(key, {
-            date: dateKey,
-            hour,
-            visit_count: 0,
-            unique_visitors: 0,
-            avg_duration_minutes: 0,
-            weather_condition: weather?.weather_condition,
-            temperature: weather?.temperature ? Number(weather.temperature) : undefined,
-            is_holiday: !!holiday,
-            event_name: holiday?.event_name,
-            event_type: holiday?.event_type,
-            regional_traffic: regional?.population ? Number(regional.population) : undefined,
-          });
-        }
-
-        const data = hourlyData.get(key)!;
-        data.visit_count += 1;
-        
-        // 고유 방문자 카운트 (customer_id 또는 visitor_id 기반)
-        const visitorKey = visit.customer_id || visit.visitor_id || visit.id;
-        if (visitorKey && !uniqueVisitors.has(visitorKey)) {
-          uniqueVisitors.add(visitorKey);
-          data.unique_visitors += 1;
-        }
-        
-        // 체류 시간 계산 (duration_minutes 컬럼이 있는 경우)
-        if (visit.duration_minutes) {
-          const currentAvg = data.avg_duration_minutes;
-          data.avg_duration_minutes = currentAvg > 0 
-            ? (currentAvg + visit.duration_minutes) / 2 
-            : visit.duration_minutes;
-        }
-      });
-
-      // WiFi 트래킹으로 고유 방문자 및 체류시간 계산
-      const sessionMap = new Map<string, { start: Date; end: Date }>();
-      trackingData?.forEach((point) => {
-        const timestamp = new Date(point.timestamp);
-        const dateKey = point.timestamp.split('T')[0] || format(timestamp, 'yyyy-MM-dd');
-        const hour = timestamp.getUTCHours();
-        const key = `${dateKey}-${hour}-${point.session_id}`;
-
-        if (!sessionMap.has(key)) {
-          sessionMap.set(key, {
-            start: new Date(point.timestamp),
-            end: new Date(point.timestamp),
-          });
-        } else {
-          const session = sessionMap.get(key)!;
-          const timestamp = new Date(point.timestamp);
-          if (timestamp > session.end) {
-            session.end = timestamp;
-          }
-        }
-      });
-
-      // 세션 데이터를 hourlyData에 통합
-      sessionMap.forEach((session, key) => {
-        // key format: dateKey-hour-session_id (e.g., 2025-12-01-14-abc123)
-        const parts = key.split('-');
-        const dateKey = `${parts[0]}-${parts[1]}-${parts[2]}`; // yyyy-MM-dd
-        const hour = parseInt(parts[3]);
-        const hourKey = `${dateKey}-${hour}`;
-        
-        if (hourlyData.has(hourKey)) {
-          const data = hourlyData.get(hourKey)!;
-          data.unique_visitors += 1;
-          const durationMinutes = (session.end.getTime() - session.start.getTime()) / (1000 * 60);
-          data.avg_duration_minutes = (data.avg_duration_minutes + durationMinutes) / 2;
-        }
-      });
-
-      const footfallData = Array.from(hourlyData.values()).sort((a, b) => {
-        if (a.date !== b.date) return a.date.localeCompare(b.date);
-        return a.hour - b.hour;
+      // FootfallData 형식으로 변환
+      const footfallData: FootfallData[] = (hourlyMetrics || []).map(m => {
+        const context = dailyContextMap.get(m.date) || {};
+        return {
+          date: m.date,
+          hour: m.hour,
+          visit_count: m.visitor_count || 0,
+          unique_visitors: m.visitor_count || 0, // hourly_metrics에서는 unique 구분 없음
+          avg_duration_minutes: 0, // hourly_metrics에 없는 필드
+          weather_condition: context.weather_condition,
+          temperature: context.temperature,
+          is_holiday: context.is_holiday,
+          event_name: context.special_event,
+        };
       });
 
       // 통계 계산
@@ -199,7 +121,6 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
       const totalUniqueVisitors = footfallData.reduce((sum, d) => sum + d.unique_visitors, 0);
       const hoursWithData = footfallData.filter(d => d.visit_count > 0).length;
       
-      // 피크 시간대 찾기 (데이터가 없으면 null 처리)
       let peakHour: number | null = null;
       let peakHourVisits = 0;
 
@@ -215,7 +136,6 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
       // 컨텍스트 기반 인사이트 생성
       const weatherImpact = generateWeatherImpact(footfallData);
       const holidayImpact = generateHolidayImpact(footfallData);
-      const regionalComparison = generateRegionalComparison(footfallData);
 
       const stats: FootfallStats = {
         total_visits: totalVisits,
@@ -223,10 +143,9 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
         avg_visits_per_hour: hoursWithData > 0 ? totalVisits / hoursWithData : 0,
         peak_hour: peakHour,
         peak_hour_visits: peakHourVisits,
-        daily_trend: 0, // TODO: 이전 기간과 비교
+        daily_trend: 0,
         weather_impact: weatherImpact,
         holiday_impact: holidayImpact,
-        regional_comparison: regionalComparison,
       };
 
       return {
@@ -234,11 +153,10 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
         stats,
       };
     },
-    enabled: !!user && !!storeId,
+    enabled: !!user && !!storeId && !!orgId,
   });
 }
 
-// 컨텍스트 인사이트 생성 함수들
 function generateWeatherImpact(data: FootfallData[]): string | undefined {
   const rainyDays = data.filter(d => d.weather_condition === 'rainy');
   const sunnyDays = data.filter(d => d.weather_condition === 'sunny');
@@ -274,56 +192,42 @@ function generateHolidayImpact(data: FootfallData[]): string | undefined {
     : `${eventName} 기간 방문 ${diff.toFixed(0)}% 증가`;
 }
 
-function generateRegionalComparison(data: FootfallData[]): string | undefined {
-  const withRegional = data.filter(d => d.regional_traffic);
-  
-  if (withRegional.length === 0) return undefined;
-  
-  const avgStoreVisits = withRegional.reduce((sum, d) => sum + d.visit_count, 0) / withRegional.length;
-  const avgRegionalTraffic = withRegional.reduce((sum, d) => sum + (d.regional_traffic || 0), 0) / withRegional.length;
-  
-  if (avgRegionalTraffic === 0) return undefined;
-  
-  const captureRate = (avgStoreVisits / avgRegionalTraffic) * 100;
-  
-  return `상권 유동인구 대비 ${captureRate.toFixed(1)}% 유입률`;
-}
-
 export function useHourlyFootfall(storeId?: string, date?: Date) {
   const { user, orgId } = useAuth();
 
   return useQuery({
-    queryKey: ['hourly-footfall', storeId, date],
+    queryKey: ['hourly-footfall', storeId, date?.toISOString()],
     queryFn: async () => {
       if (!user || !storeId || !orgId) return [];
 
-      const targetDate = date || new Date();
+      const targetDate = format(date || new Date(), 'yyyy-MM-dd');
       
-      // L2 visits 테이블에서 직접 조회 (org_id 기반)
-      const { data: visits, error } = await supabase
-        .from('visits')
-        .select('*')
+      // L3 hourly_metrics에서 조회
+      const { data, error } = await supabase
+        .from('hourly_metrics')
+        .select('hour, visitor_count')
         .eq('org_id', orgId)
         .eq('store_id', storeId)
-        .gte('visit_date', startOfDay(targetDate).toISOString())
-        .lte('visit_date', endOfDay(targetDate).toISOString());
+        .eq('date', targetDate)
+        .order('hour', { ascending: true });
 
       if (error) throw error;
 
-      // 시간대별 집계
+      // 24시간 데이터로 변환
       const hourlyData = Array.from({ length: 24 }, (_, hour) => ({
         hour,
         visits: 0,
         time: `${hour.toString().padStart(2, '0')}:00`,
       }));
 
-      visits?.forEach((visit: any) => {
-        const hour = new Date(visit.visit_date).getUTCHours();
-        hourlyData[hour].visits += 1;
+      (data || []).forEach((row: any) => {
+        if (row.hour >= 0 && row.hour < 24) {
+          hourlyData[row.hour].visits = row.visitor_count || 0;
+        }
       });
 
       return hourlyData;
     },
-    enabled: !!user && !!storeId,
+    enabled: !!user && !!storeId && !!orgId,
   });
 }
