@@ -4,11 +4,11 @@ import { useToast } from '@/hooks/use-toast';
 
 export interface Product {
   id: string;
-  name: string;
+  product_name: string;
   sku: string;
   category: string | null;
   cost_price: number;
-  selling_price: number;
+  price: number;
   supplier: string | null;
 }
 
