@@ -1,119 +1,193 @@
-import { useMemo } from 'react';
-import { useRealCustomers, useRealPurchases } from './useRealSampleData';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from './useAuth';
+import { format, subDays } from 'date-fns';
 
 /**
- * 고객 세그먼트 분석 Hook (Tier 1)
- * VIP / Regular / New 고객 분류
+ * L3 customer_segments_agg 테이블 기반 고객 세그먼트 분석 Hook
+ * Phase 3: 3-Layer Architecture - 모든 분석이 동일한 L3 데이터 소스 사용
  * 
- * 실제 customers + purchases 데이터 기반
+ * VIP / Regular / New / Churning 고객 분류
  */
 
 export interface CustomerSegment {
-  customer_id: string;
-  name: string;
-  segment: 'VIP' | 'Regular' | 'New';
-  totalSpent: number;
-  purchaseCount: number;
-  avgOrderValue: number;
-  lastPurchaseDate?: string;
+  segment: 'VIP' | 'Regular' | 'New' | 'Churning';
+  customer_count: number;
+  totalRevenue: number;
+  avgTransactionValue: number;
+  avgBasketSize: number;
+  visitFrequency: number;
   lifetimeValue: number;
+  churnRiskScore: number;
 }
 
-export function useCustomerSegments() {
-  const { data: customers, isLoading: customersLoading } = useRealCustomers();
-  const { data: purchases, isLoading: purchasesLoading } = useRealPurchases();
-
-  const segments = useMemo(() => {
-    if (!customers || !purchases) return [];
-
-    const result: CustomerSegment[] = customers.map((customer: any) => {
-      // 해당 고객의 모든 구매 내역
-      const customerPurchases = purchases.filter(
-        (p: any) => p.customer_id === customer.customer_id
-      );
-
-      const totalSpent = customerPurchases.reduce(
-        (sum: number, p: any) => sum + (parseFloat(p.price) || 0),
-        0
-      );
-
-      const purchaseCount = customerPurchases.length;
-      const avgOrderValue = purchaseCount > 0 ? totalSpent / purchaseCount : 0;
-
-      // 마지막 구매일
-      const lastPurchase = customerPurchases.sort(
-        (a: any, b: any) => new Date(b.purchase_date).getTime() - new Date(a.purchase_date).getTime()
-      )[0];
-
-      // 세그먼트 분류 로직
-      let segment: 'VIP' | 'Regular' | 'New' = 'New';
-      if (purchaseCount >= 10 && totalSpent >= 500000) {
-        segment = 'VIP';
-      } else if (purchaseCount >= 3) {
-        segment = 'Regular';
-      }
-
-      return {
-        customer_id: customer.customer_id,
-        name: customer.name,
-        segment,
-        totalSpent,
-        purchaseCount,
-        avgOrderValue,
-        lastPurchaseDate: lastPurchase?.purchase_date,
-        lifetimeValue: totalSpent, // 간단히 총 구매액을 LTV로 사용
-      };
-    });
-
-    return result;
-  }, [customers, purchases]);
-
-  // 세그먼트별 통계
-  const segmentStats = useMemo(() => {
-    const vip = segments.filter(s => s.segment === 'VIP');
-    const regular = segments.filter(s => s.segment === 'Regular');
-    const newCustomers = segments.filter(s => s.segment === 'New');
-
-    return {
-      vip: {
-        count: vip.length,
-        totalRevenue: vip.reduce((sum, c) => sum + c.totalSpent, 0),
-        avgLTV: vip.length > 0 ? vip.reduce((sum, c) => sum + c.lifetimeValue, 0) / vip.length : 0,
-      },
-      regular: {
-        count: regular.length,
-        totalRevenue: regular.reduce((sum, c) => sum + c.totalSpent, 0),
-        avgLTV: regular.length > 0 ? regular.reduce((sum, c) => sum + c.lifetimeValue, 0) / regular.length : 0,
-      },
-      new: {
-        count: newCustomers.length,
-        totalRevenue: newCustomers.reduce((sum, c) => sum + c.totalSpent, 0),
-        avgLTV: newCustomers.length > 0 ? newCustomers.reduce((sum, c) => sum + c.lifetimeValue, 0) / newCustomers.length : 0,
-      },
-    };
-  }, [segments]);
-
-  return {
-    segments,
-    segmentStats,
-    isLoading: customersLoading || purchasesLoading,
-    totalCustomers: segments.length,
+export interface SegmentStats {
+  vip: {
+    count: number;
+    totalRevenue: number;
+    avgLTV: number;
+  };
+  regular: {
+    count: number;
+    totalRevenue: number;
+    avgLTV: number;
+  };
+  new: {
+    count: number;
+    totalRevenue: number;
+    avgLTV: number;
+  };
+  churning: {
+    count: number;
+    totalRevenue: number;
+    avgLTV: number;
+    churnRisk: number;
   };
 }
 
-/**
- * 특정 세그먼트의 고객 목록 가져오기
- */
-export function useSegmentCustomers(segmentType: 'VIP' | 'Regular' | 'New') {
-  const { segments, isLoading } = useCustomerSegments();
+export function useCustomerSegments(storeId?: string, date?: string) {
+  const { user, orgId } = useAuth();
 
-  const filteredCustomers = useMemo(() => {
-    return segments.filter(s => s.segment === segmentType);
-  }, [segments, segmentType]);
+  return useQuery({
+    queryKey: ['customer-segments', storeId, date],
+    queryFn: async () => {
+      if (!user || !storeId || !orgId) {
+        return {
+          segments: [],
+          segmentStats: getEmptyStats(),
+          totalCustomers: 0,
+        };
+      }
+
+      // 특정 날짜가 없으면 최근 7일 중 가장 최근 데이터 사용
+      let targetDate = date;
+      if (!targetDate) {
+        const { data: latestData } = await supabase
+          .from('customer_segments_agg')
+          .select('date')
+          .eq('org_id', orgId)
+          .eq('store_id', storeId)
+          .order('date', { ascending: false })
+          .limit(1);
+        
+        targetDate = latestData?.[0]?.date || format(new Date(), 'yyyy-MM-dd');
+      }
+
+      // L3 customer_segments_agg에서 조회
+      const { data, error } = await supabase
+        .from('customer_segments_agg')
+        .select('*')
+        .eq('org_id', orgId)
+        .eq('store_id', storeId)
+        .eq('date', targetDate);
+
+      if (error) {
+        console.error('Customer segments fetch error:', error);
+        throw new Error('고객 세그먼트 데이터를 불러오는데 실패했습니다.');
+      }
+
+      // CustomerSegment 형식으로 변환
+      const segments: CustomerSegment[] = (data || []).map(row => ({
+        segment: mapSegmentName(row.segment_name),
+        customer_count: row.customer_count || 0,
+        totalRevenue: row.total_revenue || 0,
+        avgTransactionValue: row.avg_transaction_value || 0,
+        avgBasketSize: row.avg_basket_size || 0,
+        visitFrequency: row.visit_frequency || 0,
+        lifetimeValue: row.ltv_estimate || 0,
+        churnRiskScore: row.churn_risk_score || 0,
+      }));
+
+      // 세그먼트별 통계 계산
+      const segmentStats = calculateSegmentStats(segments);
+      const totalCustomers = segments.reduce((sum, s) => sum + s.customer_count, 0);
+
+      return {
+        segments,
+        segmentStats,
+        totalCustomers,
+      };
+    },
+    enabled: !!user && !!storeId && !!orgId,
+  });
+}
+
+function mapSegmentName(name: string): 'VIP' | 'Regular' | 'New' | 'Churning' {
+  const normalized = name.toLowerCase();
+  if (normalized.includes('vip')) return 'VIP';
+  if (normalized.includes('regular')) return 'Regular';
+  if (normalized.includes('new')) return 'New';
+  if (normalized.includes('churn')) return 'Churning';
+  return 'Regular'; // 기본값
+}
+
+function getEmptyStats(): SegmentStats {
+  return {
+    vip: { count: 0, totalRevenue: 0, avgLTV: 0 },
+    regular: { count: 0, totalRevenue: 0, avgLTV: 0 },
+    new: { count: 0, totalRevenue: 0, avgLTV: 0 },
+    churning: { count: 0, totalRevenue: 0, avgLTV: 0, churnRisk: 0 },
+  };
+}
+
+function calculateSegmentStats(segments: CustomerSegment[]): SegmentStats {
+  const stats = getEmptyStats();
+
+  segments.forEach(seg => {
+    const key = seg.segment.toLowerCase() as keyof SegmentStats;
+    if (stats[key]) {
+      stats[key].count = seg.customer_count;
+      stats[key].totalRevenue = seg.totalRevenue;
+      stats[key].avgLTV = seg.lifetimeValue;
+      if (key === 'churning') {
+        (stats.churning as any).churnRisk = seg.churnRiskScore;
+      }
+    }
+  });
+
+  return stats;
+}
+
+/**
+ * 고객 세그먼트 트렌드 조회
+ */
+export function useCustomerSegmentsTrend(storeId?: string, days: number = 30) {
+  const { user, orgId } = useAuth();
+
+  return useQuery({
+    queryKey: ['customer-segments-trend', storeId, days],
+    queryFn: async () => {
+      if (!user || !storeId || !orgId) return [];
+
+      const startDate = format(subDays(new Date(), days), 'yyyy-MM-dd');
+
+      const { data, error } = await supabase
+        .from('customer_segments_agg')
+        .select('*')
+        .eq('org_id', orgId)
+        .eq('store_id', storeId)
+        .gte('date', startDate)
+        .order('date', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user && !!storeId && !!orgId,
+  });
+}
+
+/**
+ * 특정 세그먼트의 고객 수 조회
+ */
+export function useSegmentCustomerCount(storeId?: string, segmentType: 'VIP' | 'Regular' | 'New' | 'Churning' = 'VIP') {
+  const { data, isLoading } = useCustomerSegments(storeId);
+
+  const segmentData = data?.segments.find(s => s.segment === segmentType);
 
   return {
-    customers: filteredCustomers,
+    count: segmentData?.customer_count || 0,
+    revenue: segmentData?.totalRevenue || 0,
+    avgLTV: segmentData?.lifetimeValue || 0,
     isLoading,
-    count: filteredCustomers.length,
   };
 }

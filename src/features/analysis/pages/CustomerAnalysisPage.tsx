@@ -41,7 +41,9 @@ export default function CustomerAnalysisIntegratedPage() {
   const { paths, currentPositions } = useCustomerJourney(selectedStore?.id, timeOfDay);
   const metadata = selectedStore?.metadata?.storeSpaceMetadata as StoreSpaceMetadata | undefined;
   const journeyStats = useJourneyStatistics(paths);
-  const { segments, segmentStats } = useCustomerSegments();
+  const { data: segmentData } = useCustomerSegments(selectedStore?.id);
+  const segments = segmentData?.segments || [];
+  const segmentStats = segmentData?.segmentStats;
   const { patterns } = usePurchasePatterns();
 
   // 전환 퍼널 데이터
