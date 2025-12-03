@@ -46,6 +46,53 @@ const Stores = () => {
     try {
       const storeToDelete = stores?.find(s => s.id === storeId);
       
+      // CASCADE 삭제: store_id를 참조하는 모든 테이블에서 데이터 삭제
+      const tablesToClear = [
+        'daily_sales',
+        'dashboard_kpis',
+        'funnel_metrics',
+        'daily_kpis_agg',
+        'hourly_metrics',
+        'zone_daily_metrics',
+        'customer_segments_agg',
+        'product_performance_agg',
+        'line_items',
+        'funnel_events',
+        'zone_events',
+        'visit_zone_events',
+        'ai_recommendations',
+        'ai_scene_analysis',
+        'ai_insights',
+        'analysis_history',
+        'alerts',
+        'purchases',
+        'visits',
+        'wifi_tracking',
+        'wifi_heatmap_cache',
+        'wifi_raw_signals',
+        'customers',
+        'products',
+        'inventory_levels',
+        'store_scenes',
+        'graph_relations',
+        'graph_entities',
+        'user_data_imports',
+      ];
+
+      // 각 테이블에서 store_id 기준으로 삭제
+      for (const table of tablesToClear) {
+        const { error } = await supabase
+          .from(table as any)
+          .delete()
+          .eq('store_id', storeId);
+        
+        if (error) {
+          console.warn(`Failed to delete from ${table}:`, error.message);
+          // 테이블이 없거나 컬럼이 없는 경우 무시하고 계속 진행
+        }
+      }
+
+      // 마지막으로 매장 삭제
       const { error } = await supabase
         .from('stores')
         .delete()
@@ -54,7 +101,7 @@ const Stores = () => {
 
       if (error) throw error;
 
-      toast.success('매장이 삭제되었습니다');
+      toast.success('매장 및 연관 데이터가 삭제되었습니다');
       
       // Activity logging
       logActivity('feature_use', {
@@ -192,7 +239,7 @@ const Stores = () => {
                       <AlertDialogHeader>
                         <AlertDialogTitle>매장을 삭제하시겠습니까?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          {store.store_name} 매장을 삭제합니다. 이 작업은 되돌릴 수 없습니다.
+                          {store.store_name} 매장과 모든 연관 데이터(매출, KPI, 고객, 상품, 방문 기록 등)가 삭제됩니다. 이 작업은 되돌릴 수 없습니다.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
