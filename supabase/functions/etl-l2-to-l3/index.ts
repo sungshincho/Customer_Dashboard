@@ -32,15 +32,21 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    );
-
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    // Check if using service role key (for internal calls from scheduler)
+    const token = authHeader.replace('Bearer ', '');
+    const isServiceRole = token === supabaseServiceKey;
+    
+    let userId: string | null = null;
+    
+    if (!isServiceRole) {
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+      if (authError || !user) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      userId = user.id;
     }
 
     const body: AggregationRequest = await req.json().catch(() => ({}));
@@ -49,7 +55,7 @@ Deno.serve(async (req) => {
     // Default to today if no date specified
     const targetDate = date || new Date().toISOString().split('T')[0];
 
-    console.log(`[ETL L2→L3] Starting aggregation for date: ${targetDate}, org: ${org_id}, store: ${store_id}`);
+    console.log(`[ETL L2→L3] Starting aggregation for date: ${targetDate}, org: ${org_id}, store: ${store_id}, isServiceRole: ${isServiceRole}`);
 
     const results: Record<string, { processed: number; errors: number }> = {};
     const targetSet = new Set(target_tables || [

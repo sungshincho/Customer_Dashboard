@@ -20,11 +20,10 @@ Deno.serve(async (req) => {
     const today = new Date().toISOString().split('T')[0];
     const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
 
-    // Get all active organizations
+    // Get all organizations
     const { data: orgs } = await supabase
       .from('organizations')
-      .select('id')
-      .eq('is_active', true);
+      .select('id');
 
     const results: any[] = [];
 
