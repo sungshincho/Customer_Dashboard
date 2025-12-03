@@ -41,6 +41,15 @@ verify_jwt = true
 [functions.cleanup-integrated-data]
 verify_jwt = true
 
+[functions.etl-l1-to-l2]
+verify_jwt = true
+
+[functions.etl-l2-to-l3]
+verify_jwt = true
+
+[functions.etl-scheduler]
+verify_jwt = false
+
 [functions.fetch-db-schema]
 verify_jwt = true
 

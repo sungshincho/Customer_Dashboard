@@ -53,7 +53,7 @@ export const useRealtimeInventory = () => {
         .from('inventory_levels')
         .select(`
           *,
-          products (
+          products!inventory_levels_product_id_fkey (
             id,
             name,
             sku,
