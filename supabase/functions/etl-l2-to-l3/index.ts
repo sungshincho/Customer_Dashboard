@@ -550,24 +550,22 @@ async function aggregateProductPerformance(
       const product = productMap.get(productId) as any;
 
       const totalQuantity = items.reduce((sum: number, i: any) => sum + (i.quantity || 0), 0);
-      const totalRevenue = items.reduce((sum: number, i: any) => sum + (i.total_amount || 0), 0);
+      const totalRevenue = items.reduce((sum: number, i: any) => sum + (i.line_total || 0), 0);
       const totalDiscount = items.reduce((sum: number, i: any) => sum + (i.discount_amount || 0), 0);
       const transactionCount = new Set(items.map((i: any) => i.transaction_id)).size;
+      const discountRate = totalRevenue > 0 ? (totalDiscount / (totalRevenue + totalDiscount)) * 100 : 0;
 
       aggregations.push({
         date: targetDate,
         product_id: productId,
         store_id: storeId,
         org_id: items[0]?.org_id,
-        product_name: product?.product_name || null,
-        category: items[0]?.category || product?.category || null,
-        brand: items[0]?.brand || product?.brand || null,
         units_sold: totalQuantity,
         revenue: totalRevenue,
+        transactions: transactionCount,
         avg_selling_price: totalQuantity > 0 ? totalRevenue / totalQuantity : 0,
-        discount_given: totalDiscount,
-        transaction_count: transactionCount,
-        return_count: 0, // Would need returns data
+        discount_rate: discountRate,
+        return_rate: 0,
         stock_level: product?.stock || null,
         calculated_at: new Date().toISOString(),
       });
