@@ -55,6 +55,7 @@ const Stores = () => {
         'hourly_metrics',
         'zone_daily_metrics',
         'customer_segments_agg',
+        'customer_segments',
         'product_performance_agg',
         'line_items',
         'funnel_events',
