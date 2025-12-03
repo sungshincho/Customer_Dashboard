@@ -158,7 +158,7 @@ async function aggregateDailyKPIs(
         .eq('event_date', targetDate);
 
       // Calculate metrics
-      const totalRevenue = (lineItems || []).reduce((sum: number, li: any) => sum + (li.total_amount || 0), 0);
+      const totalRevenue = (lineItems || []).reduce((sum: number, li: any) => sum + (li.line_total || 0), 0);
       const totalTransactions = new Set((lineItems || []).map((li: any) => li.transaction_id)).size;
       const totalUnits = (lineItems || []).reduce((sum: number, li: any) => sum + (li.quantity || 0), 0);
 
@@ -256,7 +256,7 @@ async function aggregateHourlyMetrics(
         const hourlyLineItems = (lineItems || []).filter((li: any) => li.transaction_hour === hour);
         const hourlyFunnelEvents = (funnelEvents || []).filter((e: any) => e.event_hour === hour);
 
-        const revenue = hourlyLineItems.reduce((sum: number, li: any) => sum + (li.total_amount || 0), 0);
+        const revenue = hourlyLineItems.reduce((sum: number, li: any) => sum + (li.line_total || 0), 0);
         const transactions = new Set(hourlyLineItems.map((li: any) => li.transaction_id)).size;
         const units = hourlyLineItems.reduce((sum: number, li: any) => sum + (li.quantity || 0), 0);
 
@@ -443,7 +443,7 @@ async function aggregateCustomerSegments(
     for (const [segmentName, segmentCustomers] of customersBySegment) {
       const customerIds = segmentCustomers.map((c: any) => c.id);
       const segmentLineItems = (lineItems || []).filter((li: any) => customerIds.includes(li.customer_id));
-      const totalRevenue = segmentLineItems.reduce((sum: number, li: any) => sum + (li.total_amount || 0), 0);
+      const totalRevenue = segmentLineItems.reduce((sum: number, li: any) => sum + (li.line_total || 0), 0);
       const avgTransactionValue = segmentLineItems.length > 0 ? totalRevenue / segmentLineItems.length : 0;
 
       aggregations.push({
@@ -467,7 +467,7 @@ async function aggregateCustomerSegments(
       const segmentCustomers = (customers || []).filter((c: any) => c.segment === segment.segment_code);
       const customerIds = segmentCustomers.map((c: any) => c.id);
       const segmentLineItems = (lineItems || []).filter((li: any) => customerIds.includes(li.customer_id));
-      const totalRevenue = segmentLineItems.reduce((sum: number, li: any) => sum + (li.total_amount || 0), 0);
+      const totalRevenue = segmentLineItems.reduce((sum: number, li: any) => sum + (li.line_total || 0), 0);
 
       aggregations.push({
         date: targetDate,
