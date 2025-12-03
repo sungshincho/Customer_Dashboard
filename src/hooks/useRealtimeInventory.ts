@@ -55,11 +55,11 @@ export const useRealtimeInventory = () => {
           *,
           products!inventory_levels_product_id_fkey (
             id,
-            name,
+            product_name,
             sku,
             category,
             cost_price,
-            selling_price,
+            price,
             supplier
           )
         `)
@@ -74,11 +74,11 @@ export const useRealtimeInventory = () => {
           *,
           products (
             id,
-            name,
+            product_name,
             sku,
             category,
             cost_price,
-            selling_price,
+            price,
             supplier
           )
         `)

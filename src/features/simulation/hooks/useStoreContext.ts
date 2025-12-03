@@ -119,7 +119,7 @@ export function useStoreContext(storeId: string | undefined) {
         // 상품 정보
         const { data: productsData } = await supabase
           .from('products')
-          .select('sku, name, category, cost_price, selling_price')
+          .select('sku, product_name, category, cost_price, price')
           .order('created_at', { ascending: false })
           .limit(100);
 
@@ -161,10 +161,10 @@ export function useStoreContext(storeId: string | undefined) {
           
           products: (productsData || []).map(p => ({
             sku: p.sku,
-            name: p.name,
+            name: p.product_name,
             category: p.category || '',
             costPrice: Number(p.cost_price) || 0,
-            sellingPrice: Number(p.selling_price) || 0
+            sellingPrice: Number(p.price) || 0
           }))
         });
 
