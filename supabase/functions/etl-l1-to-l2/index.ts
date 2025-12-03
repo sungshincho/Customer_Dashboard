@@ -31,21 +31,27 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    );
-
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    // Check if using service role key (for internal calls from scheduler)
+    const token = authHeader.replace('Bearer ', '');
+    const isServiceRole = token === supabaseServiceKey;
+    
+    let userId: string | null = null;
+    
+    if (!isServiceRole) {
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+      if (authError || !user) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      userId = user.id;
     }
 
     const body: ETLRequest = await req.json().catch(() => ({}));
     const { org_id, store_id, date_from, date_to, target_tables } = body;
 
-    console.log(`[ETL L1→L2] Starting for user: ${user.id}, org: ${org_id}, store: ${store_id}`);
+    console.log(`[ETL L1→L2] Starting for org: ${org_id}, store: ${store_id}, isServiceRole: ${isServiceRole}`);
 
     const results: Record<string, { processed: number; errors: number }> = {};
     const targetSet = new Set(target_tables || ['line_items', 'funnel_events', 'zone_events', 'visit_zone_events', 'zones_dim']);
