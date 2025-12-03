@@ -52,14 +52,14 @@ export default function ProductAnalysisPage() {
       const revenue = productPurchases.reduce((sum: number, p: any) => sum + (parseFloat(p.unit_price) || 0) * (parseInt(p.quantity) || 0), 0);
       const inventory = inventoryLevels.find(inv => inv.product_id === product.id);
       const margin = ((product.selling_price - product.cost_price) / product.selling_price) * 100;
-      return { name: product.name, sku: product.sku, category: product.category || '미분류', sales, revenue, margin, currentStock: inventory?.current_stock || 0, price: product.selling_price };
+      return { name: product.product_name, sku: product.sku, category: product.category || '미분류', sales, revenue, margin, currentStock: inventory?.current_stock || 0, price: product.price };
     });
   }, [products, storeData, inventoryLevels]);
 
   const inventoryData = inventoryLevels.map(level => {
     const stockPercentage = (level.current_stock / level.optimal_stock) * 100;
     const stockStatus = level.current_stock < level.minimum_stock ? "critical" : stockPercentage < 50 ? "low" : "normal";
-    return { productName: level.products.name, currentStock: level.current_stock, minStock: level.minimum_stock, optimalStock: level.optimal_stock, stockStatus };
+    return { productName: level.products.product_name, currentStock: level.current_stock, minStock: level.minimum_stock, optimalStock: level.optimal_stock, stockStatus };
   });
 
   const totalRevenue = productPerformance.length > 0 ? productPerformance.reduce((sum, p) => sum + p.revenue, 0) : 0;
