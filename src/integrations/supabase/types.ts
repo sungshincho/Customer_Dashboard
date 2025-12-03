@@ -3752,12 +3752,9 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
-          min_stock_level: number | null
-          name: string
           org_id: string | null
           price: number | null
           product_name: string
-          selling_price: number | null
           sku: string | null
           stock: number | null
           store_id: string | null
@@ -3772,12 +3769,9 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
-          min_stock_level?: number | null
-          name: string
           org_id?: string | null
           price?: number | null
           product_name: string
-          selling_price?: number | null
           sku?: string | null
           stock?: number | null
           store_id?: string | null
@@ -3792,12 +3786,9 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
-          min_stock_level?: number | null
-          name?: string
           org_id?: string | null
           price?: number | null
           product_name?: string
-          selling_price?: number | null
           sku?: string | null
           stock?: number | null
           store_id?: string | null
