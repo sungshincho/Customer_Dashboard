@@ -55,10 +55,10 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
       const end = endDate || new Date();
 
       // L2 visits 테이블에서 직접 방문 데이터 조회 (3-Layer Architecture)
+      // org_id 기반 조회 (조직 내 데이터 공유)
       const { data: visits, error: visitsError } = await supabase
         .from('visits')
         .select('*')
-        .eq('user_id', user.id)
         .eq('org_id', orgId)
         .eq('store_id', storeId)
         .gte('visit_date', startOfDay(start).toISOString())
@@ -73,7 +73,6 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
       const { data: trackingData } = await supabase
         .from('wifi_tracking')
         .select('*')
-        .eq('user_id', user.id)
         .eq('org_id', orgId)
         .eq('store_id', storeId)
         .gte('timestamp', startOfDay(start).toISOString())
@@ -98,9 +97,7 @@ export function useFootfallAnalysis(storeId?: string, startDate?: Date, endDate?
       const { data: holidaysData } = await supabase
         .from('holidays_events')
         .select('*')
-        .eq('user_id', user.id)
         .eq('org_id', orgId)
-        .eq('store_id', storeId)
         .gte('date', format(start, 'yyyy-MM-dd'))
         .lte('date', format(end, 'yyyy-MM-dd'));
 
@@ -298,11 +295,10 @@ export function useHourlyFootfall(storeId?: string, date?: Date) {
 
       const targetDate = date || new Date();
       
-      // L2 visits 테이블에서 직접 조회
+      // L2 visits 테이블에서 직접 조회 (org_id 기반)
       const { data: visits, error } = await supabase
         .from('visits')
         .select('*')
-        .eq('user_id', user.id)
         .eq('org_id', orgId)
         .eq('store_id', storeId)
         .gte('visit_date', startOfDay(targetDate).toISOString())
