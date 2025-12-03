@@ -140,19 +140,10 @@ async function processLineItems(
     return { processed: 0, errors: 0 };
   }
 
-  // Get product details for category mapping
-  const productIds = [...new Set(purchases.map((p: any) => p.product_id).filter(Boolean))];
-  const { data: products } = await supabase
-    .from('products')
-    .select('id, category, brand, product_name')
-    .in('id', productIds);
-
-  const productMap = new Map((products || []).map((p: any) => [p.id, p]));
-
   const lineItems = purchases.map((p: any) => {
-    const product = productMap.get(p.product_id) as any || {};
     return {
       transaction_id: p.id,
+      purchase_id: p.id,
       product_id: p.product_id,
       customer_id: p.customer_id,
       store_id: p.store_id,
@@ -160,17 +151,18 @@ async function processLineItems(
       quantity: p.quantity || 1,
       unit_price: p.unit_price || 0,
       discount_amount: 0,
-      total_amount: p.total_price || (p.unit_price * (p.quantity || 1)),
-      category: product?.category,
-      brand: product?.brand,
+      tax_amount: 0,
+      line_total: p.total_price || (p.unit_price * (p.quantity || 1)),
       transaction_date: p.purchase_date,
       transaction_hour: p.purchase_date ? new Date(p.purchase_date).getHours() : null,
+      payment_method: null,
+      is_return: false,
     };
   });
 
-  const { error: insertError, count } = await supabase
+  const { error: insertError } = await supabase
     .from('line_items')
-    .upsert(lineItems, { onConflict: 'transaction_id,product_id', ignoreDuplicates: false });
+    .insert(lineItems);
 
   if (insertError) {
     console.error('[line_items] Insert error:', insertError);
@@ -272,8 +264,8 @@ async function processZoneEvents(
   let query = supabase.from('wifi_tracking').select('*');
   if (org_id) query = query.eq('org_id', org_id);
   if (store_id) query = query.eq('store_id', store_id);
-  if (date_from) query = query.gte('detected_at', date_from);
-  if (date_to) query = query.lte('detected_at', date_to);
+  if (date_from) query = query.gte('timestamp', date_from);
+  if (date_to) query = query.lte('timestamp', date_to);
 
   const { data: wifiData, error } = await query.limit(5000);
   if (error) {
@@ -289,14 +281,14 @@ async function processZoneEvents(
     zone_id: w.zone_id,
     store_id: w.store_id,
     org_id: w.org_id,
-    visitor_id: w.device_id || w.mac_address,
+    visitor_id: w.mac_address || w.session_id,
     event_type: 'zone_enter',
-    event_timestamp: w.detected_at,
-    event_date: w.detected_at?.split('T')[0],
-    event_hour: w.detected_at ? new Date(w.detected_at).getHours() : null,
+    event_timestamp: w.timestamp,
+    event_date: w.timestamp?.split('T')[0],
+    event_hour: w.timestamp ? new Date(w.timestamp).getHours() : null,
     dwell_seconds: w.dwell_time_seconds,
-    x_coord: w.x_position,
-    y_coord: w.y_position,
+    x_coord: null,
+    y_coord: null,
     metadata: { signal_strength: w.signal_strength, source: 'wifi_tracking' },
   }));
 
