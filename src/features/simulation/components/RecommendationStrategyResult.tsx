@@ -1,61 +1,39 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Star, TrendingUp } from 'lucide-react';
-
-interface ProductPair {
-  product1?: string;
-  product2?: string;
-  affinity?: number;
-}
-
-interface Strategy {
-  strategyName?: string;
-  name?: string;
-  strategyType?: 'cross-sell' | 'up-sell' | 'personalized' | 'trending' | string;
-  type?: string;
-  targetSegment?: string;
-  target?: string;
-  expectedCTR?: number;
-  expectedCVR?: number;
-  expectedAOVIncrease?: number;
-  productPairs?: ProductPair[];
-}
-
-interface StrategySummary {
-  totalStrategies?: number;
-  avgCTRIncrease?: number;
-  avgCVRIncrease?: number;
-  avgAOVIncrease?: number;
-  expectedRevenueImpact?: number;
-}
-
-interface PerformanceMetric {
-  metric?: string;
-  name?: string;
-  current?: number;
-  predicted?: number;
-}
-
-interface RecommendationStrategyResultProps {
-  strategies?: Strategy[];
-  summary?: StrategySummary;
-  performanceMetrics?: PerformanceMetric[];
-}
+import { Star, TrendingUp, AlertTriangle } from 'lucide-react';
 
 // 안전한 숫자 헬퍼
-const safeNumber = (value: number | undefined | null, defaultValue: number = 0): number => {
+const safeNumber = (value: any, defaultValue: number = 0): number => {
   if (value === undefined || value === null || isNaN(Number(value))) return defaultValue;
   return Number(value);
 };
 
-const safeToFixed = (value: number | undefined | null, digits: number = 1): string => {
+const safeToFixed = (value: any, digits: number = 1): string => {
   return safeNumber(value).toFixed(digits);
 };
+
+// 권장사항 텍스트 추출 헬퍼
+const getRecommendationText = (rec: any): string => {
+  if (typeof rec === 'string') return rec;
+  if (typeof rec === 'object' && rec !== null) {
+    return rec.title || rec.description || rec.details || rec.message || rec.text || 
+           rec.recommendation || rec.action || rec.content || JSON.stringify(rec);
+  }
+  return String(rec);
+};
+
+interface RecommendationStrategyResultProps {
+  strategies?: any[];
+  summary?: any;
+  performanceMetrics?: any[];
+  recommendations?: any[];
+}
 
 export function RecommendationStrategyResult({ 
   strategies, 
   summary,
-  performanceMetrics 
+  performanceMetrics,
+  recommendations
 }: RecommendationStrategyResultProps) {
   if (!strategies || strategies.length === 0) {
     if (!summary) {
@@ -80,7 +58,7 @@ export function RecommendationStrategyResult({
   };
 
   // 정규화된 strategies
-  const normalizedStrategies = (strategies || []).map((strategy, idx) => ({
+  const normalizedStrategies = (strategies || []).map((strategy: any, idx: number) => ({
     strategyName: strategy.strategyName || strategy.name || `전략 ${idx + 1}`,
     strategyType: strategy.strategyType || strategy.type || 'personalized',
     targetSegment: strategy.targetSegment || strategy.target || '전체 고객',
@@ -91,7 +69,7 @@ export function RecommendationStrategyResult({
   }));
 
   // 정규화된 performanceMetrics
-  const normalizedMetrics = (performanceMetrics || []).map(metric => ({
+  const normalizedMetrics = (performanceMetrics || []).map((metric: any) => ({
     metric: metric.metric || metric.name || '지표',
     current: safeNumber(metric.current),
     predicted: safeNumber(metric.predicted),
@@ -225,7 +203,7 @@ export function RecommendationStrategyResult({
                     <div className="mt-2 pt-2 border-t border-border/50">
                       <p className="text-xs text-muted-foreground mb-1">추천 상품 조합:</p>
                       <div className="space-y-1">
-                        {strategy.productPairs.slice(0, 3).map((pair, pIdx) => (
+                        {strategy.productPairs.slice(0, 3).map((pair: any, pIdx: number) => (
                           <div key={pIdx} className="text-xs flex items-center justify-between">
                             <span>{pair.product1 || '상품A'} + {pair.product2 || '상품B'}</span>
                             <span className="text-muted-foreground">연관도: {safeToFixed(safeNumber(pair.affinity) * 100, 0)}%</span>
@@ -237,6 +215,27 @@ export function RecommendationStrategyResult({
                 </div>
               ))}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {recommendations && recommendations.length > 0 && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-primary" />
+              권장 액션
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {recommendations.map((rec: any, idx: number) => (
+                <li key={idx} className="flex items-start gap-2 text-sm">
+                  <span className="text-primary mt-0.5">•</span>
+                  <span>{getRecommendationText(rec)}</span>
+                </li>
+              ))}
+            </ul>
           </CardContent>
         </Card>
       )}
