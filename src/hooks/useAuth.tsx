@@ -343,10 +343,6 @@ const signOut = async () => {
   // 4. 강제 리다이렉트
   window.location.href = '/auth';
 };
-    
-    // 5. 항상 auth 페이지로 이동 (강제 리다이렉트)
-    window.location.href = '/auth';
-  };
 
   const resetPassword = async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
