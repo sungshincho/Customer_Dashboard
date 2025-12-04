@@ -1,57 +1,35 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, TrendingDown, Calendar, AlertTriangle, Package, Zap } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
+import { ResponsiveContainer, Area, AreaChart, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 
-interface DemandDriver {
-  factor?: string;
-  impact?: 'positive' | 'negative' | string;
-  magnitude?: number;
-  explanation?: string;
-}
+// 안전한 숫자 헬퍼
+const safeNumber = (value: any, defaultValue: number = 0): number => {
+  if (value === undefined || value === null || isNaN(Number(value))) return defaultValue;
+  return Number(value);
+};
 
-interface TopProduct {
-  sku?: string;
-  name?: string;
-  productName?: string;
-  predictedDemand?: number;
-  trend?: 'up' | 'down' | 'stable' | string;
-  confidence?: number;
-}
+const safeToFixed = (value: any, digits: number = 0): string => {
+  return safeNumber(value).toFixed(digits);
+};
 
-interface ForecastData {
-  dates?: string[];
-  predictedDemand?: number[];
-  confidence?: number[];
-  peakDays?: string[];
-  lowDays?: string[];
-}
-
-interface ForecastSummary {
-  avgDailyDemand?: number;
-  peakDemand?: number;
-  totalForecast?: number;
-  trend?: 'increasing' | 'decreasing' | 'stable' | string;
-}
+// 권장사항 텍스트 추출 헬퍼 (객체면 title/description 등에서 추출)
+const getRecommendationText = (rec: any): string => {
+  if (typeof rec === 'string') return rec;
+  if (typeof rec === 'object' && rec !== null) {
+    return rec.title || rec.description || rec.details || rec.message || rec.text || 
+           rec.recommendation || rec.action || rec.content || JSON.stringify(rec);
+  }
+  return String(rec);
+};
 
 interface DemandForecastResultProps {
-  forecastData?: ForecastData;
-  summary?: ForecastSummary;
-  demandDrivers?: DemandDriver[];
-  topProducts?: TopProduct[];
-  recommendations?: string[];
+  forecastData?: any;
+  summary?: any;
+  demandDrivers?: any[];
+  topProducts?: any[];
+  recommendations?: any[];
 }
-
-// 안전한 숫자 포맷 헬퍼
-const safeToFixed = (value: number | undefined | null, digits: number = 0): string => {
-  if (value === undefined || value === null || isNaN(value)) return '0';
-  return value.toFixed(digits);
-};
-
-const safeNumber = (value: number | undefined | null, defaultValue: number = 0): number => {
-  if (value === undefined || value === null || isNaN(value)) return defaultValue;
-  return value;
-};
 
 export function DemandForecastResult({ 
   forecastData, 
@@ -60,7 +38,6 @@ export function DemandForecastResult({
   topProducts,
   recommendations 
 }: DemandForecastResultProps) {
-  // forecastData나 summary가 없으면 기본 화면
   if (!forecastData && !summary) {
     return (
       <Card>
@@ -72,7 +49,6 @@ export function DemandForecastResult({
     );
   }
 
-  // 정규화된 summary
   const normalizedSummary = {
     avgDailyDemand: safeNumber(summary?.avgDailyDemand),
     peakDemand: safeNumber(summary?.peakDemand),
@@ -80,7 +56,6 @@ export function DemandForecastResult({
     trend: summary?.trend || 'stable',
   };
 
-  // 정규화된 forecastData
   const normalizedForecastData = {
     dates: forecastData?.dates || [],
     predictedDemand: forecastData?.predictedDemand || [],
@@ -89,14 +64,12 @@ export function DemandForecastResult({
     lowDays: forecastData?.lowDays || [],
   };
 
-  // 차트 데이터 생성
-  const chartData = normalizedForecastData.dates.map((date, idx) => ({
+  const chartData = normalizedForecastData.dates.map((date: string, idx: number) => ({
     date: date ? new Date(date).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }) : `Day ${idx + 1}`,
     demand: safeNumber(normalizedForecastData.predictedDemand[idx]),
     confidence: safeNumber(normalizedForecastData.confidence[idx]) * 100
   }));
 
-  // 트렌드 표시
   const getTrendBadge = (trend: string) => {
     if (trend === 'increasing') return 'default';
     if (trend === 'decreasing') return 'destructive';
@@ -166,21 +139,23 @@ export function DemandForecastResult({
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {demandDrivers.map((driver, idx) => {
-                const magnitude = safeNumber(driver.magnitude);
-                const isPositive = driver.impact === 'positive' || magnitude > 0;
+              {demandDrivers.map((driver: any, idx: number) => {
+                const magnitude = safeNumber(driver?.magnitude);
+                const isPositive = driver?.impact === 'positive' || magnitude > 0;
                 const displayMagnitude = Math.abs(magnitude);
+                const factor = driver?.factor || driver?.name || `요인 ${idx + 1}`;
+                const explanation = driver?.explanation || driver?.description || '';
                 
                 return (
                   <div key={idx} className="p-3 bg-muted/50 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium text-sm">{driver.factor || '요인 ' + (idx + 1)}</span>
+                      <span className="font-medium text-sm">{factor}</span>
                       <Badge variant={isPositive ? 'default' : 'destructive'}>
                         {isPositive ? '+' : '-'}{displayMagnitude}%
                       </Badge>
                     </div>
-                    {driver.explanation && (
-                      <p className="text-xs text-muted-foreground">{driver.explanation}</p>
+                    {explanation && (
+                      <p className="text-xs text-muted-foreground">{explanation}</p>
                     )}
                   </div>
                 );
@@ -201,28 +176,24 @@ export function DemandForecastResult({
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {topProducts.slice(0, 10).map((product, idx) => {
-                const productName = product.name || product.productName || `상품 ${idx + 1}`;
-                const confidence = safeNumber(product.confidence);
+              {topProducts.slice(0, 10).map((product: any, idx: number) => {
+                const productName = product?.name || product?.productName || `상품 ${idx + 1}`;
+                const confidence = safeNumber(product?.confidence);
                 const confidencePercent = confidence > 1 ? confidence : confidence * 100;
-                const trend = product.trend || 'stable';
+                const trend = product?.trend || 'stable';
                 
                 return (
                   <div key={idx} className="flex items-center justify-between py-2 px-3 bg-muted/50 rounded-lg">
                     <div className="flex-1">
                       <p className="text-sm font-medium">{productName}</p>
-                      <p className="text-xs text-muted-foreground">SKU: {product.sku || 'N/A'}</p>
+                      <p className="text-xs text-muted-foreground">SKU: {product?.sku || 'N/A'}</p>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <p className="text-sm font-bold">{safeNumber(product.predictedDemand)}개</p>
+                        <p className="text-sm font-bold">{safeNumber(product?.predictedDemand)}개</p>
                         <p className="text-xs text-muted-foreground">신뢰도 {safeToFixed(confidencePercent, 0)}%</p>
                       </div>
-                      <Badge variant={
-                        trend === 'up' ? 'default' : 
-                        trend === 'down' ? 'destructive' : 
-                        'secondary'
-                      }>
+                      <Badge variant={trend === 'up' ? 'default' : trend === 'down' ? 'destructive' : 'secondary'}>
                         {trend === 'up' && <TrendingUp className="w-3 h-3 mr-1" />}
                         {trend === 'down' && <TrendingDown className="w-3 h-3 mr-1" />}
                         {trend === 'up' ? '증가' : trend === 'down' ? '감소' : '안정'}
@@ -246,10 +217,10 @@ export function DemandForecastResult({
           </CardHeader>
           <CardContent>
             <ul className="space-y-2">
-              {recommendations.map((rec, idx) => (
+              {recommendations.map((rec: any, idx: number) => (
                 <li key={idx} className="flex items-start gap-2 text-sm">
                   <span className="text-primary mt-0.5">•</span>
-                  <span>{rec}</span>
+                  <span>{getRecommendationText(rec)}</span>
                 </li>
               ))}
             </ul>
@@ -267,7 +238,7 @@ export function DemandForecastResult({
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
-              {normalizedForecastData.peakDays.map((day, idx) => (
+              {normalizedForecastData.peakDays.map((day: string, idx: number) => (
                 <Badge key={idx} variant="outline" className="gap-1">
                   <Calendar className="w-3 h-3" />
                   {day ? new Date(day).toLocaleDateString('ko-KR') : `Day ${idx + 1}`}
