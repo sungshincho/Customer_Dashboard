@@ -8,26 +8,74 @@
  * - 모든 기능 → DB 테이블 직접 조회
  */
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueries } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useSelectedStore } from './useSelectedStore';
 import { useAuth } from './useAuth';
+import type { DataFileType, LoadOptions, StoreDataset } from '@/lib/storage/types';
 
-export interface StoreDataset {
-  customers: any[];
-  products: any[];
-  purchases: any[];
-  visits: any[];
-  staff: any[];
+// DB 테이블에서 데이터 로드하는 내부 함수
+async function loadFromDB(
+  tableName: string,
+  storeId: string,
+  orgId: string,
+  options?: { limit?: number }
+): Promise<any[]> {
+  let query = supabase
+    .from(tableName)
+    .select('*')
+    .eq('store_id', storeId)
+    .eq('org_id', orgId);
+
+  if (options?.limit) {
+    query = query.limit(options.limit);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.warn(`[useStoreData] ${tableName} query error:`, error);
+    return [];
+  }
+
+  return data || [];
 }
 
 /**
- * 전체 데이터셋 로드 Hook (DB 테이블 기반)
+ * 단일 데이터 파일 로드 Hook (DB 기반)
  */
-export function useStoreDataset() {
+export function useStoreDataFile<K extends DataFileType>(
+  fileType: K,
+  options: LoadOptions = {}
+) {
   const { selectedStore } = useSelectedStore();
   const { orgId } = useAuth();
-  
+
+  return useQuery({
+    queryKey: ['store-data-db', fileType, selectedStore?.id, orgId],
+    queryFn: async () => {
+      if (!selectedStore || !orgId) {
+        return { data: [], fromCache: false };
+      }
+
+      const tableName = fileType.replace('.csv', '');
+      const data = await loadFromDB(tableName, selectedStore.id, orgId, { limit: 500 });
+
+      return { data, fromCache: false };
+    },
+    enabled: !!selectedStore && !!orgId,
+    staleTime: 2 * 60 * 1000, // 2분 캐싱
+    gcTime: 5 * 60 * 1000,
+  });
+}
+
+/**
+ * 전체 데이터셋 로드 Hook (DB 기반)
+ */
+export function useStoreDataset(options: LoadOptions = {}) {
+  const { selectedStore } = useSelectedStore();
+  const { orgId } = useAuth();
+
   return useQuery({
     queryKey: ['store-dataset-db', selectedStore?.id, orgId],
     queryFn: async (): Promise<StoreDataset> => {
@@ -49,21 +97,16 @@ export function useStoreDataset() {
         visitsResult,
         staffResult,
       ] = await Promise.all([
-        // customers 테이블
         supabase
           .from('customers')
           .select('*')
           .eq('store_id', selectedStore.id)
           .eq('org_id', orgId),
-        
-        // products 테이블
         supabase
           .from('products')
           .select('*')
           .eq('store_id', selectedStore.id)
           .eq('org_id', orgId),
-        
-        // purchases 테이블 (오늘 날짜 기준, 최근 100건)
         supabase
           .from('purchases')
           .select(`
@@ -74,8 +117,6 @@ export function useStoreDataset() {
           .eq('org_id', orgId)
           .order('purchase_date', { ascending: false })
           .limit(100),
-        
-        // visits 테이블 (오늘 날짜 기준, 최근 100건)
         supabase
           .from('visits')
           .select('*')
@@ -83,8 +124,6 @@ export function useStoreDataset() {
           .eq('org_id', orgId)
           .order('visit_date', { ascending: false })
           .limit(100),
-        
-        // staff 테이블 (있는 경우)
         supabase
           .from('staff')
           .select('*')
@@ -93,7 +132,7 @@ export function useStoreDataset() {
           .limit(50),
       ]);
 
-      // purchases에 product_name 추가 (조인 결과 매핑)
+      // purchases에 product_name 추가
       const purchasesWithProduct = (purchasesResult.data || []).map((p: any) => ({
         ...p,
         product_name: p.product?.product_name || '상품',
@@ -109,7 +148,7 @@ export function useStoreDataset() {
       };
     },
     enabled: !!selectedStore?.id && !!orgId,
-    staleTime: 2 * 60 * 1000, // 2분 캐싱
+    staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
@@ -117,16 +156,46 @@ export function useStoreDataset() {
 }
 
 /**
+ * 여러 데이터 파일 동시 로드 Hook (DB 기반)
+ */
+export function useMultipleStoreDataFiles<K extends DataFileType>(
+  fileTypes: K[],
+  options: LoadOptions = {}
+) {
+  const { selectedStore } = useSelectedStore();
+  const { orgId } = useAuth();
+
+  return useQueries({
+    queries: fileTypes.map((fileType) => ({
+      queryKey: ['store-data-db', fileType, selectedStore?.id, orgId],
+      queryFn: async () => {
+        if (!selectedStore || !orgId) {
+          return { data: [], fromCache: false };
+        }
+
+        const tableName = fileType.replace('.csv', '');
+        const data = await loadFromDB(tableName, selectedStore.id, orgId, { limit: 500 });
+
+        return { data, fromCache: false };
+      },
+      enabled: !!selectedStore && !!orgId,
+      staleTime: 2 * 60 * 1000,
+      gcTime: 5 * 60 * 1000,
+    })),
+  });
+}
+
+/**
  * 고객 데이터 Hook (DB 기반)
  */
-export function useCustomers() {
+export function useCustomers(options?: LoadOptions) {
   const { selectedStore } = useSelectedStore();
   const { orgId } = useAuth();
 
   return useQuery({
     queryKey: ['customers-db', selectedStore?.id, orgId],
     queryFn: async () => {
-      if (!selectedStore?.id || !orgId) return [];
+      if (!selectedStore?.id || !orgId) return { data: [] };
 
       const { data, error } = await supabase
         .from('customers')
@@ -134,8 +203,11 @@ export function useCustomers() {
         .eq('store_id', selectedStore.id)
         .eq('org_id', orgId);
 
-      if (error) throw error;
-      return data || [];
+      if (error) {
+        console.warn('customers query error:', error);
+        return { data: [] };
+      }
+      return { data: data || [] };
     },
     enabled: !!selectedStore?.id && !!orgId,
     staleTime: 5 * 60 * 1000,
@@ -145,14 +217,14 @@ export function useCustomers() {
 /**
  * 상품 데이터 Hook (DB 기반)
  */
-export function useProducts() {
+export function useProducts(options?: LoadOptions) {
   const { selectedStore } = useSelectedStore();
   const { orgId } = useAuth();
 
   return useQuery({
     queryKey: ['products-db', selectedStore?.id, orgId],
     queryFn: async () => {
-      if (!selectedStore?.id || !orgId) return [];
+      if (!selectedStore?.id || !orgId) return { data: [] };
 
       const { data, error } = await supabase
         .from('products')
@@ -160,8 +232,11 @@ export function useProducts() {
         .eq('store_id', selectedStore.id)
         .eq('org_id', orgId);
 
-      if (error) throw error;
-      return data || [];
+      if (error) {
+        console.warn('products query error:', error);
+        return { data: [] };
+      }
+      return { data: data || [] };
     },
     enabled: !!selectedStore?.id && !!orgId,
     staleTime: 5 * 60 * 1000,
@@ -171,18 +246,16 @@ export function useProducts() {
 /**
  * 구매 데이터 Hook (DB 기반)
  */
-export function usePurchases(options?: { limit?: number; todayOnly?: boolean }) {
+export function usePurchases(options?: LoadOptions) {
   const { selectedStore } = useSelectedStore();
   const { orgId } = useAuth();
-  const limit = options?.limit || 100;
-  const todayOnly = options?.todayOnly || false;
 
   return useQuery({
-    queryKey: ['purchases-db', selectedStore?.id, orgId, limit, todayOnly],
+    queryKey: ['purchases-db', selectedStore?.id, orgId],
     queryFn: async () => {
-      if (!selectedStore?.id || !orgId) return [];
+      if (!selectedStore?.id || !orgId) return { data: [] };
 
-      let query = supabase
+      const { data, error } = await supabase
         .from('purchases')
         .select(`
           *,
@@ -191,23 +264,21 @@ export function usePurchases(options?: { limit?: number; todayOnly?: boolean }) 
         .eq('store_id', selectedStore.id)
         .eq('org_id', orgId)
         .order('purchase_date', { ascending: false })
-        .limit(limit);
+        .limit(100);
 
-      if (todayOnly) {
-        const today = new Date().toISOString().split('T')[0];
-        query = query.gte('purchase_date', `${today}T00:00:00`);
+      if (error) {
+        console.warn('purchases query error:', error);
+        return { data: [] };
       }
 
-      const { data, error } = await query;
-
-      if (error) throw error;
-
       // product_name 매핑
-      return (data || []).map((p: any) => ({
+      const purchasesWithProduct = (data || []).map((p: any) => ({
         ...p,
         product_name: p.product?.product_name || '상품',
         category: p.product?.category,
       }));
+
+      return { data: purchasesWithProduct };
     },
     enabled: !!selectedStore?.id && !!orgId,
     staleTime: 2 * 60 * 1000,
@@ -217,34 +288,28 @@ export function usePurchases(options?: { limit?: number; todayOnly?: boolean }) 
 /**
  * 방문 데이터 Hook (DB 기반)
  */
-export function useVisits(options?: { limit?: number; todayOnly?: boolean }) {
+export function useVisits(options?: LoadOptions) {
   const { selectedStore } = useSelectedStore();
   const { orgId } = useAuth();
-  const limit = options?.limit || 100;
-  const todayOnly = options?.todayOnly || false;
 
   return useQuery({
-    queryKey: ['visits-db', selectedStore?.id, orgId, limit, todayOnly],
+    queryKey: ['visits-db', selectedStore?.id, orgId],
     queryFn: async () => {
-      if (!selectedStore?.id || !orgId) return [];
+      if (!selectedStore?.id || !orgId) return { data: [] };
 
-      let query = supabase
+      const { data, error } = await supabase
         .from('visits')
         .select('*')
         .eq('store_id', selectedStore.id)
         .eq('org_id', orgId)
         .order('visit_date', { ascending: false })
-        .limit(limit);
+        .limit(100);
 
-      if (todayOnly) {
-        const today = new Date().toISOString().split('T')[0];
-        query = query.gte('visit_date', `${today}T00:00:00`);
+      if (error) {
+        console.warn('visits query error:', error);
+        return { data: [] };
       }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-      return data || [];
+      return { data: data || [] };
     },
     enabled: !!selectedStore?.id && !!orgId,
     staleTime: 2 * 60 * 1000,
@@ -254,14 +319,14 @@ export function useVisits(options?: { limit?: number; todayOnly?: boolean }) {
 /**
  * 직원 데이터 Hook (DB 기반)
  */
-export function useStaff() {
+export function useStaff(options?: LoadOptions) {
   const { selectedStore } = useSelectedStore();
   const { orgId } = useAuth();
 
   return useQuery({
     queryKey: ['staff-db', selectedStore?.id, orgId],
     queryFn: async () => {
-      if (!selectedStore?.id || !orgId) return [];
+      if (!selectedStore?.id || !orgId) return { data: [] };
 
       const { data, error } = await supabase
         .from('staff')
@@ -270,11 +335,10 @@ export function useStaff() {
         .eq('org_id', orgId);
 
       if (error) {
-        // staff 테이블이 없을 수 있음
-        console.warn('Staff table query failed:', error);
-        return [];
+        console.warn('staff query error:', error);
+        return { data: [] };
       }
-      return data || [];
+      return { data: data || [] };
     },
     enabled: !!selectedStore?.id && !!orgId,
     staleTime: 5 * 60 * 1000,
@@ -282,32 +346,27 @@ export function useStaff() {
 }
 
 /**
- * 단일 데이터 파일 로드 Hook (하위 호환성)
- * @deprecated DB 기반 개별 Hook 사용 권장
+ * WiFi 센서 데이터 Hook (DB 기반)
  */
-export function useStoreDataFile(fileType: string) {
+export function useWiFiSensors(options?: LoadOptions) {
   const { selectedStore } = useSelectedStore();
   const { orgId } = useAuth();
 
   return useQuery({
-    queryKey: ['store-data-file', fileType, selectedStore?.id, orgId],
+    queryKey: ['wifi-sensors-db', selectedStore?.id, orgId],
     queryFn: async () => {
       if (!selectedStore?.id || !orgId) return { data: [] };
 
-      const tableName = fileType.replace('.csv', '');
-      
       const { data, error } = await supabase
-        .from(tableName)
+        .from('wifi_sensors')
         .select('*')
         .eq('store_id', selectedStore.id)
-        .eq('org_id', orgId)
-        .limit(100);
+        .eq('org_id', orgId);
 
       if (error) {
-        console.warn(`Table ${tableName} query failed:`, error);
+        console.warn('wifi_sensors query error:', error);
         return { data: [] };
       }
-
       return { data: data || [] };
     },
     enabled: !!selectedStore?.id && !!orgId,
@@ -318,14 +377,14 @@ export function useStoreDataFile(fileType: string) {
 /**
  * WiFi 트래킹 데이터 Hook (DB 기반)
  */
-export function useWiFiTracking() {
+export function useWiFiTracking(options?: LoadOptions) {
   const { selectedStore } = useSelectedStore();
   const { orgId } = useAuth();
 
   return useQuery({
     queryKey: ['wifi-tracking-db', selectedStore?.id, orgId],
     queryFn: async () => {
-      if (!selectedStore?.id || !orgId) return [];
+      if (!selectedStore?.id || !orgId) return { data: [] };
 
       const { data, error } = await supabase
         .from('wifi_tracking')
@@ -335,8 +394,11 @@ export function useWiFiTracking() {
         .order('timestamp', { ascending: false })
         .limit(500);
 
-      if (error) throw error;
-      return data || [];
+      if (error) {
+        console.warn('wifi_tracking query error:', error);
+        return { data: [] };
+      }
+      return { data: data || [] };
     },
     enabled: !!selectedStore?.id && !!orgId,
     staleTime: 2 * 60 * 1000,
@@ -348,15 +410,15 @@ export function useWiFiTracking() {
  */
 export function useRefreshStoreData() {
   const { selectedStore } = useSelectedStore();
-  const { orgId } = useAuth();
 
   return {
     refreshAll: () => {
-      // React Query의 invalidateQueries 사용
-      // queryClient.invalidateQueries(['store-dataset-db', selectedStore?.id, orgId]);
+      // React Query의 invalidateQueries 사용 시 주석 해제
+      // queryClient.invalidateQueries(['store-data-db', selectedStore?.id]);
+      // queryClient.invalidateQueries(['store-dataset-db', selectedStore?.id]);
     },
-    refreshTable: (tableName: string) => {
-      // queryClient.invalidateQueries([`${tableName}-db`, selectedStore?.id, orgId]);
-    }
+    refreshFile: (fileType: DataFileType) => {
+      // queryClient.invalidateQueries(['store-data-db', fileType, selectedStore?.id]);
+    },
   };
 }
