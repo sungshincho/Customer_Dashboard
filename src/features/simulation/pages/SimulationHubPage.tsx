@@ -1,8 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
   Sparkles, 
@@ -11,13 +9,10 @@ import {
   DollarSign, 
   Target, 
   Package, 
-  RefreshCw, 
-  Loader2,
   Info
 } from 'lucide-react';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
-import { useAuth } from '@/hooks/useAuth';
-import { useAIInference, useStoreContext } from '../hooks';
+import { useAIInference } from '../hooks';
 import { toast } from 'sonner';
 import { SharedDigitalTwinScene } from "@/features/simulation/components/digital-twin";
 import { DemandForecastResult } from '../components/DemandForecastResult';
@@ -27,14 +22,8 @@ import { RecommendationStrategyResult } from '../components/RecommendationStrate
 import { useActivityLogger } from "@/hooks/useActivityLogger";
 import { useLocation } from "react-router-dom";
 
-// 새로운 컴포넌트들
-import { 
-  DataSourceMappingCard, 
-  type ImportedDataSource,
-  type PresetApiSource,
-  type CustomApiSource,
-  type OntologyMappingStatus
-} from '../components/DataSourceMappingCard';
+// v2 컴포넌트들
+import { DataSourceMappingCard } from '../components/DataSourceMappingCard';
 import { 
   AIModelSelector, 
   defaultScenarios, 
@@ -49,140 +38,46 @@ import {
   type SimulationResultMeta
 } from '../components/SimulationResultCard';
 
+// Phase 2: 새로운 데이터 소스 매핑 Hook
+import { useDataSourceMapping } from '../hooks/useDataSourceMapping';
+
 /**
- * SimulationHubPage v2
+ * SimulationHubPage v2.1
  * 
- * 고도화된 시뮬레이션 허브
- * - 데이터 소스 매핑 UI
- * - AI 모델 선택 UI
- * - 온톨로지 기반 추론
- * - 개선된 결과 시각화
+ * Phase 2 업데이트:
+ * - useDataSourceMapping Hook 사용
+ * - 실제 DB 데이터 기반 매핑 상태
+ * - Edge Function 연동
  */
 export default function SimulationHubPage() {
   const { selectedStore } = useSelectedStore();
-  const { user } = useAuth();
   const { logActivity } = useActivityLogger();
   const location = useLocation();
   const { infer, loading: isInferring } = useAIInference();
-  const { contextData, loading: contextLoading } = useStoreContext(selectedStore?.id);
 
-  // 관리자 여부 (NEURALTWIN master 계정)
-  const isAdmin = user?.email?.includes('@neuraltwin') || user?.email?.includes('admin');
+  // Phase 2: 데이터 소스 매핑 Hook 사용
+  const {
+    importedData,
+    presetApis,
+    customApis,
+    mappingStatus,
+    loading: dataSourcesLoading,
+    refreshMapping,
+    connectApi,
+    disconnectApi,
+    configurePresetApi,
+    isAdmin,
+    hasMinimumData,
+  } = useDataSourceMapping();
 
   // 페이지 방문 로깅
   useEffect(() => {
     logActivity('page_view', { 
       page: location.pathname,
-      page_name: 'Simulation Hub v2',
+      page_name: 'Simulation Hub v2.1',
       timestamp: new Date().toISOString() 
     });
   }, [location.pathname]);
-
-  // ===== 데이터 소스 상태 =====
-  const [dataSourcesLoading, setDataSourcesLoading] = useState(false);
-  
-  // 임포트된 데이터 (contextData에서 파생)
-  const importedData: ImportedDataSource[] = useMemo(() => {
-    if (!contextData) return [];
-    
-    return [
-      {
-        id: 'products',
-        name: '상품 데이터',
-        table: 'products',
-        recordCount: contextData.products.length,
-        lastUpdated: new Date().toISOString(),
-        status: contextData.products.length > 0 ? 'connected' : 'pending',
-        mappedToOntology: true,
-        ontologyEntityType: 'Product',
-      },
-      {
-        id: 'inventory',
-        name: '재고 데이터',
-        table: 'inventory_levels',
-        recordCount: contextData.inventory.length,
-        lastUpdated: new Date().toISOString(),
-        status: contextData.inventory.length > 0 ? 'connected' : 'pending',
-        mappedToOntology: true,
-        ontologyEntityType: 'InventoryLevel',
-      },
-      {
-        id: 'kpis',
-        name: 'KPI 데이터',
-        table: 'dashboard_kpis',
-        recordCount: contextData.recentKpis.length,
-        lastUpdated: new Date().toISOString(),
-        status: contextData.recentKpis.length > 0 ? 'connected' : 'pending',
-        mappedToOntology: true,
-        ontologyEntityType: 'DailyKPI',
-      },
-      {
-        id: 'entities',
-        name: '온톨로지 엔티티',
-        table: 'graph_entities',
-        recordCount: contextData.entities.length,
-        lastUpdated: new Date().toISOString(),
-        status: contextData.entities.length > 0 ? 'connected' : 'pending',
-        mappedToOntology: true,
-        ontologyEntityType: 'Entity',
-      },
-    ];
-  }, [contextData]);
-
-  // 프리셋 API (추후 확장)
-  const presetApis: PresetApiSource[] = useMemo(() => [
-    {
-      id: 'weather',
-      name: '날씨 API',
-      description: '기상청 날씨 데이터',
-      provider: 'OpenWeather',
-      enabled: false,
-      adminOnly: true,
-    },
-    {
-      id: 'economic',
-      name: '경제지표 API',
-      description: '소비자물가지수, 경기동행지수 등',
-      provider: 'KOSIS',
-      enabled: false,
-      adminOnly: true,
-    },
-    {
-      id: 'holidays',
-      name: '공휴일 API',
-      description: '공휴일 및 특별 기념일',
-      provider: '공공데이터포털',
-      enabled: false,
-      adminOnly: true,
-    },
-  ], []);
-
-  // 고객 연동 API (추후 확장)
-  const [customApis, setCustomApis] = useState<CustomApiSource[]>([]);
-
-  // 온톨로지 매핑 상태
-  const mappingStatus: OntologyMappingStatus = useMemo(() => {
-    const totalEntities = contextData?.entities.length || 0;
-    const mappedEntities = importedData.filter(d => d.mappedToOntology).length;
-    const unmappedFields: string[] = [];
-    
-    // 미매핑 필드 체크
-    if (!contextData?.products.length) unmappedFields.push('products');
-    if (!contextData?.inventory.length) unmappedFields.push('inventory');
-    if (!contextData?.recentKpis.length) unmappedFields.push('kpis');
-    
-    const healthScore = contextData 
-      ? Math.round(((4 - unmappedFields.length) / 4) * 100)
-      : 0;
-
-    return {
-      totalEntities,
-      mappedEntities: mappedEntities,
-      totalRelations: 0,  // TODO: 관계 수 계산
-      unmappedFields,
-      healthScore,
-    };
-  }, [contextData, importedData]);
 
   // ===== AI 모델 선택 상태 =====
   const [selectedScenarios, setSelectedScenarios] = useState<SimulationScenario[]>([
@@ -194,9 +89,9 @@ export default function SimulationHubPage() {
   const scenarios: SimulationScenarioConfig[] = useMemo(() => {
     return defaultScenarios.map(scenario => ({
       ...scenario,
-      enabled: mappingStatus.healthScore >= 25,  // 최소 25% 이상 매핑되어야 활성화
+      enabled: hasMinimumData,
     }));
-  }, [mappingStatus.healthScore]);
+  }, [hasMinimumData]);
 
   // ===== 시뮬레이션 결과 상태 =====
   const [results, setResults] = useState<Record<SimulationScenario, any>>({
@@ -244,16 +139,32 @@ export default function SimulationHubPage() {
     setParameters(prev => ({ ...prev, ...params }));
   }, []);
 
-  const handleRefreshDataSources = useCallback(() => {
-    setDataSourcesLoading(true);
-    // contextData가 자동으로 리페치됨 (useStoreContext)
-    setTimeout(() => setDataSourcesLoading(false), 1000);
-  }, []);
+  // 스토어 컨텍스트 생성 (importedData 기반)
+  const buildStoreContext = useCallback(() => {
+    // 실제 데이터 소스에서 컨텍스트 구성
+    const productsSource = importedData.find(d => d.id === 'products');
+    const inventorySource = importedData.find(d => d.id === 'inventory');
+    const kpisSource = importedData.find(d => d.id === 'kpis');
+    const entitiesSource = importedData.find(d => d.id === 'ontology_entities');
+
+    return {
+      storeInfo: selectedStore ? {
+        id: selectedStore.id,
+        name: selectedStore.store_name,
+        code: selectedStore.store_code,
+      } : null,
+      products: { count: productsSource?.recordCount || 0 },
+      inventory: { count: inventorySource?.recordCount || 0 },
+      recentKpis: { count: kpisSource?.recordCount || 0 },
+      entities: { count: entitiesSource?.recordCount || 0 },
+      mappingStatus,
+    };
+  }, [selectedStore, importedData, mappingStatus]);
 
   // 단일 시뮬레이션 실행
   const runSimulation = useCallback(async (type: SimulationScenario) => {
-    if (!selectedStore || !contextData) {
-      toast.error('매장 데이터를 불러오는 중입니다');
+    if (!selectedStore || !hasMinimumData) {
+      toast.error('매장 데이터가 충분하지 않습니다');
       return;
     }
 
@@ -265,13 +176,15 @@ export default function SimulationHubPage() {
     }));
 
     try {
+      const storeContext = buildStoreContext();
+      
       const result = await infer(type, {
         dataRange: parameters.dataRange,
         forecastPeriod: parameters.forecastPeriod,
         confidenceLevel: parameters.confidenceLevel,
         includeSeasonality: parameters.includeSeasonality,
         includeExternalFactors: parameters.includeExternalFactors,
-      }, selectedStore.id, contextData);
+      }, selectedStore.id, storeContext);
       
       if (result) {
         setResults(prev => ({ ...prev, [type]: result }));
@@ -281,18 +194,18 @@ export default function SimulationHubPage() {
             status: 'success',
             executedAt: new Date().toISOString(),
             processingTime: Date.now() - startTime,
-            dataPointsAnalyzed: contextData.recentKpis.length + contextData.products.length,
+            dataPointsAnalyzed: mappingStatus.totalEntities,
             confidenceScore: parameters.confidenceLevel,
           }
         }));
         
-        // Activity logging
         logActivity('feature_use', {
           feature: 'simulation_run',
           simulation_type: type,
           store_id: selectedStore.id,
           store_name: selectedStore.store_name,
           parameters,
+          mapping_health: mappingStatus.healthScore,
           timestamp: new Date().toISOString()
         });
         
@@ -311,12 +224,12 @@ export default function SimulationHubPage() {
     } finally {
       setLoadingStates(prev => ({ ...prev, [type]: false }));
     }
-  }, [selectedStore, contextData, parameters, infer, logActivity]);
+  }, [selectedStore, hasMinimumData, parameters, infer, buildStoreContext, mappingStatus, logActivity]);
 
   // 선택된 시뮬레이션 전체 실행
   const runAllSimulations = useCallback(async () => {
-    if (!selectedStore || !contextData) {
-      toast.error('매장을 선택하고 데이터를 불러온 후 시도하세요');
+    if (!selectedStore || !hasMinimumData) {
+      toast.error('매장을 선택하고 데이터를 확인하세요');
       return;
     }
 
@@ -332,14 +245,13 @@ export default function SimulationHubPage() {
     );
 
     toast.success('모든 시뮬레이션이 완료되었습니다');
-  }, [selectedStore, contextData, selectedScenarios, runSimulation]);
+  }, [selectedStore, hasMinimumData, selectedScenarios, runSimulation]);
 
   // 내보내기 핸들러
   const handleExport = useCallback((type: SimulationScenario, format: 'csv' | 'pdf' | 'json') => {
     const result = results[type];
     if (!result) return;
 
-    // TODO: 실제 내보내기 로직 구현
     toast.info(`${getSimulationTitle(type)} 결과를 ${format.toUpperCase()}로 내보내는 중...`);
     
     logActivity('feature_use', {
@@ -393,15 +305,18 @@ export default function SimulationHubPage() {
           </Alert>
         )}
 
-        {/* 1. 데이터 소스 & 온톨로지 매핑 */}
+        {/* 1. 데이터 소스 & 온톨로지 매핑 - Phase 2 Hook 사용 */}
         <DataSourceMappingCard
           importedData={importedData}
           presetApis={presetApis}
           customApis={customApis}
           mappingStatus={mappingStatus}
           isAdmin={isAdmin}
-          onRefresh={handleRefreshDataSources}
-          isLoading={contextLoading || dataSourcesLoading}
+          onRefresh={refreshMapping}
+          onConnectApi={(apiId) => connectApi({ type: 'custom', name: apiId })}
+          onDisconnectApi={disconnectApi}
+          onConfigureApi={(apiId) => configurePresetApi(apiId, true)}
+          isLoading={dataSourcesLoading}
         />
 
         {/* 2. AI 모델 선택 */}
@@ -415,7 +330,7 @@ export default function SimulationHubPage() {
           onParameterChange={handleParameterChange}
           onRunSimulation={runAllSimulations}
           isRunning={Object.values(loadingStates).some(v => v)}
-          disabled={!selectedStore || !contextData || mappingStatus.healthScore < 25}
+          disabled={!selectedStore || !hasMinimumData}
         />
 
         {/* 3. 레이아웃 최적화 (전체 너비) */}
