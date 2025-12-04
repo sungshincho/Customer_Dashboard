@@ -34,3 +34,11 @@ export type {
   InferenceResult,
   OntologyInferenceResult,
 } from './useEnhancedAIInference';
+
+// Phase 4 Hooks
+export { useSimulationHistory } from './useSimulationHistory';
+export type {
+  SimulationType,
+  SimulationHistoryItem,
+  ComparisonResult,
+} from './useSimulationHistory';
