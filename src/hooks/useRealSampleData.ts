@@ -7,10 +7,6 @@ import { useSelectedStore } from './useSelectedStore';
  * 실제 DB 테이블에서 데이터 조회 (수정됨)
  * 
  * 수정: user_data_imports.raw_data → 실제 테이블 직접 조회
- * 
- * 아키텍처:
- * - 고객 업로드 → Storage → ETL → DB 테이블 (customers, products, purchases, visits)
- * - 모든 기능 → DB 테이블 직접 조회
  */
 
 export function useRealCustomers() {
@@ -29,7 +25,7 @@ export function useRealCustomers() {
         .eq('org_id', orgId);
 
       if (error) {
-        console.error('customers query error:', error);
+        console.warn('customers query error:', error);
         return [];
       }
 
@@ -52,23 +48,24 @@ export function useRealPurchases() {
         .from('purchases')
         .select(`
           *,
-          product:products(id, product_name, category, price)
+          product:products(id, product_name, category, price, cost_price)
         `)
         .eq('store_id', selectedStore.id)
         .eq('org_id', orgId)
         .order('purchase_date', { ascending: false });
 
       if (error) {
-        console.error('purchases query error:', error);
+        console.warn('purchases query error:', error);
         return [];
       }
 
-      // product 정보 매핑
+      // product 정보 매핑 + price 필드 추가
       return (data || []).map((p: any) => ({
         ...p,
         product_name: p.product?.product_name,
         category: p.product?.category,
-        price: p.total_price || p.unit_price,
+        price: p.total_price || p.unit_price || p.product?.price || 0,
+        cost_price: p.product?.cost_price,
       }));
     },
     enabled: !!user && !!orgId && !!selectedStore,
@@ -91,15 +88,15 @@ export function useRealProducts() {
         .eq('org_id', orgId);
 
       if (error) {
-        console.error('products query error:', error);
+        console.warn('products query error:', error);
         return [];
       }
 
-      // 필드명 호환성 (name → product_name)
+      // 필드명 호환성 (product_id, name 추가)
       return (data || []).map((p: any) => ({
         ...p,
-        name: p.product_name,
         product_id: p.id,
+        name: p.product_name,
       }));
     },
     enabled: !!user && !!orgId && !!selectedStore,
@@ -123,7 +120,7 @@ export function useRealVisits() {
         .order('visit_date', { ascending: false });
 
       if (error) {
-        console.error('visits query error:', error);
+        console.warn('visits query error:', error);
         return [];
       }
 
@@ -151,7 +148,7 @@ export function useRealWiFiTracking() {
         .limit(500);
 
       if (error) {
-        console.error('wifi_tracking query error:', error);
+        console.warn('wifi_tracking query error:', error);
         return [];
       }
 
@@ -177,7 +174,7 @@ export function useRealZones() {
         .eq('org_id', orgId);
 
       if (error) {
-        console.error('wifi_zones query error:', error);
+        console.warn('wifi_zones query error:', error);
         return [];
       }
 
@@ -207,7 +204,7 @@ export function useRealFunnelEvents() {
         .order('event_timestamp', { ascending: false });
 
       if (error) {
-        console.error('funnel_events query error:', error);
+        console.warn('funnel_events query error:', error);
         return [];
       }
 
@@ -233,14 +230,14 @@ export function useRealProductPerformance() {
         .from('product_performance_agg')
         .select(`
           *,
-          product:products(id, product_name, category, price, stock)
+          product:products(id, product_name, category, price, stock, cost_price)
         `)
         .eq('store_id', selectedStore.id)
         .eq('org_id', orgId)
         .order('revenue', { ascending: false });
 
       if (error) {
-        console.error('product_performance_agg query error:', error);
+        console.warn('product_performance_agg query error:', error);
         return [];
       }
 
@@ -248,8 +245,11 @@ export function useRealProductPerformance() {
       return (data || []).map((p: any) => ({
         ...p,
         product_name: p.product?.product_name,
+        name: p.product?.product_name,
         category: p.product?.category,
         stock: p.product?.stock,
+        price: p.product?.price,
+        cost_price: p.product?.cost_price,
       }));
     },
     enabled: !!user && !!orgId && !!selectedStore,
@@ -276,7 +276,71 @@ export function useRealCustomerSegments() {
         .order('customer_count', { ascending: false });
 
       if (error) {
-        console.error('customer_segments_agg query error:', error);
+        console.warn('customer_segments_agg query error:', error);
+        return [];
+      }
+
+      return data || [];
+    },
+    enabled: !!user && !!orgId && !!selectedStore,
+  });
+}
+
+/**
+ * 일일 KPI 조회 (L3 테이블)
+ */
+export function useRealDailyKPIs(date?: string) {
+  const { user, orgId } = useAuth();
+  const { selectedStore } = useSelectedStore();
+  const targetDate = date || new Date().toISOString().split('T')[0];
+
+  return useQuery({
+    queryKey: ['real-daily-kpis', user?.id, selectedStore?.id, orgId, targetDate],
+    queryFn: async () => {
+      if (!user || !orgId || !selectedStore) return null;
+
+      const { data, error } = await supabase
+        .from('daily_kpis_agg')
+        .select('*')
+        .eq('store_id', selectedStore.id)
+        .eq('org_id', orgId)
+        .eq('date', targetDate)
+        .maybeSingle();
+
+      if (error) {
+        console.warn('daily_kpis_agg query error:', error);
+        return null;
+      }
+
+      return data;
+    },
+    enabled: !!user && !!orgId && !!selectedStore,
+  });
+}
+
+/**
+ * 시간대별 메트릭 조회 (L3 테이블)
+ */
+export function useRealHourlyMetrics(date?: string) {
+  const { user, orgId } = useAuth();
+  const { selectedStore } = useSelectedStore();
+  const targetDate = date || new Date().toISOString().split('T')[0];
+
+  return useQuery({
+    queryKey: ['real-hourly-metrics', user?.id, selectedStore?.id, orgId, targetDate],
+    queryFn: async () => {
+      if (!user || !orgId || !selectedStore) return [];
+
+      const { data, error } = await supabase
+        .from('hourly_metrics')
+        .select('*')
+        .eq('store_id', selectedStore.id)
+        .eq('org_id', orgId)
+        .eq('date', targetDate)
+        .order('hour', { ascending: true });
+
+      if (error) {
+        console.warn('hourly_metrics query error:', error);
         return [];
       }
 
