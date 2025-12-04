@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -17,6 +17,10 @@ import {
   History,
   BarChart3,
   Save,
+  AlertTriangle,
+  Database,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { toast } from 'sonner';
@@ -50,6 +54,9 @@ import { useDataSourceMapping } from '../hooks/useDataSourceMapping';
 // Phase 3: 온톨로지 강화 AI 추론 Hook
 import { useEnhancedAIInference } from '../hooks/useEnhancedAIInference';
 
+// ✅ 실제 데이터를 가져오는 Hook 추가
+import { useStoreContext } from '../hooks/useStoreContext';
+
 // Phase 4: 내보내기, 히스토리, 시각화
 import { exportSimulationResult } from '../utils/simulationExporter';
 import { useSimulationHistory } from '../hooks/useSimulationHistory';
@@ -57,17 +64,79 @@ import { OntologyInsightChart } from '../components/OntologyInsightChart';
 import { SimulationHistoryPanel } from '../components/SimulationHistoryPanel';
 
 /**
- * SimulationHubPage v2.3
+ * 데이터 품질 상태 타입
+ */
+interface DataQualityStatus {
+  hasProducts: boolean;
+  hasInventory: boolean;
+  hasKpis: boolean;
+  hasEntities: boolean;
+  productCount: number;
+  inventoryCount: number;
+  kpiDays: number;
+  entityCount: number;
+  overallScore: number; // 0-100
+  level: 'excellent' | 'good' | 'fair' | 'poor' | 'none';
+  message: string;
+  canRunSimulation: boolean;
+  recommendations: string[];
+}
+
+/**
+ * 시나리오별 최소 데이터 요구사항
+ */
+const SCENARIO_REQUIREMENTS: Record<SimulationScenario, {
+  minProducts?: number;
+  minInventory?: number;
+  minKpiDays?: number;
+  minEntities?: number;
+  description: string;
+}> = {
+  demand: {
+    minProducts: 5,
+    minKpiDays: 7,
+    description: '수요 예측을 위해 최소 5개 상품과 7일 이상의 KPI 데이터가 필요합니다.',
+  },
+  inventory: {
+    minInventory: 5,
+    minProducts: 5,
+    description: '재고 최적화를 위해 최소 5개 상품과 재고 데이터가 필요합니다.',
+  },
+  pricing: {
+    minProducts: 5,
+    description: '가격 최적화를 위해 최소 5개 상품 데이터(원가, 판매가)가 필요합니다.',
+  },
+  layout: {
+    minEntities: 3,
+    description: '레이아웃 최적화를 위해 최소 3개 이상의 매장 엔티티가 필요합니다.',
+  },
+  marketing: {
+    minProducts: 5,
+    minKpiDays: 7,
+    description: '마케팅 전략 수립을 위해 상품 및 고객 행동 데이터가 필요합니다.',
+  },
+};
+
+/**
+ * SimulationHubPage v2.4
  * 
- * Phase 4 업데이트:
- * - 실제 내보내기 기능 (CSV, PDF, JSON)
- * - 시뮬레이션 히스토리 저장 및 비교
- * - 온톨로지 인사이트 시각화 차트
+ * 주요 업데이트:
+ * - 실제 백엔드 데이터 연동 (useStoreContext)
+ * - 데이터 품질 평가 및 피드백
+ * - 시나리오별 데이터 요구사항 검증
+ * - 데이터 부족 시 명확한 안내
  */
 export default function SimulationHubPage() {
   const { selectedStore } = useSelectedStore();
   const { logActivity } = useActivityLogger();
   const location = useLocation();
+
+  // ✅ 실제 데이터를 가져오는 Hook
+  const { 
+    contextData, 
+    loading: contextLoading, 
+    error: contextError 
+  } = useStoreContext(selectedStore?.id);
 
   // Phase 2: 데이터 소스 매핑
   const {
@@ -81,7 +150,6 @@ export default function SimulationHubPage() {
     disconnectApi,
     configurePresetApi,
     isAdmin,
-    hasMinimumData,
   } = useDataSourceMapping();
 
   // Phase 3: 온톨로지 강화 AI 추론
@@ -110,7 +178,7 @@ export default function SimulationHubPage() {
   useEffect(() => {
     logActivity('page_view', { 
       page: location.pathname,
-      page_name: 'Simulation Hub v2.3',
+      page_name: 'Simulation Hub v2.4',
       timestamp: new Date().toISOString() 
     });
   }, [location.pathname]);
@@ -131,18 +199,149 @@ export default function SimulationHubPage() {
     setOntologyLoaded(false);
   }, [selectedStore?.id]);
 
+  // ✅ 데이터 품질 평가 함수
+  const evaluateDataQuality = useCallback((): DataQualityStatus => {
+    if (!contextData) {
+      return {
+        hasProducts: false,
+        hasInventory: false,
+        hasKpis: false,
+        hasEntities: false,
+        productCount: 0,
+        inventoryCount: 0,
+        kpiDays: 0,
+        entityCount: 0,
+        overallScore: 0,
+        level: 'none',
+        message: '매장을 선택하면 데이터를 분석합니다.',
+        canRunSimulation: false,
+        recommendations: ['매장을 선택해주세요.'],
+      };
+    }
+
+    const productCount = contextData.products?.length || 0;
+    const inventoryCount = contextData.inventory?.length || 0;
+    const kpiDays = contextData.recentKpis?.length || 0;
+    const entityCount = contextData.entities?.length || 0;
+
+    const hasProducts = productCount >= 5;
+    const hasInventory = inventoryCount >= 5;
+    const hasKpis = kpiDays >= 7;
+    const hasEntities = entityCount >= 3;
+
+    // 점수 계산 (각 항목 25점)
+    let score = 0;
+    if (productCount >= 10) score += 25;
+    else if (productCount >= 5) score += 15;
+    else if (productCount >= 1) score += 5;
+
+    if (inventoryCount >= 10) score += 25;
+    else if (inventoryCount >= 5) score += 15;
+    else if (inventoryCount >= 1) score += 5;
+
+    if (kpiDays >= 30) score += 25;
+    else if (kpiDays >= 14) score += 20;
+    else if (kpiDays >= 7) score += 15;
+    else if (kpiDays >= 1) score += 5;
+
+    if (entityCount >= 10) score += 25;
+    else if (entityCount >= 5) score += 15;
+    else if (entityCount >= 3) score += 10;
+    else if (entityCount >= 1) score += 5;
+
+    // 레벨 결정
+    let level: DataQualityStatus['level'];
+    let message: string;
+    
+    if (score >= 80) {
+      level = 'excellent';
+      message = '데이터가 충분합니다. 모든 시뮬레이션을 실행할 수 있습니다.';
+    } else if (score >= 60) {
+      level = 'good';
+      message = '대부분의 시뮬레이션을 실행할 수 있습니다.';
+    } else if (score >= 40) {
+      level = 'fair';
+      message = '일부 시뮬레이션은 제한된 결과를 제공할 수 있습니다.';
+    } else if (score >= 20) {
+      level = 'poor';
+      message = '데이터가 부족합니다. 더 많은 데이터를 추가해주세요.';
+    } else {
+      level = 'none';
+      message = '시뮬레이션을 위한 데이터가 거의 없습니다.';
+    }
+
+    // 권장 사항
+    const recommendations: string[] = [];
+    if (!hasProducts) recommendations.push(`상품 데이터를 추가해주세요 (현재 ${productCount}개, 최소 5개 필요)`);
+    if (!hasInventory) recommendations.push(`재고 데이터를 추가해주세요 (현재 ${inventoryCount}개, 최소 5개 필요)`);
+    if (!hasKpis) recommendations.push(`KPI 데이터를 추가해주세요 (현재 ${kpiDays}일, 최소 7일 필요)`);
+    if (!hasEntities) recommendations.push(`매장 엔티티를 추가해주세요 (현재 ${entityCount}개, 최소 3개 필요)`);
+
+    return {
+      hasProducts,
+      hasInventory,
+      hasKpis,
+      hasEntities,
+      productCount,
+      inventoryCount,
+      kpiDays,
+      entityCount,
+      overallScore: score,
+      level,
+      message,
+      canRunSimulation: score >= 20,
+      recommendations,
+    };
+  }, [contextData]);
+
+  // ✅ 시나리오별 실행 가능 여부 확인
+  const canRunScenario = useCallback((scenario: SimulationScenario): { canRun: boolean; reason?: string } => {
+    const dataQuality = evaluateDataQuality();
+    const requirements = SCENARIO_REQUIREMENTS[scenario];
+
+    if (!dataQuality.canRunSimulation) {
+      return { canRun: false, reason: '데이터가 부족합니다.' };
+    }
+
+    if (requirements.minProducts && dataQuality.productCount < requirements.minProducts) {
+      return { canRun: false, reason: `최소 ${requirements.minProducts}개의 상품 데이터가 필요합니다.` };
+    }
+
+    if (requirements.minInventory && dataQuality.inventoryCount < requirements.minInventory) {
+      return { canRun: false, reason: `최소 ${requirements.minInventory}개의 재고 데이터가 필요합니다.` };
+    }
+
+    if (requirements.minKpiDays && dataQuality.kpiDays < requirements.minKpiDays) {
+      return { canRun: false, reason: `최소 ${requirements.minKpiDays}일의 KPI 데이터가 필요합니다.` };
+    }
+
+    if (requirements.minEntities && dataQuality.entityCount < requirements.minEntities) {
+      return { canRun: false, reason: `최소 ${requirements.minEntities}개의 매장 엔티티가 필요합니다.` };
+    }
+
+    return { canRun: true };
+  }, [evaluateDataQuality]);
+
+  // 현재 데이터 품질 상태
+  const dataQuality = useMemo(() => evaluateDataQuality(), [evaluateDataQuality]);
+
   // AI 모델 선택 상태
   const [selectedScenarios, setSelectedScenarios] = useState<SimulationScenario[]>([
     'demand', 'inventory', 'pricing', 'layout', 'marketing'
   ]);
   const [parameters, setParameters] = useState<SimulationParameters>(defaultParameters);
   
+  // ✅ 시나리오 목록 (데이터 품질에 따라 활성화)
   const scenarios: SimulationScenarioConfig[] = useMemo(() => {
-    return defaultScenarios.map(scenario => ({
-      ...scenario,
-      enabled: hasMinimumData,
-    }));
-  }, [hasMinimumData]);
+    return defaultScenarios.map(scenario => {
+      const { canRun, reason } = canRunScenario(scenario.id);
+      return {
+        ...scenario,
+        enabled: canRun,
+        disabledReason: reason,
+      };
+    });
+  }, [canRunScenario]);
 
   // 시뮬레이션 결과 상태
   const [results, setResults] = useState<Record<SimulationScenario, any>>({
@@ -177,23 +376,58 @@ export default function SimulationHubPage() {
     setParameters(prev => ({ ...prev, ...params }));
   }, []);
 
+  // ✅ 실제 데이터를 포함한 Store Context 빌드
   const buildStoreContext = useCallback(() => {
+    if (!contextData) {
+      return {
+        storeInfo: selectedStore ? {
+          id: selectedStore.id,
+          name: selectedStore.store_name,
+          code: selectedStore.store_code,
+        } : null,
+        products: [],
+        inventory: [],
+        recentKpis: [],
+        entities: [],
+        dataQuality: evaluateDataQuality(),
+      };
+    }
+
     return {
-      storeInfo: selectedStore ? {
+      storeInfo: contextData.storeInfo || (selectedStore ? {
         id: selectedStore.id,
         name: selectedStore.store_name,
         code: selectedStore.store_code,
-      } : null,
-      products: { count: importedData.find(d => d.id === 'products')?.recordCount || 0 },
-      inventory: { count: importedData.find(d => d.id === 'inventory')?.recordCount || 0 },
+      } : null),
+      // ✅ 실제 배열 데이터 전달
+      products: contextData.products || [],
+      inventory: contextData.inventory || [],
+      recentKpis: contextData.recentKpis || [],
+      entities: contextData.entities || [],
+      // 데이터 품질 메타 정보
+      dataQuality: evaluateDataQuality(),
       mappingStatus,
     };
-  }, [selectedStore, importedData, mappingStatus]);
+  }, [selectedStore, contextData, mappingStatus, evaluateDataQuality]);
 
-  // 시뮬레이션 실행
+  // ✅ 시뮬레이션 실행 (데이터 검증 포함)
   const runSimulation = useCallback(async (type: SimulationScenario) => {
-    if (!selectedStore || !hasMinimumData) {
-      toast.error('매장 데이터가 충분하지 않습니다');
+    // 데이터 검증
+    const { canRun, reason } = canRunScenario(type);
+    if (!canRun) {
+      toast.error(reason || '데이터가 부족하여 시뮬레이션을 실행할 수 없습니다.');
+      setResultMeta(prev => ({
+        ...prev,
+        [type]: { 
+          status: 'error', 
+          errorMessage: reason || '데이터 부족' 
+        }
+      }));
+      return;
+    }
+
+    if (!selectedStore) {
+      toast.error('매장을 선택해주세요.');
       return;
     }
 
@@ -205,12 +439,16 @@ export default function SimulationHubPage() {
       const storeContext = buildStoreContext();
       const inferFn = useOntologyMode ? inferWithOntology : infer;
       
+      // ✅ 데이터 품질 정보를 파라미터에 포함
       const result = await inferFn(type, {
         dataRange: parameters.dataRange,
         forecastPeriod: parameters.forecastPeriod,
         confidenceLevel: parameters.confidenceLevel,
         includeSeasonality: parameters.includeSeasonality,
         includeExternalFactors: parameters.includeExternalFactors,
+        // 데이터 품질 메타 정보
+        dataQualityScore: dataQuality.overallScore,
+        dataQualityLevel: dataQuality.level,
       }, storeContext);
       
       if (result) {
@@ -222,6 +460,7 @@ export default function SimulationHubPage() {
             executedAt: new Date().toISOString(),
             processingTime: Date.now() - startTime,
             confidenceScore: result.confidenceScore || parameters.confidenceLevel,
+            dataQuality: dataQuality.level,
           }
         }));
         
@@ -232,25 +471,33 @@ export default function SimulationHubPage() {
         toast.success(`${getSimulationTitle(type)} 완료`);
       }
     } catch (error) {
+      console.error(`${type} simulation error:`, error);
       setResultMeta(prev => ({
         ...prev,
-        [type]: { status: 'error', errorMessage: error instanceof Error ? error.message : '오류' }
+        [type]: { status: 'error', errorMessage: error instanceof Error ? error.message : '오류 발생' }
       }));
       toast.error(`${getSimulationTitle(type)} 실패`);
     } finally {
       setLoadingStates(prev => ({ ...prev, [type]: false }));
     }
-  }, [selectedStore, hasMinimumData, parameters, useOntologyMode, infer, inferWithOntology, buildStoreContext, autoSave, saveToHistory]);
+  }, [selectedStore, canRunScenario, parameters, useOntologyMode, infer, inferWithOntology, buildStoreContext, autoSave, saveToHistory, dataQuality]);
 
   const runAllSimulations = useCallback(async () => {
-    if (!selectedStore || !hasMinimumData || selectedScenarios.length === 0) {
-      toast.error('시나리오를 선택하세요');
+    const runnableScenarios = selectedScenarios.filter(s => canRunScenario(s).canRun);
+    
+    if (runnableScenarios.length === 0) {
+      toast.error('실행 가능한 시나리오가 없습니다. 데이터를 추가해주세요.');
       return;
     }
-    toast.info(`${selectedScenarios.length}개 시뮬레이션 시작...`);
-    await Promise.all(selectedScenarios.map(type => runSimulation(type)));
-    toast.success('모든 시뮬레이션 완료');
-  }, [selectedStore, hasMinimumData, selectedScenarios, runSimulation]);
+
+    if (runnableScenarios.length < selectedScenarios.length) {
+      toast.warning(`${selectedScenarios.length - runnableScenarios.length}개 시나리오는 데이터 부족으로 건너뜁니다.`);
+    }
+
+    toast.info(`${runnableScenarios.length}개 시뮬레이션 시작...`);
+    await Promise.all(runnableScenarios.map(type => runSimulation(type)));
+    toast.success('시뮬레이션 완료');
+  }, [selectedScenarios, canRunScenario, runSimulation]);
 
   // 내보내기
   const handleExport = useCallback(async (type: SimulationScenario, format: 'csv' | 'pdf' | 'json') => {
@@ -272,6 +519,27 @@ export default function SimulationHubPage() {
       pricing: '가격 최적화', marketing: '마케팅 전략',
     };
     return titles[type] || type;
+  };
+
+  // ✅ 데이터 품질 배지 색상
+  const getQualityBadgeVariant = (level: DataQualityStatus['level']) => {
+    switch (level) {
+      case 'excellent': return 'default';
+      case 'good': return 'secondary';
+      case 'fair': return 'outline';
+      case 'poor': return 'destructive';
+      default: return 'outline';
+    }
+  };
+
+  const getQualityIcon = (level: DataQualityStatus['level']) => {
+    switch (level) {
+      case 'excellent': return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+      case 'good': return <CheckCircle2 className="h-4 w-4 text-blue-500" />;
+      case 'fair': return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
+      case 'poor': return <AlertTriangle className="h-4 w-4 text-orange-500" />;
+      default: return <XCircle className="h-4 w-4 text-red-500" />;
+    }
   };
 
   return (
@@ -322,6 +590,58 @@ export default function SimulationHubPage() {
           </div>
         </div>
 
+        {/* ✅ 데이터 품질 상태 표시 */}
+        {selectedStore && (
+          <Alert className={`
+            ${dataQuality.level === 'excellent' ? 'bg-green-50 border-green-200 dark:bg-green-950/20' : ''}
+            ${dataQuality.level === 'good' ? 'bg-blue-50 border-blue-200 dark:bg-blue-950/20' : ''}
+            ${dataQuality.level === 'fair' ? 'bg-yellow-50 border-yellow-200 dark:bg-yellow-950/20' : ''}
+            ${dataQuality.level === 'poor' ? 'bg-orange-50 border-orange-200 dark:bg-orange-950/20' : ''}
+            ${dataQuality.level === 'none' ? 'bg-red-50 border-red-200 dark:bg-red-950/20' : ''}
+          `}>
+            <Database className="h-4 w-4" />
+            <AlertTitle className="flex items-center gap-2">
+              데이터 현황
+              <Badge variant={getQualityBadgeVariant(dataQuality.level)} className="gap-1">
+                {getQualityIcon(dataQuality.level)}
+                {dataQuality.overallScore}점
+              </Badge>
+            </AlertTitle>
+            <AlertDescription>
+              <div className="mt-2 space-y-2">
+                <p>{dataQuality.message}</p>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="outline" className="gap-1">
+                    <Package className="h-3 w-3" />
+                    상품 {dataQuality.productCount}개
+                  </Badge>
+                  <Badge variant="outline" className="gap-1">
+                    재고 {dataQuality.inventoryCount}개
+                  </Badge>
+                  <Badge variant="outline" className="gap-1">
+                    <TrendingUp className="h-3 w-3" />
+                    KPI {dataQuality.kpiDays}일
+                  </Badge>
+                  <Badge variant="outline" className="gap-1">
+                    <Grid3x3 className="h-3 w-3" />
+                    엔티티 {dataQuality.entityCount}개
+                  </Badge>
+                </div>
+                {dataQuality.recommendations.length > 0 && dataQuality.level !== 'excellent' && (
+                  <div className="mt-2 text-sm text-muted-foreground">
+                    <strong>권장사항:</strong>
+                    <ul className="list-disc list-inside mt-1">
+                      {dataQuality.recommendations.map((rec, idx) => (
+                        <li key={idx}>{rec}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* 탭 */}
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
           <TabsList>
@@ -357,6 +677,15 @@ export default function SimulationHubPage() {
               </Alert>
             )}
 
+            {contextLoading && (
+              <Alert>
+                <AlertDescription className="flex items-center gap-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                  매장 데이터를 불러오는 중입니다...
+                </AlertDescription>
+              </Alert>
+            )}
+
             <DataSourceMappingCard
               importedData={importedData}
               presetApis={presetApis}
@@ -380,7 +709,7 @@ export default function SimulationHubPage() {
               onParameterChange={handleParameterChange}
               onRunSimulation={runAllSimulations}
               isRunning={Object.values(loadingStates).some(v => v) || isInferring}
-              disabled={!selectedStore || !hasMinimumData}
+              disabled={!selectedStore || !dataQuality.canRunSimulation}
             />
 
             {/* 레이아웃 */}
@@ -430,7 +759,7 @@ export default function SimulationHubPage() {
                 )}
               </SimulationResultCard>
 
-              {/* 재고 최적화 - 수정됨 */}
+              {/* 재고 최적화 */}
               <SimulationResultCard
                 type="inventory" title="재고 최적화" description="최적 재고 수준"
                 icon={Package} color="green"
@@ -453,7 +782,7 @@ export default function SimulationHubPage() {
                 )}
               </SimulationResultCard>
 
-              {/* 가격 최적화 - 수정됨 */}
+              {/* 가격 최적화 */}
               <SimulationResultCard
                 type="pricing" title="가격 최적화" description="최적 가격 전략"
                 icon={DollarSign} color="yellow"
@@ -476,7 +805,7 @@ export default function SimulationHubPage() {
                 )}
               </SimulationResultCard>
 
-              {/* 마케팅 전략 - 수정됨 */}
+              {/* 마케팅 전략 */}
               <SimulationResultCard
                 type="marketing" title="마케팅 전략" description="개인화 마케팅"
                 icon={Target} color="purple"
