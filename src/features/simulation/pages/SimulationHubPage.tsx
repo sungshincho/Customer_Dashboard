@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { 
   Sparkles, 
   Grid3x3, 
@@ -9,10 +10,11 @@ import {
   DollarSign, 
   Target, 
   Package, 
-  Info
+  Info,
+  Brain,
+  Network
 } from 'lucide-react';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
-import { useAIInference } from '../hooks';
 import { toast } from 'sonner';
 import { SharedDigitalTwinScene } from "@/features/simulation/components/digital-twin";
 import { DemandForecastResult } from '../components/DemandForecastResult';
@@ -38,24 +40,27 @@ import {
   type SimulationResultMeta
 } from '../components/SimulationResultCard';
 
-// Phase 2: 새로운 데이터 소스 매핑 Hook
+// Phase 2: 데이터 소스 매핑 Hook
 import { useDataSourceMapping } from '../hooks/useDataSourceMapping';
 
+// Phase 3: 온톨로지 강화 AI 추론 Hook
+import { useEnhancedAIInference } from '../hooks/useEnhancedAIInference';
+
 /**
- * SimulationHubPage v2.1
+ * SimulationHubPage v2.2
  * 
- * Phase 2 업데이트:
- * - useDataSourceMapping Hook 사용
- * - 실제 DB 데이터 기반 매핑 상태
- * - Edge Function 연동
+ * Phase 3 업데이트:
+ * - useEnhancedAIInference Hook 사용
+ * - 온톨로지 컨텍스트 자동 로드
+ * - 지식 그래프 기반 추론 강화
+ * - 온톨로지 인사이트 표시
  */
 export default function SimulationHubPage() {
   const { selectedStore } = useSelectedStore();
   const { logActivity } = useActivityLogger();
   const location = useLocation();
-  const { infer, loading: isInferring } = useAIInference();
 
-  // Phase 2: 데이터 소스 매핑 Hook 사용
+  // Phase 2: 데이터 소스 매핑
   const {
     importedData,
     presetApis,
@@ -70,14 +75,47 @@ export default function SimulationHubPage() {
     hasMinimumData,
   } = useDataSourceMapping();
 
+  // Phase 3: 온톨로지 강화 AI 추론
+  const {
+    loading: isInferring,
+    error: inferError,
+    lastResult,
+    ontologyContext,
+    infer,
+    inferWithOntology,
+    runOntologyInference,
+    loadOntologyContext,
+  } = useEnhancedAIInference();
+
+  // 온톨로지 모드 상태
+  const [useOntologyMode, setUseOntologyMode] = useState(true);
+  const [ontologyLoaded, setOntologyLoaded] = useState(false);
+
   // 페이지 방문 로깅
   useEffect(() => {
     logActivity('page_view', { 
       page: location.pathname,
-      page_name: 'Simulation Hub v2.1',
+      page_name: 'Simulation Hub v2.2 (Ontology Enhanced)',
       timestamp: new Date().toISOString() 
     });
   }, [location.pathname]);
+
+  // 온톨로지 컨텍스트 자동 로드
+  useEffect(() => {
+    if (selectedStore?.id && useOntologyMode && !ontologyLoaded) {
+      loadOntologyContext().then((context) => {
+        if (context) {
+          setOntologyLoaded(true);
+          toast.success(`온톨로지 컨텍스트 로드: ${context.entities.total}개 엔티티, ${context.relations.total}개 관계`);
+        }
+      });
+    }
+  }, [selectedStore?.id, useOntologyMode, ontologyLoaded, loadOntologyContext]);
+
+  // 매장 변경 시 온톨로지 리셋
+  useEffect(() => {
+    setOntologyLoaded(false);
+  }, [selectedStore?.id]);
 
   // ===== AI 모델 선택 상태 =====
   const [selectedScenarios, setSelectedScenarios] = useState<SimulationScenario[]>([
@@ -85,7 +123,7 @@ export default function SimulationHubPage() {
   ]);
   const [parameters, setParameters] = useState<SimulationParameters>(defaultParameters);
   
-  // 시나리오 설정 (데이터 유무에 따라 enabled 결정)
+  // 시나리오 설정
   const scenarios: SimulationScenarioConfig[] = useMemo(() => {
     return defaultScenarios.map(scenario => ({
       ...scenario,
@@ -139,9 +177,8 @@ export default function SimulationHubPage() {
     setParameters(prev => ({ ...prev, ...params }));
   }, []);
 
-  // 스토어 컨텍스트 생성 (importedData 기반)
+  // 스토어 컨텍스트 생성
   const buildStoreContext = useCallback(() => {
-    // 실제 데이터 소스에서 컨텍스트 구성
     const productsSource = importedData.find(d => d.id === 'products');
     const inventorySource = importedData.find(d => d.id === 'inventory');
     const kpisSource = importedData.find(d => d.id === 'kpis');
@@ -161,7 +198,7 @@ export default function SimulationHubPage() {
     };
   }, [selectedStore, importedData, mappingStatus]);
 
-  // 단일 시뮬레이션 실행
+  // 단일 시뮬레이션 실행 (온톨로지 모드 지원)
   const runSimulation = useCallback(async (type: SimulationScenario) => {
     if (!selectedStore || !hasMinimumData) {
       toast.error('매장 데이터가 충분하지 않습니다');
@@ -178,13 +215,16 @@ export default function SimulationHubPage() {
     try {
       const storeContext = buildStoreContext();
       
-      const result = await infer(type, {
+      // Phase 3: 온톨로지 모드에 따라 다른 함수 호출
+      const inferFn = useOntologyMode ? inferWithOntology : infer;
+      
+      const result = await inferFn(type, {
         dataRange: parameters.dataRange,
         forecastPeriod: parameters.forecastPeriod,
         confidenceLevel: parameters.confidenceLevel,
         includeSeasonality: parameters.includeSeasonality,
         includeExternalFactors: parameters.includeExternalFactors,
-      }, selectedStore.id, storeContext);
+      }, storeContext);
       
       if (result) {
         setResults(prev => ({ ...prev, [type]: result }));
@@ -194,8 +234,8 @@ export default function SimulationHubPage() {
             status: 'success',
             executedAt: new Date().toISOString(),
             processingTime: Date.now() - startTime,
-            dataPointsAnalyzed: mappingStatus.totalEntities,
-            confidenceScore: parameters.confidenceLevel,
+            dataPointsAnalyzed: mappingStatus.totalEntities + (ontologyContext?.relations.total || 0),
+            confidenceScore: result.confidenceScore || parameters.confidenceLevel,
           }
         }));
         
@@ -204,12 +244,16 @@ export default function SimulationHubPage() {
           simulation_type: type,
           store_id: selectedStore.id,
           store_name: selectedStore.store_name,
+          ontology_mode: useOntologyMode,
+          ontology_entities: ontologyContext?.entities.total || 0,
+          ontology_relations: ontologyContext?.relations.total || 0,
           parameters,
           mapping_health: mappingStatus.healthScore,
           timestamp: new Date().toISOString()
         });
         
-        toast.success(`${getSimulationTitle(type)} 완료`);
+        const modeLabel = useOntologyMode ? '(온톨로지 강화) ' : '';
+        toast.success(`${modeLabel}${getSimulationTitle(type)} 완료`);
       }
     } catch (error) {
       console.error(`${type} simulation error:`, error);
@@ -224,7 +268,18 @@ export default function SimulationHubPage() {
     } finally {
       setLoadingStates(prev => ({ ...prev, [type]: false }));
     }
-  }, [selectedStore, hasMinimumData, parameters, infer, buildStoreContext, mappingStatus, logActivity]);
+  }, [
+    selectedStore, 
+    hasMinimumData, 
+    parameters, 
+    useOntologyMode, 
+    infer, 
+    inferWithOntology, 
+    buildStoreContext, 
+    mappingStatus, 
+    ontologyContext, 
+    logActivity
+  ]);
 
   // 선택된 시뮬레이션 전체 실행
   const runAllSimulations = useCallback(async () => {
@@ -238,14 +293,31 @@ export default function SimulationHubPage() {
       return;
     }
 
-    toast.info(`${selectedScenarios.length}개 시뮬레이션을 시작합니다...`);
+    const modeLabel = useOntologyMode ? '온톨로지 강화 ' : '';
+    toast.info(`${modeLabel}${selectedScenarios.length}개 시뮬레이션을 시작합니다...`);
     
     await Promise.all(
       selectedScenarios.map(type => runSimulation(type))
     );
 
     toast.success('모든 시뮬레이션이 완료되었습니다');
-  }, [selectedStore, hasMinimumData, selectedScenarios, runSimulation]);
+  }, [selectedStore, hasMinimumData, selectedScenarios, runSimulation, useOntologyMode]);
+
+  // 온톨로지 전용 분석 실행
+  const runOntologyAnalysis = useCallback(async (
+    type: 'recommendation' | 'anomaly_detection' | 'pattern_analysis'
+  ) => {
+    if (!selectedStore) {
+      toast.error('매장을 선택해주세요');
+      return;
+    }
+
+    const result = await runOntologyInference(type);
+    if (result) {
+      console.log('Ontology analysis result:', result);
+      // 결과 처리 로직 추가 가능
+    }
+  }, [selectedStore, runOntologyInference]);
 
   // 내보내기 핸들러
   const handleExport = useCallback((type: SimulationScenario, format: 'csv' | 'pdf' | 'json') => {
@@ -258,6 +330,7 @@ export default function SimulationHubPage() {
       feature: 'simulation_export',
       simulation_type: type,
       format,
+      ontology_enhanced: result.ontologyEnhanced || false,
       timestamp: new Date().toISOString()
     });
   }, [results, logActivity]);
@@ -283,18 +356,60 @@ export default function SimulationHubPage() {
             <h1 className="text-3xl font-bold flex items-center gap-2">
               <Sparkles className="h-8 w-8 text-primary" />
               시뮬레이션 허브
+              {useOntologyMode && (
+                <Badge variant="secondary" className="ml-2 gap-1">
+                  <Network className="h-3 w-3" />
+                  온톨로지 강화
+                </Badge>
+              )}
             </h1>
             <p className="text-muted-foreground mt-2">
-              온톨로지 기반 AI 추론으로 매장 운영을 최적화하세요
+              {useOntologyMode 
+                ? '지식 그래프 기반 AI 추론으로 매장 운영을 최적화하세요'
+                : '온톨로지 기반 AI 추론으로 매장 운영을 최적화하세요'
+              }
             </p>
           </div>
-          {isAdmin && (
-            <Badge variant="outline" className="gap-1">
-              <Info className="h-3 w-3" />
-              관리자 모드
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            {/* 온톨로지 모드 토글 */}
+            <Button
+              variant={useOntologyMode ? "default" : "outline"}
+              size="sm"
+              onClick={() => setUseOntologyMode(!useOntologyMode)}
+              className="gap-1"
+            >
+              <Brain className="h-4 w-4" />
+              {useOntologyMode ? '온톨로지 ON' : '온톨로지 OFF'}
+            </Button>
+            {isAdmin && (
+              <Badge variant="outline" className="gap-1">
+                <Info className="h-3 w-3" />
+                관리자 모드
+              </Badge>
+            )}
+          </div>
         </div>
+
+        {/* 온톨로지 컨텍스트 상태 표시 */}
+        {useOntologyMode && ontologyContext && (
+          <Alert className="bg-primary/5 border-primary/20">
+            <Network className="h-4 w-4" />
+            <AlertDescription className="flex items-center justify-between">
+              <span>
+                <strong>지식 그래프 활성화:</strong>{' '}
+                {ontologyContext.entities.total}개 엔티티, {ontologyContext.relations.total}개 관계, {' '}
+                {ontologyContext.patterns.frequentPairs.length}개 패턴 발견
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => loadOntologyContext()}
+              >
+                새로고침
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* 매장 미선택 경고 */}
         {!selectedStore && (
@@ -305,7 +420,7 @@ export default function SimulationHubPage() {
           </Alert>
         )}
 
-        {/* 1. 데이터 소스 & 온톨로지 매핑 - Phase 2 Hook 사용 */}
+        {/* 1. 데이터 소스 & 온톨로지 매핑 */}
         <DataSourceMappingCard
           importedData={importedData}
           presetApis={presetApis}
@@ -329,7 +444,7 @@ export default function SimulationHubPage() {
           onDeselectAll={handleDeselectAll}
           onParameterChange={handleParameterChange}
           onRunSimulation={runAllSimulations}
-          isRunning={Object.values(loadingStates).some(v => v)}
+          isRunning={Object.values(loadingStates).some(v => v) || isInferring}
           disabled={!selectedStore || !hasMinimumData}
         />
 
@@ -356,6 +471,20 @@ export default function SimulationHubPage() {
               />
             </div>
           )}
+          {/* 온톨로지 인사이트 표시 */}
+          {results.layout?.ontologyBasedInsights && (
+            <div className="mt-4 p-3 bg-primary/5 rounded-lg">
+              <div className="flex items-center gap-2 text-sm font-medium mb-2">
+                <Network className="h-4 w-4 text-primary" />
+                온톨로지 기반 인사이트
+              </div>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                {Object.entries(results.layout.ontologyBasedInsights).map(([key, value]) => (
+                  <li key={key}>• {String(value)}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </SimulationResultCard>
 
         {/* 4. 나머지 4개 시뮬레이션 - 2x2 그리드 */}
@@ -374,13 +503,18 @@ export default function SimulationHubPage() {
             onExport={(format) => handleExport('demand', format)}
           >
             {results.demand && (
-              <DemandForecastResult 
-                forecastData={results.demand.demandForecast?.forecastData}
-                summary={results.demand.demandForecast?.summary}
-                demandDrivers={results.demand.demandDrivers}
-                topProducts={results.demand.topProducts}
-                recommendations={results.demand.recommendations}
-              />
+              <>
+                <DemandForecastResult 
+                  forecastData={results.demand.demandForecast?.forecastData}
+                  summary={results.demand.demandForecast?.summary}
+                  demandDrivers={results.demand.demandDrivers}
+                  topProducts={results.demand.topProducts}
+                  recommendations={results.demand.recommendations}
+                />
+                {results.demand.ontologyBasedInsights && (
+                  <OntologyInsightBadge insights={results.demand.ontologyBasedInsights} />
+                )}
+              </>
             )}
           </SimulationResultCard>
 
@@ -398,10 +532,15 @@ export default function SimulationHubPage() {
             onExport={(format) => handleExport('inventory', format)}
           >
             {results.inventory && (
-              <InventoryOptimizationResult 
-                recommendations={results.inventory.recommendations}
-                summary={results.inventory.summary}
-              />
+              <>
+                <InventoryOptimizationResult 
+                  recommendations={results.inventory.recommendations}
+                  summary={results.inventory.summary}
+                />
+                {results.inventory.ontologyBasedInsights && (
+                  <OntologyInsightBadge insights={results.inventory.ontologyBasedInsights} />
+                )}
+              </>
             )}
           </SimulationResultCard>
 
@@ -419,10 +558,15 @@ export default function SimulationHubPage() {
             onExport={(format) => handleExport('pricing', format)}
           >
             {results.pricing && (
-              <PricingOptimizationResult 
-                recommendations={results.pricing.recommendations}
-                summary={results.pricing.summary}
-              />
+              <>
+                <PricingOptimizationResult 
+                  recommendations={results.pricing.recommendations}
+                  summary={results.pricing.summary}
+                />
+                {results.pricing.ontologyBasedStrategies && (
+                  <OntologyInsightBadge insights={results.pricing.ontologyBasedStrategies} />
+                )}
+              </>
             )}
           </SimulationResultCard>
 
@@ -440,15 +584,46 @@ export default function SimulationHubPage() {
             onExport={(format) => handleExport('marketing', format)}
           >
             {results.marketing && (
-              <RecommendationStrategyResult 
-                strategies={results.marketing.strategies}
-                summary={results.marketing.summary}
-                performanceMetrics={results.marketing.performanceMetrics}
-              />
+              <>
+                <RecommendationStrategyResult 
+                  strategies={results.marketing.strategies}
+                  summary={results.marketing.summary}
+                  performanceMetrics={results.marketing.performanceMetrics}
+                />
+                {results.marketing.ontologyBasedInsights && (
+                  <OntologyInsightBadge insights={results.marketing.ontologyBasedInsights} />
+                )}
+              </>
             )}
           </SimulationResultCard>
         </SimulationResultGrid>
       </div>
     </DashboardLayout>
+  );
+}
+
+/**
+ * 온톨로지 인사이트 배지 컴포넌트
+ */
+function OntologyInsightBadge({ insights }: { insights: Record<string, any> }) {
+  const entries = Object.entries(insights).slice(0, 3);
+  
+  if (entries.length === 0) return null;
+  
+  return (
+    <div className="mt-3 p-3 bg-gradient-to-r from-primary/5 to-transparent rounded-lg border border-primary/10">
+      <div className="flex items-center gap-2 text-xs font-medium text-primary mb-2">
+        <Network className="h-3 w-3" />
+        지식 그래프 인사이트
+      </div>
+      <ul className="text-xs text-muted-foreground space-y-1">
+        {entries.map(([key, value]) => (
+          <li key={key} className="flex items-start gap-1">
+            <span className="text-primary">•</span>
+            <span>{Array.isArray(value) ? value.join(', ') : String(value)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
