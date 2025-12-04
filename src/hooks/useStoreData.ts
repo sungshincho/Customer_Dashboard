@@ -12,11 +12,14 @@ import { useQuery, useQueries } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useSelectedStore } from './useSelectedStore';
 import { useAuth } from './useAuth';
-import type { DataFileType, LoadOptions, StoreDataset } from '@/lib/storage/types';
+import type { DataFileType, LoadOptions, StoreDataset, CustomerData, ProductData, PurchaseData, VisitData, StaffData } from '@/lib/storage/types';
+
+// 지원하는 테이블 타입
+type SupportedTable = 'customers' | 'products' | 'purchases' | 'visits' | 'staff' | 'wifi_zones' | 'wifi_tracking';
 
 // DB 테이블에서 데이터 로드하는 내부 함수
 async function loadFromDB(
-  tableName: string,
+  tableName: SupportedTable,
   storeId: string,
   orgId: string,
   options?: { limit?: number }
@@ -58,7 +61,23 @@ export function useStoreDataFile<K extends DataFileType>(
         return { data: [], fromCache: false };
       }
 
-      const tableName = fileType.replace('.csv', '');
+      // 테이블 이름 매핑
+      const tableNameMap: Record<string, SupportedTable | null> = {
+        'customers': 'customers',
+        'products': 'products',
+        'purchases': 'purchases',
+        'visits': 'visits',
+        'staff': 'staff',
+        'wifi_sensors': 'wifi_zones',
+        'wifi_tracking': 'wifi_tracking',
+      };
+
+      const tableName = tableNameMap[fileType];
+      if (!tableName) {
+        console.warn(`[useStoreDataFile] Unsupported file type: ${fileType}`);
+        return { data: [], fromCache: false };
+      }
+
       const data = await loadFromDB(tableName, selectedStore.id, orgId, { limit: 500 });
 
       return { data, fromCache: false };
@@ -139,12 +158,33 @@ export function useStoreDataset(options: LoadOptions = {}) {
         category: p.product?.category,
       }));
 
+      // DB 스키마를 타입에 맞게 매핑
+      const customers: CustomerData[] = (customersResult.data || []).map((c: any) => ({
+        ...c,
+        id: c.id,
+      }));
+
+      const products: ProductData[] = (productsResult.data || []).map((p: any) => ({
+        ...p,
+        id: p.id,
+      }));
+
+      const visits: VisitData[] = (visitsResult.data || []).map((v: any) => ({
+        ...v,
+        id: v.id,
+      }));
+
+      const staff: StaffData[] = (staffResult.data || []).map((s: any) => ({
+        ...s,
+        id: s.id,
+      }));
+
       return {
-        customers: customersResult.data || [],
-        products: productsResult.data || [],
-        purchases: purchasesWithProduct,
-        visits: visitsResult.data || [],
-        staff: staffResult.data || [],
+        customers,
+        products,
+        purchases: purchasesWithProduct as PurchaseData[],
+        visits,
+        staff,
       };
     },
     enabled: !!selectedStore?.id && !!orgId,
@@ -173,7 +213,21 @@ export function useMultipleStoreDataFiles<K extends DataFileType>(
           return { data: [], fromCache: false };
         }
 
-        const tableName = fileType.replace('.csv', '');
+        const tableNameMap: Record<string, SupportedTable | null> = {
+          'customers': 'customers',
+          'products': 'products',
+          'purchases': 'purchases',
+          'visits': 'visits',
+          'staff': 'staff',
+          'wifi_sensors': 'wifi_zones',
+          'wifi_tracking': 'wifi_tracking',
+        };
+
+        const tableName = tableNameMap[fileType];
+        if (!tableName) {
+          return { data: [], fromCache: false };
+        }
+
         const data = await loadFromDB(tableName, selectedStore.id, orgId, { limit: 500 });
 
         return { data, fromCache: false };
@@ -358,13 +412,13 @@ export function useWiFiSensors(options?: LoadOptions) {
       if (!selectedStore?.id || !orgId) return { data: [] };
 
       const { data, error } = await supabase
-        .from('wifi_sensors')
+        .from('wifi_zones')
         .select('*')
         .eq('store_id', selectedStore.id)
         .eq('org_id', orgId);
 
       if (error) {
-        console.warn('wifi_sensors query error:', error);
+        console.warn('wifi_zones query error:', error);
         return { data: [] };
       }
       return { data: data || [] };
