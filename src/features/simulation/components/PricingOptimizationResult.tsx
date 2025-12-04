@@ -2,52 +2,37 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, DollarSign, Percent, Target } from 'lucide-react';
 
-interface PricingRecommendation {
-  productSku?: string;
-  sku?: string;
-  productName?: string;
-  name?: string;
-  currentPrice?: number;
-  optimalPrice?: number;
-  recommendedPrice?: number;
-  priceChange?: number;
-  expectedDemandChange?: number;
-  expectedRevenueChange?: number;
-  elasticity?: number;
-  strategy?: string;
-  expectedImpact?: string;
-}
+// 안전한 숫자 헬퍼
+const safeNumber = (value: any, defaultValue: number = 0): number => {
+  if (value === undefined || value === null || isNaN(Number(value))) return defaultValue;
+  return Number(value);
+};
 
-interface PricingSummary {
-  totalProducts?: number;
-  avgPriceChange?: number;
-  expectedRevenueIncrease?: number;
-  projectedRevenueIncrease?: number;
-  expectedMarginIncrease?: number;
-  recommendedDiscounts?: number;
-  priceDecreases?: number;
-  recommendedIncreases?: number;
-  priceIncreases?: number;
-  noChange?: number;
-}
+const safeToFixed = (value: any, digits: number = 1): string => {
+  return safeNumber(value).toFixed(digits);
+};
+
+const safeToLocaleString = (value: any): string => {
+  return safeNumber(value).toLocaleString();
+};
+
+// 권장사항 텍스트 추출 헬퍼
+const getRecommendationText = (rec: any): string => {
+  if (typeof rec === 'string') return rec;
+  if (typeof rec === 'object' && rec !== null) {
+    return rec.title || rec.description || rec.details || rec.message || rec.text || 
+           rec.recommendation || rec.action || rec.content || JSON.stringify(rec);
+  }
+  return String(rec);
+};
 
 interface PricingOptimizationResultProps {
-  recommendations?: PricingRecommendation[];
-  summary?: PricingSummary;
+  recommendations?: any[];
+  summary?: any;
+  textRecommendations?: any[];
 }
 
-// 안전한 숫자 포맷 헬퍼
-const safeToFixed = (value: number | undefined | null, digits: number = 1): string => {
-  if (value === undefined || value === null || isNaN(value)) return '0';
-  return value.toFixed(digits);
-};
-
-const safeToLocaleString = (value: number | undefined | null): string => {
-  if (value === undefined || value === null || isNaN(value)) return '0';
-  return value.toLocaleString();
-};
-
-export function PricingOptimizationResult({ recommendations, summary }: PricingOptimizationResultProps) {
+export function PricingOptimizationResult({ recommendations, summary, textRecommendations }: PricingOptimizationResultProps) {
   if (!recommendations || recommendations.length === 0) {
     if (!summary) {
       return (
@@ -61,30 +46,28 @@ export function PricingOptimizationResult({ recommendations, summary }: PricingO
     }
   }
 
-  // 정규화된 recommendations
-  const normalizedRecs = (recommendations || []).map(rec => ({
-    productSku: rec.productSku || rec.sku || 'N/A',
-    productName: rec.productName || rec.name || '상품명 없음',
-    currentPrice: rec.currentPrice || 0,
-    optimalPrice: rec.optimalPrice || rec.recommendedPrice || rec.currentPrice || 0,
-    priceChange: rec.priceChange || 0,
-    expectedDemandChange: rec.expectedDemandChange || 0,
-    expectedRevenueChange: rec.expectedRevenueChange || 0,
-    elasticity: rec.elasticity || 0,
-    strategy: rec.strategy,
-    expectedImpact: rec.expectedImpact,
-  }));
-
   // 정규화된 summary
   const normalizedSummary = {
-    totalProducts: summary?.totalProducts || normalizedRecs.length || 0,
-    avgPriceChange: summary?.avgPriceChange || 0,
-    expectedRevenueIncrease: summary?.expectedRevenueIncrease || summary?.projectedRevenueIncrease || 0,
-    expectedMarginIncrease: summary?.expectedMarginIncrease || 0,
-    recommendedDiscounts: summary?.recommendedDiscounts || summary?.priceDecreases || 0,
-    recommendedIncreases: summary?.recommendedIncreases || summary?.priceIncreases || 0,
-    noChange: summary?.noChange || 0,
+    totalProducts: safeNumber(summary?.totalProducts, recommendations?.length || 0),
+    avgPriceChange: safeNumber(summary?.avgPriceChange),
+    expectedRevenueIncrease: safeNumber(summary?.expectedRevenueIncrease || summary?.projectedRevenueIncrease),
+    expectedMarginIncrease: safeNumber(summary?.expectedMarginIncrease),
+    recommendedDiscounts: safeNumber(summary?.recommendedDiscounts || summary?.priceDecreases),
+    recommendedIncreases: safeNumber(summary?.recommendedIncreases || summary?.priceIncreases),
   };
+
+  // 정규화된 recommendations
+  const normalizedRecs = (recommendations || []).map((rec: any, idx: number) => ({
+    productSku: rec.productSku || rec.sku || `SKU-${idx + 1}`,
+    productName: rec.productName || rec.name || `상품 ${idx + 1}`,
+    currentPrice: safeNumber(rec.currentPrice),
+    optimalPrice: safeNumber(rec.optimalPrice || rec.recommendedPrice || rec.currentPrice),
+    priceChange: safeNumber(rec.priceChange),
+    expectedDemandChange: safeNumber(rec.expectedDemandChange),
+    expectedRevenueChange: safeNumber(rec.expectedRevenueChange),
+    elasticity: safeNumber(rec.elasticity),
+    strategy: rec.strategy,
+  }));
 
   return (
     <div className="space-y-4">
@@ -160,14 +143,9 @@ export function PricingOptimizationResult({ recommendations, summary }: PricingO
                       </div>
                       <div>
                         <span className="text-muted-foreground">탄력성: </span>
-                        <span>{safeToFixed(Math.abs(rec.elasticity || 0), 2)}</span>
+                        <span>{safeToFixed(Math.abs(rec.elasticity), 2)}</span>
                       </div>
                     </div>
-                    {rec.strategy && (
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        전략: {rec.strategy}
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
@@ -185,7 +163,7 @@ export function PricingOptimizationResult({ recommendations, summary }: PricingO
           <CardContent>
             <div className="space-y-3">
               {normalizedRecs
-                .sort((a, b) => (b.expectedRevenueChange || 0) - (a.expectedRevenueChange || 0))
+                .sort((a, b) => b.expectedRevenueChange - a.expectedRevenueChange)
                 .slice(0, 5)
                 .map((rec, idx) => (
                   <div key={idx} className="flex items-center justify-between p-3 bg-primary/5 border border-primary/10 rounded-lg">
@@ -222,6 +200,24 @@ export function PricingOptimizationResult({ recommendations, summary }: PricingO
                   </div>
                 ))}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {textRecommendations && textRecommendations.length > 0 && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="text-base">권장 액션</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {textRecommendations.map((rec: any, idx: number) => (
+                <li key={idx} className="flex items-start gap-2 text-sm">
+                  <span className="text-primary mt-0.5">•</span>
+                  <span>{getRecommendationText(rec)}</span>
+                </li>
+              ))}
+            </ul>
           </CardContent>
         </Card>
       )}
