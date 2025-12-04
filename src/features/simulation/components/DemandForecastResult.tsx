@@ -4,38 +4,54 @@ import { TrendingUp, TrendingDown, Calendar, AlertTriangle, Package, Zap } from 
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 
 interface DemandDriver {
-  factor: string;
-  impact: 'positive' | 'negative';
-  magnitude: number;
-  explanation: string;
+  factor?: string;
+  impact?: 'positive' | 'negative' | string;
+  magnitude?: number;
+  explanation?: string;
 }
 
 interface TopProduct {
-  sku: string;
-  name: string;
-  predictedDemand: number;
-  trend: 'up' | 'down' | 'stable';
-  confidence: number;
+  sku?: string;
+  name?: string;
+  productName?: string;
+  predictedDemand?: number;
+  trend?: 'up' | 'down' | 'stable' | string;
+  confidence?: number;
+}
+
+interface ForecastData {
+  dates?: string[];
+  predictedDemand?: number[];
+  confidence?: number[];
+  peakDays?: string[];
+  lowDays?: string[];
+}
+
+interface ForecastSummary {
+  avgDailyDemand?: number;
+  peakDemand?: number;
+  totalForecast?: number;
+  trend?: 'increasing' | 'decreasing' | 'stable' | string;
 }
 
 interface DemandForecastResultProps {
-  forecastData?: {
-    dates: string[];
-    predictedDemand: number[];
-    confidence: number[];
-    peakDays?: string[];
-    lowDays?: string[];
-  };
-  summary?: {
-    avgDailyDemand: number;
-    peakDemand: number;
-    totalForecast: number;
-    trend: 'increasing' | 'decreasing' | 'stable';
-  };
+  forecastData?: ForecastData;
+  summary?: ForecastSummary;
   demandDrivers?: DemandDriver[];
   topProducts?: TopProduct[];
   recommendations?: string[];
 }
+
+// 안전한 숫자 포맷 헬퍼
+const safeToFixed = (value: number | undefined | null, digits: number = 0): string => {
+  if (value === undefined || value === null || isNaN(value)) return '0';
+  return value.toFixed(digits);
+};
+
+const safeNumber = (value: number | undefined | null, defaultValue: number = 0): number => {
+  if (value === undefined || value === null || isNaN(value)) return defaultValue;
+  return value;
+};
 
 export function DemandForecastResult({ 
   forecastData, 
@@ -44,7 +60,8 @@ export function DemandForecastResult({
   topProducts,
   recommendations 
 }: DemandForecastResultProps) {
-  if (!forecastData || !summary) {
+  // forecastData나 summary가 없으면 기본 화면
+  if (!forecastData && !summary) {
     return (
       <Card>
         <CardHeader>
@@ -55,16 +72,53 @@ export function DemandForecastResult({
     );
   }
 
+  // 정규화된 summary
+  const normalizedSummary = {
+    avgDailyDemand: safeNumber(summary?.avgDailyDemand),
+    peakDemand: safeNumber(summary?.peakDemand),
+    totalForecast: safeNumber(summary?.totalForecast),
+    trend: summary?.trend || 'stable',
+  };
+
+  // 정규화된 forecastData
+  const normalizedForecastData = {
+    dates: forecastData?.dates || [],
+    predictedDemand: forecastData?.predictedDemand || [],
+    confidence: forecastData?.confidence || [],
+    peakDays: forecastData?.peakDays || [],
+    lowDays: forecastData?.lowDays || [],
+  };
+
+  // 차트 데이터 생성
+  const chartData = normalizedForecastData.dates.map((date, idx) => ({
+    date: date ? new Date(date).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }) : `Day ${idx + 1}`,
+    demand: safeNumber(normalizedForecastData.predictedDemand[idx]),
+    confidence: safeNumber(normalizedForecastData.confidence[idx]) * 100
+  }));
+
+  // 트렌드 표시
+  const getTrendBadge = (trend: string) => {
+    if (trend === 'increasing') return 'default';
+    if (trend === 'decreasing') return 'destructive';
+    return 'secondary';
+  };
+
+  const getTrendLabel = (trend: string) => {
+    if (trend === 'increasing') return '증가 추세';
+    if (trend === 'decreasing') return '감소 추세';
+    return '안정';
+  };
+
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>수요 예측 요약</span>
-            <Badge variant={summary.trend === 'increasing' ? 'default' : summary.trend === 'decreasing' ? 'destructive' : 'secondary'}>
-              {summary.trend === 'increasing' && <TrendingUp className="w-3 h-3 mr-1" />}
-              {summary.trend === 'decreasing' && <TrendingDown className="w-3 h-3 mr-1" />}
-              {summary.trend === 'increasing' ? '증가 추세' : summary.trend === 'decreasing' ? '감소 추세' : '안정'}
+            <Badge variant={getTrendBadge(normalizedSummary.trend)}>
+              {normalizedSummary.trend === 'increasing' && <TrendingUp className="w-3 h-3 mr-1" />}
+              {normalizedSummary.trend === 'decreasing' && <TrendingDown className="w-3 h-3 mr-1" />}
+              {getTrendLabel(normalizedSummary.trend)}
             </Badge>
           </CardTitle>
         </CardHeader>
@@ -72,34 +126,32 @@ export function DemandForecastResult({
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">평균 일일 수요</p>
-              <p className="text-2xl font-bold">{summary.avgDailyDemand.toFixed(0)}건</p>
+              <p className="text-2xl font-bold">{safeToFixed(normalizedSummary.avgDailyDemand, 0)}건</p>
             </div>
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">최대 수요 (피크)</p>
-              <p className="text-2xl font-bold">{summary.peakDemand.toFixed(0)}건</p>
+              <p className="text-2xl font-bold">{safeToFixed(normalizedSummary.peakDemand, 0)}건</p>
             </div>
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">예측 기간 총계</p>
-              <p className="text-2xl font-bold">{summary.totalForecast.toFixed(0)}건</p>
+              <p className="text-2xl font-bold">{safeToFixed(normalizedSummary.totalForecast, 0)}건</p>
             </div>
           </div>
 
-          <div className="pt-4 border-t">
-            <h4 className="text-sm font-medium mb-3">일별 수요 예측 차트</h4>
-            <ResponsiveContainer width="100%" height={200}>
-              <AreaChart data={forecastData.dates.map((date, idx) => ({
-                date: new Date(date).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }),
-                demand: forecastData.predictedDemand[idx],
-                confidence: forecastData.confidence[idx] * 100
-              }))}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip />
-                <Area type="monotone" dataKey="demand" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.3} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+          {chartData.length > 0 && (
+            <div className="pt-4 border-t">
+              <h4 className="text-sm font-medium mb-3">일별 수요 예측 차트</h4>
+              <ResponsiveContainer width="100%" height={200}>
+                <AreaChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Area type="monotone" dataKey="demand" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.3} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -114,17 +166,25 @@ export function DemandForecastResult({
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {demandDrivers.map((driver, idx) => (
-                <div key={idx} className="p-3 bg-muted/50 rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-sm">{driver.factor}</span>
-                    <Badge variant={driver.impact === 'positive' ? 'default' : 'destructive'}>
-                      {driver.impact === 'positive' ? `+${driver.magnitude}%` : `${driver.magnitude}%`}
-                    </Badge>
+              {demandDrivers.map((driver, idx) => {
+                const magnitude = safeNumber(driver.magnitude);
+                const isPositive = driver.impact === 'positive' || magnitude > 0;
+                const displayMagnitude = Math.abs(magnitude);
+                
+                return (
+                  <div key={idx} className="p-3 bg-muted/50 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium text-sm">{driver.factor || '요인 ' + (idx + 1)}</span>
+                      <Badge variant={isPositive ? 'default' : 'destructive'}>
+                        {isPositive ? '+' : '-'}{displayMagnitude}%
+                      </Badge>
+                    </div>
+                    {driver.explanation && (
+                      <p className="text-xs text-muted-foreground">{driver.explanation}</p>
+                    )}
                   </div>
-                  <p className="text-xs text-muted-foreground">{driver.explanation}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -141,29 +201,36 @@ export function DemandForecastResult({
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {topProducts.slice(0, 10).map((product, idx) => (
-                <div key={idx} className="flex items-center justify-between py-2 px-3 bg-muted/50 rounded-lg">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{product.name}</p>
-                    <p className="text-xs text-muted-foreground">SKU: {product.sku}</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <p className="text-sm font-bold">{product.predictedDemand}개</p>
-                      <p className="text-xs text-muted-foreground">신뢰도 {(product.confidence * 100).toFixed(0)}%</p>
+              {topProducts.slice(0, 10).map((product, idx) => {
+                const productName = product.name || product.productName || `상품 ${idx + 1}`;
+                const confidence = safeNumber(product.confidence);
+                const confidencePercent = confidence > 1 ? confidence : confidence * 100;
+                const trend = product.trend || 'stable';
+                
+                return (
+                  <div key={idx} className="flex items-center justify-between py-2 px-3 bg-muted/50 rounded-lg">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{productName}</p>
+                      <p className="text-xs text-muted-foreground">SKU: {product.sku || 'N/A'}</p>
                     </div>
-                    <Badge variant={
-                      product.trend === 'up' ? 'default' : 
-                      product.trend === 'down' ? 'destructive' : 
-                      'secondary'
-                    }>
-                      {product.trend === 'up' && <TrendingUp className="w-3 h-3 mr-1" />}
-                      {product.trend === 'down' && <TrendingDown className="w-3 h-3 mr-1" />}
-                      {product.trend === 'up' ? '증가' : product.trend === 'down' ? '감소' : '안정'}
-                    </Badge>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <p className="text-sm font-bold">{safeNumber(product.predictedDemand)}개</p>
+                        <p className="text-xs text-muted-foreground">신뢰도 {safeToFixed(confidencePercent, 0)}%</p>
+                      </div>
+                      <Badge variant={
+                        trend === 'up' ? 'default' : 
+                        trend === 'down' ? 'destructive' : 
+                        'secondary'
+                      }>
+                        {trend === 'up' && <TrendingUp className="w-3 h-3 mr-1" />}
+                        {trend === 'down' && <TrendingDown className="w-3 h-3 mr-1" />}
+                        {trend === 'up' ? '증가' : trend === 'down' ? '감소' : '안정'}
+                      </Badge>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -190,7 +257,7 @@ export function DemandForecastResult({
         </Card>
       )}
 
-      {(forecastData.peakDays && forecastData.peakDays.length > 0) && (
+      {normalizedForecastData.peakDays.length > 0 && (
         <Card className="border-orange-200 bg-orange-50 dark:bg-orange-950/20">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -200,10 +267,10 @@ export function DemandForecastResult({
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
-              {forecastData.peakDays.map((day, idx) => (
+              {normalizedForecastData.peakDays.map((day, idx) => (
                 <Badge key={idx} variant="outline" className="gap-1">
                   <Calendar className="w-3 h-3" />
-                  {new Date(day).toLocaleDateString('ko-KR')}
+                  {day ? new Date(day).toLocaleDateString('ko-KR') : `Day ${idx + 1}`}
                 </Badge>
               ))}
             </div>
