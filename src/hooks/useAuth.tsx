@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase";
@@ -309,8 +310,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error };
   };
 
+  // ✅ 강화된 로그아웃 함수
   const signOut = async () => {
-    // 로그아웃 전 활동 로깅 (실패해도 무시)
+    // 1. 먼저 로컬 스토리지 정리 (이게 가장 중요!)
+    try {
+      const keysToRemove = Object.keys(localStorage).filter(k => 
+        k.includes('supabase') || k.includes('sb-')
+      );
+      keysToRemove.forEach(k => localStorage.removeItem(k));
+      
+      const sessionKeysToRemove = Object.keys(sessionStorage).filter(k => 
+        k.includes('supabase') || k.includes('sb-')
+      );
+      sessionKeysToRemove.forEach(k => sessionStorage.removeItem(k));
+    } catch (err) {
+      console.debug('Storage cleanup error:', err);
+    }
+
+    // 2. 로그아웃 전 활동 로깅 (실패해도 무시)
     if (user?.id && orgId) {
       try {
         await supabase
@@ -328,23 +345,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
     
-    // ✅ 로그아웃은 항상 실행 (try-catch로 감싸서 에러 방지)
+    // 3. Supabase 로그아웃 시도 (실패해도 무시 - 세션이 이미 만료됐을 수 있음)
     try {
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: 'local' }); // local만 정리 (서버 에러 방지)
     } catch (err) {
-      console.error('SignOut error:', err);
+      console.debug('SignOut API error (ignored):', err);
     }
     
-    // ✅ localStorage/sessionStorage 강제 정리
-    try {
-      Object.keys(localStorage).filter(k => k.includes('supabase')).forEach(k => localStorage.removeItem(k));
-      Object.keys(sessionStorage).filter(k => k.includes('supabase')).forEach(k => sessionStorage.removeItem(k));
-    } catch (err) {
-      console.debug('Storage cleanup error:', err);
-    }
+    // 4. 상태 초기화
+    setUser(null);
+    setSession(null);
+    setOrgId(null);
+    setOrgName(null);
+    setRole(null);
+    setLicenseId(null);
+    setLicenseType(null);
+    setLicenseStatus(null);
     
-    // ✅ 항상 auth 페이지로 이동
-    navigate("/auth");
+    // 5. 항상 auth 페이지로 이동 (강제 리다이렉트)
+    window.location.href = '/auth';
   };
 
   const resetPassword = async (email: string) => {
