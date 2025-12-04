@@ -8,4 +8,4 @@ export * from './wifiDataProcessing';
 export * from './cleanupEntityReferences';
 export * from './verifyAndCleanupModelUrls';
 export { exportSimulationResult, default as simulationExporter } from './simulationExporter';
-export type { ExportFormat, SimulationType, ExportOptions } from './simulationExporter';
+export type { ExportFormat, SimulationType as UtilSimulationType } from './simulationExporter';

@@ -109,7 +109,7 @@ export function useSimulationHistory(): UseSimulationHistoryReturn {
         tags,
       };
 
-      const { data, error: insertError } = await supabase
+      const { data, error: insertError } = await (supabase as any)
         .from('simulation_history')
         .insert(historyItem)
         .select('id')
@@ -196,7 +196,7 @@ export function useSimulationHistory(): UseSimulationHistoryReturn {
     setError(null);
 
     try {
-      let query = supabase
+      let query = (supabase as any)
         .from('simulation_history')
         .select('*')
         .eq('user_id', user.id)
@@ -280,7 +280,7 @@ export function useSimulationHistory(): UseSimulationHistoryReturn {
     }
 
     try {
-      const { error: deleteError } = await supabase
+      const { error: deleteError } = await (supabase as any)
         .from('simulation_history')
         .delete()
         .eq('id', id);
@@ -312,7 +312,7 @@ export function useSimulationHistory(): UseSimulationHistoryReturn {
     }
 
     try {
-      const { error: updateError } = await supabase
+      const { error: updateError } = await (supabase as any)
         .from('simulation_history')
         .update({ note })
         .eq('id', id);
@@ -347,7 +347,7 @@ export function useSimulationHistory(): UseSimulationHistoryReturn {
       const existingItem = history.find(h => h.id === id);
       const newTags = [...(existingItem?.tags || []), ...tags];
 
-      const { error: updateError } = await supabase
+      const { error: updateError } = await (supabase as any)
         .from('simulation_history')
         .update({ tags: newTags })
         .eq('id', id);
