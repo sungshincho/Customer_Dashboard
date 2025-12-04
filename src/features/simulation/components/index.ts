@@ -2,6 +2,8 @@ export { DemandForecastResult } from './DemandForecastResult';
 export { InventoryOptimizationResult } from './InventoryOptimizationResult';
 export { PricingOptimizationResult } from './PricingOptimizationResult';
 export { RecommendationStrategyResult } from './RecommendationStrategyResult';
+export { OntologyInsightChart } from './OntologyInsightChart';
+export { SimulationHistoryPanel } from './SimulationHistoryPanel';
 
 // Digital Twin components
 export * from './digital-twin';
