@@ -310,7 +310,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    // 로그아웃 전 활동 로깅
+    // 로그아웃 전 활동 로깅 (실패해도 무시)
     if (user?.id && orgId) {
       try {
         await supabase
@@ -328,7 +328,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
     
-    await supabase.auth.signOut();
+    // ✅ 로그아웃은 항상 실행 (try-catch로 감싸서 에러 방지)
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error('SignOut error:', err);
+    }
+    
+    // ✅ localStorage/sessionStorage 강제 정리
+    try {
+      Object.keys(localStorage).filter(k => k.includes('supabase')).forEach(k => localStorage.removeItem(k));
+      Object.keys(sessionStorage).filter(k => k.includes('supabase')).forEach(k => sessionStorage.removeItem(k));
+    } catch (err) {
+      console.debug('Storage cleanup error:', err);
+    }
+    
+    // ✅ 항상 auth 페이지로 이동
     navigate("/auth");
   };
 
