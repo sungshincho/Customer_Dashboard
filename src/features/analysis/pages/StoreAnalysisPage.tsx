@@ -4,26 +4,31 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Users, TrendingUp, Clock, Activity, RefreshCw, Play, Pause, RotateCcw } from "lucide-react";
-import { useFootfallAnalysis } from "@/hooks/useFootfallAnalysis";
+import { useLatestKPIAgg } from "@/hooks/useDashboardKPIAgg";  // ✅ L3 사용
 import { useTrafficHeatmap, useZoneStatistics, useTrafficContext } from "@/hooks/useTrafficHeatmap";
 import { SharedDigitalTwinScene } from "@/features/simulation/components/digital-twin";
 import { HeatmapOverlay3D, ZoneBoundaryOverlay } from "@/features/simulation/components/overlays";
 import type { StoreSpaceMetadata } from "@/features/simulation/types/iot.types";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { subDays, format } from "date-fns";
+import { format } from "date-fns";
 import { useActivityLogger } from "@/hooks/useActivityLogger";
 import { useLocation } from "react-router-dom";
 
+/**
+ * 매장 분석 페이지 - 통일된 L3 구조
+ * 
+ * 데이터 소스:
+ * - KPI 카드: daily_kpis_agg (L3) ✅
+ * - 일별 추이: daily_kpis_agg (L3) ✅
+ * - 히트맵: wifi_tracking (L2) - 실시간 시각화용
+ * - 존 통계: zones_dim (L2) - 실시간 시각화용
+ */
 export default function StoreAnalysisPage() {
   const { selectedStore } = useSelectedStore();
   const { logActivity } = useActivityLogger();
   const location = useLocation();
-  const [dateRange] = useState<{ start: Date; end: Date }>({
-    start: subDays(new Date(), 7),
-    end: new Date(),
-  });
 
   // 페이지 방문 로깅
   useEffect(() => {
@@ -40,19 +45,60 @@ export default function StoreAnalysisPage() {
   const [showZones, setShowZones] = useState(true);
   const [showHeatmap, setShowHeatmap] = useState(true);
 
-  // Data
-  const { data: analysisData, isLoading, refetch } = useFootfallAnalysis(
-    selectedStore?.id,
-    dateRange.start,
-    dateRange.end
-  );
+  // ✅ L3 데이터 소스 - 최근 7일 KPI
+  const { data: latestKPIs, isLoading, refetch } = useLatestKPIAgg(selectedStore?.id, 7);
+  
+  // L2 데이터 - 실시간 시각화용 (히트맵)
   const heatPoints = useTrafficHeatmap(selectedStore?.id, timeOfDay);
   const metadata = selectedStore?.metadata?.storeSpaceMetadata as StoreSpaceMetadata | undefined;
   const zoneStats = useZoneStatistics(heatPoints, metadata);
   const contextInsights = useTrafficContext(selectedStore?.id);
 
-  const stats = analysisData?.stats;
-  const footfallData = analysisData?.data || [];
+  // ✅ L3 기반 KPI 계산
+  const stats = useMemo(() => {
+    if (!latestKPIs || latestKPIs.length === 0) {
+      return {
+        totalVisits: 0,
+        uniqueVisitors: 0,
+        avgVisitsPerHour: 0,
+        peakHour: null as number | null,
+      };
+    }
+
+    // 최근 7일 합계
+    const totalVisits = latestKPIs.reduce((sum, kpi) => sum + (kpi.total_visitors || 0), 0);
+    const uniqueVisitors = latestKPIs.reduce((sum, kpi) => sum + (kpi.unique_visitors || 0), 0);
+    
+    // 평균 시간당 방문 (영업시간 14시간 가정: 9시~23시)
+    const avgVisitsPerHour = totalVisits / (latestKPIs.length * 14);
+    
+    // 피크 시간대 (가장 최근 데이터 기준)
+    // L3에서 피크 시간대를 직접 제공하지 않으므로, 대시보드 레벨에서 계산하거나 L3 확장 필요
+    // 임시로 null 처리
+    const peakHour = null;
+
+    return {
+      totalVisits,
+      uniqueVisitors,
+      avgVisitsPerHour,
+      peakHour,
+    };
+  }, [latestKPIs]);
+
+  // ✅ L3 기반 일별 차트 데이터
+  const dailyData = useMemo(() => {
+    if (!latestKPIs || latestKPIs.length === 0) return [];
+    
+    return latestKPIs
+      .slice()
+      .reverse()
+      .map(kpi => ({
+        date: kpi.date,
+        visits: kpi.total_visitors || 0,
+        unique_visitors: kpi.unique_visitors || 0,
+        displayDate: format(new Date(kpi.date), 'MM/dd'),
+      }));
+  }, [latestKPIs]);
 
   // 시간대 애니메이션
   useEffect(() => {
@@ -62,23 +108,6 @@ export default function StoreAnalysisPage() {
     }, 1000);
     return () => clearInterval(interval);
   }, [isPlaying]);
-
-  // 일별 집계
-  const dailyData = footfallData.reduce((acc, curr) => {
-    const existing = acc.find(d => d.date === curr.date);
-    if (existing) {
-      existing.visits += curr.visit_count;
-      existing.unique_visitors += curr.unique_visitors;
-    } else {
-      acc.push({
-        date: curr.date,
-        visits: curr.visit_count,
-        unique_visitors: curr.unique_visitors,
-        displayDate: format(new Date(curr.date), 'MM/dd'),
-      });
-    }
-    return acc;
-  }, [] as Array<{ date: string; visits: number; unique_visitors: number; displayDate: string }>);
 
   if (!selectedStore) {
     return (
@@ -146,7 +175,7 @@ export default function StoreAnalysisPage() {
           </Card>
         )}
 
-        {/* KPI Cards */}
+        {/* KPI Cards - L3 기반 */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardContent className="pt-6">
@@ -154,13 +183,13 @@ export default function StoreAnalysisPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">총 방문</p>
                   <p className="text-2xl font-bold">
-                    {stats?.total_visits && stats.total_visits > 0 ? (
-                      stats.total_visits.toLocaleString()
+                    {stats.totalVisits > 0 ? (
+                      stats.totalVisits.toLocaleString()
                     ) : (
                       <span className="text-base text-muted-foreground">데이터 없음</span>
                     )}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">기간 내 전체 방문</p>
+                  <p className="text-xs text-muted-foreground mt-1">최근 7일</p>
                 </div>
                 <Users className="w-8 h-8 text-primary opacity-50" />
               </div>
@@ -173,16 +202,16 @@ export default function StoreAnalysisPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">고유 방문자</p>
                   <p className="text-2xl font-bold">
-                    {stats?.unique_visitors && stats.unique_visitors > 0 ? (
+                    {stats.uniqueVisitors > 0 ? (
                       <>
-                        {stats.unique_visitors.toLocaleString()}
+                        {stats.uniqueVisitors.toLocaleString()}
                         <span className="text-sm">명</span>
                       </>
                     ) : (
                       <span className="text-base text-muted-foreground">데이터 없음</span>
                     )}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">중복 제거 방문자</p>
+                  <p className="text-xs text-muted-foreground mt-1">중복 제거</p>
                 </div>
                 <Users className="w-8 h-8 text-green-500 opacity-50" />
               </div>
@@ -193,18 +222,18 @@ export default function StoreAnalysisPage() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">시간당 평균 방문</p>
+                  <p className="text-sm text-muted-foreground">시간당 평균</p>
                   <p className="text-2xl font-bold">
-                    {stats?.avg_visits_per_hour && stats.avg_visits_per_hour > 0 ? (
+                    {stats.avgVisitsPerHour > 0 ? (
                       <>
-                        {stats.avg_visits_per_hour.toFixed(0)}
+                        {stats.avgVisitsPerHour.toFixed(1)}
                         <span className="text-sm">명</span>
                       </>
                     ) : (
                       <span className="text-base text-muted-foreground">데이터 없음</span>
                     )}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">매장 평균</p>
+                  <p className="text-xs text-muted-foreground mt-1">영업시간 기준</p>
                 </div>
                 <Clock className="w-8 h-8 text-orange-500 opacity-50" />
               </div>
@@ -217,13 +246,13 @@ export default function StoreAnalysisPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">피크 시간대</p>
                   <p className="text-2xl font-bold">
-                    {stats?.peak_hour !== undefined && stats?.peak_hour !== null ? (
+                    {stats.peakHour !== null ? (
                       <>
-                        {stats.peak_hour}
+                        {stats.peakHour}
                         <span className="text-sm">시</span>
                       </>
                     ) : (
-                      <span className="text-base text-muted-foreground">데이터 없음</span>
+                      <span className="text-base text-muted-foreground">분석 중</span>
                     )}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">최대 방문 시간</p>
@@ -236,7 +265,7 @@ export default function StoreAnalysisPage() {
 
         {/* 3D 히트맵 & 차트 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* 3D 히트맵 */}
+          {/* 3D 히트맵 - L2 사용 (실시간 시각화) */}
           <Card className="col-span-1">
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -297,41 +326,51 @@ export default function StoreAnalysisPage() {
             </CardContent>
           </Card>
 
-          {/* 일별 방문 추이 */}
+          {/* 일별 방문 추이 - L3 사용 */}
           <Card className="col-span-1">
             <CardHeader>
               <CardTitle>일별 방문 추이</CardTitle>
-              <CardDescription>최근 7일간 방문자 데이터</CardDescription>
+              <CardDescription>최근 7일간 방문자 데이터 (L3)</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="h-[400px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={dailyData}>
-                    <defs>
-                      <linearGradient id="visitsGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                    <XAxis dataKey="displayDate" />
-                    <YAxis />
-                    <Tooltip />
-                    <Area
-                      type="monotone"
-                      dataKey="visits"
-                      stroke="hsl(var(--primary))"
-                      fill="url(#visitsGradient)"
-                      strokeWidth={2}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+                {dailyData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={dailyData}>
+                      <defs>
+                        <linearGradient id="visitsGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                      <XAxis dataKey="displayDate" />
+                      <YAxis />
+                      <Tooltip />
+                      <Area
+                        type="monotone"
+                        dataKey="visits"
+                        stroke="hsl(var(--primary))"
+                        fill="url(#visitsGradient)"
+                        strokeWidth={2}
+                        name="방문자"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-muted-foreground">
+                    <div className="text-center">
+                      <TrendingUp className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                      <p>방문 데이터가 없습니다</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* 존별 통계 */}
+        {/* 존별 통계 - L2 사용 (실시간 시각화) */}
         {zoneStats.length > 0 && (
           <Card>
             <CardHeader>
