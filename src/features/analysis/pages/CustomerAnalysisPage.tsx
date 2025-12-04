@@ -8,11 +8,15 @@ import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { useState, useEffect, useMemo } from "react";
 import { Users, TrendingUp, DollarSign, Clock, RefreshCw, Play, Pause, RotateCcw, ChevronRight } from "lucide-react";
 import { useCustomerJourney, useJourneyStatistics } from "@/hooks/useCustomerJourney";
-import { useSegmentStats } from "@/hooks/useCustomerSegmentsAgg";  // ✅ L3 사용
-import { useFunnelAnalysis } from "@/hooks/useFunnelAnalysis";     // ✅ L2 funnel_events 사용
-import { useLatestKPIAgg } from "@/hooks/useDashboardKPIAgg";       // ✅ L3 사용
+import { useSegmentStats } from "@/hooks/useCustomerSegmentsAgg"; // ✅ L3 사용
+import { useFunnelAnalysis } from "@/hooks/useFunnelAnalysis"; // ✅ L2 funnel_events 사용
+import { useLatestKPIAgg } from "@/hooks/useDashboardKPIAgg"; // ✅ L3 사용
 import { SharedDigitalTwinScene } from "@/features/simulation/components/digital-twin";
-import { CustomerPathOverlay, CustomerAvatarOverlay, ZoneBoundaryOverlay } from "@/features/simulation/components/overlays";
+import {
+  CustomerPathOverlay,
+  CustomerAvatarOverlay,
+  ZoneBoundaryOverlay,
+} from "@/features/simulation/components/overlays";
 import type { StoreSpaceMetadata } from "@/features/simulation/types/iot.types";
 import type { CustomerAvatar } from "@/features/simulation/types/avatar.types";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
@@ -22,7 +26,7 @@ import { subDays } from "date-fns";
 
 /**
  * 고객 분석 페이지 - 통일된 L3 구조
- * 
+ *
  * 데이터 소스:
  * - KPI 카드: daily_kpis_agg + customer_segments_agg (L3) ✅
  * - 전환 퍼널: funnel_events (L2) ✅ - 하드코딩 제거
@@ -34,31 +38,39 @@ export default function CustomerAnalysisPage() {
   const { selectedStore } = useSelectedStore();
   const { logActivity } = useActivityLogger();
   const location = useLocation();
-  
+
   // 페이지 방문 로깅
   useEffect(() => {
-    logActivity('page_view', { 
+    logActivity("page_view", {
       page: location.pathname,
-      page_name: 'Customer Analysis',
-      timestamp: new Date().toISOString() 
+      page_name: "Customer Analysis",
+      timestamp: new Date().toISOString(),
     });
   }, [location.pathname]);
-  
+
   // 3D Journey Controls
   const [timeOfDay, setTimeOfDay] = useState(14);
   const [isPlaying, setIsPlaying] = useState(false);
 
   // ✅ L3 데이터 소스 - 세그먼트 통계
   const { stats: segmentStats, totalCustomers, isLoading: segmentsLoading } = useSegmentStats(selectedStore?.id);
-  
+
   // ✅ L3 데이터 소스 - 최근 7일 KPI (전환율, 구매 패턴용)
   const { data: latestKPIs, isLoading: kpisLoading } = useLatestKPIAgg(selectedStore?.id, 7);
-  
+
   // ✅ L2 데이터 소스 - 퍼널 분석 (하드코딩 제거)
+  const dateRange = useMemo(
+    () => ({
+      start: subDays(new Date(), 7),
+      end: new Date(),
+    }),
+    [],
+  );
+
   const { data: funnelData, isLoading: funnelLoading } = useFunnelAnalysis(
     selectedStore?.id,
-    subDays(new Date(), 7),
-    new Date()
+    dateRange.start,
+    dateRange.end,
   );
 
   // L2 데이터 - 실시간 시각화용 (고객 여정 3D)
@@ -77,9 +89,10 @@ export default function CustomerAnalysisPage() {
 
     // 최근 7일 평균 전환율
     const avgConversion = latestKPIs.reduce((sum, kpi) => sum + (kpi.conversion_rate || 0), 0) / latestKPIs.length;
-    
+
     // 최근 7일 평균 객단가
-    const avgTransaction = latestKPIs.reduce((sum, kpi) => sum + (kpi.avg_transaction_value || 0), 0) / latestKPIs.length;
+    const avgTransaction =
+      latestKPIs.reduce((sum, kpi) => sum + (kpi.avg_transaction_value || 0), 0) / latestKPIs.length;
 
     return {
       conversionRate: avgConversion,
@@ -92,29 +105,29 @@ export default function CustomerAnalysisPage() {
     if (!funnelData || funnelData.totalEntries === 0) return [];
 
     const stageLabels: Record<string, string> = {
-      entry: '유입',
-      browse: '체류',
-      engage: '체험',
-      fitting: '피팅',
-      purchase: '구매',
+      entry: "유입",
+      browse: "체류",
+      engage: "체험",
+      fitting: "피팅",
+      purchase: "구매",
     };
 
     const stageColors: Record<string, string> = {
-      entry: 'hsl(var(--primary))',
-      browse: '#3b82f6',
-      engage: '#10b981',
-      fitting: '#f59e0b',
-      purchase: '#8b5cf6',
+      entry: "hsl(var(--primary))",
+      browse: "#3b82f6",
+      engage: "#10b981",
+      fitting: "#f59e0b",
+      purchase: "#8b5cf6",
     };
 
     return funnelData.stages
-      .filter(stage => stage.count > 0 || stage.event_type === 'entry')
-      .map(stage => ({
+      .filter((stage) => stage.count > 0 || stage.event_type === "entry")
+      .map((stage) => ({
         stage: stage.event_type,
         label: stageLabels[stage.event_type] || stage.event_type,
         count: stage.count,
         rate: Math.round(stage.conversion_rate),
-        color: stageColors[stage.event_type] || '#666',
+        color: stageColors[stage.event_type] || "#666",
       }));
   }, [funnelData]);
 
@@ -123,21 +136,21 @@ export default function CustomerAnalysisPage() {
     if (!segmentStats) return [];
 
     return [
-      { segment: 'VIP', count: segmentStats.vip.count, revenue: segmentStats.vip.totalRevenue },
-      { segment: 'Regular', count: segmentStats.regular.count, revenue: segmentStats.regular.totalRevenue },
-      { segment: 'New', count: segmentStats.new.count, revenue: segmentStats.new.totalRevenue },
-      { segment: 'Churning', count: segmentStats.churning.count, revenue: segmentStats.churning.totalRevenue },
-    ].filter(s => s.count > 0);
+      { segment: "VIP", count: segmentStats.vip.count, revenue: segmentStats.vip.totalRevenue },
+      { segment: "Regular", count: segmentStats.regular.count, revenue: segmentStats.regular.totalRevenue },
+      { segment: "New", count: segmentStats.new.count, revenue: segmentStats.new.totalRevenue },
+      { segment: "Churning", count: segmentStats.churning.count, revenue: segmentStats.churning.totalRevenue },
+    ].filter((s) => s.count > 0);
   }, [segmentStats]);
 
   // ✅ L3 기반 일별 구매 패턴 (daily_kpis_agg)
   const purchasePatternData = useMemo(() => {
     if (!latestKPIs || latestKPIs.length === 0) return [];
 
-    const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+    const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
     const weeklyMap = new Map<string, { count: number; revenue: number }>();
 
-    latestKPIs.forEach(kpi => {
+    latestKPIs.forEach((kpi) => {
       const dayIndex = new Date(kpi.date).getDay();
       const day = weekdays[dayIndex];
       const current = weeklyMap.get(day) || { count: 0, revenue: 0 };
@@ -147,7 +160,7 @@ export default function CustomerAnalysisPage() {
       });
     });
 
-    return weekdays.map(day => ({
+    return weekdays.map((day) => ({
       day,
       ...(weeklyMap.get(day) || { count: 0, revenue: 0 }),
     }));
@@ -163,16 +176,16 @@ export default function CustomerAnalysisPage() {
   }, [isPlaying]);
 
   // Convert paths for overlay
-  const pathPoints = paths.map(path => 
-    path.points.map(p => ({ x: p.x, y: 0.1, z: p.z, timestamp: new Date(p.timestamp).getTime() }))
+  const pathPoints = paths.map((path) =>
+    path.points.map((p) => ({ x: p.x, y: 0.1, z: p.z, timestamp: new Date(p.timestamp).getTime() })),
   );
 
-  const customerAvatars: CustomerAvatar[] = currentPositions.map(pos => ({
+  const customerAvatars: CustomerAvatar[] = currentPositions.map((pos) => ({
     id: pos.session_id,
     position: { x: pos.x, y: 0, z: pos.z },
     velocity: { x: 0, z: 0 },
-    status: 'browsing' as const,
-    lastUpdated: new Date(pos.timestamp).getTime()
+    status: "browsing" as const,
+    lastUpdated: new Date(pos.timestamp).getTime(),
   }));
 
   const isLoading = segmentsLoading || kpisLoading || funnelLoading;
@@ -184,9 +197,7 @@ export default function CustomerAnalysisPage() {
           <Card className="max-w-md">
             <CardHeader>
               <CardTitle>매장을 선택해주세요</CardTitle>
-              <CardDescription>
-                분석을 시작하려면 상단에서 매장을 먼저 선택해주세요.
-              </CardDescription>
+              <CardDescription>분석을 시작하려면 상단에서 매장을 먼저 선택해주세요.</CardDescription>
             </CardHeader>
           </Card>
         </div>
@@ -214,9 +225,7 @@ export default function CustomerAnalysisPage() {
         <div className="flex items-center justify-between animate-fade-in">
           <div>
             <h1 className="text-3xl font-bold gradient-text">고객 분석</h1>
-            <p className="text-muted-foreground mt-2">
-              고객 여정, 전환 퍼널, 세그먼트를 분석하세요
-            </p>
+            <p className="text-muted-foreground mt-2">고객 여정, 전환 퍼널, 세그먼트를 분석하세요</p>
           </div>
           <Button onClick={() => window.location.reload()} variant="outline" size="sm">
             <RefreshCw className="w-4 h-4 mr-2" />
@@ -233,7 +242,9 @@ export default function CustomerAnalysisPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">고객 세그먼트</p>
                   <p className="text-2xl font-bold">
-                    {segmentChartData.length > 0 ? segmentChartData.length : (
+                    {segmentChartData.length > 0 ? (
+                      segmentChartData.length
+                    ) : (
                       <span className="text-base text-muted-foreground">데이터 없음</span>
                     )}
                   </p>
@@ -325,7 +336,14 @@ export default function CustomerAnalysisPage() {
                   <Button variant="outline" size="sm" onClick={() => setIsPlaying(!isPlaying)}>
                     {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => { setIsPlaying(false); setTimeOfDay(14); }}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setIsPlaying(false);
+                      setTimeOfDay(14);
+                    }}
+                  >
                     <RotateCcw className="w-4 h-4" />
                   </Button>
                 </div>
@@ -336,13 +354,7 @@ export default function CustomerAnalysisPage() {
                 <span className="text-sm text-muted-foreground">시간대: {timeOfDay}:00</span>
                 <Badge variant="outline">{currentPositions.length}명 활동 중</Badge>
               </div>
-              <Slider
-                value={[timeOfDay]}
-                onValueChange={([val]) => setTimeOfDay(val)}
-                min={9}
-                max={23}
-                step={1}
-              />
+              <Slider value={[timeOfDay]} onValueChange={([val]) => setTimeOfDay(val)} min={9} max={23} step={1} />
               <div className="h-[400px] rounded-lg border bg-muted/20">
                 <SharedDigitalTwinScene
                   overlayType="none"
@@ -387,9 +399,11 @@ export default function CustomerAnalysisPage() {
                       <div className="flex items-center gap-2 ml-4 text-xs text-muted-foreground">
                         <ChevronRight className="w-3 h-3" />
                         <span>
-                          다음 단계로 {funnelStages[idx + 1].count > 0 && item.count > 0 
-                            ? Math.round((funnelStages[idx + 1].count / item.count) * 100) 
-                            : 0}% 전환
+                          다음 단계로{" "}
+                          {funnelStages[idx + 1].count > 0 && item.count > 0
+                            ? Math.round((funnelStages[idx + 1].count / item.count) * 100)
+                            : 0}
+                          % 전환
                         </span>
                       </div>
                     )}
@@ -440,7 +454,7 @@ export default function CustomerAnalysisPage() {
             </CardHeader>
             <CardContent>
               <div className="h-[300px]">
-                {purchasePatternData.some(d => d.count > 0) ? (
+                {purchasePatternData.some((d) => d.count > 0) ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={purchasePatternData}>
                       <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
