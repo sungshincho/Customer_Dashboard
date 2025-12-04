@@ -1,24 +1,12 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Sparkles, 
-  Grid3x3, 
-  TrendingUp, 
-  DollarSign, 
-  Target, 
-  Package, 
-  Info,
-  Brain,
-  Network,
-  History,
-  BarChart3,
-  Save,
-} from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Sparkles, Grid3x3, TrendingUp, DollarSign, Target, Package, RefreshCw, Loader2 } from 'lucide-react';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
+import { useAIInference, useStoreContext } from '../hooks';
 import { toast } from 'sonner';
 import { SharedDigitalTwinScene } from "@/features/simulation/components/digital-twin";
 import { DemandForecastResult } from '../components/DemandForecastResult';
@@ -28,251 +16,143 @@ import { RecommendationStrategyResult } from '../components/RecommendationStrate
 import { useActivityLogger } from "@/hooks/useActivityLogger";
 import { useLocation } from "react-router-dom";
 
-// v2 컴포넌트들
-import { DataSourceMappingCard } from '../components/DataSourceMappingCard';
-import { 
-  AIModelSelector, 
-  defaultScenarios, 
-  defaultParameters,
-  type SimulationScenario,
-  type SimulationParameters,
-  type SimulationScenarioConfig
-} from '../components/AIModelSelector';
-import { 
-  SimulationResultCard, 
-  SimulationResultGrid,
-  type SimulationResultMeta
-} from '../components/SimulationResultCard';
-
-// Phase 2: 데이터 소스 매핑 Hook
-import { useDataSourceMapping } from '../hooks/useDataSourceMapping';
-
-// Phase 3: 온톨로지 강화 AI 추론 Hook
-import { useEnhancedAIInference } from '../hooks/useEnhancedAIInference';
-
-// Phase 4: 내보내기, 히스토리, 시각화
-import { exportSimulationResult } from '../utils/simulationExporter';
-import { useSimulationHistory } from '../hooks/useSimulationHistory';
-import { OntologyInsightChart } from '../components/OntologyInsightChart';
-import { SimulationHistoryPanel } from '../components/SimulationHistoryPanel';
-
-/**
- * SimulationHubPage v2.3
- * 
- * Phase 4 업데이트:
- * - 실제 내보내기 기능 (CSV, PDF, JSON)
- * - 시뮬레이션 히스토리 저장 및 비교
- * - 온톨로지 인사이트 시각화 차트
- */
 export default function SimulationHubPage() {
   const { selectedStore } = useSelectedStore();
   const { logActivity } = useActivityLogger();
   const location = useLocation();
-
-  // Phase 2: 데이터 소스 매핑
-  const {
-    importedData,
-    presetApis,
-    customApis,
-    mappingStatus,
-    loading: dataSourcesLoading,
-    refreshMapping,
-    connectApi,
-    disconnectApi,
-    configurePresetApi,
-    isAdmin,
-    hasMinimumData,
-  } = useDataSourceMapping();
-
-  // Phase 3: 온톨로지 강화 AI 추론
-  const {
-    loading: isInferring,
-    lastResult,
-    ontologyContext,
-    infer,
-    inferWithOntology,
-    loadOntologyContext,
-  } = useEnhancedAIInference();
-
-  // Phase 4: 히스토리
-  const {
-    history,
-    saveToHistory,
-  } = useSimulationHistory();
-
-  // 상태
-  const [useOntologyMode, setUseOntologyMode] = useState(true);
-  const [ontologyLoaded, setOntologyLoaded] = useState(false);
-  const [activeTab, setActiveTab] = useState<'simulation' | 'history' | 'insights'>('simulation');
-  const [autoSave, setAutoSave] = useState(true);
+  const { infer, loading: isInferring } = useAIInference();
+  const { contextData, loading: contextLoading } = useStoreContext(selectedStore?.id);
 
   // 페이지 방문 로깅
   useEffect(() => {
     logActivity('page_view', { 
       page: location.pathname,
-      page_name: 'Simulation Hub v2.3',
+      page_name: 'Simulation Hub',
       timestamp: new Date().toISOString() 
     });
   }, [location.pathname]);
 
-  // 온톨로지 컨텍스트 자동 로드
-  useEffect(() => {
-    if (selectedStore?.id && useOntologyMode && !ontologyLoaded) {
-      loadOntologyContext().then((context) => {
-        if (context) {
-          setOntologyLoaded(true);
-          toast.success(`온톨로지: ${context.entities.total}개 엔티티, ${context.relations.total}개 관계`);
-        }
-      });
-    }
-  }, [selectedStore?.id, useOntologyMode, ontologyLoaded, loadOntologyContext]);
-
-  useEffect(() => {
-    setOntologyLoaded(false);
-  }, [selectedStore?.id]);
-
-  // AI 모델 선택 상태
-  const [selectedScenarios, setSelectedScenarios] = useState<SimulationScenario[]>([
-    'demand', 'inventory', 'pricing', 'layout', 'marketing'
-  ]);
-  const [parameters, setParameters] = useState<SimulationParameters>(defaultParameters);
+  // Simulation results
+  const [demandForecast, setDemandForecast] = useState<any>(null);
+  const [layoutOptimization, setLayoutOptimization] = useState<any>(null);
+  const [inventoryOptimization, setInventoryOptimization] = useState<any>(null);
+  const [pricingOptimization, setPricingOptimization] = useState<any>(null);
+  const [recommendationStrategy, setRecommendationStrategy] = useState<any>(null);
   
-  const scenarios: SimulationScenarioConfig[] = useMemo(() => {
-    return defaultScenarios.map(scenario => ({
-      ...scenario,
-      enabled: hasMinimumData,
-    }));
-  }, [hasMinimumData]);
-
-  // 시뮬레이션 결과 상태
-  const [results, setResults] = useState<Record<SimulationScenario, any>>({
-    demand: null, inventory: null, pricing: null, layout: null, marketing: null,
-  });
-  
-  const [resultMeta, setResultMeta] = useState<Record<SimulationScenario, SimulationResultMeta>>({
-    demand: { status: 'idle' }, inventory: { status: 'idle' }, pricing: { status: 'idle' },
-    layout: { status: 'idle' }, marketing: { status: 'idle' },
+  const [loadingStates, setLoadingStates] = useState({
+    demand: false,
+    layout: false,
+    inventory: false,
+    pricing: false,
+    recommendation: false
   });
 
-  const [loadingStates, setLoadingStates] = useState<Record<SimulationScenario, boolean>>({
-    demand: false, inventory: false, pricing: false, layout: false, marketing: false,
-  });
-
-  // 핸들러
-  const handleScenarioToggle = useCallback((scenario: SimulationScenario) => {
-    setSelectedScenarios(prev => 
-      prev.includes(scenario) ? prev.filter(s => s !== scenario) : [...prev, scenario]
-    );
-  }, []);
-
-  const handleSelectAll = useCallback(() => {
-    setSelectedScenarios(scenarios.filter(s => s.enabled).map(s => s.id));
-  }, [scenarios]);
-
-  const handleDeselectAll = useCallback(() => {
-    setSelectedScenarios([]);
-  }, []);
-
-  const handleParameterChange = useCallback((params: Partial<SimulationParameters>) => {
-    setParameters(prev => ({ ...prev, ...params }));
-  }, []);
-
-  const buildStoreContext = useCallback(() => {
-    return {
-      storeInfo: selectedStore ? {
-        id: selectedStore.id,
-        name: selectedStore.store_name,
-        code: selectedStore.store_code,
-      } : null,
-      products: { count: importedData.find(d => d.id === 'products')?.recordCount || 0 },
-      inventory: { count: importedData.find(d => d.id === 'inventory')?.recordCount || 0 },
-      mappingStatus,
-    };
-  }, [selectedStore, importedData, mappingStatus]);
-
-  // 시뮬레이션 실행
-  const runSimulation = useCallback(async (type: SimulationScenario) => {
-    if (!selectedStore || !hasMinimumData) {
-      toast.error('매장 데이터가 충분하지 않습니다');
+  // 자동 시뮬레이션 실행
+  const runSimulation = async (type: 'demand' | 'layout' | 'inventory' | 'pricing' | 'recommendation') => {
+    if (!selectedStore || !contextData) {
+      toast.error('매장 데이터를 불러오는 중입니다');
       return;
     }
 
-    const startTime = Date.now();
     setLoadingStates(prev => ({ ...prev, [type]: true }));
-    setResultMeta(prev => ({ ...prev, [type]: { status: 'loading' } }));
 
     try {
-      const storeContext = buildStoreContext();
-      const inferFn = useOntologyMode ? inferWithOntology : infer;
-      
-      const result = await inferFn(type, {
-        dataRange: parameters.dataRange,
-        forecastPeriod: parameters.forecastPeriod,
-        confidenceLevel: parameters.confidenceLevel,
-        includeSeasonality: parameters.includeSeasonality,
-        includeExternalFactors: parameters.includeExternalFactors,
-      }, storeContext);
+      const result = await infer(type, {}, selectedStore.id, contextData);
       
       if (result) {
-        setResults(prev => ({ ...prev, [type]: result }));
-        setResultMeta(prev => ({
-          ...prev,
-          [type]: {
-            status: 'success',
-            executedAt: new Date().toISOString(),
-            processingTime: Date.now() - startTime,
-            confidenceScore: result.confidenceScore || parameters.confidenceLevel,
-          }
-        }));
-        
-        if (autoSave) {
-          await saveToHistory(type, parameters, result);
+        switch (type) {
+          case 'demand':
+            // demandForecast 내부 데이터와 최상위 데이터 모두 저장
+            const demandResult = result as any;
+            setDemandForecast({
+              demandForecast: demandResult.demandForecast || {},
+              demandDrivers: demandResult.demandDrivers || [],
+              topProducts: demandResult.topProducts || [],
+              recommendations: demandResult.recommendations || []  // 일반 텍스트 권장사항
+            });
+            break;
+          case 'layout':
+            setLayoutOptimization(result);
+            break;
+          case 'inventory':
+            // inventoryOptimization 내부 데이터와 최상위 recommendations(텍스트) 모두 저장
+            const invResult = result as any;
+            setInventoryOptimization({
+              recommendations: invResult.inventoryOptimization?.recommendations || [],
+              summary: invResult.inventoryOptimization?.summary || {},
+              textRecommendations: invResult.recommendations || []  // 일반 텍스트 권장사항
+            });
+            break;
+          case 'pricing':
+            // pricingOptimization 내부 데이터와 최상위 recommendations(텍스트) 모두 저장
+            const priceResult = result as any;
+            setPricingOptimization({
+              recommendations: priceResult.pricingOptimization?.recommendations || [],
+              summary: priceResult.pricingOptimization?.summary || {},
+              textRecommendations: priceResult.recommendations || []  // 일반 텍스트 권장사항
+            });
+            break;
+          case 'recommendation':
+            // recommendationStrategy 내부 데이터와 최상위 recommendations(텍스트) 모두 저장
+            const recResult = result as any;
+            setRecommendationStrategy({
+              strategies: recResult.recommendationStrategy?.strategies || [],
+              summary: recResult.recommendationStrategy?.summary || {},
+              performanceMetrics: recResult.performanceMetrics || [],
+              recommendations: recResult.recommendations || []  // 일반 텍스트 권장사항
+            });
+            break;
         }
+        
+        // Activity logging
+        logActivity('feature_use', {
+          feature: 'simulation_run',
+          simulation_type: type,
+          store_id: selectedStore.id,
+          store_name: selectedStore.store_name,
+          timestamp: new Date().toISOString()
+        });
         
         toast.success(`${getSimulationTitle(type)} 완료`);
       }
     } catch (error) {
-      setResultMeta(prev => ({
-        ...prev,
-        [type]: { status: 'error', errorMessage: error instanceof Error ? error.message : '오류' }
-      }));
+      console.error(`${type} simulation error:`, error);
       toast.error(`${getSimulationTitle(type)} 실패`);
     } finally {
       setLoadingStates(prev => ({ ...prev, [type]: false }));
     }
-  }, [selectedStore, hasMinimumData, parameters, useOntologyMode, infer, inferWithOntology, buildStoreContext, autoSave, saveToHistory]);
+  };
 
-  const runAllSimulations = useCallback(async () => {
-    if (!selectedStore || !hasMinimumData || selectedScenarios.length === 0) {
-      toast.error('시나리오를 선택하세요');
+  const runAllSimulations = async () => {
+    if (!selectedStore || !contextData) {
+      toast.error('매장을 선택하고 데이터를 불러온 후 시도하세요');
       return;
     }
-    toast.info(`${selectedScenarios.length}개 시뮬레이션 시작...`);
-    await Promise.all(selectedScenarios.map(type => runSimulation(type)));
-    toast.success('모든 시뮬레이션 완료');
-  }, [selectedStore, hasMinimumData, selectedScenarios, runSimulation]);
 
-  // 내보내기
-  const handleExport = useCallback(async (type: SimulationScenario, format: 'csv' | 'pdf' | 'json') => {
-    const result = results[type];
-    if (!result) { toast.error('결과 없음'); return; }
-    await exportSimulationResult(type, result, format);
-  }, [results]);
+    toast.info('전체 시뮬레이션을 시작합니다...');
+    
+    await Promise.all([
+      runSimulation('demand'),
+      runSimulation('layout'),
+      runSimulation('inventory'),
+      runSimulation('pricing'),
+      runSimulation('recommendation')
+    ]);
 
-  // 수동 저장
-  const handleManualSave = useCallback(async (type: SimulationScenario) => {
-    const result = results[type];
-    if (!result) { toast.error('저장할 결과 없음'); return; }
-    await saveToHistory(type, parameters, result);
-  }, [results, parameters, saveToHistory]);
+    toast.success('모든 시뮬레이션이 완료되었습니다');
+  };
 
   const getSimulationTitle = (type: string) => {
     const titles: Record<string, string> = {
-      demand: '수요 예측', layout: '레이아웃 최적화', inventory: '재고 최적화',
-      pricing: '가격 최적화', marketing: '마케팅 전략',
+      demand: '수요 예측',
+      layout: '레이아웃 최적화',
+      inventory: '재고 최적화',
+      pricing: '가격 최적화',
+      recommendation: '마케팅 전략'
     };
     return titles[type] || type;
   };
+
 
   return (
     <DashboardLayout>
@@ -283,242 +163,311 @@ export default function SimulationHubPage() {
             <h1 className="text-3xl font-bold flex items-center gap-2">
               <Sparkles className="h-8 w-8 text-primary" />
               시뮬레이션 허브
-              {useOntologyMode && (
-                <Badge variant="secondary" className="ml-2 gap-1">
-                  <Network className="h-3 w-3" />
-                  온톨로지
-                </Badge>
-              )}
             </h1>
             <p className="text-muted-foreground mt-2">
-              지식 그래프 기반 AI 추론으로 매장 운영 최적화
+              임포트된 데이터와 매장 현황을 AI가 자동 분석하여 최적화 방안을 제안합니다
             </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant={autoSave ? "default" : "outline"}
-              size="sm"
-              onClick={() => setAutoSave(!autoSave)}
-              className="gap-1"
-            >
-              <Save className="h-4 w-4" />
-              {autoSave ? '자동저장' : '수동저장'}
-            </Button>
-            <Button
-              variant={useOntologyMode ? "default" : "outline"}
-              size="sm"
-              onClick={() => setUseOntologyMode(!useOntologyMode)}
-              className="gap-1"
-            >
-              <Brain className="h-4 w-4" />
-              온톨로지 {useOntologyMode ? 'ON' : 'OFF'}
-            </Button>
-            {isAdmin && (
-              <Badge variant="outline" className="gap-1">
-                <Info className="h-3 w-3" />
-                관리자
-              </Badge>
+            {contextData && (
+              <div className="flex gap-2 mt-3">
+                <Badge variant="secondary">
+                  <Package className="h-3 w-3 mr-1" />
+                  엔티티 {contextData.entities.length}개
+                </Badge>
+                <Badge variant="secondary">
+                  상품 {contextData.products.length}개
+                </Badge>
+                <Badge variant="secondary">
+                  재고 {contextData.inventory.length}개
+                </Badge>
+                <Badge variant="secondary">
+                  KPI {contextData.recentKpis.length}일
+                </Badge>
+              </div>
             )}
           </div>
+          <Button 
+            onClick={runAllSimulations}
+            disabled={isInferring || Object.values(loadingStates).some(v => v)}
+            size="lg"
+          >
+            {contextLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                데이터 로딩 중...
+              </>
+            ) : isInferring ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                AI 분석 중...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                전체 재분석
+              </>
+            )}
+          </Button>
         </div>
 
-        {/* 탭 */}
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-          <TabsList>
-            <TabsTrigger value="simulation" className="gap-2">
-              <Sparkles className="h-4 w-4" />
-              시뮬레이션
-            </TabsTrigger>
-            <TabsTrigger value="history" className="gap-2">
-              <History className="h-4 w-4" />
-              히스토리
-              {history.length > 0 && <Badge variant="secondary">{history.length}</Badge>}
-            </TabsTrigger>
-            <TabsTrigger value="insights" className="gap-2">
-              <BarChart3 className="h-4 w-4" />
-              온톨로지 분석
-            </TabsTrigger>
-          </TabsList>
+        {!selectedStore && (
+          <Alert>
+            <AlertDescription>
+              매장을 선택하면 AI가 자동으로 데이터를 분석하여 최적화 방안을 제안합니다.
+            </AlertDescription>
+          </Alert>
+        )}
 
-          {/* 시뮬레이션 탭 */}
-          <TabsContent value="simulation" className="space-y-6 mt-6">
-            {useOntologyMode && ontologyContext && (
-              <Alert className="bg-primary/5 border-primary/20">
-                <Network className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>지식 그래프:</strong> {ontologyContext.entities.total}개 엔티티, {ontologyContext.relations.total}개 관계, {ontologyContext.patterns.frequentPairs.length}개 패턴
-                </AlertDescription>
-              </Alert>
+        {contextLoading && (
+          <Alert>
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <AlertDescription>
+              매장 데이터를 불러오는 중입니다...
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* 레이아웃 최적화 - 상단 전체 너비 */}
+        <Card className="relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-cyan-500/20 to-transparent rounded-bl-full" />
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Grid3x3 className="h-5 w-5 text-cyan-500" />
+                레이아웃 최적화
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => runSimulation('layout')}
+                disabled={loadingStates.layout}
+              >
+                {loadingStates.layout ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+              </Button>
+            </CardTitle>
+            <CardDescription>
+              고객 동선 분석을 기반으로 최적의 매장 레이아웃을 3D로 제안합니다
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loadingStates.layout && (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-cyan-500" />
+              </div>
             )}
-
-            {!selectedStore && (
-              <Alert>
-                <AlertDescription>매장을 선택하면 AI가 데이터를 분석합니다.</AlertDescription>
-              </Alert>
+            {!loadingStates.layout && (
+              <div className="h-[500px] bg-muted rounded-lg">
+                <SharedDigitalTwinScene 
+                  overlayType="layout"
+                  layoutSimulationData={layoutOptimization?.sceneRecipe}
+                />
+              </div>
             )}
+            {!loadingStates.layout && !layoutOptimization && contextData && (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>분석을 시작하려면 새로고침 버튼을 클릭하세요</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-            <DataSourceMappingCard
-              importedData={importedData}
-              presetApis={presetApis}
-              customApis={customApis}
-              mappingStatus={mappingStatus}
-              isAdmin={isAdmin}
-              onRefresh={refreshMapping}
-              onConnectApi={(apiId) => connectApi({ type: 'custom', name: apiId })}
-              onDisconnectApi={disconnectApi}
-              onConfigureApi={(apiId) => configurePresetApi(apiId, true)}
-              isLoading={dataSourcesLoading}
-            />
-
-            <AIModelSelector
-              scenarios={scenarios}
-              selectedScenarios={selectedScenarios}
-              parameters={parameters}
-              onScenarioToggle={handleScenarioToggle}
-              onSelectAll={handleSelectAll}
-              onDeselectAll={handleDeselectAll}
-              onParameterChange={handleParameterChange}
-              onRunSimulation={runAllSimulations}
-              isRunning={Object.values(loadingStates).some(v => v) || isInferring}
-              disabled={!selectedStore || !hasMinimumData}
-            />
-
-            {/* 레이아웃 */}
-            <SimulationResultCard
-              type="layout" title="레이아웃 최적화" description="고객 동선 분석"
-              icon={Grid3x3} color="cyan"
-              isLoading={loadingStates.layout} hasResult={!!results.layout} meta={resultMeta.layout}
-              onRefresh={() => runSimulation('layout')}
-              onExport={(format) => handleExport('layout', format)}
-              onSave={() => handleManualSave('layout')}
-              fullWidth minHeight="400px"
-            >
-              {results.layout?.sceneRecipe && (
-                <div className="h-[400px] rounded-lg border overflow-hidden">
-                  <SharedDigitalTwinScene overlayType="layout" layoutSimulationData={results.layout.sceneRecipe} />
+        {/* 나머지 4개 시뮬레이션 - 2x2 그리드 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* 1. 향후 수요 예측 */}
+          <Card className="relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-primary/20 to-transparent rounded-bl-full" />
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                  향후 수요 예측
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => runSimulation('demand')}
+                  disabled={loadingStates.demand}
+                >
+                  {loadingStates.demand ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                </Button>
+              </CardTitle>
+              <CardDescription>
+                과거 데이터와 외부 요인을 분석하여 향후 30일간의 수요를 예측합니다
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingStates.demand && (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
               )}
-              {results.layout?.ontologyBasedInsights && (
-                <OntologyInsightChart insights={results.layout.ontologyBasedInsights} compact />
+              {!loadingStates.demand && demandForecast && (
+                <DemandForecastResult 
+                  forecastData={demandForecast.demandForecast?.forecastData}
+                  summary={demandForecast.demandForecast?.summary}
+                  demandDrivers={demandForecast.demandDrivers}
+                  topProducts={demandForecast.topProducts}
+                  recommendations={demandForecast.recommendations}
+                />
               )}
-            </SimulationResultCard>
+              {!loadingStates.demand && !demandForecast && contextData && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>분석을 시작하려면 새로고침 버튼을 클릭하세요</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-            {/* 4개 그리드 */}
-            <SimulationResultGrid columns={2}>
-              <SimulationResultCard
-                type="demand" title="수요 예측" description={`${parameters.dataRange}일→${parameters.forecastPeriod}일`}
-                icon={TrendingUp} color="blue"
-                isLoading={loadingStates.demand} hasResult={!!results.demand} meta={resultMeta.demand}
-                onRefresh={() => runSimulation('demand')}
-                onExport={(format) => handleExport('demand', format)}
-                onSave={() => handleManualSave('demand')}
-              >
-                {results.demand && (
-                  <>
-                    <DemandForecastResult 
-                      forecastData={results.demand.demandForecast?.forecastData}
-                      summary={results.demand.demandForecast?.summary}
-                      demandDrivers={results.demand.demandDrivers}
-                      topProducts={results.demand.topProducts}
-                      recommendations={results.demand.recommendations}
-                    />
-                    {results.demand.ontologyBasedInsights && (
-                      <OntologyInsightChart insights={results.demand.ontologyBasedInsights} compact />
-                    )}
-                  </>
-                )}
-              </SimulationResultCard>
+          {/* 2. 재고 최적화 */}
+          <Card className="relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-500/20 to-transparent rounded-bl-full" />
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Package className="h-5 w-5 text-green-500" />
+                  재고 최적화
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => runSimulation('inventory')}
+                  disabled={loadingStates.inventory}
+                >
+                  {loadingStates.inventory ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                </Button>
+              </CardTitle>
+              <CardDescription>
+                현재 재고 상태를 분석하여 최적 재고 수준과 발주 시점을 제안합니다
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingStates.inventory && (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-green-500" />
+                </div>
+              )}
+              {!loadingStates.inventory && inventoryOptimization && (
+                <InventoryOptimizationResult 
+                  recommendations={inventoryOptimization.recommendations}
+                  summary={inventoryOptimization.summary}
+                  textRecommendations={inventoryOptimization.textRecommendations}
+                />
+              )}
+              {!loadingStates.inventory && !inventoryOptimization && contextData && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>분석을 시작하려면 새로고침 버튼을 클릭하세요</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-              <SimulationResultCard
-                type="inventory" title="재고 최적화" description="최적 재고 수준"
-                icon={Package} color="green"
-                isLoading={loadingStates.inventory} hasResult={!!results.inventory} meta={resultMeta.inventory}
-                onRefresh={() => runSimulation('inventory')}
-                onExport={(format) => handleExport('inventory', format)}
-                onSave={() => handleManualSave('inventory')}
-              >
-                {results.inventory && (
-                  <>
-                    <InventoryOptimizationResult 
-                      recommendations={results.inventory.recommendations}
-                      summary={results.inventory.summary}
-                    />
-                    {results.inventory.ontologyBasedInsights && (
-                      <OntologyInsightChart insights={results.inventory.ontologyBasedInsights} compact />
-                    )}
-                  </>
-                )}
-              </SimulationResultCard>
+          {/* 3. 가격 최적화 */}
+          <Card className="relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-yellow-500/20 to-transparent rounded-bl-full" />
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-yellow-500" />
+                  가격 최적화
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => runSimulation('pricing')}
+                  disabled={loadingStates.pricing}
+                >
+                  {loadingStates.pricing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                </Button>
+              </CardTitle>
+              <CardDescription>
+                가격 탄력성과 경쟁사 분석을 통해 최적 가격 전략을 제안합니다
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingStates.pricing && (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-yellow-500" />
+                </div>
+              )}
+              {!loadingStates.pricing && pricingOptimization && (
+                <PricingOptimizationResult 
+                  recommendations={pricingOptimization.recommendations}
+                  summary={pricingOptimization.summary}
+                  textRecommendations={pricingOptimization.textRecommendations}
+                />
+              )}
+              {!loadingStates.pricing && !pricingOptimization && contextData && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>분석을 시작하려면 새로고침 버튼을 클릭하세요</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-              <SimulationResultCard
-                type="pricing" title="가격 최적화" description="최적 가격 전략"
-                icon={DollarSign} color="yellow"
-                isLoading={loadingStates.pricing} hasResult={!!results.pricing} meta={resultMeta.pricing}
-                onRefresh={() => runSimulation('pricing')}
-                onExport={(format) => handleExport('pricing', format)}
-                onSave={() => handleManualSave('pricing')}
-              >
-                {results.pricing && (
-                  <>
-                    <PricingOptimizationResult 
-                      recommendations={results.pricing.recommendations}
-                      summary={results.pricing.summary}
-                    />
-                    {results.pricing.ontologyBasedStrategies && (
-                      <OntologyInsightChart insights={results.pricing.ontologyBasedStrategies} compact />
-                    )}
-                  </>
-                )}
-              </SimulationResultCard>
+          {/* 4. 추천 마케팅/프로모션 전략 */}
+          <Card className="relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-500/20 to-transparent rounded-bl-full" />
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Target className="h-5 w-5 text-purple-500" />
+                  추천 마케팅·프로모션 전략
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => runSimulation('recommendation')}
+                  disabled={loadingStates.recommendation}
+                >
+                  {loadingStates.recommendation ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                </Button>
+              </CardTitle>
+              <CardDescription>
+                고객 세그먼트 분석을 통해 개인화된 마케팅 전략과 프로모션을 제안합니다
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingStates.recommendation && (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
+                </div>
+              )}
+              {!loadingStates.recommendation && recommendationStrategy && (
+                <RecommendationStrategyResult 
+                  strategies={recommendationStrategy.strategies}
+                  summary={recommendationStrategy.summary}
+                  performanceMetrics={recommendationStrategy.performanceMetrics}
+                  recommendations={recommendationStrategy.recommendations}
+                />
+              )}
+              {!loadingStates.recommendation && !recommendationStrategy && contextData && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>분석을 시작하려면 새로고침 버튼을 클릭하세요</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
-              <SimulationResultCard
-                type="marketing" title="마케팅 전략" description="개인화 마케팅"
-                icon={Target} color="purple"
-                isLoading={loadingStates.marketing} hasResult={!!results.marketing} meta={resultMeta.marketing}
-                onRefresh={() => runSimulation('marketing')}
-                onExport={(format) => handleExport('marketing', format)}
-                onSave={() => handleManualSave('marketing')}
-              >
-                {results.marketing && (
-                  <>
-                    <RecommendationStrategyResult 
-                      strategies={results.marketing.strategies}
-                      summary={results.marketing.summary}
-                      performanceMetrics={results.marketing.performanceMetrics}
-                    />
-                    {results.marketing.ontologyBasedInsights && (
-                      <OntologyInsightChart insights={results.marketing.ontologyBasedInsights} compact />
-                    )}
-                  </>
-                )}
-              </SimulationResultCard>
-            </SimulationResultGrid>
-          </TabsContent>
-
-          {/* 히스토리 탭 */}
-          <TabsContent value="history" className="mt-6">
-            <SimulationHistoryPanel
-              onSelectResult={(result) => toast.info('시뮬레이션 탭에서 확인하세요')}
-            />
-          </TabsContent>
-
-          {/* 온톨로지 분석 탭 */}
-          <TabsContent value="insights" className="mt-6">
-            {ontologyContext ? (
-              <OntologyInsightChart
-                ontologyContext={ontologyContext}
-                insights={lastResult?.ontologyBasedInsights}
-              />
-            ) : (
-              <Alert>
-                <Network className="h-4 w-4" />
-                <AlertDescription>
-                  온톨로지 모드를 활성화하고 매장을 선택하세요.
-                </AlertDescription>
-              </Alert>
-            )}
-          </TabsContent>
-        </Tabs>
       </div>
     </DashboardLayout>
   );
