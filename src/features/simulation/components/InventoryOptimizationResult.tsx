@@ -1,45 +1,34 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Package, TrendingDown, DollarSign, BarChart3 } from 'lucide-react';
-
-interface InventoryRecommendation {
-  productSku?: string;
-  sku?: string;
-  productName?: string;
-  name?: string;
-  currentStock?: number;
-  optimalStock?: number;
-  reorderPoint?: number;
-  safetyStock?: number;
-  orderQuantity?: number;
-  urgency?: 'high' | 'medium' | 'low' | string;
-}
-
-interface InventorySummary {
-  totalProducts?: number;
-  overstocked?: number;
-  understocked?: number;
-  optimal?: number;
-  potentialSavings?: number;
-  expectedTurnover?: number;
-}
-
-interface InventoryOptimizationResultProps {
-  recommendations?: InventoryRecommendation[];
-  summary?: InventorySummary;
-}
+import { Package, DollarSign, BarChart3, AlertTriangle } from 'lucide-react';
 
 // 안전한 숫자 헬퍼
-const safeNumber = (value: number | undefined | null, defaultValue: number = 0): number => {
+const safeNumber = (value: any, defaultValue: number = 0): number => {
   if (value === undefined || value === null || isNaN(Number(value))) return defaultValue;
   return Number(value);
 };
 
-const safeToFixed = (value: number | undefined | null, digits: number = 0): string => {
+const safeToFixed = (value: any, digits: number = 0): string => {
   return safeNumber(value).toFixed(digits);
 };
 
-export function InventoryOptimizationResult({ recommendations, summary }: InventoryOptimizationResultProps) {
+// 권장사항 텍스트 추출 헬퍼
+const getRecommendationText = (rec: any): string => {
+  if (typeof rec === 'string') return rec;
+  if (typeof rec === 'object' && rec !== null) {
+    return rec.title || rec.description || rec.details || rec.message || rec.text || 
+           rec.recommendation || rec.action || rec.content || JSON.stringify(rec);
+  }
+  return String(rec);
+};
+
+interface InventoryOptimizationResultProps {
+  recommendations?: any[];
+  summary?: any;
+  textRecommendations?: any[];
+}
+
+export function InventoryOptimizationResult({ recommendations, summary, textRecommendations }: InventoryOptimizationResultProps) {
   if (!recommendations || recommendations.length === 0) {
     if (!summary) {
       return (
@@ -55,7 +44,7 @@ export function InventoryOptimizationResult({ recommendations, summary }: Invent
 
   // 정규화된 summary
   const normalizedSummary = {
-    totalProducts: safeNumber(summary?.totalProducts),
+    totalProducts: safeNumber(summary?.totalProducts, recommendations?.length || 0),
     overstocked: safeNumber(summary?.overstocked),
     understocked: safeNumber(summary?.understocked),
     optimal: safeNumber(summary?.optimal),
@@ -64,7 +53,7 @@ export function InventoryOptimizationResult({ recommendations, summary }: Invent
   };
 
   // 정규화된 recommendations
-  const normalizedRecs = (recommendations || []).map((rec, idx) => ({
+  const normalizedRecs = (recommendations || []).map((rec: any, idx: number) => ({
     productSku: rec.productSku || rec.sku || `SKU-${idx + 1}`,
     productName: rec.productName || rec.name || `상품 ${idx + 1}`,
     currentStock: safeNumber(rec.currentStock),
@@ -206,6 +195,27 @@ export function InventoryOptimizationResult({ recommendations, summary }: Invent
                   </div>
                 ))}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {textRecommendations && textRecommendations.length > 0 && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-primary" />
+              권장 액션
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {textRecommendations.map((rec: any, idx: number) => (
+                <li key={idx} className="flex items-start gap-2 text-sm">
+                  <span className="text-primary mt-0.5">•</span>
+                  <span>{getRecommendationText(rec)}</span>
+                </li>
+              ))}
+            </ul>
           </CardContent>
         </Card>
       )}
