@@ -13,10 +13,10 @@ export { useRealtimeTracking } from './useRealtimeTracking';
 // ========================================
 export { useDataSourceMapping } from './useDataSourceMapping';
 export type { 
-  ImportedDataSource, 
-  PresetApiSource, 
-  CustomApiSource, 
-  OntologyMappingStatus,
+  ImportedDataSource as HookImportedDataSource, 
+  PresetApiSource as HookPresetApiSource, 
+  CustomApiSource as HookCustomApiSource, 
+  OntologyMappingStatus as HookOntologyMappingStatus,
   ApiConfig
 } from './useDataSourceMapping';
 
@@ -25,7 +25,7 @@ export type {
 // ========================================
 export { useEnhancedAIInference } from './useEnhancedAIInference';
 export type {
-  SimulationScenario,
+  SimulationScenario as HookSimulationScenario,
   OntologyContext,
   OntologySchema,
   OntologyEntityType,

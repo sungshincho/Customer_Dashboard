@@ -53,6 +53,7 @@ interface SimulationResultCardProps {
   onRefresh: () => void;
   onExport?: (format: 'csv' | 'pdf' | 'json') => void;
   onExpand?: () => void;
+  onSave?: () => void;
   
   // 결과 컨텐츠 (children)
   children?: React.ReactNode;
@@ -88,6 +89,7 @@ export function SimulationResultCard({
   onRefresh,
   onExport,
   onExpand,
+  onSave,
   children,
   emptyMessage = '분석을 시작하려면 새로고침 버튼을 클릭하세요',
   emptySubMessage,
