@@ -4,8 +4,13 @@ import { useAuth } from './useAuth';
 import { useSelectedStore } from './useSelectedStore';
 
 /**
- * 실제 업로드된 데이터만 조회
- * 샘플 데이터 생성 금지 - 데이터 없으면 빈 배열 반환
+ * 실제 DB 테이블에서 데이터 조회 (수정됨)
+ * 
+ * 수정: user_data_imports.raw_data → 실제 테이블 직접 조회
+ * 
+ * 아키텍처:
+ * - 고객 업로드 → Storage → ETL → DB 테이블 (customers, products, purchases, visits)
+ * - 모든 기능 → DB 테이블 직접 조회
  */
 
 export function useRealCustomers() {
@@ -13,28 +18,24 @@ export function useRealCustomers() {
   const { selectedStore } = useSelectedStore();
 
   return useQuery({
-    queryKey: ['real-customers', user?.id, selectedStore?.id],
+    queryKey: ['real-customers', user?.id, selectedStore?.id, orgId],
     queryFn: async () => {
-      if (!user || !orgId) return [];
+      if (!user || !orgId || !selectedStore) return [];
 
-      const query = supabase
-        .from('user_data_imports')
-        .select('raw_data')
-        .eq('user_id', user.id)
-        .eq('org_id', orgId)
-        .eq('data_type', 'customers');
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('store_id', selectedStore.id)
+        .eq('org_id', orgId);
 
-      if (selectedStore) {
-        query.eq('store_id', selectedStore.id);
+      if (error) {
+        console.error('customers query error:', error);
+        return [];
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-
-      const customers = data?.flatMap(item => item.raw_data as any[]) || [];
-      return customers;
+      return data || [];
     },
-    enabled: !!user,
+    enabled: !!user && !!orgId && !!selectedStore,
   });
 }
 
@@ -43,28 +44,34 @@ export function useRealPurchases() {
   const { selectedStore } = useSelectedStore();
 
   return useQuery({
-    queryKey: ['real-purchases', user?.id, selectedStore?.id],
+    queryKey: ['real-purchases', user?.id, selectedStore?.id, orgId],
     queryFn: async () => {
-      if (!user || !orgId) return [];
+      if (!user || !orgId || !selectedStore) return [];
 
-      const query = supabase
-        .from('user_data_imports')
-        .select('raw_data')
-        .eq('user_id', user.id)
+      const { data, error } = await supabase
+        .from('purchases')
+        .select(`
+          *,
+          product:products(id, product_name, category, price)
+        `)
+        .eq('store_id', selectedStore.id)
         .eq('org_id', orgId)
-        .eq('data_type', 'purchases');
+        .order('purchase_date', { ascending: false });
 
-      if (selectedStore) {
-        query.eq('store_id', selectedStore.id);
+      if (error) {
+        console.error('purchases query error:', error);
+        return [];
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-
-      const purchases = data?.flatMap(item => item.raw_data as any[]) || [];
-      return purchases;
+      // product 정보 매핑
+      return (data || []).map((p: any) => ({
+        ...p,
+        product_name: p.product?.product_name,
+        category: p.product?.category,
+        price: p.total_price || p.unit_price,
+      }));
     },
-    enabled: !!user,
+    enabled: !!user && !!orgId && !!selectedStore,
   });
 }
 
@@ -73,28 +80,29 @@ export function useRealProducts() {
   const { selectedStore } = useSelectedStore();
 
   return useQuery({
-    queryKey: ['real-products', user?.id, selectedStore?.id],
+    queryKey: ['real-products', user?.id, selectedStore?.id, orgId],
     queryFn: async () => {
-      if (!user || !orgId) return [];
+      if (!user || !orgId || !selectedStore) return [];
 
-      const query = supabase
-        .from('user_data_imports')
-        .select('raw_data')
-        .eq('user_id', user.id)
-        .eq('org_id', orgId)
-        .eq('data_type', 'products');
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('store_id', selectedStore.id)
+        .eq('org_id', orgId);
 
-      if (selectedStore) {
-        query.eq('store_id', selectedStore.id);
+      if (error) {
+        console.error('products query error:', error);
+        return [];
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-
-      const products = data?.flatMap(item => item.raw_data as any[]) || [];
-      return products;
+      // 필드명 호환성 (name → product_name)
+      return (data || []).map((p: any) => ({
+        ...p,
+        name: p.product_name,
+        product_id: p.id,
+      }));
     },
-    enabled: !!user,
+    enabled: !!user && !!orgId && !!selectedStore,
   });
 }
 
@@ -103,28 +111,25 @@ export function useRealVisits() {
   const { selectedStore } = useSelectedStore();
 
   return useQuery({
-    queryKey: ['real-visits', user?.id, selectedStore?.id],
+    queryKey: ['real-visits', user?.id, selectedStore?.id, orgId],
     queryFn: async () => {
-      if (!user || !orgId) return [];
+      if (!user || !orgId || !selectedStore) return [];
 
-      const query = supabase
-        .from('user_data_imports')
-        .select('raw_data')
-        .eq('user_id', user.id)
+      const { data, error } = await supabase
+        .from('visits')
+        .select('*')
+        .eq('store_id', selectedStore.id)
         .eq('org_id', orgId)
-        .eq('data_type', 'visits');
+        .order('visit_date', { ascending: false });
 
-      if (selectedStore) {
-        query.eq('store_id', selectedStore.id);
+      if (error) {
+        console.error('visits query error:', error);
+        return [];
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-
-      const visits = data?.flatMap(item => item.raw_data as any[]) || [];
-      return visits;
+      return data || [];
     },
-    enabled: !!user,
+    enabled: !!user && !!orgId && !!selectedStore,
   });
 }
 
@@ -133,26 +138,26 @@ export function useRealWiFiTracking() {
   const { selectedStore } = useSelectedStore();
 
   return useQuery({
-    queryKey: ['real-wifi-tracking', user?.id, selectedStore?.id],
+    queryKey: ['real-wifi-tracking', user?.id, selectedStore?.id, orgId],
     queryFn: async () => {
-      if (!user || !orgId) return [];
+      if (!user || !orgId || !selectedStore) return [];
 
-      const query = supabase
+      const { data, error } = await supabase
         .from('wifi_tracking')
         .select('*')
-        .eq('user_id', user.id)
-        .eq('org_id', orgId);
+        .eq('store_id', selectedStore.id)
+        .eq('org_id', orgId)
+        .order('timestamp', { ascending: false })
+        .limit(500);
 
-      if (selectedStore) {
-        query.eq('store_id', selectedStore.id);
+      if (error) {
+        console.error('wifi_tracking query error:', error);
+        return [];
       }
-
-      const { data, error } = await query;
-      if (error) throw error;
 
       return data || [];
     },
-    enabled: !!user,
+    enabled: !!user && !!orgId && !!selectedStore,
   });
 }
 
@@ -161,31 +166,128 @@ export function useRealZones() {
   const { selectedStore } = useSelectedStore();
 
   return useQuery({
-    queryKey: ['real-zones', user?.id, selectedStore?.id],
+    queryKey: ['real-zones', user?.id, selectedStore?.id, orgId],
     queryFn: async () => {
-      if (!user || !orgId) return [];
+      if (!user || !orgId || !selectedStore) return [];
 
-      const query = supabase
+      const { data, error } = await supabase
         .from('wifi_zones')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('store_id', selectedStore.id)
         .eq('org_id', orgId);
 
-      if (selectedStore) {
-        query.eq('store_id', selectedStore.id);
+      if (error) {
+        console.error('wifi_zones query error:', error);
+        return [];
       }
-
-      const { data, error } = await query;
-      if (error) throw error;
 
       return data || [];
     },
-    enabled: !!user,
+    enabled: !!user && !!orgId && !!selectedStore,
   });
 }
 
 /**
- * 전체 데이터 통계 - 실제 데이터 카운트만
+ * 퍼널 이벤트 조회 (L2 테이블)
+ */
+export function useRealFunnelEvents() {
+  const { user, orgId } = useAuth();
+  const { selectedStore } = useSelectedStore();
+
+  return useQuery({
+    queryKey: ['real-funnel-events', user?.id, selectedStore?.id, orgId],
+    queryFn: async () => {
+      if (!user || !orgId || !selectedStore) return [];
+
+      const { data, error } = await supabase
+        .from('funnel_events')
+        .select('*')
+        .eq('store_id', selectedStore.id)
+        .eq('org_id', orgId)
+        .order('event_timestamp', { ascending: false });
+
+      if (error) {
+        console.error('funnel_events query error:', error);
+        return [];
+      }
+
+      return data || [];
+    },
+    enabled: !!user && !!orgId && !!selectedStore,
+  });
+}
+
+/**
+ * 상품 성과 조회 (L3 테이블)
+ */
+export function useRealProductPerformance() {
+  const { user, orgId } = useAuth();
+  const { selectedStore } = useSelectedStore();
+
+  return useQuery({
+    queryKey: ['real-product-performance', user?.id, selectedStore?.id, orgId],
+    queryFn: async () => {
+      if (!user || !orgId || !selectedStore) return [];
+
+      const { data, error } = await supabase
+        .from('product_performance_agg')
+        .select(`
+          *,
+          product:products(id, product_name, category, price, stock)
+        `)
+        .eq('store_id', selectedStore.id)
+        .eq('org_id', orgId)
+        .order('revenue', { ascending: false });
+
+      if (error) {
+        console.error('product_performance_agg query error:', error);
+        return [];
+      }
+
+      // product 정보 매핑
+      return (data || []).map((p: any) => ({
+        ...p,
+        product_name: p.product?.product_name,
+        category: p.product?.category,
+        stock: p.product?.stock,
+      }));
+    },
+    enabled: !!user && !!orgId && !!selectedStore,
+  });
+}
+
+/**
+ * 고객 세그먼트 조회 (L3 테이블)
+ */
+export function useRealCustomerSegments() {
+  const { user, orgId } = useAuth();
+  const { selectedStore } = useSelectedStore();
+
+  return useQuery({
+    queryKey: ['real-customer-segments', user?.id, selectedStore?.id, orgId],
+    queryFn: async () => {
+      if (!user || !orgId || !selectedStore) return [];
+
+      const { data, error } = await supabase
+        .from('customer_segments_agg')
+        .select('*')
+        .eq('store_id', selectedStore.id)
+        .eq('org_id', orgId)
+        .order('customer_count', { ascending: false });
+
+      if (error) {
+        console.error('customer_segments_agg query error:', error);
+        return [];
+      }
+
+      return data || [];
+    },
+    enabled: !!user && !!orgId && !!selectedStore,
+  });
+}
+
+/**
+ * 전체 데이터 통계 - 실제 데이터 카운트
  */
 export function useRealDataSummary() {
   const customers = useRealCustomers();
