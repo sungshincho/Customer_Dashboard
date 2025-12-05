@@ -851,17 +851,21 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
   console.log(`Layout Score: ${ontologyAnalysis.layoutInsights?.score}`);
   
 
-  // 🔥 경계 밖 가구 감지
+  // 🔥 중심 기준 좌표계: 범위는 (-halfWidth ~ +halfWidth, -halfDepth ~ +halfDepth)
+  const halfWidth = storeWidth / 2;
+  const halfDepth = storeDepth / 2;
+  
+  // 🔥 경계 밖 가구 감지 (중심 기준 좌표계)
   const outOfBoundsFurniture = furnitureEntities.filter((f: any) => {
     const x = f.position?.x || 0;
     const z = f.position?.z || f.position?.y || 0;
-    return x < 0 || x > storeWidth || z < 0 || z > storeDepth;
+    return x < -halfWidth || x > halfWidth || z < -halfDepth || z > halfDepth;
   });
 
   const furnitureList = furnitureEntities.slice(0, 15).map((f: any) => {
     const x = f.position?.x || 0;
     const z = f.position?.z || f.position?.y || 0;
-    const isOutOfBounds = x < 0 || x > storeWidth || z < 0 || z > storeDepth;
+    const isOutOfBounds = x < -halfWidth || x > halfWidth || z < -halfDepth || z > halfDepth;
     return `- [${f.id}] ${f.label} (${f.entityType}): pos(x=${x.toFixed?.(1) || 0}, z=${z.toFixed?.(1) || 0})${isOutOfBounds ? ' ⚠️ OUT OF BOUNDS - MUST MOVE INSIDE' : ''}`;
   }).join('\n');
 
@@ -876,10 +880,11 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
 ${ontologyAnalysis.summaryForAI}
 ${outOfBoundsWarning}
 
-STORE BOUNDARIES (CRITICAL - READ CAREFULLY):
-- Store Width: 0 to ${storeWidth}m (X axis)
-- Store Depth: 0 to ${storeDepth}m (Z axis)
-- Safe zone: X from 1.0 to ${(storeWidth - 1).toFixed(1)}, Z from 1.0 to ${(storeDepth - 1).toFixed(1)}
+STORE BOUNDARIES (CRITICAL - CENTER-BASED COORDINATE SYSTEM):
+- Store Width: ${storeWidth}m (X axis: -${halfWidth.toFixed(1)} to +${halfWidth.toFixed(1)})
+- Store Depth: ${storeDepth}m (Z axis: -${halfDepth.toFixed(1)} to +${halfDepth.toFixed(1)})
+- Center of store is at (0, 0)
+- Safe zone: X from -${(halfWidth - 1).toFixed(1)} to +${(halfWidth - 1).toFixed(1)}, Z from -${(halfDepth - 1).toFixed(1)} to +${(halfDepth - 1).toFixed(1)}
 - ALL furniture MUST be placed within these safe boundaries
 
 Based on the graph analysis above, suggest 3-5 specific furniture position changes.
@@ -901,9 +906,9 @@ Analyze the current layout and suggest 3-5 specific furniture position changes t
 
 IMPORTANT RULES:
 1. Use EXACT entityId from the list above
-2. **CRITICAL: ALL positions MUST be within store bounds:**
-   - X axis: minimum 1.0, maximum ${(storeWidth - 1).toFixed(1)}
-   - Z axis: minimum 1.0, maximum ${(storeDepth - 1).toFixed(1)}
+2. **CRITICAL: ALL positions MUST be within store bounds (CENTER-BASED):**
+   - X axis: minimum -${(halfWidth - 1).toFixed(1)}, maximum +${(halfWidth - 1).toFixed(1)}
+   - Z axis: minimum -${(halfDepth - 1).toFixed(1)}, maximum +${(halfDepth - 1).toFixed(1)}
    - NEVER suggest positions outside these bounds
    - If current position is outside bounds, move it INSIDE the store
 3. Provide Korean explanations for reasons
@@ -1002,12 +1007,14 @@ Return ONLY valid JSON (no markdown, no explanation):
           return true;
         })
         .map((c: any) => {
-          // 🔥 경계 내로 위치 보정 (AI가 잘못된 위치를 제안해도 자동 보정)
+          // 🔥 경계 내로 위치 보정 (중심 기준 좌표계 - AI가 잘못된 위치를 제안해도 자동 보정)
           const pos = c.suggestedPosition;
+          const safeHalfWidth = halfWidth - 1;  // 벽에서 1m 여유
+          const safeHalfDepth = halfDepth - 1;
           const clampedPosition = {
-            x: Math.max(1, Math.min(storeWidth - 1, pos.x || 0)),
+            x: Math.max(-safeHalfWidth, Math.min(safeHalfWidth, pos.x || 0)),
             y: pos.y || 0,
-            z: Math.max(1, Math.min(storeDepth - 1, pos.z || 0)),
+            z: Math.max(-safeHalfDepth, Math.min(safeHalfDepth, pos.z || 0)),
           };
           
           // 보정이 발생했는지 로깅
