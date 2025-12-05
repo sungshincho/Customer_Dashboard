@@ -2,13 +2,18 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface StoreContextData {
-  // 온톨로지 데이터
+  // 온톨로지 데이터 (3D 정보 포함)
   entities: {
     id: string;
     label: string;
     entityType: string;
+    entity_type_name: string;
+    model_3d_type: string | null;
     properties: any;
     position?: { x: number; y: number; z: number };
+    model_3d_position?: { x: number; y: number; z: number };
+    model_3d_rotation?: { x: number; y: number; z: number };
+    model_3d_scale?: { x: number; y: number; z: number };
   }[];
   
   // KPI 데이터
@@ -43,6 +48,7 @@ export interface StoreContextData {
     id: string;
     name: string;
     code: string;
+    areaSqm?: number;
     metadata: any;
   } | null;
 }
@@ -66,11 +72,11 @@ export function useStoreContext(storeId: string | undefined) {
         // 매장 기본 정보
         const { data: store } = await supabase
           .from('stores')
-          .select('id, store_name, store_code, metadata')
+          .select('id, store_name, store_code, area_sqm, metadata')
           .eq('id', storeId)
           .single();
 
-        // 온톨로지 엔티티 (매장과 연결된)
+        // 온톨로지 엔티티 (3D 정보 포함) - 가구 우선 정렬
         const { data: entities } = await supabase
           .from('graph_entities')
           .select(`
@@ -78,16 +84,20 @@ export function useStoreContext(storeId: string | undefined) {
             label,
             properties,
             model_3d_position,
+            model_3d_rotation,
+            model_3d_scale,
             entity_type_id,
             ontology_entity_types (
               name,
               label,
-              model_3d_type
+              model_3d_type,
+              model_3d_url,
+              model_3d_dimensions
             )
           `)
           .eq('store_id', storeId)
           .order('created_at', { ascending: false })
-          .limit(50);
+          .limit(100);
 
         // 최근 30일 KPI
         const thirtyDaysAgo = new Date();
@@ -123,25 +133,65 @@ export function useStoreContext(storeId: string | undefined) {
           .order('created_at', { ascending: false })
           .limit(100);
 
-        setContextData({
-          storeInfo: store ? {
-            id: store.id,
-            name: store.store_name,
-            code: store.store_code,
-            metadata: store.metadata || {}
-          } : null,
-          
-          entities: (entities || []).map(e => ({
+        // 엔티티 매핑 (3D 정보 포함)
+        const mappedEntities = (entities || []).map(e => {
+          const entityType = e.ontology_entity_types as any;
+          return {
             id: e.id,
             label: e.label,
-            entityType: (e.ontology_entity_types as any)?.name || 'unknown',
+            entityType: entityType?.name || 'unknown',
+            entity_type_name: entityType?.name || 'unknown',
+            model_3d_type: entityType?.model_3d_type || null,
+            model_3d_url: entityType?.model_3d_url || null,
+            model_3d_dimensions: entityType?.model_3d_dimensions || null,
             properties: e.properties || {},
             position: e.model_3d_position ? {
               x: (e.model_3d_position as any).x || 0,
               y: (e.model_3d_position as any).y || 0,
               z: (e.model_3d_position as any).z || 0
-            } : undefined
-          })),
+            } : { x: 0, y: 0, z: 0 },
+            model_3d_position: e.model_3d_position ? {
+              x: (e.model_3d_position as any).x || 0,
+              y: (e.model_3d_position as any).y || 0,
+              z: (e.model_3d_position as any).z || 0
+            } : { x: 0, y: 0, z: 0 },
+            model_3d_rotation: e.model_3d_rotation ? {
+              x: (e.model_3d_rotation as any).x || 0,
+              y: (e.model_3d_rotation as any).y || 0,
+              z: (e.model_3d_rotation as any).z || 0
+            } : { x: 0, y: 0, z: 0 },
+            model_3d_scale: e.model_3d_scale ? {
+              x: (e.model_3d_scale as any).x || 1,
+              y: (e.model_3d_scale as any).y || 1,
+              z: (e.model_3d_scale as any).z || 1
+            } : { x: 1, y: 1, z: 1 },
+          };
+        });
+
+        // 가구 엔티티를 앞으로 정렬 (furniture, room, structure 우선)
+        const sortedEntities = mappedEntities.sort((a, b) => {
+          const priorityTypes = ['furniture', 'room', 'structure'];
+          const aPriority = priorityTypes.includes(a.model_3d_type || '') ? 0 : 1;
+          const bPriority = priorityTypes.includes(b.model_3d_type || '') ? 0 : 1;
+          return aPriority - bPriority;
+        });
+
+        console.log('Store context loaded:', {
+          entities: sortedEntities.length,
+          furniture: sortedEntities.filter(e => e.model_3d_type === 'furniture').length,
+          products: (productsData || []).length,
+        });
+
+        setContextData({
+          storeInfo: store ? {
+            id: store.id,
+            name: store.store_name,
+            code: store.store_code,
+            areaSqm: store.area_sqm,
+            metadata: store.metadata || {}
+          } : null,
+          
+          entities: sortedEntities,
           
           recentKpis: (kpis || []).map(k => ({
             date: k.date,
