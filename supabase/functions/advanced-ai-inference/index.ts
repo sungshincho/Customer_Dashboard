@@ -1033,7 +1033,6 @@ Return ONLY valid JSON (no markdown, no explanation):
       relationCount: relations.length,
       patterns: ontologyAnalysis.relationAnalysis.patterns.slice(0, 5),
     },
-    },
   };
 
   console.log('=== Layout Simulation Complete ===');
