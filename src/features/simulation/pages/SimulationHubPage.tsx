@@ -434,24 +434,6 @@ const buildStoreContext = useCallback(() => {
     mappingStatus,
   };
 }, [selectedStore, contextData, mappingStatus, evaluateDataQuality]);
-      // ✅ 실제 배열 데이터 전달
-      products: contextData.products || [],
-      inventory: contextData.inventory || [],
-      recentKpis: contextData.recentKpis || [],
-      entities: (contextData.entities || []).map((e: any) => ({
-  ...e,
-  position: e.model_3d_position || { x: 0, y: 0, z: 0 },
-  rotation: e.model_3d_rotation || { x: 0, y: 0, z: 0 },
-  scale: e.model_3d_scale || { x: 1, y: 1, z: 1 },
-  model3dUrl: e.model_3d_url,
-  dimensions: e.model_3d_dimensions,
-})),
-      // 데이터 품질 메타 정보
-      dataQuality: evaluateDataQuality(),
-      mappingStatus,
-    };
-  }, [selectedStore, contextData, mappingStatus, evaluateDataQuality]);
-
   // ✅ 시뮬레이션 실행 (데이터 검증 포함)
   const runSimulation = useCallback(async (type: SimulationScenario) => {
     // 데이터 검증
