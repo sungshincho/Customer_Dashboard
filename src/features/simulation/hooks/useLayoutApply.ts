@@ -177,15 +177,3 @@ export function useLayoutApply() {
 }
 
 export default useLayoutApply;
-```
-
----
-
-**교체 후 "확인" 클릭하면 콘솔에 이 로그가 보여야 합니다:**
-```
-🚀 applyLayoutChanges called!
-Changes: [{...}, {...}, ...]
-=== Applying Layout Changes ===
-Changes count: 5
-Updating Shelf (...) to position: {...}
-✅ Updated Shelf
