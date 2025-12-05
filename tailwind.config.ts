@@ -15,12 +15,13 @@ export default {
   	extend: {
   		fontFamily: {
   			sans: [
-  				'Pretendard',
-  				'Inter',
-  				'-apple-system',
-  				'BlinkMacSystemFont',
+  				'ui-sans-serif',
   				'system-ui',
-  				'sans-serif'
+  				'sans-serif',
+  				'Apple Color Emoji',
+  				'Segoe UI Emoji',
+  				'Segoe UI Symbol',
+  				'Noto Color Emoji'
   			],
   			pretendard: [
   				'Pretendard',
@@ -29,6 +30,24 @@ export default {
   			inter: [
   				'Inter',
   				'sans-serif'
+  			],
+  			serif: [
+  				'ui-serif',
+  				'Georgia',
+  				'Cambria',
+  				'Times New Roman',
+  				'Times',
+  				'serif'
+  			],
+  			mono: [
+  				'ui-monospace',
+  				'SFMono-Regular',
+  				'Menlo',
+  				'Monaco',
+  				'Consolas',
+  				'Liberation Mono',
+  				'Courier New',
+  				'monospace'
   			]
   		},
   		colors: {
@@ -186,7 +205,7 @@ export default {
   					boxShadow: '0 0 30px hsl(var(--primary) / 0.6)'
   				}
   			},
-  			'shimmer': {
+  			shimmer: {
   				'0%': {
   					backgroundPosition: '-200% 0'
   				},
@@ -194,7 +213,7 @@ export default {
   					backgroundPosition: '200% 0'
   				}
   			},
-  			'float': {
+  			float: {
   				'0%, 100%': {
   					transform: 'translateY(0px)'
   				},
@@ -215,10 +234,10 @@ export default {
   			'slide-in-left': 'slide-in-left 0.3s ease-out',
   			'slide-up': 'slide-up 0.4s ease-out',
   			'pulse-glow': 'pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-  			'shimmer': 'shimmer 2s linear infinite',
-  			'float': 'float 3s ease-in-out infinite',
-  			'enter': 'fade-in 0.3s ease-out, scale-in 0.2s ease-out',
-  			'exit': 'fade-out 0.3s ease-out, scale-out 0.2s ease-out'
+  			shimmer: 'shimmer 2s linear infinite',
+  			float: 'float 3s ease-in-out infinite',
+  			enter: 'fade-in 0.3s ease-out, scale-in 0.2s ease-out',
+  			exit: 'fade-out 0.3s ease-out, scale-out 0.2s ease-out'
   		},
   		boxShadow: {
   			'2xs': 'var(--shadow-2xs)',

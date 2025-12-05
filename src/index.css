@@ -44,7 +44,7 @@
     --input: 256 1.3% 92.9%;
     --ring: 257 4% 70.4%;
 
-    --radius: 0.375rem;
+    --radius: 0.875rem;
 
     /* Gradients - Electric Blue */
     --gradient-primary: linear-gradient(135deg, hsl(219 100% 55%) 0%, hsl(219 100% 65%) 100%);
@@ -169,6 +169,7 @@
     --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
     --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
     --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+    --radius: 0.875rem;
   }
 }
 
