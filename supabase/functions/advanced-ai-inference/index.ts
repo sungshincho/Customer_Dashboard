@@ -24,6 +24,26 @@ function cleanJsonResponse(content: string): string {
   return cleaned;
 }
 
+// 안전한 JSON 파싱 헬퍼
+function safeParseAIResponse(aiContent: string, defaultValue: any): any {
+  if (!aiContent || !aiContent.trim()) {
+    console.warn('Empty AI response, using default');
+    return defaultValue;
+  }
+  
+  try {
+    const cleaned = cleanJsonResponse(aiContent);
+    if (cleaned.startsWith('{')) {
+      return JSON.parse(cleaned);
+    }
+  } catch (error) {
+    console.error('JSON parse error:', error);
+    console.error('Content preview:', aiContent.substring(0, 300));
+  }
+  
+  return defaultValue;
+}
+
 interface InferenceRequest {
   inference_type: 'causal' | 'anomaly' | 'prediction' | 'pattern';
   data: any[];
@@ -825,7 +845,10 @@ Return a comprehensive JSON object:
 
   const result = await response.json();
   const cleanedContent = cleanJsonResponse(result.choices[0].message.content);
-  const prediction = JSON.parse(cleanedContent);
+  const prediction = safeParseAIResponse(
+  result.choices?.[0]?.message?.content || '',
+  { /* 기본값 */ }
+);
   
   if (prediction.confidenceScore !== undefined) {
     prediction.confidenceScore = Number(prediction.confidenceScore);
@@ -929,7 +952,10 @@ Return a comprehensive JSON object:
 
   const result = await response.json();
   const cleanedContent = cleanJsonResponse(result.choices[0].message.content);
-  const prediction = JSON.parse(cleanedContent);
+  const prediction = safeParseAIResponse(
+  result.choices?.[0]?.message?.content || '',
+  { /* 기본값 */ }
+);
   
   if (prediction.confidenceScore !== undefined) {
     prediction.confidenceScore = Number(prediction.confidenceScore);
@@ -1043,7 +1069,10 @@ Return a comprehensive JSON object:
 
   const result = await response.json();
   const cleanedContent = cleanJsonResponse(result.choices[0].message.content);
-  const prediction = JSON.parse(cleanedContent);
+  const prediction = safeParseAIResponse(
+  result.choices?.[0]?.message?.content || '',
+  { /* 기본값 */ }
+);
   
   if (prediction.confidenceScore !== undefined) {
     prediction.confidenceScore = Number(prediction.confidenceScore);
@@ -1146,7 +1175,10 @@ Return a JSON object:
 
   const result = await response.json();
   const cleanedContent = cleanJsonResponse(result.choices[0].message.content);
-  const prediction = JSON.parse(cleanedContent);
+  const prediction = safeParseAIResponse(
+  result.choices?.[0]?.message?.content || '',
+  { /* 기본값 */ }
+);
   
   if (prediction.confidenceScore !== undefined) {
     prediction.confidenceScore = Number(prediction.confidenceScore);
