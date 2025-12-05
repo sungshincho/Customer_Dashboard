@@ -379,29 +379,62 @@ export default function SimulationHubPage() {
     setParameters(prev => ({ ...prev, ...params }));
   }, []);
 
-  // ✅ 실제 데이터를 포함한 Store Context 빌드
-  const buildStoreContext = useCallback(() => {
-    if (!contextData) {
-      return {
-        storeInfo: selectedStore ? {
-          id: selectedStore.id,
-          name: selectedStore.store_name,
-          code: selectedStore.store_code,
-        } : null,
-        products: [],
-        inventory: [],
-        recentKpis: [],
-        entities: [],
-        dataQuality: evaluateDataQuality(),
-      };
-    }
-
+// ✅ 실제 데이터를 포함한 Store Context 빌드
+const buildStoreContext = useCallback(() => {
+  if (!contextData) {
     return {
-      storeInfo: contextData.storeInfo || (selectedStore ? {
+      storeInfo: selectedStore ? {
         id: selectedStore.id,
         name: selectedStore.store_name,
         code: selectedStore.store_code,
-      } : null),
+      } : null,
+      products: [],
+      inventory: [],
+      recentKpis: [],
+      entities: [],
+      dataQuality: evaluateDataQuality(),
+    };
+  }
+
+  // 엔티티 변환 (3D 정보 포함)
+  const mappedEntities = (contextData.entities || []).map((e: any) => ({
+    id: e.id,
+    label: e.label,
+    entityType: e.entityType || e.entity_type_name || 'unknown',
+    entity_type_name: e.entity_type_name || e.entityType || 'unknown',
+    model_3d_type: e.model_3d_type,
+    properties: e.properties || {},
+    position: e.model_3d_position || e.position || { x: 0, y: 0, z: 0 },
+    rotation: e.model_3d_rotation || { x: 0, y: 0, z: 0 },
+    scale: e.model_3d_scale || { x: 1, y: 1, z: 1 },
+    model3dUrl: e.model_3d_url,
+    dimensions: e.model_3d_dimensions,
+  }));
+
+  // 디버깅: 가구 엔티티 수 확인
+  const furnitureCount = mappedEntities.filter((e: any) => 
+    ['furniture', 'room', 'structure'].includes(e.model_3d_type) ||
+    ['Shelf', 'Rack', 'DisplayTable', 'CheckoutCounter', 'FittingRoom', 'Entrance'].includes(e.entity_type_name)
+  ).length;
+  
+  console.log('buildStoreContext - entities:', mappedEntities.length, 'furniture:', furnitureCount);
+  console.log('Sample furniture:', mappedEntities.find((e: any) => e.model_3d_type === 'furniture'));
+
+  return {
+    storeInfo: contextData.storeInfo || (selectedStore ? {
+      id: selectedStore.id,
+      name: selectedStore.store_name,
+      code: selectedStore.store_code,
+      areaSqm: contextData.storeInfo?.areaSqm,
+    } : null),
+    products: contextData.products || [],
+    inventory: contextData.inventory || [],
+    recentKpis: contextData.recentKpis || [],
+    entities: mappedEntities,
+    dataQuality: evaluateDataQuality(),
+    mappingStatus,
+  };
+}, [selectedStore, contextData, mappingStatus, evaluateDataQuality]);
       // ✅ 실제 배열 데이터 전달
       products: contextData.products || [],
       inventory: contextData.inventory || [],
