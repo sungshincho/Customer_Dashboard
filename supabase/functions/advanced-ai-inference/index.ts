@@ -617,7 +617,9 @@ Return ONLY valid JSON (no markdown, no explanation):
     }),
     products: [],
   });
-
+  
+  const rawConfidence = aiResponse.optimizationSummary?.confidence || 50;
+  const normalizedConfidence = rawConfidence <= 1 ? rawConfidence * 100 : rawConfidence;
   const result = {
     type: 'layout_simulation',
     timestamp: new Date().toISOString(),
@@ -628,11 +630,11 @@ Return ONLY valid JSON (no markdown, no explanation):
       expectedTrafficIncrease: aiResponse.optimizationSummary?.expectedTrafficIncrease || 0,
       expectedRevenueIncrease: aiResponse.optimizationSummary?.expectedRevenueIncrease || 0,
       changesCount: layoutChanges.length,
-      confidence: aiResponse.optimizationSummary?.confidence || 50,
+      confidence: normalizedConfidence,
     },
     aiInsights: Array.isArray(aiResponse.aiInsights) ? aiResponse.aiInsights : [],
     recommendations: Array.isArray(aiResponse.recommendations) ? aiResponse.recommendations : [],
-    confidenceScore: (aiResponse.optimizationSummary?.confidence || 50) / 100,
+    confidenceScore: normalizedConfidence / 100, 
     ontologyInsights: {
       entitiesAnalyzed: furnitureEntities.length,
       optimizationBasis: 'furniture_position_analysis',
