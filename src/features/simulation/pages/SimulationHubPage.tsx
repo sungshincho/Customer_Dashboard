@@ -749,8 +749,8 @@ const buildStoreContext = useCallback(() => {
 >
   {results.layout && (
     <div className="space-y-4">
-      {/* As-Is / To-Be 비교 뷰 (layoutChanges가 있을 때) */}
-      {results.layout.layoutChanges && results.layout.layoutChanges.length > 0 ? (
+      {/* As-Is / To-Be 비교 뷰 */}
+      {results.layout.layoutChanges && Array.isArray(results.layout.layoutChanges) && results.layout.layoutChanges.length > 0 ? (
         <LayoutComparisonView
           currentRecipe={results.layout.asIsRecipe}
           suggestedRecipe={results.layout.toBeRecipe}
@@ -758,44 +758,54 @@ const buildStoreContext = useCallback(() => {
           optimizationSummary={results.layout.optimizationSummary}
           onApplySuggestion={() => {
             toast.success('레이아웃 변경 사항이 저장되었습니다.');
-            // TODO: 실제 DB 업데이트 로직
           }}
         />
       ) : results.layout.sceneRecipe ? (
-        /* 기존 단일 씬 뷰 (하위 호환성) */
         <div className="h-[400px] rounded-lg border overflow-hidden">
           <SharedDigitalTwinScene overlayType="layout" layoutSimulationData={results.layout.sceneRecipe} />
         </div>
       ) : null}
 
-{/* AI 인사이트 */}
-{results.layout.aiInsights && Array.isArray(results.layout.aiInsights) && results.layout.aiInsights.length > 0 && (
-  <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-    <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
-      <Sparkles className="h-4 w-4 text-blue-600" />
-      AI 인사이트
-    </h4>
-    <ul className="text-sm text-muted-foreground space-y-1">
-      {results.layout.aiInsights.map((insight: string, idx: number) => (
-        <li key={idx}>• {insight}</li>
-      ))}
-    </ul>
-  </div>
-)}
+      {/* AI 인사이트 - 안전한 렌더링 */}
+      {(() => {
+        const insights = results.layout.aiInsights;
+        if (insights && Array.isArray(insights) && insights.length > 0) {
+          return (
+            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-blue-600" />
+                AI 인사이트
+              </h4>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                {insights.map((insight: string, idx: number) => (
+                  <li key={idx}>• {String(insight)}</li>
+                ))}
+              </ul>
+            </div>
+          );
+        }
+        return null;
+      })()}
 
-{/* 추천 사항 */}
-{results.layout.recommendations && Array.isArray(results.layout.recommendations) && results.layout.recommendations.length > 0 && (
-  <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-    <h4 className="font-medium text-sm mb-2">추천 사항</h4>
-    <ul className="text-sm text-muted-foreground space-y-1">
-      {results.layout.recommendations.map((rec: string, idx: number) => (
-        <li key={idx}>• {rec}</li>
-      ))}
-    </ul>
-  </div>
-)}
+      {/* 추천 사항 - 안전한 렌더링 */}
+      {(() => {
+        const recs = results.layout.recommendations;
+        if (recs && Array.isArray(recs) && recs.length > 0) {
+          return (
+            <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+              <h4 className="font-medium text-sm mb-2">추천 사항</h4>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                {recs.map((rec: string, idx: number) => (
+                  <li key={idx}>• {String(rec)}</li>
+                ))}
+              </ul>
+            </div>
+          );
+        }
+        return null;
+      })()}
 
-      {/* 온톨로지 인사이트 차트 */}
+      {/* 온톨로지 인사이트 */}
       {results.layout.ontologyBasedInsights && (
         <OntologyInsightChart insights={results.layout.ontologyBasedInsights} compact />
       )}
