@@ -4,19 +4,131 @@ import { parseModelFilename } from "./modelFilenameParser";
 
 /**
  * 사용자의 3D 모델 로드
- * - Supabase Storage에서 실제 업로드된 모델만 로드
+ * 1. DB: graph_entities (3D 모델 인스턴스 - 위치/회전/스케일)
+ * 2. DB: ontology_entity_types (3D 모델 타입 정의 - 인스턴스 없는 것들)
+ * 3. Storage: 직접 업로드된 모델 (레거시 지원)
  */
 export async function loadUserModels(
   userId: string,
   storeId?: string
 ): Promise<ModelLayer[]> {
   const models: ModelLayer[] = [];
+  const loadedUrls = new Set<string>(); // 중복 방지
 
   try {
-    // Storage에서 업로드된 모델만 로드
+    // ============================================
+    // 1. DB에서 graph_entities 로드 (인스턴스)
+    // ============================================
+    if (storeId) {
+      const { data: entities, error: entitiesError } = await supabase
+        .from('graph_entities')
+        .select(`
+          id,
+          label,
+          properties,
+          model_3d_position,
+          model_3d_rotation,
+          model_3d_scale,
+          entity_type_id,
+          ontology_entity_types (
+            id,
+            name,
+            label,
+            model_3d_url,
+            model_3d_type,
+            model_3d_dimensions,
+            model_3d_metadata
+          )
+        `)
+        .eq('store_id', storeId)
+        .eq('user_id', userId);
+
+      if (!entitiesError && entities) {
+        for (const entity of entities) {
+          const entityType = entity.ontology_entity_types as any;
+          
+          // 3D 모델 URL이 있는 엔티티만 처리
+          if (entityType?.model_3d_url) {
+            const position = parseJsonField(entity.model_3d_position, { x: 0, y: 0, z: 0 });
+            const rotation = parseJsonField(entity.model_3d_rotation, { x: 0, y: 0, z: 0 });
+            const scale = parseJsonField(entity.model_3d_scale, { x: 1, y: 1, z: 1 });
+            const dimensions = parseJsonField(entityType.model_3d_dimensions, undefined);
+            
+            // model_3d_type으로 레이어 타입 결정
+            const type = inferTypeFromModel3dType(entityType.model_3d_type);
+
+            models.push({
+              id: `entity-${entity.id}`,
+              name: entity.label || entityType.label || entityType.name,
+              type,
+              model_url: entityType.model_3d_url,
+              dimensions,
+              position,
+              rotation,
+              scale,
+              metadata: {
+                entityId: entity.id,
+                entityTypeId: entityType.id,
+                entityTypeName: entityType.label || entityType.name,
+                properties: entity.properties,
+                model3dMetadata: entityType.model_3d_metadata
+              }
+            });
+
+            loadedUrls.add(entityType.model_3d_url);
+          }
+        }
+      }
+    }
+
+    // ============================================
+    // 2. DB에서 entity_types 로드 (타입 정의 - 인스턴스 없는 것들)
+    // ============================================
+    const { data: entityTypes, error: typesError } = await supabase
+      .from('ontology_entity_types')
+      .select('id, name, label, model_3d_url, model_3d_type, model_3d_dimensions, model_3d_metadata')
+      .eq('user_id', userId)
+      .not('model_3d_url', 'is', null);
+
+    if (!typesError && entityTypes) {
+      for (const entityType of entityTypes) {
+        // 이미 인스턴스로 로드된 URL은 스킵 (중복 방지)
+        if (entityType.model_3d_url && !loadedUrls.has(entityType.model_3d_url)) {
+          const dimensions = parseJsonField(entityType.model_3d_dimensions, undefined);
+          const metadata = parseJsonField(entityType.model_3d_metadata, {});
+          const type = inferTypeFromModel3dType(entityType.model_3d_type);
+          
+          // defaultPosition이 있으면 사용
+          const defaultPosition = metadata?.defaultPosition || { x: 0, y: 0, z: 0 };
+
+          models.push({
+            id: `type-${entityType.id}`,
+            name: entityType.label || entityType.name,
+            type,
+            model_url: entityType.model_3d_url,
+            dimensions,
+            position: defaultPosition,
+            rotation: { x: 0, y: 0, z: 0 },
+            scale: { x: 1, y: 1, z: 1 },
+            metadata: {
+              entityTypeId: entityType.id,
+              entityTypeName: entityType.label || entityType.name,
+              isTypeOnly: true, // 인스턴스 없이 타입만 있는 경우
+              model3dMetadata: metadata
+            }
+          });
+
+          loadedUrls.add(entityType.model_3d_url);
+        }
+      }
+    }
+
+    // ============================================
+    // 3. Storage에서 직접 업로드된 모델 로드 (레거시)
+    // ============================================
     const storagePath = storeId 
-      ? `${userId}/${storeId}/3d-models`
-      : `${userId}/3d-models`;
+      ? `${userId}/${storeId}`
+      : `${userId}`;
 
     const { data: files, error: storageError } = await supabase.storage
       .from('3d-models')
@@ -29,8 +141,13 @@ export async function loadUserModels(
             .from('3d-models')
             .getPublicUrl(`${storagePath}/${file.name}`);
 
+          // 이미 DB에서 로드된 URL은 스킵
+          if (loadedUrls.has(publicUrl)) {
+            continue;
+          }
+
           // 파일명에서 타입 추론
-          const type = inferModelType(file.name);
+          const type = inferModelTypeFromFilename(file.name);
           
           // 파일명에서 dimensions 추출
           const parsed = parseModelFilename(file.name);
@@ -45,6 +162,8 @@ export async function loadUserModels(
             rotation: { x: 0, y: 0, z: 0 },
             scale: { x: 1, y: 1, z: 1 }
           });
+
+          loadedUrls.add(publicUrl);
         }
       }
     }
@@ -53,13 +172,38 @@ export async function loadUserModels(
     console.error('Error loading user models:', error);
   }
 
+  // 타입 순서로 정렬: space > furniture > product > other
+  const typeOrder = { space: 0, furniture: 1, product: 2, other: 3 };
+  models.sort((a, b) => typeOrder[a.type] - typeOrder[b.type]);
+
   return models;
 }
 
 /**
- * 파일명에서 모델 타입 추론
+ * model_3d_type 필드에서 레이어 타입 추론
  */
-function inferModelType(filename: string): ModelLayer['type'] {
+function inferTypeFromModel3dType(model3dType?: string): ModelLayer['type'] {
+  if (!model3dType) return 'other';
+  
+  const lower = model3dType.toLowerCase();
+  
+  if (lower === 'building' || lower === 'space' || lower === 'store') {
+    return 'space';
+  }
+  if (lower === 'furniture') {
+    return 'furniture';
+  }
+  if (lower === 'product') {
+    return 'product';
+  }
+  
+  return 'other';
+}
+
+/**
+ * 파일명에서 모델 타입 추론 (레거시 Storage 파일용)
+ */
+function inferModelTypeFromFilename(filename: string): ModelLayer['type'] {
   const lower = filename.toLowerCase();
   
   if (lower.includes('space') || lower.includes('store') || lower.includes('room') ||
@@ -68,7 +212,7 @@ function inferModelType(filename: string): ModelLayer['type'] {
   }
   if (lower.includes('shelf') || lower.includes('rack') || lower.includes('furniture') || 
       lower.includes('table') || lower.includes('desk') || lower.includes('mannequin') ||
-      lower.includes('마네킹')) {
+      lower.includes('counter') || lower.includes('마네킹')) {
     return 'furniture';
   }
   if (lower.includes('product') || lower.includes('item') || lower.includes('제품')) {
@@ -76,5 +220,28 @@ function inferModelType(filename: string): ModelLayer['type'] {
   }
   
   return 'other';
+}
+
+/**
+ * JSON 필드 파싱 헬퍼
+ */
+function parseJsonField<T>(field: any, defaultValue: T): T {
+  if (!field) return defaultValue;
+  
+  // 이미 객체인 경우
+  if (typeof field === 'object') {
+    return field as T;
+  }
+  
+  // 문자열인 경우 파싱
+  if (typeof field === 'string') {
+    try {
+      return JSON.parse(field) as T;
+    } catch {
+      return defaultValue;
+    }
+  }
+  
+  return defaultValue;
 }
 
