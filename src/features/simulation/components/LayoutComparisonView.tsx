@@ -21,8 +21,8 @@ interface LayoutChange {
   entityId: string;
   entityLabel: string;
   entityType: string;
-  currentPosition: Vector3D;
-  suggestedPosition: Vector3D;
+  currentPosition?: Vector3D;
+  suggestedPosition?: Vector3D;
   currentRotation?: Vector3D;
   suggestedRotation?: Vector3D;
   reason: string;
@@ -48,6 +48,12 @@ interface LayoutComparisonViewProps {
   isApplying?: boolean;
 }
 
+// 안전한 숫자 포맷
+function safeToFixed(value: any, digits: number = 1): string {
+  if (value === undefined || value === null || isNaN(value)) return '0.0';
+  return Number(value).toFixed(digits);
+}
+
 function FurnitureBox({ 
   position, rotation, scale, color = '#8B4513', label, isHighlighted = false 
 }: {
@@ -58,20 +64,20 @@ function FurnitureBox({
   label?: string;
   isHighlighted?: boolean;
 }) {
-  const adjustedY = position[1] + scale[1] / 2;
+  const adjustedY = (position[1] || 0) + (scale[1] || 1) / 2;
   return (
     <group 
-      position={[position[0], adjustedY, position[2]]} 
-      rotation={rotation.map(r => r * Math.PI / 180) as [number, number, number]}
+      position={[position[0] || 0, adjustedY, position[2] || 0]} 
+      rotation={(rotation || [0, 0, 0]).map(r => (r || 0) * Math.PI / 180) as [number, number, number]}
     >
       <Box args={scale}>
         <meshStandardMaterial color={isHighlighted ? '#FFD700' : color} transparent opacity={0.85} />
       </Box>
-      <Box args={[scale[0] + 0.02, scale[1] + 0.02, scale[2] + 0.02]}>
+      <Box args={[(scale[0] || 1) + 0.02, (scale[1] || 1) + 0.02, (scale[2] || 1) + 0.02]}>
         <meshBasicMaterial color={isHighlighted ? '#FF6600' : '#333'} wireframe />
       </Box>
       {label && (
-        <Html position={[0, scale[1] / 2 + 0.3, 0]} center>
+        <Html position={[0, (scale[1] || 1) / 2 + 0.3, 0]} center>
           <div className="bg-black/70 text-white text-xs px-2 py-1 rounded whitespace-nowrap">{label}</div>
         </Html>
       )}
@@ -82,8 +88,18 @@ function FurnitureBox({
 function SceneRenderer({ recipe, changes = [], isToBeView = false }: { 
   recipe: SceneRecipe | null; changes?: LayoutChange[]; isToBeView?: boolean;
 }) {
-  if (!recipe) return <Html center><div className="text-gray-400">데이터 없음</div></Html>;
-  const changedIds = new Set(changes.map(c => c.entityId));
+  if (!recipe || !recipe.furniture || recipe.furniture.length === 0) {
+    return (
+      <Html center>
+        <div className="text-gray-400 text-center">
+          <div className="text-4xl mb-2">📦</div>
+          <div>가구 데이터 없음</div>
+        </div>
+      </Html>
+    );
+  }
+  
+  const changedIds = new Set((changes || []).map(c => c.entityId));
 
   return (
     <>
@@ -92,14 +108,14 @@ function SceneRenderer({ recipe, changes = [], isToBeView = false }: {
       <Plane args={[17.4, 16.6]} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
         <meshStandardMaterial color="#f0f0f0" />
       </Plane>
-      {recipe.furniture?.map((item, idx) => (
+      {recipe.furniture.map((item, idx) => (
         <FurnitureBox
-          key={`f-${idx}-${item.id}`}
+          key={`f-${idx}-${item.id || idx}`}
           position={[item.position?.x || 0, item.position?.y || 0, item.position?.z || 0]}
           rotation={[item.rotation?.x || 0, item.rotation?.y || 0, item.rotation?.z || 0]}
           scale={[item.scale?.x || 1, item.scale?.y || 1, item.scale?.z || 1]}
           color={item.color || '#888'}
-          label={item.furniture_type}
+          label={item.furniture_type || item.label}
           isHighlighted={changedIds.has(item.id) && isToBeView}
         />
       ))}
@@ -113,6 +129,9 @@ export function LayoutComparisonView({
   currentRecipe, suggestedRecipe, changes = [], optimizationSummary, onApplySuggestion, isApplying = false
 }: LayoutComparisonViewProps) {
   const [viewMode, setViewMode] = useState<'split' | 'current' | 'suggested'>('split');
+
+  // 안전한 changes 배열
+  const safeChanges = Array.isArray(changes) ? changes : [];
 
   const getImpactBadge = (impact: string) => {
     const colors: Record<string, string> = {
@@ -156,14 +175,14 @@ export function LayoutComparisonView({
               <div className="relative bg-gray-900">
                 <div className="absolute top-2 left-2 z-10 bg-black/60 text-white px-2 py-1 rounded text-xs">현재 (As-Is)</div>
                 <Canvas camera={{ position: [10, 10, 10], fov: 50 }}>
-                  <Suspense fallback={null}><SceneRenderer recipe={currentRecipe} changes={changes} /></Suspense>
+                  <Suspense fallback={null}><SceneRenderer recipe={currentRecipe} changes={safeChanges} /></Suspense>
                   <OrbitControls />
                 </Canvas>
               </div>
               <div className="relative bg-gray-900">
                 <div className="absolute top-2 left-2 z-10 bg-blue-600/80 text-white px-2 py-1 rounded text-xs">추천 (To-Be)</div>
                 <Canvas camera={{ position: [10, 10, 10], fov: 50 }}>
-                  <Suspense fallback={null}><SceneRenderer recipe={suggestedRecipe} changes={changes} isToBeView /></Suspense>
+                  <Suspense fallback={null}><SceneRenderer recipe={suggestedRecipe} changes={safeChanges} isToBeView /></Suspense>
                   <OrbitControls />
                 </Canvas>
               </div>
@@ -172,7 +191,7 @@ export function LayoutComparisonView({
           <TabsContent value="current" className="h-full m-0">
             <div className="relative h-full bg-gray-900">
               <Canvas camera={{ position: [12, 12, 12], fov: 50 }}>
-                <Suspense fallback={null}><SceneRenderer recipe={currentRecipe} changes={changes} /></Suspense>
+                <Suspense fallback={null}><SceneRenderer recipe={currentRecipe} changes={safeChanges} /></Suspense>
                 <OrbitControls />
               </Canvas>
             </div>
@@ -180,7 +199,7 @@ export function LayoutComparisonView({
           <TabsContent value="suggested" className="h-full m-0">
             <div className="relative h-full bg-gray-900">
               <Canvas camera={{ position: [12, 12, 12], fov: 50 }}>
-                <Suspense fallback={null}><SceneRenderer recipe={suggestedRecipe} changes={changes} isToBeView /></Suspense>
+                <Suspense fallback={null}><SceneRenderer recipe={suggestedRecipe} changes={safeChanges} isToBeView /></Suspense>
                 <OrbitControls />
               </Canvas>
             </div>
@@ -189,27 +208,27 @@ export function LayoutComparisonView({
       </Tabs>
 
       {/* 변경 사항 목록 */}
-      {changes.length > 0 && (
+      {safeChanges.length > 0 && (
         <div className="border rounded-lg p-3">
           <h4 className="font-medium mb-2 flex items-center gap-2">
-            <MoveRight className="h-4 w-4" />변경 제안 ({changes.length}개)
+            <MoveRight className="h-4 w-4" />변경 제안 ({safeChanges.length}개)
           </h4>
           <ScrollArea className="h-[140px]">
             <div className="space-y-2">
-              {changes.map((change, idx) => (
+              {safeChanges.map((change, idx) => (
                 <div key={idx} className="p-2 rounded border bg-gray-50 text-sm">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium">{change.entityLabel}</span>
-                    {getImpactBadge(change.impact)}
+                    <span className="font-medium">{change.entityLabel || 'Unknown'}</span>
+                    {getImpactBadge(change.impact || 'medium')}
                   </div>
-                  <p className="text-muted-foreground text-xs">{change.reason}</p>
-<div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-  ({(change.currentPosition?.x ?? 0).toFixed(1)}, {(change.currentPosition?.z ?? 0).toFixed(1)})
-  <ArrowRight className="h-3 w-3" />
-  <span className="text-blue-600">
-    ({(change.suggestedPosition?.x ?? 0).toFixed(1)}, {(change.suggestedPosition?.z ?? 0).toFixed(1)})
-  </span>
-</div>
+                  <p className="text-muted-foreground text-xs">{change.reason || ''}</p>
+                  <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                    ({safeToFixed(change.currentPosition?.x)}, {safeToFixed(change.currentPosition?.z)})
+                    <ArrowRight className="h-3 w-3" />
+                    <span className="text-blue-600">
+                      ({safeToFixed(change.suggestedPosition?.x)}, {safeToFixed(change.suggestedPosition?.z)})
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -218,7 +237,7 @@ export function LayoutComparisonView({
       )}
 
       {/* 적용 버튼 */}
-      {changes.length > 0 && onApplySuggestion && (
+      {safeChanges.length > 0 && onApplySuggestion && (
         <div className="flex justify-end">
           <Button onClick={onApplySuggestion} disabled={isApplying}>
             {isApplying ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />적용 중...</> : <><Save className="h-4 w-4 mr-2" />추천 적용</>}
