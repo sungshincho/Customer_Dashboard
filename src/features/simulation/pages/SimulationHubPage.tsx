@@ -476,6 +476,15 @@ const buildStoreContext = useCallback(() => {
       }, storeContext);
       
       if (result) {
+  // 🔍 디버깅: 레이아웃 결과 확인
+  if (type === 'layout') {
+    console.log('=== Layout Simulation Result ===');
+    console.log('result keys:', Object.keys(result));
+    console.log('layoutChanges:', result.layoutChanges);
+    console.log('asIsRecipe:', result.asIsRecipe);
+    console.log('toBeRecipe:', result.toBeRecipe);
+  }
+  
         setResults(prev => ({ ...prev, [type]: result }));
         setResultMeta(prev => ({
           ...prev,
