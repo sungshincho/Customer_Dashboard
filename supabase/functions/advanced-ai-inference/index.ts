@@ -1811,3 +1811,6 @@ function detectStatisticalAnomalies(data: any[], parameters: any) {
   
   return { anomalies, method: 'z_score', threshold };
 }
+
+
+
