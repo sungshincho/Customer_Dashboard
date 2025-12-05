@@ -63,8 +63,9 @@ import { useSimulationHistory } from '../hooks/useSimulationHistory';
 import { OntologyInsightChart } from '../components/OntologyInsightChart';
 import { SimulationHistoryPanel } from '../components/SimulationHistoryPanel';
 
-// 기존 import들 아래에 추가
+// 레이아웃 비교 및 적용
 import { LayoutComparisonView } from '../components/LayoutComparisonView';
+import { useLayoutApply } from '../hooks/useLayoutApply';
 
 /**
  * 데이터 품질 상태 타입
@@ -78,7 +79,7 @@ interface DataQualityStatus {
   inventoryCount: number;
   kpiDays: number;
   entityCount: number;
-  overallScore: number; // 0-100
+  overallScore: number;
   level: 'excellent' | 'good' | 'fair' | 'poor' | 'none';
   message: string;
   canRunSimulation: boolean;
@@ -121,13 +122,13 @@ const SCENARIO_REQUIREMENTS: Record<SimulationScenario, {
 };
 
 /**
- * SimulationHubPage v2.4
+ * SimulationHubPage v2.5
  * 
  * 주요 업데이트:
  * - 실제 백엔드 데이터 연동 (useStoreContext)
  * - 데이터 품질 평가 및 피드백
  * - 시나리오별 데이터 요구사항 검증
- * - 데이터 부족 시 명확한 안내
+ * - 레이아웃 As-Is/To-Be 비교 및 DB 저장
  */
 export default function SimulationHubPage() {
   const { selectedStore } = useSelectedStore();
@@ -138,7 +139,8 @@ export default function SimulationHubPage() {
   const { 
     contextData, 
     loading: contextLoading, 
-    error: contextError 
+    error: contextError,
+    refetch: refetchContext,
   } = useStoreContext(selectedStore?.id);
 
   // Phase 2: 데이터 소스 매핑
@@ -171,6 +173,13 @@ export default function SimulationHubPage() {
     saveToHistory,
   } = useSimulationHistory();
 
+  // ✅ 레이아웃 적용 Hook
+  const { 
+    isApplying, 
+    applyLayoutChanges, 
+    revertLayoutChanges 
+  } = useLayoutApply();
+
   // 상태
   const [useOntologyMode, setUseOntologyMode] = useState(true);
   const [ontologyLoaded, setOntologyLoaded] = useState(false);
@@ -181,7 +190,7 @@ export default function SimulationHubPage() {
   useEffect(() => {
     logActivity('page_view', { 
       page: location.pathname,
-      page_name: 'Simulation Hub v2.4',
+      page_name: 'Simulation Hub v2.5',
       timestamp: new Date().toISOString() 
     });
   }, [location.pathname]);
@@ -232,7 +241,6 @@ export default function SimulationHubPage() {
     const hasKpis = kpiDays >= 7;
     const hasEntities = entityCount >= 3;
 
-    // 점수 계산 (각 항목 25점)
     let score = 0;
     if (productCount >= 10) score += 25;
     else if (productCount >= 5) score += 15;
@@ -252,7 +260,6 @@ export default function SimulationHubPage() {
     else if (entityCount >= 3) score += 10;
     else if (entityCount >= 1) score += 5;
 
-    // 레벨 결정
     let level: DataQualityStatus['level'];
     let message: string;
     
@@ -273,7 +280,6 @@ export default function SimulationHubPage() {
       message = '시뮬레이션을 위한 데이터가 거의 없습니다.';
     }
 
-    // 권장 사항
     const recommendations: string[] = [];
     if (!hasProducts) recommendations.push(`상품 데이터를 추가해주세요 (현재 ${productCount}개, 최소 5개 필요)`);
     if (!hasInventory) recommendations.push(`재고 데이터를 추가해주세요 (현재 ${inventoryCount}개, 최소 5개 필요)`);
@@ -325,7 +331,6 @@ export default function SimulationHubPage() {
     return { canRun: true };
   }, [evaluateDataQuality]);
 
-  // 현재 데이터 품질 상태
   const dataQuality = useMemo(() => evaluateDataQuality(), [evaluateDataQuality]);
 
   // AI 모델 선택 상태
@@ -334,7 +339,6 @@ export default function SimulationHubPage() {
   ]);
   const [parameters, setParameters] = useState<SimulationParameters>(defaultParameters);
   
-  // ✅ 시나리오 목록 (데이터 품질에 따라 활성화)
   const scenarios: SimulationScenarioConfig[] = useMemo(() => {
     return defaultScenarios.map(scenario => {
       const { canRun, reason } = canRunScenario(scenario.id);
@@ -351,7 +355,7 @@ export default function SimulationHubPage() {
     demand: null, inventory: null, pricing: null, layout: null, marketing: null,
   });
   
-  const [resultMeta, setResultMeta] = useState<Record<SimulationScenario, SimulationResultMeta>>({
+  const [resultMeta, setResultMeta] = useState<Record<SimulationScenario, SimulationResultMeta & { appliedAt?: string }>>({
     demand: { status: 'idle' }, inventory: { status: 'idle' }, pricing: { status: 'idle' },
     layout: { status: 'idle' }, marketing: { status: 'idle' },
   });
@@ -379,117 +383,109 @@ export default function SimulationHubPage() {
     setParameters(prev => ({ ...prev, ...params }));
   }, []);
 
-// ✅ 실제 데이터를 포함한 Store Context 빌드
-const buildStoreContext = useCallback(() => {
-  if (!contextData) {
+  // ✅ 실제 데이터를 포함한 Store Context 빌드
+  const buildStoreContext = useCallback(() => {
+    if (!contextData) {
+      return {
+        storeInfo: selectedStore ? {
+          id: selectedStore.id,
+          name: selectedStore.store_name,
+          code: selectedStore.store_code,
+        } : null,
+        products: [],
+        inventory: [],
+        recentKpis: [],
+        entities: [],
+        dataQuality: evaluateDataQuality(),
+      };
+    }
+
+    const mappedEntities = (contextData.entities || []).map((e: any) => ({
+      id: e.id,
+      label: e.label,
+      entityType: e.entityType || e.entity_type_name || 'unknown',
+      entity_type_name: e.entity_type_name || e.entityType || 'unknown',
+      model_3d_type: e.model_3d_type,
+      properties: e.properties || {},
+      position: e.model_3d_position || e.position || { x: 0, y: 0, z: 0 },
+      rotation: e.model_3d_rotation || { x: 0, y: 0, z: 0 },
+      scale: e.model_3d_scale || { x: 1, y: 1, z: 1 },
+      model3dUrl: e.model_3d_url,
+      dimensions: e.model_3d_dimensions,
+    }));
+
+    const furnitureCount = mappedEntities.filter((e: any) => 
+      ['furniture', 'room', 'structure'].includes(e.model_3d_type) ||
+      ['Shelf', 'Rack', 'DisplayTable', 'CheckoutCounter', 'FittingRoom', 'Entrance'].includes(e.entity_type_name)
+    ).length;
+    
+    console.log('buildStoreContext - entities:', mappedEntities.length, 'furniture:', furnitureCount);
+
     return {
-      storeInfo: selectedStore ? {
+      storeInfo: contextData.storeInfo || (selectedStore ? {
         id: selectedStore.id,
         name: selectedStore.store_name,
         code: selectedStore.store_code,
-      } : null,
-      products: [],
-      inventory: [],
-      recentKpis: [],
-      entities: [],
+        areaSqm: contextData.storeInfo?.areaSqm,
+      } : null),
+      products: contextData.products || [],
+      inventory: contextData.inventory || [],
+      recentKpis: contextData.recentKpis || [],
+      entities: mappedEntities,
       dataQuality: evaluateDataQuality(),
+      mappingStatus,
     };
-  }
+  }, [selectedStore, contextData, mappingStatus, evaluateDataQuality]);
 
-  // 엔티티 변환 (3D 정보 포함)
-  const mappedEntities = (contextData.entities || []).map((e: any) => ({
-    id: e.id,
-    label: e.label,
-    entityType: e.entityType || e.entity_type_name || 'unknown',
-    entity_type_name: e.entity_type_name || e.entityType || 'unknown',
-    model_3d_type: e.model_3d_type,
-    properties: e.properties || {},
-    position: e.model_3d_position || e.position || { x: 0, y: 0, z: 0 },
-    rotation: e.model_3d_rotation || { x: 0, y: 0, z: 0 },
-    scale: e.model_3d_scale || { x: 1, y: 1, z: 1 },
-    model3dUrl: e.model_3d_url,
-    dimensions: e.model_3d_dimensions,
-  }));
+  // ✅ 시뮬레이션 실행
+  const runSimulation = useCallback(async (type: SimulationScenario) => {
+    const { canRun, reason } = canRunScenario(type);
+    if (!canRun) {
+      toast.error(reason || '데이터가 부족하여 시뮬레이션을 실행할 수 없습니다.');
+      setResultMeta(prev => ({
+        ...prev,
+        [type]: { status: 'error', errorMessage: reason || '데이터 부족' }
+      }));
+      return;
+    }
 
-  // 디버깅 로그
-  const furnitureCount = mappedEntities.filter((e: any) => 
-    ['furniture', 'room', 'structure'].includes(e.model_3d_type) ||
-    ['Shelf', 'Rack', 'DisplayTable', 'CheckoutCounter', 'FittingRoom', 'Entrance'].includes(e.entity_type_name)
-  ).length;
-  
-  console.log('buildStoreContext - entities:', mappedEntities.length, 'furniture:', furnitureCount);
+    if (!selectedStore) {
+      toast.error('매장을 선택해주세요.');
+      return;
+    }
 
-  return {
-    storeInfo: contextData.storeInfo || (selectedStore ? {
-      id: selectedStore.id,
-      name: selectedStore.store_name,
-      code: selectedStore.store_code,
-      areaSqm: contextData.storeInfo?.areaSqm,
-    } : null),
-    products: contextData.products || [],
-    inventory: contextData.inventory || [],
-    recentKpis: contextData.recentKpis || [],
-    entities: mappedEntities,
-    dataQuality: evaluateDataQuality(),
-    mappingStatus,
-  };
-}, [selectedStore, contextData, mappingStatus, evaluateDataQuality]);
-  // ✅ 시뮬레이션 실행 (데이터 검증 포함)
-const runSimulation = useCallback(async (type: SimulationScenario) => {
-  // 데이터 검증
-  const { canRun, reason } = canRunScenario(type);
-  if (!canRun) {
-    toast.error(reason || '데이터가 부족하여 시뮬레이션을 실행할 수 없습니다.');
-    setResultMeta(prev => ({
-      ...prev,
-      [type]: { 
-        status: 'error', 
-        errorMessage: reason || '데이터 부족' 
-      }
-    }));
-    return;
-  }
+    const startTime = Date.now();
+    setLoadingStates(prev => ({ ...prev, [type]: true }));
+    setResultMeta(prev => ({ ...prev, [type]: { status: 'loading' } }));
 
-  if (!selectedStore) {
-    toast.error('매장을 선택해주세요.');
-    return;
-  }
-
-  const startTime = Date.now();
-  setLoadingStates(prev => ({ ...prev, [type]: true }));
-  setResultMeta(prev => ({ ...prev, [type]: { status: 'loading' } }));
-
-  try {
-    const storeContext = buildStoreContext();
-    
-    // 🔍 디버깅: storeContext 확인
-    console.log('=== runSimulation Debug ===');
-    console.log('type:', type);
-    console.log('storeContext.entities:', storeContext.entities?.length);
-    console.log('storeContext.storeInfo:', storeContext.storeInfo);
-    
-    const inferFn = useOntologyMode ? inferWithOntology : infer;
-    
-    // ✅ 데이터 품질 정보를 파라미터에 포함
-    const result = await inferFn(type, {
-      dataRange: parameters.dataRange,
-      forecastPeriod: parameters.forecastPeriod,
-      confidenceLevel: parameters.confidenceLevel,
-      includeSeasonality: parameters.includeSeasonality,
-      includeExternalFactors: parameters.includeExternalFactors,
-      dataQualityScore: dataQuality.overallScore,
-      dataQualityLevel: dataQuality.level,
-    }, storeContext);
+    try {
+      const storeContext = buildStoreContext();
+      
+      console.log('=== runSimulation Debug ===');
+      console.log('type:', type);
+      console.log('storeContext.entities:', storeContext.entities?.length);
+      console.log('storeContext.storeInfo:', storeContext.storeInfo);
+      
+      const inferFn = useOntologyMode ? inferWithOntology : infer;
+      
+      const result = await inferFn(type, {
+        dataRange: parameters.dataRange,
+        forecastPeriod: parameters.forecastPeriod,
+        confidenceLevel: parameters.confidenceLevel,
+        includeSeasonality: parameters.includeSeasonality,
+        includeExternalFactors: parameters.includeExternalFactors,
+        dataQualityScore: dataQuality.overallScore,
+        dataQualityLevel: dataQuality.level,
+      }, storeContext);
       
       if (result) {
-  // 🔍 디버깅: 레이아웃 결과 확인
-  if (type === 'layout') {
-    console.log('=== Layout Simulation Result ===');
-    console.log('result keys:', Object.keys(result));
-    console.log('layoutChanges:', result.layoutChanges);
-    console.log('asIsRecipe:', result.asIsRecipe);
-    console.log('toBeRecipe:', result.toBeRecipe);
-  }
+        if (type === 'layout') {
+          console.log('=== Layout Simulation Result ===');
+          console.log('result keys:', Object.keys(result));
+          console.log('layoutChanges:', result.layoutChanges);
+          console.log('asIsRecipe:', result.asIsRecipe);
+          console.log('toBeRecipe:', result.toBeRecipe);
+        }
   
         setResults(prev => ({ ...prev, [type]: result }));
         setResultMeta(prev => ({
@@ -538,6 +534,41 @@ const runSimulation = useCallback(async (type: SimulationScenario) => {
     toast.success('시뮬레이션 완료');
   }, [selectedScenarios, canRunScenario, runSimulation]);
 
+  // ✅ 레이아웃 추천 적용 핸들러
+  const handleApplyLayoutSuggestion = useCallback(async () => {
+    if (!results.layout?.layoutChanges || results.layout.layoutChanges.length === 0) {
+      toast.warning('적용할 변경사항이 없습니다.');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `${results.layout.layoutChanges.length}개의 가구 위치를 변경하시겠습니까?\n\n` +
+      `이 작업은 디지털트윈 3D에도 반영됩니다.`
+    );
+
+    if (!confirmed) return;
+
+    const result = await applyLayoutChanges(results.layout.layoutChanges, {
+      createSnapshot: true,
+      storeId: selectedStore?.id,
+    });
+
+    if (result.success) {
+      // 컨텍스트 데이터 새로고침
+      if (refetchContext) {
+        await refetchContext();
+      }
+
+      setResultMeta(prev => ({
+        ...prev,
+        layout: {
+          ...prev.layout,
+          appliedAt: new Date().toISOString(),
+        }
+      }));
+    }
+  }, [results.layout, applyLayoutChanges, selectedStore?.id, refetchContext]);
+
   // 내보내기
   const handleExport = useCallback(async (type: SimulationScenario, format: 'csv' | 'pdf' | 'json') => {
     const result = results[type];
@@ -560,7 +591,6 @@ const runSimulation = useCallback(async (type: SimulationScenario) => {
     return titles[type] || type;
   };
 
-  // ✅ 데이터 품질 배지 색상
   const getQualityBadgeVariant = (level: DataQualityStatus['level']) => {
     switch (level) {
       case 'excellent': return 'default';
@@ -629,7 +659,7 @@ const runSimulation = useCallback(async (type: SimulationScenario) => {
           </div>
         </div>
 
-        {/* ✅ 데이터 품질 상태 표시 */}
+        {/* 데이터 품질 상태 표시 */}
         {selectedStore && (
           <Alert className={`
             ${dataQuality.level === 'excellent' ? 'bg-green-50 border-green-200 dark:bg-green-950/20' : ''}
@@ -751,82 +781,88 @@ const runSimulation = useCallback(async (type: SimulationScenario) => {
               disabled={!selectedStore || !dataQuality.canRunSimulation}
             />
 
-        
-{/* 레이아웃 최적화 - As-Is / To-Be 비교 */}
-<SimulationResultCard
-  type="layout" title="레이아웃 최적화" description="AI 가구 배치 최적화"
-  icon={Grid3x3} color="cyan"
-  isLoading={loadingStates.layout} hasResult={!!results.layout} meta={resultMeta.layout}
-  onRefresh={() => runSimulation('layout')}
-  onExport={(format) => handleExport('layout', format)}
-  onSave={() => handleManualSave('layout')}
-  fullWidth minHeight="500px"
->
-  {results.layout && (
-    <div className="space-y-4">
-      {/* As-Is / To-Be 비교 뷰 */}
-      {results.layout.layoutChanges && Array.isArray(results.layout.layoutChanges) && results.layout.layoutChanges.length > 0 ? (
-        <LayoutComparisonView
-          currentRecipe={results.layout.asIsRecipe}
-          suggestedRecipe={results.layout.toBeRecipe}
-          changes={results.layout.layoutChanges}
-          optimizationSummary={results.layout.optimizationSummary}
-          onApplySuggestion={() => {
-            toast.success('레이아웃 변경 사항이 저장되었습니다.');
-          }}
-        />
-      ) : results.layout.sceneRecipe ? (
-        <div className="h-[400px] rounded-lg border overflow-hidden">
-          <SharedDigitalTwinScene overlayType="layout" layoutSimulationData={results.layout.sceneRecipe} />
-        </div>
-      ) : null}
+            {/* 레이아웃 최적화 - As-Is / To-Be 비교 */}
+            <SimulationResultCard
+              type="layout" title="레이아웃 최적화" description="AI 가구 배치 최적화"
+              icon={Grid3x3} color="cyan"
+              isLoading={loadingStates.layout} hasResult={!!results.layout} meta={resultMeta.layout}
+              onRefresh={() => runSimulation('layout')}
+              onExport={(format) => handleExport('layout', format)}
+              onSave={() => handleManualSave('layout')}
+              fullWidth minHeight="500px"
+            >
+              {results.layout && (
+                <div className="space-y-4">
+                  {/* As-Is / To-Be 비교 뷰 */}
+                  {results.layout.layoutChanges && Array.isArray(results.layout.layoutChanges) && results.layout.layoutChanges.length > 0 ? (
+                    <LayoutComparisonView
+                      currentRecipe={results.layout.asIsRecipe}
+                      suggestedRecipe={results.layout.toBeRecipe}
+                      changes={results.layout.layoutChanges}
+                      optimizationSummary={results.layout.optimizationSummary}
+                      onApplySuggestion={handleApplyLayoutSuggestion}
+                      isApplying={isApplying}
+                    />
+                  ) : results.layout.sceneRecipe ? (
+                    <div className="h-[400px] rounded-lg border overflow-hidden">
+                      <SharedDigitalTwinScene overlayType="layout" layoutSimulationData={results.layout.sceneRecipe} />
+                    </div>
+                  ) : null}
 
-      {/* AI 인사이트 - 안전한 렌더링 */}
-      {(() => {
-        const insights = results.layout.aiInsights;
-        if (insights && Array.isArray(insights) && insights.length > 0) {
-          return (
-            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-              <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-blue-600" />
-                AI 인사이트
-              </h4>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                {insights.map((insight: string, idx: number) => (
-                  <li key={idx}>• {String(insight)}</li>
-                ))}
-              </ul>
-            </div>
-          );
-        }
-        return null;
-      })()}
+                  {/* AI 인사이트 */}
+                  {(() => {
+                    const insights = results.layout.aiInsights;
+                    if (insights && Array.isArray(insights) && insights.length > 0) {
+                      return (
+                        <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                          <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+                            <Sparkles className="h-4 w-4 text-blue-600" />
+                            AI 인사이트
+                          </h4>
+                          <ul className="text-sm text-muted-foreground space-y-1">
+                            {insights.map((insight: string, idx: number) => (
+                              <li key={idx}>• {String(insight)}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
 
-      {/* 추천 사항 - 안전한 렌더링 */}
-      {(() => {
-        const recs = results.layout.recommendations;
-        if (recs && Array.isArray(recs) && recs.length > 0) {
-          return (
-            <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-              <h4 className="font-medium text-sm mb-2">추천 사항</h4>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                {recs.map((rec: string, idx: number) => (
-                  <li key={idx}>• {String(rec)}</li>
-                ))}
-              </ul>
-            </div>
-          );
-        }
-        return null;
-      })()}
+                  {/* 추천 사항 */}
+                  {(() => {
+                    const recs = results.layout.recommendations;
+                    if (recs && Array.isArray(recs) && recs.length > 0) {
+                      return (
+                        <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                          <h4 className="font-medium text-sm mb-2">추천 사항</h4>
+                          <ul className="text-sm text-muted-foreground space-y-1">
+                            {recs.map((rec: string, idx: number) => (
+                              <li key={idx}>• {String(rec)}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
 
-      {/* 온톨로지 인사이트 */}
-      {results.layout.ontologyBasedInsights && (
-        <OntologyInsightChart insights={results.layout.ontologyBasedInsights} compact />
-      )}
-    </div>
-  )}
-</SimulationResultCard>
+                  {/* 온톨로지 인사이트 */}
+                  {results.layout.ontologyBasedInsights && (
+                    <OntologyInsightChart insights={results.layout.ontologyBasedInsights} compact />
+                  )}
+
+                  {/* 적용 완료 표시 */}
+                  {resultMeta.layout?.appliedAt && (
+                    <div className="p-2 bg-green-100 rounded text-sm text-green-800 flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4" />
+                      적용 완료: {new Date(resultMeta.layout.appliedAt).toLocaleString()}
+                    </div>
+                  )}
+                </div>
+              )}
+            </SimulationResultCard>
 
             {/* 4개 그리드 */}
             <SimulationResultGrid columns={2}>
