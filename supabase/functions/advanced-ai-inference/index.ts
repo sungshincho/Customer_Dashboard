@@ -393,171 +393,246 @@ Return a JSON object:
   };
 }
 
-// Layout Simulation: 레이아웃 시뮬레이션
+// ============================================================================
+// Layout Simulation v3 - As-Is/To-Be 비교 지원
+// ============================================================================
 async function performLayoutSimulation(request: InferenceRequest, apiKey: string) {
+  console.log('performLayoutSimulation v3 - As-Is/To-Be Comparison');
+  
   const { parameters = {} } = request;
-  const { changedZones = [], movedFurniture = [], storeContext = {} } = parameters;
   
-  // 실제 매장 데이터 컨텍스트 구축
-  let storeDataContext = '';
-  if (storeContext?.storeInfo) {
-    storeDataContext = `
-STORE INFORMATION:
-- Name: ${storeContext.storeInfo.name}
-- Area: ${storeContext.storeInfo.areaSqm}㎡
-- Current Layout: ${storeContext.storeInfo.district || 'Standard retail'}
+  // storeContext 추출 (여러 가능한 경로)
+  const storeContext = parameters.store_context || parameters.storeContext || {};
+  
+  console.log('=== Layout Simulation Start ===');
+  console.log('StoreContext keys:', Object.keys(storeContext));
+  console.log('StoreContext entities count:', storeContext.entities?.length || 0);
 
-CURRENT PERFORMANCE METRICS (Recent 30 Days):
-- Average Daily Revenue: ${storeContext.recentKpis?.[0]?.totalRevenue?.toLocaleString() || 'N/A'}원
-- Average Conversion Rate: ${((storeContext.recentKpis?.[0]?.conversionRate || 0) * 100).toFixed(1)}%
-- Total Products: ${storeContext.products?.length || 0}개
-- Total Entities in 3D Scene: ${storeContext.entities?.length || 0}개
-`;
+  // 가구 엔티티 필터링
+  let furnitureEntities: any[] = [];
+  
+  if (storeContext.entities && storeContext.entities.length > 0) {
+    // 엔티티 정규화
+    const entities = storeContext.entities.map((e: any) => ({
+      id: e.id,
+      label: e.label,
+      entityType: e.entityType || e.entity_type_name || 'unknown',
+      model3dType: e.model_3d_type || e.model3dType,
+      position: e.position || e.model_3d_position || { x: 0, y: 0, z: 0 },
+      rotation: e.rotation || e.model_3d_rotation || { x: 0, y: 0, z: 0 },
+      scale: e.scale || e.model_3d_scale || { x: 1, y: 1, z: 1 },
+      properties: e.properties || {},
+    }));
+
+    console.log('Mapped entities:', entities.length);
+
+    // 가구 타입 필터링
+    furnitureEntities = entities.filter((e: any) => {
+      const type = (e.entityType || '').toLowerCase();
+      const model3dType = (e.model3dType || '').toLowerCase();
+      
+      // model_3d_type 기반 필터링
+      if (['furniture', 'room', 'structure'].includes(model3dType)) return true;
+      
+      // entity_type_name 기반 필터링
+      const furnitureTypes = ['shelf', 'rack', 'displaytable', 'checkoutcounter', 'fittingroom', 'entrance', 'gondola', 'counter', 'table', 'display'];
+      if (furnitureTypes.some(t => type.toLowerCase().includes(t))) return true;
+      
+      return false;
+    });
+
+    console.log('Filtered furniture:', furnitureEntities.length);
   }
-  
-  const prompt = `You are a world-class retail space design expert with 20+ years of experience optimizing store layouts for maximum revenue and customer satisfaction. You specialize in data-driven layout optimization using customer flow analysis, spatial psychology, and retail best practices.
 
-${storeDataContext}
+  // 가구가 없으면 빈 결과 반환
+  if (furnitureEntities.length === 0) {
+    console.log('No furniture found - returning empty result');
+    return {
+      type: 'layout_simulation',
+      timestamp: new Date().toISOString(),
+      asIsRecipe: { furniture: [], products: [] },
+      toBeRecipe: { furniture: [], products: [] },
+      layoutChanges: [],
+      optimizationSummary: {
+        expectedTrafficIncrease: 0,
+        expectedRevenueIncrease: 0,
+        changesCount: 0,
+        confidence: 0,
+      },
+      aiInsights: ['가구 데이터가 없습니다. 디지털트윈 3D에서 가구를 추가해주세요.'],
+      recommendations: [],
+      confidenceScore: 0,
+    };
+  }
 
-PROPOSED LAYOUT CHANGES:
-${changedZones.length > 0 ? `Zone Modifications (${changedZones.length}):
-${JSON.stringify(changedZones, null, 2)}` : 'No zone changes specified'}
+  // AI 프롬프트용 가구 목록 생성
+  const furnitureList = furnitureEntities.slice(0, 15).map((f: any) => 
+    `- [${f.id}] ${f.label} (${f.entityType}): pos(x=${f.position?.x?.toFixed?.(1) || 0}, z=${f.position?.z?.toFixed?.(1) || 0})`
+  ).join('\n');
 
-${movedFurniture.length > 0 ? `Furniture Relocations (${movedFurniture.length}):
-${JSON.stringify(movedFurniture, null, 2)}` : 'No furniture moves specified'}
+  const storeWidth = storeContext.storeInfo?.width || 17.4;
+  const storeDepth = storeContext.storeInfo?.depth || 16.6;
 
-ANALYSIS REQUIREMENTS:
-Based on retail psychology, customer flow patterns, and the actual store data provided above, you must predict:
-1. Customer flow patterns after the change
-2. Expected impact on KPIs (CVR, dwell time, sales per sqm)
-3. Optimal customer paths through the store
-4. High-dwell zones and their characteristics
-5. Potential bottlenecks or dead zones
-6. Generate a new 3D scene recipe for the optimized layout
+  const prompt = `You are a retail store layout optimization expert.
 
-Return a comprehensive JSON object:
+STORE INFO:
+- Name: ${storeContext.storeInfo?.name || 'Store'}
+- Dimensions: ${storeWidth}m x ${storeDepth}m
+- Total furniture: ${furnitureEntities.length} items
+
+CURRENT FURNITURE LAYOUT (${furnitureEntities.length} items):
+${furnitureList}
+
+YOUR TASK:
+Analyze the current layout and suggest 3-5 specific furniture position changes to improve:
+1. Customer flow and traffic
+2. Product visibility
+3. Sales conversion
+
+IMPORTANT RULES:
+1. Use EXACT entityId from the list above
+2. Keep positions within store bounds (x: 0-${storeWidth}, z: 0-${storeDepth})
+3. Provide Korean explanations for reasons
+4. Only suggest meaningful changes (at least 1 meter movement)
+
+Return ONLY valid JSON (no markdown, no explanation):
 {
-  "predictedKpi": {
-    "conversionRate": 0.145,
-    "averageTransactionValue": 48500,
-    "salesPerSqm": 920000,
-    "opex": 12000000,
-    "netProfit": 21000000,
-    "inventoryTurnover": 4.8,
-    "customerSatisfaction": 4.5
-  },
-  "confidenceScore": 0.85,
-  "aiInsights": "Detailed analysis of why these predictions make sense...",
-  "flowPrediction": {
-    "paths": [
-      {
-        "points": [
-          {"x": 0, "z": 0, "intensity": 1},
-          {"x": 2, "z": 1, "intensity": 0.8}
-        ],
-        "weight": 0.8
-      }
-    ],
-    "heatmap": [
-      {"x": 2, "z": 1, "intensity": 0.9}
-    ],
-    "dwellZones": [
-      {"x": 4, "z": 2, "radius": 1.5, "time": 3.2}
-    ],
-    "kpiChanges": {
-      "conversionRate": 2.5,
-      "dwellTime": 1.2,
-      "flowEfficiency": 85
+  "layoutChanges": [
+    {
+      "entityId": "exact-uuid-from-furniture-list",
+      "entityLabel": "가구 이름",
+      "entityType": "Shelf",
+      "currentPosition": {"x": 2.0, "y": 0, "z": 3.0},
+      "suggestedPosition": {"x": 5.0, "y": 0, "z": 3.0},
+      "reason": "고객 동선 개선을 위해 입구에서 더 잘 보이는 위치로 이동",
+      "impact": "high"
     }
-  },
-  "sceneRecipe": {
-    "metadata": {
-      "name": "Optimized Layout",
-      "description": "AI-optimized store layout",
-      "version": "1.0"
-    },
-    "layers": {
-      "floor": { "url": "floor_model_url", "position": [0, 0, 0] },
-      "fixtures": [
-        { "url": "fixture_url", "position": [x, y, z], "rotation": [0, 0, 0], "scale": [1, 1, 1] }
-      ],
-      "products": [
-        { "url": "product_url", "position": [x, y, z], "rotation": [0, 0, 0], "scale": [1, 1, 1] }
-      ]
-    },
-    "lighting": {
-      "ambient": { "intensity": 0.5 },
-      "directional": { "position": [10, 10, 10], "intensity": 1 }
-    }
-  },
-  "recommendations": [
-    "Consider adding signage at zone X",
-    "Optimize lighting in high-traffic areas"
   ],
-  "warnings": [
-    "Potential congestion near entrance",
-    "Low visibility for sale zone"
-  ]
-}
+  "optimizationSummary": {
+    "expectedTrafficIncrease": 15,
+    "expectedRevenueIncrease": 8,
+    "confidence": 75
+  },
+  "aiInsights": ["인사이트 1", "인사이트 2"],
+  "recommendations": ["추천 1", "추천 2"]
+}`;
 
-Focus on realistic, actionable insights based on retail psychology and spatial planning principles.`;
+  // AI 호출
+  let aiResponse: any = {
+    layoutChanges: [],
+    optimizationSummary: { expectedTrafficIncrease: 0, expectedRevenueIncrease: 0, confidence: 50 },
+    aiInsights: [],
+    recommendations: [],
+  };
+  
+  try {
+    console.log('Calling AI API...');
+    
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a retail layout expert. Return ONLY valid JSON, no markdown code blocks, no explanations.'
+          },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.5,
+        max_tokens: 2000,
+      }),
+    });
 
-  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'google/gemini-2.5-pro',
-      messages: [
-        { 
-          role: 'system', 
-          content: 'You are an elite retail analytics consultant with deep expertise in store layout optimization, customer behavior analysis, and data-driven decision making. Provide precise, actionable insights based on retail industry best practices.' 
-        },
-        { role: 'user', content: prompt }
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.7,
-    }),
+    if (response.ok) {
+      const result = await response.json();
+      const aiContent = result.choices?.[0]?.message?.content || '';
+      
+      console.log('AI response length:', aiContent.length);
+      
+      if (aiContent.trim()) {
+        // JSON 클리닝
+        const cleaned = cleanJsonResponse(aiContent);
+        
+        if (cleaned.startsWith('{')) {
+          aiResponse = JSON.parse(cleaned);
+          console.log('Parsed layoutChanges count:', aiResponse.layoutChanges?.length || 0);
+        }
+      }
+    } else {
+      console.error('AI API error:', response.status, await response.text());
+    }
+  } catch (e) {
+    console.error('AI call error:', e);
+  }
+
+  // layoutChanges 검증 및 정규화
+  const layoutChanges = Array.isArray(aiResponse.layoutChanges) 
+    ? aiResponse.layoutChanges.filter((c: any) => c.entityId && c.suggestedPosition)
+    : [];
+  
+  console.log('Valid layoutChanges:', layoutChanges.length);
+
+  // entityId -> 변경사항 매핑
+  const changesMap = new Map<string, any>();
+  layoutChanges.forEach((c: any) => {
+    changesMap.set(c.entityId, c);
   });
 
-  if (!response.ok) {
-    const error = await response.text();
-    console.error('Layout simulation AI error:', error);
-    throw new Error(`AI API error: ${error}`);
-  }
+  // As-Is / To-Be Recipe 생성
+  const buildRecipe = (mode: 'current' | 'suggested') => ({
+    furniture: furnitureEntities.map((f: any) => {
+      const change = changesMap.get(f.id);
+      const position = (mode === 'suggested' && change?.suggestedPosition) 
+        ? change.suggestedPosition 
+        : f.position;
+      
+      return {
+        id: f.id,
+        type: 'furniture',
+        furniture_type: f.entityType,
+        label: f.label,
+        position: position,
+        rotation: f.rotation || { x: 0, y: 0, z: 0 },
+        scale: f.scale || { x: 1, y: 1, z: 1 },
+        color: f.properties?.color || '#888888',
+        isChanged: mode === 'suggested' && !!change,
+      };
+    }),
+    products: [],
+  });
 
-  const result = await response.json();
-  const cleanedContent = cleanJsonResponse(result.choices[0].message.content);
-  const prediction = JSON.parse(cleanedContent);
-  
-  // Ensure numeric values are properly typed
-  if (prediction.confidenceScore !== undefined) {
-    prediction.confidenceScore = Number(prediction.confidenceScore);
-  }
-  
-  // Validate predictedKpi
-  if (prediction.predictedKpi) {
-    Object.keys(prediction.predictedKpi).forEach(key => {
-      if (prediction.predictedKpi[key] !== undefined) {
-        prediction.predictedKpi[key] = Number(prediction.predictedKpi[key]);
-      }
-    });
-  }
-  
-  console.log('Layout simulation completed:', prediction);
-  
-  return {
+  const result = {
     type: 'layout_simulation',
     timestamp: new Date().toISOString(),
-    ...prediction,
-    metadata: {
-      modelVersion: 'gemini-2.5-pro',
-      processingTime: Date.now(),
-      flowPrediction: prediction.flowPrediction,
+    asIsRecipe: buildRecipe('current'),
+    toBeRecipe: buildRecipe('suggested'),
+    layoutChanges: layoutChanges,
+    optimizationSummary: {
+      expectedTrafficIncrease: aiResponse.optimizationSummary?.expectedTrafficIncrease || 0,
+      expectedRevenueIncrease: aiResponse.optimizationSummary?.expectedRevenueIncrease || 0,
+      changesCount: layoutChanges.length,
+      confidence: aiResponse.optimizationSummary?.confidence || 50,
+    },
+    aiInsights: Array.isArray(aiResponse.aiInsights) ? aiResponse.aiInsights : [],
+    recommendations: Array.isArray(aiResponse.recommendations) ? aiResponse.recommendations : [],
+    confidenceScore: (aiResponse.optimizationSummary?.confidence || 50) / 100,
+    ontologyInsights: {
+      entitiesAnalyzed: furnitureEntities.length,
+      optimizationBasis: 'furniture_position_analysis',
     },
   };
+
+  console.log('=== Layout Simulation Complete ===');
+  console.log('asIsRecipe furniture count:', result.asIsRecipe.furniture.length);
+  console.log('toBeRecipe furniture count:', result.toBeRecipe.furniture.length);
+  console.log('layoutChanges count:', result.layoutChanges.length);
+
+  return result;
 }
 
 // Business Goal Analysis: 비즈니스 목표 분석 및 시나리오 추천
@@ -659,26 +734,6 @@ FORECAST PARAMETERS:
 - Economic Indicators: ${parameters.includeEconomicIndicators ? 'Yes' : 'No'}
 - Weather Scenario: ${parameters.weatherScenario || 'normal'}
 
-CRITICAL ANALYSIS FRAMEWORK:
-You are a senior demand forecasting analyst with expertise in retail predictive analytics. Use advanced forecasting methodologies including:
-- Time series analysis with seasonality decomposition
-- External factor regression (weather, events, economic indicators)
-- Product lifecycle modeling
-- Category-specific demand patterns
-
-Your comprehensive forecast must include:
-1. Daily demand predictions for the next ${parameters.forecastHorizonDays || 30} days with 95% confidence intervals
-2. Peak demand identification with specific dates and magnitudes
-3. Demand driver analysis with quantified impact percentages
-4. Product-level forecasts for top-selling items
-5. Actionable inventory and staffing recommendations
-
-FORECASTING METHODOLOGY:
-- Use the store's historical performance as baseline
-- Apply ${parameters.weatherScenario || 'realistic'} weather scenarios
-- ${parameters.includeEvents ? 'Factor in upcoming holidays and promotional events' : 'Exclude event impacts'}
-- ${parameters.includeEconomicIndicators ? 'Consider macroeconomic trends and consumer sentiment' : 'Exclude economic factors'}
-
 Return a comprehensive JSON object:
 {
   "predictedKpi": {
@@ -691,27 +746,21 @@ Return a comprehensive JSON object:
     "netProfit": 19500000
   },
   "confidenceScore": 85,
-  "aiInsights": "Detailed Korean explanation of demand predictions, key drivers, seasonal patterns, and recommended actions for inventory and staffing",
+  "aiInsights": "Detailed Korean explanation of demand predictions",
   "demandDrivers": [
     {
       "factor": "날씨 조건",
       "impact": "positive",
       "magnitude": 15,
       "explanation": "평균 기온 상승으로 여름 제품 수요 증가 예상"
-    },
-    {
-      "factor": "계절 트렌드",
-      "impact": "positive",
-      "magnitude": 22,
-      "explanation": "성수기 진입으로 전반적인 수요 증가"
     }
   ],
   "demandForecast": {
     "forecastData": {
-      "dates": ["2025-01-01", "2025-01-02", ...],
-      "predictedDemand": [150, 165, 180, ...],
-      "confidence": [0.85, 0.87, 0.82, ...],
-      "peakDays": ["2025-01-15", "2025-01-25"],
+      "dates": ["2025-01-01", "2025-01-02"],
+      "predictedDemand": [150, 165],
+      "confidence": [0.85, 0.87],
+      "peakDays": ["2025-01-15"],
       "lowDays": ["2025-01-10"]
     },
     "summary": {
@@ -731,15 +780,9 @@ Return a comprehensive JSON object:
     }
   ],
   "recommendations": [
-    "주요 상품의 재고를 20% 증가시키세요",
-    "피크 시간대에 추가 직원을 배치하세요",
-    "프로모션을 1월 15일 전에 준비하세요"
+    "주요 상품의 재고를 20% 증가시키세요"
   ]
-}
-
-IMPORTANT: confidenceScore should be between 0-100 (percentage).
-Provide realistic predictions based on retail analytics best practices.
-Generate 30 days of forecast data with realistic daily variations.`;
+}`;
 
   const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
@@ -752,7 +795,7 @@ Generate 30 days of forecast data with realistic daily variations.`;
       messages: [
         { 
           role: 'system', 
-          content: 'You are a world-class demand forecasting expert specializing in retail predictive analytics. Your forecasts are data-driven, realistic, and actionable. Always provide specific numbers with confidence intervals.' 
+          content: 'You are a world-class demand forecasting expert specializing in retail predictive analytics.' 
         },
         { role: 'user', content: prompt }
       ],
@@ -770,7 +813,6 @@ Generate 30 days of forecast data with realistic daily variations.`;
   const cleanedContent = cleanJsonResponse(result.choices[0].message.content);
   const prediction = JSON.parse(cleanedContent);
   
-  // Ensure numeric values are properly typed
   if (prediction.confidenceScore !== undefined) {
     prediction.confidenceScore = Number(prediction.confidenceScore);
   }
@@ -787,7 +829,6 @@ async function performInventoryOptimization(request: InferenceRequest, apiKey: s
   const { parameters = {} } = request;
   const storeContext = parameters.store_context;
   
-  // 실제 재고 데이터 요약
   let contextSummary = '';
   if (storeContext?.inventory) {
     const totalStock = storeContext.inventory.reduce((sum: number, i: any) => sum + i.currentStock, 0);
@@ -801,7 +842,6 @@ ACTUAL INVENTORY DATA:
 - Total Current Stock: ${totalStock.toLocaleString()}개
 - Low Stock Items (< 50% optimal): ${lowStock}개
 - Overstock Items (> 150% optimal): ${overStock}개
-- Average Weekly Demand: ${Math.round(storeContext.inventory.reduce((sum: number, i: any) => sum + i.weeklyDemand, 0) / storeContext.inventory.length)}개
 `;
   }
   
@@ -812,32 +852,6 @@ INVENTORY PARAMETERS:
 - Target Service Level: ${parameters.targetServiceLevel || 95}%
 - Lead Time: ${parameters.leadTimeDays || 7} days
 - Order Frequency: ${parameters.orderFrequencyDays || 14} days
-- Safety Stock Multiplier: ${parameters.safetyStockMultiplier || 1.5}
-- Order Policy: ${parameters.orderPolicy || 'periodic'}
-
-EXPERT OPTIMIZATION FRAMEWORK:
-You are an expert supply chain and inventory management consultant specializing in retail optimization. Apply advanced inventory management principles:
-- Economic Order Quantity (EOQ) optimization
-- Safety stock calculation using service level targets
-- ABC analysis for product prioritization
-- Demand variability and lead time considerations
-- Just-in-Time vs Safety Stock trade-offs
-
-Your comprehensive optimization must provide:
-1. Product-by-product stock status with urgency classification
-2. Reorder point calculations with expected stockout dates
-3. Optimal vs current stock gap analysis
-4. Annual cost savings projections from optimization
-5. Inventory turnover improvement strategies
-
-OPTIMIZATION CRITERIA:
-- Target Service Level: ${parameters.targetServiceLevel || 95}%
-- Average Lead Time: ${parameters.leadTimeDays || 7} days
-- Order Frequency: ${parameters.orderFrequencyDays || 14} days
-- Safety Stock Buffer: ${parameters.safetyStockMultiplier || 1.5}x standard deviation
-- Order Policy: ${parameters.orderPolicy || 'Periodic Review'}
-
-Generate detailed, implementable recommendations with specific SKU-level actions.
 
 Return a comprehensive JSON object:
 {
@@ -848,14 +862,7 @@ Return a comprehensive JSON object:
     "netProfit": 20500000
   },
   "confidenceScore": 88,
-  "aiInsights": "Detailed Korean explanation of inventory optimization strategy, cost-benefit analysis, risk mitigation, and implementation plan",
-  "optimizationResults": {
-    "optimalOrderQuantity": 450,
-    "reorderPoint": 180,
-    "safetyStock": 85,
-    "expectedStockouts": 3,
-    "annualSavings": 3500000
-  },
+  "aiInsights": "Detailed Korean explanation",
   "inventoryOptimization": {
     "recommendations": [
       {
@@ -878,16 +885,8 @@ Return a comprehensive JSON object:
       "expectedTurnover": 5.8
     }
   },
-  "recommendations": [
-    "180개 재고 도달 시 자동 발주 트리거 설정",
-    "분기별로 느린 판매 상품 검토",
-    "주요 SKU에 대해 공급업체 관리 재고 고려"
-  ]
-}
-
-IMPORTANT: confidenceScore should be between 0-100 (percentage).
-Provide realistic optimization based on inventory management best practices.
-Generate at least 10-20 product recommendations with varied urgency levels.`;
+  "recommendations": ["180개 재고 도달 시 자동 발주 트리거 설정"]
+}`;
 
   const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
@@ -900,7 +899,7 @@ Generate at least 10-20 product recommendations with varied urgency levels.`;
       messages: [
         { 
           role: 'system', 
-          content: 'You are an expert supply chain consultant specializing in inventory optimization for retail. Your recommendations are grounded in proven inventory management theories (EOQ, Safety Stock, ABC Analysis) and tailored to real-world constraints.' 
+          content: 'You are an expert supply chain consultant specializing in inventory optimization for retail.' 
         },
         { role: 'user', content: prompt }
       ],
@@ -918,12 +917,10 @@ Generate at least 10-20 product recommendations with varied urgency levels.`;
   const cleanedContent = cleanJsonResponse(result.choices[0].message.content);
   const prediction = JSON.parse(cleanedContent);
   
-  // Ensure numeric values are properly typed
   if (prediction.confidenceScore !== undefined) {
     prediction.confidenceScore = Number(prediction.confidenceScore);
   }
   
-  // Validate and ensure inventory optimization summary has correct types
   if (prediction.inventoryOptimization?.summary) {
     const summary = prediction.inventoryOptimization.summary;
     summary.totalProducts = Number(summary.totalProducts || 0);
@@ -946,7 +943,6 @@ async function performPricingOptimization(request: InferenceRequest, apiKey: str
   const { parameters = {} } = request;
   const storeContext = parameters.store_context;
   
-  // 실제 상품 가격 데이터 요약
   let contextSummary = '';
   if (storeContext?.products) {
     const avgPrice = storeContext.products.reduce((sum: number, p: any) => sum + p.sellingPrice, 0) / storeContext.products.length;
@@ -961,8 +957,6 @@ ACTUAL PRODUCT PRICING DATA:
 - Total Products: ${storeContext.products.length}개
 - Average Selling Price: ${Math.round(avgPrice).toLocaleString()}원
 - Average Margin: ${avgMargin.toFixed(1)}%
-- Price Range: ${Math.round(Math.min(...storeContext.products.map((p: any) => p.sellingPrice))).toLocaleString()}원 ~ ${Math.round(Math.max(...storeContext.products.map((p: any) => p.sellingPrice))).toLocaleString()}원
-- Categories: ${[...new Set(storeContext.products.map((p: any) => p.category))].join(', ')}
 `;
   }
   
@@ -973,32 +967,6 @@ PRICING PARAMETERS:
 - Price Change: ${parameters.priceChangePercent || 0}%
 - Target Margin: ${parameters.targetMarginPercent || 30}%
 - Discount Strategy: ${parameters.discountStrategy || 'none'}
-- Duration: ${parameters.durationDays || 30} days
-- Inventory Consideration: ${parameters.considerInventory ? 'Yes' : 'No'}
-
-ADVANCED PRICING STRATEGY FRAMEWORK:
-You are a revenue optimization expert specializing in retail pricing strategy. Apply sophisticated pricing methodologies:
-- Price elasticity analysis and demand curve modeling
-- Competitive positioning and market dynamics
-- Psychological pricing thresholds (e.g., ₩9,900 vs ₩10,000)
-- Dynamic pricing based on inventory levels and demand forecasts
-- Cross-price elasticity for bundling opportunities
-
-Your comprehensive pricing optimization must deliver:
-1. Product-level optimal pricing with elasticity-based justification
-2. Revenue and margin impact projections
-3. Competitive positioning analysis (value/premium/discount)
-4. Bundle and promotion recommendations
-5. Implementation timeline with A/B testing suggestions
-
-PRICING PARAMETERS:
-- Proposed Price Adjustment: ${parameters.priceChangePercent || 0}% ${parameters.priceChangePercent > 0 ? 'increase' : 'decrease'}
-- Target Gross Margin: ${parameters.targetMarginPercent || 30}%
-- Discount Strategy: ${parameters.discountStrategy || 'None'}
-- Campaign Duration: ${parameters.durationDays || 30} days
-- ${parameters.considerInventory ? 'Prioritize high-inventory items for discounting' : 'Ignore inventory levels in pricing'}
-
-Apply retail pricing best practices and provide data-driven, actionable recommendations.
 
 Return a comprehensive JSON object:
 {
@@ -1010,14 +978,7 @@ Return a comprehensive JSON object:
     "netProfit": 22500000
   },
   "confidenceScore": 86,
-  "aiInsights": "Detailed Korean explanation of pricing strategy, competitive positioning, demand elasticity, margin impact, and recommended pricing tactics",
-  "pricingAnalysis": {
-    "optimalPrice": 48500,
-    "revenueImpact": 15,
-    "volumeImpact": -8,
-    "marginImpact": 12,
-    "competitivePosition": "premium"
-  },
+  "aiInsights": "Detailed Korean explanation",
   "pricingOptimization": {
     "recommendations": [
       {
@@ -1035,21 +996,11 @@ Return a comprehensive JSON object:
       "totalProducts": 50,
       "avgPriceChange": 3.5,
       "expectedRevenueIncrease": 5500000,
-      "expectedMarginIncrease": 2.3,
-      "recommendedDiscounts": 12,
-      "recommendedIncreases": 28
+      "expectedMarginIncrease": 2.3
     }
   },
-  "recommendations": [
-    "느린 판매 상품에 10% 할인 테스트",
-    "피크 시간대 동적 가격 책정 구현",
-    "보완 제품 15% 할인으로 번들링"
-  ]
-}
-
-IMPORTANT: confidenceScore should be between 0-100 (percentage).
-Provide realistic pricing optimization based on retail best practices.
-Generate at least 10-20 product pricing recommendations with varied strategies.`;
+  "recommendations": ["느린 판매 상품에 10% 할인 테스트"]
+}`;
 
   const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
@@ -1062,7 +1013,7 @@ Generate at least 10-20 product pricing recommendations with varied strategies.`
       messages: [
         { 
           role: 'system', 
-          content: 'You are a revenue optimization strategist with expertise in retail pricing, demand elasticity, and competitive positioning. Your pricing recommendations balance revenue maximization with market realities and customer psychology.' 
+          content: 'You are a revenue optimization strategist with expertise in retail pricing.' 
         },
         { role: 'user', content: prompt }
       ],
@@ -1080,12 +1031,10 @@ Generate at least 10-20 product pricing recommendations with varied strategies.`
   const cleanedContent = cleanJsonResponse(result.choices[0].message.content);
   const prediction = JSON.parse(cleanedContent);
   
-  // Ensure numeric values are properly typed
   if (prediction.confidenceScore !== undefined) {
     prediction.confidenceScore = Number(prediction.confidenceScore);
   }
   
-  // Ensure pricing optimization summary has correct types
   if (prediction.pricingOptimization?.summary) {
     const summary = prediction.pricingOptimization.summary;
     summary.totalProducts = Number(summary.totalProducts || 0);
@@ -1106,7 +1055,6 @@ async function performRecommendationStrategy(request: InferenceRequest, apiKey: 
   const { parameters = {} } = request;
   const storeContext = parameters.store_context;
   
-  // 실제 매장 및 상품 데이터 요약
   let contextSummary = '';
   if (storeContext) {
     const avgRevenue = storeContext.recentKpis?.length > 0
@@ -1122,8 +1070,6 @@ ACTUAL STORE PERFORMANCE DATA:
 - Average Daily Revenue: ${Math.round(avgRevenue).toLocaleString()}원
 - Average Conversion Rate: ${(avgConversion * 100).toFixed(1)}%
 - Total Products: ${storeContext.products?.length || 0}개
-- Product Categories: ${[...new Set(storeContext.products?.map((p: any) => p.category) || [])].join(', ')}
-- Ontology Entities: ${storeContext.entities?.length || 0}개 (매장 내 물리적 요소들)
 `;
   }
   
@@ -1133,17 +1079,6 @@ ${contextSummary}
 RECOMMENDATION PARAMETERS:
 - Algorithm: ${parameters.algorithm || 'collaborative'}
 - Max Recommendations: ${parameters.maxRecommendations || 10}
-- Trend Weight: ${parameters.trendWeight || 0.5}
-- Diversity Weight: ${parameters.diversityWeight || 0.3}
-- Boost New Products: ${parameters.boostNewProducts ? 'Yes' : 'No'}
-- Boost High Margin: ${parameters.boostHighMargin ? 'Yes' : 'No'}
-
-Your task is to design an optimal recommendation strategy and provide actionable insights including:
-1. Segment-specific strategies
-2. Recommended campaign types with estimated ROI
-3. Optimal timing
-4. Targeted products
-5. Budget allocation by channel
 
 Return a JSON object:
 {
@@ -1155,14 +1090,7 @@ Return a JSON object:
     "customerSatisfaction": 4.6
   },
   "confidenceScore": 84,
-  "aiInsights": "Detailed Korean explanation of recommendation strategy, personalization approach, expected customer behavior changes, revenue opportunities, and implementation roadmap",
-  "strategyDetails": {
-    "primaryTactic": "collaborative_filtering",
-    "targetSegments": ["high-value", "frequent", "new"],
-    "channels": ["in-store", "mobile", "email"],
-    "expectedUplift": 22,
-    "recommendationAccuracy": 0.78
-  },
+  "aiInsights": "Detailed Korean explanation",
   "recommendationStrategy": {
     "strategies": [
       {
@@ -1171,36 +1099,18 @@ Return a JSON object:
         "targetSegment": "고가치 고객 (상위 20%)",
         "expectedCTR": 8.5,
         "expectedCVR": 12.3,
-        "expectedAOVIncrease": 15.2,
-        "productPairs": [
-          { "product1": "제품A", "product2": "제품B", "affinity": 0.82 }
-        ]
+        "expectedAOVIncrease": 15.2
       }
     ],
     "summary": {
       "totalStrategies": 5,
       "avgCTRIncrease": 6.8,
       "avgCVRIncrease": 9.5,
-      "avgAOVIncrease": 12.3,
       "expectedRevenueImpact": 8500000
-    },
-    "performanceMetrics": [
-      { "metric": "클릭률 (CTR)", "current": 3.2, "predicted": 9.8 },
-      { "metric": "전환율 (CVR)", "current": 2.5, "predicted": 11.8 },
-      { "metric": "평균 주문액 (AOV)", "current": 42000, "predicted": 52500 }
-    ]
+    }
   },
-  "recommendations": [
-    "개인화된 이메일 캠페인 시작",
-    "매장 내 디지털 사이니지 구현",
-    "스마트 리워드 로열티 프로그램 생성",
-    "월별 추천 알고리즘 A/B 테스트"
-  ]
-}
-
-IMPORTANT: confidenceScore should be between 0-100 (percentage).
-Provide realistic strategy based on modern retail marketing and data science best practices.
-Generate at least 4-6 different recommendation strategies with varied approaches.`;
+  "recommendations": ["개인화된 이메일 캠페인 시작"]
+}`;
 
   const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
@@ -1224,7 +1134,6 @@ Generate at least 4-6 different recommendation strategies with varied approaches
   const cleanedContent = cleanJsonResponse(result.choices[0].message.content);
   const prediction = JSON.parse(cleanedContent);
   
-  // Ensure numeric values are properly typed
   if (prediction.confidenceScore !== undefined) {
     prediction.confidenceScore = Number(prediction.confidenceScore);
   }
@@ -1263,61 +1172,16 @@ ${graph_data ? `GRAPH STRUCTURE:
 ${graph_data.nodes.length} nodes with ${graph_data.edges.length} connections
 ` : ''}
 
-PARAMETERS:
-- Pattern types: ${parameters.pattern_types?.join(', ') || 'all'}
-- Minimum support: ${parameters.min_support || 0.1}
-- Complexity preference: ${parameters.complexity || 'balanced'}
-
-Your task:
-1. Discover frequent patterns and associations
-2. Identify sequential patterns (if time series)
-3. Find clustering and groupings
-4. Detect trends and seasonality
-5. Uncover hidden relationships
-6. Suggest actionable insights
-
 Return a JSON object:
 {
-  "patterns": [
-    {
-      "type": "association|sequential|cluster|trend|cycle",
-      "name": "pattern name",
-      "description": "what this pattern represents",
-      "support": 0.45,
-      "confidence": 0.82,
-      "instances": ["example 1", "example 2"],
-      "business_meaning": "what this means in practice"
-    }
-  ],
-  "segments": [
-    {
-      "segment_name": "group name",
-      "size": 150,
-      "characteristics": ["characteristic 1", "characteristic 2"],
-      "distinguishing_features": ["feature 1", "feature 2"]
-    }
-  ],
-  "trends": [
-    {
-      "trend_type": "growth|decline|cyclical|stable",
-      "variable": "what's trending",
-      "strength": 0.75,
-      "timeline": "when this trend occurs",
-      "drivers": ["driver 1", "driver 2"]
-    }
-  ],
-  "insights": [
-    {
-      "insight": "key finding",
-      "importance": "high|medium|low",
-      "evidence": ["supporting fact 1", "supporting fact 2"],
-      "recommendation": "what to do with this insight"
-    }
-  ],
+  "patterns": [],
+  "segments": [],
+  "trends": [],
+  "insights": [],
   "summary": {
-    "total_patterns_found": 12,
-    "most_significant": "pattern name",
-    "next_steps": ["action 1", "action 2"]
+    "total_patterns_found": 0,
+    "most_significant": "",
+    "next_steps": []
   }
 }`;
 
@@ -1437,7 +1301,6 @@ function detectStatisticalAnomalies(data: any[], parameters: any) {
   const anomalies: any[] = [];
   const threshold = parameters.z_score_threshold || 3;
   
-  // Get numeric fields
   const sample = data[0];
   const numericFields = Object.keys(sample).filter(key => typeof sample[key] === 'number');
   
