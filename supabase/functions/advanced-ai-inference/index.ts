@@ -570,12 +570,24 @@ Return ONLY valid JSON (no markdown, no explanation):
     console.error('AI call error:', e);
   }
 
-  // layoutChanges 검증 및 정규화
+// layoutChanges 검증 및 정규화 - 실제 존재하는 entityId만 허용
+  const validEntityIds = new Set(furnitureEntities.map((f: any) => f.id));
+
   const layoutChanges = Array.isArray(aiResponse.layoutChanges) 
-    ? aiResponse.layoutChanges.filter((c: any) => c.entityId && c.suggestedPosition)
+    ? aiResponse.layoutChanges.filter((c: any) => {
+        if (!c.entityId || !c.suggestedPosition) return false;
+        
+        // 실제 존재하는 entityId인지 확인
+        if (!validEntityIds.has(c.entityId)) {
+          console.warn(`Invalid entityId from AI: ${c.entityId} (${c.entityLabel})`);
+          return false;
+        }
+        
+        return true;
+      })
     : [];
-  
-  console.log('Valid layoutChanges:', layoutChanges.length);
+
+  console.log('Valid layoutChanges after filtering:', layoutChanges.length);
 
   // entityId -> 변경사항 매핑
   const changesMap = new Map<string, any>();
