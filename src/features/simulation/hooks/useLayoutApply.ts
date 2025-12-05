@@ -1,6 +1,7 @@
 /**
- * useLayoutApply.ts
- * 레이아웃 변경사항을 DB에 저장하는 Hook (v2 - 스냅샷 제거)
+ * useLayoutApply.ts v2
+ * 레이아웃 변경사항을 DB에 저장하는 Hook
+ * 2D (x, y) 및 3D (x, y, z) 형식 모두 지원
  */
 
 import { useState, useCallback } from 'react';
@@ -11,8 +12,8 @@ interface LayoutChange {
   entityId: string;
   entityLabel: string;
   entityType: string;
-  currentPosition?: { x: number; y: number; z: number };
-  suggestedPosition?: { x: number; y: number; z: number };
+  currentPosition?: { x: number; y: number; z?: number };
+  suggestedPosition?: { x: number; y?: number; z: number };
   reason: string;
   impact: 'high' | 'medium' | 'low';
 }
@@ -63,12 +64,50 @@ export function useLayoutApply() {
           continue;
         }
 
-        console.log(`Updating ${change.entityLabel} (${change.entityId}) to position:`, change.suggestedPosition);
+        // 먼저 기존 엔티티의 model_3d_position 형식을 확인
+        const { data: existingEntity, error: fetchError } = await supabase
+          .from('graph_entities')
+          .select('id, label, model_3d_position')
+          .eq('id', change.entityId)
+          .single();
+
+        if (fetchError || !existingEntity) {
+          console.warn(`⚠️ Entity not found: ${change.entityLabel} (${change.entityId})`);
+          result.failedCount++;
+          result.errors.push(`${change.entityLabel}: 엔티티가 DB에 존재하지 않습니다`);
+          continue;
+        }
+
+        // 기존 형식 확인 (2D vs 3D)
+        const existingPosition = existingEntity.model_3d_position as any;
+        const is3DFormat = existingPosition && 'z' in existingPosition;
+
+        // 새 위치 생성 (기존 형식에 맞춤)
+        let newPosition: any;
+        
+        if (is3DFormat) {
+          // 3D 형식 유지: {x, y, z}
+          newPosition = {
+            x: change.suggestedPosition.x,
+            y: change.suggestedPosition.y ?? 0,
+            z: change.suggestedPosition.z,
+          };
+        } else {
+          // 2D 형식 유지: {x, y} - z를 y로 매핑 (평면도 기준)
+          newPosition = {
+            x: change.suggestedPosition.x,
+            y: change.suggestedPosition.z,  // 3D의 z가 2D의 y (깊이)
+          };
+        }
+
+        console.log(`Updating ${change.entityLabel} (${change.entityId})`);
+        console.log(`  기존 형식: ${is3DFormat ? '3D' : '2D'}`, existingPosition);
+        console.log(`  새 위치:`, newPosition);
 
         const { data, error } = await supabase
           .from('graph_entities')
           .update({
-            model_3d_position: change.suggestedPosition,
+            model_3d_position: newPosition,
             updated_at: new Date().toISOString(),
           })
           .eq('id', change.entityId)
@@ -78,8 +117,12 @@ export function useLayoutApply() {
           console.error(`❌ Error updating ${change.entityLabel}:`, error);
           result.failedCount++;
           result.errors.push(`${change.entityLabel}: ${error.message}`);
+        } else if (!data || data.length === 0) {
+          console.warn(`⚠️ No rows updated for ${change.entityLabel}`);
+          result.failedCount++;
+          result.errors.push(`${change.entityLabel}: 업데이트된 행이 없습니다`);
         } else {
-          console.log(`✅ Updated ${change.entityLabel}`, data);
+          console.log(`✅ Updated ${change.entityLabel}`, data[0].model_3d_position);
           result.updatedCount++;
         }
       }
