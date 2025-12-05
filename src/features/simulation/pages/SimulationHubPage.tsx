@@ -768,32 +768,32 @@ const buildStoreContext = useCallback(() => {
         </div>
       ) : null}
 
-      {/* AI 인사이트 */}
-      {results.layout.aiInsights && results.layout.aiInsights.length > 0 && (
-        <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-          <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-blue-600" />
-            AI 인사이트
-          </h4>
-          <ul className="text-sm text-muted-foreground space-y-1">
-            {results.layout.aiInsights.map((insight: string, idx: number) => (
-              <li key={idx}>• {insight}</li>
-            ))}
-          </ul>
-        </div>
-      )}
+{/* AI 인사이트 */}
+{results.layout.aiInsights && Array.isArray(results.layout.aiInsights) && results.layout.aiInsights.length > 0 && (
+  <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+    <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+      <Sparkles className="h-4 w-4 text-blue-600" />
+      AI 인사이트
+    </h4>
+    <ul className="text-sm text-muted-foreground space-y-1">
+      {results.layout.aiInsights.map((insight: string, idx: number) => (
+        <li key={idx}>• {insight}</li>
+      ))}
+    </ul>
+  </div>
+)}
 
-      {/* 추천 사항 */}
-      {results.layout.recommendations && results.layout.recommendations.length > 0 && (
-        <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-          <h4 className="font-medium text-sm mb-2">추천 사항</h4>
-          <ul className="text-sm text-muted-foreground space-y-1">
-            {results.layout.recommendations.map((rec: string, idx: number) => (
-              <li key={idx}>• {rec}</li>
-            ))}
-          </ul>
-        </div>
-      )}
+{/* 추천 사항 */}
+{results.layout.recommendations && Array.isArray(results.layout.recommendations) && results.layout.recommendations.length > 0 && (
+  <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+    <h4 className="font-medium text-sm mb-2">추천 사항</h4>
+    <ul className="text-sm text-muted-foreground space-y-1">
+      {results.layout.recommendations.map((rec: string, idx: number) => (
+        <li key={idx}>• {rec}</li>
+      ))}
+    </ul>
+  </div>
+)}
 
       {/* 온톨로지 인사이트 차트 */}
       {results.layout.ontologyBasedInsights && (
