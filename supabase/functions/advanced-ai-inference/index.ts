@@ -827,7 +827,10 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
     };
   }
 
-   // 🔥 온톨로지 그래프 분석 실행
+  // 🔥 온톨로지 그래프 분석 실행
+  const storeWidth = storeContext.storeInfo?.width || 17.4;
+  const storeDepth = storeContext.storeInfo?.depth || 16.6;
+  
   const relations: GraphRelation[] = (storeContext.relations || []).map((r: any) => ({
     id: r.id,
     sourceEntityId: r.source_entity_id || r.sourceEntityId,
@@ -847,9 +850,6 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
   const ontologyAnalysis = performOntologyAnalysis(allGraphEntities, relations, 'layout', storeWidth, storeDepth);
   console.log(`Layout Score: ${ontologyAnalysis.layoutInsights?.score}`);
   
-  // AI 프롬프트용 가구 목록 생성
-  const storeWidth = storeContext.storeInfo?.width || 17.4;
-  const storeDepth = storeContext.storeInfo?.depth || 16.6;
 
   const furnitureList = furnitureEntities.slice(0, 15).map((f: any) => 
     `- [${f.id}] ${f.label} (${f.entityType}): pos(x=${f.position?.x?.toFixed?.(1) || 0}, z=${f.position?.z?.toFixed?.(1) || 0})`
