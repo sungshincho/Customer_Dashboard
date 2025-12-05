@@ -203,11 +203,13 @@ export function LayoutComparisonView({
                     {getImpactBadge(change.impact)}
                   </div>
                   <p className="text-muted-foreground text-xs">{change.reason}</p>
-                  <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                    ({change.currentPosition.x.toFixed(1)}, {change.currentPosition.z.toFixed(1)})
-                    <ArrowRight className="h-3 w-3" />
-                    <span className="text-blue-600">({change.suggestedPosition.x.toFixed(1)}, {change.suggestedPosition.z.toFixed(1)})</span>
-                  </div>
+<div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+  ({(change.currentPosition?.x ?? 0).toFixed(1)}, {(change.currentPosition?.z ?? 0).toFixed(1)})
+  <ArrowRight className="h-3 w-3" />
+  <span className="text-blue-600">
+    ({(change.suggestedPosition?.x ?? 0).toFixed(1)}, {(change.suggestedPosition?.z ?? 0).toFixed(1)})
+  </span>
+</div>
                 </div>
               ))}
             </div>
