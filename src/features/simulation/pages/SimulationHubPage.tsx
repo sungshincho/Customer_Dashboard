@@ -140,7 +140,6 @@ export default function SimulationHubPage() {
     contextData, 
     loading: contextLoading, 
     error: contextError,
-    refetch: refetchContext,
   } = useStoreContext(selectedStore?.id);
 
   // Phase 2: 데이터 소스 매핑
@@ -554,11 +553,6 @@ export default function SimulationHubPage() {
     });
 
     if (result.success) {
-      // 컨텍스트 데이터 새로고침
-      if (refetchContext) {
-        await refetchContext();
-      }
-
       setResultMeta(prev => ({
         ...prev,
         layout: {
