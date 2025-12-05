@@ -561,7 +561,7 @@ export default function SimulationHubPage() {
         }
       }));
     }
-  }, [results.layout, applyLayoutChanges, selectedStore?.id, refetchContext]);
+  }, [results.layout, applyLayoutChanges, selectedStore?.id]);
 
   // 내보내기
   const handleExport = useCallback(async (type: SimulationScenario, format: 'csv' | 'pdf' | 'json') => {
