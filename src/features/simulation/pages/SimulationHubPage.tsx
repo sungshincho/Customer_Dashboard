@@ -411,14 +411,13 @@ const buildStoreContext = useCallback(() => {
     dimensions: e.model_3d_dimensions,
   }));
 
-  // 디버깅: 가구 엔티티 수 확인
+  // 디버깅 로그
   const furnitureCount = mappedEntities.filter((e: any) => 
     ['furniture', 'room', 'structure'].includes(e.model_3d_type) ||
     ['Shelf', 'Rack', 'DisplayTable', 'CheckoutCounter', 'FittingRoom', 'Entrance'].includes(e.entity_type_name)
   ).length;
   
   console.log('buildStoreContext - entities:', mappedEntities.length, 'furniture:', furnitureCount);
-  console.log('Sample furniture:', mappedEntities.find((e: any) => e.model_3d_type === 'furniture'));
 
   return {
     storeInfo: contextData.storeInfo || (selectedStore ? {
