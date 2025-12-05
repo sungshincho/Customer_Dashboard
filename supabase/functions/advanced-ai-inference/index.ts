@@ -851,14 +851,36 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
   console.log(`Layout Score: ${ontologyAnalysis.layoutInsights?.score}`);
   
 
-  const furnitureList = furnitureEntities.slice(0, 15).map((f: any) => 
-    `- [${f.id}] ${f.label} (${f.entityType}): pos(x=${f.position?.x?.toFixed?.(1) || 0}, z=${f.position?.z?.toFixed?.(1) || 0})`
-  ).join('\n');
+  // 🔥 경계 밖 가구 감지
+  const outOfBoundsFurniture = furnitureEntities.filter((f: any) => {
+    const x = f.position?.x || 0;
+    const z = f.position?.z || f.position?.y || 0;
+    return x < 0 || x > storeWidth || z < 0 || z > storeDepth;
+  });
+
+  const furnitureList = furnitureEntities.slice(0, 15).map((f: any) => {
+    const x = f.position?.x || 0;
+    const z = f.position?.z || f.position?.y || 0;
+    const isOutOfBounds = x < 0 || x > storeWidth || z < 0 || z > storeDepth;
+    return `- [${f.id}] ${f.label} (${f.entityType}): pos(x=${x.toFixed?.(1) || 0}, z=${z.toFixed?.(1) || 0})${isOutOfBounds ? ' ⚠️ OUT OF BOUNDS - MUST MOVE INSIDE' : ''}`;
+  }).join('\n');
+
+  // 경계 밖 가구 경고 메시지
+  const outOfBoundsWarning = outOfBoundsFurniture.length > 0 
+    ? `\n\n⚠️ CRITICAL WARNING: ${outOfBoundsFurniture.length} furniture items are OUTSIDE store boundaries and MUST be moved inside:\n${outOfBoundsFurniture.map((f: any) => `- ${f.label}: current pos(${f.position?.x?.toFixed(1)}, ${f.position?.z?.toFixed(1)}) - INVALID`).join('\n')}`
+    : '';
 
   const prompt = `You are a retail store layout optimization expert.
 
 === 온톨로지 그래프 분석 결과 ===
 ${ontologyAnalysis.summaryForAI}
+${outOfBoundsWarning}
+
+STORE BOUNDARIES (CRITICAL - READ CAREFULLY):
+- Store Width: 0 to ${storeWidth}m (X axis)
+- Store Depth: 0 to ${storeDepth}m (Z axis)
+- Safe zone: X from 1.0 to ${(storeWidth - 1).toFixed(1)}, Z from 1.0 to ${(storeDepth - 1).toFixed(1)}
+- ALL furniture MUST be placed within these safe boundaries
 
 Based on the graph analysis above, suggest 3-5 specific furniture position changes.
 PRIORITIZE fixing the violations and implementing the opportunities identified.
@@ -879,9 +901,14 @@ Analyze the current layout and suggest 3-5 specific furniture position changes t
 
 IMPORTANT RULES:
 1. Use EXACT entityId from the list above
-2. Keep positions within store bounds (x: 0-${storeWidth}, z: 0-${storeDepth})
+2. **CRITICAL: ALL positions MUST be within store bounds:**
+   - X axis: minimum 1.0, maximum ${(storeWidth - 1).toFixed(1)}
+   - Z axis: minimum 1.0, maximum ${(storeDepth - 1).toFixed(1)}
+   - NEVER suggest positions outside these bounds
+   - If current position is outside bounds, move it INSIDE the store
 3. Provide Korean explanations for reasons
 4. Only suggest meaningful changes (at least 1 meter movement)
+5. PRIORITY: Move any furniture marked "OUT OF BOUNDS" to valid positions INSIDE the store first
 
 Return ONLY valid JSON (no markdown, no explanation):
 {
@@ -962,17 +989,37 @@ Return ONLY valid JSON (no markdown, no explanation):
   const validEntityIds = new Set(furnitureEntities.map((f: any) => f.id));
 
   const layoutChanges = Array.isArray(aiResponse.layoutChanges) 
-    ? aiResponse.layoutChanges.filter((c: any) => {
-        if (!c.entityId || !c.suggestedPosition) return false;
-        
-        // 실제 존재하는 entityId인지 확인
-        if (!validEntityIds.has(c.entityId)) {
-          console.warn(`Invalid entityId from AI: ${c.entityId} (${c.entityLabel})`);
-          return false;
-        }
-        
-        return true;
-      })
+    ? aiResponse.layoutChanges
+        .filter((c: any) => {
+          if (!c.entityId || !c.suggestedPosition) return false;
+          
+          // 실제 존재하는 entityId인지 확인
+          if (!validEntityIds.has(c.entityId)) {
+            console.warn(`Invalid entityId from AI: ${c.entityId} (${c.entityLabel})`);
+            return false;
+          }
+          
+          return true;
+        })
+        .map((c: any) => {
+          // 🔥 경계 내로 위치 보정 (AI가 잘못된 위치를 제안해도 자동 보정)
+          const pos = c.suggestedPosition;
+          const clampedPosition = {
+            x: Math.max(1, Math.min(storeWidth - 1, pos.x || 0)),
+            y: pos.y || 0,
+            z: Math.max(1, Math.min(storeDepth - 1, pos.z || 0)),
+          };
+          
+          // 보정이 발생했는지 로깅
+          if (clampedPosition.x !== pos.x || clampedPosition.z !== pos.z) {
+            console.log(`Position clamped for ${c.entityLabel}: (${pos.x}, ${pos.z}) -> (${clampedPosition.x}, ${clampedPosition.z})`);
+          }
+          
+          return {
+            ...c,
+            suggestedPosition: clampedPosition,
+          };
+        })
     : [];
 
   console.log('Valid layoutChanges after filtering:', layoutChanges.length);
