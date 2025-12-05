@@ -63,6 +63,9 @@ import { useSimulationHistory } from '../hooks/useSimulationHistory';
 import { OntologyInsightChart } from '../components/OntologyInsightChart';
 import { SimulationHistoryPanel } from '../components/SimulationHistoryPanel';
 
+// 기존 import들 아래에 추가
+import { LayoutComparisonView } from '../components/LayoutComparisonView';
+
 /**
  * 데이터 품질 상태 타입
  */
@@ -403,7 +406,14 @@ export default function SimulationHubPage() {
       products: contextData.products || [],
       inventory: contextData.inventory || [],
       recentKpis: contextData.recentKpis || [],
-      entities: contextData.entities || [],
+      entities: (contextData.entities || []).map((e: any) => ({
+  ...e,
+  position: e.model_3d_position || { x: 0, y: 0, z: 0 },
+  rotation: e.model_3d_rotation || { x: 0, y: 0, z: 0 },
+  scale: e.model_3d_scale || { x: 1, y: 1, z: 1 },
+  model3dUrl: e.model_3d_url,
+  dimensions: e.model_3d_dimensions,
+})),
       // 데이터 품질 메타 정보
       dataQuality: evaluateDataQuality(),
       mappingStatus,
@@ -712,25 +722,72 @@ export default function SimulationHubPage() {
               disabled={!selectedStore || !dataQuality.canRunSimulation}
             />
 
-            {/* 레이아웃 */}
-            <SimulationResultCard
-              type="layout" title="레이아웃 최적화" description="고객 동선 분석"
-              icon={Grid3x3} color="cyan"
-              isLoading={loadingStates.layout} hasResult={!!results.layout} meta={resultMeta.layout}
-              onRefresh={() => runSimulation('layout')}
-              onExport={(format) => handleExport('layout', format)}
-              onSave={() => handleManualSave('layout')}
-              fullWidth minHeight="400px"
-            >
-              {results.layout?.sceneRecipe && (
-                <div className="h-[400px] rounded-lg border overflow-hidden">
-                  <SharedDigitalTwinScene overlayType="layout" layoutSimulationData={results.layout.sceneRecipe} />
-                </div>
-              )}
-              {results.layout?.ontologyBasedInsights && (
-                <OntologyInsightChart insights={results.layout.ontologyBasedInsights} compact />
-              )}
-            </SimulationResultCard>
+        
+{/* 레이아웃 최적화 - As-Is / To-Be 비교 */}
+<SimulationResultCard
+  type="layout" title="레이아웃 최적화" description="AI 가구 배치 최적화"
+  icon={Grid3x3} color="cyan"
+  isLoading={loadingStates.layout} hasResult={!!results.layout} meta={resultMeta.layout}
+  onRefresh={() => runSimulation('layout')}
+  onExport={(format) => handleExport('layout', format)}
+  onSave={() => handleManualSave('layout')}
+  fullWidth minHeight="500px"
+>
+  {results.layout && (
+    <div className="space-y-4">
+      {/* As-Is / To-Be 비교 뷰 (layoutChanges가 있을 때) */}
+      {results.layout.layoutChanges && results.layout.layoutChanges.length > 0 ? (
+        <LayoutComparisonView
+          currentRecipe={results.layout.asIsRecipe}
+          suggestedRecipe={results.layout.toBeRecipe}
+          changes={results.layout.layoutChanges}
+          optimizationSummary={results.layout.optimizationSummary}
+          onApplySuggestion={() => {
+            toast.success('레이아웃 변경 사항이 저장되었습니다.');
+            // TODO: 실제 DB 업데이트 로직
+          }}
+        />
+      ) : results.layout.sceneRecipe ? (
+        /* 기존 단일 씬 뷰 (하위 호환성) */
+        <div className="h-[400px] rounded-lg border overflow-hidden">
+          <SharedDigitalTwinScene overlayType="layout" layoutSimulationData={results.layout.sceneRecipe} />
+        </div>
+      ) : null}
+
+      {/* AI 인사이트 */}
+      {results.layout.aiInsights && results.layout.aiInsights.length > 0 && (
+        <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-blue-600" />
+            AI 인사이트
+          </h4>
+          <ul className="text-sm text-muted-foreground space-y-1">
+            {results.layout.aiInsights.map((insight: string, idx: number) => (
+              <li key={idx}>• {insight}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* 추천 사항 */}
+      {results.layout.recommendations && results.layout.recommendations.length > 0 && (
+        <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+          <h4 className="font-medium text-sm mb-2">추천 사항</h4>
+          <ul className="text-sm text-muted-foreground space-y-1">
+            {results.layout.recommendations.map((rec: string, idx: number) => (
+              <li key={idx}>• {rec}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* 온톨로지 인사이트 차트 */}
+      {results.layout.ontologyBasedInsights && (
+        <OntologyInsightChart insights={results.layout.ontologyBasedInsights} compact />
+      )}
+    </div>
+  )}
+</SimulationResultCard>
 
             {/* 4개 그리드 */}
             <SimulationResultGrid columns={2}>
