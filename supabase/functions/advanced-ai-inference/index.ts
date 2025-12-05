@@ -44,6 +44,348 @@ function safeParseAIResponse(aiContent: string, defaultValue: any): any {
   return defaultValue;
 }
 
+// ============================================================================
+// 온톨로지 그래프 분석 함수들 (safeParseAIResponse 함수 아래에 추가)
+// ============================================================================
+
+interface GraphEntity {
+  id: string;
+  label: string;
+  entityType: string;
+  position?: { x: number; y: number; z?: number };
+  properties?: Record<string, any>;
+}
+
+interface GraphRelation {
+  id: string;
+  sourceEntityId: string;
+  targetEntityId: string;
+  relationTypeId: string;
+  properties?: Record<string, any>;
+  weight?: number;
+}
+
+// 거리 계산
+function calculateDistance(pos1: { x: number; z: number }, pos2: { x: number; z: number }): number {
+  return Math.sqrt(Math.pow(pos2.x - pos1.x, 2) + Math.pow(pos2.z - pos1.z, 2));
+}
+
+// 클러스터 찾기
+function findClusters(entities: GraphEntity[], clusterRadius = 3) {
+  const clusters: Array<{ center: { x: number; z: number }; entities: string[]; density: number }> = [];
+  const assigned = new Set<string>();
+  
+  for (const entity of entities) {
+    if (assigned.has(entity.id) || !entity.position) continue;
+    const clusterEntities = [entity];
+    assigned.add(entity.id);
+    
+    for (const other of entities) {
+      if (assigned.has(other.id) || !other.position) continue;
+      const dist = calculateDistance(
+        { x: entity.position.x, z: entity.position.z || entity.position.y || 0 },
+        { x: other.position.x, z: other.position.z || other.position.y || 0 }
+      );
+      if (dist <= clusterRadius) {
+        clusterEntities.push(other);
+        assigned.add(other.id);
+      }
+    }
+    
+    if (clusterEntities.length >= 2) {
+      const centerX = clusterEntities.reduce((sum, e) => sum + (e.position?.x || 0), 0) / clusterEntities.length;
+      const centerZ = clusterEntities.reduce((sum, e) => sum + (e.position?.z || e.position?.y || 0), 0) / clusterEntities.length;
+      clusters.push({
+        center: { x: Math.round(centerX * 10) / 10, z: Math.round(centerZ * 10) / 10 },
+        entities: clusterEntities.map(e => e.label),
+        density: Math.round((clusterEntities.length / (Math.PI * clusterRadius * clusterRadius)) * 100) / 100
+      });
+    }
+  }
+  return clusters;
+}
+
+// 데드존 찾기
+function findDeadZones(entities: GraphEntity[], storeWidth: number, storeDepth: number, gridSize = 2) {
+  const deadZones: Array<{ area: { x: number; z: number }; reason: string }> = [];
+  
+  for (let x = gridSize; x < storeWidth - gridSize; x += gridSize) {
+    for (let z = gridSize; z < storeDepth - gridSize; z += gridSize) {
+      const nearbyEntities = entities.filter(e => {
+        if (!e.position) return false;
+        return calculateDistance({ x, z }, { x: e.position.x, z: e.position.z || e.position.y || 0 }) < gridSize * 1.5;
+      });
+      
+      if (nearbyEntities.length === 0) {
+        const overlaps = deadZones.some(dz => calculateDistance({ x, z }, dz.area) < gridSize);
+        if (!overlaps) deadZones.push({ area: { x, z }, reason: '가구나 진열대가 없는 빈 공간' });
+      }
+    }
+  }
+  return deadZones.slice(0, 5);
+}
+
+// 레이아웃 규칙
+const RETAIL_LAYOUT_RULES = [
+  {
+    id: 'checkout_near_exit', name: '계산대는 출구 근처에 위치',
+    check: (entities: GraphEntity[]) => {
+      const checkout = entities.find(e => e.entityType.toLowerCase().includes('checkout') || e.label.includes('계산대'));
+      const entrance = entities.find(e => e.entityType.toLowerCase().includes('entrance') || e.label.includes('입구'));
+      if (checkout && entrance && checkout.position && entrance.position) {
+        const dist = calculateDistance(
+          { x: checkout.position.x, z: checkout.position.z || checkout.position.y || 0 },
+          { x: entrance.position.x, z: entrance.position.z || entrance.position.y || 0 }
+        );
+        return { passed: dist < 5, entities: dist >= 5 ? [checkout.label, entrance.label] : [] };
+      }
+      return { passed: true, entities: [] };
+    },
+    severity: 'medium' as const, suggestion: '계산대를 출구/입구 근처로 이동하세요'
+  },
+  {
+    id: 'no_blocking_entrance', name: '입구 앞 2m 이내 가구 금지',
+    check: (entities: GraphEntity[]) => {
+      const entrance = entities.find(e => e.entityType.toLowerCase().includes('entrance') || e.label.includes('입구'));
+      if (entrance && entrance.position) {
+        const blocking = entities.filter(e => {
+          if (e.id === entrance.id || !e.position) return false;
+          return calculateDistance(
+            { x: entrance.position!.x, z: entrance.position!.z || entrance.position!.y || 0 },
+            { x: e.position.x, z: e.position.z || e.position.y || 0 }
+          ) < 2;
+        });
+        return { passed: blocking.length === 0, entities: blocking.map(e => e.label) };
+      }
+      return { passed: true, entities: [] };
+    },
+    severity: 'high' as const, suggestion: '입구 앞 2m 이내의 가구를 다른 위치로 이동하세요'
+  },
+  {
+    id: 'fitting_room_privacy', name: '피팅룸은 매장 안쪽에 위치',
+    check: (entities: GraphEntity[], storeDepth = 16) => {
+      const fittingRooms = entities.filter(e => e.entityType.toLowerCase().includes('fitting') || e.label.includes('탈의실'));
+      const tooClose = fittingRooms.filter(f => f.position && (f.position.z || f.position.y || 0) < storeDepth * 0.3);
+      return { passed: tooClose.length === 0, entities: tooClose.map(f => f.label) };
+    },
+    severity: 'medium' as const, suggestion: '피팅룸을 매장 안쪽으로 이동하세요'
+  },
+  {
+    id: 'aisle_width', name: '통로 최소 폭 1.2m 확보',
+    check: (entities: GraphEntity[]) => {
+      const narrowAisles: string[] = [];
+      const furniture = entities.filter(e => ['shelf', 'rack', 'displaytable', 'counter'].some(t => e.entityType.toLowerCase().includes(t)));
+      for (let i = 0; i < furniture.length; i++) {
+        for (let j = i + 1; j < furniture.length; j++) {
+          if (furniture[i].position && furniture[j].position) {
+            const dist = calculateDistance(
+              { x: furniture[i].position!.x, z: furniture[i].position!.z || furniture[i].position!.y || 0 },
+              { x: furniture[j].position!.x, z: furniture[j].position!.z || furniture[j].position!.y || 0 }
+            );
+            if (dist > 0.5 && dist < 1.2) narrowAisles.push(`${furniture[i].label} ↔ ${furniture[j].label}`);
+          }
+        }
+      }
+      return { passed: narrowAisles.length === 0, entities: narrowAisles.slice(0, 3) };
+    },
+    severity: 'high' as const, suggestion: '가구 사이 간격을 최소 1.2m 이상 확보하세요'
+  }
+];
+
+const OPPORTUNITY_RULES = [
+  {
+    id: 'power_wall', name: '파워월 활용',
+    check: (entities: GraphEntity[], storeWidth = 17) => {
+      const rightWall = entities.filter(e => e.position && e.position.x > storeWidth * 0.8);
+      const hasDisplay = rightWall.some(e => e.entityType.toLowerCase().includes('display'));
+      return { applicable: !hasDisplay && rightWall.length < 3, impact: 'high' as const, action: '입구 오른쪽 벽면(파워월)에 신상품을 배치하세요' };
+    }
+  },
+  {
+    id: 'destination_zone', name: '목적지 구역 설정',
+    check: (entities: GraphEntity[], storeWidth: number, storeDepth = 16) => {
+      const backArea = entities.filter(e => e.position && (e.position.z || e.position.y || 0) > storeDepth * 0.7);
+      const hasAttraction = backArea.some(e => e.label.includes('베스트') || e.label.includes('세일'));
+      return { applicable: !hasAttraction, impact: 'high' as const, action: '매장 뒤쪽에 인기 상품을 배치하세요' };
+    }
+  }
+];
+
+// 레이아웃 규칙 분석
+function analyzeLayoutRules(entities: GraphEntity[], storeWidth: number, storeDepth: number) {
+  const violations: Array<{ rule: string; severity: string; entities: string[]; suggestion: string }> = [];
+  const opportunities: Array<{ opportunity: string; impact: string; action: string }> = [];
+  
+  for (const rule of RETAIL_LAYOUT_RULES) {
+    const result = rule.check(entities, storeDepth);
+    if (!result.passed) violations.push({ rule: rule.name, severity: rule.severity, entities: result.entities, suggestion: rule.suggestion });
+  }
+  
+  for (const opp of OPPORTUNITY_RULES) {
+    const result = opp.check(entities, storeWidth, storeDepth);
+    if (result.applicable) opportunities.push({ opportunity: opp.name, impact: result.impact, action: result.action });
+  }
+  
+  const violationPenalty = violations.reduce((sum, v) => sum + (v.severity === 'high' ? 15 : v.severity === 'medium' ? 10 : 5), 0);
+  const score = Math.max(0, Math.min(100, 100 - violationPenalty));
+  
+  return { score, violations, opportunities, clusters: findClusters(entities), deadZones: findDeadZones(entities, storeWidth, storeDepth) };
+}
+
+// 수요 분석
+function analyzeDemandPatterns(entities: GraphEntity[], relations: GraphRelation[]) {
+  const purchaseRelations = relations.filter(r => r.properties?.purchase_id || r.properties?.total_price);
+  const idToLabel = new Map<string, string>();
+  entities.forEach(e => idToLabel.set(e.id, e.label));
+  
+  const productSales = new Map<string, { count: number; revenue: number }>();
+  for (const rel of purchaseRelations) {
+    const existing = productSales.get(rel.targetEntityId) || { count: 0, revenue: 0 };
+    existing.count += rel.properties?.quantity || 1;
+    existing.revenue += rel.properties?.total_price || 0;
+    productSales.set(rel.targetEntityId, existing);
+  }
+  
+  const topSellingProducts = Array.from(productSales.entries())
+    .map(([id, data]) => ({ product: idToLabel.get(id) || id, salesCount: data.count, revenue: data.revenue }))
+    .sort((a, b) => b.revenue - a.revenue).slice(0, 10);
+  
+  return { topSellingProducts, productClusters: [], purchasePatterns: [], customerSegments: [] };
+}
+
+// 재고 분석
+function analyzeInventoryPatterns(entities: GraphEntity[], relations: GraphRelation[]) {
+  const inventoryEntities = entities.filter(e => e.properties?.currentStock !== undefined);
+  const restockPriorities = inventoryEntities
+    .filter(e => (e.properties?.currentStock || 0) < (e.properties?.optimalStock || 10) * 0.5)
+    .map(e => ({ product: e.label, urgency: (e.properties?.currentStock || 0) < (e.properties?.optimalStock || 10) * 0.25 ? 'critical' : 'high', reason: `현재 재고 ${e.properties?.currentStock || 0}개` }));
+  
+  const furnitureEntities = entities.filter(e => ['shelf', 'rack', 'storage'].some(t => e.entityType.toLowerCase().includes(t)));
+  const storageUtilization = furnitureEntities.length > 0 ? Math.round((relations.filter(r => r.properties?.quantity).length / furnitureEntities.length) * 100) : 0;
+  
+  return { storageUtilization, restockPriorities, productLocationMap: [], storageOptimizations: [] };
+}
+
+// 가격 분석
+function analyzePricingPatterns(entities: GraphEntity[], relations: GraphRelation[]) {
+  const productEntities = entities.filter(e => e.properties?.sellingPrice || e.properties?.price);
+  
+  const marginAnalysis = productEntities
+    .filter(p => p.properties?.sellingPrice && p.properties?.costPrice)
+    .map(p => ({ product: p.label, margin: Math.round(((p.properties!.sellingPrice - p.properties!.costPrice) / p.properties!.sellingPrice) * 100), category: p.properties?.category || 'Unknown' }))
+    .sort((a, b) => b.margin - a.margin);
+  
+  const pricingOpportunities = marginAnalysis.filter(m => m.margin < 20).slice(0, 5)
+    .map(m => ({ product: m.product, suggestion: `마진 ${m.margin}% - 가격 인상 검토`, expectedImpact: 10 }));
+  
+  return { priceRanges: [], marginAnalysis: marginAnalysis.slice(0, 20), pricingOpportunities, competingProducts: [] };
+}
+
+// 마케팅 분석
+function analyzeMarketingPatterns(entities: GraphEntity[], relations: GraphRelation[]) {
+  const idToLabel = new Map<string, string>();
+  entities.forEach(e => idToLabel.set(e.id, e.label));
+  
+  const purchaseRelations = relations.filter(r => r.properties?.purchase_id);
+  const customerPurchases = new Map<string, string[]>();
+  for (const rel of purchaseRelations) {
+    if (!customerPurchases.has(rel.sourceEntityId)) customerPurchases.set(rel.sourceEntityId, []);
+    customerPurchases.get(rel.sourceEntityId)!.push(rel.targetEntityId);
+  }
+  
+  const pairFrequency = new Map<string, number>();
+  const productFrequency = new Map<string, number>();
+  for (const [_, products] of customerPurchases) {
+    for (const product of products) productFrequency.set(product, (productFrequency.get(product) || 0) + 1);
+    for (let i = 0; i < products.length; i++) {
+      for (let j = i + 1; j < products.length; j++) {
+        const pair = [products[i], products[j]].sort().join('|');
+        pairFrequency.set(pair, (pairFrequency.get(pair) || 0) + 1);
+      }
+    }
+  }
+  
+  const crossSellPairs = Array.from(pairFrequency.entries())
+    .map(([pair, freq]) => {
+      const [p1, p2] = pair.split('|');
+      return { product1: idToLabel.get(p1) || p1, product2: idToLabel.get(p2) || p2, confidence: Math.round((freq / (productFrequency.get(p1) || 1)) * 100) / 100, support: Math.round((freq / (customerPurchases.size || 1)) * 100) / 100 };
+    })
+    .filter(p => p.confidence > 0.1).sort((a, b) => b.confidence - a.confidence).slice(0, 10);
+  
+  return { crossSellPairs, customerJourneys: [], campaignTargets: [] };
+}
+
+// 통합 온톨로지 분석
+function performOntologyAnalysis(entities: GraphEntity[], relations: GraphRelation[], scenarioType: string, storeWidth = 17, storeDepth = 16) {
+  console.log(`=== Ontology Analysis: ${scenarioType} ===`);
+  
+  const entityByType: Record<string, number> = {};
+  entities.forEach(e => { entityByType[e.entityType || 'unknown'] = (entityByType[e.entityType || 'unknown'] || 0) + 1; });
+  
+  const idToLabel = new Map<string, string>();
+  entities.forEach(e => idToLabel.set(e.id, e.label));
+  
+  const patternCounts = new Map<string, { count: number; examples: string[] }>();
+  const connectionCounts = new Map<string, number>();
+  const connectedIds = new Set<string>();
+  
+  for (const relation of relations) {
+    connectedIds.add(relation.sourceEntityId);
+    connectedIds.add(relation.targetEntityId);
+    connectionCounts.set(relation.sourceEntityId, (connectionCounts.get(relation.sourceEntityId) || 0) + 1);
+    
+    const source = entities.find(e => e.id === relation.sourceEntityId);
+    const target = entities.find(e => e.id === relation.targetEntityId);
+    if (source && target) {
+      const pattern = `${source.entityType} → ${target.entityType}`;
+      if (!patternCounts.has(pattern)) patternCounts.set(pattern, { count: 0, examples: [] });
+      patternCounts.get(pattern)!.count++;
+      if (patternCounts.get(pattern)!.examples.length < 3) patternCounts.get(pattern)!.examples.push(`${source.label} → ${target.label}`);
+    }
+  }
+  
+  const patterns = Array.from(patternCounts.entries()).map(([pattern, data]) => ({ pattern, frequency: data.count, examples: data.examples })).sort((a, b) => b.frequency - a.frequency);
+  const hubEntities = Array.from(connectionCounts.entries()).map(([id, count]) => ({ entityId: id, label: idToLabel.get(id) || id, connectionCount: count })).sort((a, b) => b.connectionCount - a.connectionCount).slice(0, 5);
+  const isolatedEntities = entities.filter(e => !connectedIds.has(e.id)).map(e => e.label);
+  
+  // 가구 필터링
+  const furnitureEntities = entities.filter(e => {
+    const type = (e.entityType || '').toLowerCase();
+    const model3dType = (e.properties?.model_3d_type || '').toLowerCase();
+    if (['furniture', 'room', 'structure'].includes(model3dType)) return true;
+    return ['shelf', 'rack', 'displaytable', 'checkoutcounter', 'fittingroom', 'entrance', 'counter', 'table', 'display'].some(t => type.includes(t));
+  });
+  
+  let layoutInsights = null, demandInsights = null, inventoryInsights = null, pricingInsights = null, marketingInsights = null;
+  
+  if (scenarioType === 'layout' || scenarioType === 'all') layoutInsights = analyzeLayoutRules(furnitureEntities, storeWidth, storeDepth);
+  if (scenarioType === 'demand' || scenarioType === 'all') demandInsights = analyzeDemandPatterns(entities, relations);
+  if (scenarioType === 'inventory' || scenarioType === 'all') inventoryInsights = analyzeInventoryPatterns(entities, relations);
+  if (scenarioType === 'pricing' || scenarioType === 'all') pricingInsights = analyzePricingPatterns(entities, relations);
+  if (scenarioType === 'recommendation' || scenarioType === 'all') marketingInsights = analyzeMarketingPatterns(entities, relations);
+  
+  // AI 프롬프트용 요약 생성
+  const summaryLines: string[] = [`## 온톨로지 분석 (${scenarioType})`, `- 엔티티: ${entities.length}개, 관계: ${relations.length}개`, `- 타입별: ${Object.entries(entityByType).slice(0, 5).map(([k, v]) => `${k}(${v})`).join(', ')}`];
+  
+  if (patterns.length > 0) { summaryLines.push(`\n### 관계 패턴`); patterns.slice(0, 3).forEach(p => summaryLines.push(`- ${p.pattern}: ${p.frequency}회`)); }
+  if (layoutInsights) {
+    summaryLines.push(`\n### 레이아웃 점수: ${layoutInsights.score}/100`);
+    if (layoutInsights.violations.length > 0) { summaryLines.push(`위반사항:`); layoutInsights.violations.forEach(v => summaryLines.push(`- [${v.severity}] ${v.rule}: ${v.suggestion}`)); }
+    if (layoutInsights.opportunities.length > 0) { summaryLines.push(`기회:`); layoutInsights.opportunities.forEach(o => summaryLines.push(`- [${o.impact}] ${o.opportunity}: ${o.action}`)); }
+  }
+  if (demandInsights?.topSellingProducts?.length) summaryLines.push(`\n### 상위 판매: ${demandInsights.topSellingProducts.slice(0, 3).map(p => p.product).join(', ')}`);
+  if (inventoryInsights) summaryLines.push(`\n### 저장공간 활용: ${inventoryInsights.storageUtilization}%`);
+  if (pricingInsights?.pricingOpportunities?.length) summaryLines.push(`\n### 가격 기회: ${pricingInsights.pricingOpportunities.length}개`);
+  if (marketingInsights?.crossSellPairs?.length) summaryLines.push(`\n### 크로스셀: ${marketingInsights.crossSellPairs.slice(0, 2).map(p => `${p.product1}+${p.product2}`).join(', ')}`);
+  
+  return {
+    entityAnalysis: { totalCount: entities.length, byType: entityByType },
+    relationAnalysis: { totalCount: relations.length, patterns, hubEntities, isolatedEntities },
+    layoutInsights, demandInsights, inventoryInsights, pricingInsights, marketingInsights,
+    summaryForAI: summaryLines.join('\n')
+  };
+}
+
 interface InferenceRequest {
   inference_type: 'causal' | 'anomaly' | 'prediction' | 'pattern';
   data: any[];
@@ -485,15 +827,41 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
     };
   }
 
+   // 🔥 온톨로지 그래프 분석 실행
+  const relations: GraphRelation[] = (storeContext.relations || []).map((r: any) => ({
+    id: r.id,
+    sourceEntityId: r.source_entity_id || r.sourceEntityId,
+    targetEntityId: r.target_entity_id || r.targetEntityId,
+    relationTypeId: r.relation_type_id,
+    properties: r.properties || {}
+  }));
+  
+  const allGraphEntities: GraphEntity[] = (storeContext.entities || []).map((e: any) => ({
+    id: e.id,
+    label: e.label,
+    entityType: e.entityType || e.entity_type_name || 'unknown',
+    position: e.position || e.model_3d_position,
+    properties: { ...e.properties, model_3d_type: e.model_3d_type }
+  }));
+  
+  const ontologyAnalysis = performOntologyAnalysis(allGraphEntities, relations, 'layout', storeWidth, storeDepth);
+  console.log(`Layout Score: ${ontologyAnalysis.layoutInsights?.score}`);
+  
   // AI 프롬프트용 가구 목록 생성
+  const storeWidth = storeContext.storeInfo?.width || 17.4;
+  const storeDepth = storeContext.storeInfo?.depth || 16.6;
+
   const furnitureList = furnitureEntities.slice(0, 15).map((f: any) => 
     `- [${f.id}] ${f.label} (${f.entityType}): pos(x=${f.position?.x?.toFixed?.(1) || 0}, z=${f.position?.z?.toFixed?.(1) || 0})`
   ).join('\n');
 
-  const storeWidth = storeContext.storeInfo?.width || 17.4;
-  const storeDepth = storeContext.storeInfo?.depth || 16.6;
-
   const prompt = `You are a retail store layout optimization expert.
+
+=== 온톨로지 그래프 분석 결과 ===
+${ontologyAnalysis.summaryForAI}
+
+Based on the graph analysis above, suggest 3-5 specific furniture position changes.
+PRIORITIZE fixing the violations and implementing the opportunities identified.
 
 STORE INFO:
 - Name: ${storeContext.storeInfo?.name || 'Store'}
@@ -655,9 +1023,16 @@ Return ONLY valid JSON (no markdown, no explanation):
     aiInsights: Array.isArray(aiResponse.aiInsights) ? aiResponse.aiInsights : [],
     recommendations: Array.isArray(aiResponse.recommendations) ? aiResponse.recommendations : [],
     confidenceScore: normalizedConfidence / 100, 
-    ontologyInsights: {
-      entitiesAnalyzed: furnitureEntities.length,
-      optimizationBasis: 'furniture_position_analysis',
+    ontologyAnalysis: {
+      score: ontologyAnalysis.layoutInsights?.score || 0,
+      violations: ontologyAnalysis.layoutInsights?.violations || [],
+      opportunities: ontologyAnalysis.layoutInsights?.opportunities || [],
+      clusters: ontologyAnalysis.layoutInsights?.clusters || [],
+      deadZones: ontologyAnalysis.layoutInsights?.deadZones || [],
+      entityCount: allGraphEntities.length,
+      relationCount: relations.length,
+      patterns: ontologyAnalysis.relationAnalysis.patterns.slice(0, 5),
+    },
     },
   };
 
@@ -737,6 +1112,15 @@ async function performDemandForecast(request: InferenceRequest, apiKey: string) 
   const { parameters = {} } = request;
   const storeContext = parameters.store_context;
   
+  // 🔥 온톨로지 분석
+  const allGraphEntities: GraphEntity[] = (storeContext.entities || []).map((e: any) => ({
+    id: e.id, label: e.label, entityType: e.entityType || 'unknown', properties: e.properties || {}
+  }));
+  const relations: GraphRelation[] = (storeContext.relations || []).map((r: any) => ({
+    id: r.id, sourceEntityId: r.source_entity_id || r.sourceEntityId, targetEntityId: r.target_entity_id || r.targetEntityId, relationTypeId: r.relation_type_id, properties: r.properties || {}
+  }));
+  const ontologyAnalysis = performOntologyAnalysis(allGraphEntities, relations, 'demand');
+  
   // 실제 매장 데이터 요약
   let contextSummary = '';
   if (storeContext) {
@@ -760,6 +1144,9 @@ ACTUAL STORE DATA (Last 30 Days):
   
   const prompt = `You are an expert in demand forecasting and predictive analytics for retail.
 ${contextSummary}
+
+=== 온톨로지 분석 ===
+${ontologyAnalysis.summaryForAI}
 
 FORECAST PARAMETERS:
 - Forecast Horizon: ${parameters.forecastHorizonDays || 30} days
@@ -858,6 +1245,10 @@ Return a comprehensive JSON object:
     type: 'demand_forecast',
     timestamp: new Date().toISOString(),
     ...prediction,
+    ontologyAnalysis: {
+      demandInsights: ontologyAnalysis.demandInsights,
+      patterns: ontologyAnalysis.relationAnalysis.patterns.slice(0, 5),
+    },
   };
 }
 
@@ -865,6 +1256,15 @@ Return a comprehensive JSON object:
 async function performInventoryOptimization(request: InferenceRequest, apiKey: string) {
   const { parameters = {} } = request;
   const storeContext = parameters.store_context;
+
+   // 🔥 온톨로지 분석
+  const allGraphEntities: GraphEntity[] = (storeContext.entities || []).map((e: any) => ({
+    id: e.id, label: e.label, entityType: e.entityType || 'unknown', properties: e.properties || {}
+  }));
+  const relations: GraphRelation[] = (storeContext.relations || []).map((r: any) => ({
+    id: r.id, sourceEntityId: r.source_entity_id || r.sourceEntityId, targetEntityId: r.target_entity_id || r.targetEntityId, relationTypeId: r.relation_type_id, properties: r.properties || {}
+  }));
+  const ontologyAnalysis = performOntologyAnalysis(allGraphEntities, relations, 'inventory');
   
   let contextSummary = '';
   if (storeContext?.inventory) {
@@ -884,6 +1284,9 @@ ACTUAL INVENTORY DATA:
   
   const prompt = `You are an expert in inventory management and supply chain optimization for retail.
 ${contextSummary}
+
+=== 온톨로지 분석 ===
+${ontologyAnalysis.summaryForAI}
 
 INVENTORY PARAMETERS:
 - Target Service Level: ${parameters.targetServiceLevel || 95}%
@@ -975,6 +1378,10 @@ Return a comprehensive JSON object:
     type: 'inventory_optimization',
     timestamp: new Date().toISOString(),
     ...prediction,
+    ontologyAnalysis: {
+      inventoryInsights: ontologyAnalysis.inventoryInsights,
+      demandInsights: ontologyAnalysis.demandInsights,
+    },
   };
 }
 
@@ -982,6 +1389,15 @@ Return a comprehensive JSON object:
 async function performPricingOptimization(request: InferenceRequest, apiKey: string) {
   const { parameters = {} } = request;
   const storeContext = parameters.store_context;
+
+   // 🔥 온톨로지 분석
+  const allGraphEntities: GraphEntity[] = (storeContext.entities || []).map((e: any) => ({
+    id: e.id, label: e.label, entityType: e.entityType || 'unknown', properties: e.properties || {}
+  }));
+  const relations: GraphRelation[] = (storeContext.relations || []).map((r: any) => ({
+    id: r.id, sourceEntityId: r.source_entity_id || r.sourceEntityId, targetEntityId: r.target_entity_id || r.targetEntityId, relationTypeId: r.relation_type_id, properties: r.properties || {}
+  }));
+  const ontologyAnalysis = performOntologyAnalysis(allGraphEntities, relations, 'pricing');
   
   let contextSummary = '';
   if (storeContext?.products) {
@@ -1002,6 +1418,9 @@ ACTUAL PRODUCT PRICING DATA:
   
   const prompt = `You are an expert in pricing strategy and revenue optimization for retail.
 ${contextSummary}
+
+=== 온톨로지 분석 ===
+${ontologyAnalysis.summaryForAI}
 
 PRICING PARAMETERS:
 - Price Change: ${parameters.priceChangePercent || 0}%
@@ -1090,6 +1509,10 @@ Return a comprehensive JSON object:
     type: 'pricing_optimization',
     timestamp: new Date().toISOString(),
     ...prediction,
+    ontologyAnalysis: {
+      pricingInsights: ontologyAnalysis.pricingInsights,
+      demandInsights: ontologyAnalysis.demandInsights,
+    },
   };
 }
 
@@ -1097,6 +1520,15 @@ Return a comprehensive JSON object:
 async function performRecommendationStrategy(request: InferenceRequest, apiKey: string) {
   const { parameters = {} } = request;
   const storeContext = parameters.store_context;
+
+  // 🔥 온톨로지 분석
+  const allGraphEntities: GraphEntity[] = (storeContext.entities || []).map((e: any) => ({
+    id: e.id, label: e.label, entityType: e.entityType || 'unknown', properties: e.properties || {}
+  }));
+  const relations: GraphRelation[] = (storeContext.relations || []).map((r: any) => ({
+    id: r.id, sourceEntityId: r.source_entity_id || r.sourceEntityId, targetEntityId: r.target_entity_id || r.targetEntityId, relationTypeId: r.relation_type_id, properties: r.properties || {}
+  }));
+  const ontologyAnalysis = performOntologyAnalysis(allGraphEntities, relations, 'recommendation');
   
   let contextSummary = '';
   if (storeContext) {
@@ -1118,6 +1550,9 @@ ACTUAL STORE PERFORMANCE DATA:
   
   const prompt = `You are an expert in retail marketing, customer analytics, and recommendation systems.
 ${contextSummary}
+
+=== 온톨로지 분석 ===
+${ontologyAnalysis.summaryForAI}
 
 RECOMMENDATION PARAMETERS:
 - Algorithm: ${parameters.algorithm || 'collaborative'}
@@ -1188,6 +1623,10 @@ Return a JSON object:
     type: 'recommendation_strategy',
     timestamp: new Date().toISOString(),
     ...prediction,
+    ontologyAnalysis: {
+      marketingInsights: ontologyAnalysis.marketingInsights,
+      demandInsights: ontologyAnalysis.demandInsights,
+    },
   };
 }
 
