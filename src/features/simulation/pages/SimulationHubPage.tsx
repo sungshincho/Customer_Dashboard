@@ -435,45 +435,51 @@ const buildStoreContext = useCallback(() => {
   };
 }, [selectedStore, contextData, mappingStatus, evaluateDataQuality]);
   // ✅ 시뮬레이션 실행 (데이터 검증 포함)
-  const runSimulation = useCallback(async (type: SimulationScenario) => {
-    // 데이터 검증
-    const { canRun, reason } = canRunScenario(type);
-    if (!canRun) {
-      toast.error(reason || '데이터가 부족하여 시뮬레이션을 실행할 수 없습니다.');
-      setResultMeta(prev => ({
-        ...prev,
-        [type]: { 
-          status: 'error', 
-          errorMessage: reason || '데이터 부족' 
-        }
-      }));
-      return;
-    }
+const runSimulation = useCallback(async (type: SimulationScenario) => {
+  // 데이터 검증
+  const { canRun, reason } = canRunScenario(type);
+  if (!canRun) {
+    toast.error(reason || '데이터가 부족하여 시뮬레이션을 실행할 수 없습니다.');
+    setResultMeta(prev => ({
+      ...prev,
+      [type]: { 
+        status: 'error', 
+        errorMessage: reason || '데이터 부족' 
+      }
+    }));
+    return;
+  }
 
-    if (!selectedStore) {
-      toast.error('매장을 선택해주세요.');
-      return;
-    }
+  if (!selectedStore) {
+    toast.error('매장을 선택해주세요.');
+    return;
+  }
 
-    const startTime = Date.now();
-    setLoadingStates(prev => ({ ...prev, [type]: true }));
-    setResultMeta(prev => ({ ...prev, [type]: { status: 'loading' } }));
+  const startTime = Date.now();
+  setLoadingStates(prev => ({ ...prev, [type]: true }));
+  setResultMeta(prev => ({ ...prev, [type]: { status: 'loading' } }));
 
-    try {
-      const storeContext = buildStoreContext();
-      const inferFn = useOntologyMode ? inferWithOntology : infer;
-      
-      // ✅ 데이터 품질 정보를 파라미터에 포함
-      const result = await inferFn(type, {
-        dataRange: parameters.dataRange,
-        forecastPeriod: parameters.forecastPeriod,
-        confidenceLevel: parameters.confidenceLevel,
-        includeSeasonality: parameters.includeSeasonality,
-        includeExternalFactors: parameters.includeExternalFactors,
-        // 데이터 품질 메타 정보
-        dataQualityScore: dataQuality.overallScore,
-        dataQualityLevel: dataQuality.level,
-      }, storeContext);
+  try {
+    const storeContext = buildStoreContext();
+    
+    // 🔍 디버깅: storeContext 확인
+    console.log('=== runSimulation Debug ===');
+    console.log('type:', type);
+    console.log('storeContext.entities:', storeContext.entities?.length);
+    console.log('storeContext.storeInfo:', storeContext.storeInfo);
+    
+    const inferFn = useOntologyMode ? inferWithOntology : infer;
+    
+    // ✅ 데이터 품질 정보를 파라미터에 포함
+    const result = await inferFn(type, {
+      dataRange: parameters.dataRange,
+      forecastPeriod: parameters.forecastPeriod,
+      confidenceLevel: parameters.confidenceLevel,
+      includeSeasonality: parameters.includeSeasonality,
+      includeExternalFactors: parameters.includeExternalFactors,
+      dataQualityScore: dataQuality.overallScore,
+      dataQualityLevel: dataQuality.level,
+    }, storeContext);
       
       if (result) {
   // 🔍 디버깅: 레이아웃 결과 확인
