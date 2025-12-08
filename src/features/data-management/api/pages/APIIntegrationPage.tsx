@@ -15,7 +15,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { useActivityLogger } from "@/hooks/useActivityLogger";
 import { useLocation } from "react-router-dom";
-import { Link2 } from "lucide-react";  // Link2 아이콘
 import { POSConnectCard } from '@/features/data-management/components/POSConnectCard';
 
 interface APIConnection {
