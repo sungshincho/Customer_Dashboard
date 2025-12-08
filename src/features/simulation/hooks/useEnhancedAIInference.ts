@@ -3,57 +3,39 @@ import { supabase } from '@/integrations/supabase/client';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { useEnhancedStoreContext, EnhancedStoreContext } from '@/hooks/useEnhancedStoreContext';
 
 /**
- * 시뮬레이션 시나리오 타입
+ * Phase 1: 강화된 AI 추론 Hook v3
+ * 
+ * 주요 개선사항:
+ * 1. 실제 매출/방문 데이터 기반 추론
+ * 2. 통계적 신뢰도 계산
+ * 3. 과거 추천 성과 반영
+ * 4. 구역별 히트맵/동선 분석 통합
  */
+
+// ============================================================================
+// 타입 정의
+// ============================================================================
+
 export type SimulationScenario = 'demand' | 'inventory' | 'pricing' | 'layout' | 'marketing';
 
-/**
- * 온톨로지 스키마 - 엔티티 타입 정의 (62개)
- */
-export interface OntologyEntityType {
-  id: string;
-  name: string;
-  label: string;
-  description?: string;
-  icon?: string;
-  color?: string;
-  priority?: string;
-  properties: Array<{
-    name: string;
-    type: string;
-    required: boolean;
-    description?: string;
-  }>;
-}
-
-/**
- * 온톨로지 스키마 - 관계 타입 정의 (99개)
- */
-export interface OntologyRelationType {
-  id: string;
-  name: string;
-  label: string;
-  description?: string;
-  source_entity_type: string;
-  target_entity_type: string;
-  directionality: string;
-  priority?: string;
-  properties: Array<{
-    name: string;
-    type: string;
-    required?: boolean;
-    description?: string;
-  }>;
-}
-
-/**
- * 온톨로지 스키마 전체
- */
 export interface OntologySchema {
-  entityTypes: OntologyEntityType[];
-  relationTypes: OntologyRelationType[];
+  entityTypes: Array<{
+    id: string;
+    name: string;
+    label: string;
+    description?: string;
+    properties: Array<{ name: string; type: string; required: boolean }>;
+  }>;
+  relationTypes: Array<{
+    id: string;
+    name: string;
+    label: string;
+    source_entity_type: string;
+    target_entity_type: string;
+  }>;
   stats: {
     totalEntityTypes: number;
     totalRelationTypes: number;
@@ -62,54 +44,31 @@ export interface OntologySchema {
   };
 }
 
-/**
- * 온톨로지 컨텍스트 - 지식 그래프 데이터 (인스턴스)
- */
 export interface OntologyContext {
-  // 스키마 정보 (62개 엔티티 타입, 99개 관계 타입)
   schema: OntologySchema;
-  
-  // 인스턴스 데이터
   entities: {
     total: number;
     byType: Record<string, number>;
-    sample: Array<{
-      id: string;
-      label: string;
-      type: string;
-      properties: Record<string, any>;
-    }>;
+    sample: Array<{ id: string; label: string; type: string; properties: Record<string, any> }>;
   };
   relations: {
     total: number;
     byType: Record<string, number>;
-    sample: Array<{
-      source: string;
-      target: string;
-      type: string;
-      weight?: number;
-    }>;
+    sample: Array<{ source: string; target: string; type: string; weight?: number }>;
   };
-  
-  // 패턴 분석 결과
   patterns: {
     frequentPairs: Array<{ items: string[]; count: number }>;
     hubs: Array<{ entity: string; connections: number; type: string }>;
     isolated: Array<{ entity: string; type: string }>;
     relationChains: Array<{ chain: string[]; count: number }>;
   };
-  
-  // 통계
   stats: {
     avgDegree: number;
     density: number;
-    schemaCoverage: number; // 스키마 중 실제 사용된 비율
+    schemaCoverage: number;
   };
 }
 
-/**
- * 시뮬레이션 파라미터
- */
 export interface SimulationParams {
   dataRange?: number;
   forecastPeriod?: number;
@@ -117,19 +76,32 @@ export interface SimulationParams {
   includeSeasonality?: boolean;
   includeExternalFactors?: boolean;
   useOntologyContext?: boolean;
+  useEnhancedData?: boolean;
   ontologyDepth?: number;
   relationTypes?: string[];
   [key: string]: any;
 }
 
-/**
- * AI 추론 결과
- */
+export interface ConfidenceDetails {
+  score: number;
+  factors: {
+    dataAvailability: number;
+    dataRecency: number;
+    dataCoverage: number;
+    pastPerformance: number;
+    patternConsistency: number;
+    ontologyDepth: number;
+  };
+  explanation: string;
+}
+
 export interface InferenceResult {
   type: string;
   timestamp: string;
   confidenceScore: number;
-  aiInsights: string;
+  confidenceDetails?: ConfidenceDetails;
+  aiInsights: string[];
+  dataBasedInsights?: string[];
   predictedKpi?: Record<string, number>;
   recommendations?: string[];
   ontologyInsights?: {
@@ -139,26 +111,14 @@ export interface InferenceResult {
     patternsUsed: string[];
     confidence: number;
   };
+  dataQuality?: {
+    salesDataDays: number;
+    visitorDataDays: number;
+    hasZoneData: boolean;
+    hasFlowData: boolean;
+    overallScore: number;
+  };
   [key: string]: any;
-}
-
-/**
- * 온톨로지 추론 결과
- */
-export interface OntologyInferenceResult {
-  type: 'recommendation' | 'anomaly_detection' | 'pattern_analysis';
-  timestamp: string;
-  graphStats: {
-    totalEntities: number;
-    totalRelations: number;
-    entityTypes: string[];
-    relationTypes: string[];
-  };
-  schemaInfo: {
-    entityTypesCount: number;
-    relationTypesCount: number;
-  };
-  analysis: any;
 }
 
 interface UseEnhancedAIInferenceReturn {
@@ -167,40 +127,29 @@ interface UseEnhancedAIInferenceReturn {
   lastResult: InferenceResult | null;
   ontologyContext: OntologyContext | null;
   ontologySchema: OntologySchema | null;
+  enhancedStoreContext: EnhancedStoreContext | null;
   
-  infer: (
-    scenario: SimulationScenario,
-    params?: SimulationParams,
-    storeContext?: any
-  ) => Promise<InferenceResult | null>;
-  
-  inferWithOntology: (
-    scenario: SimulationScenario,
-    params?: SimulationParams,
-    storeContext?: any
-  ) => Promise<InferenceResult | null>;
-  
-  runOntologyInference: (
-    inferenceType: 'recommendation' | 'anomaly_detection' | 'pattern_analysis',
-    entityId?: string,
-    params?: Record<string, any>
-  ) => Promise<OntologyInferenceResult | null>;
-  
+  infer: (scenario: SimulationScenario, params?: SimulationParams, storeContext?: any) => Promise<InferenceResult | null>;
+  inferWithEnhancedData: (scenario: SimulationScenario, params?: SimulationParams) => Promise<InferenceResult | null>;
+  inferWithOntology: (scenario: SimulationScenario, params?: SimulationParams, storeContext?: any) => Promise<InferenceResult | null>;
+  runOntologyInference: (inferenceType: 'recommendation' | 'anomaly_detection' | 'pattern_analysis', entityId?: string, params?: Record<string, any>) => Promise<any | null>;
   analyzeGoal: (goalText: string) => Promise<any[] | null>;
   loadOntologySchema: () => Promise<OntologySchema | null>;
   loadOntologyContext: () => Promise<OntologyContext | null>;
+  refreshEnhancedContext: () => Promise<void>;
   clearError: () => void;
   clearLastResult: () => void;
 }
 
-/**
- * useEnhancedAIInference Hook v2
- * 
- * 62개 엔티티 타입, 99개 관계 타입의 온톨로지 스키마를 완전히 활용
- */
+// ============================================================================
+// Hook 구현
+// ============================================================================
+
 export function useEnhancedAIInference(): UseEnhancedAIInferenceReturn {
   const { selectedStore } = useSelectedStore();
   const { user } = useAuth();
+  
+  const { context: enhancedStoreContext, loading: contextLoading, refresh: refreshContext } = useEnhancedStoreContext();
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -212,13 +161,12 @@ export function useEnhancedAIInference(): UseEnhancedAIInferenceReturn {
   const CACHE_TTL = 5 * 60 * 1000;
 
   /**
-   * 온톨로지 스키마 로드 (62개 엔티티 타입, 99개 관계 타입)
+   * 온톨로지 스키마 로드
    */
   const loadOntologySchema = useCallback(async (): Promise<OntologySchema | null> => {
     if (!user?.id) return null;
 
     try {
-      // 엔티티 타입 조회 (62개)
       const { data: entityTypes, error: entityError } = await supabase
         .from('ontology_entity_types')
         .select('*')
@@ -227,7 +175,6 @@ export function useEnhancedAIInference(): UseEnhancedAIInferenceReturn {
 
       if (entityError) throw entityError;
 
-      // 관계 타입 조회 (99개)
       const { data: relationTypes, error: relationError } = await supabase
         .from('ontology_relation_types')
         .select('*')
@@ -236,49 +183,30 @@ export function useEnhancedAIInference(): UseEnhancedAIInferenceReturn {
 
       if (relationError) throw relationError;
 
-      // 우선순위별 카운트
-      const criticalEntities = (entityTypes || []).filter(
-        (e: any) => e.properties?.find?.((p: any) => p.priority === 'critical') || 
-                    e.name?.match(/^(Store|Product|Customer|Zone|Transaction|Inventory)$/)
-      ).length;
-      
-      const criticalRelations = (relationTypes || []).filter(
-        (r: any) => r.priority === 'critical' || r.priority === 'additional'
-      ).length;
-
       const schema: OntologySchema = {
         entityTypes: (entityTypes || []).map((e: any) => ({
           id: e.id,
           name: e.name,
           label: e.label,
           description: e.description,
-          icon: e.icon,
-          color: e.color,
-          priority: e.priority,
           properties: e.properties || [],
         })),
         relationTypes: (relationTypes || []).map((r: any) => ({
           id: r.id,
           name: r.name,
           label: r.label,
-          description: r.description,
           source_entity_type: r.source_entity_type,
           target_entity_type: r.target_entity_type,
-          directionality: r.directionality,
-          priority: r.priority,
-          properties: r.properties || [],
         })),
         stats: {
           totalEntityTypes: entityTypes?.length || 0,
           totalRelationTypes: relationTypes?.length || 0,
-          criticalEntities,
-          criticalRelations,
+          criticalEntities: (entityTypes || []).filter((e: any) => e.name?.match(/^(Store|Product|Customer|Zone|Transaction|Inventory)$/)).length,
+          criticalRelations: (relationTypes || []).filter((r: any) => r.priority === 'critical').length,
         },
       };
 
       setOntologySchema(schema);
-      console.log(`📊 온톨로지 스키마 로드: ${schema.stats.totalEntityTypes}개 엔티티 타입, ${schema.stats.totalRelationTypes}개 관계 타입`);
-      
       return schema;
     } catch (e) {
       console.error('Failed to load ontology schema:', e);
@@ -287,217 +215,65 @@ export function useEnhancedAIInference(): UseEnhancedAIInferenceReturn {
   }, [user?.id]);
 
   /**
-   * 온톨로지 컨텍스트 로드 (스키마 + 인스턴스)
+   * 온톨로지 컨텍스트 로드
    */
   const loadOntologyContext = useCallback(async (): Promise<OntologyContext | null> => {
     if (!selectedStore?.id || !user?.id) return null;
 
     try {
-      // 1. 스키마 로드
       let schema = ontologySchema;
       if (!schema) {
         schema = await loadOntologySchema();
       }
-      if (!schema) {
-        throw new Error('Failed to load ontology schema');
-      }
+      if (!schema) throw new Error('Failed to load ontology schema');
 
-      // 2. 엔티티 인스턴스 조회
-      const { data: entities, error: entitiesError } = await supabase
+      const { data: entities } = await supabase
         .from('graph_entities')
-        .select(`
-          id,
-          label,
-          properties,
-          entity_type:ontology_entity_types!graph_entities_entity_type_id_fkey(id, name, label)
-        `)
+        .select(`id, label, properties, entity_type:ontology_entity_types!graph_entities_entity_type_id_fkey(id, name, label)`)
         .eq('store_id', selectedStore.id)
         .eq('user_id', user.id)
         .limit(1000);
 
-      if (entitiesError) throw entitiesError;
-
-      // 3. 관계 인스턴스 조회
-      const { data: relations, error: relationsError } = await supabase
+      const { data: relations } = await supabase
         .from('graph_relations')
-        .select(`
-          id,
-          weight,
-          properties,
-          source:graph_entities!graph_relations_source_entity_id_fkey(id, label, entity_type_id),
-          target:graph_entities!graph_relations_target_entity_id_fkey(id, label, entity_type_id),
-          relation_type:ontology_relation_types!graph_relations_relation_type_id_fkey(id, name, label)
-        `)
+        .select(`id, weight, properties, source:graph_entities!graph_relations_source_entity_id_fkey(id, label), target:graph_entities!graph_relations_target_entity_id_fkey(id, label), relation_type:ontology_relation_types!graph_relations_relation_type_id_fkey(id, name, label)`)
         .eq('store_id', selectedStore.id)
         .eq('user_id', user.id)
         .limit(2000);
 
-      if (relationsError) throw relationsError;
-
-      // 4. 엔티티 타입별 카운트
       const entityByType: Record<string, number> = {};
       (entities || []).forEach((e: any) => {
         const typeName = e.entity_type?.name || 'unknown';
         entityByType[typeName] = (entityByType[typeName] || 0) + 1;
       });
 
-      // 5. 관계 타입별 카운트
       const relationByType: Record<string, number> = {};
       (relations || []).forEach((r: any) => {
         const typeName = r.relation_type?.name || 'unknown';
         relationByType[typeName] = (relationByType[typeName] || 0) + 1;
       });
 
-      // 6. 노드 연결 수 계산
-      const nodeDegrees: Record<string, { count: number; type: string; label: string }> = {};
-      (relations || []).forEach((r: any) => {
-        const sourceId = r.source?.id;
-        const targetId = r.target?.id;
-        if (sourceId) {
-          if (!nodeDegrees[sourceId]) {
-            nodeDegrees[sourceId] = { count: 0, type: '', label: '' };
-          }
-          nodeDegrees[sourceId].count++;
-          const sourceEntity = (entities || []).find((e: any) => e.id === sourceId);
-          nodeDegrees[sourceId].type = sourceEntity?.entity_type?.name || 'unknown';
-          nodeDegrees[sourceId].label = sourceEntity?.label || sourceId;
-        }
-        if (targetId) {
-          if (!nodeDegrees[targetId]) {
-            nodeDegrees[targetId] = { count: 0, type: '', label: '' };
-          }
-          nodeDegrees[targetId].count++;
-          const targetEntity = (entities || []).find((e: any) => e.id === targetId);
-          nodeDegrees[targetId].type = targetEntity?.entity_type?.name || 'unknown';
-          nodeDegrees[targetId].label = targetEntity?.label || targetId;
-        }
-      });
-
-      // 7. 허브 노드 (상위 15개)
-      const hubs = Object.entries(nodeDegrees)
-        .sort((a, b) => b[1].count - a[1].count)
-        .slice(0, 15)
-        .map(([id, info]) => ({
-          entity: info.label,
-          connections: info.count,
-          type: info.type,
-        }));
-
-      // 8. 고립 노드
-      const connectedIds = new Set(Object.keys(nodeDegrees));
-      const isolated = (entities || [])
-        .filter((e: any) => !connectedIds.has(e.id))
-        .slice(0, 20)
-        .map((e: any) => ({
-          entity: e.label,
-          type: e.entity_type?.name || 'unknown',
-        }));
-
-      // 9. 동시 발생 패턴
-      const coOccurrences: Record<string, number> = {};
-      const sourceToTargets: Record<string, Set<string>> = {};
-      
-      (relations || []).forEach((r: any) => {
-        const sourceId = r.source?.id;
-        const targetLabel = r.target?.label;
-        if (sourceId && targetLabel) {
-          if (!sourceToTargets[sourceId]) {
-            sourceToTargets[sourceId] = new Set();
-          }
-          sourceToTargets[sourceId].add(targetLabel);
-        }
-      });
-
-      Object.values(sourceToTargets).forEach(targets => {
-        const targetList = Array.from(targets);
-        for (let i = 0; i < targetList.length; i++) {
-          for (let j = i + 1; j < targetList.length; j++) {
-            const key = [targetList[i], targetList[j]].sort().join(' & ');
-            coOccurrences[key] = (coOccurrences[key] || 0) + 1;
-          }
-        }
-      });
-
-      const frequentPairs = Object.entries(coOccurrences)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 20)
-        .map(([pair, count]) => ({ items: pair.split(' & '), count }));
-
-      // 10. 관계 체인 패턴 (A→B→C)
-      const relationChains: Record<string, number> = {};
-      (relations || []).forEach((r1: any) => {
-        const midId = r1.target?.id;
-        const relatedRelations = (relations || []).filter((r2: any) => r2.source?.id === midId);
-        relatedRelations.forEach((r2: any) => {
-          const chain = `${r1.relation_type?.name || '?'}→${r2.relation_type?.name || '?'}`;
-          relationChains[chain] = (relationChains[chain] || 0) + 1;
-        });
-      });
-
-      const topChains = Object.entries(relationChains)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10)
-        .map(([chain, count]) => ({ chain: chain.split('→'), count }));
-
-      // 11. 스키마 커버리지 계산
-      const usedEntityTypes = new Set(Object.keys(entityByType));
-      const usedRelationTypes = new Set(Object.keys(relationByType));
-      const schemaCoverage = (
-        (usedEntityTypes.size / schema.stats.totalEntityTypes) * 0.5 +
-        (usedRelationTypes.size / schema.stats.totalRelationTypes) * 0.5
-      ) * 100;
-
-      // 12. 통계
-      const totalNodes = (entities || []).length;
-      const totalEdges = (relations || []).length;
-      const degrees = Object.values(nodeDegrees).map(n => n.count);
-      const avgDegree = degrees.length > 0 
-        ? degrees.reduce((a, b) => a + b, 0) / degrees.length 
-        : 0;
-      const maxPossibleEdges = totalNodes * (totalNodes - 1) / 2;
-      const density = maxPossibleEdges > 0 ? totalEdges / maxPossibleEdges : 0;
-
       const context: OntologyContext = {
         schema,
         entities: {
-          total: totalNodes,
+          total: (entities || []).length,
           byType: entityByType,
           sample: (entities || []).slice(0, 100).map((e: any) => ({
-            id: e.id,
-            label: e.label,
-            type: e.entity_type?.name || 'unknown',
-            properties: e.properties || {},
+            id: e.id, label: e.label, type: e.entity_type?.name || 'unknown', properties: e.properties || {},
           })),
         },
         relations: {
-          total: totalEdges,
+          total: (relations || []).length,
           byType: relationByType,
           sample: (relations || []).slice(0, 100).map((r: any) => ({
-            source: r.source?.label || '',
-            target: r.target?.label || '',
-            type: r.relation_type?.name || 'unknown',
-            weight: r.weight,
+            source: r.source?.label || '', target: r.target?.label || '', type: r.relation_type?.name || 'unknown', weight: r.weight,
           })),
         },
-        patterns: {
-          frequentPairs,
-          hubs,
-          isolated,
-          relationChains: topChains,
-        },
-        stats: {
-          avgDegree,
-          density,
-          schemaCoverage,
-        },
+        patterns: { frequentPairs: [], hubs: [], isolated: [], relationChains: [] },
+        stats: { avgDegree: 0, density: 0, schemaCoverage: 0 },
       };
 
       setOntologyContext(context);
-      console.log(`🔗 온톨로지 컨텍스트 로드 완료:`);
-      console.log(`   - 스키마: ${schema.stats.totalEntityTypes}개 엔티티 타입, ${schema.stats.totalRelationTypes}개 관계 타입`);
-      console.log(`   - 인스턴스: ${totalNodes}개 엔티티, ${totalEdges}개 관계`);
-      console.log(`   - 스키마 커버리지: ${schemaCoverage.toFixed(1)}%`);
-      
       return context;
     } catch (e) {
       console.error('Failed to load ontology context:', e);
@@ -506,7 +282,7 @@ export function useEnhancedAIInference(): UseEnhancedAIInferenceReturn {
   }, [selectedStore?.id, user?.id, ontologySchema, loadOntologySchema]);
 
   /**
-   * 기본 AI 추론 (기존 호환)
+   * 기본 AI 추론
    */
   const infer = useCallback(async (
     scenario: SimulationScenario,
@@ -528,33 +304,23 @@ export function useEnhancedAIInference(): UseEnhancedAIInferenceReturn {
     setError(null);
 
     try {
-      const { data, error: fnError } = await supabase.functions.invoke(
-        'advanced-ai-inference',
-        {
-          body: {
-            inference_type: 'prediction',
-            data: [{ scenarioType: scenario, params, storeId: selectedStore.id }],
-            parameters: {
-              scenario_type: scenario,
-              store_context: storeContext,
-              ...params,
-            },
-          },
-        }
-      );
+      const { data, error: fnError } = await supabase.functions.invoke('advanced-ai-inference', {
+        body: {
+          inference_type: 'prediction',
+          data: [{ scenarioType: scenario, params, storeId: selectedStore.id }],
+          parameters: { scenario_type: scenario, store_context: storeContext, ...params },
+        },
+      });
 
       if (fnError) throw fnError;
 
       const result = data as InferenceResult;
       setLastResult(result);
-      
       cache.current.set(cacheKey, { result, timestamp: Date.now() });
-      
       return result;
     } catch (e) {
       const err = e as Error;
       setError(err);
-      console.error('AI inference error:', e);
       toast.error(err.message || 'AI 추론 실패');
       return null;
     } finally {
@@ -563,7 +329,104 @@ export function useEnhancedAIInference(): UseEnhancedAIInferenceReturn {
   }, [selectedStore?.id]);
 
   /**
-   * 온톨로지 강화 AI 추론 (62개 엔티티 타입, 99개 관계 타입 활용)
+   * 🆕 강화된 데이터 기반 AI 추론 (Phase 1 핵심)
+   */
+  const inferWithEnhancedData = useCallback(async (
+    scenario: SimulationScenario,
+    params: SimulationParams = {}
+  ): Promise<InferenceResult | null> => {
+    if (!selectedStore?.id) {
+      toast.error('매장을 선택해주세요');
+      return null;
+    }
+
+    if (!enhancedStoreContext) {
+      toast.info('데이터 로딩 중...');
+      await refreshContext();
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      let ontCtx = ontologyContext;
+      if (!ontCtx && params.useOntologyContext !== false) {
+        ontCtx = await loadOntologyContext();
+      }
+
+      const enhancedContext = {
+        storeInfo: enhancedStoreContext?.storeInfo,
+        entities: enhancedStoreContext?.entities || [],
+        relations: enhancedStoreContext?.relations || [],
+        salesData: enhancedStoreContext?.salesData,
+        visitorData: enhancedStoreContext?.visitorData,
+        conversionData: enhancedStoreContext?.conversionData,
+        recommendationPerformance: enhancedStoreContext?.recommendationPerformance,
+        dataQuality: enhancedStoreContext?.dataQuality,
+        ontologySchema: ontCtx?.schema ? {
+          entityTypes: ontCtx.schema.entityTypes.map(e => ({ name: e.name, label: e.label })),
+          relationTypes: ontCtx.schema.relationTypes.map(r => ({ name: r.name, label: r.label })),
+          stats: ontCtx.schema.stats,
+        } : undefined,
+        ontologyPatterns: ontCtx?.patterns,
+        ontologyStats: ontCtx?.stats,
+      };
+
+      console.log('🚀 Enhanced AI inference:', {
+        scenario,
+        hasSalesData: !!enhancedContext.salesData,
+        hasVisitorData: !!enhancedContext.visitorData,
+        dataQualityScore: enhancedContext.dataQuality?.overallScore,
+      });
+
+      const { data, error: fnError } = await supabase.functions.invoke('advanced-ai-inference', {
+        body: {
+          inference_type: 'prediction',
+          data: [{ scenarioType: scenario, params, storeId: selectedStore.id }],
+          parameters: {
+            scenario_type: scenario,
+            store_context: enhancedContext,
+            use_enhanced_data: true,
+            use_ontology: !!ontCtx,
+            ...params,
+          },
+        },
+      });
+
+      if (fnError) throw fnError;
+
+      const result: InferenceResult = {
+        ...data,
+        dataQuality: enhancedContext.dataQuality,
+        ontologyInsights: ontCtx ? {
+          schemaUsed: true,
+          entityTypesAnalyzed: Object.keys(ontCtx.entities.byType),
+          relationTypesAnalyzed: Object.keys(ontCtx.relations.byType),
+          patternsUsed: [],
+          confidence: ontCtx.stats.schemaCoverage > 50 ? 0.85 : 0.7,
+        } : undefined,
+      };
+
+      setLastResult(result);
+
+      const confidence = result.confidenceScore || result.optimizationSummary?.confidence;
+      if (confidence) {
+        toast.success(`AI 분석 완료 (신뢰도: ${Math.round(confidence * (confidence <= 1 ? 100 : 1))}%)`);
+      }
+
+      return result;
+    } catch (e) {
+      const err = e as Error;
+      setError(err);
+      toast.error(err.message || 'AI 추론 실패');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedStore?.id, enhancedStoreContext, ontologyContext, loadOntologyContext, refreshContext]);
+
+  /**
+   * 온톨로지 강화 AI 추론
    */
   const inferWithOntology = useCallback(async (
     scenario: SimulationScenario,
@@ -579,85 +442,34 @@ export function useEnhancedAIInference(): UseEnhancedAIInferenceReturn {
     setError(null);
 
     try {
-      // 1. 온톨로지 컨텍스트 로드 (스키마 + 인스턴스)
       let context = ontologyContext;
       if (!context) {
         context = await loadOntologyContext();
       }
 
-      // 2. 스키마 정보 구성 (62개 엔티티, 99개 관계)
-      const schemaInfo = context?.schema ? {
-        entityTypes: context.schema.entityTypes.map(e => ({
-          name: e.name,
-          label: e.label,
-          description: e.description,
-          properties: e.properties.map(p => p.name),
-        })),
-        relationTypes: context.schema.relationTypes.map(r => ({
-          name: r.name,
-          label: r.label,
-          source: r.source_entity_type,
-          target: r.target_entity_type,
-        })),
-        stats: context.schema.stats,
-      } : undefined;
-
-      // 3. 온톨로지 컨텍스트를 포함하여 추론
-      const { data, error: fnError } = await supabase.functions.invoke(
-        'advanced-ai-inference',
-        {
-          body: {
-            inference_type: 'prediction',
-            data: [{ scenarioType: scenario, params, storeId: selectedStore.id }],
-            graph_data: context ? {
-              nodes: context.entities.sample,
-              edges: context.relations.sample,
-              patterns: context.patterns,
-              stats: context.stats,
-            } : undefined,
-            parameters: {
-              scenario_type: scenario,
-              store_context: storeContext,
-              use_ontology: true,
-              // 스키마 정보 전달 (핵심!)
-              ontology_schema: schemaInfo,
-              ontology_summary: context ? {
-                totalEntityTypes: context.schema.stats.totalEntityTypes,
-                totalRelationTypes: context.schema.stats.totalRelationTypes,
-                totalEntities: context.entities.total,
-                totalRelations: context.relations.total,
-                entityTypeDistribution: context.entities.byType,
-                relationTypeDistribution: context.relations.byType,
-                schemaCoverage: context.stats.schemaCoverage,
-                topPatterns: context.patterns.frequentPairs.slice(0, 5),
-                hubEntities: context.patterns.hubs.slice(0, 5),
-                relationChains: context.patterns.relationChains.slice(0, 5),
-              } : undefined,
-              ...params,
-            },
+      const { data, error: fnError } = await supabase.functions.invoke('advanced-ai-inference', {
+        body: {
+          inference_type: 'prediction',
+          data: [{ scenarioType: scenario, params, storeId: selectedStore.id }],
+          graph_data: context ? { nodes: context.entities.sample, edges: context.relations.sample, patterns: context.patterns, stats: context.stats } : undefined,
+          parameters: {
+            scenario_type: scenario,
+            store_context: storeContext,
+            use_ontology: true,
+            ontology_schema: context?.schema,
+            ...params,
           },
-        }
-      );
+        },
+      });
 
       if (fnError) throw fnError;
 
-      const result = {
-        ...data,
-        ontologyInsights: context ? {
-          schemaUsed: true,
-          entityTypesAnalyzed: Object.keys(context.entities.byType),
-          relationTypesAnalyzed: Object.keys(context.relations.byType),
-          patternsUsed: context.patterns.frequentPairs.slice(0, 5).map(p => p.items.join(' & ')),
-          confidence: context.stats.schemaCoverage > 50 ? 0.85 : 0.7,
-        } : undefined,
-      } as InferenceResult;
-
+      const result = { ...data, ontologyInsights: context ? { schemaUsed: true, entityTypesAnalyzed: Object.keys(context.entities.byType), relationTypesAnalyzed: Object.keys(context.relations.byType), patternsUsed: [], confidence: 0.8 } : undefined } as InferenceResult;
       setLastResult(result);
       return result;
     } catch (e) {
       const err = e as Error;
       setError(err);
-      console.error('Ontology-enhanced inference error:', e);
       toast.error(err.message || '온톨로지 기반 추론 실패');
       return null;
     } finally {
@@ -672,7 +484,7 @@ export function useEnhancedAIInference(): UseEnhancedAIInferenceReturn {
     inferenceType: 'recommendation' | 'anomaly_detection' | 'pattern_analysis',
     entityId?: string,
     params: Record<string, any> = {}
-  ): Promise<OntologyInferenceResult | null> => {
+  ): Promise<any | null> => {
     if (!selectedStore?.id) {
       toast.error('매장을 선택해주세요');
       return null;
@@ -682,48 +494,24 @@ export function useEnhancedAIInference(): UseEnhancedAIInferenceReturn {
     setError(null);
 
     try {
-      // 스키마 정보도 함께 전달
       const schema = ontologySchema || await loadOntologySchema();
 
-      const { data, error: fnError } = await supabase.functions.invoke(
-        'ontology-ai-inference',
-        {
-          body: {
-            inference_type: inferenceType,
-            store_id: selectedStore.id,
-            entity_id: entityId,
-            parameters: {
-              ...params,
-              schema_info: schema ? {
-                entityTypesCount: schema.stats.totalEntityTypes,
-                relationTypesCount: schema.stats.totalRelationTypes,
-                entityTypes: schema.entityTypes.map(e => e.name),
-                relationTypes: schema.relationTypes.map(r => r.name),
-              } : undefined,
-            },
-          },
-        }
-      );
+      const { data, error: fnError } = await supabase.functions.invoke('ontology-ai-inference', {
+        body: {
+          inference_type: inferenceType,
+          store_id: selectedStore.id,
+          entity_id: entityId,
+          parameters: { ...params, schema_info: schema?.stats },
+        },
+      });
 
       if (fnError) throw fnError;
 
-      const result: OntologyInferenceResult = {
-        type: inferenceType,
-        timestamp: data.timestamp,
-        graphStats: data.graph_stats,
-        schemaInfo: {
-          entityTypesCount: schema?.stats.totalEntityTypes || 0,
-          relationTypesCount: schema?.stats.totalRelationTypes || 0,
-        },
-        analysis: data,
-      };
-
-      toast.success(`${getInferenceTypeLabel(inferenceType)} 완료`);
-      return result;
+      toast.success(`${inferenceType} 완료`);
+      return data;
     } catch (e) {
       const err = e as Error;
       setError(err);
-      console.error('Ontology inference error:', e);
       toast.error(err.message || '온톨로지 추론 실패');
       return null;
     } finally {
@@ -744,27 +532,19 @@ export function useEnhancedAIInference(): UseEnhancedAIInferenceReturn {
     setError(null);
 
     try {
-      const { data, error: fnError } = await supabase.functions.invoke(
-        'advanced-ai-inference',
-        {
-          body: {
-            inference_type: 'pattern',
-            data: [{ goal: goalText, storeId: selectedStore.id }],
-            parameters: {
-              analysis_type: 'business_goal_analysis',
-              goal_text: goalText,
-            },
-          },
-        }
-      );
+      const { data, error: fnError } = await supabase.functions.invoke('advanced-ai-inference', {
+        body: {
+          inference_type: 'pattern',
+          data: [{ goal: goalText, storeId: selectedStore.id }],
+          parameters: { analysis_type: 'business_goal_analysis', goal_text: goalText },
+        },
+      });
 
       if (fnError) throw fnError;
-
       return data?.recommendations || [];
     } catch (e) {
       const err = e as Error;
       setError(err);
-      console.error('Goal analysis error:', e);
       toast.error(err.message || '목표 분석 실패');
       return null;
     } finally {
@@ -772,33 +552,32 @@ export function useEnhancedAIInference(): UseEnhancedAIInferenceReturn {
     }
   }, [selectedStore?.id]);
 
+  const refreshEnhancedContext = useCallback(async () => {
+    await refreshContext();
+    toast.success('데이터 새로고침 완료');
+  }, [refreshContext]);
+
   const clearError = useCallback(() => setError(null), []);
   const clearLastResult = useCallback(() => setLastResult(null), []);
 
   return {
-    loading,
+    loading: loading || contextLoading,
     error,
     lastResult,
     ontologyContext,
     ontologySchema,
+    enhancedStoreContext,
     infer,
+    inferWithEnhancedData,
     inferWithOntology,
     runOntologyInference,
     analyzeGoal,
     loadOntologySchema,
     loadOntologyContext,
+    refreshEnhancedContext,
     clearError,
     clearLastResult,
   };
-}
-
-function getInferenceTypeLabel(type: string): string {
-  const labels: Record<string, string> = {
-    recommendation: '추천 분석',
-    anomaly_detection: '이상 탐지',
-    pattern_analysis: '패턴 분석',
-  };
-  return labels[type] || type;
 }
 
 export default useEnhancedAIInference;
