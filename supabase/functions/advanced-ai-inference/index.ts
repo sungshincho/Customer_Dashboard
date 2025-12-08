@@ -363,17 +363,6 @@ function performOntologyAnalysis(entities: GraphEntity[], relations: GraphRelati
   if (scenarioType === 'inventory' || scenarioType === 'all') inventoryInsights = analyzeInventoryPatterns(entities, relations);
   if (scenarioType === 'pricing' || scenarioType === 'all') pricingInsights = analyzePricingPatterns(entities, relations);
   if (scenarioType === 'recommendation' || scenarioType === 'all') marketingInsights = analyzeMarketingPatterns(entities, relations);
-
-  // furnitureEntities 필터링 바로 다음에 추가
-  productEntities = entities.filter((e: any) => {
-  const type = (e.entityType || '').toLowerCase();
-  const model3dType = (e.model3dType || '').toLowerCase();
-  
-  if (model3dType === 'product') return true;
-  if (type.includes('product') || type.includes('상품')) return true;
-  
-  return false;
-});
   
   // AI 프롬프트용 요약 생성
   const summaryLines: string[] = [`## 온톨로지 분석 (${scenarioType})`, `- 엔티티: ${entities.length}개, 관계: ${relations.length}개`, `- 타입별: ${Object.entries(entityByType).slice(0, 5).map(([k, v]) => `${k}(${v})`).join(', ')}`];
@@ -783,16 +772,17 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
 
   // 가구 엔티티 필터링
   let furnitureEntities: any[] = [];
+  let productEntities: any[] = [];
   
   if (storeContext.entities && storeContext.entities.length > 0) {
-    // 엔티티 정규화
+    // 엔티티 정규화 (model_url, dimensions 포함)
     const entities = storeContext.entities.map((e: any) => ({
       id: e.id,
       label: e.label,
       entityType: e.entityType || e.entity_type_name || 'unknown',
       model3dType: e.model_3d_type || e.model3dType,
-      model3dUrl: e.model3dUrl || e.model_3d_url,      // ← 추가
-      dimensions: e.dimensions || e.model_3d_dimensions, // ← 추가
+      model3dUrl: e.model3dUrl || e.model_3d_url,
+      dimensions: e.dimensions || e.model_3d_dimensions,
       position: e.position || e.model_3d_position || { x: 0, y: 0, z: 0 },
       rotation: e.rotation || e.model_3d_rotation || { x: 0, y: 0, z: 0 },
       scale: e.scale || e.model_3d_scale || { x: 1, y: 1, z: 1 },
@@ -816,7 +806,19 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
       return false;
     });
 
+    // 상품 타입 필터링
+    productEntities = entities.filter((e: any) => {
+      const type = (e.entityType || '').toLowerCase();
+      const model3dType = (e.model3dType || '').toLowerCase();
+      
+      if (model3dType === 'product') return true;
+      if (type.includes('product') || type.includes('상품')) return true;
+      
+      return false;
+    });
+
     console.log('Filtered furniture:', furnitureEntities.length);
+    console.log('Filtered products:', productEntities.length);
   }
 
   // 가구가 없으면 빈 결과 반환
@@ -1059,31 +1061,32 @@ Return ONLY valid JSON (no markdown, no explanation):
         : f.position;
       
       return {
-  id: f.id,
-  type: 'furniture',
-  furniture_type: f.entityType,
-  label: f.label,
-  position: position,
-  rotation: f.rotation || { x: 0, y: 0, z: 0 },
-  scale: f.scale || { x: 1, y: 1, z: 1 },
-  model_url: f.model3dUrl || f.model_3d_url || null,  // ← 추가
-  dimensions: f.dimensions || f.model_3d_dimensions || null,  // ← 추가
-  color: f.properties?.color || '#888888',
-  isChanged: mode === 'suggested' && !!change,
-};
-}),
-products: productEntities.map((p: any) => ({  // ← 변경
-  id: p.id,
-  type: 'product',
-  product_id: p.id,
-  sku: p.label,
-  label: p.label,
-  position: p.position || { x: 0, y: 0, z: 0 },
-  rotation: p.rotation || { x: 0, y: 0, z: 0 },
-  scale: p.scale || { x: 1, y: 1, z: 1 },
-  model_url: p.model3dUrl || p.model_3d_url || null,
-  dimensions: p.dimensions || p.model_3d_dimensions || null,
-})),
+        id: f.id,
+        type: 'furniture',
+        furniture_type: f.entityType,
+        label: f.label,
+        position: position,
+        rotation: f.rotation || { x: 0, y: 0, z: 0 },
+        scale: f.scale || { x: 1, y: 1, z: 1 },
+        model_url: f.model3dUrl || f.model_3d_url || null,
+        dimensions: f.dimensions || f.model_3d_dimensions || null,
+        color: f.properties?.color || '#888888',
+        isChanged: mode === 'suggested' && !!change,
+      };
+    }),
+    products: productEntities.map((p: any) => ({
+      id: p.id,
+      type: 'product',
+      product_id: p.id,
+      sku: p.label,
+      label: p.label,
+      position: p.position || { x: 0, y: 0, z: 0 },
+      rotation: p.rotation || { x: 0, y: 0, z: 0 },
+      scale: p.scale || { x: 1, y: 1, z: 1 },
+      model_url: p.model3dUrl || p.model_3d_url || null,
+      dimensions: p.dimensions || p.model_3d_dimensions || null,
+    })),
+  });
   
   const rawConfidence = aiResponse.optimizationSummary?.confidence || 50;
   const normalizedConfidence = rawConfidence <= 1 ? rawConfidence * 100 : rawConfidence;
