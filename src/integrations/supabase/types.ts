@@ -2450,6 +2450,82 @@ export type Database = {
           },
         ]
       }
+      kpi_snapshots: {
+        Row: {
+          additional_metrics: Json | null
+          application_id: string | null
+          avg_dwell_time_minutes: number | null
+          avg_transaction_value: number | null
+          conversion_rate: number | null
+          created_at: string | null
+          id: string
+          items_per_transaction: number | null
+          org_id: string
+          snapshot_date: string
+          snapshot_type: string | null
+          store_id: string
+          total_revenue: number | null
+          total_transactions: number | null
+          total_visitors: number | null
+        }
+        Insert: {
+          additional_metrics?: Json | null
+          application_id?: string | null
+          avg_dwell_time_minutes?: number | null
+          avg_transaction_value?: number | null
+          conversion_rate?: number | null
+          created_at?: string | null
+          id?: string
+          items_per_transaction?: number | null
+          org_id: string
+          snapshot_date: string
+          snapshot_type?: string | null
+          store_id: string
+          total_revenue?: number | null
+          total_transactions?: number | null
+          total_visitors?: number | null
+        }
+        Update: {
+          additional_metrics?: Json | null
+          application_id?: string | null
+          avg_dwell_time_minutes?: number | null
+          avg_transaction_value?: number | null
+          conversion_rate?: number | null
+          created_at?: string | null
+          id?: string
+          items_per_transaction?: number | null
+          org_id?: string
+          snapshot_date?: string
+          snapshot_type?: string | null
+          store_id?: string
+          total_revenue?: number | null
+          total_transactions?: number | null
+          total_visitors?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kpi_snapshots_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "recommendation_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kpi_snapshots_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kpi_snapshots_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kpi_values: {
         Row: {
           created_at: string
@@ -3012,6 +3088,77 @@ export type Database = {
         }
         Relationships: []
       }
+      onboarding_progress: {
+        Row: {
+          business_type: string | null
+          completed_at: string | null
+          completed_steps: number[] | null
+          created_at: string | null
+          current_step: number
+          data_sources: string[] | null
+          id: string
+          last_activity_at: string | null
+          org_id: string
+          primary_goals: string[] | null
+          selected_template: string | null
+          skipped_steps: number[] | null
+          started_at: string | null
+          steps_status: Json | null
+          store_count: number | null
+          total_steps: number
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          business_type?: string | null
+          completed_at?: string | null
+          completed_steps?: number[] | null
+          created_at?: string | null
+          current_step?: number
+          data_sources?: string[] | null
+          id?: string
+          last_activity_at?: string | null
+          org_id: string
+          primary_goals?: string[] | null
+          selected_template?: string | null
+          skipped_steps?: number[] | null
+          started_at?: string | null
+          steps_status?: Json | null
+          store_count?: number | null
+          total_steps?: number
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          business_type?: string | null
+          completed_at?: string | null
+          completed_steps?: number[] | null
+          created_at?: string | null
+          current_step?: number
+          data_sources?: string[] | null
+          id?: string
+          last_activity_at?: string | null
+          org_id?: string
+          primary_goals?: string[] | null
+          selected_template?: string | null
+          skipped_steps?: number[] | null
+          started_at?: string | null
+          steps_status?: Json | null
+          store_count?: number | null
+          total_steps?: number
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_progress_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       online_traffic: {
         Row: {
           created_at: string
@@ -3556,6 +3703,93 @@ export type Database = {
           },
         ]
       }
+      pos_integrations: {
+        Row: {
+          access_token_encrypted: string | null
+          created_at: string | null
+          credentials_encrypted: Json | null
+          field_mappings: Json | null
+          id: string
+          last_sync_at: string | null
+          last_sync_error: string | null
+          last_sync_status: string | null
+          org_id: string
+          provider: string
+          provider_store_id: string | null
+          refresh_token_encrypted: string | null
+          status: string | null
+          store_id: string
+          sync_enabled: boolean | null
+          sync_frequency_minutes: number | null
+          token_expires_at: string | null
+          updated_at: string | null
+          webhook_events: Json | null
+          webhook_secret: string | null
+          webhook_url: string | null
+        }
+        Insert: {
+          access_token_encrypted?: string | null
+          created_at?: string | null
+          credentials_encrypted?: Json | null
+          field_mappings?: Json | null
+          id?: string
+          last_sync_at?: string | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          org_id: string
+          provider: string
+          provider_store_id?: string | null
+          refresh_token_encrypted?: string | null
+          status?: string | null
+          store_id: string
+          sync_enabled?: boolean | null
+          sync_frequency_minutes?: number | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+          webhook_events?: Json | null
+          webhook_secret?: string | null
+          webhook_url?: string | null
+        }
+        Update: {
+          access_token_encrypted?: string | null
+          created_at?: string | null
+          credentials_encrypted?: Json | null
+          field_mappings?: Json | null
+          id?: string
+          last_sync_at?: string | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          org_id?: string
+          provider?: string
+          provider_store_id?: string | null
+          refresh_token_encrypted?: string | null
+          status?: string | null
+          store_id?: string
+          sync_enabled?: boolean | null
+          sync_frequency_minutes?: number | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+          webhook_events?: Json | null
+          webhook_secret?: string | null
+          webhook_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_integrations_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_integrations_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_performance_agg: {
         Row: {
           avg_selling_price: number | null
@@ -3960,6 +4194,54 @@ export type Database = {
           },
         ]
       }
+      quickstart_guides: {
+        Row: {
+          auto_show: boolean | null
+          created_at: string | null
+          description: string | null
+          guide_key: string
+          id: string
+          is_active: boolean | null
+          priority: number | null
+          show_once: boolean | null
+          steps: Json
+          target_page: string
+          target_role: string[] | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          auto_show?: boolean | null
+          created_at?: string | null
+          description?: string | null
+          guide_key: string
+          id?: string
+          is_active?: boolean | null
+          priority?: number | null
+          show_once?: boolean | null
+          steps?: Json
+          target_page: string
+          target_role?: string[] | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          auto_show?: boolean | null
+          created_at?: string | null
+          description?: string | null
+          guide_key?: string
+          id?: string
+          is_active?: boolean | null
+          priority?: number | null
+          show_once?: boolean | null
+          steps?: Json
+          target_page?: string
+          target_role?: string[] | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       raw_imports: {
         Row: {
           created_at: string | null
@@ -4016,6 +4298,291 @@ export type Database = {
           },
           {
             foreignKeyName: "raw_imports_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      realtime_inventory: {
+        Row: {
+          barcode: string | null
+          category: string | null
+          created_at: string | null
+          external_product_id: string
+          id: string
+          is_low_stock: boolean | null
+          last_sale_at: string | null
+          last_updated_at: string | null
+          org_id: string
+          pos_integration_id: string | null
+          product_name: string | null
+          quantity_available: number | null
+          quantity_on_hand: number
+          quantity_reserved: number | null
+          reorder_point: number | null
+          reorder_quantity: number | null
+          sku: string | null
+          store_id: string
+          unit_cost: number | null
+          unit_price: number | null
+        }
+        Insert: {
+          barcode?: string | null
+          category?: string | null
+          created_at?: string | null
+          external_product_id: string
+          id?: string
+          is_low_stock?: boolean | null
+          last_sale_at?: string | null
+          last_updated_at?: string | null
+          org_id: string
+          pos_integration_id?: string | null
+          product_name?: string | null
+          quantity_available?: number | null
+          quantity_on_hand?: number
+          quantity_reserved?: number | null
+          reorder_point?: number | null
+          reorder_quantity?: number | null
+          sku?: string | null
+          store_id: string
+          unit_cost?: number | null
+          unit_price?: number | null
+        }
+        Update: {
+          barcode?: string | null
+          category?: string | null
+          created_at?: string | null
+          external_product_id?: string
+          id?: string
+          is_low_stock?: boolean | null
+          last_sale_at?: string | null
+          last_updated_at?: string | null
+          org_id?: string
+          pos_integration_id?: string | null
+          product_name?: string | null
+          quantity_available?: number | null
+          quantity_on_hand?: number
+          quantity_reserved?: number | null
+          reorder_point?: number | null
+          reorder_quantity?: number | null
+          sku?: string | null
+          store_id?: string
+          unit_cost?: number | null
+          unit_price?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "realtime_inventory_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "realtime_inventory_pos_integration_id_fkey"
+            columns: ["pos_integration_id"]
+            isOneToOne: false
+            referencedRelation: "pos_integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "realtime_inventory_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      realtime_transactions: {
+        Row: {
+          created_at: string | null
+          currency: string | null
+          customer_id: string | null
+          customer_type: string | null
+          discount_amount: number | null
+          employee_id: string | null
+          external_data: Json | null
+          external_transaction_id: string
+          id: string
+          is_voided: boolean | null
+          item_count: number | null
+          items: Json | null
+          org_id: string
+          payment_method: string | null
+          pos_integration_id: string | null
+          processed_at: string | null
+          receipt_number: string | null
+          register_id: string | null
+          store_id: string
+          subtotal: number
+          tax_amount: number | null
+          total_amount: number
+          transaction_date: string
+          transaction_time: string
+          transaction_timestamp: string
+        }
+        Insert: {
+          created_at?: string | null
+          currency?: string | null
+          customer_id?: string | null
+          customer_type?: string | null
+          discount_amount?: number | null
+          employee_id?: string | null
+          external_data?: Json | null
+          external_transaction_id: string
+          id?: string
+          is_voided?: boolean | null
+          item_count?: number | null
+          items?: Json | null
+          org_id: string
+          payment_method?: string | null
+          pos_integration_id?: string | null
+          processed_at?: string | null
+          receipt_number?: string | null
+          register_id?: string | null
+          store_id: string
+          subtotal?: number
+          tax_amount?: number | null
+          total_amount?: number
+          transaction_date: string
+          transaction_time: string
+          transaction_timestamp: string
+        }
+        Update: {
+          created_at?: string | null
+          currency?: string | null
+          customer_id?: string | null
+          customer_type?: string | null
+          discount_amount?: number | null
+          employee_id?: string | null
+          external_data?: Json | null
+          external_transaction_id?: string
+          id?: string
+          is_voided?: boolean | null
+          item_count?: number | null
+          items?: Json | null
+          org_id?: string
+          payment_method?: string | null
+          pos_integration_id?: string | null
+          processed_at?: string | null
+          receipt_number?: string | null
+          register_id?: string | null
+          store_id?: string
+          subtotal?: number
+          tax_amount?: number | null
+          total_amount?: number
+          transaction_date?: string
+          transaction_time?: string
+          transaction_timestamp?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "realtime_transactions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "realtime_transactions_pos_integration_id_fkey"
+            columns: ["pos_integration_id"]
+            isOneToOne: false
+            referencedRelation: "pos_integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "realtime_transactions_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recommendation_applications: {
+        Row: {
+          applied_at: string | null
+          applied_by: string | null
+          baseline_date: string
+          baseline_kpis: Json
+          created_at: string | null
+          id: string
+          measurement_end_date: string | null
+          measurement_period_days: number | null
+          measurement_start_date: string | null
+          org_id: string
+          recommendation_details: Json | null
+          recommendation_summary: string | null
+          recommendation_type: string
+          reverted_at: string | null
+          reverted_reason: string | null
+          scenario_id: string | null
+          status: string | null
+          store_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          applied_at?: string | null
+          applied_by?: string | null
+          baseline_date: string
+          baseline_kpis: Json
+          created_at?: string | null
+          id?: string
+          measurement_end_date?: string | null
+          measurement_period_days?: number | null
+          measurement_start_date?: string | null
+          org_id: string
+          recommendation_details?: Json | null
+          recommendation_summary?: string | null
+          recommendation_type: string
+          reverted_at?: string | null
+          reverted_reason?: string | null
+          scenario_id?: string | null
+          status?: string | null
+          store_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          applied_at?: string | null
+          applied_by?: string | null
+          baseline_date?: string
+          baseline_kpis?: Json
+          created_at?: string | null
+          id?: string
+          measurement_end_date?: string | null
+          measurement_period_days?: number | null
+          measurement_start_date?: string | null
+          org_id?: string
+          recommendation_details?: Json | null
+          recommendation_summary?: string | null
+          recommendation_type?: string
+          reverted_at?: string | null
+          reverted_reason?: string | null
+          scenario_id?: string | null
+          status?: string | null
+          store_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recommendation_applications_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recommendation_applications_scenario_id_fkey"
+            columns: ["scenario_id"]
+            isOneToOne: false
+            referencedRelation: "scenarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recommendation_applications_store_id_fkey"
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
@@ -4126,6 +4693,147 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      roi_measurements: {
+        Row: {
+          application_id: string
+          created_at: string | null
+          estimated_annual_impact: Json | null
+          id: string
+          is_positive_impact: boolean | null
+          kpi_changes: Json
+          measured_kpis: Json
+          measurement_days: number
+          measurement_end_date: string
+          measurement_start_date: string
+          org_id: string
+          statistical_significance: Json | null
+          summary_text: string | null
+        }
+        Insert: {
+          application_id: string
+          created_at?: string | null
+          estimated_annual_impact?: Json | null
+          id?: string
+          is_positive_impact?: boolean | null
+          kpi_changes: Json
+          measured_kpis: Json
+          measurement_days: number
+          measurement_end_date: string
+          measurement_start_date: string
+          org_id: string
+          statistical_significance?: Json | null
+          summary_text?: string | null
+        }
+        Update: {
+          application_id?: string
+          created_at?: string | null
+          estimated_annual_impact?: Json | null
+          id?: string
+          is_positive_impact?: boolean | null
+          kpi_changes?: Json
+          measured_kpis?: Json
+          measurement_days?: number
+          measurement_end_date?: string
+          measurement_start_date?: string
+          org_id?: string
+          statistical_significance?: Json | null
+          summary_text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roi_measurements_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "recommendation_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roi_measurements_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sample_data_templates: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          display_name: string
+          entity_types: Json | null
+          estimated_setup_minutes: number | null
+          furniture_models: Json | null
+          id: string
+          is_active: boolean | null
+          preview_image_url: string | null
+          product_models: Json | null
+          relation_types: Json | null
+          sample_entities: Json | null
+          sample_kpis: Json | null
+          sample_products: Json | null
+          sample_relations: Json | null
+          sample_transactions: Json | null
+          sample_visits: Json | null
+          sort_order: number | null
+          store_3d_model_url: string | null
+          store_config: Json | null
+          template_name: string
+          template_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          display_name: string
+          entity_types?: Json | null
+          estimated_setup_minutes?: number | null
+          furniture_models?: Json | null
+          id?: string
+          is_active?: boolean | null
+          preview_image_url?: string | null
+          product_models?: Json | null
+          relation_types?: Json | null
+          sample_entities?: Json | null
+          sample_kpis?: Json | null
+          sample_products?: Json | null
+          sample_relations?: Json | null
+          sample_transactions?: Json | null
+          sample_visits?: Json | null
+          sort_order?: number | null
+          store_3d_model_url?: string | null
+          store_config?: Json | null
+          template_name: string
+          template_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          display_name?: string
+          entity_types?: Json | null
+          estimated_setup_minutes?: number | null
+          furniture_models?: Json | null
+          id?: string
+          is_active?: boolean | null
+          preview_image_url?: string | null
+          product_models?: Json | null
+          relation_types?: Json | null
+          sample_entities?: Json | null
+          sample_kpis?: Json | null
+          sample_products?: Json | null
+          sample_relations?: Json | null
+          sample_transactions?: Json | null
+          sample_visits?: Json | null
+          sort_order?: number | null
+          store_3d_model_url?: string | null
+          store_config?: Json | null
+          template_name?: string
+          template_type?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       scenarios: {
         Row: {
@@ -4829,6 +5537,72 @@ export type Database = {
           },
         ]
       }
+      sync_logs: {
+        Row: {
+          created_at: string | null
+          error_details: Json | null
+          error_message: string | null
+          id: string
+          org_id: string
+          pos_integration_id: string
+          records_created: number | null
+          records_failed: number | null
+          records_fetched: number | null
+          records_updated: number | null
+          status: string | null
+          sync_ended_at: string | null
+          sync_started_at: string | null
+          sync_type: string
+        }
+        Insert: {
+          created_at?: string | null
+          error_details?: Json | null
+          error_message?: string | null
+          id?: string
+          org_id: string
+          pos_integration_id: string
+          records_created?: number | null
+          records_failed?: number | null
+          records_fetched?: number | null
+          records_updated?: number | null
+          status?: string | null
+          sync_ended_at?: string | null
+          sync_started_at?: string | null
+          sync_type: string
+        }
+        Update: {
+          created_at?: string | null
+          error_details?: Json | null
+          error_message?: string | null
+          id?: string
+          org_id?: string
+          pos_integration_id?: string
+          records_created?: number | null
+          records_failed?: number | null
+          records_fetched?: number | null
+          records_updated?: number | null
+          status?: string | null
+          sync_ended_at?: string | null
+          sync_started_at?: string | null
+          sync_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sync_logs_pos_integration_id_fkey"
+            columns: ["pos_integration_id"]
+            isOneToOne: false
+            referencedRelation: "pos_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           assigned_to: string | null
@@ -5224,6 +5998,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_guide_completions: {
+        Row: {
+          completed_at: string | null
+          guide_key: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          guide_key: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          guide_key?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       visit_zone_events: {
         Row: {
