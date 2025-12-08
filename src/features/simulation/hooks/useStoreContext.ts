@@ -9,13 +9,50 @@ export interface StoreContextData {
     entityType: string;
     entity_type_name: string;
     model_3d_type: string | null;
-    model_3d_url?: string | null;           // ← 추가
-    model_3d_dimensions?: { width: number; height: number; depth: number } | null;  // ← 추가
+    model_3d_url?: string | null;
+    dimensions?: any;
     properties: any;
     position?: { x: number; y: number; z: number };
     model_3d_position?: { x: number; y: number; z: number };
     model_3d_rotation?: { x: number; y: number; z: number };
     model_3d_scale?: { x: number; y: number; z: number };
+  }[];
+  
+  // 🔥 관계 데이터 추가
+  relations: {
+    id: string;
+    source_entity_id: string;
+    target_entity_id: string;
+    relation_type_id: string;
+    relation_type_name?: string;
+    properties: any;
+  }[];
+  
+  // 🔥 방문 데이터 추가
+  visits: {
+    id: string;
+    customer_id: string;
+    visit_date: string;
+    duration_minutes: number;
+    zones_visited: string[];
+  }[];
+  
+  // 🔥 거래 데이터 추가
+  transactions: {
+    id: string;
+    customer_id?: string;
+    total_amount: number;
+    items?: any[];
+    transaction_date: string;
+  }[];
+  
+  // 🔥 일별 매출 데이터 추가
+  dailySales: {
+    id: string;
+    date: string;
+    total_revenue: number;
+    transaction_count: number;
+    avg_transaction_value: number;
   }[];
   
   // KPI 데이터
@@ -51,6 +88,8 @@ export interface StoreContextData {
     name: string;
     code: string;
     areaSqm?: number;
+    width?: number;
+    depth?: number;
     metadata: any;
   } | null;
 }
@@ -78,7 +117,7 @@ export function useStoreContext(storeId: string | undefined) {
           .eq('id', storeId)
           .single();
 
-        // 온톨로지 엔티티 (3D 정보 포함) - 가구 우선 정렬
+        // 온톨로지 엔티티 (3D 정보 포함)
         const { data: entities } = await supabase
           .from('graph_entities')
           .select(`
@@ -101,10 +140,54 @@ export function useStoreContext(storeId: string | undefined) {
           .order('created_at', { ascending: false })
           .limit(100);
 
-        // 최근 30일 KPI
+        // 🔥 관계 데이터 조회
+        const { data: relations } = await supabase
+          .from('graph_relations')
+          .select(`
+            id,
+            source_entity_id,
+            target_entity_id,
+            relation_type_id,
+            properties,
+            ontology_relation_types (
+              name,
+              label
+            )
+          `)
+          .eq('store_id', storeId)
+          .limit(200);
+
+        // 🔥 방문 데이터 조회 (최근 30일)
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
+        const { data: visits } = await supabase
+          .from('visits')
+          .select('id, customer_id, visit_date, duration_minutes, zones_visited')
+          .eq('store_id', storeId)
+          .gte('visit_date', thirtyDaysAgo.toISOString())
+          .order('visit_date', { ascending: false })
+          .limit(100);
+
+        // 🔥 거래 데이터 조회 (최근 30일)
+        const { data: transactions } = await supabase
+          .from('transactions')
+          .select('id, customer_id, total_amount, items, transaction_date')
+          .eq('store_id', storeId)
+          .gte('transaction_date', thirtyDaysAgo.toISOString())
+          .order('transaction_date', { ascending: false })
+          .limit(100);
+
+        // 🔥 일별 매출 데이터 조회
+        const { data: dailySales } = await supabase
+          .from('daily_sales')
+          .select('id, date, total_revenue, transaction_count, avg_transaction_value')
+          .eq('store_id', storeId)
+          .gte('date', thirtyDaysAgo.toISOString().split('T')[0])
+          .order('date', { ascending: false })
+          .limit(30);
+
+        // 최근 30일 KPI
         const { data: kpis } = await supabase
           .from('dashboard_kpis')
           .select('date, total_visits, total_revenue, conversion_rate, sales_per_sqm')
@@ -145,7 +228,7 @@ export function useStoreContext(storeId: string | undefined) {
             entity_type_name: entityType?.name || 'unknown',
             model_3d_type: entityType?.model_3d_type || null,
             model_3d_url: entityType?.model_3d_url || null,
-            model_3d_dimensions: entityType?.model_3d_dimensions || null,
+            dimensions: entityType?.model_3d_dimensions || null,
             properties: e.properties || {},
             position: e.model_3d_position ? {
               x: (e.model_3d_position as any).x || 0,
@@ -172,14 +255,35 @@ export function useStoreContext(storeId: string | undefined) {
 
         // 가구 엔티티를 앞으로 정렬 (furniture, room, structure 우선)
         const sortedEntities = mappedEntities.sort((a, b) => {
-          const priorityTypes = ['furniture', 'room', 'structure'];
+          const priorityTypes = ['furniture', 'room', 'structure', 'building'];
           const aPriority = priorityTypes.includes(a.model_3d_type || '') ? 0 : 1;
           const bPriority = priorityTypes.includes(b.model_3d_type || '') ? 0 : 1;
           return aPriority - bPriority;
         });
 
+        // 🔥 관계 매핑
+        const mappedRelations = (relations || []).map(r => {
+          const relationType = r.ontology_relation_types as any;
+          return {
+            id: r.id,
+            source_entity_id: r.source_entity_id,
+            target_entity_id: r.target_entity_id,
+            relation_type_id: r.relation_type_id,
+            relation_type_name: relationType?.name || 'unknown',
+            properties: r.properties || {}
+          };
+        });
+
+        // 매장 크기 추출 (metadata에서)
+        const storeWidth = store?.metadata?.width || 17.4;
+        const storeDepth = store?.metadata?.depth || 16.6;
+
         console.log('Store context loaded:', {
           entities: sortedEntities.length,
+          relations: mappedRelations.length,
+          visits: (visits || []).length,
+          transactions: (transactions || []).length,
+          dailySales: (dailySales || []).length,
           furniture: sortedEntities.filter(e => e.model_3d_type === 'furniture').length,
           products: (productsData || []).length,
         });
@@ -190,10 +294,38 @@ export function useStoreContext(storeId: string | undefined) {
             name: store.store_name,
             code: store.store_code,
             areaSqm: store.area_sqm,
+            width: storeWidth,
+            depth: storeDepth,
             metadata: store.metadata || {}
           } : null,
           
           entities: sortedEntities,
+          
+          relations: mappedRelations,
+          
+          visits: (visits || []).map(v => ({
+            id: v.id,
+            customer_id: v.customer_id,
+            visit_date: v.visit_date,
+            duration_minutes: v.duration_minutes || 0,
+            zones_visited: v.zones_visited || []
+          })),
+          
+          transactions: (transactions || []).map(t => ({
+            id: t.id,
+            customer_id: t.customer_id,
+            total_amount: t.total_amount || 0,
+            items: t.items || [],
+            transaction_date: t.transaction_date
+          })),
+          
+          dailySales: (dailySales || []).map(d => ({
+            id: d.id,
+            date: d.date,
+            total_revenue: d.total_revenue || 0,
+            transaction_count: d.transaction_count || 0,
+            avg_transaction_value: d.avg_transaction_value || 0
+          })),
           
           recentKpis: (kpis || []).map(k => ({
             date: k.date,
