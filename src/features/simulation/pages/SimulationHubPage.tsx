@@ -67,6 +67,9 @@ import { SimulationHistoryPanel } from '../components/SimulationHistoryPanel';
 import { LayoutComparisonView } from '../components/LayoutComparisonView';
 import { useLayoutApply } from '../hooks/useLayoutApply';
 
+// 기존 imports 아래에 추가:
+import { IntegratedDataAnalysis } from '../components/IntegratedDataAnalysis';
+
 /**
  * 데이터 품질 상태 타입
  */
@@ -703,6 +706,18 @@ export default function SimulationHubPage() {
               </div>
             </AlertDescription>
           </Alert>
+        )}
+
+        {/* 🆕 통합 데이터 분석 섹션 */}
+        {selectedStore && contextData && (
+          <IntegratedDataAnalysis
+            contextData={contextData}
+            loading={contextLoading}
+            onRefresh={() => {
+              toast.info('데이터를 새로고침합니다...');
+              // refreshContextData(); // useStoreContext에 refresh 함수가 있다면
+            }}
+          />
         )}
 
         {/* 탭 */}
