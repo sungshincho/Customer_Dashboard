@@ -141,6 +141,12 @@ export default function SimulationHubPage() {
   const { logActivity } = useActivityLogger();
   const location = useLocation();
 
+  // 🔍 DEBUG: ROIResultCard에 전달되는 storeId 확인
+  useEffect(() => {
+    console.log('🔍 ROIResultCard storeId:', selectedStore?.id);
+    console.log('🔍 selectedStore 전체:', selectedStore);
+  }, [selectedStore]);
+
   // ✅ 실제 데이터를 가져오는 Hook
   const { 
     contextData, 
