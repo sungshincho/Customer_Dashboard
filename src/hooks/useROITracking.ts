@@ -132,15 +132,15 @@ export function useRecommendationApplications(storeId?: string) {
     queryFn: async () => {
       if (!orgId) return [];
 
-      let query = supabase
-        .from('recommendation_applications')
+      let query = (supabase
+        .from('recommendation_applications' as any)
         .select(`
           *,
           stores (store_name),
           scenarios (name)
         `)
         .eq('org_id', orgId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }) as any);
 
       if (storeId) {
         query = query.eq('store_id', storeId);
@@ -148,7 +148,7 @@ export function useRecommendationApplications(storeId?: string) {
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as (RecommendationApplication & { 
+      return (data || []) as unknown as (RecommendationApplication & { 
         stores: { store_name: string } | null;
         scenarios: { name: string } | null;
       })[];
@@ -169,8 +169,8 @@ export function useROIMeasurements(applicationId?: string) {
     queryFn: async () => {
       if (!orgId) return [];
 
-      let query = supabase
-        .from('roi_measurements')
+      let query = (supabase
+        .from('roi_measurements' as any)
         .select(`
           *,
           recommendation_applications (
@@ -181,7 +181,7 @@ export function useROIMeasurements(applicationId?: string) {
           )
         `)
         .eq('org_id', orgId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }) as any);
 
       if (applicationId) {
         query = query.eq('application_id', applicationId);
@@ -189,7 +189,7 @@ export function useROIMeasurements(applicationId?: string) {
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as (ROIMeasurement & {
+      return (data || []) as unknown as (ROIMeasurement & {
         recommendation_applications: {
           recommendation_type: RecommendationType;
           recommendation_summary: string | null;
@@ -215,8 +215,8 @@ export function useROISummary(storeId?: string) {
       if (!orgId) return null;
 
       // 완료된 측정 결과 조회
-      let query = supabase
-        .from('roi_measurements')
+      let query = (supabase
+        .from('roi_measurements' as any)
         .select(`
           *,
           recommendation_applications!inner (
@@ -224,7 +224,7 @@ export function useROISummary(storeId?: string) {
             store_id
           )
         `)
-        .eq('org_id', orgId);
+        .eq('org_id', orgId) as any);
 
       if (storeId) {
         query = query.eq('recommendation_applications.store_id', storeId);
@@ -245,28 +245,28 @@ export function useROISummary(storeId?: string) {
       }
 
       // 통계 계산
-      const positiveCount = measurements.filter(m => m.is_positive_impact).length;
+      const positiveCount = measurements.filter((m: any) => m.is_positive_impact).length;
       const roiValues = measurements
-        .map(m => m.kpi_changes?.total_revenue?.percentage || 0)
-        .filter(v => v !== 0);
+        .map((m: any) => (m.kpi_changes as any)?.total_revenue?.percentage || 0)
+        .filter((v: number) => v !== 0);
       
       const avgROI = roiValues.length > 0 
-        ? roiValues.reduce((a, b) => a + b, 0) / roiValues.length 
+        ? roiValues.reduce((a: number, b: number) => a + b, 0) / roiValues.length 
         : 0;
 
       const totalAnnualImpact = measurements
-        .reduce((sum, m) => sum + (m.estimated_annual_impact?.revenue || 0), 0);
+        .reduce((sum: number, m: any) => sum + ((m.estimated_annual_impact as any)?.revenue || 0), 0);
 
       // 유형별 통계
       const byType: Record<string, { count: number; totalROI: number }> = {};
-      measurements.forEach(m => {
+      measurements.forEach((m: any) => {
         const type = (m.recommendation_applications as any)?.recommendation_type;
         if (type) {
           if (!byType[type]) {
             byType[type] = { count: 0, totalROI: 0 };
           }
           byType[type].count++;
-          byType[type].totalROI += m.kpi_changes?.total_revenue?.percentage || 0;
+          byType[type].totalROI += (m.kpi_changes as any)?.total_revenue?.percentage || 0;
         }
       });
 
@@ -323,8 +323,8 @@ export function useApplyRecommendation() {
 
       const today = new Date().toISOString().split('T')[0];
 
-      const { data, error } = await supabase
-        .from('recommendation_applications')
+      const { data, error } = await (supabase
+        .from('recommendation_applications' as any)
         .insert({
           org_id: orgId,
           store_id: storeId,
@@ -342,19 +342,19 @@ export function useApplyRecommendation() {
           status: 'applied',
         })
         .select()
-        .single();
+        .single() as any);
 
       if (error) throw error;
 
       // KPI 스냅샷 저장 (베이스라인)
-      await supabase.from('kpi_snapshots').insert({
+      await (supabase.from('kpi_snapshots' as any).insert({
         org_id: orgId,
         store_id: storeId,
         application_id: data.id,
         snapshot_date: today,
         snapshot_type: 'baseline',
         ...baselineKpis,
-      });
+      }) as any);
 
       return data;
     },
@@ -389,11 +389,11 @@ export function useCompleteROIMeasurement() {
       if (!orgId) throw new Error('Org not found');
 
       // 적용 정보 조회
-      const { data: application, error: appError } = await supabase
-        .from('recommendation_applications')
+      const { data: application, error: appError } = await (supabase
+        .from('recommendation_applications' as any)
         .select('*')
         .eq('id', applicationId)
-        .single();
+        .single() as any);
 
       if (appError) throw appError;
 
@@ -401,19 +401,20 @@ export function useCompleteROIMeasurement() {
       const measuredKpis = await fetchCurrentKPIs(application.store_id, application.measurement_period_days);
 
       // 연간 영향 추정
-      const dailyRevenueChange = (measuredKpis.total_revenue - application.baseline_kpis.total_revenue);
+      const baselineKpis = application.baseline_kpis as any;
+      const dailyRevenueChange = (measuredKpis.total_revenue - (baselineKpis?.total_revenue || 0));
       const annualImpact = {
         revenue: Math.round(dailyRevenueChange * 365),
-        visitors: Math.round((measuredKpis.total_visitors - application.baseline_kpis.total_visitors) * 365),
+        visitors: Math.round((measuredKpis.total_visitors - (baselineKpis?.total_visitors || 0)) * 365),
         transactions: Math.round(
           ((measuredKpis.total_visitors * measuredKpis.conversion_rate / 100) - 
-           (application.baseline_kpis.total_visitors * application.baseline_kpis.conversion_rate / 100)) * 365
+           ((baselineKpis?.total_visitors || 0) * (baselineKpis?.conversion_rate || 0) / 100)) * 365
         ),
       };
 
       // ROI 측정 결과 저장
-      const { data: measurement, error: measureError } = await supabase
-        .from('roi_measurements')
+      const { data: measurement, error: measureError } = await (supabase
+        .from('roi_measurements' as any)
         .insert({
           org_id: orgId,
           application_id: applicationId,
@@ -424,25 +425,25 @@ export function useCompleteROIMeasurement() {
           estimated_annual_impact: annualImpact,
         })
         .select()
-        .single();
+        .single() as any);
 
       if (measureError) throw measureError;
 
       // 적용 상태 업데이트
-      await supabase
-        .from('recommendation_applications')
+      await (supabase
+        .from('recommendation_applications' as any)
         .update({ status: 'completed' })
-        .eq('id', applicationId);
+        .eq('id', applicationId) as any);
 
       // KPI 스냅샷 저장 (측정 후)
-      await supabase.from('kpi_snapshots').insert({
+      await (supabase.from('kpi_snapshots' as any).insert({
         org_id: orgId,
         store_id: application.store_id,
         application_id: applicationId,
         snapshot_date: new Date().toISOString().split('T')[0],
         snapshot_type: 'measurement',
         ...measuredKpis,
-      });
+      }) as any);
 
       return measurement;
     },
@@ -451,7 +452,7 @@ export function useCompleteROIMeasurement() {
       queryClient.invalidateQueries({ queryKey: ['roi-measurements'] });
       queryClient.invalidateQueries({ queryKey: ['roi-summary'] });
       
-      const change = data.kpi_changes?.total_revenue;
+      const change = (data?.kpi_changes as any)?.total_revenue;
       if (change) {
         toast({
           title: 'ROI 측정 완료!',
@@ -482,8 +483,8 @@ export function useRevertRecommendation() {
     mutationFn: async ({ applicationId, reason }: { applicationId: string; reason?: string }) => {
       if (!user?.id) throw new Error('User not authenticated');
 
-      const { data, error } = await supabase
-        .from('recommendation_applications')
+      const { data, error } = await (supabase
+        .from('recommendation_applications' as any)
         .update({
           status: 'reverted',
           reverted_at: new Date().toISOString(),
@@ -491,7 +492,7 @@ export function useRevertRecommendation() {
         })
         .eq('id', applicationId)
         .select()
-        .single();
+        .single() as any);
 
       if (error) throw error;
       return data;
@@ -555,8 +556,8 @@ async function fetchCurrentKPIs(storeId: string, days: number): Promise<Baseline
   const sum = data.reduce(
     (acc, kpi) => ({
       total_revenue: acc.total_revenue + (kpi.total_revenue || 0),
-      total_visitors: acc.total_visitors + (kpi.total_visitors || 0),
-      total_transactions: acc.total_transactions + (kpi.total_transactions || 0),
+      total_visitors: acc.total_visitors + ((kpi as any).total_visitors || kpi.total_visits || 0),
+      total_transactions: acc.total_transactions + ((kpi as any).total_transactions || kpi.total_purchases || 0),
     }),
     { total_revenue: 0, total_visitors: 0, total_transactions: 0 }
   );

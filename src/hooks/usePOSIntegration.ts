@@ -180,14 +180,14 @@ export function usePOSIntegrations(storeId?: string) {
     queryFn: async () => {
       if (!orgId) return [];
 
-      let query = supabase
-        .from('pos_integrations')
+      let query = (supabase
+        .from('pos_integrations' as any)
         .select(`
           *,
           stores (store_name)
         `)
         .eq('org_id', orgId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }) as any);
 
       if (storeId) {
         query = query.eq('store_id', storeId);
@@ -195,7 +195,7 @@ export function usePOSIntegrations(storeId?: string) {
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as (POSIntegration & { stores: { store_name: string } | null })[];
+      return (data || []) as (POSIntegration & { stores: { store_name: string } | null })[];
     },
     enabled: !!orgId,
   });
@@ -209,14 +209,14 @@ export function usePOSIntegration(integrationId: string) {
   return useQuery({
     queryKey: ['pos-integration', integrationId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('pos_integrations')
+      const { data, error } = await (supabase
+        .from('pos_integrations' as any)
         .select(`
           *,
           stores (store_name)
         `)
         .eq('id', integrationId)
-        .single();
+        .single() as any);
 
       if (error) throw error;
       return data as POSIntegration & { stores: { store_name: string } | null };
@@ -245,20 +245,20 @@ export function useConnectPOS() {
       if (!user?.id || !orgId) throw new Error('User not authenticated');
 
       // 이미 연결된 경우 확인
-      const { data: existing } = await supabase
-        .from('pos_integrations')
+      const { data: existing } = await (supabase
+        .from('pos_integrations' as any)
         .select('id')
         .eq('store_id', storeId)
         .eq('provider', provider)
-        .maybeSingle();
+        .maybeSingle() as any);
 
       if (existing) {
         throw new Error('이미 연결된 POS입니다');
       }
 
       // 연동 레코드 생성 (pending 상태)
-      const { data: integration, error } = await supabase
-        .from('pos_integrations')
+      const { data: integration, error } = await (supabase
+        .from('pos_integrations' as any)
         .insert({
           org_id: orgId,
           store_id: storeId,
@@ -268,7 +268,7 @@ export function useConnectPOS() {
           sync_frequency_minutes: 15,
         })
         .select()
-        .single();
+        .single() as any);
 
       if (error) throw error;
 
@@ -327,13 +327,13 @@ export function useCompletePOSConnection() {
       if (error) throw error;
 
       // 연동 상태 업데이트
-      await supabase
-        .from('pos_integrations')
+      await (supabase
+        .from('pos_integrations' as any)
         .update({
           status: 'active',
           updated_at: new Date().toISOString(),
         })
-        .eq('id', integrationId);
+        .eq('id', integrationId) as any);
 
       return data;
     },
@@ -364,14 +364,14 @@ export function useDisconnectPOS() {
 
   return useMutation({
     mutationFn: async (integrationId: string) => {
-      const { error } = await supabase
-        .from('pos_integrations')
+      const { error } = await (supabase
+        .from('pos_integrations' as any)
         .update({
           status: 'disconnected',
           sync_enabled: false,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', integrationId);
+        .eq('id', integrationId) as any);
 
       if (error) throw error;
     },
@@ -439,12 +439,12 @@ export function useSyncLogs(integrationId?: string, limit = 10) {
     queryFn: async () => {
       if (!orgId) return [];
 
-      let query = supabase
-        .from('sync_logs')
+      let query = (supabase
+        .from('sync_logs' as any)
         .select('*')
         .eq('org_id', orgId)
         .order('created_at', { ascending: false })
-        .limit(limit);
+        .limit(limit) as any);
 
       if (integrationId) {
         query = query.eq('pos_integration_id', integrationId);
@@ -452,7 +452,7 @@ export function useSyncLogs(integrationId?: string, limit = 10) {
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as SyncLog[];
+      return (data || []) as SyncLog[];
     },
     enabled: !!orgId,
   });
@@ -475,12 +475,12 @@ export function useRealtimeTransactions(storeId: string, options?: {
     queryFn: async () => {
       if (!orgId) return [];
 
-      let query = supabase
-        .from('realtime_transactions')
+      let query = (supabase
+        .from('realtime_transactions' as any)
         .select('*')
         .eq('store_id', storeId)
         .order('transaction_timestamp', { ascending: false })
-        .limit(limit);
+        .limit(limit) as any);
 
       if (startDate) {
         query = query.gte('transaction_date', startDate);
@@ -491,7 +491,7 @@ export function useRealtimeTransactions(storeId: string, options?: {
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as RealtimeTransaction[];
+      return (data || []) as RealtimeTransaction[];
     },
     enabled: !!orgId && !!storeId,
     refetchInterval: 60000, // 1분마다 자동 갱신
@@ -514,11 +514,11 @@ export function useRealtimeInventory(storeId: string, options?: {
     queryFn: async () => {
       if (!orgId) return [];
 
-      let query = supabase
-        .from('realtime_inventory')
+      let query = (supabase
+        .from('realtime_inventory' as any)
         .select('*')
         .eq('store_id', storeId)
-        .order('last_updated_at', { ascending: false });
+        .order('last_updated_at', { ascending: false }) as any);
 
       if (lowStockOnly) {
         query = query.eq('is_low_stock', true);
@@ -529,7 +529,7 @@ export function useRealtimeInventory(storeId: string, options?: {
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as RealtimeInventory[];
+      return (data || []) as RealtimeInventory[];
     },
     enabled: !!orgId && !!storeId,
     refetchInterval: 60000, // 1분마다 자동 갱신

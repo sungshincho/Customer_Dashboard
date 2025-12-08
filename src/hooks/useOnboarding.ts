@@ -93,11 +93,11 @@ export function useOnboardingProgress() {
     queryFn: async () => {
       if (!user?.id) return null;
 
-      const { data, error } = await supabase
-        .from('onboarding_progress')
+      const { data, error } = await (supabase
+        .from('onboarding_progress' as any)
         .select('*')
         .eq('user_id', user.id)
-        .maybeSingle();
+        .maybeSingle() as any);
 
       if (error && error.code !== 'PGRST116') throw error;
       return data as OnboardingProgress | null;
@@ -120,17 +120,17 @@ export function useInitializeOnboarding() {
       if (!user?.id || !orgId) throw new Error('User not authenticated');
 
       // 이미 온보딩이 있는지 확인
-      const { data: existing } = await supabase
-        .from('onboarding_progress')
+      const { data: existing } = await (supabase
+        .from('onboarding_progress' as any)
         .select('id')
         .eq('user_id', user.id)
-        .maybeSingle();
+        .maybeSingle() as any);
 
       if (existing) return existing;
 
       // 새 온보딩 생성
-      const { data, error } = await supabase
-        .from('onboarding_progress')
+      const { data, error } = await (supabase
+        .from('onboarding_progress' as any)
         .insert({
           org_id: orgId,
           user_id: user.id,
@@ -140,7 +140,7 @@ export function useInitializeOnboarding() {
           skipped_steps: [],
         })
         .select()
-        .single();
+        .single() as any);
 
       if (error) throw error;
       return data;
@@ -168,11 +168,11 @@ export function useCompleteOnboardingStep() {
       if (!user?.id) throw new Error('User not authenticated');
 
       // 현재 진행 상태 조회
-      const { data: progress, error: fetchError } = await supabase
-        .from('onboarding_progress')
+      const { data: progress, error: fetchError } = await (supabase
+        .from('onboarding_progress' as any)
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .single() as any);
 
       if (fetchError) throw fetchError;
 
@@ -196,8 +196,8 @@ export function useCompleteOnboardingStep() {
 
       const isComplete = completedSteps.length >= 6; // 7단계 제외
 
-      const { data, error } = await supabase
-        .from('onboarding_progress')
+      const { data, error } = await (supabase
+        .from('onboarding_progress' as any)
         .update({
           current_step: nextStep,
           completed_steps: completedSteps,
@@ -207,7 +207,7 @@ export function useCompleteOnboardingStep() {
         })
         .eq('user_id', user.id)
         .select()
-        .single();
+        .single() as any);
 
       if (error) throw error;
       return data;
@@ -245,11 +245,11 @@ export function useSkipOnboardingStep() {
     mutationFn: async (step: number) => {
       if (!user?.id) throw new Error('User not authenticated');
 
-      const { data: progress } = await supabase
-        .from('onboarding_progress')
+      const { data: progress } = await (supabase
+        .from('onboarding_progress' as any)
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .single() as any);
 
       if (!progress) throw new Error('Onboarding not found');
 
@@ -266,8 +266,8 @@ export function useSkipOnboardingStep() {
 
       const nextStep = Math.min(step + 1, 7);
 
-      const { data, error } = await supabase
-        .from('onboarding_progress')
+      const { data, error } = await (supabase
+        .from('onboarding_progress' as any)
         .update({
           current_step: nextStep,
           skipped_steps: skippedSteps,
@@ -276,7 +276,7 @@ export function useSkipOnboardingStep() {
         })
         .eq('user_id', user.id)
         .select()
-        .single();
+        .single() as any);
 
       if (error) throw error;
       return data;
@@ -295,11 +295,11 @@ export function useSampleDataTemplates() {
   return useQuery({
     queryKey: ['sample-data-templates'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('sample_data_templates')
+      const { data, error } = await (supabase
+        .from('sample_data_templates' as any)
         .select('*')
         .eq('is_active', true)
-        .order('sort_order', { ascending: true });
+        .order('sort_order', { ascending: true }) as any);
 
       if (error) throw error;
       return data as SampleDataTemplate[];
@@ -363,11 +363,11 @@ export function useQuickstartGuides() {
   return useQuery({
     queryKey: ['quickstart-guides', role],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('quickstart_guides')
+      const { data, error } = await (supabase
+        .from('quickstart_guides' as any)
         .select('*')
         .eq('is_active', true)
-        .order('priority', { ascending: false });
+        .order('priority', { ascending: false }) as any);
 
       if (error) throw error;
       
@@ -420,10 +420,10 @@ export function useGuideCompletions() {
     queryFn: async () => {
       if (!user?.id) return [];
 
-      const { data, error } = await supabase
-        .from('user_guide_completions')
+      const { data, error } = await (supabase
+        .from('user_guide_completions' as any)
         .select('*')
-        .eq('user_id', user.id);
+        .eq('user_id', user.id) as any);
 
       if (error) throw error;
       return data;
@@ -444,8 +444,8 @@ export function useCompleteGuide() {
     mutationFn: async (guideKey: string) => {
       if (!user?.id) throw new Error('User not authenticated');
 
-      const { data, error } = await supabase
-        .from('user_guide_completions')
+      const { data, error } = await (supabase
+        .from('user_guide_completions' as any)
         .upsert({
           user_id: user.id,
           guide_key: guideKey,
@@ -454,7 +454,7 @@ export function useCompleteGuide() {
           onConflict: 'user_id,guide_key',
         })
         .select()
-        .single();
+        .single() as any);
 
       if (error) throw error;
       return data;
@@ -492,8 +492,8 @@ export function useForceCompleteOnboarding() {
     mutationFn: async () => {
       if (!user?.id) throw new Error('User not authenticated');
 
-      const { data, error } = await supabase
-        .from('onboarding_progress')
+      const { data, error } = await (supabase
+        .from('onboarding_progress' as any)
         .update({
           current_step: 7,
           completed_at: new Date().toISOString(),
@@ -510,7 +510,7 @@ export function useForceCompleteOnboarding() {
         })
         .eq('user_id', user.id)
         .select()
-        .single();
+        .single() as any);
 
       if (error) throw error;
       return data;
@@ -537,8 +537,8 @@ export function useRestartOnboarding() {
     mutationFn: async () => {
       if (!user?.id || !orgId) throw new Error('User not authenticated');
 
-      const { data, error } = await supabase
-        .from('onboarding_progress')
+      const { data, error } = await (supabase
+        .from('onboarding_progress' as any)
         .update({
           current_step: 1,
           completed_steps: [],
@@ -557,7 +557,7 @@ export function useRestartOnboarding() {
         })
         .eq('user_id', user.id)
         .select()
-        .single();
+        .single() as any);
 
       if (error) throw error;
       return data;

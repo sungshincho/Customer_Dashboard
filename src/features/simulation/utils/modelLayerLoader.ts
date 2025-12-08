@@ -95,7 +95,7 @@ export async function loadUserModels(
         // 이미 인스턴스로 로드된 URL은 스킵 (중복 방지)
         if (entityType.model_3d_url && !loadedUrls.has(entityType.model_3d_url)) {
           const dimensions = parseJsonField(entityType.model_3d_dimensions, undefined);
-          const metadata = parseJsonField(entityType.model_3d_metadata, {});
+          const metadata = parseJsonField<{ defaultPosition?: { x: number; y: number; z: number } }>(entityType.model_3d_metadata, {});
           const type = inferTypeFromModel3dType(entityType.model_3d_type);
           
           // defaultPosition이 있으면 사용
