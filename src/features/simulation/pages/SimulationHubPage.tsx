@@ -70,6 +70,9 @@ import { useLayoutApply } from '../hooks/useLayoutApply';
 // 기존 imports 아래에 추가:
 import { IntegratedDataAnalysis } from '../components/IntegratedDataAnalysis';
 
+// 🆕 추가
+import { ROIResultCard, ROISummaryCard } from '../components/ROIResultCard';
+
 /**
  * 데이터 품질 상태 타입
  */
@@ -715,8 +718,16 @@ export default function SimulationHubPage() {
             loading={contextLoading}
             onRefresh={() => {
               toast.info('데이터를 새로고침합니다...');
-              // refreshContextData(); // useStoreContext에 refresh 함수가 있다면
             }}
+          />
+        )}
+
+        {/* 🆕 ROI 결과 카드 추가 - 여기! */}
+        {selectedStore && (
+          <ROIResultCard 
+            storeId={selectedStore.id} 
+            limit={3}
+            showHeader={true}
           />
         )}
 
