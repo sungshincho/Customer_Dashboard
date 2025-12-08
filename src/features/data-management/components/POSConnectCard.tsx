@@ -107,8 +107,10 @@ export function POSConnectCard({ storeId, compact = false }: POSConnectCardProps
   const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<POSIntegration | null>(null);
 
-  const activeIntegrations = integrations.filter(i => i.status === 'active');
-  const hasIntegrations = integrations.length > 0;
+  // disconnected 상태가 아닌 연동만 표시
+  const visibleIntegrations = integrations.filter(i => i.status !== 'disconnected');
+  const activeIntegrations = visibleIntegrations.filter(i => i.status === 'active');
+  const hasIntegrations = visibleIntegrations.length > 0;
 
   // ============================================================================
   // 핸들러
@@ -233,7 +235,7 @@ export function POSConnectCard({ storeId, compact = false }: POSConnectCardProps
             </div>
           ) : hasIntegrations ? (
             <div className="space-y-3">
-              {integrations.map((integration) => (
+              {visibleIntegrations.map((integration) => (
                 <POSIntegrationItem
                   key={integration.id}
                   integration={integration}
