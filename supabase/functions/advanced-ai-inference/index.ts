@@ -45,6 +45,407 @@ function safeParseAIResponse(aiContent: string, defaultValue: any): any {
 }
 
 // ============================================================================
+// 🆕 방문/거래/매출 데이터 분석 함수들 (NEW)
+// ============================================================================
+
+interface VisitData {
+  id: string;
+  customer_id?: string;
+  visit_date: string;
+  duration_minutes?: number;
+  zones_visited?: string[];
+}
+
+interface TransactionData {
+  id: string;
+  customer_id?: string;
+  total_amount: number;
+  items?: any[];
+  transaction_date: string;
+}
+
+interface DailySalesData {
+  id: string;
+  date: string;
+  total_revenue: number;
+  transaction_count?: number;
+  avg_transaction_value?: number;
+}
+
+// 방문 패턴 분석
+function analyzeVisitPatterns(visits: VisitData[]) {
+  if (!visits || visits.length === 0) {
+    return {
+      totalVisits: 0,
+      avgDuration: 0,
+      zonePopularity: {},
+      customerFlows: [],
+      peakHours: [],
+      unvisitedZones: [],
+      summaryText: '방문 데이터 없음'
+    };
+  }
+
+  // 평균 체류 시간
+  const durations = visits.filter(v => v.duration_minutes).map(v => v.duration_minutes!);
+  const avgDuration = durations.length > 0 
+    ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
+    : 0;
+
+  // 구역별 인기도
+  const zoneCounts: Record<string, number> = {};
+  const flowPatterns: Record<string, number> = {};
+  
+  visits.forEach(visit => {
+    if (visit.zones_visited && Array.isArray(visit.zones_visited)) {
+      visit.zones_visited.forEach(zone => {
+        zoneCounts[zone] = (zoneCounts[zone] || 0) + 1;
+      });
+      
+      // 동선 패턴 (순서대로 연결)
+      const flowKey = visit.zones_visited.join(' → ');
+      flowPatterns[flowKey] = (flowPatterns[flowKey] || 0) + 1;
+    }
+  });
+
+  // 구역별 방문율 계산
+  const zonePopularity: Record<string, number> = {};
+  Object.entries(zoneCounts).forEach(([zone, count]) => {
+    zonePopularity[zone] = Math.round((count / visits.length) * 100);
+  });
+
+  // 주요 동선 패턴 (상위 5개)
+  const customerFlows = Object.entries(flowPatterns)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([flow, count]) => ({
+      flow,
+      count,
+      percentage: Math.round((count / visits.length) * 100)
+    }));
+
+  // 방문 시간대 분석
+  const hourCounts: Record<number, number> = {};
+  visits.forEach(visit => {
+    const hour = new Date(visit.visit_date).getHours();
+    hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+  });
+  
+  const peakHours = Object.entries(hourCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([hour, count]) => ({ hour: parseInt(hour), count }));
+
+  // 방문 없는 구역 감지 (일반적인 매장 구역과 비교)
+  const commonZones = ['입구', '의류 섹션', '액세서리 섹션', '화장품 섹션', '신발 섹션', '계산대'];
+  const visitedZones = Object.keys(zoneCounts);
+  const unvisitedZones = commonZones.filter(z => !visitedZones.some(vz => vz.includes(z) || z.includes(vz)));
+
+  // 요약 텍스트 생성
+  const summaryText = `### 고객 방문 분석 (${visits.length}회)
+- 평균 체류: ${avgDuration}분
+- 구역별 인기도: ${Object.entries(zonePopularity).map(([z, p]) => `${z}(${p}%)`).join(', ')}
+- 주요 동선: ${customerFlows[0]?.flow || '데이터 없음'} (${customerFlows[0]?.percentage || 0}%)
+${unvisitedZones.length > 0 ? `- ⚠️ 방문 없는 구역: ${unvisitedZones.join(', ')} → 레이아웃 개선 필요` : ''}`;
+
+  return {
+    totalVisits: visits.length,
+    avgDuration,
+    zonePopularity,
+    customerFlows,
+    peakHours,
+    unvisitedZones,
+    summaryText
+  };
+}
+
+// 거래 패턴 분석
+function analyzeTransactionPatterns(transactions: TransactionData[]) {
+  if (!transactions || transactions.length === 0) {
+    return {
+      totalTransactions: 0,
+      totalRevenue: 0,
+      avgTransactionValue: 0,
+      repeatCustomerRate: 0,
+      topSellingProducts: [],
+      summaryText: '거래 데이터 없음'
+    };
+  }
+
+  const totalRevenue = transactions.reduce((sum, t) => sum + (t.total_amount || 0), 0);
+  const avgTransactionValue = Math.round(totalRevenue / transactions.length);
+
+  // 반복 고객 비율
+  const customerIds = transactions.filter(t => t.customer_id).map(t => t.customer_id!);
+  const uniqueCustomers = new Set(customerIds).size;
+  const repeatCustomerRate = customerIds.length > 0 
+    ? Math.round(((customerIds.length - uniqueCustomers) / customerIds.length) * 100)
+    : 0;
+
+  // 베스트셀러 상품
+  const productCounts: Record<string, { count: number; revenue: number }> = {};
+  transactions.forEach(t => {
+    if (t.items && Array.isArray(t.items)) {
+      t.items.forEach((item: any) => {
+        const name = item.name || item.product_name || 'Unknown';
+        if (!productCounts[name]) {
+          productCounts[name] = { count: 0, revenue: 0 };
+        }
+        productCounts[name].count += item.quantity || 1;
+        productCounts[name].revenue += item.price || 0;
+      });
+    }
+  });
+
+  const topSellingProducts = Object.entries(productCounts)
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 5)
+    .map(([name, data]) => ({ name, ...data }));
+
+  const summaryText = `### 거래 분석 (${transactions.length}건)
+- 총 매출: ${totalRevenue.toLocaleString()}원
+- 평균 거래액: ${avgTransactionValue.toLocaleString()}원
+- 반복 고객율: ${repeatCustomerRate}%
+${topSellingProducts.length > 0 ? `- 베스트셀러: ${topSellingProducts.slice(0, 3).map(p => p.name).join(', ')}` : ''}`;
+
+  return {
+    totalTransactions: transactions.length,
+    totalRevenue,
+    avgTransactionValue,
+    repeatCustomerRate,
+    topSellingProducts,
+    summaryText
+  };
+}
+
+// 일별 매출 트렌드 분석
+function analyzeDailySalesTrends(dailySales: DailySalesData[]) {
+  if (!dailySales || dailySales.length === 0) {
+    return {
+      avgDailyRevenue: 0,
+      trend: 'unknown',
+      trendPercentage: 0,
+      bestDay: null,
+      worstDay: null,
+      summaryText: '매출 트렌드 데이터 없음'
+    };
+  }
+
+  // 날짜순 정렬
+  const sorted = [...dailySales].sort((a, b) => 
+    new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+
+  const revenues = sorted.map(d => d.total_revenue || 0);
+  const avgDailyRevenue = Math.round(revenues.reduce((a, b) => a + b, 0) / revenues.length);
+
+  // 트렌드 계산 (전반부 vs 후반부)
+  const mid = Math.floor(revenues.length / 2);
+  const firstHalf = revenues.slice(0, mid);
+  const secondHalf = revenues.slice(mid);
+  
+  const firstAvg = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length;
+  const secondAvg = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
+  
+  const trendPercentage = firstAvg > 0 ? Math.round(((secondAvg - firstAvg) / firstAvg) * 100) : 0;
+  const trend = trendPercentage > 5 ? 'increasing' : trendPercentage < -5 ? 'decreasing' : 'stable';
+
+  // 최고/최저 매출일
+  const bestDay = sorted.reduce((best, curr) => 
+    (curr.total_revenue || 0) > (best.total_revenue || 0) ? curr : best
+  );
+  const worstDay = sorted.reduce((worst, curr) => 
+    (curr.total_revenue || 0) < (worst.total_revenue || 0) ? curr : worst
+  );
+
+  const trendEmoji = trend === 'increasing' ? '📈' : trend === 'decreasing' ? '📉' : '➡️';
+  const summaryText = `### 매출 트렌드 (${dailySales.length}일)
+- 일평균 매출: ${avgDailyRevenue.toLocaleString()}원
+- 트렌드: ${trendEmoji} ${trend === 'increasing' ? '상승' : trend === 'decreasing' ? '하락' : '유지'} (${trendPercentage > 0 ? '+' : ''}${trendPercentage}%)
+- 최고 매출일: ${bestDay.date} (${bestDay.total_revenue?.toLocaleString()}원)
+- 최저 매출일: ${worstDay.date} (${worstDay.total_revenue?.toLocaleString()}원)`;
+
+  return {
+    avgDailyRevenue,
+    trend,
+    trendPercentage,
+    bestDay,
+    worstDay,
+    summaryText
+  };
+}
+
+// 근접성 관계 분석 (NEAR_TO)
+function analyzeProximityRelations(relations: any[], entities: any[]) {
+  const nearToRelations = relations.filter(r => {
+    const typeName = r.relation_type_name || r.ontology_relation_types?.name || '';
+    return typeName.toLowerCase().includes('near') || typeName === 'NEAR_TO';
+  });
+
+  if (nearToRelations.length === 0) {
+    return {
+      totalProximityRelations: 0,
+      closeProximityPairs: [],
+      farProximityPairs: [],
+      isolatedFurniture: [],
+      summaryText: '근접성 관계 데이터 없음'
+    };
+  }
+
+  const entityMap = new Map(entities.map(e => [e.id, e.label || e.id]));
+  
+  // 거리 정보 추출
+  const proximityPairs = nearToRelations.map(r => ({
+    source: entityMap.get(r.source_entity_id) || r.source_entity_id,
+    target: entityMap.get(r.target_entity_id) || r.target_entity_id,
+    distance: r.properties?.distance || 0
+  })).filter(p => p.distance > 0);
+
+  // 가까운 쌍 (<4m)
+  const closeProximityPairs = proximityPairs
+    .filter(p => p.distance < 4)
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, 5);
+
+  // 멀리 떨어진 쌍 (>10m)
+  const farProximityPairs = proximityPairs
+    .filter(p => p.distance > 10)
+    .sort((a, b) => b.distance - a.distance)
+    .slice(0, 3);
+
+  // 고립된 가구 찾기 (관계가 적은 가구)
+  const relationCounts: Record<string, number> = {};
+  nearToRelations.forEach(r => {
+    const source = entityMap.get(r.source_entity_id) || r.source_entity_id;
+    const target = entityMap.get(r.target_entity_id) || r.target_entity_id;
+    relationCounts[source] = (relationCounts[source] || 0) + 1;
+    relationCounts[target] = (relationCounts[target] || 0) + 1;
+  });
+
+  const avgRelations = Object.values(relationCounts).reduce((a, b) => a + b, 0) / Object.keys(relationCounts).length;
+  const isolatedFurniture = Object.entries(relationCounts)
+    .filter(([_, count]) => count < avgRelations * 0.5)
+    .map(([name]) => name);
+
+  const summaryText = `### 가구 근접성 분석 (${nearToRelations.length}개 관계)
+${closeProximityPairs.length > 0 ? `- 가까운 쌍: ${closeProximityPairs.map(p => `${p.source}↔${p.target}(${p.distance.toFixed(1)}m)`).join(', ')}` : ''}
+${farProximityPairs.length > 0 ? `- 멀리 떨어진 쌍: ${farProximityPairs.map(p => `${p.source}↔${p.target}(${p.distance.toFixed(1)}m)`).join(', ')}` : ''}
+${isolatedFurniture.length > 0 ? `- ⚠️ 고립된 가구: ${isolatedFurniture.join(', ')} → 접근성 개선 필요` : ''}`;
+
+  return {
+    totalProximityRelations: nearToRelations.length,
+    closeProximityPairs,
+    farProximityPairs,
+    isolatedFurniture,
+    summaryText
+  };
+}
+
+// 진열 관계 분석 (DISPLAYED_ON_FURNITURE)
+function analyzeDisplayRelations(relations: any[], entities: any[]) {
+  const displayRelations = relations.filter(r => {
+    const typeName = r.relation_type_name || r.ontology_relation_types?.name || '';
+    return typeName.toLowerCase().includes('display') || typeName === 'DISPLAYED_ON_FURNITURE';
+  });
+
+  if (displayRelations.length === 0) {
+    return {
+      totalDisplayRelations: 0,
+      furnitureProductMap: {},
+      underutilizedFurniture: [],
+      summaryText: '진열 관계 데이터 없음'
+    };
+  }
+
+  const entityMap = new Map(entities.map(e => [e.id, { label: e.label, type: e.entityType || e.model_3d_type }]));
+
+  // 가구별 상품 맵핑
+  const furnitureProductMap: Record<string, { products: string[]; hasTester: number }> = {};
+  
+  displayRelations.forEach(r => {
+    const furniture = entityMap.get(r.target_entity_id)?.label || r.target_entity_id;
+    const product = entityMap.get(r.source_entity_id)?.label || r.source_entity_id;
+    const hasTester = r.properties?.has_tester ? 1 : 0;
+
+    if (!furnitureProductMap[furniture]) {
+      furnitureProductMap[furniture] = { products: [], hasTester: 0 };
+    }
+    furnitureProductMap[furniture].products.push(product);
+    furnitureProductMap[furniture].hasTester += hasTester;
+  });
+
+  // 상품이 적은 가구 찾기
+  const avgProducts = Object.values(furnitureProductMap)
+    .reduce((sum, f) => sum + f.products.length, 0) / Object.keys(furnitureProductMap).length;
+  
+  const underutilizedFurniture = Object.entries(furnitureProductMap)
+    .filter(([_, data]) => data.products.length < avgProducts * 0.5)
+    .map(([name]) => name);
+
+  const summaryText = `### 가구별 진열 현황 (${displayRelations.length}개 관계)
+${Object.entries(furnitureProductMap).map(([furniture, data]) => 
+  `- ${furniture}: ${data.products.length}개 상품${data.hasTester > 0 ? ` (테스터 ${data.hasTester}개)` : ''}`
+).join('\n')}
+${underutilizedFurniture.length > 0 ? `\n⚠️ 활용도 낮은 가구: ${underutilizedFurniture.join(', ')} → 상품 추가 배치 권장` : ''}`;
+
+  return {
+    totalDisplayRelations: displayRelations.length,
+    furnitureProductMap,
+    underutilizedFurniture,
+    summaryText
+  };
+}
+
+// 통합 데이터 분석 빌더
+function buildComprehensiveAnalysis(storeContext: any) {
+  const visits = storeContext.visits || [];
+  const transactions = storeContext.transactions || [];
+  const dailySales = storeContext.dailySales || [];
+  const relations = storeContext.relations || [];
+  const entities = storeContext.entities || [];
+
+  const visitAnalysis = analyzeVisitPatterns(visits);
+  const transactionAnalysis = analyzeTransactionPatterns(transactions);
+  const salesTrendAnalysis = analyzeDailySalesTrends(dailySales);
+  const proximityAnalysis = analyzeProximityRelations(relations, entities);
+  const displayAnalysis = analyzeDisplayRelations(relations, entities);
+
+  // 종합 요약 텍스트
+  const comprehensiveSummary = `
+## 📊 통합 데이터 분석
+
+### 데이터 현황
+- 엔티티: ${entities.length}개, 관계: ${relations.length}개
+- 방문 기록: ${visits.length}건, 거래: ${transactions.length}건, 일별 매출: ${dailySales.length}일
+
+${visitAnalysis.summaryText}
+
+${transactionAnalysis.summaryText}
+
+${salesTrendAnalysis.summaryText}
+
+${proximityAnalysis.summaryText}
+
+${displayAnalysis.summaryText}
+
+### 🎯 AI 분석 우선순위
+1. ${visitAnalysis.unvisitedZones.length > 0 ? `방문 없는 구역(${visitAnalysis.unvisitedZones.join(', ')}) 개선` : '고객 동선 최적화'}
+2. ${proximityAnalysis.isolatedFurniture.length > 0 ? `고립된 가구(${proximityAnalysis.isolatedFurniture.join(', ')}) 재배치` : '가구 배치 최적화'}
+3. ${displayAnalysis.underutilizedFurniture.length > 0 ? `활용도 낮은 가구(${displayAnalysis.underutilizedFurniture.join(', ')}) 상품 추가` : '진열 효율성 개선'}
+4. ${salesTrendAnalysis.trend === 'decreasing' ? '매출 하락 원인 분석 및 개선' : '현재 트렌드 유지/강화'}
+`;
+
+  return {
+    visitAnalysis,
+    transactionAnalysis,
+    salesTrendAnalysis,
+    proximityAnalysis,
+    displayAnalysis,
+    comprehensiveSummary
+  };
+}
+
+// ============================================================================
 // 온톨로지 그래프 분석 함수들 (safeParseAIResponse 함수 아래에 추가)
 // ============================================================================
 
@@ -878,6 +1279,13 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
   const ontologyAnalysis = performOntologyAnalysis(allGraphEntities, relations, 'layout', storeWidth, storeDepth);
   console.log(`Layout Score: ${ontologyAnalysis.layoutInsights?.score}`);
   
+  // 🆕 통합 데이터 분석 (visits, transactions, dailySales, relations)
+  const comprehensiveAnalysis = buildComprehensiveAnalysis(storeContext);
+  console.log('=== Comprehensive Analysis ===');
+  console.log('Visits:', comprehensiveAnalysis.visitAnalysis.totalVisits);
+  console.log('Transactions:', comprehensiveAnalysis.transactionAnalysis.totalTransactions);
+  console.log('Proximity Relations:', comprehensiveAnalysis.proximityAnalysis.totalProximityRelations);
+  console.log('Display Relations:', comprehensiveAnalysis.displayAnalysis.totalDisplayRelations);
 
   // 🔥 중심 기준 좌표계: 범위는 (-halfWidth ~ +halfWidth, -halfDepth ~ +halfDepth)
   const halfWidth = storeWidth / 2;
@@ -906,6 +1314,8 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
 
 === 온톨로지 그래프 분석 결과 ===
 ${ontologyAnalysis.summaryForAI}
+
+${comprehensiveAnalysis.comprehensiveSummary}
 ${outOfBoundsWarning}
 
 STORE BOUNDARIES (CRITICAL - CENTER-BASED COORDINATE SYSTEM):
@@ -1227,6 +1637,9 @@ async function performDemandForecast(request: InferenceRequest, apiKey: string) 
   }));
   const ontologyAnalysis = performOntologyAnalysis(allGraphEntities, relations, 'demand');
   
+  // 🆕 통합 데이터 분석
+  const comprehensiveAnalysis = buildComprehensiveAnalysis(storeContext);
+  
   // 실제 매장 데이터 요약
   let contextSummary = '';
   if (storeContext) {
@@ -1245,6 +1658,12 @@ ACTUAL STORE DATA (Last 30 Days):
 - Total Products: ${storeContext.products?.length || 0}개
 - Total Inventory Items: ${storeContext.inventory?.length || 0}개
 - Product Categories: ${[...new Set(storeContext.products?.map((p: any) => p.category) || [])].join(', ')}
+
+${comprehensiveAnalysis.visitAnalysis.summaryText}
+
+${comprehensiveAnalysis.transactionAnalysis.summaryText}
+
+${comprehensiveAnalysis.salesTrendAnalysis.summaryText}
 `;
   }
   
@@ -1372,6 +1791,9 @@ async function performInventoryOptimization(request: InferenceRequest, apiKey: s
   }));
   const ontologyAnalysis = performOntologyAnalysis(allGraphEntities, relations, 'inventory');
   
+  // 🆕 통합 데이터 분석
+  const comprehensiveAnalysis = buildComprehensiveAnalysis(storeContext);
+  
   let contextSummary = '';
   if (storeContext?.inventory) {
     const totalStock = storeContext.inventory.reduce((sum: number, i: any) => sum + i.currentStock, 0);
@@ -1385,6 +1807,12 @@ ACTUAL INVENTORY DATA:
 - Total Current Stock: ${totalStock.toLocaleString()}개
 - Low Stock Items (< 50% optimal): ${lowStock}개
 - Overstock Items (> 150% optimal): ${overStock}개
+
+${comprehensiveAnalysis.transactionAnalysis.summaryText}
+
+${comprehensiveAnalysis.salesTrendAnalysis.summaryText}
+
+${comprehensiveAnalysis.displayAnalysis.summaryText}
 `;
   }
   
@@ -1505,6 +1933,9 @@ async function performPricingOptimization(request: InferenceRequest, apiKey: str
   }));
   const ontologyAnalysis = performOntologyAnalysis(allGraphEntities, relations, 'pricing');
   
+  // 🆕 통합 데이터 분석
+  const comprehensiveAnalysis = buildComprehensiveAnalysis(storeContext);
+  
   let contextSummary = '';
   if (storeContext?.products) {
     const avgPrice = storeContext.products.reduce((sum: number, p: any) => sum + p.sellingPrice, 0) / storeContext.products.length;
@@ -1519,6 +1950,10 @@ ACTUAL PRODUCT PRICING DATA:
 - Total Products: ${storeContext.products.length}개
 - Average Selling Price: ${Math.round(avgPrice).toLocaleString()}원
 - Average Margin: ${avgMargin.toFixed(1)}%
+
+${comprehensiveAnalysis.transactionAnalysis.summaryText}
+
+${comprehensiveAnalysis.salesTrendAnalysis.summaryText}
 `;
   }
   
@@ -1636,6 +2071,9 @@ async function performRecommendationStrategy(request: InferenceRequest, apiKey: 
   }));
   const ontologyAnalysis = performOntologyAnalysis(allGraphEntities, relations, 'recommendation');
   
+  // 🆕 통합 데이터 분석
+  const comprehensiveAnalysis = buildComprehensiveAnalysis(storeContext);
+  
   let contextSummary = '';
   if (storeContext) {
     const avgRevenue = storeContext.recentKpis?.length > 0
@@ -1651,6 +2089,12 @@ ACTUAL STORE PERFORMANCE DATA:
 - Average Daily Revenue: ${Math.round(avgRevenue).toLocaleString()}원
 - Average Conversion Rate: ${(avgConversion * 100).toFixed(1)}%
 - Total Products: ${storeContext.products?.length || 0}개
+
+${comprehensiveAnalysis.visitAnalysis.summaryText}
+
+${comprehensiveAnalysis.displayAnalysis.summaryText}
+
+${comprehensiveAnalysis.proximityAnalysis.summaryText}
 `;
   }
   
