@@ -72,6 +72,7 @@ import { IntegratedDataAnalysis } from '../components/IntegratedDataAnalysis';
 
 // 🆕 추가
 import { ROIResultCard, ROISummaryCard } from '../components/ROIResultCard';
+import { useApplyRecommendation } from '@/hooks/useROITracking';
 
 /**
  * 데이터 품질 상태 타입
@@ -190,6 +191,9 @@ export default function SimulationHubPage() {
     applyLayoutChanges, 
     revertLayoutChanges 
   } = useLayoutApply();
+
+  // ✅ ROI 추적을 위한 추천 적용 Hook
+  const applyRecommendation = useApplyRecommendation();
 
   // 상태
   const [useOntologyMode, setUseOntologyMode] = useState(true);
@@ -572,8 +576,22 @@ export default function SimulationHubPage() {
           appliedAt: new Date().toISOString(),
         }
       }));
+
+      // ✅ ROI 추적을 위한 추천 적용 기록 저장
+      if (selectedStore) {
+        // recentKpis에서 가장 최신 KPI 데이터 추출
+        const latestKpi = contextData?.recentKpis?.[0];
+        
+        applyRecommendation.mutate({
+          storeId: selectedStore.id,
+          recommendationType: 'layout',
+          recommendationSummary: results.layout?.optimizationSummary || '레이아웃 최적화 적용',
+          recommendationDetails: results.layout,
+          measurementDays: 7,
+        });
+      }
     }
-  }, [results.layout, applyLayoutChanges, selectedStore?.id]);
+  }, [results.layout, applyLayoutChanges, selectedStore, applyRecommendation, contextData]);
 
   // 내보내기
   const handleExport = useCallback(async (type: SimulationScenario, format: 'csv' | 'pdf' | 'json') => {
