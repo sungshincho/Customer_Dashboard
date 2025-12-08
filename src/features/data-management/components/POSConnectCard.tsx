@@ -195,7 +195,7 @@ export function POSConnectCard({ storeId, compact = false }: POSConnectCardProps
           onOpenChange={setShowConnectDialog}
           onConnect={handleConnect}
           isConnecting={connectPOS.isPending}
-          existingProviders={integrations.map(i => i.provider)}
+          existingProviders={visibleIntegrations.map(i => i.provider)}
         />
       </div>
     );
@@ -261,7 +261,7 @@ export function POSConnectCard({ storeId, compact = false }: POSConnectCardProps
         onOpenChange={setShowConnectDialog}
         onConnect={handleConnect}
         isConnecting={connectPOS.isPending}
-        existingProviders={integrations.map(i => i.provider)}
+        existingProviders={visibleIntegrations.map(i => i.provider)}
       />
 
       {/* 연결 해제 확인 다이얼로그 */}
