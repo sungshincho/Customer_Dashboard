@@ -1,12 +1,11 @@
 /**
  * LayoutComparisonView.tsx
- * As-Is vs To-Be 레이아웃 비교 뷰
+ * As-Is vs To-Be 레이아웃 비교 뷰 - GLB 모델 지원
  */
 
-import { useState, Suspense } from 'react';
+import { useState, Suspense, useRef, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Grid, Box, Plane, Html } from '@react-three/drei';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { OrbitControls, Grid, Box, Plane, Html, useGLTF } from '@react-three/drei';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -14,6 +13,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   ArrowLeftRight, Eye, Sparkles, ArrowRight, Save, MoveRight, Loader2 
 } from 'lucide-react';
+import * as THREE from 'three';
 
 interface Vector3D { x: number; y: number; z: number; }
 
@@ -29,10 +29,32 @@ interface LayoutChange {
   impact: 'high' | 'medium' | 'low';
 }
 
+interface FurnitureItem {
+  id?: string;
+  position?: Vector3D;
+  rotation?: Vector3D;
+  scale?: Vector3D;
+  dimensions?: { width?: number; height?: number; depth?: number };
+  color?: string;
+  label?: string;
+  furniture_type?: string;
+  model_url?: string | null;
+}
+
+interface ProductItem {
+  id?: string;
+  position?: Vector3D;
+  rotation?: Vector3D;
+  scale?: Vector3D;
+  dimensions?: { width?: number; height?: number; depth?: number };
+  label?: string;
+  model_url?: string | null;
+}
+
 interface SceneRecipe {
   space?: any;
-  furniture: any[];
-  products: any[];
+  furniture: FurnitureItem[];
+  products: ProductItem[];
 }
 
 interface LayoutComparisonViewProps {
@@ -54,8 +76,57 @@ function safeToFixed(value: any, digits: number = 1): string {
   return Number(value).toFixed(digits);
 }
 
-function FurnitureBox({ 
-  position, rotation, scale, color = '#8B4513', label, isHighlighted = false 
+// GLB 모델 컴포넌트
+function GLBModel({ 
+  url, 
+  position, 
+  rotation, 
+  scale,
+  isHighlighted = false 
+}: {
+  url: string;
+  position: [number, number, number];
+  rotation: [number, number, number];
+  scale: [number, number, number];
+  isHighlighted?: boolean;
+}) {
+  const { scene } = useGLTF(url);
+  const clonedScene = useRef<THREE.Group | null>(null);
+  
+  useEffect(() => {
+    if (clonedScene.current && isHighlighted) {
+      clonedScene.current.traverse((child) => {
+        if (child instanceof THREE.Mesh && child.material) {
+          const mat = child.material as THREE.MeshStandardMaterial;
+          if (mat.emissive) {
+            mat.emissive = new THREE.Color('#FFD700');
+            mat.emissiveIntensity = 0.3;
+          }
+        }
+      });
+    }
+  }, [isHighlighted]);
+
+  return (
+    <group 
+      position={position}
+      rotation={rotation.map(r => r * Math.PI / 180) as [number, number, number]}
+      scale={scale}
+    >
+      <primitive ref={clonedScene} object={scene.clone()} />
+    </group>
+  );
+}
+
+// 폴백 박스 컴포넌트 (모델 없을 때)
+function FallbackBox({ 
+  position, 
+  rotation, 
+  scale, 
+  color = '#8B4513', 
+  label, 
+  isHighlighted = false,
+  isProduct = false
 }: {
   position: [number, number, number];
   rotation: [number, number, number];
@@ -63,30 +134,131 @@ function FurnitureBox({
   color?: string;
   label?: string;
   isHighlighted?: boolean;
+  isProduct?: boolean;
 }) {
   const adjustedY = (position[1] || 0) + (scale[1] || 1) / 2;
+  const boxColor = isProduct ? '#4CAF50' : color;
+  
   return (
     <group 
       position={[position[0] || 0, adjustedY, position[2] || 0]} 
-      rotation={(rotation || [0, 0, 0]).map(r => (r || 0) * Math.PI / 180) as [number, number, number]}
+      rotation={rotation.map(r => (r || 0) * Math.PI / 180) as [number, number, number]}
     >
       <Box args={scale}>
-        <meshStandardMaterial color={isHighlighted ? '#FFD700' : color} transparent opacity={0.85} />
+        <meshStandardMaterial 
+          color={isHighlighted ? '#FFD700' : boxColor} 
+          transparent 
+          opacity={0.85} 
+        />
       </Box>
       <Box args={[(scale[0] || 1) + 0.02, (scale[1] || 1) + 0.02, (scale[2] || 1) + 0.02]}>
         <meshBasicMaterial color={isHighlighted ? '#FF6600' : '#333'} wireframe />
       </Box>
       {label && (
         <Html position={[0, (scale[1] || 1) / 2 + 0.3, 0]} center>
-          <div className="bg-black/70 text-white text-xs px-2 py-1 rounded whitespace-nowrap">{label}</div>
+          <div className="bg-black/70 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+            {label}
+          </div>
         </Html>
       )}
     </group>
   );
 }
 
-function SceneRenderer({ recipe, changes = [], isToBeView = false }: { 
-  recipe: SceneRecipe | null; changes?: LayoutChange[]; isToBeView?: boolean;
+// 가구/상품 아이템 렌더러
+function ItemRenderer({ 
+  item, 
+  isHighlighted = false,
+  isProduct = false,
+  showLabel = true
+}: {
+  item: FurnitureItem | ProductItem;
+  isHighlighted?: boolean;
+  isProduct?: boolean;
+  showLabel?: boolean;
+}) {
+  const position: [number, number, number] = [
+    item.position?.x || 0, 
+    item.position?.y || 0, 
+    item.position?.z || 0
+  ];
+  const rotation: [number, number, number] = [
+    item.rotation?.x || 0, 
+    item.rotation?.y || 0, 
+    item.rotation?.z || 0
+  ];
+  
+  // dimensions 또는 scale 사용
+  const scale: [number, number, number] = item.dimensions 
+    ? [
+        item.dimensions.width || 1,
+        item.dimensions.height || 1,
+        item.dimensions.depth || 1
+      ]
+    : [
+        item.scale?.x || 1, 
+        item.scale?.y || 1, 
+        item.scale?.z || 1
+      ];
+
+  const label = showLabel 
+    ? ('furniture_type' in item ? item.furniture_type : item.label) || item.label 
+    : undefined;
+
+  // model_url이 있으면 GLB 로드 시도
+  if (item.model_url) {
+    return (
+      <Suspense fallback={
+        <FallbackBox 
+          position={position} 
+          rotation={rotation} 
+          scale={scale}
+          color={(item as FurnitureItem).color || '#888'}
+          label={label}
+          isHighlighted={isHighlighted}
+          isProduct={isProduct}
+        />
+      }>
+        <GLBModel 
+          url={item.model_url}
+          position={position}
+          rotation={rotation}
+          scale={scale}
+          isHighlighted={isHighlighted}
+        />
+        {label && (
+          <Html position={[position[0], position[1] + scale[1] + 0.5, position[2]]} center>
+            <div className="bg-black/70 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+              {label}
+            </div>
+          </Html>
+        )}
+      </Suspense>
+    );
+  }
+
+  // model_url 없으면 폴백 박스
+  return (
+    <FallbackBox 
+      position={position} 
+      rotation={rotation} 
+      scale={scale}
+      color={(item as FurnitureItem).color || '#888'}
+      label={label}
+      isHighlighted={isHighlighted}
+      isProduct={isProduct}
+    />
+  );
+}
+
+function SceneRenderer({ 
+  recipe, 
+  changes = [], 
+  isToBeView = false 
+}: { 
+  recipe: SceneRecipe | null; 
+  changes?: LayoutChange[]; 
+  isToBeView?: boolean;
 }) {
   if (!recipe || !recipe.furniture || recipe.furniture.length === 0) {
     return (
@@ -103,22 +275,41 @@ function SceneRenderer({ recipe, changes = [], isToBeView = false }: {
 
   return (
     <>
-      <Grid args={[20, 20]} cellSize={1} cellThickness={0.5} cellColor="#6e6e6e"
-        sectionSize={5} sectionThickness={1} sectionColor="#9d4b4b" fadeDistance={30} />
+      <Grid 
+        args={[20, 20]} 
+        cellSize={1} 
+        cellThickness={0.5} 
+        cellColor="#6e6e6e"
+        sectionSize={5} 
+        sectionThickness={1} 
+        sectionColor="#9d4b4b" 
+        fadeDistance={30} 
+      />
       <Plane args={[17.4, 16.6]} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
         <meshStandardMaterial color="#f0f0f0" />
       </Plane>
+      
+      {/* 가구 렌더링 */}
       {recipe.furniture.map((item, idx) => (
-        <FurnitureBox
-          key={`f-${idx}-${item.id || idx}`}
-          position={[item.position?.x || 0, item.position?.y || 0, item.position?.z || 0]}
-          rotation={[item.rotation?.x || 0, item.rotation?.y || 0, item.rotation?.z || 0]}
-          scale={[item.scale?.x || 1, item.scale?.y || 1, item.scale?.z || 1]}
-          color={item.color || '#888'}
-          label={item.furniture_type || item.label}
-          isHighlighted={changedIds.has(item.id) && isToBeView}
+        <ItemRenderer
+          key={`furniture-${item.id || idx}`}
+          item={item}
+          isHighlighted={changedIds.has(item.id || '') && isToBeView}
+          isProduct={false}
         />
       ))}
+      
+      {/* 상품 렌더링 */}
+      {recipe.products?.map((item, idx) => (
+        <ItemRenderer
+          key={`product-${item.id || idx}`}
+          item={item}
+          isHighlighted={false}
+          isProduct={true}
+          showLabel={false}
+        />
+      ))}
+      
       <ambientLight intensity={0.6} />
       <directionalLight position={[10, 15, 10]} intensity={0.8} />
     </>
@@ -135,7 +326,9 @@ export function LayoutComparisonView({
 
   const getImpactBadge = (impact: string) => {
     const colors: Record<string, string> = {
-      high: 'bg-red-100 text-red-800', medium: 'bg-yellow-100 text-yellow-800', low: 'bg-green-100 text-green-800'
+      high: 'bg-red-100 text-red-800', 
+      medium: 'bg-yellow-100 text-yellow-800', 
+      low: 'bg-green-100 text-green-800'
     };
     const labels: Record<string, string> = { high: '높음', medium: '중간', low: '낮음' };
     return <Badge className={colors[impact] || 'bg-gray-100'}>{labels[impact] || impact}</Badge>;
@@ -147,15 +340,21 @@ export function LayoutComparisonView({
       {optimizationSummary && (
         <div className="flex gap-4 p-3 bg-muted/50 rounded-lg">
           <div className="text-center">
-            <div className="text-lg font-bold text-green-600">+{optimizationSummary.expectedTrafficIncrease || 0}%</div>
+            <div className="text-lg font-bold text-green-600">
+              +{optimizationSummary.expectedTrafficIncrease || 0}%
+            </div>
             <div className="text-xs text-muted-foreground">예상 트래픽</div>
           </div>
           <div className="text-center">
-            <div className="text-lg font-bold text-blue-600">+{optimizationSummary.expectedRevenueIncrease || 0}%</div>
+            <div className="text-lg font-bold text-blue-600">
+              +{optimizationSummary.expectedRevenueIncrease || 0}%
+            </div>
             <div className="text-xs text-muted-foreground">예상 매출</div>
           </div>
           <div className="text-center">
-            <div className="text-lg font-bold text-purple-600">{optimizationSummary.confidence || 0}%</div>
+            <div className="text-lg font-bold text-purple-600">
+              {optimizationSummary.confidence || 0}%
+            </div>
             <div className="text-xs text-muted-foreground">신뢰도</div>
           </div>
         </div>
@@ -164,25 +363,39 @@ export function LayoutComparisonView({
       {/* 뷰 모드 탭 */}
       <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)}>
         <TabsList>
-          <TabsTrigger value="split"><ArrowLeftRight className="h-4 w-4 mr-1" />비교</TabsTrigger>
-          <TabsTrigger value="current"><Eye className="h-4 w-4 mr-1" />현재</TabsTrigger>
-          <TabsTrigger value="suggested"><Sparkles className="h-4 w-4 mr-1" />추천</TabsTrigger>
+          <TabsTrigger value="split">
+            <ArrowLeftRight className="h-4 w-4 mr-1" />비교
+          </TabsTrigger>
+          <TabsTrigger value="current">
+            <Eye className="h-4 w-4 mr-1" />현재
+          </TabsTrigger>
+          <TabsTrigger value="suggested">
+            <Sparkles className="h-4 w-4 mr-1" />추천
+          </TabsTrigger>
         </TabsList>
 
         <div className="mt-3 border rounded-lg overflow-hidden" style={{ height: '350px' }}>
           <TabsContent value="split" className="h-full m-0">
             <div className="grid grid-cols-2 gap-1 h-full">
               <div className="relative bg-gray-900">
-                <div className="absolute top-2 left-2 z-10 bg-black/60 text-white px-2 py-1 rounded text-xs">현재 (As-Is)</div>
+                <div className="absolute top-2 left-2 z-10 bg-black/60 text-white px-2 py-1 rounded text-xs">
+                  현재 (As-Is)
+                </div>
                 <Canvas camera={{ position: [10, 10, 10], fov: 50 }}>
-                  <Suspense fallback={null}><SceneRenderer recipe={currentRecipe} changes={safeChanges} /></Suspense>
+                  <Suspense fallback={null}>
+                    <SceneRenderer recipe={currentRecipe} changes={safeChanges} />
+                  </Suspense>
                   <OrbitControls />
                 </Canvas>
               </div>
               <div className="relative bg-gray-900">
-                <div className="absolute top-2 left-2 z-10 bg-blue-600/80 text-white px-2 py-1 rounded text-xs">추천 (To-Be)</div>
+                <div className="absolute top-2 left-2 z-10 bg-blue-600/80 text-white px-2 py-1 rounded text-xs">
+                  추천 (To-Be)
+                </div>
                 <Canvas camera={{ position: [10, 10, 10], fov: 50 }}>
-                  <Suspense fallback={null}><SceneRenderer recipe={suggestedRecipe} changes={safeChanges} isToBeView /></Suspense>
+                  <Suspense fallback={null}>
+                    <SceneRenderer recipe={suggestedRecipe} changes={safeChanges} isToBeView />
+                  </Suspense>
                   <OrbitControls />
                 </Canvas>
               </div>
@@ -191,7 +404,9 @@ export function LayoutComparisonView({
           <TabsContent value="current" className="h-full m-0">
             <div className="relative h-full bg-gray-900">
               <Canvas camera={{ position: [12, 12, 12], fov: 50 }}>
-                <Suspense fallback={null}><SceneRenderer recipe={currentRecipe} changes={safeChanges} /></Suspense>
+                <Suspense fallback={null}>
+                  <SceneRenderer recipe={currentRecipe} changes={safeChanges} />
+                </Suspense>
                 <OrbitControls />
               </Canvas>
             </div>
@@ -199,7 +414,9 @@ export function LayoutComparisonView({
           <TabsContent value="suggested" className="h-full m-0">
             <div className="relative h-full bg-gray-900">
               <Canvas camera={{ position: [12, 12, 12], fov: 50 }}>
-                <Suspense fallback={null}><SceneRenderer recipe={suggestedRecipe} changes={safeChanges} isToBeView /></Suspense>
+                <Suspense fallback={null}>
+                  <SceneRenderer recipe={suggestedRecipe} changes={safeChanges} isToBeView />
+                </Suspense>
                 <OrbitControls />
               </Canvas>
             </div>
@@ -240,7 +457,11 @@ export function LayoutComparisonView({
       {safeChanges.length > 0 && onApplySuggestion && (
         <div className="flex justify-end">
           <Button onClick={onApplySuggestion} disabled={isApplying}>
-            {isApplying ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />적용 중...</> : <><Save className="h-4 w-4 mr-2" />추천 적용</>}
+            {isApplying ? (
+              <><Loader2 className="h-4 w-4 mr-2 animate-spin" />적용 중...</>
+            ) : (
+              <><Save className="h-4 w-4 mr-2" />추천 적용</>
+            )}
           </Button>
         </div>
       )}
