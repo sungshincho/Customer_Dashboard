@@ -44,6 +44,16 @@ function safeParseAIResponse(aiContent: string, defaultValue: any): any {
   return defaultValue;
 }
 
+
+// ============================================================================
+// 🆕 Phase 1: Enhanced AI Inference - 데이터 기반 추론 강화
+// ============================================================================
+
+interface EnhancedSalesData { ... }
+interface EnhancedVisitorData { ... }
+// ... (phase1_edge_function_additions.ts 참조)
+
+
 // ============================================================================
 // 🆕 방문/거래/매출 데이터 분석 함수들 (NEW)
 // ============================================================================
@@ -1160,9 +1170,16 @@ Return a JSON object:
 // Layout Simulation v3 - As-Is/To-Be 비교 지원
 // ============================================================================
 async function performLayoutSimulation(request: InferenceRequest, apiKey: string) {
-  console.log('performLayoutSimulation v3 - As-Is/To-Be Comparison');
+  console.log('performLayoutSimulation v4 - Phase 1 Data-Driven Inference');
   
   const { parameters = {} } = request;
+  const storeContext = parameters.store_context || parameters.storeContext || {};
+  
+  // 🆕 Phase 1 로깅 추가
+  console.log('Has salesData:', !!storeContext.salesData);
+  console.log('Has visitorData:', !!storeContext.visitorData);
+  console.log('Has conversionData:', !!storeContext.conversionData);
+  console.log('Has recommendationPerformance:', !!storeContext.recommendationPerformance);
   
   // storeContext 추출 (여러 가능한 경로)
   const storeContext = parameters.store_context || parameters.storeContext || {};
@@ -1256,6 +1273,25 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
     };
   }
 
+// 🆕 Enhanced Store Context 구성 (Phase 1)
+  const enhancedContext: EnhancedStoreContext = {
+    storeInfo: storeContext.storeInfo,
+    entities: storeContext.entities || [],
+    relations: storeContext.relations || [],
+    visits: storeContext.visits,
+    transactions: storeContext.transactions,
+    dailySales: storeContext.dailySales,
+    salesData: storeContext.salesData,
+    visitorData: storeContext.visitorData,
+    conversionData: storeContext.conversionData,
+    recommendationPerformance: storeContext.recommendationPerformance,
+    dataQuality: storeContext.dataQuality,
+  };
+
+  // 🆕 통계 기반 신뢰도 계산 (Phase 1)
+  const confidenceResult = calculateStatisticalConfidence(enhancedContext);
+  console.log('Statistical Confidence:', confidenceResult.score, confidenceResult.explanation);
+  
   // 🔥 온톨로지 그래프 분석 실행
   const storeWidth = storeContext.storeInfo?.width || 17.4;
   const storeDepth = storeContext.storeInfo?.depth || 16.6;
@@ -1310,7 +1346,15 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
     ? `\n\n⚠️ CRITICAL WARNING: ${outOfBoundsFurniture.length} furniture items are OUTSIDE store boundaries and MUST be moved inside:\n${outOfBoundsFurniture.map((f: any) => `- ${f.label}: current pos(${f.position?.x?.toFixed(1)}, ${f.position?.z?.toFixed(1)}) - INVALID`).join('\n')}`
     : '';
 
-  const prompt = `You are a retail store layout optimization expert.
+  const prompt = buildEnhancedLayoutPrompt(
+  enhancedContext,
+  furnitureList,
+  ontologyAnalysis,
+  comprehensiveAnalysis,
+  storeWidth,
+  storeDepth,
+  outOfBoundsWarning
+);
 
 === 온톨로지 그래프 분석 결과 ===
 ${ontologyAnalysis.summaryForAI}
@@ -1401,8 +1445,8 @@ Return ONLY valid JSON (no markdown, no explanation):
           },
           { role: 'user', content: prompt }
         ],
-        temperature: 0.5,
-        max_tokens: 2000,
+        temperature: 0.3,
+        max_tokens: 4000,
       }),
     });
 
@@ -1534,13 +1578,20 @@ Return ONLY valid JSON (no markdown, no explanation):
     optimizationSummary: {
       expectedTrafficIncrease: aiResponse.optimizationSummary?.expectedTrafficIncrease || 0,
       expectedRevenueIncrease: aiResponse.optimizationSummary?.expectedRevenueIncrease || 0,
+      expectedConversionIncrease: aiResponse.optimizationSummary?.expectedConversionIncrease || 0,  // 🆕
       changesCount: layoutChanges.length,
       confidence: normalizedConfidence,
+      // 🆕 Phase 1 추가 필드
+    confidenceFactors: confidenceResult.factors,
+    confidenceExplanation: confidenceResult.explanation,
     },
-    aiInsights: Array.isArray(aiResponse.aiInsights) ? aiResponse.aiInsights : [],
-    recommendations: Array.isArray(aiResponse.recommendations) ? aiResponse.recommendations : [],
-    confidenceScore: normalizedConfidence / 100, 
-    ontologyAnalysis: {
+    // 🆕 Phase 1 추가 필드
+  dataBasedInsights: aiResponse.dataBasedInsights || [],
+  aiInsights: Array.isArray(aiResponse.aiInsights) ? aiResponse.aiInsights : [],
+  recommendations: Array.isArray(aiResponse.recommendations) ? aiResponse.recommendations : [],
+  confidenceScore: normalizedConfidence / 100,
+  dataQuality: enhancedContext.dataQuality,
+  ontologyAnalysis: {
       score: ontologyAnalysis.layoutInsights?.score || 0,
       violations: ontologyAnalysis.layoutInsights?.violations || [],
       opportunities: ontologyAnalysis.layoutInsights?.opportunities || [],
