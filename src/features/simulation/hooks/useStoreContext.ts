@@ -9,6 +9,8 @@ export interface StoreContextData {
     entityType: string;
     entity_type_name: string;
     model_3d_type: string | null;
+    model_3d_url?: string | null;           // ← 추가
+    model_3d_dimensions?: { width: number; height: number; depth: number } | null;  // ← 추가
     properties: any;
     position?: { x: number; y: number; z: number };
     model_3d_position?: { x: number; y: number; z: number };
