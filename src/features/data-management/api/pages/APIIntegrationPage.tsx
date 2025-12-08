@@ -15,6 +15,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
 import { useActivityLogger } from "@/hooks/useActivityLogger";
 import { useLocation } from "react-router-dom";
+import { POSConnectCard } from '@/features/data-management/components/POSConnectCard';
 
 interface APIConnection {
   id: string;
@@ -71,7 +72,7 @@ export default function APIIntegrationPage() {
   const { logActivity } = useActivityLogger();
   const location = useLocation();
   const { selectedStore } = useSelectedStore();
-  const [activeTab, setActiveTab] = useState("connections");
+  const [activeTab, setActiveTab] = useState("POS");
   const [connections, setConnections] = useState<APIConnection[]>([]);
   const [schedules, setSchedules] = useState<DataSyncSchedule[]>([]);
   const [logs, setLogs] = useState<DataSyncLog[]>([]);
@@ -544,21 +545,30 @@ export default function APIIntegrationPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 max-w-2xl">
-            <TabsTrigger value="connections" className="flex items-center gap-2">
-              <Database className="w-4 h-4" />
-              API 연결
-            </TabsTrigger>
-            <TabsTrigger value="schedules" className="flex items-center gap-2">
-              <Clock className="w-4 h-4" />
-              스케줄 관리
-            </TabsTrigger>
-            <TabsTrigger value="logs" className="flex items-center gap-2">
-              <Clock className="w-4 h-4" />
-              동기화 로그
-            </TabsTrigger>
-          </TabsList>
+  <TabsList className="grid w-full grid-cols-4 max-w-3xl">
+    <TabsTrigger value="pos" className="flex items-center gap-2">
+      <Link2 className="w-4 h-4" />
+      POS 연동
+    </TabsTrigger>
+    <TabsTrigger value="connections" className="flex items-center gap-2">
+      <Database className="w-4 h-4" />
+      API 연결
+    </TabsTrigger>
+    <TabsTrigger value="schedules" className="flex items-center gap-2">
+      <Clock className="w-4 h-4" />
+      스케줄 관리
+    </TabsTrigger>
+    <TabsTrigger value="logs" className="flex items-center gap-2">
+      <Clock className="w-4 h-4" />
+      동기화 로그
+    </TabsTrigger>
+  </TabsList>
 
+{/* POS 연동 Tab */}
+<TabsContent value="pos" className="space-y-6">
+  <POSConnectCard storeId={selectedStore?.id} />
+</TabsContent>
+          
           {/* API Connections Tab */}
           <TabsContent value="connections" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
