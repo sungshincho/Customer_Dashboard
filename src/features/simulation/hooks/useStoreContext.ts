@@ -169,23 +169,23 @@ export function useStoreContext(storeId: string | undefined) {
           .order('visit_date', { ascending: false })
           .limit(100);
 
-        // 🔥 거래 데이터 조회 (최근 30일)
-        const { data: transactions } = await supabase
-          .from('transactions')
-          .select('id, customer_id, total_amount, items, transaction_date')
+        // 🔥 거래 데이터 조회 (최근 30일) - purchases 테이블 사용
+        const { data: transactions } = await (supabase
+          .from('purchases')
+          .select('id, customer_id, total_price, purchase_date')
           .eq('store_id', storeId)
-          .gte('transaction_date', thirtyDaysAgo.toISOString())
-          .order('transaction_date', { ascending: false })
-          .limit(100);
+          .gte('purchase_date', thirtyDaysAgo.toISOString())
+          .order('purchase_date', { ascending: false })
+          .limit(100) as any);
 
         // 🔥 일별 매출 데이터 조회
-        const { data: dailySales } = await supabase
+        const { data: dailySales } = await (supabase
           .from('daily_sales')
-          .select('id, date, total_revenue, transaction_count, avg_transaction_value')
+          .select('id, date, total_revenue, total_transactions, avg_transaction_value')
           .eq('store_id', storeId)
           .gte('date', thirtyDaysAgo.toISOString().split('T')[0])
           .order('date', { ascending: false })
-          .limit(30);
+          .limit(30) as any);
 
         // 최근 30일 KPI
         const { data: kpis } = await supabase
@@ -275,8 +275,9 @@ export function useStoreContext(storeId: string | undefined) {
         });
 
         // 매장 크기 추출 (metadata에서)
-        const storeWidth = store?.metadata?.width || 17.4;
-        const storeDepth = store?.metadata?.depth || 16.6;
+        const storeMetadata = store?.metadata as any;
+        const storeWidth = storeMetadata?.width || 17.4;
+        const storeDepth = storeMetadata?.depth || 16.6;
 
         console.log('Store context loaded:', {
           entities: sortedEntities.length,
@@ -311,19 +312,19 @@ export function useStoreContext(storeId: string | undefined) {
             zones_visited: v.zones_visited || []
           })),
           
-          transactions: (transactions || []).map(t => ({
+          transactions: (transactions || []).map((t: any) => ({
             id: t.id,
             customer_id: t.customer_id,
-            total_amount: t.total_amount || 0,
-            items: t.items || [],
-            transaction_date: t.transaction_date
+            total_amount: t.total_price || 0,
+            items: [],
+            transaction_date: t.purchase_date
           })),
           
-          dailySales: (dailySales || []).map(d => ({
+          dailySales: (dailySales || []).map((d: any) => ({
             id: d.id,
             date: d.date,
             total_revenue: d.total_revenue || 0,
-            transaction_count: d.transaction_count || 0,
+            transaction_count: d.total_transactions || 0,
             avg_transaction_value: d.avg_transaction_value || 0
           })),
           
