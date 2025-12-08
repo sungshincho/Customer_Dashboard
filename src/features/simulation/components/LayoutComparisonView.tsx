@@ -76,8 +76,8 @@ function safeToFixed(value: any, digits: number = 1): string {
   return Number(value).toFixed(digits);
 }
 
-// GLB 모델 컴포넌트
-function GLBModel({ 
+// GLB 모델 컴포넌트 (에러 경계 포함)
+function GLBModelInner({ 
   url, 
   position, 
   rotation, 
@@ -116,6 +116,38 @@ function GLBModel({
       <primitive ref={clonedScene} object={scene.clone()} />
     </group>
   );
+}
+
+// GLB 모델 래퍼 (로드 실패 시 null 반환)
+function GLBModel(props: {
+  url: string;
+  position: [number, number, number];
+  rotation: [number, number, number];
+  scale: [number, number, number];
+  isHighlighted?: boolean;
+  onError?: () => void;
+}) {
+  const [hasError, setHasError] = useState(false);
+  
+  useEffect(() => {
+    // URL 유효성 사전 체크
+    fetch(props.url, { method: 'HEAD' })
+      .then(res => {
+        if (!res.ok) {
+          console.warn(`GLB not found: ${props.url}`);
+          setHasError(true);
+          props.onError?.();
+        }
+      })
+      .catch(() => {
+        setHasError(true);
+        props.onError?.();
+      });
+  }, [props.url]);
+  
+  if (hasError) return null;
+  
+  return <GLBModelInner {...props} />;
 }
 
 // 폴백 박스 컴포넌트 (모델 없을 때)
@@ -177,6 +209,8 @@ function ItemRenderer({
   isProduct?: boolean;
   showLabel?: boolean;
 }) {
+  const [modelFailed, setModelFailed] = useState(false);
+  
   const position: [number, number, number] = [
     item.position?.x || 0, 
     item.position?.y || 0, 
@@ -188,31 +222,34 @@ function ItemRenderer({
     item.rotation?.z || 0
   ];
   
-  // dimensions 또는 scale 사용
-  const scale: [number, number, number] = item.dimensions 
+  // GLB 모델용 scale (실제 scale 값 사용)
+  const modelScale: [number, number, number] = [
+    item.scale?.x || 1, 
+    item.scale?.y || 1, 
+    item.scale?.z || 1
+  ];
+  
+  // 폴백 박스용 scale (dimensions 우선, 없으면 scale)
+  const boxScale: [number, number, number] = item.dimensions 
     ? [
         item.dimensions.width || 1,
         item.dimensions.height || 1,
         item.dimensions.depth || 1
       ]
-    : [
-        item.scale?.x || 1, 
-        item.scale?.y || 1, 
-        item.scale?.z || 1
-      ];
+    : modelScale;
 
   const label = showLabel 
     ? ('furniture_type' in item ? item.furniture_type : item.label) || item.label 
     : undefined;
 
-  // model_url이 있으면 GLB 로드 시도
-  if (item.model_url) {
+  // model_url이 있고 로드 실패하지 않았으면 GLB 로드 시도
+  if (item.model_url && !modelFailed) {
     return (
       <Suspense fallback={
         <FallbackBox 
           position={position} 
           rotation={rotation} 
-          scale={scale}
+          scale={boxScale}
           color={(item as FurnitureItem).color || '#888'}
           label={label}
           isHighlighted={isHighlighted}
@@ -223,11 +260,12 @@ function ItemRenderer({
           url={item.model_url}
           position={position}
           rotation={rotation}
-          scale={scale}
+          scale={modelScale}
           isHighlighted={isHighlighted}
+          onError={() => setModelFailed(true)}
         />
         {label && (
-          <Html position={[position[0], position[1] + scale[1] + 0.5, position[2]]} center>
+          <Html position={[position[0], position[1] + (boxScale[1] || 1) + 0.5, position[2]]} center>
             <div className="bg-black/70 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
               {label}
             </div>
@@ -237,12 +275,12 @@ function ItemRenderer({
     );
   }
 
-  // model_url 없으면 폴백 박스
+  // model_url 없거나 로드 실패하면 폴백 박스
   return (
     <FallbackBox 
       position={position} 
       rotation={rotation} 
-      scale={scale}
+      scale={boxScale}
       color={(item as FurnitureItem).color || '#888'}
       label={label}
       isHighlighted={isHighlighted}
@@ -285,9 +323,40 @@ function SceneRenderer({
         sectionColor="#9d4b4b" 
         fadeDistance={30} 
       />
-      <Plane args={[17.4, 16.6]} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
-        <meshStandardMaterial color="#f0f0f0" />
-      </Plane>
+      
+      {/* 매장 공간 렌더링 */}
+      {recipe.space?.model_url ? (
+        <Suspense fallback={
+          <Plane args={[17.4, 16.6]} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
+            <meshStandardMaterial color="#f0f0f0" />
+          </Plane>
+        }>
+          <GLBModel 
+            url={recipe.space.model_url}
+            position={[
+              recipe.space.position?.x || 0,
+              recipe.space.position?.y || 0,
+              recipe.space.position?.z || 0
+            ]}
+            rotation={[
+              recipe.space.rotation?.x || 0,
+              recipe.space.rotation?.y || 0,
+              recipe.space.rotation?.z || 0
+            ]}
+            scale={[
+              recipe.space.scale?.x || 1,
+              recipe.space.scale?.y || 1,
+              recipe.space.scale?.z || 1
+            ]}
+            isHighlighted={false}
+            onError={() => console.warn('Store model failed to load')}
+          />
+        </Suspense>
+      ) : (
+        <Plane args={[17.4, 16.6]} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
+          <meshStandardMaterial color="#f0f0f0" />
+        </Plane>
+      )}
       
       {/* 가구 렌더링 */}
       {recipe.furniture.map((item, idx) => (
