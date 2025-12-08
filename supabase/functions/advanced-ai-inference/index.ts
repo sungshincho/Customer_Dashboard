@@ -773,6 +773,7 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
   // 가구 엔티티 필터링
   let furnitureEntities: any[] = [];
   let productEntities: any[] = [];
+  let spaceEntities: any[] = [];
   
   if (storeContext.entities && storeContext.entities.length > 0) {
     // 엔티티 정규화 (model_url, dimensions 포함)
@@ -817,8 +818,20 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
       return false;
     });
 
+    // 매장 공간 필터링 (space/building 타입)
+    spaceEntities = entities.filter((e: any) => {
+      const type = (e.entityType || '').toLowerCase();
+      const model3dType = (e.model3dType || '').toLowerCase();
+      
+      if (model3dType === 'building' || model3dType === 'space' || model3dType === 'store') return true;
+      if (type.includes('store') || type.includes('space') || type.includes('building') || type.includes('매장')) return true;
+      
+      return false;
+    });
+
     console.log('Filtered furniture:', furnitureEntities.length);
     console.log('Filtered products:', productEntities.length);
+    console.log('Filtered spaces:', spaceEntities.length);
   }
 
   // 가구가 없으면 빈 결과 반환
@@ -1053,7 +1066,19 @@ Return ONLY valid JSON (no markdown, no explanation):
   });
 
   // As-Is / To-Be Recipe 생성
+  const spaceEntity = spaceEntities.length > 0 ? spaceEntities[0] : null;
+  
   const buildRecipe = (mode: 'current' | 'suggested') => ({
+    space: spaceEntity ? {
+      id: spaceEntity.id,
+      type: 'space',
+      label: spaceEntity.label,
+      position: spaceEntity.position || { x: 0, y: 0, z: 0 },
+      rotation: spaceEntity.rotation || { x: 0, y: 0, z: 0 },
+      scale: spaceEntity.scale || { x: 1, y: 1, z: 1 },
+      model_url: spaceEntity.model3dUrl || spaceEntity.model_3d_url || null,
+      dimensions: spaceEntity.dimensions || spaceEntity.model_3d_dimensions || null,
+    } : null,
     furniture: furnitureEntities.map((f: any) => {
       const change = changesMap.get(f.id);
       const position = (mode === 'suggested' && change?.suggestedPosition) 
