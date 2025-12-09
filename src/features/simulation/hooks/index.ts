@@ -28,11 +28,8 @@ export type {
   SimulationScenario as HookSimulationScenario,
   OntologyContext,
   OntologySchema,
-  OntologyEntityType,
-  OntologyRelationType,
   SimulationParams,
   InferenceResult,
-  OntologyInferenceResult,
 } from './useEnhancedAIInference';
 
 // Phase 4 Hooks

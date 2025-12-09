@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { useStoreContext } from '@/features/simulation/hooks/useStoreContext';
+import { useStoreContext, StoreContextData } from '@/features/simulation/hooks/useStoreContext';
 /**
  * Phase 1: 강화된 AI 추론 Hook v3
  * 
@@ -126,7 +126,7 @@ interface UseEnhancedAIInferenceReturn {
   lastResult: InferenceResult | null;
   ontologyContext: OntologyContext | null;
   ontologySchema: OntologySchema | null;
-  enhancedStoreContext: EnhancedStoreContext | null;
+  enhancedStoreContext: StoreContextData | null;
   
   infer: (scenario: SimulationScenario, params?: SimulationParams, storeContext?: any) => Promise<InferenceResult | null>;
   inferWithEnhancedData: (scenario: SimulationScenario, params?: SimulationParams) => Promise<InferenceResult | null>;

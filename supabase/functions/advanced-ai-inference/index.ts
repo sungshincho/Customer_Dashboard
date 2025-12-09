@@ -1515,7 +1515,56 @@ Return a JSON object with predictions, feature_importance, drivers, risks, and m
     analysis,
   };
 }
-0,
+
+// Layout Simulation: 레이아웃 최적화 시뮬레이션
+async function performLayoutSimulation(request: InferenceRequest, apiKey: string) {
+  console.log('performLayoutSimulation v3 - As-Is/To-Be Comparison');
+  console.log('=== Layout Simulation Start ===');
+
+  const { parameters = {} } = request;
+  const storeContext = parameters.store_context || {};
+  
+  console.log('StoreContext keys:', JSON.stringify(Object.keys(storeContext), null, 2));
+  console.log('StoreContext entities count:', storeContext.entities?.length || 0);
+  
+  // Entity 필터링
+  const mappedEntities = (storeContext.entities || []).map((e: any) => ({
+    ...e,
+    entityType: e.entityType || e.entity_type_name || 'unknown'
+  }));
+  console.log('Mapped entities:', mappedEntities.length);
+  
+  const furnitureEntities = mappedEntities.filter((e: any) => 
+    e.model_3d_type?.toLowerCase()?.includes('furniture') ||
+    ['Shelf', 'Rack', 'DisplayTable', 'Fixture', 'shelf', 'rack', 'display_table', 'fixture', 'Entrance', 'CheckoutCounter'].includes(e.entityType || '')
+  );
+  console.log('Filtered furniture:', furnitureEntities.length);
+  
+  const spaceEntities = mappedEntities.filter((e: any) =>
+    e.model_3d_type?.toLowerCase()?.includes('space') ||
+    ['Zone', 'Aisle', 'zone', 'aisle', 'Zone', 'FittingRoom', 'StorageRoom'].includes(e.entityType || '')
+  );
+  console.log('Filtered spaces:', spaceEntities.length);
+  
+  const productEntities = mappedEntities.filter((e: any) =>
+    e.entityType === 'Product' || e.entity_type_name === 'Product'
+  );
+  console.log('Filtered products:', productEntities.length);
+
+  // 가구가 없을 경우 빈 결과 반환
+  if (furnitureEntities.length === 0) {
+    console.log('No furniture entities found - returning empty layout');
+    return {
+      type: 'layout_simulation',
+      timestamp: new Date().toISOString(),
+      asIsRecipe: { store: null, furniture: [], zones: [], products: [] },
+      toBeRecipe: { store: null, furniture: [], zones: [], products: [] },
+      layoutChanges: [],
+      optimizationSummary: {
+        totalChanges: 0,
+        expectedTrafficIncrease: 0,
+        expectedRevenueIncrease: 0,
+        keyInsights: ['가구 데이터가 없습니다'],
         confidence: 0,
       },
       aiInsights: ['가구 데이터가 없습니다. 디지털트윈 3D에서 가구를 추가해주세요.'],

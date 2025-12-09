@@ -162,10 +162,11 @@ serve(async (req) => {
       }
     );
 
-  } catch (error) {
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : 'Unknown error';
     console.error('샘플 데이터 적용 오류:', error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: errMsg }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
