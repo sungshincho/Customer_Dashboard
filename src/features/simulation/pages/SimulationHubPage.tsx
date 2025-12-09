@@ -843,6 +843,7 @@ export default function SimulationHubPage() {
                       currentRecipe={results.layout.asIsRecipe}
                       suggestedRecipe={results.layout.toBeRecipe}
                       changes={results.layout.layoutChanges}
+                      productPlacements={results.layout.productPlacements}  // 추가
                       optimizationSummary={results.layout.optimizationSummary}
                       onApplySuggestion={handleApplyLayoutSuggestion}
                       isApplying={isApplying}
