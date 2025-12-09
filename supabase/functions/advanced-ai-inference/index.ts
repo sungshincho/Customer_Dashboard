@@ -1540,11 +1540,32 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
   );
   console.log('Filtered furniture:', furnitureEntities.length);
   
-  const spaceEntities = mappedEntities.filter((e: any) =>
-    e.model_3d_type?.toLowerCase()?.includes('space') ||
-    ['Zone', 'Aisle', 'zone', 'aisle', 'Zone', 'FittingRoom', 'StorageRoom'].includes(e.entityType || '')
-  );
-  console.log('Filtered spaces:', spaceEntities.length);
+  const spaceEntities = mappedEntities.filter((e: any) => {
+    const type = (e.model_3d_type || '').toLowerCase();
+    const entityType = (e.entityType || '').toLowerCase();
+    const label = (e.label || '').toLowerCase();
+    
+    return type === 'space' || 
+           type.includes('space') ||
+           entityType === 'space' ||
+           entityType.includes('store') ||
+           label.includes('3d모델') ||
+           label.includes('매장 모델');
+  });
+  console.log('Found space entities:', spaceEntities.length, spaceEntities.map((e: any) => e.label));
+  
+  // Fallback: 명시적 space가 없으면 model_3d_url이 있고 furniture/product가 아닌 엔티티 검색
+  let spaceEntity = spaceEntities.length > 0 ? spaceEntities[0] : null;
+  if (!spaceEntity) {
+    const potentialSpace = mappedEntities.find((e: any) => 
+      (e.model_3d_url || e.model3dUrl) && 
+      !['furniture', 'product'].includes((e.model_3d_type || '').toLowerCase())
+    );
+    if (potentialSpace) {
+      spaceEntity = potentialSpace;
+      console.log('Found potential space entity:', spaceEntity.label);
+    }
+  }
   
   const productEntities = mappedEntities.filter((e: any) =>
     e.entityType === 'Product' || e.entity_type_name === 'Product'
@@ -1750,7 +1771,7 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
     changesMap.set(c.entityId, c);
   });
 
-  const spaceEntity = spaceEntities.length > 0 ? spaceEntities[0] : null;
+  // spaceEntity는 상단에서 이미 정의됨
   
   const buildRecipe = (mode: 'current' | 'suggested') => ({
     space: spaceEntity ? {
