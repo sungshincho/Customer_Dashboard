@@ -21,30 +21,30 @@ import * as THREE from 'three';
 export const SCENE_CONFIG = {
   // 렌더러 설정
   renderer: {
-    toneMapping: THREE.ACESFilmicToneMapping,  // 옵션: THREE.NoToneMapping, THREE.LinearToneMapping, THREE.ReinhardToneMapping, THREE.CineonToneMapping, THREE.ACESFilmicToneMapping
-    toneMappingExposure: 1.0,                   // 🎛️ 노출 (0.5 ~ 2.0) - 전체 밝기 조절
-    outputColorSpace: THREE.SRGBColorSpace,    // 색공간
-    physicallyCorrectLights: true,             // 물리 기반 조명
+    toneMapping: THREE.ACESFilmicToneMapping,
+    toneMappingExposure: 1.1,                   // 🎛️ 약간 밝게 (매장 느낌)
+    outputColorSpace: THREE.SRGBColorSpace,
+    physicallyCorrectLights: true,
   },
   
-  // Environment Map 설정
+  // Environment Map 설정 - 도시 리테일 매장
   environment: {
-    preset: 'apartment' as const,  // 옵션: 'apartment', 'city', 'dawn', 'forest', 'lobby', 'night', 'park', 'studio', 'sunset', 'warehouse'
-    background: false,              // HDRI 배경 표시 여부 (false = 배경 숨김, 조명만 사용)
-    intensity: 1.0,                 // 🎛️ 환경광 강도 (0.5 ~ 2.0)
+    preset: 'city' as const,      // 🎛️ 도시 환경 (천장 오픈에 적합)
+    background: false,             
+    intensity: 0.8,                // 🎛️ HDRI 강도 (천장 오픈이라 적당히)
   },
   
-  // 배경색 (environment.background가 false일 때 사용)
-  backgroundColor: '#1a1a2e',  // 🎛️ 배경색 (어두운 네이비)
+  // 배경색 - 아이보리 + 약간의 깊이감
+  backgroundColor: '#f5f3ef',      // 🎛️ 따뜻한 아이보리 (순백보다 부드러움)
   
-  // 주 광원 (Directional Light) 설정
+  // 주 광원 - 천장에서 내려오는 자연광 느낌
   mainLight: {
-    color: '#ffffff',
-    intensity: 1.5,               // 🎛️ 주 광원 강도 (0.5 ~ 3.0)
-    position: [10, 15, 10] as [number, number, number],
+    color: '#fff8f0',              // 🎛️ 약간 따뜻한 백색 (자연광)
+    intensity: 2.0,                // 🎛️ 밝은 매장 조명
+    position: [8, 20, 8] as [number, number, number],  // 🎛️ 높은 위치 (천장)
     castShadow: true,
     shadow: {
-      mapSize: 2048,              // 🎛️ 그림자 해상도 (512, 1024, 2048, 4096)
+      mapSize: 2048,
       bias: -0.0001,
       normalBias: 0.02,
       camera: {
@@ -58,47 +58,38 @@ export const SCENE_CONFIG = {
     },
   },
   
-  // 보조 광원 (Fill Light) 설정
+  // 보조 광원 - 반대쪽에서 그림자 부드럽게
   fillLight: {
-    color: '#8ecae6',             // 🎛️ 보조광 색상 (하늘색 계열로 자연스러운 반사광)
-    intensity: 0.4,               // 🎛️ 보조광 강도 (0.2 ~ 0.8)
-    position: [-10, 5, -10] as [number, number, number],
+    color: '#e8f4fc',              // 🎛️ 시원한 하늘빛 반사
+    intensity: 0.6,                // 🎛️ 적당한 보조광
+    position: [-12, 8, -8] as [number, number, number],
   },
   
-  // 림 라이트 (뒤에서 오는 빛, 물체 윤곽 강조)
+  // 림 라이트 - 물체 윤곽 살리기
   rimLight: {
     enabled: true,
-    color: '#ffd166',             // 🎛️ 림 라이트 색상 (따뜻한 톤)
-    intensity: 0.6,               // 🎛️ 림 라이트 강도 (0.2 ~ 1.0)
-    position: [-5, 10, -15] as [number, number, number],
+    color: '#fff5e6',              // 🎛️ 따뜻한 역광
+    intensity: 0.5,                // 🎛️ 은은하게
+    position: [-5, 12, -15] as [number, number, number],
   },
   
-  // Ambient Light 설정
+  // Ambient Light - 전체적인 기본 밝기
   ambientLight: {
-    color: '#404060',             // 🎛️ 환경광 색상 (약간 푸른 톤)
-    intensity: 0.3,               // 🎛️ 환경광 강도 (0.1 ~ 0.5) - 너무 높으면 밋밋해짐
+    color: '#f0ebe5',              // 🎛️ 아이보리 톤 환경광
+    intensity: 0.4,                // 🎛️ 그림자가 너무 까맣지 않게
   },
   
-  // Contact Shadows (바닥 그림자) 설정
+  // Contact Shadows - 바닥 그림자 (입체감 핵심!)
   contactShadows: {
     enabled: true,
-    opacity: 0.4,                 // 🎛️ 그림자 불투명도 (0.2 ~ 0.6)
-    blur: 2.5,                    // 🎛️ 그림자 블러 (1 ~ 4)
+    opacity: 0.35,                 // 🎛️ 은은한 그림자
+    blur: 2.0,                     // 🎛️ 부드러운 블러
     far: 10,
     resolution: 512,
-    color: '#000000',
+    color: '#1a1510',              // 🎛️ 따뜻한 그림자 색
     position: [0, -0.01, 0] as [number, number, number],
     scale: 30,
-  },
-  
-  // 안개 설정 (depth 느낌)
-  fog: {
-    enabled: false,               // 🎛️ 안개 활성화 여부
-    color: '#1a1a2e',
-    near: 20,
-    far: 50,
-  },
-};
+  }
 
 // ============================================================================
 // 렌더러 설정 컴포넌트
