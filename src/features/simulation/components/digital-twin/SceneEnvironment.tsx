@@ -81,7 +81,7 @@ export const SCENE_CONFIG = {
   
   // Contact Shadows - 바닥 그림자 (입체감 핵심!)
   contactShadows: {
-    enabled: true,
+    enabled: false,
     opacity: 0.35,                 // 🎛️ 은은한 그림자
     blur: 2.0,                     // 🎛️ 부드러운 블러
     far: 10,
