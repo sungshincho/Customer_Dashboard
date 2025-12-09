@@ -1,8 +1,5 @@
 /**
  * SceneComposer.tsx
- * 
- * 고품질 3D 씬 컴포저
- * SceneRecipe를 받아 Three.js 씬으로 렌더링
  */
 
 import { Suspense, ReactNode } from 'react';
@@ -13,16 +10,18 @@ import { StoreSpace } from './StoreSpace';
 import { FurnitureLayout } from './FurnitureLayout';
 import { ProductPlacement } from './ProductPlacement';
 import { SceneEnvironment } from './SceneEnvironment';
+import { PostProcessingEffects } from './PostProcessingEffects';  // 👈 추가
 import { HeatmapOverlay3D } from '../overlays/HeatmapOverlay3D';
 
 interface SceneComposerProps {
   recipe: SceneRecipe;
   onAssetClick?: (assetId: string, assetType: string) => void;
   overlay?: ReactNode;
-  /** Environment 프리셋 오버라이드 */
   environmentPreset?: 'apartment' | 'city' | 'dawn' | 'forest' | 'lobby' | 'night' | 'park' | 'studio' | 'sunset' | 'warehouse';
-  /** 커스텀 HDRI 경로 */
   hdriPath?: string;
+  showGrid?: boolean;
+  /** 후처리 효과 활성화 */
+  enablePostProcessing?: boolean;  // 👈 추가
 }
 
 export function SceneComposer({ 
@@ -31,9 +30,9 @@ export function SceneComposer({
   overlay,
   environmentPreset,
   hdriPath,
-
+  showGrid = false,
+  enablePostProcessing = true  // 👈 추가
 }: SceneComposerProps) {
-  // Provide safe defaults for all required fields
   const safeRecipe: SceneRecipe = {
     space: recipe?.space || {
       id: 'default-space',
@@ -83,31 +82,26 @@ export function SceneComposer({
         />
         
         <Suspense fallback={<LoadingFallback />}>
-          {/* 고품질 씬 환경 */}
           <SceneEnvironment 
             environmentPreset={environmentPreset}
             hdriPath={hdriPath}
           />
           
-          {/* Space/Store Model */}
           <StoreSpace 
             asset={safeRecipe.space}
             onClick={() => onAssetClick?.(safeRecipe.space.id, 'space')}
           />
           
-          {/* Furniture Layer */}
           <FurnitureLayout 
             furniture={safeRecipe.furniture}
             onClick={(id) => onAssetClick?.(id, 'furniture')}
           />
           
-          {/* Product Layer */}
           <ProductPlacement 
             products={safeRecipe.products}
             onClick={(id) => onAssetClick?.(id, 'product')}
           />
           
-          {/* Effect Layers */}
           {safeRecipe.effects?.map((effect, idx) => {
             if (effect.type === 'heatmap') {
               return (
@@ -120,14 +114,14 @@ export function SceneComposer({
             return null;
           })}
           
-          {/* Custom Overlay */}
           {overlay}
           
-          {/* 에셋 프리로드 */}
           <Preload all />
+          
+          {/* 🌟 후처리 효과 */}
+          {enablePostProcessing && <PostProcessingEffects />}
         </Suspense>
         
-        {/* Camera Controls */}
         <OrbitControls 
           target={[
             safeRecipe.camera.target.x,
@@ -141,6 +135,13 @@ export function SceneComposer({
           maxPolarAngle={Math.PI / 2 + 0.1}
           minPolarAngle={0.1}
         />
+        
+        {showGrid && (
+          <gridHelper 
+            args={[30, 30, '#333333', '#222222']} 
+            position={[0, 0.001, 0]}
+          />
+        )}
       </Canvas>
     </div>
   );
