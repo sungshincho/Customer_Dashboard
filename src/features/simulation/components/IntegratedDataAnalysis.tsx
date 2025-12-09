@@ -885,35 +885,35 @@ export function IntegratedDataAnalysis({
               {/* 개요 탭 */}
               <TabsContent value="overview" className="space-y-4">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {/* 방문 요약 */}
+                  {/* 방문 요약 - L3 우선 */}
                   <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                       <Users className="h-4 w-4" />
                       총 방문
                     </div>
                     <div className="text-2xl font-bold">
-                      {analysis?.visitAnalysis?.totalVisits || analysis?.salesTrendAnalysis?.totalVisitors || 0}
+                      {analysis?.salesTrendAnalysis?.totalVisitors || analysis?.visitAnalysis?.totalVisits || 0}
                       <span className="text-sm font-normal text-muted-foreground">회</span>
                     </div>
-                    {analysis?.visitAnalysis ? (
-                      <div className="text-xs text-muted-foreground mt-1">
-                        평균 체류 {analysis.visitAnalysis.avgDuration}분
-                      </div>
-                    ) : analysis?.salesTrendAnalysis?.avgConversionRate ? (
+                    {analysis?.salesTrendAnalysis?.avgConversionRate ? (
                       <div className="text-xs text-muted-foreground mt-1">
                         전환율 {analysis.salesTrendAnalysis.avgConversionRate}%
+                      </div>
+                    ) : analysis?.visitAnalysis?.avgDuration ? (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        평균 체류 {analysis.visitAnalysis.avgDuration}분
                       </div>
                     ) : null}
                   </div>
 
-                  {/* 매출 요약 */}
+                  {/* 매출 요약 - L3 우선 */}
                   <div className="p-4 bg-green-50 dark:bg-green-950/30 rounded-lg">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                       <DollarSign className="h-4 w-4" />
                       총 매출
                     </div>
                     <div className="text-2xl font-bold">
-                      {((analysis?.transactionAnalysis?.totalRevenue || analysis?.salesTrendAnalysis?.totalRevenue || 0) / 10000).toFixed(0)}
+                      {((analysis?.salesTrendAnalysis?.totalRevenue || analysis?.transactionAnalysis?.totalRevenue || 0) / 10000).toFixed(0)}
                       <span className="text-sm font-normal text-muted-foreground">만원</span>
                     </div>
                     {analysis?.salesTrendAnalysis && (
@@ -930,19 +930,19 @@ export function IntegratedDataAnalysis({
                     )}
                   </div>
 
-                  {/* 거래 요약 */}
+                  {/* 거래 요약 - L3 우선 */}
                   <div className="p-4 bg-yellow-50 dark:bg-yellow-950/30 rounded-lg">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                       <ShoppingCart className="h-4 w-4" />
                       총 거래
                     </div>
                     <div className="text-2xl font-bold">
-                      {analysis?.transactionAnalysis?.totalTransactions || analysis?.salesTrendAnalysis?.totalTransactions || 0}
+                      {analysis?.salesTrendAnalysis?.totalTransactions || analysis?.transactionAnalysis?.totalTransactions || 0}
                       <span className="text-sm font-normal text-muted-foreground">건</span>
                     </div>
-                    {(analysis?.transactionAnalysis || analysis?.salesTrendAnalysis) && (
+                    {(analysis?.salesTrendAnalysis || analysis?.transactionAnalysis) && (
                       <div className="text-xs text-muted-foreground mt-1">
-                        평균 {(((analysis.transactionAnalysis?.avgTransactionValue || analysis.salesTrendAnalysis?.avgTransactionValue || 0)) / 10000).toFixed(1)}만원
+                        평균 {(((analysis.salesTrendAnalysis?.avgTransactionValue || analysis.transactionAnalysis?.avgTransactionValue || 0)) / 10000).toFixed(1)}만원
                       </div>
                     )}
                   </div>
@@ -1072,24 +1072,24 @@ export function IntegratedDataAnalysis({
                 )}
               </TabsContent>
 
-              {/* 매출 분석 탭 */}
+              {/* 매출 분석 탭 - L3 우선 */}
               <TabsContent value="sales" className="space-y-4">
-                {analysis?.transactionAnalysis || analysis?.salesTrendAnalysis ? (
+                {analysis?.salesTrendAnalysis || analysis?.transactionAnalysis ? (
                   <>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {(analysis.transactionAnalysis || analysis.salesTrendAnalysis) && (
+                      {(analysis.salesTrendAnalysis || analysis.transactionAnalysis) && (
                         <>
                           <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg">
                             <div className="text-xs text-muted-foreground">총 거래</div>
-                            <div className="text-xl font-bold">{analysis.transactionAnalysis?.totalTransactions || analysis.salesTrendAnalysis?.totalTransactions || 0}건</div>
+                            <div className="text-xl font-bold">{analysis.salesTrendAnalysis?.totalTransactions || analysis.transactionAnalysis?.totalTransactions || 0}건</div>
                           </div>
                           <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg">
                             <div className="text-xs text-muted-foreground">총 매출</div>
-                            <div className="text-xl font-bold">{((analysis.transactionAnalysis?.totalRevenue || analysis.salesTrendAnalysis?.totalRevenue || 0) / 10000).toFixed(0)}만원</div>
+                            <div className="text-xl font-bold">{((analysis.salesTrendAnalysis?.totalRevenue || analysis.transactionAnalysis?.totalRevenue || 0) / 10000).toFixed(0)}만원</div>
                           </div>
                           <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg">
                             <div className="text-xs text-muted-foreground">평균 거래액</div>
-                            <div className="text-xl font-bold">{((analysis.transactionAnalysis?.avgTransactionValue || analysis.salesTrendAnalysis?.avgTransactionValue || 0) / 1000).toFixed(0)}천원</div>
+                            <div className="text-xl font-bold">{((analysis.salesTrendAnalysis?.avgTransactionValue || analysis.transactionAnalysis?.avgTransactionValue || 0) / 1000).toFixed(0)}천원</div>
                           </div>
                           {analysis.transactionAnalysis?.repeatCustomerRate !== undefined && (
                             <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg">
