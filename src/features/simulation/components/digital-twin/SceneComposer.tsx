@@ -23,8 +23,6 @@ interface SceneComposerProps {
   environmentPreset?: 'apartment' | 'city' | 'dawn' | 'forest' | 'lobby' | 'night' | 'park' | 'studio' | 'sunset' | 'warehouse';
   /** 커스텀 HDRI 경로 */
   hdriPath?: string;
-  /** 그리드 표시 여부 */
-  showGrid?: boolean;
 }
 
 export function SceneComposer({ 
@@ -33,7 +31,7 @@ export function SceneComposer({
   overlay,
   environmentPreset,
   hdriPath,
-  showGrid = false 
+
 }: SceneComposerProps) {
   // Provide safe defaults for all required fields
   const safeRecipe: SceneRecipe = {
@@ -143,14 +141,6 @@ export function SceneComposer({
           maxPolarAngle={Math.PI / 2 + 0.1}
           minPolarAngle={0.1}
         />
-        
-        {/* Grid Helper */}
-        {showGrid && (
-          <gridHelper 
-            args={[30, 30, '#333333', '#222222']} 
-            position={[0, 0.001, 0]}
-          />
-        )}
       </Canvas>
     </div>
   );
