@@ -33,7 +33,7 @@ export function SceneComposer({
   overlay,
   environmentPreset,
   hdriPath,
-  showGrid = true 
+  showGrid = false 
 }: SceneComposerProps) {
   // Provide safe defaults for all required fields
   const safeRecipe: SceneRecipe = {
