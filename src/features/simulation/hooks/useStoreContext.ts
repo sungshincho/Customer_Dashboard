@@ -197,7 +197,7 @@ export interface ConfidenceScore {
 // Hook 구현
 // ============================================================================
 
-export function useStoreContext(storeId: string | undefined) {
+export function useStoreContext(storeId: string | undefined, days: number = 7) {
   const [contextData, setContextData] = useState<StoreContextData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -647,26 +647,26 @@ export function useStoreContext(storeId: string | undefined) {
           .eq('store_id', storeId)
           .limit(200);
 
-        // 방문 데이터 조회 (최근 90일로 확장)
-        const ninetyDaysAgo = new Date();
-        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+        // 방문 데이터 조회 (days 파라미터 사용)
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
 
         const { data: visits } = await supabase
           .from('store_visits')
           .select('id, customer_id, visit_date, duration_minutes, zones_visited, made_purchase')
           .eq('store_id', storeId)
-          .gte('visit_date', ninetyDaysAgo.toISOString())
+          .gte('visit_date', startDate.toISOString())
           .order('visit_date', { ascending: false })
-          .limit(3000);
+          .limit(days * 50); // 일당 약 50건
 
-        // 거래 데이터 조회 (최근 90일로 확장)
+        // 거래 데이터 조회 (days 파라미터 사용)
         const { data: transactions } = await supabase
           .from('transactions')
           .select('id, customer_id, total_amount, items, created_at')
           .eq('store_id', storeId)
-          .gte('created_at', ninetyDaysAgo.toISOString())
+          .gte('created_at', startDate.toISOString())
           .order('created_at', { ascending: false })
-          .limit(1500);
+          .limit(days * 30); // 일당 약 30건
 
         // 일별 KPI 데이터 조회 (daily_kpis_agg 테이블 사용)
         let dailySales: any[] = [];
@@ -674,9 +674,9 @@ export function useStoreContext(storeId: string | undefined) {
           .from('daily_kpis_agg')
           .select('id, date, total_revenue, total_transactions, avg_transaction_value, total_visitors, conversion_rate')
           .eq('store_id', storeId)
-          .gte('date', ninetyDaysAgo.toISOString().split('T')[0])
+          .gte('date', startDate.toISOString().split('T')[0])
           .order('date', { ascending: false })
-          .limit(90);
+          .limit(days);
 
         if (dailyKpisData && dailyKpisData.length > 0) {
           dailySales = dailyKpisData.map(d => ({
@@ -685,13 +685,13 @@ export function useStoreContext(storeId: string | undefined) {
           }));
         }
 
-        // 최근 90일 KPI (daily_kpis_agg에서 이미 로드, 추가로 dashboard_kpis도 시도)
+        // KPI 데이터 (daily_kpis_agg에서 이미 로드, 추가로 dashboard_kpis도 시도)
         let kpis: any[] = [];
         const { data: dashboardKpis } = await supabase
           .from('dashboard_kpis')
           .select('date, total_visits, total_revenue, conversion_rate, sales_per_sqm')
           .eq('store_id', storeId)
-          .gte('date', ninetyDaysAgo.toISOString().split('T')[0])
+          .gte('date', startDate.toISOString().split('T')[0])
           .order('date', { ascending: false });
 
         // dashboard_kpis가 비어있으면 daily_kpis_agg에서 매핑
@@ -902,7 +902,7 @@ export function useStoreContext(storeId: string | undefined) {
     };
 
     fetchStoreContext();
-  }, [storeId, analyzeSalesData, analyzeVisitorData, analyzeConversionData, loadRecommendationPerformance, calculateDataQuality, calculateConfidence]);
+  }, [storeId, days, analyzeSalesData, analyzeVisitorData, analyzeConversionData, loadRecommendationPerformance, calculateDataQuality, calculateConfidence]);
 
   // 🆕 컨텍스트 새로고침 함수
   const refresh = useCallback(() => {
