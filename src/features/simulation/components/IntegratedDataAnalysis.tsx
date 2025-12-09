@@ -275,6 +275,14 @@ function analyzeDailySalesTrends(dailySales: DailySalesData[]) {
     ? revenues.slice(-7).map((r, i) => ({ day: i, revenue: r }))
     : null;
 
+  // 총 거래 수 계산 (dailySales의 transaction_count 합계)
+  const totalTransactions = sorted.reduce((sum, d) => sum + (d.transaction_count || 0), 0);
+
+  // 평균 거래 금액 계산
+  const avgTransactionValue = totalTransactions > 0
+    ? Math.round(revenues.reduce((a, b) => a + b, 0) / totalTransactions)
+    : 0;
+
   return {
     totalDays: dailySales.length,
     avgDailyRevenue,
@@ -284,6 +292,8 @@ function analyzeDailySalesTrends(dailySales: DailySalesData[]) {
     worstDay,
     weeklyPattern,
     totalRevenue: revenues.reduce((a, b) => a + b, 0),
+    totalTransactions,
+    avgTransactionValue,
   };
 }
 
@@ -911,12 +921,12 @@ export function IntegratedDataAnalysis({
                       총 거래
                     </div>
                     <div className="text-2xl font-bold">
-                      {analysis?.transactionAnalysis?.totalTransactions || 0}
+                      {analysis?.transactionAnalysis?.totalTransactions || analysis?.salesTrendAnalysis?.totalTransactions || 0}
                       <span className="text-sm font-normal text-muted-foreground">건</span>
                     </div>
-                    {analysis?.transactionAnalysis && (
+                    {(analysis?.transactionAnalysis || analysis?.salesTrendAnalysis) && (
                       <div className="text-xs text-muted-foreground mt-1">
-                        평균 {(analysis.transactionAnalysis.avgTransactionValue / 10000).toFixed(1)}만원
+                        평균 {(((analysis.transactionAnalysis?.avgTransactionValue || analysis.salesTrendAnalysis?.avgTransactionValue || 0)) / 10000).toFixed(1)}만원
                       </div>
                     )}
                   </div>
@@ -1051,24 +1061,26 @@ export function IntegratedDataAnalysis({
                 {analysis?.transactionAnalysis || analysis?.salesTrendAnalysis ? (
                   <>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {analysis.transactionAnalysis && (
+                      {(analysis.transactionAnalysis || analysis.salesTrendAnalysis) && (
                         <>
                           <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg">
                             <div className="text-xs text-muted-foreground">총 거래</div>
-                            <div className="text-xl font-bold">{analysis.transactionAnalysis.totalTransactions}건</div>
+                            <div className="text-xl font-bold">{analysis.transactionAnalysis?.totalTransactions || analysis.salesTrendAnalysis?.totalTransactions || 0}건</div>
                           </div>
                           <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg">
                             <div className="text-xs text-muted-foreground">총 매출</div>
-                            <div className="text-xl font-bold">{(analysis.transactionAnalysis.totalRevenue / 10000).toFixed(0)}만원</div>
+                            <div className="text-xl font-bold">{((analysis.transactionAnalysis?.totalRevenue || analysis.salesTrendAnalysis?.totalRevenue || 0) / 10000).toFixed(0)}만원</div>
                           </div>
                           <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg">
                             <div className="text-xs text-muted-foreground">평균 거래액</div>
-                            <div className="text-xl font-bold">{(analysis.transactionAnalysis.avgTransactionValue / 1000).toFixed(0)}천원</div>
+                            <div className="text-xl font-bold">{((analysis.transactionAnalysis?.avgTransactionValue || analysis.salesTrendAnalysis?.avgTransactionValue || 0) / 1000).toFixed(0)}천원</div>
                           </div>
-                          <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg">
-                            <div className="text-xs text-muted-foreground">재구매율</div>
-                            <div className="text-xl font-bold">{analysis.transactionAnalysis.repeatCustomerRate}%</div>
-                          </div>
+                          {analysis.transactionAnalysis?.repeatCustomerRate !== undefined && (
+                            <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg">
+                              <div className="text-xs text-muted-foreground">재구매율</div>
+                              <div className="text-xl font-bold">{analysis.transactionAnalysis.repeatCustomerRate}%</div>
+                            </div>
+                          )}
                         </>
                       )}
                     </div>
