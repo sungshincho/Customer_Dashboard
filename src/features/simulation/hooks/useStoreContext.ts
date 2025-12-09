@@ -779,13 +779,13 @@ export function useStoreContext(storeId: string | undefined) {
           made_purchase: v.made_purchase
         }));
 
-        // 거래 데이터 매핑
-        const mappedTransactions = (transactions || []).map(t => ({
+        // 거래 데이터 매핑 (transactions 테이블에 items 컬럼이 없을 수 있음)
+        const mappedTransactions = (transactions || []).map((t: any) => ({
           id: t.id,
           customer_id: t.customer_id,
-          total_amount: t.total_amount || 0,
-          items: t.items || [],
-          transaction_date: t.created_at
+          total_amount: t.total_amount || t.total_price || 0,
+          items: [],
+          transaction_date: t.created_at || t.transaction_date
         }));
 
         // 🆕 Phase 1: 분석 데이터 생성
@@ -799,8 +799,9 @@ export function useStoreContext(storeId: string | undefined) {
         setConfidenceScore(confidence);
 
         // 매장 크기
-        const storeWidth = store?.metadata?.width || 17.4;
-        const storeDepth = store?.metadata?.depth || 16.6;
+        const metadata = store?.metadata as Record<string, any> | null;
+        const storeWidth = metadata?.width || 17.4;
+        const storeDepth = metadata?.depth || 16.6;
 
         console.log('📊 Store context loaded (Phase 1 Enhanced):', {
           entities: sortedEntities.length,
