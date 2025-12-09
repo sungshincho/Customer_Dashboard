@@ -148,7 +148,7 @@ export function useEnhancedAIInference(): UseEnhancedAIInferenceReturn {
   const { selectedStore } = useSelectedStore();
   const { user } = useAuth();
   
-  const { context: enhancedStoreContext, loading: contextLoading, refresh: refreshContext } = useEnhancedStoreContext();
+  const { contextData: enhancedStoreContext, loading: contextLoading, refresh: refreshContext } = useStoreContext(selectedStore?.id);
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -354,14 +354,14 @@ export function useEnhancedAIInference(): UseEnhancedAIInferenceReturn {
       }
 
       const enhancedContext = {
-        storeInfo: enhancedStoreContext?.storeInfo,
-        entities: enhancedStoreContext?.entities || [],
-        relations: enhancedStoreContext?.relations || [],
-        salesData: enhancedStoreContext?.salesData,
-        visitorData: enhancedStoreContext?.visitorData,
-        conversionData: enhancedStoreContext?.conversionData,
-        recommendationPerformance: enhancedStoreContext?.recommendationPerformance,
-        dataQuality: enhancedStoreContext?.dataQuality,
+  storeInfo: enhancedStoreContext?.storeInfo,
+  entities: enhancedStoreContext?.entities || [],
+  relations: enhancedStoreContext?.relations || [],
+  salesData: enhancedStoreContext?.salesAnalysis,      // salesData → salesAnalysis
+  visitorData: enhancedStoreContext?.visitorAnalysis,  // visitorData → visitorAnalysis
+  conversionData: enhancedStoreContext?.conversionAnalysis,  // conversionData → conversionAnalysis
+  recommendationPerformance: enhancedStoreContext?.recommendationPerformance,
+  dataQuality: enhancedStoreContext?.dataQuality,
         ontologySchema: ontCtx?.schema ? {
           entityTypes: ontCtx.schema.entityTypes.map(e => ({ name: e.name, label: e.label })),
           relationTypes: ontCtx.schema.relationTypes.map(r => ({ name: r.name, label: r.label })),
