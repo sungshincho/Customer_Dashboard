@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { useStoreContext } from '@/hooks/useStoreContext';
+import { useStoreContext } from '@/features/simulation/hooks/useStoreContext';
 /**
  * Phase 1: 강화된 AI 추론 Hook v3
  * 
