@@ -856,7 +856,9 @@ export function useStoreContext(storeId: string | undefined) {
             date: d.date,
             total_revenue: d.total_revenue || 0,
             transaction_count: d.transaction_count || 0,
-            avg_transaction_value: d.avg_transaction_value || 0
+            avg_transaction_value: d.avg_transaction_value || 0,
+            total_visitors: d.total_visitors || 0,
+            conversion_rate: d.conversion_rate || 0
           })),
           
           recentKpis: (kpis || []).map(k => ({

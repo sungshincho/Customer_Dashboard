@@ -63,30 +63,63 @@ export function useTopProducts(storeId?: string, limit: number = 10, days: numbe
 
       const startDate = format(subDays(new Date(), days), 'yyyy-MM-dd');
 
-      const { data, error } = await supabase
-        .from('product_performance_agg')
-        .select('product_id, units_sold, revenue')
-        .eq('org_id', orgId)
-        .eq('store_id', storeId)
-        .gte('date', startDate);
+      try {
+        // 1차 시도: L3 product_performance_agg
+        const { data, error } = await supabase
+          .from('product_performance_agg')
+          .select('product_id, units_sold, revenue')
+          .eq('org_id', orgId)
+          .eq('store_id', storeId)
+          .gte('date', startDate);
 
-      if (error) throw error;
+        if (!error && data && data.length > 0) {
+          // 제품별 집계
+          const productMap = new Map<string, { units_sold: number; revenue: number }>();
+          data.forEach(row => {
+            const current = productMap.get(row.product_id) || { units_sold: 0, revenue: 0 };
+            productMap.set(row.product_id, {
+              units_sold: current.units_sold + (row.units_sold || 0),
+              revenue: current.revenue + (row.revenue || 0),
+            });
+          });
 
-      // 제품별 집계
-      const productMap = new Map<string, { units_sold: number; revenue: number }>();
-      (data || []).forEach(row => {
-        const current = productMap.get(row.product_id) || { units_sold: 0, revenue: 0 };
-        productMap.set(row.product_id, {
-          units_sold: current.units_sold + (row.units_sold || 0),
-          revenue: current.revenue + (row.revenue || 0),
+          // 상위 N개 반환
+          return Array.from(productMap.entries())
+            .map(([product_id, stats]) => ({ product_id, ...stats }))
+            .sort((a, b) => b.revenue - a.revenue)
+            .slice(0, limit);
+        }
+
+        // 2차 시도 (Fallback): L2 line_items
+        const { data: lineData, error: lineError } = await supabase
+          .from('line_items')
+          .select('product_id, quantity, line_total')
+          .eq('org_id', orgId)
+          .eq('store_id', storeId)
+          .gte('transaction_date', startDate);
+
+        if (lineError || !lineData) {
+          console.warn('[useTopProducts] Fallback query failed:', lineError);
+          return [];
+        }
+
+        const productMap = new Map<string, { units_sold: number; revenue: number }>();
+        lineData.forEach(row => {
+          const current = productMap.get(row.product_id) || { units_sold: 0, revenue: 0 };
+          productMap.set(row.product_id, {
+            units_sold: current.units_sold + (row.quantity || 1),
+            revenue: current.revenue + (row.line_total || 0),
+          });
         });
-      });
 
-      // 상위 N개 반환
-      return Array.from(productMap.entries())
-        .map(([product_id, stats]) => ({ product_id, ...stats }))
-        .sort((a, b) => b.revenue - a.revenue)
-        .slice(0, limit);
+        return Array.from(productMap.entries())
+          .map(([product_id, stats]) => ({ product_id, ...stats }))
+          .sort((a, b) => b.revenue - a.revenue)
+          .slice(0, limit);
+      } catch (error) {
+        console.error('[useTopProducts] Error:', error);
+        return [];
+      }
     },
     enabled: !!user && !!storeId && !!orgId,
   });
@@ -130,45 +163,97 @@ export function useCategoryPerformance(storeId?: string, days: number = 7) {
 
       const startDate = format(subDays(new Date(), days), 'yyyy-MM-dd');
 
-      // line_items에는 category가 없으므로 products 테이블과 조인 필요
-      const { data, error } = await supabase
-        .from('line_items')
-        .select('product_id, quantity, line_total')
-        .eq('org_id', orgId)
-        .eq('store_id', storeId)
-        .gte('transaction_date', startDate);
+      try {
+        // 1차 시도: L3 product_performance_agg + products 테이블 조인
+        const { data: perfData, error: perfError } = await supabase
+          .from('product_performance_agg')
+          .select('product_id, units_sold, revenue')
+          .eq('org_id', orgId)
+          .eq('store_id', storeId)
+          .gte('date', startDate);
 
-      if (error) throw error;
+        if (!perfError && perfData && perfData.length > 0) {
+          // L3 데이터 사용
+          const productIds = [...new Set(perfData.map(d => d.product_id).filter(Boolean))];
 
-      // 제품별 집계 후 products 테이블에서 카테고리 조회
-      const productIds = [...new Set((data || []).map(d => d.product_id).filter(Boolean))];
-      
-      const { data: products } = await supabase
-        .from('products')
-        .select('id, category')
-        .in('id', productIds);
+          const { data: products } = await supabase
+            .from('products')
+            .select('id, category')
+            .in('id', productIds);
 
-      const productCategoryMap = new Map((products || []).map(p => [p.id, p.category]));
+          const productCategoryMap = new Map((products || []).map(p => [p.id, p.category || 'Unknown']));
 
-      // 카테고리별 집계
-      const categoryMap = new Map<string, { count: number; revenue: number }>();
-      (data || []).forEach(item => {
-        const category = productCategoryMap.get(item.product_id) || 'Unknown';
-        const current = categoryMap.get(category) || { count: 0, revenue: 0 };
-        categoryMap.set(category, {
-          count: current.count + (item.quantity || 1),
-          revenue: current.revenue + (item.line_total || 0),
+          // 카테고리별 집계
+          const categoryMap = new Map<string, { count: number; revenue: number }>();
+          perfData.forEach(item => {
+            const category = productCategoryMap.get(item.product_id) || 'Unknown';
+            const current = categoryMap.get(category) || { count: 0, revenue: 0 };
+            categoryMap.set(category, {
+              count: current.count + (item.units_sold || 0),
+              revenue: current.revenue + (item.revenue || 0),
+            });
+          });
+
+          return Array.from(categoryMap.entries())
+            .map(([category, stats]) => ({
+              category,
+              count: stats.count,
+              revenue: stats.revenue,
+              avgPrice: stats.count > 0 ? stats.revenue / stats.count : 0,
+            }))
+            .sort((a, b) => b.revenue - a.revenue);
+        }
+
+        // 2차 시도 (Fallback): L2 line_items 사용
+        const { data, error } = await supabase
+          .from('line_items')
+          .select('product_id, quantity, line_total')
+          .eq('org_id', orgId)
+          .eq('store_id', storeId)
+          .gte('transaction_date', startDate);
+
+        if (error) {
+          console.warn('[useCategoryPerformance] line_items query failed:', error);
+          return [];
+        }
+
+        if (!data || data.length === 0) return [];
+
+        // 제품별 집계 후 products 테이블에서 카테고리 조회
+        const productIds = [...new Set(data.map(d => d.product_id).filter(Boolean))];
+
+        if (productIds.length === 0) return [];
+
+        const { data: products } = await supabase
+          .from('products')
+          .select('id, category')
+          .in('id', productIds);
+
+        const productCategoryMap = new Map((products || []).map(p => [p.id, p.category || 'Unknown']));
+
+        // 카테고리별 집계
+        const categoryMap = new Map<string, { count: number; revenue: number }>();
+        data.forEach(item => {
+          const category = productCategoryMap.get(item.product_id) || 'Unknown';
+          const current = categoryMap.get(category) || { count: 0, revenue: 0 };
+          categoryMap.set(category, {
+            count: current.count + (item.quantity || 1),
+            revenue: current.revenue + (item.line_total || 0),
+          });
         });
-      });
 
-      return Array.from(categoryMap.entries())
-        .map(([category, stats]) => ({
-          category,
-          count: stats.count,
-          revenue: stats.revenue,
-          avgPrice: stats.count > 0 ? stats.revenue / stats.count : 0,
-        }))
-        .sort((a, b) => b.revenue - a.revenue);
+        return Array.from(categoryMap.entries())
+          .map(([category, stats]) => ({
+            category,
+            count: stats.count,
+            revenue: stats.revenue,
+            avgPrice: stats.count > 0 ? stats.revenue / stats.count : 0,
+          }))
+          .sort((a, b) => b.revenue - a.revenue);
+      } catch (error) {
+        console.error('[useCategoryPerformance] Error:', error);
+        return [];
+      }
     },
     enabled: !!user && !!storeId && !!orgId,
   });

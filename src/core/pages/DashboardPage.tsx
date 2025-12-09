@@ -5,12 +5,11 @@ import { Users, TrendingUp, Package, DollarSign, AlertCircle, RefreshCw, AlertTr
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useMemo, useState, useEffect } from "react";
 import { useSelectedStore } from "@/hooks/useSelectedStore";
-import { useStoreDataset } from "@/hooks/useStoreData";
 import { DataReadinessGuard } from "@/components/DataReadinessGuard";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useClearCache } from "@/hooks/useClearCache";
-import { isToday, parseISO, format } from "date-fns";
+import { format } from "date-fns";
 import { FunnelVisualization } from "@/components/dashboard/FunnelVisualization";
 import { AIRecommendationCard } from "@/components/dashboard/AIRecommendationCard";
 import { DashboardFilters } from "@/components/dashboard/DashboardFilters";
@@ -21,16 +20,61 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { useActivityLogger } from "@/hooks/useActivityLogger";
 import { useLocation } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 
 const Dashboard = () => {
-  const { user } = useAuth();
+  const { user, orgId } = useAuth();
   const { logActivity } = useActivityLogger();
   const location = useLocation();
   const { selectedStore } = useSelectedStore();
   const { invalidateStoreData } = useClearCache();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  
-  const { data: storeData, isLoading: loading, error, refetch } = useStoreDataset();
+
+  // L3 데이터만 사용 - L1 useStoreDataset 제거
+  // 재고 부족 상품만 별도 조회 (필요시에만)
+  const { data: lowStockProducts } = useQuery({
+    queryKey: ['low-stock-products', selectedStore?.id, orgId],
+    queryFn: async () => {
+      if (!selectedStore?.id || !orgId) return [];
+      const { data } = await supabase
+        .from('products')
+        .select('id, product_name, stock_quantity')
+        .eq('store_id', selectedStore.id)
+        .eq('org_id', orgId)
+        .gt('stock_quantity', 0)
+        .lt('stock_quantity', 10)
+        .limit(5);
+      return data || [];
+    },
+    enabled: !!selectedStore?.id && !!orgId,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // 최근 구매 내역 (오늘 날짜 기준)
+  const { data: recentPurchases, refetch } = useQuery({
+    queryKey: ['recent-purchases', selectedStore?.id, orgId, format(selectedDate, 'yyyy-MM-dd')],
+    queryFn: async () => {
+      if (!selectedStore?.id || !orgId) return [];
+      const targetDate = format(selectedDate, 'yyyy-MM-dd');
+      const { data } = await supabase
+        .from('purchases')
+        .select(`
+          id, unit_price, quantity, purchase_date,
+          product:products(product_name)
+        `)
+        .eq('store_id', selectedStore.id)
+        .eq('org_id', orgId)
+        .gte('purchase_date', targetDate)
+        .order('purchase_date', { ascending: false })
+        .limit(10);
+      return (data || []).map((p: any) => ({
+        ...p,
+        product_name: p.product?.product_name || '상품'
+      }));
+    },
+    enabled: !!selectedStore?.id && !!orgId,
+    staleTime: 2 * 60 * 1000,
+  });
 
   // 페이지 방문 로깅
   useEffect(() => {
@@ -97,34 +141,7 @@ const Dashboard = () => {
     }
   };
 
-  // 오늘 날짜로 필터링된 데이터
-  const todayData = useMemo(() => {
-    if (!storeData) return { visits: [], purchases: [] };
-    
-    const todayVisits = storeData.visits?.filter((visit: any) => {
-      try {
-        if (visit.visit_date) {
-          return isToday(parseISO(visit.visit_date));
-        }
-        return false;
-      } catch {
-        return false;
-      }
-    }) || [];
-
-    const todayPurchases = storeData.purchases?.filter((purchase: any) => {
-      try {
-        if (purchase.purchase_date) {
-          return isToday(parseISO(purchase.purchase_date));
-        }
-        return false;
-      } catch {
-        return false;
-      }
-    }) || [];
-
-    return { visits: todayVisits, purchases: todayPurchases };
-  }, [storeData]);
+  // L3 데이터 기반으로 알림 데이터 계산 (L1 필터링 제거)
 
   // KPI 데이터 기반 stats 생성 - 실제 데이터만 사용
   const stats = useMemo(() => {
@@ -166,7 +183,7 @@ const Dashboard = () => {
         icon: TrendingUp,
       },
     ];
-  }, [dashboardKPI, latestKPIs]);
+  }, [dashboardKPI]);
 
   // 최근 7일 트렌드 데이터 (latestKPIs 기반)
   const visitorData = useMemo(() => {
@@ -181,10 +198,8 @@ const Dashboard = () => {
     }));
   }, [latestKPIs]);
 
-  // 실제 데이터 기반 알림 생성 - 데이터가 없으면 빈 배열
+  // L3 데이터 기반 알림 생성 - dashboardKPI 사용
   const alerts = useMemo(() => {
-    if (!storeData) return [];
-
     const alertList: Array<{
       type: 'warning' | 'info' | 'success';
       icon: any;
@@ -192,12 +207,8 @@ const Dashboard = () => {
       time: string;
     }> = [];
 
-    // 재고 부족 알림 - 실제 재고 데이터만
-    const lowStockProducts = storeData.products?.filter((p: any) => 
-      (parseInt(p.stock_quantity) || 0) > 0 && (parseInt(p.stock_quantity) || 0) < 10
-    ) || [];
-    
-    lowStockProducts.slice(0, 2).forEach((product: any) => {
+    // 재고 부족 알림 - 별도 쿼리로 가져온 데이터 사용
+    (lowStockProducts || []).slice(0, 2).forEach((product: any) => {
       alertList.push({
         type: 'warning',
         icon: AlertTriangle,
@@ -206,57 +217,53 @@ const Dashboard = () => {
       });
     });
 
-    // 높은 방문자 알림 - 실제 방문 데이터만
-    if (todayData.visits.length > 50) {
-      alertList.push({
-        type: 'info',
-        icon: Users,
-        title: `높은 방문자 수: 오늘 ${todayData.visits.length}명 방문`,
-        time: '5분 전'
-      });
+    // L3 기반 알림 - dashboardKPI 사용
+    if (dashboardKPI) {
+      // 높은 방문자 알림
+      if (dashboardKPI.total_visits > 50) {
+        alertList.push({
+          type: 'info',
+          icon: Users,
+          title: `높은 방문자 수: ${dashboardKPI.total_visits}명 방문`,
+          time: '5분 전'
+        });
+      }
+
+      // 높은 매출 알림
+      if (dashboardKPI.total_revenue > 100000) {
+        alertList.push({
+          type: 'success',
+          icon: TrendingUp,
+          title: `매출 목표 달성: ₩${dashboardKPI.total_revenue.toLocaleString()}`,
+          time: '10분 전'
+        });
+      }
+
+      // 전환율 알림
+      if (dashboardKPI.conversion_rate < 2 && dashboardKPI.total_visits > 10) {
+        alertList.push({
+          type: 'warning',
+          icon: TrendingDown,
+          title: `낮은 전환율: ${dashboardKPI.conversion_rate.toFixed(1)}% (개선 필요)`,
+          time: '30분 전'
+        });
+      }
     }
 
-    // 높은 매출 알림 - 실제 구매 데이터만
-    const todayRevenue = todayData.purchases.reduce((sum: number, p: any) => 
-      sum + (parseFloat(p.unit_price) || 0) * (parseInt(p.quantity) || 0), 0);
-    
-    if (todayRevenue > 100000) {
-      alertList.push({
-        type: 'success',
-        icon: TrendingUp,
-        title: `오늘 매출 목표 달성: ₩${todayRevenue.toLocaleString()}`,
-        time: '10분 전'
-      });
-    }
-
-    // 최근 구매 알림
-    if (todayData.purchases.length > 0) {
-      const recentPurchase = todayData.purchases[0];
-      const amount = (parseFloat(String(recentPurchase.unit_price)) || 0) * (parseInt(String(recentPurchase.quantity)) || 1);
+    // 최근 구매 알림 - recentPurchases 사용
+    if (recentPurchases && recentPurchases.length > 0) {
+      const latestPurchase = recentPurchases[0];
+      const amount = (parseFloat(String(latestPurchase.unit_price)) || 0) * (parseInt(String(latestPurchase.quantity)) || 1);
       alertList.push({
         type: 'info',
         icon: DollarSign,
-        title: `새 구매: ${recentPurchase.product_name} (₩${amount.toLocaleString()})`,
+        title: `새 구매: ${latestPurchase.product_name} (₩${amount.toLocaleString()})`,
         time: '15분 전'
       });
     }
 
-    // 전환율 알림
-    const conversionRate = todayData.visits.length > 0 
-      ? (todayData.purchases.length / todayData.visits.length) * 100
-      : 0;
-    
-    if (conversionRate < 2 && todayData.visits.length > 10) {
-      alertList.push({
-        type: 'warning',
-        icon: TrendingDown,
-        title: `낮은 전환율: ${conversionRate.toFixed(1)}% (개선 필요)`,
-        time: '30분 전'
-      });
-    }
-
     return alertList.slice(0, 5);
-  }, [storeData, todayData]);
+  }, [dashboardKPI, lowStockProducts, recentPurchases]);
 
   const alertTypeStyles = {
     warning: "bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800 text-orange-800 dark:text-orange-200",
@@ -484,13 +491,13 @@ const Dashboard = () => {
           {/* Recent Purchases */}
           <Card className="hover-lift">
             <CardHeader>
-              <CardTitle>오늘 구매 내역</CardTitle>
-              <CardDescription>최근 상품 판매 현황</CardDescription>
+              <CardTitle>최근 구매 내역</CardTitle>
+              <CardDescription>선택한 날짜의 상품 판매 현황</CardDescription>
             </CardHeader>
             <CardContent>
-              {todayData.purchases.length > 0 ? (
+              {recentPurchases && recentPurchases.length > 0 ? (
                 <div className="space-y-4">
-                  {todayData.purchases.slice(0, 5).map((purchase: any, idx: number) => (
+                  {recentPurchases.slice(0, 5).map((purchase: any, idx: number) => (
                     <div key={idx} className="flex items-center justify-between">
                       <div className="text-sm font-medium">{purchase.product_name || '상품'}</div>
                       <div className="text-sm text-muted-foreground">
@@ -502,7 +509,7 @@ const Dashboard = () => {
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>오늘 구매 내역이 없습니다</p>
+                  <p>해당 날짜의 구매 내역이 없습니다</p>
                 </div>
               )}
             </CardContent>

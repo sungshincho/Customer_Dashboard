@@ -63,6 +63,8 @@ interface DailySalesData {
   total_revenue: number;
   transaction_count?: number;
   avg_transaction_value?: number;
+  total_visitors?: number;
+  conversion_rate?: number;
 }
 
 interface RelationData {
@@ -278,9 +280,17 @@ function analyzeDailySalesTrends(dailySales: DailySalesData[]) {
   // 총 거래 수 계산 (dailySales의 transaction_count 합계)
   const totalTransactions = sorted.reduce((sum, d) => sum + (d.transaction_count || 0), 0);
 
+  // 총 방문자 수 계산 (dailySales의 total_visitors 합계)
+  const totalVisitors = sorted.reduce((sum, d) => sum + (d.total_visitors || 0), 0);
+
   // 평균 거래 금액 계산
   const avgTransactionValue = totalTransactions > 0
     ? Math.round(revenues.reduce((a, b) => a + b, 0) / totalTransactions)
+    : 0;
+
+  // 평균 전환율 계산
+  const avgConversionRate = totalVisitors > 0
+    ? Math.round((totalTransactions / totalVisitors) * 100 * 10) / 10
     : 0;
 
   return {
@@ -293,7 +303,9 @@ function analyzeDailySalesTrends(dailySales: DailySalesData[]) {
     weeklyPattern,
     totalRevenue: revenues.reduce((a, b) => a + b, 0),
     totalTransactions,
+    totalVisitors,
     avgTransactionValue,
+    avgConversionRate,
   };
 }
 
@@ -880,14 +892,18 @@ export function IntegratedDataAnalysis({
                       총 방문
                     </div>
                     <div className="text-2xl font-bold">
-                      {analysis?.visitAnalysis?.totalVisits || 0}
+                      {analysis?.visitAnalysis?.totalVisits || analysis?.salesTrendAnalysis?.totalVisitors || 0}
                       <span className="text-sm font-normal text-muted-foreground">회</span>
                     </div>
-                    {analysis?.visitAnalysis && (
+                    {analysis?.visitAnalysis ? (
                       <div className="text-xs text-muted-foreground mt-1">
                         평균 체류 {analysis.visitAnalysis.avgDuration}분
                       </div>
-                    )}
+                    ) : analysis?.salesTrendAnalysis?.avgConversionRate ? (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        전환율 {analysis.salesTrendAnalysis.avgConversionRate}%
+                      </div>
+                    ) : null}
                   </div>
 
                   {/* 매출 요약 */}
