@@ -147,10 +147,6 @@ export function SceneEnvironment({
       {/* 배경색 */}
       <color attach="background" args={[SCENE_CONFIG.backgroundColor]} />
       
-      {/* 안개 (선택적) */}
-      {SCENE_CONFIG.fog.enabled && (
-        <fog attach="fog" args={[SCENE_CONFIG.fog.color, SCENE_CONFIG.fog.near, SCENE_CONFIG.fog.far]} />
-      )}
       
       {/* Environment Map - HDRI 조명 (배경 숨김) */}
       {hdriPath ? (
