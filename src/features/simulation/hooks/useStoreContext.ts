@@ -647,48 +647,65 @@ export function useStoreContext(storeId: string | undefined) {
           .eq('store_id', storeId)
           .limit(200);
 
-        // 방문 데이터 조회 (최근 30일)
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        // 방문 데이터 조회 (최근 90일로 확장)
+        const ninetyDaysAgo = new Date();
+        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
         const { data: visits } = await supabase
           .from('store_visits')
           .select('id, customer_id, visit_date, duration_minutes, zones_visited, made_purchase')
           .eq('store_id', storeId)
-          .gte('visit_date', thirtyDaysAgo.toISOString())
+          .gte('visit_date', ninetyDaysAgo.toISOString())
           .order('visit_date', { ascending: false })
-          .limit(1000);
+          .limit(3000);
 
-        // 거래 데이터 조회 (최근 30일)
+        // 거래 데이터 조회 (최근 90일로 확장)
         const { data: transactions } = await supabase
           .from('transactions')
           .select('id, customer_id, total_amount, items, created_at')
           .eq('store_id', storeId)
-          .gte('created_at', thirtyDaysAgo.toISOString())
+          .gte('created_at', ninetyDaysAgo.toISOString())
           .order('created_at', { ascending: false })
-          .limit(500);
+          .limit(1500);
 
-        // 일별 매출 데이터 조회 (새 테이블 또는 기존 테이블)
+        // 일별 KPI 데이터 조회 (daily_kpis_agg 테이블 사용)
         let dailySales: any[] = [];
-        const { data: dailySalesData } = await supabase
-          .from('daily_sales_summary')
-          .select('id, date, total_revenue, transaction_count, avg_transaction_value')
+        const { data: dailyKpisData } = await supabase
+          .from('daily_kpis_agg')
+          .select('id, date, total_revenue, total_transactions, avg_transaction_value, total_visitors, conversion_rate')
           .eq('store_id', storeId)
-          .gte('date', thirtyDaysAgo.toISOString().split('T')[0])
+          .gte('date', ninetyDaysAgo.toISOString().split('T')[0])
           .order('date', { ascending: false })
-          .limit(30);
-        
-        if (dailySalesData && dailySalesData.length > 0) {
-          dailySales = dailySalesData;
+          .limit(90);
+
+        if (dailyKpisData && dailyKpisData.length > 0) {
+          dailySales = dailyKpisData.map(d => ({
+            ...d,
+            transaction_count: d.total_transactions // 필드명 매핑
+          }));
         }
 
-        // 최근 30일 KPI
-        const { data: kpis } = await supabase
+        // 최근 90일 KPI (daily_kpis_agg에서 이미 로드, 추가로 dashboard_kpis도 시도)
+        let kpis: any[] = [];
+        const { data: dashboardKpis } = await supabase
           .from('dashboard_kpis')
           .select('date, total_visits, total_revenue, conversion_rate, sales_per_sqm')
           .eq('store_id', storeId)
-          .gte('date', thirtyDaysAgo.toISOString().split('T')[0])
+          .gte('date', ninetyDaysAgo.toISOString().split('T')[0])
           .order('date', { ascending: false });
+
+        // dashboard_kpis가 비어있으면 daily_kpis_agg에서 매핑
+        if (dashboardKpis && dashboardKpis.length > 0) {
+          kpis = dashboardKpis;
+        } else if (dailyKpisData && dailyKpisData.length > 0) {
+          kpis = dailyKpisData.map(d => ({
+            date: d.date,
+            total_visits: d.total_visitors || 0,
+            total_revenue: d.total_revenue || 0,
+            conversion_rate: d.conversion_rate || 0,
+            sales_per_sqm: 0
+          }));
+        }
 
         // 재고 정보
         const { data: inventoryData } = await supabase
@@ -809,6 +826,8 @@ export function useStoreContext(storeId: string | undefined) {
           visits: mappedVisits.length,
           transactions: mappedTransactions.length,
           dailySales: dailySales.length,
+          kpis: kpis.length,
+          totalRevenue: salesAnalysis?.totalRevenue || 0,
           salesTrend: salesAnalysis?.trend,
           visitorAvgDaily: visitorAnalysis?.avgDaily,
           dataQualityScore: dataQuality.overallScore,
