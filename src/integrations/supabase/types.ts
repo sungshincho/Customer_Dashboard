@@ -14,6 +14,74 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_inference_logs: {
+        Row: {
+          application_id: string | null
+          confidence_factors: Json | null
+          confidence_score: number | null
+          created_at: string | null
+          id: string
+          inference_type: string
+          input_data_quality: Json | null
+          measured_impact: Json | null
+          model_version: string | null
+          org_id: string
+          processing_time_ms: number | null
+          recommendations_count: number | null
+          result_summary: Json | null
+          scenario_type: string
+          store_id: string
+          user_id: string
+          was_applied: boolean | null
+        }
+        Insert: {
+          application_id?: string | null
+          confidence_factors?: Json | null
+          confidence_score?: number | null
+          created_at?: string | null
+          id?: string
+          inference_type: string
+          input_data_quality?: Json | null
+          measured_impact?: Json | null
+          model_version?: string | null
+          org_id: string
+          processing_time_ms?: number | null
+          recommendations_count?: number | null
+          result_summary?: Json | null
+          scenario_type: string
+          store_id: string
+          user_id: string
+          was_applied?: boolean | null
+        }
+        Update: {
+          application_id?: string | null
+          confidence_factors?: Json | null
+          confidence_score?: number | null
+          created_at?: string | null
+          id?: string
+          inference_type?: string
+          input_data_quality?: Json | null
+          measured_impact?: Json | null
+          model_version?: string | null
+          org_id?: string
+          processing_time_ms?: number | null
+          recommendations_count?: number | null
+          result_summary?: Json | null
+          scenario_type?: string
+          store_id?: string
+          user_id?: string
+          was_applied?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_inference_logs_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_insights: {
         Row: {
           category: string | null
@@ -1021,6 +1089,68 @@ export type Database = {
           },
           {
             foreignKeyName: "daily_sales_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_sales_summary: {
+        Row: {
+          avg_transaction_value: number | null
+          conversion_rate: number | null
+          created_at: string | null
+          data_source: string | null
+          date: string
+          hourly_revenue: Json | null
+          id: string
+          org_id: string
+          payment_method_breakdown: Json | null
+          revenue_by_category: Json | null
+          store_id: string
+          total_revenue: number | null
+          transaction_count: number | null
+          updated_at: string | null
+          visitor_count: number | null
+        }
+        Insert: {
+          avg_transaction_value?: number | null
+          conversion_rate?: number | null
+          created_at?: string | null
+          data_source?: string | null
+          date: string
+          hourly_revenue?: Json | null
+          id?: string
+          org_id: string
+          payment_method_breakdown?: Json | null
+          revenue_by_category?: Json | null
+          store_id: string
+          total_revenue?: number | null
+          transaction_count?: number | null
+          updated_at?: string | null
+          visitor_count?: number | null
+        }
+        Update: {
+          avg_transaction_value?: number | null
+          conversion_rate?: number | null
+          created_at?: string | null
+          data_source?: string | null
+          date?: string
+          hourly_revenue?: Json | null
+          id?: string
+          org_id?: string
+          payment_method_breakdown?: Json | null
+          revenue_by_category?: Json | null
+          store_id?: string
+          total_revenue?: number | null
+          transaction_count?: number | null
+          updated_at?: string | null
+          visitor_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_sales_summary_store_id_fkey"
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
@@ -5347,6 +5477,71 @@ export type Database = {
           },
         ]
       }
+      store_visits: {
+        Row: {
+          created_at: string | null
+          customer_id: string | null
+          data_source: string | null
+          device_type: string | null
+          duration_minutes: number | null
+          entry_point: string | null
+          exit_date: string | null
+          id: string
+          made_purchase: boolean | null
+          org_id: string
+          purchase_amount: number | null
+          store_id: string
+          transaction_id: string | null
+          visit_date: string
+          zone_durations: Json | null
+          zones_visited: string[] | null
+        }
+        Insert: {
+          created_at?: string | null
+          customer_id?: string | null
+          data_source?: string | null
+          device_type?: string | null
+          duration_minutes?: number | null
+          entry_point?: string | null
+          exit_date?: string | null
+          id?: string
+          made_purchase?: boolean | null
+          org_id: string
+          purchase_amount?: number | null
+          store_id: string
+          transaction_id?: string | null
+          visit_date?: string
+          zone_durations?: Json | null
+          zones_visited?: string[] | null
+        }
+        Update: {
+          created_at?: string | null
+          customer_id?: string | null
+          data_source?: string | null
+          device_type?: string | null
+          duration_minutes?: number | null
+          entry_point?: string | null
+          exit_date?: string | null
+          id?: string
+          made_purchase?: boolean | null
+          org_id?: string
+          purchase_amount?: number | null
+          store_id?: string
+          transaction_id?: string | null
+          visit_date?: string
+          zone_durations?: Json | null
+          zones_visited?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_visits_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stores: {
         Row: {
           address: string | null
@@ -6765,6 +6960,68 @@ export type Database = {
           },
         ]
       }
+      zone_performance: {
+        Row: {
+          avg_dwell_time: number | null
+          conversion_rate: number | null
+          created_at: string | null
+          date: string
+          heatmap_data: Json | null
+          hourly_visits: Json | null
+          id: string
+          org_id: string
+          purchase_count: number | null
+          revenue_contribution: number | null
+          store_id: string
+          unique_visitors: number | null
+          updated_at: string | null
+          visit_count: number | null
+          zone_name: string
+        }
+        Insert: {
+          avg_dwell_time?: number | null
+          conversion_rate?: number | null
+          created_at?: string | null
+          date: string
+          heatmap_data?: Json | null
+          hourly_visits?: Json | null
+          id?: string
+          org_id: string
+          purchase_count?: number | null
+          revenue_contribution?: number | null
+          store_id: string
+          unique_visitors?: number | null
+          updated_at?: string | null
+          visit_count?: number | null
+          zone_name: string
+        }
+        Update: {
+          avg_dwell_time?: number | null
+          conversion_rate?: number | null
+          created_at?: string | null
+          date?: string
+          heatmap_data?: Json | null
+          hourly_visits?: Json | null
+          id?: string
+          org_id?: string
+          purchase_count?: number | null
+          revenue_contribution?: number | null
+          store_id?: string
+          unique_visitors?: number | null
+          updated_at?: string | null
+          visit_count?: number | null
+          zone_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zone_performance_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       zones_dim: {
         Row: {
           area_sqm: number | null
@@ -6894,6 +7151,19 @@ export type Database = {
         Returns: boolean
       }
       export_public_schema: { Args: never; Returns: Json }
+      generate_sample_sales_data: {
+        Args: { p_days?: number; p_org_id: string; p_store_id: string }
+        Returns: undefined
+      }
+      generate_sample_visit_data: {
+        Args: {
+          p_days?: number
+          p_org_id: string
+          p_store_id: string
+          p_visits_per_day?: number
+        }
+        Returns: undefined
+      }
       get_schema_metadata: { Args: never; Returns: Json }
       get_user_org_id: { Args: { _user_id: string }; Returns: string }
       get_user_orgs: {
