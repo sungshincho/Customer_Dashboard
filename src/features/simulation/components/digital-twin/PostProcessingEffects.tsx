@@ -19,7 +19,7 @@ import { BlendFunction, ToneMappingMode } from 'postprocessing';
 export const POSTPROCESS_CONFIG = {
   // Bloom 설정 - 밝은 부분 빛 번짐
   bloom: {
-    enabled: true,
+    enabled: false,
     intensity: 0.5,              // 🎛️ 블룸 강도 (0.2 ~ 1.5) - 높을수록 빛 번짐 강함
     luminanceThreshold: 0.9,     // 🎛️ 밝기 임계값 (0.5 ~ 1.0) - 낮을수록 더 많은 부분이 빛남
     luminanceSmoothing: 0.4,     // 🎛️ 부드러움 (0.0 ~ 1.0)
