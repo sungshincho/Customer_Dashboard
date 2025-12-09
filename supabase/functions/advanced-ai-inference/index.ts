@@ -1516,9 +1516,14 @@ Return a JSON object with predictions, feature_importance, drivers, risks, and m
   };
 }
 
-// Layout Simulation: 레이아웃 최적화 시뮬레이션
+// ============================================================================
+// performLayoutSimulation v5 - AI 제품 배치 최적화 버전
+// 가구뿐만 아니라 제품도 AI가 최적의 위치/가구로 재배치 제안
+// ============================================================================
+
+// Layout Simulation: 레이아웃 최적화 시뮬레이션 (v5 - Product Optimization)
 async function performLayoutSimulation(request: InferenceRequest, apiKey: string) {
-  console.log('performLayoutSimulation v3 - As-Is/To-Be Comparison');
+  console.log('performLayoutSimulation v5 - AI Product Placement Optimization');
   console.log('=== Layout Simulation Start ===');
 
   const { parameters = {} } = request;
@@ -1527,19 +1532,44 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
   console.log('StoreContext keys:', JSON.stringify(Object.keys(storeContext), null, 2));
   console.log('StoreContext entities count:', storeContext.entities?.length || 0);
   
-  // Entity 필터링
+  // Entity 매핑
   const mappedEntities = (storeContext.entities || []).map((e: any) => ({
     ...e,
-    entityType: e.entityType || e.entity_type_name || 'unknown'
+    entityType: e.entityType || e.entity_type_name || 'unknown',
+    position: e.position || e.model_3d_position,
+    rotation: e.rotation || e.model_3d_rotation,
+    scale: e.scale || e.model_3d_scale,
   }));
   console.log('Mapped entities:', mappedEntities.length);
   
-  const furnitureEntities = mappedEntities.filter((e: any) => 
-    e.model_3d_type?.toLowerCase()?.includes('furniture') ||
-    ['Shelf', 'Rack', 'DisplayTable', 'Fixture', 'shelf', 'rack', 'display_table', 'fixture', 'Entrance', 'CheckoutCounter'].includes(e.entityType || '')
-  );
+  // 🆕 개선된 필터링 로직
+  
+  // 1. 가구 필터링
+  const furnitureEntities = mappedEntities.filter((e: any) => {
+    const model3dType = (e.model_3d_type || '').toLowerCase();
+    const entityType = (e.entityType || '').toLowerCase();
+    
+    return model3dType === 'furniture' ||
+           model3dType.includes('furniture') ||
+           ['shelf', 'rack', 'displaytable', 'display', 'counter', 'checkout', 'fixture', 'table', 'hanger'].some(t => 
+             entityType.toLowerCase().includes(t)
+           );
+  });
   console.log('Filtered furniture:', furnitureEntities.length);
   
+  // 2. 제품 필터링 (개선)
+  const productEntities = mappedEntities.filter((e: any) => {
+    const type = (e.entityType || e.entity_type_name || '').toLowerCase();
+    const model3dType = (e.model_3d_type || '').toLowerCase();
+    
+    return type === 'product' || 
+           type.includes('product') ||
+           model3dType === 'product' ||
+           model3dType.includes('product');
+  });
+  console.log('Filtered products:', productEntities.length);
+  
+  // 3. Space 필터링 (개선)
   const spaceEntities = mappedEntities.filter((e: any) => {
     const type = (e.model_3d_type || '').toLowerCase();
     const entityType = (e.entityType || '').toLowerCase();
@@ -1548,13 +1578,11 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
     return type === 'space' || 
            type.includes('space') ||
            entityType === 'space' ||
-           entityType.includes('store') ||
            label.includes('3d모델') ||
            label.includes('매장 모델');
   });
-  console.log('Found space entities:', spaceEntities.length, spaceEntities.map((e: any) => e.label));
+  console.log('Found space entities:', spaceEntities.length);
   
-  // Fallback: 명시적 space가 없으면 model_3d_url이 있고 furniture/product가 아닌 엔티티 검색
   let spaceEntity = spaceEntities.length > 0 ? spaceEntities[0] : null;
   if (!spaceEntity) {
     const potentialSpace = mappedEntities.find((e: any) => 
@@ -1566,11 +1594,6 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
       console.log('Found potential space entity:', spaceEntity.label);
     }
   }
-  
-  const productEntities = mappedEntities.filter((e: any) =>
-    e.entityType === 'Product' || e.entity_type_name === 'Product'
-  );
-  console.log('Filtered products:', productEntities.length);
 
   // 가구가 없을 경우 빈 결과 반환
   if (furnitureEntities.length === 0) {
@@ -1578,14 +1601,15 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
     return {
       type: 'layout_simulation',
       timestamp: new Date().toISOString(),
-      asIsRecipe: { store: null, furniture: [], zones: [], products: [] },
-      toBeRecipe: { store: null, furniture: [], zones: [], products: [] },
+      asIsRecipe: { space: null, furniture: [], products: [] },
+      toBeRecipe: { space: null, furniture: [], products: [] },
       layoutChanges: [],
+      productPlacements: [],
       optimizationSummary: {
-        totalChanges: 0,
+        changesCount: 0,
+        productChangesCount: 0,
         expectedTrafficIncrease: 0,
         expectedRevenueIncrease: 0,
-        keyInsights: ['가구 데이터가 없습니다'],
         confidence: 0,
       },
       aiInsights: ['가구 데이터가 없습니다. 디지털트윈 3D에서 가구를 추가해주세요.'],
@@ -1594,7 +1618,21 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
     };
   }
 
-  // 🆕 Enhanced Store Context 구성 (Phase 1)
+  // 🆕 현재 가구-제품 관계 분석
+  const currentFurnitureProductMap = buildCurrentFurnitureProductMap(
+    storeContext.relations || [],
+    furnitureEntities,
+    productEntities
+  );
+  
+  // 관계 요약 텍스트 생성
+  const furnitureProductSummary = buildFurnitureProductSummary(
+    furnitureEntities,
+    productEntities,
+    currentFurnitureProductMap
+  );
+
+  // Enhanced Store Context 구성 (Phase 1)
   const enhancedContext: EnhancedStoreContext = {
     storeInfo: storeContext.storeInfo,
     entities: storeContext.entities || [],
@@ -1609,13 +1647,15 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
     dataQuality: storeContext.dataQuality,
   };
 
-  // 🆕 통계 기반 신뢰도 계산 (Phase 1)
+  // 통계 기반 신뢰도 계산 (Phase 1)
   const confidenceResult = calculateStatisticalConfidence(enhancedContext);
   console.log('Statistical Confidence:', confidenceResult.score, confidenceResult.explanation);
   
-  // 온톨로지 그래프 분석 실행
+  // 온톨로지 그래프 분석
   const storeWidth = storeContext.storeInfo?.width || 17.4;
   const storeDepth = storeContext.storeInfo?.depth || 16.6;
+  const halfWidth = storeWidth / 2;
+  const halfDepth = storeDepth / 2;
   
   const relations: GraphRelation[] = (storeContext.relations || []).map((r: any) => ({
     id: r.id,
@@ -1636,50 +1676,42 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
   const ontologyAnalysis = performOntologyAnalysis(allGraphEntities, relations, 'layout', storeWidth, storeDepth);
   console.log(`Layout Score: ${ontologyAnalysis.layoutInsights?.score}`);
   
-  // 🆕 통합 데이터 분석 (visits, transactions, dailySales, relations)
+  // 통합 데이터 분석
   const comprehensiveAnalysis = buildComprehensiveAnalysis(storeContext);
-  console.log('=== Comprehensive Analysis ===');
-  console.log('Visits:', comprehensiveAnalysis.visitAnalysis.totalVisits);
-  console.log('Transactions:', comprehensiveAnalysis.transactionAnalysis.totalTransactions);
-  console.log('Proximity Relations:', comprehensiveAnalysis.proximityAnalysis.totalProximityRelations);
-  console.log('Display Relations:', comprehensiveAnalysis.displayAnalysis.totalDisplayRelations);
 
-  // 중심 기준 좌표계
-  const halfWidth = storeWidth / 2;
-  const halfDepth = storeDepth / 2;
-  
-  // 경계 밖 가구 감지
-  const outOfBoundsFurniture = furnitureEntities.filter((f: any) => {
-    const x = f.position?.x || 0;
-    const z = f.position?.z || f.position?.y || 0;
-    return x < -halfWidth || x > halfWidth || z < -halfDepth || z > halfDepth;
-  });
-
+  // 가구 목록 텍스트
   const furnitureList = furnitureEntities.slice(0, 15).map((f: any) => {
     const x = f.position?.x || 0;
     const z = f.position?.z || f.position?.y || 0;
-    const isOutOfBounds = x < -halfWidth || x > halfWidth || z < -halfDepth || z > halfDepth;
-    return `- [${f.id}] ${f.label} (${f.entityType}): pos(x=${x.toFixed?.(1) || 0}, z=${z.toFixed?.(1) || 0})${isOutOfBounds ? ' ⚠️ OUT OF BOUNDS - MUST MOVE INSIDE' : ''}`;
+    const connectedProducts = currentFurnitureProductMap.get(f.id) || [];
+    return `- [${f.id}] ${f.label} (${f.entityType}): pos(x=${x.toFixed(1)}, z=${z.toFixed(1)}) - 연결된 제품: ${connectedProducts.length}개`;
   }).join('\n');
 
-  const outOfBoundsWarning = outOfBoundsFurniture.length > 0 
-    ? `\n\n⚠️ CRITICAL WARNING: ${outOfBoundsFurniture.length} furniture items are OUTSIDE store boundaries and MUST be moved inside:\n${outOfBoundsFurniture.map((f: any) => `- ${f.label}: current pos(${f.position?.x?.toFixed(1)}, ${f.position?.z?.toFixed(1)}) - INVALID`).join('\n')}`
-    : '';
+  // 🆕 제품 목록 텍스트 (AI에게 제공)
+  const productList = productEntities.slice(0, 20).map((p: any) => {
+    const x = p.position?.x || 0;
+    const z = p.position?.z || p.position?.y || 0;
+    const parentFurniture = findParentFurniture(p.id, currentFurnitureProductMap, furnitureEntities);
+    return `- [${p.id}] ${p.label}: pos(x=${x.toFixed(1)}, z=${z.toFixed(1)}) - 현재 가구: ${parentFurniture?.label || '없음'}`;
+  }).join('\n');
 
-  // 🆕 Phase 1: 강화된 프롬프트 사용
-  const prompt = buildEnhancedLayoutPrompt(
+  // 🆕 AI 프롬프트 - 가구 + 제품 최적화
+  const prompt = buildEnhancedLayoutPromptWithProducts(
     enhancedContext,
     furnitureList,
+    productList,
+    furnitureProductSummary,
     ontologyAnalysis,
     comprehensiveAnalysis,
     storeWidth,
     storeDepth,
-    outOfBoundsWarning
+    confidenceResult
   );
 
   // AI 호출
   let aiResponse: any = {
     layoutChanges: [],
+    productPlacements: [],
     optimizationSummary: { expectedTrafficIncrease: 0, expectedRevenueIncrease: 0, confidence: 50 },
     aiInsights: [],
     recommendations: [],
@@ -1687,7 +1719,7 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
   };
   
   try {
-    console.log('Calling AI API...');
+    console.log('Calling AI API for furniture + product optimization...');
     
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -1700,12 +1732,15 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
         messages: [
           {
             role: 'system',
-            content: 'You are a data-driven retail layout expert. Return ONLY valid JSON, no markdown code blocks, no explanations. Base ALL recommendations on the provided real data.'
+            content: `You are a data-driven retail layout AND product placement expert. 
+You optimize both furniture positions AND product placements on furniture.
+Return ONLY valid JSON, no markdown code blocks, no explanations.
+Base ALL recommendations on the provided real data.`
           },
           { role: 'user', content: prompt }
         ],
         temperature: 0.3,
-        max_tokens: 4000,
+        max_tokens: 6000,
       }),
     });
 
@@ -1721,6 +1756,7 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
         if (cleaned.startsWith('{')) {
           aiResponse = JSON.parse(cleaned);
           console.log('Parsed layoutChanges count:', aiResponse.layoutChanges?.length || 0);
+          console.log('Parsed productPlacements count:', aiResponse.productPlacements?.length || 0);
         }
       }
     } else {
@@ -1731,14 +1767,15 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
   }
 
   // layoutChanges 검증 및 정규화
-  const validEntityIds = new Set(furnitureEntities.map((f: any) => f.id));
+  const validFurnitureIds = new Set(furnitureEntities.map((f: any) => f.id));
+  const validProductIds = new Set(productEntities.map((p: any) => p.id));
 
   const layoutChanges = Array.isArray(aiResponse.layoutChanges) 
     ? aiResponse.layoutChanges
         .filter((c: any) => {
           if (!c.entityId || !c.suggestedPosition) return false;
-          if (!validEntityIds.has(c.entityId)) {
-            console.warn(`Invalid entityId from AI: ${c.entityId} (${c.entityLabel})`);
+          if (!validFurnitureIds.has(c.entityId)) {
+            console.warn(`Invalid furniture entityId from AI: ${c.entityId}`);
             return false;
           }
           return true;
@@ -1747,32 +1784,63 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
           const pos = c.suggestedPosition;
           const safeHalfWidth = halfWidth - 1;
           const safeHalfDepth = halfDepth - 1;
-          const clampedPosition = {
-            x: Math.max(-safeHalfWidth, Math.min(safeHalfWidth, pos.x || 0)),
-            y: pos.y || 0,
-            z: Math.max(-safeHalfDepth, Math.min(safeHalfDepth, pos.z || 0)),
-          };
-          
-          if (clampedPosition.x !== pos.x || clampedPosition.z !== pos.z) {
-            console.log(`Position clamped for ${c.entityLabel}: (${pos.x}, ${pos.z}) -> (${clampedPosition.x}, ${clampedPosition.z})`);
-          }
-          
           return {
             ...c,
-            suggestedPosition: clampedPosition,
+            suggestedPosition: {
+              x: Math.max(-safeHalfWidth, Math.min(safeHalfWidth, pos.x || 0)),
+              y: pos.y || 0,
+              z: Math.max(-safeHalfDepth, Math.min(safeHalfDepth, pos.z || 0)),
+            },
           };
         })
     : [];
 
-  console.log('Valid layoutChanges after filtering:', layoutChanges.length);
+  // 🆕 productPlacements 검증 및 정규화
+  const productPlacements = Array.isArray(aiResponse.productPlacements)
+    ? aiResponse.productPlacements
+        .filter((p: any) => {
+          if (!p.productId) return false;
+          if (!validProductIds.has(p.productId)) {
+            console.warn(`Invalid product ID from AI: ${p.productId}`);
+            return false;
+          }
+          // suggestedFurnitureId가 있으면 유효한지 확인
+          if (p.suggestedFurnitureId && !validFurnitureIds.has(p.suggestedFurnitureId)) {
+            console.warn(`Invalid suggested furniture ID: ${p.suggestedFurnitureId}`);
+            return false;
+          }
+          return true;
+        })
+        .map((p: any) => {
+          // 제품 위치도 안전 영역 내로 클램핑
+          if (p.suggestedPosition) {
+            const safeHalfWidth = halfWidth - 0.5;
+            const safeHalfDepth = halfDepth - 0.5;
+            p.suggestedPosition = {
+              x: Math.max(-safeHalfWidth, Math.min(safeHalfWidth, p.suggestedPosition.x || 0)),
+              y: p.suggestedPosition.y || 0,
+              z: Math.max(-safeHalfDepth, Math.min(safeHalfDepth, p.suggestedPosition.z || 0)),
+            };
+          }
+          return p;
+        })
+    : [];
 
-  const changesMap = new Map<string, any>();
+  console.log('Valid layoutChanges after filtering:', layoutChanges.length);
+  console.log('Valid productPlacements after filtering:', productPlacements.length);
+
+  // 변경 맵 생성
+  const furnitureChangesMap = new Map<string, any>();
   layoutChanges.forEach((c: any) => {
-    changesMap.set(c.entityId, c);
+    furnitureChangesMap.set(c.entityId, c);
   });
 
-  // spaceEntity는 상단에서 이미 정의됨
-  
+  const productChangesMap = new Map<string, any>();
+  productPlacements.forEach((p: any) => {
+    productChangesMap.set(p.productId, p);
+  });
+
+  // 🆕 레시피 빌더 (가구 + 제품 모두 변경 적용)
   const buildRecipe = (mode: 'current' | 'suggested') => ({
     space: spaceEntity ? {
       id: spaceEntity.id,
@@ -1784,8 +1852,9 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
       model_url: spaceEntity.model3dUrl || spaceEntity.model_3d_url || null,
       dimensions: spaceEntity.dimensions || spaceEntity.model_3d_dimensions || null,
     } : null,
+    
     furniture: furnitureEntities.map((f: any) => {
-      const change = changesMap.get(f.id);
+      const change = furnitureChangesMap.get(f.id);
       const position = (mode === 'suggested' && change?.suggestedPosition) 
         ? change.suggestedPosition 
         : f.position;
@@ -1804,18 +1873,41 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
         isChanged: mode === 'suggested' && !!change,
       };
     }),
-    products: productEntities.map((p: any) => ({
-      id: p.id,
-      type: 'product',
-      product_id: p.id,
-      sku: p.label,
-      label: p.label,
-      position: p.position || { x: 0, y: 0, z: 0 },
-      rotation: p.rotation || { x: 0, y: 0, z: 0 },
-      scale: p.scale || { x: 1, y: 1, z: 1 },
-      model_url: p.model3dUrl || p.model_3d_url || null,
-      dimensions: p.dimensions || p.model_3d_dimensions || null,
-    })),
+    
+    // 🆕 제품도 AI 추천 위치 적용
+    products: productEntities.map((p: any) => {
+      const change = productChangesMap.get(p.id);
+      const position = (mode === 'suggested' && change?.suggestedPosition)
+        ? change.suggestedPosition
+        : (p.position || { x: 0, y: 0, z: 0 });
+      
+      // 현재 부모 가구
+      const currentParent = findParentFurniture(p.id, currentFurnitureProductMap, furnitureEntities);
+      // 추천 부모 가구
+      const suggestedParent = change?.suggestedFurnitureId 
+        ? furnitureEntities.find((f: any) => f.id === change.suggestedFurnitureId)
+        : null;
+      
+      return {
+        id: p.id,
+        type: 'product',
+        product_id: p.id,
+        sku: p.label,
+        label: p.label,
+        position: position,
+        rotation: p.rotation || { x: 0, y: 0, z: 0 },
+        scale: p.scale || { x: 1, y: 1, z: 1 },
+        model_url: p.model3dUrl || p.model_3d_url || null,
+        dimensions: p.dimensions || p.model_3d_dimensions || null,
+        isChanged: mode === 'suggested' && !!change,
+        // 🆕 가구 연결 정보
+        currentFurnitureId: currentParent?.id || null,
+        currentFurnitureLabel: currentParent?.label || null,
+        suggestedFurnitureId: (mode === 'suggested' && suggestedParent) ? suggestedParent.id : currentParent?.id,
+        suggestedFurnitureLabel: (mode === 'suggested' && suggestedParent) ? suggestedParent.label : currentParent?.label,
+        furnitureChanged: mode === 'suggested' && change?.suggestedFurnitureId && change.suggestedFurnitureId !== currentParent?.id,
+      };
+    }),
   });
   
   const rawConfidence = aiResponse.optimizationSummary?.confidence || confidenceResult.score;
@@ -1826,18 +1918,24 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
     timestamp: new Date().toISOString(),
     asIsRecipe: buildRecipe('current'),
     toBeRecipe: buildRecipe('suggested'),
+    
+    // 가구 변경
     layoutChanges: layoutChanges,
+    
+    // 🆕 제품 배치 변경
+    productPlacements: productPlacements,
+    
     optimizationSummary: {
       expectedTrafficIncrease: aiResponse.optimizationSummary?.expectedTrafficIncrease || 0,
       expectedRevenueIncrease: aiResponse.optimizationSummary?.expectedRevenueIncrease || 0,
       expectedConversionIncrease: aiResponse.optimizationSummary?.expectedConversionIncrease || 0,
       changesCount: layoutChanges.length,
+      productChangesCount: productPlacements.length,  // 🆕
       confidence: normalizedConfidence,
-      // 🆕 Phase 1 추가 필드
       confidenceFactors: confidenceResult.factors,
       confidenceExplanation: confidenceResult.explanation,
     },
-    // 🆕 Phase 1 추가 필드
+    
     dataBasedInsights: aiResponse.dataBasedInsights || [],
     aiInsights: Array.isArray(aiResponse.aiInsights) ? aiResponse.aiInsights : [],
     recommendations: Array.isArray(aiResponse.recommendations) ? aiResponse.recommendations : [],
@@ -1857,11 +1955,234 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
 
   console.log('=== Layout Simulation Complete ===');
   console.log('asIsRecipe furniture count:', result.asIsRecipe.furniture.length);
+  console.log('asIsRecipe products count:', result.asIsRecipe.products.length);
   console.log('toBeRecipe furniture count:', result.toBeRecipe.furniture.length);
+  console.log('toBeRecipe products count:', result.toBeRecipe.products.length);
   console.log('layoutChanges count:', result.layoutChanges.length);
+  console.log('productPlacements count:', result.productPlacements.length);
   console.log('confidence:', result.optimizationSummary.confidence);
 
   return result;
+}
+
+
+// ============================================================================
+// 헬퍼 함수들
+// ============================================================================
+
+// 현재 가구-제품 관계 맵 생성
+function buildCurrentFurnitureProductMap(
+  relations: any[], 
+  furnitureEntities: any[], 
+  productEntities: any[]
+): Map<string, any[]> {
+  const furnitureProductMap = new Map<string, any[]>();
+  
+  // 모든 가구에 대해 빈 배열 초기화
+  furnitureEntities.forEach((f: any) => {
+    furnitureProductMap.set(f.id, []);
+  });
+  
+  // DISPLAYED_ON_FURNITURE 관계 찾기
+  const displayRelations = relations.filter((r: any) => {
+    const typeName = (r.relation_type_name || r.ontology_relation_types?.name || '').toLowerCase();
+    return typeName.includes('display') || typeName === 'displayed_on_furniture';
+  });
+  
+  // 관계 기반 매핑
+  displayRelations.forEach((rel: any) => {
+    const productId = rel.source_entity_id || rel.sourceEntityId;
+    const furnitureId = rel.target_entity_id || rel.targetEntityId;
+    
+    const product = productEntities.find((p: any) => p.id === productId);
+    if (product && furnitureProductMap.has(furnitureId)) {
+      furnitureProductMap.get(furnitureId)!.push(product);
+    }
+  });
+  
+  // 관계가 없는 경우: 위치 기반 근접성으로 매핑 (fallback)
+  productEntities.forEach((product: any) => {
+    let alreadyMapped = false;
+    furnitureProductMap.forEach((products) => {
+      if (products.some((p: any) => p.id === product.id)) {
+        alreadyMapped = true;
+      }
+    });
+    
+    if (!alreadyMapped && product.position) {
+      let closestFurniture: any = null;
+      let minDistance = Infinity;
+      
+      furnitureEntities.forEach((furniture: any) => {
+        if (furniture.position) {
+          const dx = (product.position.x || 0) - (furniture.position.x || 0);
+          const dz = (product.position.z || product.position.y || 0) - (furniture.position.z || furniture.position.y || 0);
+          const distance = Math.sqrt(dx * dx + dz * dz);
+          
+          if (distance < 3 && distance < minDistance) {
+            minDistance = distance;
+            closestFurniture = furniture;
+          }
+        }
+      });
+      
+      if (closestFurniture) {
+        furnitureProductMap.get(closestFurniture.id)!.push(product);
+      }
+    }
+  });
+  
+  return furnitureProductMap;
+}
+
+// 부모 가구 찾기
+function findParentFurniture(
+  productId: string, 
+  furnitureProductMap: Map<string, any[]>,
+  furnitureEntities: any[]
+): any | null {
+  for (const [furnitureId, products] of furnitureProductMap.entries()) {
+    if (products.some((p: any) => p.id === productId)) {
+      return furnitureEntities.find((f: any) => f.id === furnitureId);
+    }
+  }
+  return null;
+}
+
+// 가구-제품 관계 요약 텍스트 생성
+function buildFurnitureProductSummary(
+  furnitureEntities: any[],
+  productEntities: any[],
+  furnitureProductMap: Map<string, any[]>
+): string {
+  const lines: string[] = ['=== 🪑↔️📦 현재 가구-제품 연결 현황 ==='];
+  
+  furnitureEntities.forEach((f: any) => {
+    const products = furnitureProductMap.get(f.id) || [];
+    if (products.length > 0) {
+      lines.push(`\n${f.label} (${f.entityType}):`);
+      products.forEach((p: any) => {
+        lines.push(`  - ${p.label}`);
+      });
+    } else {
+      lines.push(`\n${f.label}: 연결된 제품 없음 ⚠️`);
+    }
+  });
+  
+  // 연결되지 않은 제품
+  const unconnectedProducts = productEntities.filter((p: any) => {
+    for (const products of furnitureProductMap.values()) {
+      if (products.some((prod: any) => prod.id === p.id)) {
+        return false;
+      }
+    }
+    return true;
+  });
+  
+  if (unconnectedProducts.length > 0) {
+    lines.push(`\n⚠️ 가구에 연결되지 않은 제품 (${unconnectedProducts.length}개):`);
+    unconnectedProducts.slice(0, 5).forEach((p: any) => {
+      lines.push(`  - ${p.label} at (${p.position?.x?.toFixed(1) || 0}, ${p.position?.z?.toFixed(1) || 0})`);
+    });
+  }
+  
+  return lines.join('\n');
+}
+
+
+// 🆕 가구 + 제품 최적화를 위한 강화된 프롬프트
+function buildEnhancedLayoutPromptWithProducts(
+  context: EnhancedStoreContext,
+  furnitureList: string,
+  productList: string,
+  furnitureProductSummary: string,
+  ontologyAnalysis: any,
+  comprehensiveAnalysis: any,
+  storeWidth: number,
+  storeDepth: number,
+  confidenceResult: any
+): string {
+  const halfWidth = storeWidth / 2;
+  const halfDepth = storeDepth / 2;
+  const enhancedDataSection = buildEnhancedDataPrompt(context);
+
+  return `You are a retail store layout AND product placement optimization expert with access to REAL business data.
+
+${enhancedDataSection}
+
+=== 🔬 온톨로지 그래프 분석 ===
+${ontologyAnalysis?.summaryForAI || '온톨로지 분석 없음'}
+
+${comprehensiveAnalysis?.comprehensiveSummary || ''}
+
+${furnitureProductSummary}
+
+=== 📐 매장 경계 (중심 기준 좌표계) ===
+- 매장 크기: ${storeWidth}m x ${storeDepth}m
+- X축 범위: -${halfWidth.toFixed(1)} ~ +${halfWidth.toFixed(1)}
+- Z축 범위: -${halfDepth.toFixed(1)} ~ +${halfDepth.toFixed(1)}
+- 가구 안전 영역: X ±${(halfWidth - 1).toFixed(1)}, Z ±${(halfDepth - 1).toFixed(1)}
+- 제품 안전 영역: X ±${(halfWidth - 0.5).toFixed(1)}, Z ±${(halfDepth - 0.5).toFixed(1)}
+
+=== 🪑 현재 가구 배치 ===
+${furnitureList}
+
+=== 📦 현재 제품 배치 ===
+${productList}
+
+=== 📊 분석 신뢰도: ${confidenceResult.score}% ===
+신뢰도 근거: ${confidenceResult.explanation}
+
+=== 💡 최적화 목표 ===
+1. **가구 배치 최적화**: 3-5개의 가구 이동 제안
+2. **제품 배치 최적화**: 제품을 더 적합한 가구로 재배치하거나 위치 조정 제안
+   - 인기 상품은 매장 뒤쪽 (목적지 구역)
+   - 신상품/프로모션 상품은 입구 근처 (파워월)
+   - 연관 상품은 인접 배치 (크로스셀)
+   - 고마진 상품은 눈높이/접근성 좋은 위치
+
+CRITICAL RULES:
+1. 모든 위치는 반드시 안전 영역 내여야 함
+2. 제품 위치는 해당 가구 위/근처여야 함 (가구 위치 + 오프셋)
+3. 실제 데이터가 지적하는 문제점을 우선 해결
+
+Return ONLY valid JSON (no markdown):
+{
+  "layoutChanges": [
+    {
+      "entityId": "furniture-uuid",
+      "entityLabel": "가구 이름",
+      "entityType": "Shelf",
+      "currentPosition": {"x": 0, "y": 0, "z": 0},
+      "suggestedPosition": {"x": 0, "y": 0, "z": 0},
+      "reason": "📊 [데이터 근거] 이동 이유",
+      "impact": "high|medium|low"
+    }
+  ],
+  "productPlacements": [
+    {
+      "productId": "product-uuid",
+      "productLabel": "제품 이름",
+      "currentFurnitureId": "current-furniture-uuid",
+      "currentFurnitureLabel": "현재 가구 이름",
+      "suggestedFurnitureId": "new-furniture-uuid",
+      "suggestedFurnitureLabel": "추천 가구 이름",
+      "suggestedPosition": {"x": 0, "y": 1.2, "z": 0},
+      "reason": "📊 [배치 이유] 예: 인기상품을 매장 뒤쪽으로 이동하여 고객 동선 유도",
+      "impact": "high|medium|low"
+    }
+  ],
+  "optimizationSummary": {
+    "expectedTrafficIncrease": 15,
+    "expectedRevenueIncrease": 8,
+    "expectedConversionIncrease": 3,
+    "confidence": ${confidenceResult.score}
+  },
+  "dataBasedInsights": ["인사이트1", "인사이트2"],
+  "aiInsights": ["종합 인사이트"],
+  "recommendations": ["추천"]
+}`
+;
 }
 
 // Business Goal Analysis
