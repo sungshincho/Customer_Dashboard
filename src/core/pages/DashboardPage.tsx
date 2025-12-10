@@ -11,8 +11,10 @@ import { Button } from "@/components/ui/button";
 import { useClearCache } from "@/hooks/useClearCache";
 import { format } from "date-fns";
 import { FunnelVisualization } from "@/components/dashboard/FunnelVisualization";
-import { AIRecommendationCard } from "@/components/dashboard/AIRecommendationCard";
+import { AIRecommendationCard, AIRecommendationEffectWidget } from "@/components/dashboard";
 import { DashboardFilters } from "@/components/dashboard/DashboardFilters";
+import { GlobalDateFilter } from "@/components/common/GlobalDateFilter";
+import { useDateFilterStore } from "@/store/dateFilterStore";
 import { useDashboardKPI, useLatestKPIs } from "@/hooks/useDashboardKPI";
 import { useAIRecommendations } from "@/hooks/useAIRecommendations";
 import { supabase } from "@/integrations/supabase/client";
@@ -276,14 +278,19 @@ const Dashboard = () => {
       <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="animate-fade-in flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold gradient-text">실시간 대시보드</h1>
-            <p className="mt-2 text-muted-foreground">
-              {selectedStore ? `${selectedStore.store_name} - 매장 운영 현황 및 주요 지표` : '매장 운영 현황 및 주요 지표'}
-            </p>
+        <div className="animate-fade-in flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold gradient-text">실시간 대시보드</h1>
+              <p className="mt-2 text-muted-foreground">
+                {selectedStore ? `${selectedStore.store_name} - 매장 운영 현황 및 주요 지표` : '매장 운영 현황 및 주요 지표'}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <GlobalDateFilter compact />
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-end gap-2">
             <DashboardFilters 
               selectedDate={selectedDate}
               onDateChange={(date) => date && setSelectedDate(date)}
@@ -362,8 +369,8 @@ const Dashboard = () => {
         {/* AI 추천 및 퍼널 섹션 */}
         <div className="grid gap-6 lg:grid-cols-2">
           {/* AI 추천 */}
-          <div className="animate-slide-up">
-            <AIRecommendationCard 
+          <div className="animate-slide-up space-y-4">
+            <AIRecommendationCard
               recommendations={recommendations || []}
               onDismiss={(id) => dismissRecommendation.mutate(id)}
             />
@@ -371,7 +378,7 @@ const Dashboard = () => {
               <Button
                 onClick={async () => {
                   await handleGenerateRecommendations();
-                  
+
                   // Activity logging
                   logActivity('feature_use', {
                     feature: 'ai_recommendation_generate',
@@ -381,13 +388,15 @@ const Dashboard = () => {
                 }}
                 variant="outline"
                 size="sm"
-                className="mt-4 w-full gap-2"
+                className="w-full gap-2"
                 disabled={generateRecommendations.isPending}
               >
                 <Sparkles className="w-4 h-4" />
                 {generateRecommendations.isPending ? 'AI 분석 중...' : 'AI 추천 생성'}
               </Button>
             )}
+            {/* AI 추천 효과 위젯 */}
+            <AIRecommendationEffectWidget />
           </div>
 
           {/* 고객 퍼널 */}

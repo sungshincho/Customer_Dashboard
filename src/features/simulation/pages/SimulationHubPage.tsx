@@ -74,6 +74,10 @@ import { IntegratedDataAnalysis } from '../components/IntegratedDataAnalysis';
 import { ROIResultCard, ROISummaryCard } from '../components/ROIResultCard';
 import { useApplyRecommendation } from '@/hooks/useROITracking';
 
+// 전역 기간 필터
+import { GlobalDateFilter } from '@/components/common/GlobalDateFilter';
+import { useDateFilterStore } from '@/store/dateFilterStore';
+
 /**
  * 데이터 품질 상태 타입
  */
@@ -148,12 +152,16 @@ export default function SimulationHubPage() {
     console.log('🔍 selectedStore 전체:', selectedStore);
   }, [selectedStore]);
 
-  // ✅ 실제 데이터를 가져오는 Hook
-  const { 
-    contextData, 
-    loading: contextLoading, 
+  // 전역 기간 필터
+  const { dateRange, getDays } = useDateFilterStore();
+  const days = getDays();
+
+  // ✅ 실제 데이터를 가져오는 Hook (전역 기간 필터 적용)
+  const {
+    contextData,
+    loading: contextLoading,
     error: contextError,
-  } = useStoreContext(selectedStore?.id);
+  } = useStoreContext(selectedStore?.id, days);
 
   // Phase 2: 데이터 소스 매핑
   const {
@@ -655,31 +663,34 @@ export default function SimulationHubPage() {
               지식 그래프 기반 AI 추론으로 매장 운영 최적화
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant={autoSave ? "default" : "outline"}
-              size="sm"
-              onClick={() => setAutoSave(!autoSave)}
-              className="gap-1"
-            >
-              <Save className="h-4 w-4" />
-              {autoSave ? '자동저장' : '수동저장'}
-            </Button>
-            <Button
-              variant={useOntologyMode ? "default" : "outline"}
-              size="sm"
-              onClick={() => setUseOntologyMode(!useOntologyMode)}
-              className="gap-1"
-            >
-              <Brain className="h-4 w-4" />
-              온톨로지 {useOntologyMode ? 'ON' : 'OFF'}
-            </Button>
-            {isAdmin && (
-              <Badge variant="outline" className="gap-1">
-                <Info className="h-3 w-3" />
-                관리자
-              </Badge>
-            )}
+          <div className="flex flex-col items-end gap-2">
+            <GlobalDateFilter compact />
+            <div className="flex items-center gap-2">
+              <Button
+                variant={autoSave ? "default" : "outline"}
+                size="sm"
+                onClick={() => setAutoSave(!autoSave)}
+                className="gap-1"
+              >
+                <Save className="h-4 w-4" />
+                {autoSave ? '자동저장' : '수동저장'}
+              </Button>
+              <Button
+                variant={useOntologyMode ? "default" : "outline"}
+                size="sm"
+                onClick={() => setUseOntologyMode(!useOntologyMode)}
+                className="gap-1"
+              >
+                <Brain className="h-4 w-4" />
+                온톨로지 {useOntologyMode ? 'ON' : 'OFF'}
+              </Button>
+              {isAdmin && (
+                <Badge variant="outline" className="gap-1">
+                  <Info className="h-3 w-3" />
+                  관리자
+                </Badge>
+              )}
+            </div>
           </div>
         </div>
 
