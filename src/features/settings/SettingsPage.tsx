@@ -45,14 +45,14 @@ import {
 } from 'lucide-react';
 import { useActivityLogger } from '@/hooks/useActivityLogger';
 import { useLocation } from 'react-router-dom';
-import { useStores } from '@/hooks/useStores';
+import { useSelectedStore } from '@/hooks/useSelectedStore';
 
 export default function SettingsPage() {
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
   const location = useLocation();
   const { user, orgId, orgName, role, licenseType, licenseStatus, isOrgHQ, isOrgStore } = useAuth();
-  const { stores, loading: storesLoading, refreshStores } = useStores();
+  const { stores, loading: storesLoading, refreshStores } = useSelectedStore();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('stores');
 
