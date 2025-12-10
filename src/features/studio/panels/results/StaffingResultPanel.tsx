@@ -1,0 +1,118 @@
+/**
+ * StaffingResultPanel.tsx
+ *
+ * 인력 배치 최적화 시뮬레이션 결과 패널
+ */
+
+import { DraggablePanel } from '../../components/DraggablePanel';
+import { UserCheck, ArrowRight, MapPin } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+
+export interface StaffingResult {
+  currentCoverage: number;
+  optimizedCoverage: number;
+  staffCount: number;
+  staffPositions: {
+    name: string;
+    current: string;
+    suggested: string;
+    coverageGain: string;
+  }[];
+  improvements: {
+    metric: string;
+    value: string;
+  }[];
+}
+
+interface StaffingResultPanelProps {
+  result: StaffingResult;
+  onClose: () => void;
+  onApply: () => void;
+  onShowPositions: () => void;
+  defaultPosition?: { x: number; y: number };
+}
+
+export const StaffingResultPanel: React.FC<StaffingResultPanelProps> = ({
+  result,
+  onClose,
+  onApply,
+  onShowPositions,
+  defaultPosition = { x: 640, y: 320 },
+}) => {
+  const improvement = result.optimizedCoverage - result.currentCoverage;
+
+  return (
+    <DraggablePanel
+      id="staffing-result"
+      title="인력 배치 최적화 결과"
+      icon={<UserCheck className="w-4 h-4" />}
+      defaultPosition={defaultPosition}
+      closable
+      onClose={onClose}
+      width="w-72"
+    >
+      {/* 커버리지 */}
+      <div className="mb-3">
+        <p className="text-xs text-white/50 mb-1">매장 커버리지</p>
+        <div className="flex items-center gap-2">
+          <span className="text-lg text-white/60">{result.currentCoverage}%</span>
+          <ArrowRight className="w-4 h-4 text-white/40" />
+          <span className="text-lg text-white font-semibold">{result.optimizedCoverage}%</span>
+          <span className="text-xs px-1.5 py-0.5 rounded bg-green-500/20 text-green-400">
+            +{improvement}%p
+          </span>
+        </div>
+      </div>
+
+      {/* 직원별 배치 제안 */}
+      <div className="mb-3">
+        <p className="text-xs text-white/50 mb-2 flex items-center gap-1">
+          <MapPin className="w-3 h-3 text-blue-400" />
+          배치 제안 ({result.staffCount}명)
+        </p>
+        <div className="space-y-2 max-h-32 overflow-y-auto">
+          {result.staffPositions.map((staff, i) => (
+            <div key={i} className="text-xs bg-white/5 rounded p-2">
+              <p className="text-white font-medium">{staff.name}</p>
+              <p className="text-white/40">{staff.current} → {staff.suggested}</p>
+              <p className="text-green-400">{staff.coverageGain}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 예상 효과 */}
+      <div>
+        <p className="text-xs text-white/50 mb-2">예상 효과</p>
+        <div className="space-y-1">
+          {result.improvements.map((imp, i) => (
+            <div key={i} className="flex justify-between text-xs">
+              <span className="text-white/60">{imp.metric}</span>
+              <span className="text-green-400">{imp.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex gap-2 mt-3">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onShowPositions}
+          className="flex-1 h-8 text-xs bg-white/10 hover:bg-white/20 text-white"
+        >
+          배치 보기
+        </Button>
+        <Button
+          size="sm"
+          onClick={onApply}
+          className="flex-1 h-8 text-xs"
+        >
+          적용하기
+        </Button>
+      </div>
+    </DraggablePanel>
+  );
+};
+
+export default StaffingResultPanel;
