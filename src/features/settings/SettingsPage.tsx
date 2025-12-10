@@ -42,10 +42,16 @@ import {
   Eye,
   Edit,
   MapPin,
+  Network,
+  Boxes,
 } from 'lucide-react';
 import { useActivityLogger } from '@/hooks/useActivityLogger';
 import { useLocation } from 'react-router-dom';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
+
+// 온톨로지 컴포넌트
+import { OntologyGraph3D } from '@/features/data-management/ontology/components/OntologyGraph3D';
+import { MasterSchemaSync } from '@/features/data-management/ontology/components/MasterSchemaSync';
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -535,46 +541,78 @@ export default function SettingsPage() {
 
           {/* 2. 데이터 관리 탭 */}
           <TabsContent value="data" className="space-y-4">
-            <div className="grid gap-4 lg:grid-cols-2">
+            {/* 데이터 현황 카드 */}
+            <div className="grid gap-4 lg:grid-cols-3">
               <Card>
-                <CardHeader>
-                  <CardTitle>데이터 현황</CardTitle>
-                  <CardDescription>온톨로지 및 그래프 데이터</CardDescription>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Boxes className="h-4 w-4 text-muted-foreground" />
+                    그래프 엔티티
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-4 border rounded-lg">
-                      <div className="text-3xl font-bold">{importStatus.totalEntities}</div>
-                      <p className="text-sm text-muted-foreground">엔티티</p>
-                    </div>
-                    <div className="text-center p-4 border rounded-lg">
-                      <div className="text-3xl font-bold">{importStatus.totalRelations}</div>
-                      <p className="text-sm text-muted-foreground">관계</p>
-                    </div>
-                  </div>
-                  <Button variant="outline" className="w-full gap-2">
-                    <RefreshCw className="h-4 w-4" />
-                    데이터 동기화
-                  </Button>
+                <CardContent>
+                  <div className="text-3xl font-bold">{importStatus.totalEntities}</div>
+                  <p className="text-xs text-muted-foreground">데이터베이스 저장 엔티티</p>
                 </CardContent>
               </Card>
 
               <Card>
-                <CardHeader>
-                  <CardTitle>데이터 가져오기</CardTitle>
-                  <CardDescription>CSV, Excel 파일 업로드</CardDescription>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Network className="h-4 w-4 text-muted-foreground" />
+                    그래프 관계
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="border-2 border-dashed rounded-lg p-8 text-center">
-                    <Upload className="h-8 w-8 mx-auto mb-4 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground mb-2">파일을 드래그하거나 클릭하여 업로드</p>
+                <CardContent>
+                  <div className="text-3xl font-bold">{importStatus.totalRelations}</div>
+                  <p className="text-xs text-muted-foreground">엔티티 간 연결</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Database className="h-4 w-4 text-muted-foreground" />
+                    데이터 가져오기
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                    <Upload className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
                     <p className="text-xs text-muted-foreground">CSV, XLSX 지원</p>
                   </div>
-                  <Button variant="outline" className="w-full">파일 선택</Button>
+                  <Button variant="outline" size="sm" className="w-full">파일 선택</Button>
                 </CardContent>
               </Card>
             </div>
 
+            {/* 마스터 스키마 동기화 */}
+            <MasterSchemaSync />
+
+            {/* 온톨로지 3D 시각화 */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Network className="h-5 w-5 text-primary" />
+                      온톨로지 스키마 뷰어
+                    </CardTitle>
+                    <CardDescription>
+                      리테일 비즈니스 도메인의 엔티티와 관계를 3D 그래프로 시각화
+                    </CardDescription>
+                  </div>
+                  <Badge variant="outline" className="bg-primary/10">리테일 전문</Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="w-full h-[500px] bg-background/50 backdrop-blur-sm rounded-lg border border-border/50">
+                  <OntologyGraph3D />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* API 연동 */}
             <Card>
               <CardHeader>
                 <CardTitle>API 연동</CardTitle>
@@ -584,7 +622,7 @@ export default function SettingsPage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <div className="h-10 w-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
                         <Link className="h-5 w-5 text-blue-600" />
                       </div>
                       <div>
@@ -596,7 +634,7 @@ export default function SettingsPage() {
                   </div>
                   <div className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 bg-green-100 rounded-lg flex items-center justify-center">
+                      <div className="h-10 w-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
                         <Link className="h-5 w-5 text-green-600" />
                       </div>
                       <div>
