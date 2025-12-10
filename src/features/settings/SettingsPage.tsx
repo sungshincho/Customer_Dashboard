@@ -606,7 +606,7 @@ export default function SettingsPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="w-full h-[500px] bg-background/50 backdrop-blur-sm rounded-lg border border-border/50">
+                <div className="w-full h-[70vh] min-h-[600px] bg-background/50 backdrop-blur-sm rounded-lg border border-border/50">
                   <OntologyGraph3D />
                 </div>
               </CardContent>

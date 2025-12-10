@@ -114,9 +114,9 @@ export function OntologyGraph3D() {
   }
 
   return (
-    <div className="flex gap-4 w-full h-full">
+    <div className="flex gap-4 w-full h-full p-2">
       {/* 좌측 3D 그래프 영역 */}
-      <div className="flex-1 min-h-[650px] flex flex-col">
+      <div className="flex-1 flex flex-col min-h-0">
         {/* 검색창 */}
         <div className="mb-3">
           <div className="relative">
@@ -203,7 +203,7 @@ export function OntologyGraph3D() {
           )}
         </div>
 
-        <div className="flex-1">
+        <div className="flex-1 min-h-0">
           <SchemaGraph3D
             nodes={filteredNodes}
             links={filteredLinks}
@@ -215,7 +215,7 @@ export function OntologyGraph3D() {
         </div>
 
         {/* 통계 정보 */}
-        <div className="mt-4 grid grid-cols-4 gap-3 bg-black/60 border border-white/10 rounded-lg p-4">
+        <div className="mt-3 grid grid-cols-4 gap-3 bg-black/60 border border-white/10 rounded-lg p-3 flex-shrink-0">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-blue-400" />
             <div className="text-xs">
@@ -248,8 +248,8 @@ export function OntologyGraph3D() {
       </div>
 
       {/* 우측 선택 노드 상세 패널 */}
-      <div className="w-80 bg-black/60 border border-white/10 rounded-lg p-3 text-xs text-gray-200">
-        <div className="font-semibold text-sm mb-2">Node Details</div>
+      <div className="w-80 bg-black/60 border border-white/10 rounded-lg p-3 text-xs text-gray-200 overflow-y-auto flex-shrink-0">
+        <div className="font-semibold text-sm mb-2 sticky top-0 bg-black/60 pb-2">Node Details</div>
         {selectedNode ? (
           <div className="space-y-2">
             <div>
