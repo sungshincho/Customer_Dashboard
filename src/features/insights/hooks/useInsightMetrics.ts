@@ -86,17 +86,14 @@ export const useInsightMetrics = () => {
       const totalReturning = kpis?.reduce((sum, k) => sum + (k.returning_visitors || 0), 0) || 0;
 
       // 2. funnel_events에서 퍼널 데이터 및 Unique Visitors
-      // store_id로만 필터링 (org_id는 옵션으로 - 데이터 누락 방지)
-      let funnelQuery = supabase
+      // store_id로만 필터링 + 충분한 limit 설정 (기본 1000개 제한 해제)
+      const { data: funnelData, error: funnelError } = await supabase
         .from('funnel_events')
         .select('event_type, visitor_id')
         .eq('store_id', selectedStore.id)
         .gte('event_date', startDate)
-        .lte('event_date', endDate);
-
-      // org_id가 있으면 추가 필터 (없으면 store_id만으로 조회)
-      // 참고: 일부 데이터가 org_id 없이 저장되어 있을 수 있음
-      const { data: funnelData, error: funnelError } = await funnelQuery;
+        .lte('event_date', endDate)
+        .limit(50000); // 기본 1000개 limit 해제
 
       // 디버깅 로그
       console.log('[useInsightMetrics] Funnel query:', {
@@ -105,7 +102,6 @@ export const useInsightMetrics = () => {
         endDate,
         resultCount: funnelData?.length || 0,
         error: funnelError?.message,
-        sampleEvents: funnelData?.slice(0, 3),
       });
 
       // 이벤트 타입별 고유 방문자 수
@@ -176,7 +172,8 @@ export const useInsightMetrics = () => {
         .select('event_type, visitor_id')
         .eq('store_id', selectedStore.id)
         .gte('event_date', prevStartDate.toISOString().split('T')[0])
-        .lte('event_date', prevEndDate.toISOString().split('T')[0]);
+        .lte('event_date', prevEndDate.toISOString().split('T')[0])
+        .limit(50000);
 
       const prevEntry = new Set(prevFunnelData?.filter(f => f.event_type === 'entry').map(f => f.visitor_id)).size;
       const prevPurchase = new Set(prevFunnelData?.filter(f => f.event_type === 'purchase').map(f => f.visitor_id)).size;
