@@ -14,6 +14,7 @@ import { FunnelVisualization } from "@/components/dashboard/FunnelVisualization"
 import { AIRecommendationCard, AIRecommendationEffectWidget } from "@/components/dashboard";
 import { DashboardFilters } from "@/components/dashboard/DashboardFilters";
 import { GlobalDateFilter } from "@/components/common/GlobalDateFilter";
+import { GoalProgressWidget } from "@/components/goals/GoalProgressWidget";
 import { useDateFilterStore } from "@/store/dateFilterStore";
 import { useDashboardKPI, useLatestKPIs } from "@/hooks/useDashboardKPI";
 import { useAIRecommendations } from "@/hooks/useAIRecommendations";
@@ -525,39 +526,45 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        {/* Recent Alerts */}
-        <Card className="animate-slide-up hover-lift">
-          <CardHeader>
-            <CardTitle>최근 알림</CardTitle>
-            <CardDescription>실시간 이벤트 및 알림</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {alerts.length > 0 ? (
-              <div className="space-y-4">
-                {alerts.map((alert, idx) => (
-                  <div
-                    key={idx}
-                    className={`flex items-start gap-4 rounded-lg border p-4 ${alertTypeStyles[alert.type]}`}
-                  >
-                    <alert.icon className="h-5 w-5 mt-0.5" />
-                    <div className="flex-1 space-y-1">
-                      <p className="text-sm font-medium leading-none">{alert.title}</p>
-                      <p className="text-xs opacity-80 flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {alert.time}
-                      </p>
+        {/* 목표 달성률 및 최근 알림 */}
+        <div className="grid gap-6 lg:grid-cols-2 animate-slide-up">
+          {/* 목표 달성률 */}
+          <GoalProgressWidget />
+
+          {/* Recent Alerts */}
+          <Card className="hover-lift">
+            <CardHeader>
+              <CardTitle>최근 알림</CardTitle>
+              <CardDescription>실시간 이벤트 및 알림</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {alerts.length > 0 ? (
+                <div className="space-y-4">
+                  {alerts.map((alert, idx) => (
+                    <div
+                      key={idx}
+                      className={`flex items-start gap-4 rounded-lg border p-4 ${alertTypeStyles[alert.type]}`}
+                    >
+                      <alert.icon className="h-5 w-5 mt-0.5" />
+                      <div className="flex-1 space-y-1">
+                        <p className="text-sm font-medium leading-none">{alert.title}</p>
+                        <p className="text-xs opacity-80 flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {alert.time}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <AlertCircle className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>현재 알림이 없습니다</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <AlertCircle className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>현재 알림이 없습니다</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </DashboardLayout>
     </DataReadinessGuard>

@@ -1,8 +1,9 @@
-import { Bell, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { useAuth } from "@/hooks/useAuth";
 import {
   DropdownMenu,
@@ -35,9 +36,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             <SidebarTrigger />
             <div className="flex-1" />
             <ThemeToggle />
-            <Button variant="ghost" size="icon">
-              <Bell className="h-5 w-5" />
-            </Button>
+            <NotificationCenter />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="rounded-full">

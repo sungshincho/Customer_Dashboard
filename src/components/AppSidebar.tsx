@@ -1,25 +1,9 @@
-import { 
-  LayoutDashboard, 
-  Store, 
+import {
+  LayoutDashboard,
+  Store,
   Settings,
-  Users,
-  Activity,
-  Map,
-  Filter,
-  UserCheck,
-  Package,
-  DollarSign,
-  Target,
-  TrendingUp,
-  Grid3x3,
-  TestTube,
-  Boxes,
-  Upload,
-  Network,
-  Database,
-  Zap,
-  Cpu,
-  ChevronDown,
+  Box,
+  BarChart3,
   LucideIcon
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
@@ -37,73 +21,42 @@ import {
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 
 interface MenuItem {
   title: string;
   url: string;
   icon: LucideIcon;
-}
-
-interface MenuSection {
-  id: string;
-  label: string;
   emoji: string;
-  items: MenuItem[];
-  defaultOpen: boolean;
+  description: string;
 }
 
-// A. Overview (4 pages)
-const overviewItems: MenuItem[] = [
-  { title: "대시보드", url: "/overview/dashboard", icon: LayoutDashboard },
-  { title: "매장 관리", url: "/overview/stores", icon: Store },
-  { title: "HQ-매장 커뮤니케이션", url: "/overview/hq-communication", icon: Network },
-  { title: "설정", url: "/overview/settings", icon: Settings },
-];
-
-// B, C, D 섹션
-const menuSections: MenuSection[] = [
+// 3개 메인 메뉴로 단순화
+const mainMenuItems: MenuItem[] = [
   {
-    id: "analysis",
-    label: "매장 현황 분석",
+    title: "인사이트 허브",
+    url: "/insights",
+    icon: BarChart3,
     emoji: "📊",
-    defaultOpen: true,
-    items: [
-      { title: "매장 분석", url: "/analysis/store", icon: Activity },
-      { title: "고객 분석", url: "/analysis/customer", icon: Users },
-      { title: "상품 분석", url: "/analysis/product", icon: Package },
-    ],
+    description: "대시보드, 분석, AI 추천, 예측"
   },
   {
-    id: "simulation",
-    label: "시뮬레이션",
-    emoji: "🔮",
-    defaultOpen: true,
-    items: [
-      { title: "디지털 트윈 3D", url: "/simulation/digital-twin", icon: Boxes },
-      { title: "시뮬레이션 허브", url: "/simulation/hub", icon: TestTube },
-    ],
+    title: "디지털트윈 스튜디오",
+    url: "/studio",
+    icon: Box,
+    emoji: "🎨",
+    description: "3D 편집, 시뮬레이션, 분석"
   },
   {
-    id: "dataManagement",
-    label: "데이터 관리",
-    emoji: "🗄️",
-    defaultOpen: true,
-    items: [
-      { title: "통합 데이터 임포트", url: "/data-management/import", icon: Upload },
-      { title: "스키마 빌더", url: "/data-management/schema", icon: Network },
-      { title: "API 연동", url: "/data-management/api", icon: Zap },
-    ],
+    title: "설정 & 관리",
+    url: "/settings",
+    icon: Settings,
+    emoji: "⚙️",
+    description: "매장, 데이터, 사용자, 시스템"
   },
 ];
 
@@ -114,7 +67,7 @@ export function AppSidebar() {
   const { stores, selectedStore, setSelectedStore } = useSelectedStore();
 
   const isActive = (path: string) => {
-    if (path === "/overview/dashboard") return location.pathname === "/" || location.pathname === "/overview/dashboard";
+    if (path === "/insights") return location.pathname === "/" || location.pathname.startsWith("/insights");
     return location.pathname.startsWith(path);
   };
 
@@ -124,8 +77,8 @@ export function AppSidebar() {
         {/* Store Selector */}
         {!collapsed && stores.length > 0 && (
           <div className="p-4 border-b border-border">
-            <Select 
-              value={selectedStore?.id || ""} 
+            <Select
+              value={selectedStore?.id || ""}
               onValueChange={(value) => {
                 const store = stores.find(s => s.id === value);
                 setSelectedStore(store || null);
@@ -145,82 +98,57 @@ export function AppSidebar() {
           </div>
         )}
 
-        {/* A. Overview Section */}
-        <SidebarGroup>
-          {!collapsed && <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground px-2">
-            A. Overview
-          </SidebarGroupLabel>}
+        {/* 메인 메뉴 (3개) */}
+        <SidebarGroup className="mt-4">
           <SidebarGroupContent>
-            <SidebarMenu>
-              {overviewItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink
-                      to={item.url}
-                      end={item.url === "/"}
-                      className="hover:bg-muted/50"
-                      activeClassName="bg-primary/10 text-primary font-medium"
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+            <SidebarMenu className="space-y-2">
+              {mainMenuItems.map((item) => {
+                const active = isActive(item.url);
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild className="h-auto py-3">
+                      <NavLink
+                        to={item.url}
+                        className={`hover:bg-muted/50 rounded-lg transition-colors ${
+                          active ? 'bg-primary/10 border-l-4 border-primary' : ''
+                        }`}
+                        activeClassName="bg-primary/10 text-primary font-medium"
+                      >
+                        <div className="flex items-center gap-3">
+                          {collapsed ? (
+                            <span className="text-lg">{item.emoji}</span>
+                          ) : (
+                            <item.icon className={`h-5 w-5 ${active ? 'text-primary' : ''}`} />
+                          )}
+                          {!collapsed && (
+                            <div className="flex flex-col">
+                              <span className={`font-medium ${active ? 'text-primary' : ''}`}>
+                                {item.title}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {item.description}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* B, C, D Sections */}
-        {menuSections.map((section) => {
-          const hasActiveItem = section.items.some((item) => isActive(item.url));
-          const sectionNumber = section.id === "analysis" ? "B" 
-            : section.id === "simulation" ? "C" 
-            : "D";
-
-          return (
-            <Collapsible
-              key={section.id}
-              defaultOpen={section.defaultOpen}
-            >
-              <SidebarGroup>
-                <CollapsibleTrigger className="w-full">
-                  <SidebarGroupLabel className="flex items-center justify-between cursor-pointer hover:bg-muted/50 rounded px-2 py-1">
-                    {!collapsed && (
-                      <>
-                        <span className="text-xs font-semibold">
-                          {sectionNumber}. {section.label}
-                        </span>
-                        <ChevronDown className="h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
-                      </>
-                    )}
-                    {collapsed && <span className="text-xs">{section.emoji}</span>}
-                  </SidebarGroupLabel>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <SidebarGroupContent>
-                    <SidebarMenu>
-                      {section.items.map((item) => (
-                        <SidebarMenuItem key={item.title}>
-                          <SidebarMenuButton asChild>
-                            <NavLink
-                              to={item.url}
-                              className="hover:bg-muted/50"
-                              activeClassName="bg-primary/10 text-primary font-medium"
-                            >
-                              <item.icon className="h-4 w-4" />
-                              {!collapsed && <span>{item.title}</span>}
-                            </NavLink>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      ))}
-                    </SidebarMenu>
-                  </SidebarGroupContent>
-                </CollapsibleContent>
-              </SidebarGroup>
-            </Collapsible>
-          );
-        })}
+        {/* 하단 브랜딩 */}
+        {!collapsed && (
+          <div className="absolute bottom-4 left-0 right-0 px-4">
+            <div className="text-center text-xs text-muted-foreground">
+              <div className="font-semibold text-primary">NEURALTWIN</div>
+              <div>AI-Powered Retail Platform</div>
+            </div>
+          </div>
+        )}
       </SidebarContent>
     </Sidebar>
   );
