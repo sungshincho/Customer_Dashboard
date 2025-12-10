@@ -33,6 +33,7 @@ interface StaffingResultPanelProps {
   onShowPositions: () => void;
   defaultPosition?: { x: number; y: number };
   rightOffset?: number;
+  defaultCollapsed?: boolean;
 }
 
 export const StaffingResultPanel: React.FC<StaffingResultPanelProps> = ({
@@ -42,6 +43,7 @@ export const StaffingResultPanel: React.FC<StaffingResultPanelProps> = ({
   onShowPositions,
   defaultPosition = { x: 640, y: 320 },
   rightOffset,
+  defaultCollapsed = true,
 }) => {
   const [showApplyModal, setShowApplyModal] = useState(false);
   const improvement = result ? result.optimizedCoverage - result.currentCoverage : 0;
@@ -54,6 +56,7 @@ export const StaffingResultPanel: React.FC<StaffingResultPanelProps> = ({
       icon={<UserCheck className="w-4 h-4" />}
       defaultPosition={defaultPosition}
       rightOffset={rightOffset}
+      defaultCollapsed={defaultCollapsed}
       closable
       onClose={onClose}
       width="w-64"

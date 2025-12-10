@@ -32,6 +32,7 @@ interface FlowResultPanelProps {
   onShowFlow: () => void;
   defaultPosition?: { x: number; y: number };
   rightOffset?: number;
+  defaultCollapsed?: boolean;
 }
 
 export const FlowResultPanel: React.FC<FlowResultPanelProps> = ({
@@ -41,6 +42,7 @@ export const FlowResultPanel: React.FC<FlowResultPanelProps> = ({
   onShowFlow,
   defaultPosition = { x: 640, y: 100 },
   rightOffset,
+  defaultCollapsed = true,
 }) => {
   const [showApplyModal, setShowApplyModal] = useState(false);
   const pathReduction = result ? ((result.currentPathLength - result.optimizedPathLength) / result.currentPathLength * 100).toFixed(1) : '0';
@@ -53,6 +55,7 @@ export const FlowResultPanel: React.FC<FlowResultPanelProps> = ({
       icon={<Route className="w-4 h-4" />}
       defaultPosition={defaultPosition}
       rightOffset={rightOffset}
+      defaultCollapsed={defaultCollapsed}
       closable
       onClose={onClose}
       width="w-64"

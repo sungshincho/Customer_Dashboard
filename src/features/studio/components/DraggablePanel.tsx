@@ -5,6 +5,7 @@
  * - 드래그 앤 드롭으로 자유롭게 이동
  * - 접기/펼치기 토글
  * - 닫기 버튼 (선택적)
+ * - 크기 조절 가능 (resizable)
  * - 화면 경계 제한
  */
 
@@ -15,6 +16,11 @@ import { cn } from '@/lib/utils';
 interface Position {
   x: number;
   y: number;
+}
+
+interface Size {
+  width: number;
+  height: number;
 }
 
 interface DraggablePanelProps {
@@ -29,6 +35,12 @@ interface DraggablePanelProps {
   closable?: boolean;
   onClose?: () => void;
   width?: string;
+  /** 리사이즈 가능 여부 */
+  resizable?: boolean;
+  /** 최소 크기 */
+  minSize?: { width: number; height: number };
+  /** 최대 크기 */
+  maxSize?: { width: number; height: number };
   children: ReactNode;
   className?: string;
 }
@@ -44,15 +56,21 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
   closable = false,
   onClose,
   width = 'w-64',
+  resizable = true,
+  minSize = { width: 180, height: 100 },
+  maxSize = { width: 500, height: 600 },
   children,
   className,
 }) => {
   const [position, setPosition] = useState<Position | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
+  const [size, setSize] = useState<Size | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLElement | null>(null);
   const dragOffset = useRef<Position>({ x: 0, y: 0 });
+  const resizeStart = useRef<{ x: number; y: number; width: number; height: number }>({ x: 0, y: 0, width: 0, height: 0 });
 
   // 초기 위치 계산 (컴포넌트 마운트 시)
   useEffect(() => {
@@ -104,6 +122,49 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
     document.addEventListener('mouseup', handleMouseUp);
   }, [position]);
 
+  // 리사이즈 핸들러
+  const handleResizeMouseDown = useCallback((e: React.MouseEvent, direction: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!panelRef.current) return;
+
+    setIsResizing(true);
+    const rect = panelRef.current.getBoundingClientRect();
+    resizeStart.current = {
+      x: e.clientX,
+      y: e.clientY,
+      width: size?.width || rect.width,
+      height: size?.height || rect.height,
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaX = e.clientX - resizeStart.current.x;
+      const deltaY = e.clientY - resizeStart.current.y;
+
+      let newWidth = resizeStart.current.width;
+      let newHeight = resizeStart.current.height;
+
+      if (direction.includes('e')) {
+        newWidth = Math.max(minSize.width, Math.min(maxSize.width, resizeStart.current.width + deltaX));
+      }
+      if (direction.includes('s')) {
+        newHeight = Math.max(minSize.height, Math.min(maxSize.height, resizeStart.current.height + deltaY));
+      }
+
+      setSize({ width: newWidth, height: newHeight });
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [size, minSize, maxSize]);
+
   // 위치가 아직 계산되지 않은 경우 렌더링하지 않음
   if (position === null) {
     return <div ref={panelRef} className="hidden" />;
@@ -115,19 +176,20 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
       data-panel-id={id}
       className={cn(
         'absolute z-20 pointer-events-auto',
-        width,
-        isDragging ? 'cursor-grabbing select-none' : '',
+        !size && width,
+        (isDragging || isResizing) ? 'cursor-grabbing select-none' : '',
         className
       )}
       style={{
         left: position.x,
         top: position.y,
-        transition: isDragging ? 'none' : 'box-shadow 0.2s',
+        width: size?.width,
+        transition: (isDragging || isResizing) ? 'none' : 'box-shadow 0.2s',
       }}
     >
       <div className={cn(
-        'bg-black/80 backdrop-blur-sm border border-white/10 rounded-lg overflow-hidden shadow-xl',
-        isDragging && 'ring-2 ring-primary/50'
+        'bg-black/80 backdrop-blur-sm border border-white/10 rounded-lg overflow-hidden shadow-xl relative',
+        (isDragging || isResizing) && 'ring-2 ring-primary/50'
       )}>
         {/* 헤더 (드래그 핸들) */}
         <div
@@ -175,13 +237,45 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
         <div
           className={cn(
             'transition-all duration-200 ease-in-out overflow-hidden',
-            isCollapsed ? 'max-h-0' : 'max-h-[500px]'
+            isCollapsed ? 'max-h-0' : ''
           )}
+          style={{
+            maxHeight: isCollapsed ? 0 : (size?.height ? size.height - 40 : 500),
+          }}
         >
-          <div className="p-3">
+          <div className="p-3 overflow-y-auto" style={{ maxHeight: size?.height ? size.height - 56 : 460 }}>
             {children}
           </div>
         </div>
+
+        {/* 리사이즈 핸들 (펼쳐진 상태에서만) */}
+        {resizable && !isCollapsed && (
+          <>
+            {/* 우측 핸들 */}
+            <div
+              className="absolute top-0 right-0 w-2 h-full cursor-e-resize hover:bg-primary/30 transition-colors"
+              onMouseDown={(e) => handleResizeMouseDown(e, 'e')}
+            />
+            {/* 하단 핸들 */}
+            <div
+              className="absolute bottom-0 left-0 w-full h-2 cursor-s-resize hover:bg-primary/30 transition-colors"
+              onMouseDown={(e) => handleResizeMouseDown(e, 's')}
+            />
+            {/* 우하단 코너 핸들 */}
+            <div
+              className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize hover:bg-primary/50 transition-colors rounded-tl"
+              onMouseDown={(e) => handleResizeMouseDown(e, 'se')}
+            >
+              <svg
+                className="w-3 h-3 absolute bottom-0.5 right-0.5 text-white/30"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+              >
+                <path d="M22 22H20V20H22V22ZM22 18H20V16H22V18ZM18 22H16V20H18V22ZM22 14H20V12H22V14ZM18 18H16V16H18V18ZM14 22H12V20H14V22Z" />
+              </svg>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

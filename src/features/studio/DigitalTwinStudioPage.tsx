@@ -501,11 +501,12 @@ export default function DigitalTwinStudioPage() {
               <DraggablePanel
                 id="tool-panel"
                 title="도구"
-                rightOffset={80}
+                rightOffset={100}
                 defaultPosition={{ x: 0, y: 16 }}
                 collapsible={true}
-                defaultCollapsed={false}
+                defaultCollapsed={true}
                 width="w-auto"
+                resizable={false}
               >
                 <ToolPanel mode={mode} onModeChange={setMode} hasSelection={false} />
               </DraggablePanel>
@@ -517,9 +518,9 @@ export default function DigitalTwinStudioPage() {
                 id="overlay"
                 title="오버레이"
                 icon={<Layers className="w-4 h-4" />}
-                rightOffset={180}
-                defaultPosition={{ x: 0, y: 130 }}
-                defaultCollapsed={false}
+                rightOffset={100}
+                defaultPosition={{ x: 0, y: 60 }}
+                defaultCollapsed={true}
                 width="w-48"
               >
                 <div className="space-y-2">
@@ -552,9 +553,9 @@ export default function DigitalTwinStudioPage() {
                 id="scene-save"
                 title="씬 저장"
                 icon={<Save className="w-4 h-4" />}
-                rightOffset={180}
-                defaultPosition={{ x: 0, y: 280 }}
-                defaultCollapsed={false}
+                rightOffset={100}
+                defaultPosition={{ x: 0, y: 104 }}
+                defaultCollapsed={true}
                 width="w-48"
               >
                 <SceneSavePanel
@@ -584,7 +585,7 @@ export default function DigitalTwinStudioPage() {
                   toggleOverlay('zone');
                   toast.info('3D 뷰에서 변경사항 표시');
                 }}
-                rightOffset={290}
+                rightOffset={320}
                 defaultPosition={{ x: 0, y: 16 }}
               />
             )}
@@ -600,8 +601,8 @@ export default function DigitalTwinStudioPage() {
                   toggleOverlay('flow');
                   toast.info('동선 오버레이 표시');
                 }}
-                rightOffset={290}
-                defaultPosition={{ x: 0, y: 200 }}
+                rightOffset={320}
+                defaultPosition={{ x: 0, y: 60 }}
               />
             )}
 
@@ -612,8 +613,8 @@ export default function DigitalTwinStudioPage() {
                 onPlayAnimation={() => {
                   toast.info('시간대별 애니메이션 재생');
                 }}
-                rightOffset={290}
-                defaultPosition={{ x: 0, y: 380 }}
+                rightOffset={320}
+                defaultPosition={{ x: 0, y: 104 }}
               />
             )}
 
@@ -628,8 +629,8 @@ export default function DigitalTwinStudioPage() {
                   toggleOverlay('avatar');
                   toast.info('직원 위치 표시');
                 }}
-                rightOffset={290}
-                defaultPosition={{ x: 0, y: 560 }}
+                rightOffset={320}
+                defaultPosition={{ x: 0, y: 148 }}
               />
             )}
 
