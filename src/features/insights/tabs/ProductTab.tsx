@@ -92,6 +92,8 @@ export function ProductTab() {
 
       // 3. products 테이블에서 상품 정보 가져오기
       const productIds = [...productMap.keys()];
+
+      // 먼저 products 테이블에서 조회
       const { data: productsInfo, error: productsError } = await supabase
         .from('products')
         .select('id, name, category')
@@ -101,18 +103,29 @@ export function ProductTab() {
         console.error('Error fetching products:', productsError);
       }
 
+      // products 테이블에서 찾지 못한 경우 product_performance_agg의 데이터 활용
       const productInfoMap = new Map(
         (productsInfo || []).map(p => [p.id, { name: p.name || p.id, category: p.category || '미분류' }])
       );
 
-      // 4. 결합하여 반환
+      // 디버깅 로그
+      console.log('[ProductTab] Product info:', {
+        requestedIds: productIds.length,
+        foundInProducts: productsInfo?.length || 0,
+        missingIds: productIds.filter(id => !productInfoMap.has(id)),
+      });
+
+      // 4. 결합하여 반환 - 상품명이 없으면 "상품 #N" 형태로 표시
+      let productIndex = 1;
       return Array.from(productMap.entries())
         .map(([productId, data]) => {
-          const info = productInfoMap.get(productId) || { name: productId.substring(0, 8), category: '미분류' };
+          const info = productInfoMap.get(productId);
+          // 상품명이 없으면 "상품 #1", "상품 #2" 형태로 표시
+          const displayName = info?.name || `상품 #${productIndex++}`;
           return {
             productId,
-            name: info.name,
-            category: info.category,
+            name: displayName,
+            category: info?.category || '미분류',
             quantity: data.quantity,
             revenue: data.revenue,
             stock: data.stock,
