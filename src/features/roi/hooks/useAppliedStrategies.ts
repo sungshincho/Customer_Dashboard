@@ -7,7 +7,6 @@ import { supabase } from '@/integrations/supabase';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import type {
   AppliedStrategy,
-  AppliedStrategyRow,
   DateRange,
   StrategyFilters,
   StrategySortOptions,
@@ -29,31 +28,31 @@ const getDaysFromRange = (range: DateRange): number => {
   }
 };
 
-// Row를 도메인 타입으로 변환
-const transformStrategy = (row: AppliedStrategyRow): AppliedStrategy => ({
+// Row를 도메인 타입으로 변환 (누락된 컬럼 안전 처리)
+const transformStrategy = (row: any): AppliedStrategy => ({
   id: row.id,
   storeId: row.store_id,
   orgId: row.org_id,
   source: row.source,
   sourceModule: row.source_module,
   name: row.name,
-  description: row.description,
-  settings: row.settings,
+  description: row.description || null,
+  settings: row.settings || {},
   startDate: row.start_date,
   endDate: row.end_date,
   expectedRoi: row.expected_roi,
-  targetRoi: row.target_roi,
-  currentRoi: row.current_roi,
-  finalRoi: row.final_roi,
-  expectedRevenue: row.expected_revenue,
-  actualRevenue: row.actual_revenue,
+  targetRoi: row.target_roi || null,
+  currentRoi: row.current_roi || null,
+  finalRoi: row.final_roi || null,
+  expectedRevenue: row.expected_revenue ?? null, // 컬럼 존재하지 않을 수 있음
+  actualRevenue: row.actual_revenue ?? null,     // 컬럼 존재하지 않을 수 있음
   status: row.status,
-  result: row.result,
-  baselineMetrics: row.baseline_metrics,
-  notes: row.notes,
+  result: row.result || null,
+  baselineMetrics: row.baseline_metrics || {},
+  notes: row.notes || null,
   createdAt: row.created_at,
-  updatedAt: row.updated_at,
-  createdBy: row.created_by,
+  updatedAt: row.updated_at || row.created_at,
+  createdBy: row.created_by ?? null,             // 컬럼 존재하지 않을 수 있음
 });
 
 export const useAppliedStrategies = (
@@ -160,29 +159,33 @@ export const useApplyStrategy = () => {
         throw new Error('Store not selected');
       }
 
+      // 필수 컬럼만 사용 (DB 스키마와 일치)
+      // 참고: 전체 스키마는 supabase/migrations/20241210_create_roi_tables.sql 참조
+      const insertData: Record<string, any> = {
+        store_id: selectedStore.id,
+        org_id: orgId,
+        source: input.source,
+        source_module: input.sourceModule,
+        name: input.name,
+        description: input.description || null,
+        settings: input.settings,
+        start_date: input.startDate,
+        end_date: input.endDate,
+        expected_roi: input.expectedRoi,
+        target_roi: input.targetRoi || input.expectedRoi,
+        baseline_metrics: input.baselineMetrics,
+        notes: input.notes || null,
+        status: 'active',
+      };
+
       const { data, error } = await supabase
         .from('applied_strategies')
-        .insert({
-          store_id: selectedStore.id,
-          org_id: orgId,
-          source: input.source,
-          source_module: input.sourceModule,
-          name: input.name,
-          description: input.description || null,
-          settings: input.settings,
-          start_date: input.startDate,
-          end_date: input.endDate,
-          expected_roi: input.expectedRoi,
-          expected_revenue: input.expectedRevenue || null,
-          target_roi: input.targetRoi || input.expectedRoi,
-          baseline_metrics: input.baselineMetrics,
-          notes: input.notes || null,
-          status: 'active',
-        })
+        .insert(insertData)
         .select()
         .single();
 
       if (error) {
+        console.error('Strategy insert error:', error);
         throw error;
       }
 
@@ -207,20 +210,21 @@ export const useUpdateStrategyStatus = () => {
       status,
       result,
       finalRoi,
-      actualRevenue,
+      currentRoi,
     }: {
       strategyId: string;
       status?: 'active' | 'completed' | 'cancelled';
       result?: 'success' | 'partial' | 'failed';
       finalRoi?: number;
-      actualRevenue?: number;
+      currentRoi?: number;
     }) => {
       const updateData: Record<string, any> = {};
 
+      // 확실히 존재하는 컬럼만 업데이트
       if (status) updateData.status = status;
       if (result) updateData.result = result;
       if (finalRoi !== undefined) updateData.final_roi = finalRoi;
-      if (actualRevenue !== undefined) updateData.actual_revenue = actualRevenue;
+      if (currentRoi !== undefined) updateData.current_roi = currentRoi;
 
       const { data, error } = await supabase
         .from('applied_strategies')
@@ -230,6 +234,7 @@ export const useUpdateStrategyStatus = () => {
         .single();
 
       if (error) {
+        console.error('Strategy update error:', error);
         throw error;
       }
 
