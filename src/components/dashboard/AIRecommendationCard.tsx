@@ -1,16 +1,26 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  AlertTriangle, 
-  Target, 
-  Lightbulb, 
+import {
+  AlertTriangle,
+  Target,
+  Lightbulb,
   X,
   TrendingUp,
   Package,
   LayoutGrid,
-  Users
+  Users,
+  Check,
+  Clock,
+  Loader2
 } from "lucide-react";
+import { useState } from "react";
+import { useApplyRecommendation, RecommendationType } from "@/hooks/useROITracking";
+import { useSelectedStore } from "@/hooks/useSelectedStore";
+import { useAuth } from "@/hooks/useAuth";
+import { useDashboardKPI } from "@/hooks/useDashboardKPI";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface Recommendation {
   id: string;
@@ -20,6 +30,7 @@ interface Recommendation {
   description: string;
   action_category?: string;
   expected_impact?: any;
+  status?: string;
 }
 
 interface Props {
@@ -40,6 +51,12 @@ const priorityColors: Record<string, string> = {
   low: "secondary",
 };
 
+const priorityBorderColors: Record<string, string> = {
+  high: "border-l-red-500",
+  medium: "border-l-yellow-500",
+  low: "border-l-blue-500",
+};
+
 const typeIcons: Record<string, any> = {
   alert: AlertTriangle,
   action: Target,
@@ -47,6 +64,50 @@ const typeIcons: Record<string, any> = {
 };
 
 export function AIRecommendationCard({ recommendations, onDismiss }: Props) {
+  const { selectedStore } = useSelectedStore();
+  const { orgId } = useAuth();
+  const { data: dashboardKPI } = useDashboardKPI(selectedStore?.id, format(new Date(), 'yyyy-MM-dd'));
+  const applyRecommendation = useApplyRecommendation();
+
+  const [applyingId, setApplyingId] = useState<string | null>(null);
+  const [appliedIds, setAppliedIds] = useState<Set<string>>(new Set());
+
+  const handleApply = async (rec: Recommendation) => {
+    if (!selectedStore?.id || !orgId) return;
+
+    setApplyingId(rec.id);
+
+    try {
+      // 현재 KPI를 베이스라인으로
+      const currentKPIs = {
+        total_revenue: dashboardKPI?.total_revenue || 0,
+        total_visitors: dashboardKPI?.total_visits || 0,
+        conversion_rate: dashboardKPI?.conversion_rate || 0,
+        avg_transaction_value: dashboardKPI?.total_revenue && dashboardKPI?.total_purchases
+          ? dashboardKPI.total_revenue / dashboardKPI.total_purchases
+          : 0,
+      };
+
+      await applyRecommendation.mutateAsync({
+        storeId: selectedStore.id,
+        recommendationType: (rec.action_category || 'layout') as RecommendationType,
+        recommendationSummary: rec.title,
+        recommendationDetails: {
+          description: rec.description,
+          expected_impact: rec.expected_impact,
+          original_id: rec.id,
+        },
+        measurementDays: 7,
+      });
+
+      setAppliedIds(prev => new Set(prev).add(rec.id));
+    } catch (error) {
+      console.error('추천 적용 실패:', error);
+    } finally {
+      setApplyingId(null);
+    }
+  };
+
   if (recommendations.length === 0) {
     return (
       <Card className="hover-lift">
@@ -79,18 +140,23 @@ export function AIRecommendationCard({ recommendations, onDismiss }: Props) {
         {recommendations.map((rec, index) => {
           const TypeIcon = typeIcons[rec.recommendation_type] || Lightbulb;
           const CategoryIcon = rec.action_category ? categoryIcons[rec.action_category] : null;
+          const isApplying = applyingId === rec.id;
+          const isApplied = appliedIds.has(rec.id) || rec.status === 'applied';
 
           return (
             <div
               key={rec.id}
-              className="p-4 rounded-lg border bg-card animate-fade-in relative group"
+              className={cn(
+                "p-4 rounded-lg border border-l-4 bg-card animate-fade-in relative group",
+                priorityBorderColors[rec.priority] || "border-l-gray-500"
+              )}
               style={{ animationDelay: `${index * 100}ms` }}
             >
               {/* Dismiss button */}
               <Button
                 variant="ghost"
                 size="sm"
-                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
                 onClick={() => onDismiss(rec.id)}
               >
                 <X className="w-4 h-4" />
@@ -101,8 +167,8 @@ export function AIRecommendationCard({ recommendations, onDismiss }: Props) {
                 <div className="p-2 rounded-lg bg-primary/10">
                   <TypeIcon className="w-5 h-5 text-primary" />
                 </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
+                <div className="flex-1 pr-8">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <h4 className="font-semibold">{rec.title}</h4>
                     <Badge variant={priorityColors[rec.priority] as any}>
                       {rec.priority === 'high' ? '높음' : rec.priority === 'medium' ? '중간' : '낮음'}
@@ -155,6 +221,50 @@ export function AIRecommendationCard({ recommendations, onDismiss }: Props) {
                   )}
                 </div>
               )}
+
+              {/* Action Buttons */}
+              <div className="mt-4 pt-3 border-t flex gap-2">
+                {isApplied ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 gap-2 text-green-600 border-green-200 bg-green-50 hover:bg-green-100"
+                    disabled
+                  >
+                    <Check className="w-4 h-4" />
+                    적용됨
+                  </Button>
+                ) : (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="flex-1 gap-2"
+                    onClick={() => handleApply(rec)}
+                    disabled={isApplying || !selectedStore?.id}
+                  >
+                    {isApplying ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        적용 중...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4" />
+                        적용하기
+                      </>
+                    )}
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => onDismiss(rec.id)}
+                >
+                  <Clock className="w-4 h-4" />
+                  나중에
+                </Button>
+              </div>
             </div>
           );
         })}
