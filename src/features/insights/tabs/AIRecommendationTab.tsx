@@ -14,12 +14,10 @@ import { Separator } from '@/components/ui/separator';
 import {
   Sparkles,
   CheckCircle,
-  Clock,
   TrendingUp,
   TrendingDown,
   DollarSign,
   BarChart3,
-  Box,
   Users,
   Calendar,
   AlertTriangle,
@@ -28,32 +26,17 @@ import {
   Play,
   Settings,
   FlaskConical,
-  Lightbulb,
-  Pause,
-  Square,
-  Edit,
   Plus,
   ArrowRight,
-  Minus,
 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { formatCurrency } from '../components';
 import { useAIRecommendations } from '@/hooks/useAIRecommendations';
-import { useApplyRecommendation } from '@/hooks/useROITracking';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
+import { ApplyStrategyModal } from '@/features/roi/components/ApplyStrategyModal';
+import type { SourceModule } from '@/features/roi/types/roi.types';
 
 // ============================================================================
 // 타입 정의
@@ -95,35 +78,20 @@ export function AIRecommendationTab() {
   const navigate = useNavigate();
   const { selectedStore } = useSelectedStore();
   const { data: recommendations = [], isLoading } = useAIRecommendations(selectedStore?.id);
-  const applyRecommendation = useApplyRecommendation();
 
-  // 적용된 추천 및 ROI 데이터
-  const { data: appliedData } = useQuery({
-    queryKey: ['applied-recommendations', selectedStore?.id],
-    queryFn: async () => {
-      if (!selectedStore?.id) return { applications: [], measurements: [] };
-
-      const [applicationsRes, measurementsRes] = await Promise.all([
-        supabase
-          .from('recommendation_applications')
-          .select('*, ai_recommendations(title, description)')
-          .eq('store_id', selectedStore.id)
-          .order('applied_at', { ascending: false }),
-        supabase
-          .from('roi_measurements')
-          .select('*')
-          .eq('store_id', selectedStore.id)
-          .eq('status', 'completed')
-          .order('measured_at', { ascending: false }),
-      ]);
-
-      return {
-        applications: applicationsRes.data || [],
-        measurements: measurementsRes.data || [],
-      };
-    },
-    enabled: !!selectedStore?.id,
-  });
+  // 적용 모달 상태
+  const [showApplyModal, setShowApplyModal] = useState(false);
+  const [applyModalData, setApplyModalData] = useState<{
+    source: '2d_simulation' | '3d_simulation';
+    sourceModule: SourceModule;
+    name: string;
+    description?: string;
+    settings: Record<string, any>;
+    expectedRoi: number;
+    expectedRevenue?: number;
+    confidence?: number;
+    baselineMetrics: Record<string, number>;
+  } | null>(null);
 
   // Mock 데이터 (실제 구현 시 API 연동)
   const activeStrategies: ActiveStrategy[] = useMemo(() => [
@@ -165,18 +133,6 @@ export function AIRecommendationTab() {
     stockoutPrevention: 5,
   }), []);
 
-  // 요약 통계
-  const summary = useMemo(() => {
-    const pending = recommendations.filter(r => r.status === 'pending').length;
-    const applied = appliedData?.applications.length || 0;
-    const totalROI = appliedData?.measurements.reduce((s, m) => s + (m.actual_revenue_change || 0), 0) || 0;
-    const avgROI = appliedData?.measurements.length
-      ? totalROI / appliedData.measurements.length
-      : 0;
-
-    return { pending, applied, totalROI, avgROI };
-  }, [recommendations, appliedData]);
-
   // 추천 전략 변환
   const strategyRecommendations = useMemo(() => {
     return recommendations
@@ -199,25 +155,58 @@ export function AIRecommendationTab() {
       }));
   }, [recommendations]);
 
-  // ROI 트렌드 데이터
-  const roiTrendData = useMemo(() => {
-    if (!appliedData?.measurements.length) {
-      return [
-        { date: '11/1', expectedROI: 150, actualROI: 145 },
-        { date: '11/15', expectedROI: 180, actualROI: 195 },
-        { date: '11/30', expectedROI: 280, actualROI: 312 },
-        { date: '12/7', expectedROI: 245, actualROI: 198 },
-      ];
-    }
-    return appliedData.measurements.slice(0, 10).map((m: any) => ({
-      date: new Date(m.measured_at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }),
-      expectedROI: 200,
-      actualROI: m.actual_revenue_change ? (m.actual_revenue_change / (m.baseline_revenue || 1)) * 100 : 0,
-    }));
-  }, [appliedData]);
+  // 가격 최적화 적용
+  const handleApplyPriceOptimization = () => {
+    setApplyModalData({
+      source: '2d_simulation',
+      sourceModule: 'price_optimization',
+      name: `가격 최적화 (${priceOptimization.optimizableCount}개 상품)`,
+      description: `${priceOptimization.optimizableCount}개 상품 가격 최적화로 ${priceOptimization.potentialRevenueIncreasePercent}% 매출 증가 예상`,
+      settings: { totalProducts: priceOptimization.totalProducts },
+      expectedRoi: Math.round(priceOptimization.potentialRevenueIncreasePercent * 10),
+      confidence: 88,
+      baselineMetrics: {
+        totalProducts: priceOptimization.totalProducts,
+        optimizableCount: priceOptimization.optimizableCount,
+      },
+    });
+    setShowApplyModal(true);
+  };
 
-  const handleApply = async (id: string) => {
-    await applyRecommendation.mutateAsync(id);
+  // 재고 최적화 적용
+  const handleApplyInventoryOptimization = () => {
+    setApplyModalData({
+      source: '2d_simulation',
+      sourceModule: 'inventory_optimization',
+      name: `재고 최적화 (${inventoryOptimization.orderRecommendations}건 발주)`,
+      description: `${inventoryOptimization.stockoutPrevention}건 품절 방지`,
+      settings: { totalItems: inventoryOptimization.totalItems },
+      expectedRoi: 120,
+      confidence: 90,
+      baselineMetrics: {
+        totalItems: inventoryOptimization.totalItems,
+        orderRecommendations: inventoryOptimization.orderRecommendations,
+      },
+    });
+    setShowApplyModal(true);
+  };
+
+  // AI 추천 전략 실행
+  const handleApplyStrategy = (strategy: typeof strategyRecommendations[0]) => {
+    setApplyModalData({
+      source: '2d_simulation',
+      sourceModule: 'ai_recommendation',
+      name: strategy.title,
+      description: strategy.description,
+      settings: { strategyId: strategy.id, priority: strategy.priority },
+      expectedRoi: strategy.expectedResults.roi,
+      expectedRevenue: strategy.expectedResults.revenueIncrease,
+      confidence: strategy.confidence,
+      baselineMetrics: {
+        conversionIncrease: strategy.expectedResults.conversionIncrease,
+      },
+    });
+    setShowApplyModal(true);
   };
 
   if (isLoading) {
@@ -435,7 +424,7 @@ export function AIRecommendationTab() {
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" className="flex-1">상세 보기</Button>
-                <Button size="sm" className="flex-1 gap-1">
+                <Button size="sm" className="flex-1 gap-1" onClick={handleApplyPriceOptimization}>
                   <CheckCircle className="w-3 h-3" />
                   적용
                 </Button>
@@ -469,7 +458,7 @@ export function AIRecommendationTab() {
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" className="flex-1">상세 보기</Button>
-                <Button size="sm" className="flex-1 gap-1">
+                <Button size="sm" className="flex-1 gap-1" onClick={handleApplyInventoryOptimization}>
                   <CheckCircle className="w-3 h-3" />
                   적용
                 </Button>
@@ -580,7 +569,7 @@ export function AIRecommendationTab() {
                       <Settings className="w-3 h-3" />
                       상세 설정
                     </Button>
-                    <Button size="sm" className="flex-1 gap-1" onClick={() => handleApply(strategy.id)}>
+                    <Button size="sm" className="flex-1 gap-1" onClick={() => handleApplyStrategy(strategy)}>
                       <Play className="w-3 h-3" />
                       실행하기
                     </Button>
@@ -598,156 +587,31 @@ export function AIRecommendationTab() {
         </Card>
       </div>
 
-      <Separator />
-
-      {/* 4단계: 실행 - 생략 (진행 중인 전략에서 표시) */}
-
-      {/* 5단계: 측정 */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center w-6 h-6 rounded-full bg-red-500/20 text-red-400 text-xs font-bold">
-            5
-          </div>
-          <h3 className="text-lg font-semibold">ROI 측정 (Measure)</h3>
+      {/* ROI 측정 - 별도 페이지로 이동 */}
+      <div className="flex items-center justify-center p-6 bg-muted/30 rounded-lg border border-dashed">
+        <div className="text-center">
+          <BarChart3 className="h-8 w-8 mx-auto mb-3 text-muted-foreground/50" />
+          <p className="text-sm text-muted-foreground mb-3">
+            적용된 전략의 ROI를 측정하고 성과를 추적하세요
+          </p>
+          <Button variant="outline" onClick={() => navigate('/roi')} className="gap-2">
+            <TrendingUp className="w-4 h-4" />
+            ROI 측정 대시보드 바로가기
+          </Button>
         </div>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          {/* 성과 테이블 */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <BarChart3 className="h-4 w-4 text-blue-500" />
-                전략 성과 요약
-              </CardTitle>
-              <CardDescription>최근 30일 기준</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {appliedData?.measurements && appliedData.measurements.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-2 px-2 font-medium">기간</th>
-                        <th className="text-right py-2 px-2 font-medium">변화량</th>
-                        <th className="text-right py-2 px-2 font-medium">변화율</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {appliedData.measurements.slice(0, 5).map((m: any) => {
-                        const change = m.actual_revenue_change || 0;
-                        const changePercent = m.baseline_revenue
-                          ? (change / m.baseline_revenue) * 100
-                          : 0;
-
-                        return (
-                          <tr key={m.id} className="border-b hover:bg-muted/50">
-                            <td className="py-2 px-2">{m.period_days}일</td>
-                            <td className={cn(
-                              "py-2 px-2 text-right font-medium",
-                              change >= 0 ? "text-green-600" : "text-red-600"
-                            )}>
-                              {change >= 0 ? '+' : ''}{formatCurrency(change)}
-                            </td>
-                            <td className={cn(
-                              "py-2 px-2 text-right",
-                              changePercent >= 0 ? "text-green-600" : "text-red-600"
-                            )}>
-                              {changePercent >= 0 ? '+' : ''}{changePercent.toFixed(1)}%
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="py-4 text-center text-muted-foreground text-sm">
-                  측정된 성과가 없습니다
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* ROI 트렌드 차트 */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-green-500" />
-                성과 트렌드
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={roiTrendData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}%`} />
-                  <Tooltip formatter={(value: number) => [`${value.toFixed(0)}%`]} />
-                  <Line
-                    type="monotone"
-                    dataKey="expectedROI"
-                    stroke="hsl(var(--muted-foreground))"
-                    strokeDasharray="5 5"
-                    strokeWidth={2}
-                    dot={false}
-                    name="예상"
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="actualROI"
-                    stroke="hsl(var(--primary))"
-                    strokeWidth={2}
-                    dot={{ fill: 'hsl(var(--primary))' }}
-                    name="실제"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* AI 학습 인사이트 */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Lightbulb className="h-4 w-4 text-yellow-500" />
-              AI 학습 인사이트
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
-              <Lightbulb className="w-4 h-4 text-yellow-500 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <p className="text-sm">&quot;할인 프로모션&quot;이 &quot;런칭 프로모션&quot;보다 평균 45% 높은 ROI</p>
-                <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-                  <span>데이터 포인트: 24개</span>
-                  <span>신뢰도: 92%</span>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
-              <Lightbulb className="w-4 h-4 text-yellow-500 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <p className="text-sm">최적 프로모션 기간: 5-7일</p>
-                <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-                  <span>데이터 포인트: 18개</span>
-                  <span>신뢰도: 85%</span>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
-              <Lightbulb className="w-4 h-4 text-yellow-500 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <p className="text-sm">타겟팅 전략이 전체 대상보다 ROI 23% 높음</p>
-                <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-                  <span>데이터 포인트: 15개</span>
-                  <span>신뢰도: 88%</span>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
+
+      {/* 적용 전략 모달 */}
+      {showApplyModal && applyModalData && (
+        <ApplyStrategyModal
+          isOpen={showApplyModal}
+          onClose={() => {
+            setShowApplyModal(false);
+            setApplyModalData(null);
+          }}
+          strategyData={applyModalData}
+        />
+      )}
     </div>
   );
 }
