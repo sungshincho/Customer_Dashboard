@@ -29,12 +29,14 @@ import {
   UserCheck,
   UserPlus,
   Heart,
+  Info,
 } from 'lucide-react';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useDateFilterStore } from '@/store/dateFilterStore';
 import { useAuth } from '@/hooks/useAuth';
+import { useInsightMetrics } from '../hooks/useInsightMetrics';
 
 const SEGMENT_COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe'];
 
@@ -42,6 +44,7 @@ export function CustomerTab() {
   const { selectedStore } = useSelectedStore();
   const { dateRange } = useDateFilterStore();
   const { user, orgId } = useAuth();
+  const { data: metrics } = useInsightMetrics();
 
   // 고객 세그먼트 데이터 (customer_segments_agg 테이블)
   const { data: segmentData } = useQuery({
@@ -149,12 +152,13 @@ export function CustomerTab() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Users className="h-4 w-4 text-muted-foreground" />
-              총 방문자
+              <span className="text-[10px] text-muted-foreground uppercase">Unique Visitors</span>
             </CardTitle>
+            <p className="text-xs text-muted-foreground -mt-1">순 방문객</p>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{summary.totalVisitors.toLocaleString()}명</div>
-            <p className="text-xs text-muted-foreground">분석 기간 내 총 방문</p>
+            <div className="text-2xl font-bold">{(metrics?.uniqueVisitors || summary.totalVisitors).toLocaleString()}명</div>
+            <p className="text-xs text-muted-foreground">기간 내 고유 방문자</p>
           </CardContent>
         </Card>
 
@@ -162,11 +166,12 @@ export function CustomerTab() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <UserCheck className="h-4 w-4 text-muted-foreground" />
-              평균 재방문율
+              <span className="text-[10px] text-muted-foreground uppercase">Repeat Rate</span>
             </CardTitle>
+            <p className="text-xs text-muted-foreground -mt-1">재방문율</p>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{summary.avgReturnRate.toFixed(1)}%</div>
+            <div className="text-2xl font-bold">{(metrics?.repeatRate || summary.avgReturnRate).toFixed(1)}%</div>
             <p className="text-xs text-muted-foreground">기간 평균</p>
           </CardContent>
         </Card>
@@ -175,8 +180,9 @@ export function CustomerTab() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <UserPlus className="h-4 w-4 text-muted-foreground" />
-              주요 세그먼트
+              <span className="text-[10px] text-muted-foreground uppercase">Top Segment</span>
             </CardTitle>
+            <p className="text-xs text-muted-foreground -mt-1">주요 세그먼트</p>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{summary.topSegment?.name || '-'}</div>
@@ -190,8 +196,9 @@ export function CustomerTab() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Heart className="h-4 w-4 text-muted-foreground" />
-              충성 고객
+              <span className="text-[10px] text-muted-foreground uppercase">Loyal Customers</span>
             </CardTitle>
+            <p className="text-xs text-muted-foreground -mt-1">충성 고객</p>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{summary.loyalCustomers.toLocaleString()}명</div>
@@ -199,6 +206,17 @@ export function CustomerTab() {
           </CardContent>
         </Card>
       </div>
+
+      {/* 방문 빈도 안내 */}
+      {metrics?.visitFrequency && metrics.visitFrequency > 1 && (
+        <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg flex items-start gap-2">
+          <Info className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">평균 방문 빈도 {metrics.visitFrequency.toFixed(1)}회:</span>{' '}
+            Footfall {metrics.footfall.toLocaleString()} / Unique Visitors {metrics.uniqueVisitors.toLocaleString()}
+          </p>
+        </div>
+      )}
 
       {/* 고객 세그먼트 분포 */}
       <div className="grid gap-6 lg:grid-cols-2">

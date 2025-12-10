@@ -2,132 +2,112 @@
  * OverviewTab.tsx
  *
  * 인사이트 허브 - 개요 탭
- * KPI 카드, 목표 달성률, AI 추천 효과, 오늘의 AI 인사이트
+ * 업계 표준 용어 기반 KPI (Footfall, Unique Visitors, Revenue, Conversion)
+ * 퍼널 차트, 목표 달성률, AI 추천 효과, 오늘의 AI 인사이트
  */
 
-import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { StatCard } from '@/components/StatCard';
 import { GoalProgressWidget } from '@/components/goals/GoalProgressWidget';
 import { AIRecommendationEffectWidget } from '@/components/dashboard/AIRecommendationEffectWidget';
-import { FunnelVisualization } from '@/components/dashboard/FunnelVisualization';
 import {
   Users,
   DollarSign,
   TrendingUp,
-  ShoppingCart,
+  UserCheck,
   Lightbulb,
   ArrowRight,
   BarChart3,
   Box,
+  Info,
 } from 'lucide-react';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
-import { useKPIsByDateRange } from '@/hooks/useDashboardKPI';
 import { useAIRecommendations } from '@/hooks/useAIRecommendations';
 import { useDateFilterStore } from '@/store/dateFilterStore';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { useInsightMetrics } from '../hooks/useInsightMetrics';
+import { MetricCard, FunnelChart, formatCurrency, formatPercent } from '../components';
 
 export function OverviewTab() {
   const navigate = useNavigate();
   const { selectedStore } = useSelectedStore();
   const { dateRange } = useDateFilterStore();
-
-  // 전역 기간 필터를 사용하여 KPI 데이터 조회
-  const { data: kpiData } = useKPIsByDateRange(
-    selectedStore?.id,
-    dateRange.startDate,
-    dateRange.endDate
-  );
+  const { data: metrics, isLoading } = useInsightMetrics();
   const { data: recommendations } = useAIRecommendations(selectedStore?.id);
-
-  // KPI 카드 데이터 - 기간 내 집계
-  const stats = useMemo(() => {
-    if (!kpiData || kpiData.length === 0) {
-      return [
-        { title: '방문자', value: '0', change: '데이터 없음', changeType: 'neutral' as const, icon: Users },
-        { title: '매출', value: '₩0', change: '데이터 없음', changeType: 'neutral' as const, icon: DollarSign },
-        { title: '전환율', value: '0%', change: '데이터 없음', changeType: 'neutral' as const, icon: TrendingUp },
-        { title: '객단가', value: '₩0', change: '데이터 없음', changeType: 'neutral' as const, icon: ShoppingCart },
-      ];
-    }
-
-    // 기간 내 총합 계산
-    const totalVisits = kpiData.reduce((sum, d) => sum + (d.total_visits || 0), 0);
-    const totalRevenue = kpiData.reduce((sum, d) => sum + (d.total_revenue || 0), 0);
-    const totalPurchases = kpiData.reduce((sum, d) => sum + (d.total_purchases || 0), 0);
-    const avgConversionRate = kpiData.reduce((sum, d) => sum + (d.conversion_rate || 0), 0) / kpiData.length;
-    const avgBasket = totalPurchases > 0 ? totalRevenue / totalPurchases : 0;
-
-    // 전반기 vs 후반기 비교로 변화율 계산
-    const midPoint = Math.floor(kpiData.length / 2);
-    let visitsChange = 0, revenueChange = 0, conversionChange = 0;
-
-    if (kpiData.length >= 2 && midPoint > 0) {
-      const firstHalf = kpiData.slice(0, midPoint);
-      const secondHalf = kpiData.slice(midPoint);
-
-      const firstVisits = firstHalf.reduce((s, d) => s + (d.total_visits || 0), 0);
-      const secondVisits = secondHalf.reduce((s, d) => s + (d.total_visits || 0), 0);
-      const firstRevenue = firstHalf.reduce((s, d) => s + (d.total_revenue || 0), 0);
-      const secondRevenue = secondHalf.reduce((s, d) => s + (d.total_revenue || 0), 0);
-      const firstConversion = firstHalf.reduce((s, d) => s + (d.conversion_rate || 0), 0) / firstHalf.length;
-      const secondConversion = secondHalf.reduce((s, d) => s + (d.conversion_rate || 0), 0) / secondHalf.length;
-
-      if (firstVisits > 0) visitsChange = ((secondVisits - firstVisits) / firstVisits) * 100;
-      if (firstRevenue > 0) revenueChange = ((secondRevenue - firstRevenue) / firstRevenue) * 100;
-      conversionChange = secondConversion - firstConversion;
-    }
-
-    const periodLabel = kpiData.length > 1 ? `${kpiData.length}일` : '오늘';
-
-    return [
-      {
-        title: '방문자',
-        value: totalVisits.toLocaleString(),
-        change: visitsChange !== 0 ? `${visitsChange > 0 ? '+' : ''}${visitsChange.toFixed(1)}%` : periodLabel,
-        changeType: visitsChange >= 0 ? 'positive' as const : 'negative' as const,
-        icon: Users,
-      },
-      {
-        title: '매출',
-        value: `₩${(totalRevenue / 10000).toFixed(0)}만`,
-        change: revenueChange !== 0 ? `${revenueChange > 0 ? '+' : ''}${revenueChange.toFixed(1)}%` : periodLabel,
-        changeType: revenueChange >= 0 ? 'positive' as const : 'negative' as const,
-        icon: DollarSign,
-      },
-      {
-        title: '전환율',
-        value: `${avgConversionRate.toFixed(1)}%`,
-        change: conversionChange !== 0 ? `${conversionChange > 0 ? '+' : ''}${conversionChange.toFixed(1)}%p` : periodLabel,
-        changeType: conversionChange >= 0 ? 'positive' as const : 'negative' as const,
-        icon: TrendingUp,
-      },
-      {
-        title: '객단가',
-        value: `₩${Math.round(avgBasket / 1000)}천`,
-        change: '평균',
-        changeType: 'neutral' as const,
-        icon: ShoppingCart,
-      },
-    ];
-  }, [kpiData]);
 
   // 우선순위 높은 추천
   const topRecommendations = recommendations?.slice(0, 2) || [];
 
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i} className="p-4 animate-pulse">
+              <div className="h-20 bg-muted rounded" />
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {/* KPI 카드 */}
+      {/* KPI 카드 - 표준 용어 */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat, index) => (
-          <div key={stat.title} className="animate-fade-in" style={{ animationDelay: `${index * 50}ms` }}>
-            <StatCard {...stat} />
-          </div>
-        ))}
+        <MetricCard
+          icon={<Users className="h-5 w-5" />}
+          labelEn="Footfall"
+          label="총 입장"
+          value={metrics?.footfall.toLocaleString() || '0'}
+          subLabel="기간 내 총 입장 횟수"
+          change={metrics?.changes.footfall}
+        />
+        <MetricCard
+          icon={<UserCheck className="h-5 w-5" />}
+          labelEn="Unique Visitors"
+          label="순 방문객"
+          value={metrics?.uniqueVisitors.toLocaleString() || '0'}
+          subLabel={metrics?.visitFrequency ? `평균 ${metrics.visitFrequency.toFixed(1)}회 방문` : undefined}
+          change={metrics?.changes.uniqueVisitors}
+        />
+        <MetricCard
+          icon={<DollarSign className="h-5 w-5" />}
+          labelEn="Revenue"
+          label="총 매출"
+          value={formatCurrency(metrics?.revenue || 0, 'man')}
+          subLabel={metrics?.atv ? `객단가 ${formatCurrency(metrics.atv, 'chun')}` : undefined}
+          change={metrics?.changes.revenue}
+        />
+        <MetricCard
+          icon={<TrendingUp className="h-5 w-5" />}
+          labelEn="Conversion"
+          label="구매 전환율"
+          value={formatPercent(metrics?.conversionRate || 0)}
+          subLabel={`${metrics?.transactions.toLocaleString() || 0}건 거래`}
+          change={metrics?.changes.conversionRate}
+          changeUnit="%p"
+        />
       </div>
+
+      {/* 방문 빈도 안내 */}
+      {metrics?.visitFrequency && metrics.visitFrequency > 1 && (
+        <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg flex items-start gap-2">
+          <Info className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">평균 방문 빈도 {metrics.visitFrequency.toFixed(1)}회:</span>{' '}
+            Footfall {metrics.footfall.toLocaleString()} / Unique Visitors {metrics.uniqueVisitors.toLocaleString()}
+          </p>
+        </div>
+      )}
+
+      {/* 고객 여정 퍼널 */}
+      {metrics?.funnel && (
+        <FunnelChart data={metrics.funnel} />
+      )}
 
       {/* 목표 달성률 & AI 추천 효과 */}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -208,19 +188,6 @@ export function OverviewTab() {
           )}
         </CardContent>
       </Card>
-
-      {/* 고객 퍼널 - 기간 집계 */}
-      {kpiData && kpiData.length > 0 && (
-        <FunnelVisualization
-          data={{
-            funnel_entry: kpiData.reduce((sum, d) => sum + (d.funnel_entry || 0), 0),
-            funnel_browse: kpiData.reduce((sum, d) => sum + (d.funnel_browse || 0), 0),
-            funnel_fitting: kpiData.reduce((sum, d) => sum + (d.funnel_fitting || 0), 0),
-            funnel_purchase: kpiData.reduce((sum, d) => sum + (d.funnel_purchase || 0), 0),
-            funnel_return: kpiData.reduce((sum, d) => sum + (d.funnel_return || 0), 0),
-          }}
-        />
-      )}
     </div>
   );
 }
