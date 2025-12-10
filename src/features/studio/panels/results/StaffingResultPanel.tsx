@@ -4,9 +4,11 @@
  * 인력 배치 최적화 시뮬레이션 결과 패널
  */
 
+import { useState } from 'react';
 import { DraggablePanel } from '../../components/DraggablePanel';
 import { UserCheck, ArrowRight, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ApplyStrategyModal } from '@/features/roi/components/ApplyStrategyModal';
 
 export interface StaffingResult {
   currentCoverage: number;
@@ -39,7 +41,9 @@ export const StaffingResultPanel: React.FC<StaffingResultPanelProps> = ({
   onShowPositions,
   defaultPosition = { x: 640, y: 320 },
 }) => {
+  const [showApplyModal, setShowApplyModal] = useState(false);
   const improvement = result.optimizedCoverage - result.currentCoverage;
+  const estimatedROI = 180; // 인력 배치 기본 예상 ROI
 
   return (
     <DraggablePanel
@@ -105,12 +109,31 @@ export const StaffingResultPanel: React.FC<StaffingResultPanelProps> = ({
         </Button>
         <Button
           size="sm"
-          onClick={onApply}
+          onClick={() => setShowApplyModal(true)}
           className="flex-1 h-8 text-xs"
         >
           적용하기
         </Button>
       </div>
+
+      {/* 전략 적용 모달 */}
+      <ApplyStrategyModal
+        isOpen={showApplyModal}
+        onClose={() => setShowApplyModal(false)}
+        strategyData={{
+          source: '3d_simulation',
+          sourceModule: 'staffing_optimization',
+          name: `인력 배치 최적화 (${result.staffCount}명 재배치)`,
+          description: `직원 ${result.staffCount}명 배치 최적화로 매장 커버리지 ${improvement}%p 개선`,
+          settings: { positions: result.staffPositions, improvements: result.improvements },
+          expectedRoi: estimatedROI,
+          confidence: 82,
+          baselineMetrics: {
+            coverage: result.currentCoverage,
+            staffCount: result.staffCount,
+          },
+        }}
+      />
     </DraggablePanel>
   );
 };

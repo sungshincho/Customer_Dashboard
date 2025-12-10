@@ -4,6 +4,7 @@ import {
   Settings,
   Box,
   BarChart3,
+  TrendingUp,
   LucideIcon
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
@@ -35,7 +36,7 @@ interface MenuItem {
   description: string;
 }
 
-// 3개 메인 메뉴로 단순화
+// 4개 메인 메뉴
 const mainMenuItems: MenuItem[] = [
   {
     title: "인사이트 허브",
@@ -50,6 +51,13 @@ const mainMenuItems: MenuItem[] = [
     icon: Box,
     emoji: "🎨",
     description: "3D 편집, 시뮬레이션, 분석"
+  },
+  {
+    title: "ROI 측정",
+    url: "/roi",
+    icon: TrendingUp,
+    emoji: "📈",
+    description: "전략 성과 추적, ROI 분석"
   },
   {
     title: "설정 & 관리",

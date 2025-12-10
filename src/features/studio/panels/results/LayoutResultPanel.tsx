@@ -4,9 +4,11 @@
  * 레이아웃 최적화 시뮬레이션 결과 패널
  */
 
+import { useState } from 'react';
 import { DraggablePanel } from '../../components/DraggablePanel';
 import { Layout, TrendingUp, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ApplyStrategyModal } from '@/features/roi/components/ApplyStrategyModal';
 
 export interface LayoutResult {
   currentEfficiency: number;
@@ -37,7 +39,20 @@ export const LayoutResultPanel: React.FC<LayoutResultPanelProps> = ({
   onShowIn3D,
   defaultPosition = { x: 350, y: 100 },
 }) => {
+  const [showApplyModal, setShowApplyModal] = useState(false);
   const improvement = result.optimizedEfficiency - result.currentEfficiency;
+
+  // ROI 계산 (매출 증가 / 예상 비용 * 100)
+  const estimatedROI = Math.round((result.revenueIncrease / (result.revenueIncrease * 0.3)) * 100);
+
+  const handleApplyClick = () => {
+    setShowApplyModal(true);
+  };
+
+  const handleApplySuccess = () => {
+    setShowApplyModal(false);
+    onApply();
+  };
 
   return (
     <DraggablePanel
@@ -118,12 +133,33 @@ export const LayoutResultPanel: React.FC<LayoutResultPanelProps> = ({
         </Button>
         <Button
           size="sm"
-          onClick={onApply}
+          onClick={handleApplyClick}
           className="flex-1 h-8 text-xs"
         >
           적용하기
         </Button>
       </div>
+
+      {/* 전략 적용 모달 */}
+      <ApplyStrategyModal
+        isOpen={showApplyModal}
+        onClose={() => setShowApplyModal(false)}
+        strategyData={{
+          source: '3d_simulation',
+          sourceModule: 'layout_optimization',
+          name: `레이아웃 최적화 (${result.changes.length}개 변경)`,
+          description: `가구 ${result.changes.length}개 재배치를 통한 매장 효율성 ${improvement}%p 개선`,
+          settings: { changes: result.changes },
+          expectedRoi: estimatedROI,
+          expectedRevenue: result.revenueIncrease,
+          confidence: 85,
+          baselineMetrics: {
+            efficiency: result.currentEfficiency,
+            dwellTime: 0,
+            conversionRate: 0,
+          },
+        }}
+      />
     </DraggablePanel>
   );
 };
