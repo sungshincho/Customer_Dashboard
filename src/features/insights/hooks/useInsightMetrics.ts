@@ -86,22 +86,26 @@ export const useInsightMetrics = () => {
       const totalReturning = kpis?.reduce((sum, k) => sum + (k.returning_visitors || 0), 0) || 0;
 
       // 2. funnel_events에서 퍼널 데이터 및 Unique Visitors
-      const { data: funnelData, error: funnelError } = await supabase
+      // store_id로만 필터링 (org_id는 옵션으로 - 데이터 누락 방지)
+      let funnelQuery = supabase
         .from('funnel_events')
         .select('event_type, visitor_id')
-        .eq('org_id', orgId)
         .eq('store_id', selectedStore.id)
         .gte('event_date', startDate)
         .lte('event_date', endDate);
 
+      // org_id가 있으면 추가 필터 (없으면 store_id만으로 조회)
+      // 참고: 일부 데이터가 org_id 없이 저장되어 있을 수 있음
+      const { data: funnelData, error: funnelError } = await funnelQuery;
+
       // 디버깅 로그
-      console.log('[useInsightMetrics] Funnel query params:', {
-        orgId,
+      console.log('[useInsightMetrics] Funnel query:', {
         storeId: selectedStore.id,
         startDate,
         endDate,
         resultCount: funnelData?.length || 0,
         error: funnelError?.message,
+        sampleEvents: funnelData?.slice(0, 3),
       });
 
       // 이벤트 타입별 고유 방문자 수
@@ -170,7 +174,6 @@ export const useInsightMetrics = () => {
       const { data: prevFunnelData } = await supabase
         .from('funnel_events')
         .select('event_type, visitor_id')
-        .eq('org_id', orgId)
         .eq('store_id', selectedStore.id)
         .gte('event_date', prevStartDate.toISOString().split('T')[0])
         .lte('event_date', prevEndDate.toISOString().split('T')[0]);
@@ -183,9 +186,17 @@ export const useInsightMetrics = () => {
       const visitFrequency = uniqueVisitors > 0 ? footfall / uniqueVisitors : 0;
       const conversionRate = funnelByType.entry > 0 ? (funnelByType.purchase / funnelByType.entry) * 100 : 0;
       const prevConversionRate = prevEntry > 0 ? (prevPurchase / prevEntry) * 100 : 0;
-      const atv = transactions > 0 ? revenue / transactions : 0;
+      const atv = transactions > 0 ? Math.round(revenue / transactions) : 0;
       const trackingCoverage = uniqueVisitors > 0 ? (trackedVisitors / uniqueVisitors) * 100 : 0;
       const repeatRate = footfall > 0 ? (totalReturning / footfall) * 100 : 0;
+
+      // ATV 디버깅 로그
+      console.log('[useInsightMetrics] ATV calculation:', {
+        revenue,
+        transactions,
+        atv,
+        expectedAtv: transactions > 0 ? revenue / transactions : 0,
+      });
 
       return {
         footfall,
