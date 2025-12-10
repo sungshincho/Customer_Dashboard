@@ -157,7 +157,8 @@ export const useApplyStrategy = () => {
 
   return useMutation({
     mutationFn: async (input: ApplyStrategyInput) => {
-      if (!selectedStore?.id || !selectedStore?.organization_id) {
+      const orgId = selectedStore?.org_id || selectedStore?.organization_id;
+      if (!selectedStore?.id || !orgId) {
         throw new Error('Store not selected');
       }
 
@@ -165,7 +166,7 @@ export const useApplyStrategy = () => {
         .from('applied_strategies')
         .insert({
           store_id: selectedStore.id,
-          org_id: selectedStore.organization_id,
+          org_id: orgId,
           source: input.source,
           source_module: input.sourceModule,
           name: input.name,

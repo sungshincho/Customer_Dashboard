@@ -11,6 +11,8 @@ interface Store {
   phone?: string;
   email?: string;
   metadata?: any;
+  org_id?: string;
+  organization_id?: string;
 }
 
 interface SelectedStoreContextType {
