@@ -25,6 +25,8 @@ export interface SceneAsset {
 export interface SpaceAsset extends SceneAsset {
   type: 'space';
   zone_name?: string;
+  /** Blender에서 combined bake된 모델인지 여부 - true면 조명/환경 영향 제외 */
+  isBaked?: boolean;
 }
 
 export interface FurnitureAsset extends SceneAsset {

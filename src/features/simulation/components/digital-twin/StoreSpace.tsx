@@ -1,5 +1,10 @@
+import { useMemo } from 'react';
 import { useGLTF } from '@react-three/drei';
 import type { SpaceAsset } from '@/types/scene3d';
+import {
+  isBakedModel,
+  prepareClonedSceneForBaked,
+} from '../../utils/bakedMaterialUtils';
 
 interface StoreSpaceProps {
   asset: SpaceAsset;
@@ -40,10 +45,26 @@ export function StoreSpace({ asset, onClick }: StoreSpaceProps) {
 
   try {
     const { scene } = useGLTF(asset.model_url);
-    
+
+    // Baked 모델 여부 확인 (명시적 플래그 또는 파일명 패턴)
+    const shouldUseBaked = asset.isBaked ?? isBakedModel(asset.model_url);
+
+    // scene을 clone하고 baked 모델이면 material 변환
+    const clonedScene = useMemo(() => {
+      const cloned = scene.clone();
+      if (shouldUseBaked) {
+        // MeshBasicMaterial로 변환하여 조명/환경 영향 제외
+        prepareClonedSceneForBaked(cloned, {
+          convertToBasic: true,
+          disableShadows: true,
+        });
+      }
+      return cloned;
+    }, [scene, shouldUseBaked]);
+
     return (
       <primitive
-        object={scene.clone()}
+        object={clonedScene}
         position={[asset.position.x, asset.position.y, asset.position.z]}
         rotation={[asset.rotation.x, asset.rotation.y, asset.rotation.z]}
         scale={[asset.scale.x, asset.scale.y, asset.scale.z]}
