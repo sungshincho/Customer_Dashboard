@@ -24,6 +24,7 @@ interface CongestionResultPanelProps {
   onPlayAnimation: () => void;
   defaultPosition?: { x: number; y: number };
   rightOffset?: number;
+  defaultCollapsed?: boolean;
 }
 
 export const CongestionResultPanel: React.FC<CongestionResultPanelProps> = ({
@@ -32,6 +33,7 @@ export const CongestionResultPanel: React.FC<CongestionResultPanelProps> = ({
   onPlayAnimation,
   defaultPosition = { x: 350, y: 320 },
   rightOffset,
+  defaultCollapsed = true,
 }) => {
   const getCongestionColor = (value: number) => {
     if (value >= 70) return 'bg-red-500';
@@ -52,6 +54,7 @@ export const CongestionResultPanel: React.FC<CongestionResultPanelProps> = ({
       icon={<Users className="w-4 h-4" />}
       defaultPosition={defaultPosition}
       rightOffset={rightOffset}
+      defaultCollapsed={defaultCollapsed}
       closable
       onClose={onClose}
       width="w-64"

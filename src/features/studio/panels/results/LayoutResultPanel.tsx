@@ -31,6 +31,7 @@ interface LayoutResultPanelProps {
   onShowIn3D: () => void;
   defaultPosition?: { x: number; y: number };
   rightOffset?: number;
+  defaultCollapsed?: boolean;
 }
 
 export const LayoutResultPanel: React.FC<LayoutResultPanelProps> = ({
@@ -40,6 +41,7 @@ export const LayoutResultPanel: React.FC<LayoutResultPanelProps> = ({
   onShowIn3D,
   defaultPosition = { x: 350, y: 100 },
   rightOffset,
+  defaultCollapsed = true,
 }) => {
   const [showApplyModal, setShowApplyModal] = useState(false);
   const improvement = result ? result.optimizedEfficiency - result.currentEfficiency : 0;
@@ -63,6 +65,7 @@ export const LayoutResultPanel: React.FC<LayoutResultPanelProps> = ({
       icon={<Layout className="w-4 h-4" />}
       defaultPosition={defaultPosition}
       rightOffset={rightOffset}
+      defaultCollapsed={defaultCollapsed}
       closable
       onClose={onClose}
       width="w-64"
