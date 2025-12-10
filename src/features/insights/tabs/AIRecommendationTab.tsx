@@ -21,6 +21,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
+import { formatCurrency } from '../components';
 import { useAIRecommendations } from '@/hooks/useAIRecommendations';
 import { useApplyRecommendation } from '@/hooks/useROITracking';
 import { useQuery } from '@tanstack/react-query';
@@ -147,7 +148,7 @@ export function AIRecommendationTab() {
               "text-2xl font-bold",
               summary.totalROI >= 0 ? "text-green-600" : "text-red-600"
             )}>
-              {summary.totalROI >= 0 ? '+' : ''}₩{(summary.totalROI / 10000).toFixed(0)}만
+              {summary.totalROI >= 0 ? '+' : ''}{formatCurrency(Math.abs(summary.totalROI))}
             </div>
             <p className="text-xs text-muted-foreground">적용된 추천의 매출 증가</p>
           </CardContent>
@@ -165,7 +166,7 @@ export function AIRecommendationTab() {
               "text-2xl font-bold",
               summary.avgROI >= 0 ? "text-green-600" : "text-red-600"
             )}>
-              {summary.avgROI >= 0 ? '+' : ''}₩{(summary.avgROI / 10000).toFixed(0)}만
+              {summary.avgROI >= 0 ? '+' : ''}{formatCurrency(Math.abs(summary.avgROI))}
             </div>
             <p className="text-xs text-muted-foreground">추천당 평균 효과</p>
           </CardContent>

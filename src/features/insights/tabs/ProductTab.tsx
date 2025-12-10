@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { useInsightMetrics } from '../hooks/useInsightMetrics';
+import { formatCurrency } from '../components';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useDateFilterStore } from '@/store/dateFilterStore';
@@ -169,7 +170,7 @@ export function ProductTab() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ₩{((metrics?.revenue || summary.totalRevenue) / 10000).toFixed(0)}만
+              {formatCurrency(metrics?.revenue || summary.totalRevenue)}
             </div>
             <p className="text-xs text-muted-foreground">분석 기간 총 매출</p>
           </CardContent>
@@ -200,7 +201,7 @@ export function ProductTab() {
           <CardContent>
             <div className="text-2xl font-bold truncate">{summary.topProduct?.name || '-'}</div>
             <p className="text-xs text-muted-foreground">
-              ₩{(summary.topProduct?.revenue || 0).toLocaleString()}
+              {formatCurrency(summary.topProduct?.revenue || 0)}
             </p>
           </CardContent>
         </Card>
@@ -231,7 +232,7 @@ export function ProductTab() {
           <Info className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
           <p className="text-sm text-muted-foreground">
             <span className="font-medium text-foreground">평균 객단가 (ATV):</span>{' '}
-            ₩{metrics.atv.toLocaleString()} = Revenue {((metrics.revenue || 0) / 10000).toFixed(0)}만 / Transactions {metrics.transactions.toLocaleString()}건
+            {formatCurrency(metrics.atv)} = Revenue {formatCurrency(metrics.revenue || 0)} / Transactions {metrics.transactions.toLocaleString()}건
           </p>
         </div>
       )}
@@ -260,7 +261,7 @@ export function ProductTab() {
                       <Cell key={index} fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(v: number) => `₩${v.toLocaleString()}`} />
+                  <Tooltip formatter={(v: number) => formatCurrency(v)} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
@@ -308,8 +309,8 @@ export function ProductTab() {
               <BarChart data={productData.slice(0, 10)}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} interval={0} />
-                <YAxis tickFormatter={(v) => `₩${(v/10000).toFixed(0)}만`} />
-                <Tooltip formatter={(v: number) => `₩${v.toLocaleString()}`} />
+                <YAxis tickFormatter={(v) => formatCurrency(v)} />
+                <Tooltip formatter={(v: number) => formatCurrency(v)} />
                 <Bar dataKey="revenue" fill="hsl(var(--primary))" name="매출" />
               </BarChart>
             </ResponsiveContainer>
@@ -347,7 +348,7 @@ export function ProductTab() {
                         <Badge variant="outline">{product.category}</Badge>
                       </td>
                       <td className="text-right py-3 px-4">{product.quantity.toLocaleString()}개</td>
-                      <td className="text-right py-3 px-4">₩{product.revenue.toLocaleString()}</td>
+                      <td className="text-right py-3 px-4">{formatCurrency(product.revenue)}</td>
                       <td className="text-right py-3 px-4">
                         {product.stock > 0 ? (
                           <Badge variant={product.stock < 10 ? 'destructive' : product.stock < 30 ? 'secondary' : 'default'}>

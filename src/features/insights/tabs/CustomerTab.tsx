@@ -32,6 +32,7 @@ import {
   Info,
 } from 'lucide-react';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
+import { formatCurrency } from '../components';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useDateFilterStore } from '@/store/dateFilterStore';
@@ -263,9 +264,9 @@ export function CustomerTab() {
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={segmentData} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" tickFormatter={(v) => `₩${(v/1000).toFixed(0)}천`} />
+                  <XAxis type="number" tickFormatter={(v) => formatCurrency(v)} />
                   <YAxis dataKey="name" type="category" width={80} />
-                  <Tooltip formatter={(v: number) => `₩${v.toLocaleString()}`} />
+                  <Tooltip formatter={(v: number) => formatCurrency(v)} />
                   <Bar dataKey="avgValue" fill="hsl(var(--chart-1))" name="평균 구매액" />
                 </BarChart>
               </ResponsiveContainer>
