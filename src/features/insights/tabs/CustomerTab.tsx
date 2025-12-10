@@ -3,6 +3,10 @@
  *
  * 인사이트 허브 - 고객 탭
  * 고객 세그먼트, 재방문율, 충성도 분석
+ *
+ * 데이터 소스:
+ * - customer_segments_agg: 고객 세그먼트 분석
+ * - daily_kpis_agg: 재방문 추이
  */
 
 import { useMemo } from 'react';
@@ -19,40 +23,44 @@ import {
   PieChart,
   Pie,
   Cell,
-  LineChart,
-  Line,
 } from 'recharts';
 import {
   Users,
   UserCheck,
   UserPlus,
   Heart,
-  TrendingUp,
-  Calendar,
 } from 'lucide-react';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useDateFilterStore } from '@/store/dateFilterStore';
+import { useAuth } from '@/hooks/useAuth';
 
 const SEGMENT_COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe'];
 
 export function CustomerTab() {
   const { selectedStore } = useSelectedStore();
   const { dateRange } = useDateFilterStore();
+  const { user, orgId } = useAuth();
 
-  // 고객 세그먼트 데이터
+  // 고객 세그먼트 데이터 (customer_segments_agg 테이블)
   const { data: segmentData } = useQuery({
-    queryKey: ['customer-segments', selectedStore?.id, dateRange],
+    queryKey: ['customer-segments-agg', selectedStore?.id, dateRange, orgId],
     queryFn: async () => {
-      if (!selectedStore?.id) return [];
+      if (!selectedStore?.id || !orgId) return [];
 
-      const { data } = await supabase
-        .from('customer_segments')
-        .select('segment_name, customer_count, avg_purchase_value, visit_frequency')
+      const { data, error } = await supabase
+        .from('customer_segments_agg')
+        .select('segment_name, customer_count, total_revenue, avg_transaction_value, visit_frequency')
+        .eq('org_id', orgId)
         .eq('store_id', selectedStore.id)
         .gte('date', dateRange.startDate)
         .lte('date', dateRange.endDate);
+
+      if (error) {
+        console.error('Error fetching customer segments:', error);
+        return [];
+      }
 
       // 세그먼트별 집계
       const segmentMap = new Map<string, { count: number; value: number; frequency: number; records: number }>();
@@ -60,7 +68,7 @@ export function CustomerTab() {
         const existing = segmentMap.get(d.segment_name) || { count: 0, value: 0, frequency: 0, records: 0 };
         segmentMap.set(d.segment_name, {
           count: existing.count + (d.customer_count || 0),
-          value: existing.value + (d.avg_purchase_value || 0),
+          value: existing.value + (d.avg_transaction_value || 0),
           frequency: existing.frequency + (d.visit_frequency || 0),
           records: existing.records + 1,
         });
@@ -71,45 +79,66 @@ export function CustomerTab() {
         count: data.count,
         avgValue: Math.round(data.value / Math.max(data.records, 1)),
         frequency: (data.frequency / Math.max(data.records, 1)).toFixed(1),
-      }));
+      })).sort((a, b) => b.count - a.count);
     },
-    enabled: !!selectedStore?.id,
+    enabled: !!selectedStore?.id && !!orgId,
   });
 
-  // 재방문 추이 데이터
+  // 재방문 추이 데이터 (daily_kpis_agg 테이블 - 올바르게 org_id 필터 추가)
   const { data: returnData } = useQuery({
-    queryKey: ['return-visits', selectedStore?.id, dateRange],
+    queryKey: ['return-visits', selectedStore?.id, dateRange, orgId],
     queryFn: async () => {
-      if (!selectedStore?.id) return [];
+      if (!selectedStore?.id || !orgId) return [];
 
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('daily_kpis_agg')
-        .select('date, total_visits, returning_visitors')
+        .select('date, total_visitors, returning_visitors')
+        .eq('org_id', orgId)
         .eq('store_id', selectedStore.id)
         .gte('date', dateRange.startDate)
         .lte('date', dateRange.endDate)
         .order('date');
 
+      if (error) {
+        console.error('Error fetching return visits:', error);
+        return [];
+      }
+
       return (data || []).map((d) => ({
         date: new Date(d.date).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }),
-        newVisitors: (d.total_visits || 0) - (d.returning_visitors || 0),
+        totalVisitors: d.total_visitors || 0,
+        newVisitors: (d.total_visitors || 0) - (d.returning_visitors || 0),
         returningVisitors: d.returning_visitors || 0,
-        returnRate: d.total_visits ? ((d.returning_visitors || 0) / d.total_visits * 100).toFixed(1) : '0',
+        returnRate: d.total_visitors ? ((d.returning_visitors || 0) / d.total_visitors * 100).toFixed(1) : '0',
       }));
     },
-    enabled: !!selectedStore?.id,
+    enabled: !!selectedStore?.id && !!orgId,
   });
 
   // 요약 통계 계산
   const summary = useMemo(() => {
-    const totalCustomers = segmentData?.reduce((sum, s) => sum + s.count, 0) || 0;
-    const avgReturnRate = returnData?.length
-      ? returnData.reduce((sum, d) => sum + parseFloat(d.returnRate), 0) / returnData.length
-      : 0;
-    const topSegment = segmentData?.sort((a, b) => b.count - a.count)[0];
-    const loyalCustomers = segmentData?.find(s => s.name.includes('충성') || s.name.includes('VIP'))?.count || 0;
+    // returnData에서 총 방문자 수 계산
+    const totalVisitors = returnData?.reduce((sum, d) => sum + d.totalVisitors, 0) || 0;
+    const totalReturning = returnData?.reduce((sum, d) => sum + d.returningVisitors, 0) || 0;
 
-    return { totalCustomers, avgReturnRate, topSegment, loyalCustomers };
+    const avgReturnRate = totalVisitors > 0 ? (totalReturning / totalVisitors) * 100 : 0;
+
+    // 세그먼트 데이터
+    const totalCustomers = segmentData?.reduce((sum, s) => sum + s.count, 0) || 0;
+    const topSegment = segmentData?.[0];
+    const loyalCustomers = segmentData?.find(s =>
+      s.name.toLowerCase().includes('vip') ||
+      s.name.includes('충성') ||
+      s.name.toLowerCase().includes('loyal')
+    )?.count || 0;
+
+    return {
+      totalVisitors,
+      totalCustomers,
+      avgReturnRate,
+      topSegment,
+      loyalCustomers
+    };
   }, [segmentData, returnData]);
 
   return (
@@ -120,12 +149,12 @@ export function CustomerTab() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Users className="h-4 w-4 text-muted-foreground" />
-              총 고객
+              총 방문자
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{summary.totalCustomers.toLocaleString()}명</div>
-            <p className="text-xs text-muted-foreground">분석 기간 내 방문 고객</p>
+            <div className="text-2xl font-bold">{summary.totalVisitors.toLocaleString()}명</div>
+            <p className="text-xs text-muted-foreground">분석 기간 내 총 방문</p>
           </CardContent>
         </Card>
 
@@ -200,7 +229,7 @@ export function CustomerTab() {
               </ResponsiveContainer>
             ) : (
               <div className="h-[250px] flex items-center justify-center text-muted-foreground">
-                데이터가 없습니다
+                세그먼트 데이터가 없습니다
               </div>
             )}
           </CardContent>
@@ -224,7 +253,7 @@ export function CustomerTab() {
               </ResponsiveContainer>
             ) : (
               <div className="h-[250px] flex items-center justify-center text-muted-foreground">
-                데이터가 없습니다
+                세그먼트 데이터가 없습니다
               </div>
             )}
           </CardContent>
@@ -235,10 +264,10 @@ export function CustomerTab() {
       <Card>
         <CardHeader>
           <CardTitle>재방문 추이</CardTitle>
-          <CardDescription>신규 vs 재방문 고객 추이</CardDescription>
+          <CardDescription>신규 vs 재방문 고객 추이 ({dateRange.startDate} ~ {dateRange.endDate})</CardDescription>
         </CardHeader>
         <CardContent>
-          {returnData && returnData.length > 0 ? (
+          {returnData && returnData.length > 0 && returnData.some(d => d.totalVisitors > 0) ? (
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={returnData}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -251,7 +280,7 @@ export function CustomerTab() {
             </ResponsiveContainer>
           ) : (
             <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-              데이터가 없습니다
+              해당 기간에 방문 데이터가 없습니다
             </div>
           )}
         </CardContent>
@@ -263,30 +292,36 @@ export function CustomerTab() {
           <CardTitle>세그먼트 상세 분석</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-3 px-4">세그먼트</th>
-                  <th className="text-right py-3 px-4">고객 수</th>
-                  <th className="text-right py-3 px-4">평균 구매액</th>
-                  <th className="text-right py-3 px-4">방문 빈도</th>
-                </tr>
-              </thead>
-              <tbody>
-                {segmentData?.map((segment) => (
-                  <tr key={segment.name} className="border-b hover:bg-muted/50">
-                    <td className="py-3 px-4 font-medium">
-                      <Badge variant="outline">{segment.name}</Badge>
-                    </td>
-                    <td className="text-right py-3 px-4">{segment.count.toLocaleString()}명</td>
-                    <td className="text-right py-3 px-4">₩{segment.avgValue.toLocaleString()}</td>
-                    <td className="text-right py-3 px-4">{segment.frequency}회/월</td>
+          {segmentData && segmentData.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 px-4">세그먼트</th>
+                    <th className="text-right py-3 px-4">고객 수</th>
+                    <th className="text-right py-3 px-4">평균 구매액</th>
+                    <th className="text-right py-3 px-4">방문 빈도</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {segmentData?.map((segment) => (
+                    <tr key={segment.name} className="border-b hover:bg-muted/50">
+                      <td className="py-3 px-4 font-medium">
+                        <Badge variant="outline">{segment.name}</Badge>
+                      </td>
+                      <td className="text-right py-3 px-4">{segment.count.toLocaleString()}명</td>
+                      <td className="text-right py-3 px-4">₩{segment.avgValue.toLocaleString()}</td>
+                      <td className="text-right py-3 px-4">{segment.frequency}회/월</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="py-8 text-center text-muted-foreground">
+              해당 기간에 세그먼트 데이터가 없습니다
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

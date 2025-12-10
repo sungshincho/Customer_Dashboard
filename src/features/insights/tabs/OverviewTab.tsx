@@ -24,10 +24,9 @@ import {
   Box,
 } from 'lucide-react';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
-import { useDashboardKPI, useLatestKPIs } from '@/hooks/useDashboardKPI';
+import { useKPIsByDateRange } from '@/hooks/useDashboardKPI';
 import { useAIRecommendations } from '@/hooks/useAIRecommendations';
 import { useDateFilterStore } from '@/store/dateFilterStore';
-import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
@@ -35,55 +34,74 @@ export function OverviewTab() {
   const navigate = useNavigate();
   const { selectedStore } = useSelectedStore();
   const { dateRange } = useDateFilterStore();
-  const { data: dashboardKPI } = useDashboardKPI(selectedStore?.id, dateRange.endDate);
-  const { data: latestKPIs } = useLatestKPIs(selectedStore?.id, 7);
+
+  // 전역 기간 필터를 사용하여 KPI 데이터 조회
+  const { data: kpiData } = useKPIsByDateRange(
+    selectedStore?.id,
+    dateRange.startDate,
+    dateRange.endDate
+  );
   const { data: recommendations } = useAIRecommendations(selectedStore?.id);
 
-  // KPI 카드 데이터
+  // KPI 카드 데이터 - 기간 내 집계
   const stats = useMemo(() => {
-    const totalVisits = dashboardKPI?.total_visits || 0;
-    const totalRevenue = dashboardKPI?.total_revenue || 0;
-    const conversionRate = dashboardKPI?.conversion_rate || 0;
-    const avgBasket = totalRevenue && dashboardKPI?.total_purchases
-      ? totalRevenue / dashboardKPI.total_purchases
-      : 0;
-
-    // 전일 대비 변화율 계산 (latestKPIs에서)
-    let visitsChange = 0, revenueChange = 0, conversionChange = 0, basketChange = 0;
-    if (latestKPIs && latestKPIs.length >= 2) {
-      const today = latestKPIs[0];
-      const yesterday = latestKPIs[1];
-
-      if (yesterday?.total_visits) {
-        visitsChange = ((today?.total_visits || 0) - yesterday.total_visits) / yesterday.total_visits * 100;
-      }
-      if (yesterday?.total_revenue) {
-        revenueChange = ((today?.total_revenue || 0) - yesterday.total_revenue) / yesterday.total_revenue * 100;
-      }
-      if (yesterday?.conversion_rate) {
-        conversionChange = (today?.conversion_rate || 0) - yesterday.conversion_rate;
-      }
+    if (!kpiData || kpiData.length === 0) {
+      return [
+        { title: '방문자', value: '0', change: '데이터 없음', changeType: 'neutral' as const, icon: Users },
+        { title: '매출', value: '₩0', change: '데이터 없음', changeType: 'neutral' as const, icon: DollarSign },
+        { title: '전환율', value: '0%', change: '데이터 없음', changeType: 'neutral' as const, icon: TrendingUp },
+        { title: '객단가', value: '₩0', change: '데이터 없음', changeType: 'neutral' as const, icon: ShoppingCart },
+      ];
     }
+
+    // 기간 내 총합 계산
+    const totalVisits = kpiData.reduce((sum, d) => sum + (d.total_visits || 0), 0);
+    const totalRevenue = kpiData.reduce((sum, d) => sum + (d.total_revenue || 0), 0);
+    const totalPurchases = kpiData.reduce((sum, d) => sum + (d.total_purchases || 0), 0);
+    const avgConversionRate = kpiData.reduce((sum, d) => sum + (d.conversion_rate || 0), 0) / kpiData.length;
+    const avgBasket = totalPurchases > 0 ? totalRevenue / totalPurchases : 0;
+
+    // 전반기 vs 후반기 비교로 변화율 계산
+    const midPoint = Math.floor(kpiData.length / 2);
+    let visitsChange = 0, revenueChange = 0, conversionChange = 0;
+
+    if (kpiData.length >= 2 && midPoint > 0) {
+      const firstHalf = kpiData.slice(0, midPoint);
+      const secondHalf = kpiData.slice(midPoint);
+
+      const firstVisits = firstHalf.reduce((s, d) => s + (d.total_visits || 0), 0);
+      const secondVisits = secondHalf.reduce((s, d) => s + (d.total_visits || 0), 0);
+      const firstRevenue = firstHalf.reduce((s, d) => s + (d.total_revenue || 0), 0);
+      const secondRevenue = secondHalf.reduce((s, d) => s + (d.total_revenue || 0), 0);
+      const firstConversion = firstHalf.reduce((s, d) => s + (d.conversion_rate || 0), 0) / firstHalf.length;
+      const secondConversion = secondHalf.reduce((s, d) => s + (d.conversion_rate || 0), 0) / secondHalf.length;
+
+      if (firstVisits > 0) visitsChange = ((secondVisits - firstVisits) / firstVisits) * 100;
+      if (firstRevenue > 0) revenueChange = ((secondRevenue - firstRevenue) / firstRevenue) * 100;
+      conversionChange = secondConversion - firstConversion;
+    }
+
+    const periodLabel = kpiData.length > 1 ? `${kpiData.length}일` : '오늘';
 
     return [
       {
         title: '방문자',
         value: totalVisits.toLocaleString(),
-        change: visitsChange !== 0 ? `${visitsChange > 0 ? '+' : ''}${visitsChange.toFixed(1)}%` : '오늘',
+        change: visitsChange !== 0 ? `${visitsChange > 0 ? '+' : ''}${visitsChange.toFixed(1)}%` : periodLabel,
         changeType: visitsChange >= 0 ? 'positive' as const : 'negative' as const,
         icon: Users,
       },
       {
         title: '매출',
         value: `₩${(totalRevenue / 10000).toFixed(0)}만`,
-        change: revenueChange !== 0 ? `${revenueChange > 0 ? '+' : ''}${revenueChange.toFixed(1)}%` : '오늘',
+        change: revenueChange !== 0 ? `${revenueChange > 0 ? '+' : ''}${revenueChange.toFixed(1)}%` : periodLabel,
         changeType: revenueChange >= 0 ? 'positive' as const : 'negative' as const,
         icon: DollarSign,
       },
       {
         title: '전환율',
-        value: `${conversionRate.toFixed(1)}%`,
-        change: conversionChange !== 0 ? `${conversionChange > 0 ? '+' : ''}${conversionChange.toFixed(1)}%p` : '오늘',
+        value: `${avgConversionRate.toFixed(1)}%`,
+        change: conversionChange !== 0 ? `${conversionChange > 0 ? '+' : ''}${conversionChange.toFixed(1)}%p` : periodLabel,
         changeType: conversionChange >= 0 ? 'positive' as const : 'negative' as const,
         icon: TrendingUp,
       },
@@ -95,7 +113,7 @@ export function OverviewTab() {
         icon: ShoppingCart,
       },
     ];
-  }, [dashboardKPI, latestKPIs]);
+  }, [kpiData]);
 
   // 우선순위 높은 추천
   const topRecommendations = recommendations?.slice(0, 2) || [];
@@ -191,15 +209,15 @@ export function OverviewTab() {
         </CardContent>
       </Card>
 
-      {/* 고객 퍼널 */}
-      {dashboardKPI && (
+      {/* 고객 퍼널 - 기간 집계 */}
+      {kpiData && kpiData.length > 0 && (
         <FunnelVisualization
           data={{
-            funnel_entry: dashboardKPI.funnel_entry,
-            funnel_browse: dashboardKPI.funnel_browse,
-            funnel_fitting: dashboardKPI.funnel_fitting,
-            funnel_purchase: dashboardKPI.funnel_purchase,
-            funnel_return: dashboardKPI.funnel_return,
+            funnel_entry: kpiData.reduce((sum, d) => sum + (d.funnel_entry || 0), 0),
+            funnel_browse: kpiData.reduce((sum, d) => sum + (d.funnel_browse || 0), 0),
+            funnel_fitting: kpiData.reduce((sum, d) => sum + (d.funnel_fitting || 0), 0),
+            funnel_purchase: kpiData.reduce((sum, d) => sum + (d.funnel_purchase || 0), 0),
+            funnel_return: kpiData.reduce((sum, d) => sum + (d.funnel_return || 0), 0),
           }}
         />
       )}

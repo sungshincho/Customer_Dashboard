@@ -3,12 +3,15 @@
  *
  * 인사이트 허브 - 상품 탭
  * 상품별 성과, 카테고리 분석, 재고 현황
+ *
+ * 데이터 소스:
+ * - product_performance_agg: 상품별 성과 데이터
+ * - products: 상품 정보 (이름, 카테고리)
  */
 
 import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import {
   BarChart,
   Bar,
@@ -23,8 +26,6 @@ import {
 } from 'recharts';
 import {
   Package,
-  TrendingUp,
-  TrendingDown,
   DollarSign,
   AlertTriangle,
   Award,
@@ -33,6 +34,7 @@ import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useDateFilterStore } from '@/store/dateFilterStore';
+import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 
 const CATEGORY_COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#00C49F'];
@@ -40,67 +42,92 @@ const CATEGORY_COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', 
 export function ProductTab() {
   const { selectedStore } = useSelectedStore();
   const { dateRange } = useDateFilterStore();
+  const { user, orgId } = useAuth();
 
-  // 상품별 판매 데이터
+  // 상품별 판매 데이터 (product_performance_agg + products 조인)
   const { data: productData } = useQuery({
-    queryKey: ['product-sales', selectedStore?.id, dateRange],
+    queryKey: ['product-performance', selectedStore?.id, dateRange, orgId],
     queryFn: async () => {
-      if (!selectedStore?.id) return [];
+      if (!selectedStore?.id || !orgId) return [];
 
-      const { data } = await supabase
-        .from('product_sales')
-        .select('product_name, category, quantity_sold, revenue, stock_level')
+      // 1. product_performance_agg에서 성과 데이터 가져오기
+      const { data: perfData, error: perfError } = await supabase
+        .from('product_performance_agg')
+        .select('product_id, units_sold, revenue, stock_level')
+        .eq('org_id', orgId)
         .eq('store_id', selectedStore.id)
         .gte('date', dateRange.startDate)
         .lte('date', dateRange.endDate);
 
-      // 상품별 집계
+      if (perfError) {
+        console.error('Error fetching product performance:', perfError);
+        return [];
+      }
+
+      if (!perfData || perfData.length === 0) return [];
+
+      // 2. 제품 ID별 집계
       const productMap = new Map<string, {
-        category: string;
         quantity: number;
         revenue: number;
         stock: number;
-        records: number;
       }>();
 
-      (data || []).forEach((d) => {
-        const existing = productMap.get(d.product_name) || {
-          category: d.category,
+      perfData.forEach((d) => {
+        const existing = productMap.get(d.product_id) || {
           quantity: 0,
           revenue: 0,
           stock: 0,
-          records: 0,
         };
-        productMap.set(d.product_name, {
-          category: d.category || existing.category,
-          quantity: existing.quantity + (d.quantity_sold || 0),
+        productMap.set(d.product_id, {
+          quantity: existing.quantity + (d.units_sold || 0),
           revenue: existing.revenue + (d.revenue || 0),
-          stock: d.stock_level || existing.stock,
-          records: existing.records + 1,
+          stock: d.stock_level ?? existing.stock,
         });
       });
 
+      // 3. products 테이블에서 상품 정보 가져오기
+      const productIds = [...productMap.keys()];
+      const { data: productsInfo, error: productsError } = await supabase
+        .from('products')
+        .select('id, name, category')
+        .in('id', productIds);
+
+      if (productsError) {
+        console.error('Error fetching products:', productsError);
+      }
+
+      const productInfoMap = new Map(
+        (productsInfo || []).map(p => [p.id, { name: p.name || p.id, category: p.category || '미분류' }])
+      );
+
+      // 4. 결합하여 반환
       return Array.from(productMap.entries())
-        .map(([name, data]) => ({
-          name,
-          category: data.category,
-          quantity: data.quantity,
-          revenue: data.revenue,
-          stock: data.stock,
-        }))
+        .map(([productId, data]) => {
+          const info = productInfoMap.get(productId) || { name: productId.substring(0, 8), category: '미분류' };
+          return {
+            productId,
+            name: info.name,
+            category: info.category,
+            quantity: data.quantity,
+            revenue: data.revenue,
+            stock: data.stock,
+          };
+        })
         .sort((a, b) => b.revenue - a.revenue);
     },
-    enabled: !!selectedStore?.id,
+    enabled: !!selectedStore?.id && !!orgId,
   });
 
   // 카테고리별 집계
   const categoryData = useMemo(() => {
-    if (!productData) return [];
+    if (!productData || productData.length === 0) return [];
 
     const categoryMap = new Map<string, { revenue: number; quantity: number }>();
     productData.forEach((p) => {
-      const existing = categoryMap.get(p.category) || { revenue: 0, quantity: 0 };
-      categoryMap.set(p.category, {
+      const category = p.category || '미분류';
+      const existing = categoryMap.get(category) || { revenue: 0, quantity: 0 };
+      categoryMap.set(category, {
         revenue: existing.revenue + p.revenue,
         quantity: existing.quantity + p.quantity,
       });
@@ -120,7 +147,7 @@ export function ProductTab() {
     const totalRevenue = productData?.reduce((sum, p) => sum + p.revenue, 0) || 0;
     const totalQuantity = productData?.reduce((sum, p) => sum + p.quantity, 0) || 0;
     const topProduct = productData?.[0];
-    const lowStockCount = productData?.filter(p => p.stock < 10).length || 0;
+    const lowStockCount = productData?.filter(p => p.stock > 0 && p.stock < 10).length || 0;
 
     return { totalRevenue, totalQuantity, topProduct, lowStockCount };
   }, [productData]);
@@ -220,7 +247,7 @@ export function ProductTab() {
               </ResponsiveContainer>
             ) : (
               <div className="h-[250px] flex items-center justify-center text-muted-foreground">
-                데이터가 없습니다
+                상품 데이터가 없습니다
               </div>
             )}
           </CardContent>
@@ -244,7 +271,7 @@ export function ProductTab() {
               </ResponsiveContainer>
             ) : (
               <div className="h-[250px] flex items-center justify-center text-muted-foreground">
-                데이터가 없습니다
+                상품 데이터가 없습니다
               </div>
             )}
           </CardContent>
@@ -255,7 +282,7 @@ export function ProductTab() {
       <Card>
         <CardHeader>
           <CardTitle>상품 성과 TOP 10</CardTitle>
-          <CardDescription>매출 기준 상위 10개 상품</CardDescription>
+          <CardDescription>매출 기준 상위 10개 상품 ({dateRange.startDate} ~ {dateRange.endDate})</CardDescription>
         </CardHeader>
         <CardContent>
           {productData && productData.length > 0 ? (
@@ -270,7 +297,7 @@ export function ProductTab() {
             </ResponsiveContainer>
           ) : (
             <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-              데이터가 없습니다
+              해당 기간에 상품 데이터가 없습니다
             </div>
           )}
         </CardContent>
@@ -282,36 +309,46 @@ export function ProductTab() {
           <CardTitle>상품별 상세 현황</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-3 px-4">상품명</th>
-                  <th className="text-left py-3 px-4">카테고리</th>
-                  <th className="text-right py-3 px-4">판매량</th>
-                  <th className="text-right py-3 px-4">매출</th>
-                  <th className="text-right py-3 px-4">재고</th>
-                </tr>
-              </thead>
-              <tbody>
-                {productData?.slice(0, 15).map((product) => (
-                  <tr key={product.name} className="border-b hover:bg-muted/50">
-                    <td className="py-3 px-4 font-medium">{product.name}</td>
-                    <td className="py-3 px-4">
-                      <Badge variant="outline">{product.category}</Badge>
-                    </td>
-                    <td className="text-right py-3 px-4">{product.quantity.toLocaleString()}개</td>
-                    <td className="text-right py-3 px-4">₩{product.revenue.toLocaleString()}</td>
-                    <td className="text-right py-3 px-4">
-                      <Badge variant={product.stock < 10 ? 'destructive' : product.stock < 30 ? 'secondary' : 'default'}>
-                        {product.stock}개
-                      </Badge>
-                    </td>
+          {productData && productData.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 px-4">상품명</th>
+                    <th className="text-left py-3 px-4">카테고리</th>
+                    <th className="text-right py-3 px-4">판매량</th>
+                    <th className="text-right py-3 px-4">매출</th>
+                    <th className="text-right py-3 px-4">재고</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {productData?.slice(0, 15).map((product) => (
+                    <tr key={product.productId} className="border-b hover:bg-muted/50">
+                      <td className="py-3 px-4 font-medium">{product.name}</td>
+                      <td className="py-3 px-4">
+                        <Badge variant="outline">{product.category}</Badge>
+                      </td>
+                      <td className="text-right py-3 px-4">{product.quantity.toLocaleString()}개</td>
+                      <td className="text-right py-3 px-4">₩{product.revenue.toLocaleString()}</td>
+                      <td className="text-right py-3 px-4">
+                        {product.stock > 0 ? (
+                          <Badge variant={product.stock < 10 ? 'destructive' : product.stock < 30 ? 'secondary' : 'default'}>
+                            {product.stock}개
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="py-8 text-center text-muted-foreground">
+              해당 기간에 상품 데이터가 없습니다
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
