@@ -3,8 +3,14 @@
  *
  * 인사이트 허브 - 매장 탭
  * 시간대별 방문 패턴, 존별 체류시간, 피크타임 분석
+ *
+ * 데이터 소스:
+ * - funnel_events: 시간대별 방문 패턴
+ * - zone_daily_metrics: 존별 체류시간 및 방문자
+ * - zones_dim: 존 정보
  */
 
+import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -15,8 +21,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  LineChart,
-  Line,
   PieChart,
   Pie,
   Cell,
@@ -28,92 +32,115 @@ import {
   Users,
 } from 'lucide-react';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
+import { useDateFilterStore } from '@/store/dateFilterStore';
+import { useZoneMetricsByDateRange, useZonesDim } from '@/hooks/useZoneMetrics';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useDateFilterStore } from '@/store/dateFilterStore';
+import { useAuth } from '@/hooks/useAuth';
 
 const ZONE_COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe'];
 
 export function StoreTab() {
   const { selectedStore } = useSelectedStore();
   const { dateRange } = useDateFilterStore();
+  const { user, orgId } = useAuth();
 
-  // 시간대별 방문 데이터
+  // 시간대별 방문 데이터 (funnel_events에서 entry 이벤트 집계)
   const { data: hourlyData } = useQuery({
-    queryKey: ['hourly-visits', selectedStore?.id, dateRange],
+    queryKey: ['store-hourly-visits', selectedStore?.id, dateRange, orgId],
     queryFn: async () => {
-      if (!selectedStore?.id) return [];
+      if (!selectedStore?.id || !orgId) return [];
 
-      const { data } = await supabase
-        .from('hourly_metrics')
-        .select('hour, visitor_count, avg_dwell_time')
+      const { data, error } = await supabase
+        .from('funnel_events')
+        .select('event_hour')
+        .eq('org_id', orgId)
         .eq('store_id', selectedStore.id)
-        .gte('date', dateRange.startDate)
-        .lte('date', dateRange.endDate)
-        .order('hour');
+        .eq('event_type', 'entry')
+        .gte('event_date', dateRange.startDate)
+        .lte('event_date', dateRange.endDate);
+
+      if (error) {
+        console.error('Error fetching hourly data:', error);
+        return [];
+      }
 
       // 시간대별 집계
-      const hourlyMap = new Map<number, { visitors: number; count: number; dwell: number }>();
+      const hourlyMap = new Map<number, number>();
       (data || []).forEach((d) => {
-        const existing = hourlyMap.get(d.hour) || { visitors: 0, count: 0, dwell: 0 };
-        hourlyMap.set(d.hour, {
-          visitors: existing.visitors + (d.visitor_count || 0),
-          count: existing.count + 1,
-          dwell: existing.dwell + (d.avg_dwell_time || 0),
-        });
+        const hour = d.event_hour || 0;
+        hourlyMap.set(hour, (hourlyMap.get(hour) || 0) + 1);
       });
 
-      return Array.from(hourlyMap.entries())
-        .map(([hour, data]) => ({
-          hour: `${hour}시`,
-          visitors: Math.round(data.visitors / Math.max(data.count, 1)),
-          avgDwell: Math.round(data.dwell / Math.max(data.count, 1)),
-        }))
-        .sort((a, b) => parseInt(a.hour) - parseInt(b.hour));
-    },
-    enabled: !!selectedStore?.id,
-  });
-
-  // 존별 데이터
-  const { data: zoneData } = useQuery({
-    queryKey: ['zone-metrics', selectedStore?.id, dateRange],
-    queryFn: async () => {
-      if (!selectedStore?.id) return [];
-
-      const { data } = await supabase
-        .from('zone_metrics')
-        .select('zone_name, visitor_count, avg_dwell_time, conversion_rate')
-        .eq('store_id', selectedStore.id)
-        .gte('date', dateRange.startDate)
-        .lte('date', dateRange.endDate);
-
-      // 존별 집계
-      const zoneMap = new Map<string, { visitors: number; dwell: number; conversion: number; count: number }>();
-      (data || []).forEach((d) => {
-        const existing = zoneMap.get(d.zone_name) || { visitors: 0, dwell: 0, conversion: 0, count: 0 };
-        zoneMap.set(d.zone_name, {
-          visitors: existing.visitors + (d.visitor_count || 0),
-          dwell: existing.dwell + (d.avg_dwell_time || 0),
-          conversion: existing.conversion + (d.conversion_rate || 0),
-          count: existing.count + 1,
-        });
-      });
-
-      return Array.from(zoneMap.entries()).map(([name, data]) => ({
-        name,
-        visitors: data.visitors,
-        avgDwell: Math.round(data.dwell / Math.max(data.count, 1)),
-        conversion: (data.conversion / Math.max(data.count, 1)).toFixed(1),
+      // 0-23시 데이터 생성
+      return Array.from({ length: 24 }, (_, hour) => ({
+        hour: `${hour}시`,
+        visitors: hourlyMap.get(hour) || 0,
       }));
     },
-    enabled: !!selectedStore?.id,
+    enabled: !!selectedStore?.id && !!orgId,
   });
 
-  // 피크타임 계산
-  const peakHour = hourlyData?.reduce(
-    (max, item) => (item.visitors > (max?.visitors || 0) ? item : max),
-    hourlyData[0]
+  // 존별 데이터 (zone_daily_metrics 테이블)
+  const { data: rawZoneMetrics } = useZoneMetricsByDateRange(
+    selectedStore?.id,
+    dateRange.startDate,
+    dateRange.endDate
   );
+
+  // 존 정보
+  const { data: zonesDim } = useZonesDim(selectedStore?.id);
+
+  // 존별 집계 데이터
+  const zoneData = useMemo(() => {
+    if (!rawZoneMetrics || rawZoneMetrics.length === 0) return [];
+
+    // zone_id별 집계
+    const zoneMap = new Map<string, {
+      visitors: number;
+      dwell: number;
+      conversion: number;
+      count: number
+    }>();
+
+    rawZoneMetrics.forEach((m: any) => {
+      const existing = zoneMap.get(m.zone_id) || { visitors: 0, dwell: 0, conversion: 0, count: 0 };
+      zoneMap.set(m.zone_id, {
+        visitors: existing.visitors + (m.total_visitors || 0),
+        dwell: existing.dwell + (m.avg_dwell_seconds || 0),
+        conversion: existing.conversion + (m.conversion_count || 0),
+        count: existing.count + 1,
+      });
+    });
+
+    // zone_id를 zone 이름으로 매핑
+    const zoneNameMap = new Map(
+      (zonesDim || []).map((z: any) => [z.id, z.zone_name || z.name || z.id])
+    );
+
+    return Array.from(zoneMap.entries()).map(([zoneId, data]) => ({
+      name: zoneNameMap.get(zoneId) || zoneId.substring(0, 8),
+      visitors: data.visitors,
+      avgDwell: Math.round((data.dwell / Math.max(data.count, 1)) / 60), // 초 → 분 변환
+      conversion: data.visitors > 0
+        ? ((data.conversion / data.visitors) * 100).toFixed(1)
+        : '0',
+    })).sort((a, b) => b.visitors - a.visitors);
+  }, [rawZoneMetrics, zonesDim]);
+
+  // 피크타임 계산
+  const peakHour = useMemo(() => {
+    if (!hourlyData || hourlyData.length === 0) return null;
+    return hourlyData.reduce(
+      (max, item) => (item.visitors > (max?.visitors || 0) ? item : max),
+      hourlyData[0]
+    );
+  }, [hourlyData]);
+
+  // 총 방문자 수
+  const totalVisitors = useMemo(() => {
+    return hourlyData?.reduce((sum, h) => sum + h.visitors, 0) || 0;
+  }, [hourlyData]);
 
   return (
     <div className="space-y-6">
@@ -129,7 +156,7 @@ export function StoreTab() {
           <CardContent>
             <div className="text-2xl font-bold">{peakHour?.hour || '-'}</div>
             <p className="text-xs text-muted-foreground">
-              평균 {peakHour?.visitors || 0}명 방문
+              {peakHour?.visitors || 0}명 방문
             </p>
           </CardContent>
         </Card>
@@ -146,7 +173,7 @@ export function StoreTab() {
               {zoneData?.[0]?.name || '-'}
             </div>
             <p className="text-xs text-muted-foreground">
-              {zoneData?.[0]?.visitors || 0}명 방문
+              {zoneData?.[0]?.visitors?.toLocaleString() || 0}명 방문
             </p>
           </CardContent>
         </Card>
@@ -172,15 +199,15 @@ export function StoreTab() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              최고 전환존
+              총 방문자
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {zoneData?.sort((a, b) => parseFloat(b.conversion) - parseFloat(a.conversion))[0]?.name || '-'}
+              {totalVisitors.toLocaleString()}명
             </div>
             <p className="text-xs text-muted-foreground">
-              전환율 {zoneData?.sort((a, b) => parseFloat(b.conversion) - parseFloat(a.conversion))[0]?.conversion || 0}%
+              기간 내 총 방문
             </p>
           </CardContent>
         </Card>
@@ -190,14 +217,14 @@ export function StoreTab() {
       <Card>
         <CardHeader>
           <CardTitle>시간대별 방문 패턴</CardTitle>
-          <CardDescription>시간대별 평균 방문자 수</CardDescription>
+          <CardDescription>시간대별 방문자 수 ({dateRange.startDate} ~ {dateRange.endDate})</CardDescription>
         </CardHeader>
         <CardContent>
-          {hourlyData && hourlyData.length > 0 ? (
+          {hourlyData && hourlyData.some(h => h.visitors > 0) ? (
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={hourlyData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="hour" />
+                <XAxis dataKey="hour" interval={2} />
                 <YAxis />
                 <Tooltip />
                 <Bar dataKey="visitors" fill="hsl(var(--primary))" name="방문자" />
@@ -205,7 +232,7 @@ export function StoreTab() {
             </ResponsiveContainer>
           ) : (
             <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-              데이터가 없습니다
+              해당 기간에 방문 데이터가 없습니다
             </div>
           )}
         </CardContent>
@@ -231,7 +258,7 @@ export function StoreTab() {
               </ResponsiveContainer>
             ) : (
               <div className="h-[250px] flex items-center justify-center text-muted-foreground">
-                데이터가 없습니다
+                존 데이터가 없습니다
               </div>
             )}
           </CardContent>
@@ -264,7 +291,7 @@ export function StoreTab() {
               </ResponsiveContainer>
             ) : (
               <div className="h-[250px] flex items-center justify-center text-muted-foreground">
-                데이터가 없습니다
+                존 데이터가 없습니다
               </div>
             )}
           </CardContent>
@@ -277,32 +304,38 @@ export function StoreTab() {
           <CardTitle>존별 성과 비교</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-3 px-4">존</th>
-                  <th className="text-right py-3 px-4">방문자</th>
-                  <th className="text-right py-3 px-4">체류시간</th>
-                  <th className="text-right py-3 px-4">전환율</th>
-                </tr>
-              </thead>
-              <tbody>
-                {zoneData?.map((zone) => (
-                  <tr key={zone.name} className="border-b hover:bg-muted/50">
-                    <td className="py-3 px-4 font-medium">{zone.name}</td>
-                    <td className="text-right py-3 px-4">{zone.visitors}명</td>
-                    <td className="text-right py-3 px-4">{zone.avgDwell}분</td>
-                    <td className="text-right py-3 px-4">
-                      <Badge variant={parseFloat(zone.conversion) > 20 ? 'default' : 'secondary'}>
-                        {zone.conversion}%
-                      </Badge>
-                    </td>
+          {zoneData && zoneData.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 px-4">존</th>
+                    <th className="text-right py-3 px-4">방문자</th>
+                    <th className="text-right py-3 px-4">체류시간</th>
+                    <th className="text-right py-3 px-4">전환율</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {zoneData?.map((zone) => (
+                    <tr key={zone.name} className="border-b hover:bg-muted/50">
+                      <td className="py-3 px-4 font-medium">{zone.name}</td>
+                      <td className="text-right py-3 px-4">{zone.visitors.toLocaleString()}명</td>
+                      <td className="text-right py-3 px-4">{zone.avgDwell}분</td>
+                      <td className="text-right py-3 px-4">
+                        <Badge variant={parseFloat(zone.conversion) > 20 ? 'default' : 'secondary'}>
+                          {zone.conversion}%
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="py-8 text-center text-muted-foreground">
+              해당 기간에 존 데이터가 없습니다
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
