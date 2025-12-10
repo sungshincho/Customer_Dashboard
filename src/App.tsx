@@ -3,32 +3,30 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { SelectedStoreProvider } from "@/hooks/useSelectedStore";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 
 // Core pages
-import Dashboard from "@/core/pages/DashboardPage";
 import Auth from "@/core/pages/AuthPage";
-import Settings from "@/core/pages/SettingsPage";
 import NotFound from "@/core/pages/NotFoundPage";
 
-// A. Overview pages
+// 새로운 3개 메인 페이지
+import InsightHubPage from "@/features/insights/InsightHubPage";
+import DigitalTwinStudioPage from "@/features/studio/DigitalTwinStudioPage";
+import SettingsPage from "@/features/settings/SettingsPage";
+
+// Legacy pages (하위 호환성)
+import Dashboard from "@/core/pages/DashboardPage";
 import { StoresPage, HQCommunicationPage } from "@/features/overview";
-
-// B. Analysis pages
 import { StoreAnalysisPage, CustomerAnalysisPage, ProductAnalysisPage } from "@/features/analysis";
-
-// C. Simulation pages
 import { DigitalTwin3DPage, SimulationHubPage } from "@/features/simulation";
-
-// D. Data Management pages
 import UnifiedDataManagementPage from "@/features/data-management/import/pages/UnifiedDataManagementPage";
 import SchemaBuilder from "@/features/data-management/ontology/pages/SchemaBuilderPage";
 import APIIntegrationPage from "@/features/data-management/api/pages/APIIntegrationPage";
 
-// E. Onboarding (신규 추가)
+// Onboarding
 import { OnboardingWizard } from "@/features/onboarding/components/OnboardingWizard";
 import { useIsOnboardingComplete } from "@/hooks/useOnboarding";
 
@@ -69,27 +67,26 @@ const App = () => (
             <OnboardingWrapper>
               <Routes>
                 <Route path="/auth" element={<Auth />} />
-                
-                {/* A. Overview (4 pages) */}
-                <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-                <Route path="/overview/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-                <Route path="/overview/stores" element={<ProtectedRoute><StoresPage /></ProtectedRoute>} />
-                <Route path="/overview/hq-communication" element={<ProtectedRoute><HQCommunicationPage /></ProtectedRoute>} />
-                <Route path="/overview/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
-                {/* B. 매장 현황 분석 (3 pages) */}
-                <Route path="/analysis/store" element={<ProtectedRoute><StoreAnalysisPage /></ProtectedRoute>} />
-                <Route path="/analysis/customer" element={<ProtectedRoute><CustomerAnalysisPage /></ProtectedRoute>} />
-                <Route path="/analysis/product" element={<ProtectedRoute><ProductAnalysisPage /></ProtectedRoute>} />
+                {/* 새로운 3개 메인 라우트 */}
+                <Route path="/" element={<ProtectedRoute><InsightHubPage /></ProtectedRoute>} />
+                <Route path="/insights" element={<ProtectedRoute><InsightHubPage /></ProtectedRoute>} />
+                <Route path="/studio" element={<ProtectedRoute><DigitalTwinStudioPage /></ProtectedRoute>} />
+                <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
 
-                {/* C. 시뮬레이션 (2 pages) */}
-                <Route path="/simulation/digital-twin" element={<ProtectedRoute><DigitalTwin3DPage /></ProtectedRoute>} />
-                <Route path="/simulation/hub" element={<ProtectedRoute><SimulationHubPage /></ProtectedRoute>} />
-
-                {/* D. 데이터 관리 (3 pages) */}
-                <Route path="/data-management/import" element={<ProtectedRoute><UnifiedDataManagementPage /></ProtectedRoute>} />
-                <Route path="/data-management/schema" element={<ProtectedRoute><SchemaBuilder /></ProtectedRoute>} />
-                <Route path="/data-management/api" element={<ProtectedRoute><APIIntegrationPage /></ProtectedRoute>} />
+                {/* 레거시 라우트 리다이렉트 (하위 호환성) */}
+                <Route path="/overview/dashboard" element={<Navigate to="/insights" replace />} />
+                <Route path="/overview/stores" element={<Navigate to="/settings?tab=stores" replace />} />
+                <Route path="/overview/hq-communication" element={<Navigate to="/insights" replace />} />
+                <Route path="/overview/settings" element={<Navigate to="/settings" replace />} />
+                <Route path="/analysis/store" element={<Navigate to="/insights?tab=store" replace />} />
+                <Route path="/analysis/customer" element={<Navigate to="/insights?tab=customer" replace />} />
+                <Route path="/analysis/product" element={<Navigate to="/insights?tab=product" replace />} />
+                <Route path="/simulation/digital-twin" element={<Navigate to="/studio" replace />} />
+                <Route path="/simulation/hub" element={<Navigate to="/studio?mode=simulation" replace />} />
+                <Route path="/data-management/import" element={<Navigate to="/settings?tab=data" replace />} />
+                <Route path="/data-management/schema" element={<Navigate to="/settings?tab=data" replace />} />
+                <Route path="/data-management/api" element={<Navigate to="/settings?tab=data" replace />} />
 
                 <Route path="*" element={<NotFound />} />
               </Routes>
