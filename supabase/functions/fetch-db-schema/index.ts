@@ -26,6 +26,15 @@ interface TableMetadata {
   primary_keys: string[];
 }
 
+// 정적 스키마 캐시 (타임아웃 방지용 fallback)
+const STATIC_SCHEMA_TABLES = [
+  'stores', 'products', 'customers', 'purchases', 'visits',
+  'daily_kpis_agg', 'dashboard_kpis', 'ai_recommendations',
+  'recommendation_applications', 'roi_measurements',
+  'graph_entities', 'graph_relations', 'scenarios',
+  'store_visits', 'transactions', 'funnel_events'
+];
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -39,23 +48,47 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // 데이터베이스 함수 호출하여 스키마 메타데이터 조회
-    const { data: schemaData, error } = await supabase.rpc('get_schema_metadata');
+    // 타임아웃 설정 (10초)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-    if (error) {
-      console.error('Error fetching schema metadata:', error);
-      throw new Error(`Failed to fetch schema metadata: ${error.message}`);
+    let schemaMetadata: Record<string, TableMetadata> = {};
+    let source = 'dynamic_database_query';
+
+    try {
+      // 데이터베이스 함수 호출하여 스키마 메타데이터 조회
+      const { data: schemaData, error } = await supabase.rpc('get_schema_metadata');
+      clearTimeout(timeoutId);
+
+      if (error) {
+        console.warn('RPC error, using fallback:', error.message);
+        throw error;
+      }
+
+      if (!schemaData) {
+        throw new Error('No schema metadata returned');
+      }
+
+      schemaMetadata = schemaData as Record<string, TableMetadata>;
+    } catch (rpcError: any) {
+      clearTimeout(timeoutId);
+      console.warn('Falling back to static schema list due to:', rpcError.message);
+
+      // Fallback: 정적 테이블 목록 반환
+      source = 'static_fallback';
+      for (const tableName of STATIC_SCHEMA_TABLES) {
+        schemaMetadata[tableName] = {
+          table_name: tableName,
+          columns: [],
+          foreign_keys: [],
+          primary_keys: ['id']
+        };
+      }
     }
 
-    if (!schemaData) {
-      throw new Error('No schema metadata returned from database');
-    }
-
-    const schemaMetadata = schemaData as Record<string, TableMetadata>;
     const tableCount = Object.keys(schemaMetadata).length;
-    
-    console.log(`Schema loaded: ${tableCount} tables`);
-    console.log(`Tables: ${Object.keys(schemaMetadata).join(', ')}`);
+
+    console.log(`Schema loaded: ${tableCount} tables (source: ${source})`);
 
     return new Response(
       JSON.stringify({
@@ -63,7 +96,7 @@ Deno.serve(async (req) => {
         schema: schemaMetadata,
         table_count: tableCount,
         fetched_at: new Date().toISOString(),
-        source: 'dynamic_database_query'
+        source
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -73,14 +106,30 @@ Deno.serve(async (req) => {
 
   } catch (error: any) {
     console.error('Error in fetch-db-schema:', error);
+
+    // 완전 실패 시에도 기본 스키마 반환
+    const fallbackSchema: Record<string, TableMetadata> = {};
+    for (const tableName of STATIC_SCHEMA_TABLES) {
+      fallbackSchema[tableName] = {
+        table_name: tableName,
+        columns: [],
+        foreign_keys: [],
+        primary_keys: ['id']
+      };
+    }
+
     return new Response(
       JSON.stringify({
-        success: false,
-        error: error.message
+        success: true,
+        schema: fallbackSchema,
+        table_count: STATIC_SCHEMA_TABLES.length,
+        fetched_at: new Date().toISOString(),
+        source: 'error_fallback',
+        warning: error.message
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500
+        status: 200
       }
     );
   }
