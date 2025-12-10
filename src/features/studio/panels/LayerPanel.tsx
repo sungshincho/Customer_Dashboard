@@ -42,8 +42,18 @@ export function LayerPanel() {
       custom: [],
     };
 
+    if (!models || !Array.isArray(models)) {
+      return groups;
+    }
+
     models.forEach((model) => {
-      groups[model.type].push({
+      // model.type이 유효한 키인지 확인, 아니면 'custom'으로 폴백
+      const modelType: ModelType =
+        model.type && groups[model.type as ModelType]
+          ? (model.type as ModelType)
+          : 'custom';
+
+      groups[modelType].push({
         id: model.id,
         name: model.name,
         type: 'model',
