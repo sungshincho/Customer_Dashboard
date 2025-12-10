@@ -5,7 +5,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
-import { useAuth } from '@/hooks/useAuth';
 import type {
   AppliedStrategy,
   AppliedStrategyRow,
@@ -153,7 +152,6 @@ export const useStrategyDetail = (strategyId: string | null) => {
 export const useApplyStrategy = () => {
   const queryClient = useQueryClient();
   const { selectedStore } = useSelectedStore();
-  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (input: ApplyStrategyInput) => {
@@ -180,7 +178,6 @@ export const useApplyStrategy = () => {
           baseline_metrics: input.baselineMetrics,
           notes: input.notes || null,
           status: 'active',
-          created_by: user?.id,
         })
         .select()
         .single();
