@@ -284,10 +284,11 @@ export default function DigitalTwinStudioPage() {
   }
 
   return (
-    <SceneProvider mode={mode} initialModels={sceneModels}>
-      <div className="relative w-full h-[calc(100vh-64px)] overflow-hidden bg-black">
-        {/* ========== 3D 캔버스 (배경) ========== */}
-        <div className="absolute inset-0 z-0">
+    <DashboardLayout>
+      <SceneProvider mode={mode} initialModels={sceneModels}>
+        <div className="relative w-full h-[calc(100vh-120px)] overflow-hidden bg-black rounded-lg">
+          {/* ========== 3D 캔버스 (배경) ========== */}
+          <div className="absolute inset-0 z-0">
           {loading ? (
             <div className="flex items-center justify-center h-full">
               <Loader2 className="w-8 h-8 animate-spin text-white" />
@@ -395,6 +396,7 @@ export default function DigitalTwinStudioPage() {
         </div>
       </div>
     </SceneProvider>
+  </DashboardLayout>
   );
 }
 
