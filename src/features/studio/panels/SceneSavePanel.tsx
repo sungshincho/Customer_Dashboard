@@ -23,6 +23,8 @@ interface SceneSavePanelProps {
   onLoad?: (sceneId: string) => void;
   onDelete?: (sceneId: string) => void;
   onNew?: () => void;
+  /** 최대 저장 가능한 씬 개수 (기본값: 무제한) */
+  maxScenes?: number;
 }
 
 // ============================================================================
@@ -37,8 +39,13 @@ export function SceneSavePanel({
   onLoad,
   onDelete,
   onNew,
+  maxScenes,
 }: SceneSavePanelProps) {
   const [sceneName, setSceneName] = useState(currentSceneName);
+
+  // 최대 개수 제한 (maxScenes가 설정된 경우)
+  const displayedScenes = maxScenes ? savedScenes.slice(0, maxScenes) : savedScenes;
+  const canSaveNew = maxScenes ? savedScenes.length < maxScenes : true;
 
   const handleSave = () => {
     if (!sceneName.trim()) return;
@@ -56,85 +63,83 @@ export function SceneSavePanel({
   };
 
   return (
-    <div className="w-64 bg-black/80 backdrop-blur-sm border border-white/10 rounded-xl overflow-hidden">
+    <div className="space-y-3">
       {/* 저장 섹션 */}
-      <div className="p-4 border-b border-white/10">
-        <h3 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
-          <Save className="w-4 h-4" />
-          씬 저장
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <Save className="w-3.5 h-3.5 text-white/60" />
+          <span className="text-xs font-medium text-white">씬 저장</span>
           {isDirty && (
-            <span className="w-2 h-2 rounded-full bg-yellow-500" title="저장되지 않은 변경사항" />
+            <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" title="저장되지 않은 변경사항" />
           )}
-        </h3>
-        <div className="space-y-2">
-          <Input
-            value={sceneName}
-            onChange={(e) => setSceneName(e.target.value)}
-            placeholder="씬 이름"
-            className="bg-white/5 border-white/10 text-white placeholder:text-white/30 h-9"
-          />
-          <Button
-            className="w-full bg-primary/80 hover:bg-primary text-white h-9"
-            onClick={handleSave}
-            disabled={!sceneName.trim() || isSaving}
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                저장 중...
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4 mr-2" />
-                저장
-              </>
-            )}
-          </Button>
         </div>
-      </div>
-
-      {/* 새 씬 버튼 */}
-      <div className="p-4 border-b border-white/10">
+        <Input
+          value={sceneName}
+          onChange={(e) => setSceneName(e.target.value)}
+          placeholder="씬 이름"
+          className="bg-white/5 border-white/10 text-white placeholder:text-white/30 h-8 text-xs"
+        />
         <Button
-          variant="outline"
-          className="w-full border-white/10 text-white/80 hover:text-white hover:bg-white/5 h-9"
-          onClick={onNew}
+          className="w-full bg-primary/80 hover:bg-primary text-white h-7 text-xs"
+          onClick={handleSave}
+          disabled={!sceneName.trim() || isSaving || !canSaveNew}
         >
-          <Plus className="w-4 h-4 mr-2" />
-          새 씬
+          {isSaving ? (
+            <>
+              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+              저장 중...
+            </>
+          ) : (
+            <>
+              <Save className="w-3 h-3 mr-1" />
+              저장
+            </>
+          )}
         </Button>
       </div>
 
-      {/* 저장된 씬 목록 */}
-      <div className="p-4">
-        <h4 className="text-sm font-medium text-white mb-2 flex items-center justify-between">
-          <span>저장된 씬</span>
-          <span className="text-xs text-white/40">{savedScenes.length}</span>
-        </h4>
+      {/* 새 씬 버튼 */}
+      <Button
+        variant="outline"
+        className="w-full border-white/10 text-white/80 hover:text-white hover:bg-white/5 h-7 text-xs"
+        onClick={onNew}
+      >
+        <Plus className="w-3 h-3 mr-1" />
+        새 씬
+      </Button>
 
-        {savedScenes.length === 0 ? (
-          <p className="text-xs text-white/40 py-4 text-center">저장된 씬이 없습니다</p>
+      {/* 저장된 씬 목록 */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-medium text-white">저장된 씬</span>
+          <span className="text-[10px] text-white/40">
+            {displayedScenes.length}{maxScenes ? `/${maxScenes}` : ''}
+          </span>
+        </div>
+
+        {displayedScenes.length === 0 ? (
+          <p className="text-[10px] text-white/40 py-3 text-center">저장된 씬이 없습니다</p>
         ) : (
-          <div className="space-y-2 max-h-48 overflow-y-auto">
-            {savedScenes.map((scene) => (
+          <div className="space-y-1.5 max-h-32 overflow-y-auto">
+            {displayedScenes.map((scene) => (
               <div
                 key={scene.id}
                 className={cn(
-                  'flex items-center gap-2 p-2 rounded-lg transition-colors group',
+                  'flex items-center gap-1.5 p-1.5 rounded transition-colors group',
                   scene.is_active ? 'bg-primary/20' : 'bg-white/5 hover:bg-white/10'
                 )}
               >
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-white truncate flex items-center gap-2">
+                  <p className="text-[11px] text-white truncate flex items-center gap-1">
                     {scene.name}
                     {scene.is_active && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/30 text-primary-foreground">
+                      <span className="text-[8px] px-1 py-0.5 rounded bg-primary/30 text-primary-foreground">
                         활성
                       </span>
                     )}
                   </p>
-                  <p className="text-xs text-white/40 flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
+                  <p className="text-[9px] text-white/40 flex items-center gap-0.5">
+                    <Clock className="w-2.5 h-2.5" />
                     {formatDate(scene.updated_at || scene.created_at)}
                   </p>
                 </div>
@@ -142,20 +147,20 @@ export function SceneSavePanel({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
                   onClick={() => onLoad?.(scene.id)}
                   disabled={scene.is_active}
                 >
-                  <FolderOpen className="w-3.5 h-3.5 text-white/60" />
+                  <FolderOpen className="w-3 h-3 text-white/60" />
                 </Button>
 
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
                   onClick={() => onDelete?.(scene.id)}
                 >
-                  <Trash2 className="w-3.5 h-3.5 text-red-400/60" />
+                  <Trash2 className="w-3 h-3 text-red-400/60" />
                 </Button>
               </div>
             ))}

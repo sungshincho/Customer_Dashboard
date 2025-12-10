@@ -101,15 +101,15 @@ export default function DigitalTwinStudioPage() {
   const [loading, setLoading] = useState(true);
   const [sceneName, setSceneName] = useState('');
 
-  // 드래그 패널 표시 상태
+  // 드래그 패널 표시 상태 (모든 패널 기본 표시)
   const [visiblePanels, setVisiblePanels] = useState<VisiblePanels>({
     tools: true,
     overlay: true,
     sceneSave: true,
-    layoutResult: false,
-    flowResult: false,
-    congestionResult: false,
-    staffingResult: false,
+    layoutResult: true,
+    flowResult: true,
+    congestionResult: true,
+    staffingResult: true,
   });
 
   // 시뮬레이션 결과 상태
@@ -496,14 +496,15 @@ export default function DigitalTwinStudioPage() {
 
             {/* ========== 드래그 가능한 플로팅 패널들 ========== */}
 
-            {/* 오른쪽 상단: 도구 패널 (드래그 가능) */}
+            {/* 오른쪽 상단: 도구 패널 (드래그 가능, 접기/펼치기 가능) */}
             {visiblePanels.tools && (
               <DraggablePanel
                 id="tool-panel"
                 title="도구"
                 rightOffset={80}
                 defaultPosition={{ x: 0, y: 16 }}
-                collapsible={false}
+                collapsible={true}
+                defaultCollapsed={false}
                 width="w-auto"
               >
                 <ToolPanel mode={mode} onModeChange={setMode} hasSelection={false} />
@@ -516,8 +517,8 @@ export default function DigitalTwinStudioPage() {
                 id="overlay"
                 title="오버레이"
                 icon={<Layers className="w-4 h-4" />}
-                rightOffset={220}
-                defaultPosition={{ x: 0, y: 200 }}
+                rightOffset={180}
+                defaultPosition={{ x: 0, y: 130 }}
                 defaultCollapsed={false}
                 width="w-48"
               >
@@ -551,82 +552,84 @@ export default function DigitalTwinStudioPage() {
                 id="scene-save"
                 title="씬 저장"
                 icon={<Save className="w-4 h-4" />}
-                rightOffset={240}
-                defaultPosition={{ x: 0, y: 350 }}
-                defaultCollapsed={true}
-                width="w-52"
+                rightOffset={180}
+                defaultPosition={{ x: 0, y: 280 }}
+                defaultCollapsed={false}
+                width="w-48"
               >
                 <SceneSavePanel
                   currentSceneName={sceneName}
-                  savedScenes={scenes}
+                  savedScenes={scenes.slice(0, 3)}
                   isSaving={isSaving}
                   isDirty={false}
                   onSave={handleSaveScene}
                   onLoad={(id) => setActiveScene(id)}
                   onDelete={(id) => deleteScene(id)}
                   onNew={() => setSceneName('')}
+                  maxScenes={3}
                 />
               </DraggablePanel>
             )}
 
-            {/* ========== 시뮬레이션 결과 패널들 ========== */}
+            {/* ========== 시뮬레이션 결과 패널들 (우측 정렬) ========== */}
 
-            {visiblePanels.layoutResult && simulationResults.layout && (
+            {visiblePanels.layoutResult && (
               <LayoutResultPanel
                 result={simulationResults.layout}
                 onClose={() => closePanel('layoutResult')}
                 onApply={() => {
                   toast.success('레이아웃 최적화 적용됨');
-                  closePanel('layoutResult');
                 }}
                 onShowIn3D={() => {
                   toggleOverlay('zone');
                   toast.info('3D 뷰에서 변경사항 표시');
                 }}
-                defaultPosition={{ x: 350, y: 100 }}
+                rightOffset={290}
+                defaultPosition={{ x: 0, y: 16 }}
               />
             )}
 
-            {visiblePanels.flowResult && simulationResults.flow && (
+            {visiblePanels.flowResult && (
               <FlowResultPanel
                 result={simulationResults.flow}
                 onClose={() => closePanel('flowResult')}
                 onApply={() => {
                   toast.success('동선 최적화 적용됨');
-                  closePanel('flowResult');
                 }}
                 onShowFlow={() => {
                   toggleOverlay('flow');
                   toast.info('동선 오버레이 표시');
                 }}
-                defaultPosition={{ x: 640, y: 100 }}
+                rightOffset={290}
+                defaultPosition={{ x: 0, y: 200 }}
               />
             )}
 
-            {visiblePanels.congestionResult && simulationResults.congestion && (
+            {visiblePanels.congestionResult && (
               <CongestionResultPanel
                 result={simulationResults.congestion}
                 onClose={() => closePanel('congestionResult')}
                 onPlayAnimation={() => {
                   toast.info('시간대별 애니메이션 재생');
                 }}
-                defaultPosition={{ x: 350, y: 380 }}
+                rightOffset={290}
+                defaultPosition={{ x: 0, y: 380 }}
               />
             )}
 
-            {visiblePanels.staffingResult && simulationResults.staffing && (
+            {visiblePanels.staffingResult && (
               <StaffingResultPanel
                 result={simulationResults.staffing}
                 onClose={() => closePanel('staffingResult')}
                 onApply={() => {
                   toast.success('인력 배치 최적화 적용됨');
-                  closePanel('staffingResult');
                 }}
                 onShowPositions={() => {
                   toggleOverlay('avatar');
                   toast.info('직원 위치 표시');
                 }}
-                defaultPosition={{ x: 640, y: 380 }}
+                rightOffset={290}
+                defaultPosition={{ x: 0, y: 560 }}
               />
             )}
 
