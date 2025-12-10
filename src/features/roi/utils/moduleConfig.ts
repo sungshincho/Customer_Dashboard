@@ -47,6 +47,14 @@ export const MODULE_CONFIG: Record<SourceModule, ModuleConfig> = {
     bgColor: 'bg-green-500/20',
     borderColor: 'border-green-500/30',
   },
+  ai_recommendation: {
+    displayName: 'AI 추천 전략',
+    shortName: 'AI 추천',
+    icon: '🤖',
+    color: 'text-violet-400',
+    bgColor: 'bg-violet-500/20',
+    borderColor: 'border-violet-500/30',
+  },
 
   // 3D 시뮬레이션
   layout_optimization: {

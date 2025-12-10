@@ -10,10 +10,6 @@ import { useNavigate } from 'react-router-dom';
 import { Separator } from '@/components/ui/separator';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { useAIRecommendations } from '@/hooks/useAIRecommendations';
-import { useApplyRecommendation } from '@/hooks/useROITracking';
-import { useDateFilterStore } from '@/store/dateFilterStore';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 
 import {
   ActiveStrategies,
@@ -21,8 +17,8 @@ import {
   OptimizeSection,
   RecommendSection,
   ExecuteSection,
-  MeasureSection,
 } from './components';
+import { ApplyStrategyModal } from '@/features/roi/components/ApplyStrategyModal';
 
 import type {
   DemandForecast,
@@ -32,17 +28,13 @@ import type {
   InventoryOptimization,
   StrategyRecommendation,
   Campaign,
-  ROIMeasurement,
-  ROISummary,
   ActiveStrategy,
 } from './types/aiDecision.types';
 
 export function AIDecisionHub() {
   const navigate = useNavigate();
   const { selectedStore } = useSelectedStore();
-  const { dateRange } = useDateFilterStore();
   const { data: aiRecommendations = [], isLoading: isLoadingRecs } = useAIRecommendations(selectedStore?.id);
-  const applyRecommendation = useApplyRecommendation();
 
   // 예측 데이터 (mock - 실제 구현 시 훅으로 분리)
   const demandForecast: DemandForecast = useMemo(() => ({
@@ -218,71 +210,19 @@ export function AIDecisionHub() {
     },
   ], []);
 
-  // ROI 측정 데이터 (mock)
-  const roiMeasurements: ROIMeasurement[] = useMemo(() => [
-    {
-      id: '1',
-      campaignId: 'c1',
-      campaignName: '블랙프라이데이',
-      type: 'discount',
-      period: { start: '2024-11-24', end: '2024-11-30', days: 7 },
-      expectedROI: 280,
-      actualROI: 312,
-      status: 'exceeded',
-      baselineRevenue: 15000000,
-      actualRevenue: 19680000,
-      revenueChange: 4680000,
-      revenueChangePercent: 31.2,
-      insights: ['할인율 최적화로 기대치 초과'],
-    },
-    {
-      id: '2',
-      campaignId: 'c2',
-      campaignName: '신상품 런칭',
-      type: 'event',
-      period: { start: '2024-12-01', end: '2024-12-07', days: 7 },
-      expectedROI: 150,
-      actualROI: 98,
-      status: 'missed',
-      baselineRevenue: 10000000,
-      actualRevenue: 10980000,
-      revenueChange: 980000,
-      revenueChangePercent: 9.8,
-      insights: ['타겟 고객층 재검토 필요'],
-    },
-  ], []);
-
-  const roiSummary: ROISummary = useMemo(() => ({
-    totalCampaigns: 15,
-    completedCampaigns: 12,
-    averageROI: 205,
-    totalRevenueImpact: 28500000,
-    successRate: 75,
-    topPerformingType: 'discount',
-    learnings: [
-      {
-        id: '1',
-        insight: '"할인 프로모션"이 "런칭 프로모션"보다 평균 45% 높은 ROI',
-        dataPoints: 24,
-        confidence: 92,
-        applicableTo: ['discount', 'event'],
-      },
-      {
-        id: '2',
-        insight: '최적 프로모션 기간: 5-7일',
-        dataPoints: 18,
-        confidence: 85,
-        applicableTo: ['discount', 'bundle', 'targeting'],
-      },
-      {
-        id: '3',
-        insight: '타겟팅 전략이 전체 대상보다 ROI 23% 높음',
-        dataPoints: 15,
-        confidence: 88,
-        applicableTo: ['targeting'],
-      },
-    ],
-  }), []);
+  // 적용 모달 상태
+  const [showApplyModal, setShowApplyModal] = useState(false);
+  const [applyModalData, setApplyModalData] = useState<{
+    source: '2d_simulation' | '3d_simulation';
+    sourceModule: string;
+    name: string;
+    description: string;
+    settings: Record<string, any>;
+    expectedRoi: number;
+    expectedRevenue?: number;
+    confidence: number;
+    baselineMetrics: Record<string, number>;
+  } | null>(null);
 
   // 핸들러
   const handleViewStrategyDetails = (id: string) => {
@@ -302,7 +242,38 @@ export function AIDecisionHub() {
   };
 
   const handleApplyOptimization = (type: 'price' | 'inventory') => {
-    console.log('Apply optimization:', type);
+    if (type === 'price' && priceOptimization) {
+      setApplyModalData({
+        source: '2d_simulation',
+        sourceModule: 'price_optimization',
+        name: `가격 최적화 (${priceOptimization.optimizableCount}개 상품)`,
+        description: `${priceOptimization.optimizableCount}개 상품 가격 최적화로 ${priceOptimization.potentialRevenueIncreasePercent}% 매출 증가 예상`,
+        settings: { actions: priceOptimization.actions },
+        expectedRoi: Math.round(priceOptimization.potentialRevenueIncreasePercent * 10),
+        expectedRevenue: priceOptimization.potentialRevenueIncrease,
+        confidence: 88,
+        baselineMetrics: {
+          totalProducts: priceOptimization.totalProducts,
+          optimizableCount: priceOptimization.optimizableCount,
+        },
+      });
+      setShowApplyModal(true);
+    } else if (type === 'inventory' && inventoryOptimization) {
+      setApplyModalData({
+        source: '2d_simulation',
+        sourceModule: 'inventory_optimization',
+        name: `재고 최적화 (${inventoryOptimization.orderRecommendations}건 발주)`,
+        description: `${inventoryOptimization.stockoutPrevention}건 품절 방지, ${inventoryOptimization.overStockReduction}건 과재고 감소`,
+        settings: { actions: inventoryOptimization.actions },
+        expectedRoi: 120,
+        confidence: 90,
+        baselineMetrics: {
+          totalItems: inventoryOptimization.totalItems,
+          orderRecommendations: inventoryOptimization.orderRecommendations,
+        },
+      });
+      setShowApplyModal(true);
+    }
   };
 
   const handleSimulateStrategy = (id: string) => {
@@ -315,8 +286,23 @@ export function AIDecisionHub() {
   };
 
   const handleExecuteStrategy = async (id: string) => {
-    console.log('Execute strategy:', id);
-    await applyRecommendation.mutateAsync(id);
+    const strategy = strategyRecommendations.find(s => s.id === id);
+    if (strategy) {
+      setApplyModalData({
+        source: '2d_simulation',
+        sourceModule: 'ai_recommendation',
+        name: strategy.title,
+        description: strategy.description,
+        settings: { strategyId: id, type: strategy.type },
+        expectedRoi: strategy.expectedResults.roi,
+        expectedRevenue: strategy.expectedResults.revenueIncrease,
+        confidence: strategy.confidence,
+        baselineMetrics: {
+          conversionIncrease: strategy.expectedResults.conversionIncrease,
+        },
+      });
+      setShowApplyModal(true);
+    }
   };
 
   const handlePauseCampaign = (id: string) => {
@@ -343,7 +329,7 @@ export function AIDecisionHub() {
           AI 의사결정 허브
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          데이터 기반 예측 → 최적화 → 추천 → 실행 → 측정
+          데이터 기반 예측 → 최적화 → 추천 → 실행
         </p>
       </div>
 
@@ -400,14 +386,32 @@ export function AIDecisionHub() {
         isLoading={false}
       />
 
-      <Separator />
+      {/* ROI 측정 - 별도 페이지로 이동 */}
+      <div className="flex items-center justify-center p-4 bg-muted/30 rounded-lg border border-dashed">
+        <div className="text-center">
+          <p className="text-sm text-muted-foreground mb-2">
+            적용된 전략의 ROI를 측정하고 성과를 추적하세요
+          </p>
+          <button
+            onClick={() => navigate('/roi')}
+            className="text-sm text-primary hover:underline font-medium"
+          >
+            ROI 측정 대시보드 바로가기 →
+          </button>
+        </div>
+      </div>
 
-      {/* 5단계: 측정 */}
-      <MeasureSection
-        measurements={roiMeasurements}
-        summary={roiSummary}
-        isLoading={false}
-      />
+      {/* 적용 전략 모달 */}
+      {showApplyModal && applyModalData && (
+        <ApplyStrategyModal
+          isOpen={showApplyModal}
+          onClose={() => {
+            setShowApplyModal(false);
+            setApplyModalData(null);
+          }}
+          strategyData={applyModalData}
+        />
+      )}
     </div>
   );
 }
