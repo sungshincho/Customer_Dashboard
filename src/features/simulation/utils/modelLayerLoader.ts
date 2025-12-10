@@ -126,44 +126,51 @@ export async function loadUserModels(
     // ============================================
     // 3. Storage에서 직접 업로드된 모델 로드 (레거시)
     // ============================================
-    const storagePath = storeId 
-      ? `${userId}/${storeId}`
-      : `${userId}`;
+    // 여러 경로 형식 지원 (레거시 호환성)
+    const storagePaths: string[] = [];
+    if (storeId) {
+      storagePaths.push(`${userId}/${storeId}`);  // 새 형식: userId/storeId
+      storagePaths.push(storeId);                  // 레거시 형식: storeId만
+    } else {
+      storagePaths.push(userId);
+    }
 
-    const { data: files, error: storageError } = await supabase.storage
-      .from('3d-models')
-      .list(storagePath);
+    for (const storagePath of storagePaths) {
+      const { data: files, error: storageError } = await supabase.storage
+        .from('3d-models')
+        .list(storagePath);
 
-    if (!storageError && files) {
-      for (const file of files) {
-        if (file.name.toLowerCase().endsWith('.glb') || file.name.toLowerCase().endsWith('.gltf')) {
-          const { data: { publicUrl } } = supabase.storage
-            .from('3d-models')
-            .getPublicUrl(`${storagePath}/${file.name}`);
+      if (!storageError && files) {
+        for (const file of files) {
+          if (file.name.toLowerCase().endsWith('.glb') || file.name.toLowerCase().endsWith('.gltf')) {
+            const { data: { publicUrl } } = supabase.storage
+              .from('3d-models')
+              .getPublicUrl(`${storagePath}/${file.name}`);
 
-          // 이미 DB에서 로드된 URL은 스킵
-          if (loadedUrls.has(publicUrl)) {
-            continue;
+            // 이미 DB에서 로드된 URL은 스킵
+            if (loadedUrls.has(publicUrl)) {
+              continue;
+            }
+
+            // 파일명에서 타입 추론
+            const type = inferModelTypeFromFilename(file.name);
+
+            // 파일명에서 dimensions 추출
+            const parsed = parseModelFilename(file.name);
+
+            models.push({
+              id: `storage-${storagePath}-${file.name}`,
+              name: file.name.replace(/\.(glb|gltf)$/i, ''),
+              type,
+              model_url: publicUrl,
+              dimensions: parsed.isValid && parsed.dimensions ? parsed.dimensions : undefined,
+              position: { x: 0, y: 0, z: 0 },
+              rotation: { x: 0, y: 0, z: 0 },
+              scale: { x: 1, y: 1, z: 1 }
+            });
+
+            loadedUrls.add(publicUrl);
           }
-
-          // 파일명에서 타입 추론
-          const type = inferModelTypeFromFilename(file.name);
-          
-          // 파일명에서 dimensions 추출
-          const parsed = parseModelFilename(file.name);
-
-          models.push({
-            id: `storage-${file.name}`,
-            name: file.name.replace(/\.(glb|gltf)$/i, ''),
-            type,
-            model_url: publicUrl,
-            dimensions: parsed.isValid && parsed.dimensions ? parsed.dimensions : undefined,
-            position: { x: 0, y: 0, z: 0 },
-            rotation: { x: 0, y: 0, z: 0 },
-            scale: { x: 1, y: 1, z: 1 }
-          });
-
-          loadedUrls.add(publicUrl);
         }
       }
     }
