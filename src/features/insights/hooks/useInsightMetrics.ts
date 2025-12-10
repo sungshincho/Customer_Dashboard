@@ -85,46 +85,42 @@ export const useInsightMetrics = () => {
       const revenue = kpis?.reduce((sum, k) => sum + Number(k.total_revenue || 0), 0) || 0;
       const totalReturning = kpis?.reduce((sum, k) => sum + (k.returning_visitors || 0), 0) || 0;
 
-      // 2. funnel_events에서 퍼널 데이터 및 Unique Visitors
-      // store_id로만 필터링 (org_id는 옵션으로 - 데이터 누락 방지)
-      let funnelQuery = supabase
-        .from('funnel_events')
-        .select('event_type, visitor_id')
-        .eq('store_id', selectedStore.id)
-        .gte('event_date', startDate)
-        .lte('event_date', endDate);
-
-      // org_id가 있으면 추가 필터 (없으면 store_id만으로 조회)
-      // 참고: 일부 데이터가 org_id 없이 저장되어 있을 수 있음
-      const { data: funnelData, error: funnelError } = await funnelQuery;
+      // 2. RPC 함수로 퍼널 데이터 조회 (DB에서 집계 - 효율적)
+      const { data: funnelStats, error: funnelError } = await supabase.rpc('get_funnel_stats', {
+        p_store_id: selectedStore.id,
+        p_start_date: startDate,
+        p_end_date: endDate,
+      });
 
       // 디버깅 로그
-      console.log('[useInsightMetrics] Funnel query:', {
+      console.log('[useInsightMetrics] Funnel RPC result:', {
         storeId: selectedStore.id,
         startDate,
         endDate,
-        resultCount: funnelData?.length || 0,
+        stats: funnelStats,
         error: funnelError?.message,
-        sampleEvents: funnelData?.slice(0, 3),
       });
 
-      // 이벤트 타입별 고유 방문자 수
-      const getUniqueByType = (type: string) =>
-        new Set(funnelData?.filter(f => f.event_type === type).map(f => f.visitor_id)).size;
+      // 이벤트 타입별 고유 방문자 수 (exit 제외)
+      const getCount = (type: string) =>
+        funnelStats?.find((f: { event_type: string; unique_visitors: number }) => f.event_type === type)?.unique_visitors || 0;
 
       const funnelByType = {
-        entry: getUniqueByType('entry'),
-        browse: getUniqueByType('browse'),
-        engage: getUniqueByType('engage'),
-        fitting: getUniqueByType('fitting'),
-        purchase: getUniqueByType('purchase'),
+        entry: getCount('entry'),
+        browse: getCount('browse'),
+        engage: getCount('engage'),
+        fitting: getCount('fitting'),
+        purchase: getCount('purchase'),
       };
 
-      // 디버깅 로그
-      console.log('[useInsightMetrics] Funnel results:', funnelByType);
-
-      // 전체 고유 방문자 수
-      const uniqueVisitors = new Set(funnelData?.map(f => f.visitor_id)).size;
+      // 전체 고유 방문자 수 (entry 기준 또는 모든 타입의 최대값)
+      const uniqueVisitors = funnelByType.entry || Math.max(
+        funnelByType.entry,
+        funnelByType.browse,
+        funnelByType.engage,
+        funnelByType.fitting,
+        funnelByType.purchase
+      );
 
       // 3. zone_events에서 행동 지표
       const { data: zoneData } = await supabase
@@ -170,17 +166,25 @@ export const useInsightMetrics = () => {
       const prevFootfall = prevKpis?.reduce((sum, k) => sum + (k.total_visitors || 0), 0) || 0;
       const prevRevenue = prevKpis?.reduce((sum, k) => sum + Number(k.total_revenue || 0), 0) || 0;
 
-      // 전 기간 퍼널 데이터 (전환율 변화 계산용)
-      const { data: prevFunnelData } = await supabase
-        .from('funnel_events')
-        .select('event_type, visitor_id')
-        .eq('store_id', selectedStore.id)
-        .gte('event_date', prevStartDate.toISOString().split('T')[0])
-        .lte('event_date', prevEndDate.toISOString().split('T')[0]);
+      // 전 기간 퍼널 데이터 (전환율 변화 계산용) - RPC 함수 사용
+      const { data: prevFunnelStats } = await supabase.rpc('get_funnel_stats', {
+        p_store_id: selectedStore.id,
+        p_start_date: prevStartDate.toISOString().split('T')[0],
+        p_end_date: prevEndDate.toISOString().split('T')[0],
+      });
 
-      const prevEntry = new Set(prevFunnelData?.filter(f => f.event_type === 'entry').map(f => f.visitor_id)).size;
-      const prevPurchase = new Set(prevFunnelData?.filter(f => f.event_type === 'purchase').map(f => f.visitor_id)).size;
-      const prevUniqueVisitors = new Set(prevFunnelData?.map(f => f.visitor_id)).size;
+      const getPrevCount = (type: string) =>
+        prevFunnelStats?.find((f: { event_type: string; unique_visitors: number }) => f.event_type === type)?.unique_visitors || 0;
+
+      const prevEntry = getPrevCount('entry');
+      const prevPurchase = getPrevCount('purchase');
+      const prevUniqueVisitors = prevEntry || Math.max(
+        getPrevCount('entry'),
+        getPrevCount('browse'),
+        getPrevCount('engage'),
+        getPrevCount('fitting'),
+        getPrevCount('purchase')
+      );
 
       // 계산
       const visitFrequency = uniqueVisitors > 0 ? footfall / uniqueVisitors : 0;
