@@ -3,7 +3,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import type { CategoryPerformance, DateRange, SimulationSource, SourceModule } from '../types/roi.types';
 
