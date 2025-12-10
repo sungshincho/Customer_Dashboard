@@ -13,7 +13,7 @@ import { useLocation } from 'react-router-dom';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, Loader2, Sparkles, Layers, Save, Eye, Edit3 } from 'lucide-react';
+import { AlertCircle, Loader2, Sparkles, Layers, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
 // 새 스튜디오 컴포넌트
@@ -65,9 +65,9 @@ interface SimulationResults {
 
 // 패널 표시 상태 타입
 interface VisiblePanels {
+  tools: boolean;
   overlay: boolean;
   sceneSave: boolean;
-  modeToggle: boolean;
   layoutResult: boolean;
   flowResult: boolean;
   congestionResult: boolean;
@@ -103,9 +103,9 @@ export default function DigitalTwinStudioPage() {
 
   // 드래그 패널 표시 상태
   const [visiblePanels, setVisiblePanels] = useState<VisiblePanels>({
+    tools: true,
     overlay: true,
     sceneSave: true,
-    modeToggle: true,
     layoutResult: false,
     flowResult: false,
     congestionResult: false,
@@ -494,12 +494,21 @@ export default function DigitalTwinStudioPage() {
               </div>
             </div>
 
-            {/* ----- 오른쪽 상단: 도구 (고정) ----- */}
-            <div className="absolute right-4 top-4 pointer-events-auto">
-              <ToolPanel mode={mode} onModeChange={setMode} hasSelection={false} />
-            </div>
-
             {/* ========== 드래그 가능한 플로팅 패널들 ========== */}
+
+            {/* 오른쪽 상단: 도구 패널 (드래그 가능) */}
+            {visiblePanels.tools && (
+              <DraggablePanel
+                id="tool-panel"
+                title="도구"
+                rightOffset={80}
+                defaultPosition={{ x: 0, y: 16 }}
+                collapsible={false}
+                width="w-auto"
+              >
+                <ToolPanel mode={mode} onModeChange={setMode} hasSelection={false} />
+              </DraggablePanel>
+            )}
 
             {/* 오버레이 컨트롤 패널 */}
             {visiblePanels.overlay && (
@@ -507,8 +516,9 @@ export default function DigitalTwinStudioPage() {
                 id="overlay"
                 title="오버레이"
                 icon={<Layers className="w-4 h-4" />}
-                defaultPosition={{ x: window.innerWidth - 220, y: 80 }}
-                defaultCollapsed={true}
+                rightOffset={220}
+                defaultPosition={{ x: 0, y: 200 }}
+                defaultCollapsed={false}
                 width="w-48"
               >
                 <div className="space-y-2">
@@ -541,7 +551,8 @@ export default function DigitalTwinStudioPage() {
                 id="scene-save"
                 title="씬 저장"
                 icon={<Save className="w-4 h-4" />}
-                defaultPosition={{ x: window.innerWidth - 220, y: 180 }}
+                rightOffset={240}
+                defaultPosition={{ x: 0, y: 350 }}
                 defaultCollapsed={true}
                 width="w-52"
               >
@@ -555,36 +566,6 @@ export default function DigitalTwinStudioPage() {
                   onDelete={(id) => deleteScene(id)}
                   onNew={() => setSceneName('')}
                 />
-              </DraggablePanel>
-            )}
-
-            {/* 모드 토글 패널 */}
-            {visiblePanels.modeToggle && (
-              <DraggablePanel
-                id="mode-toggle"
-                title="모드"
-                defaultPosition={{ x: window.innerWidth - 150, y: window.innerHeight - 180 }}
-                collapsible={false}
-                width="w-32"
-              >
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setMode('edit')}
-                    className={`flex-1 py-1.5 text-xs rounded transition-colors flex items-center justify-center gap-1
-                      ${mode === 'edit' ? 'bg-primary text-white' : 'bg-white/10 text-white/60 hover:bg-white/20'}`}
-                  >
-                    <Edit3 className="w-3 h-3" />
-                    편집
-                  </button>
-                  <button
-                    onClick={() => setMode('view')}
-                    className={`flex-1 py-1.5 text-xs rounded transition-colors flex items-center justify-center gap-1
-                      ${mode === 'view' ? 'bg-primary text-white' : 'bg-white/10 text-white/60 hover:bg-white/20'}`}
-                  >
-                    <Eye className="w-3 h-3" />
-                    뷰어
-                  </button>
-                </div>
               </DraggablePanel>
             )}
 
