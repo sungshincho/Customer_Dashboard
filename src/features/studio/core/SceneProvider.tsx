@@ -6,7 +6,7 @@
  * - 모드 기반 동작 (편집/뷰/시뮬레이션)
  */
 
-import { createContext, useContext, useReducer, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useReducer, useCallback, useEffect, ReactNode } from 'react';
 import type {
   StudioMode,
   SceneState,
@@ -244,6 +244,13 @@ export function SceneProvider({ mode = 'view', children, initialModels = [] }: S
     mode,
     models: initialModels,
   });
+
+  // initialModels가 변경되면 상태 동기화 (비동기 로드 지원)
+  useEffect(() => {
+    if (initialModels.length > 0) {
+      dispatch({ type: 'SET_MODELS', payload: initialModels });
+    }
+  }, [initialModels]);
 
   // 모드
   const setMode = useCallback((mode: StudioMode) => {
