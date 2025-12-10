@@ -78,8 +78,8 @@ export function OverviewTab() {
           icon={<DollarSign className="h-5 w-5" />}
           labelEn="Revenue"
           label="총 매출"
-          value={formatCurrency(metrics?.revenue || 0, 'man')}
-          subLabel={metrics?.atv ? `객단가 ${formatCurrency(metrics.atv, 'chun')}` : undefined}
+          value={formatCurrency(metrics?.revenue || 0)}
+          subLabel={metrics?.atv ? `객단가 ${formatCurrency(metrics.atv)}` : undefined}
           change={metrics?.changes.revenue}
         />
         <MetricCard

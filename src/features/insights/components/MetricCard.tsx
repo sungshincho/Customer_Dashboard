@@ -79,13 +79,13 @@ export const MetricCard: React.FC<MetricCardProps> = ({
 };
 
 // 포맷 유틸리티 함수들
-export const formatCurrency = (value: number, unit: 'full' | 'man' | 'chun' = 'man'): string => {
+export const formatCurrency = (value: number, unit: 'full' | 'man' | 'chun' = 'full'): string => {
   if (unit === 'man') {
     return `₩${(value / 10000).toFixed(0)}만`;
   } else if (unit === 'chun') {
     return `₩${Math.round(value / 1000)}천`;
   }
-  return `₩${value.toLocaleString()}`;
+  return `₩${value.toLocaleString('ko-KR')}원`;
 };
 
 export const formatPercent = (value: number, decimals: number = 1): string => {

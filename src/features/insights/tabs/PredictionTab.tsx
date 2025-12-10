@@ -29,6 +29,7 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
+import { formatCurrency } from '../components';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useDateFilterStore } from '@/store/dateFilterStore';
@@ -138,7 +139,7 @@ export function PredictionTab() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ₩{((predictionSummary?.totalRevenue || 0) / 10000).toFixed(0)}만
+              {formatCurrency(predictionSummary?.totalRevenue || 0)}
             </div>
             <div className={cn(
               "flex items-center gap-1 text-xs",
@@ -224,8 +225,8 @@ export function PredictionTab() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
-                <YAxis tickFormatter={(v) => `₩${(v/10000).toFixed(0)}만`} />
-                <Tooltip formatter={(v: number) => `₩${v.toLocaleString()}`} />
+                <YAxis tickFormatter={(v) => formatCurrency(v)} />
+                <Tooltip formatter={(v: number) => formatCurrency(v)} />
                 <ReferenceLine
                   x={predictionData.find(d => d.isPrediction)?.date}
                   stroke="#888"

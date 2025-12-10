@@ -86,13 +86,23 @@ export const useInsightMetrics = () => {
       const totalReturning = kpis?.reduce((sum, k) => sum + (k.returning_visitors || 0), 0) || 0;
 
       // 2. funnel_events에서 퍼널 데이터 및 Unique Visitors
-      const { data: funnelData } = await supabase
+      const { data: funnelData, error: funnelError } = await supabase
         .from('funnel_events')
         .select('event_type, visitor_id')
         .eq('org_id', orgId)
         .eq('store_id', selectedStore.id)
         .gte('event_date', startDate)
         .lte('event_date', endDate);
+
+      // 디버깅 로그
+      console.log('[useInsightMetrics] Funnel query params:', {
+        orgId,
+        storeId: selectedStore.id,
+        startDate,
+        endDate,
+        resultCount: funnelData?.length || 0,
+        error: funnelError?.message,
+      });
 
       // 이벤트 타입별 고유 방문자 수
       const getUniqueByType = (type: string) =>
@@ -105,6 +115,9 @@ export const useInsightMetrics = () => {
         fitting: getUniqueByType('fitting'),
         purchase: getUniqueByType('purchase'),
       };
+
+      // 디버깅 로그
+      console.log('[useInsightMetrics] Funnel results:', funnelByType);
 
       // 전체 고유 방문자 수
       const uniqueVisitors = new Set(funnelData?.map(f => f.visitor_id)).size;
