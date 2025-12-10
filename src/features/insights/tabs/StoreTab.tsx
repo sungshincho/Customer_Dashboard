@@ -3,9 +3,10 @@
  *
  * 인사이트 허브 - 매장 탭
  * 시간대별 방문 패턴, 존별 체류시간, 피크타임 분석
+ * 센서 커버율(Tracking Coverage) 표시
  *
  * 데이터 소스:
- * - funnel_events: 시간대별 방문 패턴
+ * - funnel_events: 시간대별 방문 패턴 (Footfall 기준)
  * - zone_daily_metrics: 존별 체류시간 및 방문자
  * - zones_dim: 존 정보
  */
@@ -28,8 +29,9 @@ import {
 import {
   Clock,
   MapPin,
-  TrendingUp,
   Users,
+  Radio,
+  Info,
 } from 'lucide-react';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { useDateFilterStore } from '@/store/dateFilterStore';
@@ -37,6 +39,8 @@ import { useZoneMetricsByDateRange, useZonesDim } from '@/hooks/useZoneMetrics';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useInsightMetrics } from '../hooks/useInsightMetrics';
+import { formatDuration } from '../components';
 
 const ZONE_COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe'];
 
@@ -44,6 +48,7 @@ export function StoreTab() {
   const { selectedStore } = useSelectedStore();
   const { dateRange } = useDateFilterStore();
   const { user, orgId } = useAuth();
+  const { data: metrics } = useInsightMetrics();
 
   // 시간대별 방문 데이터 (funnel_events에서 entry 이벤트 집계)
   const { data: hourlyData } = useQuery({
@@ -150,8 +155,9 @@ export function StoreTab() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Clock className="h-4 w-4 text-muted-foreground" />
-              피크타임
+              <span className="text-[10px] text-muted-foreground uppercase">Peak Time</span>
             </CardTitle>
+            <p className="text-xs text-muted-foreground -mt-1">피크타임</p>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{peakHour?.hour || '-'}</div>
@@ -165,15 +171,16 @@ export function StoreTab() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <MapPin className="h-4 w-4 text-muted-foreground" />
-              인기 존
+              <span className="text-[10px] text-muted-foreground uppercase">Popular Zone</span>
             </CardTitle>
+            <p className="text-xs text-muted-foreground -mt-1">인기 존</p>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
               {zoneData?.[0]?.name || '-'}
             </div>
             <p className="text-xs text-muted-foreground">
-              {zoneData?.[0]?.visitors?.toLocaleString() || 0}명 방문
+              {zoneData?.[0]?.visitors?.toLocaleString() || 0}회 방문
             </p>
           </CardContent>
         </Card>
@@ -182,14 +189,16 @@ export function StoreTab() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Users className="h-4 w-4 text-muted-foreground" />
-              평균 체류시간
+              <span className="text-[10px] text-muted-foreground uppercase">Avg Dwell Time</span>
             </CardTitle>
+            <p className="text-xs text-muted-foreground -mt-1">평균 체류시간</p>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {zoneData?.length
-                ? Math.round(zoneData.reduce((s, z) => s + z.avgDwell, 0) / zoneData.length)
-                : 0}분
+              {metrics?.avgDwellTime ? formatDuration(metrics.avgDwellTime) :
+                (zoneData?.length
+                  ? `${Math.round(zoneData.reduce((s, z) => s + z.avgDwell, 0) / zoneData.length)}분`
+                  : '0분')}
             </div>
             <p className="text-xs text-muted-foreground">전체 존 평균</p>
           </CardContent>
@@ -198,26 +207,40 @@ export function StoreTab() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              총 방문자
+              <Radio className="h-4 w-4 text-muted-foreground" />
+              <span className="text-[10px] text-muted-foreground uppercase">Tracking Coverage</span>
             </CardTitle>
+            <p className="text-xs text-muted-foreground -mt-1">센서 커버율</p>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {totalVisitors.toLocaleString()}명
+              {metrics?.trackingCoverage?.toFixed(1) || '0'}%
             </div>
             <p className="text-xs text-muted-foreground">
-              기간 내 총 방문
+              {metrics?.trackedVisitors?.toLocaleString() || 0}명 추적
             </p>
           </CardContent>
         </Card>
       </div>
 
+      {/* 센서 커버율 안내 */}
+      {metrics?.trackedVisitors && metrics.uniqueVisitors > 0 && (
+        <div className="p-3 bg-slate-500/10 border border-slate-500/20 rounded-lg flex items-start gap-2">
+          <Info className="h-4 w-4 text-slate-500 mt-0.5 flex-shrink-0" />
+          <p className="text-sm text-muted-foreground">
+            존 분석은 센서 감지 방문객{' '}
+            <span className="font-medium text-foreground">{metrics.trackedVisitors.toLocaleString()}명</span> 기준
+            (전체 {metrics.uniqueVisitors.toLocaleString()}명의{' '}
+            <span className="font-medium text-foreground">{metrics.trackingCoverage.toFixed(0)}%</span>)
+          </p>
+        </div>
+      )}
+
       {/* 시간대별 방문 패턴 */}
       <Card>
         <CardHeader>
-          <CardTitle>시간대별 방문 패턴</CardTitle>
-          <CardDescription>시간대별 방문자 수 ({dateRange.startDate} ~ {dateRange.endDate})</CardDescription>
+          <CardTitle>시간대별 방문 패턴 (Footfall 기준)</CardTitle>
+          <CardDescription>시간대별 입장 횟수 ({dateRange.startDate} ~ {dateRange.endDate})</CardDescription>
         </CardHeader>
         <CardContent>
           {hourlyData && hourlyData.some(h => h.visitors > 0) ? (

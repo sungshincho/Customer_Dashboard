@@ -29,8 +29,10 @@ import {
   DollarSign,
   AlertTriangle,
   Award,
+  Info,
 } from 'lucide-react';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
+import { useInsightMetrics } from '../hooks/useInsightMetrics';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useDateFilterStore } from '@/store/dateFilterStore';
@@ -43,6 +45,7 @@ export function ProductTab() {
   const { selectedStore } = useSelectedStore();
   const { dateRange } = useDateFilterStore();
   const { user, orgId } = useAuth();
+  const { data: metrics } = useInsightMetrics();
 
   // 상품별 판매 데이터 (product_performance_agg + products 조인)
   const { data: productData } = useQuery({
@@ -160,12 +163,13 @@ export function ProductTab() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <DollarSign className="h-4 w-4 text-muted-foreground" />
-              총 매출
+              <span className="text-[10px] text-muted-foreground uppercase">Revenue</span>
             </CardTitle>
+            <p className="text-xs text-muted-foreground -mt-1">총 매출</p>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ₩{(summary.totalRevenue / 10000).toFixed(0)}만
+              ₩{((metrics?.revenue || summary.totalRevenue) / 10000).toFixed(0)}만
             </div>
             <p className="text-xs text-muted-foreground">분석 기간 총 매출</p>
           </CardContent>
@@ -175,12 +179,13 @@ export function ProductTab() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Package className="h-4 w-4 text-muted-foreground" />
-              판매 수량
+              <span className="text-[10px] text-muted-foreground uppercase">Transactions</span>
             </CardTitle>
+            <p className="text-xs text-muted-foreground -mt-1">거래 수</p>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{summary.totalQuantity.toLocaleString()}개</div>
-            <p className="text-xs text-muted-foreground">총 판매량</p>
+            <div className="text-2xl font-bold">{(metrics?.transactions || summary.totalQuantity).toLocaleString()}건</div>
+            <p className="text-xs text-muted-foreground">총 거래 건수</p>
           </CardContent>
         </Card>
 
@@ -188,8 +193,9 @@ export function ProductTab() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Award className="h-4 w-4 text-muted-foreground" />
-              베스트셀러
+              <span className="text-[10px] text-muted-foreground uppercase">Bestseller</span>
             </CardTitle>
+            <p className="text-xs text-muted-foreground -mt-1">베스트셀러</p>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold truncate">{summary.topProduct?.name || '-'}</div>
@@ -203,8 +209,9 @@ export function ProductTab() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-              재고 부족
+              <span className="text-[10px] text-muted-foreground uppercase">Low Stock</span>
             </CardTitle>
+            <p className="text-xs text-muted-foreground -mt-1">재고 부족</p>
           </CardHeader>
           <CardContent>
             <div className={cn(
@@ -217,6 +224,17 @@ export function ProductTab() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ATV 안내 */}
+      {metrics?.atv && metrics.atv > 0 && (
+        <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg flex items-start gap-2">
+          <Info className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">평균 객단가 (ATV):</span>{' '}
+            ₩{metrics.atv.toLocaleString()} = Revenue {((metrics.revenue || 0) / 10000).toFixed(0)}만 / Transactions {metrics.transactions.toLocaleString()}건
+          </p>
+        </div>
+      )}
 
       {/* 카테고리별 매출 */}
       <div className="grid gap-6 lg:grid-cols-2">
