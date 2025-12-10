@@ -4324,6 +4324,30 @@ export type Database = {
           },
         ]
       }
+      push_subscriptions: {
+        Row: {
+          created_at: string | null
+          id: string
+          subscription: Json
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          subscription: Json
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          subscription?: Json
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       quickstart_guides: {
         Row: {
           auto_show: boolean | null
@@ -5366,6 +5390,51 @@ export type Database = {
           },
         ]
       }
+      store_goals: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          goal_type: string
+          id: string
+          is_active: boolean | null
+          org_id: string
+          period_end: string
+          period_start: string
+          period_type: string
+          store_id: string
+          target_value: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          goal_type: string
+          id?: string
+          is_active?: boolean | null
+          org_id: string
+          period_end: string
+          period_start: string
+          period_type: string
+          store_id: string
+          target_value: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          goal_type?: string
+          id?: string
+          is_active?: boolean | null
+          org_id?: string
+          period_end?: string
+          period_start?: string
+          period_type?: string
+          store_id?: string
+          target_value?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       store_scenes: {
         Row: {
           created_at: string | null
@@ -6119,6 +6188,63 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_alerts: {
+        Row: {
+          action_label: string | null
+          action_url: string | null
+          alert_type: string
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          is_dismissed: boolean | null
+          is_read: boolean | null
+          message: string | null
+          metadata: Json | null
+          org_id: string
+          read_at: string | null
+          severity: string
+          store_id: string | null
+          title: string
+          user_id: string | null
+        }
+        Insert: {
+          action_label?: string | null
+          action_url?: string | null
+          alert_type: string
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_dismissed?: boolean | null
+          is_read?: boolean | null
+          message?: string | null
+          metadata?: Json | null
+          org_id: string
+          read_at?: string | null
+          severity: string
+          store_id?: string | null
+          title: string
+          user_id?: string | null
+        }
+        Update: {
+          action_label?: string | null
+          action_url?: string | null
+          alert_type?: string
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_dismissed?: boolean | null
+          is_read?: boolean | null
+          message?: string | null
+          metadata?: Json | null
+          org_id?: string
+          read_at?: string | null
+          severity?: string
+          store_id?: string | null
+          title?: string
+          user_id?: string | null
+        }
+        Relationships: []
       }
       user_data_imports: {
         Row: {
