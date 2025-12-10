@@ -4,9 +4,11 @@
  * 동선 최적화 시뮬레이션 결과 패널
  */
 
+import { useState } from 'react';
 import { DraggablePanel } from '../../components/DraggablePanel';
 import { Route, AlertTriangle, CheckCircle, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ApplyStrategyModal } from '@/features/roi/components/ApplyStrategyModal';
 
 export interface FlowResult {
   currentPathLength: number;
@@ -38,7 +40,9 @@ export const FlowResultPanel: React.FC<FlowResultPanelProps> = ({
   onShowFlow,
   defaultPosition = { x: 640, y: 100 },
 }) => {
+  const [showApplyModal, setShowApplyModal] = useState(false);
   const pathReduction = ((result.currentPathLength - result.optimizedPathLength) / result.currentPathLength * 100).toFixed(1);
+  const estimatedROI = 150; // 동선 최적화 기본 예상 ROI
 
   return (
     <DraggablePanel
@@ -110,12 +114,30 @@ export const FlowResultPanel: React.FC<FlowResultPanelProps> = ({
         </Button>
         <Button
           size="sm"
-          onClick={onApply}
+          onClick={() => setShowApplyModal(true)}
           className="flex-1 h-8 text-xs"
         >
           적용하기
         </Button>
       </div>
+
+      {/* 전략 적용 모달 */}
+      <ApplyStrategyModal
+        isOpen={showApplyModal}
+        onClose={() => setShowApplyModal(false)}
+        strategyData={{
+          source: '3d_simulation',
+          sourceModule: 'flow_optimization',
+          name: `동선 최적화 (${result.bottlenecks.length}개 병목 해소)`,
+          description: `평균 동선 ${pathReduction}% 단축, 병목 ${result.bottlenecks.length}곳 개선`,
+          settings: { bottlenecks: result.bottlenecks, improvements: result.improvements },
+          expectedRoi: estimatedROI,
+          confidence: 78,
+          baselineMetrics: {
+            pathLength: result.currentPathLength,
+          },
+        }}
+      />
     </DraggablePanel>
   );
 };

@@ -12,9 +12,10 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Auth from "@/core/pages/AuthPage";
 import NotFound from "@/core/pages/NotFoundPage";
 
-// 새로운 3개 메인 페이지
+// 새로운 4개 메인 페이지
 import InsightHubPage from "@/features/insights/InsightHubPage";
 import DigitalTwinStudioPage from "@/features/studio/DigitalTwinStudioPage";
+import ROIMeasurementPage from "@/features/roi/ROIMeasurementPage";
 import SettingsPage from "@/features/settings/SettingsPage";
 
 // Legacy pages (하위 호환성)
@@ -68,10 +69,11 @@ const App = () => (
               <Routes>
                 <Route path="/auth" element={<Auth />} />
 
-                {/* 새로운 3개 메인 라우트 */}
+                {/* 새로운 4개 메인 라우트 */}
                 <Route path="/" element={<ProtectedRoute><InsightHubPage /></ProtectedRoute>} />
                 <Route path="/insights" element={<ProtectedRoute><InsightHubPage /></ProtectedRoute>} />
                 <Route path="/studio" element={<ProtectedRoute><DigitalTwinStudioPage /></ProtectedRoute>} />
+                <Route path="/roi" element={<ProtectedRoute><ROIMeasurementPage /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
 
                 {/* 레거시 라우트 리다이렉트 (하위 호환성) */}
