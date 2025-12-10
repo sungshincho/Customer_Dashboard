@@ -8,7 +8,7 @@
  * - 화면 경계 제한
  */
 
-import { useState, useRef, useCallback, ReactNode } from 'react';
+import { useState, useRef, useCallback, useEffect, ReactNode } from 'react';
 import { GripVertical, ChevronDown, ChevronUp, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +22,8 @@ interface DraggablePanelProps {
   title: string;
   icon?: ReactNode;
   defaultPosition?: Position;
+  /** 오른쪽 끝에서의 오프셋 (픽셀) - 설정 시 left 대신 right 기준으로 배치 */
+  rightOffset?: number;
   defaultCollapsed?: boolean;
   collapsible?: boolean;
   closable?: boolean;
@@ -36,6 +38,7 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
   title,
   icon,
   defaultPosition = { x: 16, y: 16 },
+  rightOffset,
   defaultCollapsed = false,
   collapsible = true,
   closable = false,
@@ -44,14 +47,34 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
   children,
   className,
 }) => {
-  const [position, setPosition] = useState<Position>(defaultPosition);
+  const [position, setPosition] = useState<Position | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
   const panelRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLElement | null>(null);
   const dragOffset = useRef<Position>({ x: 0, y: 0 });
 
+  // 초기 위치 계산 (컴포넌트 마운트 시)
+  useEffect(() => {
+    if (position !== null) return;
+
+    // 부모 컨테이너 찾기
+    const container = panelRef.current?.closest('.relative') as HTMLElement;
+    containerRef.current = container;
+
+    const containerRect = container?.getBoundingClientRect();
+    const containerWidth = containerRect?.width || window.innerWidth;
+
+    if (rightOffset !== undefined) {
+      // rightOffset이 설정된 경우 오른쪽에서부터 계산
+      setPosition({ x: containerWidth - rightOffset, y: defaultPosition.y });
+    } else {
+      setPosition(defaultPosition);
+    }
+  }, [defaultPosition, rightOffset, position]);
+
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (!panelRef.current) return;
+    if (!panelRef.current || position === null) return;
 
     setIsDragging(true);
     dragOffset.current = {
@@ -60,8 +83,13 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
     };
 
     const handleMouseMove = (e: MouseEvent) => {
-      const newX = Math.max(0, Math.min(window.innerWidth - 100, e.clientX - dragOffset.current.x));
-      const newY = Math.max(0, Math.min(window.innerHeight - 50, e.clientY - dragOffset.current.y));
+      const container = containerRef.current;
+      const containerRect = container?.getBoundingClientRect();
+      const maxX = containerRect ? containerRect.width - 100 : window.innerWidth - 100;
+      const maxY = containerRect ? containerRect.height - 50 : window.innerHeight - 50;
+
+      const newX = Math.max(0, Math.min(maxX, e.clientX - dragOffset.current.x));
+      const newY = Math.max(0, Math.min(maxY, e.clientY - dragOffset.current.y));
 
       setPosition({ x: newX, y: newY });
     };
@@ -75,6 +103,11 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
   }, [position]);
+
+  // 위치가 아직 계산되지 않은 경우 렌더링하지 않음
+  if (position === null) {
+    return <div ref={panelRef} className="hidden" />;
+  }
 
   return (
     <div
