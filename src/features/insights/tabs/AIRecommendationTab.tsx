@@ -21,7 +21,8 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
-import { useAIRecommendations, useApplyRecommendation } from '@/hooks/useAIRecommendations';
+import { useAIRecommendations } from '@/hooks/useAIRecommendations';
+import { useApplyRecommendation } from '@/hooks/useROITracking';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
