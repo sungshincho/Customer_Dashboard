@@ -15,15 +15,17 @@ DROP POLICY IF EXISTS "Users can create store scenes" ON public.store_scenes;
 DROP POLICY IF EXISTS "Org members can view org store scenes" ON public.store_scenes;
 
 -- Helper function to check store access
+-- Uses existing is_org_member function and organization_members table
 CREATE OR REPLACE FUNCTION public.user_can_access_store(p_store_id uuid)
 RETURNS boolean
 LANGUAGE sql
 SECURITY DEFINER
 STABLE
+SET search_path TO 'public'
 AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.stores s
-    LEFT JOIN public.org_memberships om ON om.org_id = s.org_id AND om.user_id = auth.uid()
+    LEFT JOIN public.organization_members om ON om.org_id = s.org_id AND om.user_id = auth.uid()
     WHERE s.id = p_store_id
     AND (
       s.user_id = auth.uid()  -- User owns the store directly
