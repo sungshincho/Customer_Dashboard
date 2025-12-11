@@ -10,10 +10,15 @@ import type {
   FurnitureAsset,
   ProductAsset,
   Vector3,
+  LayoutSimulationResultType,
+  FlowSimulationResultType,
+  StaffingSimulationResultType,
 } from '../types';
-import type { LayoutSimulationResult } from '../hooks/useLayoutSimulation';
-import type { FlowSimulationResult } from '../hooks/useFlowSimulation';
-import type { StaffingSimulationResult } from '../hooks/useStaffingSimulation';
+
+// 훅과의 호환성을 위한 타입 별칭
+type LayoutSimulationResult = LayoutSimulationResultType;
+type FlowSimulationResult = FlowSimulationResultType;
+type StaffingSimulationResult = StaffingSimulationResultType;
 
 // ============================================================================
 // 타입 정의

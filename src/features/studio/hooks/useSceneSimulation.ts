@@ -22,11 +22,20 @@ import {
   type SceneComparison,
   type SceneChange,
 } from '../utils/ToBeSceneGenerator';
-import type { SceneRecipe, SavedScene } from '../types';
-import type { LayoutSimulationResult } from './useLayoutSimulation';
-import type { FlowSimulationResult } from './useFlowSimulation';
-import type { CongestionSimulationResult } from './useCongestionSimulation';
-import type { StaffingSimulationResult } from './useStaffingSimulation';
+import type {
+  SceneRecipe,
+  SavedScene,
+  LayoutSimulationResultType,
+  FlowSimulationResultType,
+  CongestionSimulationResultType,
+  StaffingSimulationResultType,
+} from '../types';
+
+// 타입 별칭 (기존 코드와 호환성 유지)
+type LayoutSimulationResult = LayoutSimulationResultType;
+type FlowSimulationResult = FlowSimulationResultType;
+type CongestionSimulationResult = CongestionSimulationResultType;
+type StaffingSimulationResult = StaffingSimulationResultType;
 
 // ============================================================================
 // 타입 정의

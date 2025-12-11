@@ -8,3 +8,4 @@ export * from './scene.types';
 export * from './model.types';
 export * from './overlay.types';
 export * from './simulation.types';
+export * from './simulationResults.types';
