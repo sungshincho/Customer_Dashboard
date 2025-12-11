@@ -407,10 +407,16 @@ export function useCompleteROIMeasurement() {
         revenue: Math.round(dailyRevenueChange * 365),
         visitors: Math.round((measuredKpis.total_visitors - (baselineKpis?.total_visitors || 0)) * 365),
         transactions: Math.round(
-          ((measuredKpis.total_visitors * measuredKpis.conversion_rate / 100) - 
+          ((measuredKpis.total_visitors * measuredKpis.conversion_rate / 100) -
            ((baselineKpis?.total_visitors || 0) * (baselineKpis?.conversion_rate || 0) / 100)) * 365
         ),
       };
+
+      // ROI 계산 (%)
+      const baselineRevenue = baselineKpis?.total_revenue || 0;
+      const actualROI = baselineRevenue > 0
+        ? ((measuredKpis.total_revenue - baselineRevenue) / baselineRevenue) * 100
+        : 0;
 
       // ROI 측정 결과 저장
       const { data: measurement, error: measureError } = await (supabase
@@ -444,6 +450,62 @@ export function useCompleteROIMeasurement() {
         snapshot_type: 'measurement',
         ...measuredKpis,
       }) as any);
+
+      // 🆕 Continuous Learning: strategy_feedback 테이블에 저장
+      try {
+        const recommendationDetails = application.recommendation_details || {};
+        const expectedROI = recommendationDetails.expectedROI ||
+          recommendationDetails.optimizationSummary?.expectedRevenueIncrease || 0;
+
+        // 피드백 타입 결정
+        let feedbackType: string;
+        if (actualROI >= expectedROI * 0.8) {
+          feedbackType = 'success';
+        } else if (actualROI >= expectedROI * 0.5) {
+          feedbackType = 'partial';
+        } else if (actualROI < 0) {
+          feedbackType = 'negative';
+        } else {
+          feedbackType = 'failure';
+        }
+
+        // ROI 정확도 계산
+        const roiAccuracy = expectedROI !== 0
+          ? Math.max(0, 100 - Math.abs((actualROI - expectedROI) / expectedROI) * 100)
+          : 0;
+
+        await supabase.from('strategy_feedback').insert({
+          org_id: orgId,
+          store_id: application.store_id,
+          strategy_type: application.recommendation_type || 'layout',
+          ai_recommendation: recommendationDetails,
+          was_applied: true,
+          applied_at: application.applied_at,
+          result_measured: true,
+          measurement_period_days: application.measurement_period_days,
+          measurement_start_date: application.measurement_start_date,
+          measurement_end_date: new Date().toISOString().split('T')[0],
+          baseline_metrics: {
+            revenue: baselineKpis?.total_revenue || 0,
+            visitors: baselineKpis?.total_visitors || 0,
+            conversion: baselineKpis?.conversion_rate || 0,
+          },
+          actual_metrics: {
+            revenue: measuredKpis.total_revenue,
+            visitors: measuredKpis.total_visitors,
+            conversion: measuredKpis.conversion_rate,
+          },
+          expected_roi: expectedROI,
+          actual_roi: Math.round(actualROI * 10) / 10,
+          roi_accuracy: Math.round(roiAccuracy),
+          feedback_type: feedbackType,
+        });
+
+        console.log('[Learning] Feedback saved:', feedbackType, 'ROI:', actualROI.toFixed(1));
+      } catch (feedbackErr) {
+        console.warn('[Learning] Failed to save feedback:', feedbackErr);
+        // 피드백 저장 실패해도 메인 플로우는 계속 진행
+      }
 
       return measurement;
     },
