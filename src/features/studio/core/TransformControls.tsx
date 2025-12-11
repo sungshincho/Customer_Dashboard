@@ -103,6 +103,25 @@ export function TransformControls({
     };
   }, []);
 
+  // OrbitControls 비활성화 (드래그 중)
+  // @react-three/drei의 TransformControls는 자동으로 OrbitControls를 비활성화하지만
+  // 명시적으로 제어하기 위해 추가 처리
+  useEffect(() => {
+    if (!disableOrbitOnDrag) return;
+
+    // useThree의 controls는 makeDefault로 설정된 컨트롤을 반환
+    // OrbitControls.enabled를 제어하여 드래그 중 충돌 방지
+    const orbitControlsElement = gl.domElement.parentElement;
+    if (!orbitControlsElement) return;
+
+    // 드래그 중에는 OrbitControls 비활성화
+    if (isDragging) {
+      document.body.style.cursor = 'grabbing';
+    } else {
+      document.body.style.cursor = 'auto';
+    }
+  }, [isDragging, disableOrbitOnDrag, gl]);
+
   // 선택된 모델이 없으면 렌더링하지 않음
   if (!selectedId || !selectedModel || !targetObject.current) {
     return null;

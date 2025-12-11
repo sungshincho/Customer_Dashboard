@@ -12,12 +12,18 @@ import { useGLTF } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { Vector3Tuple } from '../types';
+import {
+  isBakedModel,
+  prepareClonedSceneForBaked,
+} from '@/features/simulation/utils/bakedMaterialUtils';
+
 
 // ============================================================================
 // Props
 // ============================================================================
 interface ModelLoaderProps {
   url: string;
+  modelId?: string;
   position?: Vector3Tuple;
   rotation?: Vector3Tuple;
   scale?: Vector3Tuple;
@@ -35,6 +41,7 @@ interface ModelLoaderProps {
 // ============================================================================
 export function ModelLoader({
   url,
+  modelId,
   position = [0, 0, 0],
   rotation = [0, 0, 0],
   scale = [1, 1, 1],
@@ -64,6 +71,7 @@ export function ModelLoader({
   if (!isValidUrl || hasError) {
     return (
       <FallbackModel
+        modelId={modelId}
         position={position}
         rotation={rotation}
         scale={scale}
@@ -79,6 +87,7 @@ export function ModelLoader({
   return (
     <GLTFModel
       url={url}
+      modelId={modelId}
       position={position}
       rotation={rotation}
       scale={scale}
@@ -103,6 +112,7 @@ interface GLTFModelProps extends ModelLoaderProps {
 
 function GLTFModel({
   url,
+  modelId,
   position = [0, 0, 0],
   rotation = [0, 0, 0],
   scale = [1, 1, 1],
@@ -123,9 +133,19 @@ function GLTFModel({
     onError?.();
   });
 
+  const shouldUseBaked = useMemo(() => isBakedModel(url), [url]);
+
   // 씬 클론 (여러 인스턴스 사용 가능)
   const clonedScene = useMemo(() => {
     const cloned = scene.clone(true);
+
+    // Baked 모델 처리
+    if (shouldUseBaked) {
+      prepareClonedSceneForBaked(cloned, {
+        convertToBasic: true,
+        disableShadows: true,
+      });
+    }
 
     // 그림자 설정
     cloned.traverse((child) => {
@@ -136,16 +156,7 @@ function GLTFModel({
     });
 
     return cloned;
-  }, [scene, castShadow, receiveShadow]);
-
-  // 선택/호버 하이라이트 애니메이션
-  useFrame((_, delta) => {
-    if (!groupRef.current) return;
-
-    // 호버 시 살짝 위로 이동
-    const targetY = hovered ? 0.05 : 0;
-    groupRef.current.position.y += (targetY + position[1] - groupRef.current.position.y) * delta * 10;
-  });
+  }, [scene, castShadow, receiveShadow, shouldUseBaked]);
 
   return (
     <group
@@ -153,6 +164,7 @@ function GLTFModel({
       position={position}
       rotation={rotation}
       scale={scale}
+      userData={{ modelId }}
       onClick={(e) => {
         e.stopPropagation();
         onClick?.();
@@ -178,6 +190,7 @@ function GLTFModel({
 // 폴백 모델 (에러 시 표시)
 // ============================================================================
 interface FallbackModelProps {
+  modelId?: string;
   position?: Vector3Tuple;
   rotation?: Vector3Tuple;
   scale?: Vector3Tuple;
@@ -189,6 +202,7 @@ interface FallbackModelProps {
 }
 
 function FallbackModel({
+  modelId,
   position = [0, 0, 0],
   rotation = [0, 0, 0],
   scale = [1, 1, 1],
@@ -203,6 +217,7 @@ function FallbackModel({
       position={position}
       rotation={rotation}
       scale={scale}
+      userData={{ modelId }}
       onClick={(e) => {
         e.stopPropagation();
         onClick?.();

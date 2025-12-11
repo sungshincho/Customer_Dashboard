@@ -416,102 +416,104 @@ export type Database = {
         Relationships: []
       }
       applied_strategies: {
-  Row: {
-    id: string
-    store_id: string
-    org_id: string
-    user_id: string | null
-    source: string
-    source_module: string
-    name: string
-    description: string | null
-    settings: Json | null
-    start_date: string
-    end_date: string
-    expected_roi: number
-    target_roi: number | null
-    current_roi: number | null
-    final_roi: number | null
-    baseline_metrics: Json | null
-    status: string | null
-    result: string | null
-    notes: string | null
-    created_at: string | null
-    updated_at: string | null
-    completed_at: string | null
-  }
-  Insert: {
-    id?: string
-    store_id: string
-    org_id: string
-    user_id?: string | null
-    source: string
-    source_module: string
-    name: string
-    description?: string | null
-    settings?: Json | null
-    start_date: string
-    end_date: string
-    expected_roi: number
-    target_roi?: number | null
-    current_roi?: number | null
-    final_roi?: number | null
-    baseline_metrics?: Json | null
-    status?: string | null
-    result?: string | null
-    notes?: string | null
-    created_at?: string | null
-    updated_at?: string | null
-    completed_at?: string | null
-  }
-  Update: {
-    id?: string
-    store_id?: string
-    org_id?: string
-    user_id?: string | null
-    source?: string
-    source_module?: string
-    name?: string
-    description?: string | null
-    settings?: Json | null
-    start_date?: string
-    end_date?: string
-    expected_roi?: number
-    target_roi?: number | null
-    current_roi?: number | null
-    final_roi?: number | null
-    baseline_metrics?: Json | null
-    status?: string | null
-    result?: string | null
-    notes?: string | null
-    created_at?: string | null
-    updated_at?: string | null
-    completed_at?: string | null
-  }
-  Relationships: [
-    {
-      foreignKeyName: "applied_strategies_store_id_fkey"
-      columns: ["store_id"]
-      isOneToOne: false
-      referencedRelation: "stores"
-      referencedColumns: ["id"]
-    },
-    {
-      foreignKeyName: "applied_strategies_org_id_fkey"
-      columns: ["org_id"]
-      isOneToOne: false
-      referencedRelation: "organizations"
-      referencedColumns: ["id"]
-    },
-    {
-      foreignKeyName: "applied_strategies_user_id_fkey"
-      columns: ["user_id"]
-      isOneToOne: false
-      referencedRelation: "users"
-      referencedColumns: ["id"]
-    }
-  ]
-}
+        Row: {
+          actual_revenue: number | null
+          baseline_metrics: Json | null
+          completed_at: string | null
+          created_at: string | null
+          created_by: string | null
+          current_roi: number | null
+          description: string | null
+          end_date: string
+          expected_revenue: number | null
+          expected_roi: number
+          final_roi: number | null
+          id: string
+          name: string
+          notes: string | null
+          org_id: string
+          result: string | null
+          settings: Json | null
+          source: string
+          source_module: string
+          start_date: string
+          status: string | null
+          store_id: string
+          target_roi: number | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          actual_revenue?: number | null
+          baseline_metrics?: Json | null
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          current_roi?: number | null
+          description?: string | null
+          end_date: string
+          expected_revenue?: number | null
+          expected_roi: number
+          final_roi?: number | null
+          id?: string
+          name: string
+          notes?: string | null
+          org_id: string
+          result?: string | null
+          settings?: Json | null
+          source: string
+          source_module: string
+          start_date: string
+          status?: string | null
+          store_id: string
+          target_roi?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          actual_revenue?: number | null
+          baseline_metrics?: Json | null
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          current_roi?: number | null
+          description?: string | null
+          end_date?: string
+          expected_revenue?: number | null
+          expected_roi?: number
+          final_roi?: number | null
+          id?: string
+          name?: string
+          notes?: string | null
+          org_id?: string
+          result?: string | null
+          settings?: Json | null
+          source?: string
+          source_module?: string
+          start_date?: string
+          status?: string | null
+          store_id?: string
+          target_roi?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "applied_strategies_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "applied_strategies_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       auto_order_suggestions: {
         Row: {
           created_at: string | null
@@ -5430,53 +5432,6 @@ export type Database = {
           },
         ]
       }
-      strategy_daily_metrics: {
-  Row: {
-    id: string
-    strategy_id: string
-    date: string
-    revenue: number | null
-    visitors: number | null
-    conversion_rate: number | null
-    transactions: number | null
-    avg_order_value: number | null
-    compared_to_baseline: Json | null
-    created_at: string | null
-  }
-  Insert: {
-    id?: string
-    strategy_id: string
-    date: string
-    revenue?: number | null
-    visitors?: number | null
-    conversion_rate?: number | null
-    transactions?: number | null
-    avg_order_value?: number | null
-    compared_to_baseline?: Json | null
-    created_at?: string | null
-  }
-  Update: {
-    id?: string
-    strategy_id?: string
-    date?: string
-    revenue?: number | null
-    visitors?: number | null
-    conversion_rate?: number | null
-    transactions?: number | null
-    avg_order_value?: number | null
-    compared_to_baseline?: Json | null
-    created_at?: string | null
-  }
-  Relationships: [
-    {
-      foreignKeyName: "strategy_daily_metrics_strategy_id_fkey"
-      columns: ["strategy_id"]
-      isOneToOne: false
-      referencedRelation: "applied_strategies"
-      referencedColumns: ["id"]
-    }
-  ]
-}
       store_comments: {
         Row: {
           author_name: string
@@ -5867,6 +5822,44 @@ export type Database = {
             columns: ["license_id"]
             isOneToOne: false
             referencedRelation: "licenses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      strategy_daily_metrics: {
+        Row: {
+          created_at: string | null
+          cumulative_roi: number | null
+          daily_roi: number | null
+          date: string
+          id: string
+          metrics: Json
+          strategy_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          cumulative_roi?: number | null
+          daily_roi?: number | null
+          date: string
+          id?: string
+          metrics?: Json
+          strategy_id: string
+        }
+        Update: {
+          created_at?: string | null
+          cumulative_roi?: number | null
+          daily_roi?: number | null
+          date?: string
+          id?: string
+          metrics?: Json
+          strategy_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "strategy_daily_metrics_strategy_id_fkey"
+            columns: ["strategy_id"]
+            isOneToOne: false
+            referencedRelation: "applied_strategies"
             referencedColumns: ["id"]
           },
         ]
@@ -7434,7 +7427,47 @@ export type Database = {
         }
         Returns: undefined
       }
+      get_funnel_stats: {
+        Args: { p_end_date: string; p_start_date: string; p_store_id: string }
+        Returns: {
+          event_type: string
+          unique_visitors: number
+        }[]
+      }
+      get_roi_by_category: {
+        Args: { p_org_id: string; p_store_id?: string }
+        Returns: {
+          avg_roi: number
+          source: string
+          source_module: string
+          success_count: number
+          total_count: number
+          total_effect: number
+        }[]
+      }
+      get_roi_summary: {
+        Args: { p_org_id: string; p_store_id?: string }
+        Returns: {
+          active_strategies: number
+          avg_roi: number
+          completed_strategies: number
+          success_count: number
+          success_rate: number
+          total_actual_revenue: number
+          total_expected_revenue: number
+          total_strategies: number
+        }[]
+      }
       get_schema_metadata: { Args: never; Returns: Json }
+      get_strategy_roi_trend: {
+        Args: { p_strategy_id: string }
+        Returns: {
+          cumulative_roi: number
+          daily_roi: number
+          date: string
+          metrics: Json
+        }[]
+      }
       get_user_org_id: { Args: { _user_id: string }; Returns: string }
       get_user_orgs: {
         Args: { _user_id: string }

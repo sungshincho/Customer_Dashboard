@@ -24,6 +24,7 @@ import type { StudioMode, EnvironmentPreset, Canvas3DProps } from '../types';
 // ============================================================================
 export function Canvas3D({
   mode = 'view',
+  transformMode = 'translate',
   enableControls = true,
   enableSelection = false,
   enableTransform = false,
@@ -47,6 +48,7 @@ export function Canvas3D({
       >
         <SceneContent
           mode={mode}
+          transformMode={transformMode}
           enableControls={enableControls}
           enableSelection={enableSelection}
           enableTransform={enableTransform}
@@ -65,6 +67,7 @@ export function Canvas3D({
 // ============================================================================
 interface SceneContentProps {
   mode: StudioMode;
+  transformMode: string;
   enableControls: boolean;
   enableSelection: boolean;
   enableTransform: boolean;
@@ -75,6 +78,7 @@ interface SceneContentProps {
 
 function SceneContent({
   mode,
+  transformMode,
   enableControls,
   enableSelection,
   enableTransform,
@@ -125,7 +129,7 @@ function SceneContent({
         {enableSelection && <SelectionManager />}
 
         {/* 변환 컨트롤 (편집 모드) */}
-        {enableTransform && <TransformControls />}
+        {enableTransform && <TransformControls mode={transformMode as any} />}
 
         {/* 자식 컴포넌트 (오버레이 등) */}
         {children}
@@ -157,6 +161,7 @@ function SceneModels({ onAssetClick }: SceneModelsProps) {
         .map((model) => (
           <ModelLoader
             key={model.id}
+            modelId={model.id}
             url={model.url}
             position={model.position}
             rotation={model.rotation}
