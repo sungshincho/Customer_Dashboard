@@ -77,7 +77,7 @@ export interface UseSceneSimulationReturn {
 
   // 시뮬레이션 실행
   runSimulation: (request: SimulationRequest) => Promise<void>;
-  runAllSimulations: (params?: Record<SimulationType, Record<string, any>>) => Promise<void>;
+  runAllSimulations: (params?: Record<SimulationType, Record<string, any>>, scene?: SceneRecipe) => Promise<void>;
 
   // 결과 관리
   getComparison: () => SceneComparison | null;
@@ -251,10 +251,13 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
     [simulationMutation]
   );
 
-  // 전체 시뮬레이션 실행
+  // 전체 시뮬레이션 실행 (scene 파라미터로 직접 씬을 전달할 수 있음)
   const runAllSimulations = useCallback(
-    async (params?: Record<SimulationType, Record<string, any>>) => {
-      if (!state.asIsScene || !selectedStore?.id || !orgId) {
+    async (params?: Record<SimulationType, Record<string, any>>, scene?: SceneRecipe) => {
+      // 직접 전달된 씬 또는 state의 asIsScene 사용
+      const targetScene = scene || state.asIsScene;
+
+      if (!targetScene || !selectedStore?.id || !orgId) {
         toast({
           title: '씬을 먼저 선택해주세요',
           variant: 'destructive',
@@ -262,26 +265,38 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
         return;
       }
 
+      // 직접 전달된 씬이 있으면 state도 업데이트
+      if (scene) {
+        setState((prev) => ({
+          ...prev,
+          asIsScene: scene,
+          toBeScene: null,
+          comparison: null,
+          results: {},
+          selectedChanges: [],
+        }));
+      }
+
       setIsSimulating(true);
 
       try {
         // 씬 데이터 준비
         const sceneData = {
-          furniture: state.asIsScene.furniture.map((f) => ({
+          furniture: targetScene.furniture.map((f) => ({
             id: f.id,
             type: f.furniture_type,
             position: f.position,
             rotation: f.rotation,
             dimensions: f.dimensions,
           })),
-          products: state.asIsScene.products.map((p) => ({
+          products: targetScene.products.map((p) => ({
             id: p.id,
             sku: p.sku,
             position: p.position,
             dimensions: p.dimensions,
           })),
           space: {
-            dimensions: state.asIsScene.space.dimensions,
+            dimensions: targetScene.space.dimensions,
           },
         };
 
@@ -325,7 +340,7 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
         }
 
         // 통합 To-be 씬 생성
-        const comparison = generateCombinedOptimizedScene(state.asIsScene, results);
+        const comparison = generateCombinedOptimizedScene(targetScene, results);
 
         setState((prev) => ({
           ...prev,
