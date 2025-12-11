@@ -22,6 +22,7 @@ import { BlendFunction, ToneMappingMode } from 'postprocessing';
 // ============================================================================
 // 후처리 설정
 // ============================================================================
+// NOTE: ToneMappingMode는 런타임에만 접근 (TDZ 에러 방지)
 export const POSTPROCESS_CONFIG = {
   // Bloom 설정
   bloom: {
@@ -49,10 +50,9 @@ export const POSTPROCESS_CONFIG = {
     darkness: 0.4,
   },
 
-  // Tone Mapping 설정
+  // Tone Mapping 설정 (mode는 컴포넌트에서 설정)
   toneMapping: {
     enabled: true,
-    mode: ToneMappingMode.ACES_FILMIC,
   },
 
   // Brightness/Contrast 설정
@@ -135,7 +135,7 @@ export function PostProcessing({
 
       {/* Tone Mapping */}
       {POSTPROCESS_CONFIG.toneMapping.enabled && (
-        <ToneMapping mode={POSTPROCESS_CONFIG.toneMapping.mode} />
+        <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
       )}
 
       {/* Brightness/Contrast */}

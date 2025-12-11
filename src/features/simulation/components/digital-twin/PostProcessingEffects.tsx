@@ -43,10 +43,10 @@ export const POSTPROCESS_CONFIG = {
     darkness: 0.4,               // 🎛️ 어두움 강도 (0.2 ~ 0.8)
   },
   
-  // Tone Mapping - 색감 보정
+  // Tone Mapping - 색감 보정 (mode는 컴포넌트에서 설정 - TDZ 방지)
   toneMapping: {
     enabled: true,
-    mode: ToneMappingMode.ACES_FILMIC,  // 🎛️ ACES_FILMIC이 영화적
+    // mode: ToneMappingMode.ACES_FILMIC - 컴포넌트에서 직접 사용
     // 다른 옵션: REINHARD, CINEON, NEUTRAL
   },
   
@@ -123,7 +123,7 @@ export function PostProcessingEffects({
       
       {/* Tone Mapping */}
       {POSTPROCESS_CONFIG.toneMapping.enabled && (
-        <ToneMapping mode={POSTPROCESS_CONFIG.toneMapping.mode} />
+        <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
       )}
       
       {/* Brightness/Contrast */}
