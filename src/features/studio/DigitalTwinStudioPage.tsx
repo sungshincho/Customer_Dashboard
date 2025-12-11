@@ -263,28 +263,6 @@ export default function DigitalTwinStudioPage() {
     handleRunSimulation(['layout', 'flow', 'congestion', 'staffing']);
   }, [setMode, handleRunSimulation]);
 
-  // As-is → To-be 씬 기반 시뮬레이션 실행
-  const handleRunSceneSimulation = useCallback(async () => {
-    if (!currentRecipe) {
-      toast.error('씬을 먼저 구성해주세요');
-      return;
-    }
-
-    // As-is 씬 설정
-    sceneSimulation.setAsIsScene(currentRecipe);
-
-    // 시뮬레이션 실행
-    await sceneSimulation.runAllSimulations({
-      layout: { goal: 'revenue' },
-      flow: { duration: '1hour', customerCount: 100 },
-      staffing: { staffCount: 3, goal: 'customer_service' },
-    });
-
-    // 비교 탭으로 전환
-    setActiveTab('comparison');
-    setMode('simulate');
-  }, [currentRecipe, sceneSimulation, setMode]);
-
   // SceneProvider용 모델 변환
   const sceneModels: Model3D[] = useMemo(() => {
     return models
@@ -364,6 +342,28 @@ export default function DigitalTwinStudioPage() {
       camera: { position: { x: 10, y: 10, z: 15 }, target: { x: 0, y: 0, z: 0 }, fov: 50 },
     };
   }, [models, activeLayers]);
+
+  // As-is → To-be 씬 기반 시뮬레이션 실행
+  const handleRunSceneSimulation = useCallback(async () => {
+    if (!currentRecipe) {
+      toast.error('씬을 먼저 구성해주세요');
+      return;
+    }
+
+    // As-is 씬 설정
+    sceneSimulation.setAsIsScene(currentRecipe);
+
+    // 시뮬레이션 실행
+    await sceneSimulation.runAllSimulations({
+      layout: { goal: 'revenue' },
+      flow: { duration: '1hour', customerCount: 100 },
+      staffing: { staffCount: 3, goal: 'customer_service' },
+    });
+
+    // 비교 탭으로 전환
+    setActiveTab('comparison');
+    setMode('simulate');
+  }, [currentRecipe, sceneSimulation, setMode]);
 
   // 데모 오버레이 데이터
   const demoHeatPoints: HeatPoint[] = useMemo(
