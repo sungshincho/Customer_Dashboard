@@ -24,3 +24,18 @@ export {
   suggestDefaultPosition,
 } from '@/features/simulation/utils/modelFilenameParser';
 export { generateSceneRecipe } from '@/features/simulation/utils/sceneRecipeGenerator';
+
+// To-be 씬 생성 유틸리티
+export {
+  generateLayoutOptimizedScene,
+  generateFlowOptimizedScene,
+  generateStaffingOptimizedScene,
+  generateCombinedOptimizedScene,
+  calculateSceneDiff,
+  mergeToBeIntoAsIs,
+} from './ToBeSceneGenerator';
+
+export type {
+  SceneChange,
+  SceneComparison,
+} from './ToBeSceneGenerator';

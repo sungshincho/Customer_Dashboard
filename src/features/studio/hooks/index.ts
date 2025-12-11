@@ -14,6 +14,9 @@ export { useFlowSimulation } from './useFlowSimulation';
 export { useCongestionSimulation } from './useCongestionSimulation';
 export { useStaffingSimulation } from './useStaffingSimulation';
 
+// 씬 기반 시뮬레이션 통합 훅
+export { useSceneSimulation } from './useSceneSimulation';
+
 // 타입 re-export
 export type {
   LayoutSimulationParams,
@@ -44,6 +47,14 @@ export type {
   ZoneCoverage,
   UseStaffingSimulationReturn,
 } from './useStaffingSimulation';
+
+export type {
+  SimulationType,
+  SimulationRequest,
+  SimulationResults,
+  SceneSimulationState,
+  UseSceneSimulationReturn,
+} from './useSceneSimulation';
 
 // SceneProvider 훅들 re-export
 export {

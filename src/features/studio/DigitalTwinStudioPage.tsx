@@ -13,7 +13,7 @@ import { useLocation } from 'react-router-dom';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, Loader2, Sparkles, Layers, Save } from 'lucide-react';
+import { AlertCircle, Loader2, Sparkles, Layers, Save, GitCompare } from 'lucide-react';
 import { toast } from 'sonner';
 
 // 새 스튜디오 컴포넌트
@@ -21,6 +21,7 @@ import { Canvas3D, SceneProvider } from './core';
 import { LayerPanel, SimulationPanel, ToolPanel, SceneSavePanel, OverlayControlPanel } from './panels';
 import { HeatmapOverlay, CustomerFlowOverlay, ZoneBoundaryOverlay, CustomerAvatarOverlay } from './overlays';
 import { DraggablePanel } from './components/DraggablePanel';
+import { SceneComparisonView } from './components/SceneComparisonView';
 import {
   LayoutResultPanel,
   FlowResultPanel,
@@ -31,7 +32,7 @@ import {
   type CongestionResult,
   type StaffingResult,
 } from './panels/results';
-import { useStudioMode, useOverlayVisibility, useScenePersistence } from './hooks';
+import { useStudioMode, useOverlayVisibility, useScenePersistence, useSceneSimulation } from './hooks';
 import { loadUserModels } from './utils';
 import type { StudioMode, Model3D, OverlayType, HeatPoint, FlowVector, ZoneBoundary, CustomerAvatar, SceneRecipe, LightingPreset, Vector3, SimulationScenario } from './types';
 
@@ -53,7 +54,7 @@ interface ModelLayer {
   metadata?: Record<string, any>;
 }
 
-type TabType = 'layer' | 'simulation';
+type TabType = 'layer' | 'simulation' | 'comparison';
 
 // 시뮬레이션 결과 상태 타입
 interface SimulationResults {
@@ -93,6 +94,9 @@ export default function DigitalTwinStudioPage() {
   // 씬 저장 관리
   const { scenes, activeScene, isSaving, saveScene, deleteScene, setActiveScene } =
     useScenePersistence({ userId: user?.id, storeId: selectedStore?.id });
+
+  // 씬 기반 시뮬레이션 (As-is → To-be)
+  const sceneSimulation = useSceneSimulation();
 
   // UI 상태
   const [activeTab, setActiveTab] = useState<TabType>('layer');
@@ -258,6 +262,28 @@ export default function DigitalTwinStudioPage() {
     setMode('simulate');
     handleRunSimulation(['layout', 'flow', 'congestion', 'staffing']);
   }, [setMode, handleRunSimulation]);
+
+  // As-is → To-be 씬 기반 시뮬레이션 실행
+  const handleRunSceneSimulation = useCallback(async () => {
+    if (!currentRecipe) {
+      toast.error('씬을 먼저 구성해주세요');
+      return;
+    }
+
+    // As-is 씬 설정
+    sceneSimulation.setAsIsScene(currentRecipe);
+
+    // 시뮬레이션 실행
+    await sceneSimulation.runAllSimulations({
+      layout: { goal: 'revenue' },
+      flow: { duration: '1hour', customerCount: 100 },
+      staffing: { staffCount: 3, goal: 'customer_service' },
+    });
+
+    // 비교 탭으로 전환
+    setActiveTab('comparison');
+    setMode('simulate');
+  }, [currentRecipe, sceneSimulation, setMode]);
 
   // SceneProvider용 모델 변환
   const sceneModels: Model3D[] = useMemo(() => {
@@ -478,16 +504,38 @@ export default function DigitalTwinStudioPage() {
                   >
                     AI 시뮬레이션
                   </TabButton>
+                  <TabButton
+                    active={activeTab === 'comparison'}
+                    onClick={() => setActiveTab('comparison')}
+                  >
+                    <GitCompare className="w-3 h-3 mr-1 inline" />
+                    씬 비교
+                  </TabButton>
                 </div>
 
                 {/* 탭 컨텐츠 */}
                 <div className="flex-1 overflow-y-auto">
-                  {activeTab === 'layer' ? (
-                    <LayerPanel />
-                  ) : (
+                  {activeTab === 'layer' && <LayerPanel />}
+                  {activeTab === 'simulation' && (
                     <SimulationPanel
                       onRunSimulation={handleRunSimulation}
                       isRunning={isInferring}
+                    />
+                  )}
+                  {activeTab === 'comparison' && (
+                    <SceneComparisonView
+                      comparison={sceneSimulation.getComparison()}
+                      viewMode={sceneSimulation.state.viewMode}
+                      selectedChanges={sceneSimulation.state.selectedChanges}
+                      onViewModeChange={sceneSimulation.setViewMode}
+                      onSelectChange={sceneSimulation.selectChange}
+                      onDeselectChange={sceneSimulation.deselectChange}
+                      onSelectAll={sceneSimulation.selectAllChanges}
+                      onDeselectAll={sceneSimulation.deselectAllChanges}
+                      onApplySelected={sceneSimulation.applySelectedChanges}
+                      onApplyAll={sceneSimulation.applyAllChanges}
+                      onSaveToBeScene={sceneSimulation.saveToBeScene}
+                      onReset={sceneSimulation.clearScenes}
                     />
                   )}
                 </div>
@@ -635,9 +683,9 @@ export default function DigitalTwinStudioPage() {
             )}
 
             {/* ----- 하단 중앙: 실행 버튼 ----- */}
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 pointer-events-auto">
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 pointer-events-auto flex gap-3">
               <Button
-                className="px-8 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-sm
+                className="px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-sm
                            border border-white/20 rounded-xl text-white font-medium
                            transition-all hover:scale-105"
                 onClick={handleRunAllSimulations}
@@ -648,7 +696,21 @@ export default function DigitalTwinStudioPage() {
                 ) : (
                   <Sparkles className="w-5 h-5 mr-2" />
                 )}
-                모든 시뮬레이션 실행
+                시뮬레이션 실행
+              </Button>
+              <Button
+                className="px-6 py-3 bg-primary/80 hover:bg-primary backdrop-blur-sm
+                           border border-primary/40 rounded-xl text-white font-medium
+                           transition-all hover:scale-105"
+                onClick={handleRunSceneSimulation}
+                disabled={sceneSimulation.isSimulating || !currentRecipe}
+              >
+                {sceneSimulation.isSimulating ? (
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                ) : (
+                  <GitCompare className="w-5 h-5 mr-2" />
+                )}
+                씬 최적화 (As-is → To-be)
               </Button>
             </div>
           </div>
