@@ -18,12 +18,11 @@ import * as THREE from 'three';
 // ============================================================================
 // 🎛️ 씬 설정 - 이 값들을 조절하여 미세 조정 가능
 // ============================================================================
+// NOTE: THREE 상수는 컴포넌트 내부에서 직접 사용 (TDZ 에러 방지)
 export const SCENE_CONFIG = {
-  // 렌더러 설정
+  // 렌더러 설정 (THREE 상수는 RendererSetup에서 직접 사용)
   renderer: {
-    toneMapping: THREE.ACESFilmicToneMapping,
     toneMappingExposure: 1.1,                   // 🎛️ 약간 밝게 (매장 느낌)
-    outputColorSpace: THREE.SRGBColorSpace,
     physicallyCorrectLights: true,
   },
   
@@ -98,25 +97,26 @@ export const SCENE_CONFIG = {
 // ============================================================================
 export function RendererSetup() {
   const { gl } = useThree();
-  
+
   useEffect(() => {
+    // THREE 상수는 여기서 직접 사용 (TDZ 방지)
     // Tone Mapping
-    gl.toneMapping = SCENE_CONFIG.renderer.toneMapping;
+    gl.toneMapping = THREE.ACESFilmicToneMapping;
     gl.toneMappingExposure = SCENE_CONFIG.renderer.toneMappingExposure;
-    
+
     // 색공간
-    gl.outputColorSpace = SCENE_CONFIG.renderer.outputColorSpace;
-    
+    gl.outputColorSpace = THREE.SRGBColorSpace;
+
     // 물리 기반 조명 (R3F에서는 기본적으로 활성화)
     // gl.physicallyCorrectLights는 Three.js r150+에서 deprecated
     // useLegacyLights = false가 기본값
-    
+
     // 그림자 설정
     gl.shadowMap.enabled = true;
     gl.shadowMap.type = THREE.PCFSoftShadowMap;  // 부드러운 그림자
-    
+
   }, [gl]);
-  
+
   return null;
 }
 

@@ -158,6 +158,15 @@ function GLTFModel({
     return cloned;
   }, [scene, castShadow, receiveShadow, shouldUseBaked]);
 
+  // 선택/호버 하이라이트 애니메이션
+  useFrame((_, delta) => {
+    if (!groupRef.current) return;
+
+    // 호버 시 살짝 위로 이동
+    const targetY = hovered ? 0.05 : 0;
+    groupRef.current.position.y += (targetY + position[1] - groupRef.current.position.y) * delta * 10;
+  });
+
   return (
     <group
       ref={groupRef}
