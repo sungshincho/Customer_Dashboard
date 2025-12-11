@@ -18,10 +18,8 @@ import { toast } from 'sonner';
 
 // 새 스튜디오 컴포넌트
 import { Canvas3D, SceneProvider, useScene } from './core';
-import { LayerPanel, SimulationPanel, ToolPanel, SceneSavePanel, OverlayControlPanel } from './panels';
-import { HeatmapOverlay, CustomerFlowOverlay, ZoneBoundaryOverlay, CustomerAvatarOverlay, LayoutOptimizationOverlay, FlowOptimizationOverlay, CongestionOverlay, StaffingOverlay } from './overlays';
 import { LayerPanel, SimulationPanel, ToolPanel, SceneSavePanel, OverlayControlPanel, PropertyPanel } from './panels';
-import { HeatmapOverlay, CustomerFlowOverlay, ZoneBoundaryOverlay, CustomerAvatarOverlay } from './overlays';
+import { HeatmapOverlay, CustomerFlowOverlay, ZoneBoundaryOverlay, CustomerAvatarOverlay, LayoutOptimizationOverlay, FlowOptimizationOverlay, CongestionOverlay, StaffingOverlay } from './overlays';
 import { DraggablePanel } from './components/DraggablePanel';
 import { SceneComparisonView } from './components/SceneComparisonView';
 import {
@@ -262,11 +260,26 @@ export default function DigitalTwinStudioPage() {
     });
   }, [handleSimulationComplete]);
 
-  // 전체 시뮬레이션 실행
-  const handleRunAllSimulations = useCallback(() => {
+  // 전체 시뮬레이션 실행 (씬 기반 + 레거시 UI 결과)
+  const handleRunAllSimulations = useCallback(async () => {
     setMode('simulate');
+
+    // 레거시 UI 결과 패널용 (데모 데이터)
     handleRunSimulation(['layout', 'flow', 'congestion', 'staffing']);
-  }, [setMode, handleRunSimulation]);
+
+    // 씬 기반 시뮬레이션도 함께 실행 (실제 모델 이동용)
+    // currentRecipe를 직접 전달하여 state 동기화 문제 해결
+    if (currentRecipe) {
+      await sceneSimulation.runAllSimulations(
+        {
+          layout: { goal: 'revenue' },
+          flow: { duration: '1hour', customerCount: 100 },
+          staffing: { staffCount: 3, goal: 'customer_service' },
+        },
+        currentRecipe  // 씬 직접 전달
+      );
+    }
+  }, [setMode, handleRunSimulation, currentRecipe, sceneSimulation]);
 
   // SceneProvider용 모델 변환
   const sceneModels: Model3D[] = useMemo(() => {
@@ -355,15 +368,15 @@ export default function DigitalTwinStudioPage() {
       return;
     }
 
-    // As-is 씬 설정
-    sceneSimulation.setAsIsScene(currentRecipe);
-
-    // 시뮬레이션 실행
-    await sceneSimulation.runAllSimulations({
-      layout: { goal: 'revenue' },
-      flow: { duration: '1hour', customerCount: 100 },
-      staffing: { staffCount: 3, goal: 'customer_service' },
-    });
+    // 씬 직접 전달하여 시뮬레이션 실행
+    await sceneSimulation.runAllSimulations(
+      {
+        layout: { goal: 'revenue' },
+        flow: { duration: '1hour', customerCount: 100 },
+        staffing: { staffCount: 3, goal: 'customer_service' },
+      },
+      currentRecipe
+    );
 
     // 비교 탭으로 전환
     setActiveTab('comparison');
