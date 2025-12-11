@@ -18,7 +18,7 @@ import { toast } from 'sonner';
 
 // 새 스튜디오 컴포넌트
 import { Canvas3D, SceneProvider } from './core';
-import { LayerPanel, SimulationPanel, ToolPanel, SceneSavePanel, OverlayControlPanel } from './panels';
+import { LayerPanel, SimulationPanel, ToolPanel, SceneSavePanel, OverlayControlPanel, PropertyPanel } from './panels';
 import { HeatmapOverlay, CustomerFlowOverlay, ZoneBoundaryOverlay, CustomerAvatarOverlay } from './overlays';
 import { DraggablePanel } from './components/DraggablePanel';
 import { SceneComparisonView } from './components/SceneComparisonView';
@@ -34,7 +34,7 @@ import {
 } from './panels/results';
 import { useStudioMode, useOverlayVisibility, useScenePersistence, useSceneSimulation } from './hooks';
 import { loadUserModels } from './utils';
-import type { StudioMode, Model3D, OverlayType, HeatPoint, FlowVector, ZoneBoundary, CustomerAvatar, SceneRecipe, LightingPreset, Vector3, SimulationScenario } from './types';
+import type { StudioMode, Model3D, OverlayType, HeatPoint, FlowVector, ZoneBoundary, CustomerAvatar, SceneRecipe, LightingPreset, Vector3, SimulationScenario, TransformMode } from './types';
 
 // 기존 시뮬레이션 훅
 import { useStoreContext } from '@/features/simulation/hooks/useStoreContext';
@@ -69,6 +69,7 @@ interface VisiblePanels {
   tools: boolean;
   overlay: boolean;
   sceneSave: boolean;
+  property: boolean;
   layoutResult: boolean;
   flowResult: boolean;
   congestionResult: boolean;
@@ -104,12 +105,14 @@ export default function DigitalTwinStudioPage() {
   const [activeLayers, setActiveLayers] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [sceneName, setSceneName] = useState('');
+  const [transformMode, setTransformMode] = useState<TransformMode>('translate');
 
   // 드래그 패널 표시 상태 (모든 패널 기본 표시)
   const [visiblePanels, setVisiblePanels] = useState<VisiblePanels>({
     tools: true,
     overlay: true,
     sceneSave: true,
+    property: true,
     layoutResult: true,
     flowResult: true,
     congestionResult: true,
@@ -474,6 +477,7 @@ export default function DigitalTwinStudioPage() {
             ) : (
               <Canvas3D
                 mode={mode}
+                transformMode={transformMode}
                 enableControls={true}
                 enableSelection={isEditMode}
                 enableTransform={isEditMode}
@@ -556,7 +560,12 @@ export default function DigitalTwinStudioPage() {
                 width="w-auto"
                 resizable={false}
               >
-                <ToolPanel mode={mode} onModeChange={setMode} hasSelection={false} />
+                <ToolPanel
+                  mode={mode}
+                  onModeChange={setMode}
+                  onTransformModeChange={setTransformMode}
+                  hasSelection={false}
+                />
               </DraggablePanel>
             )}
 
@@ -617,6 +626,20 @@ export default function DigitalTwinStudioPage() {
                   onNew={() => setSceneName('')}
                   maxScenes={3}
                 />
+              </DraggablePanel>
+            )}
+
+            {/* 속성 패널 (편집 모드에서만 표시) */}
+            {isEditMode && visiblePanels.property && (
+              <DraggablePanel
+                id="property-panel"
+                title="속성"
+                rightOffset={100}
+                defaultPosition={{ x: 0, y: 148 }}
+                defaultCollapsed={false}
+                width="w-72"
+              >
+                <PropertyPanel />
               </DraggablePanel>
             )}
 

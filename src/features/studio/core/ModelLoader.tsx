@@ -23,6 +23,7 @@ import {
 // ============================================================================
 interface ModelLoaderProps {
   url: string;
+  modelId?: string;
   position?: Vector3Tuple;
   rotation?: Vector3Tuple;
   scale?: Vector3Tuple;
@@ -40,6 +41,7 @@ interface ModelLoaderProps {
 // ============================================================================
 export function ModelLoader({
   url,
+  modelId,
   position = [0, 0, 0],
   rotation = [0, 0, 0],
   scale = [1, 1, 1],
@@ -69,6 +71,7 @@ export function ModelLoader({
   if (!isValidUrl || hasError) {
     return (
       <FallbackModel
+        modelId={modelId}
         position={position}
         rotation={rotation}
         scale={scale}
@@ -84,6 +87,7 @@ export function ModelLoader({
   return (
     <GLTFModel
       url={url}
+      modelId={modelId}
       position={position}
       rotation={rotation}
       scale={scale}
@@ -108,6 +112,7 @@ interface GLTFModelProps extends ModelLoaderProps {
 
 function GLTFModel({
   url,
+  modelId,
   position = [0, 0, 0],
   rotation = [0, 0, 0],
   scale = [1, 1, 1],
@@ -159,6 +164,7 @@ function GLTFModel({
       position={position}
       rotation={rotation}
       scale={scale}
+      userData={{ modelId }}
       onClick={(e) => {
         e.stopPropagation();
         onClick?.();
@@ -184,6 +190,7 @@ function GLTFModel({
 // 폴백 모델 (에러 시 표시)
 // ============================================================================
 interface FallbackModelProps {
+  modelId?: string;
   position?: Vector3Tuple;
   rotation?: Vector3Tuple;
   scale?: Vector3Tuple;
@@ -195,6 +202,7 @@ interface FallbackModelProps {
 }
 
 function FallbackModel({
+  modelId,
   position = [0, 0, 0],
   rotation = [0, 0, 0],
   scale = [1, 1, 1],
@@ -209,6 +217,7 @@ function FallbackModel({
       position={position}
       rotation={rotation}
       scale={scale}
+      userData={{ modelId }}
       onClick={(e) => {
         e.stopPropagation();
         onClick?.();

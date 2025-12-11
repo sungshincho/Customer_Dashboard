@@ -159,6 +159,7 @@ export interface SceneEffect {
 // Canvas3D Props
 export interface Canvas3DProps {
   mode?: StudioMode;
+  transformMode?: TransformMode;
   enableControls?: boolean;
   enableSelection?: boolean;
   enableTransform?: boolean;
@@ -167,6 +168,9 @@ export interface Canvas3DProps {
   children?: ReactNode;
   onAssetClick?: (assetId: string, assetType: string) => void;
 }
+
+// TransformMode (model.types.ts에서 재export됨)
+export type TransformMode = 'translate' | 'rotate' | 'scale';
 
 // 환경 프리셋
 export type EnvironmentPreset =
