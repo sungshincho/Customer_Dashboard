@@ -810,27 +810,23 @@ function SimulationResultPanels({
   onClose,
   toggleOverlay,
 }: SimulationResultPanelsProps) {
-  const { applySimulationResults, revertSimulationChanges } = useScene();
+  const { applySimulationResults } = useScene();
 
-  // 레이아웃 시뮬레이션 결과 적용
-  const handleApplyLayout = useCallback(() => {
+  // 3D 씬에 레이아웃 변경 적용 (모델 위치 이동)
+  const handleShowLayoutIn3D = useCallback(() => {
     const layoutResult = sceneSimulationResults.layout;
-    if (layoutResult?.furnitureMoves) {
+    if (layoutResult?.furnitureMoves && layoutResult.furnitureMoves.length > 0) {
       applySimulationResults({
         furnitureMoves: layoutResult.furnitureMoves,
         animated: true,
       });
-      toast.success('레이아웃 최적화가 3D 씬에 적용되었습니다');
+      toggleOverlay('zone');
+      toast.success('3D 씬에 레이아웃 변경이 적용되었습니다');
     } else {
-      toast.info('적용할 가구 이동 정보가 없습니다');
+      toggleOverlay('zone');
+      toast.info('3D 뷰에서 변경사항 표시');
     }
-  }, [sceneSimulationResults.layout, applySimulationResults]);
-
-  // 되돌리기
-  const handleRevert = useCallback(() => {
-    revertSimulationChanges();
-    toast.info('변경사항이 되돌려졌습니다');
-  }, [revertSimulationChanges]);
+  }, [sceneSimulationResults.layout, applySimulationResults, toggleOverlay]);
 
   return (
     <>
@@ -838,11 +834,11 @@ function SimulationResultPanels({
         <LayoutResultPanel
           result={simulationResults.layout}
           onClose={() => onClose('layoutResult')}
-          onApply={handleApplyLayout}
-          onShowIn3D={() => {
-            toggleOverlay('zone');
-            toast.info('3D 뷰에서 변경사항 표시');
+          onApply={() => {
+            // ROI 측정 모달 완료 후 호출됨 - 별도 동작 없음
+            // (모달이 이미 ROI 페이지로 이동하거나 토스트 표시함)
           }}
+          onShowIn3D={handleShowLayoutIn3D}
           rightOffset={320}
           defaultPosition={{ x: 0, y: 16 }}
         />
