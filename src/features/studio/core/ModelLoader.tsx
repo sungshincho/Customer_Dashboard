@@ -12,6 +12,11 @@ import { useGLTF } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { Vector3Tuple } from '../types';
+import {
+  isBakedModel,
+  prepareClonedSceneForBaked,
+} from '@/features/simulation/utils/bakedMaterialUtils';
+
 
 // ============================================================================
 // Props
@@ -122,6 +127,15 @@ function GLTFModel({
     console.error('GLTF load error:', error);
     onError?.();
   });
+
+  const shouldUseBaked = useMemo(() => isBakedModel(url), [url]);
+
+if (shouldUseBaked) {
+  prepareClonedSceneForBaked(cloned, {
+    convertToBasic: true,
+    disableShadows: true,
+  });
+}
 
   // 씬 클론 (여러 인스턴스 사용 가능)
   const clonedScene = useMemo(() => {
