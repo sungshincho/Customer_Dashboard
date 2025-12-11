@@ -17,12 +17,11 @@ import type { EnvironmentPreset } from '../types';
 // ============================================================================
 // 씬 설정
 // ============================================================================
+// NOTE: THREE 상수는 컴포넌트 내부에서 직접 사용 (TDZ 에러 방지)
 export const SCENE_CONFIG = {
-  // 렌더러 설정
+  // 렌더러 설정 (THREE 상수는 RendererSetup에서 직접 사용)
   renderer: {
-    toneMapping: THREE.ACESFilmicToneMapping,
     toneMappingExposure: 1.1,
-    outputColorSpace: THREE.SRGBColorSpace,
     physicallyCorrectLights: true,
   },
 
@@ -98,9 +97,10 @@ function RendererSetup() {
   const { gl } = useThree();
 
   useEffect(() => {
-    gl.toneMapping = SCENE_CONFIG.renderer.toneMapping;
+    // THREE 상수는 여기서 직접 사용 (TDZ 방지)
+    gl.toneMapping = THREE.ACESFilmicToneMapping;
     gl.toneMappingExposure = SCENE_CONFIG.renderer.toneMappingExposure;
-    gl.outputColorSpace = SCENE_CONFIG.renderer.outputColorSpace;
+    gl.outputColorSpace = THREE.SRGBColorSpace;
     gl.shadowMap.enabled = true;
     gl.shadowMap.type = THREE.PCFSoftShadowMap;
   }, [gl]);
