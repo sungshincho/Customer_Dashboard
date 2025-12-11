@@ -38,9 +38,9 @@ export function useScenePersistence(options: UseScenePersistenceOptions = {}) {
 
       const mappedScenes: SavedScene[] = (data || []).map((scene: any) => ({
         id: scene.id,
-        name: scene.name,
+        name: scene.scene_name,
         recipe_data: scene.recipe_data,
-        thumbnail: scene.thumbnail,
+        thumbnail: undefined,
         is_active: scene.is_active,
         created_at: scene.created_at,
         updated_at: scene.updated_at,
@@ -76,7 +76,7 @@ export function useScenePersistence(options: UseScenePersistenceOptions = {}) {
           const { error } = await supabase
             .from('store_scenes')
             .update({
-              name,
+              scene_name: name,
               recipe_data: recipe as any,
               updated_at: new Date().toISOString(),
             })
@@ -89,7 +89,7 @@ export function useScenePersistence(options: UseScenePersistenceOptions = {}) {
           const { error } = await supabase.from('store_scenes').insert({
             user_id: userId,
             store_id: storeId,
-            name,
+            scene_name: name,
             recipe_data: recipe as any,
             is_active: true,
           });
