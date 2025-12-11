@@ -17,7 +17,7 @@ import { AlertCircle, Loader2, Sparkles, Layers, Save, GitCompare } from 'lucide
 import { toast } from 'sonner';
 
 // 새 스튜디오 컴포넌트
-import { Canvas3D, SceneProvider } from './core';
+import { Canvas3D, SceneProvider, useScene } from './core';
 import { LayerPanel, SimulationPanel, ToolPanel, SceneSavePanel, OverlayControlPanel } from './panels';
 import { HeatmapOverlay, CustomerFlowOverlay, ZoneBoundaryOverlay, CustomerAvatarOverlay, LayoutOptimizationOverlay, FlowOptimizationOverlay, CongestionOverlay, StaffingOverlay } from './overlays';
 import { LayerPanel, SimulationPanel, ToolPanel, SceneSavePanel, OverlayControlPanel, PropertyPanel } from './panels';
@@ -686,66 +686,18 @@ export default function DigitalTwinStudioPage() {
             )}
 
             {/* ========== 시뮬레이션 결과 패널들 (우측 정렬) ========== */}
-
-            {visiblePanels.layoutResult && (
-              <LayoutResultPanel
-                result={simulationResults.layout}
-                onClose={() => closePanel('layoutResult')}
-                onApply={() => {
-                  toast.success('레이아웃 최적화 적용됨');
-                }}
-                onShowIn3D={() => {
-                  toggleOverlay('zone');
-                  toast.info('3D 뷰에서 변경사항 표시');
-                }}
-                rightOffset={320}
-                defaultPosition={{ x: 0, y: 16 }}
-              />
-            )}
-
-            {visiblePanels.flowResult && (
-              <FlowResultPanel
-                result={simulationResults.flow}
-                onClose={() => closePanel('flowResult')}
-                onApply={() => {
-                  toast.success('동선 최적화 적용됨');
-                }}
-                onShowFlow={() => {
-                  toggleOverlay('flow');
-                  toast.info('동선 오버레이 표시');
-                }}
-                rightOffset={320}
-                defaultPosition={{ x: 0, y: 60 }}
-              />
-            )}
-
-            {visiblePanels.congestionResult && (
-              <CongestionResultPanel
-                result={simulationResults.congestion}
-                onClose={() => closePanel('congestionResult')}
-                onPlayAnimation={() => {
-                  toast.info('시간대별 애니메이션 재생');
-                }}
-                rightOffset={320}
-                defaultPosition={{ x: 0, y: 104 }}
-              />
-            )}
-
-            {visiblePanels.staffingResult && (
-              <StaffingResultPanel
-                result={simulationResults.staffing}
-                onClose={() => closePanel('staffingResult')}
-                onApply={() => {
-                  toast.success('인력 배치 최적화 적용됨');
-                }}
-                onShowPositions={() => {
-                  toggleOverlay('avatar');
-                  toast.info('직원 위치 표시');
-                }}
-                rightOffset={320}
-                defaultPosition={{ x: 0, y: 148 }}
-              />
-            )}
+            <SimulationResultPanels
+              visiblePanels={{
+                layoutResult: visiblePanels.layoutResult,
+                flowResult: visiblePanels.flowResult,
+                congestionResult: visiblePanels.congestionResult,
+                staffingResult: visiblePanels.staffingResult,
+              }}
+              simulationResults={simulationResults}
+              sceneSimulationResults={sceneSimulation.state.results}
+              onClose={closePanel}
+              toggleOverlay={toggleOverlay}
+            />
 
             {/* ----- 하단 중앙: 실행 버튼 ----- */}
             <div className="absolute bottom-6 left-1/2 -translate-x-1/2 pointer-events-auto flex gap-3">
@@ -809,5 +761,123 @@ function TabButton({ active, onClick, children }: TabButtonProps) {
     >
       {children}
     </button>
+  );
+}
+
+// ============================================================================
+// 시뮬레이션 결과 패널 래퍼 (useScene 접근 가능)
+// ============================================================================
+interface SimulationResultPanelsProps {
+  visiblePanels: {
+    layoutResult: boolean;
+    flowResult: boolean;
+    congestionResult: boolean;
+    staffingResult: boolean;
+  };
+  simulationResults: {
+    layout: LayoutResult | null;
+    flow: FlowResult | null;
+    congestion: CongestionResult | null;
+    staffing: StaffingResult | null;
+  };
+  sceneSimulationResults: {
+    layout?: any;
+    flow?: any;
+    congestion?: any;
+    staffing?: any;
+  };
+  onClose: (panel: 'layoutResult' | 'flowResult' | 'congestionResult' | 'staffingResult') => void;
+  toggleOverlay: (overlay: string) => void;
+}
+
+function SimulationResultPanels({
+  visiblePanels,
+  simulationResults,
+  sceneSimulationResults,
+  onClose,
+  toggleOverlay,
+}: SimulationResultPanelsProps) {
+  const { applySimulationResults, revertSimulationChanges } = useScene();
+
+  // 레이아웃 시뮬레이션 결과 적용
+  const handleApplyLayout = useCallback(() => {
+    const layoutResult = sceneSimulationResults.layout;
+    if (layoutResult?.furnitureMoves) {
+      applySimulationResults({
+        furnitureMoves: layoutResult.furnitureMoves,
+        animated: true,
+      });
+      toast.success('레이아웃 최적화가 3D 씬에 적용되었습니다');
+    } else {
+      toast.info('적용할 가구 이동 정보가 없습니다');
+    }
+  }, [sceneSimulationResults.layout, applySimulationResults]);
+
+  // 되돌리기
+  const handleRevert = useCallback(() => {
+    revertSimulationChanges();
+    toast.info('변경사항이 되돌려졌습니다');
+  }, [revertSimulationChanges]);
+
+  return (
+    <>
+      {visiblePanels.layoutResult && (
+        <LayoutResultPanel
+          result={simulationResults.layout}
+          onClose={() => onClose('layoutResult')}
+          onApply={handleApplyLayout}
+          onShowIn3D={() => {
+            toggleOverlay('zone');
+            toast.info('3D 뷰에서 변경사항 표시');
+          }}
+          rightOffset={320}
+          defaultPosition={{ x: 0, y: 16 }}
+        />
+      )}
+
+      {visiblePanels.flowResult && (
+        <FlowResultPanel
+          result={simulationResults.flow}
+          onClose={() => onClose('flowResult')}
+          onApply={() => {
+            toast.success('동선 최적화 적용됨');
+          }}
+          onShowFlow={() => {
+            toggleOverlay('flow');
+            toast.info('동선 오버레이 표시');
+          }}
+          rightOffset={320}
+          defaultPosition={{ x: 0, y: 60 }}
+        />
+      )}
+
+      {visiblePanels.congestionResult && (
+        <CongestionResultPanel
+          result={simulationResults.congestion}
+          onClose={() => onClose('congestionResult')}
+          onPlayAnimation={() => {
+            toast.info('시간대별 애니메이션 재생');
+          }}
+          rightOffset={320}
+          defaultPosition={{ x: 0, y: 104 }}
+        />
+      )}
+
+      {visiblePanels.staffingResult && (
+        <StaffingResultPanel
+          result={simulationResults.staffing}
+          onClose={() => onClose('staffingResult')}
+          onApply={() => {
+            toast.success('인력 배치 최적화 적용됨');
+          }}
+          onShowPositions={() => {
+            toggleOverlay('avatar');
+            toast.info('직원 위치 표시');
+          }}
+          rightOffset={320}
+          defaultPosition={{ x: 0, y: 148 }}
+        />
+      )}
+    </>
   );
 }
