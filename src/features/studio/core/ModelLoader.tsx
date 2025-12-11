@@ -130,16 +130,17 @@ function GLTFModel({
 
   const shouldUseBaked = useMemo(() => isBakedModel(url), [url]);
 
-if (shouldUseBaked) {
-  prepareClonedSceneForBaked(cloned, {
-    convertToBasic: true,
-    disableShadows: true,
-  });
-}
-
   // 씬 클론 (여러 인스턴스 사용 가능)
   const clonedScene = useMemo(() => {
     const cloned = scene.clone(true);
+
+    // Baked 모델 처리
+    if (shouldUseBaked) {
+      prepareClonedSceneForBaked(cloned, {
+        convertToBasic: true,
+        disableShadows: true,
+      });
+    }
 
     // 그림자 설정
     cloned.traverse((child) => {
@@ -150,13 +151,7 @@ if (shouldUseBaked) {
     });
 
     return cloned;
-  }, [scene, castShadow, receiveShadow]);
-
-  // 선택/호버 하이라이트 애니메이션
-  useFrame((_, delta) => {
-    if (!groupRef.current) return;
-
-
+  }, [scene, castShadow, receiveShadow, shouldUseBaked]);
 
   return (
     <group
