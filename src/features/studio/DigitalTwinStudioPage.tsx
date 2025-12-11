@@ -18,6 +18,8 @@ import { toast } from 'sonner';
 
 // 새 스튜디오 컴포넌트
 import { Canvas3D, SceneProvider } from './core';
+import { LayerPanel, SimulationPanel, ToolPanel, SceneSavePanel, OverlayControlPanel } from './panels';
+import { HeatmapOverlay, CustomerFlowOverlay, ZoneBoundaryOverlay, CustomerAvatarOverlay, LayoutOptimizationOverlay, FlowOptimizationOverlay, CongestionOverlay, StaffingOverlay } from './overlays';
 import { LayerPanel, SimulationPanel, ToolPanel, SceneSavePanel, OverlayControlPanel, PropertyPanel } from './panels';
 import { HeatmapOverlay, CustomerFlowOverlay, ZoneBoundaryOverlay, CustomerAvatarOverlay } from './overlays';
 import { DraggablePanel } from './components/DraggablePanel';
@@ -483,11 +485,51 @@ export default function DigitalTwinStudioPage() {
                 enableTransform={isEditMode}
                 showGrid={isEditMode}
               >
-                {/* 조건부 오버레이 렌더링 */}
-                {isActive('heatmap') && <HeatmapOverlay heatPoints={demoHeatPoints} />}
-                {isActive('flow') && <CustomerFlowOverlay flows={demoFlows} />}
+                {/* 기본 오버레이 (데모 데이터) */}
+                {isActive('heatmap') && !sceneSimulation.state.results.layout && <HeatmapOverlay heatPoints={demoHeatPoints} />}
+                {isActive('flow') && !sceneSimulation.state.results.flow && <CustomerFlowOverlay flows={demoFlows} />}
                 {isActive('zone') && <ZoneBoundaryOverlay zones={demoZones} />}
-                {isActive('avatar') && <CustomerAvatarOverlay customers={demoCustomers} />}
+                {isActive('avatar') && !sceneSimulation.state.results.staffing && <CustomerAvatarOverlay customers={demoCustomers} />}
+
+                {/* 시뮬레이션 결과 오버레이 */}
+                {sceneSimulation.state.results.layout && (
+                  <LayoutOptimizationOverlay
+                    result={sceneSimulation.state.results.layout}
+                    showBefore={false}
+                    showAfter={true}
+                    showMoves={true}
+                    showZoneHighlights={true}
+                  />
+                )}
+                {sceneSimulation.state.results.flow && (
+                  <FlowOptimizationOverlay
+                    result={sceneSimulation.state.results.flow}
+                    showPaths={true}
+                    showBottlenecks={true}
+                    showHeatmap={true}
+                    animatePaths={true}
+                  />
+                )}
+                {sceneSimulation.state.results.congestion && (
+                  <CongestionOverlay
+                    result={sceneSimulation.state.results.congestion}
+                    showHeatmap={true}
+                    showZoneMarkers={true}
+                    showCrowdAnimation={true}
+                    animateTimeProgress={false}
+                  />
+                )}
+                {sceneSimulation.state.results.staffing && (
+                  <StaffingOverlay
+                    result={sceneSimulation.state.results.staffing}
+                    showStaffMarkers={true}
+                    showCurrentPositions={true}
+                    showSuggestedPositions={true}
+                    showCoverageZones={true}
+                    showMovementPaths={true}
+                    animateMovement={true}
+                  />
+                )}
               </Canvas3D>
             )}
           </div>
