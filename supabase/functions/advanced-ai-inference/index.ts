@@ -1,5 +1,15 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.79.0';
 
+// Continuous Learning 모듈 import
+import {
+  calculatePastPerformance,
+  buildLearningContext,
+  validateROIPrediction,
+  saveFeedbackRecord,
+  type LearningContext,
+  type PastPerformanceResult,
+} from './learning.ts';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -375,7 +385,11 @@ ${analyzePerformanceInsights(perf)}
 }
 
 // --- 통계 기반 신뢰도 계산 시스템 ---
-function calculateStatisticalConfidence(context: EnhancedStoreContext): {
+// pastPerformanceData: learning.ts에서 가져온 과거 성과 데이터 (선택적)
+function calculateStatisticalConfidence(
+  context: EnhancedStoreContext,
+  pastPerformanceData?: PastPerformanceResult
+): {
   score: number;
   factors: ConfidenceFactors;
   explanation: string;
@@ -394,7 +408,7 @@ function calculateStatisticalConfidence(context: EnhancedStoreContext): {
   // 1. 데이터 충분성 (최대 25점)
   const salesDays = context.salesData?.last30Days?.length || context.dailySales?.length || 0;
   const visitorDays = context.visitorData?.last30Days?.length || context.visits?.length || 0;
-  
+
   if (salesDays >= 30 && visitorDays >= 30) {
     factors.dataAvailability = 25;
     explanations.push('30일 이상의 충분한 매출/방문 데이터');
@@ -423,16 +437,28 @@ function calculateStatisticalConfidence(context: EnhancedStoreContext): {
   if (context.visitorData && (context.visitorData.customerFlows || []).length > 0) factors.dataCoverage += 5;
   if (context.conversionData && context.conversionData.overall > 0) factors.dataCoverage += 5;
 
-  // 4. 과거 추천 성과 (최대 20점)
-  const perf = context.recommendationPerformance;
-  if (perf && perf.totalApplied > 0) {
-    if (perf.successRate >= 0.7 && perf.totalApplied >= 5) {
-      factors.pastPerformance = 20;
-      explanations.push(`과거 ${perf.totalApplied}건 중 ${(perf.successRate * 100).toFixed(0)}% 성공`);
-    } else if (perf.successRate >= 0.5) {
-      factors.pastPerformance = 15;
+  // 4. 과거 추천 성과 (최대 20점) - Continuous Learning 데이터 활용
+  if (pastPerformanceData && pastPerformanceData.sampleSize > 0) {
+    // learning.ts에서 계산된 점수 사용
+    factors.pastPerformance = pastPerformanceData.score;
+    if (pastPerformanceData.sampleSize >= 5) {
+      explanations.push(pastPerformanceData.explanation);
+    }
+  } else {
+    // 폴백: 기존 recommendationPerformance 사용
+    const perf = context.recommendationPerformance;
+    if (perf && perf.totalApplied > 0) {
+      if (perf.successRate >= 0.7 && perf.totalApplied >= 5) {
+        factors.pastPerformance = 20;
+        explanations.push(`과거 ${perf.totalApplied}건 중 ${(perf.successRate * 100).toFixed(0)}% 성공`);
+      } else if (perf.successRate >= 0.5) {
+        factors.pastPerformance = 15;
+      } else {
+        factors.pastPerformance = 10;
+      }
     } else {
-      factors.pastPerformance = 10;
+      // 데이터 없음: 기본값 5점
+      factors.pastPerformance = 5;
     }
   }
 
@@ -452,9 +478,10 @@ function calculateStatisticalConfidence(context: EnhancedStoreContext): {
   else if (entityCount > 10 && relationCount > 15) factors.ontologyDepth = 7;
   else if (entityCount > 0) factors.ontologyDepth = 4;
 
-  // 최종 점수 계산
+  // 최종 점수 계산 (신뢰도 조정값 반영)
   const totalScore = Object.values(factors).reduce((a, b) => a + b, 0);
-  const normalizedScore = 60 + (totalScore / 100) * 35;
+  const confidenceAdjustment = pastPerformanceData?.confidenceAdjustment || 0;
+  const normalizedScore = 60 + (totalScore / 100) * 35 + confidenceAdjustment;
   const finalScore = Math.min(Math.max(normalizedScore, 60), 95);
 
   return {
@@ -1647,8 +1674,27 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
     dataQuality: storeContext.dataQuality,
   };
 
-  // 통계 기반 신뢰도 계산 (Phase 1)
-  const confidenceResult = calculateStatisticalConfidence(enhancedContext);
+  // 🆕 Continuous Learning: 과거 성과 및 학습 컨텍스트 조회
+  const storeId = storeContext.storeInfo?.id;
+  let pastPerformanceData: PastPerformanceResult | undefined;
+  let learningContext: LearningContext | undefined;
+
+  if (storeId && supabase) {
+    try {
+      // 과거 성과 데이터 조회
+      pastPerformanceData = await calculatePastPerformance(supabase, storeId, 'layout');
+      console.log('[Learning] Past performance:', pastPerformanceData);
+
+      // 학습 컨텍스트 조회 (성공/실패 패턴)
+      learningContext = await buildLearningContext(supabase, storeId, 'layout');
+      console.log('[Learning] Context summary:', learningContext.contextSummary);
+    } catch (learningErr) {
+      console.warn('[Learning] Failed to fetch learning data:', learningErr);
+    }
+  }
+
+  // 통계 기반 신뢰도 계산 (Phase 1 + Continuous Learning)
+  const confidenceResult = calculateStatisticalConfidence(enhancedContext, pastPerformanceData);
   console.log('Statistical Confidence:', confidenceResult.score, confidenceResult.explanation);
   
   // 온톨로지 그래프 분석
@@ -1695,7 +1741,7 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
     return `- [${p.id}] ${p.label}: pos(x=${x.toFixed(1)}, z=${z.toFixed(1)}) - 현재 가구: ${parentFurniture?.label || '없음'}`;
   }).join('\n');
 
-  // 🆕 AI 프롬프트 - 가구 + 제품 최적화
+  // 🆕 AI 프롬프트 - 가구 + 제품 최적화 (Continuous Learning 포함)
   const prompt = buildEnhancedLayoutPromptWithProducts(
     enhancedContext,
     furnitureList,
@@ -1705,7 +1751,8 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
     comprehensiveAnalysis,
     storeWidth,
     storeDepth,
-    confidenceResult
+    confidenceResult,
+    learningContext
   );
 
   // AI 호출
@@ -2100,15 +2147,21 @@ function buildEnhancedLayoutPromptWithProducts(
   comprehensiveAnalysis: any,
   storeWidth: number,
   storeDepth: number,
-  confidenceResult: any
+  confidenceResult: any,
+  learningContext?: LearningContext
 ): string {
   const halfWidth = storeWidth / 2;
   const halfDepth = storeDepth / 2;
   const enhancedDataSection = buildEnhancedDataPrompt(context);
 
+  // Continuous Learning 학습 데이터 추가
+  const learningSection = learningContext?.promptAddition || '';
+
   return `You are a retail store layout AND product placement optimization expert with access to REAL business data.
 
 ${enhancedDataSection}
+
+${learningSection}
 
 === 🔬 온톨로지 그래프 분석 ===
 ${ontologyAnalysis?.summaryForAI || '온톨로지 분석 없음'}
