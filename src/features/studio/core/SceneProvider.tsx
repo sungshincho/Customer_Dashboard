@@ -17,6 +17,22 @@ import type {
 } from '../types';
 
 // ============================================================================
+// 시뮬레이션 결과 적용을 위한 타입
+// ============================================================================
+export interface FurnitureMove {
+  furnitureId: string;
+  furnitureName: string;
+  fromPosition: { x: number; y: number; z: number };
+  toPosition: { x: number; y: number; z: number };
+  rotation?: number;
+}
+
+export interface SimulationResultsPayload {
+  furnitureMoves?: FurnitureMove[];
+  animated?: boolean;
+}
+
+// ============================================================================
 // 액션 타입
 // ============================================================================
 type SceneAction =
@@ -36,6 +52,7 @@ type SceneAction =
   | { type: 'SET_CAMERA'; payload: Partial<CameraSettings> }
   | { type: 'LOAD_SCENE'; payload: Partial<SceneState> }
   | { type: 'SET_DIRTY'; payload: boolean }
+  | { type: 'APPLY_SIMULATION'; payload: SimulationResultsPayload }
   | { type: 'RESET' };
 
 // ============================================================================
@@ -166,6 +183,50 @@ const sceneReducer = (state: SceneState, action: SceneAction): SceneState => {
         isDirty: action.payload,
       };
 
+    case 'APPLY_SIMULATION': {
+      const { furnitureMoves } = action.payload;
+      if (!furnitureMoves || furnitureMoves.length === 0) return state;
+
+      // 모델 위치 업데이트
+      const updatedModels = state.models.map((model) => {
+        // furnitureId 또는 모델 이름으로 매칭
+        const move = furnitureMoves.find(
+          (m) => m.furnitureId === model.id || m.furnitureName === model.name
+        );
+
+        if (move) {
+          const newPosition: Vector3Tuple = [
+            move.toPosition.x,
+            move.toPosition.y,
+            move.toPosition.z,
+          ];
+
+          // 회전이 있으면 적용
+          const newRotation: Vector3Tuple = move.rotation
+            ? [model.rotation[0], move.rotation * (Math.PI / 180), model.rotation[2]]
+            : model.rotation;
+
+          return {
+            ...model,
+            position: newPosition,
+            rotation: newRotation,
+            metadata: {
+              ...model.metadata,
+              movedBySimulation: true,
+              previousPosition: model.position,
+            },
+          };
+        }
+        return model;
+      });
+
+      return {
+        ...state,
+        models: updatedModels,
+        isDirty: true,
+      };
+    }
+
     case 'RESET':
       return initialState;
 
@@ -222,6 +283,10 @@ interface SceneContextValue {
   resetScene: () => void;
   isDirty: boolean;
   setDirty: (dirty: boolean) => void;
+
+  // 시뮬레이션 결과 적용
+  applySimulationResults: (results: SimulationResultsPayload) => void;
+  revertSimulationChanges: () => void;
 }
 
 // ============================================================================
@@ -334,6 +399,31 @@ export function SceneProvider({ mode = 'view', children, initialModels = [] }: S
     dispatch({ type: 'SET_DIRTY', payload: dirty });
   }, []);
 
+  // 시뮬레이션 결과 적용
+  const applySimulationResults = useCallback((results: SimulationResultsPayload) => {
+    dispatch({ type: 'APPLY_SIMULATION', payload: results });
+  }, []);
+
+  // 시뮬레이션 변경 되돌리기
+  const revertSimulationChanges = useCallback(() => {
+    // 이전 위치로 모델 복원
+    const revertedModels = state.models.map((model) => {
+      if (model.metadata?.movedBySimulation && model.metadata?.previousPosition) {
+        return {
+          ...model,
+          position: model.metadata.previousPosition as Vector3Tuple,
+          metadata: {
+            ...model.metadata,
+            movedBySimulation: false,
+            previousPosition: undefined,
+          },
+        };
+      }
+      return model;
+    });
+    dispatch({ type: 'SET_MODELS', payload: revertedModels });
+  }, [state.models]);
+
   const value: SceneContextValue = {
     state,
     dispatch,
@@ -364,6 +454,8 @@ export function SceneProvider({ mode = 'view', children, initialModels = [] }: S
     resetScene,
     isDirty: state.isDirty,
     setDirty,
+    applySimulationResults,
+    revertSimulationChanges,
   };
 
   return <SceneContext.Provider value={value}>{children}</SceneContext.Provider>;
