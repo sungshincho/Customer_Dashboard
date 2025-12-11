@@ -75,6 +75,47 @@ export interface LayoutSimulationResultType {
 // 동선 시뮬레이션 결과
 // ============================================================================
 
+// 동선 포인트
+export interface FlowPoint {
+  x: number;
+  y: number;
+  z: number;
+  t: number;
+  speed?: number;
+  dwell?: boolean;
+}
+
+// 동선 경로
+export interface FlowPath {
+  id: string;
+  customerId: string;
+  customerType: string;
+  points: FlowPoint[];
+  totalTime: number;
+  totalDistance: number;
+  dwellZones: Array<{
+    zoneId: string;
+    zoneName: string;
+    duration: number;
+  }>;
+  purchaseIntent: number;
+  converted: boolean;
+}
+
+// 동선 병목
+export interface FlowBottleneck {
+  id: string;
+  position: { x: number; y: number; z: number };
+  zoneName: string;
+  severity: number;
+  avgWaitTime: number;
+  frequency: number;
+  cause: string;
+  suggestions: string[];
+  impactLevel: 'high' | 'medium' | 'low';
+  affectedCustomers: number;
+}
+
 export interface FlowSimulationResultType {
   id: string;
   status: SimulationStatus;
@@ -101,19 +142,11 @@ export interface FlowSimulationResultType {
     congestionReduction: number;
   };
 
+  // 경로 데이터 (3D 시각화용)
+  paths: FlowPath[];
+
   // 상세 데이터
-  bottlenecks: Array<{
-    id: string;
-    position: { x: number; y: number; z: number };
-    zoneName: string;
-    severity: number;
-    avgWaitTime: number;
-    frequency: number;
-    cause: string;
-    suggestions: string[];
-    impactLevel: 'high' | 'medium' | 'low';
-    affectedCustomers: number;
-  }>;
+  bottlenecks: FlowBottleneck[];
 
   optimizations: Array<{
     id: string;
@@ -125,11 +158,46 @@ export interface FlowSimulationResultType {
     priority: number;
   }>;
 
+  // 존별 분석
+  zoneAnalysis: Array<{
+    zoneId: string;
+    zoneName: string;
+    visitCount: number;
+    avgDwellTime: number;
+    congestionLevel: number;
+    conversionContribution: number;
+  }>;
+
   // 신뢰도
   confidence: ConfidenceDetails;
 
   // 인사이트
   insights: string[];
+
+  // 3D 시각화 데이터
+  visualization: {
+    animatedPaths: Array<{
+      id: string;
+      points: FlowPoint[];
+      color: string;
+      type: 'current' | 'optimized';
+    }>;
+    bottleneckMarkers: Array<{
+      position: { x: number; y: number; z: number };
+      severity: number;
+      radius: number;
+    }>;
+    flowHeatmap: Array<{
+      x: number;
+      z: number;
+      density: number;
+    }>;
+    zoneFlowArrows: Array<{
+      from: { x: number; y: number; z: number };
+      to: { x: number; y: number; z: number };
+      volume: number;
+    }>;
+  };
 }
 
 // ============================================================================
