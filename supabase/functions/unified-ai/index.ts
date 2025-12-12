@@ -384,8 +384,8 @@ async function loadOntologyGraph(supabase: any, storeId: string, userId: string)
     stats: {
       totalEntities: entities?.length || 0,
       totalRelations: relations?.length || 0,
-      entityTypes: [...new Set(entities?.map((e: any) => e.entity_type?.name) || [])],
-      relationTypes: [...new Set(relations?.map((r: any) => r.relation_type?.name) || [])],
+      entityTypes: [...new Set(entities?.map((e: any) => e.entity_type?.name).filter(Boolean) || [])] as string[],
+      relationTypes: [...new Set(relations?.map((r: any) => r.relation_type?.name).filter(Boolean) || [])] as string[],
     }
   };
 }

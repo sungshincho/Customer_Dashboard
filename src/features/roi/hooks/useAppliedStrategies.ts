@@ -117,7 +117,7 @@ export const useAppliedStrategies = (
         return [];
       }
 
-      return (data || []).map(transformStrategy);
+      return (data || []).map((row) => transformStrategy(row as unknown as AppliedStrategyRow));
     },
     enabled: !!selectedStore?.id,
     staleTime: 1000 * 60 * 2, // 2분
@@ -142,7 +142,7 @@ export const useStrategyDetail = (strategyId: string | null) => {
         return null;
       }
 
-      return transformStrategy(data);
+      return transformStrategy(data as unknown as AppliedStrategyRow);
     },
     enabled: !!strategyId,
   });
@@ -186,7 +186,7 @@ export const useApplyStrategy = () => {
         throw error;
       }
 
-      return transformStrategy(data);
+      return transformStrategy(data as unknown as AppliedStrategyRow);
     },
     onSuccess: () => {
       // 관련 쿼리 무효화
@@ -233,7 +233,7 @@ export const useUpdateStrategyStatus = () => {
         throw error;
       }
 
-      return transformStrategy(data);
+      return transformStrategy(data as unknown as AppliedStrategyRow);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['applied-strategies'] });

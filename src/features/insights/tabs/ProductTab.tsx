@@ -97,7 +97,7 @@ export function ProductTab() {
       const { data: productsInfo, error: productsError } = await supabase
         .from('products')
         .select('id, name, category')
-        .in('id', productIds);
+        .in('id', productIds) as { data: Array<{ id: string; name: string; category: string | null }> | null; error: any };
 
       if (productsError) {
         console.error('Error fetching products:', productsError);

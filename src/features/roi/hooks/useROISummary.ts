@@ -34,38 +34,42 @@ export const useROISummary = (dateRange: DateRange) => {
 
       const days = getDaysFromRange(dateRange);
 
-      // RPC 함수 호출
-      const { data, error } = await supabase.rpc('get_roi_summary', {
+      // RPC 함수 호출 (타입이 생성되지 않은 경우 as any 사용)
+      const { data, error } = await supabase.rpc('get_roi_summary' as any, {
         p_store_id: selectedStore.id,
         p_days: days,
       });
 
+      // 기본값 정의
+      const defaultSummary: ROISummary = {
+        totalApplied: 0,
+        activeCount: 0,
+        successCount: 0,
+        failedCount: 0,
+        successRate: 0,
+        averageRoi: 0,
+        totalRevenueImpact: 0,
+        expectedRevenueTotal: 0,
+        revenueChangePercent: 0,
+      };
+
       if (error) {
         console.error('ROI summary fetch error:', error);
-        // 데이터가 없는 경우 기본값 반환
-        return {
-          totalApplied: 0,
-          activeCount: 0,
-          successCount: 0,
-          failedCount: 0,
-          successRate: 0,
-          averageRoi: 0,
-          totalRevenueImpact: 0,
-          expectedRevenueTotal: 0,
-          revenueChangePercent: 0,
-        };
+        return defaultSummary;
       }
 
+      // RPC 결과를 타입에 맞게 변환
+      const result = data as any;
       return {
-        totalApplied: data?.totalApplied || 0,
-        activeCount: data?.activeCount || 0,
-        successCount: data?.successCount || 0,
-        failedCount: data?.failedCount || 0,
-        successRate: data?.successRate || 0,
-        averageRoi: data?.averageRoi || 0,
-        totalRevenueImpact: data?.totalRevenueImpact || 0,
-        expectedRevenueTotal: data?.expectedRevenueTotal || 0,
-        revenueChangePercent: 0, // TODO: 전월 대비 계산
+        totalApplied: result?.total_applied || result?.totalApplied || 0,
+        activeCount: result?.active_count || result?.activeCount || 0,
+        successCount: result?.success_count || result?.successCount || 0,
+        failedCount: result?.failed_count || result?.failedCount || 0,
+        successRate: result?.success_rate || result?.successRate || 0,
+        averageRoi: result?.average_roi || result?.averageRoi || 0,
+        totalRevenueImpact: result?.total_revenue_impact || result?.totalRevenueImpact || 0,
+        expectedRevenueTotal: result?.expected_revenue_total || result?.expectedRevenueTotal || 0,
+        revenueChangePercent: result?.revenue_change_percent || 0,
       };
     },
     enabled: !!selectedStore?.id,
