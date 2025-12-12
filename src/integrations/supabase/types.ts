@@ -1413,41 +1413,147 @@ export type Database = {
           },
         ]
       }
+      data_source_sync_logs: {
+        Row: {
+          completed_at: string | null
+          data_source_id: string
+          entities_created: number | null
+          entities_updated: number | null
+          errors: Json | null
+          id: string
+          relations_created: number | null
+          started_at: string | null
+          status: string | null
+          triggered_by: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          data_source_id: string
+          entities_created?: number | null
+          entities_updated?: number | null
+          errors?: Json | null
+          id?: string
+          relations_created?: number | null
+          started_at?: string | null
+          status?: string | null
+          triggered_by?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          data_source_id?: string
+          entities_created?: number | null
+          entities_updated?: number | null
+          errors?: Json | null
+          id?: string
+          relations_created?: number | null
+          started_at?: string | null
+          status?: string | null
+          triggered_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_source_sync_logs_data_source_id_fkey"
+            columns: ["data_source_id"]
+            isOneToOne: false
+            referencedRelation: "data_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      data_source_tables: {
+        Row: {
+          columns: Json
+          created_at: string | null
+          data_source_id: string
+          display_name: string | null
+          id: string
+          row_count: number | null
+          sample_data: Json | null
+          table_name: string
+        }
+        Insert: {
+          columns?: Json
+          created_at?: string | null
+          data_source_id: string
+          display_name?: string | null
+          id?: string
+          row_count?: number | null
+          sample_data?: Json | null
+          table_name: string
+        }
+        Update: {
+          columns?: Json
+          created_at?: string | null
+          data_source_id?: string
+          display_name?: string | null
+          id?: string
+          row_count?: number | null
+          sample_data?: Json | null
+          table_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_source_tables_data_source_id_fkey"
+            columns: ["data_source_id"]
+            isOneToOne: false
+            referencedRelation: "data_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       data_sources: {
         Row: {
           config: Json | null
           connection_string: string | null
           created_at: string
+          description: string | null
           id: string
           is_active: boolean
+          last_sync_at: string | null
+          last_sync_status: string | null
           org_id: string | null
+          record_count: number | null
+          schema_definition: Json | null
           source_id_code: string | null
           source_name: string
           source_type: string
+          store_id: string | null
           updated_at: string
         }
         Insert: {
           config?: Json | null
           connection_string?: string | null
           created_at?: string
+          description?: string | null
           id?: string
           is_active?: boolean
+          last_sync_at?: string | null
+          last_sync_status?: string | null
           org_id?: string | null
+          record_count?: number | null
+          schema_definition?: Json | null
           source_id_code?: string | null
           source_name: string
           source_type: string
+          store_id?: string | null
           updated_at?: string
         }
         Update: {
           config?: Json | null
           connection_string?: string | null
           created_at?: string
+          description?: string | null
           id?: string
           is_active?: boolean
+          last_sync_at?: string | null
+          last_sync_status?: string | null
           org_id?: string | null
+          record_count?: number | null
+          schema_definition?: Json | null
           source_id_code?: string | null
           source_name?: string
           source_type?: string
+          store_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1456,6 +1562,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "data_sources_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
             referencedColumns: ["id"]
           },
         ]
@@ -3231,6 +3344,63 @@ export type Database = {
           },
         ]
       }
+      ontology_entity_mappings: {
+        Row: {
+          created_at: string | null
+          data_source_id: string
+          filter_condition: string | null
+          id: string
+          is_active: boolean | null
+          label_template: string
+          priority: number | null
+          property_mappings: Json
+          source_table: string
+          target_entity_type_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          data_source_id: string
+          filter_condition?: string | null
+          id?: string
+          is_active?: boolean | null
+          label_template?: string
+          priority?: number | null
+          property_mappings?: Json
+          source_table: string
+          target_entity_type_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          data_source_id?: string
+          filter_condition?: string | null
+          id?: string
+          is_active?: boolean | null
+          label_template?: string
+          priority?: number | null
+          property_mappings?: Json
+          source_table?: string
+          target_entity_type_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ontology_entity_mappings_data_source_id_fkey"
+            columns: ["data_source_id"]
+            isOneToOne: false
+            referencedRelation: "data_sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ontology_entity_mappings_target_entity_type_id_fkey"
+            columns: ["target_entity_type_id"]
+            isOneToOne: false
+            referencedRelation: "ontology_entity_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ontology_entity_types: {
         Row: {
           color: string | null
@@ -3373,6 +3543,57 @@ export type Database = {
             columns: ["entity_id"]
             isOneToOne: false
             referencedRelation: "graph_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ontology_relation_mappings: {
+        Row: {
+          created_at: string | null
+          data_source_id: string
+          id: string
+          is_active: boolean | null
+          property_mappings: Json | null
+          source_entity_resolver: Json
+          source_table: string
+          target_entity_resolver: Json
+          target_relation_type_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          data_source_id: string
+          id?: string
+          is_active?: boolean | null
+          property_mappings?: Json | null
+          source_entity_resolver?: Json
+          source_table: string
+          target_entity_resolver?: Json
+          target_relation_type_id: string
+        }
+        Update: {
+          created_at?: string | null
+          data_source_id?: string
+          id?: string
+          is_active?: boolean | null
+          property_mappings?: Json | null
+          source_entity_resolver?: Json
+          source_table?: string
+          target_entity_resolver?: Json
+          target_relation_type_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ontology_relation_mappings_data_source_id_fkey"
+            columns: ["data_source_id"]
+            isOneToOne: false
+            referencedRelation: "data_sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ontology_relation_mappings_target_relation_type_id_fkey"
+            columns: ["target_relation_type_id"]
+            isOneToOne: false
+            referencedRelation: "ontology_relation_types"
             referencedColumns: ["id"]
           },
         ]
@@ -4539,6 +4760,110 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      retail_concept_values: {
+        Row: {
+          computed_at: string | null
+          concept_id: string
+          id: string
+          parameters: Json | null
+          store_id: string
+          valid_until: string | null
+          value: Json
+        }
+        Insert: {
+          computed_at?: string | null
+          concept_id: string
+          id?: string
+          parameters?: Json | null
+          store_id: string
+          valid_until?: string | null
+          value: Json
+        }
+        Update: {
+          computed_at?: string | null
+          concept_id?: string
+          id?: string
+          parameters?: Json | null
+          store_id?: string
+          valid_until?: string | null
+          value?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retail_concept_values_concept_id_fkey"
+            columns: ["concept_id"]
+            isOneToOne: false
+            referencedRelation: "retail_concepts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "retail_concept_values_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      retail_concepts: {
+        Row: {
+          ai_context: Json
+          category: string
+          computation: Json
+          created_at: string | null
+          description: string | null
+          display_name: string
+          id: string
+          involved_entity_types: string[] | null
+          involved_relation_types: string[] | null
+          is_active: boolean | null
+          is_system: boolean | null
+          name: string
+          store_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          ai_context?: Json
+          category: string
+          computation?: Json
+          created_at?: string | null
+          description?: string | null
+          display_name: string
+          id?: string
+          involved_entity_types?: string[] | null
+          involved_relation_types?: string[] | null
+          is_active?: boolean | null
+          is_system?: boolean | null
+          name: string
+          store_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          ai_context?: Json
+          category?: string
+          computation?: Json
+          created_at?: string | null
+          description?: string | null
+          display_name?: string
+          id?: string
+          involved_entity_types?: string[] | null
+          involved_relation_types?: string[] | null
+          is_active?: boolean | null
+          is_system?: boolean | null
+          name?: string
+          store_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retail_concepts_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
             referencedColumns: ["id"]
           },
         ]
