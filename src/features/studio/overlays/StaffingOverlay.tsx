@@ -52,7 +52,7 @@ export function StaffingOverlay({
   const [hoveredStaff, setHoveredStaff] = useState<string | null>(null);
   const [hoveredZone, setHoveredZone] = useState<string | null>(null);
 
-  if (!result) return null;
+  if (!result || !result.visualization) return null;
 
   const { visualization, staffPositions, zoneCoverage, metrics } = result;
 
