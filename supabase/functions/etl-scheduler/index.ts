@@ -30,50 +30,28 @@ Deno.serve(async (req) => {
     for (const org of orgs || []) {
       console.log(`[ETL Scheduler] Processing org: ${org.id}`);
 
-      // Run L1→L2 ETL
+      // Run full ETL pipeline using unified-etl
       try {
-        const l1Response = await fetch(`${supabaseUrl}/functions/v1/etl-l1-to-l2`, {
+        const pipelineResponse = await fetch(`${supabaseUrl}/functions/v1/unified-etl`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${supabaseServiceKey}`,
           },
           body: JSON.stringify({
+            etl_type: 'full_pipeline',
             org_id: org.id,
             date_from: yesterday,
             date_to: today,
           }),
         });
-        const l1Result = await l1Response.json();
-        console.log(`[ETL Scheduler] L1→L2 result for ${org.id}:`, l1Result);
-        results.push({ org_id: org.id, phase: 'L1→L2', result: l1Result });
+        const pipelineResult = await pipelineResponse.json();
+        console.log(`[ETL Scheduler] Full pipeline result for ${org.id}:`, pipelineResult);
+        results.push({ org_id: org.id, phase: 'full_pipeline', result: pipelineResult });
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        console.error(`[ETL Scheduler] L1→L2 error for ${org.id}:`, error);
-        results.push({ org_id: org.id, phase: 'L1→L2', error: errorMessage });
-      }
-
-      // Run L2→L3 ETL
-      try {
-        const l2Response = await fetch(`${supabaseUrl}/functions/v1/etl-l2-to-l3`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseServiceKey}`,
-          },
-          body: JSON.stringify({
-            org_id: org.id,
-            date_from: yesterday,
-            date_to: today,
-          }),
-        });
-        const l2Result = await l2Response.json();
-        console.log(`[ETL Scheduler] L2→L3 result for ${org.id}:`, l2Result);
-        results.push({ org_id: org.id, phase: 'L2→L3', result: l2Result });
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        console.error(`[ETL Scheduler] L2→L3 error for ${org.id}:`, error);
-        results.push({ org_id: org.id, phase: 'L2→L3', error: errorMessage });
+        console.error(`[ETL Scheduler] Pipeline error for ${org.id}:`, error);
+        results.push({ org_id: org.id, phase: 'full_pipeline', error: errorMessage });
       }
     }
 

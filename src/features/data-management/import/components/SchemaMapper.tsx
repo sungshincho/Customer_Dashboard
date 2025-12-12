@@ -149,8 +149,9 @@ export const SchemaMapper = ({ importId, importData, onComplete }: SchemaMapping
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
-      const response = await supabase.functions.invoke('schema-etl', {
+      const response = await supabase.functions.invoke('unified-etl', {
         body: {
+          etl_type: 'schema',
           import_id: importId,
           store_id: selectedStore.id,
           entity_mappings: entityMappings,

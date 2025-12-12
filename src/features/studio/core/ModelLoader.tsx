@@ -161,8 +161,7 @@ function GLTFModel({
   // 선택/호버 하이라이트 애니메이션
   useFrame((_, delta) => {
     if (!groupRef.current) return;
-
-
+  });
 
   return (
     <group
