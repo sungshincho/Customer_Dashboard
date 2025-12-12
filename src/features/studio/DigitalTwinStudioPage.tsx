@@ -13,7 +13,7 @@ import { useLocation } from 'react-router-dom';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, Loader2, Sparkles, Layers, Save, GitCompare } from 'lucide-react';
+import { AlertCircle, Loader2, Sparkles, Layers, Save, Play } from 'lucide-react';
 import { toast } from 'sonner';
 
 // 새 스튜디오 컴포넌트
@@ -21,7 +21,8 @@ import { Canvas3D, SceneProvider, useScene } from './core';
 import { LayerPanel, SimulationPanel, ToolPanel, SceneSavePanel, OverlayControlPanel, PropertyPanel } from './panels';
 import { HeatmapOverlay, CustomerFlowOverlay, ZoneBoundaryOverlay, CustomerAvatarOverlay, LayoutOptimizationOverlay, FlowOptimizationOverlay, CongestionOverlay, StaffingOverlay } from './overlays';
 import { DraggablePanel } from './components/DraggablePanel';
-import { SceneComparisonView } from './components/SceneComparisonView';
+import { AIOptimizationTab } from './tabs/AIOptimizationTab';
+import { AISimulationTab } from './tabs/AISimulationTab';
 import {
   LayoutResultPanel,
   FlowResultPanel,
@@ -54,7 +55,7 @@ interface ModelLayer {
   metadata?: Record<string, any>;
 }
 
-type TabType = 'layer' | 'simulation' | 'comparison';
+type TabType = 'layer' | 'ai-optimization' | 'ai-simulation';
 
 // 시뮬레이션 결과 상태 타입
 interface SimulationResults {
@@ -600,46 +601,48 @@ export default function DigitalTwinStudioPage() {
                 {/* 탭 헤더 */}
                 <div className="flex border-b border-white/10">
                   <TabButton active={activeTab === 'layer'} onClick={() => setActiveTab('layer')}>
+                    <Layers className="w-3 h-3 mr-1 inline" />
                     레이어
                   </TabButton>
                   <TabButton
-                    active={activeTab === 'simulation'}
-                    onClick={() => setActiveTab('simulation')}
+                    active={activeTab === 'ai-optimization'}
+                    onClick={() => setActiveTab('ai-optimization')}
                   >
-                    AI 시뮬레이션
+                    <Sparkles className="w-3 h-3 mr-1 inline" />
+                    AI 최적화
                   </TabButton>
                   <TabButton
-                    active={activeTab === 'comparison'}
-                    onClick={() => setActiveTab('comparison')}
+                    active={activeTab === 'ai-simulation'}
+                    onClick={() => setActiveTab('ai-simulation')}
                   >
-                    <GitCompare className="w-3 h-3 mr-1 inline" />
-                    씬 비교
+                    <Play className="w-3 h-3 mr-1 inline" />
+                    AI 시뮬레이션
                   </TabButton>
                 </div>
 
                 {/* 탭 컨텐츠 */}
                 <div className="flex-1 overflow-y-auto">
                   {activeTab === 'layer' && <LayerPanel />}
-                  {activeTab === 'simulation' && (
-                    <SimulationPanel
-                      onRunSimulation={handleRunSimulation}
-                      isRunning={isInferring}
+                  {activeTab === 'ai-optimization' && (
+                    <AIOptimizationTab
+                      storeId={selectedStore?.id || ''}
+                      sceneData={currentRecipe}
+                      sceneSimulation={sceneSimulation}
+                      onSceneUpdate={(newScene) => {
+                        // SceneProvider에 시뮬레이션 결과 적용
+                        if (newScene.furnitureMoves) {
+                          // applySimulationResults는 useScene에서 가져옴
+                        }
+                      }}
+                      onOverlayToggle={toggleOverlay}
                     />
                   )}
-                  {activeTab === 'comparison' && (
-                    <SceneComparisonView
-                      comparison={sceneSimulation.getComparison()}
-                      viewMode={sceneSimulation.state.viewMode}
-                      selectedChanges={sceneSimulation.state.selectedChanges}
-                      onViewModeChange={sceneSimulation.setViewMode}
-                      onSelectChange={sceneSimulation.selectChange}
-                      onDeselectChange={sceneSimulation.deselectChange}
-                      onSelectAll={sceneSimulation.selectAllChanges}
-                      onDeselectAll={sceneSimulation.deselectAllChanges}
-                      onApplySelected={sceneSimulation.applySelectedChanges}
-                      onApplyAll={sceneSimulation.applyAllChanges}
-                      onSaveToBeScene={sceneSimulation.saveToBeScene}
-                      onReset={sceneSimulation.clearScenes}
+                  {activeTab === 'ai-simulation' && (
+                    <AISimulationTab
+                      storeId={selectedStore?.id || ''}
+                      sceneData={currentRecipe}
+                      onOverlayToggle={toggleOverlay}
+                      simulationZones={simulationZones}
                     />
                   )}
                 </div>
