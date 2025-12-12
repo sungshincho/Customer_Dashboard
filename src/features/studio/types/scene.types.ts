@@ -67,7 +67,7 @@ export interface Model3D {
 }
 
 // 모델 타입
-export type ModelType = 'space' | 'furniture' | 'product' | 'custom';
+export type ModelType = 'space' | 'furniture' | 'product' | 'custom' | 'other';
 
 // 씬 레시피 (저장/불러오기용)
 export interface SceneRecipe {
