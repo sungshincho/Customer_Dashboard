@@ -381,8 +381,8 @@ export default function DigitalTwinStudioPage() {
       currentRecipe
     );
 
-    // 비교 탭으로 전환
-    setActiveTab('comparison');
+    // AI 시뮬레이션 탭으로 전환
+    setActiveTab('ai-simulation');
     setMode('simulate');
   }, [currentRecipe, sceneSimulation, setMode]);
 
@@ -553,7 +553,7 @@ export default function DigitalTwinStudioPage() {
                 {/* 시뮬레이션 결과 오버레이 */}
                 {sceneSimulation.state.results.layout && (
                   <LayoutOptimizationOverlay
-                    result={sceneSimulation.state.results.layout}
+                    result={sceneSimulation.state.results.layout as any}
                     showBefore={false}
                     showAfter={true}
                     showMoves={true}
@@ -562,7 +562,7 @@ export default function DigitalTwinStudioPage() {
                 )}
                 {sceneSimulation.state.results.flow && (
                   <FlowOptimizationOverlay
-                    result={sceneSimulation.state.results.flow}
+                    result={sceneSimulation.state.results.flow as any}
                     showPaths={true}
                     showBottlenecks={true}
                     showHeatmap={true}
@@ -571,7 +571,7 @@ export default function DigitalTwinStudioPage() {
                 )}
                 {sceneSimulation.state.results.congestion && (
                   <CongestionOverlay
-                    result={sceneSimulation.state.results.congestion}
+                    result={sceneSimulation.state.results.congestion as any}
                     showHeatmap={true}
                     showZoneMarkers={true}
                     showCrowdAnimation={true}
@@ -580,7 +580,7 @@ export default function DigitalTwinStudioPage() {
                 )}
                 {sceneSimulation.state.results.staffing && (
                   <StaffingOverlay
-                    result={sceneSimulation.state.results.staffing}
+                    result={sceneSimulation.state.results.staffing as any}
                     showStaffMarkers={true}
                     showCurrentPositions={true}
                     showSuggestedPositions={true}
