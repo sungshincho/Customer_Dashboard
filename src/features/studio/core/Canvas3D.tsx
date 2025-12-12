@@ -124,10 +124,10 @@ function SceneContent({
   const isRunning = useSimulationStore((state) => state.isRunning);
   const config = useSimulationStore((state) => state.config);
 
-  // 시뮬레이션 엔진 활성화 (실시간 모드이고 실행 중일 때)
+  // 시뮬레이션 엔진 활성화 (사용자가 시작 버튼을 클릭했을 때)
   useSimulationEngine({
     zones: zones || [],
-    enabled: isRunning && (mode === 'simulation' || config.mode === 'realtime')
+    enabled: isRunning
   });
 
   return (
