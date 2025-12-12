@@ -1393,7 +1393,7 @@ Deno.serve(async (req) => {
 
 // Causal Inference: 인과 관계 추론
 async function performCausalInference(request: InferenceRequest, apiKey: string) {
-  const { data, graph_data, parameters = {} } = request;
+  const { data = [], graph_data, parameters = {} } = request;
   
   const dataSummary = summarizeData(data, graph_data);
   
@@ -1447,7 +1447,7 @@ Return a JSON object with causal_relationships, causal_chains, and insights.`;
 
 // Anomaly Detection: 이상 탐지
 async function performAnomalyDetection(request: InferenceRequest, apiKey: string) {
-  const { data, time_series_data, parameters = {} } = request;
+  const { data = [], time_series_data, parameters = {} } = request;
   
   const statisticalAnomalies = detectStatisticalAnomalies(data, parameters);
   const dataSummary = summarizeData(data);
@@ -1501,7 +1501,7 @@ Return a JSON object with anomalies, patterns, and summary.`;
 
 // Predictive Modeling: 예측 모델링
 async function performPredictiveModeling(request: InferenceRequest, apiKey: string) {
-  const { data, time_series_data, graph_data, parameters = {} } = request;
+  const { data = [], time_series_data, graph_data, parameters = {} } = request;
   
   const scenarioType = parameters.scenario_type;
   
@@ -2579,7 +2579,7 @@ Return a JSON object with predictedKpi, confidenceScore, aiInsights, recommendat
 
 // Pattern Discovery
 async function performPatternDiscovery(request: InferenceRequest, apiKey: string) {
-  const { data, graph_data, time_series_data, parameters = {} } = request;
+  const { data = [], graph_data, time_series_data, parameters = {} } = request;
   
   if (parameters.analysis_type === 'business_goal_analysis') {
     return performBusinessGoalAnalysis(request, apiKey);
