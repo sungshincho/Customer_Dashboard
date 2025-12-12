@@ -635,6 +635,12 @@ export default function DigitalTwinStudioPage() {
                         }
                       }}
                       onOverlayToggle={toggleOverlay}
+                      onResultsUpdate={(type, result) => {
+                        // AI 최적화 결과를 오른쪽 패널에 표시
+                        setSimulationResults((prev) => ({ ...prev, [type]: result }));
+                        const panelKey = `${type}Result` as keyof VisiblePanels;
+                        setVisiblePanels((prev) => ({ ...prev, [panelKey]: true }));
+                      }}
                     />
                   )}
                   {activeTab === 'ai-simulation' && (
