@@ -5,22 +5,26 @@
 -- ============================================================================
 
 -- 1. 데이터소스 정의 테이블
-CREATE TABLE IF NOT EXISTS data_sources (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  store_id UUID REFERENCES stores(id) ON DELETE SET NULL,
-  name TEXT NOT NULL,
-  description TEXT,
-  type TEXT NOT NULL CHECK (type IN ('pos', 'wifi', 'camera', 'sensor', 'crm', 'inventory', 'external', 'manual')),
-  status TEXT DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'error', 'syncing')),
-  connection_config JSONB NOT NULL DEFAULT '{}',
-  schema_definition JSONB,
-  last_sync_at TIMESTAMPTZ,
-  last_sync_status TEXT,
-  record_count BIGINT DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'data_sources' AND table_schema = 'public') THEN
+    CREATE TABLE data_sources (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      store_id UUID REFERENCES stores(id) ON DELETE SET NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      type TEXT NOT NULL CHECK (type IN ('pos', 'wifi', 'camera', 'sensor', 'crm', 'inventory', 'external', 'manual')),
+      status TEXT DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'error', 'syncing')),
+      connection_config JSONB NOT NULL DEFAULT '{}',
+      schema_definition JSONB,
+      last_sync_at TIMESTAMPTZ,
+      last_sync_status TEXT,
+      record_count BIGINT DEFAULT 0,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  END IF;
+END $$;
 
 -- 2. 데이터소스 테이블 정의
 CREATE TABLE IF NOT EXISTS data_source_tables (
@@ -64,23 +68,27 @@ CREATE TABLE IF NOT EXISTS ontology_relation_mappings (
 );
 
 -- 5. 리테일 개념 정의
-CREATE TABLE IF NOT EXISTS retail_concepts (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  display_name TEXT NOT NULL,
-  category TEXT NOT NULL CHECK (category IN ('behavior', 'metric', 'pattern', 'rule', 'kpi')),
-  description TEXT,
-  involved_entity_types TEXT[] DEFAULT '{}',
-  involved_relation_types TEXT[] DEFAULT '{}',
-  computation JSONB NOT NULL,
-  ai_context JSONB NOT NULL,
-  is_system BOOLEAN DEFAULT false,
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(user_id, name)
-);
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'retail_concepts' AND table_schema = 'public') THEN
+    CREATE TABLE retail_concepts (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      store_id UUID REFERENCES stores(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      category TEXT NOT NULL CHECK (category IN ('behavior', 'metric', 'pattern', 'rule', 'kpi')),
+      description TEXT,
+      involved_entity_types TEXT[] DEFAULT '{}',
+      involved_relation_types TEXT[] DEFAULT '{}',
+      computation JSONB NOT NULL,
+      ai_context JSONB NOT NULL,
+      is_system BOOLEAN DEFAULT false,
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  END IF;
+END $$;
 
 -- 6. 개념 계산 결과 캐시
 CREATE TABLE IF NOT EXISTS retail_concept_values (
@@ -109,26 +117,16 @@ CREATE TABLE IF NOT EXISTS data_source_sync_logs (
 );
 
 -- 8. AI 추론 결과 테이블 (retail-ai-inference에서 사용)
-CREATE TABLE IF NOT EXISTS ai_inference_results (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
-  inference_type TEXT NOT NULL,
-  result JSONB NOT NULL DEFAULT '{}',
-  parameters JSONB DEFAULT '{}',
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- 20251212_ai_inference_results.sql에서 생성하므로 여기서는 스킵
 
 -- 9. 인덱스
-CREATE INDEX IF NOT EXISTS idx_data_sources_user ON data_sources(user_id);
 CREATE INDEX IF NOT EXISTS idx_data_sources_store ON data_sources(store_id);
 CREATE INDEX IF NOT EXISTS idx_data_sources_type ON data_sources(type);
 CREATE INDEX IF NOT EXISTS idx_retail_concepts_category ON retail_concepts(category);
 CREATE INDEX IF NOT EXISTS idx_retail_concepts_system ON retail_concepts(is_system);
+CREATE INDEX IF NOT EXISTS idx_retail_concepts_store ON retail_concepts(store_id);
 CREATE INDEX IF NOT EXISTS idx_concept_values_store ON retail_concept_values(store_id);
 CREATE INDEX IF NOT EXISTS idx_concept_values_concept ON retail_concept_values(concept_id);
-CREATE INDEX IF NOT EXISTS idx_ai_inference_results_store ON ai_inference_results(store_id);
-CREATE INDEX IF NOT EXISTS idx_ai_inference_results_type ON ai_inference_results(inference_type);
 CREATE INDEX IF NOT EXISTS idx_sync_logs_source ON data_source_sync_logs(data_source_id);
 
 -- 10. RLS 활성화
@@ -139,80 +137,157 @@ ALTER TABLE ontology_relation_mappings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE retail_concepts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE retail_concept_values ENABLE ROW LEVEL SECURITY;
 ALTER TABLE data_source_sync_logs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE ai_inference_results ENABLE ROW LEVEL SECURITY;
 
--- 11. RLS 정책
--- data_sources
-CREATE POLICY "Users can manage own data sources" ON data_sources
-  FOR ALL USING (auth.uid() = user_id);
+-- 11. RLS 정책 (store_id 기반으로 변경)
+-- 기존 정책 삭제
+DO $$
+BEGIN
+  DROP POLICY IF EXISTS "Users can manage own data sources" ON data_sources;
+  DROP POLICY IF EXISTS "Users can view own data source tables" ON data_source_tables;
+  DROP POLICY IF EXISTS "Users can manage own data source tables" ON data_source_tables;
+  DROP POLICY IF EXISTS "Users can manage own entity mappings" ON ontology_entity_mappings;
+  DROP POLICY IF EXISTS "Users can manage own relation mappings" ON ontology_relation_mappings;
+  DROP POLICY IF EXISTS "Users can view system concepts and own concepts" ON retail_concepts;
+  DROP POLICY IF EXISTS "Users can manage own concepts" ON retail_concepts;
+  DROP POLICY IF EXISTS "Users can update own concepts" ON retail_concepts;
+  DROP POLICY IF EXISTS "Users can delete own concepts" ON retail_concepts;
+  DROP POLICY IF EXISTS "Users can view own concept values" ON retail_concept_values;
+  DROP POLICY IF EXISTS "Users can manage own concept values" ON retail_concept_values;
+  DROP POLICY IF EXISTS "Users can view own sync logs" ON data_source_sync_logs;
+  DROP POLICY IF EXISTS "Users can create sync logs" ON data_source_sync_logs;
+END $$;
 
--- data_source_tables
-CREATE POLICY "Users can view own data source tables" ON data_source_tables
-  FOR SELECT USING (
-    EXISTS (SELECT 1 FROM data_sources ds WHERE ds.id = data_source_id AND ds.user_id = auth.uid())
+-- data_sources (store 기반)
+CREATE POLICY "Store members can manage data sources" ON data_sources
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM stores s
+      JOIN organization_members om ON om.org_id = s.org_id
+      WHERE s.id = data_sources.store_id AND om.user_id = auth.uid()
+    )
   );
 
-CREATE POLICY "Users can manage own data source tables" ON data_source_tables
+-- data_source_tables
+CREATE POLICY "Store members can view data source tables" ON data_source_tables
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM data_sources ds
+      JOIN stores s ON s.id = ds.store_id
+      JOIN organization_members om ON om.org_id = s.org_id
+      WHERE ds.id = data_source_id AND om.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Store members can manage data source tables" ON data_source_tables
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM data_sources ds WHERE ds.id = data_source_id AND ds.user_id = auth.uid())
+    EXISTS (
+      SELECT 1 FROM data_sources ds
+      JOIN stores s ON s.id = ds.store_id
+      JOIN organization_members om ON om.org_id = s.org_id
+      WHERE ds.id = data_source_id AND om.user_id = auth.uid()
+    )
   );
 
 -- ontology_entity_mappings
-CREATE POLICY "Users can manage own entity mappings" ON ontology_entity_mappings
+CREATE POLICY "Store members can manage entity mappings" ON ontology_entity_mappings
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM data_sources ds WHERE ds.id = data_source_id AND ds.user_id = auth.uid())
+    EXISTS (
+      SELECT 1 FROM data_sources ds
+      JOIN stores s ON s.id = ds.store_id
+      JOIN organization_members om ON om.org_id = s.org_id
+      WHERE ds.id = data_source_id AND om.user_id = auth.uid()
+    )
   );
 
 -- ontology_relation_mappings
-CREATE POLICY "Users can manage own relation mappings" ON ontology_relation_mappings
+CREATE POLICY "Store members can manage relation mappings" ON ontology_relation_mappings
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM data_sources ds WHERE ds.id = data_source_id AND ds.user_id = auth.uid())
+    EXISTS (
+      SELECT 1 FROM data_sources ds
+      JOIN stores s ON s.id = ds.store_id
+      JOIN organization_members om ON om.org_id = s.org_id
+      WHERE ds.id = data_source_id AND om.user_id = auth.uid()
+    )
   );
 
--- retail_concepts
-CREATE POLICY "Users can view system concepts and own concepts" ON retail_concepts
-  FOR SELECT USING (is_system = true OR user_id = auth.uid());
+-- retail_concepts (store 기반 + 시스템 개념)
+CREATE POLICY "View system or store concepts" ON retail_concepts
+  FOR SELECT USING (
+    is_system = true OR
+    EXISTS (
+      SELECT 1 FROM stores s
+      JOIN organization_members om ON om.org_id = s.org_id
+      WHERE s.id = retail_concepts.store_id AND om.user_id = auth.uid()
+    )
+  );
 
-CREATE POLICY "Users can manage own concepts" ON retail_concepts
-  FOR INSERT WITH CHECK (user_id = auth.uid());
+CREATE POLICY "Store members can manage concepts" ON retail_concepts
+  FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM stores s
+      JOIN organization_members om ON om.org_id = s.org_id
+      WHERE s.id = retail_concepts.store_id AND om.user_id = auth.uid()
+    )
+  );
 
-CREATE POLICY "Users can update own concepts" ON retail_concepts
-  FOR UPDATE USING (user_id = auth.uid() AND is_system = false);
+CREATE POLICY "Store members can update concepts" ON retail_concepts
+  FOR UPDATE USING (
+    is_system = false AND
+    EXISTS (
+      SELECT 1 FROM stores s
+      JOIN organization_members om ON om.org_id = s.org_id
+      WHERE s.id = retail_concepts.store_id AND om.user_id = auth.uid()
+    )
+  );
 
-CREATE POLICY "Users can delete own concepts" ON retail_concepts
-  FOR DELETE USING (user_id = auth.uid() AND is_system = false);
+CREATE POLICY "Store members can delete concepts" ON retail_concepts
+  FOR DELETE USING (
+    is_system = false AND
+    EXISTS (
+      SELECT 1 FROM stores s
+      JOIN organization_members om ON om.org_id = s.org_id
+      WHERE s.id = retail_concepts.store_id AND om.user_id = auth.uid()
+    )
+  );
 
 -- retail_concept_values
-CREATE POLICY "Users can view own concept values" ON retail_concept_values
+CREATE POLICY "Store members can view concept values" ON retail_concept_values
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM stores s WHERE s.id = store_id AND s.user_id = auth.uid())
+    EXISTS (
+      SELECT 1 FROM stores s
+      JOIN organization_members om ON om.org_id = s.org_id
+      WHERE s.id = retail_concept_values.store_id AND om.user_id = auth.uid()
+    )
   );
 
-CREATE POLICY "Users can manage own concept values" ON retail_concept_values
+CREATE POLICY "Store members can manage concept values" ON retail_concept_values
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM stores s WHERE s.id = store_id AND s.user_id = auth.uid())
+    EXISTS (
+      SELECT 1 FROM stores s
+      JOIN organization_members om ON om.org_id = s.org_id
+      WHERE s.id = retail_concept_values.store_id AND om.user_id = auth.uid()
+    )
   );
 
 -- data_source_sync_logs
-CREATE POLICY "Users can view own sync logs" ON data_source_sync_logs
+CREATE POLICY "Store members can view sync logs" ON data_source_sync_logs
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM data_sources ds WHERE ds.id = data_source_id AND ds.user_id = auth.uid())
+    EXISTS (
+      SELECT 1 FROM data_sources ds
+      JOIN stores s ON s.id = ds.store_id
+      JOIN organization_members om ON om.org_id = s.org_id
+      WHERE ds.id = data_source_id AND om.user_id = auth.uid()
+    )
   );
 
-CREATE POLICY "Users can create sync logs" ON data_source_sync_logs
+CREATE POLICY "Store members can create sync logs" ON data_source_sync_logs
   FOR INSERT WITH CHECK (
-    EXISTS (SELECT 1 FROM data_sources ds WHERE ds.id = data_source_id AND ds.user_id = auth.uid())
-  );
-
--- ai_inference_results
-CREATE POLICY "Users can view own inference results" ON ai_inference_results
-  FOR SELECT USING (
-    EXISTS (SELECT 1 FROM stores s WHERE s.id = store_id AND s.user_id = auth.uid())
-  );
-
-CREATE POLICY "Users can create inference results" ON ai_inference_results
-  FOR INSERT WITH CHECK (
-    EXISTS (SELECT 1 FROM stores s WHERE s.id = store_id AND s.user_id = auth.uid())
+    EXISTS (
+      SELECT 1 FROM data_sources ds
+      JOIN stores s ON s.id = ds.store_id
+      JOIN organization_members om ON om.org_id = s.org_id
+      WHERE ds.id = data_source_id AND om.user_id = auth.uid()
+    )
   );
 
 -- 12. updated_at 트리거 함수 (존재하지 않을 경우만 생성)
