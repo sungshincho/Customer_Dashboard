@@ -260,46 +260,7 @@ export default function DigitalTwinStudioPage() {
     });
   }, [handleSimulationComplete]);
 
-  // 전체 시뮬레이션 실행 (씬 기반 + 레거시 UI 결과)
-  const handleRunAllSimulations = useCallback(async () => {
-    setMode('simulate');
-
-    // 레거시 UI 결과 패널용 (데모 데이터)
-    handleRunSimulation(['layout', 'flow', 'congestion', 'staffing']);
-
-    // 씬 기반 시뮬레이션도 함께 실행 (실제 모델 이동용)
-    // currentRecipe를 직접 전달하여 state 동기화 문제 해결
-    if (currentRecipe) {
-      await sceneSimulation.runAllSimulations(
-        {
-          layout: { goal: 'revenue' },
-          flow: { duration: '1hour', customerCount: 100 },
-          staffing: { staffCount: 3, goal: 'customer_service' },
-        },
-        currentRecipe  // 씬 직접 전달
-      );
-    }
-  }, [setMode, handleRunSimulation, currentRecipe, sceneSimulation]);
-
-  // SceneProvider용 모델 변환
-  const sceneModels: Model3D[] = useMemo(() => {
-    return models
-      .filter((m) => activeLayers.includes(m.id))
-      .map((m) => ({
-        id: m.id,
-        name: m.name,
-        url: m.model_url,
-        position: [m.position?.x || 0, m.position?.y || 0, m.position?.z || 0] as [number, number, number],
-        rotation: [m.rotation?.x || 0, m.rotation?.y || 0, m.rotation?.z || 0] as [number, number, number],
-        scale: [m.scale?.x || 1, m.scale?.y || 1, m.scale?.z || 1] as [number, number, number],
-        visible: true,
-        type: m.type,
-        metadata: m.metadata,
-        dimensions: m.dimensions,
-      }));
-  }, [models, activeLayers]);
-
-  // SceneRecipe 생성
+  // SceneRecipe 생성 (handleRunAllSimulations에서 사용하므로 먼저 정의)
   const currentRecipe = useMemo<SceneRecipe | null>(() => {
     const activeModels = models.filter((m) => activeLayers.includes(m.id));
     if (activeModels.length === 0) return null;
@@ -360,6 +321,46 @@ export default function DigitalTwinStudioPage() {
       camera: { position: { x: 10, y: 10, z: 15 }, target: { x: 0, y: 0, z: 0 }, fov: 50 },
     };
   }, [models, activeLayers]);
+
+  // 전체 시뮬레이션 실행 (씬 기반 + 레거시 UI 결과)
+  const handleRunAllSimulations = useCallback(async () => {
+    setMode('simulate');
+
+    // 레거시 UI 결과 패널용 (데모 데이터)
+    handleRunSimulation(['layout', 'flow', 'congestion', 'staffing']);
+
+    // 씬 기반 시뮬레이션도 함께 실행 (실제 모델 이동용)
+    // currentRecipe를 직접 전달하여 state 동기화 문제 해결
+    if (currentRecipe) {
+      await sceneSimulation.runAllSimulations(
+        {
+          layout: { goal: 'revenue' },
+          flow: { duration: '1hour', customerCount: 100 },
+          staffing: { staffCount: 3, goal: 'customer_service' },
+        },
+        currentRecipe  // 씬 직접 전달
+      );
+    }
+  }, [setMode, handleRunSimulation, currentRecipe, sceneSimulation]);
+
+  // SceneProvider용 모델 변환
+  const sceneModels: Model3D[] = useMemo(() => {
+    return models
+      .filter((m) => activeLayers.includes(m.id))
+      .map((m) => ({
+        id: m.id,
+        name: m.name,
+        url: m.model_url,
+        position: [m.position?.x || 0, m.position?.y || 0, m.position?.z || 0] as [number, number, number],
+        rotation: [m.rotation?.x || 0, m.rotation?.y || 0, m.rotation?.z || 0] as [number, number, number],
+        scale: [m.scale?.x || 1, m.scale?.y || 1, m.scale?.z || 1] as [number, number, number],
+        visible: true,
+        type: m.type,
+        metadata: m.metadata,
+        dimensions: m.dimensions,
+      }));
+  }, [models, activeLayers]);
+
 
   // As-is → To-be 씬 기반 시뮬레이션 실행
   const handleRunSceneSimulation = useCallback(async () => {
