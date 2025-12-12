@@ -453,6 +453,48 @@ export default function DigitalTwinStudioPage() {
     []
   );
 
+  // ZoneBoundary → SimulationZone 변환 (시뮬레이션 엔진용)
+  const simulationZones = useMemo(() => {
+    return demoZones.map((zone) => {
+      // points 배열에서 x, z 범위 계산
+      const xValues = zone.points.map((p) => p[0]);
+      const zValues = zone.points.map((p) => p[2]);
+      const minX = Math.min(...xValues);
+      const maxX = Math.max(...xValues);
+      const minZ = Math.min(...zValues);
+      const maxZ = Math.max(...zValues);
+
+      // 중심점과 크기 계산
+      const centerX = (minX + maxX) / 2;
+      const centerZ = (minZ + maxZ) / 2;
+      const width = maxX - minX;
+      const depth = maxZ - minZ;
+
+      // zone_type 추론 (이름 기반)
+      let zone_type = 'display';
+      const nameLower = zone.name.toLowerCase();
+      if (nameLower.includes('입구') || nameLower.includes('entry') || nameLower.includes('entrance')) {
+        zone_type = 'entrance';
+      } else if (nameLower.includes('출구') || nameLower.includes('exit')) {
+        zone_type = 'exit';
+      } else if (nameLower.includes('계산') || nameLower.includes('checkout') || nameLower.includes('register')) {
+        zone_type = 'checkout';
+      } else if (nameLower.includes('피팅') || nameLower.includes('fitting')) {
+        zone_type = 'fitting';
+      }
+
+      return {
+        id: zone.id,
+        zone_name: zone.name,
+        x: centerX,
+        z: centerZ,
+        width,
+        depth,
+        zone_type,
+      };
+    });
+  }, [demoZones]);
+
   // 씬 저장 핸들러
   const handleSaveScene = async (name: string) => {
     if (!currentRecipe) return;
@@ -499,6 +541,7 @@ export default function DigitalTwinStudioPage() {
                 enableSelection={isEditMode}
                 enableTransform={isEditMode}
                 showGrid={isEditMode}
+                zones={simulationZones}
               >
                 {/* 기본 오버레이 (데모 데이터) */}
                 {isActive('heatmap') && !sceneSimulation.state.results.layout && <HeatmapOverlay heatPoints={demoHeatPoints} />}
