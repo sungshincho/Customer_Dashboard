@@ -9,6 +9,9 @@ export * from './scene3d';
 // Analysis 타입
 export * from './analysis.types';
 
+// AI 타입
+export * from './ai.types';
+
 // Digital Twin types (re-export from simulation)
 export type {
   CustomerAvatar,
