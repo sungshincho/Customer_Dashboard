@@ -46,7 +46,7 @@ import { useDateFilterStore } from '@/store/dateFilterStore';
 interface ModelLayer {
   id: string;
   name: string;
-  type: 'space' | 'furniture' | 'product' | 'custom';
+  type: 'space' | 'furniture' | 'product' | 'custom' | 'other';
   model_url: string;
   position?: Vector3;
   rotation?: Vector3;

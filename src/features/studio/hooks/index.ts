@@ -28,9 +28,9 @@ export type {
   FlowSimulationParams,
   FlowSimulationResult,
   FlowPath,
-  FlowBottleneck,
   UseFlowSimulationReturn,
 } from './useFlowSimulation';
+// FlowBottleneck은 types/simulationResults.types.ts에서 export됨
 
 export type {
   CongestionSimulationParams,
