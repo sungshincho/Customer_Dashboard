@@ -82,6 +82,53 @@ export type Database = {
           },
         ]
       }
+      ai_inference_results: {
+        Row: {
+          created_at: string | null
+          id: string
+          inference_type: string
+          model_used: string | null
+          org_id: string | null
+          parameters: Json | null
+          processing_time_ms: number | null
+          result: Json
+          store_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          inference_type: string
+          model_used?: string | null
+          org_id?: string | null
+          parameters?: Json | null
+          processing_time_ms?: number | null
+          result: Json
+          store_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          inference_type?: string
+          model_used?: string | null
+          org_id?: string | null
+          parameters?: Json | null
+          processing_time_ms?: number | null
+          result?: Json
+          store_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_inference_results_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_insights: {
         Row: {
           category: string | null
@@ -5207,6 +5254,7 @@ export type Database = {
           address: string | null
           area_sqm: number | null
           city: string | null
+          closing_hour: number | null
           country: string | null
           created_at: string
           district: string | null
@@ -5217,11 +5265,14 @@ export type Database = {
           license_id: string | null
           location: string | null
           manager_name: string | null
+          max_capacity: number | null
           metadata: Json | null
           opening_date: string | null
+          opening_hour: number | null
           org_id: string | null
           phone: string | null
           region: string | null
+          staff_count: number | null
           status: string | null
           store_code: string | null
           store_format: string | null
@@ -5235,6 +5286,7 @@ export type Database = {
           address?: string | null
           area_sqm?: number | null
           city?: string | null
+          closing_hour?: number | null
           country?: string | null
           created_at?: string
           district?: string | null
@@ -5245,11 +5297,14 @@ export type Database = {
           license_id?: string | null
           location?: string | null
           manager_name?: string | null
+          max_capacity?: number | null
           metadata?: Json | null
           opening_date?: string | null
+          opening_hour?: number | null
           org_id?: string | null
           phone?: string | null
           region?: string | null
+          staff_count?: number | null
           status?: string | null
           store_code?: string | null
           store_format?: string | null
@@ -5263,6 +5318,7 @@ export type Database = {
           address?: string | null
           area_sqm?: number | null
           city?: string | null
+          closing_hour?: number | null
           country?: string | null
           created_at?: string
           district?: string | null
@@ -5273,11 +5329,14 @@ export type Database = {
           license_id?: string | null
           location?: string | null
           manager_name?: string | null
+          max_capacity?: number | null
           metadata?: Json | null
           opening_date?: string | null
+          opening_hour?: number | null
           org_id?: string | null
           phone?: string | null
           region?: string | null
+          staff_count?: number | null
           status?: string | null
           store_code?: string | null
           store_format?: string | null
@@ -7013,6 +7072,48 @@ export type Database = {
         Args: { membership_org_id: string; membership_user_id: string }
         Returns: boolean
       }
+      compute_all_retail_concepts: {
+        Args: { p_days?: number; p_store_id: string }
+        Returns: Json
+      }
+      compute_cross_sell_affinity: {
+        Args: { p_min_support?: number; p_store_id: string }
+        Returns: {
+          co_purchase_count: number
+          product_a: string
+          product_b: string
+          support: number
+        }[]
+      }
+      compute_inventory_turnover: {
+        Args: { p_days?: number; p_store_id: string }
+        Returns: {
+          avg_stock: number
+          days_of_stock: number
+          product_name: string
+          total_sold: number
+          turnover_rate: number
+        }[]
+      }
+      compute_zone_conversion_funnel: {
+        Args: { p_days?: number; p_store_id: string }
+        Returns: {
+          avg_dwell: number
+          conversion_rate: number
+          purchases: number
+          visitors: number
+          zone_name: string
+        }[]
+      }
+      compute_zone_heatmap: {
+        Args: { p_days?: number; p_store_id: string }
+        Returns: {
+          avg_dwell: number
+          hour: number
+          visit_count: number
+          zone_name: string
+        }[]
+      }
       export_public_schema: { Args: never; Returns: Json }
       generate_sample_sales_data: {
         Args: { p_days?: number; p_org_id: string; p_store_id: string }
@@ -7027,6 +7128,22 @@ export type Database = {
         }
         Returns: undefined
       }
+      get_cached_concept_value: {
+        Args: { p_concept_name: string; p_store_id: string }
+        Returns: Json
+      }
+      get_daily_kpis_summary: {
+        Args: { p_days?: number; p_store_id: string }
+        Returns: {
+          avg_transaction_value: number
+          conversion_rate: number
+          date: string
+          sales_per_sqm: number
+          total_revenue: number
+          total_transactions: number
+          total_visitors: number
+        }[]
+      }
       get_failure_patterns: {
         Args: { p_limit?: number; p_store_id: string; p_strategy_type: string }
         Returns: Json
@@ -7036,6 +7153,16 @@ export type Database = {
         Returns: {
           event_type: string
           unique_visitors: number
+        }[]
+      }
+      get_hourly_traffic: {
+        Args: { p_date?: string; p_store_id: string }
+        Returns: {
+          conversion_rate: number
+          hour: number
+          revenue: number
+          transaction_count: number
+          visitor_count: number
         }[]
       }
       get_roi_by_category: {
@@ -7087,6 +7214,17 @@ export type Database = {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      get_visit_statistics: {
+        Args: { p_days?: number; p_store_id: string }
+        Returns: {
+          avg_duration_minutes: number
+          avg_purchase_amount: number
+          conversion_rate: number
+          date: string
+          purchase_count: number
+          total_visits: number
+        }[]
+      }
       graph_n_hop_query: {
         Args: {
           p_max_hops?: number
@@ -7127,6 +7265,16 @@ export type Database = {
       }
       migrate_user_to_organization: {
         Args: { p_user_id: string }
+        Returns: string
+      }
+      save_concept_value: {
+        Args: {
+          p_concept_name: string
+          p_parameters?: Json
+          p_store_id: string
+          p_valid_hours?: number
+          p_value: Json
+        }
         Returns: string
       }
       user_can_access_store: { Args: { p_store_id: string }; Returns: boolean }
