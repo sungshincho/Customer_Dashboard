@@ -1877,7 +1877,21 @@ export type Database = {
             foreignKeyName: "funnel_events_zone_fk"
             columns: ["zone_id"]
             isOneToOne: false
+            referencedRelation: "zones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "funnel_events_zone_fk"
+            columns: ["zone_id"]
+            isOneToOne: false
             referencedRelation: "zones_dim"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "funnel_events_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "zones"
             referencedColumns: ["id"]
           },
           {
@@ -1932,6 +1946,105 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "funnel_metrics_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      furniture: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          depth: number | null
+          furniture_type: string
+          height: number | null
+          id: string
+          is_active: boolean | null
+          model_type: string | null
+          model_url: string | null
+          name: string
+          org_id: string | null
+          position_x: number | null
+          position_y: number | null
+          position_z: number | null
+          properties: Json | null
+          rotation_x: number | null
+          rotation_y: number | null
+          rotation_z: number | null
+          scale_x: number | null
+          scale_y: number | null
+          scale_z: number | null
+          store_id: string
+          updated_at: string | null
+          user_id: string | null
+          width: number | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          depth?: number | null
+          furniture_type: string
+          height?: number | null
+          id?: string
+          is_active?: boolean | null
+          model_type?: string | null
+          model_url?: string | null
+          name: string
+          org_id?: string | null
+          position_x?: number | null
+          position_y?: number | null
+          position_z?: number | null
+          properties?: Json | null
+          rotation_x?: number | null
+          rotation_y?: number | null
+          rotation_z?: number | null
+          scale_x?: number | null
+          scale_y?: number | null
+          scale_z?: number | null
+          store_id: string
+          updated_at?: string | null
+          user_id?: string | null
+          width?: number | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          depth?: number | null
+          furniture_type?: string
+          height?: number | null
+          id?: string
+          is_active?: boolean | null
+          model_type?: string | null
+          model_url?: string | null
+          name?: string
+          org_id?: string | null
+          position_x?: number | null
+          position_y?: number | null
+          position_z?: number | null
+          properties?: Json | null
+          rotation_x?: number | null
+          rotation_y?: number | null
+          rotation_z?: number | null
+          scale_x?: number | null
+          scale_y?: number | null
+          scale_z?: number | null
+          store_id?: string
+          updated_at?: string | null
+          user_id?: string | null
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "furniture_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "furniture_store_id_fkey"
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
@@ -3718,6 +3831,98 @@ export type Database = {
         }
         Relationships: []
       }
+      optimization_tasks: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          input_params: Json | null
+          org_id: string | null
+          output_result: Json | null
+          priority: number | null
+          scheduled_at: string | null
+          simulation_id: string | null
+          started_at: string | null
+          status: string | null
+          store_id: string
+          strategy_id: string | null
+          task_name: string | null
+          task_type: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          input_params?: Json | null
+          org_id?: string | null
+          output_result?: Json | null
+          priority?: number | null
+          scheduled_at?: string | null
+          simulation_id?: string | null
+          started_at?: string | null
+          status?: string | null
+          store_id: string
+          strategy_id?: string | null
+          task_name?: string | null
+          task_type: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          input_params?: Json | null
+          org_id?: string | null
+          output_result?: Json | null
+          priority?: number | null
+          scheduled_at?: string | null
+          simulation_id?: string | null
+          started_at?: string | null
+          status?: string | null
+          store_id?: string
+          strategy_id?: string | null
+          task_name?: string | null
+          task_type?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "optimization_tasks_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "optimization_tasks_simulation_id_fkey"
+            columns: ["simulation_id"]
+            isOneToOne: false
+            referencedRelation: "simulation_history"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "optimization_tasks_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "optimization_tasks_strategy_id_fkey"
+            columns: ["strategy_id"]
+            isOneToOne: false
+            referencedRelation: "applied_strategies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_members: {
         Row: {
           created_at: string
@@ -5210,6 +5415,75 @@ export type Database = {
           },
         ]
       }
+      simulation_history: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          duration_seconds: number | null
+          id: string
+          metrics: Json | null
+          org_id: string | null
+          params: Json | null
+          result: Json | null
+          simulation_name: string | null
+          simulation_type: string
+          started_at: string | null
+          status: string | null
+          store_id: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          duration_seconds?: number | null
+          id?: string
+          metrics?: Json | null
+          org_id?: string | null
+          params?: Json | null
+          result?: Json | null
+          simulation_name?: string | null
+          simulation_type: string
+          started_at?: string | null
+          status?: string | null
+          store_id: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          duration_seconds?: number | null
+          id?: string
+          metrics?: Json | null
+          org_id?: string | null
+          params?: Json | null
+          result?: Json | null
+          simulation_name?: string | null
+          simulation_type?: string
+          started_at?: string | null
+          status?: string | null
+          store_id?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "simulation_history_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "simulation_history_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staff: {
         Row: {
           created_at: string | null
@@ -5292,6 +5566,111 @@ export type Database = {
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff_assignments: {
+        Row: {
+          assigned_date: string | null
+          created_at: string | null
+          efficiency_score: number | null
+          id: string
+          is_ai_suggested: boolean | null
+          optimization_task_id: string | null
+          org_id: string | null
+          position_x: number | null
+          position_y: number | null
+          position_z: number | null
+          properties: Json | null
+          shift_end: string | null
+          shift_start: string | null
+          staff_name: string | null
+          staff_role: string | null
+          status: string | null
+          store_id: string
+          updated_at: string | null
+          user_id: string | null
+          zone_id: string | null
+        }
+        Insert: {
+          assigned_date?: string | null
+          created_at?: string | null
+          efficiency_score?: number | null
+          id?: string
+          is_ai_suggested?: boolean | null
+          optimization_task_id?: string | null
+          org_id?: string | null
+          position_x?: number | null
+          position_y?: number | null
+          position_z?: number | null
+          properties?: Json | null
+          shift_end?: string | null
+          shift_start?: string | null
+          staff_name?: string | null
+          staff_role?: string | null
+          status?: string | null
+          store_id: string
+          updated_at?: string | null
+          user_id?: string | null
+          zone_id?: string | null
+        }
+        Update: {
+          assigned_date?: string | null
+          created_at?: string | null
+          efficiency_score?: number | null
+          id?: string
+          is_ai_suggested?: boolean | null
+          optimization_task_id?: string | null
+          org_id?: string | null
+          position_x?: number | null
+          position_y?: number | null
+          position_z?: number | null
+          properties?: Json | null
+          shift_end?: string | null
+          shift_start?: string | null
+          staff_name?: string | null
+          staff_role?: string | null
+          status?: string | null
+          store_id?: string
+          updated_at?: string | null
+          user_id?: string | null
+          zone_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_assignments_optimization_task_id_fkey"
+            columns: ["optimization_task_id"]
+            isOneToOne: false
+            referencedRelation: "optimization_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_assignments_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_assignments_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_assignments_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "zones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_assignments_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "zones_dim"
             referencedColumns: ["id"]
           },
         ]
@@ -5587,6 +5966,7 @@ export type Database = {
           floor_area_sqm: number | null
           hq_store_code: string | null
           id: string
+          is_active: boolean | null
           license_id: string | null
           location: string | null
           manager_name: string | null
@@ -5619,6 +5999,7 @@ export type Database = {
           floor_area_sqm?: number | null
           hq_store_code?: string | null
           id?: string
+          is_active?: boolean | null
           license_id?: string | null
           location?: string | null
           manager_name?: string | null
@@ -5651,6 +6032,7 @@ export type Database = {
           floor_area_sqm?: number | null
           hq_store_code?: string | null
           id?: string
+          is_active?: boolean | null
           license_id?: string | null
           location?: string | null
           manager_name?: string | null
@@ -6538,7 +6920,21 @@ export type Database = {
             foreignKeyName: "visit_zone_events_zone_fk"
             columns: ["zone_id"]
             isOneToOne: false
+            referencedRelation: "zones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visit_zone_events_zone_fk"
+            columns: ["zone_id"]
+            isOneToOne: false
             referencedRelation: "zones_dim"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visit_zone_events_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "zones"
             referencedColumns: ["id"]
           },
           {
@@ -6851,6 +7247,13 @@ export type Database = {
             foreignKeyName: "wifi_tracking_zone_fk"
             columns: ["zone_id"]
             isOneToOne: false
+            referencedRelation: "zones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wifi_tracking_zone_fk"
+            columns: ["zone_id"]
+            isOneToOne: false
             referencedRelation: "zones_dim"
             referencedColumns: ["id"]
           },
@@ -6993,6 +7396,13 @@ export type Database = {
             foreignKeyName: "zone_daily_metrics_zone_id_fkey"
             columns: ["zone_id"]
             isOneToOne: false
+            referencedRelation: "zones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zone_daily_metrics_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
             referencedRelation: "zones_dim"
             referencedColumns: ["id"]
           },
@@ -7100,7 +7510,21 @@ export type Database = {
             foreignKeyName: "zone_events_zone_fk"
             columns: ["zone_id"]
             isOneToOne: false
+            referencedRelation: "zones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zone_events_zone_fk"
+            columns: ["zone_id"]
+            isOneToOne: false
             referencedRelation: "zones_dim"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zone_events_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "zones"
             referencedColumns: ["id"]
           },
           {
@@ -7259,6 +7683,7 @@ export type Database = {
         Row: {
           area_sqm: number | null
           capacity: number | null
+          color: string | null
           coordinates: Json | null
           created_at: string | null
           floor_level: number | null
@@ -7267,8 +7692,16 @@ export type Database = {
           metadata: Json | null
           org_id: string | null
           parent_zone_id: string | null
+          position_x: number | null
+          position_y: number | null
+          position_z: number | null
+          properties: Json | null
+          size_depth: number | null
+          size_height: number | null
+          size_width: number | null
           store_id: string
           updated_at: string | null
+          user_id: string | null
           zone_code: string
           zone_name: string
           zone_type: string | null
@@ -7276,6 +7709,7 @@ export type Database = {
         Insert: {
           area_sqm?: number | null
           capacity?: number | null
+          color?: string | null
           coordinates?: Json | null
           created_at?: string | null
           floor_level?: number | null
@@ -7284,8 +7718,16 @@ export type Database = {
           metadata?: Json | null
           org_id?: string | null
           parent_zone_id?: string | null
+          position_x?: number | null
+          position_y?: number | null
+          position_z?: number | null
+          properties?: Json | null
+          size_depth?: number | null
+          size_height?: number | null
+          size_width?: number | null
           store_id: string
           updated_at?: string | null
+          user_id?: string | null
           zone_code: string
           zone_name: string
           zone_type?: string | null
@@ -7293,6 +7735,7 @@ export type Database = {
         Update: {
           area_sqm?: number | null
           capacity?: number | null
+          color?: string | null
           coordinates?: Json | null
           created_at?: string | null
           floor_level?: number | null
@@ -7301,8 +7744,16 @@ export type Database = {
           metadata?: Json | null
           org_id?: string | null
           parent_zone_id?: string | null
+          position_x?: number | null
+          position_y?: number | null
+          position_z?: number | null
+          properties?: Json | null
+          size_depth?: number | null
+          size_height?: number | null
+          size_width?: number | null
           store_id?: string
           updated_at?: string | null
+          user_id?: string | null
           zone_code?: string
           zone_name?: string
           zone_type?: string | null
@@ -7326,7 +7777,21 @@ export type Database = {
             foreignKeyName: "zones_dim_parent_fk"
             columns: ["parent_zone_id"]
             isOneToOne: false
+            referencedRelation: "zones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zones_dim_parent_fk"
+            columns: ["parent_zone_id"]
+            isOneToOne: false
             referencedRelation: "zones_dim"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zones_dim_parent_zone_id_fkey"
+            columns: ["parent_zone_id"]
+            isOneToOne: false
+            referencedRelation: "zones"
             referencedColumns: ["id"]
           },
           {
@@ -7373,6 +7838,101 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      zones: {
+        Row: {
+          area_sqm: number | null
+          capacity: number | null
+          color: string | null
+          created_at: string | null
+          depth: number | null
+          height: number | null
+          id: string | null
+          is_active: boolean | null
+          name: string | null
+          org_id: string | null
+          position_x: number | null
+          position_y: number | null
+          position_z: number | null
+          properties: Json | null
+          store_id: string | null
+          type: string | null
+          updated_at: string | null
+          user_id: string | null
+          width: number | null
+        }
+        Insert: {
+          area_sqm?: number | null
+          capacity?: number | null
+          color?: string | null
+          created_at?: string | null
+          depth?: number | null
+          height?: number | null
+          id?: string | null
+          is_active?: never
+          name?: string | null
+          org_id?: string | null
+          position_x?: never
+          position_y?: never
+          position_z?: never
+          properties?: Json | null
+          store_id?: string | null
+          type?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          width?: number | null
+        }
+        Update: {
+          area_sqm?: number | null
+          capacity?: number | null
+          color?: string | null
+          created_at?: string | null
+          depth?: number | null
+          height?: number | null
+          id?: string | null
+          is_active?: never
+          name?: string | null
+          org_id?: string | null
+          position_x?: never
+          position_y?: never
+          position_z?: never
+          properties?: Json | null
+          store_id?: string | null
+          type?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zones_dim_org_fk"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zones_dim_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zones_dim_store_fk"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zones_dim_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
             referencedColumns: ["id"]
           },
         ]
