@@ -12,20 +12,11 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Auth from "@/core/pages/AuthPage";
 import NotFound from "@/core/pages/NotFoundPage";
 
-// 새로운 4개 메인 페이지
+// 4개 메인 페이지 (확정 아키텍처)
 import InsightHubPage from "@/features/insights/InsightHubPage";
 import DigitalTwinStudioPage from "@/features/studio/DigitalTwinStudioPage";
 import ROIMeasurementPage from "@/features/roi/ROIMeasurementPage";
 import SettingsPage from "@/features/settings/SettingsPage";
-
-// Legacy pages (하위 호환성)
-import Dashboard from "@/core/pages/DashboardPage";
-import { StoresPage, HQCommunicationPage } from "@/features/overview";
-import { StoreAnalysisPage, CustomerAnalysisPage, ProductAnalysisPage } from "@/features/analysis";
-import { DigitalTwin3DPage, SimulationHubPage } from "@/features/simulation";
-import UnifiedDataManagementPage from "@/features/data-management/import/pages/UnifiedDataManagementPage";
-import SchemaBuilder from "@/features/data-management/ontology/pages/SchemaBuilderPage";
-import APIIntegrationPage from "@/features/data-management/api/pages/APIIntegrationPage";
 
 // Onboarding
 import { OnboardingWizard } from "@/features/onboarding/components/OnboardingWizard";
