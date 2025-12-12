@@ -83,10 +83,10 @@ export function useOntologyInference() {
 
     try {
       const { data, error: functionError } = await supabase.functions.invoke(
-        'ontology-ai-inference',
+        'unified-ai',
         {
           body: {
-            inference_type: 'recommendation',
+            action: 'ontology_recommendation',
             store_id: storeId,
             entity_id: entityId,
             parameters: {
@@ -142,10 +142,10 @@ export function useOntologyInference() {
 
     try {
       const { data, error: functionError } = await supabase.functions.invoke(
-        'ontology-ai-inference',
+        'unified-ai',
         {
           body: {
-            inference_type: 'anomaly_detection',
+            action: 'anomaly_detection',
             store_id: storeId,
             parameters: {
               sensitivity,
@@ -209,10 +209,10 @@ export function useOntologyInference() {
 
     try {
       const { data, error: functionError } = await supabase.functions.invoke(
-        'ontology-ai-inference',
+        'unified-ai',
         {
           body: {
-            inference_type: 'pattern_analysis',
+            action: 'pattern_analysis',
             store_id: storeId,
             parameters: {
               analysis_type: analysisType,
