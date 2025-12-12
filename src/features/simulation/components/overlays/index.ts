@@ -1,11 +1,8 @@
 export { CustomerPathOverlay } from './CustomerPathOverlay';
 export { HeatmapOverlay3D } from './HeatmapOverlay3D';
 export { ProductInfoOverlay } from './ProductInfoOverlay';
-export { CustomerAvatarOverlay } from './CustomerAvatarOverlay';
 export { RealtimeCustomerOverlay } from './RealtimeCustomerOverlay';
-export { ZoneBoundaryOverlay } from './ZoneBoundaryOverlay';
 export { ZoneTransitionOverlay } from './ZoneTransitionOverlay';
 export { DwellTimeOverlay } from './DwellTimeOverlay';
 export { LayoutChangeOverlay } from './LayoutChangeOverlay';
-export { CustomerFlowOverlay } from './CustomerFlowOverlay';
 export { WiFiTrackingOverlay } from './WiFiTrackingOverlay';
