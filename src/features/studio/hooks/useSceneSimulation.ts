@@ -77,7 +77,7 @@ export interface UseSceneSimulationReturn {
 
   // 시뮬레이션 실행
   runSimulation: (request: SimulationRequest) => Promise<void>;
-  runAllSimulations: (params?: Partial<Record<SimulationType, Record<string, any>>>, scene?: SceneRecipe) => Promise<void>;
+  runAllSimulations: (params?: Partial<Record<SimulationType, Record<string, any>>>, scene?: SceneRecipe) => Promise<SimulationResults>;
 
   // 결과 관리
   getComparison: () => SceneComparison | null;
@@ -253,7 +253,7 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
 
   // 전체 시뮬레이션 실행 (scene 파라미터로 직접 씬을 전달할 수 있음)
   const runAllSimulations = useCallback(
-    async (params?: Partial<Record<SimulationType, Record<string, any>>>, scene?: SceneRecipe) => {
+    async (params?: Partial<Record<SimulationType, Record<string, any>>>, scene?: SceneRecipe): Promise<SimulationResults> => {
       // 직접 전달된 씬 또는 state의 asIsScene 사용
       const targetScene = scene || state.asIsScene;
 
@@ -262,7 +262,7 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
           title: '씬을 먼저 선택해주세요',
           variant: 'destructive',
         });
-        return;
+        return {};
       }
 
       // 직접 전달된 씬이 있으면 state도 업데이트
@@ -353,12 +353,15 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
           title: '전체 시뮬레이션 완료',
           description: `${comparison.summary.totalChanges}개의 최적화 제안이 생성되었습니다.`,
         });
+
+        return results;
       } catch (err) {
         setError(err as Error);
         toast({
           title: '시뮬레이션 실패',
           variant: 'destructive',
         });
+        return {};
       } finally {
         setIsSimulating(false);
       }

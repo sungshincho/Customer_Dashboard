@@ -29,11 +29,44 @@ interface FlowOptimizationOverlayProps {
   selectedPathId?: string | null;
   onPathClick?: (pathId: string) => void;
   onBottleneckClick?: (bottleneckId: string) => void;
+  /** 매장 경계 (좌표 클램핑용) */
+  storeBounds?: {
+    width: number;
+    depth: number;
+  };
+}
+
+// ============================================================================
+// 좌표 클램핑 헬퍼
+// ============================================================================
+
+/**
+ * 3D 좌표를 매장 경계 내로 클램핑
+ * 매장은 원점 중심으로 배치되므로 x: [-width/2, width/2], z: [-depth/2, depth/2]
+ */
+function clampToStoreBounds(
+  x: number,
+  z: number,
+  bounds: { width: number; depth: number }
+): { x: number; z: number } {
+  const halfWidth = bounds.width / 2;
+  const halfDepth = bounds.depth / 2;
+
+  // 약간의 패딩을 두어 경계 바로 위에 표시되지 않도록 함
+  const padding = 0.5;
+
+  return {
+    x: Math.max(-halfWidth + padding, Math.min(halfWidth - padding, x)),
+    z: Math.max(-halfDepth + padding, Math.min(halfDepth - padding, z)),
+  };
 }
 
 // ============================================================================
 // 컴포넌트
 // ============================================================================
+
+// 기본 매장 경계값 (일반적인 소매점 크기)
+const DEFAULT_STORE_BOUNDS = { width: 17.4, depth: 16.6 };
 
 export function FlowOptimizationOverlay({
   result,
@@ -46,6 +79,7 @@ export function FlowOptimizationOverlay({
   selectedPathId,
   onPathClick,
   onBottleneckClick,
+  storeBounds = DEFAULT_STORE_BOUNDS,
 }: FlowOptimizationOverlayProps) {
   const [hoveredPath, setHoveredPath] = useState<string | null>(null);
   const [hoveredBottleneck, setHoveredBottleneck] = useState<string | null>(null);
@@ -70,7 +104,7 @@ export function FlowOptimizationOverlay({
 
       {/* 존 간 이동 화살표 */}
       {showFlowArrows && hasZoneFlowArrows && visualization.zoneFlowArrows.map((arrow, idx) => (
-        <FlowArrow key={idx} arrow={arrow} />
+        <FlowArrow key={idx} arrow={arrow} storeBounds={storeBounds} />
       ))}
 
       {/* 애니메이션 경로 */}
@@ -78,6 +112,7 @@ export function FlowOptimizationOverlay({
         <AnimatedPath
           key={path.id}
           path={path}
+          storeBounds={storeBounds}
           animate={animatePaths}
           opacity={pathOpacity}
           isSelected={selectedPathId === path.id}
@@ -92,6 +127,7 @@ export function FlowOptimizationOverlay({
         <BottleneckMarker
           key={bottleneck.id}
           bottleneck={bottleneck}
+          storeBounds={storeBounds}
           isHovered={hoveredBottleneck === bottleneck.id}
           onClick={() => onBottleneckClick?.(bottleneck.id)}
           onHover={(hovered) => setHoveredBottleneck(hovered ? bottleneck.id : null)}
@@ -192,6 +228,7 @@ function getFlowColor(density: number): { r: number; g: number; b: number } {
 
 interface AnimatedPathProps {
   path: FlowPath;
+  storeBounds: { width: number; depth: number };
   animate: boolean;
   opacity: number;
   isSelected: boolean;
@@ -202,6 +239,7 @@ interface AnimatedPathProps {
 
 function AnimatedPath({
   path,
+  storeBounds,
   animate,
   opacity,
   isSelected,
@@ -212,20 +250,28 @@ function AnimatedPath({
   const markerRef = useRef<THREE.Mesh>(null);
   const progressRef = useRef(Math.random()); // 초기 위치 랜덤화
 
+  // 좌표를 클램핑하여 경로 포인트 계산
+  const clampedPoints = useMemo(() => {
+    return path.points.map(p => {
+      const clamped = clampToStoreBounds(p.x, p.z, storeBounds);
+      return { x: clamped.x, y: p.y, z: clamped.z };
+    });
+  }, [path.points, storeBounds]);
+
   // 경로 애니메이션
   useFrame((_, delta) => {
-    if (!animate || !markerRef.current || path.points.length < 2) return;
+    if (!animate || !markerRef.current || clampedPoints.length < 2) return;
 
     progressRef.current += delta * 0.2;
     if (progressRef.current > 1) progressRef.current = 0;
 
     const t = progressRef.current;
-    const idx = Math.floor(t * (path.points.length - 1));
-    const nextIdx = Math.min(idx + 1, path.points.length - 1);
-    const localT = (t * (path.points.length - 1)) % 1;
+    const idx = Math.floor(t * (clampedPoints.length - 1));
+    const nextIdx = Math.min(idx + 1, clampedPoints.length - 1);
+    const localT = (t * (clampedPoints.length - 1)) % 1;
 
-    const current = path.points[idx];
-    const next = path.points[nextIdx];
+    const current = clampedPoints[idx];
+    const next = clampedPoints[nextIdx];
 
     markerRef.current.position.set(
       current.x + (next.x - current.x) * localT,
@@ -234,7 +280,7 @@ function AnimatedPath({
     );
   });
 
-  const linePoints = path.points.map(p => [p.x, p.y, p.z] as [number, number, number]);
+  const linePoints = clampedPoints.map(p => [p.x, p.y, p.z] as [number, number, number]);
   const color = path.converted ? '#22c55e' : '#f59e0b';
   const lineWidth = isSelected ? 4 : isHovered ? 3 : 2;
 
@@ -267,20 +313,20 @@ function AnimatedPath({
       )}
 
       {/* 시작점 마커 */}
-      {path.points.length > 0 && (
-        <mesh position={[path.points[0].x, path.points[0].y, path.points[0].z]}>
+      {clampedPoints.length > 0 && (
+        <mesh position={[clampedPoints[0].x, clampedPoints[0].y, clampedPoints[0].z]}>
           <ringGeometry args={[0.15, 0.2, 16]} />
           <meshBasicMaterial color="#3b82f6" side={THREE.DoubleSide} />
         </mesh>
       )}
 
       {/* 끝점 마커 */}
-      {path.points.length > 1 && (
+      {clampedPoints.length > 1 && (
         <mesh
           position={[
-            path.points[path.points.length - 1].x,
-            path.points[path.points.length - 1].y,
-            path.points[path.points.length - 1].z,
+            clampedPoints[clampedPoints.length - 1].x,
+            clampedPoints[clampedPoints.length - 1].y,
+            clampedPoints[clampedPoints.length - 1].z,
           ]}
           rotation={[-Math.PI / 2, 0, 0]}
         >
@@ -302,9 +348,10 @@ interface FlowArrowProps {
     to: { x: number; y: number; z: number };
     volume: number;
   };
+  storeBounds: { width: number; depth: number };
 }
 
-function FlowArrow({ arrow }: FlowArrowProps) {
+function FlowArrow({ arrow, storeBounds }: FlowArrowProps) {
   const arrowRef = useRef<THREE.Group>(null);
 
   // 화살표 펄스 애니메이션
@@ -319,8 +366,12 @@ function FlowArrow({ arrow }: FlowArrowProps) {
     }
   });
 
-  const from = [arrow.from.x, arrow.from.y, arrow.from.z] as [number, number, number];
-  const to = [arrow.to.x, arrow.to.y, arrow.to.z] as [number, number, number];
+  // 좌표를 매장 경계 내로 클램핑
+  const clampedFrom = clampToStoreBounds(arrow.from.x, arrow.from.z, storeBounds);
+  const clampedTo = clampToStoreBounds(arrow.to.x, arrow.to.z, storeBounds);
+
+  const from = [clampedFrom.x, arrow.from.y, clampedFrom.z] as [number, number, number];
+  const to = [clampedTo.x, arrow.to.y, clampedTo.z] as [number, number, number];
   const midPoint: [number, number, number] = [
     (from[0] + to[0]) / 2,
     (from[1] + to[1]) / 2 + 0.5,
@@ -385,6 +436,7 @@ function FlowArrow({ arrow }: FlowArrowProps) {
 
 interface BottleneckMarkerProps {
   bottleneck: FlowBottleneck;
+  storeBounds: { width: number; depth: number };
   isHovered: boolean;
   onClick: () => void;
   onHover: (hovered: boolean) => void;
@@ -392,6 +444,7 @@ interface BottleneckMarkerProps {
 
 function BottleneckMarker({
   bottleneck,
+  storeBounds,
   isHovered,
   onClick,
   onHover,
@@ -406,7 +459,13 @@ function BottleneckMarker({
     }
   });
 
-  const position = [bottleneck.position.x, 0.5, bottleneck.position.z] as [number, number, number];
+  // 좌표를 매장 경계 내로 클램핑
+  const clampedPos = clampToStoreBounds(
+    bottleneck.position.x,
+    bottleneck.position.z,
+    storeBounds
+  );
+  const position = [clampedPos.x, 0.5, clampedPos.z] as [number, number, number];
   const radius = 0.3 + bottleneck.severity * 0.5;
   const color = bottleneck.severity > 0.7 ? '#ef4444' :
                 bottleneck.severity > 0.4 ? '#f59e0b' : '#fbbf24';

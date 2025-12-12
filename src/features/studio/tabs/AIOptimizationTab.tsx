@@ -142,11 +142,8 @@ export function AIOptimizationTab({
         };
       }
 
-      // useSceneSimulation의 runAllSimulations 호출
-      await sceneSimulation.runAllSimulations(params, sceneData);
-
-      // 결과 적용
-      const results = sceneSimulation.state.results;
+      // useSceneSimulation의 runAllSimulations 호출 - 결과를 직접 반환받음
+      const results = await sceneSimulation.runAllSimulations(params, sceneData);
 
       // 레이아웃 결과가 있으면 오버레이 활성화 및 오른쪽 패널 업데이트
       if (results.layout) {
