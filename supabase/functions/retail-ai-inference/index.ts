@@ -302,12 +302,12 @@ async function loadContextData(
 ) {
   const contextData: Record<string, any> = {};
 
-  // 최근 KPI 데이터
+  // 최근 KPI 데이터 (daily_kpis_agg 테이블 사용)
   const { data: kpis } = await supabase
-    .from('dashboard_kpis')
+    .from('daily_kpis_agg')
     .select('*')
     .eq('store_id', storeId)
-    .order('date', { ascending: false })
+    .order('kpi_date', { ascending: false })
     .limit(7);
 
   contextData.recent_kpis = kpis || [];
@@ -317,13 +317,37 @@ async function loadContextData(
     case 'layout_optimization':
     case 'zone_analysis':
     case 'traffic_flow':
-      // 구역 데이터
+      // 구역 데이터 (zones_dim 테이블 우선 사용)
       const { data: zones } = await supabase
-        .from('graph_entities')
+        .from('zones_dim')
+        .select(`
+          id, zone_name, zone_type, display_name, description,
+          model_3d_position, model_3d_rotation, model_3d_scale,
+          area_sqm, capacity, is_active
+        `)
+        .eq('store_id', storeId)
+        .eq('is_active', true);
+
+      // zones_dim에 데이터가 없으면 graph_entities 폴백
+      if (zones && zones.length > 0) {
+        contextData.zones = zones;
+      } else {
+        const { data: graphZones } = await supabase
+          .from('graph_entities')
+          .select('*')
+          .eq('store_id', storeId)
+          .ilike('entity_type_id', '%zone%');
+        contextData.zones = graphZones || [];
+      }
+
+      // zone_daily_metrics 추가 로드
+      const { data: zoneMetrics } = await supabase
+        .from('zone_daily_metrics')
         .select('*')
         .eq('store_id', storeId)
-        .ilike('entity_type_id', '%zone%');
-      contextData.zones = zones || [];
+        .gte('date', new Date(Date.now() - (parameters.days || 30) * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+        .order('date', { ascending: false });
+      contextData.zone_metrics = zoneMetrics || [];
       break;
 
     case 'demand_forecast':
@@ -335,6 +359,15 @@ async function loadContextData(
         .eq('store_id', storeId)
         .not('properties->stock_quantity', 'is', null);
       contextData.inventory = inventory || [];
+
+      // hourly_metrics 추가 로드 (시간대별 수요 패턴)
+      const { data: hourlyMetrics } = await supabase
+        .from('hourly_metrics')
+        .select('*')
+        .eq('store_id', storeId)
+        .gte('hour_timestamp', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+        .order('hour_timestamp', { ascending: false });
+      contextData.hourly_metrics = hourlyMetrics || [];
       break;
 
     case 'cross_sell':
@@ -349,6 +382,16 @@ async function loadContextData(
         .eq('store_id', storeId)
         .ilike('entity_type_id', '%customer%');
       contextData.customers = customers || [];
+
+      // store_visits 추가 로드 (방문 패턴)
+      const { data: visits } = await supabase
+        .from('store_visits')
+        .select('*')
+        .eq('store_id', storeId)
+        .gte('visit_date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+        .order('visit_date', { ascending: false })
+        .limit(1000);
+      contextData.store_visits = visits || [];
       break;
   }
 
