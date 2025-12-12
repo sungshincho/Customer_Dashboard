@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { buildStoreContext } from '../utils/store-context-builder';
 import { OptimizationResultPanel } from '../panels/OptimizationResultPanel';
+import { useScene } from '../core/SceneProvider';
 import type { UseSceneSimulationReturn } from '../hooks/useSceneSimulation';
 import type { SceneRecipe } from '../types';
 
@@ -62,6 +63,9 @@ export function AIOptimizationTab({
   onSceneUpdate,
   onOverlayToggle,
 }: AIOptimizationTabProps) {
+  // SceneProvider에서 applySimulationResults 가져오기
+  const { applySimulationResults } = useScene();
+
   // 선택된 최적화 유형들
   const [selectedOptimizations, setSelectedOptimizations] = useState<OptimizationType[]>(['layout']);
 
@@ -175,15 +179,27 @@ export function AIOptimizationTab({
     toast.info('원래 씬으로 복원되었습니다');
   }, [sceneSimulation, onOverlayToggle]);
 
-  // To-Be 씬 적용
+  // To-Be 씬 적용 - 3D 모델 위치 실제 변경
   const handleApplyToBe = useCallback(async () => {
     try {
+      const results = sceneSimulation.state.results;
+
+      // 레이아웃 최적화 결과가 있으면 가구 이동 적용
+      if (results.layout?.furnitureMoves && results.layout.furnitureMoves.length > 0) {
+        applySimulationResults({
+          furnitureMoves: results.layout.furnitureMoves,
+        });
+      }
+
+      // 내부 상태도 업데이트
       await sceneSimulation.applyAllChanges();
-      toast.success('최적화된 레이아웃이 적용되었습니다');
+
+      toast.success('최적화된 레이아웃이 3D 씬에 적용되었습니다');
     } catch (error) {
+      console.error('Apply To-Be error:', error);
       toast.error('적용에 실패했습니다');
     }
-  }, [sceneSimulation]);
+  }, [sceneSimulation, applySimulationResults]);
 
   // To-Be 씬 저장
   const handleSaveToBe = useCallback(async () => {
