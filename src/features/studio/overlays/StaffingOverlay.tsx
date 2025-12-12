@@ -56,15 +56,22 @@ export function StaffingOverlay({
 
   const { visualization, staffPositions, zoneCoverage, metrics } = result;
 
+  // 안전 체크: visualization이 없으면 일부 요소 렌더링 스킵
+  const hasVisualization = visualization && typeof visualization === 'object';
+  const hasHeatmap = hasVisualization && Array.isArray(visualization.heatmap) && visualization.heatmap.length > 0;
+  const hasCoverageZones = hasVisualization && Array.isArray(visualization.coverageZones);
+  const hasMovementPaths = hasVisualization && Array.isArray(visualization.movementPaths);
+  const hasStaffMarkers = hasVisualization && Array.isArray(visualization.staffMarkers);
+
   return (
     <group name="staffing-overlay">
       {/* 서비스 레벨 히트맵 */}
-      {showServiceHeatmap && visualization.heatmap.length > 0 && (
+      {showServiceHeatmap && hasHeatmap && (
         <ServiceHeatmap data={visualization.heatmap} />
       )}
 
       {/* 커버리지 영역 */}
-      {showCoverageZones && visualization.coverageZones.map((zone, idx) => (
+      {showCoverageZones && hasCoverageZones && visualization.coverageZones.map((zone, idx) => (
         <CoverageZone
           key={`coverage-${idx}`}
           zone={zone}
@@ -74,7 +81,7 @@ export function StaffingOverlay({
       ))}
 
       {/* 이동 경로 */}
-      {showMovementPaths && visualization.movementPaths.map((path) => (
+      {showMovementPaths && hasMovementPaths && visualization.movementPaths.map((path) => (
         <MovementPath
           key={path.staffId}
           path={path}
@@ -84,7 +91,7 @@ export function StaffingOverlay({
       ))}
 
       {/* 직원 마커 */}
-      {showStaffMarkers && visualization.staffMarkers.map((marker) => (
+      {showStaffMarkers && hasStaffMarkers && visualization.staffMarkers.map((marker) => (
         <StaffMarker
           key={marker.id}
           marker={marker}

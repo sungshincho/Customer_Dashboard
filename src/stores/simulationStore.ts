@@ -11,15 +11,25 @@ export type SimulationMode =
   | 'demand'
   | 'inventory'
   | 'staff'
-  | 'promotion';
+  | 'promotion'
+  | 'realtime'; // 실시간 시뮬레이션 모드 추가
 
 export type SimulationStatus = 'stopped' | 'running' | 'paused' | 'completed';
+
+// 고객 에이전트 상태 타입
+export type CustomerState = 'entering' | 'browsing' | 'engaged' | 'fitting' | 'purchasing' | 'exiting';
 
 export interface SimulationConfig {
   mode: SimulationMode;
   duration: number;      // seconds
   speed: number;         // multiplier
   parameters: Record<string, any>;
+  // 실시간 시뮬레이션 설정
+  maxCustomers: number;
+  spawnRate: number;
+  avgDwellTime: number;
+  purchaseProbability: number;
+  showAgentPaths: boolean;
 }
 
 export interface EntityState {
@@ -33,15 +43,55 @@ export interface EntityState {
   isHighlighted: boolean;
 }
 
+// 확장된 CustomerAgent 타입
 export interface CustomerAgent {
   id: string;
   position: [number, number, number];
+  targetPosition: [number, number, number];
   targetZone: string | null;
+  currentZone: string | null;
   visitedZones: string[];
   behavior: 'browsing' | 'walking' | 'purchasing' | 'exiting';
+  state: CustomerState;
+  speed: number;
+  enteredAt: number;
   dwellTime: number;
   purchaseProbability: number;
+  color: string;
+  path: [number, number, number][];
 }
+
+// 실시간 KPI 타입
+export interface SimulationKPI {
+  currentCustomers: number;
+  totalVisitors: number;
+  totalRevenue: number;
+  avgDwellTime: number;
+  conversionRate: number;
+  conversions: number;
+  zoneOccupancy: Record<string, number>;
+  zoneDwellTime: Record<string, number>;
+}
+
+// 상태별 색상 상수
+export const STATE_COLORS: Record<CustomerState, string> = {
+  entering: '#60A5FA',
+  browsing: '#34D399',
+  engaged: '#FBBF24',
+  fitting: '#A78BFA',
+  purchasing: '#F87171',
+  exiting: '#9CA3AF',
+};
+
+// 상태별 라벨 상수
+export const STATE_LABELS: Record<CustomerState, string> = {
+  entering: '입장',
+  browsing: '탐색',
+  engaged: '관심',
+  fitting: '피팅',
+  purchasing: '구매',
+  exiting: '퇴장',
+};
 
 export interface ZoneMetric {
   zoneId: string;
@@ -67,10 +117,22 @@ export interface SimulationResult {
   recommendations: string[];
 }
 
+// 기본 KPI 값
+const defaultKPI: SimulationKPI = {
+  currentCustomers: 0,
+  totalVisitors: 0,
+  totalRevenue: 0,
+  avgDwellTime: 0,
+  conversionRate: 0,
+  conversions: 0,
+  zoneOccupancy: {},
+  zoneDwellTime: {},
+};
+
 // ============== Store State Interface ==============
 
 interface SimulationState {
-  // State
+  // 기본 상태
   status: SimulationStatus;
   config: SimulationConfig;
   currentTime: number;
@@ -80,7 +142,14 @@ interface SimulationState {
   zoneMetrics: ZoneMetric[];
   results: SimulationResult | null;
 
-  // Actions
+  // 실시간 시뮬레이션 상태
+  isRunning: boolean;
+  isPaused: boolean;
+  simulationTime: number;
+  realStartTime: number | null;
+  kpi: SimulationKPI;
+
+  // 기본 액션
   setConfig: (config: Partial<SimulationConfig>) => void;
   startSimulation: () => void;
   pauseSimulation: () => void;
@@ -95,6 +164,17 @@ interface SimulationState {
   updateZoneMetrics: (metrics: ZoneMetric[]) => void;
   tick: (deltaTime: number) => void;
   setResults: (results: SimulationResult) => void;
+
+  // 실시간 시뮬레이션 액션
+  start: () => void;
+  pause: () => void;
+  resume: () => void;
+  stop: () => void;
+  reset: () => void;
+  setSpeed: (speed: number) => void;
+  updateConfig: (config: Partial<SimulationConfig>) => void;
+  updateKPI: (updates: Partial<SimulationKPI>) => void;
+  recordConversion: (revenue: number) => void;
 }
 
 // ============== Store Implementation ==============
@@ -108,6 +188,12 @@ export const useSimulationStore = create<SimulationState>()(
       duration: 3600,
       speed: 1,
       parameters: {},
+      // 실시간 시뮬레이션 기본값
+      maxCustomers: 30,
+      spawnRate: 0.3,
+      avgDwellTime: 300,
+      purchaseProbability: 0.164, // 16.4% 전환율
+      showAgentPaths: false,
     },
     currentTime: 0,
     entities: {},
@@ -116,18 +202,25 @@ export const useSimulationStore = create<SimulationState>()(
     zoneMetrics: [],
     results: null,
 
+    // 실시간 시뮬레이션 초기 상태
+    isRunning: false,
+    isPaused: false,
+    simulationTime: 0,
+    realStartTime: null,
+    kpi: { ...defaultKPI },
+
     // Configuration Actions
     setConfig: (config) =>
       set((state) => ({
         config: { ...state.config, ...config },
       })),
 
-    // Simulation Control Actions
-    startSimulation: () => set({ status: 'running' }),
+    // Simulation Control Actions (기존 호환)
+    startSimulation: () => set({ status: 'running', isRunning: true, isPaused: false }),
 
-    pauseSimulation: () => set({ status: 'paused' }),
+    pauseSimulation: () => set({ status: 'paused', isPaused: true }),
 
-    stopSimulation: () => set({ status: 'stopped', currentTime: 0 }),
+    stopSimulation: () => set({ status: 'stopped', currentTime: 0, isRunning: false, isPaused: false }),
 
     resetSimulation: () =>
       set({
@@ -136,7 +229,74 @@ export const useSimulationStore = create<SimulationState>()(
         customers: [],
         zoneMetrics: [],
         results: null,
+        isRunning: false,
+        isPaused: false,
+        simulationTime: 0,
+        realStartTime: null,
+        kpi: { ...defaultKPI },
       }),
+
+    // 실시간 시뮬레이션 액션
+    start: () => {
+      set({
+        isRunning: true,
+        isPaused: false,
+        status: 'running',
+        realStartTime: Date.now(),
+        simulationTime: 0,
+        customers: [],
+        kpi: { ...defaultKPI },
+      });
+    },
+
+    pause: () => set({ isPaused: true, status: 'paused' }),
+
+    resume: () => set({ isPaused: false, status: 'running' }),
+
+    stop: () => set({
+      isRunning: false,
+      isPaused: false,
+      status: 'stopped',
+      realStartTime: null,
+    }),
+
+    reset: () => set({
+      isRunning: false,
+      isPaused: false,
+      status: 'stopped',
+      simulationTime: 0,
+      realStartTime: null,
+      customers: [],
+      kpi: { ...defaultKPI },
+    }),
+
+    setSpeed: (speed) => set((state) => ({
+      config: { ...state.config, speed },
+    })),
+
+    updateConfig: (updates) => set((state) => ({
+      config: { ...state.config, ...updates },
+    })),
+
+    updateKPI: (updates) => set((state) => ({
+      kpi: { ...state.kpi, ...updates },
+    })),
+
+    recordConversion: (revenue) => set((state) => {
+      const newConversions = state.kpi.conversions + 1;
+      const newConversionRate = state.kpi.totalVisitors > 0
+        ? (newConversions / state.kpi.totalVisitors) * 100
+        : 0;
+
+      return {
+        kpi: {
+          ...state.kpi,
+          totalRevenue: state.kpi.totalRevenue + revenue,
+          conversions: newConversions,
+          conversionRate: newConversionRate,
+        },
+      };
+    }),
 
     // Entity Actions
     setEntities: (entities) => set({ entities }),
@@ -176,6 +336,11 @@ export const useSimulationStore = create<SimulationState>()(
     addCustomer: (customer) =>
       set((state) => ({
         customers: [...state.customers, customer],
+        kpi: {
+          ...state.kpi,
+          currentCustomers: state.kpi.currentCustomers + 1,
+          totalVisitors: state.kpi.totalVisitors + 1,
+        },
       })),
 
     updateCustomer: (id, updates) =>
@@ -185,10 +350,26 @@ export const useSimulationStore = create<SimulationState>()(
         ),
       })),
 
-    removeCustomer: (id) =>
-      set((state) => ({
+    removeCustomer: (id) => {
+      const state = get();
+      const customer = state.customers.find((c) => c.id === id);
+
+      // 평균 체류시간 업데이트
+      const dwellTime = customer?.dwellTime || 0;
+      const totalDwellTime = state.kpi.avgDwellTime * (state.kpi.totalVisitors - 1) + dwellTime;
+      const newAvgDwellTime = state.kpi.totalVisitors > 0
+        ? totalDwellTime / state.kpi.totalVisitors
+        : 0;
+
+      set({
         customers: state.customers.filter((c) => c.id !== id),
-      })),
+        kpi: {
+          ...state.kpi,
+          currentCustomers: Math.max(0, state.kpi.currentCustomers - 1),
+          avgDwellTime: newAvgDwellTime,
+        },
+      });
+    },
 
     // Metrics Actions
     updateZoneMetrics: (metrics) => set({ zoneMetrics: metrics }),
@@ -196,16 +377,19 @@ export const useSimulationStore = create<SimulationState>()(
     // Time Tick Action
     tick: (deltaTime) => {
       const state = get();
-      if (state.status !== 'running') return;
+      if (state.status !== 'running' && !state.isRunning) return;
+      if (state.isPaused) return;
 
-      const newTime = state.currentTime + deltaTime * state.config.speed;
+      const speedMultiplier = state.config.speed;
+      const newTime = state.currentTime + deltaTime * speedMultiplier;
+      const newSimTime = state.simulationTime + deltaTime * speedMultiplier;
 
-      if (newTime >= state.config.duration) {
-        set({ status: 'completed', currentTime: state.config.duration });
+      if (state.config.duration > 0 && newTime >= state.config.duration) {
+        set({ status: 'completed', currentTime: state.config.duration, simulationTime: newSimTime });
         return;
       }
 
-      set({ currentTime: newTime });
+      set({ currentTime: newTime, simulationTime: newSimTime });
     },
 
     // Results Action

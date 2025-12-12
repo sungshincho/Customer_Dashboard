@@ -33,6 +33,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import type { SimulationScenario } from '../types';
+import { RealtimeSimulationPanel } from '../components/RealtimeSimulationPanel';
 
 // ============================================================================
 // 타입 정의
@@ -408,6 +409,12 @@ export function SimulationPanel({
 
   return (
     <div className="p-3 space-y-4">
+      {/* 🆕 실시간 시뮬레이션 패널 */}
+      <RealtimeSimulationPanel />
+
+      {/* 구분선 */}
+      <div className="border-t border-gray-700" />
+
       {/* 안내 메시지 */}
       <div className="p-2.5 bg-blue-500/10 border border-blue-500/20 rounded-lg flex items-start gap-2">
         <Info className="w-3.5 h-3.5 text-blue-400 mt-0.5 flex-shrink-0" />

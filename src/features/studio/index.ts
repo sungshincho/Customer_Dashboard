@@ -19,6 +19,9 @@ export * from './overlays';
 // UI 패널
 export * from './panels';
 
+// UI 컴포넌트
+export * from './components';
+
 // 커스텀 훅
 export * from './hooks';
 

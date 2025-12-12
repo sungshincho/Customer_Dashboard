@@ -22,6 +22,11 @@ export function HeatmapOverlay({
 }: HeatmapOverlayProps) {
   const [selectedPoint, setSelectedPoint] = useState<HeatPoint | null>(null);
 
+  // 안전 체크: heatPoints가 없거나 비어있으면 렌더링하지 않음
+  if (!heatPoints || !Array.isArray(heatPoints) || heatPoints.length === 0) {
+    return null;
+  }
+
   const { geometry, colors } = useMemo(() => {
     const gridSize = 20;
     const geo = new THREE.PlaneGeometry(gridSize, gridSize, 32, 32);
