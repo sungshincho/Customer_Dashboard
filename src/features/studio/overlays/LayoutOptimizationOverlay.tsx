@@ -25,6 +25,35 @@ interface LayoutOptimizationOverlayProps {
   showZoneHighlights?: boolean;
   animationSpeed?: number;
   onFurnitureClick?: (furnitureId: string) => void;
+  /** 매장 경계 (좌표 클램핑용) */
+  storeBounds?: {
+    width: number;
+    depth: number;
+  };
+}
+
+// ============================================================================
+// 좌표 클램핑 헬퍼
+// ============================================================================
+
+const DEFAULT_STORE_BOUNDS = { width: 17.4, depth: 16.6 };
+
+/**
+ * 3D 좌표를 매장 경계 내로 클램핑
+ */
+function clampToStoreBounds(
+  x: number,
+  z: number,
+  bounds: { width: number; depth: number }
+): { x: number; z: number } {
+  const halfWidth = bounds.width / 2;
+  const halfDepth = bounds.depth / 2;
+  const padding = 0.5;
+
+  return {
+    x: Math.max(-halfWidth + padding, Math.min(halfWidth - padding, x)),
+    z: Math.max(-halfDepth + padding, Math.min(halfDepth - padding, z)),
+  };
 }
 
 // ============================================================================
@@ -39,6 +68,7 @@ export function LayoutOptimizationOverlay({
   showZoneHighlights = true,
   animationSpeed = 1,
   onFurnitureClick,
+  storeBounds = DEFAULT_STORE_BOUNDS,
 }: LayoutOptimizationOverlayProps) {
   const [selectedMove, setSelectedMove] = useState<string | null>(null);
   const animationRef = useRef(0);
@@ -62,6 +92,7 @@ export function LayoutOptimizationOverlay({
           opacity={0.3}
           heightScale={1}
           label="변경 전"
+          storeBounds={storeBounds}
         />
       )}
 
@@ -73,6 +104,7 @@ export function LayoutOptimizationOverlay({
           opacity={0.5}
           heightScale={1.5}
           label="변경 후"
+          storeBounds={storeBounds}
         />
       )}
 
@@ -81,6 +113,7 @@ export function LayoutOptimizationOverlay({
         <FurnitureMoveIndicator
           key={move.furnitureId}
           move={move}
+          storeBounds={storeBounds}
           index={idx}
           isSelected={selectedMove === move.furnitureId}
           onClick={() => {
@@ -102,6 +135,7 @@ export function LayoutOptimizationOverlay({
       {selectedMove && (
         <MovementInfoPanel
           move={furnitureMoves.find(m => m.furnitureId === selectedMove)!}
+          storeBounds={storeBounds}
           onClose={() => setSelectedMove(null)}
         />
       )}
@@ -119,22 +153,31 @@ interface HeatmapMeshProps {
   opacity: number;
   heightScale: number;
   label: string;
+  storeBounds: { width: number; depth: number };
 }
 
-function HeatmapMesh({ points, color, opacity, heightScale, label }: HeatmapMeshProps) {
+function HeatmapMesh({ points, color, opacity, heightScale, label, storeBounds }: HeatmapMeshProps) {
+  // 히트맵 포인트 좌표를 클램핑
+  const clampedPoints = useMemo(() => {
+    return points.map(p => {
+      const clamped = clampToStoreBounds(p.x, p.z, storeBounds);
+      return { ...p, x: clamped.x, z: clamped.z };
+    });
+  }, [points, storeBounds]);
+
   const geometry = useMemo(() => {
     const gridSize = 12;
     const geo = new THREE.PlaneGeometry(gridSize, gridSize, 20, 20);
     const positions = geo.attributes.position.array as Float32Array;
 
-    // 히트맵 데이터로 높이 설정
+    // 히트맵 데이터로 높이 설정 (클램핑된 포인트 사용)
     for (let i = 0; i < positions.length; i += 3) {
       const x = positions[i];
       const z = positions[i + 1];
 
       // 가장 가까운 포인트의 강도 찾기
       let intensity = 0;
-      points.forEach((point) => {
+      clampedPoints.forEach((point) => {
         const dist = Math.sqrt(Math.pow(x - point.x, 2) + Math.pow(z - point.z, 2));
         if (dist < 2) {
           intensity = Math.max(intensity, point.intensity * (1 - dist / 2));
@@ -146,7 +189,7 @@ function HeatmapMesh({ points, color, opacity, heightScale, label }: HeatmapMesh
 
     geo.computeVertexNormals();
     return geo;
-  }, [points, heightScale]);
+  }, [clampedPoints, heightScale]);
 
   return (
     <group>
@@ -190,6 +233,7 @@ interface FurnitureMoveIndicatorProps {
     toPosition: { x: number; y: number; z: number };
     rotation?: number;
   };
+  storeBounds: { width: number; depth: number };
   index: number;
   isSelected: boolean;
   onClick: () => void;
@@ -197,6 +241,7 @@ interface FurnitureMoveIndicatorProps {
 
 function FurnitureMoveIndicator({
   move,
+  storeBounds,
   index,
   isSelected,
   onClick,
@@ -212,8 +257,12 @@ function FurnitureMoveIndicator({
     }
   });
 
-  const from = [move.fromPosition.x, 0.5, move.fromPosition.z] as [number, number, number];
-  const to = [move.toPosition.x, 0.5, move.toPosition.z] as [number, number, number];
+  // 좌표를 매장 경계 내로 클램핑
+  const clampedFrom = clampToStoreBounds(move.fromPosition.x, move.fromPosition.z, storeBounds);
+  const clampedTo = clampToStoreBounds(move.toPosition.x, move.toPosition.z, storeBounds);
+
+  const from = [clampedFrom.x, 0.5, clampedFrom.z] as [number, number, number];
+  const to = [clampedTo.x, 0.5, clampedTo.z] as [number, number, number];
 
   const colors = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6'];
   const color = colors[index % colors.length];
@@ -268,9 +317,9 @@ function FurnitureMoveIndicator({
       {(hovered || isSelected) && (
         <Html
           position={[
-            (move.fromPosition.x + move.toPosition.x) / 2,
+            (from[0] + to[0]) / 2,
             1,
-            (move.fromPosition.z + move.toPosition.z) / 2,
+            (from[2] + to[2]) / 2,
           ]}
           center
         >
@@ -344,21 +393,25 @@ interface MovementInfoPanelProps {
     fromPosition: { x: number; y: number; z: number };
     toPosition: { x: number; y: number; z: number };
   };
+  storeBounds: { width: number; depth: number };
   onClose: () => void;
 }
 
-function MovementInfoPanel({ move, onClose }: MovementInfoPanelProps) {
+function MovementInfoPanel({ move, storeBounds, onClose }: MovementInfoPanelProps) {
   const distance = Math.sqrt(
     Math.pow(move.toPosition.x - move.fromPosition.x, 2) +
     Math.pow(move.toPosition.z - move.fromPosition.z, 2)
   );
 
+  // 패널 위치 클램핑
+  const clampedTo = clampToStoreBounds(move.toPosition.x, move.toPosition.z, storeBounds);
+
   return (
     <Html
       position={[
-        move.toPosition.x,
+        clampedTo.x,
         2,
-        move.toPosition.z,
+        clampedTo.z,
       ]}
       center
     >
