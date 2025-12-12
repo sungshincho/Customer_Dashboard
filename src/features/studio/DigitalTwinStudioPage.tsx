@@ -13,7 +13,7 @@ import { useLocation } from 'react-router-dom';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, Loader2, Sparkles, Layers, Save, Play } from 'lucide-react';
+import { AlertCircle, Loader2, Sparkles, Layers, Save, Play, GitCompare } from 'lucide-react';
 import { toast } from 'sonner';
 
 // 새 스튜디오 컴포넌트
