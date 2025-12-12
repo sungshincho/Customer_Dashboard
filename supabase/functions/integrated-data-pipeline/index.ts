@@ -220,9 +220,10 @@ async function runPipeline(
     // Step 3: ETL 실행
     console.log('\n📍 STEP 3: Executing ETL...');
     await updateProgress(supabase, import_id, 'etl', 65);
-    
-    const etlResponse = await supabase.functions.invoke('schema-etl', {
+
+    const etlResponse = await supabase.functions.invoke('unified-etl', {
       body: {
+        etl_type: 'schema',
         import_id,
         store_id,
         entity_mappings: result.mapping.entity_mappings,

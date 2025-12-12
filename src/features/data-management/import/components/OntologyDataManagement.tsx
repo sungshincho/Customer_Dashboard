@@ -189,9 +189,10 @@ export function OntologyDataManagement({ storeId }: OntologyDataManagementProps)
 
           // 2. ETL 실행
           const { data: etlData, error: etlError } = await supabase.functions.invoke(
-            'schema-etl',
+            'unified-etl',
             {
               body: {
+                etl_type: 'schema',
                 import_id: importItem.id,
                 store_id: storeId,
                 entity_mappings: mappingData.entity_mappings,
