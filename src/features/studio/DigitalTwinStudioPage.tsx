@@ -643,6 +643,12 @@ export default function DigitalTwinStudioPage() {
                       sceneData={currentRecipe}
                       onOverlayToggle={toggleOverlay}
                       simulationZones={simulationZones}
+                      onResultsUpdate={(type, result) => {
+                        // AI 시뮬레이션 결과를 오른쪽 패널에 표시
+                        setSimulationResults((prev) => ({ ...prev, [type]: result }));
+                        const panelKey = `${type}Result` as keyof VisiblePanels;
+                        setVisiblePanels((prev) => ({ ...prev, [panelKey]: true }));
+                      }}
                     />
                   )}
                 </div>
