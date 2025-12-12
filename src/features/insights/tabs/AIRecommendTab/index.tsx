@@ -30,6 +30,7 @@ import type {
   Campaign,
   ActiveStrategy,
 } from './types/aiDecision.types';
+import type { SourceModule } from '@/features/roi/types/roi.types';
 
 export function AIDecisionHub() {
   const navigate = useNavigate();
@@ -214,7 +215,7 @@ export function AIDecisionHub() {
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [applyModalData, setApplyModalData] = useState<{
     source: '2d_simulation' | '3d_simulation';
-    sourceModule: string;
+    sourceModule: SourceModule;
     name: string;
     description: string;
     settings: Record<string, any>;

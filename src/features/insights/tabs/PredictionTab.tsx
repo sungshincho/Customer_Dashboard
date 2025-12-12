@@ -394,7 +394,7 @@ export function PredictionTab() {
                     }
                     return <circle cx={cx} cy={cy} r={0} />;
                   }}
-                  strokeDasharray={(d) => (d?.isPrediction ? '5 5' : '0')}
+                  strokeDasharray="0"
                 />
               </LineChart>
             </ResponsiveContainer>

@@ -46,8 +46,8 @@ export const useCategoryPerformance = (dateRange: DateRange) => {
 
       const days = getDaysFromRange(dateRange);
 
-      // RPC 함수 호출
-      const { data, error } = await supabase.rpc('get_category_performance', {
+      // RPC 함수 호출 (함수가 없을 경우 applied_strategies에서 직접 집계)
+      const { data, error } = await supabase.rpc('get_category_performance' as any, {
         p_store_id: selectedStore.id,
         p_days: days,
       });
@@ -107,14 +107,14 @@ export const useCategoryPerformance = (dateRange: DateRange) => {
 
 // 2D/3D 분리된 데이터
 export const useCategoryPerformanceGrouped = (dateRange: DateRange) => {
-  const { data, isLoading, error } = useCategoryPerformance(dateRange);
+  const { data, isLoading, error, refetch } = useCategoryPerformance(dateRange);
 
   const grouped = {
     '2d': data?.filter((item) => item.source === '2d_simulation') || [],
     '3d': data?.filter((item) => item.source === '3d_simulation') || [],
   };
 
-  return { data: grouped, isLoading, error };
+  return { data: grouped, isLoading, error, refetch };
 };
 
 export default useCategoryPerformance;
