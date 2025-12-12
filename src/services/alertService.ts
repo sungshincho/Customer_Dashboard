@@ -30,24 +30,24 @@ export async function checkInventoryAlerts(
     // products 테이블에서 재고 부족 체크
     const { data: lowStockProducts } = await supabase
       .from('products')
-      .select('id, product_name, stock_quantity')
+      .select('id, product_name, stock')
       .eq('store_id', storeId)
       .eq('org_id', orgId)
-      .gt('stock_quantity', 0)
-      .lt('stock_quantity', 10);
+      .gt('stock', 0)
+      .lt('stock', 10);
 
     if (lowStockProducts) {
       for (const product of lowStockProducts) {
         alerts.push({
           alertType: 'inventory',
-          severity: product.stock_quantity <= 3 ? 'critical' : 'warning',
+          severity: (product.stock ?? 0) <= 3 ? 'critical' : 'warning',
           title: `재고 부족: ${product.product_name}`,
-          message: `현재 재고 ${product.stock_quantity}개 - 보충이 필요합니다`,
+          message: `현재 재고 ${product.stock ?? 0}개 - 보충이 필요합니다`,
           actionUrl: `/inventory?product=${product.id}`,
           actionLabel: '재고 관리',
           metadata: {
             productId: product.id,
-            currentStock: product.stock_quantity,
+            currentStock: product.stock ?? 0,
           },
         });
       }

@@ -83,7 +83,7 @@ export function SceneComposer({
         
         <Suspense fallback={<LoadingFallback />}>
           <SceneEnvironment 
-            environmentPreset={environmentPreset}
+            preset={environmentPreset}
             hdriPath={hdriPath}
           />
           

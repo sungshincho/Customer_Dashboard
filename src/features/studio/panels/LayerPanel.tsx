@@ -65,6 +65,7 @@ export function LayerPanel() {
       furniture: [],
       product: [],
       custom: [],
+      other: [],
     };
 
     if (!models || !Array.isArray(models)) {

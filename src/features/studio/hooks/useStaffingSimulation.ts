@@ -264,14 +264,17 @@ export function useStaffingSimulation(): UseStaffingSimulationReturn {
       }
 
       // 적용 이력 저장
-      await supabase.from('applied_strategies').insert({
+      await supabase.from('applied_strategies').insert([{
         org_id: orgId,
         store_id: selectedStore.id,
-        strategy_type: 'staffing',
-        strategy_data: result,
+        name: 'Staffing Optimization',
+        source: 'ai_simulation',
+        source_module: 'staffing',
         expected_roi: result.costAnalysis?.roi || result.metrics.coverageGain,
-        applied_at: new Date().toISOString(),
-      });
+        start_date: new Date().toISOString(),
+        end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        settings: result as any,
+      }]);
 
       // 직원 배치 업데이트 (staff_positions 테이블이 있는 경우)
       for (const position of result.staffPositions) {

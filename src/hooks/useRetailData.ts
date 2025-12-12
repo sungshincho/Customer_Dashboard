@@ -65,12 +65,12 @@ export interface StoreVisit {
 
 export interface DataSource {
   id: string;
-  store_id: string;
-  name: string;
-  type: string;
-  status: string;
+  store_id?: string | null;
+  source_name: string;
+  source_type: string;
+  is_active: boolean;
   last_sync_at: string | null;
-  record_count: number;
+  record_count: number | null;
 }
 
 // ============================================================================
@@ -124,7 +124,7 @@ export function useZoneDailyMetrics(days: number = 30) {
         .order('date', { ascending: false });
 
       if (error) throw error;
-      return (data || []) as ZoneDailyMetric[];
+      return (data || []) as unknown as ZoneDailyMetric[];
     },
     enabled: !!selectedStore?.id,
   });
@@ -321,7 +321,7 @@ export function useDataSources() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return (data || []) as DataSource[];
+      return (data || []) as unknown as DataSource[];
     },
     enabled: !!selectedStore?.id,
   });

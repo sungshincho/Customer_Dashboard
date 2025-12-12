@@ -399,13 +399,13 @@ export function AIOptimizationTab({
             <div className="flex justify-between">
               <span className="text-white/50">예상 매출 증가</span>
               <span className="text-green-400">
-                +{sceneSimulation.state.comparison.summary.revenueImpact?.toFixed(1) || 0}%
+                +{sceneSimulation.state.comparison.summary.expectedImpact?.revenue?.toFixed(1) || 0}%
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-white/50">예상 체류시간 증가</span>
               <span className="text-blue-400">
-                +{sceneSimulation.state.comparison.summary.dwellTimeImpact?.toFixed(1) || 0}%
+                +{sceneSimulation.state.comparison.summary.expectedImpact?.traffic?.toFixed(1) || 0}%
               </span>
             </div>
           </div>

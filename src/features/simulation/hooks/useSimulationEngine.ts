@@ -40,11 +40,18 @@ export function useSimulationEngine() {
     const newCustomer: CustomerAgent = {
       id: `customer-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       position: [...entranceZone.position] as [number, number, number],
+      targetPosition: [...entranceZone.position] as [number, number, number],
       targetZone: null,
+      currentZone: entranceZone.id,
       visitedZones: [entranceZone.id],
       behavior: 'browsing',
+      state: 'entering',
+      speed: 1 + Math.random() * 0.5,
+      enteredAt: Date.now(),
       dwellTime: 0,
-      purchaseProbability: 0.15 + Math.random() * 0.2, // 15-35%
+      purchaseProbability: 0.15 + Math.random() * 0.2,
+      color: '#60A5FA',
+      path: [[...entranceZone.position] as [number, number, number]],
     };
 
     addCustomer(newCustomer);
