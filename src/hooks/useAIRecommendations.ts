@@ -85,8 +85,8 @@ export function useAIRecommendations(storeId?: string) {
 
   const generateRecommendations = useMutation({
     mutationFn: async (storeId: string) => {
-      const { data, error } = await supabase.functions.invoke('generate-ai-recommendations', {
-        body: { store_id: storeId },
+      const { data, error } = await supabase.functions.invoke('unified-ai', {
+        body: { action: 'generate_recommendations', store_id: storeId },
       });
 
       if (error) throw error;

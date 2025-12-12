@@ -495,9 +495,16 @@ export function useEnhancedAIInference(): UseEnhancedAIInferenceReturn {
     try {
       const schema = ontologySchema || await loadOntologySchema();
 
-      const { data, error: fnError } = await supabase.functions.invoke('ontology-ai-inference', {
+      // Map inference type to unified-ai action
+      const actionMap: Record<string, string> = {
+        'recommendation': 'ontology_recommendation',
+        'anomaly_detection': 'anomaly_detection',
+        'pattern_analysis': 'pattern_analysis',
+      };
+
+      const { data, error: fnError } = await supabase.functions.invoke('unified-ai', {
         body: {
-          inference_type: inferenceType,
+          action: actionMap[inferenceType] || inferenceType,
           store_id: selectedStore.id,
           entity_id: entityId,
           parameters: { ...params, schema_info: schema?.stats },
