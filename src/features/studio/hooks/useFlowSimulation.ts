@@ -185,21 +185,20 @@ export function useFlowSimulation(): UseFlowSimulationReturn {
   const [history, setHistory] = useState<FlowSimulationResult[]>([]);
 
   // 시뮬레이션 히스토리 조회
-  const { refetch: fetchHistory } = useQuery({
-    queryKey: ['flow-simulation-history', selectedStore?.id],
+  const { refetch: fetchHistory } = useQuery<any[], Error, any[], string[]>({
+    queryKey: ['flow-simulation-history', selectedStore?.id || ''],
     queryFn: async () => {
-      if (!selectedStore?.id) return [];
+      if (!selectedStore?.id) return [] as any[];
 
-      const { data, error } = await supabase
-        .from('simulation_history')
+      const { data } = await supabase
+        .from('ai_inference_results')
         .select('*')
         .eq('store_id', selectedStore.id)
-        .eq('scenario', 'flow')
+        .eq('inference_type', 'flow_simulation')
         .order('created_at', { ascending: false })
         .limit(10);
 
-      if (error) throw error;
-      return data || [];
+      return (data || []) as any[];
     },
     enabled: false,
   });
@@ -273,20 +272,23 @@ export function useFlowSimulation(): UseFlowSimulationReturn {
       );
 
       // 적용 이력 저장
-      await supabase.from('applied_strategies').insert({
+      await supabase.from('applied_strategies').insert([{
         org_id: orgId,
         store_id: selectedStore.id,
-        strategy_type: 'flow',
-        strategy_data: {
-          result,
-          appliedOptimizations: selectedOptimizations,
-        },
+        name: 'Flow Optimization',
+        source: 'ai_simulation',
+        source_module: 'flow',
         expected_roi: selectedOptimizations.reduce(
           (sum, opt) => sum + opt.expectedImprovement,
           0
         ) / selectedOptimizations.length,
-        applied_at: new Date().toISOString(),
-      });
+        start_date: new Date().toISOString(),
+        end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        settings: {
+          result,
+          appliedOptimizations: selectedOptimizations,
+        } as any,
+      }]);
 
       // 최적화 작업 생성
       for (const opt of selectedOptimizations) {

@@ -25,25 +25,18 @@ export function useDataSources() {
 
   return useQuery({
     queryKey: ['data-sources', selectedStore?.id],
-    queryFn: async () => {
+    queryFn: async (): Promise<DataSource[]> => {
       if (!user) return [];
 
-      let query = supabase
+      const query = supabase
         .from('data_sources')
-        .select(`
-          *,
-          tables:data_source_tables(*)
-        `)
-        .eq('user_id', user.id);
-
-      if (selectedStore?.id) {
-        query = query.eq('store_id', selectedStore.id);
-      }
+        .select('*')
+        .eq('org_id', user.id);
 
       const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
-      return (data || []) as DataSource[];
+      return (data || []) as unknown as DataSource[];
     },
     enabled: !!user,
   });
@@ -232,7 +225,7 @@ export function useRetailConceptDefinitions() {
         .order('category', { ascending: true });
 
       if (error) throw error;
-      return (data || []) as RetailConcept[];
+      return (data || []) as unknown as RetailConcept[];
     },
   });
 }
@@ -258,7 +251,7 @@ export function useRetailConcepts(days: number = 30) {
         return null;
       }
 
-      return data as ComputedRetailConcepts;
+      return data as unknown as ComputedRetailConcepts;
     },
     enabled: !!selectedStore?.id,
     staleTime: 5 * 60 * 1000, // 5분 캐시
@@ -426,7 +419,7 @@ export function useAIInferenceHistory(inferenceType?: RetailInferenceType) {
       const { data, error } = await query;
 
       if (error) throw error;
-      return (data || []) as AIInferenceResult[];
+      return (data || []) as unknown as AIInferenceResult[];
     },
     enabled: !!selectedStore?.id,
   });

@@ -281,13 +281,12 @@ export default function SettingsPage() {
       if (!orgId || !user) throw new Error('Organization not found');
 
       const { error } = await supabase.from('stores').insert({
-        org_id: orgId,
         store_name: newStore.store_name,
         store_code: newStore.store_code,
         address: newStore.address,
         manager_name: newStore.manager_name,
         manager_email: newStore.manager_email,
-        created_by: user.id,
+        user_id: user.id,
       });
 
       if (error) throw error;
@@ -510,8 +509,8 @@ export default function SettingsPage() {
                           </TableCell>
                           <TableCell className="text-sm">{store.manager_name || '-'}</TableCell>
                           <TableCell>
-                            <Badge variant={store.is_active ? 'default' : 'secondary'}>
-                              {store.is_active ? '운영중' : '비활성'}
+                            <Badge variant={(store as any).status === 'active' ? 'default' : 'secondary'}>
+                              {(store as any).status === 'active' ? '운영중' : '비활성'}
                             </Badge>
                           </TableCell>
                           <TableCell>

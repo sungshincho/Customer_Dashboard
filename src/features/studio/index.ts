@@ -22,11 +22,30 @@ export * from './panels';
 // UI 컴포넌트
 export * from './components';
 
-// 커스텀 훅
-export * from './hooks';
+// 커스텀 훅 (types 제외)
+export {
+  useLayoutSimulation,
+  useSceneSimulation,
+  useScenePersistence,
+  useStudioMode,
+  useOverlayVisibility,
+  useCongestionSimulation,
+  useFlowSimulation,
+  useStaffingSimulation,
+} from './hooks';
 
 // 유틸리티
 export * from './utils';
 
-// 타입
-export * from './types';
+// 타입 (별도 export)
+export type {
+  StudioMode,
+  Vector3,
+  Vector3Tuple,
+  Model3D,
+  ModelType,
+  SceneRecipe,
+  TransformMode,
+  LayerNode,
+  ModelLayer,
+} from './types';

@@ -459,13 +459,14 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
         throw new Error('저장할 씬이 없습니다.');
       }
 
-      const { error } = await supabase.from('store_scenes').insert({
+      const { error } = await supabase.from('store_scenes').insert([{
         user_id: user.id,
+        org_id: user.id,
         store_id: selectedStore.id,
-        name,
+        scene_name: name,
         recipe_data: state.toBeScene as any,
         is_active: false,
-      });
+      }]);
 
       if (error) throw error;
     },

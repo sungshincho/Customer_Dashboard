@@ -74,15 +74,15 @@ export type {
 // ============================================================================
 // 온톨로지 훅
 // ============================================================================
-export { useOntologyData } from './useOntologyData';
+export * from './useOntologyData';
 export { useOntologySchema } from './useOntologySchema';
-export { useRetailOntology } from './useRetailOntology';
+export * from './useRetailOntology';
 
 // ============================================================================
 // 대시보드 KPI 훅
 // ============================================================================
 export { useDashboardKPI } from './useDashboardKPI';
-export { useDashboardKPIAgg } from './useDashboardKPIAgg';
+export * from './useDashboardKPIAgg';
 
 // ============================================================================
 // 고객 분석 훅
@@ -95,7 +95,7 @@ export { usePurchasePatterns } from './usePurchasePatterns';
 // ============================================================================
 // 구역/트래픽 훅
 // ============================================================================
-export { useZoneMetrics } from './useZoneMetrics';
+export * from './useZoneMetrics';
 export { useZoneTransition } from './useZoneTransition';
 export { useTrafficHeatmap } from './useTrafficHeatmap';
 export { useDwellTime } from './useDwellTime';
@@ -105,12 +105,12 @@ export { useFunnelAnalysis } from './useFunnelAnalysis';
 // ============================================================================
 // 상품 훅
 // ============================================================================
-export { useProductPerformance } from './useProductPerformance';
+export * from './useProductPerformance';
 
 // ============================================================================
 // 매장 훅
 // ============================================================================
-export { useStoreData } from './useStoreData';
+export * from './useStoreData';
 export { useStoreScene } from './useStoreScene';
 export { useRealtimeInventory } from './useRealtimeInventory';
 
@@ -122,26 +122,26 @@ export { useImportProgress } from './useImportProgress';
 export { useUploadSession } from './useUploadSession';
 export { useSchemaMetadata } from './useSchemaMetadata';
 export { usePOSIntegration } from './usePOSIntegration';
-export { useRealSampleData } from './useRealSampleData';
+export * from './useRealSampleData';
 export { useWiFiTracking } from './useWiFiTracking';
 
 // ============================================================================
 // 알림 및 목표 훅
 // ============================================================================
 export { useAlerts } from './useAlerts';
-export { useGoals } from './useGoals';
+export * from './useGoals';
 
 // ============================================================================
 // ROI 및 학습 훅
 // ============================================================================
-export { useROITracking } from './useROITracking';
-export { useLearningFeedback } from './useLearningFeedback';
+export * from './useROITracking';
+export * from './useLearningFeedback';
 
 // ============================================================================
 // 온보딩 및 커뮤니케이션 훅
 // ============================================================================
-export { useOnboarding } from './useOnboarding';
-export { useHQCommunication } from './useHQCommunication';
+export * from './useOnboarding';
+export * from './useHQCommunication';
 
 // ============================================================================
 // 유틸리티 훅

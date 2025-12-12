@@ -217,7 +217,7 @@ export function useModelPerformance(
       });
 
       if (error) throw error;
-      return data as ModelPerformance;
+      return data as unknown as ModelPerformance;
     },
     enabled: !!orgId,
   });

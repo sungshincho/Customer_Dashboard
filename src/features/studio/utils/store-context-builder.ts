@@ -121,11 +121,11 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
       .order('date', { ascending: false }),
 
     // 방문 기록 (최근 1000건)
-    supabase.from('store_visits')
+    supabase.from('visits')
       .select('*')
       .eq('store_id', storeId)
-      .gte('visit_start', thirtyDaysAgo.toISOString())
-      .order('visit_start', { ascending: false })
+      .gte('visit_date', thirtyDaysAgoStr)
+      .order('visit_date', { ascending: false })
       .limit(1000),
 
     // 구역별 일별 메트릭
@@ -145,9 +145,9 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
 
   // 데이터 품질 점수 계산
   const salesDataDays = dailyKpis.length;
-  const visitorDataDays = visits.length > 0 ? Math.min(30, new Set(visits.map(v => v.visit_start?.split('T')[0])).size) : 0;
+  const visitorDataDays = visits.length > 0 ? Math.min(30, new Set(visits.map((v: any) => v.visit_date?.split('T')[0])).size) : 0;
   const hasZoneData = zones.length > 0;
-  const hasFlowData = visits.some(v => v.zone_path && v.zone_path.length > 0);
+  const hasFlowData = visits.some((v: any) => v.zones_visited && v.zones_visited.length > 0);
 
   const overallScore = Math.min(100, (
     (salesDataDays / 30) * 30 +
@@ -156,13 +156,17 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
     (hasFlowData ? 20 : 0)
   ));
 
+  // Calculate dimensions from area
+  const storeArea = store?.floor_area_sqm || store?.area_sqm || 289;
+  const storeSide = Math.sqrt(storeArea);
+
   return {
     storeInfo: {
       id: store?.id || storeId,
-      name: store?.name || 'Unknown Store',
-      width: store?.width || 17.4,
-      depth: store?.depth || 16.6,
-      businessType: store?.business_type,
+      name: store?.store_name || 'Unknown Store',
+      width: storeSide,
+      depth: storeSide,
+      businessType: store?.store_type,
     },
     entities: entities.map((e: any) => ({
       id: e.id,
@@ -198,11 +202,11 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
     })),
     visits: visits.map((v: any) => ({
       id: v.id,
-      visitStart: v.visit_start,
-      visitEnd: v.visit_end,
-      dwellTimeSeconds: v.dwell_time_seconds,
-      purchaseAmount: v.purchase_amount,
-      zonePath: v.zone_path,
+      visitStart: v.visit_date,
+      visitEnd: v.exit_date,
+      dwellTimeSeconds: (v.duration_minutes || 0) * 60,
+      purchaseAmount: v.made_purchase ? 50000 : 0,
+      zonePath: v.zones_visited,
     })),
     zoneMetrics: zoneMetrics.map((m: any) => ({
       zoneId: m.zone_id,
