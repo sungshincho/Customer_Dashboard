@@ -26,15 +26,18 @@ interface UnifiedAIRequest {
 }
 
 interface KPI {
+  // daily_kpis_agg 테이블 컬럼
   total_revenue: number;
-  total_visits: number;
-  total_purchases: number;
+  total_visitors: number;
+  unique_visitors: number;
+  total_transactions: number;
   conversion_rate: number;
   sales_per_sqm: number;
-  funnel_entry: number;
-  funnel_browse: number;
-  funnel_fitting: number;
-  funnel_purchase: number;
+  sales_per_visitor: number;
+  avg_transaction_value: number;
+  avg_visit_duration_seconds: number;
+  browse_to_engage_rate: number;
+  engage_to_purchase_rate: number;
 }
 
 interface Recommendation {
@@ -140,11 +143,10 @@ Deno.serve(async (req) => {
  * Rule-based KPI recommendations (from generate-ai-recommendations)
  */
 async function handleGenerateRecommendations(supabase: any, userId: string, storeId: string) {
-  // 1. Get latest KPI
+  // 1. Get latest KPI (daily_kpis_agg 테이블 사용)
   const { data: latestKpi, error: kpiError } = await supabase
-    .from('dashboard_kpis')
+    .from('daily_kpis_agg')
     .select('*')
-    .eq('user_id', userId)
     .eq('store_id', storeId)
     .order('date', { ascending: false })
     .limit(1)
@@ -416,59 +418,78 @@ function generateRuleBasedRecommendations(kpi: KPI, inventory: any[]): Recommend
   }
 
   // 2. Conversion rate improvement
-  if (kpi.conversion_rate < 5) {
-    const funnelDropoff = ((kpi.funnel_browse - kpi.funnel_fitting) / kpi.funnel_browse) * 100;
+  const conversionRate = kpi.conversion_rate || 0;
+  if (conversionRate < 5) {
+    const browseToEngage = kpi.browse_to_engage_rate || 0;
     recommendations.push({
       type: 'action',
       priority: 'medium',
       title: '전환율 개선 기회',
-      description: `현재 전환율 ${kpi.conversion_rate.toFixed(1)}%는 업계 평균(7-10%)보다 낮습니다. 피팅룸 개선과 직원 배치 최적화로 2-3% 향상 가능합니다.`,
+      description: `현재 전환율 ${conversionRate.toFixed(1)}%는 업계 평균(7-10%)보다 낮습니다. 상품 진열 개선과 직원 배치 최적화로 2-3% 향상 가능합니다.`,
       category: 'layout',
       impact: {
         cvr_increase: 2.5,
-        revenue_increase: kpi.total_revenue * 0.4,
+        revenue_increase: (kpi.total_revenue || 0) * 0.4,
       },
       evidence: {
-        current_cvr: kpi.conversion_rate,
+        current_cvr: conversionRate,
         target_cvr: 7.0,
-        funnel_dropoff: funnelDropoff,
+        browse_to_engage_rate: browseToEngage,
       },
     });
   }
 
   // 3. Sales per sqm optimization
-  if (kpi.sales_per_sqm < 100000) {
+  const salesPerSqm = kpi.sales_per_sqm || 0;
+  if (salesPerSqm > 0 && salesPerSqm < 100000) {
     recommendations.push({
       type: 'action',
       priority: 'medium',
       title: '매장 공간 효율성 개선',
-      description: `현재 매출/㎡가 ₩${Math.floor(kpi.sales_per_sqm).toLocaleString()}로 목표치(₩150,000/㎡) 대비 낮습니다. 핫존 재배치로 20% 개선 가능합니다.`,
+      description: `현재 매출/㎡가 ₩${Math.floor(salesPerSqm).toLocaleString()}로 목표치(₩150,000/㎡) 대비 낮습니다. 핫존 재배치로 20% 개선 가능합니다.`,
       category: 'layout',
       impact: {
         sales_per_sqm_increase: 30000,
-        revenue_increase: kpi.total_revenue * 0.2,
+        revenue_increase: (kpi.total_revenue || 0) * 0.2,
       },
       evidence: {
-        current_sales_per_sqm: kpi.sales_per_sqm,
+        current_sales_per_sqm: salesPerSqm,
         target_sales_per_sqm: 150000,
       },
     });
   }
 
-  // 4. Customer journey optimization
-  const browseToFittingRate = (kpi.funnel_fitting / kpi.funnel_browse) * 100;
-  if (browseToFittingRate < 50) {
+  // 4. Customer engagement optimization (using browse_to_engage_rate)
+  const browseToEngageRate = kpi.browse_to_engage_rate || 0;
+  if (browseToEngageRate > 0 && browseToEngageRate < 50) {
     recommendations.push({
       type: 'insight',
       priority: 'low',
-      title: '피팅룸 유도율 개선',
-      description: `탐색 고객 중 ${browseToFittingRate.toFixed(1)}%만 피팅룸을 이용합니다. 피팅룸 표지판과 직원 안내 개선으로 15% 향상 가능합니다.`,
+      title: '고객 참여율 개선',
+      description: `탐색 고객 중 ${browseToEngageRate.toFixed(1)}%만 상품에 관심을 보입니다. 인터랙티브 디스플레이와 직원 안내 개선으로 15% 향상 가능합니다.`,
       category: 'staffing',
-      impact: { fitting_rate_increase: 15 },
+      impact: { engagement_rate_increase: 15 },
       evidence: {
-        current_rate: browseToFittingRate,
-        browse_count: kpi.funnel_browse,
-        fitting_count: kpi.funnel_fitting,
+        current_rate: browseToEngageRate,
+        total_visitors: kpi.total_visitors,
+        unique_visitors: kpi.unique_visitors,
+      },
+    });
+  }
+
+  // 5. Average transaction value improvement
+  const avgTransactionValue = kpi.avg_transaction_value || 0;
+  if (avgTransactionValue > 0 && avgTransactionValue < 50000) {
+    recommendations.push({
+      type: 'insight',
+      priority: 'low',
+      title: '객단가 향상 기회',
+      description: `현재 평균 거래금액 ₩${Math.floor(avgTransactionValue).toLocaleString()}입니다. 교차판매와 번들 프로모션으로 20% 향상 가능합니다.`,
+      category: 'promotion',
+      impact: { atv_increase: avgTransactionValue * 0.2 },
+      evidence: {
+        current_atv: avgTransactionValue,
+        total_transactions: kpi.total_transactions,
       },
     });
   }
