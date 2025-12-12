@@ -77,7 +77,7 @@ export interface UseSceneSimulationReturn {
 
   // 시뮬레이션 실행
   runSimulation: (request: SimulationRequest) => Promise<void>;
-  runAllSimulations: (params?: Record<SimulationType, Record<string, any>>, scene?: SceneRecipe) => Promise<void>;
+  runAllSimulations: (params?: Partial<Record<SimulationType, Record<string, any>>>, scene?: SceneRecipe) => Promise<void>;
 
   // 결과 관리
   getComparison: () => SceneComparison | null;
@@ -253,7 +253,7 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
 
   // 전체 시뮬레이션 실행 (scene 파라미터로 직접 씬을 전달할 수 있음)
   const runAllSimulations = useCallback(
-    async (params?: Record<SimulationType, Record<string, any>>, scene?: SceneRecipe) => {
+    async (params?: Partial<Record<SimulationType, Record<string, any>>>, scene?: SceneRecipe) => {
       // 직접 전달된 씬 또는 state의 asIsScene 사용
       const targetScene = scene || state.asIsScene;
 

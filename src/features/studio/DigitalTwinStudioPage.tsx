@@ -260,6 +260,7 @@ export default function DigitalTwinStudioPage() {
     });
   }, [handleSimulationComplete]);
 
+  // SceneRecipe 생성 (handleRunAllSimulations보다 먼저 정의되어야 함)
   // SceneRecipe 생성 (handleRunAllSimulations에서 사용하므로 먼저 정의)
   const currentRecipe = useMemo<SceneRecipe | null>(() => {
     const activeModels = models.filter((m) => activeLayers.includes(m.id));
