@@ -1692,23 +1692,13 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
   };
 
   // 🆕 Continuous Learning: 과거 성과 및 학습 컨텍스트 조회
+  // Note: supabase client is not available in this scope, skip learning features
   const storeId = storeContext.storeInfo?.id;
-  let pastPerformanceData: PastPerformanceResult | undefined;
-  let learningContext: LearningContext | undefined;
+  const pastPerformanceData: PastPerformanceResult | undefined = undefined;
+  const learningContext: LearningContext | undefined = undefined;
 
-  if (storeId && supabase) {
-    try {
-      // 과거 성과 데이터 조회
-      pastPerformanceData = await calculatePastPerformance(supabase, storeId, 'layout');
-      console.log('[Learning] Past performance:', pastPerformanceData);
-
-      // 학습 컨텍스트 조회 (성공/실패 패턴)
-      learningContext = await buildLearningContext(supabase, storeId, 'layout');
-      console.log('[Learning] Context summary:', learningContext.contextSummary);
-    } catch (learningErr) {
-      console.warn('[Learning] Failed to fetch learning data:', learningErr);
-    }
-  }
+  // Learning features disabled - supabase client needs to be passed through request chain
+  console.log('[Learning] Skipped - supabase client not available in this scope');
 
   // 통계 기반 신뢰도 계산 (Phase 1 + Continuous Learning)
   const confidenceResult = calculateStatisticalConfidence(enhancedContext, pastPerformanceData);
@@ -2639,7 +2629,7 @@ Return a JSON object with patterns, segments, trends, insights, and summary.`;
 }
 
 // Helper functions
-function summarizeData(data: any[], graph_data?: any) {
+function summarizeData(data: any[] | undefined, graph_data?: any) {
   if (!data || data.length === 0) {
     return { record_count: 0, fields: [] };
   }
@@ -2719,7 +2709,7 @@ function calculateTrendHelper(values: number[]) {
   return change > 0 ? 'increasing' : 'decreasing';
 }
 
-function detectStatisticalAnomalies(data: any[], parameters: any) {
+function detectStatisticalAnomalies(data: any[] | undefined, parameters: any) {
   if (!data || data.length === 0) return { anomalies: [] };
   
   const anomalies: any[] = [];
