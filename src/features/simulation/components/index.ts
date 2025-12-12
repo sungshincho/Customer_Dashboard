@@ -27,3 +27,8 @@ export type {
 
 export { SimulationResultCard, SimulationResultGrid } from './SimulationResultCard';
 export type { SimulationResultMeta } from './SimulationResultCard';
+
+// ========== Phase 5: AI Simulation Engine Components ==========
+export { SimulationScene } from './SimulationScene';
+export { SimulationControls } from './SimulationControls';
+export { SimulationMetrics } from './SimulationMetrics';

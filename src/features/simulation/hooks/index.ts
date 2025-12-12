@@ -39,3 +39,11 @@ export type {
   SimulationHistoryItem,
   ComparisonResult,
 } from './useSimulationHistory';
+
+// ========================================
+// Phase 5: 시뮬레이션 엔진 (NEW)
+// ========================================
+export { useSimulationEngine } from './useSimulationEngine';
+export { useLayoutApply } from './useLayoutApply';
+export { useSimulationAI, useSimulationComparison, useRealtimeInsights } from './useSimulationAI';
+export type { SimulationAIResult } from './useSimulationAI';
