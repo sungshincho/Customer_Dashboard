@@ -71,9 +71,16 @@ export function CongestionOverlay({
 
   const { visualization, hourlyData, zoneData, summary } = result;
 
+  // 안전 체크: visualization 및 데이터 배열 확인
+  const hasVisualization = visualization && typeof visualization === 'object';
+  const hasTimeSeriesHeatmaps = hasVisualization && Array.isArray(visualization.timeSeriesHeatmaps);
+  const hasHourlyData = Array.isArray(hourlyData);
+  const hasZoneData = Array.isArray(zoneData);
+  const hasSummary = summary && typeof summary === 'object';
+
   // 현재 시간대 히트맵 데이터
-  const currentHeatmap = visualization.timeSeriesHeatmaps.find(h => h.hour === activeHour);
-  const currentHourData = hourlyData.find(h => h.hour === activeHour);
+  const currentHeatmap = hasTimeSeriesHeatmaps ? visualization.timeSeriesHeatmaps.find(h => h.hour === activeHour) : null;
+  const currentHourData = hasHourlyData ? hourlyData.find(h => h.hour === activeHour) : null;
 
   return (
     <group name="congestion-overlay">
@@ -86,7 +93,7 @@ export function CongestionOverlay({
       )}
 
       {/* 존별 밀도 마커 */}
-      {showZoneMarkers && zoneData.map((zone) => (
+      {showZoneMarkers && hasZoneData && zoneData.map((zone) => (
         <ZoneDensityMarker
           key={zone.zoneId}
           zone={zone}
@@ -97,25 +104,29 @@ export function CongestionOverlay({
       ))}
 
       {/* 군중 애니메이션 */}
-      {showCrowdAnimation && currentHourData && (
+      {showCrowdAnimation && currentHourData && hasSummary && (
         <CrowdAnimation
           density={currentHourData.congestion / 100}
-          maxCustomers={summary.maxCapacity}
+          maxCustomers={summary.maxCapacity || 100}
         />
       )}
 
       {/* 시간 표시 UI */}
-      <TimeIndicator
-        currentHour={activeHour}
-        hourlyData={hourlyData}
-        peakTime={summary.peakTime}
-      />
+      {hasHourlyData && hasSummary && (
+        <TimeIndicator
+          currentHour={activeHour}
+          hourlyData={hourlyData}
+          peakTime={summary.peakTime || '14:00'}
+        />
+      )}
 
       {/* 전체 혼잡도 지표 */}
-      <CongestionIndicator
-        congestion={currentHourData?.congestion || 0}
-        riskLevel={summary.riskLevel}
-      />
+      {hasSummary && (
+        <CongestionIndicator
+          congestion={currentHourData?.congestion || 0}
+          riskLevel={summary.riskLevel || 'low'}
+        />
+      )}
     </group>
   );
 }

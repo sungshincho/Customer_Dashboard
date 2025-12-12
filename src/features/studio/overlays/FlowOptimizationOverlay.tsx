@@ -54,20 +54,27 @@ export function FlowOptimizationOverlay({
 
   const { visualization, paths, bottlenecks } = result;
 
+  // 안전 체크: visualization 속성 확인
+  const hasVisualization = visualization && typeof visualization === 'object';
+  const hasFlowHeatmap = hasVisualization && Array.isArray(visualization.flowHeatmap) && visualization.flowHeatmap.length > 0;
+  const hasZoneFlowArrows = hasVisualization && Array.isArray(visualization.zoneFlowArrows);
+  const hasPaths = Array.isArray(paths);
+  const hasBottlenecks = Array.isArray(bottlenecks);
+
   return (
     <group name="flow-optimization-overlay">
       {/* 동선 히트맵 */}
-      {showHeatmap && visualization.flowHeatmap.length > 0 && (
+      {showHeatmap && hasFlowHeatmap && (
         <FlowHeatmap data={visualization.flowHeatmap} />
       )}
 
       {/* 존 간 이동 화살표 */}
-      {showFlowArrows && visualization.zoneFlowArrows.map((arrow, idx) => (
+      {showFlowArrows && hasZoneFlowArrows && visualization.zoneFlowArrows.map((arrow, idx) => (
         <FlowArrow key={idx} arrow={arrow} />
       ))}
 
       {/* 애니메이션 경로 */}
-      {showPaths && paths.slice(0, 15).map((path) => (
+      {showPaths && hasPaths && paths.slice(0, 15).map((path) => (
         <AnimatedPath
           key={path.id}
           path={path}
@@ -81,7 +88,7 @@ export function FlowOptimizationOverlay({
       ))}
 
       {/* 병목 지점 마커 */}
-      {showBottlenecks && bottlenecks.map((bottleneck) => (
+      {showBottlenecks && hasBottlenecks && bottlenecks.map((bottleneck) => (
         <BottleneckMarker
           key={bottleneck.id}
           bottleneck={bottleneck}
@@ -92,7 +99,7 @@ export function FlowOptimizationOverlay({
       ))}
 
       {/* 경로 정보 패널 */}
-      {selectedPathId && (
+      {selectedPathId && hasPaths && paths.find(p => p.id === selectedPathId) && (
         <PathInfoPanel
           path={paths.find(p => p.id === selectedPathId)!}
           onClose={() => onPathClick?.(selectedPathId)}

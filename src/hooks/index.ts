@@ -148,3 +148,8 @@ export { useHQCommunication } from './useHQCommunication';
 // ============================================================================
 export { useClearCache } from './useClearCache';
 export { useToast, toast } from './use-toast';
+
+// ============================================================================
+// 시뮬레이션 훅
+// ============================================================================
+export { useSimulationEngine } from './useSimulationEngine';
