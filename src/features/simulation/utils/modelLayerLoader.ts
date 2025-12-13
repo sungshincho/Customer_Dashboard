@@ -12,6 +12,8 @@ export async function loadUserModels(
   userId: string,
   storeId?: string
 ): Promise<ModelLayer[]> {
+  console.log('=== [loadUserModels] CALLED ===', { userId, storeId });
+
   const models: ModelLayer[] = [];
   const loadedUrls = new Set<string>(); // 중복 방지
 
@@ -206,6 +208,16 @@ export async function loadUserModels(
   // 타입 순서로 정렬: space > furniture > product > other
   const typeOrder = { space: 0, furniture: 1, product: 2, other: 3 };
   models.sort((a, b) => typeOrder[a.type] - typeOrder[b.type]);
+
+  console.log('=== [loadUserModels] COMPLETE ===', {
+    totalModels: models.length,
+    models: models.map(m => ({
+      id: m.id,
+      name: m.name,
+      type: m.type,
+      position: m.position,
+    }))
+  });
 
   return models;
 }
