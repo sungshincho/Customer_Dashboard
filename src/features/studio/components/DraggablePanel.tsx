@@ -67,14 +67,21 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
   const [isResizing, setIsResizing] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
   const [size, setSize] = useState<Size | null>(null);
+  const [hasUserDragged, setHasUserDragged] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLElement | null>(null);
   const dragOffset = useRef<Position>({ x: 0, y: 0 });
   const resizeStart = useRef<{ x: number; y: number; width: number; height: number }>({ x: 0, y: 0, width: 0, height: 0 });
+  const prevRightOffset = useRef<number | undefined>(rightOffset);
 
-  // 초기 위치 계산 (컴포넌트 마운트 시)
+  // 초기 위치 계산 (컴포넌트 마운트 시 또는 positioning 전략 변경 시)
   useEffect(() => {
-    if (position !== null) return;
+    // rightOffset 변경 감지 (정의됨 -> 미정의 또는 그 반대)
+    const rightOffsetChanged = (prevRightOffset.current !== undefined) !== (rightOffset !== undefined);
+    prevRightOffset.current = rightOffset;
+
+    // 이미 위치가 설정되었고, 사용자가 드래그한 경우 또는 positioning 전략이 변경되지 않은 경우 스킵
+    if (position !== null && !rightOffsetChanged) return;
 
     // 부모 컨테이너 찾기
     const container = panelRef.current?.closest('.relative') as HTMLElement;
@@ -89,6 +96,7 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
     } else {
       setPosition(defaultPosition);
     }
+    setHasUserDragged(false);
   }, [defaultPosition, rightOffset, position]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
