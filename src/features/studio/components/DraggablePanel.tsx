@@ -62,26 +62,27 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
   children,
   className,
 }) => {
-  const [position, setPosition] = useState<Position | null>(null);
+  // rightOffset이 없으면 defaultPosition 사용, 있으면 나중에 계산
+  const [position, setPosition] = useState<Position>(() => {
+    // rightOffset이 있으면 초기값은 임시로 설정 (useEffect에서 계산)
+    if (rightOffset !== undefined) {
+      return { x: 0, y: defaultPosition.y };
+    }
+    return defaultPosition;
+  });
+  const [isInitialized, setIsInitialized] = useState(rightOffset === undefined);
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
   const [size, setSize] = useState<Size | null>(null);
-  const [hasUserDragged, setHasUserDragged] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLElement | null>(null);
   const dragOffset = useRef<Position>({ x: 0, y: 0 });
   const resizeStart = useRef<{ x: number; y: number; width: number; height: number }>({ x: 0, y: 0, width: 0, height: 0 });
-  const prevRightOffset = useRef<number | undefined>(rightOffset);
 
-  // 초기 위치 계산 (컴포넌트 마운트 시 또는 positioning 전략 변경 시)
+  // rightOffset이 있는 경우에만 위치 계산 (마운트 후)
   useEffect(() => {
-    // rightOffset 변경 감지 (정의됨 -> 미정의 또는 그 반대)
-    const rightOffsetChanged = (prevRightOffset.current !== undefined) !== (rightOffset !== undefined);
-    prevRightOffset.current = rightOffset;
-
-    // 이미 위치가 설정되었고, 사용자가 드래그한 경우 또는 positioning 전략이 변경되지 않은 경우 스킵
-    if (position !== null && !rightOffsetChanged) return;
+    if (rightOffset === undefined || isInitialized) return;
 
     // 부모 컨테이너 찾기
     const container = panelRef.current?.closest('.relative') as HTMLElement;
@@ -90,17 +91,12 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
     const containerRect = container?.getBoundingClientRect();
     const containerWidth = containerRect?.width || window.innerWidth;
 
-    if (rightOffset !== undefined) {
-      // rightOffset이 설정된 경우 오른쪽에서부터 계산
-      setPosition({ x: containerWidth - rightOffset, y: defaultPosition.y });
-    } else {
-      setPosition(defaultPosition);
-    }
-    setHasUserDragged(false);
-  }, [defaultPosition, rightOffset, position]);
+    setPosition({ x: containerWidth - rightOffset, y: defaultPosition.y });
+    setIsInitialized(true);
+  }, [rightOffset, defaultPosition.y, isInitialized]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (!panelRef.current || position === null) return;
+    if (!panelRef.current) return;
 
     setIsDragging(true);
     dragOffset.current = {
@@ -173,8 +169,8 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
     document.addEventListener('mouseup', handleMouseUp);
   }, [size, minSize, maxSize]);
 
-  // 위치가 아직 계산되지 않은 경우 렌더링하지 않음
-  if (position === null) {
+  // rightOffset 사용 시 초기화 전에는 숨김
+  if (!isInitialized) {
     return <div ref={panelRef} className="hidden" />;
   }
 
