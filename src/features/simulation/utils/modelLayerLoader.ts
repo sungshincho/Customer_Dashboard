@@ -205,13 +205,50 @@ export async function loadUserModels(
     console.error('Error loading user models:', error);
   }
 
+  // ============================================
+  // 중복 제거: 같은 이름의 모델이 여러 개 있으면 위치값이 있는 것을 우선
+  // ============================================
+  const deduplicatedModels: ModelLayer[] = [];
+  const modelsByName = new Map<string, ModelLayer[]>();
+
+  // 이름별로 그룹화
+  for (const model of models) {
+    const existing = modelsByName.get(model.name) || [];
+    existing.push(model);
+    modelsByName.set(model.name, existing);
+  }
+
+  // 각 그룹에서 최적의 모델 선택
+  for (const [name, group] of modelsByName) {
+    if (group.length === 1) {
+      deduplicatedModels.push(group[0]);
+    } else {
+      // 위치가 (0,0,0)이 아닌 것을 우선 선택
+      const withPosition = group.filter(m =>
+        m.position && (m.position.x !== 0 || m.position.y !== 0 || m.position.z !== 0)
+      );
+
+      if (withPosition.length > 0) {
+        // 위치가 있는 것들만 추가
+        deduplicatedModels.push(...withPosition);
+        console.log(`[ModelLoader] Dedupe: "${name}" - kept ${withPosition.length} with position, removed ${group.length - withPosition.length} at origin`);
+      } else {
+        // 모두 (0,0,0)이면 첫 번째 하나만
+        deduplicatedModels.push(group[0]);
+        console.log(`[ModelLoader] Dedupe: "${name}" - all at origin, kept 1 of ${group.length}`);
+      }
+    }
+  }
+
+  console.log(`[ModelLoader] After deduplication: ${models.length} → ${deduplicatedModels.length} models`);
+
   // 타입 순서로 정렬: space > furniture > product > other
   const typeOrder = { space: 0, furniture: 1, product: 2, other: 3 };
-  models.sort((a, b) => typeOrder[a.type] - typeOrder[b.type]);
+  deduplicatedModels.sort((a, b) => typeOrder[a.type] - typeOrder[b.type]);
 
   console.log('=== [loadUserModels] COMPLETE ===', {
-    totalModels: models.length,
-    models: models.map(m => ({
+    totalModels: deduplicatedModels.length,
+    models: deduplicatedModels.map(m => ({
       id: m.id,
       name: m.name,
       type: m.type,
@@ -219,7 +256,7 @@ export async function loadUserModels(
     }))
   });
 
-  return models;
+  return deduplicatedModels;
 }
 
 /**
