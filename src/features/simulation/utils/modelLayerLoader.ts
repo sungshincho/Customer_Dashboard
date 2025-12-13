@@ -44,7 +44,7 @@ export async function loadUserModels(
         .eq('user_id', userId);
 
       if (!entitiesError && entities) {
-        console.log(`[ModelLoader] Loading ${entities.length} entities from graph_entities`);
+        console.log(`[ModelLoader] Section 1: Loading ${entities.length} entities from graph_entities`);
 
         for (const entity of entities) {
           const entityType = entity.ontology_entity_types as any;
@@ -54,6 +54,13 @@ export async function loadUserModels(
           // 1순위: entity.properties.model_url (인스턴스별 개별 URL)
           // 2순위: entityType.model_3d_url (타입 기본 URL)
           const modelUrl = properties?.model_url || entityType?.model_3d_url || null;
+
+          console.log(`[ModelLoader] Processing entity: ${entity.label}`, {
+            hasPropertiesModelUrl: !!properties?.model_url,
+            hasEntityTypeModelUrl: !!entityType?.model_3d_url,
+            resolvedUrl: modelUrl ? modelUrl.substring(0, 50) + '...' : 'NONE',
+            position: entity.model_3d_position,
+          });
 
           // 3D 모델 URL이 있는 엔티티만 처리
           if (modelUrl) {
@@ -94,11 +101,14 @@ export async function loadUserModels(
     // ============================================
     // 2. DB에서 entity_types 로드 (타입 정의 - 인스턴스 없는 것들)
     // ============================================
+    console.log(`[ModelLoader] Section 2: Loading entity_types for user ${userId}`);
     const { data: entityTypes, error: typesError } = await supabase
       .from('ontology_entity_types')
       .select('id, name, label, model_3d_url, model_3d_type, model_3d_dimensions, model_3d_metadata')
       .eq('user_id', userId)
       .not('model_3d_url', 'is', null);
+
+    console.log(`[ModelLoader] Found ${entityTypes?.length || 0} entity_types with model_3d_url`);
 
     if (!typesError && entityTypes) {
       for (const entityType of entityTypes) {
@@ -107,9 +117,11 @@ export async function loadUserModels(
           const dimensions = parseJsonField(entityType.model_3d_dimensions, undefined);
           const metadata = parseJsonField<{ defaultPosition?: { x: number; y: number; z: number } }>(entityType.model_3d_metadata, {});
           const type = inferTypeFromModel3dType(entityType.model_3d_type);
-          
+
           // defaultPosition이 있으면 사용
           const defaultPosition = metadata?.defaultPosition || { x: 0, y: 0, z: 0 };
+
+          console.log(`[ModelLoader] EntityType: ${entityType.label || entityType.name}, Position:`, defaultPosition, `(isTypeOnly: true)`);
 
           models.push({
             id: `type-${entityType.id}`,
@@ -129,6 +141,8 @@ export async function loadUserModels(
           });
 
           loadedUrls.add(entityType.model_3d_url);
+        } else if (loadedUrls.has(entityType.model_3d_url)) {
+          console.log(`[ModelLoader] EntityType: ${entityType.label || entityType.name} - SKIPPED (already loaded as instance)`);
         }
       }
     }
