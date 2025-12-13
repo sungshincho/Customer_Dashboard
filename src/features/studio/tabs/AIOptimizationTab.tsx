@@ -154,13 +154,13 @@ export function AIOptimizationTab({
           const layoutPanelResult = {
             currentEfficiency: results.layout.currentEfficiency || 1,
             optimizedEfficiency: results.layout.optimizedEfficiency || 75,
-            revenueIncrease: results.layout.revenueIncrease || 0,
-            dwellTimeIncrease: results.layout.dwellTimeIncrease || 0,
-            conversionIncrease: results.layout.conversionIncrease || 0,
+            revenueIncrease: results.layout.improvements?.revenueIncrease || 0,
+            dwellTimeIncrease: results.layout.improvements?.dwellTimeIncrease || 0,
+            conversionIncrease: results.layout.improvements?.conversionIncrease || 0,
             changes: results.layout.furnitureMoves?.map((move: any) => ({
               item: move.furnitureId || move.name || '가구',
-              from: move.from ? `(${move.from.x?.toFixed(1)}, ${move.from.z?.toFixed(1)})` : 'As-Is',
-              to: move.to ? `(${move.to.x?.toFixed(1)}, ${move.to.z?.toFixed(1)})` : 'To-Be',
+              from: move.fromPosition ? `(${move.fromPosition.x?.toFixed(1)}, ${move.fromPosition.z?.toFixed(1)})` : 'As-Is',
+              to: move.toPosition ? `(${move.toPosition.x?.toFixed(1)}, ${move.toPosition.z?.toFixed(1)})` : 'To-Be',
               effect: move.reason || '+효율성',
             })) || [],
           };
@@ -174,18 +174,18 @@ export function AIOptimizationTab({
 
         if (onResultsUpdate) {
           const flowPanelResult = {
-            currentPathLength: results.flow.averagePathLength || 45,
-            optimizedPathLength: results.flow.optimizedPathLength || 38,
+            currentPathLength: results.flow.comparison?.currentPathLength || 45,
+            optimizedPathLength: results.flow.comparison?.optimizedPathLength || 38,
             bottlenecks: results.flow.bottlenecks?.map((b: any) => ({
               location: b.location || b.zoneName || '구간',
               congestion: Math.round((b.severity || b.congestionLevel || 0.7) * 100),
               cause: b.cause || '통로 혼잡',
-              suggestion: b.suggestion || '통로 확장 권장',
+              suggestion: b.suggestions?.[0] || '통로 확장 권장',
             })) || [],
             improvements: [
-              { metric: '동선 길이 감소', value: `${results.flow.pathLengthReduction?.toFixed(1) || -15}%` },
-              { metric: '이동 시간 감소', value: `${results.flow.travelTimeReduction?.toFixed(1) || -18}%` },
-              { metric: '병목 해소율', value: `${Math.round((results.flow.bottleneckReduction || 0.8) * 100)}%` },
+              { metric: '동선 길이 감소', value: `${results.flow.comparison?.pathLengthReduction?.toFixed(1) || -15}%` },
+              { metric: '이동 시간 감소', value: `${results.flow.comparison?.timeReduction?.toFixed(1) || -18}%` },
+              { metric: '병목 해소율', value: `${Math.round((results.flow.comparison?.congestionReduction || 0.8) * 100)}%` },
             ],
           };
           onResultsUpdate('flow', flowPanelResult);
@@ -197,20 +197,22 @@ export function AIOptimizationTab({
         onOverlayToggle('staffingOptimization', true);
 
         if (onResultsUpdate) {
+          const currentCoverage = results.staffing.zoneCoverage?.[0]?.currentCoverage || 68;
+          const optimizedCoverage = results.staffing.zoneCoverage?.[0]?.suggestedCoverage || 92;
           const staffingPanelResult = {
-            currentCoverage: results.staffing.currentCoverage || 68,
-            optimizedCoverage: results.staffing.optimizedCoverage || 92,
-            staffCount: results.staffing.staffCount || 3,
-            staffPositions: results.staffing.positions?.map((p: any) => ({
-              name: p.staffId || `직원 ${p.id}`,
+            currentCoverage,
+            optimizedCoverage,
+            staffCount: results.staffing.staffPositions?.length || 3,
+            staffPositions: results.staffing.staffPositions?.map((p: any) => ({
+              name: p.staffName || p.staffId || `직원`,
               current: p.currentPosition ? `(${p.currentPosition.x?.toFixed(1)}, ${p.currentPosition.z?.toFixed(1)})` : '현재 위치',
               suggested: p.suggestedPosition ? `(${p.suggestedPosition.x?.toFixed(1)}, ${p.suggestedPosition.z?.toFixed(1)})` : '제안 위치',
               coverageGain: `+${p.coverageGain || 10}%`,
             })) || [],
             improvements: [
-              { metric: '고객 응대율', value: `+${Math.round((results.staffing.responseRateIncrease || 0.35) * 100)}%` },
-              { metric: '대기 시간', value: `-${Math.round((results.staffing.waitTimeReduction || 0.25) * 100)}%` },
-              { metric: '커버리지 증가', value: `+${results.staffing.optimizedCoverage - results.staffing.currentCoverage || 24}%` },
+              { metric: '고객 응대율', value: `+${Math.round((results.staffing.metrics?.customerServiceRateIncrease || 0.35) * 100)}%` },
+              { metric: '대기 시간', value: `-${Math.round((1 / (results.staffing.metrics?.avgResponseTime || 1)) * 10)}%` },
+              { metric: '커버리지 증가', value: `+${results.staffing.metrics?.coverageGain || 24}%` },
             ],
           };
           onResultsUpdate('staffing', staffingPanelResult);

@@ -180,21 +180,21 @@ export function useStaffingSimulation(): UseStaffingSimulationReturn {
   const [history, setHistory] = useState<StaffingSimulationResult[]>([]);
 
   // 시뮬레이션 히스토리 조회
-  const { refetch: fetchHistory } = useQuery({
+  const { refetch: fetchHistory } = useQuery<StaffingSimulationResult[], Error>({
     queryKey: ['staffing-simulation-history', selectedStore?.id],
-    queryFn: async () => {
+    queryFn: async (): Promise<StaffingSimulationResult[]> => {
       if (!selectedStore?.id) return [];
 
       const { data, error } = await supabase
-        .from('simulation_history')
+        .from('ai_inference_results')
         .select('*')
         .eq('store_id', selectedStore.id)
-        .eq('scenario', 'staffing')
+        .eq('inference_type', 'staffing')
         .order('created_at', { ascending: false })
         .limit(10);
 
       if (error) throw error;
-      return data || [];
+      return (data || []).map((d: any) => d.result as StaffingSimulationResult);
     },
     enabled: false,
   });
