@@ -172,21 +172,21 @@ export function useCongestionSimulation(): UseCongestionSimulationReturn {
   const [history, setHistory] = useState<CongestionSimulationResult[]>([]);
 
   // 시뮬레이션 히스토리 조회
-  const { refetch: fetchHistory } = useQuery({
+  const { refetch: fetchHistory } = useQuery<CongestionSimulationResult[], Error>({
     queryKey: ['congestion-simulation-history', selectedStore?.id],
-    queryFn: async () => {
+    queryFn: async (): Promise<CongestionSimulationResult[]> => {
       if (!selectedStore?.id) return [];
 
       const { data, error } = await supabase
-        .from('simulation_history')
+        .from('ai_inference_results')
         .select('*')
         .eq('store_id', selectedStore.id)
-        .eq('scenario', 'congestion')
+        .eq('inference_type', 'congestion')
         .order('created_at', { ascending: false })
         .limit(10);
 
       if (error) throw error;
-      return data || [];
+      return (data || []).map((d: any) => d.result as CongestionSimulationResult);
     },
     enabled: false,
   });
