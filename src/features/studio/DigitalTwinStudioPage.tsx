@@ -680,13 +680,12 @@ export default function DigitalTwinStudioPage() {
 
             {/* ========== 드래그 가능한 플로팅 패널들 ========== */}
 
-            {/* 오른쪽 상단: 도구 패널 (드래그 가능, 접기/펼치기 가능) */}
+            {/* 왼쪽 상단: 도구 패널 (드래그 가능, 접기/펼치기 가능) */}
             {visiblePanels.tools && (
               <DraggablePanel
                 id="tool-panel"
                 title="도구"
-                rightOffset={100}
-                defaultPosition={{ x: 0, y: 16 }}
+                defaultPosition={{ x: 352, y: 16 }}
                 collapsible={true}
                 defaultCollapsed={true}
                 width="w-auto"
@@ -707,8 +706,7 @@ export default function DigitalTwinStudioPage() {
                 id="overlay"
                 title="오버레이"
                 icon={<Layers className="w-4 h-4" />}
-                rightOffset={100}
-                defaultPosition={{ x: 0, y: 60 }}
+                defaultPosition={{ x: 352, y: 60 }}
                 defaultCollapsed={true}
                 width="w-48"
               >
@@ -742,8 +740,7 @@ export default function DigitalTwinStudioPage() {
                 id="scene-save"
                 title="씬 저장"
                 icon={<Save className="w-4 h-4" />}
-                rightOffset={100}
-                defaultPosition={{ x: 0, y: 104 }}
+                defaultPosition={{ x: 352, y: 104 }}
                 defaultCollapsed={true}
                 width="w-48"
               >
@@ -766,8 +763,7 @@ export default function DigitalTwinStudioPage() {
               <DraggablePanel
                 id="property-panel"
                 title="속성"
-                rightOffset={100}
-                defaultPosition={{ x: 0, y: 148 }}
+                defaultPosition={{ x: 352, y: 148 }}
                 defaultCollapsed={false}
                 width="w-72"
               >
@@ -916,8 +912,7 @@ function SimulationResultPanels({
             // (모달이 이미 ROI 페이지로 이동하거나 토스트 표시함)
           }}
           onShowIn3D={handleShowLayoutIn3D}
-          rightOffset={320}
-          defaultPosition={{ x: 0, y: 16 }}
+          defaultPosition={{ x: 352, y: 220 }}
         />
       )}
 
@@ -932,8 +927,7 @@ function SimulationResultPanels({
             toggleOverlay('flow');
             toast.info('동선 오버레이 표시');
           }}
-          rightOffset={320}
-          defaultPosition={{ x: 0, y: 60 }}
+          defaultPosition={{ x: 352, y: 320 }}
         />
       )}
 
@@ -944,8 +938,7 @@ function SimulationResultPanels({
           onPlayAnimation={() => {
             toast.info('시간대별 애니메이션 재생');
           }}
-          rightOffset={320}
-          defaultPosition={{ x: 0, y: 104 }}
+          defaultPosition={{ x: 352, y: 420 }}
         />
       )}
 
@@ -960,8 +953,7 @@ function SimulationResultPanels({
             toggleOverlay('avatar');
             toast.info('직원 위치 표시');
           }}
-          rightOffset={320}
-          defaultPosition={{ x: 0, y: 148 }}
+          defaultPosition={{ x: 352, y: 520 }}
         />
       )}
     </>
