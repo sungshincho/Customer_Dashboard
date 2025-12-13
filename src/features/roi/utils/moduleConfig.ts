@@ -102,8 +102,17 @@ export const SOURCE_CONFIG: Record<SimulationSource, { displayName: string; desc
   },
 };
 
+const DEFAULT_MODULE_CONFIG: ModuleConfig = {
+  displayName: '기타',
+  shortName: '기타',
+  icon: '📊',
+  color: 'text-gray-400',
+  bgColor: 'bg-gray-500/20',
+  borderColor: 'border-gray-500/30',
+};
+
 export const getModuleConfig = (module: SourceModule): ModuleConfig => {
-  return MODULE_CONFIG[module];
+  return MODULE_CONFIG[module] || DEFAULT_MODULE_CONFIG;
 };
 
 export const getModuleIcon = (module: SourceModule): string => {
