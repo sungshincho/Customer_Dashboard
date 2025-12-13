@@ -148,12 +148,23 @@ export default function DigitalTwinStudioPage() {
     if (!user) return;
     setLoading(true);
     try {
+      console.log('[DigitalTwinStudio] Loading models for user:', user.id, 'store:', selectedStore?.id);
       const loadedModels = await loadUserModels(user.id, selectedStore?.id);
+      console.log('[DigitalTwinStudio] Loaded models:', loadedModels.length);
+      loadedModels.forEach((m, i) => {
+        console.log(`[DigitalTwinStudio] Model ${i}: ${m.name}`, {
+          id: m.id,
+          type: m.type,
+          position: m.position,
+          model_url: m.model_url?.substring(0, 50) + '...',
+        });
+      });
       setModels(loadedModels);
       if (loadedModels.length > 0) {
         setActiveLayers(loadedModels.map((m) => m.id));
       }
     } catch (error) {
+      console.error('[DigitalTwinStudio] Error loading models:', error);
       toast.error('모델 로드 실패');
     } finally {
       setLoading(false);
@@ -347,20 +358,26 @@ export default function DigitalTwinStudioPage() {
 
   // SceneProvider용 모델 변환
   const sceneModels: Model3D[] = useMemo(() => {
-    return models
+    const result = models
       .filter((m) => activeLayers.includes(m.id))
-      .map((m) => ({
-        id: m.id,
-        name: m.name,
-        url: m.model_url,
-        position: [m.position?.x || 0, m.position?.y || 0, m.position?.z || 0] as [number, number, number],
-        rotation: [m.rotation?.x || 0, m.rotation?.y || 0, m.rotation?.z || 0] as [number, number, number],
-        scale: [m.scale?.x || 1, m.scale?.y || 1, m.scale?.z || 1] as [number, number, number],
-        visible: true,
-        type: m.type,
-        metadata: m.metadata,
-        dimensions: m.dimensions,
-      }));
+      .map((m) => {
+        const converted = {
+          id: m.id,
+          name: m.name,
+          url: m.model_url,
+          position: [m.position?.x || 0, m.position?.y || 0, m.position?.z || 0] as [number, number, number],
+          rotation: [m.rotation?.x || 0, m.rotation?.y || 0, m.rotation?.z || 0] as [number, number, number],
+          scale: [m.scale?.x || 1, m.scale?.y || 1, m.scale?.z || 1] as [number, number, number],
+          visible: true,
+          type: m.type,
+          metadata: m.metadata,
+          dimensions: m.dimensions,
+        };
+        console.log(`[SceneModels] ${m.name}: original pos=`, m.position, '→ converted=', converted.position);
+        return converted;
+      });
+    console.log('[SceneModels] Total active models:', result.length);
+    return result;
   }, [models, activeLayers]);
 
 
