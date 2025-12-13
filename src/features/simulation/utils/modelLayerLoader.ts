@@ -39,15 +39,15 @@ export async function loadUserModels(
               name: f.name,
               type: 'furniture',
               model_url: f.model_url,
-              dimensions: parseJsonField(f.dimensions, undefined),
+              dimensions: parseJsonField((f as any).dimensions, undefined),
               position: { x: Number(f.position_x) || 0, y: Number(f.position_y) || 0, z: Number(f.position_z) || 0 },
               rotation: { x: Number(f.rotation_x) || 0, y: Number(f.rotation_y) || 0, z: Number(f.rotation_z) || 0 },
               scale: { x: Number(f.scale_x) || 1, y: Number(f.scale_y) || 1, z: Number(f.scale_z) || 1 },
               metadata: {
                 furnitureId: f.id,
                 furnitureType: f.furniture_type,
-                zoneId: f.zone_id,
-                movable: f.movable,
+                zoneId: (f as any).zone_id,
+                movable: (f as any).movable,
                 properties: f.properties
               }
             });
