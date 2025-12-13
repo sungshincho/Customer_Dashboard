@@ -71,10 +71,14 @@ export async function loadUserModels(
             const scale = parseJsonField(entity.model_3d_scale, { x: 1, y: 1, z: 1 });
             const dimensions = parseJsonField(entityType?.model_3d_dimensions, undefined);
 
-            // model_3d_type으로 레이어 타입 결정
-            const type = inferTypeFromModel3dType(entityType?.model_3d_type);
+            // model_3d_type으로 레이어 타입 결정, 없으면 이름에서 추론
+            const entityName = entity.label || entityType?.label || entityType?.name;
+            let type = inferTypeFromModel3dType(entityType?.model_3d_type);
+            if (type === 'other') {
+              type = inferTypeFromName(entityName) || 'other';
+            }
 
-            console.log(`[ModelLoader] Entity: ${entity.label}, Position:`, position, `URL: ${modelUrl}`);
+            console.log(`[ModelLoader] Entity: ${entity.label}, Type: ${type}, Position:`, position, `URL: ${modelUrl}`);
 
             models.push({
               id: `entity-${entity.id}`,
@@ -118,7 +122,13 @@ export async function loadUserModels(
         if (entityType.model_3d_url && !loadedUrls.has(entityType.model_3d_url)) {
           const dimensions = parseJsonField(entityType.model_3d_dimensions, undefined);
           const metadata = parseJsonField<{ defaultPosition?: { x: number; y: number; z: number } }>(entityType.model_3d_metadata, {});
-          const type = inferTypeFromModel3dType(entityType.model_3d_type);
+
+          // model_3d_type으로 레이어 타입 결정, 없으면 이름에서 추론
+          const entityTypeName = entityType.label || entityType.name;
+          let type = inferTypeFromModel3dType(entityType.model_3d_type);
+          if (type === 'other') {
+            type = inferTypeFromName(entityTypeName) || 'other';
+          }
 
           // defaultPosition이 있으면 사용
           const defaultPosition = metadata?.defaultPosition || { x: 0, y: 0, z: 0 };
@@ -264,9 +274,9 @@ export async function loadUserModels(
  */
 function inferTypeFromModel3dType(model3dType?: string): ModelLayer['type'] {
   if (!model3dType) return 'other';
-  
+
   const lower = model3dType.toLowerCase();
-  
+
   if (lower === 'building' || lower === 'space' || lower === 'store') {
     return 'space';
   }
@@ -276,8 +286,37 @@ function inferTypeFromModel3dType(model3dType?: string): ModelLayer['type'] {
   if (lower === 'product') {
     return 'product';
   }
-  
+
   return 'other';
+}
+
+/**
+ * 엔티티 이름에서 타입 추론 (한국어 지원)
+ */
+function inferTypeFromName(name?: string): ModelLayer['type'] | null {
+  if (!name) return null;
+
+  const lower = name.toLowerCase();
+
+  // 가구/설비 키워드
+  const furnitureKeywords = [
+    '선반', '행거', '계산대', '카운터', '탈의실', '출입구', '테이블', '진열대',
+    'shelf', 'rack', 'hanger', 'counter', 'fitting', 'entrance', 'exit', 'table', 'display',
+    '마네킹', 'mannequin', '거울', 'mirror', '의자', 'chair', '소파', 'sofa'
+  ];
+
+  // 공간 키워드
+  const spaceKeywords = ['space', 'store', 'room', '매장', '공간'];
+
+  for (const kw of spaceKeywords) {
+    if (lower.includes(kw)) return 'space';
+  }
+
+  for (const kw of furnitureKeywords) {
+    if (lower.includes(kw)) return 'furniture';
+  }
+
+  return null;
 }
 
 /**
