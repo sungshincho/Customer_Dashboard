@@ -2112,6 +2112,51 @@ export type Database = {
           },
         ]
       }
+      graph_entities_backup_20251213: {
+        Row: {
+          created_at: string | null
+          entity_type_id: string | null
+          id: string | null
+          label: string | null
+          model_3d_position: Json | null
+          model_3d_rotation: Json | null
+          model_3d_scale: Json | null
+          org_id: string | null
+          properties: Json | null
+          store_id: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          entity_type_id?: string | null
+          id?: string | null
+          label?: string | null
+          model_3d_position?: Json | null
+          model_3d_rotation?: Json | null
+          model_3d_scale?: Json | null
+          org_id?: string | null
+          properties?: Json | null
+          store_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          entity_type_id?: string | null
+          id?: string | null
+          label?: string | null
+          model_3d_position?: Json | null
+          model_3d_rotation?: Json | null
+          model_3d_scale?: Json | null
+          org_id?: string | null
+          properties?: Json | null
+          store_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       graph_relations: {
         Row: {
           created_at: string | null
@@ -4222,6 +4267,93 @@ export type Database = {
           },
           {
             foreignKeyName: "product_performance_agg_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_placements: {
+        Row: {
+          created_at: string | null
+          display_quantity: number | null
+          id: string
+          is_active: boolean | null
+          model_url: string | null
+          org_id: string | null
+          position_x: number | null
+          position_y: number | null
+          position_z: number | null
+          product_id: string
+          properties: Json | null
+          rotation_x: number | null
+          rotation_y: number | null
+          rotation_z: number | null
+          scale_x: number | null
+          scale_y: number | null
+          scale_z: number | null
+          store_id: string
+          updated_at: string | null
+          user_id: string
+          zone_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          display_quantity?: number | null
+          id?: string
+          is_active?: boolean | null
+          model_url?: string | null
+          org_id?: string | null
+          position_x?: number | null
+          position_y?: number | null
+          position_z?: number | null
+          product_id: string
+          properties?: Json | null
+          rotation_x?: number | null
+          rotation_y?: number | null
+          rotation_z?: number | null
+          scale_x?: number | null
+          scale_y?: number | null
+          scale_z?: number | null
+          store_id: string
+          updated_at?: string | null
+          user_id: string
+          zone_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          display_quantity?: number | null
+          id?: string
+          is_active?: boolean | null
+          model_url?: string | null
+          org_id?: string | null
+          position_x?: number | null
+          position_y?: number | null
+          position_z?: number | null
+          product_id?: string
+          properties?: Json | null
+          rotation_x?: number | null
+          rotation_y?: number | null
+          rotation_z?: number | null
+          scale_x?: number | null
+          scale_y?: number | null
+          scale_z?: number | null
+          store_id?: string
+          updated_at?: string | null
+          user_id?: string
+          zone_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_placements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_placements_store_id_fkey"
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
