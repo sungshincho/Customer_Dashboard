@@ -3,111 +3,119 @@ import type { ModelLayer } from "../components/digital-twin/ModelLayerManager";
 import { parseModelFilename } from "./modelFilenameParser";
 
 /**
- * 사용자의 3D 모델 로드
- * 1. DB: graph_entities (3D 모델 인스턴스 - 위치/회전/스케일)
- * 2. DB: ontology_entity_types (3D 모델 타입 정의 - 인스턴스 없는 것들)
- * 3. Storage: 직접 업로드된 모델 (레거시 지원)
+ * 사용자의 3D 모델 로드 (v2 - 새 아키텍처)
+ * 1. DB: furniture (가구 테이블)
+ * 2. DB: product_placements + products (상품 배치)
+ * 3. DB: ontology_entity_types (기본 모델 타입)
+ * 4. Storage: 직접 업로드된 모델 (레거시 지원)
  */
 export async function loadUserModels(
   userId: string,
   storeId?: string
 ): Promise<ModelLayer[]> {
-  console.log('=== [loadUserModels] CALLED ===', { userId, storeId });
+  console.log('=== [loadUserModels] v2 CALLED ===', { userId, storeId });
 
   const models: ModelLayer[] = [];
   const loadedUrls = new Set<string>(); // 중복 방지
 
   try {
-    // ============================================
-    // 1. DB에서 graph_entities 로드 (인스턴스)
-    // ============================================
     if (storeId) {
-      const { data: entities, error: entitiesError } = await supabase
-        .from('graph_entities')
+      // ============================================
+      // 1. furniture 테이블에서 가구 로드
+      // ============================================
+      const { data: furnitureData, error: furnitureError } = await supabase
+        .from('furniture')
+        .select('*')
+        .eq('store_id', storeId)
+        .eq('is_active', true);
+
+      if (!furnitureError && furnitureData) {
+        console.log(`[ModelLoader] Section 1: Loading ${furnitureData.length} furniture items`);
+
+        for (const f of furnitureData) {
+          if (f.model_url) {
+            models.push({
+              id: `furniture-${f.id}`,
+              name: f.name,
+              type: 'furniture',
+              model_url: f.model_url,
+              dimensions: parseJsonField(f.dimensions, undefined),
+              position: { x: Number(f.position_x) || 0, y: Number(f.position_y) || 0, z: Number(f.position_z) || 0 },
+              rotation: { x: Number(f.rotation_x) || 0, y: Number(f.rotation_y) || 0, z: Number(f.rotation_z) || 0 },
+              scale: { x: Number(f.scale_x) || 1, y: Number(f.scale_y) || 1, z: Number(f.scale_z) || 1 },
+              metadata: {
+                furnitureId: f.id,
+                furnitureType: f.furniture_type,
+                zoneId: f.zone_id,
+                movable: f.movable,
+                properties: f.properties
+              }
+            });
+            loadedUrls.add(f.model_url);
+            console.log(`[ModelLoader] Furniture: ${f.name}, Type: ${f.furniture_type}, Position:`, { x: f.position_x, y: f.position_y, z: f.position_z });
+          }
+        }
+      } else if (furnitureError) {
+        console.error('[ModelLoader] Error loading furniture:', furnitureError);
+      }
+
+      // ============================================
+      // 2. product_placements 테이블에서 상품 배치 로드
+      // ============================================
+      const { data: placementsData, error: placementsError } = await supabase
+        .from('product_placements')
         .select(`
-          id,
-          label,
-          properties,
-          model_3d_position,
-          model_3d_rotation,
-          model_3d_scale,
-          entity_type_id,
-          ontology_entity_types (
+          *,
+          products (
             id,
-            name,
-            label,
-            model_3d_url,
-            model_3d_type,
-            model_3d_dimensions,
-            model_3d_metadata
+            product_name,
+            category,
+            sku
           )
         `)
         .eq('store_id', storeId)
-        .eq('user_id', userId);
+        .eq('is_active', true);
 
-      if (!entitiesError && entities) {
-        console.log(`[ModelLoader] Section 1: Loading ${entities.length} entities from graph_entities`);
+      if (!placementsError && placementsData) {
+        console.log(`[ModelLoader] Section 2: Loading ${placementsData.length} product placements`);
 
-        for (const entity of entities) {
-          const entityType = entity.ontology_entity_types as any;
-          const properties = parseJsonField<Record<string, any>>(entity.properties, {});
+        for (const p of placementsData) {
+          const product = p.products as any;
+          const modelUrl = p.model_url || getDefaultProductModelUrl(product?.category);
 
-          // model_url 우선순위:
-          // 1순위: entity.properties.model_url (인스턴스별 개별 URL)
-          // 2순위: entityType.model_3d_url (타입 기본 URL)
-          const modelUrl = properties?.model_url || entityType?.model_3d_url || null;
-
-          console.log(`[ModelLoader] Processing entity: ${entity.label}`, {
-            hasPropertiesModelUrl: !!properties?.model_url,
-            hasEntityTypeModelUrl: !!entityType?.model_3d_url,
-            resolvedUrl: modelUrl ? modelUrl.substring(0, 50) + '...' : 'NONE',
-            position: entity.model_3d_position,
-          });
-
-          // 3D 모델 URL이 있는 엔티티만 처리
           if (modelUrl) {
-            const position = parseJsonField(entity.model_3d_position, { x: 0, y: 0, z: 0 });
-            const rotation = parseJsonField(entity.model_3d_rotation, { x: 0, y: 0, z: 0 });
-            const scale = parseJsonField(entity.model_3d_scale, { x: 1, y: 1, z: 1 });
-            const dimensions = parseJsonField(entityType?.model_3d_dimensions, undefined);
-
-            // model_3d_type으로 레이어 타입 결정, 없으면 이름에서 추론
-            const entityName = entity.label || entityType?.label || entityType?.name;
-            let type = inferTypeFromModel3dType(entityType?.model_3d_type);
-            if (type === 'other') {
-              type = inferTypeFromName(entityName) || 'other';
-            }
-
-            console.log(`[ModelLoader] Entity: ${entity.label}, Type: ${type}, Position:`, position, `URL: ${modelUrl}`);
-
             models.push({
-              id: `entity-${entity.id}`,
-              name: entity.label || entityType?.label || entityType?.name || 'Unknown',
-              type,
+              id: `product-${p.id}`,
+              name: product?.product_name || 'Unknown Product',
+              type: 'product',
               model_url: modelUrl,
-              dimensions,
-              position,
-              rotation,
-              scale,
+              position: { x: Number(p.position_x) || 0, y: Number(p.position_y) || 0, z: Number(p.position_z) || 0 },
+              rotation: { x: Number(p.rotation_x) || 0, y: Number(p.rotation_y) || 0, z: Number(p.rotation_z) || 0 },
+              scale: { x: Number(p.scale_x) || 1, y: Number(p.scale_y) || 1, z: Number(p.scale_z) || 1 },
               metadata: {
-                entityId: entity.id,
-                entityTypeId: entityType?.id,
-                entityTypeName: entityType?.label || entityType?.name,
-                properties: entity.properties,
-                model3dMetadata: entityType?.model_3d_metadata
+                placementId: p.id,
+                productId: p.product_id,
+                productName: product?.product_name,
+                category: product?.category,
+                sku: product?.sku,
+                zoneId: p.zone_id,
+                displayQuantity: p.display_quantity,
+                properties: p.properties
               }
             });
-
             loadedUrls.add(modelUrl);
+            console.log(`[ModelLoader] Product: ${product?.product_name}, Category: ${product?.category}, Position:`, { x: p.position_x, y: p.position_y, z: p.position_z });
           }
         }
+      } else if (placementsError) {
+        console.error('[ModelLoader] Error loading product placements:', placementsError);
       }
     }
 
     // ============================================
-    // 2. DB에서 entity_types 로드 (타입 정의 - 인스턴스 없는 것들)
+    // 3. DB에서 entity_types 로드 (기본 모델 - space 등)
     // ============================================
-    console.log(`[ModelLoader] Section 2: Loading entity_types for user ${userId}`);
+    console.log(`[ModelLoader] Section 3: Loading entity_types for user ${userId}`);
     const { data: entityTypes, error: typesError } = await supabase
       .from('ontology_entity_types')
       .select('id, name, label, model_3d_url, model_3d_type, model_3d_dimensions, model_3d_metadata')
@@ -118,22 +126,12 @@ export async function loadUserModels(
 
     if (!typesError && entityTypes) {
       for (const entityType of entityTypes) {
-        // 이미 인스턴스로 로드된 URL은 스킵 (중복 방지)
+        // 이미 로드된 URL은 스킵 (중복 방지)
         if (entityType.model_3d_url && !loadedUrls.has(entityType.model_3d_url)) {
           const dimensions = parseJsonField(entityType.model_3d_dimensions, undefined);
           const metadata = parseJsonField<{ defaultPosition?: { x: number; y: number; z: number } }>(entityType.model_3d_metadata, {});
-
-          // model_3d_type으로 레이어 타입 결정, 없으면 이름에서 추론
-          const entityTypeName = entityType.label || entityType.name;
-          let type = inferTypeFromModel3dType(entityType.model_3d_type);
-          if (type === 'other') {
-            type = inferTypeFromName(entityTypeName) || 'other';
-          }
-
-          // defaultPosition이 있으면 사용
+          const type = inferTypeFromModel3dType(entityType.model_3d_type);
           const defaultPosition = metadata?.defaultPosition || { x: 0, y: 0, z: 0 };
-
-          console.log(`[ModelLoader] EntityType: ${entityType.label || entityType.name}, Position:`, defaultPosition, `(isTypeOnly: true)`);
 
           models.push({
             id: `type-${entityType.id}`,
@@ -147,20 +145,19 @@ export async function loadUserModels(
             metadata: {
               entityTypeId: entityType.id,
               entityTypeName: entityType.label || entityType.name,
-              isTypeOnly: true, // 인스턴스 없이 타입만 있는 경우
+              isTypeOnly: true,
               model3dMetadata: metadata
             }
           });
 
           loadedUrls.add(entityType.model_3d_url);
-        } else if (loadedUrls.has(entityType.model_3d_url)) {
-          console.log(`[ModelLoader] EntityType: ${entityType.label || entityType.name} - SKIPPED (already loaded as instance)`);
+          console.log(`[ModelLoader] EntityType: ${entityType.label || entityType.name}, Type: ${type}`);
         }
       }
     }
 
     // ============================================
-    // 3. Storage에서 직접 업로드된 모델 로드 (레거시)
+    // 4. Storage에서 직접 업로드된 모델 로드 (레거시)
     // ============================================
     // 여러 경로 형식 지원 (레거시 호환성)
     const storagePaths: string[] = [];
@@ -291,7 +288,25 @@ function inferTypeFromModel3dType(model3dType?: string): ModelLayer['type'] {
 }
 
 /**
- * 엔티티 이름에서 타입 추론 (한국어 지원)
+ * 카테고리별 기본 상품 모델 URL 반환
+ */
+function getDefaultProductModelUrl(category?: string): string | null {
+  // TODO: 실제 기본 모델 URL로 교체 필요
+  const defaults: Record<string, string> = {
+    'outer': 'https://bdrvowacecxnraaivlhr.supabase.co/storage/v1/object/public/3d-models/defaults/product_coat.glb',
+    'top': 'https://bdrvowacecxnraaivlhr.supabase.co/storage/v1/object/public/3d-models/defaults/product_top.glb',
+    'bottom': 'https://bdrvowacecxnraaivlhr.supabase.co/storage/v1/object/public/3d-models/defaults/product_pants.glb',
+    'shoes': 'https://bdrvowacecxnraaivlhr.supabase.co/storage/v1/object/public/3d-models/defaults/product_shoes.glb',
+    'accessory': 'https://bdrvowacecxnraaivlhr.supabase.co/storage/v1/object/public/3d-models/defaults/product_accessory.glb',
+  };
+
+  if (!category) return null;
+  const lower = category.toLowerCase();
+  return defaults[lower] || null;
+}
+
+/**
+ * 엔티티 이름에서 타입 추론 (한국어 지원) - 레거시 호환용
  */
 function inferTypeFromName(name?: string): ModelLayer['type'] | null {
   if (!name) return null;
