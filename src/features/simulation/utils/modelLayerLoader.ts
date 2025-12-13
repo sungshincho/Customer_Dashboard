@@ -44,38 +44,48 @@ export async function loadUserModels(
         .eq('user_id', userId);
 
       if (!entitiesError && entities) {
+        console.log(`[ModelLoader] Loading ${entities.length} entities from graph_entities`);
+
         for (const entity of entities) {
           const entityType = entity.ontology_entity_types as any;
-          
+          const properties = parseJsonField<Record<string, any>>(entity.properties, {});
+
+          // model_url 우선순위:
+          // 1순위: entity.properties.model_url (인스턴스별 개별 URL)
+          // 2순위: entityType.model_3d_url (타입 기본 URL)
+          const modelUrl = properties?.model_url || entityType?.model_3d_url || null;
+
           // 3D 모델 URL이 있는 엔티티만 처리
-          if (entityType?.model_3d_url) {
+          if (modelUrl) {
             const position = parseJsonField(entity.model_3d_position, { x: 0, y: 0, z: 0 });
             const rotation = parseJsonField(entity.model_3d_rotation, { x: 0, y: 0, z: 0 });
             const scale = parseJsonField(entity.model_3d_scale, { x: 1, y: 1, z: 1 });
-            const dimensions = parseJsonField(entityType.model_3d_dimensions, undefined);
-            
+            const dimensions = parseJsonField(entityType?.model_3d_dimensions, undefined);
+
             // model_3d_type으로 레이어 타입 결정
-            const type = inferTypeFromModel3dType(entityType.model_3d_type);
+            const type = inferTypeFromModel3dType(entityType?.model_3d_type);
+
+            console.log(`[ModelLoader] Entity: ${entity.label}, Position:`, position, `URL: ${modelUrl}`);
 
             models.push({
               id: `entity-${entity.id}`,
-              name: entity.label || entityType.label || entityType.name,
+              name: entity.label || entityType?.label || entityType?.name || 'Unknown',
               type,
-              model_url: entityType.model_3d_url,
+              model_url: modelUrl,
               dimensions,
               position,
               rotation,
               scale,
               metadata: {
                 entityId: entity.id,
-                entityTypeId: entityType.id,
-                entityTypeName: entityType.label || entityType.name,
+                entityTypeId: entityType?.id,
+                entityTypeName: entityType?.label || entityType?.name,
                 properties: entity.properties,
-                model3dMetadata: entityType.model_3d_metadata
+                model3dMetadata: entityType?.model_3d_metadata
               }
             });
 
-            loadedUrls.add(entityType.model_3d_url);
+            loadedUrls.add(modelUrl);
           }
         }
       }
