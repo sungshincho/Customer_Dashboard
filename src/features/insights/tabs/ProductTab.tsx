@@ -93,11 +93,11 @@ export function ProductTab() {
       // 3. products 테이블에서 상품 정보 가져오기
       const productIds = [...productMap.keys()];
 
-      // 먼저 products 테이블에서 조회
+      // 먼저 products 테이블에서 조회 (컬럼명: product_name)
       const { data: productsInfo, error: productsError } = await supabase
         .from('products')
-        .select('id, name, category')
-        .in('id', productIds) as { data: Array<{ id: string; name: string; category: string | null }> | null; error: any };
+        .select('id, product_name, category')
+        .in('id', productIds) as { data: Array<{ id: string; product_name: string; category: string | null }> | null; error: any };
 
       if (productsError) {
         console.error('Error fetching products:', productsError);
@@ -105,7 +105,7 @@ export function ProductTab() {
 
       // products 테이블에서 찾지 못한 경우 product_performance_agg의 데이터 활용
       const productInfoMap = new Map(
-        (productsInfo || []).map(p => [p.id, { name: p.name || p.id, category: p.category || '미분류' }])
+        (productsInfo || []).map(p => [p.id, { name: p.product_name || p.id, category: p.category || '미분류' }])
       );
 
       // 디버깅 로그
