@@ -137,20 +137,24 @@ async function processCSVImport(
   let entityTypeId = entityTypeMapping[dataType];
 
   if (!entityTypeId) {
-    // 기본 엔티티 타입 조회 (이름으로)
+    // 기본 엔티티 타입 조회 (마스터 + 사용자 타입 통합)
     const entityTypeName = getEntityTypeNameForDataType(dataType);
-    
-    const { data: existingType } = await supabase
-      .from('ontology_entity_types')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('name', entityTypeName)
-      .maybeSingle();
 
-    if (existingType) {
-      entityTypeId = existingType.id;
-    } else {
-      // 새 엔티티 타입 생성
+    const { data: existingTypes } = await supabase
+      .from('ontology_entity_types')
+      .select('id, user_id')
+      .eq('name', entityTypeName)
+      .or(`and(org_id.is.null,user_id.is.null),user_id.eq.${userId}`);
+
+    if (existingTypes && existingTypes.length > 0) {
+      // 사용자 타입이 마스터 타입보다 우선
+      const userType = existingTypes.find((t: any) => t.user_id === userId);
+      const masterType = existingTypes.find((t: any) => t.user_id === null);
+      entityTypeId = userType?.id || masterType?.id;
+    }
+
+    // 마스터 타입도 없으면 새 사용자 타입 생성
+    if (!entityTypeId) {
       const { data: newType, error: typeError } = await supabase
         .from('ontology_entity_types')
         .insert({
@@ -239,13 +243,16 @@ async function link3DModel(
   const fileName = modelUrl.split('/').pop() || '';
   const inferredTypeName = entityTypeName || inferEntityTypeFromFilename(fileName);
 
-  // 1. 엔티티 타입 찾기
-  let { data: entityType, error: typeError } = await supabase
+  // 1. 엔티티 타입 찾기 (마스터 + 사용자 타입 통합)
+  const { data: entityTypes } = await supabase
     .from('ontology_entity_types')
     .select('*')
-    .eq('user_id', userId)
     .eq('name', inferredTypeName)
-    .maybeSingle();
+    .or(`and(org_id.is.null,user_id.is.null),user_id.eq.${userId}`);
+
+  // 사용자 타입이 마스터 타입보다 우선
+  let entityType = entityTypes?.find((t: any) => t.user_id === userId) ||
+                   entityTypes?.find((t: any) => t.user_id === null);
 
   // 2. 없으면 생성 (autoCreate 옵션)
   if (!entityType && autoCreateEntityType) {
@@ -318,13 +325,16 @@ async function createPurchaseRelations(
     return 0;
   }
 
-  // Product 엔티티들 조회
-  const { data: productType } = await supabase
+  // Product 엔티티 타입 조회 (마스터 + 사용자 타입 통합)
+  const { data: productTypes } = await supabase
     .from('ontology_entity_types')
-    .select('id')
-    .eq('user_id', userId)
+    .select('id, user_id')
     .eq('name', 'Product')
-    .maybeSingle();
+    .or(`and(org_id.is.null,user_id.is.null),user_id.eq.${userId}`);
+
+  // 사용자 타입이 마스터 타입보다 우선
+  const productType = productTypes?.find((t: any) => t.user_id === userId) ||
+                      productTypes?.find((t: any) => t.user_id === null);
 
   if (!productType) {
     console.log('⚠️ Product entity type not found, skipping relations');
@@ -341,14 +351,18 @@ async function createPurchaseRelations(
     return 0;
   }
 
-  // purchased 관계 타입 찾기 또는 생성
-  let { data: relationType } = await supabase
+  // purchased 관계 타입 찾기 (마스터 + 사용자 타입 통합)
+  const { data: relationTypes } = await supabase
     .from('ontology_relation_types')
-    .select('id')
-    .eq('user_id', userId)
+    .select('id, user_id')
     .eq('name', 'purchased')
-    .maybeSingle();
+    .or(`and(org_id.is.null,user_id.is.null),user_id.eq.${userId}`);
 
+  // 사용자 타입이 마스터 타입보다 우선
+  let relationType = relationTypes?.find((t: any) => t.user_id === userId) ||
+                     relationTypes?.find((t: any) => t.user_id === null);
+
+  // 마스터/사용자 타입 모두 없으면 새 사용자 타입 생성
   if (!relationType) {
     const { data: newRelType } = await supabase
       .from('ontology_relation_types')

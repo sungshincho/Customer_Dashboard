@@ -13,6 +13,21 @@ import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 
+/**
+ * 이름 기준 중복 제거 - 사용자 타입(user_id != null)이 마스터 타입보다 우선
+ */
+function deduplicateByName<T extends { name: string; user_id: string | null }>(items: T[]): T[] {
+  const byName = new Map<string, T>();
+  for (const item of items) {
+    const existing = byName.get(item.name);
+    // 사용자 타입이 마스터 타입보다 우선
+    if (!existing || (item.user_id !== null && existing.user_id === null)) {
+      byName.set(item.name, item);
+    }
+  }
+  return Array.from(byName.values());
+}
+
 // 문자열 유사도 계산 (Levenshtein distance)
 const calculateSimilarity = (str1: string, str2: string): number => {
   const s1 = str1.toLowerCase().replace(/[_-]/g, '');
@@ -59,28 +74,40 @@ export const SchemaMapper = ({ importId, importData, onComplete }: SchemaMapping
   const [columns, setColumns] = useState<string[]>([]);
   const [isAutoMapping, setIsAutoMapping] = useState(false);
 
-  // 온톨로지 스키마 불러오기
+  // 온톨로지 스키마 불러오기 (마스터 + 사용자 타입 통합)
   const { data: entityTypes } = useQuery({
     queryKey: ['entity-types'],
     queryFn: async () => {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) throw new Error('Not authenticated');
+
       const { data, error } = await supabase
         .from('ontology_entity_types')
         .select('*')
+        .or(`and(org_id.is.null,user_id.is.null),user_id.eq.${user.user.id}`)
         .order('name');
       if (error) throw error;
-      return data;
+
+      // 사용자 타입이 마스터 타입보다 우선 (이름 기준 중복 제거)
+      return deduplicateByName(data || []);
     },
   });
 
   const { data: relationTypes } = useQuery({
     queryKey: ['relation-types'],
     queryFn: async () => {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) throw new Error('Not authenticated');
+
       const { data, error } = await supabase
         .from('ontology_relation_types')
         .select('*')
+        .or(`and(org_id.is.null,user_id.is.null),user_id.eq.${user.user.id}`)
         .order('name');
       if (error) throw error;
-      return data;
+
+      // 사용자 타입이 마스터 타입보다 우선 (이름 기준 중복 제거)
+      return deduplicateByName(data || []);
     },
   });
 

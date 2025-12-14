@@ -3,14 +3,55 @@ import { supabase } from '@/integrations/supabase/client';
 import { useSelectedStore } from './useSelectedStore';
 
 /**
+ * 마스터 타입 + 사용자 타입 중 이름으로 엔티티 타입 ID 조회
+ * 사용자 타입이 마스터 타입보다 우선
+ */
+async function getEntityTypeId(name: string, userId: string): Promise<string | null> {
+  const { data: types } = await supabase
+    .from('ontology_entity_types')
+    .select('id, user_id')
+    .eq('name', name)
+    .or(`and(org_id.is.null,user_id.is.null),user_id.eq.${userId}`);
+
+  if (!types || types.length === 0) return null;
+
+  // 사용자 타입 우선, 없으면 마스터 타입 사용
+  const userType = types.find(t => t.user_id === userId);
+  const masterType = types.find(t => t.user_id === null);
+  return userType?.id || masterType?.id || null;
+}
+
+/**
+ * 마스터 타입 + 사용자 타입 중 이름으로 관계 타입 ID 조회
+ * 사용자 타입이 마스터 타입보다 우선
+ */
+async function getRelationTypeId(name: string, userId: string): Promise<string | null> {
+  const { data: types } = await supabase
+    .from('ontology_relation_types')
+    .select('id, user_id')
+    .eq('name', name)
+    .or(`and(org_id.is.null,user_id.is.null),user_id.eq.${userId}`);
+
+  if (!types || types.length === 0) return null;
+
+  // 사용자 타입 우선, 없으면 마스터 타입 사용
+  const userType = types.find(t => t.user_id === userId);
+  const masterType = types.find(t => t.user_id === null);
+  return userType?.id || masterType?.id || null;
+}
+
+/**
  * 온톨로지 기반 엔티티 데이터를 가져오는 Hook (매장별 필터링)
  */
 export function useOntologyEntities(entityTypeName?: string) {
   const { selectedStore } = useSelectedStore();
-  
+
   return useQuery({
     queryKey: ['ontology-entities', entityTypeName, selectedStore?.id],
     queryFn: async () => {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) throw new Error('Not authenticated');
+
       let query = supabase
         .from('graph_entities')
         .select(`
@@ -24,16 +65,11 @@ export function useOntologyEntities(entityTypeName?: string) {
         query = query.eq('store_id', selectedStore.id);
       }
 
-      // 특정 엔티티 타입 필터링
+      // 특정 엔티티 타입 필터링 (마스터 + 사용자 타입 지원)
       if (entityTypeName) {
-        const { data: entityType } = await supabase
-          .from('ontology_entity_types')
-          .select('id')
-          .eq('name', entityTypeName)
-          .single();
-        
-        if (entityType) {
-          query = query.eq('entity_type_id', entityType.id);
+        const entityTypeId = await getEntityTypeId(entityTypeName, user.user.id);
+        if (entityTypeId) {
+          query = query.eq('entity_type_id', entityTypeId);
         }
       }
 
@@ -127,22 +163,21 @@ export function transformToGraphData(entities: any[], relations: any[]) {
  */
 export function useEntityAggregation(entityTypeName: string, aggregateField: string) {
   const { selectedStore } = useSelectedStore();
-  
+
   return useQuery({
     queryKey: ['entity-aggregation', entityTypeName, aggregateField, selectedStore?.id],
     queryFn: async () => {
-      const { data: entityType } = await supabase
-        .from('ontology_entity_types')
-        .select('id')
-        .eq('name', entityTypeName)
-        .single();
-      
-      if (!entityType) return [];
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) throw new Error('Not authenticated');
+
+      // 마스터 + 사용자 타입 지원
+      const entityTypeId = await getEntityTypeId(entityTypeName, user.user.id);
+      if (!entityTypeId) return [];
 
       let query = supabase
         .from('graph_entities')
         .select('label, properties')
-        .eq('entity_type_id', entityType.id);
+        .eq('entity_type_id', entityTypeId);
 
       // 매장별 필터링
       if (selectedStore) {
@@ -168,10 +203,13 @@ export function useEntityAggregation(entityTypeName: string, aggregateField: str
  */
 export function useRelatedEntities(entityId: string, relationTypeName?: string) {
   const { selectedStore } = useSelectedStore();
-  
+
   return useQuery({
     queryKey: ['related-entities', entityId, relationTypeName, selectedStore?.id],
     queryFn: async () => {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) throw new Error('Not authenticated');
+
       let query = supabase
         .from('graph_relations')
         .select(`
@@ -185,15 +223,11 @@ export function useRelatedEntities(entityId: string, relationTypeName?: string) 
         query = query.eq('store_id', selectedStore.id);
       }
 
+      // 마스터 + 사용자 타입 지원
       if (relationTypeName) {
-        const { data: relationType } = await supabase
-          .from('ontology_relation_types')
-          .select('id')
-          .eq('name', relationTypeName)
-          .single();
-        
-        if (relationType) {
-          query = query.eq('relation_type_id', relationType.id);
+        const relationTypeId = await getRelationTypeId(relationTypeName, user.user.id);
+        if (relationTypeId) {
+          query = query.eq('relation_type_id', relationTypeId);
         }
       }
 

@@ -39,12 +39,12 @@ export function OntologyDataManagement({ storeId }: OntologyDataManagementProps)
         return;
       }
       
-      // Entity Types (현재 사용자)
+      // Entity Types (마스터 타입 + 현재 사용자 타입)
       const { count: etCount } = await supabase
         .from('ontology_entity_types')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id);
-      
+        .or(`and(org_id.is.null,user_id.is.null),user_id.eq.${user.id}`);
+
       setEntityTypeCount(etCount || 0);
 
       // Entities (현재 사용자, 선택된 매장)
@@ -57,12 +57,12 @@ export function OntologyDataManagement({ storeId }: OntologyDataManagementProps)
       const { count: eCount } = await entityQuery;
       setEntityCount(eCount || 0);
 
-      // Relation Types (현재 사용자)
+      // Relation Types (마스터 타입 + 현재 사용자 타입)
       const { count: rtCount } = await supabase
         .from('ontology_relation_types')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id);
-      
+        .or(`and(org_id.is.null,user_id.is.null),user_id.eq.${user.id}`);
+
       setRelationTypeCount(rtCount || 0);
 
       // Relations (현재 사용자, 선택된 매장)
@@ -89,10 +89,11 @@ export function OntologyDataManagement({ storeId }: OntologyDataManagementProps)
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("로그인이 필요합니다");
 
-      // 온톨로지 타입 확인
+      // 온톨로지 타입 확인 (마스터 타입 + 사용자 타입)
       const { data: entityTypes } = await supabase
         .from('ontology_entity_types')
         .select('id')
+        .or(`and(org_id.is.null,user_id.is.null),user_id.eq.${user.id}`)
         .limit(1);
 
       if (!entityTypes || entityTypes.length === 0) {
