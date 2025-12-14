@@ -500,21 +500,26 @@ async function processSchemaETL(supabase: any, userId: string, request: UnifiedE
 
     let entityType: any;
     if (isUUID) {
+      // UUID로 조회 시 마스터 타입도 허용
       const { data } = await supabase
         .from('ontology_entity_types')
         .select('*')
         .eq('id', mapping.entity_type_id)
-        .eq('user_id', userId)
+        .or(`and(org_id.is.null,user_id.is.null),user_id.eq.${userId}`)
         .single();
       entityType = data;
     } else {
-      const { data } = await supabase
+      // 이름으로 조회 시 사용자 타입 우선, 마스터 타입 폴백
+      const { data: types } = await supabase
         .from('ontology_entity_types')
         .select('*')
         .eq('name', mapping.entity_type_id)
-        .eq('user_id', userId)
-        .single();
-      entityType = data;
+        .or(`and(org_id.is.null,user_id.is.null),user_id.eq.${userId}`);
+
+      if (types && types.length > 0) {
+        // 사용자 타입이 마스터 타입보다 우선
+        entityType = types.find((t: any) => t.user_id === userId) || types.find((t: any) => t.user_id === null);
+      }
     }
 
     if (!entityType) {
@@ -605,15 +610,21 @@ async function processSchemaETL(supabase: any, userId: string, request: UnifiedE
     let relationTypeId = relMapping.relation_type_id;
 
     if (!isRelTypeUUID) {
-      const { data: relationType } = await supabase
+      // 이름으로 조회 시 마스터 타입 + 사용자 타입 통합 조회
+      const { data: relationTypes } = await supabase
         .from('ontology_relation_types')
-        .select('id')
+        .select('id, user_id')
         .eq('name', relMapping.relation_type_id)
-        .eq('user_id', userId)
-        .single();
+        .or(`and(org_id.is.null,user_id.is.null),user_id.eq.${userId}`);
 
-      if (relationType) relationTypeId = relationType.id;
-      else continue;
+      if (relationTypes && relationTypes.length > 0) {
+        // 사용자 타입이 마스터 타입보다 우선
+        const userType = relationTypes.find((t: any) => t.user_id === userId);
+        const masterType = relationTypes.find((t: any) => t.user_id === null);
+        relationTypeId = userType?.id || masterType?.id;
+      } else {
+        continue;
+      }
     }
 
     for (const record of rawData) {

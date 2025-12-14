@@ -3,8 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import type { GraphNode, GraphLink } from '@/features/data-management/ontology/components/SchemaGraph3D';
 
 /**
- * 현재 로그인한 사용자의 온톨로지 스키마 정의를 가져오는 Hook
- * (entity types와 relation types)
+ * 마스터 온톨로지 + 사용자 커스텀 스키마를 가져오는 Hook
+ * - 마스터 타입: org_id IS NULL AND user_id IS NULL
+ * - 사용자 타입: user_id = current_user (마스터 타입 오버라이드 가능)
  */
 export function useOntologySchema() {
   return useQuery({
@@ -13,30 +14,49 @@ export function useOntologySchema() {
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) throw new Error('Not authenticated');
 
-      // 엔티티 타입 가져오기
+      // 마스터 타입 + 사용자 타입 통합 조회
       const { data: entityTypes, error: entityError } = await supabase
         .from('ontology_entity_types')
         .select('*')
-        .eq('user_id', user.user.id)
+        .or(`and(org_id.is.null,user_id.is.null),user_id.eq.${user.user.id}`)
         .order('name');
 
       if (entityError) throw entityError;
 
-      // 관계 타입 가져오기
+      // 관계 타입도 동일하게 처리
       const { data: relationTypes, error: relationError } = await supabase
         .from('ontology_relation_types')
         .select('*')
-        .eq('user_id', user.user.id)
+        .or(`and(org_id.is.null,user_id.is.null),user_id.eq.${user.user.id}`)
         .order('name');
 
       if (relationError) throw relationError;
 
+      // 사용자 타입이 마스터 타입보다 우선 (이름 기준 중복 제거)
+      const deduplicatedEntityTypes = deduplicateByName(entityTypes || []);
+      const deduplicatedRelationTypes = deduplicateByName(relationTypes || []);
+
       return {
-        entityTypes: entityTypes || [],
-        relationTypes: relationTypes || []
+        entityTypes: deduplicatedEntityTypes,
+        relationTypes: deduplicatedRelationTypes
       };
     }
   });
+}
+
+/**
+ * 이름 기준 중복 제거 - 사용자 타입(user_id != null)이 마스터 타입보다 우선
+ */
+function deduplicateByName<T extends { name: string; user_id: string | null }>(items: T[]): T[] {
+  const byName = new Map<string, T>();
+  for (const item of items) {
+    const existing = byName.get(item.name);
+    // 사용자 타입이 마스터 타입보다 우선
+    if (!existing || (item.user_id !== null && existing.user_id === null)) {
+      byName.set(item.name, item);
+    }
+  }
+  return Array.from(byName.values());
 }
 
 /**
