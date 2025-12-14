@@ -658,16 +658,87 @@ BEGIN
 END $$;
 
 -- ============================================================================
--- STEP 4: graph_entities 마이그레이션 (기존 → 마스터 타입 연결)
+-- STEP 4: graph_entities/relations 마이그레이션 (기존 → 마스터 타입 연결)
 -- ============================================================================
 DO $$
 BEGIN
   RAISE NOTICE '========================================';
-  RAISE NOTICE 'STEP 4: graph_entities 마이그레이션';
+  RAISE NOTICE 'STEP 4: 기존 데이터 마이그레이션';
   RAISE NOTICE '========================================';
 END $$;
 
--- 기존 entity_type_id를 마스터 타입으로 업데이트
+-- ---------------------------------------------------------------------------
+-- 4-A: 마이그레이션 전 상세 백업 (타입명 포함)
+-- ---------------------------------------------------------------------------
+DROP TABLE IF EXISTS graph_entities_migration_backup;
+CREATE TABLE graph_entities_migration_backup AS
+SELECT
+  ge.id,
+  ge.entity_type_id AS old_entity_type_id,
+  oet.name AS old_type_name,
+  oet.user_id AS old_type_user_id,
+  CASE WHEN oet.org_id IS NULL AND oet.user_id IS NULL THEN 'master' ELSE 'user' END AS old_type_scope
+FROM graph_entities ge
+LEFT JOIN ontology_entity_types oet ON ge.entity_type_id = oet.id;
+
+DROP TABLE IF EXISTS graph_relations_migration_backup;
+CREATE TABLE graph_relations_migration_backup AS
+SELECT
+  gr.id,
+  gr.relation_type_id AS old_relation_type_id,
+  ort.name AS old_type_name,
+  ort.user_id AS old_type_user_id,
+  CASE WHEN ort.org_id IS NULL AND ort.user_id IS NULL THEN 'master' ELSE 'user' END AS old_type_scope
+FROM graph_relations gr
+LEFT JOIN ontology_relation_types ort ON gr.relation_type_id = ort.id;
+
+DO $$
+DECLARE
+  v_entity_backup_count INTEGER;
+  v_relation_backup_count INTEGER;
+BEGIN
+  SELECT COUNT(*) INTO v_entity_backup_count FROM graph_entities_migration_backup;
+  SELECT COUNT(*) INTO v_relation_backup_count FROM graph_relations_migration_backup;
+  RAISE NOTICE '📦 백업 완료: graph_entities %개, graph_relations %개', v_entity_backup_count, v_relation_backup_count;
+END $$;
+
+-- ---------------------------------------------------------------------------
+-- 4-B: 마이그레이션 전 통계
+-- ---------------------------------------------------------------------------
+DO $$
+DECLARE
+  v_total_entities INTEGER;
+  v_entities_with_type INTEGER;
+  v_entities_null_type INTEGER;
+  v_entities_master_type INTEGER;
+  v_entities_user_type INTEGER;
+BEGIN
+  SELECT COUNT(*) INTO v_total_entities FROM graph_entities;
+  SELECT COUNT(*) INTO v_entities_with_type FROM graph_entities WHERE entity_type_id IS NOT NULL;
+  SELECT COUNT(*) INTO v_entities_null_type FROM graph_entities WHERE entity_type_id IS NULL;
+
+  SELECT COUNT(*) INTO v_entities_master_type
+  FROM graph_entities ge
+  JOIN ontology_entity_types oet ON ge.entity_type_id = oet.id
+  WHERE oet.org_id IS NULL AND oet.user_id IS NULL;
+
+  SELECT COUNT(*) INTO v_entities_user_type
+  FROM graph_entities ge
+  JOIN ontology_entity_types oet ON ge.entity_type_id = oet.id
+  WHERE oet.user_id IS NOT NULL;
+
+  RAISE NOTICE '📊 마이그레이션 전 graph_entities 통계:';
+  RAISE NOTICE '   - 총 엔티티: %개', v_total_entities;
+  RAISE NOTICE '   - 타입 있음: %개', v_entities_with_type;
+  RAISE NOTICE '   - 타입 NULL: %개', v_entities_null_type;
+  RAISE NOTICE '   - 마스터 타입 참조: %개', v_entities_master_type;
+  RAISE NOTICE '   - 사용자 타입 참조: %개', v_entities_user_type;
+END $$;
+
+-- ---------------------------------------------------------------------------
+-- 4-C: graph_entities 마이그레이션 (사용자 타입 → 마스터 타입)
+-- ---------------------------------------------------------------------------
+-- 동일한 이름의 마스터 타입이 존재하는 경우에만 업데이트
 UPDATE graph_entities ge
 SET entity_type_id = master.id
 FROM ontology_entity_types master
@@ -688,7 +759,9 @@ BEGIN
   RAISE NOTICE '✅ graph_entities 업데이트: %개 행', v_updated;
 END $$;
 
--- graph_relations도 마이그레이션
+-- ---------------------------------------------------------------------------
+-- 4-D: graph_relations 마이그레이션 (사용자 타입 → 마스터 타입)
+-- ---------------------------------------------------------------------------
 UPDATE graph_relations gr
 SET relation_type_id = master.id
 FROM ontology_relation_types master
@@ -707,6 +780,101 @@ DECLARE
 BEGIN
   GET DIAGNOSTICS v_updated = ROW_COUNT;
   RAISE NOTICE '✅ graph_relations 업데이트: %개 행', v_updated;
+END $$;
+
+-- ---------------------------------------------------------------------------
+-- 4-E: 마이그레이션 후 검증
+-- ---------------------------------------------------------------------------
+DO $$
+DECLARE
+  v_orphan_entities INTEGER;
+  v_orphan_relations INTEGER;
+  v_unmapped_entities INTEGER;
+  v_unmapped_relations INTEGER;
+  v_master_ref_entities INTEGER;
+  v_master_ref_relations INTEGER;
+BEGIN
+  -- NULL entity_type_id를 가진 엔티티 (고아 데이터)
+  SELECT COUNT(*) INTO v_orphan_entities
+  FROM graph_entities WHERE entity_type_id IS NULL;
+
+  -- NULL relation_type_id를 가진 관계 (고아 데이터)
+  SELECT COUNT(*) INTO v_orphan_relations
+  FROM graph_relations WHERE relation_type_id IS NULL;
+
+  -- 존재하지 않는 타입 ID를 참조하는 엔티티
+  SELECT COUNT(*) INTO v_unmapped_entities
+  FROM graph_entities ge
+  WHERE ge.entity_type_id IS NOT NULL
+    AND NOT EXISTS (
+      SELECT 1 FROM ontology_entity_types oet WHERE oet.id = ge.entity_type_id
+    );
+
+  -- 존재하지 않는 타입 ID를 참조하는 관계
+  SELECT COUNT(*) INTO v_unmapped_relations
+  FROM graph_relations gr
+  WHERE gr.relation_type_id IS NOT NULL
+    AND NOT EXISTS (
+      SELECT 1 FROM ontology_relation_types ort WHERE ort.id = gr.relation_type_id
+    );
+
+  -- 마스터 타입을 참조하는 엔티티
+  SELECT COUNT(*) INTO v_master_ref_entities
+  FROM graph_entities ge
+  JOIN ontology_entity_types oet ON ge.entity_type_id = oet.id
+  WHERE oet.org_id IS NULL AND oet.user_id IS NULL;
+
+  -- 마스터 타입을 참조하는 관계
+  SELECT COUNT(*) INTO v_master_ref_relations
+  FROM graph_relations gr
+  JOIN ontology_relation_types ort ON gr.relation_type_id = ort.id
+  WHERE ort.org_id IS NULL AND ort.user_id IS NULL;
+
+  RAISE NOTICE '========================================';
+  RAISE NOTICE '📊 마이그레이션 후 검증 결과:';
+  RAISE NOTICE '========================================';
+  RAISE NOTICE '   [graph_entities]';
+  RAISE NOTICE '   - 마스터 타입 참조: %개 ✅', v_master_ref_entities;
+  RAISE NOTICE '   - NULL 타입 (고아): %개 %', v_orphan_entities,
+    CASE WHEN v_orphan_entities > 0 THEN '⚠️' ELSE '✅' END;
+  RAISE NOTICE '   - 존재하지 않는 타입: %개 %', v_unmapped_entities,
+    CASE WHEN v_unmapped_entities > 0 THEN '❌' ELSE '✅' END;
+  RAISE NOTICE '';
+  RAISE NOTICE '   [graph_relations]';
+  RAISE NOTICE '   - 마스터 타입 참조: %개 ✅', v_master_ref_relations;
+  RAISE NOTICE '   - NULL 타입 (고아): %개 %', v_orphan_relations,
+    CASE WHEN v_orphan_relations > 0 THEN '⚠️' ELSE '✅' END;
+  RAISE NOTICE '   - 존재하지 않는 타입: %개 %', v_unmapped_relations,
+    CASE WHEN v_unmapped_relations > 0 THEN '❌' ELSE '✅' END;
+END $$;
+
+-- ---------------------------------------------------------------------------
+-- 4-F: 고아 데이터 상세 리포트 (문제 있는 경우만)
+-- ---------------------------------------------------------------------------
+DO $$
+DECLARE
+  v_orphan_count INTEGER;
+  rec RECORD;
+BEGIN
+  SELECT COUNT(*) INTO v_orphan_count
+  FROM graph_entities ge
+  LEFT JOIN ontology_entity_types oet ON ge.entity_type_id = oet.id
+  WHERE oet.id IS NULL AND ge.entity_type_id IS NOT NULL;
+
+  IF v_orphan_count > 0 THEN
+    RAISE NOTICE '';
+    RAISE NOTICE '⚠️ 매핑 실패 엔티티 상세 (최대 10개):';
+    FOR rec IN
+      SELECT ge.id, ge.label, ge.entity_type_id, backup.old_type_name
+      FROM graph_entities ge
+      LEFT JOIN ontology_entity_types oet ON ge.entity_type_id = oet.id
+      LEFT JOIN graph_entities_migration_backup backup ON ge.id = backup.id
+      WHERE oet.id IS NULL AND ge.entity_type_id IS NOT NULL
+      LIMIT 10
+    LOOP
+      RAISE NOTICE '   - ID: %, Label: %, OldTypeName: %', rec.id, rec.label, rec.old_type_name;
+    END LOOP;
+  END IF;
 END $$;
 
 -- ============================================================================
