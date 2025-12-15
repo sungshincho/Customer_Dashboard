@@ -261,12 +261,12 @@ BEGIN
   RAISE NOTICE 'STEP 4: 고객 생성 (500명)';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
 
-  FOR i IN 1..500 LOOP
-    -- 세그먼트: VIP 5% (25명), Regular 15% (75명), New 80% (400명)
-    IF i <= 25 THEN
+  FOR i IN 1..2500 LOOP
+    -- 세그먼트: VIP 5% (125명), Regular 20% (500명), New 75% (1,875명)
+    IF i <= 125 THEN
       v_segment := 'vip';
       v_total_purchases := 3000000 + floor(random() * 2000000)::INT;
-    ELSIF i <= 100 THEN
+    ELSIF i <= 625 THEN
       v_segment := 'regular';
       v_total_purchases := 500000 + floor(random() * 1000000)::INT;
     ELSE
