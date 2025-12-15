@@ -137,14 +137,12 @@ END $$;
 DO $$
 DECLARE
   v_store_id UUID := 'd9830554-2688-4032-af40-acccda787ac4';
-  v_user_id UUID;
-  v_org_id UUID;
+  v_user_id UUID := 'e4200130-08e8-47da-8c92-3d0b90fafd77';
+  v_org_id UUID := '0c6076e3-a993-4022-9b40-0f4e4370f8ef';
 BEGIN
-  SELECT user_id, org_id INTO v_user_id, v_org_id FROM stores WHERE id = v_store_id;
-
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
-  RAISE NOTICE 'STEP 2: 존 생성 (7건)';
+  RAISE NOTICE 'STEP 2: zones_dim 생성 (7건) - 3D 좌표 포함';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
 
   INSERT INTO zones_dim (id, store_id, user_id, org_id, zone_code, zone_name, zone_type, area_sqm,
@@ -165,7 +163,7 @@ BEGIN
   ('a0000007-0000-0000-0000-000000000007'::UUID, v_store_id, v_user_id, v_org_id, 'Z007', '휴식공간', 'lounge', 16,
    0, 0, 7, 8, 2, 3, '#8BC34A', 8, true, '{"x":0,"y":0,"z":7,"width":8,"depth":2}'::jsonb, NOW());
 
-  RAISE NOTICE '  ✓ zones_dim: 7건 생성';
+  RAISE NOTICE '  ✓ zones_dim: 7건 생성 (3D 좌표 포함)';
 END $$;
 
 -- ============================================================================
@@ -174,15 +172,13 @@ END $$;
 DO $$
 DECLARE
   v_store_id UUID := 'd9830554-2688-4032-af40-acccda787ac4';
-  v_user_id UUID;
-  v_org_id UUID;
+  v_user_id UUID := 'e4200130-08e8-47da-8c92-3d0b90fafd77';
+  v_org_id UUID := '0c6076e3-a993-4022-9b40-0f4e4370f8ef';
   i INT;
 BEGIN
-  SELECT user_id, org_id INTO v_user_id, v_org_id FROM stores WHERE id = v_store_id;
-
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
-  RAISE NOTICE 'STEP 3: 상품 생성 (25건)';
+  RAISE NOTICE 'STEP 3: products 생성 (25건) - SKU/카테고리 상세';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
 
   FOR i IN 1..25 LOOP
@@ -243,7 +239,14 @@ BEGIN
   END LOOP;
 
   RAISE NOTICE '  ✓ products: 25건 생성';
+  RAISE NOTICE '    - 아우터: 5개 (SKU-OUT-001~005)';
+  RAISE NOTICE '    - 상의: 5개 (SKU-TOP-001~005)';
+  RAISE NOTICE '    - 하의: 5개 (SKU-BTM-001~005)';
+  RAISE NOTICE '    - 액세서리: 5개 (SKU-ACC-001~005)';
+  RAISE NOTICE '    - 신발: 3개 (SKU-SHO-001~003)';
+  RAISE NOTICE '    - 화장품: 2개 (SKU-COS-001~002)';
 END $$;
+
 
 -- ============================================================================
 -- STEP 4: 고객 생성 (500명) - 세그먼트 분포 유지
@@ -1127,103 +1130,204 @@ END $$;
 DO $$
 DECLARE
   v_store_id UUID := 'd9830554-2688-4032-af40-acccda787ac4';
-  v_org_id UUID;
+  v_org_id UUID := '0c6076e3-a993-4022-9b40-0f4e4370f8ef';
   v_date DATE;
-  v_pid UUID;
-  v_views INT;
-  v_sales INT;
+  v_product RECORD;
+  v_stats RECORD;
+  v_count INT := 0;
 BEGIN
-  SELECT org_id INTO v_org_id FROM stores WHERE id = v_store_id;
-
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
-  RAISE NOTICE 'STEP 12: product_performance_agg 생성 (2,250건)';
+  RAISE NOTICE 'product_performance_agg 생성 (L1 기반 집계)';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
 
-  FOR day_offset IN 0..89 LOOP
-    v_date := CURRENT_DATE - day_offset;
+  -- 각 상품에 대해
+  FOR v_product IN 
+    SELECT id, price, stock, category 
+    FROM products 
+    WHERE store_id = v_store_id
+  LOOP
+    -- 최근 90일
+    FOR day_offset IN 0..89 LOOP
+      v_date := CURRENT_DATE - day_offset;
 
-    FOR prod_num IN 1..25 LOOP
-      v_pid := ('f000' || LPAD(prod_num::TEXT, 4, '0') || '-0000-0000-0000-000000000000')::UUID;
+      -- ★ L1 데이터(purchases)에서 직접 집계 ★
+      SELECT 
+        COALESCE(SUM(quantity), 0) as units_sold,
+        COALESCE(COUNT(*), 0) as transactions,
+        COALESCE(SUM(total_price), 0) as revenue
+      INTO v_stats
+      FROM purchases
+      WHERE store_id = v_store_id 
+        AND product_id = v_product.id
+        AND purchase_date::DATE = v_date;
 
-      -- 인기 상품은 더 많은 조회/판매
-      v_views := CASE
-        WHEN prod_num IN (1,6,16,21) THEN 40 + floor(random()*20)::INT
-        WHEN prod_num IN (3,7,12,17) THEN 10 + floor(random()*10)::INT
-        ELSE 20 + floor(random()*15)::INT
-      END;
-      v_sales := floor(v_views * (0.08 + random()*0.07))::INT;
+      -- 데이터가 없는 날은 랜덤 기본값 (현실적인 분포)
+      IF v_stats.units_sold = 0 THEN
+        -- 인기 상품은 더 많은 조회/판매
+        v_stats.units_sold := CASE 
+          WHEN v_product.category IN ('아우터', '액세서리') THEN floor(random() * 3)::INT
+          WHEN v_product.category = '화장품' THEN floor(random() * 5)::INT
+          ELSE floor(random() * 2)::INT
+        END;
+        v_stats.transactions := GREATEST(0, v_stats.units_sold - floor(random() * 2)::INT);
+        v_stats.revenue := v_stats.units_sold * v_product.price;
+      END IF;
 
-      INSERT INTO product_performance_agg (id, store_id, org_id, product_id, date, units_sold, transactions, revenue,
-        conversion_rate, avg_selling_price, return_rate, stock_level, category_rank, store_rank, calculated_at, created_at)
-      VALUES (
-        gen_random_uuid(), v_store_id, v_org_id, v_pid, v_date,
-        v_sales,
-        floor(v_sales * 0.8)::INT,
-        v_sales * (100000 + prod_num * 20000),
-        CASE WHEN v_views > 0 THEN (v_sales::NUMERIC / v_views * 100) ELSE 0 END,
-        100000 + prod_num * 20000,
-        2 + floor(random()*5),
-        30 + floor(random()*50)::INT,
-        1 + floor(random()*10)::INT,
-        1 + floor(random()*25)::INT,
-        NOW(), NOW()
+      INSERT INTO product_performance_agg (
+        id, store_id, org_id, product_id, date, 
+        units_sold, transactions, revenue,
+        conversion_rate, avg_selling_price, return_rate, 
+        stock_level, category_rank, store_rank, 
+        calculated_at, created_at
+      ) VALUES (
+        gen_random_uuid(), 
+        v_store_id, 
+        v_org_id, 
+        v_product.id, 
+        v_date,
+        v_stats.units_sold,
+        v_stats.transactions,
+        v_stats.revenue,
+        CASE WHEN v_stats.units_sold > 0 THEN 8 + floor(random() * 10) ELSE 0 END,
+        v_product.price,
+        2 + floor(random() * 5),
+        COALESCE(v_product.stock, 30) - floor(random() * 10)::INT,
+        1 + floor(random() * 10)::INT,
+        1 + floor(random() * 25)::INT,
+        NOW(), 
+        NOW()
       );
+      
+      v_count := v_count + 1;
     END LOOP;
   END LOOP;
 
-  RAISE NOTICE '  ✓ product_performance_agg: 2,250건 생성';
+  RAISE NOTICE '  ✓ product_performance_agg: %건 생성 (L1 purchases 기반)', v_count;
 END $$;
 
 -- ============================================================================
 -- STEP 13: customer_segments_agg 생성 (90일 x 6세그먼트)
 -- ============================================================================
+-- ============================================================================
+-- v7.0 보강: customer_segments_agg (90일 × 6세그먼트 = 540건)
+-- ★ L1 기반 집계 - customers/purchases에서 실제 데이터 집계 ★
+-- ============================================================================
 DO $$
 DECLARE
   v_store_id UUID := 'd9830554-2688-4032-af40-acccda787ac4';
-  v_org_id UUID;
+  v_org_id UUID := '0c6076e3-a993-4022-9b40-0f4e4370f8ef';
   v_date DATE;
   v_seg_names TEXT[] := ARRAY['VIP', 'Regular', 'New', 'Dormant', 'At-Risk', 'Churned'];
   v_seg_types TEXT[] := ARRAY['value', 'frequency', 'lifecycle', 'lifecycle', 'risk', 'risk'];
-  v_cnt INT;
+  v_stats RECORD;
+  v_count INT := 0;
 BEGIN
-  SELECT org_id INTO v_org_id FROM stores WHERE id = v_store_id;
-
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
-  RAISE NOTICE 'STEP 13: customer_segments_agg 생성 (540건)';
+  RAISE NOTICE 'customer_segments_agg 생성 (L1 기반 집계)';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
 
   FOR day_offset IN 0..89 LOOP
     v_date := CURRENT_DATE - day_offset;
 
     FOR seg_idx IN 1..6 LOOP
-      v_cnt := CASE seg_idx
-        WHEN 1 THEN 15  -- VIP
-        WHEN 2 THEN 50  -- Regular
-        WHEN 3 THEN 100 -- New
-        WHEN 4 THEN 80  -- Dormant
-        WHEN 5 THEN 60  -- At-Risk
-        ELSE 30         -- Churned
-      END + floor(random()*20)::INT;
+      -- ★ L1 데이터(customers, purchases)에서 직접 집계 ★
+      -- 실제 세그먼트별 고객 수 및 매출 집계
+      IF seg_idx <= 3 THEN
+        -- VIP, Regular, New는 실제 customers 테이블에서 집계
+        SELECT 
+          COUNT(DISTINCT c.id) as customer_count,
+          COALESCE(SUM(p.total_price), 0) as total_revenue,
+          COALESCE(AVG(p.total_price), 0) as avg_transaction
+        INTO v_stats
+        FROM customers c
+        LEFT JOIN purchases p ON c.id = p.customer_id 
+          AND p.store_id = v_store_id 
+          AND p.purchase_date::DATE = v_date
+        WHERE c.store_id = v_store_id
+          AND c.segment = LOWER(v_seg_names[seg_idx]);
+      ELSE
+        -- Dormant, At-Risk, Churned는 추정값 사용
+        v_stats.customer_count := CASE seg_idx
+          WHEN 4 THEN 80 + floor(random() * 20)::INT   -- Dormant
+          WHEN 5 THEN 60 + floor(random() * 15)::INT   -- At-Risk
+          ELSE 30 + floor(random() * 10)::INT          -- Churned
+        END;
+        v_stats.total_revenue := v_stats.customer_count * CASE seg_idx
+          WHEN 4 THEN 50000
+          WHEN 5 THEN 30000
+          ELSE 10000
+        END;
+        v_stats.avg_transaction := CASE seg_idx
+          WHEN 4 THEN 80000
+          WHEN 5 THEN 60000
+          ELSE 40000
+        END;
+      END IF;
 
-      INSERT INTO customer_segments_agg (id, store_id, org_id, date, segment_name, segment_type, customer_count,
-        total_revenue, avg_transaction_value, avg_basket_size, visit_frequency, ltv_estimate, churn_risk_score, calculated_at, created_at)
-      VALUES (
-        gen_random_uuid(), v_store_id, v_org_id, v_date, v_seg_names[seg_idx], v_seg_types[seg_idx], v_cnt,
-        v_cnt * CASE seg_idx WHEN 1 THEN 500000 WHEN 2 THEN 200000 WHEN 3 THEN 100000 ELSE 50000 END,
-        CASE seg_idx WHEN 1 THEN 350000 WHEN 2 THEN 180000 WHEN 3 THEN 120000 ELSE 80000 END,
+      -- 기본값 보정 (데이터 없는 경우)
+      IF v_stats.customer_count IS NULL OR v_stats.customer_count = 0 THEN
+        v_stats.customer_count := CASE seg_idx
+          WHEN 1 THEN 15 + floor(random() * 10)::INT   -- VIP
+          WHEN 2 THEN 50 + floor(random() * 20)::INT   -- Regular
+          WHEN 3 THEN 100 + floor(random() * 30)::INT  -- New
+          WHEN 4 THEN 80 + floor(random() * 20)::INT   -- Dormant
+          WHEN 5 THEN 60 + floor(random() * 15)::INT   -- At-Risk
+          ELSE 30 + floor(random() * 10)::INT          -- Churned
+        END;
+        v_stats.total_revenue := v_stats.customer_count * CASE seg_idx
+          WHEN 1 THEN 500000
+          WHEN 2 THEN 200000
+          WHEN 3 THEN 100000
+          ELSE 50000
+        END;
+        v_stats.avg_transaction := CASE seg_idx
+          WHEN 1 THEN 350000
+          WHEN 2 THEN 180000
+          WHEN 3 THEN 120000
+          ELSE 80000
+        END;
+      END IF;
+
+      INSERT INTO customer_segments_agg (
+        id, store_id, org_id, date, 
+        segment_name, segment_type, customer_count,
+        total_revenue, avg_transaction_value, avg_basket_size, 
+        visit_frequency, ltv_estimate, churn_risk_score, 
+        calculated_at, created_at
+      ) VALUES (
+        gen_random_uuid(), 
+        v_store_id, 
+        v_org_id, 
+        v_date, 
+        v_seg_names[seg_idx], 
+        v_seg_types[seg_idx], 
+        v_stats.customer_count,
+        v_stats.total_revenue,
+        v_stats.avg_transaction,
         CASE seg_idx WHEN 1 THEN 3.2 WHEN 2 THEN 2.1 ELSE 1.5 END,
         CASE seg_idx WHEN 1 THEN 8 WHEN 2 THEN 4 WHEN 3 THEN 1.5 ELSE 0.5 END,
         CASE seg_idx WHEN 1 THEN 5000000 WHEN 2 THEN 2000000 WHEN 3 THEN 500000 ELSE 150000 END,
-        CASE seg_idx WHEN 1 THEN 5 WHEN 2 THEN 15 WHEN 3 THEN 25 WHEN 5 THEN 70 WHEN 6 THEN 90 ELSE 40 END + floor(random()*10),
-        NOW(), NOW()
+        CASE seg_idx 
+          WHEN 1 THEN 5 
+          WHEN 2 THEN 15 
+          WHEN 3 THEN 25 
+          WHEN 5 THEN 70 
+          WHEN 6 THEN 90 
+          ELSE 40 
+        END + floor(random() * 10),
+        NOW(), 
+        NOW()
       );
+      
+      v_count := v_count + 1;
     END LOOP;
   END LOOP;
 
-  RAISE NOTICE '  ✓ customer_segments_agg: 540건 생성';
+  RAISE NOTICE '  ✓ customer_segments_agg: %건 생성 (L1 기반)', v_count;
 END $$;
+
 
 -- ============================================================================
 -- STEP 14: applied_strategies & strategy_daily_metrics 생성
@@ -1231,8 +1335,8 @@ END $$;
 DO $$
 DECLARE
   v_store_id UUID := 'd9830554-2688-4032-af40-acccda787ac4';
-  v_user_id UUID;
-  v_org_id UUID;
+  v_user_id UUID := 'e4200130-08e8-47da-8c92-3d0b90fafd77';
+  v_org_id UUID := '0c6076e3-a993-4022-9b40-0f4e4370f8ef';
   v_sid UUID;
   v_sources TEXT[] := ARRAY['2d_simulation', '3d_simulation', '2d_simulation', '3d_simulation', '2d_simulation'];
   v_modules TEXT[] := ARRAY['pricing_optimization', 'layout_optimization', 'inventory_management', 'staffing_optimization', 'flow_optimization'];
@@ -1241,11 +1345,9 @@ DECLARE
   v_end DATE;
   v_status TEXT;
 BEGIN
-  SELECT user_id, org_id INTO v_user_id, v_org_id FROM stores WHERE id = v_store_id;
-
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
-  RAISE NOTICE 'STEP 14: applied_strategies 생성 (10건)';
+  RAISE NOTICE 'applied_strategies & strategy_daily_metrics 생성';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
 
   FOR i IN 1..10 LOOP
@@ -1258,14 +1360,25 @@ BEGIN
       ELSE 'active'
     END;
 
-    INSERT INTO applied_strategies (id, store_id, org_id, user_id, created_by, source, source_module, name, description, settings,
-      start_date, end_date, expected_roi, target_roi, current_roi, final_roi, expected_revenue, actual_revenue,
-      status, result, baseline_metrics, created_at, updated_at)
-    VALUES (
+    INSERT INTO applied_strategies (
+      id, store_id, org_id, user_id, created_by, 
+      source, source_module, name, description, settings,
+      start_date, end_date, 
+      expected_roi, target_roi, current_roi, final_roi, 
+      expected_revenue, actual_revenue,
+      status, result, baseline_metrics, 
+      created_at, updated_at
+    ) VALUES (
       v_sid, v_store_id, v_org_id, v_user_id, v_user_id,
-      v_sources[1+(i%5)], v_modules[1+(i%5)], v_names[i], '전략 설명 '||i,
-      '{"value": 50}'::jsonb, v_start, v_end,
-      15 + floor(random()*25), 15 + floor(random()*25),
+      v_sources[1+(i%5)], 
+      v_modules[1+(i%5)], 
+      v_names[i], 
+      '전략 설명 '||i,
+      '{"value": 50}'::jsonb, 
+      v_start, 
+      v_end,
+      15 + floor(random()*25), 
+      15 + floor(random()*25),
       CASE WHEN v_status IN ('active','completed') THEN 10 + floor(random()*20) ELSE NULL END,
       CASE WHEN v_status = 'completed' THEN 12 + floor(random()*25) ELSE NULL END,
       1000000 + floor(random()*2000000)::INT,
@@ -1273,15 +1386,20 @@ BEGIN
       v_status,
       CASE WHEN v_status = 'completed' THEN 'success' ELSE NULL END,
       '{"revenue": 2500000}'::jsonb,
-      NOW() - (i*8||' days')::INTERVAL, NOW()
+      NOW() - (i*8||' days')::INTERVAL, 
+      NOW()
     );
 
     -- 완료된 전략의 일별 메트릭
     IF v_status = 'completed' THEN
       FOR day_num IN 0..6 LOOP
-        INSERT INTO strategy_daily_metrics (id, strategy_id, date, metrics, daily_roi, cumulative_roi, created_at)
-        VALUES (
-          gen_random_uuid(), v_sid, v_start + (day_num||' days')::INTERVAL,
+        INSERT INTO strategy_daily_metrics (
+          id, strategy_id, date, metrics, 
+          daily_roi, cumulative_roi, created_at
+        ) VALUES (
+          gen_random_uuid(), 
+          v_sid, 
+          v_start + (day_num||' days')::INTERVAL,
           jsonb_build_object(
             'revenue', 350000 + floor(random()*200000)::INT,
             'visitors', 120 + floor(random()*60)::INT,
@@ -1296,7 +1414,9 @@ BEGIN
   END LOOP;
 
   RAISE NOTICE '  ✓ applied_strategies: 10건 생성';
+  RAISE NOTICE '  ✓ strategy_daily_metrics: 완료된 전략별 7일치 생성';
 END $$;
+
 
 -- ============================================================================
 -- STEP 15: inventory_levels 생성 (25건)
@@ -1393,17 +1513,17 @@ END $$;
 DO $$
 DECLARE
   v_store_id UUID := 'd9830554-2688-4032-af40-acccda787ac4';
-  v_user_id UUID;
-  v_org_id UUID;
+  v_user_id UUID := 'e4200130-08e8-47da-8c92-3d0b90fafd77';
+  v_org_id UUID := '0c6076e3-a993-4022-9b40-0f4e4370f8ef';
 BEGIN
-  SELECT user_id, org_id INTO v_user_id, v_org_id FROM stores WHERE id = v_store_id;
-
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
-  RAISE NOTICE 'STEP 18: graph_entities 생성 (30건)';
+  RAISE NOTICE 'graph_entities 생성 (30건)';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
 
+  -- ============================================
   -- 가구 (6건)
+  -- ============================================
   INSERT INTO graph_entities (id, store_id, user_id, org_id, entity_type_id, label, properties,
     model_3d_position, model_3d_rotation, model_3d_scale, created_at, updated_at) VALUES
   ('d0000001-0000-0000-0000-000000000001'::UUID, v_store_id, v_user_id, v_org_id,
@@ -1431,7 +1551,9 @@ BEGIN
    '{"category":"display","display_type":"counter","has_mirror":true,"model_url":"counter_cosmetics.glb"}'::jsonb,
    '{"x":7.7,"y":0.05,"z":1.1}'::jsonb, '{"x":0,"y":-90,"z":0}'::jsonb, '{"x":1,"y":1,"z":1}'::jsonb, NOW(), NOW());
 
+  -- ============================================
   -- 구조물 (2건)
+  -- ============================================
   INSERT INTO graph_entities (id, store_id, user_id, org_id, entity_type_id, label, properties,
     model_3d_position, model_3d_rotation, model_3d_scale, created_at, updated_at) VALUES
   ('d0000007-0000-0000-0000-000000000007'::UUID, v_store_id, v_user_id, v_org_id,
@@ -1443,7 +1565,9 @@ BEGIN
    '{"entrance_type":"main","has_sensor":true,"door_type":"automatic","model_url":"entrance_door.glb"}'::jsonb,
    '{"x":2.5,"y":0,"z":8.4}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, '{"x":1,"y":1,"z":1}'::jsonb, NOW(), NOW());
 
+  -- ============================================
   -- Zone 엔티티 (7건) - graph_relations FK용
+  -- ============================================
   INSERT INTO graph_entities (id, store_id, user_id, org_id, entity_type_id, label, properties,
     model_3d_position, model_3d_rotation, model_3d_scale, created_at, updated_at) VALUES
   ('a0000001-0000-0000-0000-000000000001'::UUID, v_store_id, v_user_id, v_org_id,
@@ -1475,7 +1599,9 @@ BEGIN
    '{"zone_code":"Z007","zone_type":"lounge"}'::jsonb,
    '{"x":0,"y":0,"z":7}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, '{"x":8,"y":3,"z":2}'::jsonb, NOW(), NOW());
 
+  -- ============================================
   -- 제품 (15건)
+  -- ============================================
   INSERT INTO graph_entities (id, store_id, user_id, org_id, entity_type_id, label, properties,
     model_3d_position, model_3d_rotation, model_3d_scale, created_at, updated_at) VALUES
   -- 의류 (5)
@@ -1543,8 +1669,13 @@ BEGIN
    '{"sku":"SKU-COS-003","display_type":"counter","parent_furniture":"d0000006-0000-0000-0000-000000000006"}'::jsonb,
    '{"x":7.3,"y":1.07,"z":1.1}'::jsonb, '{"x":0,"y":-90,"z":0}'::jsonb, '{"x":1,"y":1,"z":1}'::jsonb, NOW(), NOW());
 
-  RAISE NOTICE '  ✓ graph_entities: 30건 생성 (가구 6, 구조물 2, Zone 7, 제품 15)';
+  RAISE NOTICE '  ✓ graph_entities: 30건 생성';
+  RAISE NOTICE '    - 가구: 6건';
+  RAISE NOTICE '    - 구조물: 2건';
+  RAISE NOTICE '    - Zone: 7건';
+  RAISE NOTICE '    - 제품: 15건';
 END $$;
+
 
 -- ============================================================================
 -- STEP 19: graph_relations 생성 (30건)
@@ -1552,17 +1683,17 @@ END $$;
 DO $$
 DECLARE
   v_store_id UUID := 'd9830554-2688-4032-af40-acccda787ac4';
-  v_user_id UUID;
-  v_org_id UUID;
+  v_user_id UUID := 'e4200130-08e8-47da-8c92-3d0b90fafd77';
+  v_org_id UUID := '0c6076e3-a993-4022-9b40-0f4e4370f8ef';
 BEGIN
-  SELECT user_id, org_id INTO v_user_id, v_org_id FROM stores WHERE id = v_store_id;
-
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
-  RAISE NOTICE 'STEP 19: graph_relations 생성 (30건)';
+  RAISE NOTICE 'graph_relations 생성 (30건)';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
 
+  -- ============================================
   -- displayed_on 관계 (제품 -> 가구) - 15건
+  -- ============================================
   INSERT INTO graph_relations (id, store_id, user_id, org_id, relation_type_id, source_entity_id, target_entity_id, properties, weight, created_at) VALUES
     (gen_random_uuid(), v_store_id, v_user_id, v_org_id, 'c0000001-0000-0000-0000-000000000001'::UUID, 'e0000001-0000-0000-0000-000000000001'::UUID, 'd0000003-0000-0000-0000-000000000003'::UUID, '{"position":"hanging"}'::jsonb, 1.0, NOW()),
     (gen_random_uuid(), v_store_id, v_user_id, v_org_id, 'c0000001-0000-0000-0000-000000000001'::UUID, 'e0000002-0000-0000-0000-000000000002'::UUID, 'd0000003-0000-0000-0000-000000000003'::UUID, '{"position":"hanging"}'::jsonb, 1.0, NOW()),
@@ -1580,7 +1711,11 @@ BEGIN
     (gen_random_uuid(), v_store_id, v_user_id, v_org_id, 'c0000001-0000-0000-0000-000000000001'::UUID, 'e0000014-0000-0000-0000-000000000014'::UUID, 'd0000006-0000-0000-0000-000000000006'::UUID, '{"position":"counter"}'::jsonb, 1.0, NOW()),
     (gen_random_uuid(), v_store_id, v_user_id, v_org_id, 'c0000001-0000-0000-0000-000000000001'::UUID, 'e0000015-0000-0000-0000-000000000015'::UUID, 'd0000006-0000-0000-0000-000000000006'::UUID, '{"position":"counter"}'::jsonb, 1.0, NOW());
 
+  RAISE NOTICE '  ✓ displayed_on: 15건';
+
+  -- ============================================
   -- located_near 관계 (가구 간) - 5건
+  -- ============================================
   INSERT INTO graph_relations (id, store_id, user_id, org_id, relation_type_id, source_entity_id, target_entity_id, properties, weight, created_at) VALUES
     (gen_random_uuid(), v_store_id, v_user_id, v_org_id, 'c0000002-0000-0000-0000-000000000002'::UUID, 'd0000001-0000-0000-0000-000000000001'::UUID, 'd0000007-0000-0000-0000-000000000007'::UUID, '{"distance":2.5}'::jsonb, 1.0, NOW()),
     (gen_random_uuid(), v_store_id, v_user_id, v_org_id, 'c0000002-0000-0000-0000-000000000002'::UUID, 'd0000003-0000-0000-0000-000000000003'::UUID, 'd0000004-0000-0000-0000-000000000004'::UUID, '{"distance":3}'::jsonb, 1.0, NOW()),
@@ -1588,7 +1723,11 @@ BEGIN
     (gen_random_uuid(), v_store_id, v_user_id, v_org_id, 'c0000002-0000-0000-0000-000000000002'::UUID, 'd0000002-0000-0000-0000-000000000002'::UUID, 'd0000006-0000-0000-0000-000000000006'::UUID, '{"distance":2}'::jsonb, 1.0, NOW()),
     (gen_random_uuid(), v_store_id, v_user_id, v_org_id, 'c0000002-0000-0000-0000-000000000002'::UUID, 'd0000004-0000-0000-0000-000000000004'::UUID, 'd0000005-0000-0000-0000-000000000005'::UUID, '{"distance":5}'::jsonb, 1.0, NOW());
 
+  RAISE NOTICE '  ✓ located_near: 5건';
+
+  -- ============================================
   -- belongs_to_zone 관계 (가구/구조물 -> 존) - 6건
+  -- ============================================
   INSERT INTO graph_relations (id, store_id, user_id, org_id, relation_type_id, source_entity_id, target_entity_id, properties, weight, created_at) VALUES
     (gen_random_uuid(), v_store_id, v_user_id, v_org_id, 'c0000003-0000-0000-0000-000000000003'::UUID, 'd0000008-0000-0000-0000-000000000008'::UUID, 'a0000001-0000-0000-0000-000000000001'::UUID, '{}'::jsonb, 1.0, NOW()),
     (gen_random_uuid(), v_store_id, v_user_id, v_org_id, 'c0000003-0000-0000-0000-000000000003'::UUID, 'd0000004-0000-0000-0000-000000000004'::UUID, 'a0000002-0000-0000-0000-000000000002'::UUID, '{}'::jsonb, 1.0, NOW()),
@@ -1597,14 +1736,20 @@ BEGIN
     (gen_random_uuid(), v_store_id, v_user_id, v_org_id, 'c0000003-0000-0000-0000-000000000003'::UUID, 'd0000007-0000-0000-0000-000000000007'::UUID, 'a0000005-0000-0000-0000-000000000005'::UUID, '{}'::jsonb, 1.0, NOW()),
     (gen_random_uuid(), v_store_id, v_user_id, v_org_id, 'c0000003-0000-0000-0000-000000000003'::UUID, 'd0000005-0000-0000-0000-000000000005'::UUID, 'a0000006-0000-0000-0000-000000000006'::UUID, '{}'::jsonb, 1.0, NOW());
 
+  RAISE NOTICE '  ✓ belongs_to_zone: 6건';
+
+  -- ============================================
   -- cross_sells_with 관계 (제품 간 교차판매) - 4건
+  -- ============================================
   INSERT INTO graph_relations (id, store_id, user_id, org_id, relation_type_id, source_entity_id, target_entity_id, properties, weight, created_at) VALUES
     (gen_random_uuid(), v_store_id, v_user_id, v_org_id, 'c0000004-0000-0000-0000-000000000004'::UUID, 'e0000001-0000-0000-0000-000000000001'::UUID, 'e0000012-0000-0000-0000-000000000012'::UUID, '{"correlation":0.75}'::jsonb, 0.75, NOW()),
     (gen_random_uuid(), v_store_id, v_user_id, v_org_id, 'c0000004-0000-0000-0000-000000000004'::UUID, 'e0000003-0000-0000-0000-000000000003'::UUID, 'e0000004-0000-0000-0000-000000000004'::UUID, '{"correlation":0.68}'::jsonb, 0.68, NOW()),
     (gen_random_uuid(), v_store_id, v_user_id, v_org_id, 'c0000004-0000-0000-0000-000000000004'::UUID, 'e0000007-0000-0000-0000-000000000007'::UUID, 'e0000009-0000-0000-0000-000000000009'::UUID, '{"correlation":0.62}'::jsonb, 0.62, NOW()),
     (gen_random_uuid(), v_store_id, v_user_id, v_org_id, 'c0000004-0000-0000-0000-000000000004'::UUID, 'e0000013-0000-0000-0000-000000000013'::UUID, 'e0000015-0000-0000-0000-000000000015'::UUID, '{"correlation":0.85}'::jsonb, 0.85, NOW());
 
-  RAISE NOTICE '  ✓ graph_relations: 30건 생성';
+  RAISE NOTICE '  ✓ cross_sells_with: 4건';
+  RAISE NOTICE '';
+  RAISE NOTICE '  ✓ graph_relations 총: 30건 생성';
 END $$;
 
 -- ============================================================================
@@ -1613,32 +1758,49 @@ END $$;
 DO $$
 DECLARE
   v_store_id UUID := 'd9830554-2688-4032-af40-acccda787ac4';
-  v_user_id UUID;
-  v_org_id UUID;
+  v_user_id UUID := 'e4200130-08e8-47da-8c92-3d0b90fafd77';
+  v_org_id UUID := '0c6076e3-a993-4022-9b40-0f4e4370f8ef';
 BEGIN
-  SELECT user_id, org_id INTO v_user_id, v_org_id FROM stores WHERE id = v_store_id;
-
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
-  RAISE NOTICE 'STEP 20: store_scenes 생성 (1건)';
+  RAISE NOTICE 'store_scenes 생성 (1건)';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
 
-  INSERT INTO store_scenes (id, store_id, user_id, org_id, scene_name, scene_type, recipe_data, is_active, created_at, updated_at)
-  VALUES (
-    gen_random_uuid(), v_store_id, v_user_id, v_org_id,
-    '기본 레이아웃', '3d_layout',
+  INSERT INTO store_scenes (
+    id, store_id, user_id, org_id, 
+    scene_name, scene_type, recipe_data, 
+    is_active, created_at, updated_at
+  ) VALUES (
+    gen_random_uuid(), 
+    v_store_id, 
+    v_user_id, 
+    v_org_id,
+    '기본 레이아웃', 
+    '3d_layout',
     jsonb_build_object(
       'version', '2.0',
-      'floor', jsonb_build_object('width', 15, 'depth', 16.67, 'material', 'wood'),
-      'walls', jsonb_build_object('height', 3, 'material', 'white'),
-      'lighting', jsonb_build_object('ambient', 0.5, 'directional', 0.8),
+      'floor', jsonb_build_object(
+        'width', 15, 
+        'depth', 16.67, 
+        'material', 'wood'
+      ),
+      'walls', jsonb_build_object(
+        'height', 3, 
+        'material', 'white'
+      ),
+      'lighting', jsonb_build_object(
+        'ambient', 0.5, 
+        'directional', 0.8
+      ),
       'camera', jsonb_build_object(
         'position', jsonb_build_object('x', 0, 'y', 12, 'z', 18),
         'target', jsonb_build_object('x', 0, 'y', 0, 'z', 0)
       ),
       'store_model', 'Store_B_17.4x3.0x16.6.glb'
     ),
-    true, NOW(), NOW()
+    true, 
+    NOW(), 
+    NOW()
   );
 
   RAISE NOTICE '  ✓ store_scenes: 1건 생성';
@@ -1650,49 +1812,66 @@ END $$;
 DO $$
 DECLARE
   v_store_id UUID := 'd9830554-2688-4032-af40-acccda787ac4';
-  v_user_id UUID;
-  v_org_id UUID;
+  v_user_id UUID := 'e4200130-08e8-47da-8c92-3d0b90fafd77';
+  v_org_id UUID := '0c6076e3-a993-4022-9b40-0f4e4370f8ef';
 BEGIN
-  SELECT user_id, org_id INTO v_user_id, v_org_id FROM stores WHERE id = v_store_id;
-
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
-  RAISE NOTICE 'STEP 21: ai_recommendations 생성 (4건)';
+  RAISE NOTICE 'ai_recommendations 생성 (4건)';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
 
-  INSERT INTO ai_recommendations (id, store_id, user_id, org_id, title, description,
-    recommendation_type, priority, action_category, data_source, expected_impact, evidence,
-    status, is_displayed, created_at, updated_at) VALUES
-  (gen_random_uuid(), v_store_id, v_user_id, v_org_id,
-   '저성과 상품 리포지셔닝: 다운 패딩',
-   '다운 패딩 상품의 전환율이 5.2%로 낮습니다. 입구 근처로 위치 변경을 권장합니다.',
-   'layout', 'high', 'revenue_increase', 'product_performance_agg',
-   '{"potential_increase": 750000, "confidence": 78}'::jsonb,
-   '{"views": 150, "purchases": 8, "conversion_rate": 5.2}'::jsonb,
-   'active', true, NOW(), NOW()),
-  (gen_random_uuid(), v_store_id, v_user_id, v_org_id,
-   '혼잡 존 레이아웃 개선: 메인홀',
-   '메인홀 존의 피크 시간대 방문자가 35명으로 용량(40) 대비 혼잡합니다.',
-   'layout', 'high', 'operational_efficiency', 'zone_daily_metrics',
-   '{"efficiency_gain": 15, "confidence": 82}'::jsonb,
-   '{"zone": "메인홀", "peak_visitors": 35, "capacity": 40}'::jsonb,
-   'active', true, NOW(), NOW()),
-  (gen_random_uuid(), v_store_id, v_user_id, v_org_id,
-   '피크타임 인력 보강: 18시',
-   '18시에 평균 22명 방문. 직원 추가 배치 권장.',
-   'staffing', 'medium', 'operational_efficiency', 'hourly_metrics',
-   '{"service_improvement": 20, "confidence": 80}'::jsonb,
-   '{"peak_hour": 18, "avg_visitors": 22}'::jsonb,
-   'active', true, NOW(), NOW()),
-  (gen_random_uuid(), v_store_id, v_user_id, v_org_id,
-   'VIP 고객 특별 이벤트 제안',
-   'VIP 세그먼트 대상 전용 사전 구매 이벤트로 충성도 강화 권장.',
-   'promotion', 'medium', 'customer_experience', 'customer_segments_agg',
-   '{"potential_revenue": 500000, "confidence": 75}'::jsonb,
-   '{"segment": "VIP"}'::jsonb,
-   'active', true, NOW(), NOW());
+  INSERT INTO ai_recommendations (
+    id, store_id, user_id, org_id, 
+    title, description,
+    recommendation_type, priority, action_category, data_source, 
+    expected_impact, evidence,
+    status, is_displayed, created_at, updated_at
+  ) VALUES
+  -- 1. 레이아웃 추천: 저성과 상품 리포지셔닝
+  (
+    gen_random_uuid(), v_store_id, v_user_id, v_org_id,
+    '저성과 상품 리포지셔닝: 다운 패딩',
+    '다운 패딩 상품의 전환율이 5.2%로 낮습니다. 입구 근처로 위치 변경을 권장합니다.',
+    'layout', 'high', 'revenue_increase', 'product_performance_agg',
+    '{"potential_increase": 750000, "confidence": 78}'::jsonb,
+    '{"views": 150, "purchases": 8, "conversion_rate": 5.2}'::jsonb,
+    'active', true, NOW(), NOW()
+  ),
+  -- 2. 레이아웃 추천: 혼잡 존 개선
+  (
+    gen_random_uuid(), v_store_id, v_user_id, v_org_id,
+    '혼잡 존 레이아웃 개선: 메인홀',
+    '메인홀 존의 피크 시간대 방문자가 35명으로 용량(40) 대비 혼잡합니다.',
+    'layout', 'high', 'operational_efficiency', 'zone_daily_metrics',
+    '{"efficiency_gain": 15, "confidence": 82}'::jsonb,
+    '{"zone": "메인홀", "peak_visitors": 35, "capacity": 40}'::jsonb,
+    'active', true, NOW(), NOW()
+  ),
+  -- 3. 인력 추천: 피크타임 보강
+  (
+    gen_random_uuid(), v_store_id, v_user_id, v_org_id,
+    '피크타임 인력 보강: 18시',
+    '18시에 평균 22명 방문. 직원 추가 배치 권장.',
+    'staffing', 'medium', 'operational_efficiency', 'hourly_metrics',
+    '{"service_improvement": 20, "confidence": 80}'::jsonb,
+    '{"peak_hour": 18, "avg_visitors": 22}'::jsonb,
+    'active', true, NOW(), NOW()
+  ),
+  -- 4. 프로모션 추천: VIP 이벤트
+  (
+    gen_random_uuid(), v_store_id, v_user_id, v_org_id,
+    'VIP 고객 특별 이벤트 제안',
+    'VIP 세그먼트 대상 전용 사전 구매 이벤트로 충성도 강화 권장.',
+    'promotion', 'medium', 'customer_experience', 'customer_segments_agg',
+    '{"potential_revenue": 500000, "confidence": 75}'::jsonb,
+    '{"segment": "VIP"}'::jsonb,
+    'active', true, NOW(), NOW()
+  );
 
   RAISE NOTICE '  ✓ ai_recommendations: 4건 생성';
+  RAISE NOTICE '    - layout (high): 2건';
+  RAISE NOTICE '    - staffing (medium): 1건';
+  RAISE NOTICE '    - promotion (medium): 1건';
 END $$;
 
 -- ============================================================================
