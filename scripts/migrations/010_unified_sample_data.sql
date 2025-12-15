@@ -71,6 +71,9 @@ BEGIN
   -- 재고 삭제
   DELETE FROM inventory_levels WHERE product_id IN (SELECT id FROM products WHERE store_id = v_store_id);
 
+  -- ✅ 직원 관련 삭제 (stores 삭제 전에 필수!)
+  DELETE FROM staff WHERE store_id = v_store_id;
+
   -- 마스터 데이터 삭제
   DELETE FROM store_scenes WHERE store_id = v_store_id;
   DELETE FROM products WHERE store_id = v_store_id;
