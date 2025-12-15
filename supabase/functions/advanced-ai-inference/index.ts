@@ -2752,6 +2752,16 @@ async function performLayoutOptimization(request: InferenceRequest, apiKey: stri
   const storeContext = params?.storeContext;
   const goal = params?.goal || 'revenue';
 
+  // storeContext 디버그 로깅
+  console.log('[LayoutOptimization] storeContext available:', {
+    hasStoreInfo: !!storeContext?.storeInfo,
+    zonesCount: storeContext?.zones?.length || 0,
+    zoneMetricsCount: storeContext?.zoneMetrics?.length || 0,
+    dailySalesCount: storeContext?.dailySales?.length || 0,
+    visitsCount: storeContext?.visits?.length || 0,
+    dataQuality: storeContext?.dataQuality,
+  });
+
   // 프롬프트 빌드
   const prompt = `You are an expert retail space optimization AI specializing in store layout design.
 
@@ -2869,6 +2879,9 @@ Return a JSON object with this exact structure:
       aiResponse.improvements?.trafficIncrease ? aiResponse.improvements.trafficIncrease / 100 : 0.1
     );
 
+    // 데이터 소스 메타데이터
+    const usedRealData = !!(storeContext?.zones?.length && storeContext?.zoneMetrics?.length);
+
     return {
       result: {
         id: `layout-${Date.now()}`,
@@ -2896,6 +2909,13 @@ Return a JSON object with this exact structure:
           },
         },
         insights: aiResponse.insights || ['레이아웃 최적화 분석이 완료되었습니다.'],
+        dataSource: {
+          usedRealData,
+          zonesAvailable: storeContext?.zones?.length || 0,
+          zoneMetricsAvailable: storeContext?.zoneMetrics?.length || 0,
+          visitsAvailable: storeContext?.visits?.length || 0,
+          note: usedRealData ? '실제 매장 데이터 기반 분석' : '존 데이터 없음 - 시뮬레이션 기반 분석',
+        },
         visualization: {
           beforeHeatmap,
           afterHeatmap,
@@ -2923,8 +2943,11 @@ function generateHeatmapFromZoneMetrics(
 ): Array<{ x: number; z: number; intensity: number }> {
   const data: Array<{ x: number; z: number; intensity: number }> = [];
 
+  console.log(`[Heatmap] zones: ${zones?.length || 0}, zoneMetrics: ${zoneMetrics?.length || 0}`);
+
   if (!zones?.length || !zoneMetrics?.length) {
     // 존 데이터가 없으면 기본 그리드 생성
+    console.log('[Heatmap] Falling back to random grid - no zone data available');
     return generateHeatmapDataForStore(width, depth, intensityBoost);
   }
 
