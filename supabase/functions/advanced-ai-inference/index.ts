@@ -2951,21 +2951,36 @@ function generateHeatmapFromZoneMetrics(
     return generateHeatmapDataForStore(width, depth, intensityBoost);
   }
 
-  // 존별 방문자 수 맵 생성
+  // 존별 방문자 수 및 히트맵 강도 맵 생성
   const zoneVisitorMap = new Map<string, number>();
+  const zoneHeatmapMap = new Map<string, number>();
   zoneMetrics.forEach((m: any) => {
-    const current = zoneVisitorMap.get(m.zoneId || m.zone_id) || 0;
-    zoneVisitorMap.set(m.zoneId || m.zone_id, current + (m.visitorCount || m.visitor_count || 0));
+    const zoneId = m.zoneId || m.zone_id;
+    const currentVisitors = zoneVisitorMap.get(zoneId) || 0;
+    zoneVisitorMap.set(zoneId, currentVisitors + (m.visitorCount || m.visitor_count || m.total_visitors || 0));
+    // heatmapIntensity가 있으면 사용 (DB에서 직접 계산된 값)
+    if (m.heatmapIntensity || m.heatmap_intensity) {
+      const currentIntensity = zoneHeatmapMap.get(zoneId) || 0;
+      const newIntensity = m.heatmapIntensity || m.heatmap_intensity;
+      // 평균 강도 계산
+      zoneHeatmapMap.set(zoneId, currentIntensity > 0 ? (currentIntensity + newIntensity) / 2 : newIntensity);
+    }
   });
 
   // 최대 방문자 수 (정규화용)
   const maxVisitors = Math.max(...Array.from(zoneVisitorMap.values()), 1);
 
+  console.log(`[Heatmap] Using real zone data - maxVisitors: ${maxVisitors}, heatmapData: ${zoneHeatmapMap.size}`);
+
   // 각 존의 위치와 방문자 수 기반 히트맵 포인트 생성
   zones.forEach((zone: any) => {
     const zoneId = zone.id || zone.zoneId;
     const visitors = zoneVisitorMap.get(zoneId) || 0;
-    const intensity = Math.min(1, (visitors / maxVisitors) * 0.8 + 0.1 + intensityBoost);
+    // DB의 heatmap_intensity가 있으면 우선 사용, 없으면 방문자 수 기반 계산
+    const preCalcIntensity = zoneHeatmapMap.get(zoneId);
+    const intensity = preCalcIntensity !== undefined
+      ? Math.min(1, preCalcIntensity + intensityBoost)
+      : Math.min(1, (visitors / maxVisitors) * 0.8 + 0.1 + intensityBoost);
 
     const x = zone.x || zone.center_x || 0;
     const z = zone.z || zone.center_z || 0;
