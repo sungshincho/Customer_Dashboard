@@ -2851,11 +2851,23 @@ Return a JSON object with this exact structure:
       confidence: 0.7,
     });
 
-    // 히트맵 데이터 생성 (AI 응답 기반)
+    // 히트맵 데이터 생성 (실제 존 메트릭 기반)
     const storeWidth = storeContext?.storeInfo?.width || 17;
     const storeDepth = storeContext?.storeInfo?.depth || 16;
-    const beforeHeatmap = generateHeatmapDataForStore(storeWidth, storeDepth, 0);
-    const afterHeatmap = generateHeatmapDataForStore(storeWidth, storeDepth, aiResponse.improvements?.trafficIncrease ? aiResponse.improvements.trafficIncrease / 100 : 0.1);
+    const beforeHeatmap = generateHeatmapFromZoneMetrics(
+      storeContext?.zones || [],
+      storeContext?.zoneMetrics || [],
+      storeWidth,
+      storeDepth,
+      0
+    );
+    const afterHeatmap = generateHeatmapFromZoneMetrics(
+      storeContext?.zones || [],
+      storeContext?.zoneMetrics || [],
+      storeWidth,
+      storeDepth,
+      aiResponse.improvements?.trafficIncrease ? aiResponse.improvements.trafficIncrease / 100 : 0.1
+    );
 
     return {
       result: {
@@ -2901,7 +2913,67 @@ Return a JSON object with this exact structure:
   }
 }
 
-// 매장 크기 기반 히트맵 생성 헬퍼
+// 실제 존 메트릭 기반 히트맵 생성
+function generateHeatmapFromZoneMetrics(
+  zones: any[],
+  zoneMetrics: any[],
+  width: number,
+  depth: number,
+  intensityBoost = 0
+): Array<{ x: number; z: number; intensity: number }> {
+  const data: Array<{ x: number; z: number; intensity: number }> = [];
+
+  if (!zones?.length || !zoneMetrics?.length) {
+    // 존 데이터가 없으면 기본 그리드 생성
+    return generateHeatmapDataForStore(width, depth, intensityBoost);
+  }
+
+  // 존별 방문자 수 맵 생성
+  const zoneVisitorMap = new Map<string, number>();
+  zoneMetrics.forEach((m: any) => {
+    const current = zoneVisitorMap.get(m.zoneId || m.zone_id) || 0;
+    zoneVisitorMap.set(m.zoneId || m.zone_id, current + (m.visitorCount || m.visitor_count || 0));
+  });
+
+  // 최대 방문자 수 (정규화용)
+  const maxVisitors = Math.max(...Array.from(zoneVisitorMap.values()), 1);
+
+  // 각 존의 위치와 방문자 수 기반 히트맵 포인트 생성
+  zones.forEach((zone: any) => {
+    const zoneId = zone.id || zone.zoneId;
+    const visitors = zoneVisitorMap.get(zoneId) || 0;
+    const intensity = Math.min(1, (visitors / maxVisitors) * 0.8 + 0.1 + intensityBoost);
+
+    const x = zone.x || zone.center_x || 0;
+    const z = zone.z || zone.center_z || 0;
+    const zoneWidth = zone.width || 3;
+    const zoneDepth = zone.depth || 3;
+
+    // 존 영역에 여러 포인트 생성
+    for (let dx = -zoneWidth/2; dx <= zoneWidth/2; dx += 1) {
+      for (let dz = -zoneDepth/2; dz <= zoneDepth/2; dz += 1) {
+        // 중심에서 멀어질수록 intensity 감소
+        const distFromCenter = Math.sqrt(dx*dx + dz*dz) / Math.max(zoneWidth, zoneDepth);
+        const localIntensity = intensity * (1 - distFromCenter * 0.3);
+
+        data.push({
+          x: x + dx,
+          z: z + dz,
+          intensity: Math.max(0.1, Math.min(1, localIntensity)),
+        });
+      }
+    }
+  });
+
+  // 데이터가 너무 적으면 그리드 보충
+  if (data.length < 20) {
+    return generateHeatmapDataForStore(width, depth, intensityBoost);
+  }
+
+  return data;
+}
+
+// 매장 크기 기반 히트맵 생성 헬퍼 (fallback)
 function generateHeatmapDataForStore(width: number, depth: number, intensityBoost = 0): Array<{ x: number; z: number; intensity: number }> {
   const data: Array<{ x: number; z: number; intensity: number }> = [];
   const halfWidth = width / 2;
@@ -3109,7 +3181,13 @@ Return a JSON object with this exact structure:
             severity: bn.severity,
             radius: 0.5 + (bn.severity || 0.5),
           })),
-          flowHeatmap: generateHeatmapDataForStore(storeWidth, storeDepth, 0),
+          flowHeatmap: generateHeatmapFromZoneMetrics(
+            storeContext?.zones || [],
+            storeContext?.zoneMetrics || [],
+            storeWidth,
+            storeDepth,
+            0
+          ),
           zoneFlowArrows: [],
         },
       },

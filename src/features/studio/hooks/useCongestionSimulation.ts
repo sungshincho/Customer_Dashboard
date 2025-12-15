@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { useToast } from '@/components/ui/use-toast';
+import { buildStoreContext } from '../utils/store-context-builder';
 import type { SimulationStatus, ConfidenceDetails } from '../types';
 
 // ============================================================================
@@ -200,10 +201,16 @@ export function useCongestionSimulation(): UseCongestionSimulationReturn {
 
       setProgress(10);
 
-      // advanced-ai-inference Edge Function 호출
+      // 실제 매장 데이터 기반 storeContext 빌드
+      console.log('[useCongestionSimulation] Building store context for:', selectedStore.id);
+      const storeContext = await buildStoreContext(selectedStore.id);
+
+      setProgress(30);
+
+      // advanced-ai-inference Edge Function 호출 (storeContext 포함)
       const { data, error } = await supabase.functions.invoke('advanced-ai-inference', {
         body: {
-          type: 'congestion_prediction',
+          type: 'congestion_simulation',
           storeId: selectedStore.id,
           orgId,
           params: {
@@ -212,6 +219,7 @@ export function useCongestionSimulation(): UseCongestionSimulationReturn {
             includeWeather: params.includeWeather ?? true,
             includeEvents: params.includeEvents ?? true,
             scenario: params.scenario || 'normal',
+            storeContext, // 실제 매장 데이터 전달
           },
         },
       });

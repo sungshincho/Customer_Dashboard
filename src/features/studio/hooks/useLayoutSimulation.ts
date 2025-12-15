@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { useToast } from '@/components/ui/use-toast';
+import { buildStoreContext } from '../utils/store-context-builder';
 import type {
   LayoutOptimizationResult,
   FurnitureMove,
@@ -145,7 +146,20 @@ export function useLayoutSimulation(): UseLayoutSimulationReturn {
 
       setProgress(10);
 
-      // advanced-ai-inference Edge Function 호출
+      // 실제 매장 데이터 기반 storeContext 빌드
+      console.log('[useLayoutSimulation] Building store context for:', selectedStore.id);
+      const storeContext = await buildStoreContext(selectedStore.id);
+      console.log('[useLayoutSimulation] Store context built:', {
+        dailySales: storeContext.dailySales?.length,
+        visits: storeContext.visits?.length,
+        zones: storeContext.zones?.length,
+        zoneMetrics: storeContext.zoneMetrics?.length,
+        dataQuality: storeContext.dataQuality,
+      });
+
+      setProgress(30);
+
+      // advanced-ai-inference Edge Function 호출 (storeContext 포함)
       const { data, error } = await supabase.functions.invoke('advanced-ai-inference', {
         body: {
           type: 'layout_optimization',
@@ -155,6 +169,7 @@ export function useLayoutSimulation(): UseLayoutSimulationReturn {
             goal: params.goal,
             constraints: params.constraints || {},
             analysisDepth: params.analysisDepth || 'standard',
+            storeContext, // 실제 매장 데이터 전달
           },
         },
       });
