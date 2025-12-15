@@ -72,10 +72,10 @@ export const useInsightMetrics = () => {
       const startDate = dateRange.startDate;
       const endDate = dateRange.endDate;
 
-      // 1. daily_kpis_agg에서 기본 지표 (Footfall, Revenue)
+      // 1. daily_kpis_agg에서 기본 지표 (Footfall, Revenue, Unique Visitors)
       const { data: kpis } = await supabase
         .from('daily_kpis_agg')
-        .select('total_visitors, total_revenue, returning_visitors')
+        .select('total_visitors, unique_visitors, total_revenue, returning_visitors')
         .eq('org_id', orgId)
         .eq('store_id', selectedStore.id)
         .gte('date', startDate)
@@ -83,19 +83,47 @@ export const useInsightMetrics = () => {
 
       const footfall = kpis?.reduce((sum, k) => sum + (k.total_visitors || 0), 0) || 0;
       const revenue = kpis?.reduce((sum, k) => sum + Number(k.total_revenue || 0), 0) || 0;
-      const totalReturning = kpis?.reduce((sum, k) => sum + (k.returning_visitors || 0), 0) || 0;
+      const kpiReturningSum = kpis?.reduce((sum, k) => sum + (k.returning_visitors || 0), 0) || 0;
 
-      // 2. store_visits에서 실제 순 방문객 조회 (COUNT DISTINCT customer_id)
+      // 2. store_visits에서 실제 순 방문객 및 재방문률 조회
       const { data: visitStats } = await supabase
         .from('store_visits')
-        .select('customer_id')
+        .select('id, customer_id')
         .eq('store_id', selectedStore.id)
         .gte('visit_date', `${startDate}T00:00:00`)
         .lte('visit_date', `${endDate}T23:59:59`);
 
-      // 순 방문객 = 고유 customer_id 수
-      const uniqueCustomerIds = new Set(visitStats?.map(v => v.customer_id).filter(Boolean));
-      const uniqueVisitors = uniqueCustomerIds.size;
+      // 총 방문 수 (store_visits 기준)
+      const totalVisitsCount = visitStats?.length || 0;
+
+      // 순 방문객 계산: customer_id가 있는 경우 고유 고객 수 + NULL 방문 수
+      const customerIdVisits = visitStats?.filter(v => v.customer_id) || [];
+      const uniqueCustomerIds = new Set(customerIdVisits.map(v => v.customer_id));
+      const anonymousVisits = (visitStats?.length || 0) - customerIdVisits.length;
+
+      // 순 방문객 = 고유 고객 수 + 익명 방문 수 (각 익명 방문을 개별 방문자로 취급)
+      // 또는 daily_kpis_agg의 unique_visitors 합계 사용 (더 정확할 수 있음)
+      const kpiUniqueVisitors = kpis?.reduce((sum, k) => sum + (k.unique_visitors || 0), 0) || 0;
+
+      // 더 큰 값 사용 (데이터 일관성 문제 대응)
+      const uniqueVisitors = Math.max(
+        uniqueCustomerIds.size + anonymousVisits, // store_visits 기반
+        kpiUniqueVisitors // daily_kpis_agg 기반
+      );
+
+      // 재방문률 계산: 2회 이상 방문한 고객 비율
+      const customerVisitCounts = new Map<string, number>();
+      customerIdVisits.forEach(v => {
+        const count = customerVisitCounts.get(v.customer_id!) || 0;
+        customerVisitCounts.set(v.customer_id!, count + 1);
+      });
+      const returningCustomers = Array.from(customerVisitCounts.values()).filter(count => count >= 2).length;
+      const totalTrackedCustomers = customerVisitCounts.size;
+
+      // 재방문률 = 2회 이상 방문 고객 / 전체 고객 * 100
+      const calculatedRepeatRate = totalTrackedCustomers > 0
+        ? (returningCustomers / totalTrackedCustomers) * 100
+        : 0;
 
       // 퍼널 데이터: funnel_events 테이블에서 실제 데이터 조회
       const { data: funnelEvents } = await supabase
@@ -154,8 +182,15 @@ export const useInsightMetrics = () => {
         endDate,
         footfall,
         uniqueVisitors,
+        kpiUniqueVisitors,
+        uniqueCustomerIdsSize: uniqueCustomerIds.size,
+        anonymousVisits,
+        totalVisitsCount,
         visitStatsCount: visitStats?.length,
         purchaseCount,
+        returningCustomers,
+        totalTrackedCustomers,
+        calculatedRepeatRate,
       });
 
       // 3. zone_events에서 행동 지표
@@ -205,13 +240,30 @@ export const useInsightMetrics = () => {
       // 전 기간 순 방문객 (store_visits 기반)
       const { data: prevVisitStats } = await supabase
         .from('store_visits')
-        .select('customer_id')
+        .select('id, customer_id')
         .eq('store_id', selectedStore.id)
         .gte('visit_date', `${prevStartDate.toISOString().split('T')[0]}T00:00:00`)
         .lte('visit_date', `${prevEndDate.toISOString().split('T')[0]}T23:59:59`);
 
-      const prevUniqueCustomerIds = new Set(prevVisitStats?.map(v => v.customer_id).filter(Boolean));
-      const prevUniqueVisitors = prevUniqueCustomerIds.size;
+      // 전 기간 순 방문객 계산 (현재 기간과 동일한 로직)
+      const prevCustomerIdVisits = prevVisitStats?.filter(v => v.customer_id) || [];
+      const prevUniqueCustomerIds = new Set(prevCustomerIdVisits.map(v => v.customer_id));
+      const prevAnonymousVisits = (prevVisitStats?.length || 0) - prevCustomerIdVisits.length;
+
+      // 전 기간 daily_kpis_agg unique_visitors도 조회
+      const { data: prevKpisUnique } = await supabase
+        .from('daily_kpis_agg')
+        .select('unique_visitors')
+        .eq('org_id', orgId)
+        .eq('store_id', selectedStore.id)
+        .gte('date', prevStartDate.toISOString().split('T')[0])
+        .lte('date', prevEndDate.toISOString().split('T')[0]);
+
+      const prevKpiUniqueVisitors = prevKpisUnique?.reduce((sum, k) => sum + (k.unique_visitors || 0), 0) || 0;
+      const prevUniqueVisitors = Math.max(
+        prevUniqueCustomerIds.size + prevAnonymousVisits,
+        prevKpiUniqueVisitors
+      );
 
       // 전 기간 퍼널 데이터
       const prevEntry = prevFootfall || prevVisitStats?.length || 0;
@@ -230,7 +282,8 @@ export const useInsightMetrics = () => {
       const prevConversionRate = prevEntry > 0 ? (prevPurchase / prevEntry) * 100 : 0;
       const atv = transactions > 0 ? Math.round(revenue / transactions) : 0;
       const trackingCoverage = uniqueVisitors > 0 ? (trackedVisitors / uniqueVisitors) * 100 : 0;
-      const repeatRate = footfall > 0 ? (totalReturning / footfall) * 100 : 0;
+      // 재방문률: store_visits 기반 계산값 사용 (2회 이상 방문 고객 비율)
+      const repeatRate = calculatedRepeatRate;
 
       // ATV 디버깅 로그
       console.log('[useInsightMetrics] ATV calculation:', {
