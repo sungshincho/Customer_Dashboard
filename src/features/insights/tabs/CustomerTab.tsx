@@ -45,7 +45,7 @@ export function CustomerTab() {
   const { selectedStore } = useSelectedStore();
   const { dateRange } = useDateFilterStore();
   const { user, orgId } = useAuth();
-  const { data: metrics } = useInsightMetrics();
+  const { data: metrics, isLoading: metricsLoading } = useInsightMetrics();
 
   // 고객 세그먼트 데이터 (customer_segments_agg 테이블)
   const { data: segmentData } = useQuery({
@@ -158,7 +158,9 @@ export function CustomerTab() {
             <p className="text-xs text-muted-foreground -mt-1">순 방문객</p>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{(metrics?.uniqueVisitors || summary.totalVisitors).toLocaleString()}명</div>
+            <div className="text-2xl font-bold">
+              {metricsLoading ? '-' : (metrics?.uniqueVisitors ?? 0).toLocaleString()}명
+            </div>
             <p className="text-xs text-muted-foreground">기간 내 고유 방문자</p>
           </CardContent>
         </Card>
@@ -172,7 +174,9 @@ export function CustomerTab() {
             <p className="text-xs text-muted-foreground -mt-1">재방문율</p>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{(metrics?.repeatRate || summary.avgReturnRate).toFixed(1)}%</div>
+            <div className="text-2xl font-bold">
+              {metricsLoading ? '-' : (metrics?.repeatRate ?? summary.avgReturnRate).toFixed(1)}%
+            </div>
             <p className="text-xs text-muted-foreground">기간 평균</p>
           </CardContent>
         </Card>

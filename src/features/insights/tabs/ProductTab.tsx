@@ -46,7 +46,7 @@ export function ProductTab() {
   const { selectedStore } = useSelectedStore();
   const { dateRange } = useDateFilterStore();
   const { user, orgId } = useAuth();
-  const { data: metrics } = useInsightMetrics();
+  const { data: metrics, isLoading: metricsLoading } = useInsightMetrics();
 
   // 상품별 판매 데이터 (product_performance_agg + products 조인)
   const { data: productData } = useQuery({
