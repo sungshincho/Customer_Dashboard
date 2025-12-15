@@ -1679,6 +1679,63 @@ export type Database = {
           },
         ]
       }
+      deleted_custom_types_backup: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          description: string | null
+          icon: string | null
+          id: string | null
+          label: string | null
+          model_3d_dimensions: Json | null
+          model_3d_metadata: Json | null
+          model_3d_type: string | null
+          model_3d_url: string | null
+          name: string | null
+          org_id: string | null
+          priority: string | null
+          properties: Json | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string | null
+          label?: string | null
+          model_3d_dimensions?: Json | null
+          model_3d_metadata?: Json | null
+          model_3d_type?: string | null
+          model_3d_url?: string | null
+          name?: string | null
+          org_id?: string | null
+          priority?: string | null
+          properties?: Json | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string | null
+          label?: string | null
+          model_3d_dimensions?: Json | null
+          model_3d_metadata?: Json | null
+          model_3d_type?: string | null
+          model_3d_url?: string | null
+          name?: string | null
+          org_id?: string | null
+          priority?: string | null
+          properties?: Json | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       economic_indicators: {
         Row: {
           created_at: string | null
