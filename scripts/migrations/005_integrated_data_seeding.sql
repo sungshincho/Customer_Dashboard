@@ -84,7 +84,6 @@ DECLARE
   v_inserted INT := 0;
   rec RECORD;
   v_customer_id UUID;
-  v_visit_id UUID;
 BEGIN
   SELECT id, user_id, org_id INTO v_store_id, v_user_id, v_org_id
   FROM stores ORDER BY created_at ASC LIMIT 1;
@@ -97,7 +96,6 @@ BEGIN
   ELSE
     RAISE NOTICE 'STEP 2: purchases 생성 시작...';
 
-    -- line_items의 각 고유 transaction_id에 대해 purchase 생성
     FOR rec IN
       SELECT
         li.transaction_id,
@@ -116,34 +114,17 @@ BEGIN
       ORDER BY random()
       LIMIT 1;
 
-      -- 해당 날짜의 방문 연결 시도 (store_visits 사용)
-      SELECT id INTO v_visit_id
-      FROM store_visits
-      WHERE store_id = v_store_id
-        AND DATE(visit_date) = rec.purchase_date
-      ORDER BY random()
-      LIMIT 1;
-
       INSERT INTO purchases (
-        id,
-        user_id,
-        org_id,
-        store_id,
-        customer_id,
-        visit_id,
-        product_id,
-        purchase_date,
-        quantity,
-        unit_price,
-        total_price,
-        created_at
+        id, user_id, org_id, store_id, customer_id,
+        visit_id,  -- NULL로 설정
+        product_id, purchase_date, quantity, unit_price, total_price, created_at
       ) VALUES (
         gen_random_uuid(),
         v_user_id,
         v_org_id,
         v_store_id,
         v_customer_id,
-        v_visit_id,
+        NULL,  -- visit_id는 NULL (visits 테이블 FK 문제 회피)
         rec.first_product_id,
         rec.purchase_date::timestamptz,
         rec.item_count,
