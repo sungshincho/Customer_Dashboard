@@ -107,7 +107,7 @@ export function OntologyGraph3D() {
       <div className="flex flex-col items-center justify-center h-full text-center gap-4">
         <p className="text-muted-foreground">온톨로지 스키마가 비어있습니다.</p>
         <p className="text-sm text-muted-foreground">
-          "마스터 스키마 동기화" 기능을 사용하여 최신 스키마를 불러오세요.
+          마스터 스키마 로딩 중이거나 검색 조건에 맞는 결과가 없습니다.
         </p>
       </div>
     );
