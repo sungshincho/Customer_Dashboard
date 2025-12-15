@@ -2157,6 +2157,48 @@ export type Database = {
         }
         Relationships: []
       }
+      graph_entities_migration_backup: {
+        Row: {
+          id: string | null
+          old_entity_type_id: string | null
+          old_type_name: string | null
+          old_type_scope: string | null
+          old_type_user_id: string | null
+        }
+        Insert: {
+          id?: string | null
+          old_entity_type_id?: string | null
+          old_type_name?: string | null
+          old_type_scope?: string | null
+          old_type_user_id?: string | null
+        }
+        Update: {
+          id?: string | null
+          old_entity_type_id?: string | null
+          old_type_name?: string | null
+          old_type_scope?: string | null
+          old_type_user_id?: string | null
+        }
+        Relationships: []
+      }
+      graph_entities_type_mapping_20251214: {
+        Row: {
+          entity_type_id: string | null
+          entity_type_name: string | null
+          id: string | null
+        }
+        Insert: {
+          entity_type_id?: string | null
+          entity_type_name?: string | null
+          id?: string | null
+        }
+        Update: {
+          entity_type_id?: string | null
+          entity_type_name?: string | null
+          id?: string | null
+        }
+        Relationships: []
+      }
       graph_relations: {
         Row: {
           created_at: string | null
@@ -2227,6 +2269,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      graph_relations_migration_backup: {
+        Row: {
+          id: string | null
+          old_relation_type_id: string | null
+          old_type_name: string | null
+          old_type_scope: string | null
+          old_type_user_id: string | null
+        }
+        Insert: {
+          id?: string | null
+          old_relation_type_id?: string | null
+          old_type_name?: string | null
+          old_type_scope?: string | null
+          old_type_user_id?: string | null
+        }
+        Update: {
+          id?: string | null
+          old_relation_type_id?: string | null
+          old_type_name?: string | null
+          old_type_scope?: string | null
+          old_type_user_id?: string | null
+        }
+        Relationships: []
       }
       holidays_events: {
         Row: {
@@ -3576,7 +3642,7 @@ export type Database = {
           priority: string | null
           properties: Json | null
           updated_at: string | null
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           color?: string | null
@@ -3594,7 +3660,7 @@ export type Database = {
           priority?: string | null
           properties?: Json | null
           updated_at?: string | null
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           color?: string | null
@@ -3612,7 +3678,64 @@ export type Database = {
           priority?: string | null
           properties?: Json | null
           updated_at?: string | null
-          user_id?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      ontology_entity_types_backup_20251214: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          description: string | null
+          icon: string | null
+          id: string | null
+          label: string | null
+          model_3d_dimensions: Json | null
+          model_3d_metadata: Json | null
+          model_3d_type: string | null
+          model_3d_url: string | null
+          name: string | null
+          org_id: string | null
+          priority: string | null
+          properties: Json | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string | null
+          label?: string | null
+          model_3d_dimensions?: Json | null
+          model_3d_metadata?: Json | null
+          model_3d_type?: string | null
+          model_3d_url?: string | null
+          name?: string | null
+          org_id?: string | null
+          priority?: string | null
+          properties?: Json | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string | null
+          label?: string | null
+          model_3d_dimensions?: Json | null
+          model_3d_metadata?: Json | null
+          model_3d_type?: string | null
+          model_3d_url?: string | null
+          name?: string | null
+          org_id?: string | null
+          priority?: string | null
+          properties?: Json | null
+          updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -3770,7 +3893,7 @@ export type Database = {
           source_entity_type: string
           target_entity_type: string
           updated_at: string | null
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -3785,7 +3908,7 @@ export type Database = {
           source_entity_type: string
           target_entity_type: string
           updated_at?: string | null
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -3800,7 +3923,55 @@ export type Database = {
           source_entity_type?: string
           target_entity_type?: string
           updated_at?: string | null
-          user_id?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      ontology_relation_types_backup_20251214: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          directionality: string | null
+          id: string | null
+          label: string | null
+          name: string | null
+          org_id: string | null
+          priority: string | null
+          properties: Json | null
+          source_entity_type: string | null
+          target_entity_type: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          directionality?: string | null
+          id?: string | null
+          label?: string | null
+          name?: string | null
+          org_id?: string | null
+          priority?: string | null
+          properties?: Json | null
+          source_entity_type?: string | null
+          target_entity_type?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          directionality?: string | null
+          id?: string | null
+          label?: string | null
+          name?: string | null
+          org_id?: string | null
+          priority?: string | null
+          properties?: Json | null
+          source_entity_type?: string | null
+          target_entity_type?: string | null
+          updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
