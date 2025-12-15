@@ -101,14 +101,16 @@ BEGIN
     -- line_items의 각 고유 transaction_id에 대해 purchase 생성
     FOR rec IN
       SELECT
-        transaction_id,
-        MIN(transaction_date) as purchase_date,
-        SUM(line_total) as total_amount,
-        COUNT(*) as item_count,
-        MIN(product_id) as first_product_id
-      FROM line_items
-      WHERE store_id = v_store_id
-      GROUP BY transaction_id
+  transaction_id,
+  MIN(transaction_date) as purchase_date,
+  SUM(line_total) as total_amount,
+  COUNT(*) as item_count,
+  (SELECT product_id FROM line_items li2 
+   WHERE li2.transaction_id = line_items.transaction_id 
+   LIMIT 1) as first_product_id  -- ✅ 서브쿼리로 첫 번째 가져오기
+FROM line_items
+WHERE store_id = v_store_id
+GROUP BY transaction_id
     LOOP
       -- 랜덤 고객 선택
       SELECT id INTO v_customer_id
