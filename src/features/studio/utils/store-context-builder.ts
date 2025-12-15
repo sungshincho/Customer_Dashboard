@@ -188,16 +188,18 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
       id: z.id,
       zoneName: z.zone_name,
       zoneType: z.zone_type || 'display',
-      x: z.center_x || 0,
-      z: z.center_z || 0,
-      width: z.width || 3,
-      depth: z.depth || 3,
+      // 실제 DB 스키마: position_x, position_z, size_width, size_depth
+      x: z.position_x ?? z.center_x ?? 0,
+      z: z.position_z ?? z.center_z ?? 0,
+      width: z.size_width ?? z.width ?? 3,
+      depth: z.size_depth ?? z.depth ?? 3,
     })),
     dailySales: dailyKpis.map((k: any) => ({
       date: k.date,
       totalRevenue: k.total_revenue || 0,
-      transactionCount: k.transaction_count || 0,
-      visitorCount: k.visitor_count || 0,
+      // 실제 DB 스키마: total_transactions, total_visitors
+      transactionCount: k.total_transactions ?? k.transaction_count ?? 0,
+      visitorCount: k.total_visitors ?? k.visitor_count ?? 0,
       conversionRate: k.conversion_rate || 0,
     })),
     visits: visits.map((v: any) => ({
@@ -212,10 +214,12 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
       zoneId: m.zone_id,
       zoneName: m.zone?.zone_name || 'Unknown',
       date: m.date,
-      visitorCount: m.visitor_count || 0,
-      avgDwellTime: m.avg_dwell_time || 0,
-      conversionRate: m.conversion_rate || 0,
-      revenue: m.revenue || 0,
+      // 실제 DB 스키마: total_visitors, avg_dwell_seconds, conversion_count
+      visitorCount: m.total_visitors ?? m.visitor_count ?? 0,
+      avgDwellTime: m.avg_dwell_seconds ?? m.avg_dwell_time ?? 0,
+      conversionRate: m.conversion_rate ?? (m.conversion_count && m.total_visitors ? m.conversion_count / m.total_visitors : 0),
+      revenue: m.revenue ?? 0,
+      heatmapIntensity: m.heatmap_intensity ?? 0.5,
     })),
     dataQuality: {
       salesDataDays,
