@@ -97,7 +97,23 @@ export const useInsightMetrics = () => {
       const uniqueCustomerIds = new Set(visitStats?.map(v => v.customer_id).filter(Boolean));
       const uniqueVisitors = uniqueCustomerIds.size;
 
-      // 퍼널 데이터는 purchases/line_items 기반으로 계산
+      // 퍼널 데이터: funnel_events 테이블에서 실제 데이터 조회
+      const { data: funnelEvents } = await supabase
+        .from('funnel_events')
+        .select('event_type')
+        .eq('org_id', orgId)
+        .eq('store_id', selectedStore.id)
+        .gte('event_date', startDate)
+        .lte('event_date', endDate);
+
+      // 퍼널 이벤트 카운트
+      const funnelCounts = new Map<string, number>();
+      (funnelEvents || []).forEach(e => {
+        const count = funnelCounts.get(e.event_type) || 0;
+        funnelCounts.set(e.event_type, count + 1);
+      });
+
+      // purchases 테이블에서 구매 수 조회 (fallback)
       const { count: purchaseCount } = await supabase
         .from('purchases')
         .select('*', { count: 'exact', head: true })
@@ -105,14 +121,31 @@ export const useInsightMetrics = () => {
         .gte('purchase_date', `${startDate}T00:00:00`)
         .lte('purchase_date', `${endDate}T23:59:59`);
 
-      // 퍼널 데이터 (실제 방문/구매 기반)
-      const funnelByType = {
-        entry: footfall || visitStats?.length || 0,
-        browse: Math.round((footfall || visitStats?.length || 0) * 0.75),
-        engage: Math.round((footfall || visitStats?.length || 0) * 0.45),
-        fitting: Math.round((footfall || visitStats?.length || 0) * 0.25),
-        purchase: purchaseCount || 0,
+      // funnel_events 데이터가 있으면 실제 데이터 사용, 없으면 추정치 사용
+      const hasFunnelData = funnelEvents && funnelEvents.length > 0;
+      const entryCount = footfall || visitStats?.length || 0;
+
+      const funnelByType = hasFunnelData ? {
+        // 실제 funnel_events 데이터 사용
+        entry: funnelCounts.get('entry') || entryCount,
+        browse: funnelCounts.get('browse') || 0,
+        engage: funnelCounts.get('engage') || 0,
+        fitting: funnelCounts.get('fitting') || 0,
+        purchase: funnelCounts.get('purchase') || purchaseCount || 0,
+      } : {
+        // funnel_events 데이터 없음: store_visits + purchases 기반 추정
+        entry: entryCount,
+        browse: Math.round(entryCount * 0.75), // 추정: 75%가 둘러봄
+        engage: Math.round(entryCount * 0.45), // 추정: 45%가 상호작용
+        fitting: Math.round(entryCount * 0.25), // 추정: 25%가 피팅
+        purchase: purchaseCount || 0, // 실제 구매 데이터
       };
+
+      console.log('[useInsightMetrics] Funnel data:', {
+        hasFunnelData,
+        funnelEventsCount: funnelEvents?.length || 0,
+        funnelByType,
+      });
 
       // 디버깅 로그
       console.log('[useInsightMetrics] Visitor stats:', {
