@@ -501,6 +501,9 @@ END $$;
 -- ============================================================================
 -- STEP 6: purchases & line_items 생성 (store_visits.made_purchase 기반)
 -- ============================================================================
+-- ============================================================================
+-- STEP 6: purchases & line_items 생성 (visit_id = NULL로 수정)
+-- ============================================================================
 DO $$
 DECLARE
   v_store_id UUID := 'd9830554-2688-4032-af40-acccda787ac4';
@@ -530,12 +533,10 @@ BEGIN
     FROM store_visits
     WHERE store_id = v_store_id AND made_purchase = true
   LOOP
-    -- 한 방문당 1~3개 상품 구매
     v_item_count := 1 + floor(random() * 3)::INT;
     v_tx_id := 'TX-' || TO_CHAR(v_visit.visit_date, 'YYYYMMDD') || '-' || LPAD(v_purchase_count::TEXT, 4, '0');
 
     FOR i IN 1..v_item_count LOOP
-      -- 랜덤 상품 선택
       SELECT id, price INTO v_product
       FROM products
       WHERE store_id = v_store_id
@@ -547,7 +548,7 @@ BEGIN
       v_discount := floor(v_total * random() * 0.1);
       v_purchase_id := gen_random_uuid();
 
-      -- purchases 테이블 삽입 (실제 스키마)
+      -- ✅ visit_id를 NULL로 설정 (visits 테이블 FK 우회)
       INSERT INTO purchases (
         id, user_id, org_id, store_id, customer_id, visit_id,
         product_id, purchase_date, quantity, unit_price, total_price, created_at
@@ -557,7 +558,7 @@ BEGIN
         v_org_id,
         v_store_id,
         v_visit.customer_id,
-        v_visit.id,
+        NULL,  -- ✅ visits 테이블 FK 문제 우회
         v_product.id,
         v_visit.visit_date + ((v_visit.duration_minutes * 0.8)::INT || ' minutes')::INTERVAL,
         v_qty,
@@ -567,7 +568,6 @@ BEGIN
       );
       v_purchase_count := v_purchase_count + 1;
 
-      -- line_items 테이블 삽입 (실제 스키마)
       INSERT INTO line_items (
         id, org_id, store_id, transaction_id, purchase_id, product_id, customer_id,
         quantity, unit_price, discount_amount, tax_amount, line_total,
@@ -583,7 +583,7 @@ BEGIN
         v_qty,
         v_product.price,
         v_discount,
-        floor(v_total * 0.1),  -- 10% 세금
+        floor(v_total * 0.1),
         v_total - v_discount,
         v_visit.visit_date::DATE,
         EXTRACT(HOUR FROM v_visit.visit_date)::INT,
