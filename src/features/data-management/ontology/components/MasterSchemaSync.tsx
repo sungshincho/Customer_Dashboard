@@ -1,37 +1,29 @@
 import React from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
-import { Download, Loader2, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
+import { CheckCircle, Database, User, Layers } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { applyRetailSchemaPreset } from "../utils/comprehensiveRetailSchema";
 import { useAuth } from "@/hooks/useAuth";
 
-const MASTER_ACCOUNT_ID = 'af316ab2-ffb5-4509-bd37-13aa31feb5ad';
-const MASTER_ORG_ID = 'e738e7b1-e4bd-49f1-bd96-6de4c257b5a0';
-
 export const MasterSchemaSync = () => {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
   const { user } = useAuth();
-  
-  const isMasterAccount = user?.id === MASTER_ACCOUNT_ID;
 
-  // 마스터 계정의 스키마 정보 조회
-  const { data: masterSchema } = useQuery({
+  // 마스터 스키마 정보 조회 (org_id IS NULL AND user_id IS NULL)
+  const { data: masterSchema, isLoading: masterLoading } = useQuery({
     queryKey: ['master-schema-info'],
     queryFn: async () => {
       const [entitiesResult, relationsResult] = await Promise.all([
         supabase
           .from('ontology_entity_types')
           .select('id', { count: 'exact', head: true })
-          .eq('user_id', MASTER_ACCOUNT_ID),
+          .is('org_id', null)
+          .is('user_id', null),
         supabase
           .from('ontology_relation_types')
           .select('id', { count: 'exact', head: true })
-          .eq('user_id', MASTER_ACCOUNT_ID)
+          .is('org_id', null)
+          .is('user_id', null)
       ]);
 
       return {
@@ -41,168 +33,34 @@ export const MasterSchemaSync = () => {
     }
   });
 
-  // 현재 사용자의 스키마 정보 조회
-  const { data: currentSchema } = useQuery({
-    queryKey: ['current-schema-info'],
+  // 현재 사용자의 커스텀 스키마 정보 조회 (user_id = 현재 사용자)
+  const { data: userSchema, isLoading: userLoading } = useQuery({
+    queryKey: ['user-custom-schema-info', user?.id],
     queryFn: async () => {
-      const userId = (await supabase.auth.getUser()).data.user?.id;
-      if (!userId) return { entityCount: 0, relationCount: 0 };
+      if (!user?.id) return { entityCount: 0, relationCount: 0 };
 
       const [entitiesResult, relationsResult] = await Promise.all([
         supabase
           .from('ontology_entity_types')
           .select('id', { count: 'exact', head: true })
-          .eq('user_id', userId),
+          .eq('user_id', user.id),
         supabase
           .from('ontology_relation_types')
           .select('id', { count: 'exact', head: true })
-          .eq('user_id', userId)
+          .eq('user_id', user.id)
       ]);
 
       return {
         entityCount: entitiesResult.count || 0,
         relationCount: relationsResult.count || 0
       };
-    }
+    },
+    enabled: !!user?.id
   });
 
-  // 마스터 스키마 초기화 (마스터 계정에 스키마 생성)
-  const initMasterSchemaMutation = useMutation({
-    mutationFn: async () => {
-      const result = await applyRetailSchemaPreset(MASTER_ACCOUNT_ID, MASTER_ORG_ID, "replace");
-      if (!result.success) {
-        throw new Error(result.error || "스키마 초기화 실패");
-      }
-      return result;
-    },
-    onSuccess: (result) => {
-      toast({
-        title: "마스터 스키마 초기화 완료",
-        description: `${result.entitiesCount}개의 엔티티 타입과 ${result.relationsCount}개의 관계 타입이 마스터 계정에 생성되었습니다.`,
-      });
-      queryClient.invalidateQueries({ queryKey: ['master-schema-info'] });
-    },
-    onError: (error) => {
-      console.error('마스터 스키마 초기화 오류:', error);
-      toast({
-        title: "초기화 실패",
-        description: error instanceof Error ? error.message : "마스터 스키마 초기화 중 오류가 발생했습니다.",
-        variant: "destructive",
-      });
-    }
-  });
-
-  // 마스터 스키마 불러오기 (덮어쓰기)
-  const syncMasterSchemaMutation = useMutation({
-    mutationFn: async () => {
-      const userId = (await supabase.auth.getUser()).data.user?.id;
-      const orgId = (await supabase.auth.getUser()).data.user?.user_metadata?.org_id;
-      
-      if (!userId) throw new Error("로그인이 필요합니다");
-
-      // 1. 현재 사용자의 모든 relation types 삭제 (외래키 제약으로 먼저 삭제)
-      const { error: deleteRelError } = await supabase
-        .from('ontology_relation_types')
-        .delete()
-        .eq('user_id', userId);
-
-      if (deleteRelError) throw deleteRelError;
-
-      // 2. 현재 사용자의 모든 entity types 삭제
-      const { error: deleteEntError } = await supabase
-        .from('ontology_entity_types')
-        .delete()
-        .eq('user_id', userId);
-
-      if (deleteEntError) throw deleteEntError;
-
-      // 3. 마스터 계정의 모든 entity types 가져오기
-      const { data: masterEntities, error: entError } = await supabase
-        .from('ontology_entity_types')
-        .select('*')
-        .eq('user_id', MASTER_ACCOUNT_ID);
-
-      if (entError) throw entError;
-
-      // 4. 마스터 entity types를 현재 사용자 계정으로 복사
-      if (masterEntities && masterEntities.length > 0) {
-        const { error: insertEntError } = await supabase
-          .from('ontology_entity_types')
-          .insert(
-            masterEntities.map(e => ({
-              user_id: userId,
-              org_id: orgId,
-              name: e.name,
-              label: e.label,
-              description: e.description,
-              color: e.color,
-              icon: e.icon,
-              priority: e.priority,
-              properties: e.properties,
-              model_3d_type: e.model_3d_type,
-              model_3d_url: e.model_3d_url,
-              model_3d_dimensions: e.model_3d_dimensions,
-              model_3d_metadata: e.model_3d_metadata
-            }))
-          );
-
-        if (insertEntError) throw insertEntError;
-      }
-
-      // 5. 마스터 계정의 모든 relation types 가져오기
-      const { data: masterRelations, error: relError } = await supabase
-        .from('ontology_relation_types')
-        .select('*')
-        .eq('user_id', MASTER_ACCOUNT_ID);
-
-      if (relError) throw relError;
-
-      // 6. 마스터 relation types를 현재 사용자 계정으로 복사
-      if (masterRelations && masterRelations.length > 0) {
-        const { error: insertRelError } = await supabase
-          .from('ontology_relation_types')
-          .insert(
-            masterRelations.map(r => ({
-              user_id: userId,
-              org_id: orgId,
-              name: r.name,
-              label: r.label,
-              description: r.description,
-              source_entity_type: r.source_entity_type,
-              target_entity_type: r.target_entity_type,
-              directionality: r.directionality,
-              priority: r.priority,
-              properties: r.properties
-            }))
-          );
-
-        if (insertRelError) throw insertRelError;
-      }
-
-      return {
-        entityCount: masterEntities?.length || 0,
-        relationCount: masterRelations?.length || 0
-      };
-    },
-    onSuccess: (result) => {
-      toast({
-        title: "마스터 스키마 불러오기 완료",
-        description: `${result.entityCount}개의 엔티티 타입과 ${result.relationCount}개의 관계 타입이 적용되었습니다.`,
-      });
-      
-      queryClient.invalidateQueries({ queryKey: ['ontology-entity-types'] });
-      queryClient.invalidateQueries({ queryKey: ['ontology-relation-types'] });
-      queryClient.invalidateQueries({ queryKey: ['current-schema-info'] });
-    },
-    onError: (error) => {
-      console.error('마스터 스키마 동기화 오류:', error);
-      toast({
-        title: "동기화 실패",
-        description: error instanceof Error ? error.message : "마스터 스키마를 불러오는 중 오류가 발생했습니다.",
-        variant: "destructive",
-      });
-    }
-  });
+  // 총 사용 가능한 스키마 (마스터 + 사용자 커스텀)
+  const totalEntityCount = (masterSchema?.entityCount || 0) + (userSchema?.entityCount || 0);
+  const totalRelationCount = (masterSchema?.relationCount || 0) + (userSchema?.relationCount || 0);
 
   return (
     <Card className="glass-card">
@@ -210,98 +68,78 @@ export const MasterSchemaSync = () => {
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="flex items-center gap-2">
-              <Download className="w-5 h-5" />
-              마스터 스키마 불러오기
+              <Database className="w-5 h-5" />
+              온톨로지 스키마 현황
             </CardTitle>
             <CardDescription>
-              최신 온톨로지 스키마 v3.0으로 완전히 교체합니다
+              마스터 스키마는 모든 사용자가 공유하며, 커스텀 타입을 추가할 수 있습니다
             </CardDescription>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
+        <Alert>
+          <CheckCircle className="h-4 w-4" />
           <AlertDescription>
-            <strong>주의:</strong> 현재 계정의 모든 스키마가 삭제되고 마스터 스키마로 완전히 덮어씌워집니다.
+            <strong>자동 적용:</strong> 마스터 스키마(161개 엔티티, 110개 관계)는 모든 사용자에게 자동으로 제공됩니다.
+            별도의 동기화 없이 바로 사용할 수 있습니다.
           </AlertDescription>
         </Alert>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
+          {/* 마스터 스키마 */}
           <div className="p-4 rounded-lg border border-border bg-muted/30">
-            <div className="text-sm text-muted-foreground mb-1">마스터 스키마 (v3.0)</div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+              <Layers className="w-4 h-4" />
+              마스터 스키마 (v1.0)
+            </div>
             <div className="text-2xl font-bold text-primary">
-              {masterSchema?.entityCount || 0}
+              {masterLoading ? '...' : masterSchema?.entityCount || 0}
               <span className="text-sm font-normal text-muted-foreground ml-2">엔티티</span>
             </div>
-            <div className="text-2xl font-bold text-secondary mt-2">
-              {masterSchema?.relationCount || 0}
+            <div className="text-lg font-semibold text-secondary mt-1">
+              {masterLoading ? '...' : masterSchema?.relationCount || 0}
               <span className="text-sm font-normal text-muted-foreground ml-2">관계</span>
             </div>
           </div>
 
+          {/* 사용자 커스텀 스키마 */}
           <div className="p-4 rounded-lg border border-border bg-muted/30">
-            <div className="text-sm text-muted-foreground mb-1">현재 내 스키마</div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+              <User className="w-4 h-4" />
+              내 커스텀 타입
+            </div>
             <div className="text-2xl font-bold text-primary">
-              {currentSchema?.entityCount || 0}
+              {userLoading ? '...' : userSchema?.entityCount || 0}
               <span className="text-sm font-normal text-muted-foreground ml-2">엔티티</span>
             </div>
-            <div className="text-2xl font-bold text-secondary mt-2">
-              {currentSchema?.relationCount || 0}
+            <div className="text-lg font-semibold text-secondary mt-1">
+              {userLoading ? '...' : userSchema?.relationCount || 0}
+              <span className="text-sm font-normal text-muted-foreground ml-2">관계</span>
+            </div>
+          </div>
+
+          {/* 총 사용 가능 */}
+          <div className="p-4 rounded-lg border border-primary/50 bg-primary/10">
+            <div className="flex items-center gap-2 text-sm text-primary mb-2">
+              <CheckCircle className="w-4 h-4" />
+              총 사용 가능
+            </div>
+            <div className="text-2xl font-bold text-primary">
+              {totalEntityCount}
+              <span className="text-sm font-normal text-muted-foreground ml-2">엔티티</span>
+            </div>
+            <div className="text-lg font-semibold text-secondary mt-1">
+              {totalRelationCount}
               <span className="text-sm font-normal text-muted-foreground ml-2">관계</span>
             </div>
           </div>
         </div>
 
-        {(masterSchema?.entityCount === 0 && masterSchema?.relationCount === 0) && (
-          <Button
-            onClick={() => initMasterSchemaMutation.mutate()}
-            disabled={initMasterSchemaMutation.isPending}
-            className="w-full mb-2"
-            size="lg"
-            variant="secondary"
-          >
-            {initMasterSchemaMutation.isPending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                마스터 스키마 초기화 중...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="mr-2 h-4 w-4" />
-                마스터 스키마 초기화 (관리자 전용)
-              </>
-            )}
-          </Button>
-        )}
-
-        {isMasterAccount && (
-          <Alert className="mb-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              마스터 계정은 자기 자신의 스키마를 동기화할 수 없습니다. 일반 조직 계정으로 로그인하여 사용하세요.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        <Button
-          onClick={() => syncMasterSchemaMutation.mutate()}
-          disabled={syncMasterSchemaMutation.isPending || (masterSchema?.entityCount === 0) || isMasterAccount}
-          className="w-full"
-          size="lg"
-        >
-          {syncMasterSchemaMutation.isPending ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              스키마 불러오는 중...
-            </>
-          ) : (
-            <>
-              <CheckCircle className="mr-2 h-4 w-4" />
-              최신 마스터 스키마 불러오기
-            </>
-          )}
-        </Button>
+        <div className="text-xs text-muted-foreground mt-4 p-3 bg-muted/20 rounded">
+          <strong>참고:</strong> 동일한 이름의 타입이 있으면 내 커스텀 타입이 우선 적용됩니다.
+          마스터 스키마는 읽기 전용이며, 필요시 커스텀 타입을 추가하여 확장할 수 있습니다.
+        </div>
       </CardContent>
     </Card>
   );
