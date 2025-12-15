@@ -458,7 +458,7 @@ BEGIN
 
     IF v_relation_type_id IS NOT NULL THEN
       FOR v_entity IN
-        SELECT ge.id, ge.name, et.name as type_name
+        SELECT ge.id, et.name as type_name
         FROM graph_entities ge
         JOIN ontology_entity_types et ON ge.entity_type_id = et.id
         WHERE ge.store_id = v_store_id
