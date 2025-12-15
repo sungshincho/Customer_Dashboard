@@ -258,7 +258,7 @@ BEGIN
 
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
-  RAISE NOTICE 'STEP 4: 고객 생성 (500명)';
+  RAISE NOTICE 'STEP 4: 고객 생성 (2,500명)';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
 
   FOR i IN 1..2500 LOOP
@@ -288,20 +288,22 @@ BEGIN
     );
   END LOOP;
 
-  RAISE NOTICE '  ✓ customers: 500명 생성 (VIP 25, Regular 75, New 400)';
+  RAISE NOTICE '  ✓ customers: 2,500명 생성';
+  RAISE NOTICE '    - VIP: 125명 (5%%)';
+  RAISE NOTICE '    - Regular: 500명 (20%%)';
+  RAISE NOTICE '    - New: 1,875명 (75%%)';
 END $$;
 
 -- ============================================================================
--- STEP 5: store_visits 생성 (~1,250건) - 재방문 패턴 포함
+-- v6.0 수정: STEP 5 - store_visits (~3,500건) - 2,500명 고객 기준
 -- ============================================================================
--- 500명 고객 중:
---   - 375명 (75%): 1회 방문
---   - 75명 (15%): 2회 방문 = 150건
---   - 35명 (7%): 3회 방문 = 105건
---   - 15명 (3%): 4회 방문 = 60건
--- 총: 375 + 150 + 105 + 60 = 690건 (식별 고객)
--- + 익명 방문 560건 = ~1,250건
--- 재방문률: (75+35+15)/500 = 25%
+-- 방문 분포:
+--   - 1,875명 (75%): 1회 방문 = 1,875건
+--   - 375명 (15%): 2회 방문 = 750건
+--   - 175명 (7%): 3회 방문 = 525건
+--   - 75명 (3%): 4~8회 방문 = ~375건
+--   - 총: ~3,525건
+-- 재방문률: 25% (625/2500)
 -- ============================================================================
 DO $$
 DECLARE
@@ -319,90 +321,48 @@ DECLARE
   ];
   i INT;
   v INT;
+  j INT;
   v_customer_id UUID;
   v_visit_count INT;
   v_visit_date TIMESTAMPTZ;
   v_duration INT;
   v_path UUID[];
   v_made_purchase BOOLEAN;
-  v_visit_id UUID;
+  v_total_visits INT := 0;
+
+  -- 방문 분포 설정 (2,500명 기준)
+  v_single_count INT := 1875;  -- 1회 방문: 75%
+  v_double_count INT := 375;   -- 2회 방문: 15%
+  v_triple_count INT := 175;   -- 3회 방문: 7%
+  v_multi_count INT := 75;     -- 4회+ 방문: 3%
+  v_customer_idx INT := 1;
 BEGIN
   SELECT user_id, org_id INTO v_user_id, v_org_id FROM stores WHERE id = v_store_id;
 
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
-  RAISE NOTICE 'STEP 5: store_visits 생성 (~1,250건)';
+  RAISE NOTICE 'STEP 5: store_visits 생성 (~3,500건) - 2,500명 고객 기준';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
 
-  -- 식별 고객 방문 생성
-  FOR i IN 1..500 LOOP
-    v_customer_id := ('c' || LPAD(i::TEXT, 7, '0') || '-0000-0000-0000-000000000000')::UUID;
-
-    -- 방문 횟수 결정: 1회(75%), 2회(15%), 3회(7%), 4회(3%)
-    IF i <= 375 THEN
-      v_visit_count := 1;
-    ELSIF i <= 450 THEN
-      v_visit_count := 2;
-    ELSIF i <= 485 THEN
-      v_visit_count := 3;
-    ELSE
-      v_visit_count := 4;
-    END IF;
-
-    FOR v IN 1..v_visit_count LOOP
-      v_visit_date := NOW() - ((floor(random()*89) + 1)||' days')::INTERVAL
-                     - ((floor(random()*10) + 10)||' hours')::INTERVAL;
-      v_duration := 300 + floor(random()*1800)::INT;
-
-      -- 존 방문 경로 생성 (입구부터 시작)
-      v_path := ARRAY[v_zone_ids[1]];
-      FOR j IN 2..(2+floor(random()*5)::INT) LOOP
-        v_path := array_append(v_path, v_zone_ids[1+floor(random()*7)::INT]);
-      END LOOP;
-
-      -- VIP/Regular 고객은 구매 확률 높음
-      IF i <= 25 THEN
-        v_made_purchase := random() > 0.4;  -- VIP: 60%
-      ELSIF i <= 100 THEN
-        v_made_purchase := random() > 0.7;  -- Regular: 30%
-      ELSE
-        v_made_purchase := random() > 0.9;  -- New: 10%
-      END IF;
-
-      v_visit_id := gen_random_uuid();
-
-      INSERT INTO store_visits (id, store_id, org_id, customer_id, visit_date, exit_date,
-        duration_minutes, zones_visited, zone_durations, made_purchase, created_at)
-      VALUES (
-        v_visit_id, v_store_id, v_org_id, v_customer_id,
-        v_visit_date,
-        v_visit_date + (v_duration||' seconds')::INTERVAL,
-        floor(v_duration/60)::INT,
-        v_path,
-        '{}'::jsonb,
-        v_made_purchase,
-        v_visit_date
-      );
-    END LOOP;
-  END LOOP;
-
-  -- 익명 방문 생성 (~560건)
-  FOR i IN 1..560 LOOP
+  -- ============================================
+  -- 1회 방문 고객 (1,875명 × 1 = 1,875건)
+  -- ============================================
+  FOR i IN 1..v_single_count LOOP
+    v_customer_id := ('c' || LPAD(v_customer_idx::TEXT, 7, '0') || '-0000-0000-0000-000000000000')::UUID;
     v_visit_date := NOW() - ((floor(random()*89) + 1)||' days')::INTERVAL
                    - ((floor(random()*10) + 10)||' hours')::INTERVAL;
-    v_duration := 180 + floor(random()*900)::INT;
+    v_duration := 300 + floor(random()*1800)::INT;
+    v_made_purchase := random() < 0.10;  -- 10% 구매율
 
     v_path := ARRAY[v_zone_ids[1]];
-    FOR j IN 2..(2+floor(random()*4)::INT) LOOP
+    FOR j IN 2..(2+floor(random()*5)::INT) LOOP
       v_path := array_append(v_path, v_zone_ids[1+floor(random()*7)::INT]);
     END LOOP;
-
-    v_made_purchase := random() > 0.95;  -- 익명: 5%
 
     INSERT INTO store_visits (id, store_id, org_id, customer_id, visit_date, exit_date,
       duration_minutes, zones_visited, zone_durations, made_purchase, created_at)
     VALUES (
-      gen_random_uuid(), v_store_id, v_org_id, NULL,
+      gen_random_uuid(), v_store_id, v_org_id, v_customer_id,
       v_visit_date,
       v_visit_date + (v_duration||' seconds')::INTERVAL,
       floor(v_duration/60)::INT,
@@ -411,11 +371,129 @@ BEGIN
       v_made_purchase,
       v_visit_date
     );
+
+    v_customer_idx := v_customer_idx + 1;
+    v_total_visits := v_total_visits + 1;
   END LOOP;
 
-  RAISE NOTICE '  ✓ store_visits: ~1,250건 생성 (식별 690, 익명 560)';
-  RAISE NOTICE '  ✓ 재방문률: 25%% (125/500 고객)';
+  RAISE NOTICE '  ✓ 1회 방문: %건', v_single_count;
+
+  -- ============================================
+  -- 2회 방문 고객 (375명 × 2 = 750건)
+  -- ============================================
+  FOR i IN 1..v_double_count LOOP
+    v_customer_id := ('c' || LPAD(v_customer_idx::TEXT, 7, '0') || '-0000-0000-0000-000000000000')::UUID;
+
+    FOR v IN 1..2 LOOP
+      v_visit_date := NOW() - ((floor(random()*89) + 1)||' days')::INTERVAL
+                     - ((floor(random()*10) + 10)||' hours')::INTERVAL;
+      v_duration := 300 + floor(random()*1800)::INT;
+      v_made_purchase := random() < 0.15;  -- 15% 구매율 (재방문)
+
+      v_path := ARRAY[v_zone_ids[1]];
+      FOR j IN 2..(2+floor(random()*5)::INT) LOOP
+        v_path := array_append(v_path, v_zone_ids[1+floor(random()*7)::INT]);
+      END LOOP;
+
+      INSERT INTO store_visits (id, store_id, org_id, customer_id, visit_date, exit_date,
+        duration_minutes, zones_visited, zone_durations, made_purchase, created_at)
+      VALUES (
+        gen_random_uuid(), v_store_id, v_org_id, v_customer_id,
+        v_visit_date,
+        v_visit_date + (v_duration||' seconds')::INTERVAL,
+        floor(v_duration/60)::INT,
+        v_path,
+        '{}'::jsonb,
+        v_made_purchase,
+        v_visit_date
+      );
+      v_total_visits := v_total_visits + 1;
+    END LOOP;
+
+    v_customer_idx := v_customer_idx + 1;
+  END LOOP;
+
+  RAISE NOTICE '  ✓ 2회 방문: %건', v_double_count * 2;
+
+  -- ============================================
+  -- 3회 방문 고객 (175명 × 3 = 525건)
+  -- ============================================
+  FOR i IN 1..v_triple_count LOOP
+    v_customer_id := ('c' || LPAD(v_customer_idx::TEXT, 7, '0') || '-0000-0000-0000-000000000000')::UUID;
+
+    FOR v IN 1..3 LOOP
+      v_visit_date := NOW() - ((floor(random()*89) + 1)||' days')::INTERVAL
+                     - ((floor(random()*10) + 10)||' hours')::INTERVAL;
+      v_duration := 300 + floor(random()*1800)::INT;
+      v_made_purchase := random() < 0.18;  -- 18% 구매율
+
+      v_path := ARRAY[v_zone_ids[1]];
+      FOR j IN 2..(2+floor(random()*5)::INT) LOOP
+        v_path := array_append(v_path, v_zone_ids[1+floor(random()*7)::INT]);
+      END LOOP;
+
+      INSERT INTO store_visits (id, store_id, org_id, customer_id, visit_date, exit_date,
+        duration_minutes, zones_visited, zone_durations, made_purchase, created_at)
+      VALUES (
+        gen_random_uuid(), v_store_id, v_org_id, v_customer_id,
+        v_visit_date,
+        v_visit_date + (v_duration||' seconds')::INTERVAL,
+        floor(v_duration/60)::INT,
+        v_path,
+        '{}'::jsonb,
+        v_made_purchase,
+        v_visit_date
+      );
+      v_total_visits := v_total_visits + 1;
+    END LOOP;
+
+    v_customer_idx := v_customer_idx + 1;
+  END LOOP;
+
+  RAISE NOTICE '  ✓ 3회 방문: %건', v_triple_count * 3;
+
+  -- ============================================
+  -- 4회+ 방문 고객 (75명 × 평균 5회 = ~375건)
+  -- ============================================
+  FOR i IN 1..v_multi_count LOOP
+    v_customer_id := ('c' || LPAD(v_customer_idx::TEXT, 7, '0') || '-0000-0000-0000-000000000000')::UUID;
+    v_visit_count := 4 + floor(random() * 4)::INT;  -- 4~7회
+
+    FOR v IN 1..v_visit_count LOOP
+      v_visit_date := NOW() - ((floor(random()*89) + 1)||' days')::INTERVAL
+                     - ((floor(random()*10) + 10)||' hours')::INTERVAL;
+      v_duration := 300 + floor(random()*1800)::INT;
+      v_made_purchase := random() < 0.25;  -- 25% 구매율 (충성 고객)
+
+      v_path := ARRAY[v_zone_ids[1]];
+      FOR j IN 2..(2+floor(random()*5)::INT) LOOP
+        v_path := array_append(v_path, v_zone_ids[1+floor(random()*7)::INT]);
+      END LOOP;
+
+      INSERT INTO store_visits (id, store_id, org_id, customer_id, visit_date, exit_date,
+        duration_minutes, zones_visited, zone_durations, made_purchase, created_at)
+      VALUES (
+        gen_random_uuid(), v_store_id, v_org_id, v_customer_id,
+        v_visit_date,
+        v_visit_date + (v_duration||' seconds')::INTERVAL,
+        floor(v_duration/60)::INT,
+        v_path,
+        '{}'::jsonb,
+        v_made_purchase,
+        v_visit_date
+      );
+      v_total_visits := v_total_visits + 1;
+    END LOOP;
+
+    v_customer_idx := v_customer_idx + 1;
+  END LOOP;
+
+  RAISE NOTICE '  ✓ 4회+ 방문 고객: %명', v_multi_count;
+  RAISE NOTICE '';
+  RAISE NOTICE '  📊 총 store_visits: %건', v_total_visits;
+  RAISE NOTICE '  📊 재방문률: 25%% (625/2500 고객)';
 END $$;
+
 
 -- ============================================================================
 -- STEP 6: purchases & line_items 생성 (store_visits.made_purchase 기반)
@@ -426,76 +504,288 @@ DECLARE
   v_user_id UUID;
   v_org_id UUID;
   v_visit RECORD;
-  v_purchase_id UUID;
-  v_tx_id TEXT;
+  v_product RECORD;
   v_item_count INT;
-  v_product_id UUID;
-  v_price NUMERIC;
-  v_qty INT;
-  v_total NUMERIC;
   v_purchase_count INT := 0;
   v_line_count INT := 0;
+  v_purchase_id UUID;
+  v_tx_id TEXT;
+  v_qty INT;
+  v_total NUMERIC;
+  v_discount NUMERIC;
+  i INT;
 BEGIN
   SELECT user_id, org_id INTO v_user_id, v_org_id FROM stores WHERE id = v_store_id;
 
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
-  RAISE NOTICE 'STEP 6: purchases & line_items 생성';
+  RAISE NOTICE 'STEP 6: purchases & line_items 생성 (실제 스키마)';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
 
   FOR v_visit IN
-    SELECT id, customer_id, visit_date
+    SELECT id, customer_id, visit_date, duration_minutes
     FROM store_visits
     WHERE store_id = v_store_id AND made_purchase = true
   LOOP
-    v_purchase_id := gen_random_uuid();
+    -- 한 방문당 1~3개 상품 구매
+    v_item_count := 1 + floor(random() * 3)::INT;
     v_tx_id := 'TX-' || TO_CHAR(v_visit.visit_date, 'YYYYMMDD') || '-' || LPAD(v_purchase_count::TEXT, 4, '0');
-    v_item_count := 1 + floor(random()*3)::INT;
-    v_total := 0;
 
-    -- purchase 생성
-    INSERT INTO purchases (id, store_id, org_id, customer_id, visit_id, transaction_id,
-      purchase_date, total_amount, item_count, payment_method, created_at)
-    VALUES (
-      v_purchase_id, v_store_id, v_org_id, v_visit.customer_id, v_visit.id, v_tx_id,
-      v_visit.visit_date + '15 minutes'::INTERVAL,
-      0,  -- 나중에 업데이트
-      v_item_count,
-      (ARRAY['card', 'cash', 'mobile'])[1+floor(random()*3)::INT],
-      v_visit.visit_date
-    );
+    FOR i IN 1..v_item_count LOOP
+      -- 랜덤 상품 선택
+      SELECT id, price INTO v_product
+      FROM products
+      WHERE store_id = v_store_id
+      ORDER BY random()
+      LIMIT 1;
 
-    -- line_items 생성
-    FOR item_num IN 1..v_item_count LOOP
-      v_product_id := ('f000' || LPAD((1+floor(random()*25))::TEXT, 4, '0') || '-0000-0000-0000-000000000000')::UUID;
-      SELECT price INTO v_price FROM products WHERE id = v_product_id;
-      v_price := COALESCE(v_price, 100000);
-      v_qty := 1 + floor(random()*2)::INT;
+      v_qty := 1 + floor(random() * 2)::INT;
+      v_total := v_product.price * v_qty;
+      v_discount := floor(v_total * random() * 0.1);
+      v_purchase_id := gen_random_uuid();
 
-      INSERT INTO line_items (id, store_id, org_id, transaction_id, product_id, quantity,
-        unit_price, line_total, discount_amount, transaction_date, transaction_hour, created_at)
-      VALUES (
-        gen_random_uuid(), v_store_id, v_org_id, v_tx_id, v_product_id, v_qty,
-        v_price,
-        v_price * v_qty,
-        floor(v_price * v_qty * random() * 0.1),
-        v_visit.visit_date::DATE,
-        EXTRACT(HOUR FROM v_visit.visit_date)::INT,
+      -- purchases 테이블 삽입 (실제 스키마)
+      INSERT INTO purchases (
+        id, user_id, org_id, store_id, customer_id, visit_id,
+        product_id, purchase_date, quantity, unit_price, total_price, created_at
+      ) VALUES (
+        v_purchase_id,
+        v_user_id,
+        v_org_id,
+        v_store_id,
+        v_visit.customer_id,
+        v_visit.id,
+        v_product.id,
+        v_visit.visit_date + ((v_visit.duration_minutes * 0.8)::INT || ' minutes')::INTERVAL,
+        v_qty,
+        v_product.price,
+        v_total,
         v_visit.visit_date
       );
+      v_purchase_count := v_purchase_count + 1;
 
-      v_total := v_total + (v_price * v_qty);
+      -- line_items 테이블 삽입 (실제 스키마)
+      INSERT INTO line_items (
+        id, org_id, store_id, transaction_id, purchase_id, product_id, customer_id,
+        quantity, unit_price, discount_amount, tax_amount, line_total,
+        transaction_date, transaction_hour, payment_method, is_return, metadata, created_at
+      ) VALUES (
+        gen_random_uuid(),
+        v_org_id,
+        v_store_id,
+        v_tx_id,
+        v_purchase_id,
+        v_product.id,
+        v_visit.customer_id,
+        v_qty,
+        v_product.price,
+        v_discount,
+        floor(v_total * 0.1),  -- 10% 세금
+        v_total - v_discount,
+        v_visit.visit_date::DATE,
+        EXTRACT(HOUR FROM v_visit.visit_date)::INT,
+        (ARRAY['card', 'cash', 'mobile'])[1 + floor(random() * 3)::INT],
+        false,
+        '{}'::jsonb,
+        v_visit.visit_date
+      );
       v_line_count := v_line_count + 1;
     END LOOP;
-
-    -- purchase total 업데이트
-    UPDATE purchases SET total_amount = v_total WHERE id = v_purchase_id;
-    v_purchase_count := v_purchase_count + 1;
   END LOOP;
 
   RAISE NOTICE '  ✓ purchases: %건 생성', v_purchase_count;
   RAISE NOTICE '  ✓ line_items: %건 생성', v_line_count;
 END $$;
+
+
+-- ============================================================================
+-- v6.0 추가: STEP 6-B - store_goals 테이블 시딩
+-- ============================================================================
+DO $$
+DECLARE
+  v_store_id UUID := 'd9830554-2688-4032-af40-acccda787ac4';
+  v_user_id UUID;
+  v_org_id UUID;
+  v_period_start DATE;
+  v_period_end DATE;
+BEGIN
+  SELECT user_id, org_id INTO v_user_id, v_org_id FROM stores WHERE id = v_store_id;
+
+  RAISE NOTICE '';
+  RAISE NOTICE '════════════════════════════════════════════════════════════════';
+  RAISE NOTICE 'STEP 6-B: store_goals 생성 (목표 달성률 패널용)';
+  RAISE NOTICE '════════════════════════════════════════════════════════════════';
+
+  -- 기존 목표 삭제
+  DELETE FROM store_goals WHERE store_id = v_store_id;
+
+  -- 현재 월 기준
+  v_period_start := DATE_TRUNC('month', CURRENT_DATE)::DATE;
+  v_period_end := (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month' - INTERVAL '1 day')::DATE;
+
+  -- ============================================
+  -- 월간 목표 (현재 월)
+  -- ============================================
+
+  -- 1. 매출 목표: 1억원
+  INSERT INTO store_goals (
+    id, org_id, store_id, goal_type, period_type,
+    period_start, period_end, target_value, created_by, is_active, created_at, updated_at
+  ) VALUES (
+    gen_random_uuid(), v_org_id, v_store_id,
+    'revenue', 'monthly',
+    v_period_start, v_period_end,
+    100000000,  -- 1억원
+    v_user_id, true, NOW(), NOW()
+  );
+
+  -- 2. 방문자 목표: 5,000명
+  INSERT INTO store_goals (
+    id, org_id, store_id, goal_type, period_type,
+    period_start, period_end, target_value, created_by, is_active, created_at, updated_at
+  ) VALUES (
+    gen_random_uuid(), v_org_id, v_store_id,
+    'visitors', 'monthly',
+    v_period_start, v_period_end,
+    5000,  -- 5,000명
+    v_user_id, true, NOW(), NOW()
+  );
+
+  -- 3. 전환율 목표: 15%
+  INSERT INTO store_goals (
+    id, org_id, store_id, goal_type, period_type,
+    period_start, period_end, target_value, created_by, is_active, created_at, updated_at
+  ) VALUES (
+    gen_random_uuid(), v_org_id, v_store_id,
+    'conversion', 'monthly',
+    v_period_start, v_period_end,
+    15.0,  -- 15%
+    v_user_id, true, NOW(), NOW()
+  );
+
+  -- 4. 객단가 목표: 250,000원
+  INSERT INTO store_goals (
+    id, org_id, store_id, goal_type, period_type,
+    period_start, period_end, target_value, created_by, is_active, created_at, updated_at
+  ) VALUES (
+    gen_random_uuid(), v_org_id, v_store_id,
+    'avg_transaction', 'monthly',
+    v_period_start, v_period_end,
+    250000,  -- 250,000원
+    v_user_id, true, NOW(), NOW()
+  );
+
+  -- ============================================
+  -- 분기 목표 (현재 분기)
+  -- ============================================
+
+  v_period_start := DATE_TRUNC('quarter', CURRENT_DATE)::DATE;
+  v_period_end := (DATE_TRUNC('quarter', CURRENT_DATE) + INTERVAL '3 months' - INTERVAL '1 day')::DATE;
+
+  -- 5. 분기 매출 목표: 3억원
+  INSERT INTO store_goals (
+    id, org_id, store_id, goal_type, period_type,
+    period_start, period_end, target_value, created_by, is_active, created_at, updated_at
+  ) VALUES (
+    gen_random_uuid(), v_org_id, v_store_id,
+    'revenue', 'quarterly',
+    v_period_start, v_period_end,
+    300000000,  -- 3억원
+    v_user_id, true, NOW(), NOW()
+  );
+
+  -- 6. 분기 방문자 목표: 15,000명
+  INSERT INTO store_goals (
+    id, org_id, store_id, goal_type, period_type,
+    period_start, period_end, target_value, created_by, is_active, created_at, updated_at
+  ) VALUES (
+    gen_random_uuid(), v_org_id, v_store_id,
+    'visitors', 'quarterly',
+    v_period_start, v_period_end,
+    15000,  -- 15,000명
+    v_user_id, true, NOW(), NOW()
+  );
+
+  -- ============================================
+  -- 주간 목표 (현재 주)
+  -- ============================================
+
+  v_period_start := DATE_TRUNC('week', CURRENT_DATE)::DATE;
+  v_period_end := (DATE_TRUNC('week', CURRENT_DATE) + INTERVAL '6 days')::DATE;
+
+  -- 7. 주간 매출 목표: 2,500만원
+  INSERT INTO store_goals (
+    id, org_id, store_id, goal_type, period_type,
+    period_start, period_end, target_value, created_by, is_active, created_at, updated_at
+  ) VALUES (
+    gen_random_uuid(), v_org_id, v_store_id,
+    'revenue', 'weekly',
+    v_period_start, v_period_end,
+    25000000,  -- 2,500만원
+    v_user_id, true, NOW(), NOW()
+  );
+
+  -- 8. 주간 방문자 목표: 1,200명
+  INSERT INTO store_goals (
+    id, org_id, store_id, goal_type, period_type,
+    period_start, period_end, target_value, created_by, is_active, created_at, updated_at
+  ) VALUES (
+    gen_random_uuid(), v_org_id, v_store_id,
+    'visitors', 'weekly',
+    v_period_start, v_period_end,
+    1200,  -- 1,200명
+    v_user_id, true, NOW(), NOW()
+  );
+
+  -- ============================================
+  -- 일간 목표 (오늘)
+  -- ============================================
+
+  -- 9. 일간 매출 목표: 400만원
+  INSERT INTO store_goals (
+    id, org_id, store_id, goal_type, period_type,
+    period_start, period_end, target_value, created_by, is_active, created_at, updated_at
+  ) VALUES (
+    gen_random_uuid(), v_org_id, v_store_id,
+    'revenue', 'daily',
+    CURRENT_DATE, CURRENT_DATE,
+    4000000,  -- 400만원
+    v_user_id, true, NOW(), NOW()
+  );
+
+  -- 10. 일간 방문자 목표: 180명
+  INSERT INTO store_goals (
+    id, org_id, store_id, goal_type, period_type,
+    period_start, period_end, target_value, created_by, is_active, created_at, updated_at
+  ) VALUES (
+    gen_random_uuid(), v_org_id, v_store_id,
+    'visitors', 'daily',
+    CURRENT_DATE, CURRENT_DATE,
+    180,  -- 180명
+    v_user_id, true, NOW(), NOW()
+  );
+
+  RAISE NOTICE '  ✓ store_goals: 10건 생성';
+  RAISE NOTICE '    - 월간: 매출 1억, 방문자 5,000, 전환율 15%%, 객단가 25만원';
+  RAISE NOTICE '    - 분기: 매출 3억, 방문자 15,000';
+  RAISE NOTICE '    - 주간: 매출 2,500만, 방문자 1,200';
+  RAISE NOTICE '    - 일간: 매출 400만, 방문자 180';
+END $$;
+
+
+-- ============================================
+-- 검증 쿼리
+-- ============================================
+SELECT 
+  goal_type,
+  period_type,
+  target_value,
+  period_start,
+  period_end,
+  is_active
+FROM store_goals 
+WHERE store_id = 'd9830554-2688-4032-af40-acccda787ac4'
+ORDER BY period_type, goal_type;
 
 -- ============================================================================
 -- STEP 7: daily_kpis_agg 생성 (90일) - store_visits 기반 집계
@@ -539,7 +829,7 @@ BEGIN
       v_transactions := floor(v_total_visitors * 0.14)::INT;
     END IF;
 
-    -- 재방문 고객 수
+    -- 재방문 고객 수 (해당 날짜까지 누적)
     SELECT COUNT(*) INTO v_returning
     FROM (
       SELECT customer_id
@@ -552,7 +842,7 @@ BEGIN
     ) t;
 
     -- 매출 계산 (line_items에서)
-    SELECT COALESCE(SUM(line_total - COALESCE(discount_amount, 0)), 0) INTO v_revenue
+    SELECT COALESCE(SUM(line_total), 0) INTO v_revenue
     FROM line_items
     WHERE store_id = v_store_id AND transaction_date = v_date;
 
@@ -560,10 +850,15 @@ BEGIN
       v_revenue := v_transactions * (150000 + floor(random()*50000));
     END IF;
 
-    INSERT INTO daily_kpis_agg (id, store_id, org_id, date, total_revenue, total_transactions, avg_transaction_value,
-      total_visitors, unique_visitors, returning_visitors, conversion_rate, avg_visit_duration_seconds,
-      total_units_sold, avg_basket_size, labor_hours, sales_per_labor_hour, sales_per_visitor, calculated_at, created_at)
-    VALUES (
+    INSERT INTO daily_kpis_agg (
+      id, store_id, org_id, date, 
+      total_revenue, total_transactions, avg_transaction_value,
+      total_visitors, unique_visitors, returning_visitors, 
+      conversion_rate, avg_visit_duration_seconds,
+      total_units_sold, avg_basket_size, 
+      labor_hours, sales_per_labor_hour, sales_per_visitor, 
+      calculated_at, created_at
+    ) VALUES (
       gen_random_uuid(), v_store_id, v_org_id, v_date,
       v_revenue,
       v_transactions,
@@ -573,7 +868,7 @@ BEGIN
       v_returning,
       CASE WHEN v_total_visitors > 0 THEN (v_transactions::NUMERIC / v_total_visitors * 100) ELSE 0 END,
       1200 + floor(random()*600)::INT,
-      floor(v_transactions * 1.5)::INT,
+      floor(v_transactions * 1.5)::INT,  -- ✅ 오타 수정: aINT → INT
       CASE WHEN v_transactions > 0 THEN 1.5 + random() ELSE 0 END,
       CASE WHEN v_dow IN (0,6) THEN 64 ELSE 48 END,
       v_revenue / CASE WHEN v_dow IN (0,6) THEN 64 ELSE 48 END,
@@ -584,7 +879,6 @@ BEGIN
 
   RAISE NOTICE '  ✓ daily_kpis_agg: 90건 생성 (store_visits 기반)';
 END $$;
-
 -- ============================================================================
 -- STEP 8: funnel_events 생성 (store_visits 기반 1:1 매핑)
 -- ============================================================================
