@@ -104,37 +104,87 @@ export function useGoalProgress() {
       const progressList: GoalProgress[] = [];
 
       for (const goal of goals) {
-        // 해당 기간의 KPI 합계/평균 조회
-        const { data: kpiData } = await supabase
-          .from('daily_kpis_agg')
-          .select('total_revenue, total_visitors, conversion_rate, avg_transaction_value')
-          .eq('store_id', selectedStore.id)
-          .gte('date', goal.period_start)
-          .lte('date', goal.period_end);
-
         let currentValue = 0;
 
-        if (kpiData && kpiData.length > 0) {
-          const goalMeta = GOAL_TYPES.find(t => t.value === goal.goal_type);
+        if (goal.goal_type === 'revenue') {
+          // 매출: line_items에서 직접 조회 (가장 정확)
+          const { data: lineItems } = await supabase
+            .from('line_items')
+            .select('line_total')
+            .eq('store_id', selectedStore.id)
+            .gte('transaction_date', goal.period_start)
+            .lte('transaction_date', goal.period_end);
 
-          if (goal.goal_type === 'revenue') {
-            // 매출은 합계
-            currentValue = kpiData.reduce((sum, k) => sum + (k.total_revenue || 0), 0);
-          } else if (goal.goal_type === 'visitors') {
-            // 방문자도 합계
-            currentValue = kpiData.reduce((sum, k) => sum + (k.total_visitors || 0), 0);
-          } else if (goal.goal_type === 'conversion') {
-            // 전환율은 평균
-            const total = kpiData.reduce((sum, k) => sum + (k.conversion_rate || 0), 0);
-            currentValue = total / kpiData.length;
-          } else if (goal.goal_type === 'avg_basket') {
-            // 객단가도 평균
-            const total = kpiData.reduce((sum, k) => sum + (k.avg_transaction_value || 0), 0);
-            currentValue = total / kpiData.length;
+          currentValue = lineItems?.reduce((sum, item) => sum + Number(item.line_total || 0), 0) || 0;
+
+          // fallback to daily_kpis_agg if no line_items
+          if (currentValue === 0) {
+            const { data: kpiData } = await supabase
+              .from('daily_kpis_agg')
+              .select('total_revenue')
+              .eq('store_id', selectedStore.id)
+              .gte('date', goal.period_start)
+              .lte('date', goal.period_end);
+            currentValue = kpiData?.reduce((sum, k) => sum + Number(k.total_revenue || 0), 0) || 0;
           }
+        } else if (goal.goal_type === 'visitors') {
+          // 방문자: store_visits에서 직접 조회
+          const { count } = await supabase
+            .from('store_visits')
+            .select('*', { count: 'exact', head: true })
+            .eq('store_id', selectedStore.id)
+            .gte('visit_date', `${goal.period_start}T00:00:00`)
+            .lte('visit_date', `${goal.period_end}T23:59:59`);
+
+          currentValue = count || 0;
+
+          // fallback to daily_kpis_agg if no store_visits
+          if (currentValue === 0) {
+            const { data: kpiData } = await supabase
+              .from('daily_kpis_agg')
+              .select('total_visitors')
+              .eq('store_id', selectedStore.id)
+              .gte('date', goal.period_start)
+              .lte('date', goal.period_end);
+            currentValue = kpiData?.reduce((sum, k) => sum + (k.total_visitors || 0), 0) || 0;
+          }
+        } else if (goal.goal_type === 'conversion') {
+          // 전환율: (구매 수 / 방문 수) * 100
+          const { count: visitCount } = await supabase
+            .from('store_visits')
+            .select('*', { count: 'exact', head: true })
+            .eq('store_id', selectedStore.id)
+            .gte('visit_date', `${goal.period_start}T00:00:00`)
+            .lte('visit_date', `${goal.period_end}T23:59:59`);
+
+          const { count: purchaseCount } = await supabase
+            .from('purchases')
+            .select('*', { count: 'exact', head: true })
+            .eq('store_id', selectedStore.id)
+            .gte('purchase_date', `${goal.period_start}T00:00:00`)
+            .lte('purchase_date', `${goal.period_end}T23:59:59`);
+
+          currentValue = visitCount && visitCount > 0
+            ? ((purchaseCount || 0) / visitCount) * 100
+            : 0;
+        } else if (goal.goal_type === 'avg_basket') {
+          // 객단가: 총매출 / 거래수
+          const { data: lineItems } = await supabase
+            .from('line_items')
+            .select('line_total, transaction_id')
+            .eq('store_id', selectedStore.id)
+            .gte('transaction_date', goal.period_start)
+            .lte('transaction_date', goal.period_end);
+
+          const totalRevenue = lineItems?.reduce((sum, item) => sum + Number(item.line_total || 0), 0) || 0;
+          const uniqueTransactions = new Set(lineItems?.map(item => item.transaction_id)).size;
+
+          currentValue = uniqueTransactions > 0 ? totalRevenue / uniqueTransactions : 0;
         }
 
-        const progress = Math.min((currentValue / goal.target_value) * 100, 100);
+        const progress = goal.target_value > 0
+          ? Math.min((currentValue / goal.target_value) * 100, 100)
+          : 0;
 
         progressList.push({
           goal,
