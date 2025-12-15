@@ -120,8 +120,8 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
       .gte('date', thirtyDaysAgoStr)
       .order('date', { ascending: false }),
 
-    // 방문 기록 (최근 1000건)
-    supabase.from('visits')
+    // 방문 기록 (최근 1000건) - store_visits 테이블 사용
+    supabase.from('store_visits')
       .select('*')
       .eq('store_id', storeId)
       .gte('visit_date', thirtyDaysAgoStr)

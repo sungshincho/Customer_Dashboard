@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { useToast } from '@/components/ui/use-toast';
+import { buildStoreContext } from '../utils/store-context-builder';
 import type {
   SimulationStatus,
   ConfidenceDetails,
@@ -212,7 +213,18 @@ export function useFlowSimulation(): UseFlowSimulationReturn {
 
       setProgress(10);
 
-      // advanced-ai-inference Edge Function 호출
+      // 실제 매장 데이터 기반 storeContext 빌드
+      console.log('[useFlowSimulation] Building store context for:', selectedStore.id);
+      const storeContext = await buildStoreContext(selectedStore.id);
+      console.log('[useFlowSimulation] Store context built:', {
+        visits: storeContext.visits?.length,
+        zones: storeContext.zones?.length,
+        zoneMetrics: storeContext.zoneMetrics?.length,
+      });
+
+      setProgress(30);
+
+      // advanced-ai-inference Edge Function 호출 (storeContext 포함)
       const { data, error } = await supabase.functions.invoke('advanced-ai-inference', {
         body: {
           type: 'flow_simulation',
@@ -224,6 +236,7 @@ export function useFlowSimulation(): UseFlowSimulationReturn {
             timeOfDay: params.timeOfDay || 'all',
             customerSegment: params.customerSegment || 'all',
             analysisType: params.analysisType || 'comparison',
+            storeContext, // 실제 매장 데이터 전달
           },
         },
       });

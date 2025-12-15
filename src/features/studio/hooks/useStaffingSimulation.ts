@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { useToast } from '@/components/ui/use-toast';
+import { buildStoreContext } from '../utils/store-context-builder';
 import type { SimulationStatus, ConfidenceDetails } from '../types';
 
 // ============================================================================
@@ -208,7 +209,13 @@ export function useStaffingSimulation(): UseStaffingSimulationReturn {
 
       setProgress(10);
 
-      // advanced-ai-inference Edge Function 호출
+      // 실제 매장 데이터 기반 storeContext 빌드
+      console.log('[useStaffingSimulation] Building store context for:', selectedStore.id);
+      const storeContext = await buildStoreContext(selectedStore.id);
+
+      setProgress(30);
+
+      // advanced-ai-inference Edge Function 호출 (storeContext 포함)
       const { data, error } = await supabase.functions.invoke('advanced-ai-inference', {
         body: {
           type: 'staffing_optimization',
@@ -220,6 +227,7 @@ export function useStaffingSimulation(): UseStaffingSimulationReturn {
             timeSlot: params.timeSlot,
             includeBreaks: params.includeBreaks ?? true,
             constraints: params.constraints || {},
+            storeContext, // 실제 매장 데이터 전달
           },
         },
       });
