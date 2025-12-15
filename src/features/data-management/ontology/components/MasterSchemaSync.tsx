@@ -1,10 +1,22 @@
 import React from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle, Database, User, Layers } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useAuth";
+
+// 이름 기준 중복 제거 (사용자 타입 우선)
+function deduplicateByName<T extends { name: string; user_id: string | null }>(items: T[]): T[] {
+  const byName = new Map<string, T>();
+  for (const item of items) {
+    const existing = byName.get(item.name);
+    if (!existing || (item.user_id !== null && existing.user_id === null)) {
+      byName.set(item.name, item);
+    }
+  }
+  return Array.from(byName.values());
+}
 
 export const MasterSchemaSync = () => {
   const { user } = useAuth();
@@ -58,9 +70,33 @@ export const MasterSchemaSync = () => {
     enabled: !!user?.id
   });
 
-  // 총 사용 가능한 스키마 (마스터 + 사용자 커스텀)
-  const totalEntityCount = (masterSchema?.entityCount || 0) + (userSchema?.entityCount || 0);
-  const totalRelationCount = (masterSchema?.relationCount || 0) + (userSchema?.relationCount || 0);
+  // 실제 사용 가능한 스키마 (중복 제거 후)
+  const { data: effectiveSchema, isLoading: effectiveLoading } = useQuery({
+    queryKey: ['effective-schema-info', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return { entityCount: 0, relationCount: 0 };
+
+      const [entitiesResult, relationsResult] = await Promise.all([
+        supabase
+          .from('ontology_entity_types')
+          .select('name, user_id')
+          .or(`and(org_id.is.null,user_id.is.null),user_id.eq.${user.id}`),
+        supabase
+          .from('ontology_relation_types')
+          .select('name, user_id')
+          .or(`and(org_id.is.null,user_id.is.null),user_id.eq.${user.id}`)
+      ]);
+
+      const deduplicatedEntities = deduplicateByName(entitiesResult.data || []);
+      const deduplicatedRelations = deduplicateByName(relationsResult.data || []);
+
+      return {
+        entityCount: deduplicatedEntities.length,
+        relationCount: deduplicatedRelations.length
+      };
+    },
+    enabled: !!user?.id
+  });
 
   return (
     <Card className="glass-card">
@@ -119,25 +155,25 @@ export const MasterSchemaSync = () => {
             </div>
           </div>
 
-          {/* 총 사용 가능 */}
+          {/* 실제 사용 가능 (중복 제거) */}
           <div className="p-4 rounded-lg border border-primary/50 bg-primary/10">
             <div className="flex items-center gap-2 text-sm text-primary mb-2">
               <CheckCircle className="w-4 h-4" />
-              총 사용 가능
+              실제 사용 가능
             </div>
             <div className="text-2xl font-bold text-primary">
-              {totalEntityCount}
+              {effectiveLoading ? '...' : effectiveSchema?.entityCount || 0}
               <span className="text-sm font-normal text-muted-foreground ml-2">엔티티</span>
             </div>
             <div className="text-lg font-semibold text-secondary mt-1">
-              {totalRelationCount}
+              {effectiveLoading ? '...' : effectiveSchema?.relationCount || 0}
               <span className="text-sm font-normal text-muted-foreground ml-2">관계</span>
             </div>
           </div>
         </div>
 
         <div className="text-xs text-muted-foreground mt-4 p-3 bg-muted/20 rounded">
-          <strong>참고:</strong> 동일한 이름의 타입이 있으면 내 커스텀 타입이 우선 적용됩니다.
+          <strong>참고:</strong> 동일한 이름의 타입이 있으면 내 커스텀 타입이 우선 적용됩니다 (중복 제거됨).
           마스터 스키마는 읽기 전용이며, 필요시 커스텀 타입을 추가하여 확장할 수 있습니다.
         </div>
       </CardContent>
