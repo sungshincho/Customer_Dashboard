@@ -85,7 +85,6 @@ DECLARE
   rec RECORD;
   v_customer_id UUID;
   v_visit_id UUID;
-  v_product_id UUID;
 BEGIN
   SELECT id, user_id, org_id INTO v_store_id, v_user_id, v_org_id
   FROM stores ORDER BY created_at ASC LIMIT 1;
@@ -101,16 +100,14 @@ BEGIN
     -- line_items의 각 고유 transaction_id에 대해 purchase 생성
     FOR rec IN
       SELECT
-  transaction_id,
-  MIN(transaction_date) as purchase_date,
-  SUM(line_total) as total_amount,
-  COUNT(*) as item_count,
-  (SELECT product_id FROM line_items li2 
-   WHERE li2.transaction_id = line_items.transaction_id 
-   LIMIT 1) as first_product_id  -- ✅ 서브쿼리로 첫 번째 가져오기
-FROM line_items
-WHERE store_id = v_store_id
-GROUP BY transaction_id
+        li.transaction_id,
+        MIN(li.transaction_date) as purchase_date,
+        SUM(li.line_total) as total_amount,
+        COUNT(*) as item_count,
+        (ARRAY_AGG(li.product_id))[1] as first_product_id
+      FROM line_items li
+      WHERE li.store_id = v_store_id
+      GROUP BY li.transaction_id
     LOOP
       -- 랜덤 고객 선택
       SELECT id INTO v_customer_id
@@ -161,7 +158,6 @@ GROUP BY transaction_id
     RAISE NOTICE 'STEP 2 완료: purchases % 건 생성됨', v_inserted;
   END IF;
 END $$;
-
 
 -- ============================================================================
 -- STEP 3: line_items.customer_id 및 purchase_id 연결
