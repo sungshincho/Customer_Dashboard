@@ -1908,77 +1908,132 @@ BEGIN
 END $$;
 
 -- ============================================================================
--- STEP 22: 데이터 일관성 검증
+-- [교체] STEP 22: 데이터 일관성 검증 - v7.0 L1↔L2 강화 버전
+-- ============================================================================
+-- 기존 STEP 22 블록 전체를 아래 코드로 교체하세요
 -- ============================================================================
 DO $$
 DECLARE
   v_store_id UUID := 'd9830554-2688-4032-af40-acccda787ac4';
+  
+  -- 기본 통계
   v_customers INT;
   v_total_visits INT;
   v_unique_visitors INT;
   v_returning INT;
   v_repeat_rate NUMERIC;
   v_purchases INT;
-  v_kpi_footfall INT;
-  v_kpi_unique INT;
-  v_funnel_visit INT;
-  v_funnel_purchase INT;
+  v_purchase_visits INT;
+  
+  -- ★ L1 vs L2 일관성 검증 ★
+  v_l1_visits INT;
+  v_l2_kpi_visitors INT;
+  v_l2_hourly_visitors INT;
+  v_l1_transactions INT;
+  v_l2_kpi_transactions INT;
+  v_l1_zone_events INT;
+  v_l2_zone_visitors INT;
+  v_l1_revenue NUMERIC;
+  v_l2_kpi_revenue NUMERIC;
+  
+  -- 피크타임
+  v_peak_hour INT;
+  v_peak_visitors INT;
+  
+  -- 일치 여부
+  v_visits_match BOOLEAN;
+  v_txn_match BOOLEAN;
+  v_hourly_match BOOLEAN;
 BEGIN
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
-  RAISE NOTICE 'STEP 22: 데이터 일관성 검증';
+  RAISE NOTICE '★ STEP 22: 데이터 일관성 검증 (v7.0 L1↔L2)';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
 
-  -- 고객 수
+  -- 1. 기본 통계
   SELECT COUNT(*) INTO v_customers FROM customers WHERE store_id = v_store_id;
-
-  -- 방문 통계
-  SELECT COUNT(*), COUNT(DISTINCT customer_id) INTO v_total_visits, v_unique_visitors
+  
+  SELECT COUNT(*), COUNT(DISTINCT customer_id) 
+  INTO v_total_visits, v_unique_visitors
   FROM store_visits WHERE store_id = v_store_id;
-
-  -- 재방문 고객 수
+  
   SELECT COUNT(*) INTO v_returning FROM (
-    SELECT customer_id FROM store_visits WHERE store_id = v_store_id AND customer_id IS NOT NULL
+    SELECT customer_id FROM store_visits 
+    WHERE store_id = v_store_id AND customer_id IS NOT NULL
     GROUP BY customer_id HAVING COUNT(*) >= 2
   ) t;
-
-  v_repeat_rate := CASE WHEN v_customers > 0 THEN (v_returning::NUMERIC / v_customers * 100) ELSE 0 END;
-
-  -- 구매 수
+  
+  v_repeat_rate := CASE WHEN v_customers > 0 
+    THEN (v_returning::NUMERIC / v_customers * 100) ELSE 0 END;
+  
   SELECT COUNT(*) INTO v_purchases FROM purchases WHERE store_id = v_store_id;
+  
+  SELECT COUNT(*) INTO v_purchase_visits 
+  FROM store_visits WHERE store_id = v_store_id AND made_purchase = true;
 
-  -- KPI 집계
-  SELECT COALESCE(SUM(total_visitors), 0), COALESCE(SUM(unique_visitors), 0) INTO v_kpi_footfall, v_kpi_unique
-  FROM daily_kpis_agg WHERE store_id = v_store_id;
+  -- 2. ★ L1 vs L2 일관성 검증 ★
+  SELECT COUNT(*) INTO v_l1_visits FROM store_visits WHERE store_id = v_store_id;
+  SELECT COALESCE(SUM(total_visitors), 0) INTO v_l2_kpi_visitors FROM daily_kpis_agg WHERE store_id = v_store_id;
+  SELECT COALESCE(SUM(visitor_count), 0) INTO v_l2_hourly_visitors FROM hourly_metrics WHERE store_id = v_store_id;
+  SELECT COUNT(*) INTO v_l1_transactions FROM store_visits WHERE store_id = v_store_id AND made_purchase = true;
+  SELECT COALESCE(SUM(total_transactions), 0) INTO v_l2_kpi_transactions FROM daily_kpis_agg WHERE store_id = v_store_id;
+  SELECT COUNT(*) INTO v_l1_zone_events FROM zone_events WHERE store_id = v_store_id AND event_type = 'enter';
+  SELECT COALESCE(SUM(total_visitors), 0) INTO v_l2_zone_visitors FROM zone_daily_metrics WHERE store_id = v_store_id;
+  SELECT COALESCE(SUM(line_total), 0) INTO v_l1_revenue FROM line_items WHERE store_id = v_store_id;
+  SELECT COALESCE(SUM(total_revenue), 0) INTO v_l2_kpi_revenue FROM daily_kpis_agg WHERE store_id = v_store_id;
+  
+  SELECT hour, SUM(visitor_count) INTO v_peak_hour, v_peak_visitors
+  FROM hourly_metrics WHERE store_id = v_store_id
+  GROUP BY hour ORDER BY SUM(visitor_count) DESC LIMIT 1;
+  
+  v_visits_match := (v_l1_visits = v_l2_kpi_visitors);
+  v_txn_match := (v_l1_transactions = v_l2_kpi_transactions);
+  v_hourly_match := (v_l1_visits = v_l2_hourly_visitors);
 
-  -- 퍼널 이벤트
-  SELECT
-    COUNT(*) FILTER (WHERE event_type = 'visit'),
-    COUNT(*) FILTER (WHERE event_type = 'purchase')
-  INTO v_funnel_visit, v_funnel_purchase
-  FROM funnel_events WHERE store_id = v_store_id;
-
+  -- 3. 결과 출력
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
-  RAISE NOTICE '✅ NEURALTWIN 통합 샘플 데이터셋 v6.0 시딩 완료!';
+  RAISE NOTICE '✅ NEURALTWIN v7.0 시딩 완료! (L1→L2 일관성 보장)';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
   RAISE NOTICE '';
-  RAISE NOTICE '📊 생성된 데이터:';
-  RAISE NOTICE '  customers:        % 명', v_customers;
-  RAISE NOTICE '  store_visits:     % 건', v_total_visits;
-  RAISE NOTICE '  unique_visitors:  % 명 (식별)', v_unique_visitors;
-  RAISE NOTICE '  returning:        % 명 (%.1f%%)', v_returning, v_repeat_rate;
-  RAISE NOTICE '  purchases:        % 건', v_purchases;
+  RAISE NOTICE '📊 기본 통계:';
+  RAISE NOTICE '  customers:         % 명', v_customers;
+  RAISE NOTICE '  store_visits:      % 건', v_total_visits;
+  RAISE NOTICE '  unique_visitors:   % 명', v_unique_visitors;
+  RAISE NOTICE '  returning:         % 명 (재방문률 %.1f%%)', v_returning, v_repeat_rate;
+  RAISE NOTICE '  purchase_visits:   % 건 (전환율 %.1f%%)', v_purchase_visits, 
+    CASE WHEN v_total_visits > 0 THEN (v_purchase_visits::NUMERIC / v_total_visits * 100) ELSE 0 END;
+  RAISE NOTICE '  purchases:         % 건', v_purchases;
   RAISE NOTICE '';
-  RAISE NOTICE '📈 일관성 검증:';
-  RAISE NOTICE '  store_visits ≈ kpi_footfall:    % ≈ %', v_total_visits, v_kpi_footfall;
-  RAISE NOTICE '  store_visits = funnel_visit:    % = % %',
-    v_total_visits, v_funnel_visit,
-    CASE WHEN v_total_visits = v_funnel_visit THEN '✓' ELSE '✗' END;
-  RAISE NOTICE '  purchases = funnel_purchase:    % = % %',
-    v_purchases, v_funnel_purchase,
-    CASE WHEN v_purchases = v_funnel_purchase THEN '✓' ELSE '✗' END;
+  RAISE NOTICE '★ L1↔L2 일관성 검증:';
+  RAISE NOTICE '  [방문자] L1 store_visits = L2 daily_kpis';
+  RAISE NOTICE '    % = %  %', v_l1_visits, v_l2_kpi_visitors, 
+    CASE WHEN v_visits_match THEN '✓ 일치' ELSE '✗ 불일치' END;
+  RAISE NOTICE '  [방문자] L1 store_visits = L2 hourly_metrics SUM';
+  RAISE NOTICE '    % = %  %', v_l1_visits, v_l2_hourly_visitors, 
+    CASE WHEN v_hourly_match THEN '✓ 일치' ELSE '✗ 불일치' END;
+  RAISE NOTICE '  [거래수] L1 made_purchase = L2 total_transactions';
+  RAISE NOTICE '    % = %  %', v_l1_transactions, v_l2_kpi_transactions, 
+    CASE WHEN v_txn_match THEN '✓ 일치' ELSE '✗ 불일치' END;
+  RAISE NOTICE '  [매출액] L1 line_items = L2 total_revenue';
+  RAISE NOTICE '    ₩% = ₩%  %', 
+    TO_CHAR(v_l1_revenue, 'FM999,999,999,999'), 
+    TO_CHAR(v_l2_kpi_revenue, 'FM999,999,999,999'),
+    CASE WHEN v_l1_revenue = v_l2_kpi_revenue THEN '✓ 일치' ELSE '≈ 근사' END;
+  RAISE NOTICE '  [존방문] L1 zone_events ↔ L2 zone_daily_metrics';
+  RAISE NOTICE '    % ↔ % (다대일)', v_l1_zone_events, v_l2_zone_visitors;
+  RAISE NOTICE '';
+  RAISE NOTICE '📈 피크타임: %시 (%명)', v_peak_hour, v_peak_visitors;
+  RAISE NOTICE '';
+  
+  IF v_visits_match AND v_txn_match AND v_hourly_match THEN
+    RAISE NOTICE '🎉 L1↔L2 데이터 일관성 검증 통과!';
+  ELSE
+    RAISE NOTICE '⚠️  일부 불일치 - 상세 검토 필요';
+  END IF;
+  
   RAISE NOTICE '';
   RAISE NOTICE '🔗 Store ID: d9830554-2688-4032-af40-acccda787ac4';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
 END $$;
+
