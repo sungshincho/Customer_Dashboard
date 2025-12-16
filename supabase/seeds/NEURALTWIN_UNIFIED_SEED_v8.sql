@@ -1008,7 +1008,7 @@ END $$;
 -- ============================================================================
 -- STEP 17: customer_segments_agg 생성 - ★ L1 customers/store_visits 기반 집계 ★
 -- ============================================================================
--- v7.0 패치 적용: 하드코딩 제거, L1 데이터에서 동적 세그먼트 계산
+-- v8.0 패치: segment_type 컬럼 추가 (NOT NULL)
 -- ============================================================================
 DO $$
 DECLARE
@@ -1024,6 +1024,9 @@ BEGIN
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
   RAISE NOTICE 'STEP 17: customer_segments_agg 생성 - ★ L1 기반 동적 세그먼트 계산 ★';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
+
+  -- 기존 데이터 삭제
+  DELETE FROM customer_segments_agg WHERE store_id = v_store_id;
 
   FOR day_offset IN 0..89 LOOP
     v_date := CURRENT_DATE - day_offset;
@@ -1057,7 +1060,6 @@ BEGIN
           CASE WHEN SUM(purchase_count) > 0 THEN SUM(total_spent) / SUM(purchase_count) ELSE 0 END as avg_transaction,
           CASE WHEN COUNT(DISTINCT customer_id) > 0 THEN SUM(visit_count)::NUMERIC / COUNT(DISTINCT customer_id) ELSE 0 END as visit_frequency,
           CASE WHEN SUM(visit_count) > 0 THEN (SUM(purchase_count)::NUMERIC / SUM(visit_count) * 100) ELSE 0 END as conversion_rate,
-          -- Churn risk: 30일간 방문 0회 고객 비율
           CASE WHEN COUNT(DISTINCT customer_id) > 0
             THEN (COUNT(DISTINCT customer_id) FILTER (WHERE visit_count = 0)::NUMERIC / COUNT(DISTINCT customer_id) * 100)
             ELSE 0 END as churn_risk
@@ -1067,20 +1069,34 @@ BEGIN
       SELECT * FROM segment_agg
     LOOP
       INSERT INTO customer_segments_agg (
-        id, store_id, org_id, date, segment_name,
+        id, store_id, org_id, date,
+        segment_type,                              -- ★ 추가됨
+        segment_name,
         customer_count, total_revenue, avg_transaction_value,
-        visit_frequency, conversion_rate, churn_risk_score,
-        ltv_estimate, created_at
+        visit_frequency, avg_basket_size, churn_risk_score,
+        ltv_estimate, metadata, calculated_at, created_at
       ) VALUES (
-        gen_random_uuid(), v_store_id, v_org_id, v_date, v_segment_stats.segment_name,
-        v_segment_stats.customer_count,           -- ★ L1에서 직접 계산
-        v_segment_stats.total_revenue,            -- ★ L1에서 직접 계산
-        v_segment_stats.avg_transaction,          -- ★ L1에서 직접 계산
-        ROUND(v_segment_stats.visit_frequency::NUMERIC, 2),  -- ★ L1에서 직접 계산
-        ROUND(v_segment_stats.conversion_rate::NUMERIC, 1),  -- ★ L1에서 직접 계산
-        ROUND(v_segment_stats.churn_risk::NUMERIC, 1),       -- ★ L1에서 직접 계산
-        -- LTV 추정: 월 매출 * 12개월 * 잔류율
+        gen_random_uuid(), v_store_id, v_org_id, v_date,
+        -- ★ segment_type 매핑 (NOT NULL 필수)
+        CASE v_segment_stats.segment_name
+          WHEN 'VIP' THEN 'value'
+          WHEN 'Regular' THEN 'frequency'
+          WHEN 'New' THEN 'lifecycle'
+          WHEN 'At-Risk' THEN 'churn'
+          WHEN 'Churned' THEN 'churn'
+          WHEN 'Occasional' THEN 'frequency'
+          ELSE 'other'
+        END,
+        v_segment_stats.segment_name,
+        v_segment_stats.customer_count,
+        v_segment_stats.total_revenue,
+        v_segment_stats.avg_transaction,
+        ROUND(v_segment_stats.visit_frequency::NUMERIC, 2),
+        ROUND(v_segment_stats.avg_transaction::NUMERIC / NULLIF(v_segment_stats.visit_frequency, 0), 0),  -- avg_basket_size 추정
+        ROUND(v_segment_stats.churn_risk::NUMERIC, 1),
         ROUND(v_segment_stats.total_revenue * 12 * (1 - v_segment_stats.churn_risk / 100)),
+        jsonb_build_object('source', 'L1_aggregation', 'base_date', v_date),
+        NOW(),
         NOW()
       );
       v_count := v_count + 1;
@@ -1088,13 +1104,27 @@ BEGIN
 
     -- 데이터가 없는 세그먼트도 0으로 기록 (모든 세그먼트 커버)
     INSERT INTO customer_segments_agg (
-      id, store_id, org_id, date, segment_name,
+      id, store_id, org_id, date,
+      segment_type,                                -- ★ 추가됨
+      segment_name,
       customer_count, total_revenue, avg_transaction_value,
-      visit_frequency, conversion_rate, churn_risk_score, ltv_estimate, created_at
+      visit_frequency, avg_basket_size, churn_risk_score, ltv_estimate,
+      metadata, calculated_at, created_at
     )
     SELECT
-      gen_random_uuid(), v_store_id, v_org_id, v_date, seg,
-      0, 0, 0, 0, 0, 0, 0, NOW()
+      gen_random_uuid(), v_store_id, v_org_id, v_date,
+      CASE seg
+        WHEN 'VIP' THEN 'value'
+        WHEN 'Regular' THEN 'frequency'
+        WHEN 'New' THEN 'lifecycle'
+        WHEN 'At-Risk' THEN 'churn'
+        WHEN 'Churned' THEN 'churn'
+        WHEN 'Occasional' THEN 'frequency'
+        ELSE 'other'
+      END,
+      seg,
+      0, 0, 0, 0, 0, 0, 0,
+      '{}'::JSONB, NOW(), NOW()
     FROM unnest(ARRAY['VIP', 'Regular', 'Occasional', 'New', 'At-Risk', 'Churned']) as seg
     WHERE NOT EXISTS (
       SELECT 1 FROM customer_segments_agg
@@ -1762,7 +1792,7 @@ END $$;
 -- ============================================================================
 -- STEP 25: ai_recommendations 생성 - ★ L2 기반 동적 분석 ★
 -- ============================================================================
--- v7.0 패치 적용: L2 테이블 분석하여 실제 데이터 기반의 추천 동적 생성
+-- v8.0 패치: 스키마 불일치 수정 (기존 L2 분석 로직 100% 유지)
 -- ============================================================================
 DO $$
 DECLARE
@@ -1809,23 +1839,27 @@ BEGIN
   -- ═══════════════════════════════════════════════════════════
   SELECT
     hour,
-    COALESCE(SUM(visitors), 0) as total_visitors,
-    COALESCE(ROUND(AVG(visitors)), 5) as avg_visitors,
-    COALESCE(SUM(transactions), 0) as total_transactions,
+    COALESCE(SUM(visitor_count), 0) as total_visitors,
+    COALESCE(ROUND(AVG(visitor_count)), 5) as avg_visitors,
+    COALESCE(SUM(transaction_count), 0) as total_transactions,
     COALESCE(ROUND(AVG(revenue)), 0) as avg_revenue
   INTO v_peak_hour
   FROM hourly_metrics
   WHERE store_id = v_store_id
   GROUP BY hour
-  ORDER BY SUM(visitors) DESC NULLS LAST
+  ORDER BY SUM(visitor_count) DESC NULLS LAST
   LIMIT 1;
 
   IF v_peak_hour.hour IS NOT NULL THEN
     INSERT INTO ai_recommendations (
       id, store_id, user_id, org_id,
       recommendation_type, title, description,
-      priority, expected_impact, confidence_score, status, target_metric,
-      implementation_steps, data_sources_used, created_at, expires_at
+      priority, status,
+      expected_impact,
+      evidence,
+      action_category,
+      data_source,
+      created_at, updated_at, is_displayed
     ) VALUES (
       gen_random_uuid(), v_store_id, v_user_id, v_org_id,
       'staffing',
@@ -1833,11 +1867,20 @@ BEGIN
       v_peak_hour.hour || '시에 평균 ' || v_peak_hour.avg_visitors || '명 방문, ' ||
         '평균 매출 ₩' || TO_CHAR(v_peak_hour.avg_revenue, 'FM999,999') || '. ' ||
         '서비스 품질 유지 및 전환율 개선을 위해 직원 추가 배치를 권장합니다.',
-      'high', 15 + floor(random() * 10)::NUMERIC, 0.78 + random() * 0.12,
-      'pending', 'conversion_rate',
-      '["피크타임 분석 완료", "추가 인력 배치", "대기시간 모니터링", "효과 측정"]',
-      '["hourly_metrics", "daily_kpis_agg"]',
-      NOW(), NOW() + INTERVAL '7 days'
+      'high', 'pending',
+      jsonb_build_object(
+        'expected_improvement_percent', 15 + floor(random() * 10)::INT,
+        'confidence_score', ROUND((0.78 + random() * 0.12)::NUMERIC, 2),
+        'target_metric', 'conversion_rate'
+      ),
+      jsonb_build_object(
+        'implementation_steps', ARRAY['피크타임 분석 완료', '추가 인력 배치', '대기시간 모니터링', '효과 측정'],
+        'data_sources_used', ARRAY['hourly_metrics', 'daily_kpis_agg'],
+        'analysis_period_days', 30
+      ),
+      'staff_scheduling',
+      'hourly_metrics',
+      NOW(), NOW(), true
     );
     v_recommendation_count := v_recommendation_count + 1;
     RAISE NOTICE '  ✓ 추천 1: 피크타임 인력 - %시 (평균 %명)', v_peak_hour.hour, v_peak_hour.avg_visitors;
@@ -1848,15 +1891,15 @@ BEGIN
   -- ═══════════════════════════════════════════════════════════
   SELECT
     hour,
-    COALESCE(SUM(visitors), 0) as total_visitors,
-    COALESCE(ROUND(AVG(visitors)), 5) as avg_visitors,
+    COALESCE(SUM(visitor_count), 0) as total_visitors,
+    COALESCE(ROUND(AVG(visitor_count)), 5) as avg_visitors,
     COALESCE(ROUND(AVG(revenue)), 0) as avg_revenue
   INTO v_low_traffic_hour
   FROM hourly_metrics
   WHERE store_id = v_store_id AND hour BETWEEN 10 AND 20
   GROUP BY hour
-  HAVING AVG(visitors) > 0
-  ORDER BY SUM(visitors) ASC NULLS LAST
+  HAVING AVG(visitor_count) > 0
+  ORDER BY SUM(visitor_count) ASC NULLS LAST
   LIMIT 1;
 
   IF v_low_traffic_hour.hour IS NOT NULL AND v_peak_hour.avg_visitors IS NOT NULL
@@ -1864,8 +1907,12 @@ BEGIN
     INSERT INTO ai_recommendations (
       id, store_id, user_id, org_id,
       recommendation_type, title, description,
-      priority, expected_impact, confidence_score, status, target_metric,
-      implementation_steps, data_sources_used, created_at, expires_at
+      priority, status,
+      expected_impact,
+      evidence,
+      action_category,
+      data_source,
+      created_at, updated_at, is_displayed
     ) VALUES (
       gen_random_uuid(), v_store_id, v_user_id, v_org_id,
       'promotion',
@@ -1874,11 +1921,20 @@ BEGIN
         '피크타임(' || v_peak_hour.hour || '시) 대비 ' ||
         ROUND((v_low_traffic_hour.avg_visitors::NUMERIC / NULLIF(v_peak_hour.avg_visitors, 0) * 100)) || '% 수준. ' ||
         '해당 시간대 타임세일 또는 특별 프로모션을 권장합니다.',
-      'medium', 7 + floor(random() * 8)::NUMERIC, 0.65 + random() * 0.15,
-      'pending', 'total_visitors',
-      '["저조 시간대 분석", "타임세일 기획", "프로모션 실행", "효과 측정"]',
-      '["hourly_metrics"]',
-      NOW(), NOW() + INTERVAL '14 days'
+      'medium', 'pending',
+      jsonb_build_object(
+        'expected_improvement_percent', 7 + floor(random() * 8)::INT,
+        'confidence_score', ROUND((0.65 + random() * 0.15)::NUMERIC, 2),
+        'target_metric', 'total_visitors'
+      ),
+      jsonb_build_object(
+        'implementation_steps', ARRAY['저조 시간대 분석', '타임세일 기획', '프로모션 실행', '효과 측정'],
+        'data_sources_used', ARRAY['hourly_metrics'],
+        'analysis_period_days', 30
+      ),
+      'promotion_planning',
+      'hourly_metrics',
+      NOW(), NOW(), true
     );
     v_recommendation_count := v_recommendation_count + 1;
     RAISE NOTICE '  ✓ 추천 2: 비수기 프로모션 - %시 (평균 %명)', v_low_traffic_hour.hour, v_low_traffic_hour.avg_visitors;
@@ -1904,8 +1960,12 @@ BEGIN
     INSERT INTO ai_recommendations (
       id, store_id, user_id, org_id,
       recommendation_type, title, description,
-      priority, expected_impact, confidence_score, status, target_metric,
-      implementation_steps, data_sources_used, created_at, expires_at
+      priority, status,
+      expected_impact,
+      evidence,
+      action_category,
+      data_source,
+      created_at, updated_at, is_displayed
     ) VALUES (
       gen_random_uuid(), v_store_id, v_user_id, v_org_id,
       'layout',
@@ -1914,11 +1974,20 @@ BEGIN
         v_congested_zone.avg_visitors || '명/일)를 기록. 평균 체류시간 ' ||
         v_congested_zone.avg_dwell || '초. 동선 분산 또는 공간 최적화를 권장합니다.',
       CASE WHEN v_congested_zone.avg_visitors > 30 THEN 'high' ELSE 'medium' END,
-      10 + floor(random() * 10)::NUMERIC, 0.75 + random() * 0.15,
-      'pending', 'conversion_rate',
-      '["혼잡도 분석 완료", "동선 재설계", "레이아웃 조정", "효과 측정"]',
-      '["zone_daily_metrics", "zone_events"]',
-      NOW(), NOW() + INTERVAL '30 days'
+      'pending',
+      jsonb_build_object(
+        'expected_improvement_percent', 10 + floor(random() * 10)::INT,
+        'confidence_score', ROUND((0.75 + random() * 0.15)::NUMERIC, 2),
+        'target_metric', 'conversion_rate'
+      ),
+      jsonb_build_object(
+        'implementation_steps', ARRAY['혼잡도 분석 완료', '동선 재설계', '레이아웃 조정', '효과 측정'],
+        'data_sources_used', ARRAY['zone_daily_metrics', 'zone_events'],
+        'analysis_period_days', 30
+      ),
+      'layout_optimization',
+      'zone_daily_metrics',
+      NOW(), NOW(), true
     );
     v_recommendation_count := v_recommendation_count + 1;
     RAISE NOTICE '  ✓ 추천 3: 혼잡 존 - % (%명/일)', v_congested_zone.zone_name, v_congested_zone.avg_visitors;
@@ -1939,8 +2008,12 @@ BEGIN
     INSERT INTO ai_recommendations (
       id, store_id, user_id, org_id,
       recommendation_type, title, description,
-      priority, expected_impact, confidence_score, status, target_metric,
-      implementation_steps, data_sources_used, created_at, expires_at
+      priority, status,
+      expected_impact,
+      evidence,
+      action_category,
+      data_source,
+      created_at, updated_at, is_displayed
     ) VALUES (
       gen_random_uuid(), v_store_id, v_user_id, v_org_id,
       'promotion',
@@ -1948,11 +2021,20 @@ BEGIN
       'VIP 세그먼트 ' || v_vip_stats.vip_count || '명 대상 전용 사전 구매 이벤트로 충성도 강화를 권장합니다. ' ||
         '평균 객단가 ₩' || TO_CHAR(v_vip_stats.vip_avg_transaction, 'FM999,999') || ', ' ||
         '일평균 매출 기여 ₩' || TO_CHAR(v_vip_stats.vip_revenue, 'FM999,999') || '.',
-      'high', 12 + floor(random() * 8)::NUMERIC, 0.72 + random() * 0.15,
-      'pending', 'customer_retention',
-      '["VIP 리스트 추출", "이벤트 기획", "개인화 마케팅 실행", "효과 측정"]',
-      '["customer_segments_agg", "customers"]',
-      NOW(), NOW() + INTERVAL '14 days'
+      'high', 'pending',
+      jsonb_build_object(
+        'expected_improvement_percent', 12 + floor(random() * 8)::INT,
+        'confidence_score', ROUND((0.72 + random() * 0.15)::NUMERIC, 2),
+        'target_metric', 'customer_retention'
+      ),
+      jsonb_build_object(
+        'implementation_steps', ARRAY['VIP 리스트 추출', '이벤트 기획', '개인화 마케팅 실행', '효과 측정'],
+        'data_sources_used', ARRAY['customer_segments_agg', 'customers'],
+        'analysis_period_days', 30
+      ),
+      'customer_engagement',
+      'customer_segments_agg',
+      NOW(), NOW(), true
     );
     v_recommendation_count := v_recommendation_count + 1;
     RAISE NOTICE '  ✓ 추천 4: VIP 이벤트 - %명 (객단가 ₩%)', v_vip_stats.vip_count, TO_CHAR(v_vip_stats.vip_avg_transaction, 'FM999,999');
@@ -1973,8 +2055,12 @@ BEGIN
     INSERT INTO ai_recommendations (
       id, store_id, user_id, org_id,
       recommendation_type, title, description,
-      priority, expected_impact, confidence_score, status, target_metric,
-      implementation_steps, data_sources_used, created_at, expires_at
+      priority, status,
+      expected_impact,
+      evidence,
+      action_category,
+      data_source,
+      created_at, updated_at, is_displayed
     ) VALUES (
       gen_random_uuid(), v_store_id, v_user_id, v_org_id,
       'retention',
@@ -1983,11 +2069,20 @@ BEGIN
         v_at_risk_stats.avg_churn_risk || '%로 높습니다. ' ||
         '예상 LTV ₩' || TO_CHAR(v_at_risk_stats.avg_ltv, 'FM999,999') || ' 손실 방지를 위해 ' ||
         '맞춤형 리텐션 캠페인(쿠폰, 개인화 추천)을 권장합니다.',
-      'high', 18 + floor(random() * 12)::NUMERIC, 0.68 + random() * 0.12,
-      'pending', 'customer_retention',
-      '["At-Risk 분석 완료", "리텐션 캠페인 설계", "쿠폰 발송", "효과 측정"]',
-      '["customer_segments_agg", "customers", "store_visits"]',
-      NOW(), NOW() + INTERVAL '7 days'
+      'high', 'pending',
+      jsonb_build_object(
+        'expected_improvement_percent', 18 + floor(random() * 12)::INT,
+        'confidence_score', ROUND((0.68 + random() * 0.12)::NUMERIC, 2),
+        'target_metric', 'customer_retention'
+      ),
+      jsonb_build_object(
+        'implementation_steps', ARRAY['At-Risk 분석 완료', '리텐션 캠페인 설계', '쿠폰 발송', '효과 측정'],
+        'data_sources_used', ARRAY['customer_segments_agg', 'customers', 'store_visits'],
+        'analysis_period_days', 30
+      ),
+      'customer_engagement',
+      'customer_segments_agg',
+      NOW(), NOW(), true
     );
     v_recommendation_count := v_recommendation_count + 1;
     RAISE NOTICE '  ✓ 추천 5: At-Risk 리텐션 - %명 (이탈위험 %%)', v_at_risk_stats.at_risk_count, v_at_risk_stats.avg_churn_risk;
@@ -2007,14 +2102,17 @@ END $$;
 -- ============================================================================
 -- STEP 26: ai_inference_results 생성
 -- ============================================================================
+-- v8.0 패치: 스키마 불일치 수정 (기존 로직 100% 유지)
+-- ============================================================================
 DO $$
 DECLARE
   v_store_id UUID := 'd9830554-2688-4032-af40-acccda787ac4';
+  v_user_id UUID;
   v_org_id UUID;
   v_count INT := 0;
   i INT;
 BEGIN
-  SELECT org_id INTO v_org_id FROM stores WHERE id = v_store_id;
+  SELECT user_id, org_id INTO v_user_id, v_org_id FROM stores WHERE id = v_store_id;
 
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
@@ -2027,29 +2125,35 @@ BEGIN
   -- 50개의 AI 추론 결과 생성
   FOR i IN 1..50 LOOP
     INSERT INTO ai_inference_results (
-      id, store_id, org_id, model_name, model_version,
-      inference_type, input_data, output_data, confidence_score,
-      processing_time_ms, created_at
+      id, store_id, user_id, org_id,
+      model_used,                    -- ★ model_name → model_used
+      inference_type,
+      parameters,                    -- ★ input_data → parameters
+      result,                        -- ★ output_data → result (confidence_score 포함)
+      processing_time_ms,
+      created_at
     ) VALUES (
-      gen_random_uuid(), v_store_id, v_org_id,
+      gen_random_uuid(), v_store_id, v_user_id, v_org_id,
       (ARRAY['conversion_predictor', 'traffic_forecaster', 'churn_detector', 'basket_optimizer', 'staff_scheduler'])[1 + (i-1) % 5],
-      '2.1.0',
       (ARRAY['prediction', 'classification', 'optimization', 'forecasting', 'anomaly_detection'])[1 + (i-1) % 5],
+      -- ★ input_data → parameters
       jsonb_build_object(
         'date', (CURRENT_DATE - (i-1))::TEXT,
         'store_id', v_store_id,
-        'features', jsonb_build_array('traffic', 'weather', 'day_of_week', 'promotions')
+        'features', jsonb_build_array('traffic', 'weather', 'day_of_week', 'promotions'),
+        'model_version', '2.1.0'     -- ★ model_version을 parameters 내부로 이동
       ),
+      -- ★ output_data → result (confidence_score 포함)
       jsonb_build_object(
         'prediction', 0.5 + random() * 0.4,
         'confidence', 0.7 + random() * 0.25,
+        'confidence_score', 0.75 + random() * 0.2,  -- ★ 기존 confidence_score를 result 내부로
         'factors', jsonb_build_array(
           jsonb_build_object('name', 'traffic', 'importance', random()),
           jsonb_build_object('name', 'weather', 'importance', random()),
           jsonb_build_object('name', 'day_of_week', 'importance', random())
         )
       ),
-      0.75 + random() * 0.2,
       50 + floor(random() * 200)::INT,
       NOW() - ((i-1) || ' days')::INTERVAL
     );
@@ -2061,21 +2165,26 @@ END $$;
 
 
 -- ============================================================================
--- STEP 27: strategy_feedback 생성
+-- STEP 27: strategy_feedback 생성 (스키마 수정본)
 -- ============================================================================
 DO $$
 DECLARE
   v_store_id UUID := 'd9830554-2688-4032-af40-acccda787ac4';
-  v_user_id UUID;
-  v_org_id UUID;
+  v_org_id UUID := '0c6076e3-a993-4022-9b40-0f4e4370f8ef'::UUID;
   v_strategy_ids UUID[];
+  v_strategy_types TEXT[] := ARRAY['pricing', 'layout', 'staffing', 'promotion', 'inventory'];
   v_count INT := 0;
   i INT;
+  v_start_date DATE;
+  v_end_date DATE;
+  v_expected_roi NUMERIC;
+  v_actual_roi NUMERIC;
 BEGIN
-  SELECT user_id, org_id INTO v_user_id, v_org_id FROM stores WHERE id = v_store_id;
-
   -- 전략 ID 가져오기
-  SELECT ARRAY_AGG(id) INTO v_strategy_ids FROM applied_strategies WHERE store_id = v_store_id LIMIT 5;
+  SELECT ARRAY_AGG(id) INTO v_strategy_ids 
+  FROM applied_strategies 
+  WHERE store_id = v_store_id 
+  LIMIT 5;
 
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
@@ -2087,28 +2196,94 @@ BEGIN
 
   IF v_strategy_ids IS NOT NULL AND array_length(v_strategy_ids, 1) > 0 THEN
     FOR i IN 1..20 LOOP
+      v_start_date := CURRENT_DATE - (60 - i * 2);
+      v_end_date := v_start_date + 14;
+      v_expected_roi := 10 + floor(random() * 20)::NUMERIC;
+      v_actual_roi := v_expected_roi * (0.7 + random() * 0.6);  -- 70%~130% 달성률
+
       INSERT INTO strategy_feedback (
-  id, org_id, store_id, strategy_id, strategy_type, feedback_type,
-  expected_roi, actual_roi, roi_accuracy,
-  baseline_metrics, actual_metrics, learnings,
-  ai_recommendation, was_applied, result_measured,
-  measurement_start_date, measurement_end_date, measurement_period_days,
-  applied_at, created_at, updated_at
-) VALUES (
+        id,
+        org_id,
+        store_id,
+        strategy_id,
+        strategy_type,
+        ai_recommendation,
+        was_applied,
+        applied_at,
+        result_measured,
+        measurement_period_days,
+        measurement_start_date,
+        measurement_end_date,
+        baseline_metrics,
+        actual_metrics,
+        expected_roi,
+        actual_roi,
+        roi_accuracy,
+        feedback_type,
+        learnings,
+        created_at,
+        updated_at
+      ) VALUES (
         gen_random_uuid(),
+        v_org_id,
+        v_store_id,
         v_strategy_ids[1 + ((i-1) % array_length(v_strategy_ids, 1))],
-        v_store_id, v_user_id, v_org_id,
+        v_strategy_types[1 + ((i-1) % 5)],
+        jsonb_build_object(
+          'recommendation_id', gen_random_uuid(),
+          'title', CASE (i % 5)
+            WHEN 0 THEN '가격 최적화 전략'
+            WHEN 1 THEN '레이아웃 재배치 전략'
+            WHEN 2 THEN '인력 배치 최적화'
+            WHEN 3 THEN 'VIP 프로모션 캠페인'
+            ELSE '재고 최적화 전략'
+          END,
+          'description', '데이터 기반 AI 추천 전략',
+          'confidence', 0.75 + random() * 0.2,
+          'generated_at', NOW() - ((i * 3) || ' days')::INTERVAL
+        ),
+        true,
+        NOW() - ((60 - i * 2) || ' days')::INTERVAL,
+        CASE WHEN i <= 15 THEN true ELSE false END,
+        14,
+        v_start_date,
+        v_end_date,
+        jsonb_build_object(
+          'daily_revenue', 2500000 + floor(random() * 1000000),
+          'daily_visitors', 35 + floor(random() * 20),
+          'conversion_rate', 12 + random() * 5
+        ),
+        CASE WHEN i <= 15 THEN
+          jsonb_build_object(
+            'daily_revenue', (2500000 + floor(random() * 1000000)) * (1 + v_actual_roi / 100),
+            'daily_visitors', (35 + floor(random() * 20)) * (1 + random() * 0.15),
+            'conversion_rate', (12 + random() * 5) * (1 + random() * 0.1)
+          )
+        ELSE NULL END,
+        v_expected_roi,
+        CASE WHEN i <= 15 THEN v_actual_roi ELSE NULL END,
+        CASE WHEN i <= 15 THEN ROUND((v_actual_roi / v_expected_roi * 100)::NUMERIC, 1) ELSE NULL END,
         (ARRAY['positive', 'negative', 'neutral', 'suggestion'])[1 + (i-1) % 4],
-        3 + floor(random() * 3)::INT,
-        CASE (i % 5)
-          WHEN 0 THEN '전략이 효과적으로 작동하고 있습니다. 전환율 개선이 눈에 띕니다.'
-          WHEN 1 THEN '인력 배치 변경 후 대기 시간이 줄었습니다.'
-          WHEN 2 THEN '추가 조정이 필요할 것 같습니다. 주말에는 효과가 덜합니다.'
-          WHEN 3 THEN '고객 반응이 좋습니다. 지속적인 모니터링이 필요합니다.'
-          ELSE 'VIP 고객들의 재방문율이 증가했습니다.'
-        END,
-        60 + random() * 35,
-        NOW() - ((i-1) * 2 || ' days')::INTERVAL
+        CASE WHEN i <= 15 THEN
+          jsonb_build_object(
+            'key_insight', CASE (i % 5)
+              WHEN 0 THEN '가격 탄력성이 예상보다 높음'
+              WHEN 1 THEN '동선 변경으로 체류시간 증가'
+              WHEN 2 THEN '피크타임 인력 보강 효과적'
+              WHEN 3 THEN 'VIP 재방문율 크게 개선'
+              ELSE '재고 회전율 15% 개선'
+            END,
+            'next_action', CASE (i % 5)
+              WHEN 0 THEN '추가 가격 테스트 진행'
+              WHEN 1 THEN '2차 레이아웃 최적화'
+              WHEN 2 THEN '주말 인력 배치 확대'
+              WHEN 3 THEN 'VIP 등급별 차별화'
+              ELSE '자동 발주 시스템 도입'
+            END
+          )
+        ELSE NULL END,
+        NOW() - ((60 - i * 2) || ' days')::INTERVAL,
+        NOW()
       );
       v_count := v_count + 1;
     END LOOP;
@@ -2121,18 +2296,25 @@ END $$;
 -- ============================================================================
 -- STEP 28: data_sources & data_source_tables & ontology_mappings 생성
 -- ============================================================================
+-- v8.0 패치: 스키마 불일치 수정 (기존 로직 100% 유지)
+-- ============================================================================
 DO $$
 DECLARE
   v_store_id UUID := 'd9830554-2688-4032-af40-acccda787ac4';
   v_user_id UUID;
   v_org_id UUID;
   v_ds_ids UUID[] := ARRAY[
-    'ds-00001-0000-0000-000000000001'::UUID,
-    'ds-00002-0000-0000-000000000002'::UUID,
-    'ds-00003-0000-0000-000000000003'::UUID,
-    'ds-00004-0000-0000-000000000004'::UUID,
-    'ds-00005-0000-0000-000000000005'::UUID
+    'ds000001-0000-0000-0000-000000000001'::UUID,
+    'ds000002-0000-0000-0000-000000000002'::UUID,
+    'ds000003-0000-0000-0000-000000000003'::UUID,
+    'ds000004-0000-0000-0000-000000000004'::UUID,
+    'ds000005-0000-0000-0000-000000000005'::UUID
   ];
+  
+  -- 엔티티/릴레이션 타입 ID 조회용
+  v_entity_type_ids RECORD;
+  v_relation_type_ids RECORD;
+  
   v_count INT := 0;
   v_table_count INT := 0;
   v_entity_map_count INT := 0;
@@ -2151,71 +2333,255 @@ BEGIN
   DELETE FROM data_source_tables WHERE data_source_id = ANY(v_ds_ids);
   DELETE FROM data_sources WHERE id = ANY(v_ds_ids);
 
-  -- data_sources 생성
-  INSERT INTO data_sources (id, store_id, org_id, source_name, source_type, 
-  source_id_code, is_active, config, schema_definition, 
-  last_sync_at, last_sync_status, record_count, created_at, updated_at) VALUES
-    (v_ds_ids[1], v_store_id, v_user_id, v_org_id, 'POS 시스템', 'pos', 'pos://internal.neuraltwin.com/gangnam', 'connected', NOW() - INTERVAL '1 hour', NOW()),
-    (v_ds_ids[2], v_store_id, v_user_id, v_org_id, 'CRM 시스템', 'crm', 'crm://internal.neuraltwin.com/gangnam', 'connected', NOW() - INTERVAL '2 hours', NOW()),
-    (v_ds_ids[3], v_store_id, v_user_id, v_org_id, 'ERP 시스템', 'erp', 'erp://internal.neuraltwin.com/gangnam', 'connected', NOW() - INTERVAL '3 hours', NOW()),
-    (v_ds_ids[4], v_store_id, v_user_id, v_org_id, '센서 데이터', 'iot', 'mqtt://sensors.neuraltwin.com/gangnam', 'connected', NOW() - INTERVAL '30 minutes', NOW()),
-    (v_ds_ids[5], v_store_id, v_user_id, v_org_id, '외부 API', 'api', 'https://api.external.com/v1', 'connected', NOW() - INTERVAL '6 hours', NOW());
+  -- ═══════════════════════════════════════════════════════════
+  -- data_sources 생성 (스키마 수정)
+  -- 실제 스키마: id, org_id, source_id_code, source_name, source_type,
+  --             connection_string, config, is_active, created_at, updated_at,
+  --             store_id, description, schema_definition, last_sync_at, 
+  --             last_sync_status, record_count
+  -- ═══════════════════════════════════════════════════════════
+  INSERT INTO data_sources (
+    id, org_id, store_id, 
+    source_id_code, source_name, source_type, 
+    connection_string, config, is_active,
+    description, schema_definition,
+    last_sync_at, last_sync_status, record_count,
+    created_at, updated_at
+  ) VALUES
+    (v_ds_ids[1], v_org_id, v_store_id, 
+     'POS-001', 'POS 시스템', 'database', 
+     'pos://internal.neuraltwin.com/gangnam', 
+     '{"sync_interval": "hourly", "batch_size": 1000}'::JSONB, true,
+     '매장 POS 거래 데이터',
+     '{"tables": ["pos_transactions", "pos_items", "pos_payments"]}'::JSONB,
+     NOW() - INTERVAL '1 hour', 'success', 75000,
+     NOW(), NOW()),
+    (v_ds_ids[2], v_org_id, v_store_id, 
+     'CRM-001', 'CRM 시스템', 'database', 
+     'crm://internal.neuraltwin.com/gangnam', 
+     '{"sync_interval": "daily"}'::JSONB, true,
+     '고객 관계 관리 데이터',
+     '{"tables": ["crm_customers", "crm_interactions", "crm_campaigns"]}'::JSONB,
+     NOW() - INTERVAL '2 hours', 'success', 10550,
+     NOW(), NOW()),
+    (v_ds_ids[3], v_org_id, v_store_id, 
+     'ERP-001', 'ERP 시스템', 'database', 
+     'erp://internal.neuraltwin.com/gangnam', 
+     '{"sync_interval": "daily"}'::JSONB, true,
+     '전사 자원 관리 데이터',
+     '{"tables": ["erp_products", "erp_inventory", "erp_suppliers"]}'::JSONB,
+     NOW() - INTERVAL '3 hours', 'success', 1030,
+     NOW(), NOW()),
+    (v_ds_ids[4], v_org_id, v_store_id, 
+     'IOT-001', '센서 데이터', 'iot_sensor', 
+     'mqtt://sensors.neuraltwin.com/gangnam', 
+     '{"sensor_count": 12, "tracking_interval_ms": 500}'::JSONB, true,
+     '매장 내 IoT 센서 데이터',
+     '{"tables": ["sensor_traffic", "sensor_dwell", "sensor_heatmap"]}'::JSONB,
+     NOW() - INTERVAL '30 minutes', 'success', 180000,
+     NOW(), NOW()),
+    (v_ds_ids[5], v_org_id, v_store_id, 
+     'API-001', '외부 API', 'api', 
+     'https://api.external.com/v1', 
+     '{"auth_type": "api_key"}'::JSONB, true,
+     '날씨, 경제지표 등 외부 데이터',
+     '{"tables": ["weather_daily", "economic_index", "holidays"]}'::JSONB,
+     NOW() - INTERVAL '6 hours', 'success', 780,
+     NOW(), NOW());
   v_count := 5;
 
-  -- data_source_tables 생성
-  INSERT INTO data_sources (id, store_id, org_id, source_name, source_type, 
-  source_id_code, is_active, config, schema_definition, 
-  last_sync_at, last_sync_status, record_count, created_at, updated_at) VALUES
+  -- ═══════════════════════════════════════════════════════════
+  -- data_source_tables 생성 (스키마 수정)
+  -- 실제 스키마: id, data_source_id, table_name, display_name,
+  --             columns (JSONB, NOT NULL), row_count, sample_data, created_at
+  -- ═══════════════════════════════════════════════════════════
+  INSERT INTO data_source_tables (
+    id, data_source_id, table_name, display_name,
+    columns, row_count, sample_data, created_at
+  ) VALUES
     -- POS 테이블
-    (gen_random_uuid(), v_ds_ids[1], 'pos_transactions', '{"columns": ["id", "datetime", "amount", "items"]}', 15000, NOW()),
-    (gen_random_uuid(), v_ds_ids[1], 'pos_items', '{"columns": ["id", "transaction_id", "product_id", "qty"]}', 45000, NOW()),
-    (gen_random_uuid(), v_ds_ids[1], 'pos_payments', '{"columns": ["id", "transaction_id", "method", "amount"]}', 15000, NOW()),
+    (gen_random_uuid(), v_ds_ids[1], 'pos_transactions', 'POS 거래내역',
+     '[{"name": "id", "type": "uuid"}, {"name": "datetime", "type": "timestamp"}, {"name": "amount", "type": "numeric"}, {"name": "items", "type": "jsonb"}]'::JSONB, 
+     15000, '[{"id": "sample-1", "amount": 125000}]'::JSONB, NOW()),
+    (gen_random_uuid(), v_ds_ids[1], 'pos_items', 'POS 품목상세',
+     '[{"name": "id", "type": "uuid"}, {"name": "transaction_id", "type": "uuid"}, {"name": "product_id", "type": "uuid"}, {"name": "qty", "type": "int"}]'::JSONB, 
+     45000, NULL, NOW()),
+    (gen_random_uuid(), v_ds_ids[1], 'pos_payments', 'POS 결제내역',
+     '[{"name": "id", "type": "uuid"}, {"name": "transaction_id", "type": "uuid"}, {"name": "method", "type": "text"}, {"name": "amount", "type": "numeric"}]'::JSONB, 
+     15000, NULL, NOW()),
     -- CRM 테이블
-    (gen_random_uuid(), v_ds_ids[2], 'crm_customers', '{"columns": ["id", "name", "email", "segment"]}', 2500, NOW()),
-    (gen_random_uuid(), v_ds_ids[2], 'crm_interactions', '{"columns": ["id", "customer_id", "type", "datetime"]}', 8000, NOW()),
-    (gen_random_uuid(), v_ds_ids[2], 'crm_campaigns', '{"columns": ["id", "name", "start_date", "end_date"]}', 50, NOW()),
+    (gen_random_uuid(), v_ds_ids[2], 'crm_customers', 'CRM 고객',
+     '[{"name": "id", "type": "uuid"}, {"name": "name", "type": "text"}, {"name": "email", "type": "text"}, {"name": "segment", "type": "text"}]'::JSONB, 
+     2500, NULL, NOW()),
+    (gen_random_uuid(), v_ds_ids[2], 'crm_interactions', 'CRM 상호작용',
+     '[{"name": "id", "type": "uuid"}, {"name": "customer_id", "type": "uuid"}, {"name": "type", "type": "text"}, {"name": "datetime", "type": "timestamp"}]'::JSONB, 
+     8000, NULL, NOW()),
+    (gen_random_uuid(), v_ds_ids[2], 'crm_campaigns', 'CRM 캠페인',
+     '[{"name": "id", "type": "uuid"}, {"name": "name", "type": "text"}, {"name": "start_date", "type": "date"}, {"name": "end_date", "type": "date"}]'::JSONB, 
+     50, NULL, NOW()),
     -- ERP 테이블
-    (gen_random_uuid(), v_ds_ids[3], 'erp_products', '{"columns": ["id", "sku", "name", "price"]}', 500, NOW()),
-    (gen_random_uuid(), v_ds_ids[3], 'erp_inventory', '{"columns": ["product_id", "store_id", "qty", "reserved"]}', 500, NOW()),
-    (gen_random_uuid(), v_ds_ids[3], 'erp_suppliers', '{"columns": ["id", "name", "contact", "lead_time"]}', 30, NOW()),
+    (gen_random_uuid(), v_ds_ids[3], 'erp_products', 'ERP 상품',
+     '[{"name": "id", "type": "uuid"}, {"name": "sku", "type": "text"}, {"name": "name", "type": "text"}, {"name": "price", "type": "numeric"}]'::JSONB, 
+     500, NULL, NOW()),
+    (gen_random_uuid(), v_ds_ids[3], 'erp_inventory', 'ERP 재고',
+     '[{"name": "product_id", "type": "uuid"}, {"name": "store_id", "type": "uuid"}, {"name": "qty", "type": "int"}, {"name": "reserved", "type": "int"}]'::JSONB, 
+     500, NULL, NOW()),
+    (gen_random_uuid(), v_ds_ids[3], 'erp_suppliers', 'ERP 공급업체',
+     '[{"name": "id", "type": "uuid"}, {"name": "name", "type": "text"}, {"name": "contact", "type": "text"}, {"name": "lead_time", "type": "int"}]'::JSONB, 
+     30, NULL, NOW()),
     -- IoT 테이블
-    (gen_random_uuid(), v_ds_ids[4], 'sensor_traffic', '{"columns": ["zone_id", "timestamp", "count", "direction"]}', 100000, NOW()),
-    (gen_random_uuid(), v_ds_ids[4], 'sensor_dwell', '{"columns": ["zone_id", "timestamp", "duration"]}', 50000, NOW()),
-    (gen_random_uuid(), v_ds_ids[4], 'sensor_heatmap', '{"columns": ["zone_id", "timestamp", "intensity"]}', 30000, NOW()),
+    (gen_random_uuid(), v_ds_ids[4], 'sensor_traffic', '센서 트래픽',
+     '[{"name": "zone_id", "type": "uuid"}, {"name": "timestamp", "type": "timestamp"}, {"name": "count", "type": "int"}, {"name": "direction", "type": "text"}]'::JSONB, 
+     100000, NULL, NOW()),
+    (gen_random_uuid(), v_ds_ids[4], 'sensor_dwell', '센서 체류시간',
+     '[{"name": "zone_id", "type": "uuid"}, {"name": "timestamp", "type": "timestamp"}, {"name": "duration", "type": "int"}]'::JSONB, 
+     50000, NULL, NOW()),
+    (gen_random_uuid(), v_ds_ids[4], 'sensor_heatmap', '센서 히트맵',
+     '[{"name": "zone_id", "type": "uuid"}, {"name": "timestamp", "type": "timestamp"}, {"name": "intensity", "type": "numeric"}]'::JSONB, 
+     30000, NULL, NOW()),
     -- 외부 API 테이블
-    (gen_random_uuid(), v_ds_ids[5], 'weather_daily', '{"columns": ["date", "temp", "condition", "precipitation"]}', 365, NOW()),
-    (gen_random_uuid(), v_ds_ids[5], 'economic_index', '{"columns": ["date", "cpi", "consumer_confidence"]}', 365, NOW()),
-    (gen_random_uuid(), v_ds_ids[5], 'holidays', '{"columns": ["date", "name", "type"]}', 50, NOW());
+    (gen_random_uuid(), v_ds_ids[5], 'weather_daily', '날씨 데이터',
+     '[{"name": "date", "type": "date"}, {"name": "temp", "type": "numeric"}, {"name": "condition", "type": "text"}, {"name": "precipitation", "type": "numeric"}]'::JSONB, 
+     365, NULL, NOW()),
+    (gen_random_uuid(), v_ds_ids[5], 'economic_index', '경제 지표',
+     '[{"name": "date", "type": "date"}, {"name": "cpi", "type": "numeric"}, {"name": "consumer_confidence", "type": "numeric"}]'::JSONB, 
+     365, NULL, NOW()),
+    (gen_random_uuid(), v_ds_ids[5], 'holidays', '휴일 데이터',
+     '[{"name": "date", "type": "date"}, {"name": "name", "type": "text"}, {"name": "type", "type": "text"}]'::JSONB, 
+     50, NULL, NOW());
   v_table_count := 15;
 
-  -- ontology_entity_mappings 생성
-  INSERT INTO ontology_entity_mappings (id, data_source_id, source_table, 
-  target_entity_type_id, property_mappings, label_template, 
-  is_active, priority, created_at, updated_at) VALUES
-    (gen_random_uuid(), v_ds_ids[1], 'pos_transactions', 'id', 'Transaction', '{"direct": true}', NOW()),
-    (gen_random_uuid(), v_ds_ids[1], 'pos_items', 'product_id', 'Product', '{"lookup": "products"}', NOW()),
-    (gen_random_uuid(), v_ds_ids[2], 'crm_customers', 'id', 'Customer', '{"direct": true}', NOW()),
-    (gen_random_uuid(), v_ds_ids[2], 'crm_customers', 'segment', 'CustomerSegment', '{"enum": ["VIP", "Regular", "New"]}', NOW()),
-    (gen_random_uuid(), v_ds_ids[3], 'erp_products', 'id', 'Product', '{"direct": true}', NOW()),
-    (gen_random_uuid(), v_ds_ids[3], 'erp_inventory', 'product_id', 'Inventory', '{"join": "products"}', NOW()),
-    (gen_random_uuid(), v_ds_ids[4], 'sensor_traffic', 'zone_id', 'Zone', '{"lookup": "zones_dim"}', NOW()),
-    (gen_random_uuid(), v_ds_ids[4], 'sensor_dwell', 'zone_id', 'ZoneMetric', '{"aggregate": "avg"}', NOW()),
-    (gen_random_uuid(), v_ds_ids[5], 'weather_daily', 'date', 'ExternalFactor', '{"type": "weather"}', NOW()),
-    (gen_random_uuid(), v_ds_ids[5], 'economic_index', 'date', 'ExternalFactor', '{"type": "economic"}', NOW());
+  -- ═══════════════════════════════════════════════════════════
+  -- ontology_entity_mappings 생성 (스키마 수정)
+  -- 실제 스키마: id, data_source_id, source_table, filter_condition,
+  --             target_entity_type_id (UUID!), property_mappings (JSONB),
+  --             label_template, is_active, priority, created_at, updated_at
+  -- ═══════════════════════════════════════════════════════════
+  
+  -- 먼저 entity_type_id 조회 (Transaction, Product 등)
+  INSERT INTO ontology_entity_mappings (
+    id, data_source_id, source_table, filter_condition,
+    target_entity_type_id, property_mappings, label_template,
+    is_active, priority, created_at, updated_at
+  ) 
+  SELECT
+    gen_random_uuid(), 
+    v_ds_ids[1], 
+    'pos_transactions',
+    NULL,
+    COALESCE(
+      (SELECT id FROM ontology_entity_types WHERE name = 'Transaction' AND (org_id = v_org_id OR org_id IS NULL) LIMIT 1),
+      gen_random_uuid()
+    ),
+    '[{"source": "id", "target": "transaction_id"}, {"source": "datetime", "target": "timestamp"}]'::JSONB,
+    '${id}',
+    true, 1, NOW(), NOW()
+  WHERE EXISTS (SELECT 1);
+
+  INSERT INTO ontology_entity_mappings (
+    id, data_source_id, source_table, filter_condition,
+    target_entity_type_id, property_mappings, label_template,
+    is_active, priority, created_at, updated_at
+  ) VALUES
+    (gen_random_uuid(), v_ds_ids[1], 'pos_items', NULL,
+     COALESCE((SELECT id FROM ontology_entity_types WHERE name = 'Product' AND (org_id = v_org_id OR org_id IS NULL) LIMIT 1), gen_random_uuid()),
+     '[{"source": "product_id", "target": "id", "lookup": "products"}]'::JSONB,
+     '${product_id}', true, 2, NOW(), NOW()),
+    (gen_random_uuid(), v_ds_ids[2], 'crm_customers', NULL,
+     COALESCE((SELECT id FROM ontology_entity_types WHERE name = 'Customer' AND (org_id = v_org_id OR org_id IS NULL) LIMIT 1), gen_random_uuid()),
+     '[{"source": "id", "target": "customer_id"}]'::JSONB,
+     '${name}', true, 1, NOW(), NOW()),
+    (gen_random_uuid(), v_ds_ids[2], 'crm_customers', 'segment IS NOT NULL',
+     COALESCE((SELECT id FROM ontology_entity_types WHERE name = 'CustomerSegment' AND (org_id = v_org_id OR org_id IS NULL) LIMIT 1), gen_random_uuid()),
+     '[{"source": "segment", "target": "segment_name", "enum": ["VIP", "Regular", "New"]}]'::JSONB,
+     '${segment}', true, 2, NOW(), NOW()),
+    (gen_random_uuid(), v_ds_ids[3], 'erp_products', NULL,
+     COALESCE((SELECT id FROM ontology_entity_types WHERE name = 'Product' AND (org_id = v_org_id OR org_id IS NULL) LIMIT 1), gen_random_uuid()),
+     '[{"source": "id", "target": "product_id"}, {"source": "sku", "target": "sku"}]'::JSONB,
+     '${sku}', true, 1, NOW(), NOW()),
+    (gen_random_uuid(), v_ds_ids[3], 'erp_inventory', NULL,
+     COALESCE((SELECT id FROM ontology_entity_types WHERE name = 'Inventory' AND (org_id = v_org_id OR org_id IS NULL) LIMIT 1), gen_random_uuid()),
+     '[{"source": "product_id", "target": "product_id", "join": "products"}]'::JSONB,
+     '${product_id}', true, 2, NOW(), NOW()),
+    (gen_random_uuid(), v_ds_ids[4], 'sensor_traffic', NULL,
+     COALESCE((SELECT id FROM ontology_entity_types WHERE name = 'Zone' AND (org_id = v_org_id OR org_id IS NULL) LIMIT 1), gen_random_uuid()),
+     '[{"source": "zone_id", "target": "zone_id", "lookup": "zones_dim"}]'::JSONB,
+     '${zone_id}', true, 1, NOW(), NOW()),
+    (gen_random_uuid(), v_ds_ids[4], 'sensor_dwell', NULL,
+     COALESCE((SELECT id FROM ontology_entity_types WHERE name = 'ZoneMetric' AND (org_id = v_org_id OR org_id IS NULL) LIMIT 1), gen_random_uuid()),
+     '[{"source": "zone_id", "target": "zone_id"}, {"source": "duration", "target": "dwell_time", "aggregate": "avg"}]'::JSONB,
+     '${zone_id}', true, 2, NOW(), NOW()),
+    (gen_random_uuid(), v_ds_ids[5], 'weather_daily', NULL,
+     COALESCE((SELECT id FROM ontology_entity_types WHERE name = 'ExternalFactor' AND (org_id = v_org_id OR org_id IS NULL) LIMIT 1), gen_random_uuid()),
+     '[{"source": "date", "target": "date"}, {"source": "condition", "target": "factor_type", "value": "weather"}]'::JSONB,
+     '${date}', true, 1, NOW(), NOW()),
+    (gen_random_uuid(), v_ds_ids[5], 'economic_index', NULL,
+     COALESCE((SELECT id FROM ontology_entity_types WHERE name = 'ExternalFactor' AND (org_id = v_org_id OR org_id IS NULL) LIMIT 1), gen_random_uuid()),
+     '[{"source": "date", "target": "date"}, {"source": "cpi", "target": "factor_type", "value": "economic"}]'::JSONB,
+     '${date}', true, 2, NOW(), NOW());
   v_entity_map_count := 10;
 
-  -- ontology_relation_mappings 생성
-  INSERT INTO ontology_relation_mappings (id, data_source_id, source_table, 
-  target_relation_type_id, source_entity_resolver, target_entity_resolver, 
-  property_mappings, is_active, created_at) VALUES
-    (gen_random_uuid(), v_ds_ids[1], 'pos_transactions', 'customer_id', 'id', 'MADE_TRANSACTION', '{"fk": true}', NOW()),
-    (gen_random_uuid(), v_ds_ids[1], 'pos_items', 'product_id', 'transaction_id', 'PURCHASED', '{"through": "transactions"}', NOW()),
-    (gen_random_uuid(), v_ds_ids[2], 'crm_interactions', 'customer_id', 'id', 'VISITED', '{"event_type": "visit"}', NOW()),
-    (gen_random_uuid(), v_ds_ids[3], 'erp_inventory', 'product_id', 'store_id', 'LOCATED_IN', '{"spatial": true}', NOW()),
-    (gen_random_uuid(), v_ds_ids[4], 'sensor_traffic', 'zone_id', 'timestamp', 'MEASURED_BY', '{"timeseries": true}', NOW()),
-    (gen_random_uuid(), v_ds_ids[4], 'sensor_dwell', 'zone_id', 'timestamp', 'MEASURED_BY', '{"timeseries": true}', NOW()),
-    (gen_random_uuid(), v_ds_ids[5], 'weather_daily', 'date', 'condition', 'AFFECTS', '{"correlation": 0.35}', NOW()),
-    (gen_random_uuid(), v_ds_ids[5], 'holidays', 'date', 'type', 'AFFECTS', '{"correlation": 0.45}', NOW());
+  -- ═══════════════════════════════════════════════════════════
+  -- ontology_relation_mappings 생성 (스키마 수정)
+  -- 실제 스키마: id, data_source_id, source_table, 
+  --             target_relation_type_id (UUID!),
+  --             source_entity_resolver (JSONB!), target_entity_resolver (JSONB!),
+  --             property_mappings (JSONB), is_active, created_at
+  -- ═══════════════════════════════════════════════════════════
+  INSERT INTO ontology_relation_mappings (
+    id, data_source_id, source_table, 
+    target_relation_type_id,
+    source_entity_resolver, target_entity_resolver,
+    property_mappings, is_active, created_at
+  ) VALUES
+    (gen_random_uuid(), v_ds_ids[1], 'pos_transactions',
+     COALESCE((SELECT id FROM ontology_relation_types WHERE name = 'MADE_TRANSACTION' AND (org_id = v_org_id OR org_id IS NULL) LIMIT 1), gen_random_uuid()),
+     '{"entity_type": "Customer", "key_column": "customer_id"}'::JSONB,
+     '{"entity_type": "Transaction", "key_column": "id"}'::JSONB,
+     '[{"source": "datetime", "target": "transaction_time"}]'::JSONB, 
+     true, NOW()),
+    (gen_random_uuid(), v_ds_ids[1], 'pos_items',
+     COALESCE((SELECT id FROM ontology_relation_types WHERE name = 'PURCHASED' AND (org_id = v_org_id OR org_id IS NULL) LIMIT 1), gen_random_uuid()),
+     '{"entity_type": "Transaction", "key_column": "transaction_id"}'::JSONB,
+     '{"entity_type": "Product", "key_column": "product_id"}'::JSONB,
+     '[{"source": "qty", "target": "quantity"}]'::JSONB, 
+     true, NOW()),
+    (gen_random_uuid(), v_ds_ids[2], 'crm_interactions',
+     COALESCE((SELECT id FROM ontology_relation_types WHERE name = 'VISITED' AND (org_id = v_org_id OR org_id IS NULL) LIMIT 1), gen_random_uuid()),
+     '{"entity_type": "Customer", "key_column": "customer_id"}'::JSONB,
+     '{"entity_type": "Store", "key_column": "store_id"}'::JSONB,
+     '[{"source": "type", "target": "interaction_type", "filter": "visit"}]'::JSONB, 
+     true, NOW()),
+    (gen_random_uuid(), v_ds_ids[3], 'erp_inventory',
+     COALESCE((SELECT id FROM ontology_relation_types WHERE name = 'LOCATED_IN' AND (org_id = v_org_id OR org_id IS NULL) LIMIT 1), gen_random_uuid()),
+     '{"entity_type": "Product", "key_column": "product_id"}'::JSONB,
+     '{"entity_type": "Store", "key_column": "store_id"}'::JSONB,
+     '[{"source": "qty", "target": "stock_quantity"}]'::JSONB, 
+     true, NOW()),
+    (gen_random_uuid(), v_ds_ids[4], 'sensor_traffic',
+     COALESCE((SELECT id FROM ontology_relation_types WHERE name = 'MEASURED_BY' AND (org_id = v_org_id OR org_id IS NULL) LIMIT 1), gen_random_uuid()),
+     '{"entity_type": "Zone", "key_column": "zone_id"}'::JSONB,
+     '{"entity_type": "Sensor", "key_column": "sensor_id", "timeseries": true}'::JSONB,
+     '[{"source": "count", "target": "traffic_count"}]'::JSONB, 
+     true, NOW()),
+    (gen_random_uuid(), v_ds_ids[4], 'sensor_dwell',
+     COALESCE((SELECT id FROM ontology_relation_types WHERE name = 'MEASURED_BY' AND (org_id = v_org_id OR org_id IS NULL) LIMIT 1), gen_random_uuid()),
+     '{"entity_type": "Zone", "key_column": "zone_id"}'::JSONB,
+     '{"entity_type": "Sensor", "key_column": "sensor_id", "timeseries": true}'::JSONB,
+     '[{"source": "duration", "target": "dwell_seconds"}]'::JSONB, 
+     true, NOW()),
+    (gen_random_uuid(), v_ds_ids[5], 'weather_daily',
+     COALESCE((SELECT id FROM ontology_relation_types WHERE name = 'AFFECTS' AND (org_id = v_org_id OR org_id IS NULL) LIMIT 1), gen_random_uuid()),
+     '{"entity_type": "ExternalFactor", "key_column": "date"}'::JSONB,
+     '{"entity_type": "Store", "key_column": "store_id", "correlation": 0.35}'::JSONB,
+     '[{"source": "condition", "target": "weather_condition"}]'::JSONB, 
+     true, NOW()),
+    (gen_random_uuid(), v_ds_ids[5], 'holidays',
+     COALESCE((SELECT id FROM ontology_relation_types WHERE name = 'AFFECTS' AND (org_id = v_org_id OR org_id IS NULL) LIMIT 1), gen_random_uuid()),
+     '{"entity_type": "ExternalFactor", "key_column": "date"}'::JSONB,
+     '{"entity_type": "Store", "key_column": "store_id", "correlation": 0.45}'::JSONB,
+     '[{"source": "type", "target": "holiday_type"}]'::JSONB, 
+     true, NOW());
   v_relation_map_count := 8;
 
   RAISE NOTICE '  ✓ data_sources: %건 생성', v_count;
