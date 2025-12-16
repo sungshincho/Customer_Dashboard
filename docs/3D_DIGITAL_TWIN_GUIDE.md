@@ -1,6 +1,6 @@
 # 3D 디지털트윈 모델 준비 가이드라인
 
-**버전**: 2.2 (Placement Optimization Edition)
+**버전**: 2.3 (Avatar Integration Guide)
 **작성일**: 2025-12-16
 **기준 시드**: NEURALTWIN v8.0 ULTIMATE SEED
 
@@ -609,7 +609,7 @@ interface PlacementChangeVisualization {
 
 ---
 
-### 4.5 고객 아바타 모델 (Customer Assets) - 선택사항
+### 4.6 고객 아바타 모델 (Customer Assets) - 선택사항
 
 고객 시뮬레이션용 제네릭 아바타:
 
@@ -618,6 +618,182 @@ interface PlacementChangeVisualization {
 | 1 | VIP 고객 | `customer_vip_01.glb` ~ `_03.glb` | 3종 | 고급스러운 의상 |
 | 2 | 일반 고객 | `customer_regular_01.glb` ~ `_05.glb` | 5종 | 캐주얼 의상 |
 | 3 | 신규 고객 | `customer_new_01.glb` ~ `_03.glb` | 3종 | 다양한 연령대 |
+
+---
+
+### 4.7 직원/고객 아바타 시스템 통합 가이드
+
+#### 현재 상태 분석 (Gap)
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    아바타 시스템 통합 현황                           │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ✅ 지원됨 (바로 사용 가능)                                          │
+│  ├── Space Models      → ontology_entity_types.model_3d_url        │
+│  ├── Furniture Models  → ontology_entity_types.model_3d_url        │
+│  └── Product Models    → ontology_entity_types.model_3d_url        │
+│                                                                     │
+│  ⚠️ 미지원 (확장 필요)                                               │
+│  ├── Staff Avatars     → staff 테이블에 avatar_url 없음             │
+│  └── Customer Avatars  → customers 테이블에 avatar_url 없음         │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+#### 문제점
+
+| 구성요소 | 현재 상태 | 필요한 변경 |
+|----------|----------|------------|
+| `staff` 테이블 | `avatar_url` 컬럼 없음 | 컬럼 추가 필요 |
+| `Staff` 온톨로지 | `model_3d_type: null` | `'avatar'`로 변경 |
+| `sceneRecipeGenerator.ts` | Staff/Customer 미처리 | 아바타 렌더링 추가 |
+| `scene3d.ts` 타입 | StaffAsset 없음 | 타입 정의 추가 |
+
+#### 해결 방안 A: staff 테이블 확장 (권장)
+
+**1단계: 마이그레이션 스크립트**
+
+```sql
+-- staff 테이블에 아바타 관련 컬럼 추가
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS avatar_position JSONB DEFAULT '{"x":0,"y":0,"z":0}';
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS avatar_rotation JSONB DEFAULT '{"x":0,"y":0,"z":0}';
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS avatar_scale JSONB DEFAULT '{"x":1,"y":1,"z":1}';
+
+-- customers 테이블에 아바타 관련 컬럼 추가
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS avatar_type TEXT; -- 'vip', 'regular', 'new'
+```
+
+**2단계: 타입 정의 추가 (`scene3d.ts`)**
+
+```typescript
+export interface StaffAsset extends SceneAsset {
+  type: 'staff';
+  staff_id: string;
+  staff_name: string;
+  role: string;
+  assigned_zone_id?: string;
+  shift_start?: string;
+  shift_end?: string;
+}
+
+export interface CustomerAsset extends SceneAsset {
+  type: 'customer';
+  customer_segment: 'vip' | 'regular' | 'new';
+  is_animated?: boolean;
+  path_points?: Vector3D[];  // 동선 애니메이션용
+}
+```
+
+**3단계: SceneRecipe 확장**
+
+```typescript
+export interface SceneRecipe {
+  space: SpaceAsset;
+  furniture: FurnitureAsset[];
+  products: ProductAsset[];
+  staff?: StaffAsset[];       // 추가
+  customers?: CustomerAsset[]; // 추가
+  lighting: LightingPreset;
+  effects?: EffectLayer[];
+  camera?: { ... };
+}
+```
+
+**4단계: sceneRecipeGenerator.ts 확장**
+
+```typescript
+// 4. Load Staff Avatars
+const { data: staffData } = await supabase
+  .from('staff')
+  .select('*')
+  .eq('store_id', storeId);
+
+const staffAssets: StaffAsset[] = (staffData || [])
+  .filter(s => s.avatar_url)
+  .map(s => ({
+    id: s.id,
+    type: 'staff',
+    model_url: s.avatar_url,
+    position: s.avatar_position || { x: 0, y: 0, z: 0 },
+    rotation: s.avatar_rotation || { x: 0, y: 0, z: 0 },
+    scale: s.avatar_scale || { x: 1, y: 1, z: 1 },
+    staff_id: s.id,
+    staff_name: s.staff_name,
+    role: s.role,
+    assigned_zone_id: s.department
+  }));
+```
+
+#### 해결 방안 B: 온톨로지 시스템 활용
+
+**온톨로지를 통한 아바타 관리:**
+
+```sql
+-- Staff 엔티티 타입에 model_3d_type 설정
+UPDATE ontology_entity_types
+SET model_3d_type = 'avatar',
+    model_3d_url = NULL  -- 기본 URL, 개별 엔티티에서 오버라이드
+WHERE name = 'Staff';
+
+-- 각 직원을 graph_entities로 생성 (개별 아바타 URL 지정)
+INSERT INTO graph_entities (
+  id, entity_type_id, label, user_id,
+  model_3d_position, model_3d_rotation, model_3d_scale,
+  properties
+) VALUES (
+  'e0000001-...',
+  (SELECT id FROM ontology_entity_types WHERE name = 'Staff'),
+  '김민준',
+  v_user_id,
+  '{"x": 0, "y": 0, "z": -5}'::jsonb,
+  '{"x": 0, "y": 0, "z": 0}'::jsonb,
+  '{"x": 1, "y": 1, "z": 1}'::jsonb,
+  '{"avatar_url": "https://storage.../staff_manager_male_01.glb", "role": "manager"}'::jsonb
+);
+```
+
+#### 스토리지 업로드 후 적용 플로우
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    아바타 적용 플로우                                │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  1. 모델 업로드                                                      │
+│     └── Supabase Storage: 3d-models/{user_id}/{store_id}/staff/     │
+│                                                                     │
+│  2. URL 획득                                                        │
+│     └── supabase.storage.from('3d-models').getPublicUrl(path)       │
+│                                                                     │
+│  3-A. staff 테이블 업데이트 (방안 A)                                  │
+│     └── UPDATE staff SET avatar_url = '{url}' WHERE id = '...'      │
+│                                                                     │
+│  3-B. graph_entities 업데이트 (방안 B)                                │
+│     └── UPDATE graph_entities SET properties = properties ||        │
+│         '{"avatar_url": "{url}"}'::jsonb WHERE id = '...'           │
+│                                                                     │
+│  4. SceneRecipe 재생성                                               │
+│     └── generateSceneRecipe() 호출 → 아바타 포함된 씬 렌더링          │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+#### 권장 구현 우선순위
+
+| 우선순위 | 작업 | 영향 범위 | 예상 공수 |
+|---------|------|----------|----------|
+| 1 | `staff` 테이블 마이그레이션 | DB만 변경 | 0.5일 |
+| 2 | `StaffAsset` 타입 정의 | 타입 파일 | 0.5일 |
+| 3 | `sceneRecipeGenerator` 확장 | 유틸리티 | 1일 |
+| 4 | `Store3DViewer`에 아바타 렌더링 | 컴포넌트 | 1일 |
+| 5 | 고객 아바타 (동선 애니메이션) | 전체 | 2일 |
+
+> **결론**: 현재는 모델 파일 업로드만으로 **자동 적용되지 않습니다**.
+> 위 구현 가이드에 따라 스키마 확장 및 코드 수정이 필요합니다.
 
 ---
 
@@ -1183,6 +1359,6 @@ interface InventoryVisualization {
 
 ---
 
-*문서 버전: 2.2 (Placement Optimization Edition)*
+*문서 버전: 2.3 (Avatar Integration Guide)*
 *최종 업데이트: 2025-12-16*
 *NEURALTWIN v8.0 ULTIMATE SEED 기준*
