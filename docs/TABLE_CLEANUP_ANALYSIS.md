@@ -1,7 +1,7 @@
 # 테이블 정리 분석 보고서
 
 **작성일**: 2025-12-16
-**버전**: 1.0
+**버전**: 2.0 (코드 마이그레이션 완료)
 
 ---
 
@@ -24,9 +24,57 @@ DROP TABLE IF EXISTS hourly_zone_agg_backup_20250610 CASCADE;
 
 ---
 
-## 2. 중복 테이블 상세 분석
+## 2. Phase 2: 코드 마이그레이션 (완료)
 
-### 2.1 zone_performance vs zone_daily_metrics
+### 2.1 visits → store_visits 마이그레이션 완료
+
+**수정된 파일:**
+- `src/hooks/useStoreData.ts`
+  - SupportedTable 타입 변경: `'visits'` → `'store_visits'`
+  - tableNameMap 매핑 변경 (2개소)
+  - useStoreDataset 쿼리 변경
+  - useVisits 훅 쿼리 변경
+
+- `src/features/simulation/hooks/useDataSourceMapping.ts`
+  - loadDataSourceStatusFallback 함수 내 visits 쿼리 → store_visits로 변경
+
+**변경 사항:**
+```typescript
+// Before
+.from('visits')
+
+// After
+.from('store_visits')  // visits → store_visits 마이그레이션
+```
+
+---
+
+## 3. 즉시 삭제 가능 테이블 목록
+
+### 3.1 Phase 2 삭제 SQL (즉시 실행 가능)
+
+```sql
+-- ============================================
+-- Phase 2: 즉시 삭제 가능 테이블
+-- 실행 전 백업 권장
+-- ============================================
+
+-- 1. zone_performance (레거시, 코드에서 미사용)
+-- 크기: 3.7MB, 행: 630
+DROP TABLE IF EXISTS zone_performance CASCADE;
+
+-- 2. visits (store_visits로 마이그레이션 완료)
+-- 크기: 8KB, 행: 0
+DROP TABLE IF EXISTS visits CASCADE;
+```
+
+**예상 공간 절약**: 약 3.8MB
+
+---
+
+## 4. 중복 테이블 상세 분석
+
+### 4.1 zone_performance vs zone_daily_metrics
 
 | 구분 | zone_performance | zone_daily_metrics |
 |------|------------------|-------------------|
@@ -36,78 +84,51 @@ DROP TABLE IF EXISTS hourly_zone_agg_backup_20250610 CASCADE;
 | **FK 관계** | zone_name (문자열) | zone_id (FK to zones_dim) |
 | **데이터 완성도** | hourly_visits, heatmap_data | entry/exit_count, interaction_count, peak_hour 등 |
 
-**사용 위치 (zone_daily_metrics)**:
-- `src/hooks/useZoneMetrics.ts` (3회)
-- `src/features/studio/utils/store-context-builder.ts` (1회)
-
 **결론**: `zone_performance`는 레거시 테이블. **삭제 가능**.
 
 ---
 
-### 2.2 dashboard_kpis vs daily_kpis_agg
+### 4.2 visits vs store_visits (마이그레이션 완료)
+
+| 구분 | visits | store_visits |
+|------|--------|--------------|
+| **행 수** | 0 rows | 3,553 rows |
+| **크기** | 8 KB | 1.1 MB |
+| **코드 사용** | ❌ 0개 파일 (마이그레이션됨) | ✅ 6개 파일 (9회 호출) |
+| **데이터 완성도** | 기본 필드만 | 확장 필드 포함 |
+
+**결론**: 코드 마이그레이션 완료. `visits` **삭제 가능**.
+
+---
+
+### 4.3 dashboard_kpis vs daily_kpis_agg (보류)
 
 | 구분 | dashboard_kpis | daily_kpis_agg |
 |------|----------------|----------------|
 | **행 수** | 90 rows | 90 rows |
 | **크기** | 72 KB | 112 KB |
 | **코드 사용** | ✅ 3개 파일 (4회 호출) | ✅ 9개 파일 (19회 호출) |
-| **주요 용도** | ROI 추적, 임포트 상태 | KPI 대시보드, 알림, 인사이트 전체 |
+| **주요 용도** | ROI 추적, 임포트 상태 | KPI 대시보드, 알림, 인사이트 |
 
-**dashboard_kpis 사용 위치**:
+**dashboard_kpis 사용 위치:**
 - `src/hooks/useROITracking.ts` - ROI 추적
 - `src/features/data-management/import/components/IntegratedImportStatus.tsx` - 데이터 삭제
 - `src/features/simulation/hooks/useStoreContext.ts` - 스토어 컨텍스트
 - `src/features/simulation/hooks/useDataSourceMapping.ts` - 데이터 소스 매핑
 
-**daily_kpis_agg 사용 위치**:
-- `src/services/alertService.ts` (3회) - 알림 서비스
-- `src/hooks/useDashboardKPIAgg.ts` (3회) - 메인 KPI 훅
-- `src/hooks/useGoals.ts` (2회) - 목표 관리
-- `src/hooks/useFootfallAnalysis.ts` (1회) - 방문객 분석
-- `src/hooks/useDashboardKPI.ts` (3회) - KPI 훅
-- `src/features/studio/utils/store-context-builder.ts` (1회)
-- `src/features/insights/tabs/CustomerTab.tsx` (1회)
-- `src/features/insights/hooks/useAIPrediction.ts` (1회)
-- `src/features/simulation/hooks/useStoreContext.ts` (1회)
-- `src/features/insights/hooks/useInsightMetrics.ts` (3회)
-
 **결론**: 두 테이블 모두 **활발히 사용 중**. 현재는 삭제 불가.
-향후 `dashboard_kpis`를 `daily_kpis_agg`로 통합하는 리팩토링 권장.
+향후 통합 리팩토링 권장.
 
 ---
 
-### 2.3 visits vs store_visits
+## 5. 필수 시딩 테이블 데이터
 
-| 구분 | visits | store_visits |
-|------|--------|--------------|
-| **행 수** | 0 rows | 3,553 rows |
-| **크기** | 8 KB | 1.1 MB |
-| **코드 사용** | ✅ 2개 파일 (3회 호출) | ✅ 4개 파일 (6회 호출) |
-| **데이터 완성도** | 기본 방문 정보 | exit_date, device_type, transaction_id, zone_durations 등 상세 정보 |
+### 5.1 staff 테이블 (0 rows)
 
-**visits 사용 위치**:
-- `src/hooks/useStoreData.ts` (2회)
-- `src/features/simulation/hooks/useDataSourceMapping.ts` (1회)
-
-**store_visits 사용 위치**:
-- `src/features/studio/utils/store-context-builder.ts` (1회)
-- `src/hooks/useGoals.ts` (2회)
-- `src/features/insights/hooks/useInsightMetrics.ts` (2회)
-- `src/features/simulation/hooks/useStoreContext.ts` (1회)
-
-**결론**: `visits` 테이블은 코드에서 사용되지만 **데이터가 0행**.
-`store_visits`를 사용하도록 코드 마이그레이션 후 `visits` 삭제 필요.
-
----
-
-## 3. 필수 시딩 테이블 데이터
-
-### 3.1 staff 테이블 (0 rows)
-
-**사용 위치**:
+**사용 위치:**
 - `src/hooks/useStoreData.ts` (2회)
 
-**필수 시딩 SQL**:
+**필수 시딩 SQL:**
 
 ```sql
 -- staff 샘플 데이터 (15명 직원)
@@ -143,88 +164,95 @@ VALUES
 
 ---
 
-### 3.2 transactions 테이블 (0 rows)
+### 5.2 transactions 테이블 (0 rows)
 
-**사용 위치**:
+**사용 위치:**
 - `src/features/simulation/hooks/useStoreContext.ts` (1회)
 - `src/features/insights/hooks/useInsightMetrics.ts` (1회)
 - `src/features/insights/hooks/useAIPrediction.ts` (1회)
 
-**필수 시딩 SQL**:
+**필수 시딩 SQL:**
 
 ```sql
--- transactions 샘플 데이터 (최근 90일, 약 500건)
--- 참고: store_visits 테이블의 visit_id와 연결
-
+-- transactions 샘플 데이터 (store_visits 연동)
 INSERT INTO transactions (
   id, transaction_datetime, customer_id, store_id, visit_id,
   total_amount, discount_amount, net_amount, payment_method, channel
 )
 SELECT
   'txn-' || LPAD(row_number() OVER ()::text, 6, '0'),
-  sv.entry_date + (random() * interval '4 hours'),
+  sv.visit_date::timestamp + (random() * interval '4 hours'),
   sv.customer_id,
   sv.store_id,
   sv.id,
-  ROUND((random() * 200000 + 10000)::numeric, 0),  -- 10,000 ~ 210,000원
-  ROUND((random() * 20000)::numeric, 0),           -- 0 ~ 20,000원 할인
+  ROUND((random() * 200000 + 10000)::numeric, 0),
+  ROUND((random() * 20000)::numeric, 0),
   ROUND((random() * 200000 + 10000 - random() * 20000)::numeric, 0),
   (ARRAY['credit_card', 'debit_card', 'cash', 'mobile_pay', 'gift_card'])[floor(random() * 5 + 1)],
   'in_store'
 FROM store_visits sv
-WHERE sv.transaction_id IS NOT NULL
-  AND sv.entry_date >= CURRENT_DATE - INTERVAL '90 days'
+WHERE sv.made_purchase = true
+  AND sv.visit_date >= CURRENT_DATE - INTERVAL '90 days'
 ORDER BY random()
 LIMIT 500;
-
--- 또는 직접 삽입 버전 (store_visits 연동 없이)
-INSERT INTO transactions (id, transaction_datetime, customer_id, store_id, visit_id, total_amount, discount_amount, net_amount, payment_method, channel)
-VALUES
-  ('txn-000001', NOW() - INTERVAL '1 day', 'cust-001', 'store-gangnam-001', NULL, 89000, 5000, 84000, 'credit_card', 'in_store'),
-  ('txn-000002', NOW() - INTERVAL '1 day', 'cust-002', 'store-gangnam-001', NULL, 156000, 10000, 146000, 'mobile_pay', 'in_store'),
-  ('txn-000003', NOW() - INTERVAL '2 days', 'cust-003', 'store-gangnam-001', NULL, 45000, 0, 45000, 'cash', 'in_store'),
-  ('txn-000004', NOW() - INTERVAL '2 days', 'cust-004', 'store-gangnam-001', NULL, 234000, 15000, 219000, 'credit_card', 'in_store'),
-  ('txn-000005', NOW() - INTERVAL '3 days', 'cust-005', 'store-gangnam-001', NULL, 78000, 8000, 70000, 'debit_card', 'in_store');
--- ... (실제 운영 시 더 많은 데이터 필요)
 ```
 
 ---
 
-## 4. 권장 조치 사항 요약
+## 6. 전체 정리 요약
 
-### Phase 2: 즉시 실행 가능
+### 6.1 삭제 가능 테이블 (즉시 실행)
+
+| 테이블명 | 크기 | 행 수 | 삭제 사유 |
+|---------|------|-------|----------|
+| `zone_performance` | 3.7MB | 630 | 레거시, 코드 미사용 |
+| `visits` | 8KB | 0 | store_visits로 마이그레이션 완료 |
+| **합계** | **~3.8MB** | - | - |
+
+### 6.2 삭제 보류 테이블
+
+| 테이블명 | 사유 |
+|---------|------|
+| `dashboard_kpis` | 4개 파일에서 활발히 사용 중 |
+
+### 6.3 시딩 필요 테이블
+
+| 테이블명 | 현재 상태 | 영향 기능 |
+|---------|----------|----------|
+| `staff` | 0 rows | 직원 관리, 인력 시뮬레이션 |
+| `transactions` | 0 rows | AI 예측, 인사이트 분석 |
+
+---
+
+## 7. 최종 실행 SQL
 
 ```sql
--- zone_performance 테이블 삭제 (레거시, 코드에서 미사용)
+-- ============================================
+-- 최종 테이블 정리 SQL
+-- 실행 전 반드시 백업 확인
+-- ============================================
+
+-- Phase 2: 즉시 삭제 가능 (코드 마이그레이션 완료)
 DROP TABLE IF EXISTS zone_performance CASCADE;
--- 예상 절약: 3.7MB
-```
+DROP TABLE IF EXISTS visits CASCADE;
 
-### Phase 3: 코드 마이그레이션 필요
-
-1. **visits → store_visits 마이그레이션**
-   - 영향 파일: `useStoreData.ts`, `useDataSourceMapping.ts`
-   - 마이그레이션 후 `visits` 테이블 삭제
-
-2. **dashboard_kpis → daily_kpis_agg 통합** (선택적)
-   - 영향 파일: 4개 파일
-   - 두 테이블 스키마 차이 분석 후 진행
-
-### Phase 4: 시딩 데이터 추가
-
-```sql
--- 우선순위 순서
-1. staff 테이블 시딩 (기능 활성화 필수)
-2. transactions 테이블 시딩 (인사이트/예측 기능 필수)
+-- 결과 확인
+SELECT
+  schemaname,
+  tablename,
+  pg_size_pretty(pg_total_relation_size(schemaname || '.' || tablename)) as size
+FROM pg_tables
+WHERE schemaname = 'public'
+ORDER BY pg_total_relation_size(schemaname || '.' || tablename) DESC
+LIMIT 20;
 ```
 
 ---
 
-## 5. 최종 테이블 구조 (정리 후 예상)
+## 8. 최종 테이블 구조 (정리 후 예상)
 
-| 카테고리 | 현재 | 정리 후 | 절약 |
-|---------|------|---------|------|
+| 카테고리 | 정리 전 | 정리 후 | 절약 |
+|---------|--------|---------|------|
 | 백업 테이블 | 7개 | 0개 | ~15MB |
-| 중복 테이블 | 3쌍 | 통합 | ~4MB |
-| 활성 테이블 | 114개 | ~110개 | - |
-| **총 테이블** | **121개** | **~110개** | **~20MB** |
+| 중복/레거시 테이블 | 2개 | 0개 | ~3.8MB |
+| **총 테이블** | **121개** | **112개** | **~19MB** |

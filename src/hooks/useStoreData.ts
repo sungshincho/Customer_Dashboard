@@ -15,7 +15,7 @@ import { useAuth } from './useAuth';
 import type { DataFileType, LoadOptions, StoreDataset, CustomerData, ProductData, PurchaseData, VisitData, StaffData } from '@/lib/storage/types';
 
 // 지원하는 테이블 타입
-type SupportedTable = 'customers' | 'products' | 'purchases' | 'visits' | 'staff' | 'wifi_zones' | 'wifi_tracking';
+type SupportedTable = 'customers' | 'products' | 'purchases' | 'store_visits' | 'staff' | 'wifi_zones' | 'wifi_tracking';
 
 // DB 테이블에서 데이터 로드하는 내부 함수
 async function loadFromDB(
@@ -66,7 +66,7 @@ export function useStoreDataFile<K extends DataFileType>(
         'customers': 'customers',
         'products': 'products',
         'purchases': 'purchases',
-        'visits': 'visits',
+        'visits': 'store_visits',  // visits → store_visits 마이그레이션
         'staff': 'staff',
         'wifi_sensors': 'wifi_zones',
         'wifi_tracking': 'wifi_tracking',
@@ -137,7 +137,7 @@ export function useStoreDataset(options: LoadOptions = {}) {
           .order('purchase_date', { ascending: false })
           .limit(100),
         supabase
-          .from('visits')
+          .from('store_visits')  // visits → store_visits 마이그레이션
           .select('*')
           .eq('store_id', selectedStore.id)
           .eq('org_id', orgId)
@@ -217,7 +217,7 @@ export function useMultipleStoreDataFiles<K extends DataFileType>(
           'customers': 'customers',
           'products': 'products',
           'purchases': 'purchases',
-          'visits': 'visits',
+          'visits': 'store_visits',  // visits → store_visits 마이그레이션
           'staff': 'staff',
           'wifi_sensors': 'wifi_zones',
           'wifi_tracking': 'wifi_tracking',
@@ -341,6 +341,7 @@ export function usePurchases(options?: LoadOptions) {
 
 /**
  * 방문 데이터 Hook (DB 기반)
+ * store_visits 테이블 사용 (visits에서 마이그레이션됨)
  */
 export function useVisits(options?: LoadOptions) {
   const { selectedStore } = useSelectedStore();
@@ -352,7 +353,7 @@ export function useVisits(options?: LoadOptions) {
       if (!selectedStore?.id || !orgId) return { data: [] };
 
       const { data, error } = await supabase
-        .from('visits')
+        .from('store_visits')  // visits → store_visits 마이그레이션
         .select('*')
         .eq('store_id', selectedStore.id)
         .eq('org_id', orgId)
@@ -360,7 +361,7 @@ export function useVisits(options?: LoadOptions) {
         .limit(100);
 
       if (error) {
-        console.warn('visits query error:', error);
+        console.warn('store_visits query error:', error);
         return { data: [] };
       }
       return { data: data || [] };
