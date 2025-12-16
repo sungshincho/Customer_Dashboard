@@ -1363,91 +1363,755 @@ END $$;
 
 
 -- ============================================================================
--- STEP 14: applied_strategies & strategy_daily_metrics 생성
+-- [교체] STEP 14: applied_strategies & strategy_daily_metrics (L2 기반 동적 생성)
+-- ============================================================================
+-- 기존 STEP 14 블록 전체를 아래 코드로 교체하세요
+-- L2 테이블(daily_kpis_agg, zone_daily_metrics, product_performance_agg)에서
+-- 기준선 데이터를 조회하여 현실적인 전략 및 성과 데이터 생성
 -- ============================================================================
 DO $$
 DECLARE
   v_store_id UUID := 'd9830554-2688-4032-af40-acccda787ac4';
-  v_user_id UUID := 'e4200130-08e8-47da-8c92-3d0b90fafd77';
-  v_org_id UUID := '0c6076e3-a993-4022-9b40-0f4e4370f8ef';
-  v_sid UUID;
-  v_sources TEXT[] := ARRAY['2d_simulation', '3d_simulation', '2d_simulation', '3d_simulation', '2d_simulation'];
-  v_modules TEXT[] := ARRAY['pricing_optimization', 'layout_optimization', 'inventory_management', 'staffing_optimization', 'flow_optimization'];
-  v_names TEXT[] := ARRAY['가격 최적화', '레이아웃 재배치', '재고 최적화', '인력 배치', '동선 개선', '프로모션', '디스플레이 변경', 'VIP 이벤트', '예약 시스템', '셀프 결제'];
-  v_start DATE;
-  v_end DATE;
-  v_status TEXT;
+  v_user_id UUID;
+  v_org_id UUID;
+  
+  -- L2 기준선 데이터
+  v_baseline RECORD;
+  v_zone_baseline RECORD;
+  v_product_baseline RECORD;
+  v_hourly_peak RECORD;
+  v_segment_baseline RECORD;
+  
+  -- 전략 변수
+  v_strategy_id UUID;
+  v_start_date DATE;
+  v_end_date DATE;
+  v_baseline_revenue NUMERIC;
+  v_baseline_visitors INT;
+  v_baseline_conversion NUMERIC;
+  v_simulated_improvement NUMERIC;
+  v_day_revenue NUMERIC;
+  v_day_visitors INT;
+  day_num INT;
 BEGIN
+  SELECT user_id, org_id INTO v_user_id, v_org_id FROM stores WHERE id = v_store_id;
+
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
-  RAISE NOTICE 'applied_strategies & strategy_daily_metrics 생성';
+  RAISE NOTICE '★ STEP 14: applied_strategies (L2 기반 동적 생성)';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
 
-  FOR i IN 1..10 LOOP
-    v_sid := gen_random_uuid();
-    v_start := CURRENT_DATE - ((i*8)||' days')::INTERVAL;
-    v_end := v_start + '7 days'::INTERVAL;
-    v_status := CASE
-      WHEN v_end < CURRENT_DATE THEN 'completed'
-      WHEN v_start > CURRENT_DATE THEN 'pending'
-      ELSE 'active'
-    END;
+  -- ═══════════════════════════════════════════════════════════
+  -- L2 기준선 데이터 수집: daily_kpis_agg
+  -- ═══════════════════════════════════════════════════════════
+  SELECT 
+    COALESCE(ROUND(AVG(total_revenue)), 3000000) as avg_revenue,
+    COALESCE(ROUND(AVG(total_visitors)), 40) as avg_visitors,
+    COALESCE(ROUND(AVG(conversion_rate)::NUMERIC, 2), 14) as avg_conversion,
+    COALESCE(ROUND(AVG(avg_transaction_value)), 250000) as avg_transaction,
+    COALESCE(ROUND(AVG(total_transactions)), 6) as avg_transactions
+  INTO v_baseline
+  FROM daily_kpis_agg
+  WHERE store_id = v_store_id;
 
-    INSERT INTO applied_strategies (
-      id, store_id, org_id, user_id, created_by, 
-      source, source_module, name, description, settings,
-      start_date, end_date, 
-      expected_roi, target_roi, current_roi, final_roi, 
-      expected_revenue, actual_revenue,
-      status, result, baseline_metrics, 
-      created_at, updated_at
+  v_baseline_revenue := v_baseline.avg_revenue;
+  v_baseline_visitors := v_baseline.avg_visitors;
+  v_baseline_conversion := v_baseline.avg_conversion;
+
+  RAISE NOTICE '  📊 L2 기준선 (daily_kpis_agg):';
+  RAISE NOTICE '     - 일평균 매출: ₩%', TO_CHAR(v_baseline_revenue, 'FM999,999,999');
+  RAISE NOTICE '     - 일평균 방문자: %명', v_baseline_visitors;
+  RAISE NOTICE '     - 평균 전환율: %', v_baseline_conversion || '%';
+
+  -- ═══════════════════════════════════════════════════════════
+  -- L2 기준선 데이터 수집: zone_daily_metrics (가장 혼잡한 존)
+  -- ═══════════════════════════════════════════════════════════
+  SELECT 
+    z.zone_name,
+    z.zone_type,
+    z.capacity,
+    COALESCE(ROUND(AVG(zdm.total_visitors)), 20) as avg_visitors,
+    COALESCE(ROUND(AVG(zdm.avg_dwell_seconds)), 120) as avg_dwell,
+    COALESCE(MAX(zdm.peak_occupancy), 15) as max_occupancy
+  INTO v_zone_baseline
+  FROM zone_daily_metrics zdm
+  JOIN zones_dim z ON zdm.zone_id = z.id
+  WHERE zdm.store_id = v_store_id
+  GROUP BY z.id, z.zone_name, z.zone_type, z.capacity
+  ORDER BY AVG(zdm.total_visitors) DESC
+  LIMIT 1;
+
+  RAISE NOTICE '  📊 L2 기준선 (zone_daily_metrics):';
+  RAISE NOTICE '     - 최다 방문 존: % (%명/일)', v_zone_baseline.zone_name, v_zone_baseline.avg_visitors;
+
+  -- ═══════════════════════════════════════════════════════════
+  -- L2 기준선 데이터 수집: hourly_metrics (피크 시간대)
+  -- ═══════════════════════════════════════════════════════════
+  SELECT 
+    hour,
+    COALESCE(SUM(visitor_count), 0) as total_visitors,
+    COALESCE(ROUND(AVG(visitor_count)), 5) as avg_visitors,
+    COALESCE(SUM(transaction_count), 0) as total_transactions
+  INTO v_hourly_peak
+  FROM hourly_metrics
+  WHERE store_id = v_store_id
+  GROUP BY hour
+  ORDER BY SUM(visitor_count) DESC
+  LIMIT 1;
+
+  RAISE NOTICE '     - 피크 시간대: %시 (평균 %명)', v_hourly_peak.hour, v_hourly_peak.avg_visitors;
+
+  -- ═══════════════════════════════════════════════════════════
+  -- L2 기준선 데이터 수집: product_performance_agg (재고 부족 상품)
+  -- ═══════════════════════════════════════════════════════════
+  SELECT 
+    COALESCE(COUNT(DISTINCT product_id), 0) as low_stock_count,
+    COALESCE(ROUND(AVG(stock_level)), 30) as avg_stock,
+    COALESCE(ROUND(AVG(conversion_rate)), 10) as avg_product_conv
+  INTO v_product_baseline
+  FROM product_performance_agg
+  WHERE store_id = v_store_id AND stock_level < 15;
+
+  RAISE NOTICE '     - 재고 부족 상품: %개', v_product_baseline.low_stock_count;
+
+  -- ═══════════════════════════════════════════════════════════
+  -- L2 기준선 데이터 수집: customer_segments_agg (VIP 세그먼트)
+  -- ═══════════════════════════════════════════════════════════
+  SELECT 
+    COALESCE(ROUND(AVG(customer_count)), 20) as vip_count,
+    COALESCE(ROUND(AVG(total_revenue)), 500000) as vip_revenue,
+    COALESCE(ROUND(AVG(avg_transaction_value)), 350000) as vip_avg_transaction
+  INTO v_segment_baseline
+  FROM customer_segments_agg
+  WHERE store_id = v_store_id AND segment_name = 'VIP';
+
+  RAISE NOTICE '     - VIP 고객: %명 (객단가 ₩%)', v_segment_baseline.vip_count, TO_CHAR(v_segment_baseline.vip_avg_transaction, 'FM999,999');
+  RAISE NOTICE '';
+
+  -- ═══════════════════════════════════════════════════════════════════════════
+  -- 전략 1: 가격 최적화 (완료됨) - 60일 전 시작, 7일간 진행
+  -- ═══════════════════════════════════════════════════════════════════════════
+  v_strategy_id := gen_random_uuid();
+  v_start_date := CURRENT_DATE - 60;
+  v_end_date := v_start_date + 6;
+  v_simulated_improvement := 1.12 + random() * 0.08;  -- 12~20% 개선
+
+  INSERT INTO applied_strategies (
+    id, store_id, org_id, user_id, created_by,
+    source, source_module, name, description, settings,
+    start_date, end_date,
+    expected_roi, target_roi, current_roi, final_roi,
+    expected_revenue, actual_revenue,
+    status, result, baseline_metrics,
+    created_at, updated_at
+  ) VALUES (
+    v_strategy_id, v_store_id, v_org_id, v_user_id, v_user_id,
+    '2d_simulation', 'pricing_optimization',
+    '가격 최적화 전략',
+    'L2 데이터 분석 기반 가격 탄력성 최적화. 기준 전환율 ' || v_baseline_conversion || '%에서 개선 목표. ' ||
+    '일평균 매출 ₩' || TO_CHAR(v_baseline_revenue, 'FM999,999,999') || ' 기준.',
+    jsonb_build_object(
+      'discount_rate', 10, 
+      'target_products', 'low_performers',
+      'optimization_method', 'price_elasticity'
+    ),
+    v_start_date, v_end_date,
+    15, 15,
+    ROUND((v_simulated_improvement - 1) * 100),
+    ROUND((v_simulated_improvement - 1) * 100),
+    ROUND(v_baseline_revenue * 7),
+    ROUND(v_baseline_revenue * 7 * v_simulated_improvement),
+    'completed', 'success',
+    jsonb_build_object(
+      'source', 'daily_kpis_agg',
+      'daily_revenue', v_baseline_revenue,
+      'daily_visitors', v_baseline_visitors,
+      'conversion_rate', v_baseline_conversion,
+      'avg_transaction', v_baseline.avg_transaction
+    ),
+    v_start_date, NOW()
+  );
+
+  -- 전략 1 일별 메트릭
+  FOR day_num IN 0..6 LOOP
+    v_day_revenue := v_baseline_revenue * (1 + (v_simulated_improvement - 1) * (day_num + 1) / 7);
+    v_day_visitors := v_baseline_visitors + floor(random() * 10)::INT - 5;
+
+    INSERT INTO strategy_daily_metrics (
+      id, strategy_id, date, metrics, daily_roi, cumulative_roi, created_at
     ) VALUES (
-      v_sid, v_store_id, v_org_id, v_user_id, v_user_id,
-      v_sources[1+(i%5)], 
-      v_modules[1+(i%5)], 
-      v_names[i], 
-      '전략 설명 '||i,
-      '{"value": 50}'::jsonb, 
-      v_start, 
-      v_end,
-      15 + floor(random()*25), 
-      15 + floor(random()*25),
-      CASE WHEN v_status IN ('active','completed') THEN 10 + floor(random()*20) ELSE NULL END,
-      CASE WHEN v_status = 'completed' THEN 12 + floor(random()*25) ELSE NULL END,
-      1000000 + floor(random()*2000000)::INT,
-      CASE WHEN v_status = 'completed' THEN 800000 + floor(random()*2500000)::INT ELSE NULL END,
-      v_status,
-      CASE WHEN v_status = 'completed' THEN 'success' ELSE NULL END,
-      '{"revenue": 2500000}'::jsonb,
-      NOW() - (i*8||' days')::INTERVAL, 
+      gen_random_uuid(),
+      v_strategy_id,
+      v_start_date + day_num,
+      jsonb_build_object(
+        'revenue', ROUND(v_day_revenue),
+        'visitors', v_day_visitors,
+        'conversion_rate', ROUND((v_baseline_conversion + (day_num * 0.5))::NUMERIC, 1),
+        'transactions', ROUND(v_day_visitors * (v_baseline_conversion + day_num * 0.5) / 100),
+        'baseline_revenue', v_baseline_revenue,
+        'improvement_rate', ROUND(((v_day_revenue / v_baseline_revenue - 1) * 100)::NUMERIC, 1)
+      ),
+      ROUND(((v_day_revenue / v_baseline_revenue - 1) * 100)::NUMERIC, 1),
+      ROUND(((v_day_revenue / v_baseline_revenue - 1) * 100 * (day_num + 1) / 7)::NUMERIC, 1),
       NOW()
     );
+  END LOOP;
 
-    -- 완료된 전략의 일별 메트릭
-    IF v_status = 'completed' THEN
-      FOR day_num IN 0..6 LOOP
-        INSERT INTO strategy_daily_metrics (
-          id, strategy_id, date, metrics, 
-          daily_roi, cumulative_roi, created_at
-        ) VALUES (
-          gen_random_uuid(), 
-          v_sid, 
-          v_start + (day_num||' days')::INTERVAL,
-          jsonb_build_object(
-            'revenue', 350000 + floor(random()*200000)::INT,
-            'visitors', 120 + floor(random()*60)::INT,
-            'conversion_rate', 12 + floor(random()*8)
-          ),
-          10 + floor(random()*15),
-          (day_num+1) * (10 + floor(random()*15)),
-          NOW()
-        );
-      END LOOP;
+  RAISE NOTICE '  ✓ 전략 1: 가격 최적화 (완료, ROI %%)', ROUND((v_simulated_improvement - 1) * 100);
+
+  -- ═══════════════════════════════════════════════════════════════════════════
+  -- 전략 2: 레이아웃 재배치 (진행중) - 3일 전 시작, 7일간 예정
+  -- ═══════════════════════════════════════════════════════════════════════════
+  v_strategy_id := gen_random_uuid();
+  v_start_date := CURRENT_DATE - 3;
+  v_end_date := v_start_date + 6;
+  v_simulated_improvement := 1.15 + random() * 0.05;  -- 15~20% 개선 예상
+
+  INSERT INTO applied_strategies (
+    id, store_id, org_id, user_id, created_by,
+    source, source_module, name, description, settings,
+    start_date, end_date,
+    expected_roi, target_roi, current_roi, final_roi,
+    expected_revenue, actual_revenue,
+    status, result, baseline_metrics,
+    created_at, updated_at
+  ) VALUES (
+    v_strategy_id, v_store_id, v_org_id, v_user_id, v_user_id,
+    '3d_simulation', 'layout_optimization',
+    '레이아웃 재배치 전략',
+    v_zone_baseline.zone_name || ' 존 중심 동선 최적화. 평균 체류시간 ' || 
+    v_zone_baseline.avg_dwell || '초, 일평균 방문자 ' || v_zone_baseline.avg_visitors || '명 기준. ' ||
+    '최대 점유율 ' || v_zone_baseline.max_occupancy || '명 해소 목표.',
+    jsonb_build_object(
+      'target_zone', v_zone_baseline.zone_name,
+      'zone_type', v_zone_baseline.zone_type,
+      'method', 'flow_optimization',
+      'goal', 'reduce_congestion'
+    ),
+    v_start_date, v_end_date,
+    20, 18,
+    12,  -- 현재 진행중 ROI
+    NULL,
+    ROUND(v_baseline_revenue * 7 * 1.2),
+    NULL,
+    'active', NULL,
+    jsonb_build_object(
+      'source', 'zone_daily_metrics',
+      'target_zone', v_zone_baseline.zone_name,
+      'zone_capacity', v_zone_baseline.capacity,
+      'zone_avg_visitors', v_zone_baseline.avg_visitors,
+      'zone_avg_dwell_seconds', v_zone_baseline.avg_dwell,
+      'zone_max_occupancy', v_zone_baseline.max_occupancy
+    ),
+    v_start_date, NOW()
+  );
+
+  -- 전략 2 일별 메트릭 (시작일부터 어제까지)
+  FOR day_num IN 0..LEAST(3, (CURRENT_DATE - v_start_date - 1)) LOOP
+    IF day_num >= 0 THEN
+      v_day_revenue := v_baseline_revenue * (1.05 + day_num * 0.025);
+      v_day_visitors := v_baseline_visitors + floor(random() * 8)::INT;
+
+      INSERT INTO strategy_daily_metrics (
+        id, strategy_id, date, metrics, daily_roi, cumulative_roi, created_at
+      ) VALUES (
+        gen_random_uuid(),
+        v_strategy_id,
+        v_start_date + day_num,
+        jsonb_build_object(
+          'revenue', ROUND(v_day_revenue),
+          'visitors', v_day_visitors,
+          'zone_visitors', v_zone_baseline.avg_visitors + day_num * 2,
+          'zone_dwell_change', day_num * 5,
+          'congestion_reduction', day_num * 3
+        ),
+        5 + day_num * 2,
+        ROUND(((5 + day_num * 2) * (day_num + 1) / 4.0)::NUMERIC, 1),
+        NOW()
+      );
     END IF;
   END LOOP;
 
-  RAISE NOTICE '  ✓ applied_strategies: 10건 생성';
-  RAISE NOTICE '  ✓ strategy_daily_metrics: 완료된 전략별 7일치 생성';
+  RAISE NOTICE '  ✓ 전략 2: 레이아웃 재배치 (진행중, 목표 존: %)', v_zone_baseline.zone_name;
+
+  -- ═══════════════════════════════════════════════════════════════════════════
+  -- 전략 3: 재고 최적화 (예정) - 7일 후 시작
+  -- ═══════════════════════════════════════════════════════════════════════════
+  v_strategy_id := gen_random_uuid();
+  v_start_date := CURRENT_DATE + 7;
+  v_end_date := v_start_date + 13;
+
+  INSERT INTO applied_strategies (
+    id, store_id, org_id, user_id, created_by,
+    source, source_module, name, description, settings,
+    start_date, end_date,
+    expected_roi, target_roi, current_roi, final_roi,
+    expected_revenue, actual_revenue,
+    status, result, baseline_metrics,
+    created_at, updated_at
+  ) VALUES (
+    v_strategy_id, v_store_id, v_org_id, v_user_id, v_user_id,
+    '2d_simulation', 'inventory_management',
+    '재고 최적화 전략',
+    '재고 부족 상품 ' || v_product_baseline.low_stock_count || '개 대상 자동 발주 시스템 적용. ' ||
+    '평균 재고 수준 ' || v_product_baseline.avg_stock || '개, 상품 평균 전환율 ' || 
+    v_product_baseline.avg_product_conv || '% 기준.',
+    jsonb_build_object(
+      'min_stock_threshold', 10,
+      'auto_reorder', true,
+      'reorder_quantity', 'optimal',
+      'target_stock_level', 50
+    ),
+    v_start_date, v_end_date,
+    10, 12,
+    NULL, NULL,
+    ROUND(v_baseline_revenue * 14 * 1.1),
+    NULL,
+    'pending', NULL,
+    jsonb_build_object(
+      'source', 'product_performance_agg',
+      'low_stock_products', v_product_baseline.low_stock_count,
+      'avg_stock_level', v_product_baseline.avg_stock,
+      'avg_product_conversion', v_product_baseline.avg_product_conv
+    ),
+    NOW(), NOW()
+  );
+
+  RAISE NOTICE '  ✓ 전략 3: 재고 최적화 (예정, 대상 상품: %개)', v_product_baseline.low_stock_count;
+
+  -- ═══════════════════════════════════════════════════════════════════════════
+  -- 전략 4: 인력 배치 최적화 (완료) - 45일 전 시작
+  -- ═══════════════════════════════════════════════════════════════════════════
+  v_strategy_id := gen_random_uuid();
+  v_start_date := CURRENT_DATE - 45;
+  v_end_date := v_start_date + 6;
+  v_simulated_improvement := 1.08 + random() * 0.06;  -- 8~14% 개선
+
+  INSERT INTO applied_strategies (
+    id, store_id, org_id, user_id, created_by,
+    source, source_module, name, description, settings,
+    start_date, end_date,
+    expected_roi, target_roi, current_roi, final_roi,
+    expected_revenue, actual_revenue,
+    status, result, baseline_metrics,
+    created_at, updated_at
+  ) VALUES (
+    v_strategy_id, v_store_id, v_org_id, v_user_id, v_user_id,
+    '2d_simulation', 'staffing_optimization',
+    '인력 배치 최적화',
+    '피크타임(' || v_hourly_peak.hour || '시) 집중 배치로 서비스 품질 향상. ' ||
+    '피크 시간대 평균 ' || v_hourly_peak.avg_visitors || '명 방문, ' ||
+    '일평균 방문자 ' || v_baseline_visitors || '명 기준.',
+    jsonb_build_object(
+      'peak_hours', ARRAY[v_hourly_peak.hour, v_hourly_peak.hour + 1],
+      'staff_increase', 2,
+      'optimization_target', 'service_quality'
+    ),
+    v_start_date, v_end_date,
+    8, 10,
+    ROUND((v_simulated_improvement - 1) * 100 - 2),
+    ROUND((v_simulated_improvement - 1) * 100),
+    ROUND(v_baseline_revenue * 7 * 1.08),
+    ROUND(v_baseline_revenue * 7 * v_simulated_improvement),
+    'completed', 'success',
+    jsonb_build_object(
+      'source', 'hourly_metrics',
+      'peak_hour', v_hourly_peak.hour,
+      'peak_visitors', v_hourly_peak.avg_visitors,
+      'daily_visitors', v_baseline_visitors,
+      'conversion_rate', v_baseline_conversion
+    ),
+    v_start_date, NOW()
+  );
+
+  -- 전략 4 일별 메트릭
+  FOR day_num IN 0..6 LOOP
+    v_day_revenue := v_baseline_revenue * (1.06 + random() * 0.08);
+    v_day_visitors := v_baseline_visitors + floor(random() * 12)::INT - 3;
+
+    INSERT INTO strategy_daily_metrics (
+      id, strategy_id, date, metrics, daily_roi, cumulative_roi, created_at
+    ) VALUES (
+      gen_random_uuid(),
+      v_strategy_id,
+      v_start_date + day_num,
+      jsonb_build_object(
+        'revenue', ROUND(v_day_revenue),
+        'visitors', v_day_visitors,
+        'peak_hour_visitors', v_hourly_peak.avg_visitors + floor(random() * 5)::INT,
+        'service_score', 82 + floor(random() * 12)::INT,
+        'wait_time_reduction', 15 + floor(random() * 10)::INT
+      ),
+      ROUND(((v_day_revenue / v_baseline_revenue - 1) * 100)::NUMERIC, 1),
+      ROUND(((v_day_revenue / v_baseline_revenue - 1) * 100 * (day_num + 1) / 7)::NUMERIC, 1),
+      NOW()
+    );
+  END LOOP;
+
+  RAISE NOTICE '  ✓ 전략 4: 인력 배치 최적화 (완료, 피크타임: %시)', v_hourly_peak.hour;
+
+  -- ═══════════════════════════════════════════════════════════════════════════
+  -- 전략 5: VIP 프로모션 캠페인 (완료) - 30일 전 시작
+  -- ═══════════════════════════════════════════════════════════════════════════
+  v_strategy_id := gen_random_uuid();
+  v_start_date := CURRENT_DATE - 30;
+  v_end_date := v_start_date + 6;
+  v_simulated_improvement := 1.25 + random() * 0.1;  -- 25~35% 개선
+
+  INSERT INTO applied_strategies (
+    id, store_id, org_id, user_id, created_by,
+    source, source_module, name, description, settings,
+    start_date, end_date,
+    expected_roi, target_roi, current_roi, final_roi,
+    expected_revenue, actual_revenue,
+    status, result, baseline_metrics,
+    created_at, updated_at
+  ) VALUES (
+    v_strategy_id, v_store_id, v_org_id, v_user_id, v_user_id,
+    '2d_simulation', 'promotion_campaign',
+    'VIP 프로모션 캠페인',
+    'VIP 세그먼트 ' || v_segment_baseline.vip_count || '명 대상 20% 할인 이벤트. ' ||
+    'VIP 평균 객단가 ₩' || TO_CHAR(v_segment_baseline.vip_avg_transaction, 'FM999,999') || ', ' ||
+    'VIP 일평균 매출 ₩' || TO_CHAR(v_segment_baseline.vip_revenue, 'FM999,999') || ' 기준.',
+    jsonb_build_object(
+      'discount_rate', 20,
+      'target_segment', 'VIP',
+      'campaign_type', 'exclusive_presale',
+      'communication_channel', ARRAY['email', 'sms', 'app_push']
+    ),
+    v_start_date, v_end_date,
+    25, 22,
+    ROUND((v_simulated_improvement - 1) * 100 - 3),
+    ROUND((v_simulated_improvement - 1) * 100),
+    ROUND(v_baseline_revenue * 7 * 1.25),
+    ROUND(v_baseline_revenue * 7 * v_simulated_improvement),
+    'completed', 'success',
+    jsonb_build_object(
+      'source', 'customer_segments_agg',
+      'vip_count', v_segment_baseline.vip_count,
+      'vip_avg_revenue', v_segment_baseline.vip_revenue,
+      'vip_avg_transaction', v_segment_baseline.vip_avg_transaction,
+      'daily_revenue', v_baseline_revenue
+    ),
+    v_start_date, NOW()
+  );
+
+  -- 전략 5 일별 메트릭
+  FOR day_num IN 0..6 LOOP
+    v_day_revenue := v_baseline_revenue * (1.20 + random() * 0.15);
+
+    INSERT INTO strategy_daily_metrics (
+      id, strategy_id, date, metrics, daily_roi, cumulative_roi, created_at
+    ) VALUES (
+      gen_random_uuid(),
+      v_strategy_id,
+      v_start_date + day_num,
+      jsonb_build_object(
+        'revenue', ROUND(v_day_revenue),
+        'vip_transactions', v_segment_baseline.vip_count + floor(random() * 10)::INT - 5,
+        'vip_revenue', ROUND(v_segment_baseline.vip_revenue * (1.3 + random() * 0.2)),
+        'discount_cost', ROUND(v_day_revenue * 0.04),
+        'new_vip_signups', floor(random() * 5)::INT
+      ),
+      ROUND(((v_day_revenue / v_baseline_revenue - 1) * 100)::NUMERIC, 1),
+      ROUND(((v_day_revenue / v_baseline_revenue - 1) * 100 * (day_num + 1) / 7)::NUMERIC, 1),
+      NOW()
+    );
+  END LOOP;
+
+  RAISE NOTICE '  ✓ 전략 5: VIP 프로모션 (완료, 대상: %명)', v_segment_baseline.vip_count;
+
+  -- ═══════════════════════════════════════════════════════════════════════════
+  -- 전략 6: 동선 개선 전략 (완료) - 75일 전 시작
+  -- ═══════════════════════════════════════════════════════════════════════════
+  v_strategy_id := gen_random_uuid();
+  v_start_date := CURRENT_DATE - 75;
+  v_end_date := v_start_date + 6;
+  v_simulated_improvement := 1.10 + random() * 0.05;  -- 10~15% 개선
+
+  INSERT INTO applied_strategies (
+    id, store_id, org_id, user_id, created_by,
+    source, source_module, name, description, settings,
+    start_date, end_date,
+    expected_roi, target_roi, current_roi, final_roi,
+    expected_revenue, actual_revenue,
+    status, result, baseline_metrics,
+    created_at, updated_at
+  ) VALUES (
+    v_strategy_id, v_store_id, v_org_id, v_user_id, v_user_id,
+    '3d_simulation', 'flow_optimization',
+    '매장 동선 개선',
+    '3D 시뮬레이션 기반 동선 최적화. 평균 체류시간 ' || v_zone_baseline.avg_dwell || '초에서 개선 목표. ' ||
+    '일평균 ' || v_baseline_visitors || '명 방문자 동선 효율화.',
+    jsonb_build_object(
+      'optimization_type', 'customer_flow',
+      'simulation_runs', 100,
+      'target_metric', 'dwell_time_increase'
+    ),
+    v_start_date, v_end_date,
+    12, 10,
+    ROUND((v_simulated_improvement - 1) * 100 - 1),
+    ROUND((v_simulated_improvement - 1) * 100),
+    ROUND(v_baseline_revenue * 7 * 1.12),
+    ROUND(v_baseline_revenue * 7 * v_simulated_improvement),
+    'completed', 'success',
+    jsonb_build_object(
+      'source', 'zone_daily_metrics',
+      'avg_dwell_seconds', v_zone_baseline.avg_dwell,
+      'daily_visitors', v_baseline_visitors,
+      'zones_analyzed', 7
+    ),
+    v_start_date, NOW()
+  );
+
+  -- 전략 6 일별 메트릭
+  FOR day_num IN 0..6 LOOP
+    v_day_revenue := v_baseline_revenue * (1.08 + random() * 0.06);
+
+    INSERT INTO strategy_daily_metrics (
+      id, strategy_id, date, metrics, daily_roi, cumulative_roi, created_at
+    ) VALUES (
+      gen_random_uuid(),
+      v_strategy_id,
+      v_start_date + day_num,
+      jsonb_build_object(
+        'revenue', ROUND(v_day_revenue),
+        'visitors', v_baseline_visitors + floor(random() * 8)::INT,
+        'avg_dwell_increase', 10 + day_num * 3,
+        'zones_visited_increase', 0.2 + day_num * 0.1
+      ),
+      ROUND(((v_day_revenue / v_baseline_revenue - 1) * 100)::NUMERIC, 1),
+      ROUND(((v_day_revenue / v_baseline_revenue - 1) * 100 * (day_num + 1) / 7)::NUMERIC, 1),
+      NOW()
+    );
+  END LOOP;
+
+  RAISE NOTICE '  ✓ 전략 6: 동선 개선 (완료)';
+
+  -- ═══════════════════════════════════════════════════════════════════════════
+  -- 전략 7: 디스플레이 변경 (진행중) - 5일 전 시작
+  -- ═══════════════════════════════════════════════════════════════════════════
+  v_strategy_id := gen_random_uuid();
+  v_start_date := CURRENT_DATE - 5;
+  v_end_date := v_start_date + 6;
+
+  INSERT INTO applied_strategies (
+    id, store_id, org_id, user_id, created_by,
+    source, source_module, name, description, settings,
+    start_date, end_date,
+    expected_roi, target_roi, current_roi, final_roi,
+    expected_revenue, actual_revenue,
+    status, result, baseline_metrics,
+    created_at, updated_at
+  ) VALUES (
+    v_strategy_id, v_store_id, v_org_id, v_user_id, v_user_id,
+    '3d_simulation', 'display_optimization',
+    '시즌 디스플레이 변경',
+    '시즌 상품 전면 배치. 상품 평균 전환율 ' || v_product_baseline.avg_product_conv || '% 기준 개선 목표.',
+    jsonb_build_object(
+      'display_type', 'seasonal',
+      'featured_category', '아우터',
+      'placement', 'entrance_focal'
+    ),
+    v_start_date, v_end_date,
+    18, 15,
+    8,
+    NULL,
+    ROUND(v_baseline_revenue * 7 * 1.18),
+    NULL,
+    'active', NULL,
+    jsonb_build_object(
+      'source', 'product_performance_agg',
+      'avg_product_conversion', v_product_baseline.avg_product_conv,
+      'daily_revenue', v_baseline_revenue
+    ),
+    v_start_date, NOW()
+  );
+
+  -- 전략 7 일별 메트릭 (시작일부터 어제까지)
+  FOR day_num IN 0..LEAST(4, (CURRENT_DATE - v_start_date - 1)) LOOP
+    IF day_num >= 0 THEN
+      v_day_revenue := v_baseline_revenue * (1.04 + day_num * 0.02);
+
+      INSERT INTO strategy_daily_metrics (
+        id, strategy_id, date, metrics, daily_roi, cumulative_roi, created_at
+      ) VALUES (
+        gen_random_uuid(),
+        v_strategy_id,
+        v_start_date + day_num,
+        jsonb_build_object(
+          'revenue', ROUND(v_day_revenue),
+          'featured_product_sales', 5 + floor(random() * 8)::INT,
+          'display_engagement', 45 + floor(random() * 20)::INT
+        ),
+        4 + day_num * 2,
+        ROUND(((4 + day_num * 2) * (day_num + 1) / 5.0)::NUMERIC, 1),
+        NOW()
+      );
+    END IF;
+  END LOOP;
+
+  RAISE NOTICE '  ✓ 전략 7: 디스플레이 변경 (진행중)';
+
+  -- ═══════════════════════════════════════════════════════════════════════════
+  -- 전략 8: 셀프 결제 도입 (예정) - 14일 후 시작
+  -- ═══════════════════════════════════════════════════════════════════════════
+  v_strategy_id := gen_random_uuid();
+  v_start_date := CURRENT_DATE + 14;
+  v_end_date := v_start_date + 13;
+
+  INSERT INTO applied_strategies (
+    id, store_id, org_id, user_id, created_by,
+    source, source_module, name, description, settings,
+    start_date, end_date,
+    expected_roi, target_roi, current_roi, final_roi,
+    expected_revenue, actual_revenue,
+    status, result, baseline_metrics,
+    created_at, updated_at
+  ) VALUES (
+    v_strategy_id, v_store_id, v_org_id, v_user_id, v_user_id,
+    '2d_simulation', 'checkout_optimization',
+    '셀프 결제 시스템 도입',
+    '피크타임(' || v_hourly_peak.hour || '시) 대기 시간 감소 목표. ' ||
+    '일평균 거래 ' || v_baseline.avg_transactions || '건 처리 효율화.',
+    jsonb_build_object(
+      'kiosk_count', 2,
+      'target_reduction', 'wait_time',
+      'peak_hour_focus', v_hourly_peak.hour
+    ),
+    v_start_date, v_end_date,
+    8, 10,
+    NULL, NULL,
+    ROUND(v_baseline_revenue * 14 * 1.08),
+    NULL,
+    'pending', NULL,
+    jsonb_build_object(
+      'source', 'hourly_metrics',
+      'peak_hour', v_hourly_peak.hour,
+      'daily_transactions', v_baseline.avg_transactions,
+      'conversion_rate', v_baseline_conversion
+    ),
+    NOW(), NOW()
+  );
+
+  RAISE NOTICE '  ✓ 전략 8: 셀프 결제 도입 (예정)';
+
+  -- ═══════════════════════════════════════════════════════════════════════════
+  -- 전략 9: 크로스셀링 강화 (완료) - 50일 전 시작
+  -- ═══════════════════════════════════════════════════════════════════════════
+  v_strategy_id := gen_random_uuid();
+  v_start_date := CURRENT_DATE - 50;
+  v_end_date := v_start_date + 6;
+  v_simulated_improvement := 1.15 + random() * 0.08;  -- 15~23% 개선
+
+  INSERT INTO applied_strategies (
+    id, store_id, org_id, user_id, created_by,
+    source, source_module, name, description, settings,
+    start_date, end_date,
+    expected_roi, target_roi, current_roi, final_roi,
+    expected_revenue, actual_revenue,
+    status, result, baseline_metrics,
+    created_at, updated_at
+  ) VALUES (
+    v_strategy_id, v_store_id, v_org_id, v_user_id, v_user_id,
+    '2d_simulation', 'cross_selling',
+    '크로스셀링 강화',
+    '연관 상품 추천 시스템 적용. 평균 객단가 ₩' || TO_CHAR(v_baseline.avg_transaction, 'FM999,999') || ' 증대 목표.',
+    jsonb_build_object(
+      'recommendation_engine', 'collaborative_filtering',
+      'display_location', 'checkout_counter',
+      'target_increase', 'basket_size'
+    ),
+    v_start_date, v_end_date,
+    18, 15,
+    ROUND((v_simulated_improvement - 1) * 100 - 2),
+    ROUND((v_simulated_improvement - 1) * 100),
+    ROUND(v_baseline_revenue * 7 * 1.18),
+    ROUND(v_baseline_revenue * 7 * v_simulated_improvement),
+    'completed', 'success',
+    jsonb_build_object(
+      'source', 'daily_kpis_agg',
+      'avg_transaction_value', v_baseline.avg_transaction,
+      'daily_transactions', v_baseline.avg_transactions
+    ),
+    v_start_date, NOW()
+  );
+
+  -- 전략 9 일별 메트릭
+  FOR day_num IN 0..6 LOOP
+    v_day_revenue := v_baseline_revenue * (1.12 + random() * 0.1);
+
+    INSERT INTO strategy_daily_metrics (
+      id, strategy_id, date, metrics, daily_roi, cumulative_roi, created_at
+    ) VALUES (
+      gen_random_uuid(),
+      v_strategy_id,
+      v_start_date + day_num,
+      jsonb_build_object(
+        'revenue', ROUND(v_day_revenue),
+        'avg_basket_size', ROUND((v_baseline.avg_transaction * (1.1 + random() * 0.15))::NUMERIC, 0),
+        'cross_sell_rate', 15 + floor(random() * 10)::INT,
+        'items_per_transaction', 1.8 + random() * 0.5
+      ),
+      ROUND(((v_day_revenue / v_baseline_revenue - 1) * 100)::NUMERIC, 1),
+      ROUND(((v_day_revenue / v_baseline_revenue - 1) * 100 * (day_num + 1) / 7)::NUMERIC, 1),
+      NOW()
+    );
+  END LOOP;
+
+  RAISE NOTICE '  ✓ 전략 9: 크로스셀링 강화 (완료)';
+
+  -- ═══════════════════════════════════════════════════════════════════════════
+  -- 전략 10: 고객 세분화 마케팅 (예정) - 21일 후 시작
+  -- ═══════════════════════════════════════════════════════════════════════════
+  v_strategy_id := gen_random_uuid();
+  v_start_date := CURRENT_DATE + 21;
+  v_end_date := v_start_date + 13;
+
+  INSERT INTO applied_strategies (
+    id, store_id, org_id, user_id, created_by,
+    source, source_module, name, description, settings,
+    start_date, end_date,
+    expected_roi, target_roi, current_roi, final_roi,
+    expected_revenue, actual_revenue,
+    status, result, baseline_metrics,
+    created_at, updated_at
+  ) VALUES (
+    v_strategy_id, v_store_id, v_org_id, v_user_id, v_user_id,
+    '2d_simulation', 'segment_marketing',
+    '고객 세분화 마케팅',
+    'VIP(' || v_segment_baseline.vip_count || '명), Regular, New 세그먼트별 맞춤 마케팅. ' ||
+    'VIP 객단가 ₩' || TO_CHAR(v_segment_baseline.vip_avg_transaction, 'FM999,999') || ' 유지/확대 목표.',
+    jsonb_build_object(
+      'segments', ARRAY['VIP', 'Regular', 'New'],
+      'personalization_level', 'high',
+      'channel', 'omnichannel'
+    ),
+    v_start_date, v_end_date,
+    22, 20,
+    NULL, NULL,
+    ROUND(v_baseline_revenue * 14 * 1.22),
+    NULL,
+    'pending', NULL,
+    jsonb_build_object(
+      'source', 'customer_segments_agg',
+      'vip_count', v_segment_baseline.vip_count,
+      'vip_avg_transaction', v_segment_baseline.vip_avg_transaction,
+      'total_customers', 2500
+    ),
+    NOW(), NOW()
+  );
+
+  RAISE NOTICE '  ✓ 전략 10: 세분화 마케팅 (예정)';
+
+  RAISE NOTICE '';
+  RAISE NOTICE '  ════════════════════════════════════════════════════════════';
+  RAISE NOTICE '  ✓ applied_strategies: 10건 생성 (L2 기반)';
+  RAISE NOTICE '    - 완료: 5건 (가격최적화, 인력배치, VIP프로모션, 동선개선, 크로스셀링)';
+  RAISE NOTICE '    - 진행중: 2건 (레이아웃 재배치, 디스플레이 변경)';
+  RAISE NOTICE '    - 예정: 3건 (재고최적화, 셀프결제, 세분화마케팅)';
+  RAISE NOTICE '  ✓ strategy_daily_metrics: 완료/진행중 전략별 일별 성과 생성';
+  RAISE NOTICE '  ════════════════════════════════════════════════════════════';
 END $$;
 
 
@@ -1840,71 +2504,478 @@ BEGIN
 END $$;
 
 -- ============================================================================
--- STEP 21: ai_recommendations 생성 (4건)
+-- [교체] STEP 21: ai_recommendations - L2 기반 동적 생성
+-- ============================================================================
+-- 기존 STEP 21 블록 전체를 아래 코드로 교체하세요
+-- L2 테이블을 분석하여 실제 데이터 기반의 추천을 동적으로 생성
 -- ============================================================================
 DO $$
 DECLARE
   v_store_id UUID := 'd9830554-2688-4032-af40-acccda787ac4';
-  v_user_id UUID := 'e4200130-08e8-47da-8c92-3d0b90fafd77';
-  v_org_id UUID := '0c6076e3-a993-4022-9b40-0f4e4370f8ef';
+  v_user_id UUID;
+  v_org_id UUID;
+  
+  -- L2 분석 결과 변수
+  v_avg_conversion NUMERIC;
+  v_avg_revenue NUMERIC;
+  v_low_product RECORD;
+  v_congested_zone RECORD;
+  v_underperforming_zone RECORD;
+  v_peak_hour RECORD;
+  v_low_traffic_hour RECORD;
+  v_vip_stats RECORD;
+  v_at_risk_stats RECORD;
+  v_low_stock_product RECORD;
+  v_high_return_product RECORD;
+  
+  v_recommendation_count INT := 0;
 BEGIN
+  SELECT user_id, org_id INTO v_user_id, v_org_id FROM stores WHERE id = v_store_id;
+
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
-  RAISE NOTICE 'ai_recommendations 생성 (4건)';
+  RAISE NOTICE '★ STEP 21: ai_recommendations (L2 기반 동적 생성)';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
 
-  INSERT INTO ai_recommendations (
-    id, store_id, user_id, org_id, 
-    title, description,
-    recommendation_type, priority, action_category, data_source, 
-    expected_impact, evidence,
-    status, is_displayed, created_at, updated_at
-  ) VALUES
-  -- 1. 레이아웃 추천: 저성과 상품 리포지셔닝
-  (
-    gen_random_uuid(), v_store_id, v_user_id, v_org_id,
-    '저성과 상품 리포지셔닝: 다운 패딩',
-    '다운 패딩 상품의 전환율이 5.2%로 낮습니다. 입구 근처로 위치 변경을 권장합니다.',
-    'layout', 'high', 'revenue_increase', 'product_performance_agg',
-    '{"potential_increase": 750000, "confidence": 78}'::jsonb,
-    '{"views": 150, "purchases": 8, "conversion_rate": 5.2}'::jsonb,
-    'active', true, NOW(), NOW()
-  ),
-  -- 2. 레이아웃 추천: 혼잡 존 개선
-  (
-    gen_random_uuid(), v_store_id, v_user_id, v_org_id,
-    '혼잡 존 레이아웃 개선: 메인홀',
-    '메인홀 존의 피크 시간대 방문자가 35명으로 용량(40) 대비 혼잡합니다.',
-    'layout', 'high', 'operational_efficiency', 'zone_daily_metrics',
-    '{"efficiency_gain": 15, "confidence": 82}'::jsonb,
-    '{"zone": "메인홀", "peak_visitors": 35, "capacity": 40}'::jsonb,
-    'active', true, NOW(), NOW()
-  ),
-  -- 3. 인력 추천: 피크타임 보강
-  (
-    gen_random_uuid(), v_store_id, v_user_id, v_org_id,
-    '피크타임 인력 보강: 18시',
-    '18시에 평균 22명 방문. 직원 추가 배치 권장.',
-    'staffing', 'medium', 'operational_efficiency', 'hourly_metrics',
-    '{"service_improvement": 20, "confidence": 80}'::jsonb,
-    '{"peak_hour": 18, "avg_visitors": 22}'::jsonb,
-    'active', true, NOW(), NOW()
-  ),
-  -- 4. 프로모션 추천: VIP 이벤트
-  (
-    gen_random_uuid(), v_store_id, v_user_id, v_org_id,
-    'VIP 고객 특별 이벤트 제안',
-    'VIP 세그먼트 대상 전용 사전 구매 이벤트로 충성도 강화 권장.',
-    'promotion', 'medium', 'customer_experience', 'customer_segments_agg',
-    '{"potential_revenue": 500000, "confidence": 75}'::jsonb,
-    '{"segment": "VIP"}'::jsonb,
-    'active', true, NOW(), NOW()
-  );
+  -- ═══════════════════════════════════════════════════════════
+  -- 기준값 계산 (L2: daily_kpis_agg)
+  -- ═══════════════════════════════════════════════════════════
+  SELECT 
+    COALESCE(AVG(conversion_rate), 14) as avg_conv,
+    COALESCE(AVG(total_revenue), 3000000) as avg_rev
+  INTO v_avg_conversion, v_avg_revenue
+  FROM daily_kpis_agg 
+  WHERE store_id = v_store_id AND conversion_rate > 0;
 
-  RAISE NOTICE '  ✓ ai_recommendations: 4건 생성';
-  RAISE NOTICE '    - layout (high): 2건';
-  RAISE NOTICE '    - staffing (medium): 1건';
-  RAISE NOTICE '    - promotion (medium): 1건';
+  RAISE NOTICE '  📊 기준값: 평균 전환율 %%, 평균 매출 ₩%', 
+    ROUND(v_avg_conversion, 1), TO_CHAR(v_avg_revenue, 'FM999,999,999');
+
+  -- ═══════════════════════════════════════════════════════════
+  -- 추천 1: 저성과 상품 리포지셔닝 (L2: product_performance_agg)
+  -- ═══════════════════════════════════════════════════════════
+  SELECT 
+    p.product_name,
+    p.category,
+    ROUND(AVG(pp.conversion_rate)::NUMERIC, 1) as avg_conv,
+    SUM(pp.units_sold) as total_units,
+    SUM(pp.revenue) as total_revenue,
+    ROUND(AVG(pp.stock_level)) as avg_stock
+  INTO v_low_product
+  FROM product_performance_agg pp
+  JOIN products p ON pp.product_id = p.id
+  WHERE pp.store_id = v_store_id
+  GROUP BY p.id, p.product_name, p.category
+  HAVING AVG(pp.conversion_rate) < v_avg_conversion * 0.6  -- 평균의 60% 미만
+    AND SUM(pp.units_sold) > 0  -- 최소 1개 이상 판매
+  ORDER BY AVG(pp.conversion_rate) ASC
+  LIMIT 1;
+
+  IF v_low_product.product_name IS NOT NULL THEN
+    INSERT INTO ai_recommendations (
+      id, store_id, user_id, org_id,
+      title, description,
+      recommendation_type, priority, action_category, data_source,
+      expected_impact, evidence,
+      status, is_displayed, created_at, updated_at
+    ) VALUES (
+      gen_random_uuid(), v_store_id, v_user_id, v_org_id,
+      '저성과 상품 리포지셔닝: ' || v_low_product.product_name,
+      v_low_product.product_name || ' (' || v_low_product.category || ')의 전환율이 ' || 
+        v_low_product.avg_conv || '%로 평균(' || ROUND(v_avg_conversion, 1) || '%) 대비 현저히 낮습니다. ' ||
+        '입구 근처 또는 주요 동선으로 위치 변경을 권장합니다. ' ||
+        '현재 재고 ' || v_low_product.avg_stock || '개.',
+      'layout', 'high', 'revenue_increase', 'product_performance_agg',
+      jsonb_build_object(
+        'potential_revenue_increase', ROUND(v_low_product.total_revenue * 0.4),
+        'target_conversion_rate', ROUND(v_avg_conversion, 1),
+        'confidence', 75 + floor(random() * 10)::INT
+      ),
+      jsonb_build_object(
+        'product_name', v_low_product.product_name,
+        'category', v_low_product.category,
+        'current_conversion_rate', v_low_product.avg_conv,
+        'avg_conversion_rate', ROUND(v_avg_conversion, 1),
+        'total_units_sold', v_low_product.total_units,
+        'total_revenue', v_low_product.total_revenue,
+        'avg_stock_level', v_low_product.avg_stock,
+        'analysis_period', '90일'
+      ),
+      'active', true, NOW(), NOW()
+    );
+    v_recommendation_count := v_recommendation_count + 1;
+    RAISE NOTICE '  ✓ 추천 1: 저성과 상품 - % (전환율 %)', v_low_product.product_name, v_low_product.avg_conv || '%';
+  END IF;
+
+  -- ═══════════════════════════════════════════════════════════
+  -- 추천 2: 혼잡 존 레이아웃 개선 (L2: zone_daily_metrics)
+  -- ═══════════════════════════════════════════════════════════
+  SELECT 
+    z.zone_name,
+    z.zone_type,
+    z.capacity,
+    MAX(zdm.peak_occupancy) as max_occupancy,
+    ROUND(AVG(zdm.total_visitors)) as avg_visitors,
+    ROUND(AVG(zdm.avg_dwell_seconds)) as avg_dwell,
+    ROUND((MAX(zdm.peak_occupancy)::NUMERIC / NULLIF(z.capacity, 0) * 100), 1) as occupancy_rate
+  INTO v_congested_zone
+  FROM zone_daily_metrics zdm
+  JOIN zones_dim z ON zdm.zone_id = z.id
+  WHERE zdm.store_id = v_store_id AND z.capacity > 0
+  GROUP BY z.id, z.zone_name, z.zone_type, z.capacity
+  HAVING MAX(zdm.peak_occupancy) > z.capacity * 0.7  -- 용량의 70% 초과
+  ORDER BY MAX(zdm.peak_occupancy)::NUMERIC / NULLIF(z.capacity, 0) DESC
+  LIMIT 1;
+
+  IF v_congested_zone.zone_name IS NOT NULL THEN
+    INSERT INTO ai_recommendations (
+      id, store_id, user_id, org_id,
+      title, description,
+      recommendation_type, priority, action_category, data_source,
+      expected_impact, evidence,
+      status, is_displayed, created_at, updated_at
+    ) VALUES (
+      gen_random_uuid(), v_store_id, v_user_id, v_org_id,
+      '혼잡 존 레이아웃 개선: ' || v_congested_zone.zone_name,
+      v_congested_zone.zone_name || ' 존(' || v_congested_zone.zone_type || ')의 피크 시간대 방문자가 ' || 
+        v_congested_zone.max_occupancy || '명으로 용량(' || v_congested_zone.capacity || '명) 대비 ' || 
+        v_congested_zone.occupancy_rate || '% 수준입니다. ' ||
+        '평균 체류시간 ' || v_congested_zone.avg_dwell || '초. 동선 분산 또는 공간 확장을 권장합니다.',
+      'layout', 
+      CASE WHEN v_congested_zone.occupancy_rate > 90 THEN 'high' ELSE 'medium' END,
+      'operational_efficiency', 'zone_daily_metrics',
+      jsonb_build_object(
+        'efficiency_gain_percent', ROUND(v_congested_zone.occupancy_rate - 70),
+        'target_occupancy_rate', 70,
+        'confidence', 80 + floor(random() * 10)::INT
+      ),
+      jsonb_build_object(
+        'zone_name', v_congested_zone.zone_name,
+        'zone_type', v_congested_zone.zone_type,
+        'capacity', v_congested_zone.capacity,
+        'peak_occupancy', v_congested_zone.max_occupancy,
+        'avg_daily_visitors', v_congested_zone.avg_visitors,
+        'avg_dwell_seconds', v_congested_zone.avg_dwell,
+        'occupancy_rate', v_congested_zone.occupancy_rate,
+        'analysis_period', '90일'
+      ),
+      'active', true, NOW(), NOW()
+    );
+    v_recommendation_count := v_recommendation_count + 1;
+    RAISE NOTICE '  ✓ 추천 2: 혼잡 존 - % (점유율 %)', v_congested_zone.zone_name, v_congested_zone.occupancy_rate || '%';
+  END IF;
+
+  -- ═══════════════════════════════════════════════════════════
+  -- 추천 3: 저조한 존 활성화 (L2: zone_daily_metrics)
+  -- ═══════════════════════════════════════════════════════════
+  SELECT 
+    z.zone_name,
+    z.zone_type,
+    z.capacity,
+    ROUND(AVG(zdm.total_visitors)) as avg_visitors,
+    ROUND(AVG(zdm.avg_dwell_seconds)) as avg_dwell,
+    ROUND((AVG(zdm.total_visitors)::NUMERIC / NULLIF(z.capacity, 0) * 100), 1) as utilization_rate
+  INTO v_underperforming_zone
+  FROM zone_daily_metrics zdm
+  JOIN zones_dim z ON zdm.zone_id = z.id
+  WHERE zdm.store_id = v_store_id 
+    AND z.zone_type IN ('display', 'main')  -- 디스플레이/메인 존만
+    AND z.capacity > 0
+  GROUP BY z.id, z.zone_name, z.zone_type, z.capacity
+  HAVING AVG(zdm.total_visitors) < z.capacity * 0.3  -- 용량의 30% 미만 활용
+  ORDER BY AVG(zdm.total_visitors)::NUMERIC / NULLIF(z.capacity, 0) ASC
+  LIMIT 1;
+
+  IF v_underperforming_zone.zone_name IS NOT NULL THEN
+    INSERT INTO ai_recommendations (
+      id, store_id, user_id, org_id,
+      title, description,
+      recommendation_type, priority, action_category, data_source,
+      expected_impact, evidence,
+      status, is_displayed, created_at, updated_at
+    ) VALUES (
+      gen_random_uuid(), v_store_id, v_user_id, v_org_id,
+      '저활용 존 활성화: ' || v_underperforming_zone.zone_name,
+      v_underperforming_zone.zone_name || ' 존의 활용률이 ' || v_underperforming_zone.utilization_rate || 
+        '%로 저조합니다. 일평균 ' || v_underperforming_zone.avg_visitors || '명 방문. ' ||
+        '인기 상품 배치 또는 프로모션 존으로 활용을 권장합니다.',
+      'layout', 'medium', 'revenue_increase', 'zone_daily_metrics',
+      jsonb_build_object(
+        'potential_visitor_increase', ROUND(v_underperforming_zone.capacity * 0.5 - v_underperforming_zone.avg_visitors),
+        'target_utilization_rate', 50,
+        'confidence', 70 + floor(random() * 10)::INT
+      ),
+      jsonb_build_object(
+        'zone_name', v_underperforming_zone.zone_name,
+        'zone_type', v_underperforming_zone.zone_type,
+        'capacity', v_underperforming_zone.capacity,
+        'avg_daily_visitors', v_underperforming_zone.avg_visitors,
+        'avg_dwell_seconds', v_underperforming_zone.avg_dwell,
+        'utilization_rate', v_underperforming_zone.utilization_rate
+      ),
+      'active', true, NOW(), NOW()
+    );
+    v_recommendation_count := v_recommendation_count + 1;
+    RAISE NOTICE '  ✓ 추천 3: 저활용 존 - % (활용률 %)', v_underperforming_zone.zone_name, v_underperforming_zone.utilization_rate || '%';
+  END IF;
+
+  -- ═══════════════════════════════════════════════════════════
+  -- 추천 4: 피크타임 인력 보강 (L2: hourly_metrics)
+  -- ═══════════════════════════════════════════════════════════
+  SELECT 
+    hour,
+    SUM(visitor_count) as total_visitors,
+    ROUND(AVG(visitor_count)) as avg_visitors,
+    SUM(transaction_count) as total_transactions,
+    ROUND(AVG(revenue)) as avg_revenue,
+    ROUND(AVG(conversion_rate)::NUMERIC, 1) as avg_conversion
+  INTO v_peak_hour
+  FROM hourly_metrics
+  WHERE store_id = v_store_id
+  GROUP BY hour
+  ORDER BY SUM(visitor_count) DESC
+  LIMIT 1;
+
+  IF v_peak_hour.hour IS NOT NULL THEN
+    INSERT INTO ai_recommendations (
+      id, store_id, user_id, org_id,
+      title, description,
+      recommendation_type, priority, action_category, data_source,
+      expected_impact, evidence,
+      status, is_displayed, created_at, updated_at
+    ) VALUES (
+      gen_random_uuid(), v_store_id, v_user_id, v_org_id,
+      '피크타임 인력 보강: ' || v_peak_hour.hour || '시',
+      v_peak_hour.hour || '시에 평균 ' || v_peak_hour.avg_visitors || '명 방문, ' ||
+        '평균 매출 ₩' || TO_CHAR(v_peak_hour.avg_revenue, 'FM999,999') || '. ' ||
+        '전환율 ' || v_peak_hour.avg_conversion || '%. ' ||
+        '서비스 품질 유지 및 전환율 개선을 위해 직원 추가 배치를 권장합니다.',
+      'staffing', 'medium', 'operational_efficiency', 'hourly_metrics',
+      jsonb_build_object(
+        'service_improvement_percent', 15 + floor(random() * 10)::INT,
+        'potential_conversion_increase', 2 + floor(random() * 3)::INT,
+        'confidence', 78 + floor(random() * 10)::INT
+      ),
+      jsonb_build_object(
+        'peak_hour', v_peak_hour.hour,
+        'total_visitors_90days', v_peak_hour.total_visitors,
+        'avg_visitors_per_day', v_peak_hour.avg_visitors,
+        'total_transactions', v_peak_hour.total_transactions,
+        'avg_revenue', v_peak_hour.avg_revenue,
+        'avg_conversion_rate', v_peak_hour.avg_conversion,
+        'analysis_period', '90일'
+      ),
+      'active', true, NOW(), NOW()
+    );
+    v_recommendation_count := v_recommendation_count + 1;
+    RAISE NOTICE '  ✓ 추천 4: 피크타임 인력 - %시 (평균 %명)', v_peak_hour.hour, v_peak_hour.avg_visitors;
+  END IF;
+
+  -- ═══════════════════════════════════════════════════════════
+  -- 추천 5: 저조 시간대 프로모션 (L2: hourly_metrics)
+  -- ═══════════════════════════════════════════════════════════
+  SELECT 
+    hour,
+    SUM(visitor_count) as total_visitors,
+    ROUND(AVG(visitor_count)) as avg_visitors,
+    ROUND(AVG(revenue)) as avg_revenue
+  INTO v_low_traffic_hour
+  FROM hourly_metrics
+  WHERE store_id = v_store_id AND hour BETWEEN 10 AND 20  -- 영업시간 내
+  GROUP BY hour
+  HAVING AVG(visitor_count) > 0
+  ORDER BY SUM(visitor_count) ASC
+  LIMIT 1;
+
+  IF v_low_traffic_hour.hour IS NOT NULL AND v_peak_hour.avg_visitors IS NOT NULL 
+     AND v_low_traffic_hour.avg_visitors < v_peak_hour.avg_visitors * 0.4 THEN
+    INSERT INTO ai_recommendations (
+      id, store_id, user_id, org_id,
+      title, description,
+      recommendation_type, priority, action_category, data_source,
+      expected_impact, evidence,
+      status, is_displayed, created_at, updated_at
+    ) VALUES (
+      gen_random_uuid(), v_store_id, v_user_id, v_org_id,
+      '비수기 시간대 프로모션: ' || v_low_traffic_hour.hour || '시',
+      v_low_traffic_hour.hour || '시 평균 방문자 ' || v_low_traffic_hour.avg_visitors || '명으로 ' ||
+        '피크타임(' || v_peak_hour.hour || '시) 대비 ' || 
+        ROUND((v_low_traffic_hour.avg_visitors::NUMERIC / NULLIF(v_peak_hour.avg_visitors, 0) * 100)) || '% 수준. ' ||
+        '해당 시간대 타임세일 또는 특별 프로모션을 권장합니다.',
+      'promotion', 'low', 'revenue_increase', 'hourly_metrics',
+      jsonb_build_object(
+        'potential_visitor_increase', ROUND(v_peak_hour.avg_visitors * 0.3),
+        'potential_revenue_increase', ROUND(v_low_traffic_hour.avg_revenue * 0.5),
+        'confidence', 65 + floor(random() * 10)::INT
+      ),
+      jsonb_build_object(
+        'low_traffic_hour', v_low_traffic_hour.hour,
+        'avg_visitors', v_low_traffic_hour.avg_visitors,
+        'avg_revenue', v_low_traffic_hour.avg_revenue,
+        'peak_hour', v_peak_hour.hour,
+        'peak_visitors', v_peak_hour.avg_visitors,
+        'traffic_ratio', ROUND((v_low_traffic_hour.avg_visitors::NUMERIC / NULLIF(v_peak_hour.avg_visitors, 0) * 100))
+      ),
+      'active', true, NOW(), NOW()
+    );
+    v_recommendation_count := v_recommendation_count + 1;
+    RAISE NOTICE '  ✓ 추천 5: 비수기 프로모션 - %시 (평균 %명)', v_low_traffic_hour.hour, v_low_traffic_hour.avg_visitors;
+  END IF;
+
+  -- ═══════════════════════════════════════════════════════════
+  -- 추천 6: VIP 고객 이벤트 (L2: customer_segments_agg)
+  -- ═══════════════════════════════════════════════════════════
+  SELECT 
+    ROUND(AVG(customer_count)) as avg_count,
+    ROUND(AVG(total_revenue)) as avg_revenue,
+    ROUND(AVG(avg_transaction_value)) as avg_transaction,
+    ROUND(AVG(visit_frequency)::NUMERIC, 1) as avg_frequency,
+    ROUND(AVG(ltv_estimate)) as avg_ltv
+  INTO v_vip_stats
+  FROM customer_segments_agg
+  WHERE store_id = v_store_id AND segment_name = 'VIP';
+
+  IF v_vip_stats.avg_count IS NOT NULL AND v_vip_stats.avg_count > 0 THEN
+    INSERT INTO ai_recommendations (
+      id, store_id, user_id, org_id,
+      title, description,
+      recommendation_type, priority, action_category, data_source,
+      expected_impact, evidence,
+      status, is_displayed, created_at, updated_at
+    ) VALUES (
+      gen_random_uuid(), v_store_id, v_user_id, v_org_id,
+      'VIP 고객 특별 이벤트 제안',
+      'VIP 세그먼트 ' || v_vip_stats.avg_count || '명 대상 전용 사전 구매 이벤트로 충성도 강화를 권장합니다. ' ||
+        '평균 객단가 ₩' || TO_CHAR(v_vip_stats.avg_transaction, 'FM999,999') || ', ' ||
+        '방문빈도 월 ' || v_vip_stats.avg_frequency || '회, ' ||
+        '예상 LTV ₩' || TO_CHAR(v_vip_stats.avg_ltv, 'FM999,999,999') || '.',
+      'promotion', 'medium', 'customer_experience', 'customer_segments_agg',
+      jsonb_build_object(
+        'potential_revenue_increase', ROUND(v_vip_stats.avg_revenue * 0.25),
+        'retention_improvement_percent', 10 + floor(random() * 5)::INT,
+        'confidence', 72 + floor(random() * 10)::INT
+      ),
+      jsonb_build_object(
+        'segment', 'VIP',
+        'customer_count', v_vip_stats.avg_count,
+        'avg_daily_revenue', v_vip_stats.avg_revenue,
+        'avg_transaction_value', v_vip_stats.avg_transaction,
+        'avg_visit_frequency', v_vip_stats.avg_frequency,
+        'avg_ltv_estimate', v_vip_stats.avg_ltv,
+        'analysis_period', '90일'
+      ),
+      'active', true, NOW(), NOW()
+    );
+    v_recommendation_count := v_recommendation_count + 1;
+    RAISE NOTICE '  ✓ 추천 6: VIP 이벤트 - %명 (객단가 ₩%)', v_vip_stats.avg_count, TO_CHAR(v_vip_stats.avg_transaction, 'FM999,999');
+  END IF;
+
+  -- ═══════════════════════════════════════════════════════════
+  -- 추천 7: At-Risk 고객 리텐션 (L2: customer_segments_agg)
+  -- ═══════════════════════════════════════════════════════════
+  SELECT 
+    ROUND(AVG(customer_count)) as avg_count,
+    ROUND(AVG(churn_risk_score)) as avg_churn_risk,
+    ROUND(AVG(total_revenue)) as avg_revenue,
+    ROUND(AVG(ltv_estimate)) as avg_ltv
+  INTO v_at_risk_stats
+  FROM customer_segments_agg
+  WHERE store_id = v_store_id AND segment_name = 'At-Risk';
+
+  IF v_at_risk_stats.avg_count IS NOT NULL AND v_at_risk_stats.avg_count > 10 THEN
+    INSERT INTO ai_recommendations (
+      id, store_id, user_id, org_id,
+      title, description,
+      recommendation_type, priority, action_category, data_source,
+      expected_impact, evidence,
+      status, is_displayed, created_at, updated_at
+    ) VALUES (
+      gen_random_uuid(), v_store_id, v_user_id, v_org_id,
+      'At-Risk 고객 리텐션 캠페인',
+      'At-Risk 세그먼트 ' || v_at_risk_stats.avg_count || '명의 이탈 위험도가 ' || 
+        v_at_risk_stats.avg_churn_risk || '%로 높습니다. ' ||
+        '예상 LTV ₩' || TO_CHAR(v_at_risk_stats.avg_ltv, 'FM999,999') || ' 손실 방지를 위해 ' ||
+        '맞춤형 리텐션 캠페인(쿠폰, 개인화 추천)을 권장합니다.',
+      'promotion', 'high', 'customer_experience', 'customer_segments_agg',
+      jsonb_build_object(
+        'potential_ltv_saved', ROUND(v_at_risk_stats.avg_ltv * v_at_risk_stats.avg_count * 0.3),
+        'target_retention_rate', 30,
+        'confidence', 68 + floor(random() * 10)::INT
+      ),
+      jsonb_build_object(
+        'segment', 'At-Risk',
+        'customer_count', v_at_risk_stats.avg_count,
+        'avg_churn_risk_score', v_at_risk_stats.avg_churn_risk,
+        'avg_daily_revenue', v_at_risk_stats.avg_revenue,
+        'avg_ltv_estimate', v_at_risk_stats.avg_ltv
+      ),
+      'active', true, NOW(), NOW()
+    );
+    v_recommendation_count := v_recommendation_count + 1;
+    RAISE NOTICE '  ✓ 추천 7: At-Risk 리텐션 - %명 (이탈위험 %)', v_at_risk_stats.avg_count, v_at_risk_stats.avg_churn_risk || '%';
+  END IF;
+
+  -- ═══════════════════════════════════════════════════════════
+  -- 추천 8: 재고 부족 상품 발주 (L2: product_performance_agg)
+  -- ═══════════════════════════════════════════════════════════
+  SELECT 
+    p.product_name,
+    p.category,
+    ROUND(AVG(pp.stock_level)) as avg_stock,
+    SUM(pp.units_sold) as total_sold,
+    ROUND(AVG(pp.conversion_rate)::NUMERIC, 1) as avg_conv
+  INTO v_low_stock_product
+  FROM product_performance_agg pp
+  JOIN products p ON pp.product_id = p.id
+  WHERE pp.store_id = v_store_id
+  GROUP BY p.id, p.product_name, p.category
+  HAVING AVG(pp.stock_level) < 10 AND SUM(pp.units_sold) > 50  -- 재고 부족하지만 잘 팔리는 상품
+  ORDER BY SUM(pp.units_sold) DESC
+  LIMIT 1;
+
+  IF v_low_stock_product.product_name IS NOT NULL THEN
+    INSERT INTO ai_recommendations (
+      id, store_id, user_id, org_id,
+      title, description,
+      recommendation_type, priority, action_category, data_source,
+      expected_impact, evidence,
+      status, is_displayed, created_at, updated_at
+    ) VALUES (
+      gen_random_uuid(), v_store_id, v_user_id, v_org_id,
+      '인기 상품 재고 보충: ' || v_low_stock_product.product_name,
+      v_low_stock_product.product_name || ' (' || v_low_stock_product.category || ')의 ' ||
+        '평균 재고가 ' || v_low_stock_product.avg_stock || '개로 부족합니다. ' ||
+        '90일간 ' || v_low_stock_product.total_sold || '개 판매, 전환율 ' || v_low_stock_product.avg_conv || '%. ' ||
+        '긴급 발주를 권장합니다.',
+      'inventory', 'high', 'operational_efficiency', 'product_performance_agg',
+      jsonb_build_object(
+        'potential_lost_sales_prevention', ROUND(v_low_stock_product.total_sold * 0.2),
+        'recommended_order_quantity', 50,
+        'confidence', 85 + floor(random() * 10)::INT
+      ),
+      jsonb_build_object(
+        'product_name', v_low_stock_product.product_name,
+        'category', v_low_stock_product.category,
+        'avg_stock_level', v_low_stock_product.avg_stock,
+        'total_units_sold', v_low_stock_product.total_sold,
+        'conversion_rate', v_low_stock_product.avg_conv,
+        'analysis_period', '90일'
+      ),
+      'active', true, NOW(), NOW()
+    );
+    v_recommendation_count := v_recommendation_count + 1;
+    RAISE NOTICE '  ✓ 추천 8: 재고 보충 - % (재고 %개, 판매 %개)', v_low_stock_product.product_name, v_low_stock_product.avg_stock, v_low_stock_product.total_sold;
+  END IF;
+
+  RAISE NOTICE '';
+  RAISE NOTICE '  ════════════════════════════════════════════════════════════';
+  RAISE NOTICE '  ✓ ai_recommendations: %건 생성 (L2 기반 동적 분석)', v_recommendation_count;
+  RAISE NOTICE '  ════════════════════════════════════════════════════════════';
+  RAISE NOTICE '    데이터 소스:';
+  RAISE NOTICE '    - product_performance_agg: 저성과 상품, 재고 분석';
+  RAISE NOTICE '    - zone_daily_metrics: 혼잡/저활용 존 분석';
+  RAISE NOTICE '    - hourly_metrics: 피크/비수기 시간대 분석';
+  RAISE NOTICE '    - customer_segments_agg: VIP/At-Risk 고객 분석';
+  RAISE NOTICE '  ════════════════════════════════════════════════════════════';
 END $$;
 
 -- ============================================================================

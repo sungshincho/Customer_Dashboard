@@ -1,62 +1,183 @@
 -- =====================================================
--- NEURALTWIN: Furniture Table Migration
+-- NEURALTWIN: Furniture & Slots Migration - FINAL VERSION
 -- =====================================================
+-- Version: 1.0.0
+-- Date: 2024-12-16
 -- Description:
 --   1. Create furniture table for 3D furniture assets
 --   2. Link furniture_slots to furniture table
 --   3. Add furniture position/rotation/scale for 3D rendering
 --   4. Support mannequin furniture types
+--   furniture 테이블이 이미 존재하는 환경과 새로 생성하는 환경
+--   모두에서 안전하게 동작하는 통합 마이그레이션 스크립트
+--
+-- 포함 내용:
+--   1. furniture 테이블 생성 또는 컬럼 추가
+--   2. furniture_slots 테이블 생성
+--   3. RLS 정책 설정
+--   4. Helper 함수
+--   5. 트리거 설정
+--
+-- 실행 순서:
+--   1. 이 스크립트 실행 (스키마 생성)
+--   2. v8.2 시딩 스크립트 실행 (데이터 삽입)
 -- =====================================================
 
--- =====================================================
--- PART 1: Create Furniture Table
--- =====================================================
 
-CREATE TABLE IF NOT EXISTS furniture (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  org_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
-  zone_id UUID REFERENCES zones_dim(id) ON DELETE SET NULL,
+-- =====================================================
+-- PART 1: furniture 테이블 생성 또는 컬럼 추가
+-- =====================================================
+-- 테이블이 없으면 전체 생성, 있으면 누락된 컬럼만 추가
+
+DO $$
+BEGIN
+  -- 테이블이 존재하지 않으면 전체 생성
+  IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'furniture') THEN
+    CREATE TABLE furniture (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+      user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+      org_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+      zone_id UUID REFERENCES zones_dim(id) ON DELETE SET NULL,
+
+      -- Furniture identification
+      furniture_code TEXT NOT NULL,
+      furniture_name TEXT NOT NULL,
+      furniture_type TEXT NOT NULL,
+
+      -- Physical properties
+      width NUMERIC(6,3),
+      height NUMERIC(6,3),
+      depth NUMERIC(6,3),
+
+      -- 3D Model
+      model_url TEXT,
+      thumbnail_url TEXT,
+
+      -- 3D Transform (world coordinates)
+      position JSONB DEFAULT '{"x":0,"y":0,"z":0}'::jsonb,
+      rotation JSONB DEFAULT '{"x":0,"y":0,"z":0}'::jsonb,
+      scale JSONB DEFAULT '{"x":1,"y":1,"z":1}'::jsonb,
+
+      -- Behavior
+      movable BOOLEAN DEFAULT false,
+      is_active BOOLEAN DEFAULT true,
+
+      -- Metadata
+      properties JSONB DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+      CONSTRAINT furniture_code_unique UNIQUE (store_id, furniture_code)
+    );
+
+    RAISE NOTICE '✓ furniture 테이블 생성 완료';
+  ELSE
+    -- 테이블이 존재하면 누락된 컬럼만 추가
+    RAISE NOTICE '  furniture 테이블이 이미 존재합니다. 누락된 컬럼을 추가합니다...';
+
+    -- zone_id 컬럼
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'furniture' AND column_name = 'zone_id') THEN
+      ALTER TABLE furniture ADD COLUMN zone_id UUID;
+      -- FK는 zones_dim 테이블이 있을 때만 추가
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'zones_dim') THEN
+        ALTER TABLE furniture ADD CONSTRAINT furniture_zone_id_fkey FOREIGN KEY (zone_id) REFERENCES zones_dim(id) ON DELETE SET NULL;
+      END IF;
+      RAISE NOTICE '    + zone_id 컬럼 추가됨';
+    END IF;
 
   -- Furniture identification
   furniture_code TEXT NOT NULL,  -- e.g., 'RACK-001', 'SHELF-001', 'MANNEQUIN-001'
   furniture_name TEXT NOT NULL,  -- e.g., '의류 행거 (더블)', '전신 마네킹'
   furniture_type TEXT NOT NULL,  -- e.g., 'clothing_rack', 'mannequin_full', 'shelf_display'
+    -- furniture_code 컬럼
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'furniture' AND column_name = 'furniture_code') THEN
+      ALTER TABLE furniture ADD COLUMN furniture_code TEXT;
+      -- 기존 데이터가 있으면 자동 생성
+      UPDATE furniture SET furniture_code = 'FURN-' || UPPER(SUBSTRING(id::TEXT, 1, 8)) WHERE furniture_code IS NULL;
+      RAISE NOTICE '    + furniture_code 컬럼 추가됨';
+    END IF;
 
-  -- Physical properties
-  width NUMERIC(6,3),   -- meters
-  height NUMERIC(6,3),  -- meters
-  depth NUMERIC(6,3),   -- meters
+    -- furniture_name 컬럼 (기존 name 컬럼이 있으면 그대로 사용)
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'furniture' AND column_name = 'furniture_name') THEN
+      -- name 컬럼이 있으면 furniture_name으로 복사
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'furniture' AND column_name = 'name') THEN
+        ALTER TABLE furniture ADD COLUMN furniture_name TEXT;
+        UPDATE furniture SET furniture_name = name WHERE furniture_name IS NULL;
+        RAISE NOTICE '    + furniture_name 컬럼 추가됨 (name에서 복사)';
+      ELSE
+        ALTER TABLE furniture ADD COLUMN furniture_name TEXT;
+        RAISE NOTICE '    + furniture_name 컬럼 추가됨';
+      END IF;
+    END IF;
 
-  -- 3D Model
-  model_url TEXT,  -- GLB file URL in storage
-  thumbnail_url TEXT,  -- Preview image URL
+    -- thumbnail_url 컬럼
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'furniture' AND column_name = 'thumbnail_url') THEN
+      ALTER TABLE furniture ADD COLUMN thumbnail_url TEXT;
+      RAISE NOTICE '    + thumbnail_url 컬럼 추가됨';
+    END IF;
 
-  -- 3D Transform (world coordinates)
-  position JSONB DEFAULT '{"x":0,"y":0,"z":0}'::jsonb,
-  rotation JSONB DEFAULT '{"x":0,"y":0,"z":0}'::jsonb,
-  scale JSONB DEFAULT '{"x":1,"y":1,"z":1}'::jsonb,
+    -- movable 컬럼
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'furniture' AND column_name = 'movable') THEN
+      ALTER TABLE furniture ADD COLUMN movable BOOLEAN DEFAULT false;
+      RAISE NOTICE '    + movable 컬럼 추가됨';
+    END IF;
 
-  -- Behavior
-  movable BOOLEAN DEFAULT false,  -- Can be moved by user/AI optimization
-  is_active BOOLEAN DEFAULT true,
+    -- position JSONB 컬럼 (개별 컬럼이 있으면 스킵)
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'furniture' AND column_name = 'position') THEN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'furniture' AND column_name = 'position_x') THEN
+        ALTER TABLE furniture ADD COLUMN position JSONB DEFAULT '{"x":0,"y":0,"z":0}'::jsonb;
+        RAISE NOTICE '    + position (JSONB) 컬럼 추가됨';
+      ELSE
+        RAISE NOTICE '    - position 스킵 (position_x/y/z 개별 컬럼 존재)';
+      END IF;
+    END IF;
 
-  -- Metadata
-  properties JSONB DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
+    -- rotation JSONB 컬럼
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'furniture' AND column_name = 'rotation') THEN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'furniture' AND column_name = 'rotation_x') THEN
+        ALTER TABLE furniture ADD COLUMN rotation JSONB DEFAULT '{"x":0,"y":0,"z":0}'::jsonb;
+        RAISE NOTICE '    + rotation (JSONB) 컬럼 추가됨';
+      ELSE
+        RAISE NOTICE '    - rotation 스킵 (rotation_x/y/z 개별 컬럼 존재)';
+      END IF;
+    END IF;
 
-  CONSTRAINT furniture_code_unique UNIQUE (store_id, furniture_code)
-);
+    -- scale JSONB 컬럼
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'furniture' AND column_name = 'scale') THEN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'furniture' AND column_name = 'scale_x') THEN
+        ALTER TABLE furniture ADD COLUMN scale JSONB DEFAULT '{"x":1,"y":1,"z":1}'::jsonb;
+        RAISE NOTICE '    + scale (JSONB) 컬럼 추가됨';
+      ELSE
+        RAISE NOTICE '    - scale 스킵 (scale_x/y/z 개별 컬럼 존재)';
+      END IF;
+    END IF;
 
--- Indexes
+    RAISE NOTICE '✓ furniture 테이블 컬럼 업데이트 완료';
+  END IF;
+END $$;
+
+
+-- =====================================================
+-- PART 2: furniture 테이블 인덱스
+-- =====================================================
+
 CREATE INDEX IF NOT EXISTS idx_furniture_store_id ON furniture(store_id);
 CREATE INDEX IF NOT EXISTS idx_furniture_zone_id ON furniture(zone_id);
 CREATE INDEX IF NOT EXISTS idx_furniture_type ON furniture(furniture_type);
 
--- RLS
+
+-- =====================================================
+-- PART 3: furniture 테이블 RLS
+-- =====================================================
+
 ALTER TABLE furniture ENABLE ROW LEVEL SECURITY;
+
+-- 기존 정책 삭제 후 재생성
+DROP POLICY IF EXISTS "Users can view furniture in their stores" ON furniture;
+DROP POLICY IF EXISTS "Users can insert furniture in their stores" ON furniture;
+DROP POLICY IF EXISTS "Users can update furniture in their stores" ON furniture;
+DROP POLICY IF EXISTS "Users can delete furniture in their stores" ON furniture;
 
 CREATE POLICY "Users can view furniture in their stores" ON furniture
   FOR SELECT USING (
@@ -82,29 +203,9 @@ CREATE POLICY "Users can delete furniture in their stores" ON furniture
     store_id IN (SELECT id FROM stores WHERE user_id = auth.uid())
   );
 
--- =====================================================
--- PART 2: Update furniture_slots FK (if table exists)
--- =====================================================
-
--- Add FK constraint if furniture_slots exists and doesn't have it
-DO $$
-BEGIN
-  -- Check if furniture_slots table exists
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'furniture_slots') THEN
-    -- Check if FK constraint already exists
-    IF NOT EXISTS (
-      SELECT 1 FROM information_schema.table_constraints
-      WHERE constraint_name = 'furniture_slots_furniture_id_fkey'
-    ) THEN
-      -- Note: We don't add FK here because furniture_slots may have placeholder UUIDs
-      -- FK will be validated after proper furniture data is seeded
-      RAISE NOTICE 'furniture_slots table exists. FK will be added after data migration.';
-    END IF;
-  END IF;
-END $$;
 
 -- =====================================================
--- PART 3: Furniture Type Reference
+-- PART 4: furniture_slots 테이블 생성
 -- =====================================================
 
 COMMENT ON TABLE furniture IS 'Store furniture assets for 3D digital twin visualization';
@@ -146,10 +247,12 @@ COMMENT ON COLUMN furniture.furniture_type IS
 -- =====================================================
 -- PART 4: Create furniture_slots table if not exists
 -- =====================================================
+-- 기존 테이블이 있으면 삭제 후 재생성 (스키마 일관성 보장)
+DROP TABLE IF EXISTS furniture_slots CASCADE;
 
-CREATE TABLE IF NOT EXISTS furniture_slots (
+CREATE TABLE furniture_slots (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  furniture_id UUID NOT NULL,  -- Will reference furniture(id) after data migration
+  furniture_id UUID NOT NULL,  -- FK는 데이터 시딩 후 추가 (placeholder UUID 문제 방지)
   store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
 
@@ -181,13 +284,21 @@ CREATE TABLE IF NOT EXISTS furniture_slots (
   CONSTRAINT furniture_slots_unique UNIQUE (furniture_id, slot_id)
 );
 
--- Indexes
-CREATE INDEX IF NOT EXISTS idx_furniture_slots_furniture_id ON furniture_slots(furniture_id);
-CREATE INDEX IF NOT EXISTS idx_furniture_slots_store_id ON furniture_slots(store_id);
-CREATE INDEX IF NOT EXISTS idx_furniture_slots_slot_type ON furniture_slots(slot_type);
-CREATE INDEX IF NOT EXISTS idx_furniture_slots_is_occupied ON furniture_slots(is_occupied);
 
--- RLS
+-- =====================================================
+-- PART 5: furniture_slots 인덱스
+-- =====================================================
+
+CREATE INDEX idx_furniture_slots_furniture_id ON furniture_slots(furniture_id);
+CREATE INDEX idx_furniture_slots_store_id ON furniture_slots(store_id);
+CREATE INDEX idx_furniture_slots_slot_type ON furniture_slots(slot_type);
+CREATE INDEX idx_furniture_slots_is_occupied ON furniture_slots(is_occupied);
+
+
+-- =====================================================
+-- PART 6: furniture_slots RLS
+-- =====================================================
+
 ALTER TABLE furniture_slots ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can view slots in their stores" ON furniture_slots
@@ -202,8 +313,9 @@ CREATE POLICY "Users can manage slots in their stores" ON furniture_slots
     store_id IN (SELECT id FROM stores WHERE user_id = auth.uid())
   );
 
+
 -- =====================================================
--- PART 5: Helper Functions
+-- PART 7: Helper Functions
 -- =====================================================
 
 -- Function to check slot-product compatibility
@@ -254,10 +366,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+
 -- =====================================================
--- PART 6: Updated timestamp trigger
+-- PART 8: Triggers
 -- =====================================================
 
+-- furniture updated_at 트리거
 CREATE OR REPLACE FUNCTION update_furniture_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -272,14 +386,54 @@ CREATE TRIGGER furniture_updated_at
   FOR EACH ROW
   EXECUTE FUNCTION update_furniture_updated_at();
 
+-- furniture_slots updated_at 트리거
+CREATE OR REPLACE FUNCTION update_furniture_slots_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
 DROP TRIGGER IF EXISTS furniture_slots_updated_at ON furniture_slots;
 CREATE TRIGGER furniture_slots_updated_at
   BEFORE UPDATE ON furniture_slots
   FOR EACH ROW
   EXECUTE FUNCTION update_furniture_updated_at();
 
+
 -- =====================================================
--- PART 7: Mannequin Slot Reference
+-- PART 9: Comments
+-- =====================================================
+
+COMMENT ON TABLE furniture IS 'Store furniture assets for 3D digital twin visualization';
+COMMENT ON COLUMN furniture.furniture_type IS
+'Furniture type categories:
+- clothing_rack: 의류 행거 (hanging slots)
+- clothing_rack_double: 의류 행거 더블 (hanging slots x2)
+- clothing_rack_single: 의류 행거 싱글 (hanging slots)
+- shelf_display: 선반 진열대 (shelf slots)
+- table_display: 테이블 진열대 (table slots)
+- glass_showcase: 유리 쇼케이스 (shelf slots, locked)
+- shoe_rack: 신발 진열대 (rack slots)
+- accessory_stand: 액세서리 스탠드 (hook slots)
+- mannequin: 마네킹 (special)
+- checkout_counter: 계산대 (special)
+- fitting_room: 피팅룸 (special)';
+
+COMMENT ON TABLE furniture_slots IS 'Furniture slot definitions for product placement in 3D space';
+COMMENT ON COLUMN furniture_slots.slot_type IS
+'Slot type categories:
+- hanger: 행거 슬롯 (의류 걸이)
+- shelf: 선반 슬롯 (평면 진열)
+- table: 테이블 슬롯 (테이블 위)
+- rack: 랙 슬롯 (신발 등)
+- hook: 훅 슬롯 (액세서리)
+- drawer: 서랍 슬롯 (접힌 의류)';
+
+
+-- =====================================================
+-- PART 10: Mannequin Slot Reference
 -- =====================================================
 
 /*
@@ -303,3 +457,31 @@ Mannequin Slot Positions (relative to mannequin origin):
 | M-GLASS    | {"x":0, "y":0.15, "z":0.08}| 안경 위치 (눈 높이)   |
 | M-EARRING  | {"x":0.08, "y":0.12, "z":0}| 귀걸이 위치 (귀 높이) |
 */
+  EXECUTE FUNCTION update_furniture_slots_updated_at();
+
+
+-- =====================================================
+-- PART 11: Summary
+-- =====================================================
+
+DO $$
+DECLARE
+  v_furniture_cols INT;
+  v_slots_cols INT;
+BEGIN
+  SELECT COUNT(*) INTO v_furniture_cols FROM information_schema.columns WHERE table_name = 'furniture';
+  SELECT COUNT(*) INTO v_slots_cols FROM information_schema.columns WHERE table_name = 'furniture_slots';
+
+  RAISE NOTICE '';
+  RAISE NOTICE '════════════════════════════════════════════════════════════════';
+  RAISE NOTICE 'NEURALTWIN Furniture Migration - 완료';
+  RAISE NOTICE '════════════════════════════════════════════════════════════════';
+  RAISE NOTICE '✓ furniture 테이블: % 컬럼', v_furniture_cols;
+  RAISE NOTICE '✓ furniture_slots 테이블: % 컬럼', v_slots_cols;
+  RAISE NOTICE '✓ RLS 정책: 적용됨';
+  RAISE NOTICE '✓ Helper 함수: 2개 생성됨';
+  RAISE NOTICE '✓ 트리거: 2개 생성됨';
+  RAISE NOTICE '';
+  RAISE NOTICE '다음 단계: v8.2 시딩 스크립트 실행하여 데이터 삽입';
+  RAISE NOTICE '════════════════════════════════════════════════════════════════';
+END $$;
