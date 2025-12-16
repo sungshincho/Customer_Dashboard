@@ -73,11 +73,23 @@ export function IntegratedImportStatus({ storeId }: IntegratedImportStatusProps)
     }
 
     // 5. KPI 및 퍼널 데이터 삭제
+    // 레거시 dashboard_kpis 삭제
     const { error: kpiError } = await applyStoreFilter(
       supabase.from("dashboard_kpis").delete().eq("user_id", userId)
     );
     if (kpiError) {
       throw new Error(`dashboard_kpis 삭제 실패: ${kpiError.message}`);
+    }
+
+    // L3 daily_kpis_agg 삭제 (3-Layer Architecture 표준 테이블)
+    if (storeId) {
+      const { error: dailyKpiError } = await supabase
+        .from("daily_kpis_agg")
+        .delete()
+        .eq("store_id", storeId);
+      if (dailyKpiError) {
+        throw new Error(`daily_kpis_agg 삭제 실패: ${dailyKpiError.message}`);
+      }
     }
 
     const { error: funnelError } = await applyStoreFilter(

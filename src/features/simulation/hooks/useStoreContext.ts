@@ -685,19 +685,9 @@ export function useStoreContext(storeId: string | undefined, days: number = 7) {
           }));
         }
 
-        // KPI 데이터 (daily_kpis_agg에서 이미 로드, 추가로 dashboard_kpis도 시도)
+        // KPI 데이터 - L3 daily_kpis_agg 테이블만 사용 (3-Layer Architecture)
         let kpis: any[] = [];
-        const { data: dashboardKpis } = await supabase
-          .from('dashboard_kpis')
-          .select('date, total_visits, total_revenue, conversion_rate, sales_per_sqm')
-          .eq('store_id', storeId)
-          .gte('date', startDate.toISOString().split('T')[0])
-          .order('date', { ascending: false });
-
-        // dashboard_kpis가 비어있으면 daily_kpis_agg에서 매핑
-        if (dashboardKpis && dashboardKpis.length > 0) {
-          kpis = dashboardKpis;
-        } else if (dailyKpisData && dailyKpisData.length > 0) {
+        if (dailyKpisData && dailyKpisData.length > 0) {
           kpis = dailyKpisData.map(d => ({
             date: d.date,
             total_visits: d.total_visitors || 0,

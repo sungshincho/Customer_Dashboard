@@ -594,9 +594,9 @@ async function fetchCurrentKPIs(storeId: string, days: number): Promise<Baseline
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
 
-  // dashboard_kpis 테이블에서 조회
+  // L3 daily_kpis_agg 테이블에서 조회 (3-Layer Architecture)
   const { data, error } = await supabase
-    .from('dashboard_kpis')
+    .from('daily_kpis_agg')
     .select('*')
     .eq('store_id', storeId)
     .gte('date', startDate.toISOString().split('T')[0])
@@ -614,12 +614,12 @@ async function fetchCurrentKPIs(storeId: string, days: number): Promise<Baseline
     };
   }
 
-  // 평균 계산
+  // 평균 계산 (daily_kpis_agg 필드명 사용)
   const sum = data.reduce(
     (acc, kpi) => ({
       total_revenue: acc.total_revenue + (kpi.total_revenue || 0),
-      total_visitors: acc.total_visitors + ((kpi as any).total_visitors || kpi.total_visits || 0),
-      total_transactions: acc.total_transactions + ((kpi as any).total_transactions || kpi.total_purchases || 0),
+      total_visitors: acc.total_visitors + (kpi.total_visitors || 0),
+      total_transactions: acc.total_transactions + (kpi.total_transactions || 0),
     }),
     { total_revenue: 0, total_visitors: 0, total_transactions: 0 }
   );
