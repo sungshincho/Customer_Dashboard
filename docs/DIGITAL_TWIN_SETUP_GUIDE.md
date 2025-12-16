@@ -1,8 +1,8 @@
 # Digital Twin 3D 시스템 설정 가이드
 
-**버전**: 1.1
+**버전**: 1.2
 **작성일**: 2025-12-16
-**NEURALTWIN**: v8.3
+**NEURALTWIN**: v8.3 (Mannequin System)
 
 ---
 
@@ -645,18 +645,46 @@ WHERE furniture_id = 'b0000001-0000-0000-0000-000000000001'::UUID
 
 ---
 
-### 9.6 호환성 매핑 (참고)
+### 9.6 Display Type 정의 (6종)
+
+| display_type | 설명 | 배치 가능 슬롯 |
+|--------------|------|----------------|
+| `hanging` | 행거에 걸린 상태 | hanger, hook |
+| `standing` | 마네킹 착용 상태 | mannequin, rack |
+| `folded` | 접힌 상태 | shelf, table |
+| `located` | 올려진 상태 | shelf, table, rack |
+| `boxed` | 박스 포장 상태 | shelf, table |
+| `stacked` | 쌓인 상태 | table |
+
+### 9.7 카테고리별 호환 Display Types
+
+| 카테고리 | compatible_display_types |
+|----------|--------------------------|
+| 아우터/상의/하의 | `['hanging', 'standing', 'folded']` |
+| 신발 | `['standing', 'located']` |
+| 가방 | `['hanging', 'standing', 'located']` |
+| 스카프 | `['hanging', 'standing', 'folded', 'stacked']` |
+| 벨트 | `['located', 'standing']` |
+| 시계/쥬얼리/모자/안경 | `['standing', 'located']` |
+| 속옷/양말 | `['boxed', 'located', 'standing', 'stacked']` |
+| 선물세트 | `['boxed']` |
+| 티셔츠팩 | `['stacked']` |
+
+### 9.8 Slot Type → Display Type 매핑
 
 | slot_type | compatible_display_types | 대상 상품 예시 |
 |-----------|--------------------------|----------------|
 | `hanger` | `['hanging']` | 코트, 자켓, 셔츠, 팬츠 |
-| `shelf` | `['folded', 'boxed', 'standing']` | 접힌 옷, 박스, 신발 |
-| `table` | `['folded', 'boxed', 'stacked']` | 접힌 옷, 선물박스, 적층상품 |
-| `rack` | `['standing']` | 신발, 가방 |
+| `mannequin` | `['standing']` | 마네킹에 입혀진 의류, 신발, 액세서리 |
+| `shelf` | `['folded', 'located', 'boxed']` | 접힌 옷, 올려진 상품, 박스 |
+| `table` | `['folded', 'located', 'boxed', 'stacked']` | 다양한 진열 |
+| `rack` | `['located', 'standing']` | 신발, 액세서리 |
+| `hook` | `['hanging']` | 가방, 스카프 |
+| `drawer` | `['folded', 'boxed']` | 접힌 옷, 박스 |
 
 ---
 
-### 9.7 ID 참조표
+### 9.9 ID 참조표
 
 #### 가구 ID (furniture)
 
@@ -671,23 +699,36 @@ WHERE furniture_id = 'b0000001-0000-0000-0000-000000000001'::UUID
 | TABLE-001 | `b0000021-...-000000000021` | table_display |
 | TABLE-002 | `b0000022-...-000000000022` | table_display |
 | SHOE-001 | `b0000031-...-000000000031` | shoe_rack |
-| SHOE-002 | `b0000032-...-000000000032` | shoe_rack |
-| SHOWCASE-001 | `b0000041-...-000000000041` | glass_showcase |
-| SHOWCASE-002 | `b0000042-...-000000000042` | glass_showcase |
+| **MANNEQUIN-001** | `b0000051-...-000000000051` | **mannequin_full** |
+| **MANNEQUIN-002** | `b0000052-...-000000000052` | **mannequin_full** |
+| **MANNEQUIN-003** | `b0000053-...-000000000053` | **mannequin_half** |
+| **MANNEQUIN-004** | `b0000054-...-000000000054` | **mannequin_head** |
 
 #### 상품 ID (products)
 
-| SKU | product_id | display_type | MVP 모델 |
-|-----|------------|--------------|----------|
-| SKU-OUT-001 | `f0000001-...-000000000000` | hanging | product_coat.glb |
-| SKU-UND-001 | `f0000020-...-000000000000` | folded | product_sweater.glb |
-| SKU-SHO-001 | `f0000010-...-000000000000` | standing | product_shoes.glb |
-| SKU-GFT-001 | `f0000024-...-000000000000` | boxed | product_giftbox.glb |
-| SKU-TSK-001 | `f0000025-...-000000000000` | stacked | product_tshirt_stack.glb |
+| SKU | product_id | display_type | compatible_display_types |
+|-----|------------|--------------|--------------------------|
+| SKU-OUT-001 | `f0000001-...-000000000000` | hanging | hanging, standing, folded |
+| SKU-TOP-001 | `f0000003-...-000000000000` | hanging | hanging, standing, folded |
+| SKU-BTM-001 | `f0000007-...-000000000000` | hanging | hanging, standing, folded |
+| SKU-SHO-001 | `f0000010-...-000000000000` | located | standing, located |
+| SKU-BAG-001 | `f0000013-...-000000000000` | hanging | hanging, standing, located |
+| SKU-BLT-001 | `f0000016-...-000000000000` | located | located, standing |
+| SKU-HAT-001 | `f0000022-...-000000000000` | located | standing, located |
+| SKU-GFT-001 | `f0000024-...-000000000000` | boxed | boxed |
+| SKU-TSK-001 | `f0000025-...-000000000000` | stacked | stacked |
+
+#### 마네킹 슬롯 ID (mannequin slots)
+
+| Mannequin Type | Slot IDs | 용도 |
+|----------------|----------|------|
+| mannequin_full | M-TOP, M-BTM, M-SHOE, M-ACC | 상의, 하의, 신발, 액세서리 |
+| mannequin_half | M-TOP, M-ACC | 상의, 액세서리 |
+| mannequin_head | M-HAT, M-GLASS, M-EARRING | 모자, 안경, 귀걸이 |
 
 ---
 
-### 9.8 편집 워크플로우
+### 9.10 편집 워크플로우
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -717,5 +758,6 @@ WHERE furniture_id = 'b0000001-0000-0000-0000-000000000001'::UUID
 
 ---
 
-*문서 버전: 1.1*
+*문서 버전: 1.2*
 *최종 업데이트: 2025-12-16*
+*변경사항: 마네킹 시스템 추가, display_type 6종 (located 추가), compatible_display_types 지원*

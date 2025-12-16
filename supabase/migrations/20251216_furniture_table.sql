@@ -5,6 +5,7 @@
 --   1. Create furniture table for 3D furniture assets
 --   2. Link furniture_slots to furniture table
 --   3. Add furniture position/rotation/scale for 3D rendering
+--   4. Support mannequin furniture types
 -- =====================================================
 
 -- =====================================================
@@ -19,9 +20,9 @@ CREATE TABLE IF NOT EXISTS furniture (
   zone_id UUID REFERENCES zones_dim(id) ON DELETE SET NULL,
 
   -- Furniture identification
-  furniture_code TEXT NOT NULL,  -- e.g., 'RACK-001', 'SHELF-001'
-  furniture_name TEXT NOT NULL,  -- e.g., '의류 행거 (더블)', '선반 진열대'
-  furniture_type TEXT NOT NULL,  -- e.g., 'clothing_rack', 'shelf_display', 'table_display'
+  furniture_code TEXT NOT NULL,  -- e.g., 'RACK-001', 'SHELF-001', 'MANNEQUIN-001'
+  furniture_name TEXT NOT NULL,  -- e.g., '의류 행거 (더블)', '전신 마네킹'
+  furniture_type TEXT NOT NULL,  -- e.g., 'clothing_rack', 'mannequin_full', 'shelf_display'
 
   -- Physical properties
   width NUMERIC(6,3),   -- meters
@@ -109,17 +110,38 @@ END $$;
 COMMENT ON TABLE furniture IS 'Store furniture assets for 3D digital twin visualization';
 COMMENT ON COLUMN furniture.furniture_type IS
 'Furniture type categories:
-- clothing_rack: 의류 행거 (hanging slots)
-- clothing_rack_double: 의류 행거 더블 (hanging slots x2)
-- clothing_rack_single: 의류 행거 싱글 (hanging slots)
-- shelf_display: 선반 진열대 (shelf slots)
-- table_display: 테이블 진열대 (table slots)
-- glass_showcase: 유리 쇼케이스 (shelf slots, locked)
-- shoe_rack: 신발 진열대 (rack slots)
-- accessory_stand: 액세서리 스탠드 (hook slots)
-- mannequin: 마네킹 (special)
-- checkout_counter: 계산대 (special)
-- fitting_room: 피팅룸 (special)';
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+행거류 (Racks) - slot_type: hanger
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- clothing_rack: 의류 행거 (hanging)
+- clothing_rack_double: 의류 행거 더블 (hanging x2)
+- clothing_rack_single: 의류 행거 싱글 (hanging)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+마네킹류 (Mannequins) - slot_type: mannequin
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- mannequin_full: 전신 마네킹 (standing - 상의+하의+신발+액세서리)
+- mannequin_half: 상반신 마네킹 (standing - 상의+액세서리)
+- mannequin_head: 두상 마네킹 (standing - 모자+안경+쥬얼리)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+선반/테이블류 (Shelves/Tables) - slot_type: shelf, table
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- shelf_display: 선반 진열대 (folded, located, boxed)
+- table_display: 테이블 진열대 (folded, located, boxed, stacked)
+- glass_showcase: 유리 쇼케이스 (located, boxed)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+랙류 (Racks) - slot_type: rack
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- shoe_rack: 신발 진열대 (located, standing)
+- accessory_stand: 액세서리 스탠드 (hanging, located)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+특수 (Special)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- checkout_counter: 계산대
+- fitting_room: 피팅룸';
 
 -- =====================================================
 -- PART 4: Create furniture_slots table if not exists
@@ -132,16 +154,16 @@ CREATE TABLE IF NOT EXISTS furniture_slots (
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
 
   -- Slot identification
-  slot_id TEXT NOT NULL,  -- e.g., 'H1', 'S1-1', 'T1-2'
+  slot_id TEXT NOT NULL,  -- e.g., 'H1', 'S1-1', 'T1-2', 'M-TOP', 'M-BTM'
   furniture_type TEXT NOT NULL,  -- Denormalized for quick access
-  slot_type TEXT DEFAULT 'shelf' CHECK (slot_type IN ('hanger', 'shelf', 'table', 'rack', 'hook', 'drawer')),
+  slot_type TEXT DEFAULT 'shelf' CHECK (slot_type IN ('hanger', 'shelf', 'table', 'rack', 'hook', 'drawer', 'mannequin')),
 
   -- Slot position (relative to furniture origin)
   slot_position JSONB NOT NULL DEFAULT '{"x":0,"y":0,"z":0}'::jsonb,
   slot_rotation JSONB DEFAULT '{"x":0,"y":0,"z":0}'::jsonb,
 
-  -- Compatibility
-  compatible_display_types TEXT[] DEFAULT ARRAY['standing'],
+  -- Compatibility (6 display types)
+  compatible_display_types TEXT[] DEFAULT ARRAY['located'],
 
   -- Size constraints (meters)
   max_product_width NUMERIC(5,3),
@@ -255,3 +277,29 @@ CREATE TRIGGER furniture_slots_updated_at
   BEFORE UPDATE ON furniture_slots
   FOR EACH ROW
   EXECUTE FUNCTION update_furniture_updated_at();
+
+-- =====================================================
+-- PART 7: Mannequin Slot Reference
+-- =====================================================
+
+/*
+Mannequin Slot IDs:
+
+| Mannequin Type   | Slot IDs                                  | Description           |
+|------------------|-------------------------------------------|-----------------------|
+| mannequin_full   | M-TOP, M-BTM, M-SHOE, M-ACC              | 상의, 하의, 신발, 액세서리 |
+| mannequin_half   | M-TOP, M-ACC                              | 상의, 액세서리           |
+| mannequin_head   | M-HAT, M-GLASS, M-EARRING                | 모자, 안경, 귀걸이       |
+
+Mannequin Slot Positions (relative to mannequin origin):
+
+| Slot ID    | Position (approx)          | Description        |
+|------------|----------------------------|--------------------|
+| M-TOP      | {"x":0, "y":1.3, "z":0}   | 상의 위치 (가슴 높이) |
+| M-BTM      | {"x":0, "y":0.8, "z":0}   | 하의 위치 (허리 높이) |
+| M-SHOE     | {"x":0, "y":0.05, "z":0}  | 신발 위치 (발 높이)   |
+| M-ACC      | {"x":0, "y":1.2, "z":0.1} | 액세서리 위치 (목/손목)|
+| M-HAT      | {"x":0, "y":0.25, "z":0}  | 모자 위치 (머리 위)   |
+| M-GLASS    | {"x":0, "y":0.15, "z":0.08}| 안경 위치 (눈 높이)   |
+| M-EARRING  | {"x":0.08, "y":0.12, "z":0}| 귀걸이 위치 (귀 높이) |
+*/
