@@ -45,3 +45,11 @@ export {
 export * from './overlay.types';
 export * from './simulation.types';
 export * from './simulationResults.types';
+
+// 🆕 슬롯 기반 최적화 타입 재export
+export type {
+  DisplayType,
+  SlotType,
+  ProductPlacement,
+  SlotCompatibilityInfo,
+} from './simulation.types';
