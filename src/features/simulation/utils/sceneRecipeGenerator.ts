@@ -237,6 +237,19 @@ export async function generateSceneRecipeForStore(
   storeId: string,
   userId: string
 ): Promise<SceneRecipe> {
+  // Fetch store data (for 3D model URL)
+  const { data: storeData } = await supabase
+    .from('stores')
+    .select('*')
+    .eq('id', storeId)
+    .single();
+
+  // Fetch furniture for this store
+  const { data: furnitureData } = await supabase
+    .from('furniture')
+    .select('*')
+    .eq('store_id', storeId);
+
   // Fetch products with placement info
   const { data: productsData } = await supabase
     .from('products')
@@ -249,11 +262,36 @@ export async function generateSceneRecipeForStore(
     .select('*')
     .eq('store_id', storeId);
 
-  // Fetch entity types for 3D models
-  const { data: entityTypes } = await supabase
-    .from('ontology_entity_types')
-    .select('*')
-    .or(`and(org_id.is.null,user_id.is.null),user_id.eq.${userId}`);
+  // Build space asset from store data
+  const space: SpaceAsset = {
+    id: storeData?.id || 'main-space',
+    type: 'space',
+    model_url: storeData?.model_3d_url || '',
+    position: { x: 0, y: 0, z: 0 },
+    rotation: { x: 0, y: 0, z: 0 },
+    scale: { x: 1, y: 1, z: 1 },
+    zone_name: storeData?.store_name || 'Store',
+    dimensions: storeData?.dimensions as unknown as ModelDimensions | undefined
+  };
+
+  // Build furniture array with 3D data
+  const furniture: FurnitureAsset[] = (furnitureData || [])
+    .filter(f => f.model_url)
+    .map(f => ({
+      id: f.id,
+      type: 'furniture' as const,
+      model_url: f.model_url!,
+      position: (f.position as Vector3D) || { x: 0, y: 0, z: 0 },
+      rotation: (f.rotation as Vector3D) || { x: 0, y: 0, z: 0 },
+      scale: (f.scale as Vector3D) || { x: 1, y: 1, z: 1 },
+      furniture_type: f.furniture_type,
+      movable: f.movable ?? false,
+      dimensions: {
+        width: f.width || 1,
+        height: f.height || 1,
+        depth: f.depth || 1
+      }
+    }));
 
   // Build products array with placement info
   const products: ProductAsset[] = (productsData || [])
@@ -288,21 +326,9 @@ export async function generateSceneRecipeForStore(
       assigned_zone_id: s.assigned_zone_id || s.department
     }));
 
-  // Find space model from entity types
-  const spaceType = entityTypes?.find(et => et.model_3d_type === 'space');
-  const space: SpaceAsset = {
-    id: 'main-space',
-    type: 'space',
-    model_url: spaceType?.model_3d_url || '',
-    position: { x: 0, y: 0, z: 0 },
-    rotation: { x: 0, y: 0, z: 0 },
-    scale: { x: 1, y: 1, z: 1 },
-    dimensions: spaceType?.model_3d_dimensions as unknown as ModelDimensions | undefined
-  };
-
   return {
     space,
-    furniture: [], // Furniture loaded separately
+    furniture,
     products,
     staff,
     customers: [], // Customers loaded for simulation
