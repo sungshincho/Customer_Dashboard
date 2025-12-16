@@ -1,6 +1,6 @@
 # 3D 디지털트윈 모델 준비 가이드라인
 
-**버전**: 1.0
+**버전**: 2.0 (Complete Edition)
 **작성일**: 2025-12-16
 **기준 시드**: NEURALTWIN v8.0 ULTIMATE SEED
 
@@ -32,6 +32,42 @@
 │  │  • 이펙트 레이어 (히트맵, 동선, AI 추천)                  │      │
 │  └──────────────────────────────────────────────────────────┘      │
 │                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 1.2 NEURALTWIN v8.0 데이터셋 요약
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ 마스터 데이터 (L2 DIM)                                              │
+├─────────────────────────────────────────────────────────────────────┤
+│ • stores: 1건                     • zones_dim: 7건                  │
+│ • products: 25건                  • customers: 2,500건              │
+│ • staff: 8건                      • store_goals: 10건               │
+├─────────────────────────────────────────────────────────────────────┤
+│ 트랜잭션 데이터 (L2 FACT)                                           │
+├─────────────────────────────────────────────────────────────────────┤
+│ • store_visits: ~3,500건          • purchases: ~490건               │
+│ • transactions: ~490건            • line_items: ~980건              │
+│ • funnel_events: ~6,000건         • zone_events: ~5,000건           │
+├─────────────────────────────────────────────────────────────────────┤
+│ 집계 데이터 (L3 AGG)                                                │
+├─────────────────────────────────────────────────────────────────────┤
+│ • daily_kpis_agg: 90건            • daily_sales: 90건               │
+│ • zone_daily_metrics: 630건       • hourly_metrics: 1,080건         │
+│ • product_performance_agg: 2,250건• customer_segments_agg: 540건    │
+├─────────────────────────────────────────────────────────────────────┤
+│ AI/전략 데이터 (L3)                                                 │
+├─────────────────────────────────────────────────────────────────────┤
+│ • applied_strategies: 5건         • strategy_daily_metrics: ~50건   │
+│ • strategy_feedback: 20건         • ai_inference_results: 50건      │
+│ • ai_recommendations: ~8건        • inventory_levels: 25건          │
+├─────────────────────────────────────────────────────────────────────┤
+│ 온톨로지/그래프 데이터 (L1)                                         │
+├─────────────────────────────────────────────────────────────────────┤
+│ • ontology_entity_types: 30건     • ontology_relation_types: 15건   │
+│ • graph_entities: 30건            • graph_relations: 30건           │
+│ • store_scenes: 1건               • retail_concepts: 12건           │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -119,6 +155,7 @@
 |------|------|------|
 | **매장 전체 폴리곤** | 50,000 | 100,000 |
 | **개별 가구 폴리곤** | 1,000-3,000 | 5,000 |
+| **개별 상품 폴리곤** | 200-500 | 1,000 |
 | **텍스처 해상도** | 1024×1024 | 2048×2048 |
 | **텍스처 형식** | PNG, JPG | - |
 | **파일 크기** | 10MB 미만 | 30MB |
@@ -164,351 +201,749 @@
 
 ---
 
-## 4. 필수 3D 모델 목록
+## 4. 필수 3D 모델 목록 (전체)
 
-### 4.1 공간 모델 (Space Assets)
+### 4.1 공간 모델 (Space Assets) - 2건
 
-| 모델명 | 파일명 (권장) | 용도 | 포함 요소 |
-|--------|---------------|------|-----------|
-| **매장 전체** | `store_gangnam_main.glb` | 매장 기본 구조 | 바닥, 벽, 천장, 기둥 |
-| **바닥 플레인** | `floor_250sqm.glb` | 바닥 (히트맵 오버레이용) | 250m² 바닥면 |
-
-### 4.2 가구/집기 모델 (Furniture Assets)
-
-| 엔티티 타입 | 파일명 (권장) | 크기 (W×D×H) | movable | 배치 존 |
-|-------------|---------------|--------------|---------|---------|
-| `Rack` | `rack_clothing_01.glb` | 1.5×0.6×1.8 m | ✅ true | Z003, Z004 |
-| `Shelf` | `shelf_display_01.glb` | 1.2×0.4×2.0 m | ✅ true | Z003, Z004 |
-| `DisplayTable` | `table_display_01.glb` | 1.0×0.8×0.9 m | ✅ true | Z002, Z003, Z004 |
-| `CheckoutCounter` | `counter_checkout_01.glb` | 2.0×0.6×1.1 m | ❌ false | Z006 |
-| `FittingRoom` | `fitting_room_01.glb` | 1.2×1.2×2.2 m | ❌ false | Z005 |
-| `Bench` | `bench_lounge_01.glb` | 1.5×0.5×0.5 m | ✅ true | Z007 |
-| `Mannequin` | `mannequin_01.glb` | 0.5×0.3×1.8 m | ✅ true | Z002, Z003 |
-| `Mirror` | `mirror_full_01.glb` | 0.8×0.05×1.8 m | ✅ true | Z005 |
-| `Kiosk` | `kiosk_info_01.glb` | 0.6×0.6×1.5 m | ✅ true | Z001, Z002 |
-
-### 4.3 상품 모델 (Product Assets)
-
-상품 모델은 선택적이며, 없을 경우 기본 박스로 대체됩니다.
-
-| 카테고리 | 파일명 (권장) | 크기 | 예시 |
-|----------|---------------|------|------|
-| 의류 | `product_clothing_*.glb` | 0.4×0.3×0.6 m | 접힌 셔츠, 팬츠 |
-| 신발 | `product_shoes_*.glb` | 0.3×0.1×0.15 m | 운동화, 구두 |
-| 액세서리 | `product_accessory_*.glb` | 0.1×0.1×0.1 m | 벨트, 가방 |
+| # | 모델명 | 파일명 | 용도 | 포함 요소 | 크기 |
+|---|--------|--------|------|-----------|------|
+| 1 | 매장 전체 | `store_gangnam_main.glb` | 매장 기본 구조 | 바닥, 벽, 천장, 기둥, 조명 레일 | 20×16×3 m |
+| 2 | 바닥 플레인 | `floor_250sqm.glb` | 히트맵 오버레이용 | 250m² 평면 메쉬 | 20×16 m |
 
 ---
 
-## 5. 메타데이터 연동
+### 4.2 존별 가구/집기 모델 (Furniture Assets) - 총 52건
 
-### 5.1 zones_dim 테이블 스키마
+#### Z001 입구 (entrance) - 4건
+
+| # | 모델명 | 파일명 | 크기 (W×D×H) | 수량 | movable | 설명 |
+|---|--------|--------|--------------|------|---------|------|
+| 1 | 입구 게이트 | `gate_entrance_01.glb` | 3.0×0.3×2.5 m | 1 | ❌ | 보안 게이트/센서 |
+| 2 | 환영 사인 | `sign_welcome_01.glb` | 1.5×0.1×0.8 m | 1 | ✅ | LED 환영 사인보드 |
+| 3 | 안내 키오스크 | `kiosk_info_01.glb` | 0.6×0.6×1.5 m | 1 | ✅ | 터치스크린 안내대 |
+| 4 | 쇼핑카트 거치대 | `cart_stand_01.glb` | 1.0×0.5×1.0 m | 1 | ❌ | 쇼핑카트/바구니 거치대 |
+
+#### Z002 메인홀 (main) - 12건
+
+| # | 모델명 | 파일명 | 크기 (W×D×H) | 수량 | movable | 설명 |
+|---|--------|--------|--------------|------|---------|------|
+| 1 | 중앙 디스플레이 테이블 | `table_display_center_01.glb` | 2.0×1.2×0.9 m | 2 | ✅ | 시즌 상품 전시 |
+| 2 | 원형 디스플레이 | `display_round_01.glb` | 1.5×1.5×1.2 m | 1 | ✅ | 360도 회전 전시대 |
+| 3 | 프로모션 스탠드 | `stand_promo_01.glb` | 0.6×0.4×1.8 m | 4 | ✅ | 세일/프로모션 안내 |
+| 4 | 마네킹 (전신) | `mannequin_full_01.glb` | 0.5×0.3×1.8 m | 4 | ✅ | 코디네이션 전시 |
+| 5 | 천장 배너 행거 | `banner_hanger_01.glb` | 2.0×0.1×0.5 m | 2 | ❌ | 시즌 배너 |
+
+#### Z003 의류존 (display - 여성/남성 의류) - 14건
+
+| # | 모델명 | 파일명 | 크기 (W×D×H) | 수량 | movable | 설명 |
+|---|--------|--------|--------------|------|---------|------|
+| 1 | 의류 행거 랙 (더블) | `rack_clothing_double_01.glb` | 1.5×0.6×1.8 m | 4 | ✅ | 아우터/상의 전시 |
+| 2 | 의류 행거 랙 (싱글) | `rack_clothing_single_01.glb` | 1.2×0.4×1.8 m | 4 | ✅ | 팬츠/스커트 전시 |
+| 3 | 선반형 진열대 | `shelf_display_01.glb` | 1.2×0.4×2.0 m | 2 | ✅ | 접힌 의류 전시 |
+| 4 | 테이블 디스플레이 | `table_display_01.glb` | 1.0×0.8×0.9 m | 2 | ✅ | 신상품 전시 |
+| 5 | 마네킹 (상반신) | `mannequin_torso_01.glb` | 0.4×0.3×0.9 m | 4 | ✅ | 상의 전시용 |
+| 6 | 전신 거울 | `mirror_full_01.glb` | 0.8×0.05×1.8 m | 2 | ✅ | 고객용 거울 |
+| 7 | 사이즈 표시판 | `sign_size_01.glb` | 0.3×0.05×0.2 m | 8 | ✅ | S/M/L/XL 표시 |
+
+#### Z004 액세서리존 (display) - 10건
+
+| # | 모델명 | 파일명 | 크기 (W×D×H) | 수량 | movable | 설명 |
+|---|--------|--------|--------------|------|---------|------|
+| 1 | 쇼케이스 (잠금형) | `showcase_locked_01.glb` | 1.0×0.5×1.2 m | 2 | ❌ | 고가 액세서리 |
+| 2 | 오픈 쇼케이스 | `showcase_open_01.glb` | 1.2×0.4×1.0 m | 2 | ✅ | 일반 액세서리 |
+| 3 | 가방 진열대 | `display_bag_01.glb` | 1.5×0.5×1.5 m | 2 | ✅ | 토트백/핸드백 |
+| 4 | 스카프 행거 | `hanger_scarf_01.glb` | 0.6×0.3×1.6 m | 2 | ✅ | 스카프/머플러 |
+| 5 | 회전형 악세서리 스탠드 | `stand_accessory_01.glb` | 0.4×0.4×1.4 m | 2 | ✅ | 벨트/목걸이 |
+| 6 | 신발 진열대 | `shelf_shoes_01.glb` | 1.2×0.4×1.8 m | 3 | ✅ | 신발 전시 |
+
+#### Z005 피팅룸 (fitting) - 6건
+
+| # | 모델명 | 파일명 | 크기 (W×D×H) | 수량 | movable | 설명 |
+|---|--------|--------|--------------|------|---------|------|
+| 1 | 피팅룸 부스 | `fitting_booth_01.glb` | 1.2×1.2×2.2 m | 4 | ❌ | 탈의실 (커튼 포함) |
+| 2 | 피팅룸 내부 거울 | `mirror_fitting_01.glb` | 0.6×0.05×1.5 m | 4 | ❌ | 부스 내부 거울 |
+| 3 | 피팅룸 의자 | `stool_fitting_01.glb` | 0.4×0.4×0.45 m | 4 | ✅ | 착석용 스툴 |
+| 4 | 옷걸이 훅 | `hook_clothes_01.glb` | 0.15×0.1×0.1 m | 8 | ❌ | 벽면 옷걸이 |
+| 5 | 대기 벤치 | `bench_waiting_01.glb` | 1.5×0.5×0.45 m | 1 | ✅ | 피팅 대기용 |
+| 6 | 번호표 디스플레이 | `display_queue_01.glb` | 0.3×0.1×0.4 m | 1 | ❌ | 대기 순번 표시 |
+
+#### Z006 계산대 (checkout) - 8건
+
+| # | 모델명 | 파일명 | 크기 (W×D×H) | 수량 | movable | 설명 |
+|---|--------|--------|--------------|------|---------|------|
+| 1 | 계산대 카운터 | `counter_checkout_01.glb` | 2.0×0.6×1.1 m | 2 | ❌ | 메인 계산대 |
+| 2 | POS 단말기 | `pos_terminal_01.glb` | 0.3×0.3×0.4 m | 2 | ❌ | 결제 단말기 |
+| 3 | 카드 리더기 | `card_reader_01.glb` | 0.15×0.1×0.2 m | 2 | ❌ | 카드/모바일 결제 |
+| 4 | 포장대 | `table_packing_01.glb` | 1.5×0.6×0.9 m | 1 | ✅ | 상품 포장 |
+| 5 | 쇼핑백 거치대 | `stand_bag_01.glb` | 0.5×0.3×0.8 m | 2 | ✅ | 쇼핑백 보관 |
+| 6 | 영수증 프린터 | `printer_receipt_01.glb` | 0.15×0.2×0.15 m | 2 | ❌ | 영수증 출력 |
+| 7 | 고객 서명패드 | `signpad_01.glb` | 0.2×0.15×0.05 m | 2 | ❌ | 전자 서명 |
+| 8 | 대기선 스탠드 | `stand_queue_01.glb` | 0.3×0.3×1.0 m | 4 | ✅ | 줄서기 안내 |
+
+#### Z007 휴식공간 (lounge) - 6건
+
+| # | 모델명 | 파일명 | 크기 (W×D×H) | 수량 | movable | 설명 |
+|---|--------|--------|--------------|------|---------|------|
+| 1 | 라운지 소파 (2인) | `sofa_2seat_01.glb` | 1.5×0.8×0.85 m | 2 | ✅ | 2인용 소파 |
+| 2 | 라운지 의자 | `chair_lounge_01.glb` | 0.6×0.6×0.8 m | 2 | ✅ | 1인용 의자 |
+| 3 | 커피 테이블 | `table_coffee_01.glb` | 0.8×0.5×0.45 m | 2 | ✅ | 소파 앞 테이블 |
+| 4 | 잡지 꽂이 | `rack_magazine_01.glb` | 0.4×0.3×0.5 m | 1 | ✅ | 카탈로그/잡지 |
+| 5 | 화분 (장식) | `plant_pot_01.glb` | 0.4×0.4×1.2 m | 2 | ✅ | 인테리어 식물 |
+| 6 | 음료 자판기 | `vending_drink_01.glb` | 0.8×0.6×1.8 m | 1 | ❌ | 음료 자판기 |
+
+---
+
+### 4.3 상품 모델 (Product Assets) - 25건 (전체 목록)
+
+NEURALTWIN v8.0 시드에 정의된 모든 상품:
+
+#### 아우터 (5건) - SKU-OUT-001 ~ 005
+
+| # | Product ID | 상품명 | SKU | 가격 | 파일명 | 크기 | 배치 존 |
+|---|------------|--------|-----|------|--------|------|---------|
+| 1 | `f0000001-...` | 프리미엄 캐시미어 코트 | SKU-OUT-001 | ₩400,000 | `product_coat_cashmere_01.glb` | 0.5×0.2×0.8 m | Z003 |
+| 2 | `f0000002-...` | 울 테일러드 재킷 | SKU-OUT-002 | ₩450,000 | `product_jacket_tailored_01.glb` | 0.5×0.15×0.7 m | Z003 |
+| 3 | `f0000003-...` | 다운 패딩 | SKU-OUT-003 | ₩500,000 | `product_padding_down_01.glb` | 0.5×0.25×0.8 m | Z003 |
+| 4 | `f0000004-...` | 트렌치 코트 | SKU-OUT-004 | ₩550,000 | `product_coat_trench_01.glb` | 0.5×0.15×0.9 m | Z003 |
+| 5 | `f0000005-...` | 레더 자켓 | SKU-OUT-005 | ₩600,000 | `product_jacket_leather_01.glb` | 0.5×0.15×0.7 m | Z003 |
+
+#### 상의 (5건) - SKU-TOP-001 ~ 005
+
+| # | Product ID | 상품명 | SKU | 가격 | 파일명 | 크기 | 배치 존 |
+|---|------------|--------|-----|------|--------|------|---------|
+| 6 | `f0000006-...` | 실크 블라우스 | SKU-TOP-001 | ₩100,000 | `product_blouse_silk_01.glb` | 0.4×0.1×0.6 m | Z003 |
+| 7 | `f0000007-...` | 캐주얼 니트 스웨터 | SKU-TOP-002 | ₩120,000 | `product_sweater_knit_01.glb` | 0.4×0.15×0.5 m | Z003 |
+| 8 | `f0000008-...` | 옥스포드 셔츠 | SKU-TOP-003 | ₩140,000 | `product_shirt_oxford_01.glb` | 0.4×0.1×0.6 m | Z003 |
+| 9 | `f0000009-...` | 린넨 탑 | SKU-TOP-004 | ₩160,000 | `product_top_linen_01.glb` | 0.4×0.08×0.5 m | Z003 |
+| 10 | `f0000010-...` | 폴로 셔츠 | SKU-TOP-005 | ₩180,000 | `product_shirt_polo_01.glb` | 0.4×0.1×0.55 m | Z003 |
+
+#### 하의 (5건) - SKU-BTM-001 ~ 005
+
+| # | Product ID | 상품명 | SKU | 가격 | 파일명 | 크기 | 배치 존 |
+|---|------------|--------|-----|------|--------|------|---------|
+| 11 | `f0000011-...` | 리넨 와이드 팬츠 | SKU-BTM-001 | ₩145,000 | `product_pants_wide_01.glb` | 0.35×0.1×0.9 m | Z003 |
+| 12 | `f0000012-...` | 슬림핏 데님 | SKU-BTM-002 | ₩170,000 | `product_jeans_slim_01.glb` | 0.35×0.1×0.95 m | Z003 |
+| 13 | `f0000013-...` | 치노 팬츠 | SKU-BTM-003 | ₩195,000 | `product_pants_chino_01.glb` | 0.35×0.1×0.9 m | Z003 |
+| 14 | `f0000014-...` | 조거 팬츠 | SKU-BTM-004 | ₩220,000 | `product_pants_jogger_01.glb` | 0.35×0.12×0.9 m | Z003 |
+| 15 | `f0000015-...` | A라인 스커트 | SKU-BTM-005 | ₩245,000 | `product_skirt_aline_01.glb` | 0.35×0.08×0.6 m | Z003 |
+
+#### 액세서리 (5건) - SKU-ACC-001 ~ 005
+
+| # | Product ID | 상품명 | SKU | 가격 | 파일명 | 크기 | 배치 존 |
+|---|------------|--------|-----|------|--------|------|---------|
+| 16 | `f0000016-...` | 가죽 토트백 | SKU-ACC-001 | ₩190,000 | `product_bag_tote_01.glb` | 0.35×0.15×0.3 m | Z004 |
+| 17 | `f0000017-...` | 실버 목걸이 | SKU-ACC-002 | ₩230,000 | `product_necklace_silver_01.glb` | 0.2×0.02×0.25 m | Z004 |
+| 18 | `f0000018-...` | 가죽 벨트 | SKU-ACC-003 | ₩270,000 | `product_belt_leather_01.glb` | 0.9×0.04×0.05 m | Z004 |
+| 19 | `f0000019-...` | 스카프 세트 | SKU-ACC-004 | ₩310,000 | `product_scarf_set_01.glb` | 0.3×0.1×0.3 m | Z004 |
+| 20 | `f0000020-...` | 울 머플러 | SKU-ACC-005 | ₩350,000 | `product_muffler_wool_01.glb` | 0.3×0.15×0.3 m | Z004 |
+
+#### 신발 (3건) - SKU-SHO-001 ~ 003
+
+| # | Product ID | 상품명 | SKU | 가격 | 파일명 | 크기 | 배치 존 |
+|---|------------|--------|-----|------|--------|------|---------|
+| 21 | `f0000021-...` | 프리미엄 로퍼 | SKU-SHO-001 | ₩280,000 | `product_shoes_loafer_01.glb` | 0.28×0.1×0.1 m | Z004 |
+| 22 | `f0000022-...` | 하이힐 펌프스 | SKU-SHO-002 | ₩360,000 | `product_shoes_heels_01.glb` | 0.25×0.08×0.12 m | Z004 |
+| 23 | `f0000023-...` | 스니커즈 | SKU-SHO-003 | ₩440,000 | `product_shoes_sneakers_01.glb` | 0.3×0.12×0.12 m | Z004 |
+
+#### 화장품 (2건) - SKU-COS-001 ~ 002
+
+| # | Product ID | 상품명 | SKU | 가격 | 파일명 | 크기 | 배치 존 |
+|---|------------|--------|-----|------|--------|------|---------|
+| 24 | `f0000024-...` | 프리미엄 스킨케어 세트 | SKU-COS-001 | ₩110,000 | `product_skincare_set_01.glb` | 0.25×0.15×0.2 m | Z004 |
+| 25 | `f0000025-...` | 립스틱 컬렉션 | SKU-COS-002 | ₩140,000 | `product_lipstick_set_01.glb` | 0.15×0.1×0.1 m | Z004 |
+
+---
+
+### 4.4 직원 모델 (Staff Assets) - 8건
+
+직원 시각화용 3D 아바타 모델:
+
+| # | Staff ID | 이름 | 직책 | 담당 구역 | 파일명 | 특징 |
+|---|----------|------|------|-----------|--------|------|
+| 1 | `e0000001-...` | 김민준 | 매장 매니저 | 전체 (all) | `staff_manager_male_01.glb` | 정장, 명찰 |
+| 2 | `e0000002-...` | 이서연 | 시니어 판매 | 여성의류 (WOM) | `staff_senior_female_01.glb` | 유니폼, 여성 |
+| 3 | `e0000003-...` | 박도윤 | 시니어 판매 | 남성의류 (MEN) | `staff_senior_male_01.glb` | 유니폼, 남성 |
+| 4 | `e0000004-...` | 최하은 | 판매 | 액세서리 (ACC) | `staff_sales_female_01.glb` | 유니폼, 여성 |
+| 5 | `e0000005-...` | 정시우 | 판매 | 신발 (SHO) | `staff_sales_male_01.glb` | 유니폼, 남성 |
+| 6 | `e0000006-...` | 강유진 | 판매 | 피팅룸 (FIT) | `staff_sales_female_02.glb` | 유니폼, 여성 |
+| 7 | `e0000007-...` | 조지호 | 캐셔 | 계산대 (CHK) | `staff_cashier_male_01.glb` | 캐셔 유니폼 |
+| 8 | `e0000008-...` | 윤수빈 | 캐셔 | 계산대 (CHK) | `staff_cashier_female_01.glb` | 캐셔 유니폼 |
+
+**직원 모델 요구사항:**
+- 크기: 0.5×0.3×1.7 m (서 있는 자세)
+- T-Pose 또는 서 있는 자세
+- 로우폴리 (1,000-2,000 폴리곤)
+- 담당 구역 색상 배지 포함
+
+---
+
+### 4.5 고객 아바타 모델 (Customer Assets) - 선택사항
+
+고객 시뮬레이션용 제네릭 아바타:
+
+| # | 세그먼트 | 파일명 | 수량 | 설명 |
+|---|---------|--------|------|------|
+| 1 | VIP 고객 | `customer_vip_01.glb` ~ `_03.glb` | 3종 | 고급스러운 의상 |
+| 2 | 일반 고객 | `customer_regular_01.glb` ~ `_05.glb` | 5종 | 캐주얼 의상 |
+| 3 | 신규 고객 | `customer_new_01.glb` ~ `_03.glb` | 3종 | 다양한 연령대 |
+
+---
+
+## 5. 조명 시스템 (Lighting)
+
+### 5.1 전역 조명 프리셋
 
 ```typescript
-interface ZoneDim {
-  id: UUID;
-  store_id: UUID;
-  zone_code: string;      // 'Z001', 'Z002', ...
-  zone_name: string;      // '입구', '메인홀', ...
-  zone_type: ZoneType;    // 'entrance' | 'main' | 'display' | 'fitting' | 'checkout' | 'lounge'
-  area_sqm: number;
+const globalLighting: LightingPreset = {
+  name: 'retail_flagship',
+  description: '플래그십 매장 기본 조명',
+  lights: [
+    // 환경광 - 전체 기본 밝기
+    {
+      type: 'ambient',
+      color: '#f5f5f5',
+      intensity: 0.35
+    },
+    // 메인 조명 - 천장 중앙
+    {
+      type: 'directional',
+      color: '#ffffff',
+      intensity: 0.9,
+      position: { x: 0, y: 10, z: 0 },
+      target: { x: 0, y: 0, z: 0 },
+      castShadow: true
+    },
+    // 보조 조명 - 그림자 완화
+    {
+      type: 'directional',
+      color: '#e8e8ff',
+      intensity: 0.3,
+      position: { x: -10, y: 8, z: 10 },
+      target: { x: 0, y: 0, z: 0 },
+      castShadow: false
+    }
+  ],
+  environment: {
+    background: '#f8f9fa',
+    fog: {
+      color: '#f8f9fa',
+      near: 20,
+      far: 50
+    }
+  }
+};
+```
 
-  // 3D 좌표 (미터)
-  position_x: number;
-  position_y: number;
-  position_z: number;
+### 5.2 존별 스폿 조명 (Zone Spot Lights) - 7건
 
-  // 크기 (미터)
-  size_width: number;
-  size_depth: number;
-  size_height: number;
+| Zone | 조명 타입 | 색상 | 강도 | 위치 (x, y, z) | 대상 | 설명 |
+|------|----------|------|------|----------------|------|------|
+| Z001 입구 | Spot | `#ffffff` | 1.2 | (2.5, 3, -7.5) | 바닥 | 환영 스폿 |
+| Z002 메인홀 | Point×4 | `#fff8e7` | 0.8 | 분산 배치 | - | 따뜻한 매장 조명 |
+| Z003 의류존 | Spot×6 | `#fffaf0` | 1.0 | 랙 상단 | 의류 랙 | 상품 강조 |
+| Z004 액세서리존 | Spot×4 | `#fff5ee` | 1.2 | 쇼케이스 위 | 쇼케이스 | 반짝임 강조 |
+| Z005 피팅룸 | Point×4 | `#fff0f5` | 0.9 | 부스 천장 | - | 피팅 조명 |
+| Z006 계산대 | Spot×2 | `#ffffff` | 1.1 | 카운터 위 | 계산대 | 작업 조명 |
+| Z007 휴식공간 | Point×2 | `#ffe4c4` | 0.6 | 소파 위 | - | 편안한 조명 |
 
-  // 시각화
-  color: string;          // HEX 색상 '#RRGGBB'
-  capacity: number;       // 최대 수용 인원
+### 5.3 조명 프리셋 상세 설정
 
-  // JSONB 좌표 (2D 호환)
-  coordinates: {
-    x: number;
-    y: number;
-    z: number;
-    width: number;
-    depth: number;
+```typescript
+const zoneLights: Record<string, LightConfig[]> = {
+  'Z001_entrance': [
+    { type: 'spot', color: '#ffffff', intensity: 1.2,
+      position: { x: 2.5, y: 3, z: -7.5 },
+      target: { x: 2.5, y: 0, z: -7.5 }, angle: 0.6 }
+  ],
+  'Z002_main': [
+    { type: 'point', color: '#fff8e7', intensity: 0.8, position: { x: -3, y: 2.8, z: -2 } },
+    { type: 'point', color: '#fff8e7', intensity: 0.8, position: { x: 3, y: 2.8, z: -2 } },
+    { type: 'point', color: '#fff8e7', intensity: 0.8, position: { x: -3, y: 2.8, z: 2 } },
+    { type: 'point', color: '#fff8e7', intensity: 0.8, position: { x: 3, y: 2.8, z: 2 } }
+  ],
+  'Z003_clothing': [
+    { type: 'spot', color: '#fffaf0', intensity: 1.0, position: { x: -6, y: 2.5, z: 1 }, target: { x: -6, y: 0, z: 1 } },
+    { type: 'spot', color: '#fffaf0', intensity: 1.0, position: { x: -6, y: 2.5, z: 3 }, target: { x: -6, y: 0, z: 3 } },
+    { type: 'spot', color: '#fffaf0', intensity: 1.0, position: { x: -6, y: 2.5, z: 5 }, target: { x: -6, y: 0, z: 5 } },
+    { type: 'spot', color: '#fffaf0', intensity: 1.0, position: { x: -4, y: 2.5, z: 1 }, target: { x: -4, y: 0, z: 1 } },
+    { type: 'spot', color: '#fffaf0', intensity: 1.0, position: { x: -4, y: 2.5, z: 3 }, target: { x: -4, y: 0, z: 3 } },
+    { type: 'spot', color: '#fffaf0', intensity: 1.0, position: { x: -4, y: 2.5, z: 5 }, target: { x: -4, y: 0, z: 5 } }
+  ],
+  'Z004_accessory': [
+    { type: 'spot', color: '#fff5ee', intensity: 1.2, position: { x: 4, y: 2.5, z: 1 }, target: { x: 4, y: 0, z: 1 } },
+    { type: 'spot', color: '#fff5ee', intensity: 1.2, position: { x: 4, y: 2.5, z: 3 }, target: { x: 4, y: 0, z: 3 } },
+    { type: 'spot', color: '#fff5ee', intensity: 1.2, position: { x: 6, y: 2.5, z: 1 }, target: { x: 6, y: 0, z: 1 } },
+    { type: 'spot', color: '#fff5ee', intensity: 1.2, position: { x: 6, y: 2.5, z: 3 }, target: { x: 6, y: 0, z: 3 } }
+  ],
+  'Z005_fitting': [
+    { type: 'point', color: '#fff0f5', intensity: 0.9, position: { x: -5.5, y: 2.2, z: -5.5 } },
+    { type: 'point', color: '#fff0f5', intensity: 0.9, position: { x: -4.5, y: 2.2, z: -5.5 } },
+    { type: 'point', color: '#fff0f5', intensity: 0.9, position: { x: -5.5, y: 2.2, z: -4.5 } },
+    { type: 'point', color: '#fff0f5', intensity: 0.9, position: { x: -4.5, y: 2.2, z: -4.5 } }
+  ],
+  'Z006_checkout': [
+    { type: 'spot', color: '#ffffff', intensity: 1.1, position: { x: 4, y: 2.5, z: 5.5 }, target: { x: 4, y: 1, z: 5.5 } },
+    { type: 'spot', color: '#ffffff', intensity: 1.1, position: { x: 5, y: 2.5, z: 5.5 }, target: { x: 5, y: 1, z: 5.5 } }
+  ],
+  'Z007_lounge': [
+    { type: 'point', color: '#ffe4c4', intensity: 0.6, position: { x: -1, y: 2.5, z: 7 } },
+    { type: 'point', color: '#ffe4c4', intensity: 0.6, position: { x: 1, y: 2.5, z: 7 } }
+  ]
+};
+```
+
+### 5.4 특수 조명 효과
+
+| 효과 | 적용 위치 | 트리거 | 설명 |
+|------|----------|--------|------|
+| 하이라이트 스폿 | 신상품 디스플레이 | AI 추천 상품 | 추천 상품 강조 |
+| 혼잡도 표시 | 존 전체 | zone_daily_metrics | 빨강(혼잡) → 녹색(여유) |
+| 경로 안내 | 바닥 | AI 동선 추천 | 최적 동선 LED 표시 |
+| 알림 깜빡임 | 계산대 | 대기줄 초과 | 직원 호출 신호 |
+
+---
+
+## 6. 시각화 오버레이 (Effect Layers)
+
+### 6.1 히트맵 오버레이 (zone_daily_metrics 기반)
+
+```typescript
+interface HeatmapEffect {
+  type: 'heatmap';
+  data: {
+    zone_id: string;
+    intensity: number;      // 0.0 ~ 1.0
+    visitors: number;       // 실제 방문자 수
+    avg_dwell: number;      // 평균 체류시간 (초)
+  }[];
+  colorScale: {
+    low: '#22c55e';         // 녹색 (여유)
+    medium: '#eab308';      // 노랑 (보통)
+    high: '#ef4444';        // 빨강 (혼잡)
   };
+  opacity: 0.5;
+  height: 0.05;             // 바닥에서 5cm 위
 }
 ```
 
-### 5.2 store_scenes 테이블 스키마
+**데이터 소스**: `zone_daily_metrics` (630건, 7존 × 90일)
+
+### 6.2 고객 동선 오버레이 (zone_events 기반)
 
 ```typescript
-interface StoreScene {
-  id: UUID;
-  store_id: UUID;
-  name: string;
-  description: string;
-
-  scene_data: {
-    version: string;        // '1.0'
-    viewport: {
-      width: number;
-      height: number;
-      zoom: number;
-    };
-    zones: Array<{
-      id: string;           // zones_dim.id 참조
-      name: string;
-      x: number;            // 2D 뷰포트 좌표
-      y: number;
-      width: number;
-      height: number;
-      color: string;
-    }>;
-    connections: Array<{
-      from: string;         // zone_id
-      to: string;           // zone_id
-    }>;
-  };
-
-  is_active: boolean;
-  thumbnail_url?: string;
+interface PathFlowEffect {
+  type: 'pathflow';
+  data: {
+    from_zone: string;
+    to_zone: string;
+    flow_count: number;
+    avg_transition_time: number;
+  }[];
+  lineWidth: 2;
+  arrowSize: 0.3;
+  colorByVolume: true;
+  animated: true;
+  animationSpeed: 1.0;
 }
 ```
 
-### 5.3 SceneRecipe 타입 (프론트엔드)
+**데이터 소스**: `zone_events` (~5,000건)
+
+### 6.3 상품 성과 오버레이 (product_performance_agg 기반)
 
 ```typescript
-interface SceneRecipe {
-  space: SpaceAsset;              // 매장 공간 모델
-  furniture: FurnitureAsset[];    // 가구 배치
-  products: ProductAsset[];       // 상품 배치
-  lighting: LightingPreset;       // 조명 설정
-  effects?: EffectLayer[];        // 오버레이 (히트맵 등)
-  camera?: {
+interface ProductHighlightEffect {
+  type: 'product_highlight';
+  data: {
+    product_id: string;
     position: Vector3D;
-    target: Vector3D;
-    fov?: number;
+    metric: 'revenue' | 'units_sold' | 'conversion_rate';
+    value: number;
+    rank: number;           // 1 = 최고
+  }[];
+  highlightType: 'glow' | 'badge' | 'particle';
+  showTopN: 5;
+}
+```
+
+**데이터 소스**: `product_performance_agg` (2,250건, 25상품 × 90일)
+
+### 6.4 AI 추천 시각화 (ai_recommendations 기반)
+
+```typescript
+interface AIRecommendationEffect {
+  type: 'ai_suggestion';
+  data: {
+    recommendation_id: string;
+    category: 'staffing' | 'layout' | 'inventory' | 'pricing' | 'promotion';
+    title: string;
+    target_zone?: string;
+    target_products?: string[];
+    priority: 'high' | 'medium' | 'low';
+    expected_impact: number;  // % 개선
+    confidence: number;       // 0.0 ~ 1.0
+  }[];
+  showAsOverlay: true;
+  showAsMarkers: true;
+  markerScale: 1.0;
+}
+```
+
+**데이터 소스**: `ai_recommendations` (~8건)
+
+### 6.5 시간대별 트래픽 애니메이션 (hourly_metrics 기반)
+
+```typescript
+interface HourlyTrafficEffect {
+  type: 'hourly_animation';
+  data: {
+    hour: number;           // 0-23
+    zone_id: string;
+    visitors: number;
+    transactions: number;
+    revenue: number;
+  }[];
+  animationMode: 'timeline' | 'replay' | 'heatmap';
+  speed: 1.0;               // 1초 = 1시간
+  showTimeline: true;
+}
+```
+
+**데이터 소스**: `hourly_metrics` (1,080건, 12시간 × 90일)
+
+---
+
+## 7. 그래프 시각화 (Graph Visualization)
+
+### 7.1 그래프 엔티티 (30건)
+
+NEURALTWIN v8.0에서 정의된 온톨로지 그래프 노드:
+
+| 카테고리 | 엔티티 타입 | 수량 | 3D 표현 | 색상 |
+|----------|------------|------|---------|------|
+| 매장/구역 | Store, Zone | 6 | 3D 박스 (구역 형태) | 블루 계열 |
+| 상품 | Product | 4 | 상품 아이콘 | 오렌지 |
+| 고객 | CustomerSegment | 3 | 인물 아이콘 | 핑크 |
+| KPI | DailyKPI | 3 | 차트 아이콘 | 청록 |
+| 전략 | Strategy | 3 | 전구 아이콘 | 보라 |
+| 인사이트 | Insight | 3 | 눈 아이콘 | 초록 |
+| 외부요인 | ExternalFactor | 3 | 구름 아이콘 | 회색 |
+| 목표 | Goal | 2 | 깃발 아이콘 | 남색 |
+| 시뮬레이션 | Simulation | 3 | 재생 아이콘 | 마젠타 |
+
+### 7.2 그래프 관계 (30건)
+
+| 관계 타입 | 소스 → 타겟 | 수량 | 시각화 |
+|----------|------------|------|--------|
+| CONTAINS | Store → Zone | 5 | 점선 포함 |
+| ADJACENT_TO | Zone → Zone | 5 | 양방향 화살표 |
+| LOCATED_IN | Product → Zone | 4 | 위치 마커 |
+| GENERATES | CustomerSegment → KPI | 3 | 흐름 화살표 |
+| RECOMMENDS | Insight → Strategy | 3 | 추천 화살표 |
+| TARGETS | Strategy → Goal | 3 | 목표 화살표 |
+| AFFECTS | ExternalFactor → KPI | 3 | 영향 표시 |
+| SIMULATES | Scenario → Simulation | 2 | 시뮬 연결 |
+| 기타 | 다양한 관계 | 2 | 기본 연결선 |
+
+### 7.3 그래프 3D 시각화 옵션
+
+```typescript
+interface Graph3DVisualization {
+  layout: 'force-directed' | 'hierarchical' | 'radial' | 'spatial';
+  nodeSize: {
+    base: 0.3,
+    scaleByImportance: true
   };
-}
-
-interface SpaceAsset {
-  id: string;
-  type: 'space';
-  model_url: string;              // Supabase Storage URL
-  position: Vector3D;
-  rotation: Vector3D;
-  scale: Vector3D;
-  zone_name?: string;
-  isBaked?: boolean;              // Blender combined bake 여부
-}
-
-interface FurnitureAsset {
-  id: string;
-  type: 'furniture';
-  model_url: string;
-  position: Vector3D;
-  rotation: Vector3D;
-  scale: Vector3D;
-  furniture_type?: string;
-  movable?: boolean;              // AI 레이아웃 최적화 대상 여부
-  suggested_position?: Vector3D;  // AI 제안 위치
-  optimization_reason?: string;   // AI 제안 이유
+  edgeStyle: {
+    width: 0.05,
+    animated: true,
+    showArrows: true
+  };
+  interaction: {
+    hoverable: true,
+    selectable: true,
+    draggable: true
+  };
+  labels: {
+    show: true,
+    billboarding: true,
+    fontSize: 14
+  };
 }
 ```
 
 ---
 
-## 6. 스토리지 구조
+## 8. 전략/시뮬레이션 시각화
 
-### 6.1 Supabase Storage 경로
+### 8.1 적용 전략 (applied_strategies) - 5건
+
+| # | 전략 유형 | 전략명 | 상태 | 시각화 |
+|---|----------|--------|------|--------|
+| 1 | pricing | 가격 최적화 전략 | completed | 가격 태그 강조 |
+| 2 | staffing | 피크타임 인력 배치 | completed | 직원 위치 표시 |
+| 3 | promotion | VIP 전용 프로모션 | completed | VIP 존 표시 |
+| 4 | layout | 레이아웃 재배치 | in_progress | 이동 화살표 |
+| 5 | inventory | 재고 최적화 | planned | 재고 레벨 표시 |
+
+### 8.2 전략 효과 시각화
+
+```typescript
+interface StrategyVisualization {
+  strategy_id: string;
+  type: 'pricing' | 'staffing' | 'promotion' | 'layout' | 'inventory';
+
+  // 레이아웃 전략용
+  layoutChanges?: {
+    furniture_id: string;
+    from_position: Vector3D;
+    to_position: Vector3D;
+    showPath: boolean;
+  }[];
+
+  // 인력 배치 전략용
+  staffingChanges?: {
+    staff_id: string;
+    zone_id: string;
+    shift_start: string;
+    shift_end: string;
+  }[];
+
+  // 프로모션 전략용
+  promotionHighlights?: {
+    zone_id?: string;
+    product_ids?: string[];
+    discount_rate: number;
+  };
+
+  // 성과 표시
+  metrics: {
+    before: { revenue: number; conversion: number };
+    after: { revenue: number; conversion: number };
+    improvement: number;
+  };
+}
+```
+
+---
+
+## 9. 목표 및 KPI 대시보드 (3D 오버레이)
+
+### 9.1 매장 목표 (store_goals) - 10건
+
+| 기간 | 목표 유형 | 목표값 | 진행률 표시 |
+|------|----------|--------|------------|
+| 일간 | 매출 | ₩4,000,000 | 프로그레스 바 |
+| 일간 | 방문자 | 180명 | 프로그레스 바 |
+| 주간 | 매출 | ₩25,000,000 | 프로그레스 링 |
+| 주간 | 방문자 | 1,200명 | 프로그레스 링 |
+| 월간 | 매출 | ₩100,000,000 | 3D 차트 |
+| 월간 | 방문자 | 5,000명 | 3D 차트 |
+| 월간 | 전환율 | 15% | 게이지 |
+| 월간 | 객단가 | ₩250,000 | 게이지 |
+| 분기 | 매출 | ₩300,000,000 | 3D 막대 그래프 |
+| 분기 | 방문자 | 15,000명 | 3D 막대 그래프 |
+
+### 9.2 실시간 KPI 오버레이
+
+```typescript
+interface KPIDashboardOverlay {
+  position: 'top-right' | 'floating' | 'integrated';
+  metrics: {
+    current_visitors: number;       // 현재 매장 내 방문자
+    today_revenue: number;          // 오늘 매출
+    conversion_rate: number;        // 실시간 전환율
+    avg_dwell_time: number;         // 평균 체류시간
+    goal_progress: number;          // 목표 달성률
+  };
+  visualization: '2d-panel' | '3d-hologram' | 'zone-integrated';
+}
+```
+
+---
+
+## 10. 재고 시각화 (inventory_levels)
+
+### 10.1 재고 상태 표시 (25건)
+
+```typescript
+interface InventoryVisualization {
+  product_id: string;
+  position: Vector3D;           // 상품 위치
+  current_stock: number;
+  min_stock: number;
+  max_stock: number;
+  reorder_point: number;
+
+  // 시각적 표현
+  stockLevel: 'critical' | 'low' | 'normal' | 'high';
+  showIndicator: boolean;
+  indicatorColor: string;       // 빨강/노랑/녹색/파랑
+  showQuantity: boolean;
+}
+```
+
+### 10.2 재고 레벨 색상 코드
+
+| 상태 | 조건 | 색상 | 표시 |
+|------|------|------|------|
+| Critical | current < min | `#ef4444` (빨강) | 깜빡이는 경고 |
+| Low | current < reorder | `#f59e0b` (노랑) | 경고 아이콘 |
+| Normal | reorder ≤ current < max×0.8 | `#22c55e` (녹색) | 정상 표시 |
+| High | current ≥ max×0.8 | `#3b82f6` (파랑) | 과잉 표시 |
+
+---
+
+## 11. 리테일 컨셉 시각화 (retail_concepts)
+
+### 11.1 핵심 지표 (12건)
+
+| 카테고리 | 지표명 | 공식 | 벤치마크 | 3D 시각화 |
+|----------|--------|------|----------|-----------|
+| traffic | Foot Traffic | COUNT(store_visits) | 40명/일 | 존별 밀도 |
+| traffic | Traffic Density | visitors / sqm | 0.2명/㎡ | 히트맵 |
+| traffic | Peak Hour Ratio | peak / total | 25% | 시간 차트 |
+| conversion | Conversion Rate | purchases / visitors | 15% | 퍼널 |
+| conversion | Try-on Rate | fitting / visitors | 25% | 피팅룸 표시 |
+| conversion | Browse-to-Buy | buyers / browsers | 20% | 동선 표시 |
+| revenue | Average Basket | revenue / transactions | ₩65,000 | 가격 표시 |
+| revenue | Revenue per Visitor | revenue / visitors | ₩10,000 | 고객당 표시 |
+| revenue | Sales per SQM | revenue / sqm | ₩50,000 | 면적 차트 |
+| customer | Customer LTV | SUM(purchases) | ₩500,000 | VIP 표시 |
+| customer | Repeat Visit Rate | returning / total | 35% | 재방문 표시 |
+| customer | Churn Rate | churned / total | 5% | 이탈 경고 |
+
+---
+
+## 12. 스토리지 구조
+
+### 12.1 Supabase Storage 전체 경로
 
 ```
 3d-models/
 ├── {user_id}/
 │   └── {store_id}/
 │       └── 3d-models/
-│           ├── store_gangnam_main.glb      # 매장 전체 모델
-│           ├── rack_clothing_01.glb         # 의류 랙
-│           ├── shelf_display_01.glb         # 진열대
-│           ├── counter_checkout_01.glb      # 계산대
-│           └── ...
-```
-
-### 6.2 파일 업로드 API
-
-```typescript
-// 모델 업로드
-const { data, error } = await supabase.storage
-  .from('3d-models')
-  .upload(`${userId}/${storeId}/3d-models/${fileName}`, file);
-
-// 공개 URL 획득
-const { data: { publicUrl } } = supabase.storage
-  .from('3d-models')
-  .getPublicUrl(`${userId}/${storeId}/3d-models/${fileName}`);
-```
-
----
-
-## 7. AI 모델 분석 연동
-
-### 7.1 자동 분석 플로우
-
-```
-┌──────────────┐     ┌──────────────────┐     ┌──────────────────┐
-│  3D 모델     │────▶│ analyze-3d-model │────▶│ ontology_entity_ │
-│  업로드      │     │   Edge Function  │     │ types 매칭       │
-└──────────────┘     └──────────────────┘     └──────────────────┘
-                              │
-                              ▼
-                     ┌──────────────────┐
-                     │  분석 결과       │
-                     │  • entity_type   │
-                     │  • dimensions    │
-                     │  • movable       │
-                     │  • confidence    │
-                     └──────────────────┘
-```
-
-### 7.2 온톨로지 엔티티 타입 (30개)
-
-시스템에서 지원하는 엔티티 타입:
-
-**핵심 비즈니스 엔티티 (1-10)**
-- `Store`, `Zone`, `Product`, `Customer`, `Staff`
-- `Transaction`, `Visit`, `Purchase`, `Promotion`, `Category`
-
-**분석/메트릭 엔티티 (11-20)**
-- `DailyKPI`, `HourlyMetric`, `ZoneMetric`, `ProductPerformance`, `CustomerSegment`
-- `FunnelStage`, `Heatmap`, `Trend`, `Anomaly`, `Forecast`
-
-**전략/AI 엔티티 (21-30)**
-- `Strategy`, `Recommendation`, `Insight`, `Alert`, `Goal`
-- `Scenario`, `Simulation`, `ExternalFactor`, `Event`, `Inventory`
-
-### 7.3 Movability 규칙
-
-| movable=true | movable=false |
-|--------------|---------------|
-| Rack, Shelf, DisplayTable | Store, Zone |
-| Mannequin, Bench, Mirror | Camera, Beacon, POS |
-| Kiosk, Product | 벽, 기둥, 천장 |
-
----
-
-## 8. 조명 프리셋
-
-### 8.1 기본 조명 설정
-
-```typescript
-const defaultLighting: LightingPreset = {
-  name: 'retail_standard',
-  description: '소매 매장 표준 조명',
-  lights: [
-    {
-      type: 'ambient',
-      color: '#ffffff',
-      intensity: 0.4
-    },
-    {
-      type: 'directional',
-      color: '#ffffff',
-      intensity: 0.8,
-      position: { x: 10, y: 15, z: 10 },
-      target: { x: 0, y: 0, z: 0 }
-    },
-    {
-      type: 'point',
-      color: '#fff5e6',  // 따뜻한 톤
-      intensity: 0.6,
-      position: { x: -5, y: 3, z: 3 }  // 의류존 위
-    }
-  ]
-};
-```
-
-### 8.2 Baked 모델 처리
-
-Blender에서 조명을 베이크한 모델의 경우:
-
-```typescript
-const bakedSpaceAsset: SpaceAsset = {
-  // ...
-  isBaked: true  // 실시간 조명 영향 제외
-};
+│           │
+│           ├── space/                       # 공간 모델
+│           │   ├── store_gangnam_main.glb
+│           │   └── floor_250sqm.glb
+│           │
+│           ├── furniture/                   # 가구 모델
+│           │   ├── Z001_entrance/
+│           │   │   ├── gate_entrance_01.glb
+│           │   │   ├── sign_welcome_01.glb
+│           │   │   └── kiosk_info_01.glb
+│           │   ├── Z002_main/
+│           │   │   ├── table_display_center_01.glb
+│           │   │   └── ...
+│           │   ├── Z003_clothing/
+│           │   │   └── ...
+│           │   ├── Z004_accessory/
+│           │   │   └── ...
+│           │   ├── Z005_fitting/
+│           │   │   └── ...
+│           │   ├── Z006_checkout/
+│           │   │   └── ...
+│           │   └── Z007_lounge/
+│           │       └── ...
+│           │
+│           ├── products/                    # 상품 모델 (25건)
+│           │   ├── outerwear/              # 아우터 (5)
+│           │   │   └── product_coat_*.glb
+│           │   ├── tops/                   # 상의 (5)
+│           │   │   └── product_blouse_*.glb
+│           │   ├── bottoms/                # 하의 (5)
+│           │   │   └── product_pants_*.glb
+│           │   ├── accessories/            # 액세서리 (5)
+│           │   │   └── product_bag_*.glb
+│           │   ├── shoes/                  # 신발 (3)
+│           │   │   └── product_shoes_*.glb
+│           │   └── cosmetics/              # 화장품 (2)
+│           │       └── product_skincare_*.glb
+│           │
+│           ├── staff/                       # 직원 아바타 (8건)
+│           │   ├── staff_manager_*.glb
+│           │   ├── staff_senior_*.glb
+│           │   ├── staff_sales_*.glb
+│           │   └── staff_cashier_*.glb
+│           │
+│           └── customers/                   # 고객 아바타 (선택)
+│               ├── customer_vip_*.glb
+│               ├── customer_regular_*.glb
+│               └── customer_new_*.glb
 ```
 
 ---
 
-## 9. 데이터 연동 예시
+## 13. 전체 체크리스트
 
-### 9.1 히트맵 오버레이
+### 13.1 공간 모델 (2건)
+- [ ] `store_gangnam_main.glb` - 매장 전체 구조
+- [ ] `floor_250sqm.glb` - 바닥 플레인 (오버레이용)
 
-```typescript
-// zone_daily_metrics → 히트맵 데이터
-const heatmapData = zoneMetrics.map(zone => ({
-  zone_id: zone.zone_id,
-  intensity: zone.total_visitors / maxVisitors,  // 0~1 정규화
-  color: getHeatmapColor(zone.total_visitors)
-}));
+### 13.2 존별 가구 모델 (52건)
+- [ ] Z001 입구 (4건): 게이트, 사인, 키오스크, 카트거치대
+- [ ] Z002 메인홀 (12건): 디스플레이, 마네킹, 배너
+- [ ] Z003 의류존 (14건): 랙, 선반, 거울, 사이즈표
+- [ ] Z004 액세서리존 (10건): 쇼케이스, 스탠드, 신발대
+- [ ] Z005 피팅룸 (6건): 부스, 거울, 의자, 훅, 벤치
+- [ ] Z006 계산대 (8건): 카운터, POS, 포장대, 대기선
+- [ ] Z007 휴식공간 (6건): 소파, 테이블, 화분, 자판기
 
-// 3D 씬에 오버레이
-const effects: EffectLayer[] = [{
-  type: 'heatmap',
-  data: heatmapData,
-  opacity: 0.7
-}];
-```
+### 13.3 상품 모델 (25건)
+- [ ] 아우터 (5건): 코트, 재킷, 패딩, 트렌치, 레더
+- [ ] 상의 (5건): 블라우스, 니트, 셔츠, 탑, 폴로
+- [ ] 하의 (5건): 와이드팬츠, 데님, 치노, 조거, 스커트
+- [ ] 액세서리 (5건): 토트백, 목걸이, 벨트, 스카프, 머플러
+- [ ] 신발 (3건): 로퍼, 하이힐, 스니커즈
+- [ ] 화장품 (2건): 스킨케어, 립스틱
 
-### 9.2 AI 레이아웃 추천
+### 13.4 직원 아바타 (8건)
+- [ ] 매니저 (1): 김민준
+- [ ] 시니어 판매 (2): 이서연, 박도윤
+- [ ] 판매 (3): 최하은, 정시우, 강유진
+- [ ] 캐셔 (2): 조지호, 윤수빈
 
-```typescript
-// AI가 분석한 결과
-const aiLayoutResult: AILayoutResult = {
-  zones: [{
-    zone_id: 'a0000003-...',  // 의류존
-    zone_type: 'display',
-    furniture: [{
-      furniture_id: 'rack-001',
-      entity_type: 'Rack',
-      current_position: { x: -5, y: 0, z: 3 },
-      suggested_position: { x: -4, y: 0, z: 2 },
-      optimization_reason: '동선 개선: 입구에서 접근성 15% 향상'
-    }]
-  }],
-  optimization_summary: '전체 고객 체류시간 8% 증가 예상'
-};
-```
+### 13.5 조명 설정
+- [ ] 전역 조명 프리셋
+- [ ] Z001 ~ Z007 존별 스폿 조명
 
----
+### 13.6 시각화 오버레이
+- [ ] 히트맵 (zone_daily_metrics)
+- [ ] 동선 흐름 (zone_events)
+- [ ] 상품 성과 (product_performance_agg)
+- [ ] AI 추천 (ai_recommendations)
+- [ ] 시간대별 트래픽 (hourly_metrics)
 
-## 10. 체크리스트
+### 13.7 그래프 시각화
+- [ ] 30개 엔티티 노드
+- [ ] 30개 관계 엣지
 
-### 10.1 모델 제작 체크리스트
+### 13.8 전략/목표 시각화
+- [ ] 5개 전략 시각화
+- [ ] 10개 목표 프로그레스
 
-- [ ] GLB 형식으로 내보내기
-- [ ] Y-up 좌표계 확인
-- [ ] 단위: 미터(m) 설정
-- [ ] 원점: 바닥 중앙 설정
-- [ ] 폴리곤 수 최적화 (가구 3,000 이하)
-- [ ] 텍스처 해상도 확인 (1024×1024)
-- [ ] 파일명 규칙 준수 (`type_category_##.glb`)
-
-### 10.2 메타데이터 체크리스트
-
-- [ ] zones_dim 좌표와 3D 모델 위치 일치
-- [ ] store_scenes.scene_data에 모든 zone 포함
-- [ ] 가구별 movable 속성 정의
-- [ ] 엔티티 타입 매칭 확인
-
-### 10.3 통합 테스트 체크리스트
-
-- [ ] Store3DViewer에서 모델 로드 확인
-- [ ] SceneComposer에서 가구 배치 확인
-- [ ] 히트맵 오버레이 정상 표시
-- [ ] AI 추천 결과 시각화 확인
+### 13.9 재고/컨셉 시각화
+- [ ] 25개 상품 재고 표시
+- [ ] 12개 리테일 컨셉 지표
 
 ---
 
-## 11. 문의 및 지원
+## 14. 모델 제작 총 수량 요약
+
+| 카테고리 | 수량 | 우선순위 |
+|----------|------|----------|
+| 공간 모델 | 2 | ★★★ 필수 |
+| 가구/집기 모델 | 52 | ★★★ 필수 |
+| 상품 모델 | 25 | ★★☆ 권장 |
+| 직원 아바타 | 8 | ★★☆ 권장 |
+| 고객 아바타 | 11 | ★☆☆ 선택 |
+| **총계** | **98** | - |
+
+---
+
+## 15. 문의 및 지원
 
 - **기술 문의**: 개발팀
 - **3D 모델링 문의**: 디지털트윈 팀
@@ -516,5 +951,6 @@ const aiLayoutResult: AILayoutResult = {
 
 ---
 
-*문서 버전: 1.0*
+*문서 버전: 2.0 (Complete Edition)*
 *최종 업데이트: 2025-12-16*
+*NEURALTWIN v8.0 ULTIMATE SEED 기준*
