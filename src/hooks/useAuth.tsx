@@ -228,9 +228,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        fetchOrganizationContext(session.user.id).then(() => {
-          setLoading(false);
-        });
+        fetchOrganizationContext(session.user.id)
+          .then(() => {
+            setLoading(false);
+          })
+          .catch((err) => {
+            console.error('Failed to fetch organization context:', err);
+            // 오류 발생 시에도 로딩 상태 해제
+            setLoading(false);
+          });
       } else {
         setLoading(false);
       }
