@@ -1,8 +1,8 @@
 # 3D 디지털트윈 모델 준비 가이드라인
 
-**버전**: 2.7 (Implementation Guide)
+**버전**: 2.8 (Phase 1-3 Complete)
 **작성일**: 2025-12-16
-**기준 시드**: NEURALTWIN v8.0 ULTIMATE SEED
+**기준 시드**: NEURALTWIN v8.2
 
 ---
 
@@ -2331,75 +2331,108 @@ serve(async (req) => {
 │                        구현 로드맵                                   │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
-│  Phase 1: MVP 기능 (핵심)                                           │
+│  Phase 1: MVP 기능 (핵심)                              ✅ 완료       │
 │  ─────────────────────────                                          │
-│  □ SceneViewer 컴포넌트 구현                                        │
-│  □ useSceneRecipe 훅 구현                                           │
-│  □ MVP 테스트 모델 제작 (12개)                                      │
-│  □ 슬롯 시드 데이터에 실제 가구 ID 연결                             │
-│  □ 기본 렌더링 테스트                                               │
+│  ✅ SceneViewer 컴포넌트 구현                                        │
+│  ✅ useSceneRecipe 훅 구현                                           │
+│  □ MVP 테스트 모델 제작 (12개)                    ⏳ 3D 모델 제작 대기│
+│  □ 슬롯 시드 데이터에 실제 가구 ID 연결           ⏳ 3D 모델 제작 대기│
+│  □ 기본 렌더링 테스트                             ⏳ 3D 모델 제작 대기│
 │                                                                     │
-│  Phase 2: 배치 편집                                                 │
+│  Phase 2: 배치 편집                                    ✅ 완료       │
 │  ─────────────────────────                                          │
-│  □ PlacementEditor 컴포넌트 구현                                    │
-│  □ SlotVisualizer 컴포넌트 구현                                     │
-│  □ 드래그&드롭 상품 이동                                            │
-│  □ 호환성 실시간 체크 UI                                            │
+│  ✅ PlacementEditor 컴포넌트 구현                                    │
+│  ✅ SlotVisualizer 컴포넌트 구현 (SlotVisualizerOverlay)             │
+│  ✅ 드래그&드롭 상품 이동                                            │
+│  ✅ 호환성 실시간 체크 UI                                            │
 │                                                                     │
-│  Phase 3: AI 최적화                                                 │
+│  Phase 3: AI 최적화                                    ✅ 완료       │
 │  ─────────────────────────                                          │
-│  □ generate-optimization Edge Function                              │
-│  □ OptimizationPanel 컴포넌트                                       │
-│  □ 전/후 비교 뷰                                                    │
-│  □ 최적화 적용/롤백 기능                                            │
+│  ✅ generate-optimization Edge Function                              │
+│  ✅ OptimizationPanel 컴포넌트                                       │
+│  ✅ 전/후 비교 뷰 (ComparisonView)                                   │
+│  ✅ 최적화 적용/롤백 기능 (useOptimization, usePlacement)            │
 │                                                                     │
-│  Phase 4: 프로덕션                                                  │
+│  Phase 4: 프로덕션                                     ⏳ 대기       │
 │  ─────────────────────────                                          │
-│  □ 전체 모델 제작 (98개)                                            │
-│  □ 성능 최적화 (LOD, 인스턴싱)                                      │
+│  □ 전체 모델 제작 (98개)                          ⏳ 3D 모델 제작 대기│
+│  □ 성능 최적화 (LOD, 인스턴싱)                                       │
 │  □ 모바일 대응                                                      │
 │  □ 실시간 협업 기능                                                 │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### 20.4 파일 구조 (구현 후 예상)
+### 20.4 파일 구조 (현재 상태)
 
 ```
-src/features/simulation/
-├── components/
-│   ├── SceneViewer.tsx          [구현 필요]
-│   ├── PlacementEditor.tsx      [구현 필요]
-│   ├── SlotVisualizer.tsx       [구현 필요]
-│   ├── OptimizationPanel.tsx    [구현 필요]
-│   └── ComparisonView.tsx       [구현 필요]
-│
-├── hooks/
-│   ├── useSceneRecipe.ts        [구현 필요]
-│   ├── useFurnitureSlots.ts     [구현 필요]
-│   └── useOptimization.ts       [구현 필요]
-│
-├── utils/
-│   └── sceneRecipeGenerator.ts  [✅ 구현 완료]
-│
-└── types/
-    └── (scene3d.ts 참조)        [✅ 구현 완료]
+src/features/simulation/components/digital-twin/
+├── SceneViewer.tsx              [✅ 구현 완료] Staff/Customer 아바타, 오버레이 지원
+├── PlacementEditor.tsx          [✅ 구현 완료] 드래그&드롭, 슬롯 스냅
+├── SlotVisualizerOverlay.tsx    [✅ 구현 완료] 슬롯 시각화 오버레이
+├── OptimizationPanel.tsx        [✅ 구현 완료] AI 최적화 결과 표시
+├── ComparisonView.tsx           [✅ 구현 완료] 전/후 비교 뷰
+├── ProductPlacement.tsx         [✅ 구현 완료] Display Type 프리미티브
+├── StoreSpace.tsx               [✅ 구현 완료]
+├── FurnitureLayout.tsx          [✅ 구현 완료]
+└── LightingPreset.tsx           [✅ 구현 완료]
 
-supabase/
-├── migrations/
-│   ├── 20251216_product_placement_and_avatars.sql  [✅ 구현 완료]
-│   └── 20251216_display_type_and_slots.sql         [✅ 구현 완료]
+src/features/studio/hooks/
+├── useSceneRecipe.ts            [✅ 구현 완료] SceneRecipe ↔ SceneProvider 연동
+├── useFurnitureSlots.ts         [✅ 구현 완료] 슬롯 데이터 관리
+├── useOptimization.ts           [✅ 구현 완료] AI 최적화 결과 관리, 적용/롤백
+├── usePlacement.ts              [✅ 구현 완료] 배치 저장, Undo/Redo, 히스토리
+├── useSceneSimulation.ts        [✅ 구현 완료]
+├── useLayoutSimulation.ts       [✅ 구현 완료]
+├── useFlowSimulation.ts         [✅ 구현 완료]
+├── useCongestionSimulation.ts   [✅ 구현 완료]
+└── useStaffingSimulation.ts     [✅ 구현 완료]
+
+src/features/simulation/utils/
+└── sceneRecipeGenerator.ts      [✅ 구현 완료]
+
+src/types/
+└── scene3d.ts                   [✅ 구현 완료] 모든 3D 타입 정의
+
+supabase/migrations/
+├── 20251216_product_placement_and_avatars.sql  [✅ 구현 완료]
+└── 20251216_display_type_and_slots.sql         [✅ 구현 완료]
+
+supabase/seeds/
+├── NEURALTWIN_v8.1_avatar_placement_data.sql   [✅ 구현 완료]
+└── NEURALTWIN_v8.2_furniture_slots.sql         [✅ 구현 완료]
+
+supabase/functions/
+├── generate-optimization/index.ts              [✅ 구현 완료] AI 레이아웃 최적화
+└── retail-ai-inference/index.ts                [✅ 구현 완료] 리테일 AI 추론
+```
+
+### 20.5 남은 작업 (3D 모델 제작 후)
+
+```
+⏳ 대기 중인 작업:
+├── 3D 모델 GLB 파일 제작 (98개)
+│   ├── 매장 공간 모델 (1개)
+│   ├── 가구 모델 (12개 MVP / 전체 20+개)
+│   └── 상품 모델 (25개 기본 / 전체 50+개)
 │
-├── seeds/
-│   ├── NEURALTWIN_v8.1_avatar_placement_data.sql   [✅ 구현 완료]
-│   └── NEURALTWIN_v8.2_furniture_slots.sql         [✅ 구현 완료]
+├── 시드 데이터 실제 ID 연결
+│   ├── furniture_slots.furniture_id → 실제 가구 ID
+│   └── products.model_url → 실제 GLB URL
 │
-└── functions/
-    └── generate-optimization/index.ts               [구현 필요]
+├── 렌더링 통합 테스트
+│   ├── GLB 모델 로딩 테스트
+│   ├── 슬롯 스냅 동작 검증
+│   └── 성능 프로파일링
+│
+└── 프로덕션 최적화
+    ├── LOD (Level of Detail) 구현
+    ├── 인스턴싱 (동일 모델 복제)
+    └── 모바일 반응형 처리
 ```
 
 ---
 
-*문서 버전: 2.7 (Implementation Guide)*
+*문서 버전: 2.8 (Phase 1-3 Complete)*
 *최종 업데이트: 2025-12-16*
-*NEURALTWIN v8.0 ULTIMATE SEED 기준*
+*NEURALTWIN v8.2 기준*
