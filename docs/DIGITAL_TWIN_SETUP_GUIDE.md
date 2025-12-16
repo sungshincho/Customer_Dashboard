@@ -1,6 +1,6 @@
 # Digital Twin 3D 시스템 설정 가이드
 
-**버전**: 1.0
+**버전**: 1.1
 **작성일**: 2025-12-16
 **NEURALTWIN**: v8.3
 
@@ -16,6 +16,7 @@
 6. [3D 모델 제작 스펙](#6-3d-모델-제작-스펙)
 7. [Storage 업로드 가이드](#7-storage-업로드-가이드)
 8. [테스트 시나리오](#8-테스트-시나리오)
+9. [데이터 편집 가이드](#9-데이터-편집-가이드) ← 신규
 
 ---
 
@@ -473,5 +474,248 @@ DECLARE
 
 ---
 
-*문서 버전: 1.0*
+## 9. 데이터 편집 가이드
+
+이 섹션에서는 가구 위치, 슬롯 정보, 상품 배치 등을 직접 수정할 때 어떤 파일의 어느 부분을 편집해야 하는지 설명합니다.
+
+### 9.1 편집 파일 위치 요약
+
+| 데이터 | 파일 | 섹션 |
+|--------|------|------|
+| **가구 위치/회전/크기** | `NEURALTWIN_v8.3_unified_products_furniture.sql` | STEP 2 |
+| **슬롯 개수 및 위치** | `NEURALTWIN_v8.3_unified_products_furniture.sql` | STEP 3 |
+| **상품-슬롯 배치** | `MVP_MODEL_URL_UPDATE.sql` | MVP Product-Slot Assignment |
+| **3D 모델 URL** | `MVP_MODEL_URL_UPDATE.sql` | 상단 v_storage_base |
+
+---
+
+### 9.2 가구 위치 편집
+
+**파일**: `supabase/seeds/NEURALTWIN_v8.3_unified_products_furniture.sql`
+
+**섹션**: STEP 2: Create Furniture Entities (약 100번째 줄)
+
+```sql
+-- 가구 위치 편집 예시
+INSERT INTO furniture (
+  id, store_id, user_id, org_id, zone_id,
+  furniture_code, furniture_name, furniture_type,
+  width, height, depth,
+  position, rotation, scale,        -- ← 여기서 편집
+  movable, is_active
+) VALUES
+-- 의류 행거 #1
+('b0000001-0000-0000-0000-000000000001'::UUID, v_store_id, v_user_id, v_org_id, v_zone_clothing,
+ 'RACK-001', '의류 행거 (더블) #1', 'clothing_rack_double',
+ 1.2, 1.8, 0.5,                     -- width, height, depth (미터)
+ '{"x":-6,"y":0,"z":2}'::jsonb,     -- ← position (월드 좌표)
+ '{"x":0,"y":0,"z":0}'::jsonb,      -- ← rotation (각도)
+ '{"x":1,"y":1,"z":1}'::jsonb,      -- ← scale (배율)
+ true, true),
+
+-- 선반형 진열대 #1
+('b0000011-0000-0000-0000-000000000011'::UUID, v_store_id, v_user_id, v_org_id, v_zone_clothing,
+ 'SHELF-001', '선반형 진열대 #1', 'shelf_display',
+ 1.0, 1.8, 0.4,
+ '{"x":-3,"y":0,"z":3}'::jsonb,     -- ← 이 좌표 수정
+ '{"x":0,"y":0,"z":0}'::jsonb,
+ '{"x":1,"y":1,"z":1}'::jsonb,
+ true, true),
+...
+```
+
+**좌표 설명**:
+- `position.x`: 좌우 위치 (음수: 왼쪽, 양수: 오른쪽)
+- `position.y`: 높이 (바닥 = 0)
+- `position.z`: 앞뒤 위치 (음수: 뒤쪽, 양수: 앞쪽)
+
+---
+
+### 9.3 슬롯 개수 및 위치 편집
+
+**파일**: `supabase/seeds/NEURALTWIN_v8.3_unified_products_furniture.sql`
+
+**섹션**: STEP 3: Create Furniture Slots (약 150번째 줄)
+
+```sql
+-- 행거 슬롯 편집 예시 (RACK-001)
+INSERT INTO furniture_slots (
+  furniture_id, furniture_type, slot_id, slot_type,
+  slot_position, slot_rotation,          -- ← 슬롯 위치
+  compatible_display_types,
+  max_product_width, max_product_height, max_product_depth,
+  store_id
+)
+SELECT
+  'b0000001-0000-0000-0000-000000000001'::uuid,  -- furniture_id
+  'clothing_rack_double',
+  'H' || row_num,                        -- slot_id: H1, H2, H3...
+  'hanger',
+  jsonb_build_object(
+    'x', -0.5 + (row_num - 1) * 0.11,    -- ← X 위치 (간격 0.11m)
+    'y', 1.6,                             -- ← Y 높이 (1.6m)
+    'z', 0                                -- ← Z 위치
+  ),
+  '{"x":0,"y":0,"z":0}'::jsonb,
+  ARRAY['hanging'],                       -- ← 호환 display_type
+  0.6, 1.2, 0.3,                         -- max 크기 제한
+  v_store_id
+FROM generate_series(1, 10) AS row_num;  -- ← 슬롯 개수 (10개)
+```
+
+#### 슬롯 개수 변경
+
+```sql
+-- 10개 → 8개로 변경
+FROM generate_series(1, 8) AS row_num;
+```
+
+#### 슬롯 간격 변경
+
+```sql
+-- 간격 0.11m → 0.15m로 변경
+'x', -0.5 + (row_num - 1) * 0.15,
+```
+
+#### 슬롯 높이 변경
+
+```sql
+-- 높이 1.6m → 1.8m로 변경
+'y', 1.8,
+```
+
+---
+
+### 9.4 선반/테이블 슬롯 (2D 배열)
+
+```sql
+-- 선반 슬롯 (4단 × 3열 = 12개)
+SELECT
+  'b0000011-0000-0000-0000-000000000011'::uuid,
+  'shelf_display',
+  'S' || shelf_level || '-' || col_num,  -- S1-1, S1-2, S2-1...
+  'shelf',
+  jsonb_build_object(
+    'x', -0.3 + (col_num - 1) * 0.3,     -- ← 열 위치 (간격 0.3m)
+    'y', 0.2 + (shelf_level - 1) * 0.4,  -- ← 단 높이 (간격 0.4m)
+    'z', 0
+  ),
+  ...
+FROM
+  generate_series(1, 4) AS shelf_level,   -- ← 단 수 (4단)
+  generate_series(1, 3) AS col_num;       -- ← 열 수 (3열)
+```
+
+---
+
+### 9.5 상품-슬롯 배치 편집
+
+**파일**: `supabase/seeds/MVP_MODEL_URL_UPDATE.sql`
+
+**섹션**: MVP Product-Slot Assignment (약 100번째 줄)
+
+```sql
+-- 상품을 특정 가구의 특정 슬롯에 배치
+
+-- 코트 → RACK-001의 H1 슬롯
+UPDATE products SET
+  initial_furniture_id = 'b0000001-0000-0000-0000-000000000001'::UUID,  -- ← 가구 ID
+  slot_id = 'H1',                                                        -- ← 슬롯 ID
+  model_3d_position = '{"x":-6,"y":1.6,"z":2}'::jsonb                   -- ← 월드 좌표
+WHERE sku = 'SKU-OUT-001';
+
+-- 슬롯 점유 상태 업데이트 (필수)
+UPDATE furniture_slots SET
+  is_occupied = true,
+  occupied_by_product_id = 'f0000001-0000-0000-0000-000000000000'::UUID
+WHERE furniture_id = 'b0000001-0000-0000-0000-000000000001'::UUID
+  AND slot_id = 'H1';
+```
+
+#### 상품 월드 좌표 계산
+
+```
+상품 월드 좌표 = 가구 position + 슬롯 slot_position
+
+예시:
+├── 가구 position:      {"x":-6,   "y":0,   "z":2}
+├── 슬롯 slot_position: {"x":-0.5, "y":1.6, "z":0}
+└── 상품 월드 좌표:     {"x":-6.5, "y":1.6, "z":2}
+```
+
+---
+
+### 9.6 호환성 매핑 (참고)
+
+| slot_type | compatible_display_types | 대상 상품 예시 |
+|-----------|--------------------------|----------------|
+| `hanger` | `['hanging']` | 코트, 자켓, 셔츠, 팬츠 |
+| `shelf` | `['folded', 'boxed', 'standing']` | 접힌 옷, 박스, 신발 |
+| `table` | `['folded', 'boxed', 'stacked']` | 접힌 옷, 선물박스, 적층상품 |
+| `rack` | `['standing']` | 신발, 가방 |
+
+---
+
+### 9.7 ID 참조표
+
+#### 가구 ID (furniture)
+
+| furniture_code | furniture_id | 타입 |
+|----------------|--------------|------|
+| RACK-001 | `b0000001-...-000000000001` | clothing_rack_double |
+| RACK-002 | `b0000002-...-000000000002` | clothing_rack_double |
+| RACK-003 | `b0000003-...-000000000003` | clothing_rack_double |
+| RACK-004 | `b0000004-...-000000000004` | clothing_rack_double |
+| SHELF-001 | `b0000011-...-000000000011` | shelf_display |
+| SHELF-002 | `b0000012-...-000000000012` | shelf_display |
+| TABLE-001 | `b0000021-...-000000000021` | table_display |
+| TABLE-002 | `b0000022-...-000000000022` | table_display |
+| SHOE-001 | `b0000031-...-000000000031` | shoe_rack |
+| SHOE-002 | `b0000032-...-000000000032` | shoe_rack |
+| SHOWCASE-001 | `b0000041-...-000000000041` | glass_showcase |
+| SHOWCASE-002 | `b0000042-...-000000000042` | glass_showcase |
+
+#### 상품 ID (products)
+
+| SKU | product_id | display_type | MVP 모델 |
+|-----|------------|--------------|----------|
+| SKU-OUT-001 | `f0000001-...-000000000000` | hanging | product_coat.glb |
+| SKU-UND-001 | `f0000020-...-000000000000` | folded | product_sweater.glb |
+| SKU-SHO-001 | `f0000010-...-000000000000` | standing | product_shoes.glb |
+| SKU-GFT-001 | `f0000024-...-000000000000` | boxed | product_giftbox.glb |
+| SKU-TSK-001 | `f0000025-...-000000000000` | stacked | product_tshirt_stack.glb |
+
+---
+
+### 9.8 편집 워크플로우
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      데이터 편집 워크플로우                               │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  1️⃣ 3D 모델 제작 후 실제 크기 측정                                       │
+│     └── Blender에서 가구 모델의 슬롯 위치 측정                          │
+│                                                                         │
+│  2️⃣ NEURALTWIN_v8.3_unified_products_furniture.sql 편집                │
+│     ├── STEP 2: 가구 position 수정 (월드 좌표)                         │
+│     └── STEP 3: 슬롯 slot_position 수정 (상대 좌표)                    │
+│                                                                         │
+│  3️⃣ MVP_MODEL_URL_UPDATE.sql 편집                                      │
+│     ├── v_storage_base URL 수정                                        │
+│     └── 상품-슬롯 배치 수정                                             │
+│                                                                         │
+│  4️⃣ SQL 재실행                                                          │
+│     ├── v8.3 시드 재실행 (가구/슬롯 업데이트)                          │
+│     └── MVP URL 스크립트 실행 (URL/배치 적용)                          │
+│                                                                         │
+│  5️⃣ 프론트엔드 테스트                                                   │
+│     └── SceneViewer에서 위치 확인                                       │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+*문서 버전: 1.1*
 *최종 업데이트: 2025-12-16*
