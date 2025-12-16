@@ -5,7 +5,16 @@
  * hooks와 utils 간 순환 참조를 방지하기 위해 분리
  */
 
-import type { SimulationStatus, ConfidenceDetails, Bottleneck, SimulatedPath } from './simulation.types';
+import type {
+  SimulationStatus,
+  ConfidenceDetails,
+  Bottleneck,
+  SimulatedPath,
+  DisplayType,
+  SlotType,
+  ProductPlacement,
+  SlotCompatibilityInfo,
+} from './simulation.types';
 
 // ============================================================================
 // 레이아웃 시뮬레이션 결과
@@ -37,21 +46,47 @@ export interface LayoutSimulationResultType {
     fromPosition: { x: number; y: number; z: number };
     toPosition: { x: number; y: number; z: number };
     rotation?: number;
+    reason?: string;
   }>;
+
+  // 🆕 슬롯 기반 상품 배치 제안
+  productPlacements?: ProductPlacement[];
+
   zoneChanges: Array<{
     zoneId: string;
     zoneName: string;
     changeType: string;
     before: any;
     after: any;
+    reason?: string;
   }>;
 
-  // 신뢰도
-  confidence: ConfidenceDetails;
+  // 신뢰도 (확장)
+  confidence: ConfidenceDetails & {
+    factors: ConfidenceDetails['factors'] & {
+      slotDataAvailable?: number;
+    };
+  };
 
   // AI 인사이트
   insights: string[];
   warnings?: string[];
+
+  // 🆕 데이터 소스 메타데이터
+  dataSource?: {
+    usedRealData: boolean;
+    usedSlotSystem: boolean;
+    zonesAvailable: number;
+    zoneMetricsAvailable: number;
+    visitsAvailable: number;
+    slotsAvailable: number;
+    furnitureAvailable: number;
+    productsAvailable: number;
+    note: string;
+  };
+
+  // 🆕 슬롯 호환성 정보
+  slotCompatibility?: SlotCompatibilityInfo | null;
 
   // 3D 시각화 데이터
   visualization: {
@@ -63,10 +98,12 @@ export interface LayoutSimulationResultType {
       type: 'current' | 'optimized';
     }>;
     highlightZones: Array<{
-      zoneId: string;
-      color: string;
-      opacity: number;
-      changeType: 'improved' | 'degraded' | 'new' | 'removed';
+      zoneId?: string;
+      position?: { x: number; y: number; z: number };
+      color?: string;
+      opacity?: number;
+      type?: string;
+      changeType?: 'improved' | 'degraded' | 'new' | 'removed' | 'suggested';
     }>;
   };
 }

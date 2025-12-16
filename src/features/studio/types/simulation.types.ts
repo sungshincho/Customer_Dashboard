@@ -117,10 +117,42 @@ export interface PricingOptimizationResult {
   margin: number;
 }
 
+// 🆕 Display type: 상품이 진열될 수 있는 방식
+export type DisplayType = 'hanging' | 'standing' | 'folded' | 'located' | 'boxed' | 'stacked';
+
+// 🆕 Slot type: 가구의 슬롯 타입
+export type SlotType = 'hanger' | 'mannequin' | 'shelf' | 'table' | 'rack' | 'hook' | 'drawer';
+
+// 🆕 상품 배치 변경
+export interface ProductPlacement {
+  productId: string;
+  productSku: string;
+  productName?: string;
+  displayType?: DisplayType;
+  fromSlotId: string | null;
+  toSlotId: string;
+  toFurnitureId: string;
+  slotType?: SlotType;
+  reason: string;
+  priority?: 'high' | 'medium' | 'low';
+  displayTypeMatch?: boolean;
+}
+
+// 🆕 슬롯 호환성 정보
+export interface SlotCompatibilityInfo {
+  totalSlots: number;
+  occupiedSlots: number;
+  availableSlots: number;
+  slotTypes: SlotType[];
+  displayTypes: DisplayType[];
+}
+
 // 레이아웃 최적화 결과
 export interface LayoutOptimizationResult {
   zoneChanges: ZoneChange[];
   furnitureMoves: FurnitureMove[];
+  // 🆕 슬롯 기반 상품 배치 제안
+  productPlacements?: ProductPlacement[];
   expectedImprovement: {
     traffic: number;
     conversion: number;
@@ -128,6 +160,17 @@ export interface LayoutOptimizationResult {
   };
   heatmapBefore?: any;
   heatmapAfter?: any;
+  // 🆕 슬롯 호환성 정보
+  slotCompatibility?: SlotCompatibilityInfo | null;
+  // 🆕 데이터 소스 메타데이터
+  dataSource?: {
+    usedRealData: boolean;
+    usedSlotSystem: boolean;
+    slotsAvailable: number;
+    furnitureAvailable: number;
+    productsAvailable: number;
+    note: string;
+  };
 }
 
 // 존 변경

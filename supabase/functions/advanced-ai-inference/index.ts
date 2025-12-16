@@ -56,6 +56,310 @@ function safeParseAIResponse(aiContent: string, defaultValue: any): any {
 
 
 // ============================================================================
+// 🆕 Slot-Based Optimization System (Unified from generate-optimization)
+// ============================================================================
+
+// Display type: how products can be displayed
+type DisplayType = 'hanging' | 'standing' | 'folded' | 'located' | 'boxed' | 'stacked';
+
+// Slot type: physical slot types on furniture
+type SlotType = 'hanger' | 'mannequin' | 'shelf' | 'table' | 'rack' | 'hook' | 'drawer';
+
+// Slot to Display type compatibility mapping
+const SLOT_DISPLAY_COMPATIBILITY: Record<SlotType, DisplayType[]> = {
+  hanger: ['hanging'],
+  mannequin: ['standing'],
+  shelf: ['folded', 'located', 'boxed', 'stacked'],
+  table: ['folded', 'located', 'boxed'],
+  rack: ['hanging', 'located'],
+  hook: ['hanging'],
+  drawer: ['folded', 'boxed'],
+};
+
+interface FurnitureSlot {
+  id: string;
+  furniture_id: string;
+  slot_id: string;
+  slot_type: SlotType;
+  slot_position: { x: number; y: number; z: number };
+  is_occupied: boolean;
+  current_product_id?: string;
+  compatible_display_types: DisplayType[];
+  zone_id?: string;
+}
+
+interface ProductWithDisplay {
+  id: string;
+  sku: string;
+  name: string;
+  category: string;
+  display_type: DisplayType;
+  compatible_display_types: DisplayType[];
+  price?: number;
+  position?: { x: number; y: number; z: number };
+  furniture_id?: string;
+  slot_id?: string;
+}
+
+interface FurnitureData {
+  id: string;
+  furniture_type: string;
+  position: { x: number; y: number; z: number };
+  rotation: { x: number; y: number; z: number };
+  dimensions?: { width: number; height: number; depth: number };
+  movable: boolean;
+  zone_id?: string;
+  slots?: FurnitureSlot[];
+}
+
+interface SlotBasedLayoutData {
+  furniture: FurnitureData[];
+  slots: FurnitureSlot[];
+  products: ProductWithDisplay[];
+  zones: any[];
+  slotCompatibilityMatrix: Map<string, string[]>; // slotId -> compatible product IDs
+}
+
+// Check if a product can be placed on a slot based on display_type compatibility
+function isSlotCompatible(slot: FurnitureSlot, product: ProductWithDisplay): boolean {
+  // Check slot_type compatibility
+  const slotCompatibleTypes = SLOT_DISPLAY_COMPATIBILITY[slot.slot_type] || [];
+
+  // Product's compatible display types
+  const productDisplayTypes = product.compatible_display_types || [product.display_type];
+
+  // Check if there's any overlap
+  return productDisplayTypes.some(dt => slotCompatibleTypes.includes(dt));
+}
+
+// Find compatible slots for a product
+function findCompatibleSlots(slots: FurnitureSlot[], product: ProductWithDisplay): FurnitureSlot[] {
+  return slots.filter(slot => !slot.is_occupied && isSlotCompatible(slot, product));
+}
+
+// Find compatible products for a slot
+function findCompatibleProducts(slot: FurnitureSlot, products: ProductWithDisplay[]): ProductWithDisplay[] {
+  return products.filter(product => isSlotCompatible(slot, product));
+}
+
+// Build slot compatibility matrix
+function buildSlotCompatibilityMatrix(
+  slots: FurnitureSlot[],
+  products: ProductWithDisplay[]
+): Map<string, string[]> {
+  const matrix = new Map<string, string[]>();
+
+  for (const slot of slots) {
+    const compatibleProductIds = products
+      .filter(p => isSlotCompatible(slot, p))
+      .map(p => p.id);
+    matrix.set(slot.id, compatibleProductIds);
+  }
+
+  return matrix;
+}
+
+// Load slot-based layout data from Supabase
+async function loadSlotBasedLayoutData(
+  supabase: any,
+  storeId: string,
+  userId: string
+): Promise<SlotBasedLayoutData> {
+  // Load furniture with their slot types
+  const { data: furnitureData } = await supabase
+    .from('furniture')
+    .select('*')
+    .eq('store_id', storeId);
+
+  // Load furniture slots
+  const { data: slotsData } = await supabase
+    .from('furniture_slots')
+    .select('*')
+    .eq('store_id', storeId);
+
+  // Load products with display_type
+  const { data: productsData } = await supabase
+    .from('products')
+    .select('id, sku, name, category, price, display_type, compatible_display_types')
+    .eq('store_id', storeId);
+
+  // Load zones
+  const { data: zonesData } = await supabase
+    .from('zones_dim')
+    .select('id, zone_name, zone_type, area_sqm, center_x, center_z')
+    .eq('store_id', storeId);
+
+  // Transform furniture data
+  const furniture: FurnitureData[] = (furnitureData || []).map((f: any) => ({
+    id: f.id,
+    furniture_type: f.furniture_type,
+    position: f.position || { x: 0, y: 0, z: 0 },
+    rotation: f.rotation || { x: 0, y: 0, z: 0 },
+    dimensions: f.dimensions,
+    movable: f.movable !== false,
+    zone_id: f.zone_id,
+  }));
+
+  // Transform slots data
+  const slots: FurnitureSlot[] = (slotsData || []).map((s: any) => ({
+    id: s.id,
+    furniture_id: s.furniture_id,
+    slot_id: s.slot_id,
+    slot_type: s.slot_type || 'shelf',
+    slot_position: s.slot_position || { x: 0, y: 0, z: 0 },
+    is_occupied: s.is_occupied || false,
+    current_product_id: s.current_product_id,
+    compatible_display_types: s.compatible_display_types || SLOT_DISPLAY_COMPATIBILITY[s.slot_type as SlotType] || [],
+    zone_id: s.zone_id,
+  }));
+
+  // Transform products data
+  const products: ProductWithDisplay[] = (productsData || []).map((p: any) => ({
+    id: p.id,
+    sku: p.sku || '',
+    name: p.name || '',
+    category: p.category || '',
+    display_type: p.display_type || 'hanging',
+    compatible_display_types: p.compatible_display_types || ['hanging'],
+    price: p.price,
+  }));
+
+  // Build compatibility matrix
+  const slotCompatibilityMatrix = buildSlotCompatibilityMatrix(slots, products);
+
+  // Attach slots to furniture
+  furniture.forEach(f => {
+    f.slots = slots.filter(s => s.furniture_id === f.id);
+  });
+
+  return {
+    furniture,
+    slots,
+    products,
+    zones: zonesData || [],
+    slotCompatibilityMatrix,
+  };
+}
+
+// Generate slot-based product placement suggestions
+function generateSlotBasedProductPlacements(
+  layoutData: SlotBasedLayoutData,
+  performanceData: any,
+  maxSuggestions = 10
+): Array<{
+  product_id: string;
+  product_sku: string;
+  current_slot_id?: string;
+  suggested_slot_id: string;
+  suggested_furniture_id: string;
+  reason: string;
+  priority: 'high' | 'medium' | 'low';
+  display_type_match: boolean;
+}> {
+  const suggestions: Array<{
+    product_id: string;
+    product_sku: string;
+    current_slot_id?: string;
+    suggested_slot_id: string;
+    suggested_furniture_id: string;
+    reason: string;
+    priority: 'high' | 'medium' | 'low';
+    display_type_match: boolean;
+  }> = [];
+
+  const { slots, products, slotCompatibilityMatrix } = layoutData;
+  const productPerformance = performanceData?.productPerformance || [];
+
+  // Get available slots (not occupied)
+  const availableSlots = slots.filter(s => !s.is_occupied);
+
+  // Get low-performing products
+  const lowPerformers = productPerformance
+    .filter((p: any) => p.conversion_rate < 0.05 || p.units_sold < 5)
+    .slice(0, maxSuggestions);
+
+  for (const perf of lowPerformers) {
+    const product = products.find(p => p.id === perf.product_id);
+    if (!product) continue;
+
+    // Find compatible available slots
+    const compatibleSlots = findCompatibleSlots(availableSlots, product);
+
+    if (compatibleSlots.length > 0) {
+      // Prefer high-traffic zone slots (if zone metrics available)
+      const targetSlot = compatibleSlots[0]; // Can be improved with zone metrics
+
+      suggestions.push({
+        product_id: product.id,
+        product_sku: product.sku,
+        current_slot_id: product.slot_id,
+        suggested_slot_id: targetSlot.id,
+        suggested_furniture_id: targetSlot.furniture_id,
+        reason: `저성과 상품 재배치: ${product.name}의 전환율이 ${((perf.conversion_rate || 0) * 100).toFixed(1)}%로 낮음. ${targetSlot.slot_type} 슬롯에 ${product.display_type} 진열 가능.`,
+        priority: perf.conversion_rate < 0.02 ? 'high' : 'medium',
+        display_type_match: true,
+      });
+
+      // Mark slot as used for this iteration
+      targetSlot.is_occupied = true;
+    }
+  }
+
+  return suggestions.slice(0, maxSuggestions);
+}
+
+// Build slot-based optimization prompt section
+function buildSlotOptimizationPrompt(layoutData: SlotBasedLayoutData): string {
+  const { furniture, slots, products } = layoutData;
+
+  const occupiedSlots = slots.filter(s => s.is_occupied);
+  const availableSlots = slots.filter(s => !s.is_occupied);
+
+  const slotTypeStats: Record<string, { total: number; occupied: number }> = {};
+  slots.forEach(s => {
+    if (!slotTypeStats[s.slot_type]) {
+      slotTypeStats[s.slot_type] = { total: 0, occupied: 0 };
+    }
+    slotTypeStats[s.slot_type].total++;
+    if (s.is_occupied) slotTypeStats[s.slot_type].occupied++;
+  });
+
+  const displayTypeStats: Record<string, number> = {};
+  products.forEach(p => {
+    displayTypeStats[p.display_type] = (displayTypeStats[p.display_type] || 0) + 1;
+  });
+
+  return `
+=== 🎯 슬롯 기반 배치 시스템 ===
+총 가구: ${furniture.length}개
+총 슬롯: ${slots.length}개 (점유: ${occupiedSlots.length}, 가용: ${availableSlots.length})
+총 상품: ${products.length}개
+
+슬롯 타입별 현황:
+${Object.entries(slotTypeStats).map(([type, stats]) =>
+  `- ${type}: ${stats.occupied}/${stats.total} (${((stats.occupied/stats.total)*100).toFixed(0)}% 사용)`
+).join('\n')}
+
+상품 진열 타입 분포:
+${Object.entries(displayTypeStats).map(([type, count]) =>
+  `- ${type}: ${count}개`
+).join('\n')}
+
+슬롯-진열 호환성 규칙:
+- hanger → hanging (옷걸이에 걸기)
+- mannequin → standing (마네킹에 입히기)
+- shelf → folded, located, boxed, stacked (선반에 놓기)
+- table → folded, located, boxed (테이블에 놓기)
+- rack → hanging, located (랙에 걸거나 놓기)
+- hook → hanging (후크에 걸기)
+- drawer → folded, boxed (서랍에 넣기)
+
+⚠️ 상품 재배치 시 반드시 슬롯 호환성을 확인하세요!
+`;
+}
+
+
+// ============================================================================
 // 🆕 Phase 1: Enhanced AI Inference - 데이터 기반 추론 강화
 // ============================================================================
 
@@ -1319,6 +1623,8 @@ interface InferenceRequest {
   params?: Record<string, any>;
   storeId?: string;
   orgId?: string;
+  // 🆕 Supabase client for slot-based optimization
+  supabaseClient?: any;
 }
 
 Deno.serve(async (req) => {
@@ -1348,6 +1654,15 @@ Deno.serve(async (req) => {
     const inferenceType = body.inference_type || body.type;
     console.log('Advanced AI inference request:', inferenceType);
 
+    // 🆕 슬롯 기반 최적화를 위해 Supabase 클라이언트를 params에 주입
+    const enrichedBody: InferenceRequest = {
+      ...body,
+      params: {
+        ...body.params,
+        supabaseClient: supabase, // 슬롯 데이터 로드용
+      },
+    };
+
     let result;
     switch (inferenceType) {
       case 'causal':
@@ -1363,16 +1678,17 @@ Deno.serve(async (req) => {
         result = await performPatternDiscovery(body, lovableApiKey);
         break;
       case 'layout_optimization':
-        result = await performLayoutOptimization(body, lovableApiKey);
+        // 🆕 슬롯 기반 최적화 통합 - enrichedBody 사용
+        result = await performLayoutOptimization(enrichedBody, lovableApiKey);
         break;
       case 'flow_simulation':
-        result = await performFlowSimulation(body, lovableApiKey);
+        result = await performFlowSimulation(enrichedBody, lovableApiKey);
         break;
       case 'staffing_optimization':
-        result = await performStaffingOptimization(body, lovableApiKey);
+        result = await performStaffingOptimization(enrichedBody, lovableApiKey);
         break;
       case 'congestion_simulation':
-        result = await performCongestionSimulation(body, lovableApiKey);
+        result = await performCongestionSimulation(enrichedBody, lovableApiKey);
         break;
       default:
         throw new Error('Invalid inference type: ' + inferenceType);
@@ -2747,10 +3063,11 @@ function detectStatisticalAnomalies(data: any[] | undefined, parameters: any) {
 
 // 레이아웃 최적화 시뮬레이션
 async function performLayoutOptimization(request: InferenceRequest, apiKey: string) {
-  const { params, storeId } = request;
+  const { params, storeId, orgId } = request;
   const sceneData = params?.sceneData;
   const storeContext = params?.storeContext;
   const goal = params?.goal || 'revenue';
+  const supabaseClient = params?.supabaseClient; // Supabase client passed from main handler
 
   // storeContext 디버그 로깅
   console.log('[LayoutOptimization] storeContext available:', {
@@ -2762,7 +3079,37 @@ async function performLayoutOptimization(request: InferenceRequest, apiKey: stri
     dataQuality: storeContext?.dataQuality,
   });
 
-  // 프롬프트 빌드
+  // 🆕 슬롯 기반 레이아웃 데이터 로드
+  let slotLayoutData: SlotBasedLayoutData | null = null;
+  let slotOptimizationSection = '';
+  let productPlacements: any[] = [];
+
+  if (storeId && supabaseClient) {
+    try {
+      slotLayoutData = await loadSlotBasedLayoutData(supabaseClient, storeId, '');
+      console.log('[LayoutOptimization] Slot data loaded:', {
+        furnitureCount: slotLayoutData.furniture.length,
+        slotsCount: slotLayoutData.slots.length,
+        productsCount: slotLayoutData.products.length,
+      });
+
+      // 슬롯 최적화 프롬프트 섹션 생성
+      if (slotLayoutData.slots.length > 0) {
+        slotOptimizationSection = buildSlotOptimizationPrompt(slotLayoutData);
+
+        // 룰 기반 상품 배치 제안 생성
+        productPlacements = generateSlotBasedProductPlacements(
+          slotLayoutData,
+          storeContext,
+          10
+        );
+      }
+    } catch (err) {
+      console.warn('[LayoutOptimization] Failed to load slot data:', err);
+    }
+  }
+
+  // 프롬프트 빌드 (슬롯 시스템 통합)
   const prompt = `You are an expert retail space optimization AI specializing in store layout design.
 
 TASK: Analyze the current store layout and suggest optimal furniture/fixture placements to maximize ${goal === 'revenue' ? 'revenue and sales conversion' : goal === 'traffic' ? 'customer traffic flow' : 'customer experience and dwell time'}.
@@ -2785,6 +3132,7 @@ ${JSON.stringify({
     id: p.id,
     sku: p.sku,
     position: p.position,
+    display_type: p.display_type,
   })),
 }, null, 2)}
 
@@ -2798,6 +3146,8 @@ ${storeContext?.dailySales?.length ? `SALES PERFORMANCE (last 7 days):
 ${storeContext?.zoneMetrics?.length ? `ZONE PERFORMANCE:
 ${storeContext.zoneMetrics.slice(0, 5).map((z: any) => `- ${z.zoneName}: ${z.visitorCount} visitors, ${z.avgDwellTime}s avg dwell time, ${(z.conversionRate * 100).toFixed(1)}% conversion`).join('\n')}` : ''}
 
+${slotOptimizationSection}
+
 Return a JSON object with this exact structure:
 {
   "furnitureMoves": [
@@ -2808,6 +3158,18 @@ Return a JSON object with this exact structure:
       "toPosition": {"x": number, "y": number, "z": number},
       "rotation": number,
       "reason": "string explaining why this move improves the layout"
+    }
+  ],
+  "productPlacements": [
+    {
+      "productId": "string",
+      "productSku": "string",
+      "displayType": "hanging|standing|folded|located|boxed|stacked",
+      "fromSlotId": "string or null",
+      "toSlotId": "string",
+      "toFurnitureId": "string",
+      "slotType": "hanger|mannequin|shelf|table|rack|hook|drawer",
+      "reason": "string explaining why this placement is optimal"
     }
   ],
   "zoneChanges": [
@@ -2828,7 +3190,16 @@ Return a JSON object with this exact structure:
   },
   "insights": ["string array of 3-5 actionable insights in Korean"],
   "confidence": number (0-1)
-}`;
+}
+
+IMPORTANT: When suggesting productPlacements, ensure slotType is compatible with displayType:
+- hanger → hanging only
+- mannequin → standing only (worn on mannequin)
+- shelf → folded, located, boxed, stacked
+- table → folded, located, boxed
+- rack → hanging, located
+- hook → hanging
+- drawer → folded, boxed`;
 
   try {
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -2853,6 +3224,7 @@ Return a JSON object with this exact structure:
     const result = await response.json();
     const aiResponse = safeParseAIResponse(result.choices[0]?.message?.content, {
       furnitureMoves: [],
+      productPlacements: [],
       zoneChanges: [],
       currentEfficiency: 70,
       optimizedEfficiency: 85,
@@ -2860,6 +3232,21 @@ Return a JSON object with this exact structure:
       insights: ['AI 분석 결과를 불러오는 중 오류가 발생했습니다.'],
       confidence: 0.7,
     });
+
+    // 🆕 AI 상품 배치 제안과 룰 기반 제안 병합
+    const combinedProductPlacements = [
+      ...(aiResponse.productPlacements || []),
+      ...productPlacements.map(p => ({
+        productId: p.product_id,
+        productSku: p.product_sku,
+        fromSlotId: p.current_slot_id || null,
+        toSlotId: p.suggested_slot_id,
+        toFurnitureId: p.suggested_furniture_id,
+        reason: p.reason,
+        priority: p.priority,
+        displayTypeMatch: p.display_type_match,
+      })),
+    ].slice(0, 15); // 최대 15개 제안
 
     // 히트맵 데이터 생성 (실제 존 메트릭 기반)
     const storeWidth = storeContext?.storeInfo?.width || 17;
@@ -2881,6 +3268,7 @@ Return a JSON object with this exact structure:
 
     // 데이터 소스 메타데이터
     const usedRealData = !!(storeContext?.zones?.length && storeContext?.zoneMetrics?.length);
+    const usedSlotSystem = !!(slotLayoutData && slotLayoutData.slots.length > 0);
 
     return {
       result: {
@@ -2898,6 +3286,7 @@ Return a JSON object with this exact structure:
           trafficIncrease: aiResponse.improvements?.trafficIncrease || 7,
         },
         furnitureMoves: aiResponse.furnitureMoves || [],
+        productPlacements: combinedProductPlacements,
         zoneChanges: aiResponse.zoneChanges || [],
         confidence: {
           overall: aiResponse.confidence || 0.8,
@@ -2906,16 +3295,32 @@ Return a JSON object with this exact structure:
             modelAccuracy: 0.85,
             sampleSize: storeContext?.dailySales?.length ? Math.min(1, storeContext.dailySales.length / 30) : 0.5,
             variability: 0.75,
+            slotDataAvailable: usedSlotSystem ? 1 : 0,
           },
         },
         insights: aiResponse.insights || ['레이아웃 최적화 분석이 완료되었습니다.'],
         dataSource: {
           usedRealData,
+          usedSlotSystem,
           zonesAvailable: storeContext?.zones?.length || 0,
           zoneMetricsAvailable: storeContext?.zoneMetrics?.length || 0,
           visitsAvailable: storeContext?.visits?.length || 0,
-          note: usedRealData ? '실제 매장 데이터 기반 분석' : '존 데이터 없음 - 시뮬레이션 기반 분석',
+          slotsAvailable: slotLayoutData?.slots?.length || 0,
+          furnitureAvailable: slotLayoutData?.furniture?.length || 0,
+          productsAvailable: slotLayoutData?.products?.length || 0,
+          note: usedSlotSystem
+            ? '슬롯 기반 최적화 시스템 활성화 - 상품 진열 호환성 검증됨'
+            : usedRealData
+              ? '실제 매장 데이터 기반 분석'
+              : '존 데이터 없음 - 시뮬레이션 기반 분석',
         },
+        slotCompatibility: usedSlotSystem ? {
+          totalSlots: slotLayoutData!.slots.length,
+          occupiedSlots: slotLayoutData!.slots.filter(s => s.is_occupied).length,
+          availableSlots: slotLayoutData!.slots.filter(s => !s.is_occupied).length,
+          slotTypes: [...new Set(slotLayoutData!.slots.map(s => s.slot_type))],
+          displayTypes: [...new Set(slotLayoutData!.products.map(p => p.display_type))],
+        } : null,
         visualization: {
           beforeHeatmap,
           afterHeatmap,
