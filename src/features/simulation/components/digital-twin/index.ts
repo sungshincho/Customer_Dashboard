@@ -11,3 +11,8 @@ export { Model3DPreview } from './Model3DPreview';
 export { ModelUploader } from './ModelUploader';
 export { AutoModelMapper } from './AutoModelMapper';
 export { StorageToInstanceConverter } from './StorageToInstanceConverter';
+
+// Phase 2/3: Digital Twin Studio 컴포넌트
+export { PlacementEditor } from './PlacementEditor';
+export { OptimizationPanel } from './OptimizationPanel';
+export { ComparisonView } from './ComparisonView';
