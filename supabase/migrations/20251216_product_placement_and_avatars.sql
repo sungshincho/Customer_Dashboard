@@ -1,8 +1,18 @@
 -- =====================================================
--- NEURALTWIN v8.1: Product Placement & Avatar System (FIXED)
+-- NEURALTWIN v8.1: Product Placement & Avatar System
 -- =====================================================
--- Safe migration with IF NOT EXISTS checks
+-- Version: 1.0.0 (FINAL - Idempotent)
+-- Date: 2024-12-16
+-- Description:
+--   재실행 가능한 멱등성 스크립트
+--   1. Product placement fields (products 테이블)
+--   2. Staff avatar system (staff 테이블)
+--   3. Customer avatar system (customers 테이블)
+--   4. product_placements 테이블
+--   5. furniture_slots 테이블
+--   6. layout_optimization_results 테이블
 -- =====================================================
+
 
 -- =====================================================
 -- PART 1: Product Placement Fields on products table
@@ -10,7 +20,6 @@
 
 DO $$
 BEGIN
-  -- Add placement fields to products table
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'initial_furniture_id') THEN
     ALTER TABLE products ADD COLUMN initial_furniture_id UUID;
   END IF;
@@ -42,6 +51,7 @@ BEGIN
   RAISE NOTICE '✓ Products table: placement columns added/verified';
 END $$;
 
+
 -- =====================================================
 -- PART 2: Staff Avatar System
 -- =====================================================
@@ -71,6 +81,7 @@ BEGIN
   RAISE NOTICE '✓ Staff table: avatar columns added/verified';
 END $$;
 
+
 -- =====================================================
 -- PART 3: Customer Avatar System
 -- =====================================================
@@ -88,19 +99,12 @@ BEGIN
   RAISE NOTICE '✓ Customers table: avatar columns added/verified';
 END $$;
 
--- =====================================================
--- PART 4: Drop existing tables if they have wrong schema
--- =====================================================
-
-DROP TABLE IF EXISTS product_placements CASCADE;
-DROP TABLE IF EXISTS layout_optimization_results CASCADE;
-DROP TABLE IF EXISTS furniture_slots CASCADE;
 
 -- =====================================================
--- PART 5: Create product_placements table
+-- PART 4: Create product_placements table
 -- =====================================================
 
-CREATE TABLE product_placements (
+CREATE TABLE IF NOT EXISTS product_placements (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
@@ -137,15 +141,17 @@ CREATE TABLE product_placements (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX idx_product_placements_product_id ON product_placements(product_id);
-CREATE INDEX idx_product_placements_store_id ON product_placements(store_id);
-CREATE INDEX idx_product_placements_status ON product_placements(status);
+-- Indexes (IF NOT EXISTS)
+CREATE INDEX IF NOT EXISTS idx_product_placements_product_id ON product_placements(product_id);
+CREATE INDEX IF NOT EXISTS idx_product_placements_store_id ON product_placements(store_id);
+CREATE INDEX IF NOT EXISTS idx_product_placements_status ON product_placements(status);
+
 
 -- =====================================================
--- PART 6: Create furniture_slots table
+-- PART 5: Create furniture_slots table
 -- =====================================================
 
-CREATE TABLE furniture_slots (
+CREATE TABLE IF NOT EXISTS furniture_slots (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   furniture_id UUID NOT NULL,
   furniture_type TEXT NOT NULL,
@@ -162,17 +168,20 @@ CREATE TABLE furniture_slots (
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now(),
 
-  UNIQUE(furniture_id, slot_id)
+  CONSTRAINT furniture_slots_unique UNIQUE (furniture_id, slot_id)
 );
 
-CREATE INDEX idx_furniture_slots_furniture_id ON furniture_slots(furniture_id);
-CREATE INDEX idx_furniture_slots_store_id ON furniture_slots(store_id);
+-- Indexes (IF NOT EXISTS)
+CREATE INDEX IF NOT EXISTS idx_furniture_slots_furniture_id ON furniture_slots(furniture_id);
+CREATE INDEX IF NOT EXISTS idx_furniture_slots_store_id ON furniture_slots(store_id);
+CREATE INDEX IF NOT EXISTS idx_furniture_slots_is_occupied ON furniture_slots(is_occupied);
+
 
 -- =====================================================
--- PART 7: Create layout_optimization_results table
+-- PART 6: Create layout_optimization_results table
 -- =====================================================
 
-CREATE TABLE layout_optimization_results (
+CREATE TABLE IF NOT EXISTS layout_optimization_results (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -201,18 +210,26 @@ CREATE TABLE layout_optimization_results (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX idx_layout_optimization_results_store_id ON layout_optimization_results(store_id);
-CREATE INDEX idx_layout_optimization_results_status ON layout_optimization_results(status);
+-- Indexes (IF NOT EXISTS)
+CREATE INDEX IF NOT EXISTS idx_layout_optimization_results_store_id ON layout_optimization_results(store_id);
+CREATE INDEX IF NOT EXISTS idx_layout_optimization_results_status ON layout_optimization_results(status);
+
 
 -- =====================================================
--- PART 8: RLS Policies
+-- PART 7: RLS Policies (DROP IF EXISTS + CREATE)
 -- =====================================================
 
+-- Enable RLS
 ALTER TABLE product_placements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE furniture_slots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE layout_optimization_results ENABLE ROW LEVEL SECURITY;
 
 -- Product Placements RLS
+DROP POLICY IF EXISTS "Users can view own product placements" ON product_placements;
+DROP POLICY IF EXISTS "Users can insert own product placements" ON product_placements;
+DROP POLICY IF EXISTS "Users can update own product placements" ON product_placements;
+DROP POLICY IF EXISTS "Users can delete own product placements" ON product_placements;
+
 CREATE POLICY "Users can view own product placements" ON product_placements
   FOR SELECT USING (auth.uid() = user_id OR store_id IN (SELECT id FROM stores WHERE user_id = auth.uid()));
 
@@ -226,6 +243,11 @@ CREATE POLICY "Users can delete own product placements" ON product_placements
   FOR DELETE USING (auth.uid() = user_id OR store_id IN (SELECT id FROM stores WHERE user_id = auth.uid()));
 
 -- Furniture Slots RLS
+DROP POLICY IF EXISTS "Users can view own furniture slots" ON furniture_slots;
+DROP POLICY IF EXISTS "Users can insert own furniture slots" ON furniture_slots;
+DROP POLICY IF EXISTS "Users can update own furniture slots" ON furniture_slots;
+DROP POLICY IF EXISTS "Users can delete own furniture slots" ON furniture_slots;
+
 CREATE POLICY "Users can view own furniture slots" ON furniture_slots
   FOR SELECT USING (auth.uid() = user_id OR store_id IN (SELECT id FROM stores WHERE user_id = auth.uid()));
 
@@ -239,6 +261,11 @@ CREATE POLICY "Users can delete own furniture slots" ON furniture_slots
   FOR DELETE USING (auth.uid() = user_id OR store_id IN (SELECT id FROM stores WHERE user_id = auth.uid()));
 
 -- Layout Optimization Results RLS
+DROP POLICY IF EXISTS "Users can view own optimization results" ON layout_optimization_results;
+DROP POLICY IF EXISTS "Users can insert own optimization results" ON layout_optimization_results;
+DROP POLICY IF EXISTS "Users can update own optimization results" ON layout_optimization_results;
+DROP POLICY IF EXISTS "Users can delete own optimization results" ON layout_optimization_results;
+
 CREATE POLICY "Users can view own optimization results" ON layout_optimization_results
   FOR SELECT USING (auth.uid() = user_id OR store_id IN (SELECT id FROM stores WHERE user_id = auth.uid()));
 
@@ -251,8 +278,9 @@ CREATE POLICY "Users can update own optimization results" ON layout_optimization
 CREATE POLICY "Users can delete own optimization results" ON layout_optimization_results
   FOR DELETE USING (auth.uid() = user_id OR store_id IN (SELECT id FROM stores WHERE user_id = auth.uid()));
 
+
 -- =====================================================
--- PART 9: Updated_at Triggers
+-- PART 8: Updated_at Triggers
 -- =====================================================
 
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -278,29 +306,56 @@ CREATE TRIGGER update_layout_optimization_results_updated_at
   BEFORE UPDATE ON layout_optimization_results
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+
 -- =====================================================
--- PART 10: Comments
+-- PART 9: Comments
 -- =====================================================
 
 COMMENT ON TABLE product_placements IS 'Product placement tracking with AI optimization suggestions';
 COMMENT ON TABLE furniture_slots IS 'Furniture slot definitions for product placement';
 COMMENT ON TABLE layout_optimization_results IS 'AI-generated layout optimization results';
 
+COMMENT ON COLUMN staff.avatar_url IS '3D avatar model URL for staff visualization';
+COMMENT ON COLUMN staff.avatar_position IS '3D position of staff avatar in store';
+COMMENT ON COLUMN staff.avatar_rotation IS '3D rotation of staff avatar';
+COMMENT ON COLUMN staff.avatar_scale IS '3D scale of staff avatar';
+
+COMMENT ON COLUMN customers.avatar_url IS '3D avatar model URL for customer simulation';
+COMMENT ON COLUMN customers.avatar_type IS 'Customer segment type for avatar selection (vip/regular/new)';
+
+COMMENT ON COLUMN products.initial_furniture_id IS 'Initial furniture where product is placed';
+COMMENT ON COLUMN products.slot_id IS 'Slot ID within the furniture (A1, B2, etc.)';
+COMMENT ON COLUMN products.model_3d_position IS '3D position of product model';
+COMMENT ON COLUMN products.model_3d_url IS '3D model URL for product visualization';
+
+
 -- =====================================================
--- PART 11: Summary
+-- PART 10: Summary
 -- =====================================================
 
 DO $$
+DECLARE
+  v_pp_count INT;
+  v_fs_count INT;
+  v_lor_count INT;
 BEGIN
+  SELECT COUNT(*) INTO v_pp_count FROM information_schema.columns WHERE table_name = 'product_placements';
+  SELECT COUNT(*) INTO v_fs_count FROM information_schema.columns WHERE table_name = 'furniture_slots';
+  SELECT COUNT(*) INTO v_lor_count FROM information_schema.columns WHERE table_name = 'layout_optimization_results';
+
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
-  RAISE NOTICE 'NEURALTWIN v8.1 Migration Complete';
+  RAISE NOTICE 'NEURALTWIN v8.1 Migration Complete (Idempotent)';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
   RAISE NOTICE '✓ products: 7 columns added (placement, 3D model)';
   RAISE NOTICE '✓ staff: 5 columns added (avatar)';
   RAISE NOTICE '✓ customers: 2 columns added (avatar)';
-  RAISE NOTICE '✓ product_placements: table created';
-  RAISE NOTICE '✓ furniture_slots: table created';
-  RAISE NOTICE '✓ layout_optimization_results: table created';
+  RAISE NOTICE '✓ product_placements: % columns', v_pp_count;
+  RAISE NOTICE '✓ furniture_slots: % columns', v_fs_count;
+  RAISE NOTICE '✓ layout_optimization_results: % columns', v_lor_count;
+  RAISE NOTICE '✓ RLS policies: 12 policies created';
+  RAISE NOTICE '✓ Triggers: 3 triggers created';
+  RAISE NOTICE '';
+  RAISE NOTICE '이 스크립트는 여러 번 재실행해도 안전합니다.';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
 END $$;
