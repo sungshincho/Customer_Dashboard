@@ -215,6 +215,31 @@ export interface AILayoutOptimizationResult {
   };
 }
 
+// Furniture Slot Types
+export interface FurnitureSlot {
+  id: string;
+  furniture_id: string;
+  furniture_type: string;
+  slot_id: string;  // e.g., "A1", "B2", "TOP-L"
+  slot_position: Vector3D;  // Relative position within furniture
+  slot_rotation: Vector3D;
+  max_product_width?: number;
+  max_product_height?: number;
+  max_product_depth?: number;
+  is_occupied: boolean;
+  occupied_by_product_id?: string;
+}
+
+// Slot Snap Result
+export interface SlotSnapResult {
+  world_position: Vector3D;
+  world_rotation: Vector3D;
+  slot_id: string;
+  furniture_id: string;
+  furniture_world_position: Vector3D;
+  furniture_world_rotation: Vector3D;
+}
+
 // Placement Visualization Config
 export interface PlacementVisualizationConfig {
   showMovementPath: boolean;

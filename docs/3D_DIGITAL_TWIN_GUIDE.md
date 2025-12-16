@@ -1,6 +1,6 @@
 # 3D 디지털트윈 모델 준비 가이드라인
 
-**버전**: 2.4 (Implementation Complete)
+**버전**: 2.5 (Slot Auto-Snap)
 **작성일**: 2025-12-16
 **기준 시드**: NEURALTWIN v8.0 ULTIMATE SEED
 
@@ -583,6 +583,84 @@ interface PlacementChangeVisualization {
   comparisonMode: 'side-by-side' | 'overlay' | 'toggle';
 }
 ```
+
+#### 4.4.4 슬롯 기반 자동 스냅 렌더링
+
+AI 최적화 결과 적용 시, 상품이 **자동으로 새 가구의 슬롯에 스냅**되어 렌더링됩니다.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    슬롯 스냅 렌더링 로직                              │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  AI 최적화 결과                                                      │
+│  ┌──────────────────┐                                               │
+│  │ product_id: P001 │                                               │
+│  │ suggested:       │                                               │
+│  │   furniture_id   │─────┐                                         │
+│  │   slot_id: "B2"  │     │                                         │
+│  └──────────────────┘     │                                         │
+│                           ▼                                         │
+│  ┌──────────────────────────────────────────────────────────┐      │
+│  │              calculateSlotWorldPosition()                 │      │
+│  │                                                          │      │
+│  │  가구 월드 좌표      슬롯 상대 좌표      회전 변환           │      │
+│  │  (5.0, 0, 3.0)  +  (0.3, 0.8, 0)  ×  rotate(Y:45°)       │      │
+│  │                                                          │      │
+│  │  = 최종 월드 좌표 (5.21, 0.8, 3.21)                       │      │
+│  └──────────────────────────────────────────────────────────┘      │
+│                           │                                         │
+│                           ▼                                         │
+│  ┌──────────────────┐                                               │
+│  │  상품 자동 배치   │  → 3D 씬에서 슬롯 위치에 렌더링              │
+│  │  position: {...}  │                                               │
+│  │  rotation: {...}  │                                               │
+│  └──────────────────┘                                               │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**핵심 함수 (sceneRecipeGenerator.ts):**
+
+| 함수 | 설명 |
+|------|------|
+| `calculateSlotWorldPosition()` | 가구 위치 + 슬롯 상대 위치 + Y축 회전 변환 → 월드 좌표 계산 |
+| `applyOptimizedPlacements()` | AI 결과를 SceneRecipe에 적용, 자동 슬롯 스냅 |
+| `generateOptimizedSceneRecipe()` | 최적화 결과 ID로 직접 씬 생성 |
+| `previewProductAtSlot()` | 특정 슬롯에 상품 배치 미리보기 |
+
+**사용 예시:**
+
+```typescript
+// 1. 기존 씬 로드
+const baseRecipe = await generateSceneRecipeForStore(storeId, userId);
+
+// 2. AI 최적화 결과 적용 (자동 슬롯 스냅)
+const optimizedRecipe = await applyOptimizedPlacements(
+  baseRecipe,
+  aiOptimizationResult,
+  storeId
+);
+
+// 상품이 자동으로 새 가구의 슬롯에 맞춰 렌더링됨
+// products[i].position → 슬롯 기반 월드 좌표로 자동 계산됨
+
+// 3. 또는 최적화 결과 ID로 직접 생성
+const optimizedRecipe = await generateOptimizedSceneRecipe(
+  storeId,
+  userId,
+  optimizationResultId
+);
+```
+
+**자동 스냅 조건:**
+
+| 조건 | 설명 |
+|------|------|
+| `targetFurniture` 존재 | 대상 가구가 씬에 로드되어 있어야 함 |
+| `targetSlot` 존재 | `furniture_slots` 테이블에 슬롯 정의 필요 |
+| `movable !== false` | 상품이 이동 가능 상태여야 함 |
+| Fallback | 슬롯 미정의 시 AI 추천 좌표 직접 사용 |
 
 ---
 
