@@ -1,6 +1,6 @@
 # 3D 디지털트윈 모델 준비 가이드라인
 
-**버전**: 2.0 (Complete Edition)
+**버전**: 2.3 (Avatar Integration Guide)
 **작성일**: 2025-12-16
 **기준 시드**: NEURALTWIN v8.0 ULTIMATE SEED
 
@@ -69,6 +69,75 @@
 │ • graph_entities: 30건            • graph_relations: 30건           │
 │ • store_scenes: 1건               • retail_concepts: 12건           │
 └─────────────────────────────────────────────────────────────────────┘
+```
+
+### 1.3 온톨로지 스키마 아키텍처
+
+NEURALTWIN은 **계층적 온톨로지 아키텍처**를 사용합니다.
+
+#### 마스터 온톨로지 vs 사용자/스토어 온톨로지
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    온톨로지 스키마 구조                              │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │            마스터 온톨로지 (Master Ontology)                   │  │
+│  │            org_id IS NULL AND user_id IS NULL                 │  │
+│  ├───────────────────────────────────────────────────────────────┤  │
+│  │  • Entity Types: 185건 (리테일 산업 공통 개념)                 │  │
+│  │  • Relation Types: 110건 (엔티티 간 관계 정의)                 │  │
+│  │  • 용도: 모든 스토어에서 공유하는 기본 스키마                   │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+│                              ▼ 상속/확장                            │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │          사용자/스토어 온톨로지 (User/Store Ontology)          │  │
+│  │          user_id = {specific_user_id}                         │  │
+│  ├───────────────────────────────────────────────────────────────┤  │
+│  │  • Entity Types: 30건 (v8.0 데모용 인스턴스)                   │  │
+│  │  • Relation Types: 15건 (스토어별 커스텀 관계)                 │  │
+│  │  • 용도: 특정 스토어에 맞춤화된 스키마                         │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+#### 스키마 병합 로직 (`useOntologySchema.ts`)
+
+```typescript
+// 마스터 + 사용자 타입 통합 조회
+.or(`and(org_id.is.null,user_id.is.null),user_id.eq.${user.user.id}`)
+
+// 중복 시 사용자 타입이 마스터보다 우선
+function deduplicateByName(items) {
+  // 이름이 같은 경우 user_id가 있는 항목이 우선
+  if (item.user_id !== null && existing.user_id === null) {
+    byName.set(item.name, item);
+  }
+}
+```
+
+#### v8.0 활용률 분석
+
+| 구분 | Master | v8.0 User | 활용률 | 설명 |
+|------|--------|-----------|--------|------|
+| Entity Types | 185건 | 30건 | 16% | 의도된 MVP 범위 |
+| Relation Types | 110건 | 15건 | 14% | 필수 관계만 구현 |
+
+> **참고**: 16%의 활용률은 문제가 아닌 **의도된 설계**입니다.
+> - 마스터 온톨로지 = 리테일 산업 전체 도메인 모델
+> - v8.0 사용자 온톨로지 = 서울 플래그십 스토어 1개 데모용
+> - 향후 다른 스토어/업종 추가 시 마스터 온톨로지 확장 가능
+
+#### 데이터 삭제 시 주의사항
+
+v8.0 시드 스크립트의 STEP 20/21은 **사용자별 타입만 삭제**합니다:
+
+```sql
+-- 마스터 온톨로지는 보존됨 (삭제되지 않음)
+DELETE FROM ontology_entity_types WHERE user_id = v_user_id;
+DELETE FROM ontology_relation_types WHERE user_id = v_user_id;
 ```
 
 ---
@@ -299,62 +368,225 @@ NEURALTWIN v8.0 시드에 정의된 모든 상품:
 
 #### 아우터 (5건) - SKU-OUT-001 ~ 005
 
-| # | Product ID | 상품명 | SKU | 가격 | 파일명 | 크기 | 배치 존 |
-|---|------------|--------|-----|------|--------|------|---------|
-| 1 | `f0000001-...` | 프리미엄 캐시미어 코트 | SKU-OUT-001 | ₩400,000 | `product_coat_cashmere_01.glb` | 0.5×0.2×0.8 m | Z003 |
-| 2 | `f0000002-...` | 울 테일러드 재킷 | SKU-OUT-002 | ₩450,000 | `product_jacket_tailored_01.glb` | 0.5×0.15×0.7 m | Z003 |
-| 3 | `f0000003-...` | 다운 패딩 | SKU-OUT-003 | ₩500,000 | `product_padding_down_01.glb` | 0.5×0.25×0.8 m | Z003 |
-| 4 | `f0000004-...` | 트렌치 코트 | SKU-OUT-004 | ₩550,000 | `product_coat_trench_01.glb` | 0.5×0.15×0.9 m | Z003 |
-| 5 | `f0000005-...` | 레더 자켓 | SKU-OUT-005 | ₩600,000 | `product_jacket_leather_01.glb` | 0.5×0.15×0.7 m | Z003 |
+| # | SKU | 상품명 | 파일명 | 초기 배치 가구 | 슬롯 | 3D 좌표 |
+|---|-----|--------|--------|---------------|------|---------|
+| 1 | SKU-OUT-001 | 프리미엄 캐시미어 코트 | `product_coat_cashmere_01.glb` | `rack_clothing_double_01` | A1 | (-6.0, 1.2, 1.0) |
+| 2 | SKU-OUT-002 | 울 테일러드 재킷 | `product_jacket_tailored_01.glb` | `rack_clothing_double_01` | A2 | (-6.0, 1.2, 1.3) |
+| 3 | SKU-OUT-003 | 다운 패딩 | `product_padding_down_01.glb` | `rack_clothing_double_02` | A1 | (-6.0, 1.2, 2.0) |
+| 4 | SKU-OUT-004 | 트렌치 코트 | `product_coat_trench_01.glb` | `rack_clothing_double_02` | A2 | (-6.0, 1.2, 2.3) |
+| 5 | SKU-OUT-005 | 레더 자켓 | `product_jacket_leather_01.glb` | `rack_clothing_double_03` | A1 | (-4.5, 1.2, 1.0) |
 
 #### 상의 (5건) - SKU-TOP-001 ~ 005
 
-| # | Product ID | 상품명 | SKU | 가격 | 파일명 | 크기 | 배치 존 |
-|---|------------|--------|-----|------|--------|------|---------|
-| 6 | `f0000006-...` | 실크 블라우스 | SKU-TOP-001 | ₩100,000 | `product_blouse_silk_01.glb` | 0.4×0.1×0.6 m | Z003 |
-| 7 | `f0000007-...` | 캐주얼 니트 스웨터 | SKU-TOP-002 | ₩120,000 | `product_sweater_knit_01.glb` | 0.4×0.15×0.5 m | Z003 |
-| 8 | `f0000008-...` | 옥스포드 셔츠 | SKU-TOP-003 | ₩140,000 | `product_shirt_oxford_01.glb` | 0.4×0.1×0.6 m | Z003 |
-| 9 | `f0000009-...` | 린넨 탑 | SKU-TOP-004 | ₩160,000 | `product_top_linen_01.glb` | 0.4×0.08×0.5 m | Z003 |
-| 10 | `f0000010-...` | 폴로 셔츠 | SKU-TOP-005 | ₩180,000 | `product_shirt_polo_01.glb` | 0.4×0.1×0.55 m | Z003 |
+| # | SKU | 상품명 | 파일명 | 초기 배치 가구 | 슬롯 | 3D 좌표 |
+|---|-----|--------|--------|---------------|------|---------|
+| 6 | SKU-TOP-001 | 실크 블라우스 | `product_blouse_silk_01.glb` | `rack_clothing_single_01` | B1 | (-4.5, 1.0, 2.0) |
+| 7 | SKU-TOP-002 | 캐주얼 니트 스웨터 | `product_sweater_knit_01.glb` | `shelf_display_01` | C1 | (-5.5, 1.5, 3.5) |
+| 8 | SKU-TOP-003 | 옥스포드 셔츠 | `product_shirt_oxford_01.glb` | `rack_clothing_single_02` | B1 | (-4.0, 1.0, 3.0) |
+| 9 | SKU-TOP-004 | 린넨 탑 | `product_top_linen_01.glb` | `table_display_01` | D1 | (-5.0, 0.95, 4.0) |
+| 10 | SKU-TOP-005 | 폴로 셔츠 | `product_shirt_polo_01.glb` | `shelf_display_01` | C2 | (-5.5, 1.2, 3.5) |
 
 #### 하의 (5건) - SKU-BTM-001 ~ 005
 
-| # | Product ID | 상품명 | SKU | 가격 | 파일명 | 크기 | 배치 존 |
-|---|------------|--------|-----|------|--------|------|---------|
-| 11 | `f0000011-...` | 리넨 와이드 팬츠 | SKU-BTM-001 | ₩145,000 | `product_pants_wide_01.glb` | 0.35×0.1×0.9 m | Z003 |
-| 12 | `f0000012-...` | 슬림핏 데님 | SKU-BTM-002 | ₩170,000 | `product_jeans_slim_01.glb` | 0.35×0.1×0.95 m | Z003 |
-| 13 | `f0000013-...` | 치노 팬츠 | SKU-BTM-003 | ₩195,000 | `product_pants_chino_01.glb` | 0.35×0.1×0.9 m | Z003 |
-| 14 | `f0000014-...` | 조거 팬츠 | SKU-BTM-004 | ₩220,000 | `product_pants_jogger_01.glb` | 0.35×0.12×0.9 m | Z003 |
-| 15 | `f0000015-...` | A라인 스커트 | SKU-BTM-005 | ₩245,000 | `product_skirt_aline_01.glb` | 0.35×0.08×0.6 m | Z003 |
+| # | SKU | 상품명 | 파일명 | 초기 배치 가구 | 슬롯 | 3D 좌표 |
+|---|-----|--------|--------|---------------|------|---------|
+| 11 | SKU-BTM-001 | 리넨 와이드 팬츠 | `product_pants_wide_01.glb` | `rack_clothing_single_03` | B1 | (-4.0, 1.0, 4.5) |
+| 12 | SKU-BTM-002 | 슬림핏 데님 | `product_jeans_slim_01.glb` | `rack_clothing_single_03` | B2 | (-4.0, 1.0, 4.8) |
+| 13 | SKU-BTM-003 | 치노 팬츠 | `product_pants_chino_01.glb` | `rack_clothing_single_04` | B1 | (-3.5, 1.0, 5.0) |
+| 14 | SKU-BTM-004 | 조거 팬츠 | `product_pants_jogger_01.glb` | `shelf_display_02` | C1 | (-5.0, 1.5, 5.5) |
+| 15 | SKU-BTM-005 | A라인 스커트 | `product_skirt_aline_01.glb` | `table_display_02` | D1 | (-4.5, 0.95, 5.0) |
 
 #### 액세서리 (5건) - SKU-ACC-001 ~ 005
 
-| # | Product ID | 상품명 | SKU | 가격 | 파일명 | 크기 | 배치 존 |
-|---|------------|--------|-----|------|--------|------|---------|
-| 16 | `f0000016-...` | 가죽 토트백 | SKU-ACC-001 | ₩190,000 | `product_bag_tote_01.glb` | 0.35×0.15×0.3 m | Z004 |
-| 17 | `f0000017-...` | 실버 목걸이 | SKU-ACC-002 | ₩230,000 | `product_necklace_silver_01.glb` | 0.2×0.02×0.25 m | Z004 |
-| 18 | `f0000018-...` | 가죽 벨트 | SKU-ACC-003 | ₩270,000 | `product_belt_leather_01.glb` | 0.9×0.04×0.05 m | Z004 |
-| 19 | `f0000019-...` | 스카프 세트 | SKU-ACC-004 | ₩310,000 | `product_scarf_set_01.glb` | 0.3×0.1×0.3 m | Z004 |
-| 20 | `f0000020-...` | 울 머플러 | SKU-ACC-005 | ₩350,000 | `product_muffler_wool_01.glb` | 0.3×0.15×0.3 m | Z004 |
+| # | SKU | 상품명 | 파일명 | 초기 배치 가구 | 슬롯 | 3D 좌표 |
+|---|-----|--------|--------|---------------|------|---------|
+| 16 | SKU-ACC-001 | 가죽 토트백 | `product_bag_tote_01.glb` | `display_bag_01` | E1 | (5.0, 1.2, 1.5) |
+| 17 | SKU-ACC-002 | 실버 목걸이 | `product_necklace_silver_01.glb` | `showcase_locked_01` | F1 | (4.5, 1.0, 2.0) |
+| 18 | SKU-ACC-003 | 가죽 벨트 | `product_belt_leather_01.glb` | `stand_accessory_01` | G1 | (5.5, 1.1, 2.5) |
+| 19 | SKU-ACC-004 | 스카프 세트 | `product_scarf_set_01.glb` | `hanger_scarf_01` | H1 | (6.0, 1.3, 3.0) |
+| 20 | SKU-ACC-005 | 울 머플러 | `product_muffler_wool_01.glb` | `hanger_scarf_02` | H2 | (6.0, 1.3, 3.5) |
 
 #### 신발 (3건) - SKU-SHO-001 ~ 003
 
-| # | Product ID | 상품명 | SKU | 가격 | 파일명 | 크기 | 배치 존 |
-|---|------------|--------|-----|------|--------|------|---------|
-| 21 | `f0000021-...` | 프리미엄 로퍼 | SKU-SHO-001 | ₩280,000 | `product_shoes_loafer_01.glb` | 0.28×0.1×0.1 m | Z004 |
-| 22 | `f0000022-...` | 하이힐 펌프스 | SKU-SHO-002 | ₩360,000 | `product_shoes_heels_01.glb` | 0.25×0.08×0.12 m | Z004 |
-| 23 | `f0000023-...` | 스니커즈 | SKU-SHO-003 | ₩440,000 | `product_shoes_sneakers_01.glb` | 0.3×0.12×0.12 m | Z004 |
+| # | SKU | 상품명 | 파일명 | 초기 배치 가구 | 슬롯 | 3D 좌표 |
+|---|-----|--------|--------|---------------|------|---------|
+| 21 | SKU-SHO-001 | 프리미엄 로퍼 | `product_shoes_loafer_01.glb` | `shelf_shoes_01` | I1 | (5.5, 0.8, 4.0) |
+| 22 | SKU-SHO-002 | 하이힐 펌프스 | `product_shoes_heels_01.glb` | `shelf_shoes_01` | I2 | (5.5, 0.5, 4.0) |
+| 23 | SKU-SHO-003 | 스니커즈 | `product_shoes_sneakers_01.glb` | `shelf_shoes_02` | I1 | (5.5, 0.8, 4.5) |
 
 #### 화장품 (2건) - SKU-COS-001 ~ 002
 
-| # | Product ID | 상품명 | SKU | 가격 | 파일명 | 크기 | 배치 존 |
-|---|------------|--------|-----|------|--------|------|---------|
-| 24 | `f0000024-...` | 프리미엄 스킨케어 세트 | SKU-COS-001 | ₩110,000 | `product_skincare_set_01.glb` | 0.25×0.15×0.2 m | Z004 |
-| 25 | `f0000025-...` | 립스틱 컬렉션 | SKU-COS-002 | ₩140,000 | `product_lipstick_set_01.glb` | 0.15×0.1×0.1 m | Z004 |
+| # | SKU | 상품명 | 파일명 | 초기 배치 가구 | 슬롯 | 3D 좌표 |
+|---|-----|--------|--------|---------------|------|---------|
+| 24 | SKU-COS-001 | 프리미엄 스킨케어 세트 | `product_skincare_set_01.glb` | `showcase_open_01` | J1 | (4.0, 0.9, 5.0) |
+| 25 | SKU-COS-002 | 립스틱 컬렉션 | `product_lipstick_set_01.glb` | `showcase_open_01` | J2 | (4.0, 0.9, 5.2) |
+
+#### 상품 배치 메타데이터 스키마
+
+```typescript
+interface ProductPlacement {
+  // 기본 정보
+  product_id: string;
+  sku: string;
+  model_url: string;
+
+  // 초기 배치 정보 (필수)
+  initial_placement: {
+    zone_id: string;              // 배치 존 ID
+    furniture_id: string;         // 배치 가구 ID
+    furniture_type: string;       // 가구 타입 (rack, shelf, display, etc.)
+    slot_id: string;              // 가구 내 슬롯 ID (A1, B2, C3...)
+    position: Vector3D;           // 절대 3D 좌표
+    rotation: Vector3D;           // 회전 (라디안)
+    relative_position?: Vector3D; // 가구 기준 상대 좌표
+  };
+
+  // 시뮬레이션/최적화 결과 (선택)
+  optimization_result?: {
+    suggested_zone_id?: string;
+    suggested_furniture_id?: string;
+    suggested_slot_id?: string;
+    suggested_position: Vector3D;
+    suggested_rotation?: Vector3D;
+    optimization_reason: string;      // AI 추천 이유
+    expected_impact: {
+      revenue_change_pct: number;     // 예상 매출 변화 %
+      visibility_score: number;       // 노출도 점수 (0-1)
+      accessibility_score: number;    // 접근성 점수 (0-1)
+    };
+    confidence: number;               // 신뢰도 (0-1)
+  };
+
+  // 이동 가능 여부
+  movable: boolean;  // 상품은 기본적으로 true
+}
+```
+
+#### 가구-상품 슬롯 매핑
+
+| 가구 타입 | 슬롯 ID 패턴 | 설명 | 최대 수용 |
+|----------|-------------|------|----------|
+| `rack_clothing_double` | A1, A2, A3... | 행거 위치 (좌→우) | 8개 |
+| `rack_clothing_single` | B1, B2, B3... | 행거 위치 (좌→우) | 6개 |
+| `shelf_display` | C1, C2, C3... | 선반 층 (상→하) | 4층×3개 |
+| `table_display` | D1, D2, D3, D4 | 테이블 4분면 | 4개 |
+| `display_bag` | E1, E2, E3... | 가방 스탠드 | 6개 |
+| `showcase_locked` | F1, F2, F3... | 쇼케이스 칸 | 9개 |
+| `stand_accessory` | G1, G2, G3... | 회전 스탠드 층 | 4개 |
+| `hanger_scarf` | H1, H2, H3... | 스카프 훅 | 6개 |
+| `shelf_shoes` | I1, I2, I3... | 신발 선반 (상→하) | 3층×4개 |
+| `showcase_open` | J1, J2, J3... | 오픈 쇼케이스 칸 | 6개 |
 
 ---
 
-### 4.4 직원 모델 (Staff Assets) - 8건
+### 4.4 가구/상품 배치 최적화 시스템
+
+#### 4.4.1 AI 레이아웃 최적화 결과 스키마
+
+```typescript
+interface AILayoutOptimizationResult {
+  // 메타정보
+  optimization_id: string;
+  store_id: string;
+  created_at: string;
+  optimization_type: 'furniture' | 'product' | 'both';
+
+  // 가구 배치 변경 제안
+  furniture_changes: Array<{
+    furniture_id: string;
+    furniture_type: string;
+    movable: boolean;           // movable=false면 변경 제안 안함
+
+    current: {
+      zone_id: string;
+      position: Vector3D;
+      rotation: Vector3D;
+    };
+
+    suggested: {
+      zone_id: string;
+      position: Vector3D;
+      rotation: Vector3D;
+    };
+
+    reason: string;
+    priority: 'high' | 'medium' | 'low';
+    expected_impact: number;    // % 개선
+  }>;
+
+  // 상품 배치 변경 제안
+  product_changes: Array<{
+    product_id: string;
+    sku: string;
+
+    current: {
+      zone_id: string;
+      furniture_id: string;
+      slot_id: string;
+      position: Vector3D;
+    };
+
+    suggested: {
+      zone_id: string;
+      furniture_id: string;
+      slot_id: string;
+      position: Vector3D;
+    };
+
+    reason: string;
+    priority: 'high' | 'medium' | 'low';
+    expected_revenue_impact: number;
+    expected_visibility_impact: number;
+  }>;
+
+  // 전체 최적화 요약
+  summary: {
+    total_furniture_changes: number;
+    total_product_changes: number;
+    expected_revenue_improvement: number;     // %
+    expected_traffic_improvement: number;     // %
+    expected_conversion_improvement: number;  // %
+  };
+}
+```
+
+#### 4.4.2 시뮬레이션 시각화 모드
+
+| 모드 | 설명 | 시각적 표현 |
+|------|------|------------|
+| **Current** | 현재 배치 상태 | 실제 위치 렌더링 |
+| **Suggested** | AI 추천 배치 | 반투명 고스트 오버레이 |
+| **Comparison** | 현재 vs 추천 | 현재(실선) + 추천(점선) + 이동 화살표 |
+| **Heatmap** | 성과 기반 히트맵 | 매출/노출도 기준 색상 코딩 |
+| **Animation** | 이동 애니메이션 | 현재→추천 위치 이동 모션 |
+
+#### 4.4.3 배치 변경 시각화 컴포넌트
+
+```typescript
+interface PlacementChangeVisualization {
+  // 이동 경로 표시
+  showMovementPath: boolean;
+  pathColor: string;           // 기본: '#3b82f6'
+  pathWidth: number;           // 기본: 0.05m
+  pathAnimated: boolean;       // 애니메이션 여부
+
+  // 고스트 모델 (추천 위치)
+  showGhostModel: boolean;
+  ghostOpacity: number;        // 기본: 0.5
+  ghostColor: string;          // 기본: '#22c55e'
+
+  // 영향도 표시
+  showImpactIndicator: boolean;
+  impactBadgePosition: 'top' | 'side';
+
+  // 비교 모드
+  comparisonMode: 'side-by-side' | 'overlay' | 'toggle';
+}
+```
+
+---
+
+### 4.5 직원 모델 (Staff Assets) - 8건
 
 직원 시각화용 3D 아바타 모델:
 
@@ -377,7 +609,7 @@ NEURALTWIN v8.0 시드에 정의된 모든 상품:
 
 ---
 
-### 4.5 고객 아바타 모델 (Customer Assets) - 선택사항
+### 4.6 고객 아바타 모델 (Customer Assets) - 선택사항
 
 고객 시뮬레이션용 제네릭 아바타:
 
@@ -386,6 +618,182 @@ NEURALTWIN v8.0 시드에 정의된 모든 상품:
 | 1 | VIP 고객 | `customer_vip_01.glb` ~ `_03.glb` | 3종 | 고급스러운 의상 |
 | 2 | 일반 고객 | `customer_regular_01.glb` ~ `_05.glb` | 5종 | 캐주얼 의상 |
 | 3 | 신규 고객 | `customer_new_01.glb` ~ `_03.glb` | 3종 | 다양한 연령대 |
+
+---
+
+### 4.7 직원/고객 아바타 시스템 통합 가이드
+
+#### 현재 상태 분석 (Gap)
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    아바타 시스템 통합 현황                           │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ✅ 지원됨 (바로 사용 가능)                                          │
+│  ├── Space Models      → ontology_entity_types.model_3d_url        │
+│  ├── Furniture Models  → ontology_entity_types.model_3d_url        │
+│  └── Product Models    → ontology_entity_types.model_3d_url        │
+│                                                                     │
+│  ⚠️ 미지원 (확장 필요)                                               │
+│  ├── Staff Avatars     → staff 테이블에 avatar_url 없음             │
+│  └── Customer Avatars  → customers 테이블에 avatar_url 없음         │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+#### 문제점
+
+| 구성요소 | 현재 상태 | 필요한 변경 |
+|----------|----------|------------|
+| `staff` 테이블 | `avatar_url` 컬럼 없음 | 컬럼 추가 필요 |
+| `Staff` 온톨로지 | `model_3d_type: null` | `'avatar'`로 변경 |
+| `sceneRecipeGenerator.ts` | Staff/Customer 미처리 | 아바타 렌더링 추가 |
+| `scene3d.ts` 타입 | StaffAsset 없음 | 타입 정의 추가 |
+
+#### 해결 방안 A: staff 테이블 확장 (권장)
+
+**1단계: 마이그레이션 스크립트**
+
+```sql
+-- staff 테이블에 아바타 관련 컬럼 추가
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS avatar_position JSONB DEFAULT '{"x":0,"y":0,"z":0}';
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS avatar_rotation JSONB DEFAULT '{"x":0,"y":0,"z":0}';
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS avatar_scale JSONB DEFAULT '{"x":1,"y":1,"z":1}';
+
+-- customers 테이블에 아바타 관련 컬럼 추가
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS avatar_type TEXT; -- 'vip', 'regular', 'new'
+```
+
+**2단계: 타입 정의 추가 (`scene3d.ts`)**
+
+```typescript
+export interface StaffAsset extends SceneAsset {
+  type: 'staff';
+  staff_id: string;
+  staff_name: string;
+  role: string;
+  assigned_zone_id?: string;
+  shift_start?: string;
+  shift_end?: string;
+}
+
+export interface CustomerAsset extends SceneAsset {
+  type: 'customer';
+  customer_segment: 'vip' | 'regular' | 'new';
+  is_animated?: boolean;
+  path_points?: Vector3D[];  // 동선 애니메이션용
+}
+```
+
+**3단계: SceneRecipe 확장**
+
+```typescript
+export interface SceneRecipe {
+  space: SpaceAsset;
+  furniture: FurnitureAsset[];
+  products: ProductAsset[];
+  staff?: StaffAsset[];       // 추가
+  customers?: CustomerAsset[]; // 추가
+  lighting: LightingPreset;
+  effects?: EffectLayer[];
+  camera?: { ... };
+}
+```
+
+**4단계: sceneRecipeGenerator.ts 확장**
+
+```typescript
+// 4. Load Staff Avatars
+const { data: staffData } = await supabase
+  .from('staff')
+  .select('*')
+  .eq('store_id', storeId);
+
+const staffAssets: StaffAsset[] = (staffData || [])
+  .filter(s => s.avatar_url)
+  .map(s => ({
+    id: s.id,
+    type: 'staff',
+    model_url: s.avatar_url,
+    position: s.avatar_position || { x: 0, y: 0, z: 0 },
+    rotation: s.avatar_rotation || { x: 0, y: 0, z: 0 },
+    scale: s.avatar_scale || { x: 1, y: 1, z: 1 },
+    staff_id: s.id,
+    staff_name: s.staff_name,
+    role: s.role,
+    assigned_zone_id: s.department
+  }));
+```
+
+#### 해결 방안 B: 온톨로지 시스템 활용
+
+**온톨로지를 통한 아바타 관리:**
+
+```sql
+-- Staff 엔티티 타입에 model_3d_type 설정
+UPDATE ontology_entity_types
+SET model_3d_type = 'avatar',
+    model_3d_url = NULL  -- 기본 URL, 개별 엔티티에서 오버라이드
+WHERE name = 'Staff';
+
+-- 각 직원을 graph_entities로 생성 (개별 아바타 URL 지정)
+INSERT INTO graph_entities (
+  id, entity_type_id, label, user_id,
+  model_3d_position, model_3d_rotation, model_3d_scale,
+  properties
+) VALUES (
+  'e0000001-...',
+  (SELECT id FROM ontology_entity_types WHERE name = 'Staff'),
+  '김민준',
+  v_user_id,
+  '{"x": 0, "y": 0, "z": -5}'::jsonb,
+  '{"x": 0, "y": 0, "z": 0}'::jsonb,
+  '{"x": 1, "y": 1, "z": 1}'::jsonb,
+  '{"avatar_url": "https://storage.../staff_manager_male_01.glb", "role": "manager"}'::jsonb
+);
+```
+
+#### 스토리지 업로드 후 적용 플로우
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    아바타 적용 플로우                                │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  1. 모델 업로드                                                      │
+│     └── Supabase Storage: 3d-models/{user_id}/{store_id}/staff/     │
+│                                                                     │
+│  2. URL 획득                                                        │
+│     └── supabase.storage.from('3d-models').getPublicUrl(path)       │
+│                                                                     │
+│  3-A. staff 테이블 업데이트 (방안 A)                                  │
+│     └── UPDATE staff SET avatar_url = '{url}' WHERE id = '...'      │
+│                                                                     │
+│  3-B. graph_entities 업데이트 (방안 B)                                │
+│     └── UPDATE graph_entities SET properties = properties ||        │
+│         '{"avatar_url": "{url}"}'::jsonb WHERE id = '...'           │
+│                                                                     │
+│  4. SceneRecipe 재생성                                               │
+│     └── generateSceneRecipe() 호출 → 아바타 포함된 씬 렌더링          │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+#### 권장 구현 우선순위
+
+| 우선순위 | 작업 | 영향 범위 | 예상 공수 |
+|---------|------|----------|----------|
+| 1 | `staff` 테이블 마이그레이션 | DB만 변경 | 0.5일 |
+| 2 | `StaffAsset` 타입 정의 | 타입 파일 | 0.5일 |
+| 3 | `sceneRecipeGenerator` 확장 | 유틸리티 | 1일 |
+| 4 | `Store3DViewer`에 아바타 렌더링 | 컴포넌트 | 1일 |
+| 5 | 고객 아바타 (동선 애니메이션) | 전체 | 2일 |
+
+> **결론**: 현재는 모델 파일 업로드만으로 **자동 적용되지 않습니다**.
+> 위 구현 가이드에 따라 스키마 확장 및 코드 수정이 필요합니다.
 
 ---
 
@@ -951,6 +1359,6 @@ interface InventoryVisualization {
 
 ---
 
-*문서 버전: 2.0 (Complete Edition)*
+*문서 버전: 2.3 (Avatar Integration Guide)*
 *최종 업데이트: 2025-12-16*
 *NEURALTWIN v8.0 ULTIMATE SEED 기준*
