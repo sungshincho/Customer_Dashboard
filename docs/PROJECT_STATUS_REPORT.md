@@ -1,8 +1,18 @@
 # Customer Dashboard 프로젝트 현황 보고서
 
 **작성일**: 2025-12-16
-**버전**: 1.0
+**최종 수정**: 2025-12-16
+**버전**: 1.1
 **프로젝트명**: NeuralTwin Customer Dashboard
+
+---
+
+## 변경 이력
+
+| 버전 | 날짜 | 내용 |
+|------|------|------|
+| 1.1 | 2025-12-16 | 미사용 코드 정리 (4,444줄 삭제) |
+| 1.0 | 2025-12-16 | 최초 작성 |
 
 ---
 
@@ -41,17 +51,16 @@ Customer_Dashboard/
 │   │   ├── goals/                # 목표 설정 관련
 │   │   └── notifications/        # 알림 센터
 │   ├── core/                     # 코어 페이지
-│   │   └── pages/                # AuthPage, DashboardPage, NotFoundPage
+│   │   └── pages/                # AuthPage, NotFoundPage
 │   ├── features/                 # 기능별 모듈 (Feature-based 구조)
 │   │   ├── insights/             # 인사이트 허브
 │   │   ├── studio/               # 디지털 트윈 스튜디오
 │   │   ├── roi/                  # ROI 측정
 │   │   ├── settings/             # 설정 페이지
-│   │   ├── simulation/           # 시뮬레이션 엔진
+│   │   ├── simulation/           # 시뮬레이션 엔진 (studio 지원)
 │   │   ├── data-management/      # 데이터 관리
-│   │   ├── onboarding/           # 온보딩 위자드
-│   │   └── overview/             # 오버뷰 컴포넌트
-│   ├── hooks/                    # 커스텀 훅 (40+ 훅)
+│   │   └── onboarding/           # 온보딩 위자드
+│   ├── hooks/                    # 커스텀 훅 (35+ 훅)
 │   ├── types/                    # TypeScript 타입 정의
 │   ├── utils/                    # 유틸리티 함수
 │   ├── services/                 # 서비스 레이어
@@ -198,17 +207,9 @@ Customer_Dashboard/
 
 ### 5.2 Simulation (시뮬레이션)
 
-**components/**
-| 컴포넌트 | 기능 |
-|----------|------|
-| IntegratedDataAnalysis | 통합 데이터 분석 |
-| LayoutComparisonView | 레이아웃 비교 뷰 |
-| SimulationControls | 시뮬레이션 제어 |
-| SimulationHistoryPanel | 시뮬레이션 이력 |
-| DataSourceMappingCard | 데이터 소스 매핑 |
-| AIModelSelector | AI 모델 선택 |
+> **참고**: simulation 모듈은 독립 페이지로 사용되지 않고, studio 페이지를 지원하는 유틸리티/훅 모듈로 사용됩니다.
 
-**digital-twin/**
+**digital-twin/** (활성 사용)
 | 컴포넌트 | 기능 |
 |----------|------|
 | ModelUploader | 3D 모델 업로드 |
@@ -216,21 +217,29 @@ Customer_Dashboard/
 | SceneComposer | 씬 구성 |
 | Store3DViewer | 3D 매장 뷰어 |
 | SharedDigitalTwinScene | 공유 디지털 트윈 씬 |
+| AutoModelMapper | 자동 모델 매핑 |
 
-**hooks/**
+**hooks/** (활성 사용)
 | 훅 | 기능 |
 |----|------|
-| useSimulationEngine | 시뮬레이션 엔진 |
-| useEnhancedAIInference | AI 추론 |
 | useStoreContext | 매장 컨텍스트 |
-| useLayoutApply | 레이아웃 적용 |
+| useEnhancedAIInference | AI 추론 |
+| useDataSourceMapping | 데이터 소스 매핑 |
 | useRealtimeTracking | 실시간 추적 |
+
+**utils/** (활성 사용)
+| 유틸 | 기능 |
+|------|------|
+| coordinateMapper | 좌표 변환 |
+| modelLayerLoader | 모델 레이어 로더 |
+| modelStorageManager | 모델 스토리지 관리 |
+| bakedMaterialUtils | Baked Material 유틸 |
 
 ---
 
 ## 6. 커스텀 Hooks
 
-### 6.1 핵심 Hooks (40+)
+### 6.1 핵심 Hooks (35+)
 
 | 훅 | 파일 | 기능 |
 |----|------|------|
@@ -239,11 +248,13 @@ Customer_Dashboard/
 | **useDashboardKPI** | useDashboardKPI.ts | 대시보드 KPI 조회 |
 | **useDashboardKPIAgg** | useDashboardKPIAgg.ts | 집계된 KPI |
 | **useCustomerSegments** | useCustomerSegments.ts | 고객 세그먼트 |
+| **useCustomerSegmentsAgg** | useCustomerSegmentsAgg.ts | 고객 세그먼트 집계 |
 | **useCustomerJourney** | useCustomerJourney.ts | 고객 여정 분석 |
 | **useProductPerformance** | useProductPerformance.ts | 상품 성과 |
 | **useFunnelAnalysis** | useFunnelAnalysis.ts | 퍼널 분석 |
 | **useFootfallAnalysis** | useFootfallAnalysis.ts | 방문객 분석 |
 | **useZoneMetrics** | useZoneMetrics.ts | 존 메트릭 |
+| **useZoneTransition** | useZoneTransition.ts | 존 전환 분석 |
 | **useWiFiTracking** | useWiFiTracking.ts | WiFi 추적 데이터 |
 | **useDwellTime** | useDwellTime.ts | 체류 시간 분석 |
 | **useTrafficHeatmap** | useTrafficHeatmap.ts | 트래픽 히트맵 |
@@ -257,6 +268,7 @@ Customer_Dashboard/
 | **useOntologyInference** | useOntologyInference.ts | 온톨로지 추론 |
 | **useRetailOntology** | useRetailOntology.ts | 리테일 온톨로지 |
 | **useStoreScene** | useStoreScene.ts | 3D 매장 씬 |
+| **useStoreData** | useStoreData.ts | 매장 데이터 |
 | **useSimulationEngine** | useSimulationEngine.ts | 시뮬레이션 엔진 |
 | **usePOSIntegration** | usePOSIntegration.ts | POS 연동 |
 | **useRealtimeInventory** | useRealtimeInventory.ts | 실시간 재고 |
@@ -264,6 +276,10 @@ Customer_Dashboard/
 | **useLearningFeedback** | useLearningFeedback.ts | AI 학습 피드백 |
 | **useOnboarding** | useOnboarding.ts | 온보딩 상태 |
 | **useDataReadiness** | useDataReadiness.ts | 데이터 준비 상태 |
+| **useImportProgress** | useImportProgress.ts | 임포트 진행 상태 |
+| **useUploadSession** | useUploadSession.ts | 업로드 세션 |
+| **useSchemaMetadata** | useSchemaMetadata.ts | 스키마 메타데이터 |
+| **useClearCache** | useClearCache.ts | 캐시 초기화 |
 
 ---
 
@@ -346,7 +362,7 @@ Customer_Dashboard/
 | `api_connections` | API 연결 정보 |
 | `column_mappings` | 컬럼 매핑 |
 
-#### 알림/커뮤니케이션
+#### 알림
 | 테이블 | 설명 |
 |--------|------|
 | `alerts` | 알림 |
@@ -463,6 +479,8 @@ npm run lint     # 린트 실행
 
 | 문서 | 내용 |
 |------|------|
+| `PROJECT_STATUS_REPORT.md` | 프로젝트 현황 보고서 (현재 문서) |
+| `UNUSED_CODE_ANALYSIS.md` | 미사용 코드 분석 보고서 |
 | `CUSTOMER_DASHBOARD_SPECIFICATION.md` | 고객 대시보드 사양 |
 | `NEURALTWIN_ADMIN_DASHBOARD_SPECIFICATION.md` | 관리자 대시보드 사양 |
 | `NEURALTWIN_BACKEND_SPECIFICATION.md` | 백엔드 사양 |
@@ -474,7 +492,6 @@ npm run lint     # 린트 실행
 | `WIFI_TRACKING_CSV_GUIDE.md` | WiFi 추적 CSV 가이드 |
 | `IOT_TRACKING_INTEGRATION.md` | IoT 추적 통합 |
 | `DATA_MANAGEMENT_GUIDE.md` | 데이터 관리 가이드 |
-| `HQ_ADMIN_INTEGRATION_GUIDE.md` | 본사 관리자 연동 가이드 |
 
 ---
 
@@ -498,6 +515,7 @@ npm run lint     # 린트 실행
 - [x] API 연동 시스템
 - [x] AI 추론 엔진
 - [x] 온보딩 위자드
+- [x] 미사용 코드 정리 (v1.1)
 
 ### 14.2 진행 중인 기능 🔄
 
@@ -536,6 +554,10 @@ npm run lint     # 린트 실행
 2. 컴포넌트, 훅, 타입 분리
 3. 필요시 Edge Function 추가
 4. 타입 정의 업데이트
+
+### 15.4 코드 정리 시 참고
+
+미사용 코드 분석은 `docs/UNUSED_CODE_ANALYSIS.md` 참조
 
 ---
 
