@@ -794,7 +794,10 @@ WHERE store_id = 'd9830554-2688-4032-af40-acccda787ac4'
 ORDER BY period_type, goal_type;
 
 -- ============================================================================
--- STEP 7: daily_kpis_agg 생성 (90일) - store_visits 기반 집계
+-- [교체 1] STEP 7: daily_kpis_agg - ★ L1(store_visits) 기반 직접 집계 ★
+-- ============================================================================
+-- 기존 v6.0 문제: 랜덤값으로 생성하여 store_visits 수와 불일치
+-- v7.0 해결: store_visits에서 직접 COUNT하여 100% 일치 보장
 -- ============================================================================
 DO $$
 DECLARE
@@ -802,40 +805,34 @@ DECLARE
   v_org_id UUID;
   v_date DATE;
   v_dow INT;
-  v_total_visitors INT;
-  v_unique_visitors INT;
+  v_stats RECORD;
   v_returning INT;
-  v_transactions INT;
   v_revenue NUMERIC;
+  v_count INT := 0;
 BEGIN
   SELECT org_id INTO v_org_id FROM stores WHERE id = v_store_id;
 
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
-  RAISE NOTICE 'STEP 7: daily_kpis_agg 생성 (90일)';
+  RAISE NOTICE '★ STEP 7: daily_kpis_agg 생성 (L1 store_visits 기반 직접 집계)';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
 
   FOR day_offset IN 0..89 LOOP
     v_date := CURRENT_DATE - day_offset;
     v_dow := EXTRACT(DOW FROM v_date)::INT;
 
-    -- store_visits에서 해당 날짜 통계 집계
+    -- ★★★ 핵심: L1 데이터(store_visits)에서 직접 집계 ★★★
     SELECT
-      COUNT(*),
-      COUNT(DISTINCT customer_id),
-      COUNT(*) FILTER (WHERE made_purchase = true)
-    INTO v_total_visitors, v_unique_visitors, v_transactions
+      COALESCE(COUNT(*), 0) as total_visitors,
+      COALESCE(COUNT(DISTINCT customer_id), 0) as unique_visitors,
+      COALESCE(COUNT(*) FILTER (WHERE made_purchase = true), 0) as transactions,
+      COALESCE(AVG(duration_minutes), 0) as avg_duration
+    INTO v_stats
     FROM store_visits
-    WHERE store_id = v_store_id AND visit_date::DATE = v_date;
+    WHERE store_id = v_store_id 
+      AND visit_date::DATE = v_date;
 
-    -- 방문이 없는 날은 기본값 사용
-    IF v_total_visitors = 0 THEN
-      v_total_visitors := CASE WHEN v_dow IN (0,6) THEN 15 + floor(random()*5)::INT ELSE 10 + floor(random()*5)::INT END;
-      v_unique_visitors := floor(v_total_visitors * 0.85)::INT;
-      v_transactions := floor(v_total_visitors * 0.14)::INT;
-    END IF;
-
-    -- 재방문 고객 수 (해당 날짜까지 누적)
+    -- 재방문 고객 수 (해당 날짜까지 누적 2회 이상 방문)
     SELECT COUNT(*) INTO v_returning
     FROM (
       SELECT customer_id
@@ -847,44 +844,47 @@ BEGIN
       HAVING COUNT(*) >= 2
     ) t;
 
-    -- 매출 계산 (line_items에서)
+    -- ★★★ 핵심: L1 데이터(line_items)에서 매출 직접 집계 ★★★
     SELECT COALESCE(SUM(line_total), 0) INTO v_revenue
     FROM line_items
-    WHERE store_id = v_store_id AND transaction_date = v_date;
+    WHERE store_id = v_store_id 
+      AND transaction_date = v_date;
 
-    IF v_revenue = 0 THEN
-      v_revenue := v_transactions * (150000 + floor(random()*50000));
-    END IF;
-
+    -- v6.0과 달리: 데이터 없는 날은 0 유지 (랜덤 기본값 생성 안 함)
     INSERT INTO daily_kpis_agg (
-      id, store_id, org_id, date, 
+      id, store_id, org_id, date,
       total_revenue, total_transactions, avg_transaction_value,
-      total_visitors, unique_visitors, returning_visitors, 
+      total_visitors, unique_visitors, returning_visitors,
       conversion_rate, avg_visit_duration_seconds,
-      total_units_sold, avg_basket_size, 
-      labor_hours, sales_per_labor_hour, sales_per_visitor, 
+      total_units_sold, avg_basket_size,
+      labor_hours, sales_per_labor_hour, sales_per_visitor,
       calculated_at, created_at
     ) VALUES (
       gen_random_uuid(), v_store_id, v_org_id, v_date,
       v_revenue,
-      v_transactions,
-      CASE WHEN v_transactions > 0 THEN v_revenue / v_transactions ELSE 0 END,
-      v_total_visitors,
-      v_unique_visitors,
+      v_stats.transactions,
+      CASE WHEN v_stats.transactions > 0 THEN v_revenue / v_stats.transactions ELSE 0 END,
+      v_stats.total_visitors,          -- ★ L1에서 직접 가져옴
+      v_stats.unique_visitors,         -- ★ L1에서 직접 가져옴
       v_returning,
-      CASE WHEN v_total_visitors > 0 THEN (v_transactions::NUMERIC / v_total_visitors * 100) ELSE 0 END,
-      1200 + floor(random()*600)::INT,
-      floor(v_transactions * 1.5)::INT,  -- ✅ 오타 수정: aINT → INT
-      CASE WHEN v_transactions > 0 THEN 1.5 + random() ELSE 0 END,
+      CASE WHEN v_stats.total_visitors > 0 
+           THEN (v_stats.transactions::NUMERIC / v_stats.total_visitors * 100) 
+           ELSE 0 END,
+      v_stats.avg_duration * 60,       -- ★ L1에서 직접 가져옴
+      v_stats.transactions,
+      CASE WHEN v_stats.transactions > 0 THEN 1.5 + random() ELSE 0 END,
       CASE WHEN v_dow IN (0,6) THEN 64 ELSE 48 END,
-      v_revenue / CASE WHEN v_dow IN (0,6) THEN 64 ELSE 48 END,
-      CASE WHEN v_total_visitors > 0 THEN v_revenue / v_total_visitors ELSE 0 END,
+      CASE WHEN v_dow IN (0,6) THEN v_revenue / NULLIF(64, 0) ELSE v_revenue / NULLIF(48, 0) END,
+      CASE WHEN v_stats.total_visitors > 0 THEN v_revenue / v_stats.total_visitors ELSE 0 END,
       NOW(), NOW()
     );
+
+    v_count := v_count + 1;
   END LOOP;
 
-  RAISE NOTICE '  ✓ daily_kpis_agg: 90건 생성 (store_visits 기반)';
+  RAISE NOTICE '  ✓ daily_kpis_agg: %건 생성 (★ L1 store_visits 기반)', v_count;
 END $$;
+
 -- ============================================================================
 -- STEP 8: funnel_events 생성 (store_visits 기반 1:1 매핑)
 -- ============================================================================
@@ -1013,7 +1013,10 @@ BEGIN
 END $$;
 
 -- ============================================================================
--- STEP 10: zone_daily_metrics 생성 (90일 x 7존)
+-- [교체 3] STEP 10: zone_daily_metrics - ★ L1(zone_events) 기반 직접 집계 ★
+-- ============================================================================
+-- 기존 v6.0 문제: daily_kpis에서 가중치로 분배하여 실제 존 방문과 불일치
+-- v7.0 해결: zone_events에서 직접 COUNT
 -- ============================================================================
 DO $$
 DECLARE
@@ -1029,99 +1032,129 @@ DECLARE
     'a0000006-0000-0000-0000-000000000006'::UUID,
     'a0000007-0000-0000-0000-000000000007'::UUID
   ];
-  v_zone_weights NUMERIC[] := ARRAY[1.0, 0.9, 0.7, 0.5, 0.3, 0.4, 0.2];
-  v_base_visitors INT;
-  v_dow INT;
+  v_stats RECORD;
+  v_count INT := 0;
 BEGIN
   SELECT org_id INTO v_org_id FROM stores WHERE id = v_store_id;
 
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
-  RAISE NOTICE 'STEP 10: zone_daily_metrics 생성 (630건)';
+  RAISE NOTICE '★ STEP 10: zone_daily_metrics 생성 (L1 zone_events 기반 직접 집계)';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
 
   FOR day_offset IN 0..89 LOOP
     v_date := CURRENT_DATE - day_offset;
-    v_dow := EXTRACT(DOW FROM v_date)::INT;
-
-    -- 해당 날짜 총 방문자 수
-    SELECT COALESCE(total_visitors, 10) INTO v_base_visitors
-    FROM daily_kpis_agg WHERE store_id = v_store_id AND date = v_date;
 
     FOR zone_idx IN 1..7 LOOP
-      INSERT INTO zone_daily_metrics (id, store_id, org_id, zone_id, date, total_visitors, unique_visitors,
-        avg_dwell_seconds, peak_hour, peak_occupancy, conversion_count, heatmap_intensity, calculated_at, created_at)
-      VALUES (
+      -- ★★★ 핵심: L1 데이터(zone_events)에서 직접 집계 ★★★
+      SELECT
+        COALESCE(COUNT(*) FILTER (WHERE event_type = 'enter'), 0) as total_visitors,
+        COALESCE(COUNT(DISTINCT visitor_id), 0) as unique_visitors,
+        COALESCE(AVG(duration_seconds) FILTER (WHERE event_type = 'dwell'), 0) as avg_dwell,
+        COALESCE(MODE() WITHIN GROUP (ORDER BY event_hour), 12) as peak_hour
+      INTO v_stats
+      FROM zone_events
+      WHERE store_id = v_store_id
+        AND zone_id = v_zone_ids[zone_idx]
+        AND event_date = v_date;
+
+      INSERT INTO zone_daily_metrics (
+        id, store_id, org_id, zone_id, date,
+        total_visitors, unique_visitors, avg_dwell_seconds,
+        peak_hour, peak_occupancy, conversion_count, heatmap_intensity,
+        calculated_at, created_at
+      ) VALUES (
         gen_random_uuid(), v_store_id, v_org_id, v_zone_ids[zone_idx], v_date,
-        floor(v_base_visitors * v_zone_weights[zone_idx] * (0.8 + random()*0.4))::INT,
-        floor(v_base_visitors * v_zone_weights[zone_idx] * 0.85)::INT,
-        CASE zone_idx
-          WHEN 1 THEN 30 WHEN 2 THEN 120 WHEN 3 THEN 180
-          WHEN 4 THEN 150 WHEN 5 THEN 300 WHEN 6 THEN 180 ELSE 240
-        END + floor(random()*60),
-        CASE WHEN v_dow IN (0,6) THEN 14+floor(random()*4)::INT ELSE 12+floor(random()*3)::INT END,
-        floor(v_base_visitors * v_zone_weights[zone_idx] * 0.15)::INT,
-        CASE zone_idx WHEN 6 THEN floor(v_base_visitors*0.1) ELSE floor(v_base_visitors*0.02) END,
-        CASE zone_idx
-          WHEN 1 THEN 0.9 + random()*0.1  -- 입구: 높음
-          WHEN 2 THEN 0.7 + random()*0.2  -- 메인홀: 높음
-          WHEN 6 THEN 0.6 + random()*0.2  -- 계산대: 중간
-          ELSE 0.3 + random()*0.3         -- 기타: 낮음~중간
+        v_stats.total_visitors,          -- ★ L1에서 직접 가져옴
+        v_stats.unique_visitors,         -- ★ L1에서 직접 가져옴
+        v_stats.avg_dwell,               -- ★ L1에서 직접 가져옴
+        v_stats.peak_hour,               -- ★ L1에서 직접 가져옴
+        GREATEST(1, floor(v_stats.total_visitors * 0.15))::INT,
+        CASE zone_idx 
+          WHEN 6 THEN floor(v_stats.total_visitors * 0.3)  -- 계산대: 30% 전환
+          ELSE floor(v_stats.total_visitors * 0.05)        -- 기타: 5% 전환
+        END,
+        -- 히트맵 강도: 방문자 수 기반 동적 계산
+        CASE
+          WHEN v_stats.total_visitors > 20 THEN 0.8 + random() * 0.2
+          WHEN v_stats.total_visitors > 10 THEN 0.5 + random() * 0.3
+          WHEN v_stats.total_visitors > 0 THEN 0.2 + random() * 0.3
+          ELSE 0.1
         END,
         NOW(), NOW()
       );
+
+      v_count := v_count + 1;
     END LOOP;
   END LOOP;
 
-  RAISE NOTICE '  ✓ zone_daily_metrics: 630건 생성';
+  RAISE NOTICE '  ✓ zone_daily_metrics: %건 생성 (★ L1 zone_events 기반)', v_count;
 END $$;
 
 -- ============================================================================
--- STEP 11: hourly_metrics 생성 (90일 x 12시간)
+-- [교체 2] STEP 11: hourly_metrics - ★ L1(store_visits) 시간대별 직접 집계 ★
+-- ============================================================================
+-- 기존 v6.0 문제: daily_kpis에서 분배하여 시간대별 합계 ≠ 일별 합계
+-- v7.0 해결: store_visits에서 시간대별 직접 COUNT
 -- ============================================================================
 DO $$
 DECLARE
   v_store_id UUID := 'd9830554-2688-4032-af40-acccda787ac4';
   v_org_id UUID;
   v_date DATE;
-  v_base_visitors INT;
-  v_hour_mult NUMERIC;
+  v_hour INT;
+  v_stats RECORD;
+  v_revenue NUMERIC;
+  v_count INT := 0;
 BEGIN
   SELECT org_id INTO v_org_id FROM stores WHERE id = v_store_id;
 
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
-  RAISE NOTICE 'STEP 11: hourly_metrics 생성 (1,080건)';
+  RAISE NOTICE '★ STEP 11: hourly_metrics 생성 (L1 store_visits 시간대별 직접 집계)';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
 
   FOR day_offset IN 0..89 LOOP
     v_date := CURRENT_DATE - day_offset;
 
-    SELECT COALESCE(total_visitors, 10) INTO v_base_visitors
-    FROM daily_kpis_agg WHERE store_id = v_store_id AND date = v_date;
-
     FOR v_hour IN 10..21 LOOP
-      v_hour_mult := CASE
-        WHEN v_hour BETWEEN 12 AND 14 THEN 1.3  -- 점심
-        WHEN v_hour BETWEEN 17 AND 19 THEN 1.5  -- 저녁
-        WHEN v_hour <= 11 THEN 0.7              -- 오전
-        WHEN v_hour >= 20 THEN 0.8              -- 늦은 저녁
-        ELSE 1.0
-      END;
+      -- ★★★ 핵심: L1 데이터(store_visits)에서 시간대별 직접 집계 ★★★
+      SELECT
+        COALESCE(COUNT(*), 0) as visitor_count,
+        COALESCE(COUNT(*) FILTER (WHERE made_purchase = true), 0) as transaction_count
+      INTO v_stats
+      FROM store_visits
+      WHERE store_id = v_store_id
+        AND visit_date::DATE = v_date
+        AND EXTRACT(HOUR FROM visit_date) = v_hour;
 
-      INSERT INTO hourly_metrics (id, store_id, org_id, date, hour, visitor_count, transaction_count, revenue, conversion_rate, created_at)
-      VALUES (
+      -- ★★★ 핵심: L1 데이터(line_items)에서 시간대별 매출 직접 집계 ★★★
+      SELECT COALESCE(SUM(line_total), 0) INTO v_revenue
+      FROM line_items
+      WHERE store_id = v_store_id
+        AND transaction_date = v_date
+        AND transaction_hour = v_hour;
+
+      INSERT INTO hourly_metrics (
+        id, store_id, org_id, date, hour,
+        visitor_count, transaction_count, revenue, conversion_rate, 
+        created_at
+      ) VALUES (
         gen_random_uuid(), v_store_id, v_org_id, v_date, v_hour,
-        floor(v_base_visitors / 12 * v_hour_mult * (0.8 + random()*0.4))::INT,
-        floor(v_base_visitors / 12 * 0.14 * (0.8 + random()*0.4))::INT,
-        floor(v_base_visitors / 12 * 120000 * v_hour_mult * (0.8 + random()*0.4)),
-        10 + floor(random()*8),
+        v_stats.visitor_count,           -- ★ L1에서 직접 가져옴
+        v_stats.transaction_count,       -- ★ L1에서 직접 가져옴
+        v_revenue,                       -- ★ L1에서 직접 가져옴
+        CASE WHEN v_stats.visitor_count > 0 
+             THEN (v_stats.transaction_count::NUMERIC / v_stats.visitor_count * 100) 
+             ELSE 0 END,
         NOW()
       );
+
+      v_count := v_count + 1;
     END LOOP;
   END LOOP;
 
-  RAISE NOTICE '  ✓ hourly_metrics: 1,080건 생성';
+  RAISE NOTICE '  ✓ hourly_metrics: %건 생성 (★ L1 store_visits 시간대별 직접 집계)', v_count;
 END $$;
 
 -- ============================================================================
