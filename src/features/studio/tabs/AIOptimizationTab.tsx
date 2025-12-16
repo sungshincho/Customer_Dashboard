@@ -237,22 +237,41 @@ export function AIOptimizationTab({
     toast.info('원래 씬으로 복원되었습니다');
   }, [sceneSimulation, onOverlayToggle]);
 
-  // To-Be 씬 적용 - 3D 모델 위치 실제 변경
+  // To-Be 씬 적용 - 3D 모델 위치 실제 변경 (가구 + 상품)
   const handleApplyToBe = useCallback(async () => {
     try {
       const results = sceneSimulation.state.results;
 
-      // 레이아웃 최적화 결과가 있으면 가구 이동 적용
+      const payload: {
+        furnitureMoves?: any[];
+        productPlacements?: any[];
+      } = {};
+
+      // 1️⃣ 레이아웃 최적화 결과가 있으면 가구 이동 적용
       if (results.layout?.furnitureMoves && results.layout.furnitureMoves.length > 0) {
-        applySimulationResults({
-          furnitureMoves: results.layout.furnitureMoves,
-        });
+        payload.furnitureMoves = results.layout.furnitureMoves;
+      }
+
+      // 2️⃣ 상품 배치 결과가 있으면 상품 재배치 적용 (슬롯 기반)
+      if (results.layout?.productPlacements && results.layout.productPlacements.length > 0) {
+        payload.productPlacements = results.layout.productPlacements;
+      }
+
+      // 변경사항이 있을 때만 적용
+      if (payload.furnitureMoves || payload.productPlacements) {
+        applySimulationResults(payload);
+
+        const moveCount = payload.furnitureMoves?.length || 0;
+        const placementCount = payload.productPlacements?.length || 0;
+
+        toast.success(
+          `최적화 적용 완료: 가구 ${moveCount}개 이동, 상품 ${placementCount}개 재배치`
+        );
       }
 
       // 내부 상태도 업데이트
       await sceneSimulation.applyAllChanges();
 
-      toast.success('최적화된 레이아웃이 3D 씬에 적용되었습니다');
     } catch (error) {
       console.error('Apply To-Be error:', error);
       toast.error('적용에 실패했습니다');

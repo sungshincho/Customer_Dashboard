@@ -13,6 +13,7 @@ import type {
   LayoutSimulationResultType,
   FlowSimulationResultType,
   StaffingSimulationResultType,
+  ProductPlacement,
 } from '../types';
 
 // 훅과의 호환성을 위한 타입 별칭
@@ -66,6 +67,7 @@ export interface SceneComparison {
 
 /**
  * 레이아웃 최적화 결과를 기반으로 To-be 씬 생성
+ * 🆕 상품 배치(productPlacements) 지원 추가
  */
 export function generateLayoutOptimizedScene(
   asIsScene: SceneRecipe,
@@ -76,7 +78,7 @@ export function generateLayoutOptimizedScene(
   // 씬 복사
   const toBe: SceneRecipe = deepClone(asIsScene);
 
-  // 가구 이동 적용
+  // 1️⃣ 가구 이동 적용
   layoutResult.furnitureMoves.forEach((move) => {
     const furnitureIdx = toBe.furniture.findIndex(
       (f) => f.id === move.furnitureId || f.furniture_type === move.furnitureName
@@ -109,7 +111,7 @@ export function generateLayoutOptimizedScene(
         assetName: move.furnitureName,
         before: { position: beforePosition },
         after: { position: furniture.position },
-        reason: '레이아웃 최적화',
+        reason: (move as any).reason || '레이아웃 최적화',
         impact: `효율성 +${(Math.random() * 10 + 5).toFixed(1)}%`,
       });
     } else {
@@ -137,6 +139,64 @@ export function generateLayoutOptimizedScene(
       });
     }
   });
+
+  // 2️⃣ 상품 배치 적용 (슬롯 기반)
+  if (layoutResult.productPlacements && layoutResult.productPlacements.length > 0) {
+    layoutResult.productPlacements.forEach((placement) => {
+      const productIdx = toBe.products.findIndex(
+        (p) => p.id === placement.productId || p.sku === placement.productSku
+      );
+
+      if (productIdx !== -1) {
+        const product = toBe.products[productIdx];
+        const beforePosition = { ...product.position };
+
+        // 대상 가구 찾기
+        const targetFurniture = toBe.furniture.find(
+          (f) => f.id === placement.toFurnitureId
+        );
+
+        if (targetFurniture) {
+          // 슬롯 타입에 따른 오프셋 계산
+          const slotOffsets: Record<string, Vector3> = {
+            hanger: { x: 0, y: 1.5, z: 0 },
+            mannequin: { x: 0, y: 1.0, z: 0 },
+            shelf: { x: 0, y: 0.8, z: 0 },
+            table: { x: 0, y: 0.75, z: 0 },
+            rack: { x: 0, y: 1.2, z: 0 },
+            hook: { x: 0, y: 1.4, z: 0 },
+            drawer: { x: 0, y: 0.3, z: 0 },
+          };
+
+          const offset = slotOffsets[placement.slotType || 'shelf'] || { x: 0, y: 0.8, z: 0 };
+
+          // 위치 업데이트
+          product.position = {
+            x: targetFurniture.position.x + offset.x,
+            y: targetFurniture.position.y + offset.y,
+            z: targetFurniture.position.z + offset.z,
+          };
+
+          // 메타데이터 업데이트
+          (product as any).furniture_id = placement.toFurnitureId;
+          (product as any).slot_id = placement.toSlotId;
+          (product as any).display_type = placement.displayType;
+
+          changes.push({
+            id: `change-product-${placement.productId}`,
+            type: 'move',
+            assetType: 'product',
+            assetId: placement.productId,
+            assetName: placement.productName || placement.productSku,
+            before: { position: beforePosition },
+            after: { position: product.position },
+            reason: placement.reason || '상품 재배치 최적화',
+            impact: placement.priority === 'high' ? '높은 우선순위' : '전환율 개선 기대',
+          });
+        }
+      }
+    });
+  }
 
   // 요약 생성
   const summary = {
