@@ -3,23 +3,55 @@ import type { ModelLayer } from "../components/digital-twin/ModelLayerManager";
 import { parseModelFilename } from "./modelFilenameParser";
 
 /**
- * 사용자의 3D 모델 로드 (v2 - 새 아키텍처)
- * 1. DB: furniture (가구 테이블)
- * 2. DB: product_placements + products (상품 배치)
- * 3. DB: ontology_entity_types (기본 모델 타입)
- * 4. Storage: 직접 업로드된 모델 (레거시 지원)
+ * 사용자의 3D 모델 로드 (v3 - stores/furniture/products 테이블 직접 로드)
+ * 1. DB: stores (매장 공간 3D 모델)
+ * 2. DB: furniture (가구 테이블)
+ * 3. DB: products (상품 3D 모델)
+ * 4. DB: ontology_entity_types (기본 모델 타입 - 레거시)
+ * 5. Storage: 직접 업로드된 모델 (레거시 지원)
  */
 export async function loadUserModels(
   userId: string,
   storeId?: string
 ): Promise<ModelLayer[]> {
-  console.log('=== [loadUserModels] v2 CALLED ===', { userId, storeId });
+  console.log('=== [loadUserModels] v3 CALLED ===', { userId, storeId });
 
   const models: ModelLayer[] = [];
   const loadedUrls = new Set<string>(); // 중복 방지
 
   try {
     if (storeId) {
+      // ============================================
+      // 0. stores 테이블에서 매장 공간 모델 로드
+      // ============================================
+      const { data: storeData, error: storeError } = await supabase
+        .from('stores')
+        .select('*')
+        .eq('id', storeId)
+        .single();
+
+      if (!storeError && storeData && storeData.model_3d_url) {
+        console.log(`[ModelLoader] Section 0: Loading store space model: ${storeData.store_name}`);
+        models.push({
+          id: `space-${storeData.id}`,
+          name: storeData.store_name || 'Store Space',
+          type: 'space',
+          model_url: storeData.model_3d_url,
+          dimensions: parseJsonField(storeData.dimensions, undefined),
+          position: { x: 0, y: 0, z: 0 },
+          rotation: { x: 0, y: 0, z: 0 },
+          scale: { x: 1, y: 1, z: 1 },
+          metadata: {
+            storeId: storeData.id,
+            storeName: storeData.store_name
+          }
+        });
+        loadedUrls.add(storeData.model_3d_url);
+        console.log(`[ModelLoader] Store: ${storeData.store_name}, Model URL: ${storeData.model_3d_url}`);
+      } else if (storeError) {
+        console.error('[ModelLoader] Error loading store:', storeError);
+      }
+
       // ============================================
       // 1. furniture 테이블에서 가구 로드
       // ============================================
@@ -34,25 +66,38 @@ export async function loadUserModels(
 
         for (const f of furnitureData) {
           if (f.model_url) {
+            // position/rotation/scale은 JSONB 또는 개별 컬럼일 수 있음
+            const pos = parseJsonField((f as any).position, null) ||
+                       { x: Number((f as any).position_x) || 0, y: Number((f as any).position_y) || 0, z: Number((f as any).position_z) || 0 };
+            const rot = parseJsonField((f as any).rotation, null) ||
+                       { x: Number((f as any).rotation_x) || 0, y: Number((f as any).rotation_y) || 0, z: Number((f as any).rotation_z) || 0 };
+            const scl = parseJsonField((f as any).scale, null) ||
+                       { x: Number((f as any).scale_x) || 1, y: Number((f as any).scale_y) || 1, z: Number((f as any).scale_z) || 1 };
+
             models.push({
               id: `furniture-${f.id}`,
-              name: f.name,
+              name: (f as any).furniture_name || f.name || 'Furniture',
               type: 'furniture',
               model_url: f.model_url,
-              dimensions: parseJsonField((f as any).dimensions, undefined),
-              position: { x: Number(f.position_x) || 0, y: Number(f.position_y) || 0, z: Number(f.position_z) || 0 },
-              rotation: { x: Number(f.rotation_x) || 0, y: Number(f.rotation_y) || 0, z: Number(f.rotation_z) || 0 },
-              scale: { x: Number(f.scale_x) || 1, y: Number(f.scale_y) || 1, z: Number(f.scale_z) || 1 },
+              dimensions: {
+                width: f.width || 1,
+                height: f.height || 1,
+                depth: f.depth || 1
+              },
+              position: pos,
+              rotation: rot,
+              scale: scl,
               metadata: {
                 furnitureId: f.id,
                 furnitureType: f.furniture_type,
+                furnitureCode: (f as any).furniture_code,
                 zoneId: (f as any).zone_id,
                 movable: (f as any).movable,
                 properties: f.properties
               }
             });
             loadedUrls.add(f.model_url);
-            console.log(`[ModelLoader] Furniture: ${f.name}, Type: ${f.furniture_type}, Position:`, { x: f.position_x, y: f.position_y, z: f.position_z });
+            console.log(`[ModelLoader] Furniture: ${(f as any).furniture_name || f.name}, Type: ${f.furniture_type}, Position:`, pos);
           }
         }
       } else if (furnitureError) {
@@ -60,7 +105,51 @@ export async function loadUserModels(
       }
 
       // ============================================
-      // 2. product_placements 테이블에서 상품 배치 로드
+      // 2. products 테이블에서 상품 3D 모델 로드
+      // ============================================
+      const { data: productsData, error: productsError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('store_id', storeId)
+        .not('model_3d_url', 'is', null);
+
+      if (!productsError && productsData) {
+        console.log(`[ModelLoader] Section 2: Loading ${productsData.length} products with 3D models`);
+
+        for (const p of productsData) {
+          if (p.model_3d_url) {
+            const pos = parseJsonField((p as any).model_3d_position, { x: 0, y: 0, z: 0 });
+            const rot = parseJsonField((p as any).model_3d_rotation, { x: 0, y: 0, z: 0 });
+            const scl = parseJsonField((p as any).model_3d_scale, { x: 1, y: 1, z: 1 });
+
+            models.push({
+              id: `product-${p.id}`,
+              name: p.product_name || p.sku || 'Product',
+              type: 'product',
+              model_url: p.model_3d_url,
+              position: pos,
+              rotation: rot,
+              scale: scl,
+              metadata: {
+                productId: p.id,
+                productName: p.product_name,
+                sku: p.sku,
+                category: p.category,
+                initialFurnitureId: (p as any).initial_furniture_id,
+                slotId: (p as any).slot_id,
+                movable: (p as any).movable ?? true
+              }
+            });
+            loadedUrls.add(p.model_3d_url);
+            console.log(`[ModelLoader] Product: ${p.product_name}, SKU: ${p.sku}, Position:`, pos);
+          }
+        }
+      } else if (productsError) {
+        console.error('[ModelLoader] Error loading products:', productsError);
+      }
+
+      // ============================================
+      // 3. product_placements 테이블에서 상품 배치 로드 (레거시)
       // ============================================
       const { data: placementsData, error: placementsError } = await supabase
         .from('product_placements')
@@ -77,7 +166,7 @@ export async function loadUserModels(
         .eq('is_active', true);
 
       if (!placementsError && placementsData) {
-        console.log(`[ModelLoader] Section 2: Loading ${placementsData.length} product placements`);
+        console.log(`[ModelLoader] Section 3: Loading ${placementsData.length} product placements (legacy)`);
 
         for (const p of placementsData) {
           const product = p.products as any;
@@ -113,9 +202,9 @@ export async function loadUserModels(
     }
 
     // ============================================
-    // 3. DB에서 entity_types 로드 (기본 모델 - space 등)
+    // 4. DB에서 entity_types 로드 (레거시 - 기본 모델)
     // ============================================
-    console.log(`[ModelLoader] Section 3: Loading entity_types for user ${userId}`);
+    console.log(`[ModelLoader] Section 4: Loading entity_types for user ${userId} (legacy)`);
     const { data: entityTypes, error: typesError } = await supabase
       .from('ontology_entity_types')
       .select('id, name, label, model_3d_url, model_3d_type, model_3d_dimensions, model_3d_metadata')
@@ -157,7 +246,7 @@ export async function loadUserModels(
     }
 
     // ============================================
-    // 4. Storage에서 직접 업로드된 모델 로드 (레거시)
+    // 5. Storage에서 직접 업로드된 모델 로드 (레거시)
     // ============================================
     // 여러 경로 형식 지원 (레거시 호환성)
     const storagePaths: string[] = [];
