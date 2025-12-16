@@ -90,7 +90,6 @@ export * from './useDashboardKPIAgg';
 export { useCustomerJourney } from './useCustomerJourney';
 export { useCustomerSegments } from './useCustomerSegments';
 export { useCustomerSegmentsAgg } from './useCustomerSegmentsAgg';
-export { usePurchasePatterns } from './usePurchasePatterns';
 
 // ============================================================================
 // 구역/트래픽 훅
@@ -122,7 +121,6 @@ export { useImportProgress } from './useImportProgress';
 export { useUploadSession } from './useUploadSession';
 export { useSchemaMetadata } from './useSchemaMetadata';
 export { usePOSIntegration } from './usePOSIntegration';
-export * from './useRealSampleData';
 export { useWiFiTracking } from './useWiFiTracking';
 
 // ============================================================================
@@ -138,10 +136,9 @@ export * from './useROITracking';
 export * from './useLearningFeedback';
 
 // ============================================================================
-// 온보딩 및 커뮤니케이션 훅
+// 온보딩 훅
 // ============================================================================
 export * from './useOnboarding';
-export * from './useHQCommunication';
 
 // ============================================================================
 // 유틸리티 훅
