@@ -28,6 +28,12 @@ export {
   doesProductFitSlot,
 } from './useFurnitureSlots';
 
+// AI 최적화 훅
+export { useOptimization } from './useOptimization';
+
+// 배치 저장/관리 훅
+export { usePlacement } from './usePlacement';
+
 // 타입 re-export
 export type {
   LayoutSimulationParams,
@@ -76,6 +82,21 @@ export type {
   UseFurnitureSlotsOptions,
   UseFurnitureSlotsReturn,
 } from './useFurnitureSlots';
+
+export type {
+  UseOptimizationOptions,
+  UseOptimizationReturn,
+  OptimizationStatus,
+  OptimizationHistoryItem,
+  GenerateOptimizationParams,
+} from './useOptimization';
+
+export type {
+  UsePlacementOptions,
+  UsePlacementReturn,
+  PlacementChange,
+  PlacementHistoryEntry,
+} from './usePlacement';
 
 // SceneProvider 훅들 re-export
 export {
