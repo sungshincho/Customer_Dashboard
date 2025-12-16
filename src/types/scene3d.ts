@@ -38,11 +38,14 @@ export interface FurnitureAsset extends SceneAsset {
   optimization_reason?: string;
 }
 
+export type ProductDisplayType = 'hanging' | 'folded' | 'standing' | 'boxed' | 'stacked';
+
 export interface ProductAsset extends SceneAsset {
   type: 'product';
   product_id?: string;
   sku?: string;
   movable?: boolean;
+  display_type?: ProductDisplayType;
   suggested_position?: Vector3D;
   suggested_rotation?: Vector3D;
   optimization_reason?: string;
@@ -216,13 +219,17 @@ export interface AILayoutOptimizationResult {
 }
 
 // Furniture Slot Types
+export type SlotType = 'hanger' | 'shelf' | 'table' | 'rack' | 'hook' | 'drawer';
+
 export interface FurnitureSlot {
   id: string;
   furniture_id: string;
   furniture_type: string;
   slot_id: string;  // e.g., "A1", "B2", "TOP-L"
+  slot_type?: SlotType;
   slot_position: Vector3D;  // Relative position within furniture
   slot_rotation: Vector3D;
+  compatible_display_types?: ProductDisplayType[];  // Compatible product display types
   max_product_width?: number;
   max_product_height?: number;
   max_product_depth?: number;

@@ -1,6 +1,6 @@
 # 3D 디지털트윈 모델 준비 가이드라인
 
-**버전**: 2.5 (Slot Auto-Snap)
+**버전**: 2.6 (Display Type Compatibility)
 **작성일**: 2025-12-16
 **기준 시드**: NEURALTWIN v8.0 ULTIMATE SEED
 
@@ -660,7 +660,56 @@ const optimizedRecipe = await generateOptimizedSceneRecipe(
 | `targetFurniture` 존재 | 대상 가구가 씬에 로드되어 있어야 함 |
 | `targetSlot` 존재 | `furniture_slots` 테이블에 슬롯 정의 필요 |
 | `movable !== false` | 상품이 이동 가능 상태여야 함 |
+| `display_type` 호환 | 상품 디스플레이 타입이 슬롯과 호환되어야 함 |
 | Fallback | 슬롯 미정의 시 AI 추천 좌표 직접 사용 |
+
+#### 4.4.5 디스플레이 타입 호환성 시스템
+
+상품의 **디스플레이 형태**(걸림, 접힘, 세움 등)와 **가구 슬롯의 호환 타입**이 맞아야 재배치가 가능합니다.
+
+**상품 디스플레이 타입 (display_type):**
+
+| 타입 | 설명 | 예시 상품 |
+|------|------|----------|
+| `hanging` | 걸린 형태 | 아우터, 상의, 바지(행거), 스카프 |
+| `folded` | 접힌 형태 | 니트, 속옷, 양말, 수건 |
+| `standing` | 세운 형태 | 신발, 가방, 시계, 안경 |
+| `boxed` | 박스 형태 | 포장된 상품, 선물세트 |
+| `stacked` | 적층 형태 | 청바지 스택, 티셔츠 스택 |
+
+**슬롯 타입별 호환 매핑:**
+
+| 슬롯 타입 | 가구 예시 | 호환 디스플레이 타입 |
+|----------|----------|---------------------|
+| `hanger` | 의류 행거 랙 | `hanging` |
+| `shelf` | 선반형 진열대, 쇼케이스 | `folded`, `standing`, `boxed` |
+| `table` | 디스플레이 테이블 | `folded`, `boxed` |
+| `rack` | 신발 진열대 | `standing` |
+| `hook` | 스카프 행거 | `hanging` |
+
+**호환성 체크 로직:**
+
+```typescript
+// 행거에 걸린 코트 → 테이블로 이동 시도?
+// hanging ↛ table (folded, boxed만 호환) → 이동 거부!
+
+// 테이블에 접힌 니트 → 다른 선반으로 이동?
+// folded → shelf (folded 호환) → 이동 허용!
+```
+
+**자동 슬롯 조정:**
+
+```
+AI 추천: 상품 A → 가구 B의 슬롯 S1
+          │
+          ▼
+  S1 호환성 체크 ──NO──▶ 가구 B의 다른 호환 슬롯 검색
+          │                    │
+          YES                  ▼
+          │              S2 발견? ──YES──▶ S2로 자동 조정
+          ▼                    │
+     S1에 배치              NO → 이동 거부 (원래 위치 유지)
+```
 
 ---
 

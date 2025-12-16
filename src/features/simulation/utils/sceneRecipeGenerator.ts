@@ -13,7 +13,8 @@ import type {
   ModelDimensions,
   Vector3D,
   FurnitureSlot,
-  SlotSnapResult
+  SlotSnapResult,
+  ProductDisplayType
 } from "@/types/scene3d";
 
 const DEFAULT_LIGHTING: LightingPreset = {
@@ -338,14 +339,29 @@ async function loadFurnitureSlots(storeId: string): Promise<FurnitureSlot[]> {
     furniture_id: s.furniture_id,
     furniture_type: s.furniture_type,
     slot_id: s.slot_id,
+    slot_type: s.slot_type,
     slot_position: s.slot_position as Vector3D,
     slot_rotation: (s.slot_rotation as Vector3D) || { x: 0, y: 0, z: 0 },
+    compatible_display_types: s.compatible_display_types as ProductDisplayType[] || ['standing'],
     max_product_width: s.max_product_width,
     max_product_height: s.max_product_height,
     max_product_depth: s.max_product_depth,
     is_occupied: s.is_occupied || false,
     occupied_by_product_id: s.occupied_by_product_id
   }));
+}
+
+/**
+ * Check if product display type is compatible with slot
+ */
+function isDisplayTypeCompatible(
+  productDisplayType: ProductDisplayType | undefined,
+  slotCompatibleTypes: ProductDisplayType[] | undefined
+): boolean {
+  if (!productDisplayType || !slotCompatibleTypes || slotCompatibleTypes.length === 0) {
+    return true; // Allow if not specified
+  }
+  return slotCompatibleTypes.includes(productDisplayType);
 }
 
 /**
@@ -435,17 +451,30 @@ export async function applyOptimizedPlacements(
 
     if (change && p.movable !== false) {
       const targetFurniture = furnitureMap.get(change.suggested.furniture_id);
+
+      // Find compatible slot (check display type compatibility)
       const targetSlot = slots.find(
-        s => s.furniture_id === change.suggested.furniture_id && s.slot_id === change.suggested.slot_id
+        s => s.furniture_id === change.suggested.furniture_id &&
+             s.slot_id === change.suggested.slot_id &&
+             isDisplayTypeCompatible(p.display_type, s.compatible_display_types)
       );
 
-      if (targetFurniture && targetSlot) {
+      // If exact slot not compatible, try to find any compatible slot on same furniture
+      const fallbackSlot = !targetSlot ? slots.find(
+        s => s.furniture_id === change.suggested.furniture_id &&
+             !s.is_occupied &&
+             isDisplayTypeCompatible(p.display_type, s.compatible_display_types)
+      ) : null;
+
+      const selectedSlot = targetSlot || fallbackSlot;
+
+      if (targetFurniture && selectedSlot) {
         // Auto-snap: calculate world position from furniture + slot
         const snapResult = calculateSlotWorldPosition(
           targetFurniture.position,
           targetFurniture.rotation,
-          targetSlot.slot_position,
-          targetSlot.slot_rotation
+          selectedSlot.slot_position,
+          selectedSlot.slot_rotation
         );
 
         return {
@@ -455,8 +484,8 @@ export async function applyOptimizedPlacements(
           suggested_position: snapResult.world_position,
           suggested_rotation: snapResult.world_rotation,
           initial_furniture_id: change.suggested.furniture_id,
-          slot_id: change.suggested.slot_id,
-          optimization_reason: change.reason,
+          slot_id: selectedSlot.slot_id,
+          optimization_reason: change.reason + (fallbackSlot ? ' (slot adjusted for display type compatibility)' : ''),
           expected_impact: {
             revenue_change_pct: change.expected_revenue_impact,
             visibility_score: change.expected_visibility_impact,
@@ -465,7 +494,15 @@ export async function applyOptimizedPlacements(
         };
       }
 
-      // Fallback: use suggested position directly
+      // Skip if display type not compatible with any slot on target furniture
+      if (targetFurniture && !selectedSlot) {
+        console.warn(
+          `Product ${p.id} (display_type: ${p.display_type}) not compatible with any slot on furniture ${change.suggested.furniture_id}`
+        );
+        return p; // Keep original position
+      }
+
+      // Fallback: use suggested position directly (no slot info available)
       return {
         ...p,
         position: change.suggested.position,
