@@ -17,6 +17,17 @@ export { useStaffingSimulation } from './useStaffingSimulation';
 // 씬 기반 시뮬레이션 통합 훅
 export { useSceneSimulation } from './useSceneSimulation';
 
+// SceneRecipe 연동 훅
+export { useSceneRecipe, useSlotInfo, modelsToRecipe } from './useSceneRecipe';
+
+// 가구 슬롯 관리 훅
+export {
+  useFurnitureSlots,
+  calculateSlotWorldPosition,
+  isSlotCompatible,
+  doesProductFitSlot,
+} from './useFurnitureSlots';
+
 // 타입 re-export
 export type {
   LayoutSimulationParams,
@@ -55,6 +66,16 @@ export type {
   SceneSimulationState,
   UseSceneSimulationReturn,
 } from './useSceneSimulation';
+
+export type {
+  UseSceneRecipeOptions,
+  UseSceneRecipeReturn,
+} from './useSceneRecipe';
+
+export type {
+  UseFurnitureSlotsOptions,
+  UseFurnitureSlotsReturn,
+} from './useFurnitureSlots';
 
 // SceneProvider 훅들 re-export
 export {
