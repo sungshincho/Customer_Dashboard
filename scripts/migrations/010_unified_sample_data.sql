@@ -1421,7 +1421,7 @@ BEGIN
   RAISE NOTICE '  📊 L2 기준선 (daily_kpis_agg):';
   RAISE NOTICE '     - 일평균 매출: ₩%', TO_CHAR(v_baseline_revenue, 'FM999,999,999');
   RAISE NOTICE '     - 일평균 방문자: %명', v_baseline_visitors;
-  RAISE NOTICE '     - 평균 전환율: %%', v_baseline_conversion;
+  RAISE NOTICE '     - 평균 전환율: %', v_baseline_conversion || '%';
 
   -- ═══════════════════════════════════════════════════════════
   -- L2 기준선 데이터 수집: zone_daily_metrics (가장 혼잡한 존)
@@ -2603,7 +2603,7 @@ BEGIN
       'active', true, NOW(), NOW()
     );
     v_recommendation_count := v_recommendation_count + 1;
-    RAISE NOTICE '  ✓ 추천 1: 저성과 상품 - % (전환율 %%)', v_low_product.product_name, v_low_product.avg_conv;
+    RAISE NOTICE '  ✓ 추천 1: 저성과 상품 - % (전환율 %)', v_low_product.product_name, v_low_product.avg_conv || '%';
   END IF;
 
   -- ═══════════════════════════════════════════════════════════
@@ -2661,7 +2661,7 @@ BEGIN
       'active', true, NOW(), NOW()
     );
     v_recommendation_count := v_recommendation_count + 1;
-    RAISE NOTICE '  ✓ 추천 2: 혼잡 존 - % (점유율 %%)', v_congested_zone.zone_name, v_congested_zone.occupancy_rate;
+    RAISE NOTICE '  ✓ 추천 2: 혼잡 존 - % (점유율 %)', v_congested_zone.zone_name, v_congested_zone.occupancy_rate || '%';
   END IF;
 
   -- ═══════════════════════════════════════════════════════════
@@ -2715,7 +2715,7 @@ BEGIN
       'active', true, NOW(), NOW()
     );
     v_recommendation_count := v_recommendation_count + 1;
-    RAISE NOTICE '  ✓ 추천 3: 저활용 존 - % (활용률 %%)', v_underperforming_zone.zone_name, v_underperforming_zone.utilization_rate;
+    RAISE NOTICE '  ✓ 추천 3: 저활용 존 - % (활용률 %)', v_underperforming_zone.zone_name, v_underperforming_zone.utilization_rate || '%';
   END IF;
 
   -- ═══════════════════════════════════════════════════════════
@@ -2911,7 +2911,7 @@ BEGIN
       'active', true, NOW(), NOW()
     );
     v_recommendation_count := v_recommendation_count + 1;
-    RAISE NOTICE '  ✓ 추천 7: At-Risk 리텐션 - %명 (이탈위험 %%)', v_at_risk_stats.avg_count, v_at_risk_stats.avg_churn_risk;
+    RAISE NOTICE '  ✓ 추천 7: At-Risk 리텐션 - %명 (이탈위험 %)', v_at_risk_stats.avg_count, v_at_risk_stats.avg_churn_risk || '%';
   END IF;
 
   -- ═══════════════════════════════════════════════════════════
