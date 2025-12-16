@@ -71,6 +71,9 @@ BEGIN
   RAISE NOTICE 'STEP 0: 기존 데이터 전체 삭제';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
 
+  -- ★ FK 제약조건 임시 비활성화 (세션 레벨)
+  SET session_replication_role = 'replica';
+
   -- v8.0 추가 테이블 삭제
   DELETE FROM strategy_feedback WHERE store_id = v_store_id;
   DELETE FROM ai_inference_results WHERE store_id = v_store_id;
@@ -143,6 +146,9 @@ BEGIN
   );
   DELETE FROM ontology_entity_types WHERE id::TEXT LIKE 'b0000%';
 
+  -- ★ FK 제약조건 다시 활성화
+  SET session_replication_role = 'origin';
+
   RAISE NOTICE '  ✓ 기존 데이터 전체 삭제 완료';
 END $$;
 
@@ -153,16 +159,9 @@ END $$;
 DO $$
 DECLARE
   v_store_id UUID := 'd9830554-2688-4032-af40-acccda787ac4';
-  v_user_id UUID;
-  v_org_id UUID;
+  v_user_id UUID := 'e4200130-08e8-47da-8c92-3d0b90fafd77'::UUID;
+  v_org_id UUID := '0c6076e3-a993-4022-9b40-0f4e4370f8ef'::UUID;
 BEGIN
-  SELECT id INTO v_user_id FROM auth.users LIMIT 1;
-  SELECT id INTO v_org_id FROM organizations LIMIT 1;
-
-  IF v_user_id IS NULL OR v_org_id IS NULL THEN
-    RAISE EXCEPTION 'User or Organization not found';
-  END IF;
-
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
   RAISE NOTICE 'STEP 1: 매장 생성';
@@ -1446,11 +1445,10 @@ END $$;
 DO $$
 DECLARE
   v_store_id UUID := 'd9830554-2688-4032-af40-acccda787ac4';
-  v_user_id UUID;
-  v_org_id UUID;
+  v_user_id UUID := 'e4200130-08e8-47da-8c92-3d0b90fafd77'::UUID;
+  v_org_id UUID := '0c6076e3-a993-4022-9b40-0f4e4370f8ef'::UUID;
   v_count INT := 0;
 BEGIN
-  SELECT user_id, org_id INTO v_user_id, v_org_id FROM stores WHERE id = v_store_id;
 
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
@@ -1510,11 +1508,10 @@ END $$;
 DO $$
 DECLARE
   v_store_id UUID := 'd9830554-2688-4032-af40-acccda787ac4';
-  v_user_id UUID;
-  v_org_id UUID;
+  v_user_id UUID := 'e4200130-08e8-47da-8c92-3d0b90fafd77'::UUID;
+  v_org_id UUID := '0c6076e3-a993-4022-9b40-0f4e4370f8ef'::UUID;
   v_count INT := 0;
 BEGIN
-  SELECT user_id, org_id INTO v_user_id, v_org_id FROM stores WHERE id = v_store_id;
 
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
@@ -2091,10 +2088,13 @@ BEGIN
   IF v_strategy_ids IS NOT NULL AND array_length(v_strategy_ids, 1) > 0 THEN
     FOR i IN 1..20 LOOP
       INSERT INTO strategy_feedback (
-        id, strategy_id, store_id, user_id, org_id,
-        feedback_type, rating, comment, effectiveness_score,
-        created_at
-      ) VALUES (
+  id, org_id, store_id, strategy_id, strategy_type, feedback_type,
+  expected_roi, actual_roi, roi_accuracy,
+  baseline_metrics, actual_metrics, learnings,
+  ai_recommendation, was_applied, result_measured,
+  measurement_start_date, measurement_end_date, measurement_period_days,
+  applied_at, created_at, updated_at
+) VALUES (
         gen_random_uuid(),
         v_strategy_ids[1 + ((i-1) % array_length(v_strategy_ids, 1))],
         v_store_id, v_user_id, v_org_id,
@@ -2152,7 +2152,9 @@ BEGIN
   DELETE FROM data_sources WHERE id = ANY(v_ds_ids);
 
   -- data_sources 생성
-  INSERT INTO data_sources (id, store_id, user_id, org_id, name, type, connection_string, status, last_sync_at, created_at) VALUES
+  INSERT INTO data_sources (id, store_id, org_id, source_name, source_type, 
+  source_id_code, is_active, config, schema_definition, 
+  last_sync_at, last_sync_status, record_count, created_at, updated_at) VALUES
     (v_ds_ids[1], v_store_id, v_user_id, v_org_id, 'POS 시스템', 'pos', 'pos://internal.neuraltwin.com/gangnam', 'connected', NOW() - INTERVAL '1 hour', NOW()),
     (v_ds_ids[2], v_store_id, v_user_id, v_org_id, 'CRM 시스템', 'crm', 'crm://internal.neuraltwin.com/gangnam', 'connected', NOW() - INTERVAL '2 hours', NOW()),
     (v_ds_ids[3], v_store_id, v_user_id, v_org_id, 'ERP 시스템', 'erp', 'erp://internal.neuraltwin.com/gangnam', 'connected', NOW() - INTERVAL '3 hours', NOW()),
@@ -2161,7 +2163,9 @@ BEGIN
   v_count := 5;
 
   -- data_source_tables 생성
-  INSERT INTO data_source_tables (id, data_source_id, table_name, schema_info, row_count, last_updated) VALUES
+  INSERT INTO data_sources (id, store_id, org_id, source_name, source_type, 
+  source_id_code, is_active, config, schema_definition, 
+  last_sync_at, last_sync_status, record_count, created_at, updated_at) VALUES
     -- POS 테이블
     (gen_random_uuid(), v_ds_ids[1], 'pos_transactions', '{"columns": ["id", "datetime", "amount", "items"]}', 15000, NOW()),
     (gen_random_uuid(), v_ds_ids[1], 'pos_items', '{"columns": ["id", "transaction_id", "product_id", "qty"]}', 45000, NOW()),
@@ -2185,7 +2189,9 @@ BEGIN
   v_table_count := 15;
 
   -- ontology_entity_mappings 생성
-  INSERT INTO ontology_entity_mappings (id, data_source_id, source_table, source_column, target_entity_type, mapping_rule, created_at) VALUES
+  INSERT INTO ontology_entity_mappings (id, data_source_id, source_table, 
+  target_entity_type_id, property_mappings, label_template, 
+  is_active, priority, created_at, updated_at) VALUES
     (gen_random_uuid(), v_ds_ids[1], 'pos_transactions', 'id', 'Transaction', '{"direct": true}', NOW()),
     (gen_random_uuid(), v_ds_ids[1], 'pos_items', 'product_id', 'Product', '{"lookup": "products"}', NOW()),
     (gen_random_uuid(), v_ds_ids[2], 'crm_customers', 'id', 'Customer', '{"direct": true}', NOW()),
@@ -2199,7 +2205,9 @@ BEGIN
   v_entity_map_count := 10;
 
   -- ontology_relation_mappings 생성
-  INSERT INTO ontology_relation_mappings (id, data_source_id, source_table, source_column, target_column, relation_type, mapping_rule, created_at) VALUES
+  INSERT INTO ontology_relation_mappings (id, data_source_id, source_table, 
+  target_relation_type_id, source_entity_resolver, target_entity_resolver, 
+  property_mappings, is_active, created_at) VALUES
     (gen_random_uuid(), v_ds_ids[1], 'pos_transactions', 'customer_id', 'id', 'MADE_TRANSACTION', '{"fk": true}', NOW()),
     (gen_random_uuid(), v_ds_ids[1], 'pos_items', 'product_id', 'transaction_id', 'PURCHASED', '{"through": "transactions"}', NOW()),
     (gen_random_uuid(), v_ds_ids[2], 'crm_interactions', 'customer_id', 'id', 'VISITED', '{"event_type": "visit"}', NOW()),
