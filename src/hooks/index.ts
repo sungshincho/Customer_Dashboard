@@ -48,28 +48,8 @@ export { useAIRecommendations as useLegacyAIRecommendations } from './useAIRecom
 export { useOntologyInference } from './useOntologyInference';
 
 // ============================================================================
-// 리테일 데이터 훅
+// 리테일 데이터 훅 (useZoneMetrics, useProductPerformance 등으로 대체됨)
 // ============================================================================
-export {
-  useZones,
-  useZoneDailyMetrics,
-  useDailyKPIs,
-  useLatestKPI,
-  useStoreVisits,
-  useRetailConcepts,
-  useZoneConversionFunnel,
-  useCrossSellAffinity,
-  useDataSources,
-  useSyncDataSource,
-} from './useRetailData';
-
-export type {
-  ZoneDim,
-  ZoneDailyMetric,
-  DailyKPI,
-  StoreVisit,
-  DataSource,
-} from './useRetailData';
 
 // ============================================================================
 // 온톨로지 훅
