@@ -435,7 +435,7 @@ advanced-ai-inference Edge Function
 | Weather | 일부 매장/기간만 연동 | `weather_data`를 모든 매장/기간으로 확대 | 중간 |
 | Holiday/Events | 주요 공휴일 중심 | 로컬 이벤트/프로모션/캠페인까지 확대 | 중간 |
 | Labor Hours | 미연동 | `staff`, `shift_schedules` 스키마 정의 및 구현 | 낮음 |
-| KPI 집계 방식 | graph_entities 기반 | L2 Fact 테이블 (visits, transactions) 기반으로 전환 | 높음 |
+| ~~KPI 테이블 통합~~ | ~~dashboard_kpis + daily_kpis_agg 중복~~ | ~~daily_kpis_agg로 통합~~ | ~~✅ 완료~~ |
 
 ---
 
@@ -454,12 +454,33 @@ advanced-ai-inference Edge Function
 
 | 영역 | 현재 구현 | 목표 아키텍처 |
 |------|----------|--------------|
-| KPI 계산 | `graph_entities` (L1) 직접 스캔 | L2 Fact 테이블 기반 집계 |
+| ~~KPI 조회~~ | ~~dashboard_kpis / daily_kpis_agg 혼용~~ | ~~daily_kpis_agg (L3) 단일 사용~~ | ✅ 완료 |
 | 고객 여정 | `wifi_tracking` (L1) | `visits` + `visit_zone_events` (L2) |
 | 구매 패턴 | `purchases` (L2) | `transactions` + `line_items` (L2) |
 | 존 통계 | `stores.metadata.zones` | `zones_dim` (L2) + `zone_metrics` (L3) |
+| ~~방문 데이터~~ | ~~visits / store_visits 혼용~~ | ~~store_visits (L2) 단일 사용~~ | ✅ 완료 |
 
 ---
 
-*문서 버전: 2.1*  
-*최종 업데이트: 2025-12-03 (실제 구현 검증 반영)*
+### 6.4 완료된 개선 사항 (2025-12-16)
+
+#### KPI 테이블 통합 (dashboard_kpis → daily_kpis_agg)
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/hooks/useROITracking.ts` | fetchCurrentKPIs → daily_kpis_agg 사용 |
+| `src/features/simulation/hooks/useStoreContext.ts` | dashboard_kpis fallback 제거, daily_kpis_agg만 사용 |
+| `src/features/simulation/hooks/useDataSourceMapping.ts` | KPI 소스를 daily_kpis_agg로 변경 |
+| `src/features/data-management/import/components/IntegratedImportStatus.tsx` | daily_kpis_agg 삭제 로직 추가 |
+
+#### 방문 데이터 테이블 통합 (visits → store_visits)
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/hooks/useStoreData.ts` | visits 쿼리 → store_visits로 변경 |
+| `src/features/simulation/hooks/useDataSourceMapping.ts` | 방문 데이터 소스를 store_visits로 변경 |
+
+---
+
+*문서 버전: 2.2*
+*최종 업데이트: 2025-12-16 (KPI 테이블 통합, visits 마이그레이션 완료)*

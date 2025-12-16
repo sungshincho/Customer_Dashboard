@@ -256,16 +256,16 @@ export function useDataSourceMapping(): UseDataSourceMappingReturn {
         ontologyEntityType: 'Visit',
       });
 
-      // dashboard_kpis
+      // daily_kpis_agg (L3 표준 KPI 테이블)
       const { count: kpisCount } = await supabase
-        .from('dashboard_kpis')
+        .from('daily_kpis_agg')
         .select('*', { count: 'exact', head: true })
         .eq('store_id', selectedStore.id);
 
       sources.push({
         id: 'kpis',
         name: 'KPI 데이터',
-        table: 'dashboard_kpis',
+        table: 'daily_kpis_agg',  // L3 표준 테이블로 변경
         recordCount: kpisCount || 0,
         lastUpdated: new Date().toISOString(),
         status: (kpisCount || 0) > 0 ? 'connected' : 'pending',
