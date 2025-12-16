@@ -366,13 +366,13 @@ BEGIN
 
   FOR i IN 1..2500 LOOP
     IF i <= 125 THEN
-      v_segment := 'vip';
+      v_segment := 'VIP';
       v_total_purchases := 3000000 + floor(random() * 2000000)::INT;
     ELSIF i <= 625 THEN
-      v_segment := 'regular';
+      v_segment := 'Regular';
       v_total_purchases := 500000 + floor(random() * 1000000)::INT;
     ELSE
-      v_segment := 'new';
+      v_segment := 'New';
       v_total_purchases := floor(random() * 300000)::INT;
     END IF;
 
