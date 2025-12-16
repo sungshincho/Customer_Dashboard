@@ -14,6 +14,7 @@ import type {
   SceneLayer,
   CameraSettings,
   Vector3Tuple,
+  ProductPlacement,
 } from '../types';
 
 // ============================================================================
@@ -29,6 +30,8 @@ export interface FurnitureMove {
 
 export interface SimulationResultsPayload {
   furnitureMoves?: FurnitureMove[];
+  // 🆕 슬롯 기반 상품 배치
+  productPlacements?: ProductPlacement[];
   animated?: boolean;
 }
 
@@ -184,39 +187,103 @@ const sceneReducer = (state: SceneState, action: SceneAction): SceneState => {
       };
 
     case 'APPLY_SIMULATION': {
-      const { furnitureMoves } = action.payload;
-      if (!furnitureMoves || furnitureMoves.length === 0) return state;
+      const { furnitureMoves, productPlacements } = action.payload;
+
+      // 변경할 내용이 없으면 반환
+      const hasFurnitureMoves = furnitureMoves && furnitureMoves.length > 0;
+      const hasProductPlacements = productPlacements && productPlacements.length > 0;
+      if (!hasFurnitureMoves && !hasProductPlacements) return state;
 
       // 모델 위치 업데이트
       const updatedModels = state.models.map((model) => {
-        // furnitureId 또는 모델 이름으로 매칭
-        const move = furnitureMoves.find(
-          (m) => m.furnitureId === model.id || m.furnitureName === model.name
-        );
+        // 1️⃣ 가구 이동 처리
+        if (hasFurnitureMoves && model.type === 'furniture') {
+          const move = furnitureMoves!.find(
+            (m) => m.furnitureId === model.id || m.furnitureName === model.name
+          );
 
-        if (move) {
-          const newPosition: Vector3Tuple = [
-            move.toPosition.x,
-            move.toPosition.y,
-            move.toPosition.z,
-          ];
+          if (move) {
+            const newPosition: Vector3Tuple = [
+              move.toPosition.x,
+              move.toPosition.y,
+              move.toPosition.z,
+            ];
 
-          // 회전이 있으면 적용
-          const newRotation: Vector3Tuple = move.rotation
-            ? [model.rotation[0], move.rotation * (Math.PI / 180), model.rotation[2]]
-            : model.rotation;
+            const newRotation: Vector3Tuple = move.rotation
+              ? [model.rotation[0], move.rotation * (Math.PI / 180), model.rotation[2]]
+              : model.rotation;
 
-          return {
-            ...model,
-            position: newPosition,
-            rotation: newRotation,
-            metadata: {
-              ...model.metadata,
-              movedBySimulation: true,
-              previousPosition: model.position,
-            },
-          };
+            return {
+              ...model,
+              position: newPosition,
+              rotation: newRotation,
+              metadata: {
+                ...model.metadata,
+                movedBySimulation: true,
+                previousPosition: model.position,
+                simulationType: 'furniture_move',
+              },
+            };
+          }
         }
+
+        // 2️⃣ 상품 재배치 처리 (슬롯 기반)
+        if (hasProductPlacements && model.type === 'product') {
+          const placement = productPlacements!.find(
+            (p) => p.productId === model.id || p.productSku === model.metadata?.sku
+          );
+
+          if (placement) {
+            // 슬롯 위치를 가구 위치 기준으로 계산
+            // toFurnitureId에 해당하는 가구 찾기
+            const targetFurniture = state.models.find(
+              (m) => m.id === placement.toFurnitureId || m.metadata?.furniture_id === placement.toFurnitureId
+            );
+
+            let newPosition: Vector3Tuple = model.position;
+
+            if (targetFurniture) {
+              // 가구 위치를 기준으로 슬롯 오프셋 적용
+              // 슬롯 타입에 따른 기본 오프셋
+              const slotOffsets: Record<string, { x: number; y: number; z: number }> = {
+                hanger: { x: 0, y: 1.5, z: 0 },
+                mannequin: { x: 0, y: 1.0, z: 0 },
+                shelf: { x: 0, y: 0.8, z: 0 },
+                table: { x: 0, y: 0.75, z: 0 },
+                rack: { x: 0, y: 1.2, z: 0 },
+                hook: { x: 0, y: 1.4, z: 0 },
+                drawer: { x: 0, y: 0.3, z: 0 },
+              };
+
+              const offset = slotOffsets[placement.slotType || 'shelf'] || { x: 0, y: 0.8, z: 0 };
+
+              newPosition = [
+                targetFurniture.position[0] + offset.x,
+                targetFurniture.position[1] + offset.y,
+                targetFurniture.position[2] + offset.z,
+              ];
+            }
+
+            return {
+              ...model,
+              position: newPosition,
+              metadata: {
+                ...model.metadata,
+                movedBySimulation: true,
+                previousPosition: model.position,
+                previousFurnitureId: model.metadata?.furniture_id,
+                previousSlotId: model.metadata?.slot_id,
+                furniture_id: placement.toFurnitureId,
+                slot_id: placement.toSlotId,
+                slot_type: placement.slotType,
+                display_type: placement.displayType,
+                simulationType: 'product_placement',
+                placementReason: placement.reason,
+              },
+            };
+          }
+        }
+
         return model;
       });
 
