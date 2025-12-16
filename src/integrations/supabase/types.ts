@@ -1089,6 +1089,8 @@ export type Database = {
       }
       customers: {
         Row: {
+          avatar_type: string | null
+          avatar_url: string | null
           created_at: string
           customer_name: string | null
           email: string | null
@@ -1103,6 +1105,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          avatar_type?: string | null
+          avatar_url?: string | null
           created_at?: string
           customer_name?: string | null
           email?: string | null
@@ -1117,6 +1121,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          avatar_type?: string | null
+          avatar_url?: string | null
           created_at?: string
           customer_name?: string | null
           email?: string | null
@@ -1679,63 +1685,6 @@ export type Database = {
           },
         ]
       }
-      deleted_custom_types_backup: {
-        Row: {
-          color: string | null
-          created_at: string | null
-          description: string | null
-          icon: string | null
-          id: string | null
-          label: string | null
-          model_3d_dimensions: Json | null
-          model_3d_metadata: Json | null
-          model_3d_type: string | null
-          model_3d_url: string | null
-          name: string | null
-          org_id: string | null
-          priority: string | null
-          properties: Json | null
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          color?: string | null
-          created_at?: string | null
-          description?: string | null
-          icon?: string | null
-          id?: string | null
-          label?: string | null
-          model_3d_dimensions?: Json | null
-          model_3d_metadata?: Json | null
-          model_3d_type?: string | null
-          model_3d_url?: string | null
-          name?: string | null
-          org_id?: string | null
-          priority?: string | null
-          properties?: Json | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          color?: string | null
-          created_at?: string | null
-          description?: string | null
-          icon?: string | null
-          id?: string | null
-          label?: string | null
-          model_3d_dimensions?: Json | null
-          model_3d_metadata?: Json | null
-          model_3d_type?: string | null
-          model_3d_url?: string | null
-          name?: string | null
-          org_id?: string | null
-          priority?: string | null
-          properties?: Json | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       economic_indicators: {
         Row: {
           created_at: string | null
@@ -2015,12 +1964,15 @@ export type Database = {
           category: string | null
           created_at: string | null
           depth: number | null
+          furniture_code: string | null
+          furniture_name: string | null
           furniture_type: string
           height: number | null
           id: string
           is_active: boolean | null
           model_type: string | null
           model_url: string | null
+          movable: boolean | null
           name: string
           org_id: string | null
           position_x: number | null
@@ -2034,20 +1986,25 @@ export type Database = {
           scale_y: number | null
           scale_z: number | null
           store_id: string
+          thumbnail_url: string | null
           updated_at: string | null
           user_id: string | null
           width: number | null
+          zone_id: string | null
         }
         Insert: {
           category?: string | null
           created_at?: string | null
           depth?: number | null
+          furniture_code?: string | null
+          furniture_name?: string | null
           furniture_type: string
           height?: number | null
           id?: string
           is_active?: boolean | null
           model_type?: string | null
           model_url?: string | null
+          movable?: boolean | null
           name: string
           org_id?: string | null
           position_x?: number | null
@@ -2061,20 +2018,25 @@ export type Database = {
           scale_y?: number | null
           scale_z?: number | null
           store_id: string
+          thumbnail_url?: string | null
           updated_at?: string | null
           user_id?: string | null
           width?: number | null
+          zone_id?: string | null
         }
         Update: {
           category?: string | null
           created_at?: string | null
           depth?: number | null
+          furniture_code?: string | null
+          furniture_name?: string | null
           furniture_type?: string
           height?: number | null
           id?: string
           is_active?: boolean | null
           model_type?: string | null
           model_url?: string | null
+          movable?: boolean | null
           name?: string
           org_id?: string | null
           position_x?: number | null
@@ -2088,9 +2050,11 @@ export type Database = {
           scale_y?: number | null
           scale_z?: number | null
           store_id?: string
+          thumbnail_url?: string | null
           updated_at?: string | null
           user_id?: string | null
           width?: number | null
+          zone_id?: string | null
         }
         Relationships: [
           {
@@ -2102,6 +2066,88 @@ export type Database = {
           },
           {
             foreignKeyName: "furniture_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "furniture_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "zones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "furniture_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "zones_dim"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      furniture_slots: {
+        Row: {
+          compatible_display_types: string[] | null
+          created_at: string | null
+          furniture_id: string
+          furniture_type: string
+          id: string
+          is_occupied: boolean | null
+          max_product_depth: number | null
+          max_product_height: number | null
+          max_product_width: number | null
+          occupied_by_product_id: string | null
+          slot_id: string
+          slot_position: Json
+          slot_rotation: Json | null
+          slot_type: string | null
+          store_id: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          compatible_display_types?: string[] | null
+          created_at?: string | null
+          furniture_id: string
+          furniture_type: string
+          id?: string
+          is_occupied?: boolean | null
+          max_product_depth?: number | null
+          max_product_height?: number | null
+          max_product_width?: number | null
+          occupied_by_product_id?: string | null
+          slot_id: string
+          slot_position?: Json
+          slot_rotation?: Json | null
+          slot_type?: string | null
+          store_id: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          compatible_display_types?: string[] | null
+          created_at?: string | null
+          furniture_id?: string
+          furniture_type?: string
+          id?: string
+          is_occupied?: boolean | null
+          max_product_depth?: number | null
+          max_product_height?: number | null
+          max_product_width?: number | null
+          occupied_by_product_id?: string | null
+          slot_id?: string
+          slot_position?: Json
+          slot_rotation?: Json | null
+          slot_type?: string | null
+          store_id?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "furniture_slots_store_id_fkey"
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
@@ -2168,93 +2214,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      graph_entities_backup_20251213: {
-        Row: {
-          created_at: string | null
-          entity_type_id: string | null
-          id: string | null
-          label: string | null
-          model_3d_position: Json | null
-          model_3d_rotation: Json | null
-          model_3d_scale: Json | null
-          org_id: string | null
-          properties: Json | null
-          store_id: string | null
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          entity_type_id?: string | null
-          id?: string | null
-          label?: string | null
-          model_3d_position?: Json | null
-          model_3d_rotation?: Json | null
-          model_3d_scale?: Json | null
-          org_id?: string | null
-          properties?: Json | null
-          store_id?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          entity_type_id?: string | null
-          id?: string | null
-          label?: string | null
-          model_3d_position?: Json | null
-          model_3d_rotation?: Json | null
-          model_3d_scale?: Json | null
-          org_id?: string | null
-          properties?: Json | null
-          store_id?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      graph_entities_migration_backup: {
-        Row: {
-          id: string | null
-          old_entity_type_id: string | null
-          old_type_name: string | null
-          old_type_scope: string | null
-          old_type_user_id: string | null
-        }
-        Insert: {
-          id?: string | null
-          old_entity_type_id?: string | null
-          old_type_name?: string | null
-          old_type_scope?: string | null
-          old_type_user_id?: string | null
-        }
-        Update: {
-          id?: string | null
-          old_entity_type_id?: string | null
-          old_type_name?: string | null
-          old_type_scope?: string | null
-          old_type_user_id?: string | null
-        }
-        Relationships: []
-      }
-      graph_entities_type_mapping_20251214: {
-        Row: {
-          entity_type_id: string | null
-          entity_type_name: string | null
-          id: string | null
-        }
-        Insert: {
-          entity_type_id?: string | null
-          entity_type_name?: string | null
-          id?: string | null
-        }
-        Update: {
-          entity_type_id?: string | null
-          entity_type_name?: string | null
-          id?: string | null
-        }
-        Relationships: []
       }
       graph_relations: {
         Row: {
@@ -2326,30 +2285,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      graph_relations_migration_backup: {
-        Row: {
-          id: string | null
-          old_relation_type_id: string | null
-          old_type_name: string | null
-          old_type_scope: string | null
-          old_type_user_id: string | null
-        }
-        Insert: {
-          id?: string | null
-          old_relation_type_id?: string | null
-          old_type_name?: string | null
-          old_type_scope?: string | null
-          old_type_user_id?: string | null
-        }
-        Update: {
-          id?: string | null
-          old_relation_type_id?: string | null
-          old_type_name?: string | null
-          old_type_scope?: string | null
-          old_type_user_id?: string | null
-        }
-        Relationships: []
       }
       holidays_events: {
         Row: {
@@ -3148,6 +3083,84 @@ export type Database = {
           },
         ]
       }
+      layout_optimization_results: {
+        Row: {
+          applied_at: string | null
+          created_at: string | null
+          expected_conversion_improvement: number | null
+          expected_revenue_improvement: number | null
+          expected_traffic_improvement: number | null
+          furniture_changes: Json | null
+          id: string
+          optimization_type: string
+          org_id: string | null
+          product_changes: Json | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string | null
+          store_id: string
+          total_furniture_changes: number | null
+          total_product_changes: number | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          applied_at?: string | null
+          created_at?: string | null
+          expected_conversion_improvement?: number | null
+          expected_revenue_improvement?: number | null
+          expected_traffic_improvement?: number | null
+          furniture_changes?: Json | null
+          id?: string
+          optimization_type: string
+          org_id?: string | null
+          product_changes?: Json | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          store_id: string
+          total_furniture_changes?: number | null
+          total_product_changes?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          applied_at?: string | null
+          created_at?: string | null
+          expected_conversion_improvement?: number | null
+          expected_revenue_improvement?: number | null
+          expected_traffic_improvement?: number | null
+          furniture_changes?: Json | null
+          id?: string
+          optimization_type?: string
+          org_id?: string | null
+          product_changes?: Json | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          store_id?: string
+          total_furniture_changes?: number | null
+          total_product_changes?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "layout_optimization_results_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "layout_optimization_results_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       learning_adjustments: {
         Row: {
           adjustment_type: string
@@ -3739,63 +3752,6 @@ export type Database = {
         }
         Relationships: []
       }
-      ontology_entity_types_backup_20251214: {
-        Row: {
-          color: string | null
-          created_at: string | null
-          description: string | null
-          icon: string | null
-          id: string | null
-          label: string | null
-          model_3d_dimensions: Json | null
-          model_3d_metadata: Json | null
-          model_3d_type: string | null
-          model_3d_url: string | null
-          name: string | null
-          org_id: string | null
-          priority: string | null
-          properties: Json | null
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          color?: string | null
-          created_at?: string | null
-          description?: string | null
-          icon?: string | null
-          id?: string | null
-          label?: string | null
-          model_3d_dimensions?: Json | null
-          model_3d_metadata?: Json | null
-          model_3d_type?: string | null
-          model_3d_url?: string | null
-          name?: string | null
-          org_id?: string | null
-          priority?: string | null
-          properties?: Json | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          color?: string | null
-          created_at?: string | null
-          description?: string | null
-          icon?: string | null
-          id?: string | null
-          label?: string | null
-          model_3d_dimensions?: Json | null
-          model_3d_metadata?: Json | null
-          model_3d_type?: string | null
-          model_3d_url?: string | null
-          name?: string | null
-          org_id?: string | null
-          priority?: string | null
-          properties?: Json | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       ontology_mapping_cache: {
         Row: {
           confidence_score: number | null
@@ -3979,54 +3935,6 @@ export type Database = {
           properties?: Json | null
           source_entity_type?: string
           target_entity_type?: string
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      ontology_relation_types_backup_20251214: {
-        Row: {
-          created_at: string | null
-          description: string | null
-          directionality: string | null
-          id: string | null
-          label: string | null
-          name: string | null
-          org_id: string | null
-          priority: string | null
-          properties: Json | null
-          source_entity_type: string | null
-          target_entity_type: string | null
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          description?: string | null
-          directionality?: string | null
-          id?: string | null
-          label?: string | null
-          name?: string | null
-          org_id?: string | null
-          priority?: string | null
-          properties?: Json | null
-          source_entity_type?: string | null
-          target_entity_type?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          description?: string | null
-          directionality?: string | null
-          id?: string | null
-          label?: string | null
-          name?: string | null
-          org_id?: string | null
-          priority?: string | null
-          properties?: Json | null
-          source_entity_type?: string | null
-          target_entity_type?: string | null
           updated_at?: string | null
           user_id?: string | null
         }
@@ -4504,75 +4412,94 @@ export type Database = {
       }
       product_placements: {
         Row: {
+          applied_at: string | null
+          confidence: number | null
           created_at: string | null
-          display_quantity: number | null
+          current_furniture_id: string | null
+          current_position: Json | null
+          current_rotation: Json | null
+          current_slot_id: string | null
+          current_zone_id: string | null
+          expected_accessibility_score: number | null
+          expected_revenue_impact: number | null
+          expected_visibility_score: number | null
           id: string
-          is_active: boolean | null
-          model_url: string | null
+          optimization_reason: string | null
           org_id: string | null
-          position_x: number | null
-          position_y: number | null
-          position_z: number | null
+          priority: string | null
           product_id: string
-          properties: Json | null
-          rotation_x: number | null
-          rotation_y: number | null
-          rotation_z: number | null
-          scale_x: number | null
-          scale_y: number | null
-          scale_z: number | null
+          status: string | null
           store_id: string
+          suggested_furniture_id: string | null
+          suggested_position: Json | null
+          suggested_rotation: Json | null
+          suggested_slot_id: string | null
+          suggested_zone_id: string | null
           updated_at: string | null
-          user_id: string
-          zone_id: string | null
+          user_id: string | null
         }
         Insert: {
+          applied_at?: string | null
+          confidence?: number | null
           created_at?: string | null
-          display_quantity?: number | null
+          current_furniture_id?: string | null
+          current_position?: Json | null
+          current_rotation?: Json | null
+          current_slot_id?: string | null
+          current_zone_id?: string | null
+          expected_accessibility_score?: number | null
+          expected_revenue_impact?: number | null
+          expected_visibility_score?: number | null
           id?: string
-          is_active?: boolean | null
-          model_url?: string | null
+          optimization_reason?: string | null
           org_id?: string | null
-          position_x?: number | null
-          position_y?: number | null
-          position_z?: number | null
+          priority?: string | null
           product_id: string
-          properties?: Json | null
-          rotation_x?: number | null
-          rotation_y?: number | null
-          rotation_z?: number | null
-          scale_x?: number | null
-          scale_y?: number | null
-          scale_z?: number | null
+          status?: string | null
           store_id: string
+          suggested_furniture_id?: string | null
+          suggested_position?: Json | null
+          suggested_rotation?: Json | null
+          suggested_slot_id?: string | null
+          suggested_zone_id?: string | null
           updated_at?: string | null
-          user_id: string
-          zone_id?: string | null
+          user_id?: string | null
         }
         Update: {
+          applied_at?: string | null
+          confidence?: number | null
           created_at?: string | null
-          display_quantity?: number | null
+          current_furniture_id?: string | null
+          current_position?: Json | null
+          current_rotation?: Json | null
+          current_slot_id?: string | null
+          current_zone_id?: string | null
+          expected_accessibility_score?: number | null
+          expected_revenue_impact?: number | null
+          expected_visibility_score?: number | null
           id?: string
-          is_active?: boolean | null
-          model_url?: string | null
+          optimization_reason?: string | null
           org_id?: string | null
-          position_x?: number | null
-          position_y?: number | null
-          position_z?: number | null
+          priority?: string | null
           product_id?: string
-          properties?: Json | null
-          rotation_x?: number | null
-          rotation_y?: number | null
-          rotation_z?: number | null
-          scale_x?: number | null
-          scale_y?: number | null
-          scale_z?: number | null
+          status?: string | null
           store_id?: string
+          suggested_furniture_id?: string | null
+          suggested_position?: Json | null
+          suggested_rotation?: Json | null
+          suggested_slot_id?: string | null
+          suggested_zone_id?: string | null
           updated_at?: string | null
-          user_id?: string
-          zone_id?: string | null
+          user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "product_placements_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "product_placements_product_id_fkey"
             columns: ["product_id"]
@@ -4593,14 +4520,23 @@ export type Database = {
         Row: {
           brand: string | null
           category: string | null
+          compatible_display_types: string[] | null
           cost_price: number | null
           created_at: string
           description: string | null
+          display_type: string | null
           id: string
+          initial_furniture_id: string | null
+          model_3d_position: Json | null
+          model_3d_rotation: Json | null
+          model_3d_scale: Json | null
+          model_3d_url: string | null
+          movable: boolean | null
           org_id: string | null
           price: number | null
           product_name: string
           sku: string | null
+          slot_id: string | null
           stock: number | null
           store_id: string | null
           supplier: string | null
@@ -4610,14 +4546,23 @@ export type Database = {
         Insert: {
           brand?: string | null
           category?: string | null
+          compatible_display_types?: string[] | null
           cost_price?: number | null
           created_at?: string
           description?: string | null
+          display_type?: string | null
           id?: string
+          initial_furniture_id?: string | null
+          model_3d_position?: Json | null
+          model_3d_rotation?: Json | null
+          model_3d_scale?: Json | null
+          model_3d_url?: string | null
+          movable?: boolean | null
           org_id?: string | null
           price?: number | null
           product_name: string
           sku?: string | null
+          slot_id?: string | null
           stock?: number | null
           store_id?: string | null
           supplier?: string | null
@@ -4627,14 +4572,23 @@ export type Database = {
         Update: {
           brand?: string | null
           category?: string | null
+          compatible_display_types?: string[] | null
           cost_price?: number | null
           created_at?: string
           description?: string | null
+          display_type?: string | null
           id?: string
+          initial_furniture_id?: string | null
+          model_3d_position?: Json | null
+          model_3d_rotation?: Json | null
+          model_3d_scale?: Json | null
+          model_3d_url?: string | null
+          movable?: boolean | null
           org_id?: string | null
           price?: number | null
           product_name?: string
           sku?: string | null
+          slot_id?: string | null
           stock?: number | null
           store_id?: string | null
           supplier?: string | null
@@ -5846,6 +5800,11 @@ export type Database = {
       }
       staff: {
         Row: {
+          assigned_zone_id: string | null
+          avatar_position: Json | null
+          avatar_rotation: Json | null
+          avatar_scale: Json | null
+          avatar_url: string | null
           created_at: string | null
           department: string | null
           email: string | null
@@ -5864,6 +5823,11 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          assigned_zone_id?: string | null
+          avatar_position?: Json | null
+          avatar_rotation?: Json | null
+          avatar_scale?: Json | null
+          avatar_url?: string | null
           created_at?: string | null
           department?: string | null
           email?: string | null
@@ -5882,6 +5846,11 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          assigned_zone_id?: string | null
+          avatar_position?: Json | null
+          avatar_rotation?: Json | null
+          avatar_scale?: Json | null
+          avatar_url?: string | null
           created_at?: string | null
           department?: string | null
           email?: string | null
@@ -8317,6 +8286,14 @@ export type Database = {
         Args: { membership_org_id: string; membership_user_id: string }
         Returns: boolean
       }
+      check_slot_display_compatibility: {
+        Args: { p_product_id: string; p_slot_id: string }
+        Returns: boolean
+      }
+      check_slot_product_compatibility: {
+        Args: { p_product_display_type: string; p_slot_id: string }
+        Returns: boolean
+      }
       compute_all_retail_concepts: {
         Args: { p_days?: number; p_store_id: string }
         Returns: Json
@@ -8373,9 +8350,32 @@ export type Database = {
         }
         Returns: undefined
       }
+      get_available_slots_for_display_type: {
+        Args: { p_display_type: string; p_store_id: string }
+        Returns: {
+          furniture_id: string
+          furniture_type: string
+          slot_code: string
+          slot_id: string
+          slot_position: Json
+          slot_type: string
+        }[]
+      }
       get_cached_concept_value: {
         Args: { p_concept_name: string; p_store_id: string }
         Returns: Json
+      }
+      get_compatible_slots_for_product: {
+        Args: { p_product_id: string; p_store_id: string }
+        Returns: {
+          compatible_display_types: string[]
+          furniture_id: string
+          furniture_type: string
+          slot_code: string
+          slot_position: Json
+          slot_type: string
+          slot_uuid: string
+        }[]
       }
       get_daily_kpis_summary: {
         Args: { p_days?: number; p_store_id: string }
