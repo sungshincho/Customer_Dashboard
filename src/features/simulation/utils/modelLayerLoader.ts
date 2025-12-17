@@ -119,6 +119,12 @@ export async function loadUserModels(
 
         for (const p of productsData) {
           if (p.model_3d_url) {
+            // 🔍 디버그: DB 원본 값 출력
+            console.log(`[ModelLoader] Product ${p.product_name} raw DB values:`, {
+              model_3d_position: (p as any).model_3d_position,
+              model_3d_position_type: typeof (p as any).model_3d_position,
+            });
+
             const pos = parseJsonField((p as any).model_3d_position, { x: 0, y: 0, z: 0 });
             const rot = parseJsonField((p as any).model_3d_rotation, { x: 0, y: 0, z: 0 });
             const scl = parseJsonField((p as any).model_3d_scale, { x: 1, y: 1, z: 1 });
