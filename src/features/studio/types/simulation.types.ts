@@ -136,6 +136,9 @@ export interface ProductPlacement {
   reason: string;
   priority?: 'high' | 'medium' | 'low';
   displayTypeMatch?: boolean;
+  // 🔧 FIX: 실제 월드 좌표 (하드코딩 오프셋 대신 사용)
+  toPosition?: { x: number; y: number; z: number };
+  toSlotPosition?: { x: number; y: number; z: number }; // 슬롯의 상대 위치
 }
 
 // 🆕 슬롯 호환성 정보

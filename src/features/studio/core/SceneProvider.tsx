@@ -234,34 +234,62 @@ const sceneReducer = (state: SceneState, action: SceneAction): SceneState => {
           );
 
           if (placement) {
-            // 슬롯 위치를 가구 위치 기준으로 계산
-            // toFurnitureId에 해당하는 가구 찾기
-            const targetFurniture = state.models.find(
-              (m) => m.id === placement.toFurnitureId || m.metadata?.furniture_id === placement.toFurnitureId
-            );
-
             let newPosition: Vector3Tuple = model.position;
 
-            if (targetFurniture) {
-              // 가구 위치를 기준으로 슬롯 오프셋 적용
-              // 슬롯 타입에 따른 기본 오프셋
-              const slotOffsets: Record<string, { x: number; y: number; z: number }> = {
-                hanger: { x: 0, y: 1.5, z: 0 },
-                mannequin: { x: 0, y: 1.0, z: 0 },
-                shelf: { x: 0, y: 0.8, z: 0 },
-                table: { x: 0, y: 0.75, z: 0 },
-                rack: { x: 0, y: 1.2, z: 0 },
-                hook: { x: 0, y: 1.4, z: 0 },
-                drawer: { x: 0, y: 0.3, z: 0 },
-              };
-
-              const offset = slotOffsets[placement.slotType || 'shelf'] || { x: 0, y: 0.8, z: 0 };
-
+            // 🔧 FIX: toPosition이 있으면 그 값을 직접 사용 (가장 정확)
+            if (placement.toPosition) {
               newPosition = [
-                targetFurniture.position[0] + offset.x,
-                targetFurniture.position[1] + offset.y,
-                targetFurniture.position[2] + offset.z,
+                placement.toPosition.x,
+                placement.toPosition.y,
+                placement.toPosition.z,
               ];
+              console.log(`[SceneProvider] Product ${model.name} moved to toPosition:`, newPosition);
+            }
+            // toSlotPosition이 있으면 가구 위치 + 슬롯 오프셋 계산
+            else if (placement.toSlotPosition) {
+              const targetFurniture = state.models.find(
+                (m) => m.id === placement.toFurnitureId ||
+                       m.id === `furniture-${placement.toFurnitureId}` ||
+                       m.metadata?.furnitureId === placement.toFurnitureId
+              );
+
+              if (targetFurniture) {
+                newPosition = [
+                  targetFurniture.position[0] + placement.toSlotPosition.x,
+                  targetFurniture.position[1] + placement.toSlotPosition.y,
+                  targetFurniture.position[2] + placement.toSlotPosition.z,
+                ];
+                console.log(`[SceneProvider] Product ${model.name} moved to furniture + slot offset:`, newPosition);
+              }
+            }
+            // Fallback: 하드코딩된 슬롯 타입별 오프셋 (레거시 지원)
+            else {
+              const targetFurniture = state.models.find(
+                (m) => m.id === placement.toFurnitureId ||
+                       m.id === `furniture-${placement.toFurnitureId}` ||
+                       m.metadata?.furnitureId === placement.toFurnitureId
+              );
+
+              if (targetFurniture) {
+                const slotOffsets: Record<string, { x: number; y: number; z: number }> = {
+                  hanger: { x: 0, y: 1.5, z: 0 },
+                  mannequin: { x: 0, y: 1.0, z: 0 },
+                  shelf: { x: 0, y: 0.8, z: 0 },
+                  table: { x: 0, y: 0.75, z: 0 },
+                  rack: { x: 0, y: 1.2, z: 0 },
+                  hook: { x: 0, y: 1.4, z: 0 },
+                  drawer: { x: 0, y: 0.3, z: 0 },
+                };
+
+                const offset = slotOffsets[placement.slotType || 'shelf'] || { x: 0, y: 0.8, z: 0 };
+
+                newPosition = [
+                  targetFurniture.position[0] + offset.x,
+                  targetFurniture.position[1] + offset.y,
+                  targetFurniture.position[2] + offset.z,
+                ];
+                console.warn(`[SceneProvider] Product ${model.name} using fallback offset (toPosition/toSlotPosition not provided):`, newPosition);
+              }
             }
 
             return {
