@@ -153,7 +153,9 @@ export function LayoutOptimizationOverlay({
       ))}
 
       {/* 존 하이라이트 */}
-      {showZoneHighlights && visualization.highlightZones.map((zone) => (
+      {showZoneHighlights && visualization.highlightZones
+        .filter((zone) => zone.zoneId) // zoneId가 있는 것만 렌더링
+        .map((zone) => (
         <ZoneHighlight
           key={zone.zoneId}
           zone={zone}
@@ -515,12 +517,9 @@ function ZoneHighlight({ zone, externalZonePositions, externalZoneSizes }: ZoneH
     계산대: [4.5, 0.02, 5.5],
   };
 
-  // zoneId가 없으면 early return
-  const zoneId = zone.zoneId || 'unknown';
-
   // 실제 존 위치 사용 (우선순위: externalZonePositions > fallbackPositions)
   const zonePositions = externalZonePositions || fallbackPositions;
-  const position = zonePositions[zoneId] || zonePositions[zoneId.toLowerCase()] || [0, 0.02, 0];
+  const position = zonePositions[zone.zoneId] || zonePositions[zone.zoneId.toLowerCase()] || [0, 0.02, 0];
 
   // 기본 폴백 크기
   const fallbackSizes: Record<string, { width: number; depth: number }> = {
@@ -536,7 +535,7 @@ function ZoneHighlight({ zone, externalZonePositions, externalZoneSizes }: ZoneH
 
   // 실제 존 크기 사용 (우선순위: externalZoneSizes > fallbackSizes)
   const zoneSizes = externalZoneSizes || fallbackSizes;
-  const size = zoneSizes[zoneId] || zoneSizes[zoneId.toLowerCase()] || { width: 3, depth: 3 };
+  const size = zoneSizes[zone.zoneId] || zoneSizes[zone.zoneId.toLowerCase()] || { width: 3, depth: 3 };
 
   return (
     <mesh ref={meshRef} position={position} rotation={[-Math.PI / 2, 0, 0]}>
