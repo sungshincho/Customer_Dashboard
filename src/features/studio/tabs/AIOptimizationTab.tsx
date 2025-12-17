@@ -7,8 +7,8 @@
  * - 3D 씬에 결과 자동 반영
  */
 
-import { useState, useCallback } from 'react';
-import { Sparkles, Layout, Route, Users, Loader2, ChevronDown, ChevronUp, Check, RotateCcw } from 'lucide-react';
+import { useState, useCallback, useEffect } from 'react';
+import { Sparkles, Layout, Route, Users, Loader2, ChevronDown, ChevronUp, Check, RotateCcw, Eye, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -19,6 +19,7 @@ import type { UseSceneSimulationReturn } from '../hooks/useSceneSimulation';
 import type { SceneRecipe } from '../types';
 
 type OptimizationType = 'layout' | 'flow' | 'staffing';
+type ViewMode = 'all' | 'as-is' | 'to-be';
 
 interface OptimizationOption {
   id: OptimizationType;
@@ -76,6 +77,23 @@ export function AIOptimizationTab({
 
   // 결과 패널 펼침/접힘
   const [isResultExpanded, setIsResultExpanded] = useState(true);
+
+  // 비교 모드 (all: 전체, as-is: 변경 전, to-be: 변경 후)
+  const [viewMode, setViewMode] = useState<ViewMode>('all');
+
+  // 비교 모드 변경 시 오버레이 업데이트
+  useEffect(() => {
+    const { results } = sceneSimulation.state;
+    const hasLayoutResult = !!results.layout;
+
+    if (hasLayoutResult) {
+      // viewMode에 따라 오버레이 설정
+      // 'all' - 모든 변경 표시 (As-Is, To-Be, 화살표 모두)
+      // 'as-is' - 원래 상태만
+      // 'to-be' - 최적화 결과만
+      onOverlayToggle('layoutOptimization', viewMode !== 'as-is');
+    }
+  }, [viewMode, sceneSimulation.state.results, onOverlayToggle]);
 
   // 체크박스 토글
   const toggleOptimization = (type: OptimizationType) => {
@@ -442,6 +460,54 @@ export function AIOptimizationTab({
                     onToggleOverlay={(visible) => onOverlayToggle('staffingOptimization', visible)}
                   />
                 )}
+
+                {/* 비교 모드 토글 */}
+                <div className="p-2 bg-white/5 rounded-lg">
+                  <div className="flex items-center gap-1 text-[10px] text-white/50 mb-2">
+                    <Eye className="h-3 w-3" />
+                    3D 뷰 모드
+                  </div>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => setViewMode('as-is')}
+                      className={cn(
+                        'flex-1 px-2 py-1.5 text-xs rounded transition-all',
+                        viewMode === 'as-is'
+                          ? 'bg-red-600 text-white'
+                          : 'bg-white/10 text-white/60 hover:bg-white/20'
+                      )}
+                    >
+                      As-Is
+                    </button>
+                    <button
+                      onClick={() => setViewMode('all')}
+                      className={cn(
+                        'flex-1 px-2 py-1.5 text-xs rounded transition-all',
+                        viewMode === 'all'
+                          ? 'bg-gradient-to-r from-red-600 to-green-600 text-white'
+                          : 'bg-white/10 text-white/60 hover:bg-white/20'
+                      )}
+                    >
+                      <Layers className="h-3 w-3 mx-auto" />
+                    </button>
+                    <button
+                      onClick={() => setViewMode('to-be')}
+                      className={cn(
+                        'flex-1 px-2 py-1.5 text-xs rounded transition-all',
+                        viewMode === 'to-be'
+                          ? 'bg-green-600 text-white'
+                          : 'bg-white/10 text-white/60 hover:bg-white/20'
+                      )}
+                    >
+                      To-Be
+                    </button>
+                  </div>
+                  <p className="text-[9px] text-white/40 mt-1.5 text-center">
+                    {viewMode === 'as-is' && '원래 배치 상태'}
+                    {viewMode === 'all' && '변경 비교 (화살표 표시)'}
+                    {viewMode === 'to-be' && '최적화 후 배치'}
+                  </p>
+                </div>
 
                 {/* As-Is / To-Be 액션 버튼 */}
                 <div className="flex gap-2 pt-2">
