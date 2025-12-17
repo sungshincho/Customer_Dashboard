@@ -204,9 +204,17 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
   let storeDepth: number;
   let entrancePosition: { x: number; z: number } | null = null;
 
+  // 매장 면적 정보 먼저 확인 (실제 DB 값 우선)
+  const storeArea = store?.floor_area_sqm || store?.area_sqm || null;
+  const storeWidthFromDb = store?.width_m || store?.store_width || null;
+  const storeDepthFromDb = store?.depth_m || store?.store_depth || null;
+
   if (zones.length > 0) {
     // zones_dim 데이터에서 바운딩 박스 계산
     let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+
+    // 입구 후보 목록 (우선순위별로 정렬)
+    const entranceCandidates: Array<{ x: number; z: number; priority: number; name: string }> = [];
 
     zones.forEach((z: any) => {
       const x = z.position_x ?? z.center_x ?? 0;
@@ -219,28 +227,83 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
       minZ = Math.min(minZ, zPos - halfDepth);
       maxZ = Math.max(maxZ, zPos + halfDepth);
 
-      // 입구 존 찾기
+      // 입구 존 찾기 (확장된 감지 로직)
       const zoneName = (z.zone_name || '').toLowerCase();
       const zoneType = (z.zone_type || '').toLowerCase();
-      if (zoneName.includes('입구') || zoneName.includes('entrance') ||
-          zoneType.includes('entrance') || zoneType.includes('entry')) {
-        entrancePosition = { x, z: zPos };
+
+      // 우선순위 1: 명확한 입구 타입
+      if (zoneType === 'entrance' || zoneType === 'entry') {
+        entranceCandidates.push({ x, z: zPos, priority: 1, name: zoneName });
+      }
+      // 우선순위 2: 이름에 입구 포함
+      else if (zoneName.includes('입구') || zoneName.includes('entrance') || zoneName.includes('entry')) {
+        entranceCandidates.push({ x, z: zPos, priority: 2, name: zoneName });
+      }
+      // 우선순위 3: 문, 출입 관련
+      else if (zoneName.includes('door') || zoneName.includes('문') || zoneName.includes('출입')) {
+        entranceCandidates.push({ x, z: zPos, priority: 3, name: zoneName });
       }
     });
 
+    // 가장 높은 우선순위의 입구 선택
+    if (entranceCandidates.length > 0) {
+      entranceCandidates.sort((a, b) => a.priority - b.priority);
+      entrancePosition = { x: entranceCandidates[0].x, z: entranceCandidates[0].z };
+      console.log('[StoreContext] Entrance found:', entranceCandidates[0].name);
+    }
+
     // 바운딩 박스에서 매장 크기 계산 (여유 공간 포함)
-    storeWidth = (maxX - minX) + 2; // 양쪽 1m 여유
-    storeDepth = (maxZ - minZ) + 2;
+    const calculatedWidth = (maxX - minX) + 2; // 양쪽 1m 여유
+    const calculatedDepth = (maxZ - minZ) + 2;
+
+    // DB에 저장된 면적과 비교하여 더 정확한 값 사용
+    if (storeArea && storeArea > 0) {
+      const calculatedArea = calculatedWidth * calculatedDepth;
+      const areaRatio = storeArea / calculatedArea;
+
+      // 면적 차이가 50% 이상이면 DB 면적 기반으로 스케일 조정
+      if (areaRatio > 1.5 || areaRatio < 0.67) {
+        const scale = Math.sqrt(areaRatio);
+        storeWidth = calculatedWidth * scale;
+        storeDepth = calculatedDepth * scale;
+        console.log('[StoreContext] Adjusted from DB area:', { storeArea, calculatedArea, scale });
+      } else {
+        storeWidth = calculatedWidth;
+        storeDepth = calculatedDepth;
+      }
+    } else {
+      storeWidth = calculatedWidth;
+      storeDepth = calculatedDepth;
+    }
+
+    // 입구가 없으면 경계 기반으로 추정 (가장 -z 쪽 중앙)
+    if (!entrancePosition) {
+      entrancePosition = { x: (minX + maxX) / 2, z: minZ - 0.5 };
+      console.log('[StoreContext] Entrance estimated at store edge:', entrancePosition);
+    }
 
     console.log('[StoreContext] Calculated from zones:', { storeWidth, storeDepth, zonesCount: zones.length, entrancePosition });
-  } else {
-    // zones 데이터가 없으면 면적에서 추정 (정사각형 가정은 부정확함)
-    const storeArea = store?.floor_area_sqm || store?.area_sqm || 289;
+  } else if (storeWidthFromDb && storeDepthFromDb) {
+    // zones 데이터가 없지만 DB에 크기 정보가 있는 경우
+    storeWidth = storeWidthFromDb;
+    storeDepth = storeDepthFromDb;
+    // 입구는 하단 중앙으로 가정
+    entrancePosition = { x: 0, z: -storeDepth / 2 + 1 };
+    console.log('[StoreContext] Using DB dimensions:', { storeWidth, storeDepth });
+  } else if (storeArea && storeArea > 0) {
+    // zones 데이터가 없으면 면적에서 추정
     // 일반적인 매장은 정사각형보다 직사각형이 많음 (비율 약 1:1.2)
     storeDepth = Math.sqrt(storeArea / 1.2);
     storeWidth = storeDepth * 1.2;
-
+    // 입구는 하단 중앙으로 가정
+    entrancePosition = { x: 0, z: -storeDepth / 2 + 1 };
     console.log('[StoreContext] Estimated from area:', { storeArea, storeWidth, storeDepth });
+  } else {
+    // 기본값 (중소형 매장 기준 약 17x16m)
+    storeWidth = 17.4;
+    storeDepth = 16.6;
+    entrancePosition = { x: 0, z: -8 };
+    console.log('[StoreContext] Using default dimensions');
   }
 
   return {

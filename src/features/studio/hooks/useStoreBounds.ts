@@ -154,12 +154,61 @@ export function useStoreBounds() {
       return DEFAULT_ENTRANCE;
     }
 
-    // entrance 타입 존 찾기
-    const entranceZone = zones.find(
-      (z) => z.zone_type === 'entrance' || z.zone_name.toLowerCase().includes('입구')
-    );
+    // 입구 후보 목록 (우선순위별로 정렬)
+    type EntranceCandidate = {
+      zone: ZoneDimData;
+      priority: number;
+    };
+    const candidates: EntranceCandidate[] = [];
 
-    if (!entranceZone) {
+    zones.forEach((zone) => {
+      const zoneType = (zone.zone_type || '').toLowerCase();
+      const zoneName = (zone.zone_name || '').toLowerCase();
+
+      // 우선순위 1: 명확한 입구 타입
+      if (zoneType === 'entrance' || zoneType === 'entry') {
+        candidates.push({ zone, priority: 1 });
+      }
+      // 우선순위 2: 이름에 입구 포함
+      else if (zoneName.includes('입구') || zoneName.includes('entrance') || zoneName.includes('entry')) {
+        candidates.push({ zone, priority: 2 });
+      }
+      // 우선순위 3: 문, 출입 관련
+      else if (zoneName.includes('door') || zoneName.includes('문') || zoneName.includes('출입')) {
+        candidates.push({ zone, priority: 3 });
+      }
+    });
+
+    let entranceZone: ZoneDimData | null = null;
+
+    if (candidates.length > 0) {
+      // 가장 높은 우선순위의 입구 선택
+      candidates.sort((a, b) => a.priority - b.priority);
+      entranceZone = candidates[0].zone;
+      console.log('[useStoreBounds] Entrance found:', entranceZone.zone_name);
+    } else {
+      // 입구가 없으면 경계 기반으로 추정 (가장 minZ 쪽에 있는 존)
+      let minZZone: ZoneDimData | null = null;
+      let minZValue = Infinity;
+
+      zones.forEach((zone) => {
+        const zPos = zone.position_z || zone.coordinates?.z || 0;
+        if (zPos < minZValue) {
+          minZValue = zPos;
+          minZZone = zone;
+        }
+      });
+
+      if (minZZone) {
+        console.log('[useStoreBounds] No entrance zone found, using zone at min Z:', minZZone.zone_name);
+        // 이 경우 존 대신 경계 추정값 사용
+        return {
+          x: storeBounds.centerX,
+          z: storeBounds.minZ + 1,
+          direction: 'south' as const,
+        };
+      }
+
       console.log('[useStoreBounds] No entrance zone found, using default');
       return DEFAULT_ENTRANCE;
     }
