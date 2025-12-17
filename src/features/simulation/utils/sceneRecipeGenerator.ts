@@ -232,6 +232,7 @@ async function loadCustomerAvatars(userId: string): Promise<CustomerAsset[]> {
 
 /**
  * Generate scene recipe with store-specific data
+ * Uses slot-based positioning for products when slot data is available
  */
 export async function generateSceneRecipeForStore(
   storeId: string,
@@ -261,6 +262,9 @@ export async function generateSceneRecipeForStore(
     .from('staff')
     .select('*')
     .eq('store_id', storeId);
+
+  // Fetch furniture slots for slot-based positioning
+  const slots = await loadFurnitureSlots(storeId);
 
   // Build space asset from store data
   const space: SpaceAsset = {
@@ -293,22 +297,55 @@ export async function generateSceneRecipeForStore(
       }
     }));
 
-  // Build products array with placement info
+  // Create furniture position map for slot-based calculations
+  const furnitureMap = new Map<string, FurnitureAsset>();
+  for (const f of furniture) {
+    furnitureMap.set(f.id, f);
+  }
+
+  // Build products array with slot-based positioning
   const products: ProductAsset[] = (productsData || [])
     .filter(p => p.model_3d_url)
-    .map(p => ({
-      id: p.id,
-      type: 'product' as const,
-      model_url: p.model_3d_url!,
-      position: (p.model_3d_position as Vector3D) || { x: 0, y: 0, z: 0 },
-      rotation: (p.model_3d_rotation as Vector3D) || { x: 0, y: 0, z: 0 },
-      scale: (p.model_3d_scale as Vector3D) || { x: 1, y: 1, z: 1 },
-      product_id: p.id,
-      sku: p.sku,
-      movable: p.movable ?? true,
-      initial_furniture_id: p.initial_furniture_id,
-      slot_id: p.slot_id
-    }));
+    .map(p => {
+      // Default position from product data
+      let position: Vector3D = (p.model_3d_position as Vector3D) || { x: 0, y: 0, z: 0 };
+      let rotation: Vector3D = (p.model_3d_rotation as Vector3D) || { x: 0, y: 0, z: 0 };
+
+      // If product has slot assignment, calculate position from furniture + slot
+      if (p.initial_furniture_id && p.slot_id) {
+        const parentFurniture = furnitureMap.get(p.initial_furniture_id);
+        const slot = slots.find(s =>
+          s.furniture_id === p.initial_furniture_id &&
+          s.slot_id === p.slot_id
+        );
+
+        if (parentFurniture && slot) {
+          // Calculate world position using slot-based auto-snap
+          const snapResult = calculateSlotWorldPosition(
+            parentFurniture.position,
+            parentFurniture.rotation,
+            slot.slot_position,
+            slot.slot_rotation
+          );
+          position = snapResult.world_position;
+          rotation = snapResult.world_rotation;
+        }
+      }
+
+      return {
+        id: p.id,
+        type: 'product' as const,
+        model_url: p.model_3d_url!,
+        position,
+        rotation,
+        scale: (p.model_3d_scale as Vector3D) || { x: 1, y: 1, z: 1 },
+        product_id: p.id,
+        sku: p.sku,
+        movable: p.movable ?? true,
+        initial_furniture_id: p.initial_furniture_id,
+        slot_id: p.slot_id
+      };
+    });
 
   // Build staff array with avatars
   const staff: StaffAsset[] = (staffData || [])
