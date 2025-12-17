@@ -80,7 +80,7 @@ export interface LayoutSimulationResult {
       zoneId: string;
       color: string;
       opacity: number;
-      changeType: 'improved' | 'degraded' | 'new' | 'removed';
+      changeType: 'improved' | 'degraded' | 'new' | 'removed' | 'suggested';
     }>;
   };
 }
@@ -333,13 +333,24 @@ function transformLayoutResult(
   );
 
   const zoneChanges: ZoneChange[] = (rawResult.zoneChanges || []).map(
-    (change: any, idx: number) => ({
-      zoneId: change.zoneId || `zone-${idx}`,
-      zoneName: change.zoneName || `존 ${idx + 1}`,
-      changeType: change.changeType || 'resize',
-      before: change.before || {},
-      after: change.after || {},
-    })
+    (change: any, idx: number) => {
+      const zoneId =
+        change.zoneId ||
+        change.zone_id ||
+        change.zoneName ||
+        change.zone_name ||
+        change.zoneType ||
+        change.zone_type ||
+        `zone-${idx}`;
+
+      return {
+        zoneId: String(zoneId),
+        zoneName: change.zoneName || change.zone_name || `존 ${idx + 1}`,
+        changeType: change.changeType || change.change_type || 'resize',
+        before: change.before || {},
+        after: change.after || {},
+      };
+    }
   );
 
   // 신뢰도 정보
@@ -354,7 +365,7 @@ function transformLayoutResult(
   };
 
   // 시각화 데이터 생성
-  const visualization = generateVisualizationData(rawResult, furnitureMoves);
+  const visualization = generateVisualizationData(rawResult, furnitureMoves, zoneChanges);
 
   return {
     id: rawResult.id || `sim-${Date.now()}`,
@@ -392,7 +403,8 @@ function transformLayoutResult(
 
 function generateVisualizationData(
   rawResult: any,
-  furnitureMoves: FurnitureMove[]
+  furnitureMoves: FurnitureMove[],
+  zoneChanges: ZoneChange[]
 ): LayoutSimulationResult['visualization'] {
   // 히트맵 데이터 생성
   const beforeHeatmap = generateHeatmapData(rawResult.heatmapBefore || null, 'before');
@@ -408,16 +420,46 @@ function generateVisualizationData(
     type: 'optimized' as const,
   }));
 
-  // 하이라이트 존 생성 (zoneId 또는 zone_id가 있는 항목만 포함)
-  const highlightZones = (rawResult.zoneChanges || [])
-    .filter((change: any) => change.zoneId || change.zone_id)
-    .map((change: any) => ({
-      zoneId: change.zoneId || change.zone_id,
-      color: change.changeType === 'improved' ? '#22c55e' :
-             change.changeType === 'new' ? '#3b82f6' : '#f59e0b',
-      opacity: 0.4,
-      changeType: change.changeType || change.change_type || 'improved',
-    }));
+  // 하이라이트 존 생성
+  // - rawResult.zoneChanges는 provider/버전별로 zoneId 누락이 발생할 수 있어, 이미 정규화된 zoneChanges를 사용
+  const highlightZones = (zoneChanges || [])
+    .filter((c) => !!c.zoneId)
+    .map((change) => {
+      const rawType = String(change.changeType || '').toLowerCase();
+      const changeType:
+        | 'improved'
+        | 'degraded'
+        | 'new'
+        | 'removed'
+        | 'suggested' =
+        rawType === 'improved'
+          ? 'improved'
+          : rawType === 'degraded'
+            ? 'degraded'
+            : rawType === 'new'
+              ? 'new'
+              : rawType === 'removed' || rawType === 'remove'
+                ? 'removed'
+                : 'suggested';
+
+      const color =
+        changeType === 'new'
+          ? '#3b82f6'
+          : changeType === 'removed'
+            ? '#ef4444'
+            : changeType === 'degraded'
+              ? '#f59e0b'
+              : changeType === 'suggested'
+                ? '#8b5cf6'
+                : '#22c55e';
+
+      return {
+        zoneId: change.zoneId,
+        color,
+        opacity: 0.4,
+        changeType,
+      };
+    });
 
   return {
     beforeHeatmap,
