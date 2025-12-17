@@ -230,10 +230,24 @@ BEGIN
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
 
   FOR i IN 1..25 LOOP
-    INSERT INTO products (id, store_id, user_id, org_id, product_name, sku, category, price, cost_price, stock, created_at)
+    -- v8.4 패치: name 컬럼도 함께 설정 (product_name과 동일한 값)
+    INSERT INTO products (id, store_id, user_id, org_id, product_name, name, sku, category, price, cost_price, stock, created_at)
     VALUES (
       ('f000' || LPAD(i::TEXT, 4, '0') || '-0000-0000-0000-000000000000')::UUID,
       v_store_id, v_user_id, v_org_id,
+      -- product_name
+      CASE i
+        WHEN 1 THEN '프리미엄 캐시미어 코트' WHEN 2 THEN '울 테일러드 재킷' WHEN 3 THEN '다운 패딩'
+        WHEN 4 THEN '트렌치 코트' WHEN 5 THEN '레더 자켓' WHEN 6 THEN '실크 블라우스'
+        WHEN 7 THEN '캐주얼 니트 스웨터' WHEN 8 THEN '옥스포드 셔츠' WHEN 9 THEN '린넨 탑'
+        WHEN 10 THEN '폴로 셔츠' WHEN 11 THEN '리넨 와이드 팬츠' WHEN 12 THEN '슬림핏 데님'
+        WHEN 13 THEN '치노 팬츠' WHEN 14 THEN '조거 팬츠' WHEN 15 THEN 'A라인 스커트'
+        WHEN 16 THEN '가죽 토트백' WHEN 17 THEN '실버 목걸이' WHEN 18 THEN '가죽 벨트'
+        WHEN 19 THEN '스카프 세트' WHEN 20 THEN '울 머플러' WHEN 21 THEN '프리미엄 로퍼'
+        WHEN 22 THEN '하이힐 펌프스' WHEN 23 THEN '스니커즈' WHEN 24 THEN '프리미엄 스킨케어 세트'
+        ELSE '립스틱 컬렉션'
+      END,
+      -- name (product_name과 동일)
       CASE i
         WHEN 1 THEN '프리미엄 캐시미어 코트' WHEN 2 THEN '울 테일러드 재킷' WHEN 3 THEN '다운 패딩'
         WHEN 4 THEN '트렌치 코트' WHEN 5 THEN '레더 자켓' WHEN 6 THEN '실크 블라우스'
@@ -741,7 +755,9 @@ DECLARE
   v_visit RECORD;
   v_session TEXT;
   v_stages INT;
-  v_funnel TEXT[] := ARRAY['visit', 'browse', 'interest', 'try', 'purchase'];
+  -- v8.4 패치: 스키마 정의와 일치하도록 event_type 수정
+  -- 스키마: 'entry', 'browse', 'engage', 'fitting', 'checkout', 'purchase', 'exit'
+  v_funnel TEXT[] := ARRAY['entry', 'browse', 'engage', 'fitting', 'purchase'];
   v_funnel_count INT := 0;
 BEGIN
   SELECT user_id, org_id INTO v_user_id, v_org_id FROM stores WHERE id = v_store_id;
@@ -970,7 +986,8 @@ BEGIN
   FOR day_offset IN 0..89 LOOP
     v_date := CURRENT_DATE - day_offset;
 
-    FOR v_product IN SELECT id, name, category, price FROM products WHERE store_id = v_store_id LOOP
+    -- v8.4 패치: stock 컬럼 추가하여 stock_level에 반영
+    FOR v_product IN SELECT id, name, category, price, COALESCE(stock, 50 + floor(random()*100)::INT) as stock FROM products WHERE store_id = v_store_id LOOP
       -- L1 line_items에서 실제 판매 데이터 집계
       SELECT
         COALESCE(SUM(quantity), 0) AS total_qty,
@@ -984,10 +1001,11 @@ BEGIN
         AND p.purchase_date::DATE = v_date;
 
       -- 데이터가 없어도 최소 0으로 기록
+      -- v8.4 패치: stock_level 컬럼 추가
       INSERT INTO product_performance_agg (
         id, store_id, org_id, product_id, date,
         units_sold, revenue, view_count, cart_additions,
-        conversion_rate, return_rate
+        conversion_rate, return_rate, stock_level
       ) VALUES (
         gen_random_uuid(), v_store_id, v_org_id, v_product.id, v_date,
         GREATEST(v_sales_data.total_qty, 0),
@@ -995,7 +1013,9 @@ BEGIN
         GREATEST(v_sales_data.total_qty * 5, floor(random()*20)::INT),
         GREATEST(v_sales_data.total_qty * 2, floor(random()*5)::INT),
         CASE WHEN v_sales_data.total_qty > 0 THEN 10 + random()*15 ELSE random()*5 END,
-        random()*3
+        random()*3,
+        -- stock_level: products.stock 값 사용, 판매량에 따라 조정
+        GREATEST(v_product.stock - v_sales_data.total_qty, 0)
       );
       v_count := v_count + 1;
     END LOOP;
