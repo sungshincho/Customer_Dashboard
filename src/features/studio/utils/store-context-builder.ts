@@ -64,6 +64,16 @@ export interface StoreContext {
     conversionRate: number;
     revenue: number;
   }>;
+  /** 시간대별 혼잡도 데이터 (흐름 시뮬레이션용) */
+  hourlyMetrics: Array<{
+    date: string;
+    hour: number;
+    zoneId?: string;
+    zoneName?: string;
+    visitorCount: number;
+    avgDwellSeconds: number;
+    congestionLevel?: number;
+  }>;
   /** 상품별 매출 성과 데이터 (AI 최적화 핵심 입력) */
   productPerformance: Array<{
     productId: string;
@@ -113,6 +123,8 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
     zoneMetricsResult,
     productPerfResult,
     furnitureSlotsResult,
+    furnitureResult,
+    hourlyMetricsResult,
   ] = await Promise.all([
     // 매장 정보
     supabase.from('stores').select('*').eq('id', storeId).single(),
@@ -168,10 +180,23 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
       .gte('date', thirtyDaysAgoStr)
       .order('total_revenue', { ascending: false }),
 
-    // 가구 슬롯 정보 (상품 배치 관계)
+    // 가구 슬롯 정보 (상품 배치 관계) - furniture_slots만 조회
     supabase.from('furniture_slots')
-      .select('*, furniture:graph_entities(id, name, model_3d_position)')
+      .select('*')
       .eq('store_id', storeId),
+
+    // 가구 정보 (실제 3D 위치 포함) - furniture 테이블에서 직접 조회
+    supabase.from('furniture')
+      .select('id, name, furniture_code, furniture_type, position_x, position_y, position_z, rotation_x, rotation_y, rotation_z, zone_id, movable')
+      .eq('store_id', storeId),
+
+    // 시간대별 메트릭 (혼잡도 시뮬레이션용)
+    supabase.from('hourly_metrics')
+      .select('*')
+      .eq('store_id', storeId)
+      .gte('date', thirtyDaysAgoStr)
+      .order('date', { ascending: false })
+      .limit(500),
   ]);
 
   const store = storeResult.data;
@@ -183,6 +208,28 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
   const zoneMetrics = zoneMetricsResult.data || [];
   const productPerf = productPerfResult.data || [];
   const furnitureSlots = furnitureSlotsResult.data || [];
+  const furniture = furnitureResult.data || [];
+  const hourlyMetrics = hourlyMetricsResult.data || [];
+
+  // 가구 ID -> 가구 데이터 맵 생성 (빠른 조회용)
+  const furnitureMap = new Map<string, any>();
+  furniture.forEach((f: any) => {
+    furnitureMap.set(f.id, f);
+  });
+
+  // 존 ID -> 존 이름 맵 생성 (UUID 변환용)
+  const zoneIdToNameMap = new Map<string, string>();
+  zones.forEach((z: any) => {
+    zoneIdToNameMap.set(z.id, z.zone_name);
+  });
+
+  console.log('[StoreContext] Data loaded:', {
+    zones: zones.length,
+    furniture: furniture.length,
+    furnitureSlots: furnitureSlots.length,
+    hourlyMetrics: hourlyMetrics.length,
+    visits: visits.length,
+  });
 
   // 데이터 품질 점수 계산
   const salesDataDays = dailyKpis.length;
@@ -349,14 +396,25 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
       visitorCount: k.total_visitors ?? k.visitor_count ?? 0,
       conversionRate: k.conversion_rate || 0,
     })),
-    visits: visits.map((v: any) => ({
-      id: v.id,
-      visitStart: v.visit_date,
-      visitEnd: v.exit_date,
-      dwellTimeSeconds: (v.duration_minutes || 0) * 60,
-      purchaseAmount: v.made_purchase ? 50000 : 0,
-      zonePath: v.zones_visited,
-    })),
+    visits: visits.map((v: any) => {
+      // zones_visited가 UUID 배열인 경우 존 이름으로 변환
+      let zonePath: string[] | undefined = undefined;
+      if (v.zones_visited && Array.isArray(v.zones_visited)) {
+        zonePath = v.zones_visited.map((zoneId: string) => {
+          // UUID 형식이면 맵에서 이름 조회, 아니면 그대로 사용
+          const zoneName = zoneIdToNameMap.get(zoneId);
+          return zoneName || zoneId;
+        });
+      }
+      return {
+        id: v.id,
+        visitStart: v.visit_date,
+        visitEnd: v.exit_date,
+        dwellTimeSeconds: (v.duration_minutes || 0) * 60,
+        purchaseAmount: v.made_purchase ? 50000 : 0,
+        zonePath,
+      };
+    }),
     zoneMetrics: zoneMetrics.map((m: any) => ({
       zoneId: m.zone_id,
       zoneName: m.zone?.zone_name || 'Unknown',
@@ -368,18 +426,36 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
       revenue: m.revenue ?? 0,
       heatmapIntensity: m.heatmap_intensity ?? 0.5,
     })),
+    // 시간대별 혼잡도 데이터 (흐름 시뮬레이션용)
+    hourlyMetrics: hourlyMetrics.map((h: any) => ({
+      date: h.date,
+      hour: h.hour ?? 0,
+      zoneId: h.zone_id,
+      zoneName: h.zone_id ? zoneIdToNameMap.get(h.zone_id) : undefined,
+      visitorCount: h.visitor_count ?? h.total_visitors ?? 0,
+      avgDwellSeconds: h.avg_dwell_seconds ?? 0,
+      congestionLevel: h.congestion_level ?? (h.visitor_count > 50 ? 0.8 : h.visitor_count > 30 ? 0.5 : 0.3),
+    })),
     // 상품별 매출 성과 (중복 제거 후 집계)
     productPerformance: aggregateProductPerformance(productPerf),
-    // 현재 상품 배치 정보
+    // 현재 상품 배치 정보 (furniture 테이블에서 위치 정보 조회)
     productPlacements: furnitureSlots
       .filter((s: any) => s.occupied_by_product_id)
-      .map((s: any) => ({
-        productId: s.occupied_by_product_id,
-        furnitureId: s.furniture_id,
-        furnitureName: s.furniture?.name,
-        slotId: s.slot_id,
-        position: s.furniture?.model_3d_position,
-      })),
+      .map((s: any) => {
+        const furn = furnitureMap.get(s.furniture_id);
+        return {
+          productId: s.occupied_by_product_id,
+          furnitureId: s.furniture_id,
+          furnitureName: furn?.name || furn?.furniture_code,
+          slotId: s.slot_id,
+          // furniture 테이블의 position_x/y/z 사용
+          position: furn ? {
+            x: furn.position_x ?? 0,
+            y: furn.position_y ?? 0,
+            z: furn.position_z ?? 0,
+          } : undefined,
+        };
+      }),
     dataQuality: {
       salesDataDays,
       visitorDataDays,
