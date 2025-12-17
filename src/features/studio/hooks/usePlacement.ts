@@ -126,23 +126,26 @@ export function usePlacement({
     try {
       setIsSaving(true);
 
-      const placements = products.map(p => ({
-        product_id: p.id,
-        store_id: storeId,
-        user_id: userId,
-        zone_id: p.zone_id,
-        furniture_id: p.furniture_id,
-        slot_id: p.slot_id,
-        position: p.position,
-        rotation: p.rotation,
-        scale: p.scale,
-        display_type: p.display_type,
-        updated_at: new Date().toISOString(),
-      }));
+      const placements = products.map(p => {
+        const pAny = p as any;
+        return {
+          product_id: p.id,
+          store_id: storeId,
+          user_id: userId,
+          zone_id: pAny.zone_id,
+          furniture_id: pAny.furniture_id,
+          slot_id: p.slot_id,
+          position: p.position,
+          rotation: p.rotation,
+          scale: p.scale,
+          display_type: p.display_type,
+          updated_at: new Date().toISOString(),
+        };
+      });
 
       const { error } = await supabase
         .from('product_placements')
-        .upsert(placements, {
+        .upsert(placements as any, {
           onConflict: 'product_id,store_id',
         });
 
@@ -159,7 +162,7 @@ export function usePlacement({
           description: `${pendingChanges.length}개 상품 배치 변경`,
         };
 
-        await supabase
+        await (supabase as any)
           .from('placement_history')
           .insert({
             id: historyEntry.id,
@@ -231,7 +234,7 @@ export function usePlacement({
         changes: [...pendingChanges],
       };
 
-      await supabase
+      await (supabase as any)
         .from('placement_history')
         .insert({
           id: historyEntry.id,
@@ -280,7 +283,7 @@ export function usePlacement({
   // 히스토리 로드
   const loadHistory = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('placement_history')
         .select('id, created_at, changes, description')
         .eq('store_id', storeId)
@@ -291,7 +294,7 @@ export function usePlacement({
         throw error;
       }
 
-      setHistory((data || []).map(item => ({
+      setHistory((data || []).map((item: any) => ({
         id: item.id,
         created_at: item.created_at,
         changes: item.changes || [],
@@ -341,7 +344,7 @@ export function usePlacement({
       }
 
       // 롤백 히스토리 기록
-      await supabase
+      await (supabase as any)
         .from('placement_history')
         .insert({
           id: crypto.randomUUID(),
