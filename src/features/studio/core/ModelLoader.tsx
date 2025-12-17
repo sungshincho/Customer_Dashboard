@@ -142,8 +142,8 @@ function GLTFModel({
 
   const shouldUseBaked = useMemo(() => isBakedModel(url), [url]);
 
-  // 씬 클론 (여러 인스턴스 사용 가능)
-  const clonedScene = useMemo(() => {
+  // 씬 클론 및 바운딩 박스 계산
+  const { clonedScene, yOffset } = useMemo(() => {
     const cloned = scene.clone(true);
 
     // Baked 모델 처리
@@ -162,18 +162,40 @@ function GLTFModel({
       }
     });
 
-    return cloned;
-  }, [scene, castShadow, receiveShadow, shouldUseBaked]);
+    // 🔧 FIX: 바운딩 박스 계산하여 모델 하단이 지정 Y 위치에 오도록 오프셋 계산
+    // product 모델에만 적용 (가구/공간은 원점 기준 유지)
+    let calculatedYOffset = 0;
+    if (modelId?.includes('product')) {
+      const box = new THREE.Box3().setFromObject(cloned);
+      if (box.min.y !== Infinity && !isNaN(box.min.y)) {
+        // 모델의 최하단(min.y)이 0이 되도록 오프셋 계산
+        // 이렇게 하면 position.y가 모델 하단의 실제 Y 좌표가 됨
+        calculatedYOffset = -box.min.y;
+        console.log(`[ModelLoader] ${modelId} bounding box:`, {
+          min: box.min.toArray(),
+          max: box.max.toArray(),
+          yOffset: calculatedYOffset,
+        });
+      }
+    }
+
+    return { clonedScene: cloned, yOffset: calculatedYOffset };
+  }, [scene, castShadow, receiveShadow, shouldUseBaked, modelId]);
 
   // 선택/호버 하이라이트 애니메이션
   useFrame((_, delta) => {
     if (!groupRef.current) return;
   });
 
+  // 🔧 FIX: Y 오프셋 적용된 위치 계산
+  const adjustedPosition: Vector3Tuple = useMemo(() => {
+    return [position[0], position[1] + yOffset, position[2]];
+  }, [position, yOffset]);
+
   return (
     <group
       ref={groupRef}
-      position={position}
+      position={adjustedPosition}
       rotation={rotation}
       scale={scale}
       userData={{ modelId }}
