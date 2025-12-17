@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 // 새 스튜디오 컴포넌트
 import { Canvas3D, SceneProvider, useScene } from './core';
 import { LayerPanel, SimulationPanel, ToolPanel, SceneSavePanel, OverlayControlPanel, PropertyPanel } from './panels';
-import { HeatmapOverlay, CustomerFlowOverlay, ZoneBoundaryOverlay, CustomerAvatarOverlay, LayoutOptimizationOverlay, FlowOptimizationOverlay, CongestionOverlay, StaffingOverlay } from './overlays';
+import { HeatmapOverlay, CustomerFlowOverlay, ZoneBoundaryOverlay, CustomerAvatarOverlay, LayoutOptimizationOverlay, FlowOptimizationOverlay, CongestionOverlay, StaffingOverlay, ZonesFloorOverlay } from './overlays';
 import { DraggablePanel } from './components/DraggablePanel';
 import { AIOptimizationTab } from './tabs/AIOptimizationTab';
 import { AISimulationTab } from './tabs/AISimulationTab';
@@ -580,10 +580,23 @@ export default function DigitalTwinStudioPage() {
                 showGrid={isEditMode}
                 zones={simulationZones}
               >
+                {/* zones_dim 기반 구역 바닥 오버레이 (DB 데이터 우선) */}
+                {isActive('zone') && dbZones && dbZones.length > 0 && (
+                  <ZonesFloorOverlay
+                    zones={dbZones}
+                    visible={true}
+                    showLabels={true}
+                    opacity={0.3}
+                  />
+                )}
+                {/* 폴백: DB 데이터 없으면 demoZones 사용 */}
+                {isActive('zone') && (!dbZones || dbZones.length === 0) && (
+                  <ZoneBoundaryOverlay zones={demoZones} />
+                )}
+
                 {/* 기본 오버레이 (데모 데이터) */}
                 {isActive('heatmap') && !sceneSimulation.state.results.layout && <HeatmapOverlay heatPoints={demoHeatPoints} />}
                 {isActive('flow') && !sceneSimulation.state.results.flow && <CustomerFlowOverlay flows={demoFlows} />}
-                {isActive('zone') && <ZoneBoundaryOverlay zones={demoZones} />}
                 {isActive('avatar') && !sceneSimulation.state.results.staffing && <CustomerAvatarOverlay customers={demoCustomers} />}
 
                 {/* 시뮬레이션 결과 오버레이 */}
