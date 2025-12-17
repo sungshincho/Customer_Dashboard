@@ -13,6 +13,7 @@ export interface StoreContext {
     width: number;
     depth: number;
     businessType?: string;
+    entrancePosition?: { x: number; z: number } | null;
   };
   entities: Array<{
     id: string;
@@ -198,17 +199,58 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
     (hasProductData ? 20 : 0)
   ));
 
-  // Calculate dimensions from area
-  const storeArea = store?.floor_area_sqm || store?.area_sqm || 289;
-  const storeSide = Math.sqrt(storeArea);
+  // Calculate store dimensions from zones bounding box (더 정확한 방법)
+  let storeWidth: number;
+  let storeDepth: number;
+  let entrancePosition: { x: number; z: number } | null = null;
+
+  if (zones.length > 0) {
+    // zones_dim 데이터에서 바운딩 박스 계산
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+
+    zones.forEach((z: any) => {
+      const x = z.position_x ?? z.center_x ?? 0;
+      const zPos = z.position_z ?? z.center_z ?? 0;
+      const halfWidth = (z.size_width ?? z.width ?? 3) / 2;
+      const halfDepth = (z.size_depth ?? z.depth ?? 3) / 2;
+
+      minX = Math.min(minX, x - halfWidth);
+      maxX = Math.max(maxX, x + halfWidth);
+      minZ = Math.min(minZ, zPos - halfDepth);
+      maxZ = Math.max(maxZ, zPos + halfDepth);
+
+      // 입구 존 찾기
+      const zoneName = (z.zone_name || '').toLowerCase();
+      const zoneType = (z.zone_type || '').toLowerCase();
+      if (zoneName.includes('입구') || zoneName.includes('entrance') ||
+          zoneType.includes('entrance') || zoneType.includes('entry')) {
+        entrancePosition = { x, z: zPos };
+      }
+    });
+
+    // 바운딩 박스에서 매장 크기 계산 (여유 공간 포함)
+    storeWidth = (maxX - minX) + 2; // 양쪽 1m 여유
+    storeDepth = (maxZ - minZ) + 2;
+
+    console.log('[StoreContext] Calculated from zones:', { storeWidth, storeDepth, zonesCount: zones.length, entrancePosition });
+  } else {
+    // zones 데이터가 없으면 면적에서 추정 (정사각형 가정은 부정확함)
+    const storeArea = store?.floor_area_sqm || store?.area_sqm || 289;
+    // 일반적인 매장은 정사각형보다 직사각형이 많음 (비율 약 1:1.2)
+    storeDepth = Math.sqrt(storeArea / 1.2);
+    storeWidth = storeDepth * 1.2;
+
+    console.log('[StoreContext] Estimated from area:', { storeArea, storeWidth, storeDepth });
+  }
 
   return {
     storeInfo: {
       id: store?.id || storeId,
       name: store?.store_name || 'Unknown Store',
-      width: storeSide,
-      depth: storeSide,
+      width: Math.round(storeWidth * 10) / 10,
+      depth: Math.round(storeDepth * 10) / 10,
       businessType: store?.store_type,
+      entrancePosition, // 입구 위치 추가
     },
     entities: entities.map((e: any) => ({
       id: e.id,
