@@ -136,11 +136,11 @@ export function AIOptimizationTab({
     if (!sceneData?.furniture) return [];
     return sceneData.furniture.map((f) => ({
       id: f.id,
-      name: f.name || f.furniture_type || '가구',
+      name: f.metadata?.name || f.furniture_type || '가구',
       furniture_type: f.furniture_type || 'unknown',
       movable: f.movable !== false, // 기본적으로 이동 가능
       position: f.position || { x: 0, y: 0, z: 0 },
-      zone_id: f.zone_id,
+      zone_id: f.metadata?.zone_id,
     }));
   }, [sceneData?.furniture]);
 
@@ -149,10 +149,10 @@ export function AIOptimizationTab({
     return sceneData.products.map((p) => ({
       id: p.id,
       sku: p.sku || '',
-      product_name: p.product_name || p.name || '상품',
-      category: p.category,
-      furniture_id: p.furniture_id,
-      slot_id: p.slot_id,
+      product_name: p.metadata?.product_name || p.metadata?.name || '상품',
+      category: p.metadata?.category,
+      furniture_id: p.metadata?.furniture_id,
+      slot_id: p.metadata?.slot_id,
     }));
   }, [sceneData?.products]);
 
