@@ -137,14 +137,9 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
       `)
       .eq('store_id', storeId),
 
-    // 온톨로지 관계
+    // 온톨로지 관계 (FK 조인 제거 - 400 에러 방지)
     supabase.from('graph_relations')
-      .select(`
-        *,
-        source:graph_entities!graph_relations_source_entity_id_fkey(id, name),
-        target:graph_entities!graph_relations_target_entity_id_fkey(id, name),
-        relation_type:ontology_relation_types!graph_relations_relation_type_id_fkey(id, name)
-      `)
+      .select('*')
       .eq('store_id', storeId),
 
     // 구역 정보
@@ -173,9 +168,9 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
       .eq('store_id', storeId)
       .gte('date', thirtyDaysAgoStr),
 
-    // 상품 성과 데이터 (AI 최적화 핵심)
+    // 상품 성과 데이터 (AI 최적화 핵심) - FK 조인 제거하여 400 에러 방지
     supabase.from('product_performance_agg')
-      .select('*, product:products(*), zone:zones_dim(id, zone_name)')
+      .select('*')
       .eq('store_id', storeId)
       .gte('date', thirtyDaysAgoStr)
       .order('total_revenue', { ascending: false }),
