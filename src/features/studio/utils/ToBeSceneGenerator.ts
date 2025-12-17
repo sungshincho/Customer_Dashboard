@@ -140,8 +140,10 @@ export function generateLayoutOptimizedScene(
     }
   });
 
-  // 2️⃣ 상품 배치 적용 (슬롯 기반)
+  // 2️⃣ 상품 배치 적용 (toPosition 우선 사용)
   if (layoutResult.productPlacements && layoutResult.productPlacements.length > 0) {
+    console.log('[ToBeSceneGenerator] Processing product placements:', layoutResult.productPlacements.length);
+
     layoutResult.productPlacements.forEach((placement) => {
       const productIdx = toBe.products.findIndex(
         (p) => p.id === placement.productId || p.sku === placement.productSku
@@ -151,49 +153,73 @@ export function generateLayoutOptimizedScene(
         const product = toBe.products[productIdx];
         const beforePosition = { ...product.position };
 
-        // 대상 가구 찾기
-        const targetFurniture = toBe.furniture.find(
-          (f) => f.id === placement.toFurnitureId
-        );
-
-        if (targetFurniture) {
-          // 슬롯 타입에 따른 오프셋 계산
-          const slotOffsets: Record<string, Vector3> = {
-            hanger: { x: 0, y: 1.5, z: 0 },
-            mannequin: { x: 0, y: 1.0, z: 0 },
-            shelf: { x: 0, y: 0.8, z: 0 },
-            table: { x: 0, y: 0.75, z: 0 },
-            rack: { x: 0, y: 1.2, z: 0 },
-            hook: { x: 0, y: 1.4, z: 0 },
-            drawer: { x: 0, y: 0.3, z: 0 },
-          };
-
-          const offset = slotOffsets[placement.slotType || 'shelf'] || { x: 0, y: 0.8, z: 0 };
-
-          // 위치 업데이트
+        // 🔧 FIX: toPosition이 있으면 직접 사용 (Edge Function에서 계산된 실제 월드 좌표)
+        if (placement.toPosition) {
           product.position = {
-            x: targetFurniture.position.x + offset.x,
-            y: targetFurniture.position.y + offset.y,
-            z: targetFurniture.position.z + offset.z,
+            x: placement.toPosition.x,
+            y: placement.toPosition.y,
+            z: placement.toPosition.z,
           };
-
-          // 메타데이터 업데이트
-          (product as any).furniture_id = placement.toFurnitureId;
-          (product as any).slot_id = placement.toSlotId;
-          (product as any).display_type = placement.displayType;
-
-          changes.push({
-            id: `change-product-${placement.productId}`,
-            type: 'move',
-            assetType: 'product',
-            assetId: placement.productId,
-            assetName: placement.productName || placement.productSku,
-            before: { position: beforePosition },
-            after: { position: product.position },
-            reason: placement.reason || '상품 재배치 최적화',
-            impact: placement.priority === 'high' ? '높은 우선순위' : '전환율 개선 기대',
-          });
+          console.log(`[ToBeSceneGenerator] Product ${placement.productSku} using toPosition:`, placement.toPosition);
         }
+        // toSlotPosition + 가구 위치로 계산
+        else if (placement.toSlotPosition) {
+          const targetFurniture = toBe.furniture.find(
+            (f) => f.id === placement.toFurnitureId
+          );
+          if (targetFurniture) {
+            product.position = {
+              x: targetFurniture.position.x + (placement.toSlotPosition.x || 0),
+              y: targetFurniture.position.y + (placement.toSlotPosition.y || 0),
+              z: targetFurniture.position.z + (placement.toSlotPosition.z || 0),
+            };
+            console.log(`[ToBeSceneGenerator] Product ${placement.productSku} using furniture + slotOffset:`, product.position);
+          }
+        }
+        // 폴백: 슬롯 타입 기반 하드코딩 오프셋 (레거시)
+        else {
+          const targetFurniture = toBe.furniture.find(
+            (f) => f.id === placement.toFurnitureId
+          );
+
+          if (targetFurniture) {
+            const slotOffsets: Record<string, Vector3> = {
+              hanger: { x: 0, y: 1.5, z: 0 },
+              mannequin: { x: 0, y: 1.0, z: 0 },
+              shelf: { x: 0, y: 0.8, z: 0 },
+              table: { x: 0, y: 0.75, z: 0 },
+              rack: { x: 0, y: 1.2, z: 0 },
+              hook: { x: 0, y: 1.4, z: 0 },
+              drawer: { x: 0, y: 0.3, z: 0 },
+            };
+
+            const offset = slotOffsets[placement.slotType || 'shelf'] || { x: 0, y: 0.8, z: 0 };
+
+            product.position = {
+              x: targetFurniture.position.x + offset.x,
+              y: targetFurniture.position.y + offset.y,
+              z: targetFurniture.position.z + offset.z,
+            };
+            console.warn(`[ToBeSceneGenerator] Product ${placement.productSku} using fallback offset:`, product.position);
+          }
+        }
+
+        // 메타데이터 업데이트
+        (product as any).furniture_id = placement.toFurnitureId;
+        (product as any).slot_id = placement.toSlotId;
+        (product as any).display_type = placement.displayType;
+
+        changes.push({
+          id: `change-product-${placement.productId}`,
+          type: 'move',
+          assetType: 'product',
+          assetId: placement.productId,
+          assetName: placement.productName || placement.productSku,
+          before: { position: beforePosition },
+          after: { position: product.position },
+          reason: placement.reason || '상품 재배치 최적화',
+          impact: placement.priority === 'high' ? '높은 우선순위' : '전환율 개선 기대',
+        });
       }
     });
   }

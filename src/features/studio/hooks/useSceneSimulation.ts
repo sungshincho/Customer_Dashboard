@@ -315,9 +315,17 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
 
         // 병렬로 시뮬레이션 실행
         console.log('[useSceneSimulation] Invoking Edge Functions...');
-        console.log('[useSceneSimulation] Layout params:', params?.layout);
-        console.log('[useSceneSimulation] Flow params:', params?.flow);
-        console.log('[useSceneSimulation] Staffing params:', params?.staffing);
+        console.log('[useSceneSimulation] Store ID:', selectedStore.id);
+        console.log('[useSceneSimulation] Org ID:', orgId);
+        console.log('[useSceneSimulation] Scene data:', {
+          furnitureCount: sceneData.furniture.length,
+          productCount: sceneData.products.length,
+          spaceDimensions: sceneData.space.dimensions,
+        });
+        console.log('[useSceneSimulation] Supabase URL:', (supabase as any).supabaseUrl || 'not accessible');
+
+        // 🔍 DEBUG: 실제 Edge Function 호출 직전 로그
+        console.log('[useSceneSimulation] 🚀 Starting Edge Function calls NOW...');
 
         const [layoutRes, flowRes, staffingRes] = await Promise.allSettled([
           supabase.functions.invoke('advanced-ai-inference', {
