@@ -318,8 +318,8 @@ export async function generateSceneRecipeForStore(
     .filter(p => p.model_3d_url)
     .map(p => {
       // Default position from product data
-      let position: Vector3D = (p.model_3d_position as Vector3D) || { x: 0, y: 0, z: 0 };
-      let rotation: Vector3D = (p.model_3d_rotation as Vector3D) || { x: 0, y: 0, z: 0 };
+      let position: Vector3D = (p.model_3d_position as unknown as Vector3D) || { x: 0, y: 0, z: 0 };
+      let rotation: Vector3D = (p.model_3d_rotation as unknown as Vector3D) || { x: 0, y: 0, z: 0 };
 
       // If product has slot assignment, calculate position from furniture + slot
       if (p.initial_furniture_id && p.slot_id) {
@@ -348,7 +348,7 @@ export async function generateSceneRecipeForStore(
         model_url: p.model_3d_url!,
         position,
         rotation,
-        scale: (p.model_3d_scale as Vector3D) || { x: 1, y: 1, z: 1 },
+        scale: (p.model_3d_scale as unknown as Vector3D) || { x: 1, y: 1, z: 1 },
         product_id: p.id,
         sku: p.sku,
         movable: p.movable ?? true,
