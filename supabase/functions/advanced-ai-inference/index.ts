@@ -3253,19 +3253,76 @@ IMPORTANT: When suggesting productPlacements, ensure slotType is compatible with
     });
 
     // 🆕 AI 상품 배치 제안과 룰 기반 제안 병합
+    // 🔧 FIX: toPosition과 toSlotPosition 계산하여 포함
+    const furnitureMap = new Map<string, any>();
+    const slotMap = new Map<string, any>();
+
+    if (slotLayoutData) {
+      for (const f of slotLayoutData.furniture) {
+        furnitureMap.set(f.id, f);
+      }
+      for (const s of slotLayoutData.slots) {
+        // key: furniture_id + slot_id
+        slotMap.set(`${s.furniture_id}:${s.slot_id}`, s);
+      }
+    }
+
+    const enrichPlacementWithPosition = (placement: any) => {
+      const targetFurniture = furnitureMap.get(placement.toFurnitureId || placement.suggested_furniture_id);
+      const slotKey = `${placement.toFurnitureId || placement.suggested_furniture_id}:${placement.toSlotId || placement.suggested_slot_id}`;
+      const targetSlot = slotMap.get(slotKey);
+
+      let toPosition = null;
+      let toSlotPosition = null;
+
+      if (targetSlot && targetSlot.slot_position) {
+        toSlotPosition = targetSlot.slot_position;
+
+        if (targetFurniture) {
+          // 월드 좌표 계산: 가구 위치 + 슬롯 상대 위치
+          const furniturePos = targetFurniture.position || { x: 0, y: 0, z: 0 };
+          toPosition = {
+            x: (furniturePos.x || 0) + (toSlotPosition.x || 0),
+            y: (furniturePos.y || 0) + (toSlotPosition.y || 0),
+            z: (furniturePos.z || 0) + (toSlotPosition.z || 0),
+          };
+        }
+      }
+
+      return { toPosition, toSlotPosition };
+    };
+
     const combinedProductPlacements = [
-      ...(aiResponse.productPlacements || []),
-      ...productPlacements.map(p => ({
-        productId: p.product_id,
-        productSku: p.product_sku,
-        fromSlotId: p.current_slot_id || null,
-        toSlotId: p.suggested_slot_id,
-        toFurnitureId: p.suggested_furniture_id,
-        reason: p.reason,
-        priority: p.priority,
-        displayTypeMatch: p.display_type_match,
-      })),
+      ...(aiResponse.productPlacements || []).map((p: any) => {
+        const positions = enrichPlacementWithPosition(p);
+        return { ...p, ...positions };
+      }),
+      ...productPlacements.map(p => {
+        const positions = enrichPlacementWithPosition({
+          toFurnitureId: p.suggested_furniture_id,
+          toSlotId: p.suggested_slot_id,
+        });
+        return {
+          productId: p.product_id,
+          productSku: p.product_sku,
+          fromSlotId: p.current_slot_id || null,
+          toSlotId: p.suggested_slot_id,
+          toFurnitureId: p.suggested_furniture_id,
+          reason: p.reason,
+          priority: p.priority,
+          displayTypeMatch: p.display_type_match,
+          ...positions,
+        };
+      }),
     ].slice(0, 15); // 최대 15개 제안
+
+    console.log('[LayoutOptimization] Product placements with positions:',
+      combinedProductPlacements.slice(0, 3).map((p: any) => ({
+        productId: p.productId,
+        toSlotId: p.toSlotId,
+        toPosition: p.toPosition,
+      }))
+    );
 
     // 히트맵 데이터 생성 (실제 존 메트릭 기반)
     const storeWidth = storeContext?.storeInfo?.width || 17;
