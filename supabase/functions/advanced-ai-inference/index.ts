@@ -3109,6 +3109,10 @@ async function performLayoutOptimization(request: InferenceRequest, apiKey: stri
     }
   }
 
+  // 🆕 실제 제품 배치 정보 사용 (storeContext의 productPlacements 우선)
+  const actualProductPlacements = storeContext?.productPlacements || [];
+  const hasRealProductPositions = actualProductPlacements.length > 0;
+
   // 프롬프트 빌드 (슬롯 시스템 통합)
   const prompt = `You are an expert retail space optimization AI specializing in store layout design.
 
@@ -3117,7 +3121,8 @@ TASK: Analyze the current store layout and suggest optimal furniture/fixture pla
 STORE INFORMATION:
 ${storeContext?.storeInfo ? `- Store: ${storeContext.storeInfo.name}
 - Dimensions: ${storeContext.storeInfo.width}m x ${storeContext.storeInfo.depth}m
-- Business Type: ${storeContext.storeInfo.businessType || 'Retail'}` : '- Standard retail store'}
+- Business Type: ${storeContext.storeInfo.businessType || 'Retail'}
+- Entrance Position: ${storeContext.storeInfo.entrancePosition ? `(${storeContext.storeInfo.entrancePosition.x}, ${storeContext.storeInfo.entrancePosition.z})` : 'Not specified (assume bottom edge)'}` : '- Standard retail store'}
 
 CURRENT LAYOUT:
 ${JSON.stringify({
@@ -3128,16 +3133,30 @@ ${JSON.stringify({
     position: f.position,
     rotation: f.rotation,
   })),
-  products: (sceneData?.products || []).slice(0, 10).map((p: any) => ({
-    id: p.id,
-    sku: p.sku,
-    position: p.position,
-    display_type: p.display_type,
-  })),
+  // 실제 제품 위치 데이터가 있으면 사용, 없으면 sceneData 사용
+  products: hasRealProductPositions
+    ? actualProductPlacements.slice(0, 15).map((p: any) => ({
+        id: p.productId,
+        furnitureId: p.furnitureId,
+        furnitureName: p.furnitureName,
+        slotId: p.slotId,
+        position: p.position,
+        note: 'actual_db_position',
+      }))
+    : (sceneData?.products || []).slice(0, 10).map((p: any) => ({
+        id: p.id,
+        sku: p.sku,
+        position: p.position,
+        display_type: p.display_type,
+        note: 'scene_position',
+      })),
 }, null, 2)}
 
-${storeContext?.zones?.length ? `ZONE DATA:
-${JSON.stringify(storeContext.zones.slice(0, 10), null, 2)}` : ''}
+${storeContext?.zones?.length ? `ZONE DATA (with entrance marked):
+${JSON.stringify(storeContext.zones.slice(0, 10).map((z: any) => ({
+  ...z,
+  isEntrance: (z.zoneName || '').toLowerCase().includes('입구') || (z.zoneName || '').toLowerCase().includes('entrance'),
+})), null, 2)}` : ''}
 
 ${storeContext?.dailySales?.length ? `SALES PERFORMANCE (last 7 days):
 - Average daily revenue: ${(storeContext.dailySales.slice(0, 7).reduce((sum: number, d: any) => sum + (d.totalRevenue || 0), 0) / Math.min(7, storeContext.dailySales.length)).toLocaleString()}원
@@ -3446,6 +3465,19 @@ async function performFlowSimulation(request: InferenceRequest, apiKey: string) 
   const customerCount = params?.customerCount || 100;
   const duration = params?.duration || '1hour';
 
+  // 입구 위치 결정 (storeContext에서 가져오거나 zones에서 찾기)
+  let entrancePosition = storeContext?.storeInfo?.entrancePosition;
+  if (!entrancePosition && storeContext?.zones?.length) {
+    const entranceZone = storeContext.zones.find((z: any) => {
+      const name = (z.zoneName || '').toLowerCase();
+      const type = (z.zoneType || '').toLowerCase();
+      return name.includes('입구') || name.includes('entrance') || type.includes('entrance');
+    });
+    if (entranceZone) {
+      entrancePosition = { x: entranceZone.x, z: entranceZone.z };
+    }
+  }
+
   // 프롬프트 빌드
   const prompt = `You are an expert retail analytics AI specializing in customer flow analysis and optimization.
 
@@ -3454,14 +3486,18 @@ TASK: Analyze customer flow patterns in the store and identify bottlenecks, opti
 STORE INFORMATION:
 ${storeContext?.storeInfo ? `- Store: ${storeContext.storeInfo.name}
 - Dimensions: ${storeContext.storeInfo.width}m x ${storeContext.storeInfo.depth}m
-- Business Type: ${storeContext.storeInfo.businessType || 'Retail'}` : '- Standard retail store'}
+- Business Type: ${storeContext.storeInfo.businessType || 'Retail'}
+- Entrance Position: ${entrancePosition ? `(${entrancePosition.x}, ${entrancePosition.z})` : 'Not specified'}` : '- Standard retail store'}
 
 SIMULATION PARAMETERS:
 - Customer Count: ${customerCount}
 - Duration: ${duration}
 
-${storeContext?.zones?.length ? `ZONES:
-${JSON.stringify(storeContext.zones, null, 2)}` : ''}
+${storeContext?.zones?.length ? `ZONES (entrance zone marked):
+${JSON.stringify(storeContext.zones.map((z: any) => ({
+  ...z,
+  isEntrance: (z.zoneName || '').toLowerCase().includes('입구') || (z.zoneName || '').toLowerCase().includes('entrance'),
+})), null, 2)}` : ''}
 
 ${storeContext?.visits?.length ? `RECENT VISITOR DATA (sample):
 - Total visits analyzed: ${storeContext.visits.length}
