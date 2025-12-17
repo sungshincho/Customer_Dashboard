@@ -482,7 +482,7 @@ interface ZoneHighlightProps {
     zoneId: string;
     color: string;
     opacity: number;
-    changeType: 'improved' | 'degraded' | 'new' | 'removed';
+    changeType: 'improved' | 'degraded' | 'new' | 'removed' | 'suggested';
   };
   /** 실제 존 위치 데이터 (zones_dim 기반) */
   externalZonePositions?: Record<string, [number, number, number]>;
