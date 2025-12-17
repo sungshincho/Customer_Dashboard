@@ -127,6 +127,13 @@ function GLTFModel({
 }: GLTFModelProps) {
   const groupRef = useRef<THREE.Group>(null);
 
+  // 🔍 디버그: 실제 렌더링에 사용되는 위치 로깅
+  useEffect(() => {
+    if (modelId?.includes('product')) {
+      console.log(`[ModelLoader] Rendering ${modelId} at position:`, position);
+    }
+  }, [modelId, position]);
+
   // GLTF 로드
   const { scene } = useGLTF(url, true, true, (error) => {
     console.error('GLTF load error:', error);
