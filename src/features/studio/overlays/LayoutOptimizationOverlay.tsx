@@ -517,9 +517,15 @@ function ZoneHighlight({ zone, externalZonePositions, externalZoneSizes }: ZoneH
     계산대: [4.5, 0.02, 5.5],
   };
 
+  // zoneId가 없으면 렌더링하지 않음
+  if (!zone.zoneId) {
+    return null;
+  }
+
   // 실제 존 위치 사용 (우선순위: externalZonePositions > fallbackPositions)
   const zonePositions = externalZonePositions || fallbackPositions;
-  const position = zonePositions[zone.zoneId] || zonePositions[zone.zoneId.toLowerCase()] || [0, 0.02, 0];
+  const zoneIdLower = zone.zoneId.toLowerCase();
+  const position = zonePositions[zone.zoneId] || zonePositions[zoneIdLower] || [0, 0.02, 0];
 
   // 기본 폴백 크기
   const fallbackSizes: Record<string, { width: number; depth: number }> = {
@@ -535,7 +541,7 @@ function ZoneHighlight({ zone, externalZonePositions, externalZoneSizes }: ZoneH
 
   // 실제 존 크기 사용 (우선순위: externalZoneSizes > fallbackSizes)
   const zoneSizes = externalZoneSizes || fallbackSizes;
-  const size = zoneSizes[zone.zoneId] || zoneSizes[zone.zoneId.toLowerCase()] || { width: 3, depth: 3 };
+  const size = zoneSizes[zone.zoneId] || zoneSizes[zoneIdLower] || { width: 3, depth: 3 };
 
   return (
     <mesh ref={meshRef} position={position} rotation={[-Math.PI / 2, 0, 0]}>
