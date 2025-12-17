@@ -183,19 +183,22 @@ async function loadStaffAvatars(userId: string): Promise<StaffAsset[]> {
   }
 
   return (staffData || [])
-    .filter(s => s.avatar_url)
-    .map(s => ({
-      id: s.id,
-      type: 'staff' as const,
-      model_url: s.avatar_url!,
-      position: (s.avatar_position as Vector3D) || { x: 0, y: 0, z: 0 },
-      rotation: (s.avatar_rotation as Vector3D) || { x: 0, y: 0, z: 0 },
-      scale: (s.avatar_scale as Vector3D) || { x: 1, y: 1, z: 1 },
-      staff_id: s.id,
-      staff_name: s.staff_name,
-      role: s.role || 'staff',
-      assigned_zone_id: s.assigned_zone_id || s.department
-    }));
+    .filter(s => (s as any).avatar_url)
+    .map(s => {
+      const staff = s as any;
+      return {
+        id: staff.id,
+        type: 'staff' as const,
+        model_url: staff.avatar_url!,
+        position: (staff.avatar_position as Vector3D) || { x: 0, y: 0, z: 0 },
+        rotation: (staff.avatar_rotation as Vector3D) || { x: 0, y: 0, z: 0 },
+        scale: (staff.avatar_scale as Vector3D) || { x: 1, y: 1, z: 1 },
+        staff_id: staff.id,
+        staff_name: staff.staff_name,
+        role: staff.role || 'staff',
+        assigned_zone_id: staff.assigned_zone_id || staff.department
+      };
+    });
 }
 
 /**
@@ -263,68 +266,81 @@ export async function generateSceneRecipeForStore(
     .eq('store_id', storeId);
 
   // Build space asset from store data
+  const storeAny = storeData as any;
   const space: SpaceAsset = {
-    id: storeData?.id || 'main-space',
+    id: storeAny?.id || 'main-space',
     type: 'space',
-    model_url: storeData?.model_3d_url || '',
+    model_url: storeAny?.model_3d_url || '',
     position: { x: 0, y: 0, z: 0 },
     rotation: { x: 0, y: 0, z: 0 },
     scale: { x: 1, y: 1, z: 1 },
-    zone_name: storeData?.store_name || 'Store',
-    dimensions: storeData?.dimensions as unknown as ModelDimensions | undefined
+    zone_name: storeAny?.store_name || 'Store',
+    dimensions: storeAny?.dimensions as unknown as ModelDimensions | undefined
   };
 
   // Build furniture array with 3D data
   const furniture: FurnitureAsset[] = (furnitureData || [])
     .filter(f => f.model_url)
-    .map(f => ({
-      id: f.id,
-      type: 'furniture' as const,
-      model_url: f.model_url!,
-      position: (f.position as Vector3D) || { x: 0, y: 0, z: 0 },
-      rotation: (f.rotation as Vector3D) || { x: 0, y: 0, z: 0 },
-      scale: (f.scale as Vector3D) || { x: 1, y: 1, z: 1 },
-      furniture_type: f.furniture_type,
-      movable: f.movable ?? false,
-      dimensions: {
-        width: f.width || 1,
-        height: f.height || 1,
-        depth: f.depth || 1
-      }
-    }));
+    .map(f => {
+      const fAny = f as any;
+      const pos = fAny.position || { x: fAny.position_x || 0, y: fAny.position_y || 0, z: fAny.position_z || 0 };
+      const rot = fAny.rotation || { x: fAny.rotation_x || 0, y: fAny.rotation_y || 0, z: fAny.rotation_z || 0 };
+      const scl = fAny.scale || { x: fAny.scale_x || 1, y: fAny.scale_y || 1, z: fAny.scale_z || 1 };
+      return {
+        id: f.id,
+        type: 'furniture' as const,
+        model_url: f.model_url!,
+        position: pos as Vector3D,
+        rotation: rot as Vector3D,
+        scale: scl as Vector3D,
+        furniture_type: f.furniture_type,
+        movable: f.movable ?? false,
+        dimensions: {
+          width: f.width || 1,
+          height: f.height || 1,
+          depth: f.depth || 1
+        }
+      };
+    });
 
   // Build products array with placement info
   const products: ProductAsset[] = (productsData || [])
-    .filter(p => p.model_3d_url)
-    .map(p => ({
-      id: p.id,
-      type: 'product' as const,
-      model_url: p.model_3d_url!,
-      position: (p.model_3d_position as Vector3D) || { x: 0, y: 0, z: 0 },
-      rotation: (p.model_3d_rotation as Vector3D) || { x: 0, y: 0, z: 0 },
-      scale: (p.model_3d_scale as Vector3D) || { x: 1, y: 1, z: 1 },
-      product_id: p.id,
-      sku: p.sku,
-      movable: p.movable ?? true,
-      initial_furniture_id: p.initial_furniture_id,
-      slot_id: p.slot_id
-    }));
+    .filter(p => (p as any).model_3d_url)
+    .map(p => {
+      const pAny = p as any;
+      return {
+        id: p.id,
+        type: 'product' as const,
+        model_url: pAny.model_3d_url!,
+        position: (pAny.model_3d_position as Vector3D) || { x: 0, y: 0, z: 0 },
+        rotation: (pAny.model_3d_rotation as Vector3D) || { x: 0, y: 0, z: 0 },
+        scale: (pAny.model_3d_scale as Vector3D) || { x: 1, y: 1, z: 1 },
+        product_id: p.id,
+        sku: p.sku,
+        movable: pAny.movable ?? true,
+        initial_furniture_id: pAny.initial_furniture_id,
+        slot_id: pAny.slot_id
+      };
+    });
 
   // Build staff array with avatars
   const staff: StaffAsset[] = (staffData || [])
-    .filter(s => s.avatar_url)
-    .map(s => ({
-      id: s.id,
-      type: 'staff' as const,
-      model_url: s.avatar_url!,
-      position: (s.avatar_position as Vector3D) || { x: 0, y: 0, z: 0 },
-      rotation: (s.avatar_rotation as Vector3D) || { x: 0, y: 0, z: 0 },
-      scale: (s.avatar_scale as Vector3D) || { x: 1, y: 1, z: 1 },
-      staff_id: s.id,
-      staff_name: s.staff_name,
-      role: s.role || 'staff',
-      assigned_zone_id: s.assigned_zone_id || s.department
-    }));
+    .filter(s => (s as any).avatar_url)
+    .map(s => {
+      const sAny = s as any;
+      return {
+        id: s.id,
+        type: 'staff' as const,
+        model_url: sAny.avatar_url!,
+        position: (sAny.avatar_position as Vector3D) || { x: 0, y: 0, z: 0 },
+        rotation: (sAny.avatar_rotation as Vector3D) || { x: 0, y: 0, z: 0 },
+        scale: (sAny.avatar_scale as Vector3D) || { x: 1, y: 1, z: 1 },
+        staff_id: s.id,
+        staff_name: s.staff_name,
+        role: s.role || 'staff',
+        assigned_zone_id: sAny.assigned_zone_id || s.department
+      };
+    });
 
   return {
     space,
@@ -360,21 +376,24 @@ async function loadFurnitureSlots(storeId: string): Promise<FurnitureSlot[]> {
     return [];
   }
 
-  return (data || []).map(s => ({
-    id: s.id,
-    furniture_id: s.furniture_id,
-    furniture_type: s.furniture_type,
-    slot_id: s.slot_id,
-    slot_type: s.slot_type,
-    slot_position: s.slot_position as Vector3D,
-    slot_rotation: (s.slot_rotation as Vector3D) || { x: 0, y: 0, z: 0 },
-    compatible_display_types: s.compatible_display_types as ProductDisplayType[] || ['standing'],
-    max_product_width: s.max_product_width,
-    max_product_height: s.max_product_height,
-    max_product_depth: s.max_product_depth,
-    is_occupied: s.is_occupied || false,
-    occupied_by_product_id: s.occupied_by_product_id
-  }));
+  return (data || []).map(s => {
+    const slot = s as any;
+    return {
+      id: slot.id,
+      furniture_id: slot.furniture_id,
+      furniture_type: slot.furniture_type,
+      slot_id: slot.slot_id,
+      slot_type: slot.slot_type as any,
+      slot_position: (slot.slot_position as unknown as Vector3D) || { x: 0, y: 0, z: 0 },
+      slot_rotation: (slot.slot_rotation as unknown as Vector3D) || { x: 0, y: 0, z: 0 },
+      compatible_display_types: slot.compatible_display_types as ProductDisplayType[] || ['standing'],
+      max_product_width: slot.max_product_width,
+      max_product_height: slot.max_product_height,
+      max_product_depth: slot.max_product_depth,
+      is_occupied: slot.is_occupied || false,
+      occupied_by_product_id: slot.occupied_by_product_id
+    };
+  });
 }
 
 /**

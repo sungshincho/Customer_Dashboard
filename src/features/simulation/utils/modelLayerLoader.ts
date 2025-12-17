@@ -30,24 +30,25 @@ export async function loadUserModels(
         .eq('id', storeId)
         .single();
 
-      if (!storeError && storeData && storeData.model_3d_url) {
-        console.log(`[ModelLoader] Section 0: Loading store space model: ${storeData.store_name}`);
+      const storeAny = storeData as any;
+      if (!storeError && storeAny && storeAny.model_3d_url) {
+        console.log(`[ModelLoader] Section 0: Loading store space model: ${storeAny.store_name}`);
         models.push({
-          id: `space-${storeData.id}`,
-          name: storeData.store_name || 'Store Space',
+          id: `space-${storeAny.id}`,
+          name: storeAny.store_name || 'Store Space',
           type: 'space',
-          model_url: storeData.model_3d_url,
-          dimensions: parseJsonField(storeData.dimensions, undefined),
+          model_url: storeAny.model_3d_url,
+          dimensions: parseJsonField(storeAny.dimensions, undefined),
           position: { x: 0, y: 0, z: 0 },
           rotation: { x: 0, y: 0, z: 0 },
           scale: { x: 1, y: 1, z: 1 },
           metadata: {
-            storeId: storeData.id,
-            storeName: storeData.store_name
+            storeId: storeAny.id,
+            storeName: storeAny.store_name
           }
         });
-        loadedUrls.add(storeData.model_3d_url);
-        console.log(`[ModelLoader] Store: ${storeData.store_name}, Model URL: ${storeData.model_3d_url}`);
+        loadedUrls.add(storeAny.model_3d_url);
+        console.log(`[ModelLoader] Store: ${storeAny.store_name}, Model URL: ${storeAny.model_3d_url}`);
       } else if (storeError) {
         console.error('[ModelLoader] Error loading store:', storeError);
       }
@@ -151,7 +152,7 @@ export async function loadUserModels(
       // ============================================
       // 3. product_placements 테이블에서 상품 배치 로드 (레거시)
       // ============================================
-      const { data: placementsData, error: placementsError } = await supabase
+      const { data: placementsData, error: placementsError } = await (supabase as any)
         .from('product_placements')
         .select(`
           *,
@@ -168,8 +169,9 @@ export async function loadUserModels(
       if (!placementsError && placementsData) {
         console.log(`[ModelLoader] Section 3: Loading ${placementsData.length} product placements (legacy)`);
 
-        for (const p of placementsData) {
-          const product = p.products as any;
+        for (const placement of placementsData) {
+          const p = placement as any;
+          const product = p.products;
           const modelUrl = p.model_url || getDefaultProductModelUrl(product?.category);
 
           if (modelUrl) {

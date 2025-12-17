@@ -80,21 +80,24 @@ export function useFurnitureSlots({
 
       if (error) throw error;
 
-      return (data || []).map((s) => ({
-        id: s.id,
-        furniture_id: s.furniture_id,
-        furniture_type: s.furniture_type,
-        slot_id: s.slot_id,
-        slot_type: s.slot_type,
-        slot_position: s.slot_position as Vector3D,
-        slot_rotation: (s.slot_rotation as Vector3D) || { x: 0, y: 0, z: 0 },
-        compatible_display_types: (s.compatible_display_types as ProductDisplayType[]) || ['standing'],
-        max_product_width: s.max_product_width || undefined,
-        max_product_height: s.max_product_height || undefined,
-        max_product_depth: s.max_product_depth || undefined,
-        is_occupied: s.is_occupied || false,
-        occupied_by_product_id: s.occupied_by_product_id || undefined,
-      }));
+      return (data || []).map((s) => {
+        const slot = s as any;
+        return {
+          id: slot.id,
+          furniture_id: slot.furniture_id,
+          furniture_type: slot.furniture_type,
+          slot_id: slot.slot_id,
+          slot_type: slot.slot_type as any,
+          slot_position: (slot.slot_position as unknown as Vector3D) || { x: 0, y: 0, z: 0 },
+          slot_rotation: (slot.slot_rotation as unknown as Vector3D) || { x: 0, y: 0, z: 0 },
+          compatible_display_types: (slot.compatible_display_types as ProductDisplayType[]) || ['standing'],
+          max_product_width: slot.max_product_width || undefined,
+          max_product_height: slot.max_product_height || undefined,
+          max_product_depth: slot.max_product_depth || undefined,
+          is_occupied: slot.is_occupied || false,
+          occupied_by_product_id: slot.occupied_by_product_id || undefined,
+        };
+      });
     },
     enabled: autoLoad && !!storeId,
     staleTime: 30000, // 30초
