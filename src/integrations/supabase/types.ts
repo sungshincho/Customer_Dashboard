@@ -1793,6 +1793,7 @@ export type Database = {
           next_event_type: string | null
           org_id: string | null
           previous_event_type: string | null
+          product_id: string | null
           session_id: string | null
           store_id: string | null
           visitor_id: string | null
@@ -1812,6 +1813,7 @@ export type Database = {
           next_event_type?: string | null
           org_id?: string | null
           previous_event_type?: string | null
+          product_id?: string | null
           session_id?: string | null
           store_id?: string | null
           visitor_id?: string | null
@@ -1831,6 +1833,7 @@ export type Database = {
           next_event_type?: string | null
           org_id?: string | null
           previous_event_type?: string | null
+          product_id?: string | null
           session_id?: string | null
           store_id?: string | null
           visitor_id?: string | null
@@ -6301,6 +6304,8 @@ export type Database = {
           manager_name: string | null
           max_capacity: number | null
           metadata: Json | null
+          model_3d_url: string | null
+          model_url: string | null
           opening_date: string | null
           opening_hour: number | null
           org_id: string | null
@@ -6334,6 +6339,8 @@ export type Database = {
           manager_name?: string | null
           max_capacity?: number | null
           metadata?: Json | null
+          model_3d_url?: string | null
+          model_url?: string | null
           opening_date?: string | null
           opening_hour?: number | null
           org_id?: string | null
@@ -6367,6 +6374,8 @@ export type Database = {
           manager_name?: string | null
           max_capacity?: number | null
           metadata?: Json | null
+          model_3d_url?: string | null
+          model_url?: string | null
           opening_date?: string | null
           opening_hour?: number | null
           org_id?: string | null

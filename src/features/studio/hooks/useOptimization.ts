@@ -309,7 +309,7 @@ export function useOptimization({
     try {
       const { data, error } = await supabase
         .from('layout_optimization_results')
-        .select('id, created_at, optimization_type, status, summary, applied_changes')
+        .select('*')
         .eq('store_id', storeId)
         .order('created_at', { ascending: false })
         .limit(20);
@@ -318,7 +318,7 @@ export function useOptimization({
         throw error;
       }
 
-      setHistory((data || []).map(item => ({
+      setHistory((data || []).map((item: any) => ({
         id: item.id,
         created_at: item.created_at,
         optimization_type: item.optimization_type,
@@ -339,6 +339,8 @@ export function useOptimization({
       .filter(c => appliedChangeIds.has(c.product_id))
       .map(c => ({
         id: c.product_id,
+        type: 'product' as const,
+        model_url: '',
         sku: c.sku,
         product_name: c.sku,
         category: '',
@@ -348,7 +350,7 @@ export function useOptimization({
         position: c.suggested.position,
         rotation: { x: 0, y: 0, z: 0 },
         scale: { x: 1, y: 1, z: 1 },
-        display_type: 'standing',
+        display_type: 'standing' as any,
         stock_quantity: 0,
         price: 0,
         movable: true,
