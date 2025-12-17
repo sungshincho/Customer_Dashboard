@@ -313,6 +313,21 @@ export async function generateSceneRecipeForStore(
     furnitureMap.set(f.id, f);
   }
 
+  // 🔧 FIX: Create reverse lookup map from product_id -> slot
+  // furniture_slots.occupied_by_product_id tells us which product is in which slot
+  const productToSlotMap = new Map<string, FurnitureSlot>();
+  for (const slot of slots) {
+    if (slot.occupied_by_product_id) {
+      productToSlotMap.set(slot.occupied_by_product_id, slot);
+    }
+  }
+
+  console.log('[SceneRecipe] Product-to-slot mapping:', {
+    totalSlots: slots.length,
+    occupiedSlots: productToSlotMap.size,
+    products: productsData?.length || 0,
+  });
+
   // Build products array with slot-based positioning
   const products: ProductAsset[] = (productsData || [])
     .filter(p => p.model_3d_url)
@@ -320,9 +335,31 @@ export async function generateSceneRecipeForStore(
       // Default position from product data
       let position: Vector3D = (p.model_3d_position as unknown as Vector3D) || { x: 0, y: 0, z: 0 };
       let rotation: Vector3D = (p.model_3d_rotation as unknown as Vector3D) || { x: 0, y: 0, z: 0 };
+      let furnitureId: string | undefined = p.initial_furniture_id;
+      let slotId: string | undefined = p.slot_id;
 
-      // If product has slot assignment, calculate position from furniture + slot
-      if (p.initial_furniture_id && p.slot_id) {
+      // 🔧 FIX: First try reverse lookup from furniture_slots.occupied_by_product_id
+      const occupiedSlot = productToSlotMap.get(p.id);
+      if (occupiedSlot) {
+        const parentFurniture = furnitureMap.get(occupiedSlot.furniture_id);
+        if (parentFurniture) {
+          // Calculate world position using slot-based auto-snap
+          const snapResult = calculateSlotWorldPosition(
+            parentFurniture.position,
+            parentFurniture.rotation,
+            occupiedSlot.slot_position,
+            occupiedSlot.slot_rotation
+          );
+          position = snapResult.world_position;
+          rotation = snapResult.world_rotation;
+          furnitureId = occupiedSlot.furniture_id;
+          slotId = occupiedSlot.slot_id;
+
+          console.log(`[SceneRecipe] Product ${p.sku} positioned at slot ${slotId} on furniture ${parentFurniture.furniture_type}:`, position);
+        }
+      }
+      // Fallback: If product has direct slot assignment in products table
+      else if (p.initial_furniture_id && p.slot_id) {
         const parentFurniture = furnitureMap.get(p.initial_furniture_id);
         const slot = slots.find(s =>
           s.furniture_id === p.initial_furniture_id &&
@@ -352,8 +389,8 @@ export async function generateSceneRecipeForStore(
         product_id: p.id,
         sku: p.sku,
         movable: p.movable ?? true,
-        initial_furniture_id: p.initial_furniture_id,
-        slot_id: p.slot_id
+        initial_furniture_id: furnitureId,  // 🔧 Use resolved furniture ID
+        slot_id: slotId                      // 🔧 Use resolved slot ID
       };
     });
 

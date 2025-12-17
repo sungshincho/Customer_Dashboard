@@ -182,10 +182,18 @@ export function AISimulationTab({
 
   // AI 시뮬레이션 실행 (혼잡도, 동선 분석 등)
   const runAISimulations = useCallback(async () => {
+    console.log('[AISimulationTab] runAISimulations clicked', {
+      selectedSimulations,
+      storeId,
+      hasSceneData: !!sceneData,
+    });
+
     const aiSimTypes = selectedSimulations.filter(t =>
       (t === 'congestion' || t === 'customerPath') &&
       !simulationOptions.find(o => o.id === t)?.locked
     );
+
+    console.log('[AISimulationTab] AI simulation types to run:', aiSimTypes);
 
     if (aiSimTypes.length === 0) {
       toast.error('실행할 AI 시뮬레이션이 없습니다');
@@ -201,10 +209,17 @@ export function AISimulationTab({
     const newResults: Record<string, any> = {};
 
     try {
+      console.log('[AISimulationTab] Building store context...');
       const storeContext = await buildStoreContext(storeId);
+      console.log('[AISimulationTab] Store context built:', {
+        hasZones: storeContext.zones?.length,
+        hasVisits: storeContext.visits?.length,
+        hasHourlyMetrics: storeContext.hourlyMetrics?.length,
+      });
 
       const promises = aiSimTypes.map(async (type) => {
         if (type === 'congestion') {
+          console.log('[AISimulationTab] Invoking congestion_simulation Edge Function...');
           const { data, error } = await supabase.functions.invoke('advanced-ai-inference', {
             body: {
               type: 'congestion_simulation',
@@ -220,10 +235,12 @@ export function AISimulationTab({
             },
           });
 
+          console.log('[AISimulationTab] congestion_simulation response:', { data, error });
           if (error) throw error;
           return { type, result: data.result };
         }
         if (type === 'customerPath') {
+          console.log('[AISimulationTab] Invoking flow_simulation Edge Function...');
           const { data, error } = await supabase.functions.invoke('advanced-ai-inference', {
             body: {
               type: 'flow_simulation',
@@ -241,6 +258,7 @@ export function AISimulationTab({
             },
           });
 
+          console.log('[AISimulationTab] flow_simulation response:', { data, error });
           if (error) throw error;
           return { type: 'flow', result: data.result };
         }
@@ -248,6 +266,7 @@ export function AISimulationTab({
       });
 
       const settledResults = await Promise.allSettled(promises);
+      console.log('[AISimulationTab] All simulation results:', settledResults);
 
       settledResults.forEach((result) => {
         if (result.status === 'fulfilled' && result.value.result) {

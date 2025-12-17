@@ -153,6 +153,13 @@ export function AIOptimizationTab({
 
   // 최적화 실행
   const runOptimizations = useCallback(async () => {
+    console.log('[AIOptimizationTab] runOptimizations clicked', {
+      selectedOptimizations,
+      selectedGoal,
+      storeId,
+      hasSceneData: !!sceneData,
+    });
+
     if (selectedOptimizations.length === 0) {
       toast.error('최적화를 선택하세요');
       return;
@@ -172,7 +179,13 @@ export function AIOptimizationTab({
 
     try {
       // Store Context 빌드 (온톨로지 + 데이터소스)
+      console.log('[AIOptimizationTab] Building store context...');
       const storeContext = await buildStoreContext(storeId);
+      console.log('[AIOptimizationTab] Store context built:', {
+        hasZones: storeContext.zones?.length,
+        hasFurniture: storeContext.productPlacements?.length,
+        hasVisits: storeContext.visits?.length,
+      });
 
       // 선택된 최적화만 실행하도록 파라미터 구성
       const params: Record<string, Record<string, any>> = {};
@@ -205,8 +218,17 @@ export function AIOptimizationTab({
         };
       }
 
+      console.log('[AIOptimizationTab] Calling runAllSimulations with params:', Object.keys(params));
+
       // useSceneSimulation의 runAllSimulations 호출 - 결과를 직접 반환받음
       const results = await sceneSimulation.runAllSimulations(params, sceneData);
+
+      console.log('[AIOptimizationTab] runAllSimulations returned:', {
+        hasLayout: !!results.layout,
+        hasFlow: !!results.flow,
+        hasStaffing: !!results.staffing,
+        results,
+      });
 
       // 레이아웃 결과가 있으면 오버레이 활성화 및 오른쪽 패널 업데이트
       if (results.layout) {

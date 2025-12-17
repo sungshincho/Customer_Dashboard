@@ -254,10 +254,23 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
   // 전체 시뮬레이션 실행 (scene 파라미터로 직접 씬을 전달할 수 있음)
   const runAllSimulations = useCallback(
     async (params?: Partial<Record<SimulationType, Record<string, any>>>, scene?: SceneRecipe): Promise<SimulationResults> => {
+      console.log('[useSceneSimulation] runAllSimulations called', {
+        hasParams: !!params,
+        paramsKeys: params ? Object.keys(params) : [],
+        hasScene: !!scene,
+        storeId: selectedStore?.id,
+        orgId,
+      });
+
       // 직접 전달된 씬 또는 state의 asIsScene 사용
       const targetScene = scene || state.asIsScene;
 
       if (!targetScene || !selectedStore?.id || !orgId) {
+        console.error('[useSceneSimulation] Missing required data:', {
+          hasTargetScene: !!targetScene,
+          storeId: selectedStore?.id,
+          orgId,
+        });
         toast({
           title: '씬을 먼저 선택해주세요',
           variant: 'destructive',
@@ -301,6 +314,11 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
         };
 
         // 병렬로 시뮬레이션 실행
+        console.log('[useSceneSimulation] Invoking Edge Functions...');
+        console.log('[useSceneSimulation] Layout params:', params?.layout);
+        console.log('[useSceneSimulation] Flow params:', params?.flow);
+        console.log('[useSceneSimulation] Staffing params:', params?.staffing);
+
         const [layoutRes, flowRes, staffingRes] = await Promise.allSettled([
           supabase.functions.invoke('advanced-ai-inference', {
             body: {
@@ -328,15 +346,30 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
           }),
         ]);
 
+        console.log('[useSceneSimulation] Edge Function responses:', {
+          layout: layoutRes.status === 'fulfilled' ? { data: layoutRes.value.data, error: layoutRes.value.error } : { reason: layoutRes.reason },
+          flow: flowRes.status === 'fulfilled' ? { data: flowRes.value.data, error: flowRes.value.error } : { reason: flowRes.reason },
+          staffing: staffingRes.status === 'fulfilled' ? { data: staffingRes.value.data, error: staffingRes.value.error } : { reason: staffingRes.reason },
+        });
+
         const results: SimulationResults = {};
         if (layoutRes.status === 'fulfilled' && layoutRes.value.data?.result) {
           results.layout = layoutRes.value.data.result;
+          console.log('[useSceneSimulation] Layout result extracted:', results.layout);
+        } else {
+          console.warn('[useSceneSimulation] No layout result:', layoutRes);
         }
         if (flowRes.status === 'fulfilled' && flowRes.value.data?.result) {
           results.flow = flowRes.value.data.result;
+          console.log('[useSceneSimulation] Flow result extracted:', results.flow);
+        } else {
+          console.warn('[useSceneSimulation] No flow result:', flowRes);
         }
         if (staffingRes.status === 'fulfilled' && staffingRes.value.data?.result) {
           results.staffing = staffingRes.value.data.result;
+          console.log('[useSceneSimulation] Staffing result extracted:', results.staffing);
+        } else {
+          console.warn('[useSceneSimulation] No staffing result:', staffingRes);
         }
 
         // 통합 To-be 씬 생성
