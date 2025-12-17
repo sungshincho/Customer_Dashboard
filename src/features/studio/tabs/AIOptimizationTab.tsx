@@ -8,7 +8,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { Sparkles, Layout, Route, Users, Loader2, ChevronDown, ChevronUp, Check, RotateCcw, Eye, Layers } from 'lucide-react';
+import { Sparkles, Layout, Route, Users, Loader2, ChevronDown, ChevronUp, Check, RotateCcw, Eye, Layers, Target, TrendingUp, Clock, Footprints } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -20,6 +20,41 @@ import type { SceneRecipe } from '../types';
 
 type OptimizationType = 'layout' | 'flow' | 'staffing';
 type ViewMode = 'all' | 'as-is' | 'to-be';
+type OptimizationGoal = 'revenue' | 'dwell_time' | 'traffic' | 'conversion';
+
+interface GoalOption {
+  id: OptimizationGoal;
+  label: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
+const goalOptions: GoalOption[] = [
+  {
+    id: 'revenue',
+    label: '매출',
+    description: '매출 극대화',
+    icon: TrendingUp,
+  },
+  {
+    id: 'dwell_time',
+    label: '체류',
+    description: '체류시간 증가',
+    icon: Clock,
+  },
+  {
+    id: 'traffic',
+    label: '동선',
+    description: '유동인구 분산',
+    icon: Footprints,
+  },
+  {
+    id: 'conversion',
+    label: '전환',
+    description: '전환율 개선',
+    icon: Target,
+  },
+];
 
 interface OptimizationOption {
   id: OptimizationType;
@@ -68,6 +103,9 @@ export function AIOptimizationTab({
 }: AIOptimizationTabProps) {
   // SceneProvider에서 applySimulationResults 가져오기
   const { applySimulationResults } = useScene();
+
+  // 최적화 목표 선택
+  const [selectedGoal, setSelectedGoal] = useState<OptimizationGoal>('revenue');
 
   // 선택된 최적화 유형들
   const [selectedOptimizations, setSelectedOptimizations] = useState<OptimizationType[]>(['layout']);
@@ -141,7 +179,7 @@ export function AIOptimizationTab({
 
       if (selectedOptimizations.includes('layout')) {
         params.layout = {
-          goal: 'revenue',
+          goal: selectedGoal,
           storeContext,
         };
       }
@@ -153,9 +191,16 @@ export function AIOptimizationTab({
         };
       }
       if (selectedOptimizations.includes('staffing')) {
+        // 선택된 목표에 따라 직원 배치 전략 결정
+        const staffingGoalMap: Record<OptimizationGoal, string> = {
+          revenue: 'sales_support',
+          dwell_time: 'customer_engagement',
+          traffic: 'flow_guidance',
+          conversion: 'customer_service',
+        };
         params.staffing = {
           staffCount: 3,
-          goal: 'customer_service',
+          goal: staffingGoalMap[selectedGoal],
           storeContext,
         };
       }
@@ -259,7 +304,7 @@ export function AIOptimizationTab({
     } finally {
       setRunningTypes([]);
     }
-  }, [selectedOptimizations, storeId, sceneData, sceneSimulation, onOverlayToggle, onResultsUpdate]);
+  }, [selectedOptimizations, selectedGoal, storeId, sceneData, sceneSimulation, onOverlayToggle, onResultsUpdate]);
 
   // As-Is 씬으로 복원
   const handleRevertToAsIs = useCallback(() => {
@@ -327,6 +372,42 @@ export function AIOptimizationTab({
 
   return (
     <div className="p-4 space-y-4">
+      {/* ========== 최적화 목표 선택 ========== */}
+      <div className="space-y-2">
+        <div className="text-xs font-medium text-white/60 flex items-center gap-1.5">
+          <Target className="h-3 w-3" />
+          최적화 목표
+        </div>
+        <div className="grid grid-cols-4 gap-1.5">
+          {goalOptions.map((goal) => {
+            const Icon = goal.icon;
+            const isSelected = selectedGoal === goal.id;
+            return (
+              <button
+                key={goal.id}
+                onClick={() => setSelectedGoal(goal.id)}
+                disabled={isRunning}
+                className={cn(
+                  'flex flex-col items-center p-2 rounded-lg transition-all text-center',
+                  isSelected
+                    ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-lg'
+                    : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white/80'
+                )}
+              >
+                <Icon className={cn('h-4 w-4 mb-1', isSelected ? 'text-white' : 'text-white/40')} />
+                <span className="text-[10px] font-medium">{goal.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[10px] text-white/40 text-center">
+          {goalOptions.find(g => g.id === selectedGoal)?.description}
+        </p>
+      </div>
+
+      {/* 구분선 */}
+      <div className="border-t border-white/10" />
+
       {/* ========== 최적화 선택 섹션 ========== */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
