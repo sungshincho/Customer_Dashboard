@@ -31,6 +31,14 @@ export {
 // AI 최적화 훅
 export { useOptimization } from './useOptimization';
 
+// 매장 경계/입구 위치 훅
+export { useStoreBounds } from './useStoreBounds';
+export type {
+  StoreBounds,
+  EntrancePosition,
+  ZoneDimData,
+} from './useStoreBounds';
+
 // 배치 저장/관리 훅
 export { usePlacement } from './usePlacement';
 

@@ -33,7 +33,7 @@ import {
   type CongestionResult,
   type StaffingResult,
 } from './panels/results';
-import { useStudioMode, useOverlayVisibility, useScenePersistence, useSceneSimulation } from './hooks';
+import { useStudioMode, useOverlayVisibility, useScenePersistence, useSceneSimulation, useStoreBounds } from './hooks';
 import { loadUserModels } from './utils';
 import type { StudioMode, Model3D, OverlayType, HeatPoint, FlowVector, ZoneBoundary, CustomerAvatar, SceneRecipe, LightingPreset, Vector3, SimulationScenario, TransformMode } from './types';
 
@@ -99,6 +99,9 @@ export default function DigitalTwinStudioPage() {
 
   // 씬 기반 시뮬레이션 (As-is → To-be)
   const sceneSimulation = useSceneSimulation();
+
+  // 매장 경계 및 입구 위치 (zones_dim 기반)
+  const { storeBounds, entrancePosition, zonePositions, zoneSizes } = useStoreBounds();
 
   // UI 상태
   const [activeTab, setActiveTab] = useState<TabType>('layer');
@@ -575,6 +578,9 @@ export default function DigitalTwinStudioPage() {
                     showAfter={true}
                     showMoves={true}
                     showZoneHighlights={true}
+                    storeBounds={storeBounds}
+                    zonePositions={zonePositions}
+                    zoneSizes={zoneSizes}
                   />
                 )}
                 {sceneSimulation.state.results.flow && (
@@ -584,6 +590,8 @@ export default function DigitalTwinStudioPage() {
                     showBottlenecks={true}
                     showHeatmap={true}
                     animatePaths={true}
+                    storeBounds={storeBounds}
+                    entrancePosition={entrancePosition}
                   />
                 )}
                 {sceneSimulation.state.results.congestion && (

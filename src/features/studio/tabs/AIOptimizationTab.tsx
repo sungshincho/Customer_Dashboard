@@ -157,11 +157,26 @@ export function AIOptimizationTab({
             revenueIncrease: results.layout.improvements?.revenueIncrease || 0,
             dwellTimeIncrease: results.layout.improvements?.dwellTimeIncrease || 0,
             conversionIncrease: results.layout.improvements?.conversionIncrease || 0,
+            // 가구 변경 사항
             changes: results.layout.furnitureMoves?.map((move: any) => ({
-              item: move.furnitureId || move.name || '가구',
+              item: move.furnitureName || move.furnitureId || move.name || '가구',
               from: move.fromPosition ? `(${move.fromPosition.x?.toFixed(1)}, ${move.fromPosition.z?.toFixed(1)})` : 'As-Is',
               to: move.toPosition ? `(${move.toPosition.x?.toFixed(1)}, ${move.toPosition.z?.toFixed(1)})` : 'To-Be',
               effect: move.reason || '+효율성',
+            })) || [],
+            // 제품 재배치 변경 사항 (슬롯 기반)
+            productChanges: results.layout.productPlacements?.map((placement: any) => ({
+              productId: placement.productId || placement.product_id || '',
+              productName: placement.productName || placement.sku || '상품',
+              fromFurniture: placement.current?.furnitureId || placement.initial_placement?.furniture_id || '현재 위치',
+              fromSlot: placement.current?.slotId || placement.initial_placement?.slot_id || '-',
+              toFurniture: placement.suggested?.furnitureId || placement.optimization_result?.suggested_furniture_id || '추천 위치',
+              toSlot: placement.suggested?.slotId || placement.optimization_result?.suggested_slot_id || '-',
+              reason: placement.reason || placement.optimization_result?.optimization_reason || '매출 최적화',
+              expectedImpact: placement.expectedImpact || placement.optimization_result?.expected_impact ? {
+                revenueChangePct: placement.expectedImpact?.revenue_change_pct || placement.optimization_result?.expected_impact?.revenue_change_pct || 0,
+                visibilityScore: placement.expectedImpact?.visibility_score || placement.optimization_result?.expected_impact?.visibility_score || 0,
+              } : undefined,
             })) || [],
           };
           onResultsUpdate('layout', layoutPanelResult);

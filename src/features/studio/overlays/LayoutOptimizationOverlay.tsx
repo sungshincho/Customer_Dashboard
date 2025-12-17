@@ -30,6 +30,10 @@ interface LayoutOptimizationOverlayProps {
     width: number;
     depth: number;
   };
+  /** 실제 존 위치 데이터 (zones_dim 기반) */
+  zonePositions?: Record<string, [number, number, number]>;
+  /** 실제 존 크기 데이터 (zones_dim 기반) */
+  zoneSizes?: Record<string, { width: number; depth: number }>;
 }
 
 // ============================================================================
@@ -69,6 +73,8 @@ export function LayoutOptimizationOverlay({
   animationSpeed = 1,
   onFurnitureClick,
   storeBounds = DEFAULT_STORE_BOUNDS,
+  zonePositions: externalZonePositions,
+  zoneSizes: externalZoneSizes,
 }: LayoutOptimizationOverlayProps) {
   const [selectedMove, setSelectedMove] = useState<string | null>(null);
   const animationRef = useRef(0);
@@ -128,6 +134,8 @@ export function LayoutOptimizationOverlay({
         <ZoneHighlight
           key={zone.zoneId}
           zone={zone}
+          externalZonePositions={externalZonePositions}
+          externalZoneSizes={externalZoneSizes}
         />
       ))}
 
@@ -343,9 +351,13 @@ interface ZoneHighlightProps {
     opacity: number;
     changeType: 'improved' | 'degraded' | 'new' | 'removed';
   };
+  /** 실제 존 위치 데이터 (zones_dim 기반) */
+  externalZonePositions?: Record<string, [number, number, number]>;
+  /** 실제 존 크기 데이터 (zones_dim 기반) */
+  externalZoneSizes?: Record<string, { width: number; depth: number }>;
 }
 
-function ZoneHighlight({ zone }: ZoneHighlightProps) {
+function ZoneHighlight({ zone, externalZonePositions, externalZoneSizes }: ZoneHighlightProps) {
   const meshRef = useRef<THREE.Mesh>(null);
 
   // 깜빡임 애니메이션
@@ -357,19 +369,44 @@ function ZoneHighlight({ zone }: ZoneHighlightProps) {
     }
   });
 
-  // 존 위치 (임시 - 실제로는 존 데이터에서 가져와야 함)
-  const zonePositions: Record<string, [number, number, number]> = {
-    entrance: [-4, 0.02, 0],
+  // 기본 폴백 위치 (외부 데이터 없을 경우)
+  const fallbackPositions: Record<string, [number, number, number]> = {
+    entrance: [2.5, 0.02, -7.5],
     'zone-a': [0, 0.02, 2],
     'zone-b': [0, 0.02, -2],
     'zone-c': [4, 0.02, 0],
+    main: [0, 0.02, 0],
+    메인홀: [0, 0.02, 0],
+    입구: [2.5, 0.02, -7.5],
+    의류존: [-5, 0.02, 3],
+    액세서리존: [5, 0.02, 3],
+    피팅룸: [-5, 0.02, -5],
+    계산대: [4.5, 0.02, 5.5],
   };
 
-  const position = zonePositions[zone.zoneId] || [0, 0.02, 0];
+  // 실제 존 위치 사용 (우선순위: externalZonePositions > fallbackPositions)
+  const zonePositions = externalZonePositions || fallbackPositions;
+  const position = zonePositions[zone.zoneId] || zonePositions[zone.zoneId.toLowerCase()] || [0, 0.02, 0];
+
+  // 기본 폴백 크기
+  const fallbackSizes: Record<string, { width: number; depth: number }> = {
+    entrance: { width: 3, depth: 1 },
+    main: { width: 10, depth: 8 },
+    메인홀: { width: 10, depth: 8 },
+    입구: { width: 3, depth: 1 },
+    의류존: { width: 6, depth: 6 },
+    액세서리존: { width: 6, depth: 6 },
+    피팅룸: { width: 4, depth: 4 },
+    계산대: { width: 3, depth: 3 },
+  };
+
+  // 실제 존 크기 사용 (우선순위: externalZoneSizes > fallbackSizes)
+  const zoneSizes = externalZoneSizes || fallbackSizes;
+  const size = zoneSizes[zone.zoneId] || zoneSizes[zone.zoneId.toLowerCase()] || { width: 3, depth: 3 };
 
   return (
     <mesh ref={meshRef} position={position} rotation={[-Math.PI / 2, 0, 0]}>
-      <planeGeometry args={[3, 3]} />
+      <planeGeometry args={[size.width, size.depth]} />
       <meshStandardMaterial
         color={zone.color}
         transparent
