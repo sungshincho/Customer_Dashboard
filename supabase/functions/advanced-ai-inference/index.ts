@@ -3592,18 +3592,35 @@ Return a JSON object with this exact structure:
       confidence: 0.75,
     });
 
-    // 시뮬레이션 경로 생성 (AI 분석 기반 개선된 패턴)
+    // 시뮬레이션 경로 생성 (실제 존 데이터 및 입구 위치 활용)
     const storeWidth = storeContext?.storeInfo?.width || 17;
     const storeDepth = storeContext?.storeInfo?.depth || 16;
-    const paths = generateSimulatedPaths(Math.min(customerCount, 20), storeWidth, storeDepth, aiResponse.zoneAnalysis || []);
+    const paths = generateSimulatedPaths(
+      Math.min(customerCount, 20),
+      storeWidth,
+      storeDepth,
+      aiResponse.zoneAnalysis || [],
+      storeContext?.zones || [],
+      entrancePosition
+    );
+
+    // AI 응답에서 병목 데이터가 없거나 부족하면 실제 데이터 기반 fallback
+    let bottlenecks = aiResponse.bottlenecks || [];
+    if (bottlenecks.length === 0 && storeContext?.zoneMetrics?.length && storeContext?.zones?.length) {
+      console.log('[FlowSimulation] No AI bottlenecks, generating from zone metrics');
+      bottlenecks = generateBottlenecksFromZoneMetrics(
+        storeContext.zoneMetrics,
+        storeContext.zones
+      );
+    }
 
     // 최적화 제안 생성
-    const optimizations = (aiResponse.bottlenecks || []).map((bn: any, idx: number) => ({
+    const optimizations = bottlenecks.map((bn: any, idx: number) => ({
       id: `opt-${idx}`,
       type: 'layout_change',
       description: bn.suggestions?.[0] || '레이아웃 개선',
       location: bn.position,
-      expectedImprovement: Math.round(bn.severity * 20 + 10),
+      expectedImprovement: Math.round((bn.severity || 0.5) * 20 + 10),
       effort: bn.impactLevel === 'high' ? 'high' : bn.impactLevel === 'medium' ? 'medium' : 'low',
       priority: idx + 1,
     }));
@@ -3619,7 +3636,7 @@ Return a JSON object with this exact structure:
           avgTravelDistance: 45,
           avgDwellTime: 120,
           conversionRate: 0.35,
-          bottleneckCount: (aiResponse.bottlenecks || []).length,
+          bottleneckCount: bottlenecks.length,
         },
         comparison: aiResponse.comparison || {
           currentPathLength: 45,
@@ -3631,7 +3648,7 @@ Return a JSON object with this exact structure:
           congestionReduction: 20,
         },
         paths,
-        bottlenecks: (aiResponse.bottlenecks || []).map((bn: any, idx: number) => ({
+        bottlenecks: bottlenecks.map((bn: any, idx: number) => ({
           ...bn,
           id: bn.id || `bn-${idx}`,
           frequency: bn.severity || 0.5,
@@ -3649,13 +3666,13 @@ Return a JSON object with this exact structure:
         },
         insights: aiResponse.insights || ['동선 분석이 완료되었습니다.'],
         visualization: {
-          animatedPaths: paths.slice(0, 10).map(p => ({
+          animatedPaths: paths.slice(0, 10).map((p: any) => ({
             id: p.id,
             points: p.points,
             color: p.converted ? '#22c55e' : '#ef4444',
             type: 'current' as const,
           })),
-          bottleneckMarkers: (aiResponse.bottlenecks || []).map((bn: any) => ({
+          bottleneckMarkers: bottlenecks.map((bn: any) => ({
             position: bn.position,
             severity: bn.severity,
             radius: 0.5 + (bn.severity || 0.5),
@@ -3677,20 +3694,49 @@ Return a JSON object with this exact structure:
   }
 }
 
-// 시뮬레이션 경로 생성 헬퍼
-function generateSimulatedPaths(count: number, storeWidth: number, storeDepth: number, zoneAnalysis: any[]): any[] {
+// 시뮬레이션 경로 생성 헬퍼 (실제 존 데이터 기반)
+function generateSimulatedPaths(
+  count: number,
+  storeWidth: number,
+  storeDepth: number,
+  zoneAnalysis: any[],
+  zones?: any[],
+  entrancePosition?: { x: number; z: number } | null
+): any[] {
   const halfWidth = storeWidth / 2;
   const halfDepth = storeDepth / 2;
 
+  // 입구 위치 결정 (실제 데이터 우선)
+  const entrance = entrancePosition || { x: 0, z: -halfDepth + 1 };
+
+  // 존 위치 목록 생성 (실제 존 데이터 활용)
+  const zonePositions: Array<{ x: number; z: number; name: string; weight: number }> = [];
+  if (zones && zones.length > 0) {
+    zones.forEach((z: any) => {
+      const x = z.x ?? z.position_x ?? 0;
+      const zPos = z.z ?? z.position_z ?? 0;
+      const name = z.zoneName || z.zone_name || 'Unknown';
+      // 존 방문 빈도 가중치 (zoneMetrics 기반)
+      const metric = zoneAnalysis.find((za: any) => za.zoneId === z.id || za.zoneName === name);
+      const weight = metric?.visitCount || 1;
+      zonePositions.push({ x, z: zPos, name, weight });
+    });
+  }
+
   return Array.from({ length: count }, (_, idx) => {
-    const points = generatePathPointsForStore(halfWidth, halfDepth);
+    const points = generatePathPointsWithZones(
+      halfWidth,
+      halfDepth,
+      entrance,
+      zonePositions
+    );
     const totalTime = 180 + Math.random() * 300;
     const converted = Math.random() > 0.4;
 
-    // 구역별 체류 시간 (AI 분석 데이터 활용)
-    const dwellZones = zoneAnalysis.slice(0, 3).map((zone: any) => ({
-      zoneId: zone.zoneId || `zone-${Math.floor(Math.random() * 5)}`,
-      zoneName: zone.zoneName || `구역 ${Math.floor(Math.random() * 5) + 1}`,
+    // 구역별 체류 시간 (AI 분석 데이터 활용, 실제 존 이름 사용)
+    const dwellZones = (zoneAnalysis.length > 0 ? zoneAnalysis : zonePositions).slice(0, 3).map((zone: any) => ({
+      zoneId: zone.zoneId || zone.id || `zone-${Math.floor(Math.random() * 5)}`,
+      zoneName: zone.zoneName || zone.name || `구역 ${Math.floor(Math.random() * 5) + 1}`,
       duration: zone.avgDwellTime || (30 + Math.random() * 60),
     }));
 
@@ -3708,27 +3754,143 @@ function generateSimulatedPaths(count: number, storeWidth: number, storeDepth: n
   });
 }
 
-// 매장 크기 기반 경로 포인트 생성
-function generatePathPointsForStore(halfWidth: number, halfDepth: number): Array<{ x: number; y: number; z: number; t: number }> {
+// 존 위치 기반 경로 포인트 생성 (실제 데이터 활용)
+function generatePathPointsWithZones(
+  halfWidth: number,
+  halfDepth: number,
+  entrance: { x: number; z: number },
+  zonePositions: Array<{ x: number; z: number; name: string; weight: number }>
+): Array<{ x: number; y: number; z: number; t: number }> {
   const points: Array<{ x: number; y: number; z: number; t: number }> = [];
 
-  // 입구에서 시작 (보통 -z 방향)
-  let x = (Math.random() - 0.5) * halfWidth;
-  let z = -halfDepth + 1;
+  // 입구에서 시작
+  let x = entrance.x + (Math.random() - 0.5) * 2;
+  let z = entrance.z;
 
-  for (let t = 0; t < 300; t += 30) {
-    points.push({ x, y: 0.5, z, t });
+  // 시작점 추가
+  points.push({ x, y: 0.5, z, t: 0 });
 
-    // 자연스러운 이동 패턴
-    x += (Math.random() - 0.5) * 3;
-    z += Math.random() * 2 + 0.5; // 주로 매장 안쪽으로 이동
+  if (zonePositions.length > 0) {
+    // 실제 존 위치를 경유하는 경로 생성
+    // 가중치 기반으로 2-4개 존 선택
+    const shuffledZones = [...zonePositions]
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 2 + Math.floor(Math.random() * 3));
 
-    // 경계 제한
-    x = Math.max(-halfWidth + 1, Math.min(halfWidth - 1, x));
-    z = Math.max(-halfDepth + 1, Math.min(halfDepth - 1, z));
+    let t = 30;
+    shuffledZones.forEach((zone) => {
+      // 존 위치로 이동 (약간의 랜덤 오프셋)
+      const targetX = zone.x + (Math.random() - 0.5) * 2;
+      const targetZ = zone.z + (Math.random() - 0.5) * 2;
+
+      // 중간 포인트 추가 (자연스러운 곡선)
+      const midX = (x + targetX) / 2 + (Math.random() - 0.5) * 1.5;
+      const midZ = (z + targetZ) / 2 + (Math.random() - 0.5) * 1.5;
+
+      points.push({
+        x: Math.max(-halfWidth + 1, Math.min(halfWidth - 1, midX)),
+        y: 0.5,
+        z: Math.max(-halfDepth + 1, Math.min(halfDepth - 1, midZ)),
+        t,
+      });
+      t += 30;
+
+      // 존 도착
+      x = Math.max(-halfWidth + 1, Math.min(halfWidth - 1, targetX));
+      z = Math.max(-halfDepth + 1, Math.min(halfDepth - 1, targetZ));
+      points.push({ x, y: 0.5, z, t });
+      t += 30 + Math.random() * 30; // 체류 시간 반영
+    });
+
+    // 출구(입구)로 돌아가기
+    const exitX = entrance.x + (Math.random() - 0.5) * 2;
+    const exitZ = entrance.z;
+    points.push({
+      x: Math.max(-halfWidth + 1, Math.min(halfWidth - 1, exitX)),
+      y: 0.5,
+      z: Math.max(-halfDepth + 1, Math.min(halfDepth - 1, exitZ)),
+      t,
+    });
+  } else {
+    // 존 데이터가 없는 경우 기존 로직 사용
+    for (let t = 30; t < 300; t += 30) {
+      x += (Math.random() - 0.5) * 3;
+      z += Math.random() * 2 + 0.5;
+
+      x = Math.max(-halfWidth + 1, Math.min(halfWidth - 1, x));
+      z = Math.max(-halfDepth + 1, Math.min(halfDepth - 1, z));
+
+      points.push({ x, y: 0.5, z, t });
+    }
   }
 
   return points;
+}
+
+// 실제 존 메트릭 기반 병목 지점 생성 (AI fallback용)
+function generateBottlenecksFromZoneMetrics(
+  zoneMetrics: any[],
+  zones: any[]
+): any[] {
+  if (!zoneMetrics || zoneMetrics.length === 0 || !zones || zones.length === 0) {
+    return [];
+  }
+
+  const bottlenecks: any[] = [];
+
+  // 존별 혼잡도 계산 (방문자 수 / 면적)
+  const zoneCongestionsData: Array<{
+    zone: any;
+    metric: any;
+    congestion: number;
+  }> = [];
+
+  zoneMetrics.forEach((metric: any) => {
+    const zone = zones.find((z: any) =>
+      z.id === metric.zoneId ||
+      (z.zoneName || z.zone_name) === metric.zoneName
+    );
+    if (zone) {
+      const area = (zone.width || zone.size_width || 3) * (zone.depth || zone.size_depth || 3);
+      const congestion = (metric.visitorCount || 0) / Math.max(area, 1);
+      zoneCongestionsData.push({ zone, metric, congestion });
+    }
+  });
+
+  // 혼잡도 상위 존을 병목으로 식별
+  zoneCongestionsData
+    .sort((a, b) => b.congestion - a.congestion)
+    .slice(0, 3)
+    .forEach((data, idx) => {
+      const severity = Math.min(1, data.congestion / 10); // 정규화
+
+      if (severity > 0.3) { // 최소 심각도 필터
+        bottlenecks.push({
+          id: `bn-${idx}`,
+          position: {
+            x: data.zone.x ?? data.zone.position_x ?? 0,
+            y: 0.5,
+            z: data.zone.z ?? data.zone.position_z ?? 0,
+          },
+          zoneName: data.metric.zoneName || data.zone.zoneName || data.zone.zone_name || `구역 ${idx + 1}`,
+          severity,
+          avgWaitTime: Math.round(15 + severity * 45),
+          cause: severity > 0.7
+            ? '높은 방문자 밀도로 인한 혼잡'
+            : severity > 0.5
+              ? '통로 폭 대비 방문자 수 과다'
+              : '일시적 정체 발생 구역',
+          suggestions: [
+            severity > 0.7 ? '해당 구역 가구 재배치 필요' : '안내 사인 추가 권장',
+            '대체 동선 유도 필요',
+          ],
+          impactLevel: severity > 0.7 ? 'high' : severity > 0.5 ? 'medium' : 'low',
+          affectedCustomers: Math.round(data.metric.visitorCount * severity * 0.3),
+        });
+      }
+    });
+
+  return bottlenecks;
 }
 
 // 인력 배치 최적화 시뮬레이션
