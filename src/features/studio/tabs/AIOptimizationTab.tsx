@@ -5,18 +5,26 @@
  * - 다중 선택 가능
  * - As-Is / To-Be 결과 비교
  * - 3D 씬에 결과 자동 반영
+ * - 최적화 설정 패널 (가구/제품/강도)
  */
 
-import { useState, useCallback, useEffect } from 'react';
-import { Sparkles, Layout, Route, Users, Loader2, ChevronDown, ChevronUp, Check, RotateCcw, Eye, Layers, Target, TrendingUp, Clock, Footprints } from 'lucide-react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
+import { Sparkles, Layout, Route, Users, Loader2, ChevronDown, ChevronUp, Check, RotateCcw, Eye, Layers, Target, TrendingUp, Clock, Footprints, Settings2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { buildStoreContext } from '../utils/store-context-builder';
 import { OptimizationResultPanel } from '../panels/OptimizationResultPanel';
 import { useScene } from '../core/SceneProvider';
+import { OptimizationSettingsPanel } from '../components/optimization';
 import type { UseSceneSimulationReturn } from '../hooks/useSceneSimulation';
 import type { SceneRecipe } from '../types';
+import type {
+  OptimizationSettings,
+  FurnitureItem,
+  ProductItem,
+} from '../types/optimization.types';
+import { DEFAULT_OPTIMIZATION_SETTINGS, INTENSITY_LIMITS } from '../types/optimization.types';
 
 type OptimizationType = 'layout' | 'flow' | 'staffing';
 type ViewMode = 'all' | 'as-is' | 'to-be';
@@ -119,6 +127,35 @@ export function AIOptimizationTab({
   // 비교 모드 (all: 전체, as-is: 변경 전, to-be: 변경 후)
   const [viewMode, setViewMode] = useState<ViewMode>('all');
 
+  // 최적화 설정 상태
+  const [optimizationSettings, setOptimizationSettings] = useState<OptimizationSettings>(DEFAULT_OPTIMIZATION_SETTINGS);
+  const [isSettingsExpanded, setIsSettingsExpanded] = useState(false);
+
+  // sceneData에서 가구/제품 목록 추출
+  const furnitureItems: FurnitureItem[] = useMemo(() => {
+    if (!sceneData?.furniture) return [];
+    return sceneData.furniture.map((f) => ({
+      id: f.id,
+      name: f.name || f.furniture_type || '가구',
+      furniture_type: f.furniture_type || 'unknown',
+      movable: f.movable !== false, // 기본적으로 이동 가능
+      position: f.position || { x: 0, y: 0, z: 0 },
+      zone_id: f.zone_id,
+    }));
+  }, [sceneData?.furniture]);
+
+  const productItems: ProductItem[] = useMemo(() => {
+    if (!sceneData?.products) return [];
+    return sceneData.products.map((p) => ({
+      id: p.id,
+      sku: p.sku || '',
+      product_name: p.product_name || p.name || '상품',
+      category: p.category,
+      furniture_id: p.furniture_id,
+      slot_id: p.slot_id,
+    }));
+  }, [sceneData?.products]);
+
   // 비교 모드 변경 시 오버레이 업데이트
   useEffect(() => {
     const { results } = sceneSimulation.state;
@@ -158,6 +195,7 @@ export function AIOptimizationTab({
       selectedGoal,
       storeId,
       hasSceneData: !!sceneData,
+      optimizationSettings,
     });
 
     if (selectedOptimizations.length === 0) {
@@ -187,13 +225,44 @@ export function AIOptimizationTab({
         hasVisits: storeContext.visits?.length,
       });
 
+      // 강도에 따른 제한 설정
+      const intensityLimits = INTENSITY_LIMITS[optimizationSettings.intensity];
+
       // 선택된 최적화만 실행하도록 파라미터 구성
       const params: Record<string, Record<string, any>> = {};
 
       if (selectedOptimizations.includes('layout')) {
+        // 목표를 설정 패널의 objective로 매핑
+        const goalMapping: Record<string, OptimizationGoal> = {
+          revenue: 'revenue',
+          dwell_time: 'dwell_time',
+          conversion: 'conversion',
+          balanced: 'revenue', // balanced는 revenue로 기본 설정
+        };
+
         params.layout = {
-          goal: selectedGoal,
+          goal: goalMapping[optimizationSettings.objective] || selectedGoal,
           storeContext,
+          // 설정 패널의 상세 설정 전달
+          settings: {
+            objective: optimizationSettings.objective,
+            furniture: {
+              movableIds: optimizationSettings.furniture.movableIds,
+              keepWallAttached: optimizationSettings.furniture.keepWallAttached,
+              keepZoneBoundaries: optimizationSettings.furniture.keepZoneBoundaries,
+              maxMoves: intensityLimits.maxFurnitureMoves,
+            },
+            products: {
+              relocatableIds: optimizationSettings.products.relocateAll
+                ? [] // 빈 배열 = 전체 제품
+                : optimizationSettings.products.relocatableIds,
+              relocateAll: optimizationSettings.products.relocateAll,
+              respectDisplayType: optimizationSettings.products.respectDisplayType,
+              keepCategory: optimizationSettings.products.keepCategory,
+              maxRelocations: intensityLimits.maxProductRelocations,
+            },
+            intensity: optimizationSettings.intensity,
+          },
         };
       }
       if (selectedOptimizations.includes('flow')) {
@@ -326,7 +395,7 @@ export function AIOptimizationTab({
     } finally {
       setRunningTypes([]);
     }
-  }, [selectedOptimizations, selectedGoal, storeId, sceneData, sceneSimulation, onOverlayToggle, onResultsUpdate]);
+  }, [selectedOptimizations, selectedGoal, storeId, sceneData, sceneSimulation, onOverlayToggle, onResultsUpdate, optimizationSettings]);
 
   // As-Is 씬으로 복원
   const handleRevertToAsIs = useCallback(() => {
@@ -488,6 +557,38 @@ export function AIOptimizationTab({
               </label>
             );
           })}
+        </div>
+
+        {/* ========== 상세 설정 섹션 ========== */}
+        <div className="space-y-2">
+          <button
+            onClick={() => setIsSettingsExpanded(!isSettingsExpanded)}
+            className="w-full flex items-center justify-between text-xs font-medium text-white/70 hover:text-white/90 transition-colors p-2 bg-white/5 rounded-lg"
+          >
+            <div className="flex items-center gap-2">
+              <Settings2 className="h-4 w-4 text-purple-400" />
+              상세 설정
+              <span className="text-white/40">
+                ({optimizationSettings.intensity === 'low' ? '보수적' : optimizationSettings.intensity === 'medium' ? '균형' : '적극적'})
+              </span>
+            </div>
+            {isSettingsExpanded ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
+          </button>
+
+          {isSettingsExpanded && (
+            <OptimizationSettingsPanel
+              settings={optimizationSettings}
+              onChange={setOptimizationSettings}
+              furniture={furnitureItems}
+              products={productItems}
+              disabled={isRunning}
+              compact
+            />
+          )}
         </div>
 
         {/* 실행 버튼 */}

@@ -45,6 +45,7 @@ export {
 export * from './overlay.types';
 export * from './simulation.types';
 export * from './simulationResults.types';
+export * from './optimization.types';
 
 // 🆕 슬롯 기반 최적화 타입 재export
 export type {
