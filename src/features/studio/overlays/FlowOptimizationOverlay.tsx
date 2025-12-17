@@ -34,6 +34,12 @@ interface FlowOptimizationOverlayProps {
     width: number;
     depth: number;
   };
+  /** 입구 위치 (동선 시작점 결정용) */
+  entrancePosition?: {
+    x: number;
+    z: number;
+    direction: 'north' | 'south' | 'east' | 'west';
+  };
 }
 
 // ============================================================================
@@ -68,6 +74,9 @@ function clampToStoreBounds(
 // 기본 매장 경계값 (일반적인 소매점 크기)
 const DEFAULT_STORE_BOUNDS = { width: 17.4, depth: 16.6 };
 
+// 기본 입구 위치 (남쪽, 하단)
+const DEFAULT_ENTRANCE = { x: 0, z: -8, direction: 'south' as const };
+
 export function FlowOptimizationOverlay({
   result,
   showPaths = true,
@@ -80,6 +89,7 @@ export function FlowOptimizationOverlay({
   onPathClick,
   onBottleneckClick,
   storeBounds = DEFAULT_STORE_BOUNDS,
+  entrancePosition = DEFAULT_ENTRANCE,
 }: FlowOptimizationOverlayProps) {
   const [hoveredPath, setHoveredPath] = useState<string | null>(null);
   const [hoveredBottleneck, setHoveredBottleneck] = useState<string | null>(null);

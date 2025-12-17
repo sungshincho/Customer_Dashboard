@@ -7,8 +7,8 @@
  * - 3D 씬에 결과 자동 반영
  */
 
-import { useState, useCallback } from 'react';
-import { Sparkles, Layout, Route, Users, Loader2, ChevronDown, ChevronUp, Check, RotateCcw } from 'lucide-react';
+import { useState, useCallback, useEffect } from 'react';
+import { Sparkles, Layout, Route, Users, Loader2, ChevronDown, ChevronUp, Check, RotateCcw, Eye, Layers, Target, TrendingUp, Clock, Footprints } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -19,6 +19,42 @@ import type { UseSceneSimulationReturn } from '../hooks/useSceneSimulation';
 import type { SceneRecipe } from '../types';
 
 type OptimizationType = 'layout' | 'flow' | 'staffing';
+type ViewMode = 'all' | 'as-is' | 'to-be';
+type OptimizationGoal = 'revenue' | 'dwell_time' | 'traffic' | 'conversion';
+
+interface GoalOption {
+  id: OptimizationGoal;
+  label: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
+const goalOptions: GoalOption[] = [
+  {
+    id: 'revenue',
+    label: '매출',
+    description: '매출 극대화',
+    icon: TrendingUp,
+  },
+  {
+    id: 'dwell_time',
+    label: '체류',
+    description: '체류시간 증가',
+    icon: Clock,
+  },
+  {
+    id: 'traffic',
+    label: '동선',
+    description: '유동인구 분산',
+    icon: Footprints,
+  },
+  {
+    id: 'conversion',
+    label: '전환',
+    description: '전환율 개선',
+    icon: Target,
+  },
+];
 
 interface OptimizationOption {
   id: OptimizationType;
@@ -68,6 +104,9 @@ export function AIOptimizationTab({
   // SceneProvider에서 applySimulationResults 가져오기
   const { applySimulationResults } = useScene();
 
+  // 최적화 목표 선택
+  const [selectedGoal, setSelectedGoal] = useState<OptimizationGoal>('revenue');
+
   // 선택된 최적화 유형들
   const [selectedOptimizations, setSelectedOptimizations] = useState<OptimizationType[]>(['layout']);
 
@@ -76,6 +115,23 @@ export function AIOptimizationTab({
 
   // 결과 패널 펼침/접힘
   const [isResultExpanded, setIsResultExpanded] = useState(true);
+
+  // 비교 모드 (all: 전체, as-is: 변경 전, to-be: 변경 후)
+  const [viewMode, setViewMode] = useState<ViewMode>('all');
+
+  // 비교 모드 변경 시 오버레이 업데이트
+  useEffect(() => {
+    const { results } = sceneSimulation.state;
+    const hasLayoutResult = !!results.layout;
+
+    if (hasLayoutResult) {
+      // viewMode에 따라 오버레이 설정
+      // 'all' - 모든 변경 표시 (As-Is, To-Be, 화살표 모두)
+      // 'as-is' - 원래 상태만
+      // 'to-be' - 최적화 결과만
+      onOverlayToggle('layoutOptimization', viewMode !== 'as-is');
+    }
+  }, [viewMode, sceneSimulation.state.results, onOverlayToggle]);
 
   // 체크박스 토글
   const toggleOptimization = (type: OptimizationType) => {
@@ -123,7 +179,7 @@ export function AIOptimizationTab({
 
       if (selectedOptimizations.includes('layout')) {
         params.layout = {
-          goal: 'revenue',
+          goal: selectedGoal,
           storeContext,
         };
       }
@@ -135,9 +191,16 @@ export function AIOptimizationTab({
         };
       }
       if (selectedOptimizations.includes('staffing')) {
+        // 선택된 목표에 따라 직원 배치 전략 결정
+        const staffingGoalMap: Record<OptimizationGoal, string> = {
+          revenue: 'sales_support',
+          dwell_time: 'customer_engagement',
+          traffic: 'flow_guidance',
+          conversion: 'customer_service',
+        };
         params.staffing = {
           staffCount: 3,
-          goal: 'customer_service',
+          goal: staffingGoalMap[selectedGoal],
           storeContext,
         };
       }
@@ -157,11 +220,26 @@ export function AIOptimizationTab({
             revenueIncrease: results.layout.improvements?.revenueIncrease || 0,
             dwellTimeIncrease: results.layout.improvements?.dwellTimeIncrease || 0,
             conversionIncrease: results.layout.improvements?.conversionIncrease || 0,
+            // 가구 변경 사항
             changes: results.layout.furnitureMoves?.map((move: any) => ({
-              item: move.furnitureId || move.name || '가구',
+              item: move.furnitureName || move.furnitureId || move.name || '가구',
               from: move.fromPosition ? `(${move.fromPosition.x?.toFixed(1)}, ${move.fromPosition.z?.toFixed(1)})` : 'As-Is',
               to: move.toPosition ? `(${move.toPosition.x?.toFixed(1)}, ${move.toPosition.z?.toFixed(1)})` : 'To-Be',
               effect: move.reason || '+효율성',
+            })) || [],
+            // 제품 재배치 변경 사항 (슬롯 기반)
+            productChanges: results.layout.productPlacements?.map((placement: any) => ({
+              productId: placement.productId || placement.product_id || '',
+              productName: placement.productName || placement.sku || '상품',
+              fromFurniture: placement.current?.furnitureId || placement.initial_placement?.furniture_id || '현재 위치',
+              fromSlot: placement.current?.slotId || placement.initial_placement?.slot_id || '-',
+              toFurniture: placement.suggested?.furnitureId || placement.optimization_result?.suggested_furniture_id || '추천 위치',
+              toSlot: placement.suggested?.slotId || placement.optimization_result?.suggested_slot_id || '-',
+              reason: placement.reason || placement.optimization_result?.optimization_reason || '매출 최적화',
+              expectedImpact: placement.expectedImpact || placement.optimization_result?.expected_impact ? {
+                revenueChangePct: placement.expectedImpact?.revenue_change_pct || placement.optimization_result?.expected_impact?.revenue_change_pct || 0,
+                visibilityScore: placement.expectedImpact?.visibility_score || placement.optimization_result?.expected_impact?.visibility_score || 0,
+              } : undefined,
             })) || [],
           };
           onResultsUpdate('layout', layoutPanelResult);
@@ -226,7 +304,7 @@ export function AIOptimizationTab({
     } finally {
       setRunningTypes([]);
     }
-  }, [selectedOptimizations, storeId, sceneData, sceneSimulation, onOverlayToggle, onResultsUpdate]);
+  }, [selectedOptimizations, selectedGoal, storeId, sceneData, sceneSimulation, onOverlayToggle, onResultsUpdate]);
 
   // As-Is 씬으로 복원
   const handleRevertToAsIs = useCallback(() => {
@@ -294,6 +372,42 @@ export function AIOptimizationTab({
 
   return (
     <div className="p-4 space-y-4">
+      {/* ========== 최적화 목표 선택 ========== */}
+      <div className="space-y-2">
+        <div className="text-xs font-medium text-white/60 flex items-center gap-1.5">
+          <Target className="h-3 w-3" />
+          최적화 목표
+        </div>
+        <div className="grid grid-cols-4 gap-1.5">
+          {goalOptions.map((goal) => {
+            const Icon = goal.icon;
+            const isSelected = selectedGoal === goal.id;
+            return (
+              <button
+                key={goal.id}
+                onClick={() => setSelectedGoal(goal.id)}
+                disabled={isRunning}
+                className={cn(
+                  'flex flex-col items-center p-2 rounded-lg transition-all text-center',
+                  isSelected
+                    ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-lg'
+                    : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white/80'
+                )}
+              >
+                <Icon className={cn('h-4 w-4 mb-1', isSelected ? 'text-white' : 'text-white/40')} />
+                <span className="text-[10px] font-medium">{goal.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[10px] text-white/40 text-center">
+          {goalOptions.find(g => g.id === selectedGoal)?.description}
+        </p>
+      </div>
+
+      {/* 구분선 */}
+      <div className="border-t border-white/10" />
+
       {/* ========== 최적화 선택 섹션 ========== */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
@@ -427,6 +541,54 @@ export function AIOptimizationTab({
                     onToggleOverlay={(visible) => onOverlayToggle('staffingOptimization', visible)}
                   />
                 )}
+
+                {/* 비교 모드 토글 */}
+                <div className="p-2 bg-white/5 rounded-lg">
+                  <div className="flex items-center gap-1 text-[10px] text-white/50 mb-2">
+                    <Eye className="h-3 w-3" />
+                    3D 뷰 모드
+                  </div>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => setViewMode('as-is')}
+                      className={cn(
+                        'flex-1 px-2 py-1.5 text-xs rounded transition-all',
+                        viewMode === 'as-is'
+                          ? 'bg-red-600 text-white'
+                          : 'bg-white/10 text-white/60 hover:bg-white/20'
+                      )}
+                    >
+                      As-Is
+                    </button>
+                    <button
+                      onClick={() => setViewMode('all')}
+                      className={cn(
+                        'flex-1 px-2 py-1.5 text-xs rounded transition-all',
+                        viewMode === 'all'
+                          ? 'bg-gradient-to-r from-red-600 to-green-600 text-white'
+                          : 'bg-white/10 text-white/60 hover:bg-white/20'
+                      )}
+                    >
+                      <Layers className="h-3 w-3 mx-auto" />
+                    </button>
+                    <button
+                      onClick={() => setViewMode('to-be')}
+                      className={cn(
+                        'flex-1 px-2 py-1.5 text-xs rounded transition-all',
+                        viewMode === 'to-be'
+                          ? 'bg-green-600 text-white'
+                          : 'bg-white/10 text-white/60 hover:bg-white/20'
+                      )}
+                    >
+                      To-Be
+                    </button>
+                  </div>
+                  <p className="text-[9px] text-white/40 mt-1.5 text-center">
+                    {viewMode === 'as-is' && '원래 배치 상태'}
+                    {viewMode === 'all' && '변경 비교 (화살표 표시)'}
+                    {viewMode === 'to-be' && '최적화 후 배치'}
+                  </p>
+                </div>
 
                 {/* As-Is / To-Be 액션 버튼 */}
                 <div className="flex gap-2 pt-2">

@@ -63,11 +63,35 @@ export interface StoreContext {
     conversionRate: number;
     revenue: number;
   }>;
+  /** 상품별 매출 성과 데이터 (AI 최적화 핵심 입력) */
+  productPerformance: Array<{
+    productId: string;
+    productName: string;
+    sku: string;
+    category: string;
+    zoneId?: string;
+    zoneName?: string;
+    totalRevenue: number;
+    unitsSold: number;
+    viewCount: number;
+    conversionRate: number;
+    avgDwellTime: number;
+    revenueRank: number;
+  }>;
+  /** 상품-가구 배치 관계 */
+  productPlacements: Array<{
+    productId: string;
+    furnitureId: string;
+    furnitureName?: string;
+    slotId?: string;
+    position?: { x: number; y: number; z: number };
+  }>;
   dataQuality: {
     salesDataDays: number;
     visitorDataDays: number;
     hasZoneData: boolean;
     hasFlowData: boolean;
+    hasProductData: boolean;
     overallScore: number;
   };
 }
@@ -86,6 +110,8 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
     kpisResult,
     visitsResult,
     zoneMetricsResult,
+    productPerfResult,
+    furnitureSlotsResult,
   ] = await Promise.all([
     // 매장 정보
     supabase.from('stores').select('*').eq('id', storeId).single(),
@@ -133,6 +159,18 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
       .select('*, zone:zones_dim(*)')
       .eq('store_id', storeId)
       .gte('date', thirtyDaysAgoStr),
+
+    // 상품 성과 데이터 (AI 최적화 핵심)
+    supabase.from('product_performance_agg')
+      .select('*, product:products(*), zone:zones_dim(id, zone_name)')
+      .eq('store_id', storeId)
+      .gte('date', thirtyDaysAgoStr)
+      .order('total_revenue', { ascending: false }),
+
+    // 가구 슬롯 정보 (상품 배치 관계)
+    supabase.from('furniture_slots')
+      .select('*, furniture:graph_entities(id, name, model_3d_position)')
+      .eq('store_id', storeId),
   ]);
 
   const store = storeResult.data;
@@ -142,18 +180,22 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
   const dailyKpis = kpisResult.data || [];
   const visits = visitsResult.data || [];
   const zoneMetrics = zoneMetricsResult.data || [];
+  const productPerf = productPerfResult.data || [];
+  const furnitureSlots = furnitureSlotsResult.data || [];
 
   // 데이터 품질 점수 계산
   const salesDataDays = dailyKpis.length;
   const visitorDataDays = visits.length > 0 ? Math.min(30, new Set(visits.map((v: any) => v.visit_date?.split('T')[0])).size) : 0;
   const hasZoneData = zones.length > 0;
   const hasFlowData = visits.some((v: any) => v.zones_visited && v.zones_visited.length > 0);
+  const hasProductData = productPerf.length > 0;
 
   const overallScore = Math.min(100, (
-    (salesDataDays / 30) * 30 +
-    (visitorDataDays / 30) * 30 +
-    (hasZoneData ? 20 : 0) +
-    (hasFlowData ? 20 : 0)
+    (salesDataDays / 30) * 25 +
+    (visitorDataDays / 30) * 25 +
+    (hasZoneData ? 15 : 0) +
+    (hasFlowData ? 15 : 0) +
+    (hasProductData ? 20 : 0)
   ));
 
   // Calculate dimensions from area
@@ -221,14 +263,104 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
       revenue: m.revenue ?? 0,
       heatmapIntensity: m.heatmap_intensity ?? 0.5,
     })),
+    // 상품별 매출 성과 (중복 제거 후 집계)
+    productPerformance: aggregateProductPerformance(productPerf),
+    // 현재 상품 배치 정보
+    productPlacements: furnitureSlots
+      .filter((s: any) => s.occupied_by_product_id)
+      .map((s: any) => ({
+        productId: s.occupied_by_product_id,
+        furnitureId: s.furniture_id,
+        furnitureName: s.furniture?.name,
+        slotId: s.slot_id,
+        position: s.furniture?.model_3d_position,
+      })),
     dataQuality: {
       salesDataDays,
       visitorDataDays,
       hasZoneData,
       hasFlowData,
+      hasProductData,
       overallScore,
     },
   };
+}
+
+/**
+ * 상품 성과 데이터 집계 (기간 내 합산 + 랭킹)
+ */
+function aggregateProductPerformance(rawData: any[]): StoreContext['productPerformance'] {
+  if (!rawData || rawData.length === 0) return [];
+
+  // 상품별 집계
+  const aggregated = new Map<string, {
+    productId: string;
+    productName: string;
+    sku: string;
+    category: string;
+    zoneId?: string;
+    zoneName?: string;
+    totalRevenue: number;
+    unitsSold: number;
+    viewCount: number;
+    conversionSum: number;
+    dwellTimeSum: number;
+    recordCount: number;
+  }>();
+
+  rawData.forEach((row: any) => {
+    const productId = row.product_id;
+    const existing = aggregated.get(productId);
+
+    if (existing) {
+      existing.totalRevenue += row.total_revenue || 0;
+      existing.unitsSold += row.units_sold || 0;
+      existing.viewCount += row.view_count || 0;
+      existing.conversionSum += row.conversion_rate || 0;
+      existing.dwellTimeSum += row.avg_dwell_time || 0;
+      existing.recordCount += 1;
+    } else {
+      aggregated.set(productId, {
+        productId,
+        productName: row.product?.product_name || row.product_name || 'Unknown',
+        sku: row.product?.sku || row.sku || '',
+        category: row.product?.category || row.category || 'Other',
+        zoneId: row.zone_id,
+        zoneName: row.zone?.zone_name,
+        totalRevenue: row.total_revenue || 0,
+        unitsSold: row.units_sold || 0,
+        viewCount: row.view_count || 0,
+        conversionSum: row.conversion_rate || 0,
+        dwellTimeSum: row.avg_dwell_time || 0,
+        recordCount: 1,
+      });
+    }
+  });
+
+  // 배열로 변환 후 매출 랭킹 추가
+  const products = Array.from(aggregated.values())
+    .map((p) => ({
+      productId: p.productId,
+      productName: p.productName,
+      sku: p.sku,
+      category: p.category,
+      zoneId: p.zoneId,
+      zoneName: p.zoneName,
+      totalRevenue: p.totalRevenue,
+      unitsSold: p.unitsSold,
+      viewCount: p.viewCount,
+      conversionRate: p.recordCount > 0 ? p.conversionSum / p.recordCount : 0,
+      avgDwellTime: p.recordCount > 0 ? p.dwellTimeSum / p.recordCount : 0,
+      revenueRank: 0, // 아래에서 설정
+    }))
+    .sort((a, b) => b.totalRevenue - a.totalRevenue);
+
+  // 랭킹 설정
+  products.forEach((p, idx) => {
+    p.revenueRank = idx + 1;
+  });
+
+  return products;
 }
 
 export default buildStoreContext;

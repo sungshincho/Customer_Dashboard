@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import { DraggablePanel } from '../../components/DraggablePanel';
-import { Layout, TrendingUp, ArrowRight } from 'lucide-react';
+import { Layout, TrendingUp, ArrowRight, Package, Armchair } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ApplyStrategyModal } from '@/features/roi/components/ApplyStrategyModal';
 
@@ -16,11 +16,26 @@ export interface LayoutResult {
   revenueIncrease: number;
   dwellTimeIncrease: number;
   conversionIncrease: number;
+  /** 가구 변경 사항 */
   changes: {
     item: string;
     from: string;
     to: string;
     effect: string;
+  }[];
+  /** 제품 재배치 변경 사항 (슬롯 기반) */
+  productChanges?: {
+    productId: string;
+    productName: string;
+    fromFurniture: string;
+    fromSlot: string;
+    toFurniture: string;
+    toSlot: string;
+    reason: string;
+    expectedImpact?: {
+      revenueChangePct: number;
+      visibilityScore: number;
+    };
   }[];
 }
 
@@ -121,19 +136,62 @@ export const LayoutResultPanel: React.FC<LayoutResultPanelProps> = ({
             </div>
           </div>
 
-          {/* 변경 사항 */}
-          <div>
-            <p className="text-xs text-white/50 mb-2">변경 사항 ({result.changes.length}건)</p>
-            <div className="space-y-2 max-h-32 overflow-y-auto">
-              {result.changes.map((change, i) => (
-                <div key={i} className="text-xs bg-white/5 rounded p-2">
-                  <p className="text-white font-medium">{change.item}</p>
-                  <p className="text-white/40">{change.from} → {change.to}</p>
-                  <p className="text-green-400">{change.effect}</p>
-                </div>
-              ))}
+          {/* 가구 변경 사항 */}
+          {result.changes.length > 0 && (
+            <div className="mb-3">
+              <p className="text-xs text-white/50 mb-2 flex items-center gap-1">
+                <Armchair className="w-3 h-3" />
+                가구 변경 ({result.changes.length}건)
+              </p>
+              <div className="space-y-2 max-h-28 overflow-y-auto">
+                {result.changes.map((change, i) => (
+                  <div key={i} className="text-xs bg-white/5 rounded p-2">
+                    <p className="text-white font-medium">{change.item}</p>
+                    <p className="text-white/40">{change.from} → {change.to}</p>
+                    <p className="text-green-400">{change.effect}</p>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* 제품 재배치 변경 사항 */}
+          {result.productChanges && result.productChanges.length > 0 && (
+            <div className="mb-3">
+              <p className="text-xs text-white/50 mb-2 flex items-center gap-1">
+                <Package className="w-3 h-3" />
+                제품 재배치 ({result.productChanges.length}건)
+              </p>
+              <div className="space-y-2 max-h-28 overflow-y-auto">
+                {result.productChanges.map((change, i) => (
+                  <div key={i} className="text-xs bg-blue-500/10 border border-blue-500/20 rounded p-2">
+                    <p className="text-white font-medium">{change.productName}</p>
+                    <p className="text-white/40">
+                      {change.fromFurniture}[{change.fromSlot}] → {change.toFurniture}[{change.toSlot}]
+                    </p>
+                    <p className="text-blue-400 text-[10px]">{change.reason}</p>
+                    {change.expectedImpact && (
+                      <div className="flex gap-2 mt-1">
+                        <span className="text-green-400 text-[10px]">
+                          매출 {change.expectedImpact.revenueChangePct > 0 ? '+' : ''}{change.expectedImpact.revenueChangePct.toFixed(1)}%
+                        </span>
+                        <span className="text-yellow-400 text-[10px]">
+                          노출 {(change.expectedImpact.visibilityScore * 100).toFixed(0)}점
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 변경 사항 없음 */}
+          {result.changes.length === 0 && (!result.productChanges || result.productChanges.length === 0) && (
+            <div className="text-xs text-white/40 text-center py-2">
+              변경 사항 없음
+            </div>
+          )}
 
           {/* 액션 버튼 */}
           <div className="flex gap-2 mt-3">
@@ -161,9 +219,12 @@ export const LayoutResultPanel: React.FC<LayoutResultPanelProps> = ({
             strategyData={{
               source: '3d_simulation',
               sourceModule: 'layout_optimization',
-              name: `레이아웃 최적화 (${result.changes.length}개 변경)`,
-              description: `가구 ${result.changes.length}개 재배치를 통한 매장 효율성 ${improvement}%p 개선`,
-              settings: { changes: result.changes },
+              name: `레이아웃 최적화 (가구 ${result.changes.length}개, 제품 ${result.productChanges?.length || 0}개 변경)`,
+              description: `가구 ${result.changes.length}개 재배치${result.productChanges?.length ? `, 제품 ${result.productChanges.length}개 재배치` : ''}를 통한 매장 효율성 ${improvement}%p 개선`,
+              settings: {
+                furnitureChanges: result.changes,
+                productChanges: result.productChanges || [],
+              },
               expectedRoi: estimatedROI,
               expectedRevenue: result.revenueIncrease,
               confidence: 85,
