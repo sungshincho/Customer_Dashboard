@@ -253,8 +253,10 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
 
   // 매장 면적 정보 먼저 확인 (실제 DB 값 우선)
   const storeArea = store?.floor_area_sqm || store?.area_sqm || null;
-  const storeWidthFromDb = store?.width_m || store?.store_width || null;
-  const storeDepthFromDb = store?.depth_m || store?.store_depth || null;
+  // metadata에서 너비/깊이 정보 추출 (stores 테이블에 해당 컬럼 없음)
+  const storeMetadata = store?.metadata as Record<string, any> | null;
+  const storeWidthFromDb = storeMetadata?.width_m || storeMetadata?.store_width || null;
+  const storeDepthFromDb = storeMetadata?.depth_m || storeMetadata?.store_depth || null;
 
   if (zones.length > 0) {
     // zones_dim 데이터에서 바운딩 박스 계산
