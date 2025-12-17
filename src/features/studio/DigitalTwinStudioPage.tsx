@@ -101,7 +101,7 @@ export default function DigitalTwinStudioPage() {
   const sceneSimulation = useSceneSimulation();
 
   // 매장 경계 및 입구 위치 (zones_dim 기반)
-  const { storeBounds, entrancePosition, zonePositions, zoneSizes } = useStoreBounds();
+  const { storeBounds, entrancePosition, zonePositions, zoneSizes, zones: dbZones } = useStoreBounds();
 
   // UI 상태
   const [activeTab, setActiveTab] = useState<TabType>('layer');
@@ -474,8 +474,24 @@ export default function DigitalTwinStudioPage() {
     []
   );
 
-  // ZoneBoundary → SimulationZone 변환 (시뮬레이션 엔진용)
+  // 🔧 FIX: zones_dim 데이터 기반 시뮬레이션 존 (DB 우선, 폴백으로 demoZones 사용)
   const simulationZones = useMemo(() => {
+    // DB에서 로드한 zones_dim 데이터가 있으면 우선 사용
+    if (dbZones && dbZones.length > 0) {
+      console.log('[SimulationZones] Using DB zones:', dbZones.length, 'zones');
+      return dbZones.map((zone) => ({
+        id: zone.id,
+        zone_name: zone.zone_name,
+        x: zone.position_x || zone.coordinates?.x || 0,
+        z: zone.position_z || zone.coordinates?.z || 0,
+        width: zone.size_width || zone.coordinates?.width || 3,
+        depth: zone.size_depth || zone.coordinates?.depth || 3,
+        zone_type: zone.zone_type || 'display',
+      }));
+    }
+
+    // 폴백: demoZones 사용 (DB 데이터가 없는 경우)
+    console.log('[SimulationZones] Using demo zones (DB zones not available)');
     return demoZones.map((zone) => {
       // points 배열에서 x, z 범위 계산
       const xValues = zone.points.map((p) => p[0]);
@@ -514,7 +530,7 @@ export default function DigitalTwinStudioPage() {
         zone_type,
       };
     });
-  }, [demoZones]);
+  }, [dbZones, demoZones]);
 
   // 씬 저장 핸들러
   const handleSaveScene = async (name: string) => {
