@@ -408,14 +408,16 @@ function generateVisualizationData(
     type: 'optimized' as const,
   }));
 
-  // 하이라이트 존 생성
-  const highlightZones = (rawResult.zoneChanges || []).map((change: any) => ({
-    zoneId: change.zoneId,
-    color: change.changeType === 'improved' ? '#22c55e' :
-           change.changeType === 'new' ? '#3b82f6' : '#f59e0b',
-    opacity: 0.4,
-    changeType: change.changeType || 'improved',
-  }));
+  // 하이라이트 존 생성 (zoneId 또는 zone_id가 있는 항목만 포함)
+  const highlightZones = (rawResult.zoneChanges || [])
+    .filter((change: any) => change.zoneId || change.zone_id)
+    .map((change: any) => ({
+      zoneId: change.zoneId || change.zone_id,
+      color: change.changeType === 'improved' ? '#22c55e' :
+             change.changeType === 'new' ? '#3b82f6' : '#f59e0b',
+      opacity: 0.4,
+      changeType: change.changeType || change.change_type || 'improved',
+    }));
 
   return {
     beforeHeatmap,
