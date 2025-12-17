@@ -2,7 +2,7 @@
 
 **작성일**: 2025-12-16
 **최종 수정**: 2025-12-17
-**버전**: 2.0
+**버전**: 2.1
 **프로젝트명**: NeuralTwin Customer Dashboard
 
 ---
@@ -11,6 +11,7 @@
 
 | 버전 | 날짜 | 내용 |
 |------|------|------|
+| 2.1 | 2025-12-17 | 슬롯 기반 제품 배치 구현, 모든 기능 검증 완료, 빌드 검증 |
 | 2.0 | 2025-12-17 | 데이터 소스 문서화, 3-Layer 아키텍처, 시드 데이터 상세화, 데이터 연결 현황 추가 |
 | 1.1 | 2025-12-16 | 미사용 코드 정리 (4,444줄 삭제) |
 | 1.0 | 2025-12-16 | 최초 작성 |
@@ -439,14 +440,14 @@ Customer_Dashboard/
 
 ### 10.2 알려진 이슈 및 해결방안
 
-| 이슈 | 원인 | 해결 파일 |
-|------|------|----------|
-| 퍼널 Engage/Fitting = 0 | funnel_events 누락 | `INSIGHT_HUB_DATA_FIX_v8.5.sql` |
-| 시간대별 방문 패턴 없음 | `event_hour` NULL | `INSIGHT_HUB_DATA_FIX_v8.5.sql` |
-| 재방문 추이 음수 | `returning_visitors > total_visitors` | `INSIGHT_HUB_DATA_FIX_v8.5.sql` |
-| Repeat Rate 0% | `store_visits.customer_id` NULL | 시드 데이터 수정 필요 |
-| 3D 모델 로드 오류 | 잘못된 model URL | `MVP_MODEL_URL_UPDATE.sql` |
-| 상품 슬롯 배치 안됨 | `model_3d_position` 직접 사용 | 코드 수정 필요 |
+| 이슈 | 원인 | 해결 파일 | 상태 |
+|------|------|----------|------|
+| 퍼널 Engage/Fitting = 0 | funnel_events 누락 | `INSIGHT_HUB_DATA_FIX_v8.5.sql` | 패치 대기 |
+| 시간대별 방문 패턴 없음 | `event_hour` NULL | `INSIGHT_HUB_DATA_FIX_v8.5.sql` | 패치 대기 |
+| 재방문 추이 음수 | `returning_visitors > total_visitors` | `INSIGHT_HUB_DATA_FIX_v8.5.sql` | 패치 대기 |
+| Repeat Rate 0% | `store_visits.customer_id` NULL | 시드 데이터 수정 필요 | 패치 대기 |
+| 3D 모델 로드 오류 | 잘못된 model URL | `MVP_MODEL_URL_UPDATE.sql` | 패치 대기 |
+| 상품 슬롯 배치 안됨 | `model_3d_position` 직접 사용 | `sceneRecipeGenerator.ts` | ✅ 수정 완료 |
 
 ---
 
@@ -567,18 +568,23 @@ Customer_Dashboard/
 
 ### 14.2 진행 중인 기능 🔄
 
-- [ ] 인사이트 허브 데이터 불일치 수정 (v8.5 패치)
-- [ ] 3D 상품 슬롯 배치 로직 수정
+- [ ] 인사이트 허브 데이터 불일치 수정 (v8.5 패치 - 실행 대기)
 - [ ] 온톨로지 AI 추론 (Phase 3)
 - [ ] 고급 예측 모델링
 
-### 14.3 계획된 기능 📋
+### 14.3 완료된 최적화 (v2.1) ✅
+
+- [x] **슬롯 기반 제품 배치 구현**: `sceneRecipeGenerator.ts`에서 `initial_furniture_id` + `slot_id` 기반으로 `calculateSlotWorldPosition()` 함수를 사용하여 제품 위치 자동 계산
+- [x] **모든 기능 모듈 검증**: Insight Hub (6탭), Digital Twin Studio, ROI Measurement, Settings (5탭) 구현 완료 확인
+- [x] **ROI RPC 함수 확인**: `get_roi_summary`, `get_category_performance` 함수 정상 작동 확인
+- [x] **빌드 검증**: `npm run build` 성공 (3.1MB JS 번들)
+
+### 14.4 계획된 기능 📋
 
 - [ ] 고급 AI 추천 시스템
 - [ ] 이상 탐지 시스템
 - [ ] 고급 패턴 분석
 - [ ] 다국어 지원 확대
-- [ ] ROI Summary RPC 함수 구현
 
 ---
 
