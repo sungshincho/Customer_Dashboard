@@ -49,14 +49,89 @@ BEGIN
   -- ══════════════════════════════════════════════════════════════════════════
   RAISE NOTICE '  [STEP 2.1] zones_dim 시딩 (7개)...';
 
-  INSERT INTO zones_dim (id, store_id, user_id, org_id, zone_code, zone_name, zone_type, description, floor_level, area_sqm, capacity, position, boundaries, metadata, is_active, created_at, updated_at) VALUES
-  (gen_random_uuid(), v_store_id, v_user_id, v_org_id, 'Z001', '입구', 'entrance', '매장 입구 및 환영 공간', 1, 25.0, 30, '{"x":0,"y":0,"z":-8}', '{"min":{"x":-3,"y":0,"z":-10},"max":{"x":3,"y":3,"z":-6}}', '{"color":"#4CAF50","priority":1}', true, NOW(), NOW()),
-  (gen_random_uuid(), v_store_id, v_user_id, v_org_id, 'Z002', '메인홀', 'main', '중앙 디스플레이 및 프로모션 공간', 1, 80.0, 50, '{"x":0,"y":0,"z":0}', '{"min":{"x":-4,"y":0,"z":-5},"max":{"x":4,"y":3,"z":3}}', '{"color":"#2196F3","priority":2}', true, NOW(), NOW()),
-  (gen_random_uuid(), v_store_id, v_user_id, v_org_id, 'Z003', '의류존', 'clothing', '의류 전문 진열 공간', 1, 60.0, 40, '{"x":-8,"y":0,"z":-4}', '{"min":{"x":-10,"y":0,"z":-6},"max":{"x":-5,"y":3,"z":-2}}', '{"color":"#9C27B0","priority":3}', true, NOW(), NOW()),
-  (gen_random_uuid(), v_store_id, v_user_id, v_org_id, 'Z004', '액세서리존', 'accessory', '액세서리 및 신발 전문 공간', 1, 50.0, 35, '{"x":7,"y":0,"z":-4}', '{"min":{"x":5,"y":0,"z":-6},"max":{"x":10,"y":3,"z":-2}}', '{"color":"#FF9800","priority":4}', true, NOW(), NOW()),
-  (gen_random_uuid(), v_store_id, v_user_id, v_org_id, 'Z005', '피팅룸', 'fitting', '피팅룸 공간', 1, 20.0, 8, '{"x":-8,"y":0,"z":6}', '{"min":{"x":-10,"y":0,"z":3},"max":{"x":-6,"y":3,"z":9}}', '{"color":"#E91E63","priority":5}', true, NOW(), NOW()),
-  (gen_random_uuid(), v_store_id, v_user_id, v_org_id, 'Z006', '계산대', 'checkout', '결제 및 포장 공간', 1, 25.0, 15, '{"x":7,"y":0,"z":6}', '{"min":{"x":5,"y":0,"z":4},"max":{"x":10,"y":3,"z":9}}', '{"color":"#F44336","priority":6}', true, NOW(), NOW()),
-  (gen_random_uuid(), v_store_id, v_user_id, v_org_id, 'Z007', '휴식공간', 'lounge', '고객 휴식 및 대기 공간', 1, 30.0, 20, '{"x":-1,"y":0,"z":8}', '{"min":{"x":-5,"y":0,"z":7},"max":{"x":3,"y":3,"z":10}}', '{"color":"#00BCD4","priority":7}', true, NOW(), NOW());
+  INSERT INTO zones_dim (
+  id, store_id, user_id, org_id, 
+  zone_code, zone_name, zone_type, description, 
+  floor_level, area_sqm, capacity, 
+  position, boundaries, metadata, 
+  is_active, created_at, updated_at
+) VALUES
+  -- Z001: 입구 (하단 중앙, 4건)
+  (
+    gen_random_uuid(), v_store_id, v_user_id, v_org_id, 
+    'Z001', '입구', 'entrance', '매장 입구 및 환영 공간', 
+    1, 40.0, 30, 
+    '{"x":0,"y":0,"z":-8}', 
+    '{"min":{"x":-4,"y":0,"z":-10},"max":{"x":4,"y":3,"z":-6}}', 
+    '{"color":"#FFC107","priority":1,"furnitureCount":4}', 
+    true, NOW(), NOW()
+  ),
+  
+  -- Z002: 메인홀 (중앙, 13건) - 가장 큰 중앙 공간
+  (
+    gen_random_uuid(), v_store_id, v_user_id, v_org_id, 
+    'Z002', '메인홀', 'main', '중앙 디스플레이 및 프로모션 공간', 
+    1, 100.0, 60, 
+    '{"x":0,"y":0,"z":0}', 
+    '{"min":{"x":-5,"y":0,"z":-6},"max":{"x":5,"y":3,"z":4}}', 
+    '{"color":"#FF5722","priority":2,"furnitureCount":13}', 
+    true, NOW(), NOW()
+  ),
+  
+  -- Z003: 의류존 (좌측 하단, 26건) - 가장 많은 가구
+  (
+    gen_random_uuid(), v_store_id, v_user_id, v_org_id, 
+    'Z003', '의류존', 'clothing', '의류 전문 진열 공간', 
+    1, 80.0, 50, 
+    '{"x":-7,"y":0,"z":-2}', 
+    '{"min":{"x":-10,"y":0,"z":-6},"max":{"x":-4,"y":3,"z":2}}', 
+    '{"color":"#E91E63","priority":3,"furnitureCount":26}', 
+    true, NOW(), NOW()
+  ),
+  
+  -- Z004: 액세서리존 (우측 하단, 11건)
+  (
+    gen_random_uuid(), v_store_id, v_user_id, v_org_id, 
+    'Z004', '액세서리존', 'accessory', '액세서리 및 신발 전문 공간', 
+    1, 60.0, 40, 
+    '{"x":7,"y":0,"z":-2}', 
+    '{"min":{"x":4,"y":0,"z":-6},"max":{"x":10,"y":3,"z":2}}', 
+    '{"color":"#FF9800","priority":4,"furnitureCount":11}', 
+    true, NOW(), NOW()
+  ),
+  
+  -- Z005: 피팅룸 (좌측 상단, 4건)
+  (
+    gen_random_uuid(), v_store_id, v_user_id, v_org_id, 
+    'Z005', '피팅룸', 'fitting', '피팅룸 공간', 
+    1, 24.0, 8, 
+    '{"x":-7,"y":0,"z":7}', 
+    '{"min":{"x":-10,"y":0,"z":5},"max":{"x":-4,"y":3,"z":10}}', 
+    '{"color":"#9C27B0","priority":5,"furnitureCount":4,"fittingRooms":4}', 
+    true, NOW(), NOW()
+  ),
+  
+  -- Z006: 계산대 (우측 상단, 4건)
+  (
+    gen_random_uuid(), v_store_id, v_user_id, v_org_id, 
+    'Z006', '계산대', 'checkout', '결제 및 포장 공간', 
+    1, 24.0, 15, 
+    '{"x":7,"y":0,"z":7}', 
+    '{"min":{"x":4,"y":0,"z":5},"max":{"x":10,"y":3,"z":10}}', 
+    '{"color":"#FF9800","priority":6,"furnitureCount":4,"posCount":2}', 
+    true, NOW(), NOW()
+  ),
+  
+  -- Z007: 휴식공간 (상단 중앙, 6건)
+  (
+    gen_random_uuid(), v_store_id, v_user_id, v_org_id, 
+    'Z007', '휴식공간', 'lounge', '고객 휴식 및 대기 공간', 
+    1, 32.0, 20, 
+    '{"x":0,"y":0,"z":8}', 
+    '{"min":{"x":-4,"y":0,"z":5},"max":{"x":4,"y":3,"z":10}}', 
+    '{"color":"#4CAF50","priority":7,"furnitureCount":6}', 
+    true, NOW(), NOW()
+  );
 
   -- Zone ID 가져오기
   SELECT id INTO v_zone_entrance FROM zones_dim WHERE zone_code = 'Z001' AND store_id = v_store_id;
