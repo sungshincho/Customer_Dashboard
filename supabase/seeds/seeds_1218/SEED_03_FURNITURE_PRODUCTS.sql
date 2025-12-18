@@ -386,8 +386,16 @@ BEGIN
   RAISE NOTICE '    ✓ inventory_levels: 25건 삽입';
 
   -- ══════════════════════════════════════════════════════════════════════════
-  -- STEP 6.1: product_placements (25개 초기 배치)
+  -- NOTE: 상품-슬롯 바인딩은 SEED_03A_PRODUCT_BINDING.sql에서
+  -- 명시적 좌표 기반으로 진행합니다.
   -- ══════════════════════════════════════════════════════════════════════════
+  RAISE NOTICE '';
+  RAISE NOTICE '  [NOTE] 상품-슬롯 바인딩은 SEED_03A_PRODUCT_BINDING.sql에서 진행';
+  RAISE NOTICE '         → 명시적 월드 좌표 기반 배치';
+
+  -- [REMOVED] 자동 배치 로직 삭제됨
+  -- 아래 product_placements 자동 배치 코드는 SEED_03A로 이동
+  /*
   RAISE NOTICE '  [STEP 6.1] product_placements 시딩 (25개)...';
 
   -- 의류 상품 → clothing_rack 슬롯에 배치
@@ -494,6 +502,8 @@ BEGIN
 
   SELECT COUNT(*) INTO v_count FROM product_placements WHERE store_id = v_store_id;
   RAISE NOTICE '    ✓ product_placements: % 건 삽입', v_count;
+  */
+  -- [END REMOVED] 자동 배치 로직 종료
 
   -- ══════════════════════════════════════════════════════════════════════════
   -- 완료 리포트
@@ -512,8 +522,8 @@ BEGIN
   RAISE NOTICE '  ✓ product_models: % 건', v_count;
   SELECT COUNT(*) INTO v_count FROM inventory_levels WHERE store_id = v_store_id;
   RAISE NOTICE '  ✓ inventory_levels: % 건', v_count;
-  SELECT COUNT(*) INTO v_count FROM product_placements WHERE store_id = v_store_id;
-  RAISE NOTICE '  ✓ product_placements: % 건', v_count;
+  RAISE NOTICE '';
+  RAISE NOTICE '  → 상품-슬롯 바인딩: SEED_03A 실행 필요';
   RAISE NOTICE '';
   RAISE NOTICE '  완료 시간: %', NOW();
   RAISE NOTICE '════════════════════════════════════════════════════════════════════';
