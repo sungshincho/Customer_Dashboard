@@ -3,6 +3,7 @@
 -- ============================================================================
 -- 실행 순서: SEED_00 이후
 -- 목적: 기존 시딩 데이터 삭제 (마스터 온톨로지, stores, organizations 유지)
+-- 수정: ontology_mapping_cache store_id → org_id
 -- ============================================================================
 
 BEGIN;
@@ -121,8 +122,8 @@ BEGIN
   GET DIAGNOSTICS v_count = ROW_COUNT;
   RAISE NOTICE '    1.15 ontology_relation_inference_queue: % rows', v_count;
   
-  -- 1.16 ontology_mapping_cache
-  DELETE FROM ontology_mapping_cache WHERE store_id = v_store_id;
+  -- 1.16 ontology_mapping_cache (수정: store_id → org_id)
+  DELETE FROM ontology_mapping_cache WHERE org_id = v_org_id;
   GET DIAGNOSTICS v_count = ROW_COUNT;
   RAISE NOTICE '    1.16 ontology_mapping_cache: % rows', v_count;
   
@@ -319,8 +320,8 @@ BEGIN
   GET DIAGNOSTICS v_count = ROW_COUNT;
   RAISE NOTICE '    1.46 realtime_inventory: % rows', v_count;
   
-  -- 1.47 auto_order_suggestions
-  DELETE FROM auto_order_suggestions WHERE store_id = v_store_id;
+  -- 1.47 auto_order_suggestions (org_id 사용)
+  DELETE FROM auto_order_suggestions WHERE org_id = v_org_id;
   GET DIAGNOSTICS v_count = ROW_COUNT;
   RAISE NOTICE '    1.47 auto_order_suggestions: % rows', v_count;
   
@@ -554,16 +555,6 @@ COMMIT;
 -- ============================================================================
 -- 검증 쿼리: 주요 테이블 레코드 수 확인
 -- ============================================================================
-DO $$
-DECLARE
-  v_store_id UUID;
-BEGIN
-  SELECT id INTO v_store_id FROM stores LIMIT 1;
-  
-  RAISE NOTICE '';
-  RAISE NOTICE '  [검증] 주요 테이블 레코드 수:';
-END $$;
-
 SELECT 
   'products' as table_name, 
   COUNT(*) as row_count 
