@@ -25,6 +25,8 @@ DECLARE
   v_slot RECORD;
   v_count INT;
   v_base_url TEXT := 'https://bdrvowacecxnraaivlhr.supabase.co/storage/v1/object/public/3d-models/e4200130-08e8-47da-8c92-3d0b90fafd77/d9830554-2688-4032-af40-acccda787ac4/3d-models';
+  v_display_type TEXT;
+
 BEGIN
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════════';
@@ -327,8 +329,8 @@ END LOOP;
   -- STEP 5.1: products (25개)
   -- ══════════════════════════════════════════════════════════════════════════
 
-  RAISE NOTICE '    ✓ products: 25건 삽입';
-  INSERT INTO products (id, store_id, user_id, org_id, product_name, sku, category, price, cost_price, stock, display_type, compatible_display_types, model_url, created_at, updated_at) VALUES
+  
+  INSERT INTO products (id, store_id, user_id, org_id, product_name, sku, category, price, cost_price, stock, display_type, compatible_display_types, model_3d_url, created_at, updated_at) VALUES
   
   -- ========== 아우터 (5개) ==========
   ('f0000001-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
@@ -464,10 +466,12 @@ END LOOP;
    'boxed', ARRAY['boxed'], 
    v_base_url || '/products/giftbox/product_giftbox_01.glb', NOW(), NOW());
    
+
+   RAISE NOTICE '    ✓ products: 25건 삽입';
    RAISE NOTICE '✅ Successfully inserted 25 products with correct model URLs';
   RAISE NOTICE '   Store ID: %', v_store_id;
-  
-END $$;
+
+
   -- ══════════════════════════════════════════════════════════════════════════
   -- STEP 5.2: product_models (60개 - 상품당 평균 2~3개 display_type)
   -- ══════════════════════════════════════════════════════════════════════════
@@ -484,16 +488,16 @@ END $$;
 
     -- 호환 display_type 모델들 (is_default = false)
     IF v_product.compatible_display_types IS NOT NULL THEN
-      FOREACH v_customer_type IN ARRAY v_product.compatible_display_types LOOP
-        IF v_customer_type != v_product.display_type THEN
-          INSERT INTO product_models (id, product_id, display_type, model_3d_url, is_default, created_at, updated_at)
-          VALUES (gen_random_uuid(), v_product.id, v_customer_type,
-                  v_base_url || '/product/' || v_product.sku || '_' || v_customer_type || '.glb',
-                  false, NOW(), NOW())
-          ON CONFLICT (product_id, display_type) DO NOTHING;
-        END IF;
-      END LOOP;
-    END IF;
+    FOREACH v_display_type IN ARRAY v_product.compatible_display_types LOOP
+      IF v_display_type != v_product.display_type THEN
+        INSERT INTO product_models (id, product_id, display_type, model_3d_url, is_default, created_at, updated_at)
+        VALUES (gen_random_uuid(), v_product.id, v_display_type,
+                v_base_url || '/product/' || v_product.sku || '_' || v_display_type || '.glb',
+                false, NOW(), NOW())
+        ON CONFLICT (product_id, display_type) DO NOTHING;
+      END IF;
+    END LOOP;
+  END IF;
   END LOOP;
 
   SELECT COUNT(*) INTO v_count FROM product_models WHERE product_id IN (SELECT id FROM products WHERE store_id = v_store_id);
@@ -504,29 +508,20 @@ END $$;
   -- ══════════════════════════════════════════════════════════════════════════
   RAISE NOTICE '  [STEP 5.3] inventory_levels 시딩 (25개)...';
 
-  INSERT INTO inventory_levels (id, store_id, org_id, user_id, product_id, current_stock, min_stock, max_stock, reorder_point, reorder_quantity, last_restock_date, next_restock_date, status, created_at, updated_at)
-  SELECT
-    gen_random_uuid(),
-    v_store_id,
-    v_org_id,
-    v_user_id,
-    p.id,
-    p.stock,
-    FLOOR(p.stock * 0.2)::INT,
-    FLOOR(p.stock * 2.5)::INT,
-    FLOOR(p.stock * 0.3)::INT,
-    FLOOR(p.stock * 0.5)::INT,
-    CURRENT_DATE - (FLOOR(RANDOM() * 30))::INT,
-    CURRENT_DATE + (FLOOR(RANDOM() * 14) + 7)::INT,
-    CASE
-      WHEN p.stock <= FLOOR(p.stock * 0.2) THEN 'critical'
-      WHEN p.stock <= FLOOR(p.stock * 0.3) THEN 'low'
-      ELSE 'normal'
-    END,
-    NOW(),
-    NOW()
-  FROM products p
-  WHERE p.store_id = v_store_id;
+  INSERT INTO inventory_levels (id, user_id, org_id, product_id, current_stock, optimal_stock, minimum_stock, weekly_demand, created_at, last_updated)
+SELECT 
+  gen_random_uuid(), 
+  v_user_id, 
+  v_org_id, 
+  p.id, 
+  p.stock,                          -- current_stock
+  FLOOR(p.stock * 1.5)::INT,        -- optimal_stock
+  FLOOR(p.stock * 0.2)::INT,        -- minimum_stock
+  FLOOR(p.stock * 0.3)::INT,        -- weekly_demand
+  NOW(), 
+  NOW()
+FROM products p 
+WHERE p.store_id = v_store_id;
 
   RAISE NOTICE '    ✓ inventory_levels: 25건 삽입';
 
@@ -681,34 +676,38 @@ END $$;
       -- 1) product_placements 테이블에 배치 레코드 생성
       -- ──────────────────────────────────────────────────────────────────────
       INSERT INTO product_placements (
-        id,
-        product_id,
-        store_id,
-        user_id,
-        org_id,
-        current_zone_id,
-        current_furniture_id,
-        current_slot_id,
-        current_position,
-        display_type,
-        is_active,
-        created_at,
-        updated_at
-      ) VALUES (
-        gen_random_uuid(),
-        v_placement.product_id,
-        v_store_id,
-        v_user_id,
-        v_org_id,
-        v_placement.zone_id,
-        v_placement.furniture_id,
-        v_placement.slot_code,
-        v_world_position,
-        COALESCE(v_placement.matched_display_type, v_placement.preferred_display),
-        true,
-        NOW(),
-        NOW()
-      );
+  id,
+  product_id,
+  store_id,
+  user_id,
+  org_id,
+  slot_id,
+  display_type,
+  position_offset,
+  rotation_offset,
+  scale,
+  quantity,
+  is_active,
+  placed_at,
+  created_at,
+  updated_at
+) VALUES (
+  gen_random_uuid(),
+  v_placement.product_id,
+  v_store_id,
+  v_user_id,
+  v_org_id,
+  v_placement.slot_uuid,  -- slot_uuid 사용
+  COALESCE(v_placement.matched_display_type, v_placement.preferred_display),
+  v_placement.slot_position,   -- position_offset으로 사용
+  v_placement.slot_rotation,   -- rotation_offset으로 사용
+  COALESCE(v_placement.model_3d_scale, '{"x":1,"y":1,"z":1}'::jsonb),
+  1,
+  true,
+  NOW(),
+  NOW(),
+  NOW()
+);
 
       -- ──────────────────────────────────────────────────────────────────────
       -- 2) products 테이블 직접 업데이트 (3D Studio 호환)
@@ -725,7 +724,6 @@ END $$;
       -- ──────────────────────────────────────────────────────────────────────
       UPDATE furniture_slots SET
         is_occupied = true,
-        occupied_by_product_id = v_placement.product_id,
         updated_at = NOW()
       WHERE id = v_placement.slot_uuid;
 
@@ -781,7 +779,7 @@ END $$;
   RAISE NOTICE '  ✓ products: % 건', v_count;
   SELECT COUNT(*) INTO v_count FROM product_models WHERE product_id IN (SELECT id FROM products WHERE store_id = v_store_id);
   RAISE NOTICE '  ✓ product_models: % 건', v_count;
-  SELECT COUNT(*) INTO v_count FROM inventory_levels WHERE store_id = v_store_id;
+  SELECT COUNT(*) INTO v_count FROM inventory_levels WHERE org_id = v_org_id;
   RAISE NOTICE '  ✓ inventory_levels: % 건', v_count;
   SELECT COUNT(*) INTO v_count FROM product_placements WHERE store_id = v_store_id AND is_active = true;
   RAISE NOTICE '  ✓ product_placements: % 건 (자동배치)', v_count;
