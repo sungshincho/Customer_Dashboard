@@ -129,16 +129,21 @@ export interface ProductPlacement {
   productSku: string;
   productName?: string;
   displayType?: DisplayType;
+  // FROM (현재 위치)
+  fromFurnitureId?: string | null;
   fromSlotId: string | null;
+  fromPosition?: { x: number; y: number; z: number };
+  fromSlotPosition?: { x: number; y: number; z: number };
+  // TO (제안 위치)
   toSlotId: string;
   toFurnitureId: string;
+  toPosition?: { x: number; y: number; z: number };
+  toSlotPosition?: { x: number; y: number; z: number };
+  // 메타데이터
   slotType?: SlotType;
   reason: string;
   priority?: 'high' | 'medium' | 'low';
   displayTypeMatch?: boolean;
-  // 🔧 FIX: 실제 월드 좌표 (하드코딩 오프셋 대신 사용)
-  toPosition?: { x: number; y: number; z: number };
-  toSlotPosition?: { x: number; y: number; z: number }; // 슬롯의 상대 위치
 }
 
 // 🆕 슬롯 호환성 정보
