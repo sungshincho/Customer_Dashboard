@@ -328,34 +328,146 @@ END LOOP;
   -- ══════════════════════════════════════════════════════════════════════════
 
   RAISE NOTICE '    ✓ products: 25건 삽입';
-  INSERT INTO products (id, store_id, user_id, org_id, product_name, sku, category, price, cost_price, stock, display_type, compatible_display_types, created_at) VALUES
-  ('f0000001-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '프리미엄 캐시미어 코트', 'SKU-OUT-001', '아우터', 450000, 180000, 15, 'hanging', ARRAY['hanging','standing'], v_base_url || '/products/outwear/product_coat_01_hanging.glb', NOW(), NOW()),
-  ('f0000002-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '울 테일러드 재킷', 'SKU-OUT-002', '아우터', 380000, 152000, 20, 'hanging', ARRAY['hanging','standing'], v_base_url || '/products/outwear/product_coat_01_hanging.glb', NOW(), NOW()),
-  ('f0000003-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '다운 패딩', 'SKU-OUT-003', '아우터', 380000, 152000, 20, 'hanging', ARRAY['hanging','standing'], v_base_url || '/products/outwear/product_coat_01_hanging.glb', NOW(), NOW()),
-  ('f0000004-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '트렌치 코트', 'SKU-OUT-004', '아우터', 380000, 152000, 20, 'hanging', ARRAY['hanging','standing'], v_base_url || '/products/outwear/product_coat_01_hanging.glb', NOW(), NOW()),
-  ('f0000005-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '레더 재킷', 'SKU-OUT-005', '아우터', 380000, 152000, 20, 'hanging', ARRAY['hanging','standing'], v_base_url || '/products/outwear/product_coat_01_hanging.glb', NOW(), NOW()),
-  ('f0000006-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '실크 블라우스', 'SKU-TOP-001', '상의', 120000, 48000, 25, 'hanging', ARRAY['hanging','standing','folded','stacked'], v_base_url || '/products/tops/product_blouse_01_hanging.glb', NOW(), NOW()),
-  ('f0000007-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '캐주얼 니트 스웨터', 'SKU-TOP-002', '상의', 98000, 39200, 30, 'hanging', ARRAY['hanging','standing','folded','stacked'], v_base_url || '/products/outwear/product_coat_01_hanging.glb', NOW(), NOW()),
-  ('f0000008-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '옥스포드 셔츠', 'SKU-TOP-003', '상의', 85000, 34000, 35, 'hanging', ARRAY['hanging','standing','folded','stacked'],, v_base_url || '/products/outwear/product_coat_01_hanging.glb', NOW(), NOW()),
-  ('f0000009-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '린넨 탑', 'SKU-TOP-004', '상의', 75000, 30000, 28, 'hanging', ARRAY['hanging','standing','folded','stacked'], v_base_url || '/products/outwear/product_coat_01_hanging.glb', NOW(), NOW()),
-  ('f0000010-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '폴로 셔츠', 'SKU-TOP-005', '상의', 75000, 30000, 28, 'hanging', ARRAY['hanging','standing','folded','stacked'], v_base_url || '/products/outwear/product_coat_01_hanging.glb', NOW(), NOW()),
-  ('f0000011-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '리넨 와이드 팬츠', 'SKU-BTM-001', '하의', 128000, 51200, 40, 'hanging', ARRAY['hanging','standing','folded','stacked'], v_base_url || '/products/outwear/product_coat_01_hanging.glb', NOW(), NOW()),
-  ('f0000012-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '슬림핏 데님', 'SKU-BTM-002', '하의', 95000, 38000, 35, 'hanging', ARRAY['hanging','standing','folded','stacked'], v_base_url || '/products/outwear/product_coat_01_hanging.glb', NOW(), NOW()),
-  ('f0000013-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '치노 팬츠', 'SKU-BTM-003', '하의', 95000, 38000, 35, 'hanging', ARRAY['hanging','standing','folded','stacked'], v_base_url || '/products/outwear/product_coat_01_hanging.glb', NOW(), NOW()),
-  ('f0000014-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '조거 팬츠', 'SKU-BTM-004', '하의', 95000, 38000, 35, 'hanging', ARRAY['hanging','standing','folded','stacked'], v_base_url || '/products/outwear/product_coat_01_hanging.glb', NOW(), NOW()),
-  ('f0000015-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '프리미엄 로퍼', 'SKU-SHO-001', '신발', 280000, 112000, 18, 'located', ARRAY['located','standing'],, v_base_url || '/products/outwear/product_coat_01_hanging.glb', NOW(), NOW()),
-  ('f0000016-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '하이힐 펌프스', 'SKU-SHO-002', '신발', 320000, 128000, 12, 'located', ARRAY['located','standing'], v_base_url || '/products/outwear/product_coat_01_hanging.glb', NOW(), NOW()),
-  ('f0000017-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '프리미엄 스니커즈', 'SKU-SHO-003', '신발', 198000, 79200, 25, 'located', ARRAY['located','standing'], v_base_url || '/products/outwear/product_coat_01_hanging.glb', NOW(), NOW()),
-  ('f0000018-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '가죽 토트백', 'SKU-BAG-001', '가방', 350000, 140000, 10, 'hanging', ARRAY['located'], v_base_url || '/products/accessories/product_bag_tote_01.glb', NOW(), NOW()),
-  ('f0000019-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '울 머플러', 'SKU-MUF-001', '머플러', 180000, 72000, 15, 'hanging', ARRAY['located'], v_base_url || '/products/outwear/product_coat_01_hanging.glb', NOW(), NOW()),
-  ('f0000020-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '실크 스카프', 'SKU-SCA-001', '스카프', 85000, 34000, 20, 'hanging', ARRAY['folded'], v_base_url || '/products/outwear/product_coat_01_hanging.glb', NOW(), NOW()),
-  ('f0000021-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '가죽 벨트', 'SKU-BLT-001', '벨트', 120000, 48000, 30, 'located', ARRAY['located'], v_base_url || '/products/accessories/product_belt_leather_01.glb', NOW(), NOW()),
-  ('f0000022-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '실버 목걸이', 'SKU-JWL-001', '쥬얼리', 180000, 72000, 12, 'located', ARRAY['located'], v_base_url || '/products/outwear/product_coat_01_hanging.glb', NOW(), NOW()),
-  ('f0000023-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '프리미엄 스킨케어 세트', 'SKU-SKI-001', '화장품', 65000, 26000, 40, 'boxed', ARRAY['located'], v_base_url || '/products/outwear/product_coat_01_hanging.glb', NOW(), NOW()),
-  ('f0000024-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '립스틱 컬렉션', 'SKU-LIP-001', '화장품', 25000, 10000, 60, 'stacked', ARRAY['located'], v_base_url || '/products/outwear/product_coat_01_hanging.glb', NOW(), NOW()),
-  ('f0000025-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '프리미엄 선물 세트', 'SKU-GFT-001', '선물세트', 150000, 60000, 20, 'boxed', ARRAY['boxed'], v_base_url || '/products/outwear/product_coat_01_hanging.glb', NOW(), NOW()),
-  RAISE NOTICE '  ✓ products: 25건';
+  INSERT INTO products (id, store_id, user_id, org_id, product_name, sku, category, price, cost_price, stock, display_type, compatible_display_types, model_url, created_at, updated_at) VALUES
+  
+  -- ========== 아우터 (5개) ==========
+  ('f0000001-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '프리미엄 캐시미어 코트', 'SKU-OUT-001', '아우터', 450000, 180000, 15, 
+   'hanging', ARRAY['hanging','standing'], 
+   v_base_url || '/products/outwear/product_cashmerecoat_01_hanging.glb', NOW(), NOW()),
+   
+  ('f0000002-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '울 테일러드 재킷', 'SKU-OUT-002', '아우터', 380000, 152000, 20, 
+   'hanging', ARRAY['hanging','standing'], 
+   v_base_url || '/products/outwear/product_tailoredjacket_01_hanging.glb', NOW(), NOW()),
+   
+  ('f0000003-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '다운 패딩', 'SKU-OUT-003', '아우터', 380000, 152000, 20, 
+   'hanging', ARRAY['hanging','standing'], 
+   v_base_url || '/products/outwear/product_padding_01_hanging.glb', NOW(), NOW()),
+   
+  ('f0000004-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '트렌치 코트', 'SKU-OUT-004', '아우터', 380000, 152000, 20, 
+   'hanging', ARRAY['hanging','standing'], 
+   v_base_url || '/products/outwear/product_trenchcoat_01_hanging.glb', NOW(), NOW()),
+   
+  ('f0000005-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '레더 재킷', 'SKU-OUT-005', '아우터', 380000, 152000, 20, 
+   'hanging', ARRAY['hanging','standing'], 
+   v_base_url || '/products/outwear/product_leatherjacket_01_hanging.glb', NOW(), NOW()),
 
+  -- ========== 상의 (5개) ==========
+  ('f0000006-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '실크 블라우스', 'SKU-TOP-001', '상의', 120000, 48000, 25, 
+   'hanging', ARRAY['hanging','standing','folded','stacked'], 
+   v_base_url || '/products/tops/product_blouse_01_hanging.glb', NOW(), NOW()),
+   
+  ('f0000007-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '캐주얼 니트 스웨터', 'SKU-TOP-002', '상의', 98000, 39200, 30, 
+   'hanging', ARRAY['hanging','standing','folded','stacked'], 
+   v_base_url || '/products/tops/product_sweater_01_hanging.glb', NOW(), NOW()),
+   
+  ('f0000008-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '옥스포드 셔츠', 'SKU-TOP-003', '상의', 85000, 34000, 35, 
+   'hanging', ARRAY['hanging','standing','folded','stacked'], 
+   v_base_url || '/products/tops/product_oxfordshirts_01_hanging.glb', NOW(), NOW()),
+   
+  ('f0000009-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '린넨 탑', 'SKU-TOP-004', '상의', 75000, 30000, 28, 
+   'hanging', ARRAY['hanging','standing','folded','stacked'], 
+   v_base_url || '/products/tops/product_linentop_01_hanging.glb', NOW(), NOW()),
+   
+  ('f0000010-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '폴로 셔츠', 'SKU-TOP-005', '상의', 75000, 30000, 28, 
+   'hanging', ARRAY['hanging','standing','folded','stacked'], 
+   v_base_url || '/products/tops/product_poloshirts_01_hanging.glb', NOW(), NOW()),
+
+  -- ========== 하의 (4개) ==========
+  ('f0000011-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '리넨 와이드 팬츠', 'SKU-BTM-001', '하의', 128000, 51200, 40, 
+   'hanging', ARRAY['hanging','standing','folded','stacked'], 
+   v_base_url || '/products/bottoms/product_widepants_01_hanging.glb', NOW(), NOW()),
+   
+  ('f0000012-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '슬림핏 데님', 'SKU-BTM-002', '하의', 95000, 38000, 35, 
+   'hanging', ARRAY['hanging','standing','folded','stacked'], 
+   v_base_url || '/products/bottoms/product_jeans_01_hanging.glb', NOW(), NOW()),
+   
+  ('f0000013-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '치노 팬츠', 'SKU-BTM-003', '하의', 95000, 38000, 35, 
+   'hanging', ARRAY['hanging','standing','folded','stacked'], 
+   v_base_url || '/products/bottoms/product_chinopants_01_hanging.glb', NOW(), NOW()),
+   
+  ('f0000014-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '조거 팬츠', 'SKU-BTM-004', '하의', 95000, 38000, 35, 
+   'hanging', ARRAY['hanging','standing','folded','stacked'], 
+   v_base_url || '/products/bottoms/product_joggerpants_01_hanging.glb', NOW(), NOW()),
+
+  -- ========== 신발 (3개) ==========
+  ('f0000015-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '프리미엄 로퍼', 'SKU-SHO-001', '신발', 280000, 112000, 18, 
+   'located', ARRAY['located','standing'], 
+   v_base_url || '/products/shoes/product_shoes_loafer_01_located.glb', NOW(), NOW()),
+   
+  ('f0000016-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '하이힐 펌프스', 'SKU-SHO-002', '신발', 320000, 128000, 12, 
+   'located', ARRAY['located','standing'], 
+   v_base_url || '/products/shoes/product_shoes_heels_01_located.glb', NOW(), NOW()),
+   
+  ('f0000017-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '프리미엄 스니커즈', 'SKU-SHO-003', '신발', 198000, 79200, 25, 
+   'located', ARRAY['located','standing'], 
+   v_base_url || '/products/shoes/product_shoes_sneakers_01_located.glb', NOW(), NOW()),
+
+  -- ========== 가방 (1개) ==========
+  ('f0000018-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '가죽 토트백', 'SKU-BAG-001', '가방', 350000, 140000, 10, 
+   'located', ARRAY['located'], 
+   v_base_url || '/products/accessories/product_bag_tote_01.glb', NOW(), NOW()),
+
+  -- ========== 액세서리 - 머플러/스카프 (2개) ==========
+  ('f0000019-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '울 머플러', 'SKU-MUF-001', '머플러', 180000, 72000, 15, 
+   'located', ARRAY['located'], 
+   v_base_url || '/products/accessories/product_muffler_set_01.glb', NOW(), NOW()),
+   
+  ('f0000020-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '실크 스카프', 'SKU-SCA-001', '스카프', 85000, 34000, 20, 
+   'located', ARRAY['folded'], 
+   v_base_url || '/products/accessories/product_scarf_set_01.glb', NOW(), NOW()),
+
+  -- ========== 액세서리 - 벨트/쥬얼리 (2개) ==========
+  ('f0000021-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '가죽 벨트', 'SKU-BLT-001', '벨트', 120000, 48000, 30, 
+   'located', ARRAY['located'], 
+   v_base_url || '/products/accessories/product_belt_leather_01.glb', NOW(), NOW()),
+   
+  ('f0000022-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '실버 목걸이', 'SKU-JWL-001', '쥬얼리', 180000, 72000, 12, 
+   'located', ARRAY['located'], 
+   v_base_url || '/products/accessories/product_necklace_silver_01.glb', NOW(), NOW()),
+
+  -- ========== 화장품 (2개) ==========
+  ('f0000023-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '프리미엄 스킨케어 세트', 'SKU-SKI-001', '화장품', 65000, 26000, 40, 
+   'boxed', ARRAY['located'], 
+   v_base_url || '/products/cosmetics/product_skincare_set_01.glb', NOW(), NOW()),
+   
+  ('f0000024-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '립스틱 컬렉션', 'SKU-LIP-001', '화장품', 25000, 10000, 60, 
+   'stacked', ARRAY['located'], 
+   v_base_url || '/products/cosmetics/product_lipstick_set_01.glb', NOW(), NOW()),
+
+  -- ========== 선물세트 (1개) ==========
+  ('f0000025-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '프리미엄 선물 세트', 'SKU-GFT-001', '선물세트', 150000, 60000, 20, 
+   'boxed', ARRAY['boxed'], 
+   v_base_url || '/products/giftbox/product_giftbox_01.glb', NOW(), NOW());
+   
+   RAISE NOTICE '✅ Successfully inserted 25 products with correct model URLs';
+  RAISE NOTICE '   Store ID: %', v_store_id;
+  
+END $$;
   -- ══════════════════════════════════════════════════════════════════════════
   -- STEP 5.2: product_models (60개 - 상품당 평균 2~3개 display_type)
   -- ══════════════════════════════════════════════════════════════════════════
