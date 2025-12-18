@@ -633,7 +633,13 @@ interface ProductMoveIndicatorProps {
     productId?: string;
     product_id?: string;
     productName?: string;
+    productSku?: string;
     sku?: string;
+    // 🔧 NEW: Edge Function에서 계산된 실제 위치
+    fromPosition?: { x: number; y: number; z: number };
+    toPosition?: { x: number; y: number; z: number };
+    toSlotPosition?: { x: number; y: number; z: number };
+    // 기존 필드 (레거시 호환)
     initial_placement?: {
       furniture_id?: string;
       slot_id?: string;
@@ -651,6 +657,14 @@ interface ProductMoveIndicatorProps {
     };
     current?: { position?: { x: number; y: number; z: number } };
     suggested?: { position?: { x: number; y: number; z: number } };
+    // 추가 메타데이터
+    fromFurnitureId?: string;
+    toFurnitureId?: string;
+    fromSlotId?: string;
+    toSlotId?: string;
+    slotType?: string;
+    reason?: string;
+    priority?: string;
   };
   storeBounds: { width: number; depth: number };
   index: number;
@@ -668,21 +682,46 @@ function ProductMoveIndicator({
   const particleRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
 
-  // 위치 추출
-  const fromPos = placement.current?.position ||
-    placement.initial_placement?.position ||
-    { x: -2 + (index % 3) * 2, y: 0.5, z: -1 + Math.floor(index / 3) * 2 };
+  // 🔧 FIX: 위치 추출 우선순위 변경 (Edge Function 결과 우선)
+  // 1. fromPosition (Edge Function에서 계산)
+  // 2. current.position (기존 필드)
+  // 3. initial_placement.position (기존 필드)
+  // 4. 폴백 (절대 사용하지 않도록 로그 출력)
+  const fromPos = placement.fromPosition ||
+    placement.current?.position ||
+    placement.initial_placement?.position;
 
-  const toPos = placement.suggested?.position ||
-    placement.optimization_result?.suggested_position ||
-    { x: fromPos.x + 2, y: 0.5, z: fromPos.z + 1 };
+  // 1. toPosition (Edge Function에서 계산된 실제 월드 좌표)
+  // 2. suggested.position (기존 필드)
+  // 3. optimization_result.suggested_position (기존 필드)
+  const toPos = placement.toPosition ||
+    placement.suggested?.position ||
+    placement.optimization_result?.suggested_position;
+
+  // 위치가 없으면 렌더링하지 않음
+  if (!fromPos || !toPos) {
+    console.warn('[ProductMoveIndicator] Missing position data:', {
+      productId: placement.productId || placement.product_id,
+      hasFromPosition: !!placement.fromPosition,
+      hasToPosition: !!placement.toPosition,
+      hasCurrent: !!placement.current?.position,
+      hasSuggested: !!placement.suggested?.position,
+    });
+    return null;
+  }
+
+  console.log('[ProductMoveIndicator] Rendering product move:', {
+    productId: placement.productId || placement.product_id,
+    from: fromPos,
+    to: toPos,
+  });
 
   // 좌표 클램핑
   const clampedFrom = clampToStoreBounds(fromPos.x, fromPos.z, storeBounds);
   const clampedTo = clampToStoreBounds(toPos.x, toPos.z, storeBounds);
 
-  const from = [clampedFrom.x, 0.8, clampedFrom.z] as [number, number, number];
-  const to = [clampedTo.x, 0.8, clampedTo.z] as [number, number, number];
+  const from = [clampedFrom.x, fromPos.y || 0.8, clampedFrom.z] as [number, number, number];
+  const to = [clampedTo.x, toPos.y || 0.8, clampedTo.z] as [number, number, number];
 
   // 곡선 경로 생성 (더 높은 아크)
   const curvedPath = useMemo(() => {
@@ -722,8 +761,9 @@ function ProductMoveIndicator({
     }
   });
 
-  const productName = placement.productName || placement.sku || '상품';
+  const productName = placement.productName || placement.productSku || placement.sku || '상품';
   const impact = placement.optimization_result?.expected_impact;
+  const reason = placement.reason || placement.optimization_result?.optimization_reason;
 
   // 제품별 다른 색상
   const productColors = ['#8b5cf6', '#06b6d4', '#f97316', '#ec4899', '#10b981'];

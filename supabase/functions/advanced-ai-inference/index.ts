@@ -3268,6 +3268,28 @@ IMPORTANT: When suggesting productPlacements, ensure slotType is compatible with
     }
 
     const enrichPlacementWithPosition = (placement: any) => {
+      // 🆕 FROM (현재 위치) 계산
+      const fromFurniture = furnitureMap.get(placement.fromFurnitureId || placement.current_furniture_id);
+      const fromSlotKey = `${placement.fromFurnitureId || placement.current_furniture_id}:${placement.fromSlotId || placement.current_slot_id}`;
+      const fromSlot = slotMap.get(fromSlotKey);
+
+      let fromPosition = null;
+      let fromSlotPosition = null;
+
+      if (fromSlot && fromSlot.slot_position) {
+        fromSlotPosition = fromSlot.slot_position;
+
+        if (fromFurniture) {
+          const furniturePos = fromFurniture.position || { x: 0, y: 0, z: 0 };
+          fromPosition = {
+            x: (furniturePos.x || 0) + (fromSlotPosition.x || 0),
+            y: (furniturePos.y || 0) + (fromSlotPosition.y || 0),
+            z: (furniturePos.z || 0) + (fromSlotPosition.z || 0),
+          };
+        }
+      }
+
+      // TO (제안 위치) 계산
       const targetFurniture = furnitureMap.get(placement.toFurnitureId || placement.suggested_furniture_id);
       const slotKey = `${placement.toFurnitureId || placement.suggested_furniture_id}:${placement.toSlotId || placement.suggested_slot_id}`;
       const targetSlot = slotMap.get(slotKey);
@@ -3289,7 +3311,7 @@ IMPORTANT: When suggesting productPlacements, ensure slotType is compatible with
         }
       }
 
-      return { toPosition, toSlotPosition };
+      return { fromPosition, fromSlotPosition, toPosition, toSlotPosition };
     };
 
     const combinedProductPlacements = [
@@ -3299,12 +3321,18 @@ IMPORTANT: When suggesting productPlacements, ensure slotType is compatible with
       }),
       ...productPlacements.map(p => {
         const positions = enrichPlacementWithPosition({
+          // FROM (현재 위치)
+          fromFurnitureId: p.current_furniture_id,
+          fromSlotId: p.current_slot_id,
+          // TO (제안 위치)
           toFurnitureId: p.suggested_furniture_id,
           toSlotId: p.suggested_slot_id,
         });
         return {
           productId: p.product_id,
           productSku: p.product_sku,
+          productName: p.product_name,
+          fromFurnitureId: p.current_furniture_id || null,
           fromSlotId: p.current_slot_id || null,
           toSlotId: p.suggested_slot_id,
           toFurnitureId: p.suggested_furniture_id,
@@ -3319,7 +3347,10 @@ IMPORTANT: When suggesting productPlacements, ensure slotType is compatible with
     console.log('[LayoutOptimization] Product placements with positions:',
       combinedProductPlacements.slice(0, 3).map((p: any) => ({
         productId: p.productId,
+        productSku: p.productSku,
+        fromSlotId: p.fromSlotId,
         toSlotId: p.toSlotId,
+        fromPosition: p.fromPosition,
         toPosition: p.toPosition,
       }))
     );
