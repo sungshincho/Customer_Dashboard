@@ -386,131 +386,247 @@ BEGIN
   RAISE NOTICE '    ✓ inventory_levels: 25건 삽입';
 
   -- ══════════════════════════════════════════════════════════════════════════
-  -- NOTE: 상품-슬롯 바인딩은 SEED_03A_PRODUCT_BINDING.sql에서
-  -- 명시적 좌표 기반으로 진행합니다.
+  -- STEP 6: 풀 자동화 상품-슬롯 배치
+  -- 호환성 타입 매칭 + 3D 월드 좌표 계산 + 우선순위 기반 배치
   -- ══════════════════════════════════════════════════════════════════════════
   RAISE NOTICE '';
-  RAISE NOTICE '  [NOTE] 상품-슬롯 바인딩은 SEED_03A_PRODUCT_BINDING.sql에서 진행';
-  RAISE NOTICE '         → 명시적 월드 좌표 기반 배치';
+  RAISE NOTICE '  [STEP 6] 풀 자동화 상품-슬롯 배치 시작...';
+  RAISE NOTICE '           → 호환성 타입 매칭 (&&) + 3D 월드 좌표 계산';
 
-  -- [REMOVED] 자동 배치 로직 삭제됨
-  -- 아래 product_placements 자동 배치 코드는 SEED_03A로 이동
-  /*
-  RAISE NOTICE '  [STEP 6.1] product_placements 시딩 (25개)...';
+  DECLARE
+    v_placement RECORD;
+    v_world_position JSONB;
+    v_placement_count INT := 0;
+    v_category_zone_priority JSONB;
+  BEGIN
+    -- 카테고리별 권장 존 우선순위 매핑
+    v_category_zone_priority := '{
+      "아우터": ["Z003"],
+      "상의": ["Z003"],
+      "하의": ["Z003"],
+      "신발": ["Z004"],
+      "가방": ["Z004"],
+      "머플러": ["Z004", "Z003"],
+      "스카프": ["Z004", "Z003"],
+      "벨트": ["Z004"],
+      "쥬얼리": ["Z004"],
+      "화장품": ["Z003", "Z004"],
+      "선물세트": ["Z003", "Z006"]
+    }'::JSONB;
 
-  -- 의류 상품 → clothing_rack 슬롯에 배치
-  v_count := 0;
-  FOR v_product IN
-    SELECT id, display_type
-    FROM products
-    WHERE store_id = v_store_id AND category IN ('아우터', '상의', '하의')
-    LIMIT 14
-  LOOP
-    SELECT fs.id INTO v_slot
-    FROM furniture_slots fs
-    JOIN furniture f ON f.id = fs.furniture_id
-    WHERE fs.store_id = v_store_id
-      AND fs.is_occupied = false
-      AND f.furniture_type LIKE 'clothing_rack%'
-      AND 'hanging' = ANY(fs.compatible_display_types)
-    LIMIT 1;
+    -- ────────────────────────────────────────────────────────────────────────
+    -- CTE 기반 호환성 자동 매칭 루프
+    -- ────────────────────────────────────────────────────────────────────────
+    FOR v_placement IN
+      WITH available_slots AS (
+        -- 비어있고 호환 타입이 정의된 슬롯들
+        SELECT
+          fs.id AS slot_uuid,
+          fs.furniture_id,
+          fs.slot_id AS slot_code,
+          fs.slot_position,
+          fs.slot_rotation,
+          fs.compatible_display_types AS slot_types,
+          fs.max_product_width,
+          fs.max_product_height,
+          fs.max_product_depth,
+          -- 가구 정보
+          f.zone_id,
+          f.furniture_code,
+          f.furniture_type,
+          f.position_x AS furn_x,
+          f.position_y AS furn_y,
+          f.position_z AS furn_z,
+          f.rotation_x AS furn_rot_x,
+          f.rotation_y AS furn_rot_y,
+          f.rotation_z AS furn_rot_z,
+          -- 존 정보
+          z.zone_code
+        FROM furniture_slots fs
+        JOIN furniture f ON f.id = fs.furniture_id
+        LEFT JOIN zones_dim z ON z.id = f.zone_id
+        WHERE fs.store_id = v_store_id
+          AND fs.is_occupied = false
+          AND fs.compatible_display_types IS NOT NULL
+          AND array_length(fs.compatible_display_types, 1) > 0
+      ),
+      unplaced_products AS (
+        -- 아직 배치되지 않은 상품들
+        SELECT
+          p.id AS product_id,
+          p.product_name,
+          p.sku,
+          p.category,
+          p.display_type AS preferred_display,
+          p.compatible_display_types AS product_types,
+          p.model_3d_url,
+          p.model_3d_scale,
+          p.model_3d_rotation
+        FROM products p
+        WHERE p.store_id = v_store_id
+          AND p.compatible_display_types IS NOT NULL
+          AND array_length(p.compatible_display_types, 1) > 0
+          -- 아직 배치 안 된 상품 (product_placements 또는 products.initial_furniture_id 체크)
+          AND p.initial_furniture_id IS NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM product_placements pp
+            WHERE pp.product_id = p.id AND pp.is_active = true
+          )
+      )
+      -- 호환성 기반 자동 매칭: 배열 교집합(&&) 연산
+      SELECT DISTINCT ON (up.product_id)
+        up.product_id,
+        up.product_name,
+        up.sku,
+        up.category,
+        up.preferred_display,
+        up.product_types,
+        up.model_3d_url,
+        up.model_3d_scale,
+        up.model_3d_rotation,
+        asl.slot_uuid,
+        asl.slot_code,
+        asl.slot_position,
+        asl.slot_rotation,
+        asl.slot_types,
+        asl.furniture_id,
+        asl.furniture_code,
+        asl.furniture_type,
+        asl.furn_x,
+        asl.furn_y,
+        asl.furn_z,
+        asl.furn_rot_x,
+        asl.furn_rot_y,
+        asl.furn_rot_z,
+        asl.zone_id,
+        asl.zone_code,
+        -- 교집합에서 첫 번째 호환 타입 선택
+        (
+          SELECT x FROM unnest(up.product_types) x
+          WHERE x = ANY(asl.slot_types)
+          LIMIT 1
+        ) AS matched_display_type
+      FROM unplaced_products up
+      CROSS JOIN available_slots asl
+      WHERE up.product_types && asl.slot_types  -- && = 배열 겹침 연산자 (핵심!)
+      ORDER BY
+        up.product_id,
+        -- 1순위: 상품의 선호 display_type이 슬롯에서 지원되면 우선
+        CASE WHEN up.preferred_display = ANY(asl.slot_types) THEN 0 ELSE 1 END,
+        -- 2순위: 카테고리별 권장 존 매칭 (의류→Z003, 신발→Z004 등)
+        CASE
+          WHEN asl.zone_code = ANY(
+            ARRAY(SELECT jsonb_array_elements_text(v_category_zone_priority->up.category))
+          ) THEN 0
+          ELSE 1
+        END,
+        -- 3순위: 슬롯 ID 순서 (안정적인 배치)
+        asl.slot_code
+    LOOP
+      -- ──────────────────────────────────────────────────────────────────────
+      -- 월드 좌표 계산: 가구 position + 슬롯 slot_position
+      -- ──────────────────────────────────────────────────────────────────────
+      v_world_position := jsonb_build_object(
+        'x', ROUND((v_placement.furn_x + COALESCE((v_placement.slot_position->>'x')::NUMERIC, 0))::NUMERIC, 3),
+        'y', ROUND((v_placement.furn_y + COALESCE((v_placement.slot_position->>'y')::NUMERIC, 0))::NUMERIC, 3),
+        'z', ROUND((v_placement.furn_z + COALESCE((v_placement.slot_position->>'z')::NUMERIC, 0))::NUMERIC, 3)
+      );
 
-    IF v_slot IS NOT NULL THEN
-      INSERT INTO product_placements (id, slot_id, product_id, store_id, user_id, display_type, is_active, placed_at, created_at, updated_at)
-      VALUES (gen_random_uuid(), v_slot.id, v_product.id, v_store_id, v_user_id, 'hanging', true, NOW(), NOW(), NOW());
+      -- ──────────────────────────────────────────────────────────────────────
+      -- 1) product_placements 테이블에 배치 레코드 생성
+      -- ──────────────────────────────────────────────────────────────────────
+      INSERT INTO product_placements (
+        id,
+        product_id,
+        store_id,
+        user_id,
+        org_id,
+        current_zone_id,
+        current_furniture_id,
+        current_slot_id,
+        current_position,
+        display_type,
+        is_active,
+        created_at,
+        updated_at
+      ) VALUES (
+        gen_random_uuid(),
+        v_placement.product_id,
+        v_store_id,
+        v_user_id,
+        v_org_id,
+        v_placement.zone_id,
+        v_placement.furniture_id,
+        v_placement.slot_code,
+        v_world_position,
+        COALESCE(v_placement.matched_display_type, v_placement.preferred_display),
+        true,
+        NOW(),
+        NOW()
+      );
 
-      UPDATE furniture_slots SET is_occupied = true WHERE id = v_slot.id;
-      v_count := v_count + 1;
+      -- ──────────────────────────────────────────────────────────────────────
+      -- 2) products 테이블 직접 업데이트 (3D Studio 호환)
+      -- ──────────────────────────────────────────────────────────────────────
+      UPDATE products SET
+        initial_furniture_id = v_placement.furniture_id,
+        slot_id = v_placement.slot_code,
+        model_3d_position = v_world_position,
+        updated_at = NOW()
+      WHERE id = v_placement.product_id;
+
+      -- ──────────────────────────────────────────────────────────────────────
+      -- 3) furniture_slots 점유 상태 업데이트
+      -- ──────────────────────────────────────────────────────────────────────
+      UPDATE furniture_slots SET
+        is_occupied = true,
+        occupied_by_product_id = v_placement.product_id,
+        updated_at = NOW()
+      WHERE id = v_placement.slot_uuid;
+
+      v_placement_count := v_placement_count + 1;
+
+      -- 상세 로그 출력
+      RAISE NOTICE '    ✓ [%] % → %/% (type: %, pos: %)',
+        v_placement.sku,
+        v_placement.product_name,
+        v_placement.furniture_code,
+        v_placement.slot_code,
+        COALESCE(v_placement.matched_display_type, v_placement.preferred_display),
+        v_world_position;
+
+    END LOOP;
+
+    RAISE NOTICE '';
+    RAISE NOTICE '    ════════════════════════════════════════════════════════════';
+    RAISE NOTICE '    자동 배치 완료: %/25 건', v_placement_count;
+    RAISE NOTICE '    ════════════════════════════════════════════════════════════';
+
+    -- 미배치 상품 경고
+    IF v_placement_count < 25 THEN
+      RAISE NOTICE '';
+      RAISE NOTICE '    ⚠️  미배치 상품 목록:';
+      FOR v_placement IN
+        SELECT p.sku, p.product_name, p.category, p.compatible_display_types
+        FROM products p
+        WHERE p.store_id = v_store_id
+          AND p.initial_furniture_id IS NULL
+      LOOP
+        RAISE NOTICE '       - [%] % (카테고리: %, 호환타입: %)',
+          v_placement.sku,
+          v_placement.product_name,
+          v_placement.category,
+          v_placement.compatible_display_types;
+      END LOOP;
     END IF;
-  END LOOP;
-  RAISE NOTICE '    - 의류 배치: % 건', v_count;
-
-  -- 신발 상품 → shelf_shoes 슬롯에 배치
-  v_count := 0;
-  FOR v_product IN
-    SELECT id, display_type
-    FROM products
-    WHERE store_id = v_store_id AND category = '신발'
-  LOOP
-    SELECT fs.id INTO v_slot
-    FROM furniture_slots fs
-    JOIN furniture f ON f.id = fs.furniture_id
-    WHERE fs.store_id = v_store_id
-      AND fs.is_occupied = false
-      AND f.furniture_type LIKE 'shelf_shoes%'
-    LIMIT 1;
-
-    IF v_slot IS NOT NULL THEN
-      INSERT INTO product_placements (id, slot_id, product_id, store_id, user_id, display_type, is_active, placed_at, created_at, updated_at)
-      VALUES (gen_random_uuid(), v_slot.id, v_product.id, v_store_id, v_user_id, 'located', true, NOW(), NOW(), NOW());
-
-      UPDATE furniture_slots SET is_occupied = true WHERE id = v_slot.id;
-      v_count := v_count + 1;
-    END IF;
-  END LOOP;
-  RAISE NOTICE '    - 신발 배치: % 건', v_count;
-
-  -- 가방 상품 → display_bag 슬롯에 배치
-  v_count := 0;
-  FOR v_product IN
-    SELECT id, display_type
-    FROM products
-    WHERE store_id = v_store_id AND category = '가방'
-  LOOP
-    SELECT fs.id INTO v_slot
-    FROM furniture_slots fs
-    JOIN furniture f ON f.id = fs.furniture_id
-    WHERE fs.store_id = v_store_id
-      AND fs.is_occupied = false
-      AND f.furniture_type LIKE 'display_bag%'
-    LIMIT 1;
-
-    IF v_slot IS NOT NULL THEN
-      INSERT INTO product_placements (id, slot_id, product_id, store_id, user_id, display_type, is_active, placed_at, created_at, updated_at)
-      VALUES (gen_random_uuid(), v_slot.id, v_product.id, v_store_id, v_user_id, 'hanging', true, NOW(), NOW(), NOW());
-
-      UPDATE furniture_slots SET is_occupied = true WHERE id = v_slot.id;
-      v_count := v_count + 1;
-    END IF;
-  END LOOP;
-  RAISE NOTICE '    - 가방 배치: % 건', v_count;
-
-  -- 액세서리/쥬얼리 → showcase 슬롯에 배치
-  v_count := 0;
-  FOR v_product IN
-    SELECT id, display_type
-    FROM products
-    WHERE store_id = v_store_id AND category IN ('쥬얼리', '시계', '벨트')
-  LOOP
-    SELECT fs.id INTO v_slot
-    FROM furniture_slots fs
-    JOIN furniture f ON f.id = fs.furniture_id
-    WHERE fs.store_id = v_store_id
-      AND fs.is_occupied = false
-      AND f.furniture_type LIKE 'showcase%'
-    LIMIT 1;
-
-    IF v_slot IS NOT NULL THEN
-      INSERT INTO product_placements (id, slot_id, product_id, store_id, user_id, display_type, is_active, placed_at, created_at, updated_at)
-      VALUES (gen_random_uuid(), v_slot.id, v_product.id, v_store_id, v_user_id, 'located', true, NOW(), NOW(), NOW());
-
-      UPDATE furniture_slots SET is_occupied = true WHERE id = v_slot.id;
-      v_count := v_count + 1;
-    END IF;
-  END LOOP;
-  RAISE NOTICE '    - 액세서리/쥬얼리 배치: % 건', v_count;
-
-  SELECT COUNT(*) INTO v_count FROM product_placements WHERE store_id = v_store_id;
-  RAISE NOTICE '    ✓ product_placements: % 건 삽입', v_count;
-  */
-  -- [END REMOVED] 자동 배치 로직 종료
+  END;
 
   -- ══════════════════════════════════════════════════════════════════════════
   -- 완료 리포트
   -- ══════════════════════════════════════════════════════════════════════════
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════════';
-  RAISE NOTICE '  SEED_03 완료: 가구/상품 데이터';
+  RAISE NOTICE '  SEED_03 완료: 가구/상품/자동배치 데이터';
   RAISE NOTICE '════════════════════════════════════════════════════════════════════';
   SELECT COUNT(*) INTO v_count FROM furniture WHERE store_id = v_store_id;
   RAISE NOTICE '  ✓ furniture: % 건', v_count;
@@ -522,8 +638,10 @@ BEGIN
   RAISE NOTICE '  ✓ product_models: % 건', v_count;
   SELECT COUNT(*) INTO v_count FROM inventory_levels WHERE store_id = v_store_id;
   RAISE NOTICE '  ✓ inventory_levels: % 건', v_count;
-  RAISE NOTICE '';
-  RAISE NOTICE '  → 상품-슬롯 바인딩: SEED_03A 실행 필요';
+  SELECT COUNT(*) INTO v_count FROM product_placements WHERE store_id = v_store_id AND is_active = true;
+  RAISE NOTICE '  ✓ product_placements: % 건 (자동배치)', v_count;
+  SELECT COUNT(*) INTO v_count FROM furniture_slots WHERE store_id = v_store_id AND is_occupied = true;
+  RAISE NOTICE '  ✓ occupied_slots: % 건', v_count;
   RAISE NOTICE '';
   RAISE NOTICE '  완료 시간: %', NOW();
   RAISE NOTICE '════════════════════════════════════════════════════════════════════';
