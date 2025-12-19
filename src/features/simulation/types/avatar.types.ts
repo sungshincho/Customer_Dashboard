@@ -9,6 +9,10 @@ export interface CustomerAvatar {
   velocity?: { x: number; z: number }; // 이동 속도
   status: 'browsing' | 'purchasing' | 'leaving';
   timestamp?: number;
+  /** 3D 아바타 모델 URL (GLB) */
+  avatar_url?: string;
+  /** 아바타 타입 (vip, regular, new, dormant 등) */
+  avatar_type?: string;
 }
 
 export interface CustomerAvatarOverlayProps {

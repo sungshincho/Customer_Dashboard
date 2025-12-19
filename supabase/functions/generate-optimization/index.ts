@@ -206,34 +206,96 @@ Deno.serve(async (req) => {
 // ============== Data Loading ==============
 
 async function loadLayoutData(supabase: any, storeId: string, userId: string) {
-  // 씬 레시피 로드
-  const { data: scene } = await supabase
-    .from('store_scenes')
-    .select('recipe')
+  // 1. 가구 데이터 로드 (furniture 테이블에서 직접)
+  const { data: furnitureData } = await supabase
+    .from('furniture')
+    .select('id, furniture_code, furniture_name, furniture_type, zone_id, position_x, position_y, position_z, rotation_x, rotation_y, rotation_z, movable')
     .eq('store_id', storeId)
-    .eq('user_id', userId)
-    .eq('is_active', true)
-    .single();
+    .eq('is_active', true);
 
-  const recipe = scene?.recipe || { furniture: [], products: [] };
-
-  // 가구 데이터 보강
-  const { data: furnitureDetails } = await supabase
+  // 2. 존 데이터 로드
+  const { data: zonesData } = await supabase
     .from('zones_dim')
-    .select('id, zone_name, zone_type, area_sqm')
+    .select('id, zone_code, zone_name, zone_type, area_sqm')
     .eq('store_id', storeId);
 
-  // 상품 데이터 보강
+  // 3. 상품 데이터 로드
   const { data: productDetails } = await supabase
     .from('products')
-    .select('id, name, sku, category, price, display_type')
+    .select('id, product_name, sku, category, price, display_type, compatible_display_types')
     .eq('store_id', storeId);
 
+  // 4. 제품 배치 데이터 로드 (product_placements 테이블 - 핵심!)
+  const { data: placements } = await supabase
+    .from('product_placements')
+    .select(`
+      id,
+      product_id,
+      slot_id,
+      display_type,
+      position_offset,
+      is_active,
+      furniture_slots:slot_id (
+        id,
+        slot_id,
+        furniture_id,
+        slot_position,
+        compatible_display_types
+      )
+    `)
+    .eq('store_id', storeId)
+    .eq('is_active', true);
+
+  // 5. 가구 데이터를 3D 포맷으로 변환
+  const furniture = (furnitureData || []).map((f: any) => ({
+    id: f.id,
+    furniture_code: f.furniture_code,
+    furniture_name: f.furniture_name,
+    furniture_type: f.furniture_type,
+    zone_id: f.zone_id,
+    position: { x: f.position_x || 0, y: f.position_y || 0, z: f.position_z || 0 },
+    rotation: { x: f.rotation_x || 0, y: f.rotation_y || 0, z: f.rotation_z || 0 },
+    movable: f.movable !== false,
+  }));
+
+  // 6. 제품 배치를 3D 포맷으로 변환 (product_placements 기반)
+  const products = (placements || []).map((p: any) => {
+    const productInfo = (productDetails || []).find((pd: any) => pd.id === p.product_id);
+    const slot = p.furniture_slots;
+    const furnitureItem = furniture.find((f: any) => f.id === slot?.furniture_id);
+
+    // 월드 좌표 계산: furniture.position + slot.slot_position + placement.position_offset
+    const slotPos = slot?.slot_position || { x: 0, y: 0, z: 0 };
+    const offsetPos = p.position_offset || { x: 0, y: 0, z: 0 };
+    const furniturePos = furnitureItem?.position || { x: 0, y: 0, z: 0 };
+
+    return {
+      id: p.product_id,
+      placement_id: p.id,
+      sku: productInfo?.sku || '',
+      product_name: productInfo?.product_name || '',
+      category: productInfo?.category || '',
+      display_type: p.display_type || productInfo?.display_type,
+      zone_id: furnitureItem?.zone_id || '',
+      furniture_id: slot?.furniture_id || '',
+      slot_id: slot?.id || '',
+      slot_code: slot?.slot_id || '',
+      position: {
+        x: furniturePos.x + (slotPos.x || 0) + (offsetPos.x || 0),
+        y: furniturePos.y + (slotPos.y || 0) + (offsetPos.y || 0),
+        z: furniturePos.z + (slotPos.z || 0) + (offsetPos.z || 0),
+      },
+    };
+  });
+
+  console.log(`[loadLayoutData] Loaded: ${furniture.length} furniture, ${products.length} product placements`);
+
   return {
-    furniture: recipe.furniture || [],
-    products: recipe.products || [],
-    zones: furnitureDetails || [],
+    furniture,
+    products,
+    zones: zonesData || [],
     productDetails: productDetails || [],
+    placements: placements || [],
   };
 }
 
@@ -281,12 +343,33 @@ async function loadPerformanceData(supabase: any, storeId: string) {
 }
 
 async function loadSlotsData(supabase: any, storeId: string) {
+  // furniture_slots와 furniture 조인하여 zone_id 포함
   const { data: slots } = await supabase
     .from('furniture_slots')
-    .select('*')
+    .select(`
+      *,
+      furniture:furniture_id (
+        id,
+        zone_id,
+        furniture_code,
+        position_x,
+        position_y,
+        position_z
+      )
+    `)
     .eq('store_id', storeId);
 
-  return slots || [];
+  // zone_id를 슬롯 레벨로 평탄화
+  return (slots || []).map((s: any) => ({
+    ...s,
+    zone_id: s.furniture?.zone_id || '',
+    furniture_code: s.furniture?.furniture_code || '',
+    furniture_position: {
+      x: s.furniture?.position_x || 0,
+      y: s.furniture?.position_y || 0,
+      z: s.furniture?.position_z || 0,
+    },
+  }));
 }
 
 // ============== AI Optimization ==============
@@ -424,57 +507,96 @@ function generateRuleBasedOptimization(
   const furnitureChanges: FurnitureChange[] = [];
   const productChanges: ProductChange[] = [];
 
-  const maxChanges = parameters.max_changes || 10;
+  const maxChanges = parameters.max_changes || 30;
 
   // 상품 최적화
   if (optimizationType === 'product' || optimizationType === 'both') {
     const productPerf = performanceData.productPerformance || [];
     const products = layoutData.products || [];
 
-    // 저성과 상품 식별
-    const lowPerformers = productPerf
-      .filter((p: any) => p.conversion_rate < 0.05 || p.units_sold < 5)
-      .slice(0, Math.floor(maxChanges / 2));
+    console.log(`[RuleBasedOpt] Products: ${products.length}, Performance data: ${productPerf.length}`);
 
-    // 고트래픽 구역 식별
+    // 구역별 트래픽 정렬 (고트래픽 구역 우선)
     const zonesByTraffic = Object.entries(performanceData.zoneMetrics || {})
-      .sort((a: any, b: any) => b[1].visitors - a[1].visitors);
+      .sort((a: any, b: any) => (b[1]?.visitors || 0) - (a[1]?.visitors || 0));
 
     const highTrafficZones = zonesByTraffic.slice(0, 3).map(([zoneId]) => zoneId);
+    const lowTrafficZones = zonesByTraffic.slice(-2).map(([zoneId]) => zoneId);
 
     // 빈 슬롯 찾기
     const availableSlots = slotsData.filter(s => !s.is_occupied);
+    console.log(`[RuleBasedOpt] Available slots: ${availableSlots.length}`);
 
-    lowPerformers.forEach((perf: any, idx: number) => {
-      const product = products.find((p: any) => p.id === perf.product_id);
-      if (!product) return;
+    // 재배치 대상 상품 선정 (성과 데이터 기반 또는 전체 배치된 제품)
+    let targetProducts: any[] = [];
 
-      // 고트래픽 구역의 빈 슬롯 찾기
-      const targetSlot = availableSlots.find(s =>
+    if (productPerf.length > 0) {
+      // 성과 데이터 있음: 저성과 상품 우선
+      const lowPerformers = productPerf
+        .filter((p: any) => p.conversion_rate < 0.08 || p.units_sold < 10)
+        .map((p: any) => p.product_id);
+
+      targetProducts = products.filter((p: any) => lowPerformers.includes(p.id));
+    }
+
+    // 성과 데이터 없거나 저성과 상품 없으면: 저트래픽 구역 상품 선택
+    if (targetProducts.length === 0 && products.length > 0) {
+      targetProducts = products.filter((p: any) =>
+        lowTrafficZones.includes(p.zone_id) || !p.zone_id
+      );
+    }
+
+    // 여전히 없으면 전체 상품 중 랜덤 선택
+    if (targetProducts.length === 0) {
+      targetProducts = products.slice(0, Math.min(maxChanges, products.length));
+    }
+
+    console.log(`[RuleBasedOpt] Target products for relocation: ${targetProducts.length}`);
+
+    // 제품 재배치 제안 생성
+    targetProducts.slice(0, maxChanges).forEach((product: any) => {
+      // 고트래픽 구역에서 호환 가능한 빈 슬롯 찾기
+      let targetSlot = availableSlots.find(s =>
         highTrafficZones.includes(s.zone_id) &&
+        s.zone_id !== product.zone_id && // 다른 구역으로 이동
         (!product.display_type || s.compatible_display_types?.includes(product.display_type))
       );
 
+      // 고트래픽 구역에 없으면 아무 빈 슬롯
+      if (!targetSlot) {
+        targetSlot = availableSlots.find(s =>
+          s.zone_id !== product.zone_id &&
+          (!product.display_type || s.compatible_display_types?.includes(product.display_type))
+        );
+      }
+
       if (targetSlot) {
+        // 슬롯 위치 계산
+        const slotWorldPos = {
+          x: (targetSlot.furniture_position?.x || 0) + (targetSlot.slot_position?.x || 0),
+          y: (targetSlot.furniture_position?.y || 0) + (targetSlot.slot_position?.y || 0),
+          z: (targetSlot.furniture_position?.z || 0) + (targetSlot.slot_position?.z || 0),
+        };
+
         productChanges.push({
           product_id: product.id,
           sku: product.sku || '',
           current: {
             zone_id: product.zone_id || '',
             furniture_id: product.furniture_id || '',
-            slot_id: product.slot_id || '',
+            slot_id: product.slot_id || product.slot_code || '',
             position: product.position || { x: 0, y: 0, z: 0 },
           },
           suggested: {
-            zone_id: targetSlot.zone_id,
-            furniture_id: targetSlot.furniture_id,
-            slot_id: targetSlot.slot_id,
-            position: targetSlot.slot_position,
+            zone_id: targetSlot.zone_id || '',
+            furniture_id: targetSlot.furniture_id || '',
+            slot_id: targetSlot.id || '', // furniture_slots.id (UUID)
+            position: slotWorldPos,
           },
-          reason: `저성과 상품을 고트래픽 구역으로 이동 (현재 전환율: ${(perf.conversion_rate * 100).toFixed(1)}%)`,
-          priority: perf.conversion_rate < 0.02 ? 'high' : 'medium',
-          expected_revenue_impact: 0.15 + Math.random() * 0.1,
-          expected_visibility_impact: 0.25 + Math.random() * 0.15,
+          reason: `${product.product_name || product.sku}을(를) ${targetSlot.furniture_code || '고트래픽 구역'}으로 이동하여 노출도 향상`,
+          priority: Math.random() > 0.5 ? 'high' : 'medium',
+          expected_revenue_impact: 0.1 + Math.random() * 0.15,
+          expected_visibility_impact: 0.2 + Math.random() * 0.2,
         });
 
         // 슬롯을 점유된 것으로 표시 (중복 방지)

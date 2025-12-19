@@ -78,6 +78,10 @@ export interface CustomerAvatar {
   status: CustomerStatus;
   segmentId?: string;
   dwellTime?: number;
+  /** 3D 아바타 모델 URL (GLB) */
+  avatar_url?: string;
+  /** 아바타 타입 (vip, regular, new 등) */
+  avatar_type?: string;
 }
 
 // 고객 아바타 오버레이 Props
