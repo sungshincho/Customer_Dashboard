@@ -107,7 +107,25 @@ export async function loadUserModels(
 
       // ============================================
       // 2. products 테이블에서 상품 3D 모델 로드
+      // NOTE: product_placements에 배치된 제품은 Section 3에서 로드하므로 여기서 스킵
       // ============================================
+
+      // 2-1. product_placements에 배치된 product_id 목록 먼저 조회
+      const { data: placedProductIds } = await (supabase as any)
+        .from('product_placements')
+        .select('product_id')
+        .eq('store_id', storeId)
+        .eq('is_active', true);
+
+      const placedProductIdSet = new Set<string>();
+      if (placedProductIds) {
+        for (const pp of placedProductIds) {
+          placedProductIdSet.add(pp.product_id);
+        }
+        console.log(`[ModelLoader] Section 2: ${placedProductIdSet.size} products already in placements, will skip`);
+      }
+
+      // 2-2. products 로드 (placements에 없는 것만)
       const { data: productsData, error: productsError } = await supabase
         .from('products')
         .select('*')
@@ -115,16 +133,11 @@ export async function loadUserModels(
         .not('model_3d_url', 'is', null);
 
       if (!productsError && productsData) {
-        console.log(`[ModelLoader] Section 2: Loading ${productsData.length} products with 3D models`);
+        const unplacedProducts = productsData.filter(p => !placedProductIdSet.has(p.id));
+        console.log(`[ModelLoader] Section 2: Loading ${unplacedProducts.length}/${productsData.length} unplaced products`);
 
-        for (const p of productsData) {
+        for (const p of unplacedProducts) {
           if (p.model_3d_url) {
-            // 🔍 디버그: DB 원본 값 출력
-            console.log(`[ModelLoader] Product ${p.product_name} raw DB values:`, {
-              model_3d_position: (p as any).model_3d_position,
-              model_3d_position_type: typeof (p as any).model_3d_position,
-            });
-
             const pos = parseJsonField((p as any).model_3d_position, { x: 0, y: 0, z: 0 });
             const rot = parseJsonField((p as any).model_3d_rotation, { x: 0, y: 0, z: 0 });
             const scl = parseJsonField((p as any).model_3d_scale, { x: 1, y: 1, z: 1 });
@@ -148,7 +161,7 @@ export async function loadUserModels(
               }
             });
             loadedUrls.add(p.model_3d_url);
-            console.log(`[ModelLoader] Product: ${p.product_name}, SKU: ${p.sku}, Position:`, pos);
+            console.log(`[ModelLoader] Product (unplaced): ${p.product_name}, Position:`, pos);
           }
         }
       } else if (productsError) {
