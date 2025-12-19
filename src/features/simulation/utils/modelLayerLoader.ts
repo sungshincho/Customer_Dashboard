@@ -156,7 +156,7 @@ export async function loadUserModels(
       }
 
       // ============================================
-      // 3. product_placements 테이블에서 상품 배치 로드 (레거시)
+      // 3. product_placements 테이블에서 상품 배치 로드 (v3 - 슬롯/가구 조인 포함)
       // ============================================
       const { data: placementsData, error: placementsError } = await (supabase as any)
         .from('product_placements')
@@ -166,28 +166,72 @@ export async function loadUserModels(
             id,
             product_name,
             category,
-            sku
+            sku,
+            model_3d_url
+          ),
+          furniture_slots (
+            id,
+            slot_index,
+            slot_position,
+            slot_rotation,
+            furniture:furniture_id (
+              id,
+              furniture_name,
+              position,
+              rotation
+            )
           )
         `)
         .eq('store_id', storeId)
         .eq('is_active', true);
 
       if (!placementsError && placementsData) {
-        console.log(`[ModelLoader] Section 3: Loading ${placementsData.length} product placements (legacy)`);
+        console.log(`[ModelLoader] Section 3: Loading ${placementsData.length} product placements`);
 
         for (const placement of placementsData) {
           const p = placement as any;
           const product = p.products;
-          const modelUrl = p.model_url || getDefaultProductModelUrl(product?.category);
+          const slot = p.furniture_slots;
+          const furniture = slot?.furniture;
+
+          // model_3d_url 우선, 없으면 placement의 model_url, 마지막으로 기본 URL
+          const modelUrl = product?.model_3d_url || p.model_url || getDefaultProductModelUrl(product?.category);
 
           if (modelUrl) {
+            // 슬롯이 있으면 월드 좌표 계산 (가구 위치 + 슬롯 오프셋)
+            let worldPosition = { x: Number(p.position_x) || 0, y: Number(p.position_y) || 0, z: Number(p.position_z) || 0 };
+            let worldRotation = { x: Number(p.rotation_x) || 0, y: Number(p.rotation_y) || 0, z: Number(p.rotation_z) || 0 };
+
+            if (slot && furniture) {
+              const furniturePos = parseJsonField(furniture.position, { x: 0, y: 0, z: 0 });
+              const furnitureRot = parseJsonField(furniture.rotation, { x: 0, y: 0, z: 0 });
+              const slotOffset = parseJsonField(slot.slot_position, { x: 0, y: 0, z: 0 });
+              const slotRot = parseJsonField(slot.slot_rotation, { x: 0, y: 0, z: 0 });
+
+              // 월드 좌표 = 가구 위치 + 슬롯 오프셋
+              worldPosition = {
+                x: furniturePos.x + slotOffset.x,
+                y: furniturePos.y + slotOffset.y,
+                z: furniturePos.z + slotOffset.z
+              };
+
+              // 회전 합산
+              worldRotation = {
+                x: furnitureRot.x + slotRot.x,
+                y: furnitureRot.y + slotRot.y,
+                z: furnitureRot.z + slotRot.z
+              };
+
+              console.log(`[ModelLoader] Placement ${product?.product_name}: furniture(${furniture.furniture_name}) + slot → world:`, worldPosition);
+            }
+
             models.push({
-              id: `product-${p.id}`,
+              id: `placement-${p.id}`,  // placement- prefix로 변경하여 products와 구분
               name: product?.product_name || 'Unknown Product',
               type: 'product',
               model_url: modelUrl,
-              position: { x: Number(p.position_x) || 0, y: Number(p.position_y) || 0, z: Number(p.position_z) || 0 },
-              rotation: { x: Number(p.rotation_x) || 0, y: Number(p.rotation_y) || 0, z: Number(p.rotation_z) || 0 },
+              position: worldPosition,
+              rotation: worldRotation,
               scale: { x: Number(p.scale_x) || 1, y: Number(p.scale_y) || 1, z: Number(p.scale_z) || 1 },
               metadata: {
                 placementId: p.id,
@@ -195,13 +239,18 @@ export async function loadUserModels(
                 productName: product?.product_name,
                 category: product?.category,
                 sku: product?.sku,
+                slotId: p.slot_id,
+                slotIndex: slot?.slot_index,
+                furnitureId: furniture?.id,
+                furnitureName: furniture?.furniture_name,
                 zoneId: p.zone_id,
                 displayQuantity: p.display_quantity,
-                properties: p.properties
+                properties: p.properties,
+                isPlacement: true  // placement에서 온 데이터임을 표시
               }
             });
             loadedUrls.add(modelUrl);
-            console.log(`[ModelLoader] Product: ${product?.product_name}, Category: ${product?.category}, Position:`, { x: p.position_x, y: p.position_y, z: p.position_z });
+            console.log(`[ModelLoader] Placement: ${product?.product_name}, Slot: ${slot?.slot_index ?? 'none'}, Position:`, worldPosition);
           }
         }
       } else if (placementsError) {
@@ -310,13 +359,42 @@ export async function loadUserModels(
   }
 
   // ============================================
-  // 중복 제거: 같은 이름의 모델이 여러 개 있으면 위치값이 있는 것을 우선
+  // 중복 제거: placement 우선, productId 기준으로 중복 제거
+  // - placement 데이터는 모두 유지 (동일 상품이 여러 슬롯에 배치 가능)
+  // - products 테이블 데이터는 해당 productId의 placement가 없을 때만 유지
   // ============================================
   const deduplicatedModels: ModelLayer[] = [];
+  const placementProductIds = new Set<string>();
+
+  // 1차: placement 모델 모두 추가 (슬롯 배치된 상품)
+  for (const model of models) {
+    if ((model.metadata as any)?.isPlacement) {
+      deduplicatedModels.push(model);
+      const productId = (model.metadata as any)?.productId;
+      if (productId) {
+        placementProductIds.add(productId);
+      }
+    }
+  }
+
+  console.log(`[ModelLoader] Dedupe: Added ${deduplicatedModels.length} placements, productIds:`, Array.from(placementProductIds));
+
+  // 2차: non-placement 모델 중 placement가 없는 것만 추가
   const modelsByName = new Map<string, ModelLayer[]>();
 
-  // 이름별로 그룹화
   for (const model of models) {
+    if ((model.metadata as any)?.isPlacement) continue; // placement는 이미 추가됨
+
+    // products 테이블 데이터: 해당 productId의 placement가 있으면 스킵
+    if (model.id.startsWith('product-')) {
+      const productId = (model.metadata as any)?.productId;
+      if (productId && placementProductIds.has(productId)) {
+        console.log(`[ModelLoader] Dedupe: Skipping raw product "${model.name}" (productId: ${productId}) - has placement`);
+        continue;
+      }
+    }
+
+    // 나머지는 이름별로 그룹화
     const existing = modelsByName.get(model.name) || [];
     existing.push(model);
     modelsByName.set(model.name, existing);
@@ -333,11 +411,9 @@ export async function loadUserModels(
       );
 
       if (withPosition.length > 0) {
-        // 위치가 있는 것들만 추가
         deduplicatedModels.push(...withPosition);
         console.log(`[ModelLoader] Dedupe: "${name}" - kept ${withPosition.length} with position, removed ${group.length - withPosition.length} at origin`);
       } else {
-        // 모두 (0,0,0)이면 첫 번째 하나만
         deduplicatedModels.push(group[0]);
         console.log(`[ModelLoader] Dedupe: "${name}" - all at origin, kept 1 of ${group.length}`);
       }
