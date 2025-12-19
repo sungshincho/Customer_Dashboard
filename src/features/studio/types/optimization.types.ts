@@ -51,9 +51,9 @@ export interface IntensityLimits {
 }
 
 export const INTENSITY_LIMITS: Record<OptimizationIntensity, IntensityLimits> = {
-  low: { maxFurnitureMoves: 1, maxProductRelocations: 3 },
-  medium: { maxFurnitureMoves: 3, maxProductRelocations: 8 },
-  high: { maxFurnitureMoves: 5, maxProductRelocations: 15 },
+  low: { maxFurnitureMoves: 5, maxProductRelocations: 15 },
+  medium: { maxFurnitureMoves: 12, maxProductRelocations: 35 },
+  high: { maxFurnitureMoves: 25, maxProductRelocations: 60 },
 };
 
 // 기본 최적화 설정

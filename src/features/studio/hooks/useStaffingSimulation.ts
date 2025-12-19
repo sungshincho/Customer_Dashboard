@@ -123,6 +123,8 @@ export interface StaffingSimulationResult {
       suggestedPosition: { x: number; y: number; z: number };
       color: string;
       coverageRadius: number;
+      /** GLB 아바타 모델 URL */
+      avatar_url?: string;
     }>;
     coverageZones: Array<{
       position: { x: number; y: number; z: number };
@@ -463,8 +465,24 @@ function transformStaffingResult(
     roi: (metrics.coverageGain * 50000) / (params.staffCount * 2500000) * 100,
   };
 
+  // 스태프 아바타 URL 맵 생성 (Edge Function 결과에서 avatar_url 추출)
+  const staffAvatarMap = new Map<string, string>();
+  if (rawResult.staffAvatars && Array.isArray(rawResult.staffAvatars)) {
+    rawResult.staffAvatars.forEach((s: { id: string; avatar_url?: string }) => {
+      if (s.avatar_url) {
+        staffAvatarMap.set(s.id, s.avatar_url);
+      }
+    });
+  }
+  // 직원 위치 데이터에서 avatar_url 추출 (대체 방식)
+  (rawResult.staffPositions || []).forEach((pos: any) => {
+    if (pos.avatar_url && pos.staffId) {
+      staffAvatarMap.set(pos.staffId, pos.avatar_url);
+    }
+  });
+
   // 시각화 데이터
-  const visualization = generateStaffingVisualization(staffPositions, zoneCoverage);
+  const visualization = generateStaffingVisualization(staffPositions, zoneCoverage, staffAvatarMap);
 
   return {
     id: rawResult.id || `staff-sim-${Date.now()}`,
@@ -551,7 +569,9 @@ function generateStaffingInsights(
 
 function generateStaffingVisualization(
   staffPositions: StaffPosition[],
-  zoneCoverage: ZoneCoverage[]
+  zoneCoverage: ZoneCoverage[],
+  /** 스태프 ID -> avatar_url 맵 (GLB 모델 렌더링용) */
+  staffAvatarMap?: Map<string, string>
 ): StaffingSimulationResult['visualization'] {
   const colors = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6'];
 
@@ -563,6 +583,7 @@ function generateStaffingVisualization(
     suggestedPosition: pos.suggestedPosition,
     color: colors[idx % colors.length],
     coverageRadius: 2 + pos.efficiencyScore / 50,
+    avatar_url: staffAvatarMap?.get(pos.staffId),
   }));
 
   // 커버리지 존

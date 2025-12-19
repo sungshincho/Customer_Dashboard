@@ -42,6 +42,8 @@ export function useRealtimeTracking({
   const metadataRef = useRef<StoreSpaceMetadata | null>(null);
   const kalmanFiltersRef = useRef<Map<string, KalmanFilter>>(new Map());
   const trackingBufferRef = useRef<Map<string, TrackingData[]>>(new Map());
+  // 고객 아바타 URL 캐시 (customer_id -> avatar_url)
+  const customerAvatarsRef = useRef<Map<string, string>>(new Map());
 
   // 매장 메타데이터 및 센서 정보 로드
   useEffect(() => {
@@ -99,9 +101,26 @@ export function useRealtimeTracking({
         ];
         setSensorCount(sensorsRef.current.length);
 
+        // 고객 아바타 URL 로드 (3D 모델 렌더링용)
+        const { data: customers, error: customersError } = await supabase
+          .from('customers')
+          .select('id, avatar_url, avatar_type')
+          .eq('store_id', storeId)
+          .not('avatar_url', 'is', null);
+
+        if (!customersError && customers) {
+          customers.forEach((c: any) => {
+            if (c.avatar_url) {
+              customerAvatarsRef.current.set(c.id, c.avatar_url);
+            }
+          });
+          console.log(`고객 아바타 URL 로드: ${customers.length}건`);
+        }
+
         console.log('매장 구성 로드 완료:', {
           metadata: metadataRef.current,
-          sensors: sensorsRef.current.length
+          sensors: sensorsRef.current.length,
+          customerAvatars: customerAvatarsRef.current.size
         });
       } catch (error) {
         console.error('매장 구성 로드 실패:', error);
@@ -127,20 +146,24 @@ export function useRealtimeTracking({
     channel.on('presence', { event: 'sync' }, () => {
       const presenceState = channel.presenceState<CustomerPresenceState>();
       console.log('Presence sync:', Object.keys(presenceState).length, '명');
-      
+
       const updatedAvatars: CustomerAvatar[] = [];
       Object.values(presenceState).forEach(presences => {
         presences.forEach(presence => {
+          // 고객 아바타 URL 캐시에서 조회
+          const avatarUrl = customerAvatarsRef.current.get(presence.customer_id);
+
           updatedAvatars.push({
             id: presence.customer_id,
             position: presence.position,
             velocity: presence.velocity,
             status: presence.status,
-            timestamp: presence.last_updated
+            timestamp: presence.last_updated,
+            avatar_url: avatarUrl, // GLB 모델 URL 추가
           });
         });
       });
-      
+
       setAvatars(updatedAvatars);
       setLastUpdate(Date.now());
     });

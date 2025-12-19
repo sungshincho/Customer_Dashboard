@@ -8,9 +8,9 @@
  * - 서비스 레벨 히트맵
  */
 
-import { useMemo, useState, useRef } from 'react';
+import { useMemo, useState, useRef, Suspense } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Html, Line, Text } from '@react-three/drei';
+import { Html, Line, Text, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import type { StaffingSimulationResult, StaffPosition, ZoneCoverage } from '../hooks/useStaffingSimulation';
 
@@ -349,6 +349,8 @@ interface StaffMarkerProps {
     suggestedPosition: { x: number; y: number; z: number };
     color: string;
     coverageRadius: number;
+    /** GLB 아바타 모델 URL */
+    avatar_url?: string;
   };
   position?: StaffPosition;
   showCurrent: boolean;
@@ -357,6 +359,77 @@ interface StaffMarkerProps {
   isHovered: boolean;
   onClick: () => void;
   onHover: (hovered: boolean) => void;
+}
+
+// ============================================================================
+// GLB 스태프 아바타 컴포넌트
+// ============================================================================
+interface GLBStaffAvatarProps {
+  url: string;
+  position: [number, number, number];
+  color: string;
+  isHighlighted: boolean;
+  onClick: () => void;
+  onHover: (hovered: boolean) => void;
+}
+
+function GLBStaffAvatar({ url, position, color, isHighlighted, onClick, onHover }: GLBStaffAvatarProps) {
+  const groupRef = useRef<THREE.Group>(null);
+  const { scene } = useGLTF(url);
+
+  const clonedScene = useMemo(() => {
+    const cloned = scene.clone(true);
+    cloned.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        // 색상 힌트 적용
+        if (child.material instanceof THREE.MeshStandardMaterial) {
+          const mat = child.material.clone();
+          mat.emissive = new THREE.Color(color);
+          mat.emissiveIntensity = isHighlighted ? 0.4 : 0.15;
+          child.material = mat;
+        }
+      }
+    });
+    return cloned;
+  }, [scene, color, isHighlighted]);
+
+  // 호버 애니메이션
+  useFrame(({ clock }) => {
+    if (groupRef.current && isHighlighted) {
+      const bounce = Math.sin(clock.elapsedTime * 4) * 0.05;
+      groupRef.current.position.y = position[1] + bounce;
+    }
+  });
+
+  return (
+    <group
+      ref={groupRef}
+      position={position}
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      onPointerOver={(e) => { e.stopPropagation(); onHover(true); }}
+      onPointerOut={(e) => { e.stopPropagation(); onHover(false); }}
+    >
+      <primitive object={clonedScene} />
+
+      {/* 바닥 인디케이터 링 */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
+        <ringGeometry args={[0.35, 0.45, 16]} />
+        <meshBasicMaterial color={color} transparent opacity={isHighlighted ? 0.6 : 0.3} />
+      </mesh>
+    </group>
+  );
+}
+
+function StaffAvatarWithFallback({ url, ...props }: GLBStaffAvatarProps) {
+  if (!url) return null;
+
+  return (
+    <Suspense fallback={null}>
+      <GLBStaffAvatar url={url} {...props} />
+    </Suspense>
+  );
 }
 
 function StaffMarker({
@@ -385,22 +458,34 @@ function StaffMarker({
       {/* 현재 위치 마커 */}
       {showCurrent && (
         <group position={[marker.currentPosition.x, 0, marker.currentPosition.z]}>
-          <mesh
-            ref={currentRef}
-            position={[0, 0.5, 0]}
-            onClick={onClick}
-            onPointerOver={() => onHover(true)}
-            onPointerOut={() => onHover(false)}
-          >
-            <capsuleGeometry args={[0.2, 0.4, 4, 8]} />
-            <meshStandardMaterial
+          {/* GLB 모델이 있으면 GLB, 없으면 캡슐 */}
+          {marker.avatar_url ? (
+            <StaffAvatarWithFallback
+              url={marker.avatar_url}
+              position={[0, 0, 0]}
               color="#94a3b8"
-              emissive="#94a3b8"
-              emissiveIntensity={0.2}
-              transparent
-              opacity={0.6}
+              isHighlighted={false}
+              onClick={onClick}
+              onHover={onHover}
             />
-          </mesh>
+          ) : (
+            <mesh
+              ref={currentRef}
+              position={[0, 0.5, 0]}
+              onClick={onClick}
+              onPointerOver={() => onHover(true)}
+              onPointerOut={() => onHover(false)}
+            >
+              <capsuleGeometry args={[0.2, 0.4, 4, 8]} />
+              <meshStandardMaterial
+                color="#94a3b8"
+                emissive="#94a3b8"
+                emissiveIntensity={0.2}
+                transparent
+                opacity={0.6}
+              />
+            </mesh>
+          )}
 
           {/* 현재 위치 라벨 */}
           <Text
@@ -417,20 +502,32 @@ function StaffMarker({
       {/* 제안 위치 마커 */}
       {showSuggested && (
         <group position={[marker.suggestedPosition.x, 0, marker.suggestedPosition.z]}>
-          <mesh
-            ref={suggestedRef}
-            position={[0, 0.6, 0]}
-            onClick={onClick}
-            onPointerOver={() => onHover(true)}
-            onPointerOut={() => onHover(false)}
-          >
-            <capsuleGeometry args={[0.25, 0.5, 4, 8]} />
-            <meshStandardMaterial
+          {/* GLB 모델이 있으면 GLB, 없으면 캡슐 */}
+          {marker.avatar_url ? (
+            <StaffAvatarWithFallback
+              url={marker.avatar_url}
+              position={[0, 0, 0]}
               color={marker.color}
-              emissive={marker.color}
-              emissiveIntensity={isHovered || isSelected ? 0.6 : 0.3}
+              isHighlighted={isHovered || isSelected}
+              onClick={onClick}
+              onHover={onHover}
             />
-          </mesh>
+          ) : (
+            <mesh
+              ref={suggestedRef}
+              position={[0, 0.6, 0]}
+              onClick={onClick}
+              onPointerOver={() => onHover(true)}
+              onPointerOut={() => onHover(false)}
+            >
+              <capsuleGeometry args={[0.25, 0.5, 4, 8]} />
+              <meshStandardMaterial
+                color={marker.color}
+                emissive={marker.color}
+                emissiveIntensity={isHovered || isSelected ? 0.6 : 0.3}
+              />
+            </mesh>
+          )}
 
           {/* 직원 이름 */}
           <Text
