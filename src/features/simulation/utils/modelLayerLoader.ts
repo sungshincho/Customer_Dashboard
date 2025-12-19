@@ -156,7 +156,8 @@ export async function loadUserModels(
       }
 
       // ============================================
-      // 3. product_placements 테이블에서 상품 배치 로드 (v3 - 슬롯/가구 조인 포함)
+      // 3. product_placements 테이블에서 상품 배치 로드
+      // current_position에 이미 월드 좌표가 저장되어 있음 (SEED_03에서 계산됨)
       // ============================================
       const { data: placementsData, error: placementsError } = await (supabase as any)
         .from('product_placements')
@@ -169,17 +170,10 @@ export async function loadUserModels(
             sku,
             model_3d_url
           ),
-          furniture_slots (
+          furniture:current_furniture_id (
             id,
-            slot_index,
-            slot_position,
-            slot_rotation,
-            furniture:furniture_id (
-              id,
-              furniture_name,
-              position,
-              rotation
-            )
+            furniture_name,
+            furniture_code
           )
         `)
         .eq('store_id', storeId)
@@ -191,39 +185,28 @@ export async function loadUserModels(
         for (const placement of placementsData) {
           const p = placement as any;
           const product = p.products;
-          const slot = p.furniture_slots;
-          const furniture = slot?.furniture;
+          const furniture = p.furniture;
 
           // model_3d_url 우선, 없으면 placement의 model_url, 마지막으로 기본 URL
           const modelUrl = product?.model_3d_url || p.model_url || getDefaultProductModelUrl(product?.category);
 
           if (modelUrl) {
-            // 슬롯이 있으면 월드 좌표 계산 (가구 위치 + 슬롯 오프셋)
-            let worldPosition = { x: Number(p.position_x) || 0, y: Number(p.position_y) || 0, z: Number(p.position_z) || 0 };
-            let worldRotation = { x: Number(p.rotation_x) || 0, y: Number(p.rotation_y) || 0, z: Number(p.rotation_z) || 0 };
+            // current_position에 이미 월드 좌표가 JSONB로 저장되어 있음
+            const currentPos = parseJsonField(p.current_position, null);
+            const currentRot = parseJsonField(p.current_rotation, null);
 
-            if (slot && furniture) {
-              const furniturePos = parseJsonField(furniture.position, { x: 0, y: 0, z: 0 });
-              const furnitureRot = parseJsonField(furniture.rotation, { x: 0, y: 0, z: 0 });
-              const slotOffset = parseJsonField(slot.slot_position, { x: 0, y: 0, z: 0 });
-              const slotRot = parseJsonField(slot.slot_rotation, { x: 0, y: 0, z: 0 });
+            // current_position 우선, 없으면 position_x/y/z 사용
+            const worldPosition = currentPos || {
+              x: Number(p.position_x) || 0,
+              y: Number(p.position_y) || 0,
+              z: Number(p.position_z) || 0
+            };
 
-              // 월드 좌표 = 가구 위치 + 슬롯 오프셋
-              worldPosition = {
-                x: furniturePos.x + slotOffset.x,
-                y: furniturePos.y + slotOffset.y,
-                z: furniturePos.z + slotOffset.z
-              };
-
-              // 회전 합산
-              worldRotation = {
-                x: furnitureRot.x + slotRot.x,
-                y: furnitureRot.y + slotRot.y,
-                z: furnitureRot.z + slotRot.z
-              };
-
-              console.log(`[ModelLoader] Placement ${product?.product_name}: furniture(${furniture.furniture_name}) + slot → world:`, worldPosition);
-            }
+            const worldRotation = currentRot || {
+              x: Number(p.rotation_x) || 0,
+              y: Number(p.rotation_y) || 0,
+              z: Number(p.rotation_z) || 0
+            };
 
             models.push({
               id: `placement-${p.id}`,  // placement- prefix로 변경하여 products와 구분
@@ -239,18 +222,18 @@ export async function loadUserModels(
                 productName: product?.product_name,
                 category: product?.category,
                 sku: product?.sku,
-                slotId: p.slot_id,
-                slotIndex: slot?.slot_index,
-                furnitureId: furniture?.id,
+                slotId: p.current_slot_id,
+                furnitureId: p.current_furniture_id,
                 furnitureName: furniture?.furniture_name,
-                zoneId: p.zone_id,
-                displayQuantity: p.display_quantity,
+                furnitureCode: furniture?.furniture_code,
+                zoneId: p.current_zone_id,
+                displayType: p.display_type,
                 properties: p.properties,
                 isPlacement: true  // placement에서 온 데이터임을 표시
               }
             });
             loadedUrls.add(modelUrl);
-            console.log(`[ModelLoader] Placement: ${product?.product_name}, Slot: ${slot?.slot_index ?? 'none'}, Position:`, worldPosition);
+            console.log(`[ModelLoader] Placement: ${product?.product_name}, Furniture: ${furniture?.furniture_code ?? 'none'}, Slot: ${p.current_slot_id ?? 'none'}, Position:`, worldPosition);
           }
         }
       } else if (placementsError) {
