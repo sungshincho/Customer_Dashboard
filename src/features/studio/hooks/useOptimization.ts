@@ -163,13 +163,11 @@ export function useOptimization({
             product_id: productChange.product_id,
             store_id: storeId,
             user_id: userId,
-            zone_id: productChange.suggested.zone_id,
-            furniture_id: productChange.suggested.furniture_id,
             slot_id: productChange.suggested.slot_id,
-            position: productChange.suggested.position,
-            applied_from_optimization_id: result.optimization_id,
+            display_type: 'shelf',
+            position_offset: productChange.suggested.position ? JSON.parse(JSON.stringify(productChange.suggested.position)) : null,
             updated_at: new Date().toISOString(),
-          }, {
+          } as any, {
             onConflict: 'product_id,store_id',
           });
 
@@ -221,18 +219,16 @@ export function useOptimization({
           product_id: c.product_id,
           store_id: storeId,
           user_id: userId,
-          zone_id: c.suggested.zone_id,
-          furniture_id: c.suggested.furniture_id,
           slot_id: c.suggested.slot_id,
-          position: c.suggested.position,
-          applied_from_optimization_id: result.optimization_id,
+          display_type: 'shelf',
+          position_offset: c.suggested.position ? JSON.parse(JSON.stringify(c.suggested.position)) : null,
           updated_at: new Date().toISOString(),
         }));
 
       if (productPlacements.length > 0) {
         const { error: upsertError } = await supabase
           .from('product_placements')
-          .upsert(productPlacements, {
+          .upsert(productPlacements as any, {
             onConflict: 'product_id,store_id',
           });
 
