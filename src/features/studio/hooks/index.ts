@@ -39,6 +39,10 @@ export type {
   ZoneDimData,
 } from './useStoreBounds';
 
+// 스태프 데이터 훅
+export { useStaffData, getStaffColor, STAFF_ROLE_COLORS } from './useStaffData';
+export type { StaffMember } from './useStaffData';
+
 // 배치 저장/관리 훅
 export { usePlacement } from './usePlacement';
 

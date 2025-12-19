@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 // 새 스튜디오 컴포넌트
 import { Canvas3D, SceneProvider, useScene } from './core';
 import { LayerPanel, SimulationPanel, ToolPanel, SceneSavePanel, OverlayControlPanel, PropertyPanel } from './panels';
-import { HeatmapOverlay, CustomerFlowOverlay, ZoneBoundaryOverlay, CustomerAvatarOverlay, LayoutOptimizationOverlay, FlowOptimizationOverlay, CongestionOverlay, StaffingOverlay, ZonesFloorOverlay } from './overlays';
+import { HeatmapOverlay, CustomerFlowOverlay, ZoneBoundaryOverlay, CustomerAvatarOverlay, LayoutOptimizationOverlay, FlowOptimizationOverlay, CongestionOverlay, StaffingOverlay, ZonesFloorOverlay, StaffAvatarsOverlay } from './overlays';
 import { DraggablePanel } from './components/DraggablePanel';
 import { AIOptimizationTab } from './tabs/AIOptimizationTab';
 import { AISimulationTab } from './tabs/AISimulationTab';
@@ -33,7 +33,7 @@ import {
   type CongestionResult,
   type StaffingResult,
 } from './panels/results';
-import { useStudioMode, useOverlayVisibility, useScenePersistence, useSceneSimulation, useStoreBounds } from './hooks';
+import { useStudioMode, useOverlayVisibility, useScenePersistence, useSceneSimulation, useStoreBounds, useStaffData } from './hooks';
 import { loadUserModels } from './utils';
 import type { StudioMode, Model3D, OverlayType, HeatPoint, FlowVector, ZoneBoundary, CustomerAvatar, SceneRecipe, LightingPreset, Vector3, SimulationScenario, TransformMode } from './types';
 
@@ -103,6 +103,9 @@ export default function DigitalTwinStudioPage() {
 
   // 매장 경계 및 입구 위치 (zones_dim 기반)
   const { storeBounds, entrancePosition, zonePositions, zoneSizes, zones: dbZones } = useStoreBounds();
+
+  // 실제 DB 스태프 데이터
+  const { staff: dbStaff, loading: staffLoading } = useStaffData({ storeId: selectedStore?.id });
 
   // UI 상태
   const [activeTab, setActiveTab] = useState<TabType>('layer');
@@ -599,16 +602,25 @@ export default function DigitalTwinStudioPage() {
                 {isActive('heatmap') && !sceneSimulation.state.results.layout && <HeatmapOverlay heatPoints={demoHeatPoints} />}
                 {isActive('avatar') && !sceneSimulation.state.results.staffing && <CustomerAvatarOverlay customers={demoCustomers} />}
 
-                {/* 스태프 오버레이 - 직원 위치 표시 (staffing 시뮬레이션 결과 활용) */}
+                {/* 스태프 오버레이 - 실제 DB 스태프 데이터 사용 */}
+                {isActive('staff') && dbStaff && dbStaff.length > 0 && (
+                  <StaffAvatarsOverlay
+                    staff={dbStaff}
+                    showLabels={true}
+                    showRoles={true}
+                  />
+                )}
+
+                {/* 시뮬레이션 결과 스태프 오버레이 (최적화 결과가 있을 때) */}
                 {isActive('staff') && sceneSimulation.state.results.staffing && (
                   <StaffingOverlay
                     result={sceneSimulation.state.results.staffing as any}
                     showStaffMarkers={true}
-                    showCurrentPositions={true}
+                    showCurrentPositions={false}
                     showSuggestedPositions={true}
                     showCoverageZones={false}
-                    showMovementPaths={false}
-                    animateMovement={false}
+                    showMovementPaths={true}
+                    animateMovement={true}
                   />
                 )}
 

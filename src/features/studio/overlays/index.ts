@@ -16,6 +16,9 @@ export { FlowOptimizationOverlay } from './FlowOptimizationOverlay';
 export { CongestionOverlay } from './CongestionOverlay';
 export { StaffingOverlay } from './StaffingOverlay';
 
+// 실제 DB 스태프 아바타 오버레이
+export { StaffAvatarsOverlay } from './StaffAvatarsOverlay';
+
 // 슬롯 시각화 오버레이
 export { SlotVisualizerOverlay, SlotCompatibilityPreview } from './SlotVisualizerOverlay';
 
