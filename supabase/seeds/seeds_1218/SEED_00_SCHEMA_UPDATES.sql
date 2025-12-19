@@ -77,7 +77,7 @@ CREATE TABLE furniture_slots (
   -- 슬롯 식별
   slot_id TEXT NOT NULL,
   furniture_type TEXT NOT NULL,
-  slot_type TEXT NOT NULL CHECK (slot_type IN ('hanger', 'shelf', 'hook', 'stand', 'display', 'bin', 'drawer')),
+  slot_type TEXT NOT NULL CHECK (slot_type IN ('hanger', 'shelf', 'hook', 'stand', 'display', 'bin', 'drawer', 'table', 'mannequin', 'showcase', 'rack')),
   
   -- 슬롯 위치/회전 (가구 로컬 좌표)
   slot_position JSONB DEFAULT '{"x":0,"y":0,"z":0}'::jsonb,
