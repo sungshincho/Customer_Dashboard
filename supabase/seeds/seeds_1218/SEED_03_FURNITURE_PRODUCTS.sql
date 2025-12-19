@@ -230,10 +230,10 @@ BEGIN
   -- display_round (1×4=4)
   FOR v_furn IN SELECT id, furniture_type FROM furniture WHERE store_id = v_store_id AND furniture_type LIKE 'display_round_%' LOOP
     INSERT INTO furniture_slots (id, furniture_id, store_id, user_id, slot_id, furniture_type, slot_type, slot_position, slot_rotation, compatible_display_types, max_product_width, max_product_height, max_product_depth, is_occupied, created_at, updated_at) VALUES
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'T1', v_furn.furniture_type, 'display', '{"x":0,"y":0.8,"z":0.7}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.4, 0.5, 0.4, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'T2', v_furn.furniture_type, 'display', '{"x":-0.7,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":90,"z":0}'::jsonb, ARRAY['located'], 0.4, 0.5, 0.4, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'T3', v_furn.furniture_type, 'display', '{"x":0.7,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":-90,"z":0}'::jsonb, ARRAY['located'], 0.4, 0.5, 0.4, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'T4', v_furn.furniture_type, 'display', '{"x":0,"y":0.8,"z":-0.7}'::jsonb, '{"x":0,"y":180,"z":0}'::jsonb, ARRAY['located'], 0.4, 0.5, 0.4, false, NOW(), NOW());
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'T1', v_furn.furniture_type, 'display', '{"x":0,"y":0.8,"z":0.7}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['folded','located','boxed','stacked'], 0.4, 0.5, 0.4, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'T2', v_furn.furniture_type, 'display', '{"x":-0.7,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":90,"z":0}'::jsonb, ARRAY['folded','located','boxed','stacked'], 0.4, 0.5, 0.4, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'T3', v_furn.furniture_type, 'display', '{"x":0.7,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":-90,"z":0}'::jsonb, ARRAY['folded','located','boxed','stacked'], 0.4, 0.5, 0.4, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'T4', v_furn.furniture_type, 'display', '{"x":0,"y":0.8,"z":-0.7}'::jsonb, '{"x":0,"y":180,"z":0}'::jsonb, ARRAY['folded','located','boxed','stacked'], 0.4, 0.5, 0.4, false, NOW(), NOW());
   END LOOP;
 
 
