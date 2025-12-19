@@ -32,7 +32,7 @@ function FurnitureItem({ asset, onClick }: { asset: FurnitureAsset; onClick: () 
           asset.position.y + dimensions.height / 2,
           asset.position.z
         ]}
-        rotation={[asset.rotation.x, asset.rotation.y, asset.rotation.z]}
+        rotation={[asset.rotation.x * Math.PI / 180, asset.rotation.y * Math.PI / 180, asset.rotation.z * Math.PI / 180]}
         onClick={onClick}
         castShadow
         receiveShadow
