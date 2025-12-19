@@ -276,14 +276,14 @@ END LOOP;
   -- display_bag (2×8=16)
   FOR v_furn IN SELECT id, furniture_type FROM furniture WHERE store_id = v_store_id AND furniture_type LIKE 'display_bag_%' LOOP
     INSERT INTO furniture_slots (id, furniture_id, store_id, user_id, slot_id, furniture_type, slot_type, slot_position, slot_rotation, compatible_display_types, max_product_width, max_product_height, max_product_depth, is_occupied, created_at, updated_at) VALUES
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D1-1', v_furn.furniture_type, 'display', '{"x":-0.4,"y":0.04,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D1-2', v_furn.furniture_type, 'display', '{"x":0.4,"y":0.04,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D2-1', v_furn.furniture_type, 'display', '{"x":-0.4,"y":0.42,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D2-2', v_furn.furniture_type, 'display', '{"x":0.4,"y":0.42,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D3-1', v_furn.furniture_type, 'display', '{"x":-0.4,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D3-2', v_furn.furniture_type, 'display', '{"x":0.4,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D4-1', v_furn.furniture_type, 'display', '{"x":-0.4,"y":1.18,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D4-2', v_furn.furniture_type, 'display', '{"x":0.4,"y":1.18,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','located'], 0.35, 0.35, 0.25, false, NOW(), NOW());
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D1-1', v_furn.furniture_type, 'display', '{"x":-0.4,"y":0.04,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D1-2', v_furn.furniture_type, 'display', '{"x":0.4,"y":0.04,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D2-1', v_furn.furniture_type, 'display', '{"x":-0.4,"y":0.42,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D2-2', v_furn.furniture_type, 'display', '{"x":0.4,"y":0.42,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D3-1', v_furn.furniture_type, 'display', '{"x":-0.4,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D3-2', v_furn.furniture_type, 'display', '{"x":0.4,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D4-1', v_furn.furniture_type, 'display', '{"x":-0.4,"y":1.18,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D4-2', v_furn.furniture_type, 'display', '{"x":0.4,"y":1.18,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.35, 0.35, 0.25, false, NOW(), NOW());
   END LOOP;
 
 
