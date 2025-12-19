@@ -20,6 +20,11 @@ export function FurnitureLayout({ furniture = [], onClick }: FurnitureLayoutProp
 }
 
 function FurnitureItem({ asset, onClick }: { asset: FurnitureAsset; onClick: () => void }) {
+  // degrees → radians 변환
+  const rotationX = asset.rotation.x * Math.PI / 180;
+  const rotationY = asset.rotation.y * Math.PI / 180;
+  const rotationZ = asset.rotation.z * Math.PI / 180;
+
   // Render placeholder if no model URL
   if (!asset.model_url) {
     const dimensions = asset.dimensions || { width: 2, height: 2, depth: 0.5 };
@@ -32,7 +37,7 @@ function FurnitureItem({ asset, onClick }: { asset: FurnitureAsset; onClick: () 
           asset.position.y + dimensions.height / 2,
           asset.position.z
         ]}
-        rotation={[asset.rotation.x * Math.PI / 180, asset.rotation.y * Math.PI / 180, asset.rotation.z * Math.PI / 180]}
+        rotation={[rotationX, rotationY, rotationZ]}
         onClick={onClick}
         castShadow
         receiveShadow
@@ -50,7 +55,7 @@ function FurnitureItem({ asset, onClick }: { asset: FurnitureAsset; onClick: () 
       <primitive
         object={scene.clone()}
         position={[asset.position.x, asset.position.y, asset.position.z]}
-        rotation={[asset.rotation.x, asset.rotation.y, asset.rotation.z]}
+        rotation={[rotationX, rotationY, rotationZ]}
         scale={[asset.scale.x, asset.scale.y, asset.scale.z]}
         onClick={onClick}
       />
@@ -67,7 +72,7 @@ function FurnitureItem({ asset, onClick }: { asset: FurnitureAsset; onClick: () 
           asset.position.y + dimensions.height / 2,
           asset.position.z
         ]}
-        rotation={[asset.rotation.x, asset.rotation.y, asset.rotation.z]}
+        rotation={[rotationX, rotationY, rotationZ]}
         onClick={onClick}
         castShadow
         receiveShadow
