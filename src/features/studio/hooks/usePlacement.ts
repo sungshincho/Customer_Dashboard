@@ -398,18 +398,28 @@ export function usePlacement({
   // 슬롯 점유 상태 조회
   const getSlotOccupancy = useCallback(async (slotId: string): Promise<string | null> => {
     try {
-      const { data, error } = await supabase
+      // furniture_slots에서 is_occupied 확인 후, product_placements에서 해당 슬롯의 상품 조회
+      const { data: slotData, error: slotError } = await supabase
         .from('furniture_slots')
-        .select('occupied_by_product_id')
+        .select('is_occupied')
         .eq('id', slotId)
         .eq('store_id', storeId)
-        .single();
+        .maybeSingle();
 
-      if (error) {
-        throw error;
+      if (slotError || !slotData?.is_occupied) {
+        return null;
       }
 
-      return data?.occupied_by_product_id || null;
+      // 해당 슬롯에 배치된 상품 조회
+      const { data: placementData } = await supabase
+        .from('product_placements')
+        .select('product_id')
+        .eq('slot_id', slotId)
+        .eq('store_id', storeId)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      return placementData?.product_id || null;
     } catch (err) {
       console.error('Failed to get slot occupancy:', err);
       return null;
