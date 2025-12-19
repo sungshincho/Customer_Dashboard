@@ -137,7 +137,7 @@ export function useRecommendationApplications(storeId?: string) {
         .select(`
           *,
           stores (store_name),
-          scenarios (name)
+          scenarios (scenario_name)
         `)
         .eq('org_id', orgId)
         .order('created_at', { ascending: false }) as any);
@@ -150,7 +150,7 @@ export function useRecommendationApplications(storeId?: string) {
       if (error) throw error;
       return (data || []) as unknown as (RecommendationApplication & { 
         stores: { store_name: string } | null;
-        scenarios: { name: string } | null;
+        scenarios: { scenario_name: string } | null;
       })[];
     },
     enabled: !!orgId,
