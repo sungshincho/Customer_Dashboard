@@ -86,7 +86,7 @@ function ZoneFloor({
   onClick,
 }: ZoneFloorProps) {
   // 위치 및 크기 추출
-  const x = -(zone.position_x ?? zone.coordinates?.x ?? 0);
+  const x = zone.position_x ?? zone.coordinates?.x ?? 0;
   const z = zone.position_z ?? zone.coordinates?.z ?? 0;
   const width = zone.size_width ?? zone.coordinates?.width ?? 3;
   const depth = zone.size_depth ?? zone.coordinates?.depth ?? 3;
