@@ -78,6 +78,7 @@ export function useStaffData(options: UseStaffDataOptions = {}): UseStaffDataRet
 
     try {
       // 1단계: staff 테이블에서 기본 데이터 조회 (조인 없이)
+      // 컬럼명: assigned_zone_id (zone_id 아님)
       let query = supabase
         .from('staff')
         .select(`
@@ -85,7 +86,7 @@ export function useStaffData(options: UseStaffDataOptions = {}): UseStaffDataRet
           staff_code,
           staff_name,
           role,
-          zone_id,
+          assigned_zone_id,
           avatar_url,
           avatar_position,
           is_active
@@ -107,7 +108,7 @@ export function useStaffData(options: UseStaffDataOptions = {}): UseStaffDataRet
 
       // 2단계: zones_dim에서 구역 이름 조회 (별도 쿼리)
       const zoneIds = (staffData || [])
-        .map((s: any) => s.zone_id)
+        .map((s: any) => s.assigned_zone_id)
         .filter((id: any) => id != null);
 
       let zoneMap: Record<string, string> = {};
@@ -132,8 +133,8 @@ export function useStaffData(options: UseStaffDataOptions = {}): UseStaffDataRet
         staff_code: row.staff_code || '',
         staff_name: row.staff_name || '직원',
         role: row.role || 'staff',
-        zone_id: row.zone_id,
-        zone_name: row.zone_id ? (zoneMap[row.zone_id] || '미배정') : '미배정',
+        zone_id: row.assigned_zone_id, // assigned_zone_id를 zone_id로 매핑
+        zone_name: row.assigned_zone_id ? (zoneMap[row.assigned_zone_id] || '미배정') : '미배정',
         avatar_url: row.avatar_url,
         avatar_position: parsePosition(row.avatar_position),
         is_active: row.is_active ?? true,

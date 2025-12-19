@@ -130,11 +130,12 @@ export function AISimulationTab({
   const [isAIRunning, setIsAIRunning] = useState(false);
   const [aiResults, setAIResults] = useState<Record<string, any>>({});
 
-  // 시간 포맷팅 (초 → HH:MM:SS)
+  // 시간 포맷팅 (초 → HH:MM:SS) - 음수는 0으로 처리
   const formatTime = (seconds: number): string => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = Math.floor(seconds % 60);
+    const absSeconds = Math.max(0, Math.abs(seconds));
+    const h = Math.floor(absSeconds / 3600);
+    const m = Math.floor((absSeconds % 3600) / 60);
+    const s = Math.floor(absSeconds % 60);
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 

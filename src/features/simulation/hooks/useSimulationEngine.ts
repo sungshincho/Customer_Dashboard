@@ -329,13 +329,19 @@ export function useSimulationEngine() {
       if (frameRef.current) {
         cancelAnimationFrame(frameRef.current);
       }
+      // 시뮬레이션 정지 시 lastTimeRef 리셋 (다음 시작 시 음수 delta 방지)
+      lastTimeRef.current = 0;
       return;
     }
 
     const loop = (timestamp: number) => {
-      const delta = lastTimeRef.current
-        ? (timestamp - lastTimeRef.current) / 1000
-        : 0;
+      // lastTimeRef가 0이거나 비정상적으로 오래된 경우 delta를 0으로 처리
+      let delta = 0;
+      if (lastTimeRef.current > 0) {
+        const rawDelta = (timestamp - lastTimeRef.current) / 1000;
+        // delta가 1초 이상이면 비정상 (탭 전환 등) - 스킵
+        delta = rawDelta > 0 && rawDelta < 1 ? rawDelta : 0;
+      }
       lastTimeRef.current = timestamp;
 
       // 시간 진행

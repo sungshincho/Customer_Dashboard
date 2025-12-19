@@ -1015,10 +1015,11 @@ function OverlayControlPanelIntegrated({ isActive, toggleOverlay }: OverlayContr
     }
   }, [isActive, toggleOverlay, isRunning, start, stop]);
 
-  // 시간 포맷팅
+  // 시간 포맷팅 - 음수는 0으로 처리
   const formatTime = (seconds: number): string => {
-    const m = Math.floor(seconds / 60);
-    const s = Math.floor(seconds % 60);
+    const absSeconds = Math.max(0, seconds);
+    const m = Math.floor(absSeconds / 60);
+    const s = Math.floor(absSeconds % 60);
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
