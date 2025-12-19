@@ -109,13 +109,21 @@ export default function DigitalTwinStudioPage() {
 
   // 스태프 데이터 디버깅
   useEffect(() => {
-    console.log('[DigitalTwinStudio] Staff data state:', {
-      storeId: selectedStore?.id,
+    const debugInfo = {
+      selectedStoreId: selectedStore?.id,
+      selectedStoreName: selectedStore?.store_name,
+      expectedStoreId: 'd9830554-2688-4032-af40-acccda787ac4',
+      idMatch: selectedStore?.id === 'd9830554-2688-4032-af40-acccda787ac4',
       staffCount: dbStaff?.length || 0,
       staffLoading,
       staffError: staffError?.message,
-      staffData: dbStaff,
-    });
+    };
+    console.log('%c[DigitalTwinStudio] Staff Debug', 'background: yellow; color: black; font-size: 14px', debugInfo);
+
+    // window에도 저장
+    if (typeof window !== 'undefined') {
+      (window as any).__studioDebug = debugInfo;
+    }
   }, [selectedStore?.id, dbStaff, staffLoading, staffError]);
 
   // UI 상태

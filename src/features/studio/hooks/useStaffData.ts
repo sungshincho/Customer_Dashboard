@@ -66,14 +66,17 @@ export function useStaffData(options: UseStaffDataOptions = {}): UseStaffDataRet
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  // 디버깅: 훅 호출 즉시 로그
-  console.log('[useStaffData] Hook called with storeId:', storeId);
+  // 디버깅: window 객체에도 저장 (콘솔에서 확인 가능)
+  if (typeof window !== 'undefined') {
+    (window as any).__staffDebug = { storeId, loading, staffCount: staff.length };
+  }
+  console.log('%c[useStaffData] Hook called', 'color: red; font-weight: bold', { storeId, activeOnly });
 
   const fetchStaff = async () => {
-    console.log('[useStaffData] fetchStaff called, storeId:', storeId);
+    console.log('%c[useStaffData] fetchStaff called', 'color: blue; font-weight: bold', { storeId });
 
     if (!storeId) {
-      console.log('[useStaffData] No storeId, returning empty');
+      console.log('%c[useStaffData] No storeId!', 'color: orange; font-weight: bold');
       setStaff([]);
       setLoading(false);
       return;
@@ -110,8 +113,18 @@ export function useStaffData(options: UseStaffDataOptions = {}): UseStaffDataRet
         throw new Error(staffError.message);
       }
 
-      console.log('[useStaffData] Raw staff data:', staffData);
-      console.log('[useStaffData] Query used storeId:', storeId, '| Expected: d9830554-2688-4032-af40-acccda787ac4');
+      console.log('%c[useStaffData] Query SUCCESS', 'color: green; font-weight: bold', {
+        rowCount: staffData?.length || 0,
+        storeId,
+        expectedStoreId: 'd9830554-2688-4032-af40-acccda787ac4',
+        match: storeId === 'd9830554-2688-4032-af40-acccda787ac4',
+        rawData: staffData,
+      });
+
+      // window에도 저장
+      if (typeof window !== 'undefined') {
+        (window as any).__staffQueryResult = staffData;
+      }
 
       // 2단계: zones_dim에서 구역 이름 조회 (별도 쿼리)
       const zoneIds = (staffData || [])
@@ -147,7 +160,16 @@ export function useStaffData(options: UseStaffDataOptions = {}): UseStaffDataRet
         is_active: row.is_active ?? true,
       }));
 
-      console.log('[useStaffData] Loaded staff:', staffMembers.length, 'members', staffMembers);
+      console.log('%c[useStaffData] LOADED', 'color: purple; font-weight: bold; font-size: 14px', {
+        count: staffMembers.length,
+        members: staffMembers,
+      });
+
+      // window에 최종 결과 저장
+      if (typeof window !== 'undefined') {
+        (window as any).__staffMembers = staffMembers;
+      }
+
       setStaff(staffMembers);
     } catch (err) {
       console.error('[useStaffData] Error:', err);
