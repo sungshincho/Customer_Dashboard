@@ -105,7 +105,18 @@ export default function DigitalTwinStudioPage() {
   const { storeBounds, entrancePosition, zonePositions, zoneSizes, zones: dbZones } = useStoreBounds();
 
   // 실제 DB 스태프 데이터
-  const { staff: dbStaff, loading: staffLoading } = useStaffData({ storeId: selectedStore?.id });
+  const { staff: dbStaff, loading: staffLoading, error: staffError } = useStaffData({ storeId: selectedStore?.id });
+
+  // 스태프 데이터 디버깅
+  useEffect(() => {
+    console.log('[DigitalTwinStudio] Staff data state:', {
+      storeId: selectedStore?.id,
+      staffCount: dbStaff?.length || 0,
+      staffLoading,
+      staffError: staffError?.message,
+      staffData: dbStaff,
+    });
+  }, [selectedStore?.id, dbStaff, staffLoading, staffError]);
 
   // UI 상태
   const [activeTab, setActiveTab] = useState<TabType>('layer');
@@ -610,13 +621,58 @@ export default function DigitalTwinStudioPage() {
                 {isActive('avatar') && !sceneSimulation.state.results.staffing && <CustomerAvatarOverlay customers={demoCustomers} />}
 
                 {/* 스태프 오버레이 - 실제 DB 스태프 데이터 사용 */}
-                {isActive('staff') && dbStaff && dbStaff.length > 0 && (
-                  <StaffAvatarsOverlay
-                    staff={dbStaff}
-                    showLabels={true}
-                    showRoles={true}
-                  />
-                )}
+                {(() => {
+                  const staffActive = isActive('staff');
+                  const hasStaffData = dbStaff && dbStaff.length > 0;
+                  console.log('[DigitalTwinStudio] Staff overlay render check:', {
+                    staffActive,
+                    hasStaffData,
+                    staffCount: dbStaff?.length || 0,
+                    zonePositions: Object.keys(zonePositions || {}).length,
+                  });
+
+                  if (staffActive && hasStaffData) {
+                    // 스태프 위치가 (0,0,0)인 경우 zone 위치를 fallback으로 사용
+                    const staffWithPositions = dbStaff.map((s, idx) => {
+                      const pos = s.avatar_position;
+                      const isZeroPosition = pos.x === 0 && pos.y === 0 && pos.z === 0;
+
+                      if (isZeroPosition && s.zone_id && zonePositions[s.zone_id]) {
+                        // zone 위치 기반 fallback
+                        const zonePos = zonePositions[s.zone_id];
+                        return {
+                          ...s,
+                          avatar_position: {
+                            x: zonePos.x + (idx % 3) * 1.5 - 1.5,
+                            y: 0,
+                            z: zonePos.z + Math.floor(idx / 3) * 1.5 - 1.5,
+                          },
+                        };
+                      } else if (isZeroPosition) {
+                        // zone 없으면 그리드 배치
+                        return {
+                          ...s,
+                          avatar_position: {
+                            x: -5 + (idx % 4) * 3,
+                            y: 0,
+                            z: -3 + Math.floor(idx / 4) * 3,
+                          },
+                        };
+                      }
+                      return s;
+                    });
+
+                    console.log('[DigitalTwinStudio] Rendering staff with positions:', staffWithPositions);
+                    return (
+                      <StaffAvatarsOverlay
+                        staff={staffWithPositions}
+                        showLabels={true}
+                        showRoles={true}
+                      />
+                    );
+                  }
+                  return null;
+                })()}
 
                 {/* 시뮬레이션 결과 스태프 오버레이 (최적화 결과가 있을 때) */}
                 {isActive('staff') && sceneSimulation.state.results.staffing && (
