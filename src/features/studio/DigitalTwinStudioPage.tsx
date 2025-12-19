@@ -13,7 +13,7 @@ import { useLocation } from 'react-router-dom';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, Loader2, Sparkles, Layers, Save, Play, GitCompare } from 'lucide-react';
+import { AlertCircle, Loader2, Sparkles, Layers, Save, Play, GitCompare, Pause, Square, RotateCcw, Users } from 'lucide-react';
 import { toast } from 'sonner';
 
 // 새 스튜디오 컴포넌트
@@ -41,6 +41,7 @@ import type { StudioMode, Model3D, OverlayType, HeatPoint, FlowVector, ZoneBound
 import { useStoreContext } from '@/features/simulation/hooks/useStoreContext';
 import { useEnhancedAIInference } from '@/features/simulation/hooks/useEnhancedAIInference';
 import { useDateFilterStore } from '@/store/dateFilterStore';
+import { useSimulationStore, STATE_COLORS, STATE_LABELS, type CustomerState } from '@/stores/simulationStore';
 
 // 타입 변환 헬퍼
 interface ModelLayer {
@@ -596,8 +597,20 @@ export default function DigitalTwinStudioPage() {
 
                 {/* 기본 오버레이 (데모 데이터) */}
                 {isActive('heatmap') && !sceneSimulation.state.results.layout && <HeatmapOverlay heatPoints={demoHeatPoints} />}
-                {isActive('flow') && !sceneSimulation.state.results.flow && <CustomerFlowOverlay flows={demoFlows} />}
                 {isActive('avatar') && !sceneSimulation.state.results.staffing && <CustomerAvatarOverlay customers={demoCustomers} />}
+
+                {/* 스태프 오버레이 - 직원 위치 표시 (staffing 시뮬레이션 결과 활용) */}
+                {isActive('staff') && sceneSimulation.state.results.staffing && (
+                  <StaffingOverlay
+                    result={sceneSimulation.state.results.staffing as any}
+                    showStaffMarkers={true}
+                    showCurrentPositions={true}
+                    showSuggestedPositions={true}
+                    showCoverageZones={false}
+                    showMovementPaths={false}
+                    animateMovement={false}
+                  />
+                )}
 
                 {/* 시뮬레이션 결과 오버레이 */}
                 {sceneSimulation.state.results.layout && (
@@ -737,38 +750,12 @@ export default function DigitalTwinStudioPage() {
               </DraggablePanel>
             )}
 
-            {/* 오버레이 컨트롤 패널 */}
+            {/* 오버레이 컨트롤 패널 (고객 시뮬레이션 통합) */}
             {visiblePanels.overlay && (
-              <DraggablePanel
-                id="overlay"
-                title="오버레이"
-                icon={<Layers className="w-4 h-4" />}
-                defaultPosition={{ x: 352, y: 60 }}
-                defaultCollapsed={true}
-                width="w-48"
-              >
-                <div className="space-y-2">
-                  {[
-                    { id: 'heatmap', label: '히트맵' },
-                    { id: 'flow', label: '동선' },
-                    { id: 'zone', label: '구역' },
-                    { id: 'avatar', label: '고객' },
-                  ].map((overlay) => (
-                    <label
-                      key={overlay.id}
-                      className="flex items-center gap-2 text-xs text-white/80 cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isActive(overlay.id as OverlayType)}
-                        onChange={() => toggleOverlay(overlay.id as OverlayType)}
-                        className="w-3 h-3 rounded"
-                      />
-                      {overlay.label}
-                    </label>
-                  ))}
-                </div>
-              </DraggablePanel>
+              <OverlayControlPanelIntegrated
+                isActive={isActive}
+                toggleOverlay={toggleOverlay}
+              />
             )}
 
             {/* 씬 저장 패널 */}
@@ -911,6 +898,200 @@ interface SimulationResultPanelsProps {
   };
   onClose: (panel: 'layoutResult' | 'flowResult' | 'congestionResult' | 'staffingResult') => void;
   toggleOverlay: (overlay: string) => void;
+}
+
+// ============================================================================
+// 통합 오버레이 컨트롤 패널 (고객 시뮬레이션 통합)
+// ============================================================================
+interface OverlayControlPanelIntegratedProps {
+  isActive: (overlayId: OverlayType) => boolean;
+  toggleOverlay: (overlayId: OverlayType) => void;
+}
+
+function OverlayControlPanelIntegrated({ isActive, toggleOverlay }: OverlayControlPanelIntegratedProps) {
+  // 시뮬레이션 스토어
+  const {
+    isRunning,
+    isPaused,
+    simulationTime,
+    kpi,
+    config,
+    start,
+    pause,
+    resume,
+    stop,
+    reset,
+    setSpeed,
+  } = useSimulationStore();
+
+  // 고객 오버레이 토글 핸들러 (시뮬레이션 연동)
+  const handleAvatarToggle = useCallback(() => {
+    const wasActive = isActive('avatar');
+    toggleOverlay('avatar');
+
+    // 고객 오버레이가 활성화되면 시뮬레이션 시작
+    if (!wasActive && !isRunning) {
+      start();
+      toast.success('고객 시뮬레이션이 시작되었습니다');
+    }
+    // 비활성화되면 시뮬레이션 중지
+    else if (wasActive && isRunning) {
+      stop();
+    }
+  }, [isActive, toggleOverlay, isRunning, start, stop]);
+
+  // 시간 포맷팅
+  const formatTime = (seconds: number): string => {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <DraggablePanel
+      id="overlay"
+      title="오버레이"
+      icon={<Layers className="w-4 h-4" />}
+      defaultPosition={{ x: 352, y: 60 }}
+      defaultCollapsed={true}
+      width="w-56"
+    >
+      <div className="space-y-3">
+        {/* 기본 오버레이 토글 */}
+        <div className="space-y-2">
+          {[
+            { id: 'heatmap', label: '히트맵', icon: '🔥' },
+            { id: 'zone', label: '구역', icon: '📍' },
+          ].map((overlay) => (
+            <label
+              key={overlay.id}
+              className="flex items-center gap-2 text-xs text-white/80 cursor-pointer hover:text-white transition-colors"
+            >
+              <input
+                type="checkbox"
+                checked={isActive(overlay.id as OverlayType)}
+                onChange={() => toggleOverlay(overlay.id as OverlayType)}
+                className="w-3 h-3 rounded"
+              />
+              <span>{overlay.icon}</span>
+              {overlay.label}
+            </label>
+          ))}
+        </div>
+
+        {/* 구분선 */}
+        <div className="border-t border-white/10" />
+
+        {/* 고객 시뮬레이션 섹션 */}
+        <div className="space-y-2">
+          <label className="flex items-center gap-2 text-xs text-white/80 cursor-pointer hover:text-white transition-colors">
+            <input
+              type="checkbox"
+              checked={isActive('avatar')}
+              onChange={handleAvatarToggle}
+              className="w-3 h-3 rounded"
+            />
+            <Users className="w-3 h-3 text-green-400" />
+            고객 (실시간)
+          </label>
+
+          {/* 시뮬레이션 컨트롤 (고객 활성화시) */}
+          {isActive('avatar') && (
+            <div className="pl-5 space-y-2">
+              {/* 시간 & 상태 */}
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="text-white/40">경과: {formatTime(simulationTime)}</span>
+                <span className={isRunning ? (isPaused ? 'text-yellow-400' : 'text-green-400') : 'text-white/40'}>
+                  {isRunning ? (isPaused ? '일시정지' : '실행중') : '대기'}
+                </span>
+              </div>
+
+              {/* 컨트롤 버튼 */}
+              <div className="flex gap-1">
+                <Button
+                  onClick={() => {
+                    if (!isRunning) start();
+                    else if (isPaused) resume();
+                    else pause();
+                  }}
+                  size="sm"
+                  className={`flex-1 h-6 text-[10px] ${isRunning && !isPaused ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-green-600 hover:bg-green-700'}`}
+                >
+                  {!isRunning ? <Play className="w-3 h-3" /> : isPaused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
+                </Button>
+                <Button onClick={stop} disabled={!isRunning} size="sm" variant="destructive" className="h-6 w-6 p-0">
+                  <Square className="w-3 h-3" />
+                </Button>
+                <Button onClick={reset} size="sm" variant="outline" className="h-6 w-6 p-0 border-white/20">
+                  <RotateCcw className="w-3 h-3" />
+                </Button>
+              </div>
+
+              {/* 속도 조절 */}
+              <div className="flex gap-0.5">
+                {[1, 2, 4, 10].map((speed) => (
+                  <Button
+                    key={speed}
+                    onClick={() => setSpeed(speed)}
+                    size="sm"
+                    variant={config.speed === speed ? 'default' : 'outline'}
+                    className={`flex-1 h-5 text-[9px] px-1 ${config.speed === speed ? 'bg-blue-600' : 'border-white/20 text-white/60'}`}
+                  >
+                    {speed}x
+                  </Button>
+                ))}
+              </div>
+
+              {/* 실시간 KPI (실행 중일 때) */}
+              {isRunning && (
+                <div className="grid grid-cols-2 gap-1 text-[9px]">
+                  <div className="bg-white/5 rounded px-1.5 py-1">
+                    <span className="text-white/40">고객</span>
+                    <div className="text-white font-bold">{kpi.currentCustomers}</div>
+                  </div>
+                  <div className="bg-white/5 rounded px-1.5 py-1">
+                    <span className="text-white/40">전환</span>
+                    <div className="text-green-400 font-bold">{kpi.conversions}</div>
+                  </div>
+                </div>
+              )}
+
+              {/* 고객 상태 범례 */}
+              <div className="pt-1 border-t border-white/10">
+                <div className="text-[9px] text-white/40 mb-1">상태 범례</div>
+                <div className="grid grid-cols-3 gap-x-1 gap-y-0.5">
+                  {(Object.entries(STATE_LABELS) as [CustomerState, string][]).map(([state, label]) => (
+                    <div key={state} className="flex items-center gap-1">
+                      <div
+                        className="w-1.5 h-1.5 rounded-full"
+                        style={{ backgroundColor: STATE_COLORS[state] }}
+                      />
+                      <span className="text-[8px] text-white/50">{label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 구분선 */}
+        <div className="border-t border-white/10" />
+
+        {/* 스태프 오버레이 */}
+        <label className="flex items-center gap-2 text-xs text-white/80 cursor-pointer hover:text-white transition-colors">
+          <input
+            type="checkbox"
+            checked={isActive('staff')}
+            onChange={() => toggleOverlay('staff')}
+            className="w-3 h-3 rounded"
+          />
+          <span>👤</span>
+          스태프
+        </label>
+      </div>
+    </DraggablePanel>
+  );
 }
 
 function SimulationResultPanels({

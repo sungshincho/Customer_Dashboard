@@ -97,7 +97,7 @@ export function LayoutOptimizationOverlay({
 
   return (
     <group name="layout-optimization-overlay">
-      {/* 변경 전 히트맵 */}
+      {/* 변경 전 히트맵 (비교 모드에서만 표시) */}
       {showBefore && visualization.beforeHeatmap.length > 0 && (
         <HeatmapMesh
           points={visualization.beforeHeatmap}
@@ -109,17 +109,10 @@ export function LayoutOptimizationOverlay({
         />
       )}
 
-      {/* 변경 후 히트맵 */}
-      {showAfter && visualization.afterHeatmap.length > 0 && (
-        <HeatmapMesh
-          points={visualization.afterHeatmap}
-          color="#22c55e"
-          opacity={0.5}
-          heightScale={1.5}
-          label="변경 후"
-          storeBounds={storeBounds}
-        />
-      )}
+      {/* 변경 후 히트맵 - 초록색 바닥 영역 시각화 삭제됨 (사용자 요청)
+       * 기존: showAfter && afterHeatmap -> 초록색(#22c55e) 바닥면 표시
+       * 제거: AI 최적화 실행 시 바닥에 표시되던 초록색 영역
+       */}
 
       {/* 가구 이동 경로 */}
       {showMoves && furnitureMoves.map((move, idx) => (
