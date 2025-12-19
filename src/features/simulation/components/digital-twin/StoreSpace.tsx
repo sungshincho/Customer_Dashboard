@@ -62,11 +62,18 @@ export function StoreSpace({ asset, onClick }: StoreSpaceProps) {
       return cloned;
     }, [scene, shouldUseBaked]);
 
+    // degrees → radians 변환
+    const rotation: [number, number, number] = [
+      asset.rotation.x * Math.PI / 180,
+      asset.rotation.y * Math.PI / 180,
+      asset.rotation.z * Math.PI / 180,
+    ];
+
     return (
       <primitive
         object={clonedScene}
         position={[asset.position.x, asset.position.y, asset.position.z]}
-        rotation={[asset.rotation.x, asset.rotation.y, asset.rotation.z]}
+        rotation={rotation}
         scale={[asset.scale.x, asset.scale.y, asset.scale.z]}
         onClick={onClick}
       />
