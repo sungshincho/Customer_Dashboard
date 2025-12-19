@@ -77,7 +77,7 @@ export function useStaffData(options: UseStaffDataOptions = {}): UseStaffDataRet
     setError(null);
 
     try {
-      // staff 테이블에서 데이터 조회 (zone 정보 조인)
+      // 1단계: staff 테이블에서 기본 데이터 조회 (조인 없이)
       let query = supabase
         .from('staff')
         .select(`
@@ -88,10 +88,7 @@ export function useStaffData(options: UseStaffDataOptions = {}): UseStaffDataRet
           zone_id,
           avatar_url,
           avatar_position,
-          is_active,
-          zones_dim!zone_id (
-            zone_name
-          )
+          is_active
         `)
         .eq('store_id', storeId);
 
@@ -99,31 +96,55 @@ export function useStaffData(options: UseStaffDataOptions = {}): UseStaffDataRet
         query = query.eq('is_active', true);
       }
 
-      const { data, error: queryError } = await query;
+      const { data: staffData, error: staffError } = await query;
 
-      if (queryError) {
-        console.error('[useStaffData] Query error:', queryError);
-        throw new Error(queryError.message);
+      if (staffError) {
+        console.error('[useStaffData] Staff query error:', staffError);
+        throw new Error(staffError.message);
+      }
+
+      console.log('[useStaffData] Raw staff data:', staffData);
+
+      // 2단계: zones_dim에서 구역 이름 조회 (별도 쿼리)
+      const zoneIds = (staffData || [])
+        .map((s: any) => s.zone_id)
+        .filter((id: any) => id != null);
+
+      let zoneMap: Record<string, string> = {};
+
+      if (zoneIds.length > 0) {
+        const { data: zonesData } = await supabase
+          .from('zones_dim')
+          .select('id, zone_name')
+          .in('id', zoneIds);
+
+        if (zonesData) {
+          zoneMap = zonesData.reduce((acc: Record<string, string>, z: any) => {
+            acc[z.id] = z.zone_name;
+            return acc;
+          }, {});
+        }
       }
 
       // 데이터 변환
-      const staffMembers: StaffMember[] = (data || []).map((row: any) => ({
+      const staffMembers: StaffMember[] = (staffData || []).map((row: any) => ({
         id: row.id,
-        staff_code: row.staff_code,
-        staff_name: row.staff_name,
+        staff_code: row.staff_code || '',
+        staff_name: row.staff_name || '직원',
         role: row.role || 'staff',
         zone_id: row.zone_id,
-        zone_name: row.zones_dim?.zone_name || '미배정',
+        zone_name: row.zone_id ? (zoneMap[row.zone_id] || '미배정') : '미배정',
         avatar_url: row.avatar_url,
         avatar_position: parsePosition(row.avatar_position),
-        is_active: row.is_active,
+        is_active: row.is_active ?? true,
       }));
 
-      console.log('[useStaffData] Loaded staff:', staffMembers.length, 'members');
+      console.log('[useStaffData] Loaded staff:', staffMembers.length, 'members', staffMembers);
       setStaff(staffMembers);
     } catch (err) {
       console.error('[useStaffData] Error:', err);
       setError(err instanceof Error ? err : new Error('Failed to fetch staff data'));
+      setStaff([]); // 에러 시 빈 배열 설정
     } finally {
       setLoading(false);
     }

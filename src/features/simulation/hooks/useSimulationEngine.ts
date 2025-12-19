@@ -1,5 +1,7 @@
-import { useEffect, useRef, useCallback } from 'react';
-import { useSimulationStore, CustomerAgent, ZoneMetric } from '@/stores/simulationStore';
+import { useEffect, useRef, useCallback, useState } from 'react';
+import { useSimulationStore, CustomerAgent, ZoneMetric, STATE_COLORS } from '@/stores/simulationStore';
+import { supabase } from '@/integrations/supabase/client';
+import { useSelectedStore } from '@/hooks/useSelectedStore';
 
 /**
  * 시뮬레이션 엔진 훅
@@ -10,6 +12,11 @@ import { useSimulationStore, CustomerAgent, ZoneMetric } from '@/stores/simulati
 export function useSimulationEngine() {
   const frameRef = useRef<number>();
   const lastTimeRef = useRef<number>(0);
+  const { selectedStore } = useSelectedStore();
+
+  // 고객 아바타 URL 캐시 (DB에서 로드)
+  const [customerAvatars, setCustomerAvatars] = useState<string[]>([]);
+  const avatarIndexRef = useRef(0);
 
   const {
     status,
@@ -25,6 +32,31 @@ export function useSimulationEngine() {
     setResults,
   } = useSimulationStore();
 
+  // 고객 아바타 URL 로드 (DB에서)
+  useEffect(() => {
+    const loadCustomerAvatars = async () => {
+      if (!selectedStore?.id) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('customers')
+          .select('avatar_url')
+          .eq('store_id', selectedStore.id)
+          .not('avatar_url', 'is', null);
+
+        if (!error && data && data.length > 0) {
+          const urls = data.map((c: any) => c.avatar_url).filter(Boolean);
+          setCustomerAvatars(urls);
+          console.log('[SimulationEngine] Loaded customer avatars:', urls.length);
+        }
+      } catch (err) {
+        console.error('[SimulationEngine] Failed to load customer avatars:', err);
+      }
+    };
+
+    loadCustomerAvatars();
+  }, [selectedStore?.id]);
+
   /**
    * 새로운 고객 에이전트 생성
    */
@@ -37,6 +69,16 @@ export function useSimulationEngine() {
       zones.find((z) => z.metadata?.isEntrance || z.metadata?.zone_type === 'entrance') ||
       zones[0];
 
+    // 상태별 색상 사용
+    const initialState = 'entering';
+
+    // DB에서 로드한 아바타 URL 순환 사용
+    let avatarUrl: string | undefined;
+    if (customerAvatars.length > 0) {
+      avatarUrl = customerAvatars[avatarIndexRef.current % customerAvatars.length];
+      avatarIndexRef.current++;
+    }
+
     const newCustomer: CustomerAgent = {
       id: `customer-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       position: [...entranceZone.position] as [number, number, number],
@@ -45,17 +87,18 @@ export function useSimulationEngine() {
       currentZone: entranceZone.id,
       visitedZones: [entranceZone.id],
       behavior: 'browsing',
-      state: 'entering',
+      state: initialState,
       speed: 1 + Math.random() * 0.5,
       enteredAt: Date.now(),
       dwellTime: 0,
       purchaseProbability: 0.15 + Math.random() * 0.2,
-      color: '#60A5FA',
+      color: STATE_COLORS[initialState],
       path: [[...entranceZone.position] as [number, number, number]],
+      avatar_url: avatarUrl, // DB에서 로드한 GLB 모델 URL
     };
 
     addCustomer(newCustomer);
-  }, [entities, addCustomer]);
+  }, [entities, addCustomer, customerAvatars]);
 
   /**
    * 고객 에이전트 이동 및 행동 업데이트
