@@ -186,7 +186,7 @@ export const useSimulationStore = create<SimulationState>()(
     status: 'stopped',
     config: {
       mode: 'idle',
-      duration: 3600,
+      duration: 0, // 0 = 무한 실행 (자동 완료 없음)
       speed: 1,
       parameters: {},
       // 실시간 시뮬레이션 기본값
@@ -245,6 +245,7 @@ export const useSimulationStore = create<SimulationState>()(
         status: 'running',
         realStartTime: Date.now(),
         simulationTime: 0,
+        currentTime: 0, // currentTime도 함께 리셋
         customers: [],
         kpi: { ...defaultKPI },
       });
@@ -381,10 +382,14 @@ export const useSimulationStore = create<SimulationState>()(
       if (state.status !== 'running' && !state.isRunning) return;
       if (state.isPaused) return;
 
-      const speedMultiplier = state.config.speed;
-      const newTime = state.currentTime + deltaTime * speedMultiplier;
-      const newSimTime = state.simulationTime + deltaTime * speedMultiplier;
+      // deltaTime이 음수거나 비정상적으로 크면 무시
+      if (deltaTime < 0 || deltaTime > 1) return;
 
+      const speedMultiplier = state.config.speed;
+      const newTime = Math.max(0, state.currentTime + deltaTime * speedMultiplier);
+      const newSimTime = Math.max(0, state.simulationTime + deltaTime * speedMultiplier);
+
+      // duration이 0이면 무한 실행 (완료 조건 없음)
       if (state.config.duration > 0 && newTime >= state.config.duration) {
         set({ status: 'completed', currentTime: state.config.duration, simulationTime: newSimTime });
         return;
