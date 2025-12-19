@@ -59,6 +59,7 @@ export interface CustomerAgent {
   purchaseProbability: number;
   color: string;
   path: [number, number, number][];
+  avatar_url?: string; // GLB 모델 URL (customers 테이블에서 로드)
 }
 
 // 실시간 KPI 타입
