@@ -271,75 +271,132 @@ END LOOP;
   RAISE NOTICE '    - Dormant: 250명';
   RAISE NOTICE '    ✓ customers: 2,500건 삽입';
 
-  -- ══════════════════════════════════════════════════════════════════════════
-  -- STEP 3.2: staff (8명)
-  -- ══════════════════════════════════════════════════════════════════════════
+-- ══════════════════════════════════════════════════════════════════════════
+-- STEP 3.2: staff (8명) - avatar 컬럼 직접 설정
+-- ══════════════════════════════════════════════════════════════════════════
   RAISE NOTICE '  [STEP 3.2] staff 시딩 (8명)...';
 
-  INSERT INTO staff (id, store_id, org_id, user_id, staff_code, staff_name, role, email, phone, department, is_active, metadata, created_at, updated_at) VALUES
-(gen_random_uuid(), v_store_id, v_org_id, v_user_id, 'EMP001', '매니저', 'manager', 'manager@store.com', '010-1111-0001', '관리', true, '{"zone":"Z002","avatar_url":"avatar_manager_01.glb"}', NOW(), NOW()),
-(gen_random_uuid(), v_store_id, v_org_id, v_user_id, 'EMP002', '판매직원 1', 'sales', 'sales1@store.com', '010-1111-0002', '판매', true, '{"zone":"Z003","avatar_url":"avatar_sales_01.glb"}', NOW(), NOW()),
-(gen_random_uuid(), v_store_id, v_org_id, v_user_id, 'EMP003', '판매직원 2', 'sales', 'sales2@store.com', '010-1111-0003', '판매', true, '{"zone":"Z004","avatar_url":"avatar_sales_02.glb"}', NOW(), NOW()),
-(gen_random_uuid(), v_store_id, v_org_id, v_user_id, 'EMP004', '계산원 1', 'cashier', 'cashier1@store.com', '010-1111-0004', '계산', true, '{"zone":"Z006","avatar_url":"avatar_cashier_01.glb"}', NOW(), NOW()),
-(gen_random_uuid(), v_store_id, v_org_id, v_user_id, 'EMP005', '계산원 2', 'cashier', 'cashier2@store.com', '010-1111-0005', '계산', true, '{"zone":"Z006","avatar_url":"avatar_cashier_02.glb"}', NOW(), NOW()),
-(gen_random_uuid(), v_store_id, v_org_id, v_user_id, 'EMP006', '보안요원', 'security', 'security@store.com', '010-1111-0006', '보안', true, '{"zone":"Z001","avatar_url":"avatar_security_01.glb"}', NOW(), NOW()),
-(gen_random_uuid(), v_store_id, v_org_id, v_user_id, 'EMP007', '피팅룸 담당', 'fitting', 'fitting@store.com', '010-1111-0007', '피팅', true, '{"zone":"Z005","avatar_url":"avatar_fitting_01.glb"}', NOW(), NOW()),
-(gen_random_uuid(), v_store_id, v_org_id, v_user_id, 'EMP008', '안내직원', 'greeter', 'greeter@store.com', '010-1111-0008', '안내', true, '{"zone":"Z001","avatar_url":"avatar_greeter_01.glb"}', NOW(), NOW());
+  INSERT INTO staff (
+    id, store_id, org_id, user_id, 
+    staff_code, staff_name, role, email, phone, department,
+    avatar_url, avatar_position, assigned_zone_id,
+    is_active, metadata, created_at, updated_at
+  ) VALUES
+  -- 매니저 - Z002 메인홀
+  (
+    gen_random_uuid(), v_store_id, v_org_id, v_user_id,
+    'EMP001', '매니저', 'manager', 'manager@store.com', '010-1111-0001', '관리',
+    'avatar_manager_01.glb',
+    '{"x":0,"y":0,"z":0.5}'::jsonb,
+    v_zone_main,
+    true, '{"zone":"Z002"}', NOW(), NOW()
+  ),
+  -- 판매직원 1 - Z003 의류존
+  (
+    gen_random_uuid(), v_store_id, v_org_id, v_user_id,
+    'EMP002', '판매직원 1', 'sales', 'sales1@store.com', '010-1111-0002', '판매',
+    'avatar_sales_01.glb',
+    '{"x":-7.5,"y":0,"z":-3}'::jsonb,
+    v_zone_clothing,
+    true, '{"zone":"Z003"}', NOW(), NOW()
+  ),
+  -- 판매직원 2 - Z004 액세서리존
+  (
+    gen_random_uuid(), v_store_id, v_org_id, v_user_id,
+    'EMP003', '판매직원 2', 'sales', 'sales2@store.com', '010-1111-0003', '판매',
+    'avatar_sales_02.glb',
+    '{"x":6.5,"y":0,"z":-3.5}'::jsonb,
+    v_zone_accessory,
+    true, '{"zone":"Z004"}', NOW(), NOW()
+  ),
+  -- 계산원 1 - Z006 계산대
+  (
+    gen_random_uuid(), v_store_id, v_org_id, v_user_id,
+    'EMP004', '계산원 1', 'cashier', 'cashier1@store.com', '010-1111-0004', '계산',
+    'avatar_cashier_01.glb',
+    '{"x":7,"y":0,"z":6.7}'::jsonb,
+    v_zone_checkout,
+    true, '{"zone":"Z006"}', NOW(), NOW()
+  ),
+  -- 계산원 2 - Z006 계산대
+  (
+    gen_random_uuid(), v_store_id, v_org_id, v_user_id,
+    'EMP005', '계산원 2', 'cashier', 'cashier2@store.com', '010-1111-0005', '계산',
+    'avatar_cashier_02.glb',
+    '{"x":7,"y":0,"z":5.7}'::jsonb,
+    v_zone_checkout,
+    true, '{"zone":"Z006"}', NOW(), NOW()
+  ),
+  -- 보안요원 - Z001 입구
+  (
+    gen_random_uuid(), v_store_id, v_org_id, v_user_id,
+    'EMP006', '보안요원', 'security', 'security@store.com', '010-1111-0006', '보안',
+    'avatar_security_01.glb',
+    '{"x":-1,"y":0,"z":-8.5}'::jsonb,
+    v_zone_entrance,
+    true, '{"zone":"Z001"}', NOW(), NOW()
+  ),
+  -- 피팅룸 담당 - Z005 피팅룸
+  (
+    gen_random_uuid(), v_store_id, v_org_id, v_user_id,
+    'EMP007', '피팅룸 담당', 'fitting', 'fitting@store.com', '010-1111-0007', '피팅',
+    'avatar_fitting_01.glb',
+    '{"x":-7,"y":0,"z":5.5}'::jsonb,
+    v_zone_fitting,
+    true, '{"zone":"Z005"}', NOW(), NOW()
+  ),
+  -- 안내직원 - Z001 입구
+  (
+    gen_random_uuid(), v_store_id, v_org_id, v_user_id,
+    'EMP008', '안내직원', 'greeter', 'greeter@store.com', '010-1111-0008', '안내',
+    'avatar_greeter_01.glb',
+    '{"x":1,"y":0,"z":-8.5}'::jsonb,
+    v_zone_entrance,
+    true, '{"zone":"Z001"}', NOW(), NOW()
+  );
 
   RAISE NOTICE '    ✓ staff: 8건 삽입';
 
--- ══════════════════════════════════════════════════════════════════════════
--- STEP 3.2.1: staff_assignments (8명 배치) - 신규 추가
--- ══════════════════════════════════════════════════════════════════════════
+  -- ══════════════════════════════════════════════════════════════════════════
+  -- STEP 3.2.1: staff_assignments (8명 배치)
+  -- staff 테이블 데이터 기반으로 자동 생성
+  -- ══════════════════════════════════════════════════════════════════════════
   RAISE NOTICE '  [STEP 3.2.1] staff_assignments 시딩 (8명 배치)...';
 
-  -- 매니저 - Z002 메인홀
-  INSERT INTO staff_assignments (id, store_id, user_id, org_id, staff_name, staff_role, zone_id, position_x, position_y, position_z, shift_start, shift_end, assigned_date, status, is_ai_suggested, efficiency_score, properties, created_at, updated_at)
-  SELECT gen_random_uuid(), v_store_id, v_user_id, v_org_id, '매니저', 'manager', v_zone_main, 0, 0, 0.5, '09:00'::TIME, '18:00'::TIME, CURRENT_DATE, 'active', false, 92.5,
-    jsonb_build_object('staff_id', s.id, 'avatar_url', s.metadata->>'avatar_url', 'assigned_zone_code', 'Z002'), NOW(), NOW()
-  FROM staff s WHERE s.store_id = v_store_id AND s.staff_name = '매니저';
-
-  -- 판매직원 1 - Z003 의류존
-  INSERT INTO staff_assignments (id, store_id, user_id, org_id, staff_name, staff_role, zone_id, position_x, position_y, position_z, shift_start, shift_end, assigned_date, status, is_ai_suggested, efficiency_score, properties, created_at, updated_at)
-  SELECT gen_random_uuid(), v_store_id, v_user_id, v_org_id, '판매직원 1', 'sales', v_zone_clothing, -7.5, 0, -3, '09:00'::TIME, '18:00'::TIME, CURRENT_DATE, 'active', false, 88.3,
-    jsonb_build_object('staff_id', s.id, 'avatar_url', s.metadata->>'avatar_url', 'assigned_zone_code', 'Z003'), NOW(), NOW()
-  FROM staff s WHERE s.store_id = v_store_id AND s.staff_name = '판매직원 1';
-
-  -- 판매직원 2 - Z004 액세서리존
-  INSERT INTO staff_assignments (id, store_id, user_id, org_id, staff_name, staff_role, zone_id, position_x, position_y, position_z, shift_start, shift_end, assigned_date, status, is_ai_suggested, efficiency_score, properties, created_at, updated_at)
-  SELECT gen_random_uuid(), v_store_id, v_user_id, v_org_id, '판매직원 2', 'sales', v_zone_accessory, 6.5, 0, -3.5, '09:00'::TIME, '18:00'::TIME, CURRENT_DATE, 'active', false, 86.7,
-    jsonb_build_object('staff_id', s.id, 'avatar_url', s.metadata->>'avatar_url', 'assigned_zone_code', 'Z004'), NOW(), NOW()
-  FROM staff s WHERE s.store_id = v_store_id AND s.staff_name = '판매직원 2';
-
-  -- 계산원 1 - Z006 계산대
-  INSERT INTO staff_assignments (id, store_id, user_id, org_id, staff_name, staff_role, zone_id, position_x, position_y, position_z, shift_start, shift_end, assigned_date, status, is_ai_suggested, efficiency_score, properties, created_at, updated_at)
-  SELECT gen_random_uuid(), v_store_id, v_user_id, v_org_id, '계산원 1', 'cashier', v_zone_checkout, 7, 0, 6.7, '09:00'::TIME, '18:00'::TIME, CURRENT_DATE, 'active', false, 91.2,
-    jsonb_build_object('staff_id', s.id, 'avatar_url', s.metadata->>'avatar_url', 'assigned_zone_code', 'Z006'), NOW(), NOW()
-  FROM staff s WHERE s.store_id = v_store_id AND s.staff_name = '계산원 1';
-
-  -- 계산원 2 - Z006 계산대
-  INSERT INTO staff_assignments (id, store_id, user_id, org_id, staff_name, staff_role, zone_id, position_x, position_y, position_z, shift_start, shift_end, assigned_date, status, is_ai_suggested, efficiency_score, properties, created_at, updated_at)
-  SELECT gen_random_uuid(), v_store_id, v_user_id, v_org_id, '계산원 2', 'cashier', v_zone_checkout, 7, 0, 5.7, '09:00'::TIME, '18:00'::TIME, CURRENT_DATE, 'active', false, 89.8,
-    jsonb_build_object('staff_id', s.id, 'avatar_url', s.metadata->>'avatar_url', 'assigned_zone_code', 'Z006'), NOW(), NOW()
-  FROM staff s WHERE s.store_id = v_store_id AND s.staff_name = '계산원 2';
-
-  -- 보안요원 - Z001 입구
-  INSERT INTO staff_assignments (id, store_id, user_id, org_id, staff_name, staff_role, zone_id, position_x, position_y, position_z, shift_start, shift_end, assigned_date, status, is_ai_suggested, efficiency_score, properties, created_at, updated_at)
-  SELECT gen_random_uuid(), v_store_id, v_user_id, v_org_id, '보안요원', 'security', v_zone_entrance, -1, 0, -8.5, '09:00'::TIME, '18:00'::TIME, CURRENT_DATE, 'active', false, 94.1,
-    jsonb_build_object('staff_id', s.id, 'avatar_url', s.metadata->>'avatar_url', 'assigned_zone_code', 'Z001'), NOW(), NOW()
-  FROM staff s WHERE s.store_id = v_store_id AND s.staff_name = '보안요원';
-
-  -- 피팅룸 담당 - Z005 피팅룸
-  INSERT INTO staff_assignments (id, store_id, user_id, org_id, staff_name, staff_role, zone_id, position_x, position_y, position_z, shift_start, shift_end, assigned_date, status, is_ai_suggested, efficiency_score, properties, created_at, updated_at)
-  SELECT gen_random_uuid(), v_store_id, v_user_id, v_org_id, '피팅룸 담당', 'fitting', v_zone_fitting, -7, 0, 5.5, '09:00'::TIME, '18:00'::TIME, CURRENT_DATE, 'active', false, 87.5,
-    jsonb_build_object('staff_id', s.id, 'avatar_url', s.metadata->>'avatar_url', 'assigned_zone_code', 'Z005'), NOW(), NOW()
-  FROM staff s WHERE s.store_id = v_store_id AND s.staff_name = '피팅룸 담당';
-
-  -- 안내직원 - Z001 입구
-  INSERT INTO staff_assignments (id, store_id, user_id, org_id, staff_name, staff_role, zone_id, position_x, position_y, position_z, shift_start, shift_end, assigned_date, status, is_ai_suggested, efficiency_score, properties, created_at, updated_at)
-  SELECT gen_random_uuid(), v_store_id, v_user_id, v_org_id, '안내직원', 'greeter', v_zone_entrance, 1, 0, -8.5, '09:00'::TIME, '18:00'::TIME, CURRENT_DATE, 'active', false, 90.3,
-    jsonb_build_object('staff_id', s.id, 'avatar_url', s.metadata->>'avatar_url', 'assigned_zone_code', 'Z001'), NOW(), NOW()
-  FROM staff s WHERE s.store_id = v_store_id AND s.staff_name = '안내직원';
+  INSERT INTO staff_assignments (
+    id, store_id, user_id, org_id,
+    staff_name, staff_role, zone_id,
+    position_x, position_y, position_z,
+    shift_start, shift_end, assigned_date,
+    status, is_ai_suggested, efficiency_score,
+    properties, created_at, updated_at
+  )
+  SELECT
+    gen_random_uuid(),
+    s.store_id,
+    s.user_id,
+    s.org_id,
+    s.staff_name,
+    s.role,
+    s.assigned_zone_id,
+    (s.avatar_position->>'x')::NUMERIC,
+    (s.avatar_position->>'y')::NUMERIC,
+    (s.avatar_position->>'z')::NUMERIC,
+    '09:00'::TIME,
+    '18:00'::TIME,
+    CURRENT_DATE,
+    'active',
+    false,
+    85.0 + (random() * 10),
+    jsonb_build_object(
+      'staff_id', s.id,
+      'avatar_url', s.avatar_url,
+      'assigned_zone_code', s.metadata->>'zone'
+    ),
+    NOW(),
+    NOW()
+  FROM staff s
+  WHERE s.store_id = v_store_id AND s.is_active = true;
 
   RAISE NOTICE '    ✓ staff_assignments: 8건 삽입';
 
