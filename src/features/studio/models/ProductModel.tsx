@@ -92,10 +92,11 @@ function ProductGLTF({
     asset.position.z,
   ];
 
+  // degrees → radians 변환
   const rotation: [number, number, number] = [
-    asset.rotation.x,
-    asset.rotation.y,
-    asset.rotation.z,
+    asset.rotation.x * Math.PI / 180,
+    asset.rotation.y * Math.PI / 180,
+    asset.rotation.z * Math.PI / 180,
   ];
 
   const scale: [number, number, number] = [
@@ -153,10 +154,17 @@ function ProductPlaceholder({
 }: ProductModelProps) {
   const dimensions = asset.dimensions || { width: 0.3, height: 0.3, depth: 0.3 };
 
+  // degrees → radians 변환
+  const rotation: [number, number, number] = [
+    asset.rotation.x * Math.PI / 180,
+    asset.rotation.y * Math.PI / 180,
+    asset.rotation.z * Math.PI / 180,
+  ];
+
   return (
     <group
       position={[asset.position.x, asset.position.y + dimensions.height / 2, asset.position.z]}
-      rotation={[asset.rotation.x, asset.rotation.y, asset.rotation.z]}
+      rotation={rotation}
       scale={[asset.scale.x, asset.scale.y, asset.scale.z]}
       onClick={(e) => {
         e.stopPropagation();

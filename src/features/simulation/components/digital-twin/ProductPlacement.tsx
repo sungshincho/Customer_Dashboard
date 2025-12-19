@@ -53,6 +53,13 @@ function ProductItem({ asset, onClick, showOptimizationHint }: ProductItemProps)
   const displayType = asset.display_type || 'standing';
   const isOptimized = !!asset.optimization_reason;
 
+  // degrees → radians 변환
+  const rotation: [number, number, number] = [
+    (asset.rotation.x || 0) * Math.PI / 180,
+    (asset.rotation.y || 0) * Math.PI / 180,
+    (asset.rotation.z || 0) * Math.PI / 180,
+  ];
+
   // 색상 결정: 최적화 힌트 표시 시 초록색, 아니면 display_type별 색상
   const color = useMemo(() => {
     if (showOptimizationHint && isOptimized) {
@@ -67,7 +74,7 @@ function ProductItem({ asset, onClick, showOptimizationHint }: ProductItemProps)
       <DisplayTypePrimitive
         displayType={displayType}
         position={[asset.position.x, asset.position.y, asset.position.z]}
-        rotation={[asset.rotation.x || 0, asset.rotation.y || 0, asset.rotation.z || 0]}
+        rotation={rotation}
         dimensions={dimensions}
         color={color}
         onClick={onClick}
@@ -84,7 +91,7 @@ function ProductItem({ asset, onClick, showOptimizationHint }: ProductItemProps)
         <primitive
           object={scene.clone()}
           position={[asset.position.x, asset.position.y, asset.position.z]}
-          rotation={[asset.rotation.x || 0, asset.rotation.y || 0, asset.rotation.z || 0]}
+          rotation={rotation}
           scale={[asset.scale.x, asset.scale.y, asset.scale.z]}
           onClick={onClick}
         />
@@ -102,7 +109,7 @@ function ProductItem({ asset, onClick, showOptimizationHint }: ProductItemProps)
       <DisplayTypePrimitive
         displayType={displayType}
         position={[asset.position.x, asset.position.y, asset.position.z]}
-        rotation={[asset.rotation.x || 0, asset.rotation.y || 0, asset.rotation.z || 0]}
+        rotation={rotation}
         dimensions={dimensions}
         color={color}
         onClick={onClick}
