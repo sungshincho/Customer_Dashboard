@@ -230,10 +230,10 @@ BEGIN
   -- display_round (1×4=4)
   FOR v_furn IN SELECT id, furniture_type FROM furniture WHERE store_id = v_store_id AND furniture_type LIKE 'display_round_%' LOOP
     INSERT INTO furniture_slots (id, furniture_id, store_id, user_id, slot_id, furniture_type, slot_type, slot_position, slot_rotation, compatible_display_types, max_product_width, max_product_height, max_product_depth, is_occupied, created_at, updated_at) VALUES
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'T1', v_furn.furniture_type, 'display', '{"x":0,"y":0.8,"z":0.7}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['standing','located'], 0.4, 0.5, 0.4, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'T2', v_furn.furniture_type, 'display', '{"x":-0.7,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":90,"z":0}'::jsonb, ARRAY['standing','located'], 0.4, 0.5, 0.4, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'T3', v_furn.furniture_type, 'display', '{"x":0.7,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":-90,"z":0}'::jsonb, ARRAY['standing','located'], 0.4, 0.5, 0.4, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'T4', v_furn.furniture_type, 'display', '{"x":0,"y":0.8,"z":-0.7}'::jsonb, '{"x":0,"y":180,"z":0}'::jsonb, ARRAY['standing','located'], 0.4, 0.5, 0.4, false, NOW(), NOW());
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'T1', v_furn.furniture_type, 'display', '{"x":0,"y":0.8,"z":0.7}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.4, 0.5, 0.4, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'T2', v_furn.furniture_type, 'display', '{"x":-0.7,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":90,"z":0}'::jsonb, ARRAY['located'], 0.4, 0.5, 0.4, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'T3', v_furn.furniture_type, 'display', '{"x":0.7,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":-90,"z":0}'::jsonb, ARRAY['located'], 0.4, 0.5, 0.4, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'T4', v_furn.furniture_type, 'display', '{"x":0,"y":0.8,"z":-0.7}'::jsonb, '{"x":0,"y":180,"z":0}'::jsonb, ARRAY['located'], 0.4, 0.5, 0.4, false, NOW(), NOW());
   END LOOP;
 
 
@@ -261,64 +261,64 @@ END LOOP;
   -- stand_accessory (2×10=20)
   FOR v_furn IN SELECT id, furniture_type FROM furniture WHERE store_id = v_store_id AND furniture_type LIKE 'stand_accessory_%' LOOP
     INSERT INTO furniture_slots (id, furniture_id, store_id, user_id, slot_id, furniture_type, slot_type, slot_position, slot_rotation, compatible_display_types, max_product_width, max_product_height, max_product_depth, is_occupied, created_at, updated_at) VALUES
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S1-1', v_furn.furniture_type, 'stand', '{"x":0,"y":0.21,"z":0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S1-2', v_furn.furniture_type, 'stand', '{"x":0,"y":0.21,"z":-0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S2-1', v_furn.furniture_type, 'stand', '{"x":0,"y":0.465,"z":0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S2-2', v_furn.furniture_type, 'stand', '{"x":0,"y":0.465,"z":-0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S3-1', v_furn.furniture_type, 'stand', '{"x":0,"y":0.72,"z":0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S3-2', v_furn.furniture_type, 'stand', '{"x":0,"y":0.72,"z":-0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S4-1', v_furn.furniture_type, 'stand', '{"x":0,"y":0.975,"z":0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S4-2', v_furn.furniture_type, 'stand', '{"x":0,"y":0.975,"z":-0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S5-1', v_furn.furniture_type, 'stand', '{"x":0,"y":1.23,"z":0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S5-2', v_furn.furniture_type, 'stand', '{"x":0,"y":1.23,"z":-0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.15, 0.2, 0.15, false, NOW(), NOW());
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S1-1', v_furn.furniture_type, 'stand', '{"x":0,"y":0.21,"z":0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S1-2', v_furn.furniture_type, 'stand', '{"x":0,"y":0.21,"z":-0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S2-1', v_furn.furniture_type, 'stand', '{"x":0,"y":0.465,"z":0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S2-2', v_furn.furniture_type, 'stand', '{"x":0,"y":0.465,"z":-0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S3-1', v_furn.furniture_type, 'stand', '{"x":0,"y":0.72,"z":0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S3-2', v_furn.furniture_type, 'stand', '{"x":0,"y":0.72,"z":-0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S4-1', v_furn.furniture_type, 'stand', '{"x":0,"y":0.975,"z":0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S4-2', v_furn.furniture_type, 'stand', '{"x":0,"y":0.975,"z":-0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S5-1', v_furn.furniture_type, 'stand', '{"x":0,"y":1.23,"z":0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S5-2', v_furn.furniture_type, 'stand', '{"x":0,"y":1.23,"z":-0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.15, 0.2, 0.15, false, NOW(), NOW());
   END LOOP;
 
   -- display_bag (2×8=16)
   FOR v_furn IN SELECT id, furniture_type FROM furniture WHERE store_id = v_store_id AND furniture_type LIKE 'display_bag_%' LOOP
     INSERT INTO furniture_slots (id, furniture_id, store_id, user_id, slot_id, furniture_type, slot_type, slot_position, slot_rotation, compatible_display_types, max_product_width, max_product_height, max_product_depth, is_occupied, created_at, updated_at) VALUES
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D1-1', v_furn.furniture_type, 'display', '{"x":-0.4,"y":0.04,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','standing','located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D1-2', v_furn.furniture_type, 'display', '{"x":0.4,"y":0.04,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','standing','located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D2-1', v_furn.furniture_type, 'display', '{"x":-0.4,"y":0.42,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','standing','located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D2-2', v_furn.furniture_type, 'display', '{"x":0.4,"y":0.42,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','standing','located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D3-1', v_furn.furniture_type, 'display', '{"x":-0.4,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','standing','located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D3-2', v_furn.furniture_type, 'display', '{"x":0.4,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','standing','located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D4-1', v_furn.furniture_type, 'display', '{"x":-0.4,"y":1.18,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','standing','located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D4-2', v_furn.furniture_type, 'display', '{"x":0.4,"y":1.18,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','standing','located'], 0.35, 0.35, 0.25, false, NOW(), NOW());
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D1-1', v_furn.furniture_type, 'display', '{"x":-0.4,"y":0.04,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D1-2', v_furn.furniture_type, 'display', '{"x":0.4,"y":0.04,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D2-1', v_furn.furniture_type, 'display', '{"x":-0.4,"y":0.42,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D2-2', v_furn.furniture_type, 'display', '{"x":0.4,"y":0.42,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D3-1', v_furn.furniture_type, 'display', '{"x":-0.4,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D3-2', v_furn.furniture_type, 'display', '{"x":0.4,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D4-1', v_furn.furniture_type, 'display', '{"x":-0.4,"y":1.18,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D4-2', v_furn.furniture_type, 'display', '{"x":0.4,"y":1.18,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','located'], 0.35, 0.35, 0.25, false, NOW(), NOW());
   END LOOP;
 
 
   -- showcase_open (2×4=8)
   FOR v_furn IN SELECT id, furniture_type FROM furniture WHERE store_id = v_store_id AND furniture_type LIKE 'showcase_open_%' LOOP
     INSERT INTO furniture_slots (id, furniture_id, store_id, user_id, slot_id, furniture_type, slot_type, slot_position, slot_rotation, compatible_display_types, max_product_width, max_product_height, max_product_depth, is_occupied, created_at, updated_at) VALUES
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S1-1', v_furn.furniture_type, 'showcase', '{"x":-0.3,"y":0.4,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.25, 0.2, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S1-2', v_furn.furniture_type, 'showcase', '{"x":0.3,"y":0.4,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.25, 0.2, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S2-1', v_furn.furniture_type, 'showcase', '{"x":-0.3,"y":0.7,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.25, 0.2, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S2-2', v_furn.furniture_type, 'showcase', '{"x":0.3,"y":0.7,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.25, 0.2, false, NOW(), NOW());
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S1-1', v_furn.furniture_type, 'showcase', '{"x":-0.3,"y":0.4,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.25, 0.2, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S1-2', v_furn.furniture_type, 'showcase', '{"x":0.3,"y":0.4,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.25, 0.2, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S2-1', v_furn.furniture_type, 'showcase', '{"x":-0.3,"y":0.7,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.25, 0.2, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S2-2', v_furn.furniture_type, 'showcase', '{"x":0.3,"y":0.7,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.25, 0.2, false, NOW(), NOW());
   END LOOP;
 
 
   -- showcase_locked (2×3=6)
   FOR v_furn IN SELECT id, furniture_type FROM furniture WHERE store_id = v_store_id AND furniture_type LIKE 'showcase_locked_%' LOOP
     INSERT INTO furniture_slots (id, furniture_id, store_id, user_id, slot_id, furniture_type, slot_type, slot_position, slot_rotation, compatible_display_types, max_product_width, max_product_height, max_product_depth, is_occupied, created_at, updated_at) VALUES
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S1', v_furn.furniture_type, 'showcase', '{"x":0,"y":0.45,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.2, 0.2, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S2', v_furn.furniture_type, 'showcase', '{"x":0,"y":0.711,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.2, 0.2, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S3', v_furn.furniture_type, 'showcase', '{"x":0,"y":0.967,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.2, 0.2, false, NOW(), NOW());
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S1', v_furn.furniture_type, 'showcase', '{"x":0,"y":0.45,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.2, 0.2, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S2', v_furn.furniture_type, 'showcase', '{"x":0,"y":0.711,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.2, 0.2, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S3', v_furn.furniture_type, 'showcase', '{"x":0,"y":0.967,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.2, 0.2, false, NOW(), NOW());
   END LOOP;
 
 
   -- shelf_shoes (3×10=30)
   FOR v_furn IN SELECT id, furniture_type FROM furniture WHERE store_id = v_store_id AND furniture_type LIKE 'shelf_shoes_%' LOOP
     INSERT INTO furniture_slots (id, furniture_id, store_id, user_id, slot_id, furniture_type, slot_type, slot_position, slot_rotation, compatible_display_types, max_product_width, max_product_height, max_product_depth, is_occupied, created_at, updated_at) VALUES
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R1-1', v_furn.furniture_type, 'rack', '{"x":-0.15,"y":0.2,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R1-2', v_furn.furniture_type, 'rack', '{"x":0.15,"y":0.2,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R2-1', v_furn.furniture_type, 'rack', '{"x":-0.15,"y":0.5,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R2-2', v_furn.furniture_type, 'rack', '{"x":0.15,"y":0.5,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R3-1', v_furn.furniture_type, 'rack', '{"x":-0.15,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R3-2', v_furn.furniture_type, 'rack', '{"x":0.15,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R4-1', v_furn.furniture_type, 'rack', '{"x":-0.15,"y":1.1,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R4-2', v_furn.furniture_type, 'rack', '{"x":0.15,"y":1.1,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R5-1', v_furn.furniture_type, 'rack', '{"x":-0.15,"y":1.4,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R5-2', v_furn.furniture_type, 'rack', '{"x":0.15,"y":1.4,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.25, 0.35, false, NOW(), NOW());
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R1-1', v_furn.furniture_type, 'rack', '{"x":-0.15,"y":0.2,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R1-2', v_furn.furniture_type, 'rack', '{"x":0.15,"y":0.2,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R2-1', v_furn.furniture_type, 'rack', '{"x":-0.15,"y":0.5,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R2-2', v_furn.furniture_type, 'rack', '{"x":0.15,"y":0.5,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R3-1', v_furn.furniture_type, 'rack', '{"x":-0.15,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R3-2', v_furn.furniture_type, 'rack', '{"x":0.15,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R4-1', v_furn.furniture_type, 'rack', '{"x":-0.15,"y":1.1,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R4-2', v_furn.furniture_type, 'rack', '{"x":0.15,"y":1.1,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R5-1', v_furn.furniture_type, 'rack', '{"x":-0.15,"y":1.4,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R5-2', v_furn.furniture_type, 'rack', '{"x":0.15,"y":1.4,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.25, 0.35, false, NOW(), NOW());
   END LOOP;
   RAISE NOTICE '    - display_round: 6 슬롯';
 
