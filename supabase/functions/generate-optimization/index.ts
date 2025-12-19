@@ -527,82 +527,180 @@ function generateRuleBasedOptimization(
     const availableSlots = slotsData.filter(s => !s.is_occupied);
     console.log(`[RuleBasedOpt] Available slots: ${availableSlots.length}`);
 
-    // 재배치 대상 상품 선정 (성과 데이터 기반 또는 전체 배치된 제품)
-    let targetProducts: any[] = [];
+    // 🆕 모든 슬롯이 점유된 경우: 제품 스왑 로직 사용
+    if (availableSlots.length === 0 && products.length > 0) {
+      console.log(`[RuleBasedOpt] No empty slots - using SWAP logic`);
 
-    if (productPerf.length > 0) {
-      // 성과 데이터 있음: 저성과 상품 우선
-      const lowPerformers = productPerf
-        .filter((p: any) => p.conversion_rate < 0.08 || p.units_sold < 10)
-        .map((p: any) => p.product_id);
-
-      targetProducts = products.filter((p: any) => lowPerformers.includes(p.id));
-    }
-
-    // 성과 데이터 없거나 저성과 상품 없으면: 저트래픽 구역 상품 선택
-    if (targetProducts.length === 0 && products.length > 0) {
-      targetProducts = products.filter((p: any) =>
-        lowTrafficZones.includes(p.zone_id) || !p.zone_id
-      );
-    }
-
-    // 여전히 없으면 전체 상품 중 랜덤 선택
-    if (targetProducts.length === 0) {
-      targetProducts = products.slice(0, Math.min(maxChanges, products.length));
-    }
-
-    console.log(`[RuleBasedOpt] Target products for relocation: ${targetProducts.length}`);
-
-    // 제품 재배치 제안 생성
-    targetProducts.slice(0, maxChanges).forEach((product: any) => {
-      // 고트래픽 구역에서 호환 가능한 빈 슬롯 찾기
-      let targetSlot = availableSlots.find(s =>
-        highTrafficZones.includes(s.zone_id) &&
-        s.zone_id !== product.zone_id && // 다른 구역으로 이동
-        (!product.display_type || s.compatible_display_types?.includes(product.display_type))
+      // 고트래픽 구역의 제품 (고성과 가능성)
+      const highTrafficProducts = products.filter((p: any) =>
+        highTrafficZones.includes(p.zone_id)
       );
 
-      // 고트래픽 구역에 없으면 아무 빈 슬롯
-      if (!targetSlot) {
-        targetSlot = availableSlots.find(s =>
-          s.zone_id !== product.zone_id &&
-          (!product.display_type || s.compatible_display_types?.includes(product.display_type))
-        );
-      }
+      // 저트래픽 구역의 제품 (저성과 가능성)
+      const lowTrafficProducts = products.filter((p: any) =>
+        lowTrafficZones.includes(p.zone_id)
+      );
 
-      if (targetSlot) {
-        // 슬롯 위치 계산
-        const slotWorldPos = {
-          x: (targetSlot.furniture_position?.x || 0) + (targetSlot.slot_position?.x || 0),
-          y: (targetSlot.furniture_position?.y || 0) + (targetSlot.slot_position?.y || 0),
-          z: (targetSlot.furniture_position?.z || 0) + (targetSlot.slot_position?.z || 0),
+      console.log(`[RuleBasedOpt] High traffic products: ${highTrafficProducts.length}, Low traffic: ${lowTrafficProducts.length}`);
+
+      // 스왑 제안 생성: 저트래픽 구역의 제품을 고트래픽 구역으로
+      const swapCount = Math.min(lowTrafficProducts.length, highTrafficProducts.length, maxChanges);
+
+      for (let i = 0; i < swapCount; i++) {
+        const lowProduct = lowTrafficProducts[i];
+        const highProduct = highTrafficProducts[i];
+
+        // display_type 호환성 확인
+        const lowSlot = slotsData.find((s: any) => s.id === lowProduct.slot_id || s.slot_id === lowProduct.slot_code);
+        const highSlot = slotsData.find((s: any) => s.id === highProduct.slot_id || s.slot_id === highProduct.slot_code);
+
+        if (!lowSlot || !highSlot) continue;
+
+        // 호환성 체크 (양방향)
+        const lowCompatible = !lowProduct.display_type ||
+          highSlot.compatible_display_types?.includes(lowProduct.display_type);
+        const highCompatible = !highProduct.display_type ||
+          lowSlot.compatible_display_types?.includes(highProduct.display_type);
+
+        if (!lowCompatible || !highCompatible) continue;
+
+        // 저트래픽 → 고트래픽 이동 제안 (메인 제안)
+        const highSlotWorldPos = {
+          x: (highSlot.furniture_position?.x || 0) + (highSlot.slot_position?.x || 0),
+          y: (highSlot.furniture_position?.y || 0) + (highSlot.slot_position?.y || 0),
+          z: (highSlot.furniture_position?.z || 0) + (highSlot.slot_position?.z || 0),
         };
 
         productChanges.push({
-          product_id: product.id,
-          sku: product.sku || '',
+          product_id: lowProduct.id,
+          sku: lowProduct.sku || '',
           current: {
-            zone_id: product.zone_id || '',
-            furniture_id: product.furniture_id || '',
-            slot_id: product.slot_id || product.slot_code || '',
-            position: product.position || { x: 0, y: 0, z: 0 },
+            zone_id: lowProduct.zone_id || '',
+            furniture_id: lowProduct.furniture_id || '',
+            slot_id: lowProduct.slot_id || lowProduct.slot_code || '',
+            position: lowProduct.position || { x: 0, y: 0, z: 0 },
           },
           suggested: {
-            zone_id: targetSlot.zone_id || '',
-            furniture_id: targetSlot.furniture_id || '',
-            slot_id: targetSlot.id || '', // furniture_slots.id (UUID)
-            position: slotWorldPos,
+            zone_id: highSlot.zone_id || highProduct.zone_id || '',
+            furniture_id: highSlot.furniture_id || '',
+            slot_id: highSlot.id || '',
+            position: highSlotWorldPos,
           },
-          reason: `${product.product_name || product.sku}을(를) ${targetSlot.furniture_code || '고트래픽 구역'}으로 이동하여 노출도 향상`,
-          priority: Math.random() > 0.5 ? 'high' : 'medium',
-          expected_revenue_impact: 0.1 + Math.random() * 0.15,
-          expected_visibility_impact: 0.2 + Math.random() * 0.2,
+          reason: `${lowProduct.product_name || lowProduct.sku}을(를) 고트래픽 구역으로 이동 (${highProduct.product_name || highProduct.sku}과(와) 위치 교환)`,
+          priority: 'high',
+          expected_revenue_impact: 0.15 + Math.random() * 0.1,
+          expected_visibility_impact: 0.25 + Math.random() * 0.15,
         });
 
-        // 슬롯을 점유된 것으로 표시 (중복 방지)
-        targetSlot.is_occupied = true;
+        // 고트래픽 → 저트래픽 이동 제안 (스왑 파트너)
+        const lowSlotWorldPos = {
+          x: (lowSlot.furniture_position?.x || 0) + (lowSlot.slot_position?.x || 0),
+          y: (lowSlot.furniture_position?.y || 0) + (lowSlot.slot_position?.y || 0),
+          z: (lowSlot.furniture_position?.z || 0) + (lowSlot.slot_position?.z || 0),
+        };
+
+        productChanges.push({
+          product_id: highProduct.id,
+          sku: highProduct.sku || '',
+          current: {
+            zone_id: highProduct.zone_id || '',
+            furniture_id: highProduct.furniture_id || '',
+            slot_id: highProduct.slot_id || highProduct.slot_code || '',
+            position: highProduct.position || { x: 0, y: 0, z: 0 },
+          },
+          suggested: {
+            zone_id: lowSlot.zone_id || lowProduct.zone_id || '',
+            furniture_id: lowSlot.furniture_id || '',
+            slot_id: lowSlot.id || '',
+            position: lowSlotWorldPos,
+          },
+          reason: `${highProduct.product_name || highProduct.sku}을(를) 저트래픽 구역으로 이동 (위치 교환)`,
+          priority: 'low',
+          expected_revenue_impact: -0.05,
+          expected_visibility_impact: -0.1,
+        });
       }
-    });
+
+      console.log(`[RuleBasedOpt] Generated ${productChanges.length} swap suggestions`);
+    } else {
+      // 기존 로직: 빈 슬롯이 있는 경우
+      // 재배치 대상 상품 선정 (성과 데이터 기반 또는 전체 배치된 제품)
+      let targetProducts: any[] = [];
+
+      if (productPerf.length > 0) {
+        // 성과 데이터 있음: 저성과 상품 우선
+        const lowPerformers = productPerf
+          .filter((p: any) => p.conversion_rate < 0.08 || p.units_sold < 10)
+          .map((p: any) => p.product_id);
+
+        targetProducts = products.filter((p: any) => lowPerformers.includes(p.id));
+      }
+
+      // 성과 데이터 없거나 저성과 상품 없으면: 저트래픽 구역 상품 선택
+      if (targetProducts.length === 0 && products.length > 0) {
+        targetProducts = products.filter((p: any) =>
+          lowTrafficZones.includes(p.zone_id) || !p.zone_id
+        );
+      }
+
+      // 여전히 없으면 전체 상품 중 랜덤 선택
+      if (targetProducts.length === 0) {
+        targetProducts = products.slice(0, Math.min(maxChanges, products.length));
+      }
+
+      console.log(`[RuleBasedOpt] Target products for relocation: ${targetProducts.length}`);
+
+      // 제품 재배치 제안 생성
+      targetProducts.slice(0, maxChanges).forEach((product: any) => {
+        // 고트래픽 구역에서 호환 가능한 빈 슬롯 찾기
+        let targetSlot = availableSlots.find(s =>
+          highTrafficZones.includes(s.zone_id) &&
+          s.zone_id !== product.zone_id && // 다른 구역으로 이동
+          (!product.display_type || s.compatible_display_types?.includes(product.display_type))
+        );
+
+        // 고트래픽 구역에 없으면 아무 빈 슬롯
+        if (!targetSlot) {
+          targetSlot = availableSlots.find(s =>
+            s.zone_id !== product.zone_id &&
+            (!product.display_type || s.compatible_display_types?.includes(product.display_type))
+          );
+        }
+
+        if (targetSlot) {
+          // 슬롯 위치 계산
+          const slotWorldPos = {
+            x: (targetSlot.furniture_position?.x || 0) + (targetSlot.slot_position?.x || 0),
+            y: (targetSlot.furniture_position?.y || 0) + (targetSlot.slot_position?.y || 0),
+            z: (targetSlot.furniture_position?.z || 0) + (targetSlot.slot_position?.z || 0),
+          };
+
+          productChanges.push({
+            product_id: product.id,
+            sku: product.sku || '',
+            current: {
+              zone_id: product.zone_id || '',
+              furniture_id: product.furniture_id || '',
+              slot_id: product.slot_id || product.slot_code || '',
+              position: product.position || { x: 0, y: 0, z: 0 },
+            },
+            suggested: {
+              zone_id: targetSlot.zone_id || '',
+              furniture_id: targetSlot.furniture_id || '',
+              slot_id: targetSlot.id || '', // furniture_slots.id (UUID)
+              position: slotWorldPos,
+            },
+            reason: `${product.product_name || product.sku}을(를) ${targetSlot.furniture_code || '고트래픽 구역'}으로 이동하여 노출도 향상`,
+            priority: Math.random() > 0.5 ? 'high' : 'medium',
+            expected_revenue_impact: 0.1 + Math.random() * 0.15,
+            expected_visibility_impact: 0.2 + Math.random() * 0.2,
+          });
+
+          // 슬롯을 점유된 것으로 표시 (중복 방지)
+          targetSlot.is_occupied = true;
+        }
+      });
+    }
   }
 
   // 가구 최적화
