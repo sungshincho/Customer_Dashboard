@@ -53,7 +53,19 @@ export function StaffAvatarsOverlay({
 }: StaffAvatarsOverlayProps) {
   const [hoveredStaffId, setHoveredStaffId] = useState<string | null>(null);
 
+  // 디버깅 로그
+  console.log('[StaffAvatarsOverlay] Rendering:', {
+    staffCount: staff?.length || 0,
+    staffMembers: staff?.map(s => ({
+      id: s.id,
+      name: s.staff_name,
+      position: s.avatar_position,
+      hasUrl: !!s.avatar_url,
+    })),
+  });
+
   if (!staff || staff.length === 0) {
+    console.log('[StaffAvatarsOverlay] No staff data, returning null');
     return null;
   }
 
@@ -100,19 +112,24 @@ function StaffAvatarMarker({
 }: StaffAvatarMarkerProps) {
   const groupRef = useRef<THREE.Group>(null);
   const color = getStaffColor(member.role);
+
+  // Y 좌표는 항상 0.1로 설정 (바닥 위)
   const position: [number, number, number] = [
     member.avatar_position.x,
-    member.avatar_position.y,
+    0.1, // 바닥 위에 배치
     member.avatar_position.z,
   ];
 
+  console.log('[StaffAvatarMarker] Rendering:', member.staff_name, 'at', position);
+
   // 호버/선택 시 부드러운 바운스 효과
+  const baseY = 0.1;
   useFrame(({ clock }) => {
     if (groupRef.current && (isHovered || isSelected)) {
       const bounce = Math.sin(clock.elapsedTime * 4) * 0.05;
-      groupRef.current.position.y = position[1] + bounce;
+      groupRef.current.position.y = baseY + bounce;
     } else if (groupRef.current) {
-      groupRef.current.position.y = position[1];
+      groupRef.current.position.y = baseY;
     }
   });
 
