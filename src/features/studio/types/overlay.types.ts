@@ -17,7 +17,8 @@ export type OverlayType =
   | 'product'
   | 'realtime'
   | 'wifi'
-  | 'layout';
+  | 'layout'
+  | 'staff';
 
 // 오버레이 설정
 export interface OverlayConfig {
