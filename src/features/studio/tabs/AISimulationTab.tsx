@@ -46,13 +46,6 @@ const simulationOptions: SimulationOption[] = [
     locked: false,
   },
   {
-    id: 'customerPath',
-    label: '동선 분석 (AI)',
-    description: 'AI가 고객 동선과 병목 구간을 분석합니다',
-    icon: Route,
-    locked: false,
-  },
-  {
     id: 'customerState',
     label: '고객 상태 범례',
     description: '고객 상태별 색상을 표시합니다',
@@ -66,6 +59,7 @@ const simulationOptions: SimulationOption[] = [
     icon: Thermometer,
     locked: false,
   },
+  // 동선 분석(customerPath)는 오버레이_고객 시뮬레이션으로 통합됨
   {
     id: 'display',
     label: '디스플레이 효과',

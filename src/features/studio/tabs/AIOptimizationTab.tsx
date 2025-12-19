@@ -79,17 +79,12 @@ const optimizationOptions: OptimizationOption[] = [
     icon: Layout,
   },
   {
-    id: 'flow',
-    label: '동선 최적화',
-    description: 'AI가 최적의 고객 동선을 제안합니다',
-    icon: Route,
-  },
-  {
     id: 'staffing',
     label: '인력 배치 최적화',
     description: 'AI가 최적의 직원 배치를 제안합니다',
     icon: Users,
   },
+  // 동선 최적화는 오버레이_고객 시뮬레이션으로 통합됨
 ];
 
 interface AIOptimizationTabProps {
