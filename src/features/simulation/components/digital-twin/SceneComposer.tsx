@@ -51,7 +51,7 @@ export function SceneComposer({
     },
     effects: recipe?.effects || [],
     camera: recipe?.camera || {
-      position: { x: 0, y: 10, z: 15 },
+      position: { x: 0, y: 10, z: -15 },
       target: { x: 0, y: 0, z: 0 },
       fov: 50
     }
