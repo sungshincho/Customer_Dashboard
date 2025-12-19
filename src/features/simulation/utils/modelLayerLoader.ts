@@ -160,6 +160,22 @@ export async function loadUserModels(
       // slot_id (UUID FK) → furniture_slots → furniture 조인
       // 월드 좌표 = furniture.position + slot.slot_position + placement.position_offset
       // ============================================
+
+      // 3-1. furniture 데이터 먼저 로드 (중첩 조인 대신 Map 사용)
+      const { data: furnitureListData } = await (supabase as any)
+        .from('furniture')
+        .select('id, furniture_name, furniture_code, position_x, position_y, position_z, zone_id')
+        .eq('store_id', storeId);
+
+      const furnitureMap = new Map<string, any>();
+      if (furnitureListData) {
+        for (const f of furnitureListData) {
+          furnitureMap.set(f.id, f);
+        }
+        console.log(`[ModelLoader] Section 3-1: Loaded ${furnitureListData.length} furniture items into map`);
+      }
+
+      // 3-2. product_placements 쿼리 (중첩 furniture 조인 제거)
       const { data: placementsData, error: placementsError } = await (supabase as any)
         .from('product_placements')
         .select(`
@@ -178,29 +194,20 @@ export async function loadUserModels(
             slot_position,
             slot_rotation,
             compatible_display_types,
-            furniture_id,
-            furniture:furniture_id (
-              id,
-              furniture_name,
-              furniture_code,
-              position_x,
-              position_y,
-              position_z,
-              zone_id
-            )
+            furniture_id
           )
         `)
         .eq('store_id', storeId)
         .eq('is_active', true);
 
       if (!placementsError && placementsData) {
-        console.log(`[ModelLoader] Section 3: Loading ${placementsData.length} product placements`);
+        console.log(`[ModelLoader] Section 3-2: Loading ${placementsData.length} product placements`);
 
-        // product_models 테이블에서 display_type별 모델 URL 가져오기
+        // 3-3. product_models 테이블에서 display_type별 모델 URL 가져오기
+        // NOTE: product_models 테이블에는 store_id 컬럼이 없음!
         const { data: productModelsData } = await (supabase as any)
           .from('product_models')
-          .select('*')
-          .eq('store_id', storeId);
+          .select('*');
 
         const productModelsMap = new Map<string, any>();
         if (productModelsData) {
@@ -209,14 +216,15 @@ export async function loadUserModels(
             const key = `${pm.product_id}_${pm.display_type}`;
             productModelsMap.set(key, pm);
           }
-          console.log(`[ModelLoader] Loaded ${productModelsData.length} product_models entries`);
+          console.log(`[ModelLoader] Section 3-3: Loaded ${productModelsData.length} product_models entries`);
         }
 
         for (const placement of placementsData) {
           const p = placement as any;
           const product = p.products;
           const slot = p.furniture_slots;
-          const furniture = slot?.furniture;
+          // furniture_id로 Map에서 조회 (중첩 조인 대체)
+          const furniture = slot?.furniture_id ? furnitureMap.get(slot.furniture_id) : null;
 
           // display_type에 맞는 모델 URL 찾기
           // 우선순위: product_models[display_type] > products.model_3d_url > 기본 URL
