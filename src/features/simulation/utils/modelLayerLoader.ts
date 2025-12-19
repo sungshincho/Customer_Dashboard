@@ -239,6 +239,18 @@ export async function loadUserModels(
           // furniture_id로 Map에서 조회 (중첩 조인 대체)
           const furniture = slot?.furniture_id ? furnitureMap.get(slot.furniture_id) : null;
 
+          // 🔍 디버그: 조인 상태 확인
+          console.log(`[ModelLoader] DEBUG placement:`, {
+            placementId: p.id,
+            productName: product?.product_name,
+            slotExists: !!slot,
+            slotId: slot?.slot_id,
+            slotFurnitureId: slot?.furniture_id,
+            furnitureFound: !!furniture,
+            furnitureCode: furniture?.furniture_code,
+            slotPosition: slot?.slot_position
+          });
+
           // display_type에 맞는 모델 URL 찾기
           // 우선순위: product_models[display_type] > products.model_3d_url > 기본 URL
           let modelUrl: string | null = null;
