@@ -2101,6 +2101,7 @@ export type Database = {
           max_product_depth: number | null
           max_product_height: number | null
           max_product_width: number | null
+          occupied_by_product_id: string | null
           org_id: string | null
           slot_id: string
           slot_position: Json | null
@@ -2120,6 +2121,7 @@ export type Database = {
           max_product_depth?: number | null
           max_product_height?: number | null
           max_product_width?: number | null
+          occupied_by_product_id?: string | null
           org_id?: string | null
           slot_id: string
           slot_position?: Json | null
@@ -2139,6 +2141,7 @@ export type Database = {
           max_product_depth?: number | null
           max_product_height?: number | null
           max_product_width?: number | null
+          occupied_by_product_id?: string | null
           org_id?: string | null
           slot_id?: string
           slot_position?: Json | null
@@ -2161,6 +2164,13 @@ export type Database = {
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "furniture_slots_occupied_by_product_id_fkey"
+            columns: ["occupied_by_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
@@ -4466,55 +4476,70 @@ export type Database = {
       }
       product_placements: {
         Row: {
+          applied_from_optimization_id: string | null
           created_at: string | null
           display_type: string
+          furniture_id: string | null
           id: string
           is_active: boolean | null
           org_id: string | null
           placed_at: string | null
+          position: Json | null
           position_offset: Json | null
           product_id: string
           quantity: number | null
+          rotation: Json | null
           rotation_offset: Json | null
           scale: Json | null
           slot_id: string
           store_id: string
           updated_at: string | null
           user_id: string | null
+          zone_id: string | null
         }
         Insert: {
+          applied_from_optimization_id?: string | null
           created_at?: string | null
           display_type: string
+          furniture_id?: string | null
           id?: string
           is_active?: boolean | null
           org_id?: string | null
           placed_at?: string | null
+          position?: Json | null
           position_offset?: Json | null
           product_id: string
           quantity?: number | null
+          rotation?: Json | null
           rotation_offset?: Json | null
           scale?: Json | null
           slot_id: string
           store_id: string
           updated_at?: string | null
           user_id?: string | null
+          zone_id?: string | null
         }
         Update: {
+          applied_from_optimization_id?: string | null
           created_at?: string | null
           display_type?: string
+          furniture_id?: string | null
           id?: string
           is_active?: boolean | null
           org_id?: string | null
           placed_at?: string | null
+          position?: Json | null
           position_offset?: Json | null
           product_id?: string
           quantity?: number | null
+          rotation?: Json | null
           rotation_offset?: Json | null
           scale?: Json | null
           slot_id?: string
           store_id?: string
           updated_at?: string | null
           user_id?: string | null
+          zone_id?: string | null
         }
         Relationships: [
           {
@@ -4527,7 +4552,7 @@ export type Database = {
           {
             foreignKeyName: "fk_product_placements_slot"
             columns: ["slot_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "furniture_slots"
             referencedColumns: ["id"]
           },
@@ -4536,6 +4561,27 @@ export type Database = {
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_placements_furniture_id_fkey"
+            columns: ["furniture_id"]
+            isOneToOne: false
+            referencedRelation: "furniture"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_placements_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "zones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_placements_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "zones_dim"
             referencedColumns: ["id"]
           },
         ]
