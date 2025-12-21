@@ -260,6 +260,18 @@ export async function generateSceneRecipeForStore(
     .select('*')
     .eq('store_id', storeId);
 
+  // 🔧 NEW: Fetch product_placements for display_type info
+  const { data: placementsData } = await supabase
+    .from('product_placements')
+    .select('*')
+    .eq('store_id', storeId)
+    .eq('is_active', true);
+
+  // 🔧 NEW: Fetch product_models for display_type-specific model URLs
+  const { data: productModelsData } = await supabase
+    .from('product_models')
+    .select('*');
+
   // Fetch staff with avatars
   const { data: staffData } = await supabase
     .from('staff')
@@ -322,10 +334,28 @@ export async function generateSceneRecipeForStore(
     }
   }
 
+  // 🔧 NEW: Create placement map (product_id -> placement with display_type)
+  const placementMap = new Map<string, { slot_id: string; display_type: string }>();
+  for (const placement of placementsData || []) {
+    placementMap.set(placement.product_id, {
+      slot_id: placement.slot_id,
+      display_type: placement.display_type
+    });
+  }
+
+  // 🔧 NEW: Create product_models map (product_id + display_type -> model_url)
+  const productModelsMap = new Map<string, string>();
+  for (const model of productModelsData || []) {
+    const key = `${model.product_id}_${model.display_type}`;
+    productModelsMap.set(key, model.model_3d_url);
+  }
+
   console.log('[SceneRecipe] Product-to-slot mapping:', {
     totalSlots: slots.length,
     occupiedSlots: productToSlotMap.size,
     products: productsData?.length || 0,
+    placements: placementMap.size,
+    productModels: productModelsMap.size,
   });
 
   // Build products array with slot-based positioning
@@ -337,6 +367,24 @@ export async function generateSceneRecipeForStore(
       let rotation: Vector3D = (p.model_3d_rotation as unknown as Vector3D) || { x: 0, y: 0, z: 0 };
       let furnitureId: string | undefined = p.initial_furniture_id;
       let slotId: string | undefined = p.slot_id;
+
+      // 🔧 NEW: Get display_type from product_placements
+      const placement = placementMap.get(p.id);
+      const placedDisplayType = placement?.display_type;
+
+      // 🔧 NEW: Select model URL based on display_type from product_models
+      // Priority: product_models[display_type] > products.model_3d_url (fallback)
+      let modelUrl = p.model_3d_url!;
+      if (placedDisplayType) {
+        const modelKey = `${p.id}_${placedDisplayType}`;
+        const displayTypeModelUrl = productModelsMap.get(modelKey);
+        if (displayTypeModelUrl) {
+          modelUrl = displayTypeModelUrl;
+          console.log(`[SceneRecipe] Product ${p.sku} using display_type '${placedDisplayType}' model: ${displayTypeModelUrl}`);
+        } else {
+          console.log(`[SceneRecipe] Product ${p.sku} no model for display_type '${placedDisplayType}', using default: ${modelUrl}`);
+        }
+      }
 
       // 🔧 FIX: First try reverse lookup from furniture_slots.occupied_by_product_id
       const occupiedSlot = productToSlotMap.get(p.id);
@@ -382,7 +430,7 @@ export async function generateSceneRecipeForStore(
       return {
         id: p.id,
         type: 'product' as const,
-        model_url: p.model_3d_url!,
+        model_url: modelUrl,  // 🔧 CHANGED: Use display_type-based model URL
         position,
         rotation,
         scale: (p.model_3d_scale as unknown as Vector3D) || { x: 1, y: 1, z: 1 },

@@ -397,7 +397,10 @@ export default function DigitalTwinStudioPage() {
   }, [setMode, handleRunSimulation, currentRecipe, sceneSimulation]);
 
   // SceneProvider용 모델 변환
+  // - DB(rotation_x/y/z)는 degree로 저장되어 있어 three.js에 전달 전 radians로 변환
   const sceneModels: Model3D[] = useMemo(() => {
+    const degToRad = (deg: number) => (deg * Math.PI) / 180;
+
     const result = models
       .filter((m) => activeLayers.includes(m.id))
       .map((m) => {
@@ -406,7 +409,11 @@ export default function DigitalTwinStudioPage() {
           name: m.name,
           url: m.model_url,
           position: [m.position?.x || 0, m.position?.y || 0, m.position?.z || 0] as [number, number, number],
-          rotation: [m.rotation?.x || 0, m.rotation?.y || 0, m.rotation?.z || 0] as [number, number, number],
+          rotation: [
+            degToRad(m.rotation?.x || 0),
+            degToRad(m.rotation?.y || 0),
+            degToRad(m.rotation?.z || 0),
+          ] as [number, number, number],
           scale: [m.scale?.x || 1, m.scale?.y || 1, m.scale?.z || 1] as [number, number, number],
           visible: true,
           type: m.type,

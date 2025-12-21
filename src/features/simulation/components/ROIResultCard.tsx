@@ -235,7 +235,7 @@ export function ROIResultCard({
 interface ROIItemCardProps {
   application: RecommendationApplication & {
     stores?: { store_name: string } | null;
-    scenarios?: { name: string } | null;
+    scenarios?: { scenario_name: string } | null;
   };
   measurement?: ROIMeasurement | null;
   progress: number;

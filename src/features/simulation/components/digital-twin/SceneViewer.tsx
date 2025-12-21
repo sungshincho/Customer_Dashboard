@@ -46,7 +46,12 @@ function furnitureToModel3D(furniture: SceneRecipe['furniture']): Model3D[] {
     name: f.furniture_type || 'Furniture',
     url: f.model_url || '',
     position: [f.position.x, f.position.y, f.position.z] as [number, number, number],
-    rotation: [f.rotation.x, f.rotation.y, f.rotation.z] as [number, number, number],
+    // degrees → radians 변환
+    rotation: [
+      f.rotation.x * Math.PI / 180,
+      f.rotation.y * Math.PI / 180,
+      f.rotation.z * Math.PI / 180,
+    ] as [number, number, number],
     scale: [f.scale.x, f.scale.y, f.scale.z] as [number, number, number],
     visible: true,
     type: 'furniture' as const,

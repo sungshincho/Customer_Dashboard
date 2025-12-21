@@ -7,7 +7,6 @@
 -- ═══════════════════════════════════════════════════════════════════════════════
 -- 공통 변수 설정
 -- ═══════════════════════════════════════════════════════════════════════════════
-
 DO $$
 DECLARE
   v_org_id UUID;
@@ -22,6 +21,26 @@ DECLARE
   v_product_id UUID;
   v_segment TEXT;
 
+  -- daily/hourly/product/segment temp vars hoisted here
+  v_hour_visitors INTEGER;
+  v_hour_transactions INTEGER;
+  v_hour_revenue NUMERIC;
+
+  v_zone_visitors INTEGER;
+  v_zone_dwell INTEGER;
+
+  v_units_sold INTEGER;
+  v_prod_revenue NUMERIC;
+  v_avg_price NUMERIC;
+
+  v_seg_count INTEGER;
+  v_seg_revenue NUMERIC;
+  v_seg_avg_txn NUMERIC;
+  v_seg_freq NUMERIC;
+  v_seg_basket NUMERIC;
+  v_seg_churn NUMERIC;
+  v_seg_ltv NUMERIC;
+
   -- 집계 메트릭 변수
   v_daily_visitors INTEGER;
   v_daily_transactions INTEGER;
@@ -33,10 +52,9 @@ DECLARE
   v_zone_codes TEXT[] := ARRAY['Z001','Z002','Z003','Z004','Z005','Z006','Z007'];
   v_products UUID[];
   v_segments TEXT[] := ARRAY['VIP','Regular','New','Dormant'];
-
 BEGIN
   -- 기준 ID 조회
-  SELECT id INTO v_org_id FROM organizations WHERE name ILIKE '%NeuralTwin%' OR name ILIKE '%MVP%' LIMIT 1;
+  SELECT id INTO v_org_id FROM organizations WHERE org_name ILIKE '%TCAG%' OR org_name ILIKE '%MVP%' LIMIT 1;
   IF v_org_id IS NULL THEN
     SELECT id INTO v_org_id FROM organizations LIMIT 1;
   END IF;
@@ -71,13 +89,10 @@ BEGIN
   RAISE NOTICE 'Date Range: % ~ %', v_start_date, v_current_date;
   RAISE NOTICE '═══════════════════════════════════════════════════════════════';
 
-  -- ═══════════════════════════════════════════════════════════════════════════
   -- STEP 13.1: daily_kpis_agg (90일 KPI)
-  -- ═══════════════════════════════════════════════════════════════════════════
   RAISE NOTICE '[STEP 13.1] daily_kpis_agg 시딩 시작 (90건)';
 
   FOR v_day_offset IN 0..89 LOOP
-    -- 일별 기본 메트릭 계산 (요일별 변동)
     v_daily_visitors := 70 + (v_day_offset % 7) * 5 + FLOOR(RANDOM() * 30);
     v_daily_transactions := FLOOR(v_daily_visitors * (0.45 + RANDOM() * 0.15));
     v_daily_revenue := v_daily_transactions * (85000 + FLOOR(RANDOM() * 50000));
@@ -95,7 +110,7 @@ BEGIN
       weather_condition, temperature, is_holiday, special_event,
       calculated_at, metadata
     ) VALUES (
-      v_org_id, v_store_id, v_start_date + (v_day_offset || ' days')::INTERVAL,
+      v_org_id, v_store_id, (v_start_date + v_day_offset),
       v_daily_visitors,
       FLOOR(v_daily_visitors * 0.85),
       FLOOR(v_daily_visitors * 0.25),
@@ -104,21 +119,21 @@ BEGIN
       v_daily_revenue,
       v_daily_units,
       ROUND((v_daily_units::NUMERIC / NULLIF(v_daily_transactions, 0)), 2),
-      ROUND((v_daily_revenue / NULLIF(v_daily_transactions, 0)), 0),
+      ROUND((v_daily_revenue::NUMERIC / NULLIF(v_daily_transactions, 0)), 0),
       ROUND((v_daily_transactions::NUMERIC / NULLIF(v_daily_visitors, 0)) * 100, 2),
-      ROUND(55 + RANDOM() * 20, 2),
-      ROUND(35 + RANDOM() * 25, 2),
-      ROUND(v_daily_revenue / 500, 0),
-      ROUND(v_daily_revenue / NULLIF(v_daily_visitors, 0), 0),
+      ROUND((55 + RANDOM() * 20)::numeric, 2),
+      ROUND((35 + RANDOM() * 25)::numeric, 2),
+      ROUND((v_daily_revenue::NUMERIC / 500), 0),
+      ROUND((v_daily_revenue::NUMERIC / NULLIF(v_daily_visitors, 0)), 0),
       64,
-      ROUND(v_daily_revenue / 64, 0),
+      ROUND((v_daily_revenue::NUMERIC / 64), 0),
       CASE FLOOR(RANDOM() * 4)
         WHEN 0 THEN 'sunny'
         WHEN 1 THEN 'cloudy'
         WHEN 2 THEN 'rainy'
         ELSE 'clear'
       END,
-      ROUND(-5 + RANDOM() * 30, 1),
+      ROUND((-5 + RANDOM() * 30)::numeric, 1),
       CASE WHEN v_day_offset % 7 IN (5, 6) THEN FALSE ELSE FALSE END,
       CASE
         WHEN v_day_offset = 30 THEN 'Black Friday'
@@ -136,9 +151,7 @@ BEGIN
 
   RAISE NOTICE '[STEP 13.1] daily_kpis_agg 완료: 90건 삽입';
 
-  -- ═══════════════════════════════════════════════════════════════════════════
-  -- STEP 13.2: daily_sales (90일 매출)
-  -- ═══════════════════════════════════════════════════════════════════════════
+  -- STEP 13.2: daily_sales
   RAISE NOTICE '[STEP 13.2] daily_sales 시딩 시작 (90건)';
 
   FOR v_day_offset IN 0..89 LOOP
@@ -151,10 +164,10 @@ BEGIN
       avg_transaction_value, total_customers,
       metadata
     ) VALUES (
-      v_org_id, v_store_id, v_start_date + (v_day_offset || ' days')::INTERVAL,
+      v_org_id, v_store_id, (v_start_date + v_day_offset),
       v_daily_revenue,
       v_daily_transactions,
-      ROUND(v_daily_revenue / NULLIF(v_daily_transactions, 0), 0),
+      ROUND((v_daily_revenue::NUMERIC / NULLIF(v_daily_transactions, 0)), 0),
       FLOOR(v_daily_transactions * 0.9),
       jsonb_build_object(
         'source', 'seed_script',
@@ -165,63 +178,52 @@ BEGIN
 
   RAISE NOTICE '[STEP 13.2] daily_sales 완료: 90건 삽입';
 
-  -- ═══════════════════════════════════════════════════════════════════════════
-  -- STEP 13.3: hourly_metrics (90일 × 12시간 = 1,080건)
-  -- ═══════════════════════════════════════════════════════════════════════════
+  -- STEP 13.3: hourly_metrics
   RAISE NOTICE '[STEP 13.3] hourly_metrics 시딩 시작 (1,080건)';
 
   FOR v_day_offset IN 0..89 LOOP
-    FOR v_hour IN 10..21 LOOP  -- 영업시간: 10:00 ~ 21:00 (12시간)
-      -- 시간대별 방문자 분포 (피크타임: 13~14시, 18~19시)
-      DECLARE
-        v_hour_visitors INTEGER;
-        v_hour_transactions INTEGER;
-        v_hour_revenue NUMERIC;
-      BEGIN
-        v_hour_visitors := CASE
-          WHEN v_hour IN (13, 14, 18, 19) THEN 12 + FLOOR(RANDOM() * 8)  -- 피크
-          WHEN v_hour IN (11, 12, 17, 20) THEN 8 + FLOOR(RANDOM() * 6)   -- 준피크
-          ELSE 4 + FLOOR(RANDOM() * 4)  -- 비피크
-        END;
-        v_hour_transactions := FLOOR(v_hour_visitors * (0.4 + RANDOM() * 0.2));
-        v_hour_revenue := v_hour_transactions * (70000 + FLOOR(RANDOM() * 50000));
-
-        INSERT INTO hourly_metrics (
-          org_id, store_id, date, hour,
-          visitor_count, entry_count, exit_count,
-          transaction_count, revenue, units_sold,
-          avg_occupancy, peak_occupancy, conversion_rate,
-          calculated_at, metadata
-        ) VALUES (
-          v_org_id, v_store_id, v_start_date + (v_day_offset || ' days')::INTERVAL, v_hour,
-          v_hour_visitors,
-          v_hour_visitors,
-          FLOOR(v_hour_visitors * 0.95),
-          v_hour_transactions,
-          v_hour_revenue,
-          v_hour_transactions + FLOOR(RANDOM() * 3),
-          FLOOR(v_hour_visitors * 0.6),
-          v_hour_visitors + FLOOR(RANDOM() * 5),
-          ROUND((v_hour_transactions::NUMERIC / NULLIF(v_hour_visitors, 0)) * 100, 2),
-          NOW(),
-          jsonb_build_object(
-            'hour_type', CASE
-              WHEN v_hour IN (13, 14, 18, 19) THEN 'peak'
-              WHEN v_hour IN (11, 12, 17, 20) THEN 'semi_peak'
-              ELSE 'off_peak'
-            END,
-            'source', 'seed_script'
-          )
-        );
+    FOR v_hour IN 10..21 LOOP
+      v_hour_visitors := CASE
+        WHEN v_hour IN (13, 14, 18, 19) THEN 12 + FLOOR(RANDOM() * 8)
+        WHEN v_hour IN (11, 12, 17, 20) THEN 8 + FLOOR(RANDOM() * 6)
+        ELSE 4 + FLOOR(RANDOM() * 4)
       END;
+      v_hour_transactions := FLOOR(v_hour_visitors * (0.4 + RANDOM() * 0.2));
+      v_hour_revenue := v_hour_transactions * (70000 + FLOOR(RANDOM() * 50000));
+
+      INSERT INTO hourly_metrics (
+        org_id, store_id, date, hour,
+        visitor_count, entry_count, exit_count,
+        transaction_count, revenue, units_sold,
+        avg_occupancy, peak_occupancy, conversion_rate,
+        calculated_at, metadata
+      ) VALUES (
+        v_org_id, v_store_id, (v_start_date + v_day_offset), v_hour,
+        v_hour_visitors,
+        v_hour_visitors,
+        FLOOR(v_hour_visitors * 0.95),
+        v_hour_transactions,
+        v_hour_revenue,
+        v_hour_transactions + FLOOR(RANDOM() * 3),
+        FLOOR(v_hour_visitors * 0.6),
+        v_hour_visitors + FLOOR(RANDOM() * 5),
+        ROUND((v_hour_transactions::NUMERIC / NULLIF(v_hour_visitors, 0)) * 100, 2),
+        NOW(),
+        jsonb_build_object(
+          'hour_type', CASE
+            WHEN v_hour IN (13, 14, 18, 19) THEN 'peak'
+            WHEN v_hour IN (11, 12, 17, 20) THEN 'semi_peak'
+            ELSE 'off_peak'
+          END,
+          'source', 'seed_script'
+        )
+      );
     END LOOP;
   END LOOP;
 
   RAISE NOTICE '[STEP 13.3] hourly_metrics 완료: 1,080건 삽입';
 
-  -- ═══════════════════════════════════════════════════════════════════════════
-  -- STEP 14.1: zone_daily_metrics (90일 × 7존 = 630건)
-  -- ═══════════════════════════════════════════════════════════════════════════
+  -- STEP 14.1: zone_daily_metrics
   RAISE NOTICE '[STEP 14.1] zone_daily_metrics 시딩 시작 (630건)';
 
   IF v_zones IS NOT NULL AND array_length(v_zones, 1) >= 7 THEN
@@ -230,79 +232,73 @@ BEGIN
         v_zone_id := v_zones[i];
         v_zone_code := v_zone_codes[i];
 
-        -- 존별 방문자 분포
-        DECLARE
-          v_zone_visitors INTEGER;
-          v_zone_dwell INTEGER;
-        BEGIN
-          v_zone_visitors := CASE v_zone_code
-            WHEN 'Z001' THEN 80 + FLOOR(RANDOM() * 20)   -- 입구 (높은 트래픽)
-            WHEN 'Z002' THEN 65 + FLOOR(RANDOM() * 15)   -- 메인홀
-            WHEN 'Z003' THEN 45 + FLOOR(RANDOM() * 15)   -- 의류존
-            WHEN 'Z004' THEN 30 + FLOOR(RANDOM() * 10)   -- 악세서리존
-            WHEN 'Z005' THEN 15 + FLOOR(RANDOM() * 8)    -- 피팅룸
-            WHEN 'Z006' THEN 40 + FLOOR(RANDOM() * 10)   -- 계산대
-            WHEN 'Z007' THEN 20 + FLOOR(RANDOM() * 10)   -- 라운지
-            ELSE 30 + FLOOR(RANDOM() * 15)
-          END;
-
-          v_zone_dwell := CASE v_zone_code
-            WHEN 'Z001' THEN 60 + FLOOR(RANDOM() * 30)   -- 입구 (짧은 체류)
-            WHEN 'Z002' THEN 180 + FLOOR(RANDOM() * 60)  -- 메인홀
-            WHEN 'Z003' THEN 300 + FLOOR(RANDOM() * 120) -- 의류존 (긴 체류)
-            WHEN 'Z004' THEN 180 + FLOOR(RANDOM() * 90)  -- 악세서리존
-            WHEN 'Z005' THEN 360 + FLOOR(RANDOM() * 180) -- 피팅룸 (가장 긴 체류)
-            WHEN 'Z006' THEN 120 + FLOOR(RANDOM() * 60)  -- 계산대
-            WHEN 'Z007' THEN 240 + FLOOR(RANDOM() * 120) -- 라운지
-            ELSE 180 + FLOOR(RANDOM() * 90)
-          END;
-
-          INSERT INTO zone_daily_metrics (
-            org_id, store_id, zone_id, date,
-            total_visitors, unique_visitors,
-            entry_count, exit_count,
-            avg_dwell_seconds, total_dwell_seconds,
-            interaction_count, conversion_count,
-            revenue_attributed, heatmap_intensity,
-            peak_hour, peak_occupancy,
-            calculated_at, metadata
-          ) VALUES (
-            v_org_id, v_store_id, v_zone_id, v_start_date + (v_day_offset || ' days')::INTERVAL,
-            v_zone_visitors,
-            FLOOR(v_zone_visitors * 0.85),
-            v_zone_visitors,
-            FLOOR(v_zone_visitors * 0.95),
-            v_zone_dwell,
-            v_zone_dwell * v_zone_visitors,
-            FLOOR(v_zone_visitors * (0.3 + RANDOM() * 0.3)),
-            CASE WHEN v_zone_code IN ('Z003', 'Z004', 'Z006')
-              THEN FLOOR(v_zone_visitors * (0.2 + RANDOM() * 0.15))
-              ELSE FLOOR(v_zone_visitors * 0.05)
-            END,
-            CASE WHEN v_zone_code IN ('Z003', 'Z004', 'Z006')
-              THEN FLOOR(v_zone_visitors * (50000 + RANDOM() * 30000))
-              ELSE 0
-            END,
-            ROUND(v_zone_visitors::NUMERIC / 100, 2),
-            13 + FLOOR(RANDOM() * 8),  -- 피크 시간: 13~20시
-            v_zone_visitors + FLOOR(RANDOM() * 10),
-            NOW(),
-            jsonb_build_object(
-              'zone_code', v_zone_code,
-              'zone_type', CASE v_zone_code
-                WHEN 'Z001' THEN 'entrance'
-                WHEN 'Z002' THEN 'main_hall'
-                WHEN 'Z003' THEN 'clothing'
-                WHEN 'Z004' THEN 'accessory'
-                WHEN 'Z005' THEN 'fitting_room'
-                WHEN 'Z006' THEN 'checkout'
-                WHEN 'Z007' THEN 'lounge'
-                ELSE 'other'
-              END,
-              'source', 'seed_script'
-            )
-          );
+        v_zone_visitors := CASE v_zone_code
+          WHEN 'Z001' THEN 80 + FLOOR(RANDOM() * 20)
+          WHEN 'Z002' THEN 65 + FLOOR(RANDOM() * 15)
+          WHEN 'Z003' THEN 45 + FLOOR(RANDOM() * 15)
+          WHEN 'Z004' THEN 30 + FLOOR(RANDOM() * 10)
+          WHEN 'Z005' THEN 15 + FLOOR(RANDOM() * 8)
+          WHEN 'Z006' THEN 40 + FLOOR(RANDOM() * 10)
+          WHEN 'Z007' THEN 20 + FLOOR(RANDOM() * 10)
+          ELSE 30 + FLOOR(RANDOM() * 15)
         END;
+
+        v_zone_dwell := CASE v_zone_code
+          WHEN 'Z001' THEN 60 + FLOOR(RANDOM() * 30)
+          WHEN 'Z002' THEN 180 + FLOOR(RANDOM() * 60)
+          WHEN 'Z003' THEN 300 + FLOOR(RANDOM() * 120)
+          WHEN 'Z004' THEN 180 + FLOOR(RANDOM() * 90)
+          WHEN 'Z005' THEN 360 + FLOOR(RANDOM() * 180)
+          WHEN 'Z006' THEN 120 + FLOOR(RANDOM() * 60)
+          WHEN 'Z007' THEN 240 + FLOOR(RANDOM() * 120)
+          ELSE 180 + FLOOR(RANDOM() * 90)
+        END;
+
+        INSERT INTO zone_daily_metrics (
+          org_id, store_id, zone_id, date,
+          total_visitors, unique_visitors,
+          entry_count, exit_count,
+          avg_dwell_seconds, total_dwell_seconds,
+          interaction_count, conversion_count,
+          revenue_attributed, heatmap_intensity,
+          peak_hour, peak_occupancy,
+          calculated_at, metadata
+        ) VALUES (
+          v_org_id, v_store_id, v_zone_id, (v_start_date + v_day_offset),
+          v_zone_visitors,
+          FLOOR(v_zone_visitors * 0.85),
+          v_zone_visitors,
+          FLOOR(v_zone_visitors * 0.95),
+          v_zone_dwell,
+          v_zone_dwell * v_zone_visitors,
+          FLOOR(v_zone_visitors * (0.3 + RANDOM() * 0.3)),
+          CASE WHEN v_zone_code IN ('Z003', 'Z004', 'Z006')
+            THEN FLOOR(v_zone_visitors * (0.2 + RANDOM() * 0.15))
+            ELSE FLOOR(v_zone_visitors * 0.05)
+          END,
+          CASE WHEN v_zone_code IN ('Z003', 'Z004', 'Z006')
+            THEN FLOOR(v_zone_visitors * (50000 + RANDOM() * 30000))
+            ELSE 0
+          END,
+          ROUND((v_zone_visitors::NUMERIC / 100), 2),
+          13 + FLOOR(RANDOM() * 8),
+          v_zone_visitors + FLOOR(RANDOM() * 10),
+          NOW(),
+          jsonb_build_object(
+            'zone_code', v_zone_code,
+            'zone_type', CASE v_zone_code
+              WHEN 'Z001' THEN 'entrance'
+              WHEN 'Z002' THEN 'main_hall'
+              WHEN 'Z003' THEN 'clothing'
+              WHEN 'Z004' THEN 'accessory'
+              WHEN 'Z005' THEN 'fitting_room'
+              WHEN 'Z006' THEN 'checkout'
+              WHEN 'Z007' THEN 'lounge'
+              ELSE 'other'
+            END,
+            'source', 'seed_script'
+          )
+        );
       END LOOP;
     END LOOP;
 
@@ -311,9 +307,7 @@ BEGIN
     RAISE WARNING '[STEP 14.1] zones_dim 데이터 부족 - zone_daily_metrics 스킵';
   END IF;
 
-  -- ═══════════════════════════════════════════════════════════════════════════
-  -- STEP 14.2: product_performance_agg (90일 × 25상품 = 2,250건)
-  -- ═══════════════════════════════════════════════════════════════════════════
+  -- STEP 14.2: product_performance_agg
   RAISE NOTICE '[STEP 14.2] product_performance_agg 시딩 시작 (2,250건)';
 
   IF v_products IS NOT NULL AND array_length(v_products, 1) >= 25 THEN
@@ -321,59 +315,52 @@ BEGIN
       FOR i IN 1..25 LOOP
         v_product_id := v_products[i];
 
-        DECLARE
-          v_units_sold INTEGER;
-          v_prod_revenue NUMERIC;
-          v_avg_price NUMERIC;
-        BEGIN
-          -- 상품별 판매량 (일부 베스트셀러)
-          v_units_sold := CASE
-            WHEN i <= 5 THEN 3 + FLOOR(RANDOM() * 5)   -- 베스트셀러
-            WHEN i <= 15 THEN 1 + FLOOR(RANDOM() * 3)  -- 일반
-            ELSE FLOOR(RANDOM() * 2)                    -- 저판매
-          END;
-
-          v_avg_price := CASE
-            WHEN i <= 5 THEN 150000 + FLOOR(RANDOM() * 100000)   -- 고가
-            WHEN i <= 15 THEN 80000 + FLOOR(RANDOM() * 50000)    -- 중가
-            ELSE 30000 + FLOOR(RANDOM() * 30000)                  -- 저가
-          END;
-
-          v_prod_revenue := v_units_sold * v_avg_price;
-
-          INSERT INTO product_performance_agg (
-            org_id, store_id, product_id, date,
-            units_sold, revenue, transactions,
-            conversion_rate, avg_selling_price,
-            discount_rate, return_rate,
-            stock_level, stockout_hours,
-            category_rank, store_rank,
-            calculated_at, metadata
-          ) VALUES (
-            v_org_id, v_store_id, v_product_id, v_start_date + (v_day_offset || ' days')::INTERVAL,
-            v_units_sold,
-            v_prod_revenue,
-            GREATEST(1, v_units_sold - FLOOR(RANDOM() * 2)),
-            ROUND((RANDOM() * 0.15 + 0.02) * 100, 2),
-            v_avg_price,
-            ROUND(RANDOM() * 0.2, 2),
-            ROUND(RANDOM() * 0.05, 3),
-            50 + FLOOR(RANDOM() * 100),
-            CASE WHEN RANDOM() < 0.05 THEN FLOOR(RANDOM() * 4) ELSE 0 END,
-            i,
-            i,
-            NOW(),
-            jsonb_build_object(
-              'product_rank', i,
-              'performance_tier', CASE
-                WHEN i <= 5 THEN 'top'
-                WHEN i <= 15 THEN 'mid'
-                ELSE 'low'
-              END,
-              'source', 'seed_script'
-            )
-          );
+        v_units_sold := CASE
+          WHEN i <= 5 THEN 3 + FLOOR(RANDOM() * 5)
+          WHEN i <= 15 THEN 1 + FLOOR(RANDOM() * 3)
+          ELSE FLOOR(RANDOM() * 2)
         END;
+
+        v_avg_price := CASE
+          WHEN i <= 5 THEN 150000 + FLOOR(RANDOM() * 100000)
+          WHEN i <= 15 THEN 80000 + FLOOR(RANDOM() * 50000)
+          ELSE 30000 + FLOOR(RANDOM() * 30000)
+        END;
+
+        v_prod_revenue := v_units_sold * v_avg_price;
+
+        INSERT INTO product_performance_agg (
+          org_id, store_id, product_id, date,
+          units_sold, revenue, transactions,
+          conversion_rate, avg_selling_price,
+          discount_rate, return_rate,
+          stock_level, stockout_hours,
+          category_rank, store_rank,
+          calculated_at, metadata
+        ) VALUES (
+          v_org_id, v_store_id, v_product_id, (v_start_date + v_day_offset),
+          v_units_sold,
+          v_prod_revenue,
+          GREATEST(1, v_units_sold - FLOOR(RANDOM() * 2)),
+          ROUND(((RANDOM() * 0.15 + 0.02) * 100)::numeric, 2),
+          v_avg_price,
+          ROUND((RANDOM() * 0.2)::numeric, 2),
+          ROUND((RANDOM() * 0.05)::numeric, 3),
+          50 + FLOOR(RANDOM() * 100),
+          CASE WHEN RANDOM() < 0.05 THEN FLOOR(RANDOM() * 4) ELSE 0 END,
+          i,
+          i,
+          NOW(),
+          jsonb_build_object(
+            'product_rank', i,
+            'performance_tier', CASE
+              WHEN i <= 5 THEN 'top'
+              WHEN i <= 15 THEN 'mid'
+              ELSE 'low'
+            END,
+            'source', 'seed_script'
+          )
+        );
       END LOOP;
     END LOOP;
 
@@ -382,93 +369,80 @@ BEGIN
     RAISE WARNING '[STEP 14.2] products 데이터 부족 - product_performance_agg 스킵';
   END IF;
 
-  -- ═══════════════════════════════════════════════════════════════════════════
-  -- STEP 14.3: customer_segments_agg (90일 × 4세그먼트 = 360건)
-  -- ═══════════════════════════════════════════════════════════════════════════
+  -- STEP 14.3: customer_segments_agg
   RAISE NOTICE '[STEP 14.3] customer_segments_agg 시딩 시작 (360건)';
 
   FOR v_day_offset IN 0..89 LOOP
     FOREACH v_segment IN ARRAY v_segments LOOP
-      DECLARE
-        v_seg_count INTEGER;
-        v_seg_revenue NUMERIC;
-        v_seg_avg_txn NUMERIC;
-        v_seg_freq NUMERIC;
-        v_seg_basket NUMERIC;
-        v_seg_churn NUMERIC;
-        v_seg_ltv NUMERIC;
-      BEGIN
-        -- 세그먼트별 메트릭 계산
-        CASE v_segment
-          WHEN 'VIP' THEN
-            v_seg_count := 20 + FLOOR(RANDOM() * 10);
-            v_seg_revenue := v_seg_count * (200000 + FLOOR(RANDOM() * 100000));
-            v_seg_avg_txn := 180000 + FLOOR(RANDOM() * 80000);
-            v_seg_freq := 3.5 + RANDOM() * 1.5;
-            v_seg_basket := 2.5 + RANDOM();
-            v_seg_churn := 0.05 + RANDOM() * 0.05;
-            v_seg_ltv := 5000000 + FLOOR(RANDOM() * 2000000);
-          WHEN 'Regular' THEN
-            v_seg_count := 40 + FLOOR(RANDOM() * 15);
-            v_seg_revenue := v_seg_count * (100000 + FLOOR(RANDOM() * 50000));
-            v_seg_avg_txn := 95000 + FLOOR(RANDOM() * 30000);
-            v_seg_freq := 2.0 + RANDOM();
-            v_seg_basket := 1.8 + RANDOM() * 0.5;
-            v_seg_churn := 0.15 + RANDOM() * 0.1;
-            v_seg_ltv := 2000000 + FLOOR(RANDOM() * 800000);
-          WHEN 'New' THEN
-            v_seg_count := 25 + FLOOR(RANDOM() * 12);
-            v_seg_revenue := v_seg_count * (70000 + FLOOR(RANDOM() * 40000));
-            v_seg_avg_txn := 65000 + FLOOR(RANDOM() * 25000);
-            v_seg_freq := 1.0 + RANDOM() * 0.5;
-            v_seg_basket := 1.3 + RANDOM() * 0.4;
-            v_seg_churn := 0.30 + RANDOM() * 0.15;
-            v_seg_ltv := 800000 + FLOOR(RANDOM() * 400000);
-          WHEN 'Dormant' THEN
-            v_seg_count := 10 + FLOOR(RANDOM() * 8);
-            v_seg_revenue := v_seg_count * (30000 + FLOOR(RANDOM() * 20000));
-            v_seg_avg_txn := 50000 + FLOOR(RANDOM() * 20000);
-            v_seg_freq := 0.2 + RANDOM() * 0.3;
-            v_seg_basket := 1.1 + RANDOM() * 0.2;
-            v_seg_churn := 0.60 + RANDOM() * 0.2;
-            v_seg_ltv := 200000 + FLOOR(RANDOM() * 150000);
-          ELSE
-            v_seg_count := 15;
-            v_seg_revenue := 1000000;
-            v_seg_avg_txn := 80000;
-            v_seg_freq := 1.5;
-            v_seg_basket := 1.5;
-            v_seg_churn := 0.25;
-            v_seg_ltv := 1000000;
-        END CASE;
+      CASE v_segment
+        WHEN 'VIP' THEN
+          v_seg_count := 20 + FLOOR(RANDOM() * 10);
+          v_seg_revenue := v_seg_count * (200000 + FLOOR(RANDOM() * 100000));
+          v_seg_avg_txn := 180000 + FLOOR(RANDOM() * 80000);
+          v_seg_freq := 3.5 + RANDOM() * 1.5;
+          v_seg_basket := 2.5 + RANDOM();
+          v_seg_churn := 0.05 + RANDOM() * 0.05;
+          v_seg_ltv := 5000000 + FLOOR(RANDOM() * 2000000);
+        WHEN 'Regular' THEN
+          v_seg_count := 40 + FLOOR(RANDOM() * 15);
+          v_seg_revenue := v_seg_count * (100000 + FLOOR(RANDOM() * 50000));
+          v_seg_avg_txn := 95000 + FLOOR(RANDOM() * 30000);
+          v_seg_freq := 2.0 + RANDOM();
+          v_seg_basket := 1.8 + RANDOM() * 0.5;
+          v_seg_churn := 0.15 + RANDOM() * 0.1;
+          v_seg_ltv := 2000000 + FLOOR(RANDOM() * 800000);
+        WHEN 'New' THEN
+          v_seg_count := 25 + FLOOR(RANDOM() * 12);
+          v_seg_revenue := v_seg_count * (70000 + FLOOR(RANDOM() * 40000));
+          v_seg_avg_txn := 65000 + FLOOR(RANDOM() * 25000);
+          v_seg_freq := 1.0 + RANDOM() * 0.5;
+          v_seg_basket := 1.3 + RANDOM() * 0.4;
+          v_seg_churn := 0.30 + RANDOM() * 0.15;
+          v_seg_ltv := 800000 + FLOOR(RANDOM() * 400000);
+        WHEN 'Dormant' THEN
+          v_seg_count := 10 + FLOOR(RANDOM() * 8);
+          v_seg_revenue := v_seg_count * (30000 + FLOOR(RANDOM() * 20000));
+          v_seg_avg_txn := 50000 + FLOOR(RANDOM() * 20000);
+          v_seg_freq := 0.2 + RANDOM() * 0.3;
+          v_seg_basket := 1.1 + RANDOM() * 0.2;
+          v_seg_churn := 0.60 + RANDOM() * 0.2;
+          v_seg_ltv := 200000 + FLOOR(RANDOM() * 150000);
+        ELSE
+          v_seg_count := 15;
+          v_seg_revenue := 1000000;
+          v_seg_avg_txn := 80000;
+          v_seg_freq := 1.5;
+          v_seg_basket := 1.5;
+          v_seg_churn := 0.25;
+          v_seg_ltv := 1000000;
+      END CASE;
 
-        INSERT INTO customer_segments_agg (
-          org_id, store_id, date,
-          segment_type, segment_name,
-          customer_count, total_revenue,
-          avg_transaction_value, visit_frequency,
-          avg_basket_size, churn_risk_score, ltv_estimate,
-          metadata, calculated_at
-        ) VALUES (
-          v_org_id, v_store_id, v_start_date + (v_day_offset || ' days')::INTERVAL,
-          'customer_tier', v_segment,
-          v_seg_count, v_seg_revenue,
-          v_seg_avg_txn, v_seg_freq,
-          v_seg_basket, v_seg_churn, v_seg_ltv,
-          jsonb_build_object(
-            'segment', v_segment,
-            'tier_rank', CASE v_segment
-              WHEN 'VIP' THEN 1
-              WHEN 'Regular' THEN 2
-              WHEN 'New' THEN 3
-              WHEN 'Dormant' THEN 4
-              ELSE 5
-            END,
-            'source', 'seed_script'
-          ),
-          NOW()
-        );
-      END;
+      INSERT INTO customer_segments_agg (
+        org_id, store_id, date,
+        segment_type, segment_name,
+        customer_count, total_revenue,
+        avg_transaction_value, visit_frequency,
+        avg_basket_size, churn_risk_score, ltv_estimate,
+        metadata, calculated_at
+      ) VALUES (
+        v_org_id, v_store_id, (v_start_date + v_day_offset),
+        'customer_tier', v_segment,
+        v_seg_count, v_seg_revenue,
+        v_seg_avg_txn, v_seg_freq,
+        v_seg_basket, v_seg_churn, v_seg_ltv,
+        jsonb_build_object(
+          'segment', v_segment,
+          'tier_rank', CASE v_segment
+            WHEN 'VIP' THEN 1
+            WHEN 'Regular' THEN 2
+            WHEN 'New' THEN 3
+            WHEN 'Dormant' THEN 4
+            ELSE 5
+          END,
+          'source', 'seed_script'
+        ),
+        NOW()
+      );
     END LOOP;
   END LOOP;
 

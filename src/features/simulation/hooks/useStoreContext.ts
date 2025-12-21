@@ -662,7 +662,7 @@ export function useStoreContext(storeId: string | undefined, days: number = 7) {
         // 거래 데이터 조회 (days 파라미터 사용)
         const { data: transactions } = await supabase
           .from('transactions')
-          .select('id, customer_id, total_amount, items, created_at')
+          .select('id, customer_id, total_amount, created_at')
           .eq('store_id', storeId)
           .gte('created_at', startDate.toISOString())
           .order('created_at', { ascending: false })

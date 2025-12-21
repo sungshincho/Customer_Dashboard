@@ -25,6 +25,8 @@ DECLARE
   v_slot RECORD;
   v_count INT;
   v_base_url TEXT := 'https://bdrvowacecxnraaivlhr.supabase.co/storage/v1/object/public/3d-models/e4200130-08e8-47da-8c92-3d0b90fafd77/d9830554-2688-4032-af40-acccda787ac4/3d-models';
+  v_display_type TEXT;
+
 BEGIN
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════════';
@@ -228,10 +230,10 @@ BEGIN
   -- display_round (1×4=4)
   FOR v_furn IN SELECT id, furniture_type FROM furniture WHERE store_id = v_store_id AND furniture_type LIKE 'display_round_%' LOOP
     INSERT INTO furniture_slots (id, furniture_id, store_id, user_id, slot_id, furniture_type, slot_type, slot_position, slot_rotation, compatible_display_types, max_product_width, max_product_height, max_product_depth, is_occupied, created_at, updated_at) VALUES
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'T1', v_furn.furniture_type, 'display', '{"x":0,"y":0.8,"z":0.7}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['standing','located'], 0.4, 0.5, 0.4, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'T2', v_furn.furniture_type, 'display', '{"x":-0.7,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":90,"z":0}'::jsonb, ARRAY['standing','located'], 0.4, 0.5, 0.4, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'T3', v_furn.furniture_type, 'display', '{"x":0.7,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":-90,"z":0}'::jsonb, ARRAY['standing','located'], 0.4, 0.5, 0.4, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'T4', v_furn.furniture_type, 'display', '{"x":0,"y":0.8,"z":-0.7}'::jsonb, '{"x":0,"y":180,"z":0}'::jsonb, ARRAY['standing','located'], 0.4, 0.5, 0.4, false, NOW(), NOW());
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'T1', v_furn.furniture_type, 'display', '{"x":0,"y":0.8,"z":0.7}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['folded','located','boxed','stacked'], 0.4, 0.5, 0.4, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'T2', v_furn.furniture_type, 'display', '{"x":-0.7,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":90,"z":0}'::jsonb, ARRAY['folded','located','boxed','stacked'], 0.4, 0.5, 0.4, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'T3', v_furn.furniture_type, 'display', '{"x":0.7,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":-90,"z":0}'::jsonb, ARRAY['folded','located','boxed','stacked'], 0.4, 0.5, 0.4, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'T4', v_furn.furniture_type, 'display', '{"x":0,"y":0.8,"z":-0.7}'::jsonb, '{"x":0,"y":180,"z":0}'::jsonb, ARRAY['folded','located','boxed','stacked'], 0.4, 0.5, 0.4, false, NOW(), NOW());
   END LOOP;
 
 
@@ -259,64 +261,64 @@ END LOOP;
   -- stand_accessory (2×10=20)
   FOR v_furn IN SELECT id, furniture_type FROM furniture WHERE store_id = v_store_id AND furniture_type LIKE 'stand_accessory_%' LOOP
     INSERT INTO furniture_slots (id, furniture_id, store_id, user_id, slot_id, furniture_type, slot_type, slot_position, slot_rotation, compatible_display_types, max_product_width, max_product_height, max_product_depth, is_occupied, created_at, updated_at) VALUES
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S1-1', v_furn.furniture_type, 'stand', '{"x":0,"y":0.21,"z":0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S1-2', v_furn.furniture_type, 'stand', '{"x":0,"y":0.21,"z":-0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S2-1', v_furn.furniture_type, 'stand', '{"x":0,"y":0.465,"z":0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S2-2', v_furn.furniture_type, 'stand', '{"x":0,"y":0.465,"z":-0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S3-1', v_furn.furniture_type, 'stand', '{"x":0,"y":0.72,"z":0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S3-2', v_furn.furniture_type, 'stand', '{"x":0,"y":0.72,"z":-0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S4-1', v_furn.furniture_type, 'stand', '{"x":0,"y":0.975,"z":0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S4-2', v_furn.furniture_type, 'stand', '{"x":0,"y":0.975,"z":-0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S5-1', v_furn.furniture_type, 'stand', '{"x":0,"y":1.23,"z":0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S5-2', v_furn.furniture_type, 'stand', '{"x":0,"y":1.23,"z":-0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.15, 0.2, 0.15, false, NOW(), NOW());
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S1-1', v_furn.furniture_type, 'stand', '{"x":0,"y":0.21,"z":0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S1-2', v_furn.furniture_type, 'stand', '{"x":0,"y":0.21,"z":-0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S2-1', v_furn.furniture_type, 'stand', '{"x":0,"y":0.465,"z":0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S2-2', v_furn.furniture_type, 'stand', '{"x":0,"y":0.465,"z":-0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S3-1', v_furn.furniture_type, 'stand', '{"x":0,"y":0.72,"z":0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S3-2', v_furn.furniture_type, 'stand', '{"x":0,"y":0.72,"z":-0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S4-1', v_furn.furniture_type, 'stand', '{"x":0,"y":0.975,"z":0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S4-2', v_furn.furniture_type, 'stand', '{"x":0,"y":0.975,"z":-0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S5-1', v_furn.furniture_type, 'stand', '{"x":0,"y":1.23,"z":0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.15, 0.2, 0.15, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S5-2', v_furn.furniture_type, 'stand', '{"x":0,"y":1.23,"z":-0.1}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.15, 0.2, 0.15, false, NOW(), NOW());
   END LOOP;
 
   -- display_bag (2×8=16)
   FOR v_furn IN SELECT id, furniture_type FROM furniture WHERE store_id = v_store_id AND furniture_type LIKE 'display_bag_%' LOOP
     INSERT INTO furniture_slots (id, furniture_id, store_id, user_id, slot_id, furniture_type, slot_type, slot_position, slot_rotation, compatible_display_types, max_product_width, max_product_height, max_product_depth, is_occupied, created_at, updated_at) VALUES
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D1-1', v_furn.furniture_type, 'display', '{"x":-0.4,"y":0.04,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','standing','located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D1-2', v_furn.furniture_type, 'display', '{"x":0.4,"y":0.04,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','standing','located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D2-1', v_furn.furniture_type, 'display', '{"x":-0.4,"y":0.42,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','standing','located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D2-2', v_furn.furniture_type, 'display', '{"x":0.4,"y":0.42,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','standing','located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D3-1', v_furn.furniture_type, 'display', '{"x":-0.4,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','standing','located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D3-2', v_furn.furniture_type, 'display', '{"x":0.4,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','standing','located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D4-1', v_furn.furniture_type, 'display', '{"x":-0.4,"y":1.18,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','standing','located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D4-2', v_furn.furniture_type, 'display', '{"x":0.4,"y":1.18,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['hanging','standing','located'], 0.35, 0.35, 0.25, false, NOW(), NOW());
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D1-1', v_furn.furniture_type, 'display', '{"x":-0.4,"y":0.04,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D1-2', v_furn.furniture_type, 'display', '{"x":0.4,"y":0.04,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D2-1', v_furn.furniture_type, 'display', '{"x":-0.4,"y":0.42,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D2-2', v_furn.furniture_type, 'display', '{"x":0.4,"y":0.42,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D3-1', v_furn.furniture_type, 'display', '{"x":-0.4,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D3-2', v_furn.furniture_type, 'display', '{"x":0.4,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D4-1', v_furn.furniture_type, 'display', '{"x":-0.4,"y":1.18,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.35, 0.35, 0.25, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'D4-2', v_furn.furniture_type, 'display', '{"x":0.4,"y":1.18,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.35, 0.35, 0.25, false, NOW(), NOW());
   END LOOP;
 
 
   -- showcase_open (2×4=8)
   FOR v_furn IN SELECT id, furniture_type FROM furniture WHERE store_id = v_store_id AND furniture_type LIKE 'showcase_open_%' LOOP
     INSERT INTO furniture_slots (id, furniture_id, store_id, user_id, slot_id, furniture_type, slot_type, slot_position, slot_rotation, compatible_display_types, max_product_width, max_product_height, max_product_depth, is_occupied, created_at, updated_at) VALUES
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S1-1', v_furn.furniture_type, 'showcase', '{"x":-0.3,"y":0.4,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.25, 0.2, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S1-2', v_furn.furniture_type, 'showcase', '{"x":0.3,"y":0.4,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.25, 0.2, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S2-1', v_furn.furniture_type, 'showcase', '{"x":-0.3,"y":0.7,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.25, 0.2, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S2-2', v_furn.furniture_type, 'showcase', '{"x":0.3,"y":0.7,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.25, 0.2, false, NOW(), NOW());
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S1-1', v_furn.furniture_type, 'showcase', '{"x":-0.3,"y":0.4,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.25, 0.2, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S1-2', v_furn.furniture_type, 'showcase', '{"x":0.3,"y":0.4,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.25, 0.2, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S2-1', v_furn.furniture_type, 'showcase', '{"x":-0.3,"y":0.7,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.25, 0.2, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S2-2', v_furn.furniture_type, 'showcase', '{"x":0.3,"y":0.7,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.25, 0.2, false, NOW(), NOW());
   END LOOP;
 
 
   -- showcase_locked (2×3=6)
   FOR v_furn IN SELECT id, furniture_type FROM furniture WHERE store_id = v_store_id AND furniture_type LIKE 'showcase_locked_%' LOOP
     INSERT INTO furniture_slots (id, furniture_id, store_id, user_id, slot_id, furniture_type, slot_type, slot_position, slot_rotation, compatible_display_types, max_product_width, max_product_height, max_product_depth, is_occupied, created_at, updated_at) VALUES
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S1', v_furn.furniture_type, 'showcase', '{"x":0,"y":0.45,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.2, 0.2, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S2', v_furn.furniture_type, 'showcase', '{"x":0,"y":0.711,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.2, 0.2, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S3', v_furn.furniture_type, 'showcase', '{"x":0,"y":0.967,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.2, 0.2, false, NOW(), NOW());
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S1', v_furn.furniture_type, 'showcase', '{"x":0,"y":0.45,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.2, 0.2, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S2', v_furn.furniture_type, 'showcase', '{"x":0,"y":0.711,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.2, 0.2, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'S3', v_furn.furniture_type, 'showcase', '{"x":0,"y":0.967,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.2, 0.2, false, NOW(), NOW());
   END LOOP;
 
 
   -- shelf_shoes (3×10=30)
   FOR v_furn IN SELECT id, furniture_type FROM furniture WHERE store_id = v_store_id AND furniture_type LIKE 'shelf_shoes_%' LOOP
     INSERT INTO furniture_slots (id, furniture_id, store_id, user_id, slot_id, furniture_type, slot_type, slot_position, slot_rotation, compatible_display_types, max_product_width, max_product_height, max_product_depth, is_occupied, created_at, updated_at) VALUES
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R1-1', v_furn.furniture_type, 'rack', '{"x":-0.15,"y":0.2,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R1-2', v_furn.furniture_type, 'rack', '{"x":0.15,"y":0.2,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R2-1', v_furn.furniture_type, 'rack', '{"x":-0.15,"y":0.5,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R2-2', v_furn.furniture_type, 'rack', '{"x":0.15,"y":0.5,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R3-1', v_furn.furniture_type, 'rack', '{"x":-0.15,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R3-2', v_furn.furniture_type, 'rack', '{"x":0.15,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R4-1', v_furn.furniture_type, 'rack', '{"x":-0.15,"y":1.1,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R4-2', v_furn.furniture_type, 'rack', '{"x":0.15,"y":1.1,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R5-1', v_furn.furniture_type, 'rack', '{"x":-0.15,"y":1.4,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
-    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R5-2', v_furn.furniture_type, 'rack', '{"x":0.15,"y":1.4,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located','standing'], 0.25, 0.25, 0.35, false, NOW(), NOW());
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R1-1', v_furn.furniture_type, 'rack', '{"x":-0.15,"y":0.2,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R1-2', v_furn.furniture_type, 'rack', '{"x":0.15,"y":0.2,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R2-1', v_furn.furniture_type, 'rack', '{"x":-0.15,"y":0.5,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R2-2', v_furn.furniture_type, 'rack', '{"x":0.15,"y":0.5,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R3-1', v_furn.furniture_type, 'rack', '{"x":-0.15,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R3-2', v_furn.furniture_type, 'rack', '{"x":0.15,"y":0.8,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R4-1', v_furn.furniture_type, 'rack', '{"x":-0.15,"y":1.1,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R4-2', v_furn.furniture_type, 'rack', '{"x":0.15,"y":1.1,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R5-1', v_furn.furniture_type, 'rack', '{"x":-0.15,"y":1.4,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.25, 0.35, false, NOW(), NOW()),
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'R5-2', v_furn.furniture_type, 'rack', '{"x":0.15,"y":1.4,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, ARRAY['located'], 0.25, 0.25, 0.35, false, NOW(), NOW());
   END LOOP;
   RAISE NOTICE '    - display_round: 6 슬롯';
 
@@ -326,63 +328,149 @@ END LOOP;
   -- ══════════════════════════════════════════════════════════════════════════
   -- STEP 5.1: products (25개)
   -- ══════════════════════════════════════════════════════════════════════════
-  RAISE NOTICE '  [STEP 5.1] products 시딩 (25개)...';
 
+  
   INSERT INTO products (id, store_id, user_id, org_id, product_name, sku, category, price, cost_price, stock, display_type, compatible_display_types, model_3d_url, created_at, updated_at) VALUES
-  ('f0000001-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '프리미엄 캐시미어 코트', 'SKU-OUT-001', '아우터', 450000, 180000, 15, 'hanging', ARRAY['hanging','standing'], v_base_url || '/products/outwear/product_coat_01_hanging.glb', NOW(), NOW()),
-  ('f0000002-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '울 테일러드 재킷', 'SKU-OUT-002', '아우터', 380000, 152000, 20, 'hanging', ARRAY['hanging','standing'], v_base_url || '/products/outwear/product_jacket_01_hanging.glb', NOW(), NOW()),
-  ('f0000003-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '다운 패딩', 'SKU-OUT-003', '아우터', 520000, 208000, 18, 'hanging', ARRAY['hanging','standing'], v_base_url || '/products/outwear/product_padding_01_hanging.glb', NOW(), NOW()),
-  ('f0000004-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '트렌치 코트', 'SKU-OUT-004', '아우터', 420000, 168000, 12, 'hanging', ARRAY['hanging','standing'], v_base_url || '/products/outwear/product_coat_02_hanging.glb', NOW(), NOW()),
-  ('f0000005-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '레더 재킷', 'SKU-OUT-005', '아우터', 680000, 272000, 8, 'hanging', ARRAY['hanging','standing'], v_base_url || '/products/outwear/product_jacket_02_hanging.glb', NOW(), NOW()),
-  ('f0000006-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '실크 블라우스', 'SKU-TOP-001', '상의', 120000, 48000, 25, 'hanging', ARRAY['hanging','folded'], v_base_url || '/products/tops/product_blouse_01_hanging.glb', NOW(), NOW()),
-  ('f0000007-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '캐주얼 니트 스웨터', 'SKU-TOP-002', '상의', 98000, 39200, 30, 'folded', ARRAY['hanging','folded','stacked'], v_base_url || '/products/tops/product_sweater_01_folded.glb', NOW(), NOW()),
-  ('f0000008-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '옥스포드 셔츠', 'SKU-TOP-003', '상의', 85000, 34000, 35, 'hanging', ARRAY['hanging','folded'], v_base_url || '/products/tops/product_shirts_01_hanging.glb', NOW(), NOW()),
-  ('f0000009-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '린넨 탑', 'SKU-TOP-004', '상의', 75000, 30000, 28, 'hanging', ARRAY['hanging','folded'], v_base_url || '/products/tops/product_top_01_hanging.glb', NOW(), NOW()),
-  ('f0000010-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '폴로 셔츠', 'SKU-TOP-005', '상의', 65000, 26000, 40, 'folded', ARRAY['hanging','folded','stacked'], v_base_url || '/products/tops/product_shirts_02_folded.glb', NOW(), NOW()),
-  ('f0000011-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '슬림핏 데님', 'SKU-BTM-001', '하의', 128000, 51200, 30, 'hanging', ARRAY['hanging','folded'], v_base_url || '/products/bottoms/product_jeans_01_hanging.glb', NOW(), NOW()),
-  ('f0000012-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '치노 팬츠', 'SKU-BTM-002', '하의', 95000, 38000, 25, 'hanging', ARRAY['hanging','folded'], v_base_url || '/products/bottoms/product_pants_01_hanging.glb', NOW(), NOW()),
-  ('f0000013-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '플리츠 스커트', 'SKU-BTM-003', '하의', 88000, 35200, 20, 'hanging', ARRAY['hanging','folded'], v_base_url || '/products/bottoms/product_pants_02_hanging.glb', NOW(), NOW()),
-  ('f0000014-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '조거 팬츠', 'SKU-BTM-004', '하의', 78000, 31200, 35, 'folded', ARRAY['hanging','folded','stacked'], v_base_url || '/products/bottoms/product_pants_03_folded.glb', NOW(), NOW()),
-  ('f0000015-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '프리미엄 로퍼', 'SKU-SHO-001', '신발', 280000, 112000, 18, 'located', ARRAY['located','standing'], v_base_url || '/products/shoes/product_shoes_loafer_01_located.glb', NOW(), NOW()),
-  ('f0000016-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '하이힐 펌프스', 'SKU-SHO-002', '신발', 320000, 128000, 12, 'located', ARRAY['located','standing'], v_base_url || '/products/shoes/product_shoes_heels_01_located.glb', NOW(), NOW()),
-  ('f0000017-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '프리미엄 스니커즈', 'SKU-SHO-003', '신발', 198000, 79200, 25, 'located', ARRAY['located','standing'], v_base_url || '/products/shoes/product_shoes_sneakers_01_located.glb', NOW(), NOW()),
-  ('f0000018-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '가죽 토트백', 'SKU-BAG-001', '가방', 350000, 140000, 10, 'hanging', ARRAY['hanging','located'], v_base_url || '/products/accessories/product_bag_tote_01.glb', NOW(), NOW()),
-  ('f0000019-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '크로스바디백', 'SKU-BAG-002', '가방', 220000, 88000, 15, 'hanging', ARRAY['hanging','located'], v_base_url || '/products/accessories/product_bag_tote_01.glb', NOW(), NOW()),
-  ('f0000020-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '실크 스카프', 'SKU-SCA-001', '스카프', 85000, 34000, 20, 'folded', ARRAY['folded','hanging'], v_base_url || '/products/accessories/product_scarf_set_01.glb', NOW(), NOW()),
-  ('f0000021-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '가죽 벨트', 'SKU-BLT-001', '벨트', 120000, 48000, 30, 'located', ARRAY['located','hanging'], v_base_url || '/products/accessories/product_belt_leather_01.glb', NOW(), NOW()),
-  ('f0000022-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '클래식 손목시계', 'SKU-WAT-001', '시계', 450000, 180000, 8, 'located', ARRAY['located'], v_base_url || '/products/accessories/product_necklace_silver_01.glb', NOW(), NOW()),
-  ('f0000023-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '실버 목걸이', 'SKU-JWL-001', '쥬얼리', 180000, 72000, 12, 'located', ARRAY['located'], v_base_url || '/products/accessories/product_necklace_silver_01.glb', NOW(), NOW()),
-  ('f0000024-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '머플러 세트', 'SKU-JWL-002', '쥬얼리', 95000, 38000, 18, 'located', ARRAY['located'], v_base_url || '/products/accessories/product_muffler_set_01.glb', NOW(), NOW()),
-  ('f0000025-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '프리미엄 선물 세트', 'SKU-GFT-001', '선물세트', 150000, 60000, 20, 'boxed', ARRAY['boxed','stacked'], v_base_url || '/products/giftbox/product_giftbox_01.glb', NOW(), NOW());
+  
+  -- ========== 아우터 (5개) ==========
+  ('f0000001-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '프리미엄 캐시미어 코트', 'SKU-OUT-001', '아우터', 450000, 180000, 15, 
+   'hanging', ARRAY['hanging','standing'], 
+   v_base_url || '/products/outwear/product_cashmerecoat_01_hanging.glb', NOW(), NOW()),
+   
+  ('f0000002-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '울 테일러드 재킷', 'SKU-OUT-002', '아우터', 380000, 152000, 20, 
+   'hanging', ARRAY['hanging','standing'], 
+   v_base_url || '/products/outwear/product_tailoredjacket_01_hanging.glb', NOW(), NOW()),
+   
+  ('f0000003-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '다운 패딩', 'SKU-OUT-003', '아우터', 380000, 152000, 20, 
+   'hanging', ARRAY['hanging','standing'], 
+   v_base_url || '/products/outwear/product_padding_01_hanging.glb', NOW(), NOW()),
+   
+  ('f0000004-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '트렌치 코트', 'SKU-OUT-004', '아우터', 380000, 152000, 20, 
+   'hanging', ARRAY['hanging','standing'], 
+   v_base_url || '/products/outwear/product_trenchcoat_01_hanging.glb', NOW(), NOW()),
+   
+  ('f0000005-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '레더 재킷', 'SKU-OUT-005', '아우터', 380000, 152000, 20, 
+   'hanging', ARRAY['hanging','standing'], 
+   v_base_url || '/products/outwear/product_leatherjacket_01_hanging.glb', NOW(), NOW()),
 
-  RAISE NOTICE '    ✓ products: 25건 삽입';
-  INSERT INTO products (id, store_id, user_id, org_id, product_name, sku, category, price, cost_price, stock, display_type, compatible_display_types, created_at) VALUES
-  ('f0000001-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '프리미엄 캐시미어 코트', 'SKU-OUT-001', '아우터', 450000, 180000, 15, 'hanging', ARRAY['hanging','standing'], NOW()),
-  ('f0000002-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '울 테일러드 재킷', 'SKU-OUT-002', '아우터', 380000, 152000, 20, 'hanging', ARRAY['hanging','standing'], NOW()),
-  ('f0000003-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '다운 패딩', 'SKU-OUT-003', '아우터', 380000, 152000, 20, 'hanging', ARRAY['hanging','standing'], NOW()),
-  ('f0000004-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '트렌치 코트', 'SKU-OUT-004', '아우터', 380000, 152000, 20, 'hanging', ARRAY['hanging','standing'], NOW()),
-  ('f0000005-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '레더 재킷', 'SKU-OUT-005', '아우터', 380000, 152000, 20, 'hanging', ARRAY['hanging','standing'], NOW()),
-  ('f0000006-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '실크 블라우스', 'SKU-TOP-001', '상의', 120000, 48000, 25, 'hanging', ARRAY['hanging','standing','folded','stacked'], NOW()),
-  ('f0000007-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '캐주얼 니트 스웨터', 'SKU-TOP-002', '상의', 98000, 39200, 30, 'hanging', ARRAY['hanging','standing','folded','stacked'], NOW()),
-  ('f0000008-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '옥스포드 셔츠', 'SKU-TOP-003', '상의', 85000, 34000, 35, 'hanging', ARRAY['hanging','standing','folded','stacked'], NOW()),
-  ('f0000009-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '린넨 탑', 'SKU-TOP-004', '상의', 75000, 30000, 28, 'hanging', ARRAY['hanging','standing','folded','stacked'], NOW()),
-  ('f0000010-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '폴로 셔츠', 'SKU-TOP-005', '상의', 75000, 30000, 28, 'hanging', ARRAY['hanging','standing','folded','stacked'], NOW()),
-  ('f0000011-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '리넨 와이드 팬츠', 'SKU-BTM-001', '하의', 128000, 51200, 40, 'hanging', ARRAY['hanging','standing','folded','stacked'], NOW()),
-  ('f0000012-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '슬림핏 데님', 'SKU-BTM-002', '하의', 95000, 38000, 35, 'hanging', ARRAY['hanging','standing','folded','stacked'], NOW()),
-  ('f0000013-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '치노 팬츠', 'SKU-BTM-003', '하의', 95000, 38000, 35, 'hanging', ARRAY['hanging','standing','folded','stacked'], NOW()),
-  ('f0000014-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '조거 팬츠', 'SKU-BTM-004', '하의', 95000, 38000, 35, 'hanging', ARRAY['hanging','standing','folded','stacked'], NOW()),
-  ('f0000015-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '프리미엄 로퍼', 'SKU-SHO-001', '신발', 280000, 112000, 18, 'located', ARRAY['located','standing'], NOW()),
-  ('f0000016-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '하이힐 펌프스', 'SKU-SHO-002', '신발', 320000, 128000, 12, 'located', ARRAY['located','standing'], NOW()),
-  ('f0000017-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '프리미엄 스니커즈', 'SKU-SHO-003', '신발', 198000, 79200, 25, 'located', ARRAY['located','standing'], NOW()),
-  ('f0000018-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '가죽 토트백', 'SKU-BAG-001', '가방', 350000, 140000, 10, 'hanging', ARRAY['located'], NOW()),
-  ('f0000019-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '울 머플러', 'SKU-MUF-001', '머플러', 180000, 72000, 15, 'hanging', ARRAY['located'], NOW()),
-  ('f0000020-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '실크 스카프', 'SKU-SCA-001', '스카프', 85000, 34000, 20, 'hanging', ARRAY['folded'], NOW()),
-  ('f0000021-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '가죽 벨트', 'SKU-BLT-001', '벨트', 120000, 48000, 30, 'located', ARRAY['located'], NOW()),
-  ('f0000022-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '실버 목걸이', 'SKU-JWL-001', '쥬얼리', 180000, 72000, 12, 'located', ARRAY['located'], NOW()),
-  ('f0000023-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '프리미엄 스킨케어 세트', 'SKU-SKI-001', '화장품', 65000, 26000, 40, 'boxed', ARRAY['located'], NOW()),
-  ('f0000024-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '립스틱 컬렉션', 'SKU-LIP-001', '화장품', 25000, 10000, 60, 'stacked', ARRAY['located'], NOW()),
-  ('f0000025-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, '프리미엄 선물 세트', 'SKU-GFT-001', '선물세트', 150000, 60000, 20, 'boxed', ARRAY['boxed'], NOW());
-  RAISE NOTICE '  ✓ products: 25건';
+  -- ========== 상의 (5개) ==========
+  ('f0000006-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '실크 블라우스', 'SKU-TOP-001', '상의', 120000, 48000, 25, 
+   'hanging', ARRAY['hanging','standing','folded','stacked'], 
+   v_base_url || '/products/tops/product_blouse_01_hanging.glb', NOW(), NOW()),
+   
+  ('f0000007-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '캐주얼 니트 스웨터', 'SKU-TOP-002', '상의', 98000, 39200, 30, 
+   'hanging', ARRAY['hanging','standing','folded','stacked'], 
+   v_base_url || '/products/tops/product_sweater_01_hanging.glb', NOW(), NOW()),
+   
+  ('f0000008-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '옥스포드 셔츠', 'SKU-TOP-003', '상의', 85000, 34000, 35, 
+   'hanging', ARRAY['hanging','standing','folded','stacked'], 
+   v_base_url || '/products/tops/product_oxfordshirts_01_hanging.glb', NOW(), NOW()),
+   
+  ('f0000009-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '린넨 탑', 'SKU-TOP-004', '상의', 75000, 30000, 28, 
+   'hanging', ARRAY['hanging','standing','folded','stacked'], 
+   v_base_url || '/products/tops/product_linentop_01_hanging.glb', NOW(), NOW()),
+   
+  ('f0000010-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '폴로 셔츠', 'SKU-TOP-005', '상의', 75000, 30000, 28, 
+   'hanging', ARRAY['hanging','standing','folded','stacked'], 
+   v_base_url || '/products/tops/product_poloshirts_01_hanging.glb', NOW(), NOW()),
+
+  -- ========== 하의 (4개) ==========
+  ('f0000011-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '리넨 와이드 팬츠', 'SKU-BTM-001', '하의', 128000, 51200, 40, 
+   'hanging', ARRAY['hanging','standing','folded','stacked'], 
+   v_base_url || '/products/bottoms/product_widepants_01_hanging.glb', NOW(), NOW()),
+   
+  ('f0000012-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '슬림핏 데님', 'SKU-BTM-002', '하의', 95000, 38000, 35, 
+   'hanging', ARRAY['hanging','standing','folded','stacked'], 
+   v_base_url || '/products/bottoms/product_jeans_01_hanging.glb', NOW(), NOW()),
+   
+  ('f0000013-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '치노 팬츠', 'SKU-BTM-003', '하의', 95000, 38000, 35, 
+   'hanging', ARRAY['hanging','standing','folded','stacked'], 
+   v_base_url || '/products/bottoms/product_chinopants_01_hanging.glb', NOW(), NOW()),
+   
+  ('f0000014-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '조거 팬츠', 'SKU-BTM-004', '하의', 95000, 38000, 35, 
+   'hanging', ARRAY['hanging','standing','folded','stacked'], 
+   v_base_url || '/products/bottoms/product_joggerpants_01_hanging.glb', NOW(), NOW()),
+
+  -- ========== 신발 (3개) ==========
+  ('f0000015-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '프리미엄 로퍼', 'SKU-SHO-001', '신발', 280000, 112000, 18, 
+   'located', ARRAY['located','standing'], 
+   v_base_url || '/products/shoes/product_shoes_loafer_01_located.glb', NOW(), NOW()),
+   
+  ('f0000016-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '하이힐 펌프스', 'SKU-SHO-002', '신발', 320000, 128000, 12, 
+   'located', ARRAY['located','standing'], 
+   v_base_url || '/products/shoes/product_shoes_heels_01_located.glb', NOW(), NOW()),
+   
+  ('f0000017-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '프리미엄 스니커즈', 'SKU-SHO-003', '신발', 198000, 79200, 25, 
+   'located', ARRAY['located','standing'], 
+   v_base_url || '/products/shoes/product_shoes_sneakers_01_located.glb', NOW(), NOW()),
+
+  -- ========== 가방 (1개) ==========
+  ('f0000018-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '가죽 토트백', 'SKU-BAG-001', '가방', 350000, 140000, 10, 
+   'located', ARRAY['located'], 
+   v_base_url || '/products/accessories/product_bag_tote_01.glb', NOW(), NOW()),
+
+  -- ========== 액세서리 - 머플러/스카프 (2개) ==========
+  ('f0000019-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '울 머플러', 'SKU-MUF-001', '머플러', 180000, 72000, 15, 
+   'located', ARRAY['located'], 
+   v_base_url || '/products/accessories/product_muffler_set_01.glb', NOW(), NOW()),
+   
+  ('f0000020-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '실크 스카프', 'SKU-SCA-001', '스카프', 85000, 34000, 20, 
+   'located', ARRAY['folded'], 
+   v_base_url || '/products/accessories/product_scarf_set_01.glb', NOW(), NOW()),
+
+  -- ========== 액세서리 - 벨트/쥬얼리 (2개) ==========
+  ('f0000021-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '가죽 벨트', 'SKU-BLT-001', '벨트', 120000, 48000, 30, 
+   'located', ARRAY['located'], 
+   v_base_url || '/products/accessories/product_belt_leather_01.glb', NOW(), NOW()),
+   
+  ('f0000022-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '실버 목걸이', 'SKU-JWL-001', '쥬얼리', 180000, 72000, 12, 
+   'located', ARRAY['located'], 
+   v_base_url || '/products/accessories/product_necklace_silver_01.glb', NOW(), NOW()),
+
+  -- ========== 화장품 (2개) ==========
+  ('f0000023-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '프리미엄 스킨케어 세트', 'SKU-SKI-001', '화장품', 65000, 26000, 40, 
+   'boxed', ARRAY['located'], 
+   v_base_url || '/products/cosmetics/product_skincare_set_01.glb', NOW(), NOW()),
+   
+  ('f0000024-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '립스틱 컬렉션', 'SKU-LIP-001', '화장품', 25000, 10000, 60, 
+   'stacked', ARRAY['located'], 
+   v_base_url || '/products/cosmetics/product_lipstick_set_01.glb', NOW(), NOW()),
+
+  -- ========== 선물세트 (1개) ==========
+  ('f0000025-0000-0000-0000-000000000000'::UUID, v_store_id, v_user_id, v_org_id, 
+   '프리미엄 선물 세트', 'SKU-GFT-001', '선물세트', 150000, 60000, 20, 
+   'boxed', ARRAY['boxed'], 
+   v_base_url || '/products/giftbox/product_giftbox_01.glb', NOW(), NOW());
+   
+
+   RAISE NOTICE '    ✓ products: 25건 삽입';
+   RAISE NOTICE '✅ Successfully inserted 25 products with correct model URLs';
+  RAISE NOTICE '   Store ID: %', v_store_id;
+
 
   -- ══════════════════════════════════════════════════════════════════════════
   -- STEP 5.2: product_models (60개 - 상품당 평균 2~3개 display_type)
@@ -400,16 +488,16 @@ END LOOP;
 
     -- 호환 display_type 모델들 (is_default = false)
     IF v_product.compatible_display_types IS NOT NULL THEN
-      FOREACH v_customer_type IN ARRAY v_product.compatible_display_types LOOP
-        IF v_customer_type != v_product.display_type THEN
-          INSERT INTO product_models (id, product_id, display_type, model_3d_url, is_default, created_at, updated_at)
-          VALUES (gen_random_uuid(), v_product.id, v_customer_type,
-                  v_base_url || '/product/' || v_product.sku || '_' || v_customer_type || '.glb',
-                  false, NOW(), NOW())
-          ON CONFLICT (product_id, display_type) DO NOTHING;
-        END IF;
-      END LOOP;
-    END IF;
+    FOREACH v_display_type IN ARRAY v_product.compatible_display_types LOOP
+      IF v_display_type != v_product.display_type THEN
+        INSERT INTO product_models (id, product_id, display_type, model_3d_url, is_default, created_at, updated_at)
+        VALUES (gen_random_uuid(), v_product.id, v_display_type,
+                v_base_url || '/product/' || v_product.sku || '_' || v_display_type || '.glb',
+                false, NOW(), NOW())
+        ON CONFLICT (product_id, display_type) DO NOTHING;
+      END IF;
+    END LOOP;
+  END IF;
   END LOOP;
 
   SELECT COUNT(*) INTO v_count FROM product_models WHERE product_id IN (SELECT id FROM products WHERE store_id = v_store_id);
@@ -420,29 +508,20 @@ END LOOP;
   -- ══════════════════════════════════════════════════════════════════════════
   RAISE NOTICE '  [STEP 5.3] inventory_levels 시딩 (25개)...';
 
-  INSERT INTO inventory_levels (id, store_id, org_id, user_id, product_id, current_stock, min_stock, max_stock, reorder_point, reorder_quantity, last_restock_date, next_restock_date, status, created_at, updated_at)
-  SELECT
-    gen_random_uuid(),
-    v_store_id,
-    v_org_id,
-    v_user_id,
-    p.id,
-    p.stock,
-    FLOOR(p.stock * 0.2)::INT,
-    FLOOR(p.stock * 2.5)::INT,
-    FLOOR(p.stock * 0.3)::INT,
-    FLOOR(p.stock * 0.5)::INT,
-    CURRENT_DATE - (FLOOR(RANDOM() * 30))::INT,
-    CURRENT_DATE + (FLOOR(RANDOM() * 14) + 7)::INT,
-    CASE
-      WHEN p.stock <= FLOOR(p.stock * 0.2) THEN 'critical'
-      WHEN p.stock <= FLOOR(p.stock * 0.3) THEN 'low'
-      ELSE 'normal'
-    END,
-    NOW(),
-    NOW()
-  FROM products p
-  WHERE p.store_id = v_store_id;
+  INSERT INTO inventory_levels (id, user_id, org_id, product_id, current_stock, optimal_stock, minimum_stock, weekly_demand, created_at, last_updated)
+SELECT 
+  gen_random_uuid(), 
+  v_user_id, 
+  v_org_id, 
+  p.id, 
+  p.stock,                          -- current_stock
+  FLOOR(p.stock * 1.5)::INT,        -- optimal_stock
+  FLOOR(p.stock * 0.2)::INT,        -- minimum_stock
+  FLOOR(p.stock * 0.3)::INT,        -- weekly_demand
+  NOW(), 
+  NOW()
+FROM products p 
+WHERE p.store_id = v_store_id;
 
   RAISE NOTICE '    ✓ inventory_levels: 25건 삽입';
 
@@ -597,34 +676,38 @@ END LOOP;
       -- 1) product_placements 테이블에 배치 레코드 생성
       -- ──────────────────────────────────────────────────────────────────────
       INSERT INTO product_placements (
-        id,
-        product_id,
-        store_id,
-        user_id,
-        org_id,
-        current_zone_id,
-        current_furniture_id,
-        current_slot_id,
-        current_position,
-        display_type,
-        is_active,
-        created_at,
-        updated_at
-      ) VALUES (
-        gen_random_uuid(),
-        v_placement.product_id,
-        v_store_id,
-        v_user_id,
-        v_org_id,
-        v_placement.zone_id,
-        v_placement.furniture_id,
-        v_placement.slot_code,
-        v_world_position,
-        COALESCE(v_placement.matched_display_type, v_placement.preferred_display),
-        true,
-        NOW(),
-        NOW()
-      );
+  id,
+  product_id,
+  store_id,
+  user_id,
+  org_id,
+  slot_id,
+  display_type,
+  position_offset,
+  rotation_offset,
+  scale,
+  quantity,
+  is_active,
+  placed_at,
+  created_at,
+  updated_at
+) VALUES (
+  gen_random_uuid(),
+  v_placement.product_id,
+  v_store_id,
+  v_user_id,
+  v_org_id,
+  v_placement.slot_uuid,  -- slot_uuid 사용
+  COALESCE(v_placement.matched_display_type, v_placement.preferred_display),
+  v_placement.slot_position,   -- position_offset으로 사용
+  v_placement.slot_rotation,   -- rotation_offset으로 사용
+  COALESCE(v_placement.model_3d_scale, '{"x":1,"y":1,"z":1}'::jsonb),
+  1,
+  true,
+  NOW(),
+  NOW(),
+  NOW()
+);
 
       -- ──────────────────────────────────────────────────────────────────────
       -- 2) products 테이블 직접 업데이트 (3D Studio 호환)
@@ -641,7 +724,6 @@ END LOOP;
       -- ──────────────────────────────────────────────────────────────────────
       UPDATE furniture_slots SET
         is_occupied = true,
-        occupied_by_product_id = v_placement.product_id,
         updated_at = NOW()
       WHERE id = v_placement.slot_uuid;
 
@@ -697,7 +779,7 @@ END LOOP;
   RAISE NOTICE '  ✓ products: % 건', v_count;
   SELECT COUNT(*) INTO v_count FROM product_models WHERE product_id IN (SELECT id FROM products WHERE store_id = v_store_id);
   RAISE NOTICE '  ✓ product_models: % 건', v_count;
-  SELECT COUNT(*) INTO v_count FROM inventory_levels WHERE store_id = v_store_id;
+  SELECT COUNT(*) INTO v_count FROM inventory_levels WHERE org_id = v_org_id;
   RAISE NOTICE '  ✓ inventory_levels: % 건', v_count;
   SELECT COUNT(*) INTO v_count FROM product_placements WHERE store_id = v_store_id AND is_active = true;
   RAISE NOTICE '  ✓ product_placements: % 건 (자동배치)', v_count;

@@ -261,98 +261,110 @@ BEGIN
 
   v_updated := 0;
 
-  -- VIP 고객 → avatar_customer_vip_{gender}.glb
-  v_idx := 0;
-  FOR v_customer IN
-    SELECT id, customer_code
-    FROM customers
-    WHERE store_id = v_store_id AND segment = 'VIP'
-    ORDER BY customer_code
-  LOOP
-    IF v_idx % 2 = 0 THEN
-      UPDATE customers SET avatar_url = v_base_url || '/customers/avatar_customer_vip_male.glb'
-      WHERE id = v_customer.id;
-    ELSE
-      UPDATE customers SET avatar_url = v_base_url || '/customers/avatar_customer_vip_female.glb'
-      WHERE id = v_customer.id;
-    END IF;
-    v_idx := v_idx + 1;
-    v_updated := v_updated + 1;
-  END LOOP;
-  RAISE NOTICE '    - VIP 고객: %건 (vip_male/vip_female)', v_idx;
+-- VIP 고객 → avatar_customer_vip_{gender}.glb
+v_idx := 0;
+FOR v_customer IN
+  SELECT id
+  FROM customers
+  WHERE store_id = v_store_id AND segment = 'VIP'
+  ORDER BY COALESCE(customer_name, '')
+LOOP
+  IF v_idx % 2 = 0 THEN
+    UPDATE customers
+      SET avatar_url = v_base_url || '/customers/avatar_customer_vip_male.glb'
+    WHERE id = v_customer.id;
+  ELSE
+    UPDATE customers
+      SET avatar_url = v_base_url || '/customers/avatar_customer_vip_female.glb'
+    WHERE id = v_customer.id;
+  END IF;
+  v_idx := v_idx + 1;
+  v_updated := v_updated + 1;
+END LOOP;
+RAISE NOTICE '    - VIP 고객: %건 (vip_male/vip_female)', v_idx;
 
-  -- Regular 고객 → avatar_customer_regular_{gender}.glb
-  v_idx := 0;
-  FOR v_customer IN
-    SELECT id, customer_code
-    FROM customers
-    WHERE store_id = v_store_id AND segment = 'Regular'
-    ORDER BY customer_code
-  LOOP
-    IF v_idx % 2 = 0 THEN
-      UPDATE customers SET avatar_url = v_base_url || '/customers/avatar_customer_regular_male.glb'
-      WHERE id = v_customer.id;
-    ELSE
-      UPDATE customers SET avatar_url = v_base_url || '/customers/avatar_customer_regular_female.glb'
-      WHERE id = v_customer.id;
-    END IF;
-    v_idx := v_idx + 1;
-    v_updated := v_updated + 1;
-  END LOOP;
-  RAISE NOTICE '    - Regular 고객: %건 (regular_male/regular_female)', v_idx;
+-- Regular 고객 → avatar_customer_regular_{gender}.glb
+v_idx := 0;
+FOR v_customer IN
+  SELECT id
+  FROM customers
+  WHERE store_id = v_store_id AND segment = 'Regular'
+  ORDER BY COALESCE(customer_name, '')
+LOOP
+  IF v_idx % 2 = 0 THEN
+    UPDATE customers
+      SET avatar_url = v_base_url || '/customers/avatar_customer_regular_male.glb'
+    WHERE id = v_customer.id;
+  ELSE
+    UPDATE customers
+      SET avatar_url = v_base_url || '/customers/avatar_customer_regular_female.glb'
+    WHERE id = v_customer.id;
+  END IF;
+  v_idx := v_idx + 1;
+  v_updated := v_updated + 1;
+END LOOP;
+RAISE NOTICE '    - Regular 고객: %건 (regular_male/regular_female)', v_idx;
 
-  -- New 고객 → avatar_customer_new_{gender}.glb + teen 믹스
-  v_idx := 0;
-  FOR v_customer IN
-    SELECT id, customer_code
-    FROM customers
-    WHERE store_id = v_store_id AND segment = 'New'
-    ORDER BY customer_code
-  LOOP
-    -- New 고객 중 일부는 teen 아바타 사용 (젊은 신규 고객 표현)
-    IF v_idx % 4 = 0 THEN
-      UPDATE customers SET avatar_url = v_base_url || '/customers/avatar_customer_teen_male.glb'
-      WHERE id = v_customer.id;
-    ELSIF v_idx % 4 = 1 THEN
-      UPDATE customers SET avatar_url = v_base_url || '/customers/avatar_customer_teen_female.glb'
-      WHERE id = v_customer.id;
-    ELSIF v_idx % 4 = 2 THEN
-      UPDATE customers SET avatar_url = v_base_url || '/customers/avatar_customer_new_male.glb'
-      WHERE id = v_customer.id;
-    ELSE
-      UPDATE customers SET avatar_url = v_base_url || '/customers/avatar_customer_new_female.glb'
-      WHERE id = v_customer.id;
-    END IF;
-    v_idx := v_idx + 1;
-    v_updated := v_updated + 1;
-  END LOOP;
-  RAISE NOTICE '    - New 고객: %건 (new + teen 믹스)', v_idx;
+-- New 고객 → avatar_customer_new_{gender}.glb + teen 믹스
+v_idx := 0;
+FOR v_customer IN
+  SELECT id
+  FROM customers
+  WHERE store_id = v_store_id AND segment = 'New'
+  ORDER BY COALESCE(customer_name, '')
+LOOP
+  -- New 고객 중 일부는 teen 아바타 사용 (젊은 신규 고객 표현)
+  IF v_idx % 4 = 0 THEN
+    UPDATE customers
+      SET avatar_url = v_base_url || '/customers/avatar_customer_teen_male.glb'
+    WHERE id = v_customer.id;
+  ELSIF v_idx % 4 = 1 THEN
+    UPDATE customers
+      SET avatar_url = v_base_url || '/customers/avatar_customer_teen_female.glb'
+    WHERE id = v_customer.id;
+  ELSIF v_idx % 4 = 2 THEN
+    UPDATE customers
+      SET avatar_url = v_base_url || '/customers/avatar_customer_new_male.glb'
+    WHERE id = v_customer.id;
+  ELSE
+    UPDATE customers
+      SET avatar_url = v_base_url || '/customers/avatar_customer_new_female.glb'
+    WHERE id = v_customer.id;
+  END IF;
+  v_idx := v_idx + 1;
+  v_updated := v_updated + 1;
+END LOOP;
+RAISE NOTICE '    - New 고객: %건 (new + teen 믹스)', v_idx;
 
-  -- Dormant 고객 → avatar_customer_dormant_{gender}.glb + senior 믹스
-  v_idx := 0;
-  FOR v_customer IN
-    SELECT id, customer_code
-    FROM customers
-    WHERE store_id = v_store_id AND segment = 'Dormant'
-    ORDER BY customer_code
-  LOOP
-    -- Dormant 고객 중 일부는 senior 아바타 사용 (연령 다양성)
-    IF v_idx % 4 = 0 THEN
-      UPDATE customers SET avatar_url = v_base_url || '/customers/avatar_customer_senior_male.glb'
-      WHERE id = v_customer.id;
-    ELSIF v_idx % 4 = 1 THEN
-      UPDATE customers SET avatar_url = v_base_url || '/customers/avatar_customer_senior_female.glb'
-      WHERE id = v_customer.id;
-    ELSIF v_idx % 4 = 2 THEN
-      UPDATE customers SET avatar_url = v_base_url || '/customers/avatar_customer_dormant_male.glb'
-      WHERE id = v_customer.id;
-    ELSE
-      UPDATE customers SET avatar_url = v_base_url || '/customers/avatar_customer_dormant_female.glb'
-      WHERE id = v_customer.id;
-    END IF;
-    v_idx := v_idx + 1;
-    v_updated := v_updated + 1;
-  END LOOP;
+-- Dormant 고객 → avatar_customer_dormant_{gender}.glb + senior 믹스
+v_idx := 0;
+FOR v_customer IN
+  SELECT id
+  FROM customers
+  WHERE store_id = v_store_id AND segment = 'Dormant'
+  ORDER BY COALESCE(customer_name, '')
+LOOP
+  -- Dormant 고객 중 일부는 senior 아바타 사용 (연령 다양성)
+  IF v_idx % 4 = 0 THEN
+    UPDATE customers
+      SET avatar_url = v_base_url || '/customers/avatar_customer_senior_male.glb'
+    WHERE id = v_customer.id;
+  ELSIF v_idx % 4 = 1 THEN
+    UPDATE customers
+      SET avatar_url = v_base_url || '/customers/avatar_customer_senior_female.glb'
+    WHERE id = v_customer.id;
+  ELSIF v_idx % 4 = 2 THEN
+    UPDATE customers
+      SET avatar_url = v_base_url || '/customers/avatar_customer_dormant_male.glb'
+    WHERE id = v_customer.id;
+  ELSE
+    UPDATE customers
+      SET avatar_url = v_base_url || '/customers/avatar_customer_dormant_female.glb'
+    WHERE id = v_customer.id;
+  END IF;
+  v_idx := v_idx + 1;
+  v_updated := v_updated + 1;
+END LOOP;
   RAISE NOTICE '    - Dormant 고객: %건 (dormant + senior 믹스)', v_idx;
 
   RAISE NOTICE '    ✓ customers avatar_url: 총 %건 설정됨', v_updated;
@@ -475,5 +487,5 @@ WHERE model_url IS NULL
 ORDER BY furniture_type;
 
 -- 7. Store 모델 URL 확인
-SELECT id, name, metadata->>'model_3d_url' as model_url
+SELECT id, store_name, metadata->>'model_3d_url' as model_url
 FROM stores;

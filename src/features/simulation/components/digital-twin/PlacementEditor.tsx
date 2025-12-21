@@ -188,10 +188,17 @@ function DraggableProduct({
     }
   };
 
+  // degrees → radians 변환
+  const rotation: [number, number, number] = [
+    (product.rotation.x || 0) * Math.PI / 180,
+    (product.rotation.y || 0) * Math.PI / 180,
+    (product.rotation.z || 0) * Math.PI / 180,
+  ];
+
   return (
     <group
       position={vectorToTuple(product.position)}
-      rotation={[product.rotation.x || 0, product.rotation.y || 0, product.rotation.z || 0]}
+      rotation={rotation}
     >
       <mesh
         ref={meshRef}
@@ -350,16 +357,24 @@ function EditScene({
   return (
     <>
       {/* 가구 (편집 불가) */}
-      {furniture.map((f) => (
-        <mesh
-          key={f.id}
-          position={vectorToTuple(f.position)}
-          rotation={[f.rotation.x || 0, f.rotation.y || 0, f.rotation.z || 0]}
-        >
-          <boxGeometry args={[1, 1.5, 0.5]} />
-          <meshStandardMaterial color="#6b7280" metalness={0.2} roughness={0.8} />
-        </mesh>
-      ))}
+      {furniture.map((f) => {
+        // degrees → radians 변환
+        const rotation: [number, number, number] = [
+          (f.rotation.x || 0) * Math.PI / 180,
+          (f.rotation.y || 0) * Math.PI / 180,
+          (f.rotation.z || 0) * Math.PI / 180,
+        ];
+        return (
+          <mesh
+            key={f.id}
+            position={vectorToTuple(f.position)}
+            rotation={rotation}
+          >
+            <boxGeometry args={[1, 1.5, 0.5]} />
+            <meshStandardMaterial color="#6b7280" metalness={0.2} roughness={0.8} />
+          </mesh>
+        );
+      })}
 
       {/* 슬롯 하이라이트 */}
       {selectedProduct && (

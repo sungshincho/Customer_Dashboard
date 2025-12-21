@@ -36,6 +36,8 @@ function FurnitureItem({ asset, onClick, onProductClick }: FurnitureItemProps) {
   const childProducts = asset.childProducts || [];
 
   // degrees → radians 변환 (main 브랜치에서 병합)
+function FurnitureItem({ asset, onClick }: { asset: FurnitureAsset; onClick: () => void }) {
+  // degrees → radians 변환
   const rotationX = asset.rotation.x * Math.PI / 180;
   const rotationY = asset.rotation.y * Math.PI / 180;
   const rotationZ = asset.rotation.z * Math.PI / 180;
@@ -49,6 +51,16 @@ function FurnitureItem({ asset, onClick, onProductClick }: FurnitureItemProps) {
       <group
         position={[asset.position.x, asset.position.y, asset.position.z]}
         rotation={[rotationX, rotationY, rotationZ]}
+      <mesh
+        position={[
+          asset.position.x,
+          asset.position.y + dimensions.height / 2,
+          asset.position.z
+        ]}
+        rotation={[rotationX, rotationY, rotationZ]}
+        onClick={onClick}
+        castShadow
+        receiveShadow
       >
         {/* 가구 플레이스홀더 */}
         <mesh
@@ -104,6 +116,16 @@ function FurnitureItem({ asset, onClick, onProductClick }: FurnitureItemProps) {
       <group
         position={[asset.position.x, asset.position.y, asset.position.z]}
         rotation={[rotationX, rotationY, rotationZ]}
+      <mesh
+        position={[
+          asset.position.x,
+          asset.position.y + dimensions.height / 2,
+          asset.position.z
+        ]}
+        rotation={[rotationX, rotationY, rotationZ]}
+        onClick={onClick}
+        castShadow
+        receiveShadow
       >
         {/* 가구 플레이스홀더 */}
         <mesh
