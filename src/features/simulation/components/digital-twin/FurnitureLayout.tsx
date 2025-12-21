@@ -1,5 +1,5 @@
 import { useGLTF } from '@react-three/drei';
-import type { FurnitureAsset, ProductAsset } from '@/types/scene3d';
+import type { FurnitureAsset } from '@/types/scene3d';
 import { ChildProductItem } from './ChildProductItem';
 
 interface FurnitureLayoutProps {
@@ -9,7 +9,6 @@ interface FurnitureLayoutProps {
 }
 
 export function FurnitureLayout({ furniture = [], onClick, onProductClick }: FurnitureLayoutProps) {
-  // Guard against undefined or null
   const safeFurniture = Array.isArray(furniture) ? furniture : [];
 
   return (
@@ -34,35 +33,23 @@ interface FurnitureItemProps {
 
 function FurnitureItem({ asset, onClick, onProductClick }: FurnitureItemProps) {
   const childProducts = asset.childProducts || [];
-
-  // degrees → radians 변환 (main 브랜치에서 병합)
-function FurnitureItem({ asset, onClick }: { asset: FurnitureAsset; onClick: () => void }) {
+  
   // degrees → radians 변환
-  const rotationX = asset.rotation.x * Math.PI / 180;
-  const rotationY = asset.rotation.y * Math.PI / 180;
-  const rotationZ = asset.rotation.z * Math.PI / 180;
+  const rotationX = (asset.rotation?.x || 0) * Math.PI / 180;
+  const rotationY = (asset.rotation?.y || 0) * Math.PI / 180;
+  const rotationZ = (asset.rotation?.z || 0) * Math.PI / 180;
 
-  // Render placeholder if no model URL
+  const dimensions = asset.dimensions || { width: 2, height: 2, depth: 0.5 };
+  const color = asset.furniture_type?.toLowerCase().includes('shelf') ? '#8b6914' : '#654321';
+
+  // 모델 URL이 없는 경우: 플레이스홀더 박스 렌더링
   if (!asset.model_url) {
-    const dimensions = asset.dimensions || { width: 2, height: 2, depth: 0.5 };
-    const color = asset.furniture_type?.toLowerCase().includes('shelf') ? '#8b6914' : '#654321';
-
     return (
       <group
         position={[asset.position.x, asset.position.y, asset.position.z]}
         rotation={[rotationX, rotationY, rotationZ]}
-      <mesh
-        position={[
-          asset.position.x,
-          asset.position.y + dimensions.height / 2,
-          asset.position.z
-        ]}
-        rotation={[rotationX, rotationY, rotationZ]}
-        onClick={onClick}
-        castShadow
-        receiveShadow
+        scale={[asset.scale?.x || 1, asset.scale?.y || 1, asset.scale?.z || 1]}
       >
-        {/* 가구 플레이스홀더 */}
         <mesh
           position={[0, dimensions.height / 2, 0]}
           onClick={onClick}
@@ -73,7 +60,6 @@ function FurnitureItem({ asset, onClick }: { asset: FurnitureAsset; onClick: () 
           <meshStandardMaterial color={color} />
         </mesh>
 
-        {/* 자식 제품들 (상대 좌표로 렌더링) */}
         {childProducts.map((product) => (
           <ChildProductItem
             key={product.id}
@@ -85,6 +71,7 @@ function FurnitureItem({ asset, onClick }: { asset: FurnitureAsset; onClick: () 
     );
   }
 
+  // GLB 모델 로드 시도
   try {
     const { scene } = useGLTF(asset.model_url);
 
@@ -92,12 +79,10 @@ function FurnitureItem({ asset, onClick }: { asset: FurnitureAsset; onClick: () 
       <group
         position={[asset.position.x, asset.position.y, asset.position.z]}
         rotation={[rotationX, rotationY, rotationZ]}
-        scale={[asset.scale.x, asset.scale.y, asset.scale.z]}
+        scale={[asset.scale?.x || 1, asset.scale?.y || 1, asset.scale?.z || 1]}
       >
-        {/* 가구 모델 */}
         <primitive object={scene.clone()} onClick={onClick} />
 
-        {/* 자식 제품들 (상대 좌표로 렌더링) */}
         {childProducts.map((product) => (
           <ChildProductItem
             key={product.id}
@@ -109,25 +94,14 @@ function FurnitureItem({ asset, onClick }: { asset: FurnitureAsset; onClick: () 
     );
   } catch (error) {
     console.warn('Failed to load furniture model:', asset.furniture_type, error);
-    const dimensions = asset.dimensions || { width: 2, height: 2, depth: 0.5 };
-    const color = asset.furniture_type?.toLowerCase().includes('shelf') ? '#8b6914' : '#654321';
-
+    
+    // 로드 실패 시: 플레이스홀더 박스 렌더링
     return (
       <group
         position={[asset.position.x, asset.position.y, asset.position.z]}
         rotation={[rotationX, rotationY, rotationZ]}
-      <mesh
-        position={[
-          asset.position.x,
-          asset.position.y + dimensions.height / 2,
-          asset.position.z
-        ]}
-        rotation={[rotationX, rotationY, rotationZ]}
-        onClick={onClick}
-        castShadow
-        receiveShadow
+        scale={[asset.scale?.x || 1, asset.scale?.y || 1, asset.scale?.z || 1]}
       >
-        {/* 가구 플레이스홀더 */}
         <mesh
           position={[0, dimensions.height / 2, 0]}
           onClick={onClick}
@@ -138,7 +112,6 @@ function FurnitureItem({ asset, onClick }: { asset: FurnitureAsset; onClick: () 
           <meshStandardMaterial color={color} />
         </mesh>
 
-        {/* 자식 제품들 (상대 좌표로 렌더링) */}
         {childProducts.map((product) => (
           <ChildProductItem
             key={product.id}
