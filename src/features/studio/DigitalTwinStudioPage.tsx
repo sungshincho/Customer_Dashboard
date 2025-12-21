@@ -340,6 +340,20 @@ export default function DigitalTwinStudioPage() {
           dimensions: m.dimensions,
           movable: true,
           metadata: m.metadata,
+          // 🔧 FIX: 가구에 배치된 자식 제품들 (상대 좌표 사용)
+          childProducts: (m.metadata as any)?.childProducts?.map((cp: any) => ({
+            id: cp.id,
+            type: 'product' as const,
+            model_url: cp.model_url,
+            position: cp.position || { x: 0, y: 0, z: 0 },
+            rotation: cp.rotation || { x: 0, y: 0, z: 0 },
+            scale: cp.scale || { x: 1, y: 1, z: 1 },
+            sku: cp.name,
+            display_type: cp.metadata?.displayType,
+            dimensions: cp.dimensions,
+            isRelativePosition: true,
+            metadata: cp.metadata,
+          })) || [],
         })),
       products: activeModels
         .filter((m) => m.type === 'product')

@@ -92,9 +92,10 @@ export function SceneComposer({
             onClick={() => onAssetClick?.(safeRecipe.space.id, 'space')}
           />
           
-          <FurnitureLayout 
+          <FurnitureLayout
             furniture={safeRecipe.furniture}
             onClick={(id) => onAssetClick?.(id, 'furniture')}
+            onProductClick={(id) => onAssetClick?.(id, 'product')}
           />
           
           <ProductPlacement 

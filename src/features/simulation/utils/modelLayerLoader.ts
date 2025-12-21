@@ -171,7 +171,8 @@ export async function loadUserModels(
       // ============================================
       // 3. product_placements 테이블에서 상품 배치 로드 (SEED_00/SEED_08 스키마)
       // slot_id (UUID FK) → furniture_slots → furniture 조인
-      // 월드 좌표 = furniture.position + slot.slot_position + placement.position_offset
+      // 🔧 FIX: 상대 좌표 사용 (가구 기준) - 가구 이동 시 제품도 함께 이동
+      // relativePosition = slot.slot_position + placement.position_offset (가구 위치 제외)
       // ============================================
 
       // 3-1. furniture 데이터 먼저 로드 (중첩 조인 대신 Map 사용)
@@ -239,18 +240,6 @@ export async function loadUserModels(
           // furniture_id로 Map에서 조회 (중첩 조인 대체)
           const furniture = slot?.furniture_id ? furnitureMap.get(slot.furniture_id) : null;
 
-          // 🔍 디버그: 조인 상태 확인
-          console.log(`[ModelLoader] DEBUG placement:`, {
-            placementId: p.id,
-            productName: product?.product_name,
-            slotExists: !!slot,
-            slotId: slot?.slot_id,
-            slotFurnitureId: slot?.furniture_id,
-            furnitureFound: !!furniture,
-            furnitureCode: furniture?.furniture_code,
-            slotPosition: slot?.slot_position
-          });
-
           // display_type에 맞는 모델 URL 찾기
           // 우선순위: product_models[display_type] > products.model_3d_url > 기본 URL
           let modelUrl: string | null = null;
@@ -268,27 +257,23 @@ export async function loadUserModels(
           }
 
           if (modelUrl) {
-            // 월드 좌표 계산: furniture.position + slot.slot_position + placement.position_offset
-            const furniturePos = {
-              x: Number(furniture?.position_x) || 0,
-              y: Number(furniture?.position_y) || 0,
-              z: Number(furniture?.position_z) || 0
-            };
-
+            // 🔧 FIX: 상대 좌표 계산 (가구 위치 제외!)
+            // relativePosition = slot.slot_position + placement.position_offset
             const slotPos = parseJsonField(slot?.slot_position, { x: 0, y: 0, z: 0 });
             const offsetPos = parseJsonField(p.position_offset, { x: 0, y: 0, z: 0 });
 
-            const worldPosition = {
-              x: furniturePos.x + slotPos.x + offsetPos.x,
-              y: furniturePos.y + slotPos.y + offsetPos.y,
-              z: furniturePos.z + slotPos.z + offsetPos.z
+            // 상대 좌표 (가구 기준)
+            const relativePosition = {
+              x: slotPos.x + offsetPos.x,
+              y: slotPos.y + offsetPos.y,
+              z: slotPos.z + offsetPos.z
             };
 
             // 회전: slot.slot_rotation + placement.rotation_offset
             const slotRot = parseJsonField(slot?.slot_rotation, { x: 0, y: 0, z: 0 });
             const offsetRot = parseJsonField(p.rotation_offset, { x: 0, y: 0, z: 0 });
 
-            const worldRotation = {
+            const relativeRotation = {
               x: slotRot.x + offsetRot.x,
               y: slotRot.y + offsetRot.y,
               z: slotRot.z + offsetRot.z
@@ -302,8 +287,8 @@ export async function loadUserModels(
               name: product?.product_name || 'Unknown Product',
               type: 'product',
               model_url: modelUrl,
-              position: worldPosition,
-              rotation: worldRotation,
+              position: relativePosition,  // 🔧 상대 좌표 사용
+              rotation: relativeRotation,
               scale: scaleData,
               metadata: {
                 placementId: p.id,
@@ -314,17 +299,18 @@ export async function loadUserModels(
                 slotId: slot?.id,
                 slotCode: slot?.slot_id,
                 slotType: slot?.slot_type,
-                furnitureId: furniture?.id,
+                furnitureId: furniture?.id,  // 부모 가구 ID (그룹화용)
                 furnitureName: furniture?.furniture_name,
                 furnitureCode: furniture?.furniture_code,
                 zoneId: furniture?.zone_id,
                 displayType: p.display_type,
                 quantity: p.quantity,
-                isPlacement: true  // placement에서 온 데이터임을 표시
+                isPlacement: true,
+                isRelativePosition: true  // 🔧 상대 좌표임을 표시
               }
             });
             loadedUrls.add(modelUrl);
-            console.log(`[ModelLoader] Placement: ${product?.product_name}, Display: ${p.display_type}, Furniture: ${furniture?.furniture_code ?? 'none'}, Slot: ${slot?.slot_id ?? 'none'}, WorldPos:`, worldPosition);
+            console.log(`[ModelLoader] Placement: ${product?.product_name}, Display: ${p.display_type}, Furniture: ${furniture?.furniture_code ?? 'none'}, Slot: ${slot?.slot_id ?? 'none'}, RelativePos:`, relativePosition);
           }
         }
       } else if (placementsError) {
@@ -496,21 +482,79 @@ export async function loadUserModels(
 
   console.log(`[ModelLoader] After deduplication: ${models.length} → ${deduplicatedModels.length} models`);
 
+  // ============================================
+  // 🔧 FIX: 상대 좌표 제품을 가구별로 그룹화 (childProducts)
+  // 가구 이동 시 자식 제품도 함께 이동하도록
+  // ============================================
+  const furnitureModelsMap = new Map<string, ModelLayer>();
+  const childProductsMap = new Map<string, ModelLayer[]>();  // furnitureId -> products[]
+
+  // 가구 모델 Map 생성
+  for (const model of deduplicatedModels) {
+    if (model.type === 'furniture') {
+      furnitureModelsMap.set(model.id.replace('furniture-', ''), model);
+    }
+  }
+
+  // 상대 좌표 제품을 가구별로 그룹화
+  const productsToRemove = new Set<string>();
+  for (const model of deduplicatedModels) {
+    if (model.type === 'product' && (model.metadata as any)?.isRelativePosition) {
+      const furnitureId = (model.metadata as any)?.furnitureId;
+      if (furnitureId && furnitureModelsMap.has(furnitureId)) {
+        // 해당 가구의 childProducts에 추가
+        const children = childProductsMap.get(furnitureId) || [];
+        children.push(model);
+        childProductsMap.set(furnitureId, children);
+        productsToRemove.add(model.id);  // 개별 렌더링에서 제외
+      }
+    }
+  }
+
+  // 가구 모델에 childProducts 메타데이터 추가
+  for (const model of deduplicatedModels) {
+    if (model.type === 'furniture') {
+      const furnitureId = model.id.replace('furniture-', '');
+      const childProducts = childProductsMap.get(furnitureId);
+      if (childProducts && childProducts.length > 0) {
+        (model.metadata as any) = {
+          ...(model.metadata || {}),
+          childProducts: childProducts.map(cp => ({
+            id: cp.id,
+            name: cp.name,
+            model_url: cp.model_url,
+            position: cp.position,  // 상대 좌표
+            rotation: cp.rotation,
+            scale: cp.scale,
+            metadata: cp.metadata
+          }))
+        };
+        console.log(`[ModelLoader] Grouped ${childProducts.length} products under furniture ${furnitureId}`);
+      }
+    }
+  }
+
+  // 상대 좌표 제품은 개별 렌더링에서 제외 (가구 childProducts로 렌더링)
+  const finalModels = deduplicatedModels.filter(m => !productsToRemove.has(m.id));
+
+  console.log(`[ModelLoader] After grouping childProducts: ${deduplicatedModels.length} → ${finalModels.length} models`);
+
   // 타입 순서로 정렬: space > furniture > product > other
   const typeOrder = { space: 0, furniture: 1, product: 2, other: 3 };
-  deduplicatedModels.sort((a, b) => typeOrder[a.type] - typeOrder[b.type]);
+  finalModels.sort((a, b) => typeOrder[a.type] - typeOrder[b.type]);
 
   console.log('=== [loadUserModels] COMPLETE ===', {
-    totalModels: deduplicatedModels.length,
-    models: deduplicatedModels.map(m => ({
+    totalModels: finalModels.length,
+    models: finalModels.map(m => ({
       id: m.id,
       name: m.name,
       type: m.type,
       position: m.position,
+      childProductsCount: (m.metadata as any)?.childProducts?.length || 0
     }))
   });
 
-  return deduplicatedModels;
+  return finalModels;
 }
 
 /**
