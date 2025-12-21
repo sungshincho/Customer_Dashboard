@@ -36,6 +36,8 @@ export interface FurnitureAsset extends SceneAsset {
   suggested_position?: Vector3D;
   suggested_rotation?: Vector3D;
   optimization_reason?: string;
+  /** 이 가구에 배치된 제품들 (상대 좌표 사용) */
+  childProducts?: ProductAsset[];
 }
 
 export type ProductDisplayType = 'hanging' | 'folded' | 'standing' | 'boxed' | 'stacked';
@@ -57,6 +59,8 @@ export interface ProductAsset extends SceneAsset {
     visibility_score: number;
     accessibility_score: number;
   };
+  /** position이 가구 기준 상대 좌표인지 여부 (true면 가구 자식으로 렌더링) */
+  isRelativePosition?: boolean;
 }
 
 export interface StaffAsset extends SceneAsset {

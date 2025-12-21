@@ -109,13 +109,21 @@ export default function DigitalTwinStudioPage() {
 
   // 스태프 데이터 디버깅
   useEffect(() => {
-    console.log('[DigitalTwinStudio] Staff data state:', {
-      storeId: selectedStore?.id,
+    const debugInfo = {
+      selectedStoreId: selectedStore?.id,
+      selectedStoreName: selectedStore?.store_name,
+      expectedStoreId: 'd9830554-2688-4032-af40-acccda787ac4',
+      idMatch: selectedStore?.id === 'd9830554-2688-4032-af40-acccda787ac4',
       staffCount: dbStaff?.length || 0,
       staffLoading,
       staffError: staffError?.message,
-      staffData: dbStaff,
-    });
+    };
+    console.log('%c[DigitalTwinStudio] Staff Debug', 'background: yellow; color: black; font-size: 14px', debugInfo);
+
+    // window에도 저장
+    if (typeof window !== 'undefined') {
+      (window as any).__studioDebug = debugInfo;
+    }
   }, [selectedStore?.id, dbStaff, staffLoading, staffError]);
 
   // UI 상태
@@ -332,6 +340,20 @@ export default function DigitalTwinStudioPage() {
           dimensions: m.dimensions,
           movable: true,
           metadata: m.metadata,
+          // 🔧 FIX: 가구에 배치된 자식 제품들 (상대 좌표 사용)
+          childProducts: (m.metadata as any)?.childProducts?.map((cp: any) => ({
+            id: cp.id,
+            type: 'product' as const,
+            model_url: cp.model_url,
+            position: cp.position || { x: 0, y: 0, z: 0 },
+            rotation: cp.rotation || { x: 0, y: 0, z: 0 },
+            scale: cp.scale || { x: 1, y: 1, z: 1 },
+            sku: cp.name,
+            display_type: cp.metadata?.displayType,
+            dimensions: cp.dimensions,
+            isRelativePosition: true,
+            metadata: cp.metadata,
+          })) || [],
         })),
       products: activeModels
         .filter((m) => m.type === 'product')

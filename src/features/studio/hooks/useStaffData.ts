@@ -66,14 +66,8 @@ export function useStaffData(options: UseStaffDataOptions = {}): UseStaffDataRet
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  // 디버깅: 훅 호출 즉시 로그
-  console.log('[useStaffData] Hook called with storeId:', storeId);
-
   const fetchStaff = async () => {
-    console.log('[useStaffData] fetchStaff called, storeId:', storeId);
-
     if (!storeId) {
-      console.log('[useStaffData] No storeId, returning empty');
       setStaff([]);
       setLoading(false);
       return;
@@ -110,9 +104,6 @@ export function useStaffData(options: UseStaffDataOptions = {}): UseStaffDataRet
         throw new Error(staffError.message);
       }
 
-      console.log('[useStaffData] Raw staff data:', staffData);
-      console.log('[useStaffData] Query used storeId:', storeId, '| Expected: d9830554-2688-4032-af40-acccda787ac4');
-
       // 2단계: zones_dim에서 구역 이름 조회 (별도 쿼리)
       const zoneIds = (staffData || [])
         .map((s: any) => s.assigned_zone_id)
@@ -147,7 +138,6 @@ export function useStaffData(options: UseStaffDataOptions = {}): UseStaffDataRet
         is_active: row.is_active ?? true,
       }));
 
-      console.log('[useStaffData] Loaded staff:', staffMembers.length, 'members', staffMembers);
       setStaff(staffMembers);
     } catch (err) {
       console.error('[useStaffData] Error:', err);
