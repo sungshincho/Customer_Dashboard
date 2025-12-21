@@ -35,6 +35,11 @@ interface FurnitureItemProps {
 function FurnitureItem({ asset, onClick, onProductClick }: FurnitureItemProps) {
   const childProducts = asset.childProducts || [];
 
+  // degrees → radians 변환 (main 브랜치에서 병합)
+  const rotationX = asset.rotation.x * Math.PI / 180;
+  const rotationY = asset.rotation.y * Math.PI / 180;
+  const rotationZ = asset.rotation.z * Math.PI / 180;
+
   // Render placeholder if no model URL
   if (!asset.model_url) {
     const dimensions = asset.dimensions || { width: 2, height: 2, depth: 0.5 };
@@ -43,7 +48,7 @@ function FurnitureItem({ asset, onClick, onProductClick }: FurnitureItemProps) {
     return (
       <group
         position={[asset.position.x, asset.position.y, asset.position.z]}
-        rotation={[asset.rotation.x, asset.rotation.y, asset.rotation.z]}
+        rotation={[rotationX, rotationY, rotationZ]}
       >
         {/* 가구 플레이스홀더 */}
         <mesh
@@ -74,7 +79,7 @@ function FurnitureItem({ asset, onClick, onProductClick }: FurnitureItemProps) {
     return (
       <group
         position={[asset.position.x, asset.position.y, asset.position.z]}
-        rotation={[asset.rotation.x, asset.rotation.y, asset.rotation.z]}
+        rotation={[rotationX, rotationY, rotationZ]}
         scale={[asset.scale.x, asset.scale.y, asset.scale.z]}
       >
         {/* 가구 모델 */}
@@ -98,7 +103,7 @@ function FurnitureItem({ asset, onClick, onProductClick }: FurnitureItemProps) {
     return (
       <group
         position={[asset.position.x, asset.position.y, asset.position.z]}
-        rotation={[asset.rotation.x, asset.rotation.y, asset.rotation.z]}
+        rotation={[rotationX, rotationY, rotationZ]}
       >
         {/* 가구 플레이스홀더 */}
         <mesh
