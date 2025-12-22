@@ -417,10 +417,9 @@ export default function DigitalTwinStudioPage() {
           metadata: m.metadata,
           dimensions: m.dimensions,
         };
-        console.log(`[SceneModels] ${m.name}: original pos=`, m.position, '→ converted=', converted.position);
         return converted;
       });
-    console.log('[SceneModels] Total active models:', result.length);
+
     return result;
   }, [models, activeLayers]);
 

@@ -58,7 +58,7 @@ export function LayerPanel() {
   // 씬 저장 관련 상태
   const [newSceneName, setNewSceneName] = useState('');
 
-  // 모델을 타입별로 그룹화
+  // 모델을 타입별로 그룹화 (가구의 childProducts도 포함)
   const groupedLayers = useMemo(() => {
     const groups: Record<ModelType, LayerNode[]> = {
       space: [],
@@ -86,6 +86,22 @@ export function LayerPanel() {
         locked: false,
         modelId: model.id,
       });
+
+      // 🔧 FIX: 가구의 childProducts를 상품 목록에 추가
+      if (model.type === 'furniture' && (model.metadata as any)?.childProducts) {
+        const childProducts = (model.metadata as any).childProducts as any[];
+        childProducts.forEach((cp) => {
+          groups.product.push({
+            id: cp.id,
+            name: cp.name || cp.metadata?.sku || 'Product',
+            type: 'model',
+            visible: model.visible, // 부모 가구의 가시성 따름
+            locked: false,
+            modelId: cp.id,
+            parentFurnitureId: model.id, // 부모 가구 ID 추가
+          } as LayerNode & { parentFurnitureId?: string });
+        });
+      }
     });
 
     return groups;

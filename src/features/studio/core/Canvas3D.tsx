@@ -210,17 +210,23 @@ function SceneModels({ onAssetClick }: SceneModelsProps) {
         .filter((model) => model.visible)
         .map((model) => {
           // 가구 모델인 경우, childProducts도 함께 렌더링
-          const rawChildProducts = model.metadata?.childProducts as any[] | undefined;
+          const rawChildProducts = (model.metadata as any)?.childProducts as any[] | undefined;
           const hasChildren = model.type === 'furniture' && rawChildProducts && rawChildProducts.length > 0;
 
-          // childProducts를 ProductAsset 형식으로 변환
+          // childProducts를 ProductAsset 형식으로 변환 (rotation은 degrees → radians)
+          const degToRad = (deg: number) => (deg || 0) * Math.PI / 180;
           const childProducts: ProductAsset[] | undefined = hasChildren
             ? rawChildProducts!.map((cp) => ({
                 id: cp.id,
                 type: 'product' as const,
                 model_url: cp.model_url || '',
                 position: cp.position || { x: 0, y: 0, z: 0 },
-                rotation: cp.rotation || { x: 0, y: 0, z: 0 },
+                // 🔧 FIX: degrees → radians 변환
+                rotation: {
+                  x: degToRad(cp.rotation?.x),
+                  y: degToRad(cp.rotation?.y),
+                  z: degToRad(cp.rotation?.z),
+                },
                 scale: cp.scale || { x: 1, y: 1, z: 1 },
                 sku: cp.metadata?.sku || cp.name,
                 display_type: cp.metadata?.displayType,
