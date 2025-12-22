@@ -352,15 +352,20 @@ function transformLayoutResult(
   params: LayoutSimulationParams
 ): LayoutSimulationResult {
   // AI 응답을 LayoutSimulationResult 형식으로 변환
-  const furnitureMoves: FurnitureMove[] = (rawResult.layoutChanges || rawResult.changes || []).map(
+  // 🔧 FIX: furnitureMoves 필드도 확인 (smart layout handler는 furnitureMoves 반환)
+  const furnitureMoves: FurnitureMove[] = (
+    rawResult.layoutChanges || rawResult.furnitureMoves || rawResult.changes || []
+  ).map(
     (change: any, idx: number) => ({
-      furnitureId: change.id || `furniture-${idx}`,
-      furnitureName: change.item || change.name || `가구 ${idx + 1}`,
+      furnitureId: change.id || change.entityId || `furniture-${idx}`,
+      furnitureName: change.item || change.name || change.entityLabel || `가구 ${idx + 1}`,
       fromPosition: change.from || change.currentPosition || { x: 0, y: 0, z: 0 },
       toPosition: change.to || change.suggestedPosition || { x: 0, y: 0, z: 0 },
       rotation: change.rotation,
     })
   );
+
+  console.log('[useLayoutSimulation] Extracted furniture moves:', furnitureMoves.length);
 
   const zoneChanges: ZoneChange[] = (rawResult.zoneChanges || []).map(
     (change: any, idx: number) => {

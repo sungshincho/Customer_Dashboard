@@ -127,35 +127,92 @@ export function useSimulationEngine({ zones, enabled = true }: UseSimulationEngi
   zonesRef.current = zones;
   configRef.current = config;
 
-  // 특수 구역 찾기
-  const entryZone = zones.find(isEntryZone) || zones[0];
-  const exitZone = zones.find(isExitZone) || entryZone;
-  const browseZones = zones.filter((z) => !isEntryZone(z) && !isExitZone(z));
+  // 🔧 FIX: 존 찾기 함수들 (ref 기반으로 동적 조회)
+  const findEntryZone = useCallback((): Zone | null => {
+    const currentZones = zonesRef.current;
+    if (!currentZones || currentZones.length === 0) return null;
 
-  // 🔧 DEBUG: zones 정보 로깅
+    // 1. zone_type이 'entrance'인 존 찾기
+    const byType = currentZones.find(z =>
+      (z.zone_type || '').toLowerCase() === 'entrance' ||
+      (z.zone_type || '').toLowerCase() === 'entry'
+    );
+    if (byType) return byType;
+
+    // 2. zone_name에 '입구' 포함된 존 찾기
+    const byName = currentZones.find(z => {
+      const name = (z.zone_name || '').toLowerCase();
+      return name.includes('입구') || name.includes('entrance') || name.includes('entry');
+    });
+    if (byName) return byName;
+
+    // 3. 가장 낮은 z 좌표를 가진 존 (일반적으로 입구가 앞쪽에 위치)
+    const sorted = [...currentZones].sort((a, b) => {
+      const zA = a.z ?? a.coordinates?.z ?? 0;
+      const zB = b.z ?? b.coordinates?.z ?? 0;
+      return zA - zB;
+    });
+
+    console.log('[useSimulationEngine] Entry zone not found by type/name, using zone with lowest Z:', sorted[0]?.zone_name);
+    return sorted[0] || null;
+  }, []);
+
+  const findExitZone = useCallback((): Zone | null => {
+    const currentZones = zonesRef.current;
+    if (!currentZones || currentZones.length === 0) return null;
+    return currentZones.find(isExitZone) || findEntryZone();
+  }, [findEntryZone]);
+
+  const findBrowseZones = useCallback((): Zone[] => {
+    const currentZones = zonesRef.current;
+    if (!currentZones) return [];
+    return currentZones.filter((z) => !isEntryZone(z) && !isExitZone(z));
+  }, []);
+
+  // 🔧 DEBUG: zones 정보 로깅 (더 상세한 정보)
   useEffect(() => {
+    const entryZone = findEntryZone();
+    const exitZone = findExitZone();
+    const browseZones = findBrowseZones();
+
     console.log('[useSimulationEngine] Zones updated:', {
       total: zones.length,
-      entryZone: entryZone?.zone_name || entryZone?.id,
+      entryZone: entryZone ? {
+        name: entryZone.zone_name,
+        type: entryZone.zone_type,
+        x: entryZone.x ?? entryZone.coordinates?.x,
+        z: entryZone.z ?? entryZone.coordinates?.z,
+      } : null,
       exitZone: exitZone?.zone_name || exitZone?.id,
       browseZones: browseZones.length,
       enabled,
       isRunning,
     });
-  }, [zones, enabled, isRunning]);
+
+    if (zones.length > 0 && !entryZone) {
+      console.warn('[useSimulationEngine] ⚠️ Entry zone not detected! Available zones:',
+        zones.map(z => ({ name: z.zone_name, type: z.zone_type }))
+      );
+    }
+  }, [zones, enabled, isRunning, findEntryZone, findExitZone, findBrowseZones]);
 
   // 🔧 FIX: 고객 수를 ref로 추적 (effect 재시작 방지)
   const customersRef = useRef(customers);
   customersRef.current = customers;
 
   // 새 고객 생성 (의존성에서 customers.length 제거)
+  // 🔧 FIX: 동적으로 입구 존을 찾아 고객 생성
   const spawnCustomer = useCallback(() => {
-    // 🔧 FIX: ref에서 최신 고객 수 확인
+    // ref에서 최신 고객 수 및 설정 확인
     const currentCustomerCount = customersRef.current.length;
     const currentConfig = configRef.current;
 
+    // 🔧 FIX: 실시간으로 입구 존 찾기 (ref 기반)
+    const entryZone = findEntryZone();
+    const browseZones = findBrowseZones();
+
     if (!entryZone) {
-      console.log('[useSimulationEngine] No entry zone, cannot spawn');
+      console.log('[useSimulationEngine] No entry zone found, cannot spawn customer');
       return;
     }
     if (currentCustomerCount >= (currentConfig?.maxCustomers || 30)) {
@@ -185,15 +242,23 @@ export function useSimulationEngine({ zones, enabled = true }: UseSimulationEngi
       path: [position],
     };
 
-    console.log('[useSimulationEngine] Spawning customer:', customer.id, 'at', entryZone.zone_name || entryZone.id);
+    console.log('[useSimulationEngine] 🚶 Spawning customer:', customer.id,
+      'at', entryZone.zone_name || entryZone.id,
+      `(x: ${position[0].toFixed(1)}, z: ${position[2].toFixed(1)})`);
     addCustomer(customer);
-  }, [entryZone, browseZones, addCustomer]);  // 🔧 FIX: customers.length, config 제거
+  }, [findEntryZone, findBrowseZones, addCustomer]);
 
   // 고객 상태 전환
+  // 🔧 FIX: 동적으로 존 찾기 사용
   const transitionCustomerState = useCallback((
     customer: CustomerAgent,
     currentZone: Zone | null
   ): { newState: CustomerState; newTarget: [number, number, number]; shouldRemove: boolean } => {
+    // 실시간으로 존 정보 가져오기
+    const browseZones = findBrowseZones();
+    const exitZone = findExitZone();
+    const currentConfig = configRef.current;
+
     let newState: CustomerState = customer.state;
     let newTarget = customer.targetPosition;
     let shouldRemove = false;
@@ -240,7 +305,7 @@ export function useSimulationEngine({ zones, enabled = true }: UseSimulationEngi
         break;
 
       case 'fitting':
-        if (Math.random() < config.purchaseProbability * 2.5) {
+        if (Math.random() < (currentConfig?.purchaseProbability || 0.164) * 2.5) {
           newState = 'purchasing';
         } else {
           newState = 'exiting';
@@ -262,7 +327,7 @@ export function useSimulationEngine({ zones, enabled = true }: UseSimulationEngi
     }
 
     return { newState, newTarget, shouldRemove };
-  }, [browseZones, exitZone, config.purchaseProbability, recordConversion]);
+  }, [findBrowseZones, findExitZone, recordConversion]);
 
   // 고객 업데이트
   const updateCustomers = useCallback((deltaTime: number) => {
