@@ -75,7 +75,6 @@ const initialState: SceneState = {
     fov: 50,
   },
   isDirty: false,
-  hiddenProductIds: [],  // 🆕 제품 개별 가시성 제어
 };
 
 // ============================================================================
@@ -424,15 +423,44 @@ const sceneReducer = (state: SceneState, action: SceneAction): SceneState => {
       };
     }
 
-    // 🆕 제품 개별 가시성 토글
+    // 🆕 제품 개별 가시성 토글 (가구의 childProducts 내 visible 속성 직접 수정)
     case 'TOGGLE_PRODUCT_VISIBILITY': {
       const productId = action.payload;
-      const isHidden = state.hiddenProductIds.includes(productId);
+
+      // 모든 가구의 childProducts를 검색하여 해당 제품 찾기
+      const updatedModels = state.models.map((model) => {
+        if (model.type !== 'furniture') return model;
+
+        const childProducts = (model.metadata as any)?.childProducts as any[] | undefined;
+        if (!childProducts) return model;
+
+        // 해당 제품이 이 가구의 childProducts에 있는지 확인
+        const productIndex = childProducts.findIndex((cp) => cp.id === productId);
+        if (productIndex === -1) return model;
+
+        // childProducts 배열 복사 후 visible 토글
+        const newChildProducts = childProducts.map((cp, idx) => {
+          if (idx !== productIndex) return cp;
+          // visible이 undefined면 기본 true로 처리 후 false로, 있으면 토글
+          const currentVisible = cp.visible !== false;
+          return { ...cp, visible: !currentVisible };
+        });
+
+        console.log(`[SceneProvider] TOGGLE_PRODUCT_VISIBILITY: ${productId} -> visible: ${!childProducts[productIndex].visible}`);
+
+        return {
+          ...model,
+          metadata: {
+            ...model.metadata,
+            childProducts: newChildProducts,
+          },
+        };
+      });
+
       return {
         ...state,
-        hiddenProductIds: isHidden
-          ? state.hiddenProductIds.filter(id => id !== productId)  // 숨김 해제
-          : [...state.hiddenProductIds, productId],  // 숨김 추가
+        models: updatedModels,
+        isDirty: true,
       };
     }
 
@@ -497,8 +525,7 @@ interface SceneContextValue {
   applySimulationResults: (results: SimulationResultsPayload) => void;
   revertSimulationChanges: () => void;
 
-  // 🆕 제품 개별 가시성 제어
-  hiddenProductIds: string[];
+  // 🆕 제품 개별 가시성 제어 (childProduct.visible 방식)
   toggleProductVisibility: (productId: string) => void;
   isProductVisible: (productId: string) => boolean;
 }
@@ -638,15 +665,29 @@ export function SceneProvider({ mode = 'view', children, initialModels = [] }: S
     dispatch({ type: 'SET_MODELS', payload: revertedModels });
   }, [state.models]);
 
-  // 🆕 제품 개별 가시성 토글
+  // 🆕 제품 개별 가시성 토글 (가구의 childProducts 내 visible 속성 직접 수정)
   const toggleProductVisibility = useCallback((productId: string) => {
     dispatch({ type: 'TOGGLE_PRODUCT_VISIBILITY', payload: productId });
   }, []);
 
-  // 🆕 제품 가시성 확인
+  // 🆕 제품 가시성 확인 (가구의 childProducts 내 visible 속성 확인)
   const isProductVisible = useCallback((productId: string) => {
-    return !state.hiddenProductIds.includes(productId);
-  }, [state.hiddenProductIds]);
+    // 모든 가구의 childProducts를 검색하여 해당 제품의 visible 상태 확인
+    for (const model of state.models) {
+      if (model.type !== 'furniture') continue;
+
+      const childProducts = (model.metadata as any)?.childProducts as any[] | undefined;
+      if (!childProducts) continue;
+
+      const product = childProducts.find((cp) => cp.id === productId);
+      if (product) {
+        // visible이 undefined면 기본 true로 처리
+        return product.visible !== false;
+      }
+    }
+    // 찾지 못하면 기본 true
+    return true;
+  }, [state.models]);
 
   const value: SceneContextValue = {
     state,
@@ -680,8 +721,7 @@ export function SceneProvider({ mode = 'view', children, initialModels = [] }: S
     setDirty,
     applySimulationResults,
     revertSimulationChanges,
-    // 🆕 제품 개별 가시성 제어
-    hiddenProductIds: state.hiddenProductIds,
+    // 🆕 제품 개별 가시성 제어 (childProduct.visible 방식)
     toggleProductVisibility,
     isProductVisible,
   };

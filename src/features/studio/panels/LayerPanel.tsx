@@ -92,7 +92,7 @@ export function LayerPanel() {
         modelId: model.id,
       });
 
-      // 🔧 FIX: 가구의 childProducts를 상품 목록에 추가
+      // 🔧 FIX: 가구의 childProducts를 상품 목록에 추가 (개별 visible 속성 사용)
       if (model.type === 'furniture' && (model.metadata as any)?.childProducts) {
         const childProducts = (model.metadata as any).childProducts as any[];
         totalChildProducts += childProducts.length;
@@ -104,7 +104,8 @@ export function LayerPanel() {
             id: cp.id,
             name: cp.name || cp.metadata?.sku || 'Product',
             type: 'model',
-            visible: model.visible, // 부모 가구의 가시성 따름
+            // 🔧 FIX: 개별 visible 속성 사용 (undefined면 기본 true)
+            visible: cp.visible !== false,
             locked: false,
             modelId: cp.id,
             parentFurnitureId: model.id, // 부모 가구 ID 추가
@@ -372,7 +373,7 @@ export function LayerPanel() {
                           isChildProduct && 'pl-4' // childProduct 들여쓰기
                         )}
                         onClick={() => select(item.modelId || null)}
-                        title={isChildProduct ? '가구에 배치된 제품 (가구와 함께 표시/숨김)' : undefined}
+                        title={isChildProduct ? '가구에 배치된 제품 (개별 표시/숨김 가능)' : undefined}
                       >
                         {/* 가시성 체크박스 */}
                         <Checkbox

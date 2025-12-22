@@ -202,7 +202,7 @@ interface SceneModelsProps {
 }
 
 function SceneModels({ onAssetClick }: SceneModelsProps) {
-  const { models, selectedId, hoveredId, select, hover, isProductVisible } = useScene();
+  const { models, selectedId, hoveredId, select, hover } = useScene();
 
   return (
     <group>
@@ -258,18 +258,24 @@ function SceneModels({ onAssetClick }: SceneModelsProps) {
                 onPointerOut={() => hover(null)}
               />
 
-              {/* 자식 제품들 (가구 기준 상대 좌표) */}
-              {hasChildren && childProducts!.map((child) => (
-                <ChildProductItem
-                  key={child.id}
-                  asset={child}
-                  visible={isProductVisible(child.id)}  // 🆕 개별 가시성 제어
-                  onClick={() => {
-                    select(child.id);
-                    onAssetClick?.(child.id, 'product');
-                  }}
-                />
-              ))}
+              {/* 자식 제품들 (가구 기준 상대 좌표) - 개별 visible 속성 사용 */}
+              {hasChildren && childProducts!.map((child, idx) => {
+                // 🔧 FIX: childProduct의 visible 속성 직접 확인 (rawChildProducts에서)
+                const rawChild = rawChildProducts![idx];
+                const childVisible = rawChild?.visible !== false;
+
+                return (
+                  <ChildProductItem
+                    key={child.id}
+                    asset={child}
+                    visible={childVisible}  // 🆕 개별 visible 속성 사용
+                    onClick={() => {
+                      select(child.id);
+                      onAssetClick?.(child.id, 'product');
+                    }}
+                  />
+                );
+              })}
             </group>
           );
         })}
