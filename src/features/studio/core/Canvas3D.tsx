@@ -204,13 +204,6 @@ interface SceneModelsProps {
 function SceneModels({ onAssetClick }: SceneModelsProps) {
   const { models, selectedId, hoveredId, select, hover } = useScene();
 
-  // 🔍 디버깅: 가구 모델의 childProducts 확인
-  const furnitureModels = models.filter((m) => m.type === 'furniture');
-  console.log('[SceneModels] Total models:', models.length, ', Furniture:', furnitureModels.length);
-  furnitureModels.slice(0, 3).forEach((f) => {
-    console.log(`[SceneModels] Furniture "${f.name}" metadata:`, f.metadata, 'childProducts:', (f.metadata as any)?.childProducts?.length || 0);
-  });
-
   return (
     <group>
       {models
@@ -220,14 +213,20 @@ function SceneModels({ onAssetClick }: SceneModelsProps) {
           const rawChildProducts = (model.metadata as any)?.childProducts as any[] | undefined;
           const hasChildren = model.type === 'furniture' && rawChildProducts && rawChildProducts.length > 0;
 
-          // childProducts를 ProductAsset 형식으로 변환
+          // childProducts를 ProductAsset 형식으로 변환 (rotation은 degrees → radians)
+          const degToRad = (deg: number) => (deg || 0) * Math.PI / 180;
           const childProducts: ProductAsset[] | undefined = hasChildren
             ? rawChildProducts!.map((cp) => ({
                 id: cp.id,
                 type: 'product' as const,
                 model_url: cp.model_url || '',
                 position: cp.position || { x: 0, y: 0, z: 0 },
-                rotation: cp.rotation || { x: 0, y: 0, z: 0 },
+                // 🔧 FIX: degrees → radians 변환
+                rotation: {
+                  x: degToRad(cp.rotation?.x),
+                  y: degToRad(cp.rotation?.y),
+                  z: degToRad(cp.rotation?.z),
+                },
                 scale: cp.scale || { x: 1, y: 1, z: 1 },
                 sku: cp.metadata?.sku || cp.name,
                 display_type: cp.metadata?.displayType,
