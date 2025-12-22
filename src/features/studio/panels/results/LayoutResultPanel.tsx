@@ -65,6 +65,11 @@ export const LayoutResultPanel: React.FC<LayoutResultPanelProps> = ({
   const [showApplyModal, setShowApplyModal] = useState(false);
   const improvement = result ? result.optimizedEfficiency - result.currentEfficiency : 0;
 
+  // 🐛 디버그: 제품 재배치 데이터 확인
+  console.log('[LayoutResultPanel] result:', result);
+  console.log('[LayoutResultPanel] productChanges:', result?.productChanges);
+  console.log('[LayoutResultPanel] productChanges length:', result?.productChanges?.length);
+
   // ROI 계산 (매출 증가 / 예상 비용 * 100)
   const estimatedROI = result ? Math.round((result.revenueIncrease / (result.revenueIncrease * 0.3)) * 100) : 0;
 
@@ -159,55 +164,60 @@ export const LayoutResultPanel: React.FC<LayoutResultPanelProps> = ({
             </div>
           )}
 
+          {/* 🐛 디버그: 제품 재배치 데이터 존재 여부 표시 */}
+          <div className="text-[9px] text-white/30 border-t border-white/10 pt-1 mt-2">
+            📊 productChanges: {result.productChanges ? result.productChanges.length : 'undefined'}건
+          </div>
+
           {/* 🆕 제품 재배치 변경 사항 (슬롯 바인딩 기반) */}
           {result.productChanges && result.productChanges.length > 0 && (
-            <div className="mb-3">
-              <p className="text-xs text-white/50 mb-2 flex items-center gap-1">
-                <Package className="w-3 h-3" />
-                제품 재배치 ({result.productChanges.length}건)
+            <div className="mb-3 border-t border-purple-500/30 pt-3 mt-3">
+              <p className="text-xs text-purple-300 mb-2 flex items-center gap-1 font-semibold">
+                <Package className="w-3.5 h-3.5 text-purple-400" />
+                📦 제품 재배치 ({result.productChanges.length}건)
               </p>
-              <div className="space-y-2 max-h-36 overflow-y-auto">
+              <div className="space-y-2 max-h-48 overflow-y-auto">
                 {result.productChanges.map((change, i) => (
-                  <div key={i} className="text-xs bg-purple-500/10 border border-purple-500/20 rounded p-2.5">
+                  <div key={i} className="text-xs bg-purple-500/15 border border-purple-500/30 rounded-lg p-2.5">
                     {/* 제품 정보 */}
                     <div className="flex items-center gap-2 mb-1.5">
                       <span className="text-white font-medium">{change.productName}</span>
                       {change.productSku && (
-                        <span className="text-purple-300 text-[10px] font-mono">({change.productSku})</span>
+                        <span className="text-purple-300 text-[10px] font-mono bg-purple-500/20 px-1 rounded">
+                          {change.productSku}
+                        </span>
                       )}
                     </div>
 
                     {/* 슬롯 바인딩 변경 (As-Is → To-Be) */}
-                    <div className="flex items-center gap-2 text-[10px]">
+                    <div className="flex items-center gap-1.5 text-[10px]">
                       {/* As-Is */}
-                      <div className="bg-red-500/20 px-2 py-1 rounded flex-1 text-center">
-                        <span className="text-red-300 font-mono">{change.fromFurniture}</span>
-                        <span className="text-white/40"> / </span>
-                        <span className="text-red-200 font-mono">{change.fromSlot}</span>
+                      <div className="bg-red-500/25 px-1.5 py-1 rounded flex-1 text-center border border-red-500/30">
+                        <div className="text-red-300 font-mono truncate">{change.fromFurniture}</div>
+                        <div className="text-red-200/70 font-mono text-[9px]">[{change.fromSlot}]</div>
                       </div>
 
                       {/* Arrow */}
-                      <ArrowRight className="w-3 h-3 text-purple-400 flex-shrink-0" />
+                      <ArrowRight className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
 
                       {/* To-Be */}
-                      <div className="bg-green-500/20 px-2 py-1 rounded flex-1 text-center">
-                        <span className="text-green-300 font-mono">{change.toFurniture}</span>
-                        <span className="text-white/40"> / </span>
-                        <span className="text-green-200 font-mono">{change.toSlot}</span>
+                      <div className="bg-green-500/25 px-1.5 py-1 rounded flex-1 text-center border border-green-500/30">
+                        <div className="text-green-300 font-mono truncate">{change.toFurniture}</div>
+                        <div className="text-green-200/70 font-mono text-[9px]">[{change.toSlot}]</div>
                       </div>
                     </div>
 
                     {/* 사유 */}
-                    <p className="text-purple-300 text-[10px] mt-1.5 leading-tight">💡 {change.reason}</p>
+                    <p className="text-purple-200/80 text-[10px] mt-1.5 leading-tight">💡 {change.reason}</p>
 
                     {/* 예상 효과 */}
                     {change.expectedImpact && (
                       <div className="flex gap-2 mt-1.5 pt-1.5 border-t border-white/10">
                         <span className="text-green-400 text-[10px]">
-                          매출 {change.expectedImpact.revenueChangePct >= 0 ? '+' : ''}{change.expectedImpact.revenueChangePct.toFixed(1)}%
+                          📈 {change.expectedImpact.revenueChangePct >= 0 ? '+' : ''}{change.expectedImpact.revenueChangePct.toFixed(1)}%
                         </span>
                         <span className="text-yellow-400 text-[10px]">
-                          노출 {(change.expectedImpact.visibilityScore * 100).toFixed(0)}점
+                          👁 {(change.expectedImpact.visibilityScore * 100).toFixed(0)}점
                         </span>
                       </div>
                     )}
