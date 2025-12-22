@@ -89,22 +89,47 @@ export function LayoutOptimizationOverlay({
   // 🆕 씬 데이터 가져오기 (가구 위치 폴백용)
   const { models } = useScene();
 
-  // 🆕 가구/제품 위치 조회 헬퍼
+  // 🆕 가구/제품 위치 조회 헬퍼 (더 유연한 매칭 지원)
   const findFurniturePosition = useCallback((furnitureId: string | undefined, furnitureLabel: string | undefined) => {
     if (!furnitureId && !furnitureLabel) return null;
 
-    const furniture = models.find((m) =>
-      m.type === 'furniture' &&
-      (m.id === furnitureId || m.name === furnitureLabel || (m.metadata as any)?.furniture_id === furnitureId)
+    const furnitureModels = models.filter(m => m.type === 'furniture');
+
+    // 1. 정확한 ID 매칭
+    let furniture = furnitureModels.find((m) =>
+      m.id === furnitureId ||
+      (m.metadata as any)?.furniture_id === furnitureId
     );
 
+    // 2. 이름 매칭 (정확한 매칭)
+    if (!furniture && furnitureLabel) {
+      furniture = furnitureModels.find((m) =>
+        m.name === furnitureLabel ||
+        (m.metadata as any)?.label === furnitureLabel
+      );
+    }
+
+    // 3. 이름 부분 매칭 (포함 관계)
+    if (!furniture && furnitureLabel) {
+      const labelLower = furnitureLabel.toLowerCase();
+      furniture = furnitureModels.find((m) => {
+        const nameLower = (m.name || '').toLowerCase();
+        const metaLabel = ((m.metadata as any)?.label || '').toLowerCase();
+        return nameLower.includes(labelLower) || labelLower.includes(nameLower) ||
+               metaLabel.includes(labelLower) || labelLower.includes(metaLabel);
+      });
+    }
+
     if (furniture?.position) {
+      console.log('[findFurniturePosition] Found furniture:', furniture.name, 'for', furnitureId || furnitureLabel);
       return {
         x: furniture.position[0],
         y: furniture.position[1] + 0.8, // 가구 위에 표시
         z: furniture.position[2],
       };
     }
+
+    console.log('[findFurniturePosition] NOT found for:', furnitureId || furnitureLabel);
     return null;
   }, [models]);
 
@@ -121,12 +146,14 @@ export function LayoutOptimizationOverlay({
       const product = childProducts.find((cp) =>
         cp.id === productId ||
         cp.metadata?.sku === productSku ||
-        cp.name === productSku
+        cp.name === productSku ||
+        (productSku && cp.name?.toLowerCase().includes(productSku.toLowerCase()))
       );
 
       if (product?.position) {
         // 가구 위치 + 제품 상대 위치
         const furniturePos = model.position || [0, 0, 0];
+        console.log('[findProductPosition] Found product:', product.name, 'in furniture:', model.name);
         return {
           x: furniturePos[0] + (product.position[0] || 0),
           y: furniturePos[1] + (product.position[1] || 0) + 0.3,
@@ -134,6 +161,8 @@ export function LayoutOptimizationOverlay({
         };
       }
     }
+
+    console.log('[findProductPosition] NOT found for:', productId || productSku);
     return null;
   }, [models]);
 
@@ -148,30 +177,65 @@ export function LayoutOptimizationOverlay({
   // productPlacements 추출 (타입 캐스트)
   const rawProductPlacements = (result as any).productPlacements || [];
 
+  // 🐛 디버그: productPlacements 데이터 확인
+  console.log('[LayoutOptimizationOverlay] rawProductPlacements:', rawProductPlacements);
+  console.log('[LayoutOptimizationOverlay] rawProductPlacements count:', rawProductPlacements.length);
+  console.log('[LayoutOptimizationOverlay] models count:', models.length);
+  console.log('[LayoutOptimizationOverlay] furniture models:', models.filter(m => m.type === 'furniture').map(m => ({
+    id: m.id,
+    name: m.name,
+    position: m.position,
+    furniture_id: (m.metadata as any)?.furniture_id,
+  })));
+
   // 🆕 productPlacements에 씬 기반 폴백 위치 추가
   const productPlacements = useMemo(() => {
-    return rawProductPlacements.map((placement: any) => {
+    console.log('[LayoutOptimizationOverlay] Processing productPlacements for fallback positions...');
+
+    return rawProductPlacements.map((placement: any, idx: number) => {
+      console.log(`[LayoutOptimizationOverlay] Processing placement ${idx}:`, {
+        productId: placement.productId,
+        productSku: placement.productSku,
+        fromFurnitureId: placement.fromFurnitureId,
+        fromFurniture: placement.fromFurniture,
+        toFurnitureId: placement.toFurnitureId,
+        toFurniture: placement.toFurniture,
+        hasFromPosition: !!placement.fromPosition,
+        hasToPosition: !!placement.toPosition,
+      });
+
       // 이미 위치가 있으면 그대로 사용
       if (placement.fromPosition && placement.toPosition) {
+        console.log(`[LayoutOptimizationOverlay] Placement ${idx} already has positions`);
         return placement;
       }
 
-      // fromPosition 폴백 계산
-      let fromPosition = placement.fromPosition;
+      // fromPosition 폴백 계산 (다양한 필드명 지원)
+      let fromPosition = placement.fromPosition || placement.currentPosition;
       if (!fromPosition) {
         // 1. 제품의 현재 위치에서 검색
         fromPosition = findProductPosition(placement.productId, placement.productSku);
-        // 2. fromFurniture 위치 사용
+        console.log(`[LayoutOptimizationOverlay] Placement ${idx} findProductPosition result:`, fromPosition);
+
+        // 2. fromFurniture 위치 사용 (다양한 필드명 지원)
         if (!fromPosition) {
-          fromPosition = findFurniturePosition(placement.fromFurnitureId, placement.fromFurniture);
+          const fromFurnitureId = placement.fromFurnitureId || placement.currentFurnitureId || placement.current_furniture_id;
+          const fromFurnitureLabel = placement.fromFurniture || placement.currentFurnitureLabel || placement.currentFurnitureName;
+          fromPosition = findFurniturePosition(fromFurnitureId, fromFurnitureLabel);
+          console.log(`[LayoutOptimizationOverlay] Placement ${idx} findFurniturePosition (from) result:`, fromPosition,
+            'searched:', fromFurnitureId || fromFurnitureLabel);
         }
       }
 
-      // toPosition 폴백 계산
-      let toPosition = placement.toPosition;
+      // toPosition 폴백 계산 (다양한 필드명 지원)
+      let toPosition = placement.toPosition || placement.suggestedPosition;
       if (!toPosition) {
-        // toFurniture 위치 사용
-        toPosition = findFurniturePosition(placement.toFurnitureId, placement.toFurniture);
+        // toFurniture 위치 사용 (다양한 필드명 지원)
+        const toFurnitureId = placement.toFurnitureId || placement.suggestedFurnitureId || placement.suggested_furniture_id;
+        const toFurnitureLabel = placement.toFurniture || placement.suggestedFurnitureLabel || placement.suggestedFurnitureName;
+        toPosition = findFurniturePosition(toFurnitureId, toFurnitureLabel);
+        console.log(`[LayoutOptimizationOverlay] Placement ${idx} findFurniturePosition (to) result:`, toPosition,
+          'searched:', toFurnitureId || toFurnitureLabel);
 
         // 같은 위치가 되지 않도록 약간 오프셋 적용
         if (toPosition && fromPosition &&
@@ -184,20 +248,39 @@ export function LayoutOptimizationOverlay({
         }
       }
 
-      if (fromPosition && toPosition) {
-        console.log('[LayoutOptimizationOverlay] Fallback positions calculated:', {
-          productId: placement.productId,
-          productSku: placement.productSku,
-          fromPosition,
-          toPosition,
-        });
+      // 🆕 최종 폴백: 위치를 전혀 찾지 못한 경우 기본 위치 사용
+      // 가구 이동 인디케이터와 유사한 위치에 배치
+      if (!fromPosition && !toPosition) {
+        // 인덱스 기반으로 위치 분산
+        const baseX = -3 + (idx % 4) * 2;
+        const baseZ = -3 + Math.floor(idx / 4) * 2;
+        fromPosition = { x: baseX, y: 0.8, z: baseZ };
+        toPosition = { x: baseX + 1.5, y: 0.8, z: baseZ + 1 };
+        console.log(`[LayoutOptimizationOverlay] Placement ${idx} using DEFAULT positions`);
+      } else if (!fromPosition && toPosition) {
+        // toPosition만 있는 경우
+        fromPosition = { x: toPosition.x - 1.5, y: toPosition.y, z: toPosition.z - 1 };
+        console.log(`[LayoutOptimizationOverlay] Placement ${idx} calculated fromPosition from toPosition`);
+      } else if (fromPosition && !toPosition) {
+        // fromPosition만 있는 경우
+        toPosition = { x: fromPosition.x + 1.5, y: fromPosition.y, z: fromPosition.z + 1 };
+        console.log(`[LayoutOptimizationOverlay] Placement ${idx} calculated toPosition from fromPosition`);
       }
 
-      return {
+      const finalResult = {
         ...placement,
-        fromPosition: fromPosition || placement.fromPosition,
-        toPosition: toPosition || placement.toPosition,
+        fromPosition,
+        toPosition,
       };
+
+      console.log(`[LayoutOptimizationOverlay] Placement ${idx} final result:`, {
+        hasFromPosition: !!finalResult.fromPosition,
+        hasToPosition: !!finalResult.toPosition,
+        fromPosition: finalResult.fromPosition,
+        toPosition: finalResult.toPosition,
+      });
+
+      return finalResult;
     });
   }, [rawProductPlacements, findProductPosition, findFurniturePosition]);
 
@@ -236,6 +319,11 @@ export function LayoutOptimizationOverlay({
       ))}
 
       {/* 제품 재배치 경로 (슬롯 기반) */}
+      {console.log('[LayoutOptimizationOverlay] Rendering product placements:', {
+        showProductMoves,
+        count: productPlacements.length,
+        placements: productPlacements.slice(0, 2),
+      }) && false}
       {showProductMoves && productPlacements.map((placement: any, idx: number) => (
         <ProductMoveIndicator
           key={placement.productId || placement.product_id || `product-${idx}`}
