@@ -329,32 +329,38 @@ export default function DigitalTwinStudioPage() {
       },
       furniture: activeModels
         .filter((m) => m.type === 'furniture')
-        .map((m) => ({
-          id: m.id,
-          model_url: m.model_url,
-          type: 'furniture' as const,
-          furniture_type: m.name,
-          position: m.position || { x: 0, y: 0, z: 0 },
-          rotation: m.rotation || { x: 0, y: 0, z: 0 },
-          scale: m.scale || { x: 1, y: 1, z: 1 },
-          dimensions: m.dimensions,
-          movable: true,
-          metadata: m.metadata,
-          // 🔧 FIX: 가구에 배치된 자식 제품들 (상대 좌표 사용)
-          childProducts: (m.metadata as any)?.childProducts?.map((cp: any) => ({
-            id: cp.id,
-            type: 'product' as const,
-            model_url: cp.model_url,
-            position: cp.position || { x: 0, y: 0, z: 0 },
-            rotation: cp.rotation || { x: 0, y: 0, z: 0 },
-            scale: cp.scale || { x: 1, y: 1, z: 1 },
-            sku: cp.name,
-            display_type: cp.metadata?.displayType,
-            dimensions: cp.dimensions,
-            isRelativePosition: true,
-            metadata: cp.metadata,
-          })) || [],
-        })),
+        .map((m) => {
+          // 🔍 디버깅: metadata.childProducts 확인
+          const metaChildProducts = (m.metadata as any)?.childProducts;
+          console.log(`[currentRecipe] furniture ${m.id}: metadata.childProducts =`, metaChildProducts?.length || 0, metaChildProducts);
+
+          return {
+            id: m.id,
+            model_url: m.model_url,
+            type: 'furniture' as const,
+            furniture_type: m.name,
+            position: m.position || { x: 0, y: 0, z: 0 },
+            rotation: m.rotation || { x: 0, y: 0, z: 0 },
+            scale: m.scale || { x: 1, y: 1, z: 1 },
+            dimensions: m.dimensions,
+            movable: true,
+            metadata: m.metadata,
+            // 🔧 FIX: 가구에 배치된 자식 제품들 (상대 좌표 사용)
+            childProducts: metaChildProducts?.map((cp: any) => ({
+              id: cp.id,
+              type: 'product' as const,
+              model_url: cp.model_url,
+              position: cp.position || { x: 0, y: 0, z: 0 },
+              rotation: cp.rotation || { x: 0, y: 0, z: 0 },
+              scale: cp.scale || { x: 1, y: 1, z: 1 },
+              sku: cp.name,
+              display_type: cp.metadata?.displayType,
+              dimensions: cp.dimensions,
+              isRelativePosition: true,
+              metadata: cp.metadata,
+            })) || [],
+          };
+        }),
       products: activeModels
         .filter((m) => m.type === 'product')
         .map((m) => ({

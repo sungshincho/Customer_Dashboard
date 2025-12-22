@@ -12,6 +12,12 @@ export function FurnitureLayout({ furniture = [], onClick, onProductClick }: Fur
   // Guard against undefined or null
   const safeFurniture = Array.isArray(furniture) ? furniture : [];
 
+  // 🔍 디버깅: furniture 배열의 childProducts 확인
+  console.log('[FurnitureLayout] furniture count:', safeFurniture.length);
+  safeFurniture.forEach((f, i) => {
+    console.log(`[FurnitureLayout] furniture[${i}]:`, f.id, 'childProducts:', f.childProducts?.length || 0);
+  });
+
   return (
     <group>
       {safeFurniture.map((item) => (
@@ -35,8 +41,6 @@ interface FurnitureItemProps {
 function FurnitureItem({ asset, onClick, onProductClick }: FurnitureItemProps) {
   const childProducts = asset.childProducts || [];
 
-  // degrees → radians 변환 (main 브랜치에서 병합)
-function FurnitureItem({ asset, onClick }: { asset: FurnitureAsset; onClick: () => void }) {
   // degrees → radians 변환
   const rotationX = asset.rotation.x * Math.PI / 180;
   const rotationY = asset.rotation.y * Math.PI / 180;
@@ -51,16 +55,6 @@ function FurnitureItem({ asset, onClick }: { asset: FurnitureAsset; onClick: () 
       <group
         position={[asset.position.x, asset.position.y, asset.position.z]}
         rotation={[rotationX, rotationY, rotationZ]}
-      <mesh
-        position={[
-          asset.position.x,
-          asset.position.y + dimensions.height / 2,
-          asset.position.z
-        ]}
-        rotation={[rotationX, rotationY, rotationZ]}
-        onClick={onClick}
-        castShadow
-        receiveShadow
       >
         {/* 가구 플레이스홀더 */}
         <mesh
@@ -116,16 +110,6 @@ function FurnitureItem({ asset, onClick }: { asset: FurnitureAsset; onClick: () 
       <group
         position={[asset.position.x, asset.position.y, asset.position.z]}
         rotation={[rotationX, rotationY, rotationZ]}
-      <mesh
-        position={[
-          asset.position.x,
-          asset.position.y + dimensions.height / 2,
-          asset.position.z
-        ]}
-        rotation={[rotationX, rotationY, rotationZ]}
-        onClick={onClick}
-        castShadow
-        receiveShadow
       >
         {/* 가구 플레이스홀더 */}
         <mesh
