@@ -202,7 +202,7 @@ interface SceneModelsProps {
 }
 
 function SceneModels({ onAssetClick }: SceneModelsProps) {
-  const { models, selectedId, hoveredId, select, hover } = useScene();
+  const { models, selectedId, hoveredId, select, hover, isProductVisible } = useScene();
 
   return (
     <group>
@@ -263,6 +263,7 @@ function SceneModels({ onAssetClick }: SceneModelsProps) {
                 <ChildProductItem
                   key={child.id}
                   asset={child}
+                  visible={isProductVisible(child.id)}  // 🆕 개별 가시성 제어
                   onClick={() => {
                     select(child.id);
                     onAssetClick?.(child.id, 'product');

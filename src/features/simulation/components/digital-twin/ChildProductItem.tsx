@@ -21,9 +21,15 @@ const DISPLAY_TYPE_COLORS: Record<ProductDisplayType, string> = {
 interface ChildProductItemProps {
   asset: ProductAsset;
   onClick?: () => void;
+  /** 개별 가시성 제어 (기본값: true) */
+  visible?: boolean;
 }
 
-export function ChildProductItem({ asset, onClick }: ChildProductItemProps) {
+export function ChildProductItem({ asset, onClick, visible = true }: ChildProductItemProps) {
+  // 🔧 FIX: 개별 가시성 제어
+  if (!visible) {
+    return null;
+  }
   const dimensions = asset.dimensions || { width: 0.3, height: 0.4, depth: 0.2 };
   const displayType = asset.display_type || 'standing';
   const color = DISPLAY_TYPE_COLORS[displayType] || DISPLAY_TYPE_COLORS.standing;

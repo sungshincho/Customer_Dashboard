@@ -38,7 +38,7 @@ import type { LayerNode, ModelType } from '../types';
 export function LayerPanel() {
   const { user } = useAuth();
   const { selectedStore } = useSelectedStore();
-  const { models, selectedId, select, updateModel, removeModel, loadScene } = useScene();
+  const { models, selectedId, select, updateModel, removeModel, loadScene, toggleProductVisibility, isProductVisible } = useScene();
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['space', 'furniture', 'product']));
 
   // 씬 저장/불러오기 훅
@@ -134,7 +134,7 @@ export function LayerPanel() {
     });
   };
 
-  // 가시성 토글 (childProduct인 경우 부모 가구의 가시성을 토글)
+  // 가시성 토글 (childProduct인 경우 개별 가시성 토글)
   const handleVisibilityToggle = (modelId: string) => {
     // 1️⃣ 직접 모델인 경우
     const model = models.find((m) => m.id === modelId);
@@ -143,14 +143,10 @@ export function LayerPanel() {
       return;
     }
 
-    // 2️⃣ childProduct인 경우 → 부모 가구의 가시성 토글
+    // 2️⃣ childProduct인 경우 → 개별 가시성 토글 (SceneProvider의 toggleProductVisibility 사용)
     const parentFurnitureId = childProductMap.get(modelId);
     if (parentFurnitureId) {
-      const parentModel = models.find((m) => m.id === parentFurnitureId);
-      if (parentModel) {
-        updateModel(parentFurnitureId, { visible: !parentModel.visible });
-        toast.info('제품은 부모 가구와 함께 표시/숨김됩니다');
-      }
+      toggleProductVisibility(modelId);
     }
   };
 
@@ -162,16 +158,16 @@ export function LayerPanel() {
       return model.visible;
     }
 
-    // 2️⃣ childProduct인 경우 → 부모 가구의 가시성 확인
+    // 2️⃣ childProduct인 경우 → 개별 가시성 확인 (SceneProvider의 isProductVisible 사용)
     const parentFurnitureId = childProductMap.get(modelId);
     if (parentFurnitureId) {
+      // 부모 가구가 보이고 && 제품 자체도 보일 때만 true
       const parentModel = models.find((m) => m.id === parentFurnitureId);
-      return parentModel?.visible ?? true;
+      const parentVisible = parentModel?.visible ?? true;
+      return parentVisible && isProductVisible(modelId);
     }
 
-    // 🔍 DEBUG: childProductMap에 없는 경우 로깅
-    // console.warn('[LayerPanel] getModelVisibility - not found:', modelId, 'mapSize:', childProductMap.size);
-    return true; // 기본값을 true로 변경하여 표시되도록
+    return true; // 기본값
   };
 
   const handleDelete = (modelId: string) => {
