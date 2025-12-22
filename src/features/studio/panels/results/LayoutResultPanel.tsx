@@ -65,11 +65,6 @@ export const LayoutResultPanel: React.FC<LayoutResultPanelProps> = ({
   const [showApplyModal, setShowApplyModal] = useState(false);
   const improvement = result ? result.optimizedEfficiency - result.currentEfficiency : 0;
 
-  // 🐛 디버그: 제품 재배치 데이터 확인
-  console.log('[LayoutResultPanel] result:', result);
-  console.log('[LayoutResultPanel] productChanges:', result?.productChanges);
-  console.log('[LayoutResultPanel] productChanges length:', result?.productChanges?.length);
-
   // ROI 계산 (매출 증가 / 예상 비용 * 100)
   const estimatedROI = result ? Math.round((result.revenueIncrease / (result.revenueIncrease * 0.3)) * 100) : 0;
 
@@ -163,11 +158,6 @@ export const LayoutResultPanel: React.FC<LayoutResultPanelProps> = ({
               </div>
             </div>
           )}
-
-          {/* 🐛 디버그: 제품 재배치 데이터 존재 여부 표시 */}
-          <div className="text-[9px] text-white/30 border-t border-white/10 pt-1 mt-2">
-            📊 productChanges: {result.productChanges ? result.productChanges.length : 'undefined'}건
-          </div>
 
           {/* 🆕 제품 재배치 변경 사항 (슬롯 바인딩 기반) */}
           {result.productChanges && result.productChanges.length > 0 && (
