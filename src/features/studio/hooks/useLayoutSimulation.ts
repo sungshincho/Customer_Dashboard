@@ -389,6 +389,7 @@ function transformLayoutResult(
   );
 
   // 🆕 상품 재배치 추출 (productPlacements, productMoves, productChanges 등 다양한 필드명 지원)
+  // Edge Function에서 suggestedFurnitureId/suggestedPosition 필드도 지원
   const productPlacements: ProductPlacement[] = (
     rawResult.productPlacements ||
     rawResult.productMoves ||
@@ -397,15 +398,15 @@ function transformLayoutResult(
   ).map((placement: any, idx: number) => ({
     productId: placement.productId || placement.product_id || `product-${idx}`,
     productSku: placement.productSku || placement.sku || '',
-    productName: placement.productName || placement.product_name || `상품 ${idx + 1}`,
+    productName: placement.productName || placement.product_name || placement.productLabel || `상품 ${idx + 1}`,
     displayType: placement.displayType || placement.display_type,
-    fromFurnitureId: placement.fromFurnitureId || placement.from_furniture_id || null,
+    fromFurnitureId: placement.fromFurnitureId || placement.from_furniture_id || placement.currentFurnitureId || null,
     fromSlotId: placement.fromSlotId || placement.from_slot_id || null,
-    fromPosition: placement.fromPosition || placement.from_position,
+    fromPosition: placement.fromPosition || placement.from_position || placement.currentPosition,
     fromSlotPosition: placement.fromSlotPosition || placement.from_slot_position,
-    toSlotId: placement.toSlotId || placement.to_slot_id || `slot-${idx}`,
-    toFurnitureId: placement.toFurnitureId || placement.to_furniture_id || '',
-    toPosition: placement.toPosition || placement.to_position,
+    toSlotId: placement.toSlotId || placement.to_slot_id || placement.suggestedSlotId || `slot-${idx}`,
+    toFurnitureId: placement.toFurnitureId || placement.to_furniture_id || placement.suggestedFurnitureId || '',
+    toPosition: placement.toPosition || placement.to_position || placement.suggestedPosition,
     toSlotPosition: placement.toSlotPosition || placement.to_slot_position,
     slotType: placement.slotType || placement.slot_type,
     reason: placement.reason || placement.rationale || '매출 최적화를 위한 위치 변경',
