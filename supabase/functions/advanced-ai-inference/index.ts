@@ -3325,20 +3325,35 @@ ${JSON.stringify((sceneData?.furniture || []).map((f: any) => ({
   position: f.position,
 })), null, 2)}
 
-=== 🏷️ 현재 제품 배치 (슬롯 기반) ===
+=== 🏷️ 현재 제품 배치 (슬롯 기반) - 총 ${actualProductPlacements.length}개 ===
 ${hasRealProductPositions ? actualProductPlacements.slice(0, 20).map((p: any) =>
   `- [${p.productSku || p.productId}] ${p.productName || '상품'} @ ${p.furnitureCode || p.furnitureName || '가구'}[${p.slotId || '-'}] (카테고리: ${p.category || 'N/A'})`
-).join('\n') : '제품 배치 정보 없음'}
+).join('\n') + (actualProductPlacements.length > 20 ? `\n... 외 ${actualProductPlacements.length - 20}개` : '') : '제품 배치 정보 없음'}
 
-=== ✅ 사용 가능한 빈 슬롯 ===
+=== ✅ 사용 가능한 빈 슬롯 (${availableSlots.length}개) ===
 ${availableSlots.length > 0 ? availableSlots.slice(0, 30).map((s: any) =>
   `- ${s.furnitureCode || s.furnitureName}[${s.slotCode || s.slotId}] (타입: ${s.slotType || 'N/A'}, 호환: ${(s.compatibleDisplayTypes || []).join(',')})`
-).join('\n') : '빈 슬롯 정보 없음'}
+).join('\n') : '빈 슬롯 없음 - 아래 "슬롯 교환" 방식으로 제안하세요'}
 
-🚨 CRITICAL - 제품 재배치 규칙:
-1. productSku는 반드시 위 "현재 제품 배치" 목록에 있는 SKU만 사용
-2. toSlotId/toSlotCode는 반드시 위 "사용 가능한 빈 슬롯" 목록에서 선택
-3. 슬롯의 호환 displayType과 제품의 displayType이 맞아야 함
+🚨🚨🚨 CRITICAL - 제품 재배치(productSlotMoves) 필수 규칙 🚨🚨🚨
+
+⚠️ productSlotMoves는 빈 배열이 아닌 **최소 3-5개** 제안을 포함해야 합니다!
+
+📌 방법 1: 빈 슬롯이 있는 경우
+- 위 "빈 슬롯" 목록에서 toSlotId 선택
+- 예: 캐시미어 코트를 RACK-001[H1-1]에서 MANNE-001[M3]으로 이동
+
+📌 방법 2: 빈 슬롯이 없거나 부족한 경우 → "슬롯 교환" 방식
+- 두 제품의 위치를 서로 교환 (swapWith 필드 사용)
+- 예: 고가 상품 A를 입구 근처로 이동, 저가 상품 B를 뒤쪽으로 이동
+- 결과적으로 두 제품이 서로 자리를 바꿈
+
+📌 제품 재배치 우선순위:
+1. 프리미엄/고마진 상품 → 입구 근처 마네킹, 눈높이 진열
+2. 신상품/프로모션 → 매장 앞쪽 파워월
+3. 인기 베스트셀러 → 매장 뒤쪽 (고객 동선 유도)
+4. 연관 상품 → 인접 배치 (크로스셀링)
+5. 시즌 오프 상품 → 세일 코너
 
 ${storeContext?.zones?.length ? `ZONE DATA (with entrance marked):
 ${JSON.stringify(storeContext.zones.slice(0, 10).map((z: any) => ({
@@ -3369,21 +3384,27 @@ Return a JSON object with this exact structure:
   ],
   "productSlotMoves": [
     {
-      "productId": "string (제품 UUID)",
-      "productSku": "string (반드시 위 목록의 SKU, 예: SKU-OUT-001)",
+      "productId": "string (제품 UUID, 없으면 null)",
+      "productSku": "string (필수! 반드시 위 목록의 SKU, 예: SKU-OUT-001)",
       "productName": "string (제품명, 예: 캐시미어 코트)",
-      "fromFurnitureId": "string (현재 가구 UUID)",
       "fromFurnitureCode": "string (현재 가구 코드, 예: RACK-001)",
       "fromFurnitureName": "string (현재 가구 이름)",
       "fromSlotId": "string (현재 슬롯 ID, 예: H1-1)",
-      "toFurnitureId": "string (제안 가구 UUID)",
       "toFurnitureCode": "string (제안 가구 코드, 예: MANNE-001)",
       "toFurnitureName": "string (제안 가구 이름)",
-      "toSlotId": "string (반드시 위 빈 슬롯 목록에서 선택, 예: M3)",
-      "reason": "string (재배치 사유, 예: 입구 근처 마네킹으로 이동하여 고객 첫인상 극대화)",
-      "expectedImpact": {"revenueChangePct": number, "visibilityScore": number}
+      "toSlotId": "string (제안 슬롯 ID, 예: M3)",
+      "swapWithSku": "string or null (교환 대상 제품 SKU, 빈 슬롯 없을 때 사용)",
+      "reason": "string (재배치 사유, 한국어로 작성)",
+      "expectedImpact": {"revenueChangePct": number, "visibilityScore": number (0-1)}
     }
   ],
+
+  ⚠️ productSlotMoves 작성 시 주의:
+  - 반드시 3-5개 이상의 제안을 포함할 것!
+  - productSku는 위 "현재 제품 배치" 목록에 있는 SKU만 사용
+  - 빈 슬롯이 없으면 swapWithSku를 사용하여 두 제품 위치 교환 제안
+  - reason은 비즈니스 관점에서 한국어로 작성
+
   "zoneChanges": [
     {
       "zoneId": "string",
@@ -3516,12 +3537,28 @@ Return a JSON object with this exact structure:
       return { fromPosition, fromSlotPosition, toPosition, toSlotPosition };
     };
 
+    // 🆕 디버깅 로그 강화
+    console.log('[LayoutOptimization] AI Response Keys:', Object.keys(aiResponse));
+    console.log('[LayoutOptimization] AI productSlotMoves count:', aiResponse.productSlotMoves?.length || 0);
+    console.log('[LayoutOptimization] AI productPlacements count:', aiResponse.productPlacements?.length || 0);
+    console.log('[LayoutOptimization] AI furnitureMoves count:', aiResponse.furnitureMoves?.length || 0);
+
     // 🆕 productSlotMoves 형식도 지원 (슬롯 바인딩 기반)
     const aiProductSlotMoves = aiResponse.productSlotMoves || [];
     const aiProductPlacements = aiResponse.productPlacements || [];
 
-    // productSlotMoves를 표준 형식으로 변환
-    const processedSlotMoves = aiProductSlotMoves.map((move: any) => {
+    // 빈 배열 경고
+    if (aiProductSlotMoves.length === 0 && aiProductPlacements.length === 0) {
+      console.warn('[LayoutOptimization] ⚠️ AI returned EMPTY product moves! Input data:', {
+        productPlacementsProvided: actualProductPlacements.length,
+        availableSlotsProvided: availableSlots.length,
+      });
+    }
+
+    // productSlotMoves를 표준 형식으로 변환 (swapWithSku 교환 처리 포함)
+    const processedSlotMoves: any[] = [];
+
+    for (const move of aiProductSlotMoves) {
       // 현재 제품 배치 정보에서 추가 정보 조회
       const currentPlacement = productPlacementMap.get(move.productId) || productPlacementMap.get(move.productSku);
       // 빈 슬롯 정보에서 타겟 슬롯 정보 조회
@@ -3539,14 +3576,41 @@ Return a JSON object with this exact structure:
         toFurnitureCode: move.toFurnitureCode || targetSlot?.furnitureCode,
         toFurnitureName: move.toFurnitureName || targetSlot?.furnitureName,
         toSlotId: move.toSlotId,
+        swapWithSku: move.swapWithSku,
         reason: move.reason,
         expectedImpact: move.expectedImpact,
       };
 
       // 위치 정보 계산
       const positions = enrichPlacementWithPosition(enrichedMove);
-      return { ...enrichedMove, ...positions };
-    });
+      processedSlotMoves.push({ ...enrichedMove, ...positions });
+
+      // 🆕 swapWithSku가 있으면 교환 대상 제품도 추가
+      if (move.swapWithSku) {
+        const swapPlacement = productPlacementMap.get(move.swapWithSku);
+        if (swapPlacement) {
+          const swapMove = {
+            productId: swapPlacement.productId,
+            productSku: move.swapWithSku,
+            productName: swapPlacement.productName,
+            fromFurnitureId: swapPlacement.furnitureId,
+            fromFurnitureCode: swapPlacement.furnitureCode,
+            fromFurnitureName: swapPlacement.furnitureName,
+            fromSlotId: swapPlacement.slotId,
+            toFurnitureId: currentPlacement?.furnitureId,
+            toFurnitureCode: currentPlacement?.furnitureCode,
+            toFurnitureName: currentPlacement?.furnitureName,
+            toSlotId: currentPlacement?.slotId,
+            isSwapPair: true,
+            swapWithSku: move.productSku,
+            reason: `${move.productName || move.productSku}와(과) 위치 교환`,
+            expectedImpact: move.expectedImpact,
+          };
+          const swapPositions = enrichPlacementWithPosition(swapMove);
+          processedSlotMoves.push({ ...swapMove, ...swapPositions });
+        }
+      }
+    }
 
     // 기존 productPlacements 형식 처리
     const processedPlacements = aiProductPlacements.map((p: any) => {
