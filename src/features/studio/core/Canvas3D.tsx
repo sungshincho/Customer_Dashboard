@@ -204,13 +204,20 @@ interface SceneModelsProps {
 function SceneModels({ onAssetClick }: SceneModelsProps) {
   const { models, selectedId, hoveredId, select, hover } = useScene();
 
+  // 🔍 디버깅: 가구 모델의 childProducts 확인
+  const furnitureModels = models.filter((m) => m.type === 'furniture');
+  console.log('[SceneModels] Total models:', models.length, ', Furniture:', furnitureModels.length);
+  furnitureModels.slice(0, 3).forEach((f) => {
+    console.log(`[SceneModels] Furniture "${f.name}" metadata:`, f.metadata, 'childProducts:', (f.metadata as any)?.childProducts?.length || 0);
+  });
+
   return (
     <group>
       {models
         .filter((model) => model.visible)
         .map((model) => {
           // 가구 모델인 경우, childProducts도 함께 렌더링
-          const rawChildProducts = model.metadata?.childProducts as any[] | undefined;
+          const rawChildProducts = (model.metadata as any)?.childProducts as any[] | undefined;
           const hasChildren = model.type === 'furniture' && rawChildProducts && rawChildProducts.length > 0;
 
           // childProducts를 ProductAsset 형식으로 변환

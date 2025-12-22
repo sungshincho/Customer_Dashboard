@@ -178,6 +178,15 @@ export default function DigitalTwinStudioPage() {
       const loadedModels = await loadUserModels(user.id, selectedStore?.id);
       console.log('[DigitalTwinStudio] Loaded models:', loadedModels.length);
 
+      // 🔍 디버깅: childProducts 있는 가구 확인
+      const furnitureWithChildren = loadedModels.filter(
+        (m) => m.type === 'furniture' && (m.metadata as any)?.childProducts?.length > 0
+      );
+      console.log(`%c[DigitalTwinStudio] loadedModels: 가구 ${loadedModels.filter(m => m.type === 'furniture').length}개, childProducts 있는 가구: ${furnitureWithChildren.length}개`, 'color: yellow; font-weight: bold; background: #333; padding: 2px 6px;');
+      furnitureWithChildren.slice(0, 3).forEach((f) => {
+        console.log(`  - ${f.name}: ${(f.metadata as any).childProducts.length} products`);
+      });
+
       setModels(loadedModels);
       if (loadedModels.length > 0) {
         setActiveLayers(loadedModels.map((m) => m.id));
@@ -417,10 +426,19 @@ export default function DigitalTwinStudioPage() {
           metadata: m.metadata,
           dimensions: m.dimensions,
         };
-        console.log(`[SceneModels] ${m.name}: original pos=`, m.position, '→ converted=', converted.position);
+        // 디버깅: furniture의 childProducts 확인
+        if (m.type === 'furniture') {
+          const childCount = (m.metadata as any)?.childProducts?.length || 0;
+          if (childCount > 0) {
+            console.log(`%c[SceneModels] 가구 "${m.name}" (${m.id}): childProducts=${childCount}`, 'color: lime; font-weight: bold');
+          }
+        }
         return converted;
       });
-    console.log('[SceneModels] Total active models:', result.length);
+
+    // 전체 통계
+    const furnitureWithChildren = result.filter((m) => m.type === 'furniture' && (m.metadata as any)?.childProducts?.length > 0);
+    console.log(`%c[SceneModels] 총 ${result.length}개 모델, childProducts 있는 가구: ${furnitureWithChildren.length}개`, 'color: cyan; font-weight: bold');
     return result;
   }, [models, activeLayers]);
 
