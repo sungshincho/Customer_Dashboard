@@ -336,31 +336,46 @@ export function AIOptimizationTab({
           const layoutPanelResult = {
             currentEfficiency: results.layout.currentEfficiency || 1,
             optimizedEfficiency: results.layout.optimizedEfficiency || 75,
-            revenueIncrease: results.layout.improvements?.revenueIncrease || 0,
+            revenueIncrease: results.layout.improvements?.revenueIncrease ||
+                            results.layout.optimizationSummary?.expectedRevenueIncrease || 0,
             dwellTimeIncrease: results.layout.improvements?.dwellTimeIncrease || 0,
-            conversionIncrease: results.layout.improvements?.conversionIncrease || 0,
-            // 가구 변경 사항
-            changes: results.layout.furnitureMoves?.map((move: any) => ({
-              item: move.furnitureName || move.furnitureId || move.name || '가구',
-              from: move.fromPosition ? `(${move.fromPosition.x?.toFixed(1)}, ${move.fromPosition.z?.toFixed(1)})` : 'As-Is',
-              to: move.toPosition ? `(${move.toPosition.x?.toFixed(1)}, ${move.toPosition.z?.toFixed(1)})` : 'To-Be',
+            conversionIncrease: results.layout.improvements?.conversionIncrease ||
+                               results.layout.optimizationSummary?.expectedConversionIncrease || 0,
+            // 가구 변경 사항 (layoutChanges 또는 furnitureMoves 지원)
+            changes: (results.layout.layoutChanges || results.layout.furnitureMoves || []).map((move: any) => ({
+              item: move.entityLabel || move.furnitureName || move.furnitureId || move.name || '가구',
+              from: (move.currentPosition || move.fromPosition)
+                ? `(${(move.currentPosition?.x || move.fromPosition?.x || 0).toFixed(1)}, ${(move.currentPosition?.z || move.fromPosition?.z || 0).toFixed(1)})`
+                : 'As-Is',
+              to: (move.suggestedPosition || move.toPosition)
+                ? `(${(move.suggestedPosition?.x || move.toPosition?.x || 0).toFixed(1)}, ${(move.suggestedPosition?.z || move.toPosition?.z || 0).toFixed(1)})`
+                : 'To-Be',
               effect: move.reason || '+효율성',
-            })) || [],
+            })),
             // 제품 재배치 변경 사항 (슬롯 기반)
-            productChanges: results.layout.productPlacements?.map((placement: any) => ({
+            productChanges: (results.layout.productPlacements || []).map((placement: any) => ({
               productId: placement.productId || placement.product_id || '',
-              productName: placement.productName || placement.sku || '상품',
-              fromFurniture: placement.current?.furnitureId || placement.initial_placement?.furniture_id || '현재 위치',
-              fromSlot: placement.current?.slotId || placement.initial_placement?.slot_id || '-',
-              toFurniture: placement.suggested?.furnitureId || placement.optimization_result?.suggested_furniture_id || '추천 위치',
-              toSlot: placement.suggested?.slotId || placement.optimization_result?.suggested_slot_id || '-',
+              productName: placement.productLabel || placement.productName || placement.sku || '상품',
+              fromFurniture: placement.currentFurnitureLabel || placement.current?.furnitureId || placement.initial_placement?.furniture_id || '현재 위치',
+              fromSlot: placement.fromSlotId || placement.current?.slotId || placement.initial_placement?.slot_id || '-',
+              toFurniture: placement.suggestedFurnitureLabel || placement.suggested?.furnitureId || placement.optimization_result?.suggested_furniture_id || '추천 위치',
+              toSlot: placement.toSlotId || placement.suggested?.slotId || placement.optimization_result?.suggested_slot_id || '-',
               reason: placement.reason || placement.optimization_result?.optimization_reason || '매출 최적화',
               expectedImpact: placement.expectedImpact || placement.optimization_result?.expected_impact ? {
                 revenueChangePct: placement.expectedImpact?.revenue_change_pct || placement.optimization_result?.expected_impact?.revenue_change_pct || 0,
                 visibilityScore: placement.expectedImpact?.visibility_score || placement.optimization_result?.expected_impact?.visibility_score || 0,
               } : undefined,
-            })) || [],
+            })),
           };
+
+          console.log('[AIOptimizationTab] layoutPanelResult:', {
+            changesCount: layoutPanelResult.changes.length,
+            productChangesCount: layoutPanelResult.productChanges.length,
+            rawLayoutChanges: results.layout.layoutChanges?.length,
+            rawFurnitureMoves: results.layout.furnitureMoves?.length,
+            rawProductPlacements: results.layout.productPlacements?.length,
+          });
+
           onResultsUpdate('layout', layoutPanelResult);
         }
       }
@@ -444,9 +459,10 @@ export function AIOptimizationTab({
         productPlacements?: any[];
       } = {};
 
-      // 1️⃣ 레이아웃 최적화 결과가 있으면 가구 이동 적용
-      if (results.layout?.furnitureMoves && results.layout.furnitureMoves.length > 0) {
-        payload.furnitureMoves = results.layout.furnitureMoves;
+      // 1️⃣ 레이아웃 최적화 결과가 있으면 가구 이동 적용 (layoutChanges 또는 furnitureMoves)
+      const furnitureMoves = results.layout?.layoutChanges || results.layout?.furnitureMoves || [];
+      if (furnitureMoves.length > 0) {
+        payload.furnitureMoves = furnitureMoves;
       }
 
       // 2️⃣ 상품 배치 결과가 있으면 상품 재배치 적용 (슬롯 기반)
