@@ -75,6 +75,8 @@ export function LayerPanel() {
       return { groupedLayers: groups, childProductMap: cpMap };
     }
 
+    let totalChildProducts = 0;
+
     models.forEach((model) => {
       const modelType: ModelType =
         model.type && groups[model.type as ModelType]
@@ -93,6 +95,7 @@ export function LayerPanel() {
       // 🔧 FIX: 가구의 childProducts를 상품 목록에 추가
       if (model.type === 'furniture' && (model.metadata as any)?.childProducts) {
         const childProducts = (model.metadata as any).childProducts as any[];
+        totalChildProducts += childProducts.length;
         childProducts.forEach((cp) => {
           // childProduct → parentFurniture 매핑 저장
           cpMap.set(cp.id, model.id);
@@ -108,6 +111,15 @@ export function LayerPanel() {
           } as LayerNode & { parentFurnitureId?: string });
         });
       }
+    });
+
+    // 🔍 DEBUG: 그룹화 결과 로깅
+    console.log('[LayerPanel] groupedLayers:', {
+      furnitureCount: groups.furniture.length,
+      productCount: groups.product.length,
+      childProductMapSize: cpMap.size,
+      totalChildProducts,
+      furnitureWithChildren: models.filter(m => m.type === 'furniture' && (m.metadata as any)?.childProducts?.length > 0).length,
     });
 
     return { groupedLayers: groups, childProductMap: cpMap };
@@ -157,7 +169,9 @@ export function LayerPanel() {
       return parentModel?.visible ?? true;
     }
 
-    return true;
+    // 🔍 DEBUG: childProductMap에 없는 경우 로깅
+    // console.warn('[LayerPanel] getModelVisibility - not found:', modelId, 'mapSize:', childProductMap.size);
+    return true; // 기본값을 true로 변경하여 표시되도록
   };
 
   const handleDelete = (modelId: string) => {

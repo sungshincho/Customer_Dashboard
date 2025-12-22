@@ -176,7 +176,22 @@ export default function DigitalTwinStudioPage() {
     try {
       console.log('[DigitalTwinStudio] Loading models for user:', user.id, 'store:', selectedStore?.id);
       const loadedModels = await loadUserModels(user.id, selectedStore?.id);
-      console.log('[DigitalTwinStudio] Loaded models:', loadedModels.length);
+
+      // 🔍 DEBUG: 로드된 모델의 childProducts 확인
+      const furnitureWithChildren = loadedModels.filter(
+        m => m.type === 'furniture' && (m.metadata as any)?.childProducts?.length > 0
+      );
+      const totalChildProducts = furnitureWithChildren.reduce(
+        (sum, m) => sum + ((m.metadata as any)?.childProducts?.length || 0),
+        0
+      );
+      console.log('[DigitalTwinStudio] Loaded models:', {
+        total: loadedModels.length,
+        furniture: loadedModels.filter(m => m.type === 'furniture').length,
+        products: loadedModels.filter(m => m.type === 'product').length,
+        furnitureWithChildren: furnitureWithChildren.length,
+        totalChildProducts,
+      });
 
       setModels(loadedModels);
       if (loadedModels.length > 0) {
@@ -309,6 +324,67 @@ export default function DigitalTwinStudioPage() {
       ],
     };
 
+    const furnitureList = activeModels
+      .filter((m) => m.type === 'furniture')
+      .map((m) => {
+        const metaChildProducts = (m.metadata as any)?.childProducts;
+
+        return {
+          id: m.id,
+          model_url: m.model_url,
+          type: 'furniture' as const,
+          furniture_type: m.name,
+          position: m.position || { x: 0, y: 0, z: 0 },
+          rotation: m.rotation || { x: 0, y: 0, z: 0 },
+          scale: m.scale || { x: 1, y: 1, z: 1 },
+          dimensions: m.dimensions,
+          movable: true,
+          metadata: m.metadata,
+          // 🔧 FIX: 가구에 배치된 자식 제품들 (상대 좌표 사용)
+          childProducts: metaChildProducts?.map((cp: any) => ({
+            id: cp.id,
+            type: 'product' as const,
+            model_url: cp.model_url,
+            position: cp.position || { x: 0, y: 0, z: 0 },
+            rotation: cp.rotation || { x: 0, y: 0, z: 0 },
+            scale: cp.scale || { x: 1, y: 1, z: 1 },
+            sku: cp.name,
+            display_type: cp.metadata?.displayType,
+            dimensions: cp.dimensions,
+            isRelativePosition: true,
+            metadata: cp.metadata,
+          })) || [],
+        };
+      });
+
+    const productsList = activeModels
+      .filter((m) => m.type === 'product')
+      .map((m) => ({
+        id: m.id,
+        model_url: m.model_url,
+        type: 'product' as const,
+        product_id: m.metadata?.entityId,
+        sku: m.name,
+        position: m.position || { x: 0, y: 0, z: 0 },
+        rotation: m.rotation || { x: 0, y: 0, z: 0 },
+        scale: m.scale || { x: 1, y: 1, z: 1 },
+        dimensions: m.dimensions,
+        movable: true,
+        metadata: m.metadata,
+      }));
+
+    // 🔍 DEBUG: currentRecipe의 childProducts 확인
+    const totalChildProducts = furnitureList.reduce(
+      (sum, f) => sum + ((f as any).childProducts?.length || 0),
+      0
+    );
+    console.log('[DigitalTwinStudio] currentRecipe built:', {
+      furnitureCount: furnitureList.length,
+      productsCount: productsList.length,
+      childProductsTotal: totalChildProducts,
+      furnitureWithChildren: furnitureList.filter(f => (f as any).childProducts?.length > 0).length,
+    });
+
     return {
       space: {
         id: spaceModel.id,
@@ -320,69 +396,11 @@ export default function DigitalTwinStudioPage() {
         dimensions: spaceModel.dimensions,
         metadata: spaceModel.metadata,
       },
-      furniture: activeModels
-        .filter((m) => m.type === 'furniture')
-        .map((m) => {
-          const metaChildProducts = (m.metadata as any)?.childProducts;
-
-          return {
-            id: m.id,
-            model_url: m.model_url,
-            type: 'furniture' as const,
-            furniture_type: m.name,
-            position: m.position || { x: 0, y: 0, z: 0 },
-            rotation: m.rotation || { x: 0, y: 0, z: 0 },
-            scale: m.scale || { x: 1, y: 1, z: 1 },
-            dimensions: m.dimensions,
-            movable: true,
-            metadata: m.metadata,
-            // 🔧 FIX: 가구에 배치된 자식 제품들 (상대 좌표 사용)
-            childProducts: metaChildProducts?.map((cp: any) => ({
-              id: cp.id,
-              type: 'product' as const,
-              model_url: cp.model_url,
-              position: cp.position || { x: 0, y: 0, z: 0 },
-              rotation: cp.rotation || { x: 0, y: 0, z: 0 },
-              scale: cp.scale || { x: 1, y: 1, z: 1 },
-              sku: cp.name,
-              display_type: cp.metadata?.displayType,
-              dimensions: cp.dimensions,
-              isRelativePosition: true,
-              metadata: cp.metadata,
-            })) || [],
-          };
-        }),
-      products: activeModels
-        .filter((m) => m.type === 'product')
-        .map((m) => ({
-          id: m.id,
-          model_url: m.model_url,
-          type: 'product' as const,
-          product_id: m.metadata?.entityId,
-          sku: m.name,
-          position: m.position || { x: 0, y: 0, z: 0 },
-          rotation: m.rotation || { x: 0, y: 0, z: 0 },
-          scale: m.scale || { x: 1, y: 1, z: 1 },
-          dimensions: m.dimensions,
-          movable: true,
-          metadata: m.metadata,
-        })),
+      furniture: furnitureList,
+      products: productsList,
       lighting: lightingPreset,
       camera: { position: { x: 10, y: 10, z: 15 }, target: { x: 0, y: 0, z: 0 }, fov: 50 },
     };
-
-    // 🔍 DEBUG: currentRecipe의 childProducts 확인
-    const totalChildProducts = result.furniture.reduce(
-      (sum, f) => sum + ((f as any).childProducts?.length || 0),
-      0
-    );
-    console.log('[DigitalTwinStudio] currentRecipe built:', {
-      furnitureCount: result.furniture.length,
-      productsCount: result.products.length,
-      childProductsTotal: totalChildProducts,
-    });
-
-    return result;
   }, [models, activeLayers]);
 
   // 전체 시뮬레이션 실행 (씬 기반 + 레거시 UI 결과)
@@ -432,6 +450,20 @@ export default function DigitalTwinStudioPage() {
         };
         return converted;
       });
+
+    // 🔍 DEBUG: sceneModels의 childProducts 확인
+    const furnitureWithChildren = result.filter(
+      m => m.type === 'furniture' && (m.metadata as any)?.childProducts?.length > 0
+    );
+    console.log('[DigitalTwinStudio] sceneModels built:', {
+      total: result.length,
+      furniture: result.filter(m => m.type === 'furniture').length,
+      furnitureWithChildren: furnitureWithChildren.length,
+      totalChildProducts: furnitureWithChildren.reduce(
+        (sum, m) => sum + ((m.metadata as any)?.childProducts?.length || 0),
+        0
+      ),
+    });
 
     return result;
   }, [models, activeLayers]);
