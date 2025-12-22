@@ -1918,16 +1918,34 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
   console.log('Filtered furniture:', furnitureEntities.length);
   
   // 2. 제품 필터링 (개선)
-  const productEntities = mappedEntities.filter((e: any) => {
+  let productEntities = mappedEntities.filter((e: any) => {
     const type = (e.entityType || e.entity_type_name || '').toLowerCase();
     const model3dType = (e.model_3d_type || '').toLowerCase();
-    
-    return type === 'product' || 
+
+    return type === 'product' ||
            type.includes('product') ||
            model3dType === 'product' ||
            model3dType.includes('product');
   });
-  console.log('Filtered products:', productEntities.length);
+  console.log('Filtered products from entities:', productEntities.length);
+
+  // 2-1. productPlacements에서도 제품 추출 (entities에 제품이 없는 경우)
+  // store-context-builder에서 제품은 productPlacements에 저장됨
+  if (productEntities.length === 0 && storeContext.productPlacements?.length > 0) {
+    const placementProducts = storeContext.productPlacements.map((p: any) => ({
+      id: p.productId,
+      label: p.productName || p.productId,
+      entityType: 'product',
+      position: p.position,
+      furnitureId: p.furnitureId,
+      furnitureName: p.furnitureName,
+      slotId: p.slotId,
+      currentPosition: p.position,
+    }));
+    productEntities = placementProducts;
+    console.log('Added products from productPlacements:', placementProducts.length);
+  }
+  console.log('Total products for optimization:', productEntities.length);
   
   // 3. Space 필터링 (개선)
   const spaceEntities = mappedEntities.filter((e: any) => {
