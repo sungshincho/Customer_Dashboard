@@ -3292,9 +3292,18 @@ async function performLayoutOptimization(request: InferenceRequest, apiKey: stri
     }
   }
 
-  // 🆕 실제 제품 배치 정보 사용 (storeContext의 productPlacements 우선)
-  const actualProductPlacements = storeContext?.productPlacements || [];
+  // 🆕 실제 제품 배치 정보 사용 (sceneData의 productPlacements 우선 - 슬롯 기반)
+  const sceneProductPlacements = sceneData?.productPlacements || [];
+  const actualProductPlacements = sceneProductPlacements.length > 0
+    ? sceneProductPlacements
+    : (storeContext?.productPlacements || []);
   const hasRealProductPositions = actualProductPlacements.length > 0;
+
+  // 🆕 사용 가능한 빈 슬롯 정보 (sceneData에서 추출)
+  const availableSlots = sceneData?.availableSlots || [];
+
+  console.log('[LayoutOptimization] Slot-based product placements:', actualProductPlacements.length);
+  console.log('[LayoutOptimization] Available slots for AI:', availableSlots.length);
 
   // 프롬프트 빌드 (슬롯 시스템 통합)
   const prompt = `You are an expert retail space optimization AI specializing in store layout design.
@@ -3307,33 +3316,29 @@ ${storeContext?.storeInfo ? `- Store: ${storeContext.storeInfo.name}
 - Business Type: ${storeContext.storeInfo.businessType || 'Retail'}
 - Entrance Position: ${storeContext.storeInfo.entrancePosition ? `(${storeContext.storeInfo.entrancePosition.x}, ${storeContext.storeInfo.entrancePosition.z})` : 'Not specified (assume bottom edge)'}` : '- Standard retail store'}
 
-CURRENT LAYOUT:
-${JSON.stringify({
-  space: sceneData?.space ? { id: sceneData.space.id, position: sceneData.space.position } : null,
-  furniture: (sceneData?.furniture || []).map((f: any) => ({
-    id: f.id,
-    type: f.furniture_type || f.type,
-    position: f.position,
-    rotation: f.rotation,
-  })),
-  // 실제 제품 위치 데이터가 있으면 사용, 없으면 sceneData 사용
-  products: hasRealProductPositions
-    ? actualProductPlacements.slice(0, 15).map((p: any) => ({
-        id: p.productId,
-        furnitureId: p.furnitureId,
-        furnitureName: p.furnitureName,
-        slotId: p.slotId,
-        position: p.position,
-        note: 'actual_db_position',
-      }))
-    : (sceneData?.products || []).slice(0, 10).map((p: any) => ({
-        id: p.id,
-        sku: p.sku,
-        position: p.position,
-        display_type: p.display_type,
-        note: 'scene_position',
-      })),
-}, null, 2)}
+CURRENT FURNITURE:
+${JSON.stringify((sceneData?.furniture || []).map((f: any) => ({
+  id: f.id,
+  code: f.code,
+  name: f.name,
+  type: f.furniture_type || f.type,
+  position: f.position,
+})), null, 2)}
+
+=== 🏷️ 현재 제품 배치 (슬롯 기반) ===
+${hasRealProductPositions ? actualProductPlacements.slice(0, 20).map((p: any) =>
+  `- [${p.productSku || p.productId}] ${p.productName || '상품'} @ ${p.furnitureCode || p.furnitureName || '가구'}[${p.slotId || '-'}] (카테고리: ${p.category || 'N/A'})`
+).join('\n') : '제품 배치 정보 없음'}
+
+=== ✅ 사용 가능한 빈 슬롯 ===
+${availableSlots.length > 0 ? availableSlots.slice(0, 30).map((s: any) =>
+  `- ${s.furnitureCode || s.furnitureName}[${s.slotCode || s.slotId}] (타입: ${s.slotType || 'N/A'}, 호환: ${(s.compatibleDisplayTypes || []).join(',')})`
+).join('\n') : '빈 슬롯 정보 없음'}
+
+🚨 CRITICAL - 제품 재배치 규칙:
+1. productSku는 반드시 위 "현재 제품 배치" 목록에 있는 SKU만 사용
+2. toSlotId/toSlotCode는 반드시 위 "사용 가능한 빈 슬롯" 목록에서 선택
+3. 슬롯의 호환 displayType과 제품의 displayType이 맞아야 함
 
 ${storeContext?.zones?.length ? `ZONE DATA (with entrance marked):
 ${JSON.stringify(storeContext.zones.slice(0, 10).map((z: any) => ({
@@ -3354,24 +3359,29 @@ Return a JSON object with this exact structure:
 {
   "furnitureMoves": [
     {
-      "furnitureId": "string",
-      "furnitureName": "string",
+      "furnitureId": "string (가구 UUID)",
+      "furnitureName": "string (가구 이름, 예: 의류 행거)",
       "fromPosition": {"x": number, "y": number, "z": number},
       "toPosition": {"x": number, "y": number, "z": number},
       "rotation": number,
       "reason": "string explaining why this move improves the layout"
     }
   ],
-  "productPlacements": [
+  "productSlotMoves": [
     {
-      "productId": "string",
-      "productSku": "string",
-      "displayType": "hanging|standing|folded|located|boxed|stacked",
-      "fromSlotId": "string or null",
-      "toSlotId": "string",
-      "toFurnitureId": "string",
-      "slotType": "hanger|mannequin|shelf|table|rack|hook|drawer",
-      "reason": "string explaining why this placement is optimal"
+      "productId": "string (제품 UUID)",
+      "productSku": "string (반드시 위 목록의 SKU, 예: SKU-OUT-001)",
+      "productName": "string (제품명, 예: 캐시미어 코트)",
+      "fromFurnitureId": "string (현재 가구 UUID)",
+      "fromFurnitureCode": "string (현재 가구 코드, 예: RACK-001)",
+      "fromFurnitureName": "string (현재 가구 이름)",
+      "fromSlotId": "string (현재 슬롯 ID, 예: H1-1)",
+      "toFurnitureId": "string (제안 가구 UUID)",
+      "toFurnitureCode": "string (제안 가구 코드, 예: MANNE-001)",
+      "toFurnitureName": "string (제안 가구 이름)",
+      "toSlotId": "string (반드시 위 빈 슬롯 목록에서 선택, 예: M3)",
+      "reason": "string (재배치 사유, 예: 입구 근처 마네킹으로 이동하여 고객 첫인상 극대화)",
+      "expectedImpact": {"revenueChangePct": number, "visibilityScore": number}
     }
   ],
   "zoneChanges": [
@@ -3394,14 +3404,23 @@ Return a JSON object with this exact structure:
   "confidence": number (0-1)
 }
 
-IMPORTANT: When suggesting productPlacements, ensure slotType is compatible with displayType:
-- hanger → hanging only
-- mannequin → standing only (worn on mannequin)
-- shelf → folded, located, boxed, stacked
-- table → folded, located, boxed
-- rack → hanging, located
-- hook → hanging
-- drawer → folded, boxed`;
+⚠️ CRITICAL - 제품 재배치(productSlotMoves) 규칙:
+1. productSku는 반드시 "현재 제품 배치" 목록에 있는 SKU만 사용
+2. toSlotId는 반드시 "사용 가능한 빈 슬롯" 목록에 있는 슬롯만 선택
+3. 슬롯 호환성: hanger→hanging, mannequin→standing, shelf→folded/boxed, table→folded, rack→hanging
+4. 제품 카테고리와 슬롯 타입이 맞아야 함 (아우터→행거/마네킹, 액세서리→쇼케이스)`;
+
+  // 🆕 현재 제품 배치 정보를 가구 ID 매핑 맵으로 변환
+  const productPlacementMap = new Map<string, any>();
+  actualProductPlacements.forEach((p: any) => {
+    productPlacementMap.set(p.productId || p.productSku, p);
+  });
+
+  // 🆕 빈 슬롯 정보를 슬롯 ID 매핑 맵으로 변환
+  const availableSlotMap = new Map<string, any>();
+  availableSlots.forEach((s: any) => {
+    availableSlotMap.set(s.slotCode || s.slotId, s);
+  });
 
   try {
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -3497,35 +3516,82 @@ IMPORTANT: When suggesting productPlacements, ensure slotType is compatible with
       return { fromPosition, fromSlotPosition, toPosition, toSlotPosition };
     };
 
+    // 🆕 productSlotMoves 형식도 지원 (슬롯 바인딩 기반)
+    const aiProductSlotMoves = aiResponse.productSlotMoves || [];
+    const aiProductPlacements = aiResponse.productPlacements || [];
+
+    // productSlotMoves를 표준 형식으로 변환
+    const processedSlotMoves = aiProductSlotMoves.map((move: any) => {
+      // 현재 제품 배치 정보에서 추가 정보 조회
+      const currentPlacement = productPlacementMap.get(move.productId) || productPlacementMap.get(move.productSku);
+      // 빈 슬롯 정보에서 타겟 슬롯 정보 조회
+      const targetSlot = availableSlotMap.get(move.toSlotId);
+
+      const enrichedMove = {
+        productId: move.productId || currentPlacement?.productId,
+        productSku: move.productSku || currentPlacement?.productSku,
+        productName: move.productName || currentPlacement?.productName,
+        fromFurnitureId: move.fromFurnitureId || currentPlacement?.furnitureId,
+        fromFurnitureCode: move.fromFurnitureCode || currentPlacement?.furnitureCode,
+        fromFurnitureName: move.fromFurnitureName || currentPlacement?.furnitureName,
+        fromSlotId: move.fromSlotId || currentPlacement?.slotId,
+        toFurnitureId: move.toFurnitureId || targetSlot?.furnitureId,
+        toFurnitureCode: move.toFurnitureCode || targetSlot?.furnitureCode,
+        toFurnitureName: move.toFurnitureName || targetSlot?.furnitureName,
+        toSlotId: move.toSlotId,
+        reason: move.reason,
+        expectedImpact: move.expectedImpact,
+      };
+
+      // 위치 정보 계산
+      const positions = enrichPlacementWithPosition(enrichedMove);
+      return { ...enrichedMove, ...positions };
+    });
+
+    // 기존 productPlacements 형식 처리
+    const processedPlacements = aiProductPlacements.map((p: any) => {
+      const positions = enrichPlacementWithPosition(p);
+      return { ...p, ...positions };
+    });
+
+    // 룰 기반 제안 처리
+    const processedRuleBased = productPlacements.map(p => {
+      const positions = enrichPlacementWithPosition({
+        // FROM (현재 위치)
+        fromFurnitureId: p.current_furniture_id,
+        fromSlotId: p.current_slot_id,
+        // TO (제안 위치)
+        toFurnitureId: p.suggested_furniture_id,
+        toSlotId: p.suggested_slot_id,
+      });
+      return {
+        productId: p.product_id,
+        productSku: p.product_sku,
+        productName: p.product_name,
+        fromFurnitureId: p.current_furniture_id || null,
+        fromFurnitureCode: p.current_furniture_code || null,
+        fromFurnitureName: p.current_furniture_name || null,
+        fromSlotId: p.current_slot_id || null,
+        toSlotId: p.suggested_slot_id,
+        toFurnitureId: p.suggested_furniture_id,
+        toFurnitureCode: p.suggested_furniture_code || null,
+        toFurnitureName: p.suggested_furniture_name || null,
+        reason: p.reason,
+        priority: p.priority,
+        displayTypeMatch: p.display_type_match,
+        ...positions,
+      };
+    });
+
+    // 모든 제품 배치 제안 병합 (슬롯 기반 우선)
     const combinedProductPlacements = [
-      ...(aiResponse.productPlacements || []).map((p: any) => {
-        const positions = enrichPlacementWithPosition(p);
-        return { ...p, ...positions };
-      }),
-      ...productPlacements.map(p => {
-        const positions = enrichPlacementWithPosition({
-          // FROM (현재 위치)
-          fromFurnitureId: p.current_furniture_id,
-          fromSlotId: p.current_slot_id,
-          // TO (제안 위치)
-          toFurnitureId: p.suggested_furniture_id,
-          toSlotId: p.suggested_slot_id,
-        });
-        return {
-          productId: p.product_id,
-          productSku: p.product_sku,
-          productName: p.product_name,
-          fromFurnitureId: p.current_furniture_id || null,
-          fromSlotId: p.current_slot_id || null,
-          toSlotId: p.suggested_slot_id,
-          toFurnitureId: p.suggested_furniture_id,
-          reason: p.reason,
-          priority: p.priority,
-          displayTypeMatch: p.display_type_match,
-          ...positions,
-        };
-      }),
+      ...processedSlotMoves,
+      ...processedPlacements,
+      ...processedRuleBased,
     ].slice(0, 15); // 최대 15개 제안
+
+    console.log('[LayoutOptimization] Processed productSlotMoves:', processedSlotMoves.length);
+    console.log('[LayoutOptimization] Processed productPlacements:', processedPlacements.length);
 
     console.log('[LayoutOptimization] Product placements with positions:',
       combinedProductPlacements.slice(0, 3).map((p: any) => ({
