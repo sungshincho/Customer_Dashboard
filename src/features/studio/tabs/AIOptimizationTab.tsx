@@ -140,16 +140,41 @@ export function AIOptimizationTab({
   }, [sceneData?.furniture]);
 
   const productItems: ProductItem[] = useMemo(() => {
-    if (!sceneData?.products) return [];
-    return sceneData.products.map((p) => ({
-      id: p.id,
-      sku: p.sku || '',
-      product_name: p.metadata?.product_name || p.metadata?.name || '상품',
-      category: p.metadata?.category,
-      furniture_id: p.metadata?.furniture_id,
-      slot_id: p.metadata?.slot_id,
-    }));
-  }, [sceneData?.products]);
+    const products: ProductItem[] = [];
+
+    // 1️⃣ sceneData.products에서 추출 (기존 방식)
+    if (sceneData?.products) {
+      sceneData.products.forEach((p) => {
+        products.push({
+          id: p.id,
+          sku: p.sku || '',
+          product_name: p.metadata?.product_name || p.metadata?.name || '상품',
+          category: p.metadata?.category,
+          furniture_id: p.metadata?.furniture_id,
+          slot_id: p.metadata?.slot_id,
+        });
+      });
+    }
+
+    // 2️⃣ 가구의 childProducts에서 추출 (SEED 로더 방식)
+    if (sceneData?.furniture) {
+      sceneData.furniture.forEach((f) => {
+        const childProducts = (f as any).childProducts || [];
+        childProducts.forEach((cp: any) => {
+          products.push({
+            id: cp.id,
+            sku: cp.sku || cp.metadata?.sku || '',
+            product_name: cp.metadata?.product_name || cp.metadata?.name || cp.sku || '상품',
+            category: cp.metadata?.category,
+            furniture_id: f.id,
+            slot_id: cp.metadata?.slot_id,
+          });
+        });
+      });
+    }
+
+    return products;
+  }, [sceneData?.products, sceneData?.furniture]);
 
   // 비교 모드 변경 시 오버레이 업데이트
   useEffect(() => {
