@@ -843,9 +843,12 @@ export default function DigitalTwinStudioPage() {
                       onOverlayToggle={toggleOverlay}
                       onResultsUpdate={(type, result) => {
                         // AI 최적화 결과를 오른쪽 패널에 표시
+                        console.log('[DigitalTwinStudioPage] onResultsUpdate called:', type, result);
+                        console.log('[DigitalTwinStudioPage] productChanges in result:', result?.productChanges);
                         setSimulationResults((prev) => ({ ...prev, [type]: result }));
                         const panelKey = `${type}Result` as keyof VisiblePanels;
                         setVisiblePanels((prev) => ({ ...prev, [panelKey]: true }));
+                        console.log('[DigitalTwinStudioPage] Set visiblePanels:', panelKey, '= true');
                       }}
                     />
                   )}
@@ -1242,6 +1245,11 @@ function SimulationResultPanels({
   toggleOverlay,
 }: SimulationResultPanelsProps) {
   const { applySimulationResults } = useScene();
+
+  // 🐛 디버그: 패널 렌더링 상태 확인
+  console.log('[SimulationResultPanels] visiblePanels.layoutResult:', visiblePanels.layoutResult);
+  console.log('[SimulationResultPanels] simulationResults.layout:', simulationResults.layout);
+  console.log('[SimulationResultPanels] simulationResults.layout?.productChanges:', simulationResults.layout?.productChanges);
 
   // 3D 씬에 레이아웃 변경 적용 (모델 위치 이동)
   const handleShowLayoutIn3D = useCallback(() => {
