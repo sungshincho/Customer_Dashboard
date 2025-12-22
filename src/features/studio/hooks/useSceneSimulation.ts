@@ -519,12 +519,6 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
         const results: SimulationResults = {};
         if (layoutRes.status === 'fulfilled' && layoutRes.value.data?.result) {
           results.layout = layoutRes.value.data.result;
-          console.log('[useSceneSimulation] Layout result extracted:', results.layout);
-          // 🐛 디버그: productPlacements, furnitureMoves 상세 확인
-          console.log('[useSceneSimulation] 📦 productPlacements:', results.layout.productPlacements);
-          console.log('[useSceneSimulation] 📦 productPlacements count:', results.layout.productPlacements?.length || 0);
-          console.log('[useSceneSimulation] 🪑 furnitureMoves:', results.layout.furnitureMoves);
-          console.log('[useSceneSimulation] 🪑 furnitureMoves count:', results.layout.furnitureMoves?.length || 0);
         } else {
           console.warn('[useSceneSimulation] No layout result:', layoutRes);
         }

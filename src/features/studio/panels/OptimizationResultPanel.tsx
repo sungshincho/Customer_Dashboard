@@ -8,7 +8,7 @@
  */
 
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Eye, EyeOff, TrendingUp, Clock, Users, Percent } from 'lucide-react';
+import { ChevronDown, ChevronUp, Eye, EyeOff, TrendingUp, Clock, Users, Percent, Package, ArrowRight, Armchair } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -29,6 +29,8 @@ export function OptimizationResultPanel({
 }: OptimizationResultPanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [isOverlayVisible, setIsOverlayVisible] = useState(true);
+  const [showFurnitureDetails, setShowFurnitureDetails] = useState(false);
+  const [showProductDetails, setShowProductDetails] = useState(false);
 
   const toggleOverlay = () => {
     const newValue = !isOverlayVisible;
@@ -140,18 +142,113 @@ export function OptimizationResultPanel({
                 </div>
               </div>
 
-              {/* 변경 사항 요약 */}
-              <div className="space-y-1 text-xs text-white/50">
-                {summary.furnitureChangesCount > 0 && (
-                  <div>🪑 가구/장치 재배치: {summary.furnitureChangesCount}건</div>
-                )}
-                {summary.productChangesCount > 0 && (
-                  <div>📦 상품 재배치: {summary.productChangesCount}건</div>
-                )}
-                {summary.furnitureChangesCount === 0 && summary.productChangesCount === 0 && (
-                  <div>변경 사항 없음</div>
-                )}
-              </div>
+              {/* 가구 재배치 상세 */}
+              {summary.furnitureChangesCount > 0 && (
+                <div className="space-y-1">
+                  <button
+                    onClick={() => setShowFurnitureDetails(!showFurnitureDetails)}
+                    className="flex items-center gap-1 text-xs text-white/60 hover:text-white transition-colors w-full"
+                  >
+                    <Armchair className="h-3 w-3" />
+                    <span>가구 재배치: {summary.furnitureChangesCount}건</span>
+                    {showFurnitureDetails ? (
+                      <ChevronUp className="h-3 w-3 ml-auto" />
+                    ) : (
+                      <ChevronDown className="h-3 w-3 ml-auto" />
+                    )}
+                  </button>
+
+                  {showFurnitureDetails && result.furnitureMoves?.length > 0 && (
+                    <div className="space-y-1.5 mt-1 max-h-24 overflow-y-auto">
+                      {result.furnitureMoves.slice(0, 5).map((move: any, i: number) => (
+                        <div key={i} className="text-[10px] bg-white/5 rounded p-1.5">
+                          <div className="text-white font-medium truncate">
+                            {move.furnitureName || move.furnitureLabel || move.furnitureId}
+                          </div>
+                          <div className="text-white/40 truncate">{move.reason || '위치 최적화'}</div>
+                        </div>
+                      ))}
+                      {result.furnitureMoves.length > 5 && (
+                        <div className="text-[9px] text-white/30 text-center">
+                          +{result.furnitureMoves.length - 5}건 더보기
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 🆕 제품 재배치 상세 */}
+              {summary.productChangesCount > 0 && (
+                <div className="space-y-1 border-t border-purple-500/20 pt-2 mt-2">
+                  <button
+                    onClick={() => setShowProductDetails(!showProductDetails)}
+                    className="flex items-center gap-1 text-xs text-purple-300 hover:text-purple-200 transition-colors w-full"
+                  >
+                    <Package className="h-3 w-3 text-purple-400" />
+                    <span>📦 제품 재배치: {summary.productChangesCount}건</span>
+                    {showProductDetails ? (
+                      <ChevronUp className="h-3 w-3 ml-auto" />
+                    ) : (
+                      <ChevronDown className="h-3 w-3 ml-auto" />
+                    )}
+                  </button>
+
+                  {showProductDetails && result.productPlacements?.length > 0 && (
+                    <div className="space-y-1.5 mt-1 max-h-32 overflow-y-auto">
+                      {result.productPlacements.slice(0, 6).map((placement: any, i: number) => (
+                        <div key={i} className="text-[10px] bg-purple-500/10 border border-purple-500/20 rounded p-1.5">
+                          {/* 제품명 */}
+                          <div className="flex items-center gap-1 mb-1">
+                            <span className="text-white font-medium truncate flex-1">
+                              {placement.productName || placement.productLabel || placement.productSku}
+                            </span>
+                            {placement.productSku && (
+                              <span className="text-purple-300 text-[9px] font-mono bg-purple-500/20 px-0.5 rounded shrink-0">
+                                {placement.productSku}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* 슬롯 변경 정보 */}
+                          <div className="flex items-center gap-1 text-[9px]">
+                            <div className="bg-red-500/20 px-1 py-0.5 rounded text-red-300 truncate flex-1 text-center">
+                              {placement.fromFurniture || placement.currentFurnitureLabel || '-'}
+                              {placement.fromSlot && (
+                                <span className="text-red-200/60 ml-0.5">[{placement.fromSlot}]</span>
+                              )}
+                            </div>
+                            <ArrowRight className="h-2.5 w-2.5 text-purple-400 shrink-0" />
+                            <div className="bg-green-500/20 px-1 py-0.5 rounded text-green-300 truncate flex-1 text-center">
+                              {placement.toFurniture || placement.suggestedFurnitureLabel || '-'}
+                              {placement.toSlot && (
+                                <span className="text-green-200/60 ml-0.5">[{placement.toSlot}]</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* 사유 */}
+                          {placement.reason && (
+                            <div className="text-purple-200/60 mt-1 truncate">
+                              💡 {placement.reason}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {result.productPlacements.length > 6 && (
+                        <div className="text-[9px] text-purple-300/50 text-center">
+                          +{result.productPlacements.length - 6}건 더보기
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 변경 사항 없음 */}
+              {summary.furnitureChangesCount === 0 && summary.productChangesCount === 0 && (
+                <div className="text-xs text-white/40">변경 사항 없음</div>
+              )}
             </>
           )}
 

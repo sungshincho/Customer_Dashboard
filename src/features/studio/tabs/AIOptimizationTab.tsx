@@ -327,11 +327,6 @@ export function AIOptimizationTab({
         results,
       });
 
-      // 🐛 디버그: Edge Function 응답 상세 확인
-      console.log('[AIOptimizationTab] 📦 results.layout.productPlacements:', results.layout?.productPlacements);
-      console.log('[AIOptimizationTab] 🪑 results.layout.furnitureMoves:', results.layout?.furnitureMoves);
-      console.log('[AIOptimizationTab] 🔄 results.layout.layoutChanges:', results.layout?.layoutChanges);
-
       // 레이아웃 결과가 있으면 오버레이 활성화 및 오른쪽 패널 업데이트
       if (results.layout) {
         onOverlayToggle('layoutOptimization', true);

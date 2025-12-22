@@ -5,13 +5,15 @@
  * - 가구 이동 경로 시각화
  * - 변경 전/후 히트맵 비교
  * - 존 하이라이트
+ * - 🆕 제품 재배치 경로 시각화 (슬롯 기반)
  */
 
-import { useMemo, useState, useRef } from 'react';
+import { useMemo, useState, useRef, useCallback } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Html, Line, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import type { LayoutSimulationResult } from '../hooks/useLayoutSimulation';
+import { useScene } from '../core/SceneProvider';
 
 // ============================================================================
 // 타입 정의
@@ -84,6 +86,57 @@ export function LayoutOptimizationOverlay({
   const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
   const animationRef = useRef(0);
 
+  // 🆕 씬 데이터 가져오기 (가구 위치 폴백용)
+  const { models } = useScene();
+
+  // 🆕 가구/제품 위치 조회 헬퍼
+  const findFurniturePosition = useCallback((furnitureId: string | undefined, furnitureLabel: string | undefined) => {
+    if (!furnitureId && !furnitureLabel) return null;
+
+    const furniture = models.find((m) =>
+      m.type === 'furniture' &&
+      (m.id === furnitureId || m.name === furnitureLabel || (m.metadata as any)?.furniture_id === furnitureId)
+    );
+
+    if (furniture?.position) {
+      return {
+        x: furniture.position[0],
+        y: furniture.position[1] + 0.8, // 가구 위에 표시
+        z: furniture.position[2],
+      };
+    }
+    return null;
+  }, [models]);
+
+  // 🆕 제품의 현재 위치 조회 (childProducts에서 검색)
+  const findProductPosition = useCallback((productId: string | undefined, productSku: string | undefined) => {
+    if (!productId && !productSku) return null;
+
+    for (const model of models) {
+      if (model.type !== 'furniture') continue;
+
+      const childProducts = (model.metadata as any)?.childProducts as any[] | undefined;
+      if (!childProducts) continue;
+
+      const product = childProducts.find((cp) =>
+        cp.id === productId ||
+        cp.metadata?.sku === productSku ||
+        cp.name === productSku
+      );
+
+      if (product?.position) {
+        // 가구 위치 + 제품 상대 위치
+        const furniturePos = model.position || [0, 0, 0];
+        return {
+          x: furniturePos[0] + (product.position[0] || 0),
+          y: furniturePos[1] + (product.position[1] || 0) + 0.3,
+          z: furniturePos[2] + (product.position[2] || 0),
+        };
+      }
+    }
+    return null;
+  }, [models]);
+
   // 애니메이션 프레임
   useFrame((_, delta) => {
     animationRef.current += delta * animationSpeed;
@@ -93,7 +146,60 @@ export function LayoutOptimizationOverlay({
 
   const { visualization, furnitureMoves } = result;
   // productPlacements 추출 (타입 캐스트)
-  const productPlacements = (result as any).productPlacements || [];
+  const rawProductPlacements = (result as any).productPlacements || [];
+
+  // 🆕 productPlacements에 씬 기반 폴백 위치 추가
+  const productPlacements = useMemo(() => {
+    return rawProductPlacements.map((placement: any) => {
+      // 이미 위치가 있으면 그대로 사용
+      if (placement.fromPosition && placement.toPosition) {
+        return placement;
+      }
+
+      // fromPosition 폴백 계산
+      let fromPosition = placement.fromPosition;
+      if (!fromPosition) {
+        // 1. 제품의 현재 위치에서 검색
+        fromPosition = findProductPosition(placement.productId, placement.productSku);
+        // 2. fromFurniture 위치 사용
+        if (!fromPosition) {
+          fromPosition = findFurniturePosition(placement.fromFurnitureId, placement.fromFurniture);
+        }
+      }
+
+      // toPosition 폴백 계산
+      let toPosition = placement.toPosition;
+      if (!toPosition) {
+        // toFurniture 위치 사용
+        toPosition = findFurniturePosition(placement.toFurnitureId, placement.toFurniture);
+
+        // 같은 위치가 되지 않도록 약간 오프셋 적용
+        if (toPosition && fromPosition &&
+            Math.abs(toPosition.x - fromPosition.x) < 0.5 &&
+            Math.abs(toPosition.z - fromPosition.z) < 0.5) {
+          toPosition = {
+            ...toPosition,
+            x: toPosition.x + 1.5, // 옆으로 이동 표시
+          };
+        }
+      }
+
+      if (fromPosition && toPosition) {
+        console.log('[LayoutOptimizationOverlay] Fallback positions calculated:', {
+          productId: placement.productId,
+          productSku: placement.productSku,
+          fromPosition,
+          toPosition,
+        });
+      }
+
+      return {
+        ...placement,
+        fromPosition: fromPosition || placement.fromPosition,
+        toPosition: toPosition || placement.toPosition,
+      };
+    });
+  }, [rawProductPlacements, findProductPosition, findFurniturePosition]);
 
   return (
     <group name="layout-optimization-overlay">
