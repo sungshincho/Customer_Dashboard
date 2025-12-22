@@ -894,6 +894,10 @@ function ProductMoveIndicator({
     placement.suggested?.position ||
     placement.optimization_result?.suggested_position;
 
+  // 🐛 디버그: placement 전체 데이터 확인
+  console.log('[ProductMoveIndicator] Received placement:', placement);
+  console.log('[ProductMoveIndicator] Placement keys:', Object.keys(placement || {}));
+
   // 위치가 없으면 렌더링하지 않음
   if (!fromPos || !toPos) {
     console.warn('[ProductMoveIndicator] Missing position data:', {
@@ -902,6 +906,7 @@ function ProductMoveIndicator({
       hasToPosition: !!placement.toPosition,
       hasCurrent: !!placement.current?.position,
       hasSuggested: !!placement.suggested?.position,
+      placementData: placement,
     });
     return null;
   }
