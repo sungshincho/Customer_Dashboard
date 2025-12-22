@@ -45,7 +45,8 @@ export function OptimizationResultPanel({
           revenueIncrease: result.improvements?.revenueIncreasePercent || result.improvements?.revenueIncrease || 0,
           dwellTimeIncrease: result.improvements?.dwellTimeIncrease || 0,
           conversionIncrease: result.improvements?.conversionIncrease || 0,
-          changesCount: result.furnitureMoves?.length || 0,
+          furnitureChangesCount: result.furnitureMoves?.length || 0,
+          productChangesCount: result.productPlacements?.length || 0,
           currentEfficiency: result.currentEfficiency || 0,
           optimizedEfficiency: result.optimizedEfficiency || 0,
         };
@@ -140,8 +141,16 @@ export function OptimizationResultPanel({
               </div>
 
               {/* 변경 사항 요약 */}
-              <div className="text-xs text-white/50">
-                가구/장치 재배치: {summary.changesCount}건
+              <div className="space-y-1 text-xs text-white/50">
+                {summary.furnitureChangesCount > 0 && (
+                  <div>🪑 가구/장치 재배치: {summary.furnitureChangesCount}건</div>
+                )}
+                {summary.productChangesCount > 0 && (
+                  <div>📦 상품 재배치: {summary.productChangesCount}건</div>
+                )}
+                {summary.furnitureChangesCount === 0 && summary.productChangesCount === 0 && (
+                  <div>변경 사항 없음</div>
+                )}
               </div>
             </>
           )}
