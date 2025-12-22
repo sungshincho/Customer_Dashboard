@@ -173,6 +173,14 @@ export function AIOptimizationTab({
       });
     }
 
+    // 🔍 DEBUG: 제품 추출 결과 로깅
+    console.log('[AIOptimizationTab] productItems extracted:', {
+      fromProducts: sceneData?.products?.length || 0,
+      fromChildProducts: products.length - (sceneData?.products?.length || 0),
+      total: products.length,
+      furnitureCount: sceneData?.furniture?.length || 0,
+    });
+
     return products;
   }, [sceneData?.products, sceneData?.furniture]);
 

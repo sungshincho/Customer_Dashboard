@@ -370,6 +370,19 @@ export default function DigitalTwinStudioPage() {
       lighting: lightingPreset,
       camera: { position: { x: 10, y: 10, z: 15 }, target: { x: 0, y: 0, z: 0 }, fov: 50 },
     };
+
+    // 🔍 DEBUG: currentRecipe의 childProducts 확인
+    const totalChildProducts = result.furniture.reduce(
+      (sum, f) => sum + ((f as any).childProducts?.length || 0),
+      0
+    );
+    console.log('[DigitalTwinStudio] currentRecipe built:', {
+      furnitureCount: result.furniture.length,
+      productsCount: result.products.length,
+      childProductsTotal: totalChildProducts,
+    });
+
+    return result;
   }, [models, activeLayers]);
 
   // 전체 시뮬레이션 실행 (씬 기반 + 레거시 UI 결과)
