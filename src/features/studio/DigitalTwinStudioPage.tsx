@@ -178,16 +178,6 @@ export default function DigitalTwinStudioPage() {
       const loadedModels = await loadUserModels(user.id, selectedStore?.id);
       console.log('[DigitalTwinStudio] Loaded models:', loadedModels.length);
 
-      // 🔍 디버깅: childProducts 확인
-      const furnitureWithChildren = loadedModels.filter(m => m.type === 'furniture' && (m.metadata as any)?.childProducts?.length > 0);
-      console.log(`%c[DigitalTwinStudio] Furniture with childProducts: ${furnitureWithChildren.length}`, 'color: cyan; font-weight: bold');
-      furnitureWithChildren.forEach(f => {
-        console.log(`%c  - ${f.id}: ${(f.metadata as any).childProducts.length} children`, 'color: cyan');
-      });
-
-      // window에 저장하여 콘솔에서 확인 가능
-      (window as any).__loadedModels = loadedModels;
-
       setModels(loadedModels);
       if (loadedModels.length > 0) {
         setActiveLayers(loadedModels.map((m) => m.id));
@@ -333,9 +323,7 @@ export default function DigitalTwinStudioPage() {
       furniture: activeModels
         .filter((m) => m.type === 'furniture')
         .map((m) => {
-          // 🔍 디버깅: metadata.childProducts 확인
           const metaChildProducts = (m.metadata as any)?.childProducts;
-          console.log(`[currentRecipe] furniture ${m.id}: metadata.childProducts =`, metaChildProducts?.length || 0, metaChildProducts);
 
           return {
             id: m.id,

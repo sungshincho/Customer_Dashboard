@@ -21,7 +21,9 @@ import { PostProcessing } from './PostProcessing';
 import { CustomerAgents } from '../components/CustomerAgents';
 import { useSimulationEngine } from '@/hooks/useSimulationEngine';
 import { useSimulationStore } from '@/stores/simulationStore';
+import { ChildProductItem } from '@/features/simulation/components/digital-twin/ChildProductItem';
 import type { StudioMode, EnvironmentPreset, Canvas3DProps } from '../types';
+import type { ProductAsset } from '@/types/scene3d';
 
 // 시뮬레이션용 Zone 타입
 interface SimulationZone {
@@ -206,24 +208,64 @@ function SceneModels({ onAssetClick }: SceneModelsProps) {
     <group>
       {models
         .filter((model) => model.visible)
-        .map((model) => (
-          <ModelLoader
-            key={model.id}
-            modelId={model.id}
-            url={model.url}
-            position={model.position}
-            rotation={model.rotation}
-            scale={model.scale}
-            selected={model.id === selectedId}
-            hovered={model.id === hoveredId}
-            onClick={() => {
-              select(model.id);
-              onAssetClick?.(model.id, model.type);
-            }}
-            onPointerOver={() => hover(model.id)}
-            onPointerOut={() => hover(null)}
-          />
-        ))}
+        .map((model) => {
+          // 가구 모델인 경우, childProducts도 함께 렌더링
+          const rawChildProducts = model.metadata?.childProducts as any[] | undefined;
+          const hasChildren = model.type === 'furniture' && rawChildProducts && rawChildProducts.length > 0;
+
+          // childProducts를 ProductAsset 형식으로 변환
+          const childProducts: ProductAsset[] | undefined = hasChildren
+            ? rawChildProducts!.map((cp) => ({
+                id: cp.id,
+                type: 'product' as const,
+                model_url: cp.model_url || '',
+                position: cp.position || { x: 0, y: 0, z: 0 },
+                rotation: cp.rotation || { x: 0, y: 0, z: 0 },
+                scale: cp.scale || { x: 1, y: 1, z: 1 },
+                sku: cp.metadata?.sku || cp.name,
+                display_type: cp.metadata?.displayType,
+                dimensions: cp.metadata?.dimensions || { width: 0.3, height: 0.4, depth: 0.2 },
+                isRelativePosition: true,
+              }))
+            : undefined;
+
+          return (
+            <group
+              key={model.id}
+              position={model.position}
+              rotation={model.rotation}
+            >
+              {/* 가구/모델 자체 렌더링 (position은 group에서 처리) */}
+              <ModelLoader
+                modelId={model.id}
+                url={model.url}
+                position={[0, 0, 0]}  // group이 position 담당
+                rotation={[0, 0, 0]}  // group이 rotation 담당
+                scale={model.scale}
+                selected={model.id === selectedId}
+                hovered={model.id === hoveredId}
+                onClick={() => {
+                  select(model.id);
+                  onAssetClick?.(model.id, model.type);
+                }}
+                onPointerOver={() => hover(model.id)}
+                onPointerOut={() => hover(null)}
+              />
+
+              {/* 자식 제품들 (가구 기준 상대 좌표) */}
+              {hasChildren && childProducts!.map((child) => (
+                <ChildProductItem
+                  key={child.id}
+                  asset={child}
+                  onClick={() => {
+                    select(child.id);
+                    onAssetClick?.(child.id, 'product');
+                  }}
+                />
+              ))}
+            </group>
+          );
+        })}
     </group>
   );
 }

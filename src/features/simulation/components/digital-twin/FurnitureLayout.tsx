@@ -12,12 +12,6 @@ export function FurnitureLayout({ furniture = [], onClick, onProductClick }: Fur
   // Guard against undefined or null
   const safeFurniture = Array.isArray(furniture) ? furniture : [];
 
-  // 🔍 디버깅: furniture 배열의 childProducts 확인
-  console.log('[FurnitureLayout] furniture count:', safeFurniture.length);
-  safeFurniture.forEach((f, i) => {
-    console.log(`[FurnitureLayout] furniture[${i}]:`, f.id, 'childProducts:', f.childProducts?.length || 0);
-  });
-
   return (
     <group>
       {safeFurniture.map((item) => (
