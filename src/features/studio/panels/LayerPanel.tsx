@@ -59,7 +59,8 @@ export function LayerPanel() {
   const [newSceneName, setNewSceneName] = useState('');
 
   // 모델을 타입별로 그룹화 (가구의 childProducts도 포함)
-  const groupedLayers = useMemo(() => {
+  // childProducts는 별도로 관리하여 가시성 체크 시 부모 가구 기준으로 처리
+  const { groupedLayers, childProductMap } = useMemo(() => {
     const groups: Record<ModelType, LayerNode[]> = {
       space: [],
       furniture: [],
@@ -67,9 +68,11 @@ export function LayerPanel() {
       custom: [],
       other: [],
     };
+    // childProductId → parentFurnitureId 매핑
+    const cpMap = new Map<string, string>();
 
     if (!models || !Array.isArray(models)) {
-      return groups;
+      return { groupedLayers: groups, childProductMap: cpMap };
     }
 
     models.forEach((model) => {
@@ -91,6 +94,9 @@ export function LayerPanel() {
       if (model.type === 'furniture' && (model.metadata as any)?.childProducts) {
         const childProducts = (model.metadata as any).childProducts as any[];
         childProducts.forEach((cp) => {
+          // childProduct → parentFurniture 매핑 저장
+          cpMap.set(cp.id, model.id);
+
           groups.product.push({
             id: cp.id,
             name: cp.name || cp.metadata?.sku || 'Product',
@@ -104,7 +110,7 @@ export function LayerPanel() {
       }
     });
 
-    return groups;
+    return { groupedLayers: groups, childProductMap: cpMap };
   }, [models]);
 
   const toggleExpand = (id: string) => {
@@ -116,11 +122,42 @@ export function LayerPanel() {
     });
   };
 
+  // 가시성 토글 (childProduct인 경우 부모 가구의 가시성을 토글)
   const handleVisibilityToggle = (modelId: string) => {
+    // 1️⃣ 직접 모델인 경우
     const model = models.find((m) => m.id === modelId);
     if (model) {
       updateModel(modelId, { visible: !model.visible });
+      return;
     }
+
+    // 2️⃣ childProduct인 경우 → 부모 가구의 가시성 토글
+    const parentFurnitureId = childProductMap.get(modelId);
+    if (parentFurnitureId) {
+      const parentModel = models.find((m) => m.id === parentFurnitureId);
+      if (parentModel) {
+        updateModel(parentFurnitureId, { visible: !parentModel.visible });
+        toast.info('제품은 부모 가구와 함께 표시/숨김됩니다');
+      }
+    }
+  };
+
+  // 모델 또는 childProduct의 가시성 확인
+  const getModelVisibility = (modelId: string): boolean => {
+    // 1️⃣ 직접 모델인 경우
+    const model = models.find((m) => m.id === modelId);
+    if (model) {
+      return model.visible;
+    }
+
+    // 2️⃣ childProduct인 경우 → 부모 가구의 가시성 확인
+    const parentFurnitureId = childProductMap.get(modelId);
+    if (parentFurnitureId) {
+      const parentModel = models.find((m) => m.id === parentFurnitureId);
+      return parentModel?.visible ?? true;
+    }
+
+    return true;
   };
 
   const handleDelete = (modelId: string) => {
@@ -274,9 +311,10 @@ export function LayerPanel() {
         {folders.map(({ type, name, icon: Icon }) => {
           const items = groupedLayers[type];
           const isExpanded = expanded.has(type);
+          // 🔧 FIX: childProduct도 부모 가구 기준으로 가시성 체크
           const visibleCount = items.filter((i) => {
-            const model = models.find((m) => m.id === i.modelId);
-            return model?.visible;
+            if (!i.modelId) return false;
+            return getModelVisibility(i.modelId);
           }).length;
 
           if (items.length === 0) return null;
@@ -309,18 +347,22 @@ export function LayerPanel() {
               {isExpanded && (
                 <div className="ml-4">
                   {items.map((item) => {
-                    const model = models.find((m) => m.id === item.modelId);
                     const isSelected = selectedId === item.modelId;
-                    const isVisible = model?.visible ?? true;
+                    // 🔧 FIX: childProduct도 부모 가구 기준으로 가시성 체크
+                    const isVisible = item.modelId ? getModelVisibility(item.modelId) : true;
+                    // childProduct인지 확인 (부모 가구 ID가 있으면 childProduct)
+                    const isChildProduct = item.modelId ? childProductMap.has(item.modelId) : false;
 
                     return (
                       <div
                         key={item.id}
                         className={cn(
                           'flex items-center gap-1.5 py-1.5 px-2 rounded-md cursor-pointer transition-colors group',
-                          isSelected ? 'bg-primary/20' : 'hover:bg-white/5'
+                          isSelected ? 'bg-primary/20' : 'hover:bg-white/5',
+                          isChildProduct && 'pl-4' // childProduct 들여쓰기
                         )}
                         onClick={() => select(item.modelId || null)}
+                        title={isChildProduct ? '가구에 배치된 제품 (가구와 함께 표시/숨김)' : undefined}
                       >
                         {/* 가시성 체크박스 */}
                         <Checkbox
@@ -329,11 +371,19 @@ export function LayerPanel() {
                             e.stopPropagation();
                             if (item.modelId) handleVisibilityToggle(item.modelId);
                           }}
-                          className="border-white/40 data-[state=checked]:bg-primary h-3.5 w-3.5"
+                          className={cn(
+                            'h-3.5 w-3.5',
+                            isChildProduct
+                              ? 'border-yellow-500/50 data-[state=checked]:bg-yellow-600'
+                              : 'border-white/40 data-[state=checked]:bg-primary'
+                          )}
                         />
 
-                        {/* 아이콘 */}
-                        <Box className="w-4 h-4 text-blue-400" />
+                        {/* 아이콘 - childProduct는 다른 색상 */}
+                        <Box className={cn(
+                          'w-4 h-4',
+                          isChildProduct ? 'text-yellow-400' : 'text-blue-400'
+                        )} />
 
                         {/* 이름 */}
                         <span
@@ -345,18 +395,25 @@ export function LayerPanel() {
                           {item.name}
                         </span>
 
-                        {/* 삭제 버튼 */}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (item.modelId) handleDelete(item.modelId);
-                          }}
-                        >
-                          <Trash2 className="w-3 h-3 text-red-400" />
-                        </Button>
+                        {/* childProduct 표시 */}
+                        {isChildProduct && (
+                          <span className="text-[10px] text-yellow-500/60 mr-1">📍</span>
+                        )}
+
+                        {/* 삭제 버튼 - childProduct는 삭제 비활성 */}
+                        {!isChildProduct && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (item.modelId) handleDelete(item.modelId);
+                            }}
+                          >
+                            <Trash2 className="w-3 h-3 text-red-400" />
+                          </Button>
+                        )}
                       </div>
                     );
                   })}
