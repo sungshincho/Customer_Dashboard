@@ -2102,6 +2102,7 @@ export type Database = {
           max_product_height: number | null
           max_product_width: number | null
           org_id: string | null
+          properties: Json | null
           slot_id: string
           slot_position: Json | null
           slot_rotation: Json | null
@@ -2121,6 +2122,7 @@ export type Database = {
           max_product_height?: number | null
           max_product_width?: number | null
           org_id?: string | null
+          properties?: Json | null
           slot_id: string
           slot_position?: Json | null
           slot_rotation?: Json | null
@@ -2140,6 +2142,7 @@ export type Database = {
           max_product_height?: number | null
           max_product_width?: number | null
           org_id?: string | null
+          properties?: Json | null
           slot_id?: string
           slot_position?: Json | null
           slot_rotation?: Json | null
@@ -5845,6 +5848,7 @@ export type Database = {
           store_id: string | null
           updated_at: string | null
           user_id: string | null
+          zone_id: string | null
         }
         Insert: {
           assigned_zone_id?: string | null
@@ -5868,6 +5872,7 @@ export type Database = {
           store_id?: string | null
           updated_at?: string | null
           user_id?: string | null
+          zone_id?: string | null
         }
         Update: {
           assigned_zone_id?: string | null
@@ -5891,6 +5896,7 @@ export type Database = {
           store_id?: string | null
           updated_at?: string | null
           user_id?: string | null
+          zone_id?: string | null
         }
         Relationships: [
           {
@@ -5919,6 +5925,20 @@ export type Database = {
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "zones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "zones_dim"
             referencedColumns: ["id"]
           },
         ]
