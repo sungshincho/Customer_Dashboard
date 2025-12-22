@@ -220,6 +220,7 @@ export function useFlowSimulation(): UseFlowSimulationReturn {
         visits: storeContext.visits?.length,
         zones: storeContext.zones?.length,
         zoneMetrics: storeContext.zoneMetrics?.length,
+        entrancePosition: storeContext.storeInfo.entrancePosition,
       });
 
       setProgress(30);
@@ -246,8 +247,12 @@ export function useFlowSimulation(): UseFlowSimulationReturn {
       if (error) throw error;
       if (!data?.result) throw new Error('시뮬레이션 결과를 받지 못했습니다.');
 
-      // 결과 변환
-      const simulationResult = transformFlowResult(data.result, params);
+      // 결과 변환 - 입구 위치 전달하여 동선 시작점 조정
+      const simulationResult = transformFlowResult(
+        data.result,
+        params,
+        storeContext.storeInfo.entrancePosition
+      );
 
       setProgress(100);
 
@@ -391,27 +396,47 @@ export function useFlowSimulation(): UseFlowSimulationReturn {
 
 function transformFlowResult(
   rawResult: any,
-  params: FlowSimulationParams
+  params: FlowSimulationParams,
+  entrancePosition?: { x: number; z: number } | null
 ): FlowSimulationResult {
-  // 동선 경로 변환
-  const paths: FlowPath[] = (rawResult.paths || []).map((path: any, idx: number) => ({
-    id: path.id || `path-${idx}`,
-    customerId: path.customerId || `customer-${idx}`,
-    customerType: path.customerType || 'standard',
-    points: (path.points || []).map((p: any) => ({
+  // 입구 위치 (storeContext에서 전달됨, 없으면 기본값)
+  const entrance = entrancePosition || { x: 0, z: -8 };
+
+  // 동선 경로 변환 - 입구에서 시작하도록 조정
+  const paths: FlowPath[] = (rawResult.paths || []).map((path: any, idx: number) => {
+    // 경로 포인트 변환
+    let transformedPoints = (path.points || []).map((p: any) => ({
       x: p.x || 0,
       y: p.y || 0.5,
       z: p.z || p.y || 0,
       t: p.t || 0,
       speed: p.speed,
       dwell: p.dwell,
-    })),
-    totalTime: path.totalTime || 300,
-    totalDistance: path.totalDistance || 45,
-    dwellZones: path.dwellZones || [],
-    purchaseIntent: path.purchaseIntent || Math.random(),
-    converted: path.converted ?? Math.random() > 0.6,
-  }));
+    }));
+
+    // 🔧 FIX: 경로가 있으면 첫 번째 점을 입구 근처로 조정
+    if (transformedPoints.length > 0) {
+      // 첫 번째 점을 입구 위치 근처로 설정 (약간의 랜덤 오프셋 추가)
+      const randomOffset = (Math.random() - 0.5) * 2; // -1 ~ 1
+      transformedPoints[0] = {
+        ...transformedPoints[0],
+        x: entrance.x + randomOffset,
+        z: entrance.z + Math.random() * 0.5, // 입구 약간 안쪽
+      };
+    }
+
+    return {
+      id: path.id || `path-${idx}`,
+      customerId: path.customerId || `customer-${idx}`,
+      customerType: path.customerType || 'standard',
+      points: transformedPoints,
+      totalTime: path.totalTime || 300,
+      totalDistance: path.totalDistance || 45,
+      dwellZones: path.dwellZones || [],
+      purchaseIntent: path.purchaseIntent || Math.random(),
+      converted: path.converted ?? Math.random() > 0.6,
+    };
+  });
 
   // 병목 지점 변환
   const bottlenecks: FlowBottleneck[] = (rawResult.bottlenecks || []).map(

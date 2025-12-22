@@ -56,6 +56,7 @@ type SceneAction =
   | { type: 'LOAD_SCENE'; payload: Partial<SceneState> }
   | { type: 'SET_DIRTY'; payload: boolean }
   | { type: 'APPLY_SIMULATION'; payload: SimulationResultsPayload }
+  | { type: 'TOGGLE_PRODUCT_VISIBILITY'; payload: string }  // 🆕 제품 개별 가시성 토글
   | { type: 'RESET' };
 
 // ============================================================================
@@ -74,6 +75,7 @@ const initialState: SceneState = {
     fov: 50,
   },
   isDirty: false,
+  hiddenProductIds: [],  // 🆕 제품 개별 가시성 제어
 };
 
 // ============================================================================
@@ -194,36 +196,136 @@ const sceneReducer = (state: SceneState, action: SceneAction): SceneState => {
       const hasProductPlacements = productPlacements && productPlacements.length > 0;
       if (!hasFurnitureMoves && !hasProductPlacements) return state;
 
+      // 🔧 FIX: childProducts 재배치를 위한 사전 처리
+      // productPlacements에서 이동할 제품 목록을 미리 구성
+      const childProductMoves = new Map<string, {
+        productId: string;
+        fromFurnitureId: string;
+        toFurnitureId: string;
+        productData: any;
+        newPosition: { x: number; y: number; z: number };
+        newSlotId: string | null;
+        reason?: string;
+      }>();
+
+      if (hasProductPlacements) {
+        // 모든 가구의 childProducts를 검색하여 이동할 제품 식별
+        state.models.forEach((model) => {
+          if (model.type === 'furniture' && (model.metadata as any)?.childProducts) {
+            const childProducts = (model.metadata as any).childProducts as any[];
+            childProducts.forEach((cp) => {
+              const placement = productPlacements!.find(
+                (p) => p.productId === cp.id || p.productSku === cp.metadata?.sku || p.productSku === cp.name
+              );
+              if (placement && placement.toFurnitureId && placement.toFurnitureId !== model.id) {
+                // 다른 가구로 이동해야 하는 제품 발견
+                childProductMoves.set(cp.id, {
+                  productId: cp.id,
+                  fromFurnitureId: model.id,
+                  toFurnitureId: placement.toFurnitureId,
+                  productData: cp,
+                  newPosition: placement.toSlotPosition || placement.toPosition || cp.position,
+                  newSlotId: placement.toSlotId || null,
+                  reason: placement.reason,
+                });
+              }
+            });
+          }
+        });
+      }
+
+      console.log('[SceneProvider] APPLY_SIMULATION - childProduct moves:', childProductMoves.size);
+
       // 모델 위치 업데이트
       const updatedModels = state.models.map((model) => {
-        // 1️⃣ 가구 이동 처리
-        if (hasFurnitureMoves && model.type === 'furniture') {
-          const move = furnitureMoves!.find(
-            (m) => m.furnitureId === model.id || m.furnitureName === model.name
-          );
+        // 1️⃣ 가구 이동 처리 + childProducts 재배치
+        if (model.type === 'furniture') {
+          let updatedModel = model;
+          let needsUpdate = false;
 
-          if (move) {
-            const newPosition: Vector3Tuple = [
-              move.toPosition.x,
-              move.toPosition.y,
-              move.toPosition.z,
-            ];
+          // 가구 위치 이동 처리
+          if (hasFurnitureMoves) {
+            const move = furnitureMoves!.find(
+              (m) => m.furnitureId === model.id || m.furnitureName === model.name
+            );
 
-            const newRotation: Vector3Tuple = move.rotation
-              ? [model.rotation[0], move.rotation * (Math.PI / 180), model.rotation[2]]
-              : model.rotation;
+            if (move) {
+              const newPosition: Vector3Tuple = [
+                move.toPosition.x,
+                move.toPosition.y,
+                move.toPosition.z,
+              ];
 
-            return {
-              ...model,
-              position: newPosition,
-              rotation: newRotation,
-              metadata: {
-                ...model.metadata,
-                movedBySimulation: true,
-                previousPosition: model.position,
-                simulationType: 'furniture_move',
-              },
-            };
+              const newRotation: Vector3Tuple = move.rotation
+                ? [model.rotation[0], move.rotation * (Math.PI / 180), model.rotation[2]]
+                : model.rotation;
+
+              updatedModel = {
+                ...updatedModel,
+                position: newPosition,
+                rotation: newRotation,
+                metadata: {
+                  ...updatedModel.metadata,
+                  movedBySimulation: true,
+                  previousPosition: model.position,
+                  simulationType: 'furniture_move',
+                },
+              };
+              needsUpdate = true;
+            }
+          }
+
+          // 🔧 FIX: childProducts 재배치 처리
+          if (childProductMoves.size > 0) {
+            const currentChildProducts = ((updatedModel.metadata as any)?.childProducts as any[]) || [];
+
+            // 이 가구에서 제거할 제품들 (다른 가구로 이동)
+            const productsToRemove = new Set<string>();
+            childProductMoves.forEach((move, productId) => {
+              if (move.fromFurnitureId === model.id) {
+                productsToRemove.add(productId);
+              }
+            });
+
+            // 이 가구로 추가할 제품들 (다른 가구에서 이동)
+            const productsToAdd: any[] = [];
+            childProductMoves.forEach((move) => {
+              if (move.toFurnitureId === model.id) {
+                productsToAdd.push({
+                  ...move.productData,
+                  position: move.newPosition,
+                  metadata: {
+                    ...move.productData.metadata,
+                    slot_id: move.newSlotId,
+                    movedBySimulation: true,
+                    placementReason: move.reason,
+                  },
+                });
+              }
+            });
+
+            if (productsToRemove.size > 0 || productsToAdd.length > 0) {
+              console.log(`[SceneProvider] Furniture ${model.id}: removing ${productsToRemove.size}, adding ${productsToAdd.length} products`);
+
+              const newChildProducts = [
+                ...currentChildProducts.filter((cp) => !productsToRemove.has(cp.id)),
+                ...productsToAdd,
+              ];
+
+              updatedModel = {
+                ...updatedModel,
+                metadata: {
+                  ...updatedModel.metadata,
+                  childProducts: newChildProducts,
+                  childProductsModified: true,
+                },
+              };
+              needsUpdate = true;
+            }
+          }
+
+          if (needsUpdate) {
+            return updatedModel;
           }
         }
 
@@ -322,6 +424,18 @@ const sceneReducer = (state: SceneState, action: SceneAction): SceneState => {
       };
     }
 
+    // 🆕 제품 개별 가시성 토글
+    case 'TOGGLE_PRODUCT_VISIBILITY': {
+      const productId = action.payload;
+      const isHidden = state.hiddenProductIds.includes(productId);
+      return {
+        ...state,
+        hiddenProductIds: isHidden
+          ? state.hiddenProductIds.filter(id => id !== productId)  // 숨김 해제
+          : [...state.hiddenProductIds, productId],  // 숨김 추가
+      };
+    }
+
     case 'RESET':
       return initialState;
 
@@ -382,6 +496,11 @@ interface SceneContextValue {
   // 시뮬레이션 결과 적용
   applySimulationResults: (results: SimulationResultsPayload) => void;
   revertSimulationChanges: () => void;
+
+  // 🆕 제품 개별 가시성 제어
+  hiddenProductIds: string[];
+  toggleProductVisibility: (productId: string) => void;
+  isProductVisible: (productId: string) => boolean;
 }
 
 // ============================================================================
@@ -519,6 +638,16 @@ export function SceneProvider({ mode = 'view', children, initialModels = [] }: S
     dispatch({ type: 'SET_MODELS', payload: revertedModels });
   }, [state.models]);
 
+  // 🆕 제품 개별 가시성 토글
+  const toggleProductVisibility = useCallback((productId: string) => {
+    dispatch({ type: 'TOGGLE_PRODUCT_VISIBILITY', payload: productId });
+  }, []);
+
+  // 🆕 제품 가시성 확인
+  const isProductVisible = useCallback((productId: string) => {
+    return !state.hiddenProductIds.includes(productId);
+  }, [state.hiddenProductIds]);
+
   const value: SceneContextValue = {
     state,
     dispatch,
@@ -551,6 +680,10 @@ export function SceneProvider({ mode = 'view', children, initialModels = [] }: S
     setDirty,
     applySimulationResults,
     revertSimulationChanges,
+    // 🆕 제품 개별 가시성 제어
+    hiddenProductIds: state.hiddenProductIds,
+    toggleProductVisibility,
+    isProductVisible,
   };
 
   return <SceneContext.Provider value={value}>{children}</SceneContext.Provider>;

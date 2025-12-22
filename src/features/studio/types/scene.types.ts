@@ -46,6 +46,8 @@ export interface SceneState {
   activeOverlays: string[];
   camera: CameraSettings;
   isDirty: boolean;
+  /** 숨겨진 제품 ID 목록 (childProducts 개별 가시성 제어용) */
+  hiddenProductIds: string[];
 }
 
 // 3D 모델
