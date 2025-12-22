@@ -97,6 +97,15 @@ export interface StoreContext {
     slotId?: string;
     position?: { x: number; y: number; z: number };
   }>;
+  /** 존 간 이동 데이터 (실제 고객 동선 시각화용) */
+  zoneTransitions: Array<{
+    fromZoneId: string;
+    fromZoneName?: string;
+    toZoneId: string;
+    toZoneName?: string;
+    transitionCount: number;
+    avgDurationSeconds: number;
+  }>;
   dataQuality: {
     salesDataDays: number;
     visitorDataDays: number;
@@ -125,6 +134,7 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
     furnitureSlotsResult,
     furnitureResult,
     hourlyMetricsResult,
+    zoneTransitionsResult,
   ] = await Promise.all([
     // 매장 정보
     supabase.from('stores').select('*').eq('id', storeId).single(),
@@ -192,6 +202,13 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
       .gte('date', thirtyDaysAgoStr)
       .order('date', { ascending: false })
       .limit(500),
+
+    // 존 간 이동 데이터 (실제 고객 동선 시각화용)
+    supabase.from('zone_transitions')
+      .select('*')
+      .eq('store_id', storeId)
+      .gte('transition_date', thirtyDaysAgoStr)
+      .order('transition_count', { ascending: false }),
   ]);
 
   const store = storeResult.data;
@@ -205,6 +222,7 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
   const furnitureSlots = furnitureSlotsResult.data || [];
   const furniture = furnitureResult.data || [];
   const hourlyMetrics = hourlyMetricsResult.data || [];
+  const zoneTransitions = zoneTransitionsResult.data || [];
 
   // 가구 ID -> 가구 데이터 맵 생성 (빠른 조회용)
   const furnitureMap = new Map<string, any>();
@@ -224,13 +242,14 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
     furnitureSlots: furnitureSlots.length,
     hourlyMetrics: hourlyMetrics.length,
     visits: visits.length,
+    zoneTransitions: zoneTransitions.length,
   });
 
   // 데이터 품질 점수 계산
   const salesDataDays = dailyKpis.length;
   const visitorDataDays = visits.length > 0 ? Math.min(30, new Set(visits.map((v: any) => v.visit_date?.split('T')[0])).size) : 0;
   const hasZoneData = zones.length > 0;
-  const hasFlowData = visits.some((v: any) => v.zones_visited && v.zones_visited.length > 0);
+  const hasFlowData = zoneTransitions.length > 0 || visits.some((v: any) => v.zones_visited && v.zones_visited.length > 0);
   const hasProductData = productPerf.length > 0;
 
   const overallScore = Math.min(100, (
@@ -453,6 +472,15 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
           } : undefined,
         };
       }),
+    // 존 간 이동 데이터 (실제 고객 동선 시각화용)
+    zoneTransitions: zoneTransitions.map((t: any) => ({
+      fromZoneId: t.from_zone_id,
+      fromZoneName: zoneIdToNameMap.get(t.from_zone_id),
+      toZoneId: t.to_zone_id,
+      toZoneName: zoneIdToNameMap.get(t.to_zone_id),
+      transitionCount: t.transition_count || 0,
+      avgDurationSeconds: t.avg_duration_seconds || 0,
+    })),
     dataQuality: {
       salesDataDays,
       visitorDataDays,
