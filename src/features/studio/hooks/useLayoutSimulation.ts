@@ -19,7 +19,8 @@ import type {
   FurnitureMove,
   ZoneChange,
   SimulationStatus,
-  ConfidenceDetails
+  ConfidenceDetails,
+  ProductPlacement,
 } from '../types';
 
 // ============================================================================
@@ -59,6 +60,9 @@ export interface LayoutSimulationResult {
   // 변경 사항
   furnitureMoves: FurnitureMove[];
   zoneChanges: ZoneChange[];
+
+  // 🆕 상품 재배치 제안
+  productPlacements: ProductPlacement[];
 
   // 신뢰도
   confidence: ConfidenceDetails;
@@ -238,6 +242,32 @@ export function useLayoutSimulation(): UseLayoutSimulationReturn {
         }
       }
 
+      // 🆕 상품 배치 변경 적용
+      for (const productMove of result.productPlacements) {
+        if (productMove.toSlotId && productMove.toFurnitureId) {
+          // 기존 슬롯에서 상품 제거
+          if (productMove.fromSlotId) {
+            await supabase
+              .from('furniture_slots')
+              .update({
+                occupied_by_product_id: null,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('slot_id', productMove.fromSlotId);
+          }
+
+          // 새 슬롯에 상품 배치
+          await supabase
+            .from('furniture_slots')
+            .update({
+              occupied_by_product_id: productMove.productId,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('slot_id', productMove.toSlotId)
+            .eq('furniture_id', productMove.toFurnitureId);
+        }
+      }
+
       // 적용 이력 저장
       await supabase.from('applied_strategies').insert([{
         org_id: orgId,
@@ -353,6 +383,33 @@ function transformLayoutResult(
     }
   );
 
+  // 🆕 상품 재배치 추출 (productPlacements, productMoves, productChanges 등 다양한 필드명 지원)
+  const productPlacements: ProductPlacement[] = (
+    rawResult.productPlacements ||
+    rawResult.productMoves ||
+    rawResult.productChanges ||
+    []
+  ).map((placement: any, idx: number) => ({
+    productId: placement.productId || placement.product_id || `product-${idx}`,
+    productSku: placement.productSku || placement.sku || '',
+    productName: placement.productName || placement.product_name || `상품 ${idx + 1}`,
+    displayType: placement.displayType || placement.display_type,
+    fromFurnitureId: placement.fromFurnitureId || placement.from_furniture_id || null,
+    fromSlotId: placement.fromSlotId || placement.from_slot_id || null,
+    fromPosition: placement.fromPosition || placement.from_position,
+    fromSlotPosition: placement.fromSlotPosition || placement.from_slot_position,
+    toSlotId: placement.toSlotId || placement.to_slot_id || `slot-${idx}`,
+    toFurnitureId: placement.toFurnitureId || placement.to_furniture_id || '',
+    toPosition: placement.toPosition || placement.to_position,
+    toSlotPosition: placement.toSlotPosition || placement.to_slot_position,
+    slotType: placement.slotType || placement.slot_type,
+    reason: placement.reason || placement.rationale || '매출 최적화를 위한 위치 변경',
+    priority: placement.priority || 'medium',
+    displayTypeMatch: placement.displayTypeMatch ?? true,
+  }));
+
+  console.log('[useLayoutSimulation] Extracted product placements:', productPlacements.length);
+
   // 신뢰도 정보
   const confidence: ConfidenceDetails = {
     overall: rawResult.confidence || 0.75,
@@ -389,6 +446,7 @@ function transformLayoutResult(
 
     furnitureMoves,
     zoneChanges,
+    productPlacements,
     confidence,
 
     insights: rawResult.insights || [
@@ -508,6 +566,7 @@ function transformHistoryItem(item: any): LayoutSimulationResult {
     },
     furnitureMoves: item.result?.furnitureMoves || [],
     zoneChanges: item.result?.zoneChanges || [],
+    productPlacements: item.result?.productPlacements || item.result?.productMoves || [],
     confidence: item.result?.confidence || {
       overall: 0.7,
       factors: { dataQuality: 0.7, modelAccuracy: 0.7, sampleSize: 0.7, variability: 0.7 },

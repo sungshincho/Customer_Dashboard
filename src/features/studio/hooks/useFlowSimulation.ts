@@ -220,6 +220,7 @@ export function useFlowSimulation(): UseFlowSimulationReturn {
         visits: storeContext.visits?.length,
         zones: storeContext.zones?.length,
         zoneMetrics: storeContext.zoneMetrics?.length,
+        zoneTransitions: storeContext.zoneTransitions?.length,
         entrancePosition: storeContext.storeInfo.entrancePosition,
       });
 
@@ -247,11 +248,13 @@ export function useFlowSimulation(): UseFlowSimulationReturn {
       if (error) throw error;
       if (!data?.result) throw new Error('시뮬레이션 결과를 받지 못했습니다.');
 
-      // 결과 변환 - 입구 위치 전달하여 동선 시작점 조정
+      // 결과 변환 - 입구 위치, 실제 zone_transitions 데이터 전달
       const simulationResult = transformFlowResult(
         data.result,
         params,
-        storeContext.storeInfo.entrancePosition
+        storeContext.storeInfo.entrancePosition,
+        storeContext.zoneTransitions,
+        storeContext.zones
       );
 
       setProgress(100);
@@ -394,10 +397,30 @@ export function useFlowSimulation(): UseFlowSimulationReturn {
 // 헬퍼 함수
 // ============================================================================
 
+interface ZoneTransitionData {
+  fromZoneId: string;
+  fromZoneName?: string;
+  toZoneId: string;
+  toZoneName?: string;
+  transitionCount: number;
+  avgDurationSeconds: number;
+}
+
+interface ZoneData {
+  id: string;
+  zoneName: string;
+  x: number;
+  z: number;
+  width: number;
+  depth: number;
+}
+
 function transformFlowResult(
   rawResult: any,
   params: FlowSimulationParams,
-  entrancePosition?: { x: number; z: number } | null
+  entrancePosition?: { x: number; z: number } | null,
+  zoneTransitions?: ZoneTransitionData[],
+  zones?: ZoneData[]
 ): FlowSimulationResult {
   // 입구 위치 (storeContext에서 전달됨, 없으면 기본값)
   const entrance = entrancePosition || { x: 0, z: -8 };
@@ -479,8 +502,8 @@ function transformFlowResult(
     },
   };
 
-  // 시각화 데이터 생성
-  const visualization = generateFlowVisualization(paths, bottlenecks);
+  // 시각화 데이터 생성 - 실제 zone_transitions 데이터 활용
+  const visualization = generateFlowVisualization(paths, bottlenecks, zoneTransitions, zones);
 
   // 비교 데이터
   const currentPathLength = rawResult.currentPathLength ||
@@ -613,7 +636,9 @@ function generateFlowInsights(
 
 function generateFlowVisualization(
   paths: FlowPath[],
-  bottlenecks: FlowBottleneck[]
+  bottlenecks: FlowBottleneck[],
+  zoneTransitions?: ZoneTransitionData[],
+  zones?: ZoneData[]
 ): FlowSimulationResult['visualization'] {
   // 애니메이션 경로
   const animatedPaths = paths.slice(0, 20).map((path) => ({
@@ -670,57 +695,91 @@ function generateFlowVisualization(
     }
   }
 
-  // 존 간 이동 화살표 - 실제 경로 기반 생성
+  // 존 간 이동 화살표 - 🔧 FIX: 실제 zone_transitions DB 데이터 우선 사용
   const zoneFlowArrows: Array<{
     from: { x: number; y: number; z: number };
     to: { x: number; y: number; z: number };
     volume: number;
   }> = [];
 
-  // 경로에서 연속적인 포인트 쌍의 이동 패턴 분석
-  const flowTransitions: Map<string, { from: { x: number; z: number }; to: { x: number; z: number }; count: number }> = new Map();
+  // 존 ID -> 위치 맵 생성
+  const zonePositionMap = new Map<string, { x: number; z: number }>();
+  if (zones && zones.length > 0) {
+    zones.forEach((zone) => {
+      zonePositionMap.set(zone.id, { x: zone.x, z: zone.z });
+    });
+  }
 
-  paths.forEach((path) => {
-    if (path.points.length < 4) return;
+  // 🔧 실제 zone_transitions 데이터가 있으면 사용
+  if (zoneTransitions && zoneTransitions.length > 0 && zonePositionMap.size > 0) {
+    console.log('[useFlowSimulation] Using real zone_transitions data:', zoneTransitions.length);
 
-    // 경로를 세그먼트로 나누어 주요 이동 패턴 추출
-    const segmentSize = Math.max(3, Math.floor(path.points.length / 4));
-    for (let i = 0; i < path.points.length - segmentSize; i += segmentSize) {
-      const fromPoint = path.points[i];
-      const toPoint = path.points[Math.min(i + segmentSize, path.points.length - 1)];
+    // 최대 이동 횟수 계산
+    const maxTransitionCount = Math.max(...zoneTransitions.map((t) => t.transitionCount), 1);
 
-      // 그리드화하여 키 생성 (2m 단위)
-      const fromKey = `${Math.round(fromPoint.x / 2) * 2},${Math.round(fromPoint.z / 2) * 2}`;
-      const toKey = `${Math.round(toPoint.x / 2) * 2},${Math.round(toPoint.z / 2) * 2}`;
-      const key = `${fromKey}->${toKey}`;
+    // 상위 10개 이동 패턴을 화살표로 변환
+    zoneTransitions
+      .filter((t) => zonePositionMap.has(t.fromZoneId) && zonePositionMap.has(t.toZoneId))
+      .slice(0, 10)
+      .forEach((transition) => {
+        const fromPos = zonePositionMap.get(transition.fromZoneId)!;
+        const toPos = zonePositionMap.get(transition.toZoneId)!;
 
-      if (fromKey !== toKey) {
-        const existing = flowTransitions.get(key);
-        if (existing) {
-          existing.count += 1;
-        } else {
-          flowTransitions.set(key, {
-            from: { x: Math.round(fromPoint.x / 2) * 2, z: Math.round(fromPoint.z / 2) * 2 },
-            to: { x: Math.round(toPoint.x / 2) * 2, z: Math.round(toPoint.z / 2) * 2 },
-            count: 1,
-          });
+        zoneFlowArrows.push({
+          from: { x: fromPos.x, y: 0.5, z: fromPos.z },
+          to: { x: toPos.x, y: 0.5, z: toPos.z },
+          volume: transition.transitionCount / maxTransitionCount,
+        });
+      });
+
+    console.log('[useFlowSimulation] Generated', zoneFlowArrows.length, 'flow arrows from DB data');
+  } else {
+    // 폴백: 경로에서 연속적인 포인트 쌍의 이동 패턴 분석
+    console.log('[useFlowSimulation] No zone_transitions data, using path-based analysis');
+    const flowTransitions: Map<string, { from: { x: number; z: number }; to: { x: number; z: number }; count: number }> = new Map();
+
+    paths.forEach((path) => {
+      if (path.points.length < 4) return;
+
+      // 경로를 세그먼트로 나누어 주요 이동 패턴 추출
+      const segmentSize = Math.max(3, Math.floor(path.points.length / 4));
+      for (let i = 0; i < path.points.length - segmentSize; i += segmentSize) {
+        const fromPoint = path.points[i];
+        const toPoint = path.points[Math.min(i + segmentSize, path.points.length - 1)];
+
+        // 그리드화하여 키 생성 (2m 단위)
+        const fromKey = `${Math.round(fromPoint.x / 2) * 2},${Math.round(fromPoint.z / 2) * 2}`;
+        const toKey = `${Math.round(toPoint.x / 2) * 2},${Math.round(toPoint.z / 2) * 2}`;
+        const key = `${fromKey}->${toKey}`;
+
+        if (fromKey !== toKey) {
+          const existing = flowTransitions.get(key);
+          if (existing) {
+            existing.count += 1;
+          } else {
+            flowTransitions.set(key, {
+              from: { x: Math.round(fromPoint.x / 2) * 2, z: Math.round(fromPoint.z / 2) * 2 },
+              to: { x: Math.round(toPoint.x / 2) * 2, z: Math.round(toPoint.z / 2) * 2 },
+              count: 1,
+            });
+          }
         }
       }
-    }
-  });
-
-  // 상위 5개 이동 패턴을 화살표로 변환
-  const maxCount = Math.max(...Array.from(flowTransitions.values()).map((t) => t.count), 1);
-  Array.from(flowTransitions.values())
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5)
-    .forEach((transition) => {
-      zoneFlowArrows.push({
-        from: { x: transition.from.x, y: 0.5, z: transition.from.z },
-        to: { x: transition.to.x, y: 0.5, z: transition.to.z },
-        volume: transition.count / maxCount,
-      });
     });
+
+    // 상위 5개 이동 패턴을 화살표로 변환
+    const maxCount = Math.max(...Array.from(flowTransitions.values()).map((t) => t.count), 1);
+    Array.from(flowTransitions.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5)
+      .forEach((transition) => {
+        zoneFlowArrows.push({
+          from: { x: transition.from.x, y: 0.5, z: transition.from.z },
+          to: { x: transition.to.x, y: 0.5, z: transition.to.z },
+          volume: transition.count / maxCount,
+        });
+      });
+  }
 
   return {
     animatedPaths,
