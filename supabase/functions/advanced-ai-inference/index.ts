@@ -3302,8 +3302,15 @@ async function performLayoutOptimization(request: InferenceRequest, apiKey: stri
   // 🆕 사용 가능한 빈 슬롯 정보 (sceneData에서 추출)
   const availableSlots = sceneData?.availableSlots || [];
 
+  // 🆕 최적화 강도 설정에서 최대 변경 수 추출
+  const settings = params?.settings || {};
+  const maxFurnitureMoves = settings.furniture?.maxMoves || 12;  // 기본값: medium
+  const maxProductRelocations = settings.products?.maxRelocations || 35;  // 기본값: medium
+  const intensityLevel = settings.intensity || 'medium';
+
   console.log('[LayoutOptimization] Slot-based product placements:', actualProductPlacements.length);
   console.log('[LayoutOptimization] Available slots for AI:', availableSlots.length);
+  console.log('[LayoutOptimization] Intensity settings:', { intensityLevel, maxFurnitureMoves, maxProductRelocations });
 
   // 프롬프트 빌드 (슬롯 시스템 통합)
   const prompt = `You are an expert retail space optimization AI specializing in store layout design.
@@ -3335,18 +3342,21 @@ ${availableSlots.length > 0 ? availableSlots.slice(0, 30).map((s: any) =>
   `- ${s.furnitureCode || s.furnitureName}[${s.slotCode || s.slotId}] (타입: ${s.slotType || 'N/A'}, 호환: ${(s.compatibleDisplayTypes || []).join(',')})`
 ).join('\n') : '빈 슬롯 없음 - 아래 "슬롯 교환" 방식으로 제안하세요'}
 
-🚨🚨🚨 CRITICAL - 제품 재배치(productSlotMoves) 필수 규칙 🚨🚨🚨
+🚨🚨🚨 CRITICAL - 최적화 강도 및 개수 제한 🚨🚨🚨
 
-⚠️ productSlotMoves는 빈 배열이 아닌 **최소 3-5개** 제안을 포함해야 합니다!
+📊 현재 최적화 강도: ${intensityLevel === 'low' ? '보수적 (Low)' : intensityLevel === 'medium' ? '균형 (Medium)' : '적극적 (High)'}
 
-📌 방법 1: 빈 슬롯이 있는 경우
-- 위 "빈 슬롯" 목록에서 toSlotId 선택
-- 예: 캐시미어 코트를 RACK-001[H1-1]에서 MANNE-001[M3]으로 이동
+⚠️ 필수 제한 사항:
+- furnitureMoves: 최소 3개, 최대 ${maxFurnitureMoves}개
+- productSlotMoves: 최소 3개, 최대 ${maxProductRelocations}개
 
-📌 방법 2: 빈 슬롯이 없거나 부족한 경우 → "슬롯 교환" 방식
-- 두 제품의 위치를 서로 교환 (swapWith 필드 사용)
-- 예: 고가 상품 A를 입구 근처로 이동, 저가 상품 B를 뒤쪽으로 이동
-- 결과적으로 두 제품이 서로 자리를 바꿈
+📌 가구 재배치 (furnitureMoves):
+- 반드시 ${Math.min(3, maxFurnitureMoves)}~${maxFurnitureMoves}개 범위 내에서 제안
+- 영향력 높은 가구 우선 (입구 근처, 동선 핵심 위치)
+
+📌 제품 재배치 (productSlotMoves):
+- 반드시 ${Math.min(3, maxProductRelocations)}~${maxProductRelocations}개 범위 내에서 제안
+- 빈 슬롯이 없으면 swapWithSku를 사용하여 위치 교환
 
 📌 제품 재배치 우선순위:
 1. 프리미엄/고마진 상품 → 입구 근처 마네킹, 눈높이 진열
@@ -3399,8 +3409,9 @@ Return a JSON object with this exact structure:
     }
   ],
 
-  ⚠️ productSlotMoves 작성 시 주의:
-  - 반드시 3-5개 이상의 제안을 포함할 것!
+  ⚠️ 개수 제한 필수:
+  - furnitureMoves: ${Math.min(3, maxFurnitureMoves)}~${maxFurnitureMoves}개 (현재 강도: ${intensityLevel})
+  - productSlotMoves: ${Math.min(3, maxProductRelocations)}~${maxProductRelocations}개 (현재 강도: ${intensityLevel})
   - productSku는 위 "현재 제품 배치" 목록에 있는 SKU만 사용
   - 빈 슬롯이 없으면 swapWithSku를 사용하여 두 제품 위치 교환 제안
   - reason은 비즈니스 관점에서 한국어로 작성
@@ -3647,15 +3658,19 @@ Return a JSON object with this exact structure:
       };
     });
 
-    // 모든 제품 배치 제안 병합 (슬롯 기반 우선)
+    // 모든 제품 배치 제안 병합 (슬롯 기반 우선, 최적화 강도 제한 적용)
     const combinedProductPlacements = [
       ...processedSlotMoves,
       ...processedPlacements,
       ...processedRuleBased,
-    ].slice(0, 15); // 최대 15개 제안
+    ].slice(0, maxProductRelocations); // 최적화 강도에 따른 최대 개수 제한
+
+    // 가구 이동도 최대 개수 제한 적용
+    const limitedFurnitureMoves = (aiResponse.furnitureMoves || []).slice(0, maxFurnitureMoves);
 
     console.log('[LayoutOptimization] Processed productSlotMoves:', processedSlotMoves.length);
     console.log('[LayoutOptimization] Processed productPlacements:', processedPlacements.length);
+    console.log('[LayoutOptimization] Applied limits - furniture:', limitedFurnitureMoves.length, '/', maxFurnitureMoves, ', products:', combinedProductPlacements.length, '/', maxProductRelocations);
 
     console.log('[LayoutOptimization] Product placements with positions:',
       combinedProductPlacements.slice(0, 3).map((p: any) => ({
@@ -3705,7 +3720,7 @@ Return a JSON object with this exact structure:
           conversionIncrease: aiResponse.improvements?.conversionIncrease || 5,
           trafficIncrease: aiResponse.improvements?.trafficIncrease || 7,
         },
-        furnitureMoves: aiResponse.furnitureMoves || [],
+        furnitureMoves: limitedFurnitureMoves,
         productPlacements: combinedProductPlacements,
         zoneChanges: aiResponse.zoneChanges || [],
         confidence: {
