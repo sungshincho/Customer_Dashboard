@@ -352,18 +352,22 @@ export function AIOptimizationTab({
                 : 'To-Be',
               effect: move.reason || '+효율성',
             })),
-            // 제품 재배치 변경 사항 (슬롯 기반)
+            // 🆕 제품 재배치 변경 사항 (슬롯 바인딩 기반)
             productChanges: (results.layout.productPlacements || []).map((placement: any) => ({
               productId: placement.productId || placement.product_id || '',
-              productName: placement.productLabel || placement.productName || placement.sku || '상품',
-              fromFurniture: placement.currentFurnitureLabel || placement.current?.furnitureId || placement.initial_placement?.furniture_id || '현재 위치',
-              fromSlot: placement.fromSlotId || placement.current?.slotId || placement.initial_placement?.slot_id || '-',
-              toFurniture: placement.suggestedFurnitureLabel || placement.suggested?.furnitureId || placement.optimization_result?.suggested_furniture_id || '추천 위치',
-              toSlot: placement.toSlotId || placement.suggested?.slotId || placement.optimization_result?.suggested_slot_id || '-',
-              reason: placement.reason || placement.optimization_result?.optimization_reason || '매출 최적화',
-              expectedImpact: placement.expectedImpact || placement.optimization_result?.expected_impact ? {
-                revenueChangePct: placement.expectedImpact?.revenue_change_pct || placement.optimization_result?.expected_impact?.revenue_change_pct || 0,
-                visibilityScore: placement.expectedImpact?.visibility_score || placement.optimization_result?.expected_impact?.visibility_score || 0,
+              productSku: placement.productSku || placement.sku || '',
+              productName: placement.productName || placement.productLabel || placement.sku || '상품',
+              // As-Is (현재 위치)
+              fromFurniture: placement.fromFurnitureCode || placement.fromFurnitureName || placement.currentFurnitureLabel || '현재 가구',
+              fromSlot: placement.fromSlotId || '-',
+              // To-Be (제안 위치)
+              toFurniture: placement.toFurnitureCode || placement.toFurnitureName || placement.suggestedFurnitureLabel || '추천 가구',
+              toSlot: placement.toSlotId || '-',
+              // 사유 및 예상 효과
+              reason: placement.reason || '슬롯 최적화',
+              expectedImpact: placement.expectedImpact ? {
+                revenueChangePct: placement.expectedImpact.revenueChangePct || placement.expectedImpact.revenue_change_pct || 0,
+                visibilityScore: placement.expectedImpact.visibilityScore || placement.expectedImpact.visibility_score || 0,
               } : undefined,
             })),
           };

@@ -628,7 +628,16 @@ interface ProductMoveIndicatorProps {
     productName?: string;
     productSku?: string;
     sku?: string;
-    // 🔧 NEW: Edge Function에서 계산된 실제 위치
+    // 🔧 슬롯 바인딩 정보 (Edge Function에서 반환)
+    fromFurnitureId?: string;
+    fromFurnitureCode?: string;
+    fromFurnitureName?: string;
+    fromSlotId?: string;
+    toFurnitureId?: string;
+    toFurnitureCode?: string;
+    toFurnitureName?: string;
+    toSlotId?: string;
+    // 🔧 Edge Function에서 계산된 실제 위치
     fromPosition?: { x: number; y: number; z: number };
     toPosition?: { x: number; y: number; z: number };
     toSlotPosition?: { x: number; y: number; z: number };
@@ -651,13 +660,13 @@ interface ProductMoveIndicatorProps {
     current?: { position?: { x: number; y: number; z: number } };
     suggested?: { position?: { x: number; y: number; z: number } };
     // 추가 메타데이터
-    fromFurnitureId?: string;
-    toFurnitureId?: string;
-    fromSlotId?: string;
-    toSlotId?: string;
     slotType?: string;
     reason?: string;
     priority?: string;
+    expectedImpact?: {
+      revenueChangePct?: number;
+      visibilityScore?: number;
+    };
   };
   storeBounds: { width: number; depth: number };
   index: number;
@@ -755,7 +764,15 @@ function ProductMoveIndicator({
   });
 
   const productName = placement.productName || placement.productSku || placement.sku || '상품';
-  const impact = placement.optimization_result?.expected_impact;
+  const productSku = placement.productSku || placement.sku || '';
+
+  // 슬롯 바인딩 정보
+  const fromSlotDisplay = placement.fromSlotId || placement.initial_placement?.slot_id || '-';
+  const toSlotDisplay = placement.toSlotId || placement.optimization_result?.suggested_slot_id || '-';
+  const fromFurnitureDisplay = placement.fromFurnitureCode || placement.fromFurnitureName || '현재 가구';
+  const toFurnitureDisplay = placement.toFurnitureCode || placement.toFurnitureName || '추천 가구';
+
+  const impact = placement.expectedImpact || placement.optimization_result?.expected_impact;
   const reason = placement.reason || placement.optimization_result?.optimization_reason;
 
   // 제품별 다른 색상
@@ -827,26 +844,50 @@ function ProductMoveIndicator({
         />
       </mesh>
 
-      {/* 라벨 (호버/선택 시) */}
+      {/* 🆕 슬롯 바인딩 라벨 (호버/선택 시) */}
       {(hovered || isSelected) && (
         <Html
           position={[
             (from[0] + to[0]) / 2,
-            Math.max(from[1], to[1]) + 1,
+            Math.max(from[1], to[1]) + 1.2,
             (from[2] + to[2]) / 2,
           ]}
           center
         >
-          <div className="px-2 py-1.5 bg-purple-900/95 text-white text-[10px] rounded-lg shadow-lg border border-purple-400/30 min-w-[100px]">
+          <div className="px-3 py-2 bg-purple-900/95 text-white text-[10px] rounded-lg shadow-lg border border-purple-400/30 min-w-[140px]">
+            {/* 제품 정보 */}
             <div className="font-medium text-xs">{productName}</div>
-            <div className="text-purple-300 text-[9px] mt-0.5">
-              {placement.initial_placement?.slot_id || '현재'} → {placement.optimization_result?.suggested_slot_id || '추천'}
+            {productSku && (
+              <div className="text-purple-300 text-[9px] font-mono">({productSku})</div>
+            )}
+
+            {/* 슬롯 바인딩 변경 */}
+            <div className="mt-1.5 pt-1.5 border-t border-purple-500/30">
+              <div className="flex items-center gap-1.5 text-[9px]">
+                <span className="text-red-300 font-mono">{fromFurnitureDisplay}[{fromSlotDisplay}]</span>
+                <span className="text-purple-400">→</span>
+                <span className="text-green-300 font-mono">{toFurnitureDisplay}[{toSlotDisplay}]</span>
+              </div>
             </div>
+
+            {/* 사유 */}
+            {reason && (
+              <div className="text-purple-200 text-[9px] mt-1 leading-tight">
+                💡 {reason}
+              </div>
+            )}
+
+            {/* 예상 효과 */}
             {impact && (
-              <div className="flex gap-1.5 mt-1 text-[9px]">
-                {impact.revenue_change_pct !== undefined && (
-                  <span className={impact.revenue_change_pct >= 0 ? 'text-green-400' : 'text-red-400'}>
-                    매출 {impact.revenue_change_pct >= 0 ? '+' : ''}{impact.revenue_change_pct.toFixed(1)}%
+              <div className="flex gap-2 mt-1.5 pt-1 border-t border-purple-500/20 text-[9px]">
+                {(impact.revenueChangePct !== undefined || impact.revenue_change_pct !== undefined) && (
+                  <span className={(impact.revenueChangePct ?? impact.revenue_change_pct ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}>
+                    매출 {(impact.revenueChangePct ?? impact.revenue_change_pct ?? 0) >= 0 ? '+' : ''}{(impact.revenueChangePct ?? impact.revenue_change_pct ?? 0).toFixed(1)}%
+                  </span>
+                )}
+                {(impact.visibilityScore !== undefined || impact.visibility_score !== undefined) && (
+                  <span className="text-yellow-400">
+                    노출 {((impact.visibilityScore ?? impact.visibility_score ?? 0) * 100).toFixed(0)}점
                   </span>
                 )}
               </div>

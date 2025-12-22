@@ -5,6 +5,7 @@
  * - As-is 씬 데이터를 AI에 전달
  * - 시뮬레이션 결과로 To-be 씬 생성
  * - 씬 비교 및 적용 관리
+ * - 🆕 슬롯 기반 제품 배치 정보 추출
  */
 
 import { useState, useCallback, useMemo } from 'react';
@@ -29,7 +30,126 @@ import type {
   FlowSimulationResultType,
   CongestionSimulationResultType,
   StaffingSimulationResultType,
+  FurnitureAsset,
 } from '../types';
+
+// ============================================================================
+// 🆕 슬롯 기반 제품 배치 타입
+// ============================================================================
+
+export interface ProductPlacementInfo {
+  productId: string;
+  productSku: string;
+  productName: string;
+  category?: string;
+  displayType?: string;
+  furnitureId: string;
+  furnitureCode?: string;
+  furnitureName?: string;
+  slotId?: string;
+  slotType?: string;
+  position?: { x: number; y: number; z: number };
+}
+
+export interface AvailableSlotInfo {
+  slotId: string;
+  slotCode?: string;
+  furnitureId: string;
+  furnitureCode?: string;
+  furnitureName?: string;
+  slotType?: string;
+  compatibleDisplayTypes?: string[];
+  position?: { x: number; y: number; z: number };
+}
+
+// ============================================================================
+// 🆕 제품 배치 및 슬롯 정보 추출 함수
+// ============================================================================
+
+/**
+ * 가구의 childProducts에서 현재 제품 배치 정보 추출
+ */
+function extractProductPlacements(furniture: FurnitureAsset[]): ProductPlacementInfo[] {
+  const placements: ProductPlacementInfo[] = [];
+
+  furniture.forEach((f) => {
+    const childProducts = (f as any).childProducts || [];
+    childProducts.forEach((cp: any) => {
+      placements.push({
+        productId: cp.id,
+        productSku: cp.sku || cp.metadata?.sku || '',
+        productName: cp.metadata?.product_name || cp.metadata?.name || cp.sku || '상품',
+        category: cp.metadata?.category,
+        displayType: cp.display_type || cp.metadata?.display_type,
+        furnitureId: f.id,
+        furnitureCode: f.metadata?.furniture_code || f.metadata?.code,
+        furnitureName: f.metadata?.name || f.furniture_type,
+        slotId: cp.metadata?.slot_id || cp.slot_id,
+        slotType: cp.metadata?.slot_type,
+        position: cp.position ? {
+          x: cp.position.x ?? cp.position[0] ?? 0,
+          y: cp.position.y ?? cp.position[1] ?? 0,
+          z: cp.position.z ?? cp.position[2] ?? 0,
+        } : undefined,
+      });
+    });
+  });
+
+  console.log('[useSceneSimulation] extractProductPlacements:', placements.length, 'products');
+  return placements;
+}
+
+/**
+ * 사용 가능한 빈 슬롯 목록 추출
+ * (DB의 furniture_slots 테이블에서 로드된 슬롯 정보와 현재 제품 배치 비교)
+ */
+async function extractAvailableSlots(
+  storeId: string,
+  furniture: FurnitureAsset[],
+  currentPlacements: ProductPlacementInfo[]
+): Promise<AvailableSlotInfo[]> {
+  // DB에서 슬롯 데이터 로드
+  const { data: dbSlots, error } = await supabase
+    .from('furniture_slots')
+    .select('*')
+    .eq('store_id', storeId);
+
+  if (error || !dbSlots) {
+    console.warn('[useSceneSimulation] Failed to load slots:', error);
+    return [];
+  }
+
+  // 현재 점유된 슬롯 ID 세트
+  const occupiedSlotIds = new Set(currentPlacements.map((p) => p.slotId).filter(Boolean));
+
+  // 가구 ID -> 가구 정보 맵
+  const furnitureMap = new Map<string, FurnitureAsset>();
+  furniture.forEach((f) => furnitureMap.set(f.id, f));
+
+  // 빈 슬롯 필터링
+  const availableSlots: AvailableSlotInfo[] = dbSlots
+    .filter((s: any) => !s.is_occupied && !occupiedSlotIds.has(s.slot_id))
+    .map((s: any) => {
+      const furn = furnitureMap.get(s.furniture_id);
+      return {
+        slotId: s.id,
+        slotCode: s.slot_id,
+        furnitureId: s.furniture_id,
+        furnitureCode: furn?.metadata?.furniture_code || furn?.metadata?.code,
+        furnitureName: furn?.metadata?.name || furn?.furniture_type,
+        slotType: s.slot_type,
+        compatibleDisplayTypes: s.compatible_display_types,
+        position: s.slot_position ? {
+          x: s.slot_position.x ?? 0,
+          y: s.slot_position.y ?? 0,
+          z: s.slot_position.z ?? 0,
+        } : undefined,
+      };
+    });
+
+  console.log('[useSceneSimulation] extractAvailableSlots:', availableSlots.length, 'slots');
+  return availableSlots;
+}
 
 // 타입 별칭 (기존 코드와 호환성 유지)
 type LayoutSimulationResult = LayoutSimulationResultType;
@@ -293,11 +413,24 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
       setIsSimulating(true);
 
       try {
-        // 씬 데이터 준비
+        // 🆕 슬롯 기반 제품 배치 정보 추출
+        const productPlacements = extractProductPlacements(targetScene.furniture);
+        const availableSlots = await extractAvailableSlots(
+          selectedStore.id,
+          targetScene.furniture,
+          productPlacements
+        );
+
+        console.log('[useSceneSimulation] Product placements for AI:', productPlacements.length);
+        console.log('[useSceneSimulation] Available slots for AI:', availableSlots.length);
+
+        // 씬 데이터 준비 (🆕 슬롯 기반 정보 포함)
         const sceneData = {
           furniture: targetScene.furniture.map((f) => ({
             id: f.id,
             type: f.furniture_type,
+            code: f.metadata?.furniture_code || f.metadata?.code,
+            name: f.metadata?.name || f.furniture_type,
             position: f.position,
             rotation: f.rotation,
             dimensions: f.dimensions,
@@ -311,6 +444,29 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
           space: {
             dimensions: targetScene.space.dimensions,
           },
+          // 🆕 슬롯 기반 제품 배치 정보
+          productPlacements: productPlacements.map((p) => ({
+            productId: p.productId,
+            productSku: p.productSku,
+            productName: p.productName,
+            category: p.category,
+            displayType: p.displayType,
+            furnitureId: p.furnitureId,
+            furnitureCode: p.furnitureCode,
+            furnitureName: p.furnitureName,
+            slotId: p.slotId,
+            slotType: p.slotType,
+          })),
+          // 🆕 사용 가능한 빈 슬롯
+          availableSlots: availableSlots.map((s) => ({
+            slotId: s.slotId,
+            slotCode: s.slotCode,
+            furnitureId: s.furnitureId,
+            furnitureCode: s.furnitureCode,
+            furnitureName: s.furnitureName,
+            slotType: s.slotType,
+            compatibleDisplayTypes: s.compatibleDisplayTypes,
+          })),
         };
 
         // 병렬로 시뮬레이션 실행

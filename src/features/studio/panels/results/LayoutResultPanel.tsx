@@ -23,14 +23,18 @@ export interface LayoutResult {
     to: string;
     effect: string;
   }[];
-  /** 제품 재배치 변경 사항 (슬롯 기반) */
+  /** 🆕 제품 재배치 변경 사항 (슬롯 바인딩 기반) */
   productChanges?: {
     productId: string;
+    productSku?: string;
     productName: string;
-    fromFurniture: string;
-    fromSlot: string;
-    toFurniture: string;
-    toSlot: string;
+    // As-Is (현재 위치)
+    fromFurniture: string;   // 가구 코드/이름 (예: "RACK-001" 또는 "의류 행거")
+    fromSlot: string;        // 슬롯 ID (예: "H1-1")
+    // To-Be (제안 위치)
+    toFurniture: string;     // 제안 가구 코드/이름 (예: "MANNE-001" 또는 "전신 마네킹")
+    toSlot: string;          // 제안 슬롯 ID (예: "M3")
+    // 사유 및 효과
     reason: string;
     expectedImpact?: {
       revenueChangePct: number;
@@ -155,25 +159,52 @@ export const LayoutResultPanel: React.FC<LayoutResultPanelProps> = ({
             </div>
           )}
 
-          {/* 제품 재배치 변경 사항 */}
+          {/* 🆕 제품 재배치 변경 사항 (슬롯 바인딩 기반) */}
           {result.productChanges && result.productChanges.length > 0 && (
             <div className="mb-3">
               <p className="text-xs text-white/50 mb-2 flex items-center gap-1">
                 <Package className="w-3 h-3" />
                 제품 재배치 ({result.productChanges.length}건)
               </p>
-              <div className="space-y-2 max-h-28 overflow-y-auto">
+              <div className="space-y-2 max-h-36 overflow-y-auto">
                 {result.productChanges.map((change, i) => (
-                  <div key={i} className="text-xs bg-blue-500/10 border border-blue-500/20 rounded p-2">
-                    <p className="text-white font-medium">{change.productName}</p>
-                    <p className="text-white/40">
-                      {change.fromFurniture}[{change.fromSlot}] → {change.toFurniture}[{change.toSlot}]
-                    </p>
-                    <p className="text-blue-400 text-[10px]">{change.reason}</p>
+                  <div key={i} className="text-xs bg-purple-500/10 border border-purple-500/20 rounded p-2.5">
+                    {/* 제품 정보 */}
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="text-white font-medium">{change.productName}</span>
+                      {change.productSku && (
+                        <span className="text-purple-300 text-[10px] font-mono">({change.productSku})</span>
+                      )}
+                    </div>
+
+                    {/* 슬롯 바인딩 변경 (As-Is → To-Be) */}
+                    <div className="flex items-center gap-2 text-[10px]">
+                      {/* As-Is */}
+                      <div className="bg-red-500/20 px-2 py-1 rounded flex-1 text-center">
+                        <span className="text-red-300 font-mono">{change.fromFurniture}</span>
+                        <span className="text-white/40"> / </span>
+                        <span className="text-red-200 font-mono">{change.fromSlot}</span>
+                      </div>
+
+                      {/* Arrow */}
+                      <ArrowRight className="w-3 h-3 text-purple-400 flex-shrink-0" />
+
+                      {/* To-Be */}
+                      <div className="bg-green-500/20 px-2 py-1 rounded flex-1 text-center">
+                        <span className="text-green-300 font-mono">{change.toFurniture}</span>
+                        <span className="text-white/40"> / </span>
+                        <span className="text-green-200 font-mono">{change.toSlot}</span>
+                      </div>
+                    </div>
+
+                    {/* 사유 */}
+                    <p className="text-purple-300 text-[10px] mt-1.5 leading-tight">💡 {change.reason}</p>
+
+                    {/* 예상 효과 */}
                     {change.expectedImpact && (
-                      <div className="flex gap-2 mt-1">
+                      <div className="flex gap-2 mt-1.5 pt-1.5 border-t border-white/10">
                         <span className="text-green-400 text-[10px]">
-                          매출 {change.expectedImpact.revenueChangePct > 0 ? '+' : ''}{change.expectedImpact.revenueChangePct.toFixed(1)}%
+                          매출 {change.expectedImpact.revenueChangePct >= 0 ? '+' : ''}{change.expectedImpact.revenueChangePct.toFixed(1)}%
                         </span>
                         <span className="text-yellow-400 text-[10px]">
                           노출 {(change.expectedImpact.visibilityScore * 100).toFixed(0)}점
