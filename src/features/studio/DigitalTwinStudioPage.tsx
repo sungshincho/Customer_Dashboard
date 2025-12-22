@@ -661,9 +661,9 @@ export default function DigitalTwinStudioPage() {
                         return {
                           ...s,
                           avatar_position: {
-                            x: zonePos.x + (idx % 3) * 1.5 - 1.5,
+                            x: zonePos[0] + (idx % 3) * 1.5 - 1.5,
                             y: 0,
-                            z: zonePos.z + Math.floor(idx / 3) * 1.5 - 1.5,
+                            z: zonePos[2] + Math.floor(idx / 3) * 1.5 - 1.5,
                           },
                         };
                       } else if (isZeroPosition) {
