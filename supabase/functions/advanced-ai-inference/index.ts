@@ -2183,15 +2183,87 @@ Base ALL recommendations on the provided real data.`
         })
     : [];
 
-  // 🆕 productPlacements 검증 및 정규화
+  // 🆕 AI가 잘못된 productId를 반환할 경우 실제 제품에 매핑하는 함수
+  const mapAIProductIdToReal = (aiProductId: string): string | null => {
+    // 1. 정확히 일치하는 경우
+    if (validProductIds.has(aiProductId)) {
+      return aiProductId;
+    }
+
+    // 2. 유사한 ID 찾기 (SKU 패턴 매칭)
+    // AI가 "NA-SWT-001" 같은 형식을 반환하면, 실제 DB의 "SKU-TOP-001" 형식과 매핑 시도
+    const productArray = Array.from(productEntities);
+
+    // 2-1. productLabel과 AI의 productLabel 비교
+    const aiProduct = aiResponse.productPlacements?.find((p: any) => p.productId === aiProductId);
+    if (aiProduct?.productLabel) {
+      const byLabel = productArray.find((p: any) =>
+        p.label?.toLowerCase().includes(aiProduct.productLabel.toLowerCase()) ||
+        aiProduct.productLabel.toLowerCase().includes((p.label || '').toLowerCase())
+      );
+      if (byLabel) {
+        console.log(`[ProductMapping] Matched by label: ${aiProductId} → ${byLabel.id}`);
+        return byLabel.id;
+      }
+    }
+
+    // 2-2. 카테고리 힌트로 매핑 (예: "SWT" → "TOP", "LIP" → "LIP")
+    const categoryMap: Record<string, string[]> = {
+      'SWT': ['TOP', 'SWT'],  // sweater → tops
+      'TOP': ['TOP'],
+      'SCF': ['SCA', 'ACC'],  // scarf → scarves/accessories
+      'SCA': ['SCA'],
+      'LIP': ['LIP'],  // lipstick
+      'BAG': ['BAG'],
+      'SHO': ['SHO'],  // shoes
+      'ACC': ['ACC'],  // accessories
+      'DRS': ['DRS'],  // dress
+      'PNT': ['PNT'],  // pants
+    };
+
+    const parts = aiProductId.split('-');
+    if (parts.length >= 2) {
+      const aiCategory = parts[1].toUpperCase();
+      const possibleCategories = categoryMap[aiCategory] || [aiCategory];
+
+      for (const cat of possibleCategories) {
+        const match = productArray.find((p: any) =>
+          (p.id || '').toUpperCase().includes(`-${cat}-`) ||
+          (p.id || '').toUpperCase().includes(`SKU-${cat}`)
+        );
+        if (match) {
+          console.log(`[ProductMapping] Matched by category ${aiCategory}→${cat}: ${aiProductId} → ${match.id}`);
+          return match.id;
+        }
+      }
+    }
+
+    // 3. 순서 기반 폴백: AI가 N번째 제품을 언급했다면 실제 목록의 N번째 제품 사용
+    // (AI 응답의 productPlacements 배열 인덱스 기반)
+    const aiIndex = aiResponse.productPlacements?.findIndex((p: any) => p.productId === aiProductId);
+    if (aiIndex !== undefined && aiIndex >= 0 && aiIndex < productArray.length) {
+      const fallback = productArray[aiIndex];
+      console.log(`[ProductMapping] Fallback by index ${aiIndex}: ${aiProductId} → ${fallback.id}`);
+      return fallback.id;
+    }
+
+    console.warn(`[ProductMapping] No match found for: ${aiProductId}`);
+    return null;
+  };
+
+  // 🆕 productPlacements 검증 및 정규화 (매핑 로직 포함)
   const productPlacements = Array.isArray(aiResponse.productPlacements)
     ? aiResponse.productPlacements
-        .filter((p: any) => {
-          if (!p.productId) return false;
-          if (!validProductIds.has(p.productId)) {
-            console.warn(`Invalid product ID from AI: ${p.productId}`);
-            return false;
+        .map((p: any) => {
+          // AI가 반환한 productId를 실제 ID로 매핑
+          const mappedProductId = mapAIProductIdToReal(p.productId);
+          if (mappedProductId) {
+            return { ...p, productId: mappedProductId, originalAIProductId: p.productId };
           }
+          return null;
+        })
+        .filter((p: any) => {
+          if (!p) return false;
           // suggestedFurnitureId가 있으면 유효한지 확인
           if (p.suggestedFurnitureId && !validFurnitureIds.has(p.suggestedFurnitureId)) {
             console.warn(`Invalid suggested furniture ID: ${p.suggestedFurnitureId}`);
@@ -2216,6 +2288,14 @@ Base ALL recommendations on the provided real data.`
 
   console.log('Valid layoutChanges after filtering:', layoutChanges.length);
   console.log('Valid productPlacements after filtering:', productPlacements.length);
+
+  // 매핑된 제품 정보 로깅
+  const mappedProducts = productPlacements.filter((p: any) => p.originalAIProductId && p.originalAIProductId !== p.productId);
+  if (mappedProducts.length > 0) {
+    console.log(`[ProductMapping] ${mappedProducts.length} products were mapped from AI IDs to real SKUs:`,
+      mappedProducts.map((p: any) => `${p.originalAIProductId} → ${p.productId}`).join(', ')
+    );
+  }
 
   // 변경 맵 생성
   const furnitureChangesMap = new Map<string, any>();
@@ -2521,8 +2601,12 @@ ${furnitureProductSummary}
 === 🪑 현재 가구 배치 ===
 ${furnitureList}
 
-=== 📦 현재 제품 배치 ===
+=== 📦 현재 제품 배치 (반드시 아래 ID만 사용) ===
 ${productList}
+
+⚠️ CRITICAL: productPlacements의 productId는 반드시 위 목록의 [대괄호] 안에 있는 ID를 그대로 사용하세요.
+예: [SKU-TOP-001] 형식이면 productId는 "SKU-TOP-001"을 사용
+임의의 ID를 생성하지 마세요!
 
 === 📊 분석 신뢰도: ${confidenceResult.score}% ===
 신뢰도 근거: ${confidenceResult.explanation}
@@ -2555,7 +2639,7 @@ Return ONLY valid JSON (no markdown):
   ],
   "productPlacements": [
     {
-      "productId": "product-uuid",
+      "productId": "SKU-XXX-001",  // ⚠️ 반드시 위 제품 목록의 [대괄호] 안 ID 그대로 사용!
       "productLabel": "제품 이름",
       "currentFurnitureId": "current-furniture-uuid",
       "currentFurnitureLabel": "현재 가구 이름",
