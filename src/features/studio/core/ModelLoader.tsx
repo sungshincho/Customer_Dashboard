@@ -7,7 +7,7 @@
  * - 에러 처리
  */
 
-import { useRef, useMemo, useState, useEffect } from 'react';
+import { useRef, useMemo, useState } from 'react';
 import { useGLTF } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -126,13 +126,6 @@ function GLTFModel({
   onError,
 }: GLTFModelProps) {
   const groupRef = useRef<THREE.Group>(null);
-
-  // 🔍 디버그: 실제 렌더링에 사용되는 위치 로깅
-  useEffect(() => {
-    if (modelId?.includes('product')) {
-      console.log(`[ModelLoader] Rendering ${modelId} at position:`, position);
-    }
-  }, [modelId, position]);
 
   // GLTF 로드
   const { scene } = useGLTF(url, true, true, (error) => {
