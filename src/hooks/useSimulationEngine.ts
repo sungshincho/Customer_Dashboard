@@ -106,6 +106,10 @@ export function useSimulationEngine({ zones, enabled = true }: UseSimulationEngi
   const frameRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
 
+  // 🔧 FIX: ref로 최신 값 유지 (effect 재시작 방지)
+  const zonesRef = useRef(zones);
+  const configRef = useRef<typeof config | null>(null);
+
   const {
     isRunning,
     isPaused,
@@ -119,14 +123,44 @@ export function useSimulationEngine({ zones, enabled = true }: UseSimulationEngi
     tick,
   } = useSimulationStore();
 
+  // refs 업데이트
+  zonesRef.current = zones;
+  configRef.current = config;
+
   // 특수 구역 찾기
   const entryZone = zones.find(isEntryZone) || zones[0];
   const exitZone = zones.find(isExitZone) || entryZone;
   const browseZones = zones.filter((z) => !isEntryZone(z) && !isExitZone(z));
 
-  // 새 고객 생성
+  // 🔧 DEBUG: zones 정보 로깅
+  useEffect(() => {
+    console.log('[useSimulationEngine] Zones updated:', {
+      total: zones.length,
+      entryZone: entryZone?.zone_name || entryZone?.id,
+      exitZone: exitZone?.zone_name || exitZone?.id,
+      browseZones: browseZones.length,
+      enabled,
+      isRunning,
+    });
+  }, [zones, enabled, isRunning]);
+
+  // 🔧 FIX: 고객 수를 ref로 추적 (effect 재시작 방지)
+  const customersRef = useRef(customers);
+  customersRef.current = customers;
+
+  // 새 고객 생성 (의존성에서 customers.length 제거)
   const spawnCustomer = useCallback(() => {
-    if (!entryZone || customers.length >= config.maxCustomers) return;
+    // 🔧 FIX: ref에서 최신 고객 수 확인
+    const currentCustomerCount = customersRef.current.length;
+    const currentConfig = configRef.current;
+
+    if (!entryZone) {
+      console.log('[useSimulationEngine] No entry zone, cannot spawn');
+      return;
+    }
+    if (currentCustomerCount >= (currentConfig?.maxCustomers || 30)) {
+      return;
+    }
 
     const position = getRandomPositionInZone(entryZone);
     const targetZone = browseZones.length > 0
@@ -146,13 +180,14 @@ export function useSimulationEngine({ zones, enabled = true }: UseSimulationEngi
       speed: 0.8 + Math.random() * 0.6,
       enteredAt: Date.now(),
       dwellTime: 0,
-      purchaseProbability: config.purchaseProbability,
+      purchaseProbability: currentConfig?.purchaseProbability || 0.164,
       color: STATE_COLORS.entering,
       path: [position],
     };
 
+    console.log('[useSimulationEngine] Spawning customer:', customer.id, 'at', entryZone.zone_name || entryZone.id);
     addCustomer(customer);
-  }, [entryZone, browseZones, customers.length, config.maxCustomers, config.purchaseProbability, addCustomer]);
+  }, [entryZone, browseZones, addCustomer]);  // 🔧 FIX: customers.length, config 제거
 
   // 고객 상태 전환
   const transitionCustomerState = useCallback((
@@ -291,9 +326,20 @@ export function useSimulationEngine({ zones, enabled = true }: UseSimulationEngi
 
   }, [customers, config.speed, zones, transitionCustomerState, updateCustomer, removeCustomer, updateKPI]);
 
+  // 🔧 FIX: refs로 콜백 추적 (effect 재시작 방지)
+  const spawnCustomerRef = useRef(spawnCustomer);
+  const updateCustomersRef = useRef(updateCustomers);
+  const tickRef = useRef(tick);
+
+  spawnCustomerRef.current = spawnCustomer;
+  updateCustomersRef.current = updateCustomers;
+  tickRef.current = tick;
+
   // 메인 애니메이션 루프
   useEffect(() => {
-    if (!enabled || !isRunning || isPaused || zones.length === 0) {
+    // 🔧 FIX: zones.length === 0 조건 제거 - zones가 나중에 로드될 수 있음
+    if (!enabled || !isRunning || isPaused) {
+      console.log('[useSimulationEngine] Animation loop not starting:', { enabled, isRunning, isPaused });
       if (frameRef.current) {
         cancelAnimationFrame(frameRef.current);
         frameRef.current = null;
@@ -301,7 +347,12 @@ export function useSimulationEngine({ zones, enabled = true }: UseSimulationEngi
       return;
     }
 
+    console.log('[useSimulationEngine] Starting animation loop');
+    let isActive = true;
+
     const animate = (time: number) => {
+      if (!isActive) return;
+
       const deltaTime = lastTimeRef.current ? (time - lastTimeRef.current) / 1000 : 0.016;
       lastTimeRef.current = time;
 
@@ -309,15 +360,22 @@ export function useSimulationEngine({ zones, enabled = true }: UseSimulationEngi
       const clampedDelta = Math.min(deltaTime, 0.1);
 
       // 시간 업데이트
-      tick(clampedDelta);
+      tickRef.current(clampedDelta);
 
-      // 고객 생성 (확률적)
-      if (Math.random() < config.spawnRate * clampedDelta * config.speed) {
-        spawnCustomer();
+      // 🔧 FIX: zones가 로드되었을 때만 고객 생성
+      const currentZones = zonesRef.current;
+      const currentConfig = configRef.current;
+
+      if (currentZones && currentZones.length > 0 && currentConfig) {
+        // 고객 생성 (확률적)
+        const spawnProb = currentConfig.spawnRate * clampedDelta * currentConfig.speed;
+        if (Math.random() < spawnProb) {
+          spawnCustomerRef.current();
+        }
+
+        // 고객 업데이트
+        updateCustomersRef.current(clampedDelta);
       }
-
-      // 고객 업데이트
-      updateCustomers(clampedDelta);
 
       frameRef.current = requestAnimationFrame(animate);
     };
@@ -326,12 +384,14 @@ export function useSimulationEngine({ zones, enabled = true }: UseSimulationEngi
     frameRef.current = requestAnimationFrame(animate);
 
     return () => {
+      console.log('[useSimulationEngine] Stopping animation loop');
+      isActive = false;
       if (frameRef.current) {
         cancelAnimationFrame(frameRef.current);
         frameRef.current = null;
       }
     };
-  }, [enabled, isRunning, isPaused, zones, config, spawnCustomer, updateCustomers, tick]);
+  }, [enabled, isRunning, isPaused]);  // 🔧 FIX: 최소 의존성으로 변경
 
   return {
     spawnCustomer,

@@ -681,7 +681,8 @@ export default function DigitalTwinStudioPage() {
 
                 {/* 기본 오버레이 (데모 데이터) */}
                 {isActive('heatmap') && !sceneSimulation.state.results.layout && <HeatmapOverlay heatPoints={demoHeatPoints} />}
-                {isActive('avatar') && !sceneSimulation.state.results.staffing && <CustomerAvatarOverlay customers={demoCustomers} />}
+                {/* 🔧 FIX: 실시간 시뮬레이션이 실행 중이면 CustomerAgents가 렌더링하므로 데모 고객 표시 안함 */}
+                {/* CustomerAgents는 Canvas3D 내부에서 simulationStore.customers를 렌더링함 */}
 
                 {/* 스태프 오버레이 - 실제 DB 스태프 데이터 사용 */}
                 {(() => {
