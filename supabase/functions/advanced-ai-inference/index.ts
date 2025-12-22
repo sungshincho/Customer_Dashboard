@@ -2074,19 +2074,24 @@ async function performLayoutSimulation(request: InferenceRequest, apiKey: string
     return `- [${f.id}] ${f.label} (${f.entityType}): pos(x=${x.toFixed(1)}, z=${z.toFixed(1)}) - 연결된 제품: ${connectedProducts.length}개`;
   }).join('\n');
 
-  // 🆕 제품 목록 텍스트 (AI에게 제공)
-  const productList = productEntities.slice(0, 20).map((p: any) => {
+  // 🆕 제품 목록 텍스트 (AI에게 제공) - SKU 형식 강조
+  const productList = productEntities.slice(0, 20).map((p: any, idx: number) => {
     const x = p.position?.x || 0;
     const z = p.position?.z || p.position?.y || 0;
     const parentFurniture = findParentFurniture(p.id, currentFurnitureProductMap, furnitureEntities);
-    return `- [${p.id}] ${p.label}: pos(x=${x.toFixed(1)}, z=${z.toFixed(1)}) - 현재 가구: ${parentFurniture?.label || '없음'}`;
+    // SKU 형식 명확히 표시
+    return `${idx + 1}. productId="${p.id}" (${p.label}) - 위치(${x.toFixed(1)}, ${z.toFixed(1)}) - 가구: ${parentFurniture?.label || '없음'}`;
   }).join('\n');
+
+  // 사용 가능한 productId 목록 (AI가 반드시 이 중에서만 선택해야 함)
+  const validProductIdList = productEntities.slice(0, 20).map((p: any) => `"${p.id}"`).join(', ');
 
   // 🆕 AI 프롬프트 - 가구 + 제품 최적화 (Continuous Learning 포함)
   const prompt = buildEnhancedLayoutPromptWithProducts(
     enhancedContext,
     furnitureList,
     productList,
+    validProductIdList,
     furnitureProductSummary,
     ontologyAnalysis,
     comprehensiveAnalysis,
@@ -2185,16 +2190,17 @@ Base ALL recommendations on the provided real data.`
 
   // 🆕 AI가 잘못된 productId를 반환할 경우 실제 제품에 매핑하는 함수
   const mapAIProductIdToReal = (aiProductId: string): string | null => {
+    if (!aiProductId) return null;
+
     // 1. 정확히 일치하는 경우
     if (validProductIds.has(aiProductId)) {
       return aiProductId;
     }
 
-    // 2. 유사한 ID 찾기 (SKU 패턴 매칭)
-    // AI가 "NA-SWT-001" 같은 형식을 반환하면, 실제 DB의 "SKU-TOP-001" 형식과 매핑 시도
     const productArray = Array.from(productEntities);
+    const lowerAiId = aiProductId.toLowerCase();
 
-    // 2-1. productLabel과 AI의 productLabel 비교
+    // 2. productLabel과 AI의 productLabel 비교
     const aiProduct = aiResponse.productPlacements?.find((p: any) => p.productId === aiProductId);
     if (aiProduct?.productLabel) {
       const byLabel = productArray.find((p: any) =>
@@ -2207,18 +2213,64 @@ Base ALL recommendations on the provided real data.`
       }
     }
 
-    // 2-2. 카테고리 힌트로 매핑 (예: "SWT" → "TOP", "LIP" → "LIP")
+    // 3. 시맨틱 키워드로 매핑 (AI가 "product-new-arrival-knit-01" 같은 형식 생성 시)
+    const semanticMap: Record<string, string[]> = {
+      // 의류
+      'knit': ['TOP', 'SWT', 'KNI'],
+      'sweater': ['TOP', 'SWT', 'KNI'],
+      'tshirt': ['TOP', 'TSH'],
+      't-shirt': ['TOP', 'TSH'],
+      'shirt': ['TOP', 'SHI'],
+      'blouse': ['TOP', 'BLO'],
+      'pants': ['BTM', 'PNT'],
+      'jeans': ['BTM', 'JNS'],
+      'skirt': ['BTM', 'SKI'],
+      'dress': ['DRS', 'ONE'],
+      'coat': ['OUT', 'COA'],
+      'jacket': ['OUT', 'JAC'],
+      // 액세서리
+      'socks': ['SCA', 'SOC', 'ACC'],
+      'scarf': ['SCA', 'ACC'],
+      'hat': ['ACC', 'HAT'],
+      'bag': ['BAG'],
+      'shoes': ['SHO'],
+      'sneakers': ['SHO', 'SNE'],
+      // 화장품
+      'lipstick': ['LIP', 'COS'],
+      'lip': ['LIP', 'COS'],
+      'perfume': ['PER', 'COS'],
+      'makeup': ['COS', 'MAK'],
+    };
+
+    // AI ID에서 시맨틱 키워드 추출 시도
+    for (const [keyword, categories] of Object.entries(semanticMap)) {
+      if (lowerAiId.includes(keyword)) {
+        for (const cat of categories) {
+          const match = productArray.find((p: any) =>
+            (p.id || '').toUpperCase().includes(`-${cat}-`) ||
+            (p.id || '').toUpperCase().includes(`SKU-${cat}`) ||
+            (p.id || '').toUpperCase().includes(`-${cat}`)
+          );
+          if (match) {
+            console.log(`[ProductMapping] Matched by semantic keyword "${keyword}": ${aiProductId} → ${match.id}`);
+            return match.id;
+          }
+        }
+      }
+    }
+
+    // 4. 카테고리 코드로 매핑 (예: "SWT" → "TOP")
     const categoryMap: Record<string, string[]> = {
-      'SWT': ['TOP', 'SWT'],  // sweater → tops
+      'SWT': ['TOP', 'SWT'],
       'TOP': ['TOP'],
-      'SCF': ['SCA', 'ACC'],  // scarf → scarves/accessories
+      'SCF': ['SCA', 'ACC'],
       'SCA': ['SCA'],
-      'LIP': ['LIP'],  // lipstick
+      'LIP': ['LIP'],
       'BAG': ['BAG'],
-      'SHO': ['SHO'],  // shoes
-      'ACC': ['ACC'],  // accessories
-      'DRS': ['DRS'],  // dress
-      'PNT': ['PNT'],  // pants
+      'SHO': ['SHO'],
+      'ACC': ['ACC'],
+      'DRS': ['DRS'],
+      'PNT': ['PNT'],
     };
 
     const parts = aiProductId.split('-');
@@ -2238,8 +2290,7 @@ Base ALL recommendations on the provided real data.`
       }
     }
 
-    // 3. 순서 기반 폴백: AI가 N번째 제품을 언급했다면 실제 목록의 N번째 제품 사용
-    // (AI 응답의 productPlacements 배열 인덱스 기반)
+    // 5. 순서 기반 폴백: AI가 N번째 제품을 언급했다면 실제 목록의 N번째 제품 사용
     const aiIndex = aiResponse.productPlacements?.findIndex((p: any) => p.productId === aiProductId);
     if (aiIndex !== undefined && aiIndex >= 0 && aiIndex < productArray.length) {
       const fallback = productArray[aiIndex];
@@ -2258,7 +2309,27 @@ Base ALL recommendations on the provided real data.`
           // AI가 반환한 productId를 실제 ID로 매핑
           const mappedProductId = mapAIProductIdToReal(p.productId);
           if (mappedProductId) {
-            return { ...p, productId: mappedProductId, originalAIProductId: p.productId };
+            // 현재 제품 정보 찾기 (fromPosition 계산용)
+            const currentProduct = productEntities.find((pe: any) => pe.id === mappedProductId);
+            const currentPosition = currentProduct?.position || currentProduct?.currentPosition || null;
+
+            // 현재 가구 정보 찾기
+            const currentParent = findParentFurniture(mappedProductId, currentFurnitureProductMap, furnitureEntities);
+
+            return {
+              ...p,
+              productId: mappedProductId,
+              originalAIProductId: p.productId,
+              productLabel: currentProduct?.label || p.productLabel || mappedProductId,
+              // 🆕 fromPosition 추가 (현재 위치)
+              fromPosition: currentPosition,
+              currentPosition: currentPosition,
+              // 🆕 toPosition 추가 (suggestedPosition 별칭)
+              toPosition: p.suggestedPosition,
+              // 🆕 가구 정보 추가
+              currentFurnitureId: currentParent?.id || p.currentFurnitureId,
+              currentFurnitureLabel: currentParent?.label || p.currentFurnitureLabel,
+            };
           }
           return null;
         })
@@ -2276,11 +2347,13 @@ Base ALL recommendations on the provided real data.`
           if (p.suggestedPosition) {
             const safeHalfWidth = halfWidth - 0.5;
             const safeHalfDepth = halfDepth - 0.5;
-            p.suggestedPosition = {
+            const clampedPosition = {
               x: Math.max(-safeHalfWidth, Math.min(safeHalfWidth, p.suggestedPosition.x || 0)),
-              y: p.suggestedPosition.y || 0,
+              y: p.suggestedPosition.y || 0.8,
               z: Math.max(-safeHalfDepth, Math.min(safeHalfDepth, p.suggestedPosition.z || 0)),
             };
+            p.suggestedPosition = clampedPosition;
+            p.toPosition = clampedPosition;
           }
           return p;
         })
@@ -2563,6 +2636,7 @@ function buildEnhancedLayoutPromptWithProducts(
   context: EnhancedStoreContext,
   furnitureList: string,
   productList: string,
+  validProductIdList: string,
   furnitureProductSummary: string,
   ontologyAnalysis: any,
   comprehensiveAnalysis: any,
@@ -2601,12 +2675,19 @@ ${furnitureProductSummary}
 === 🪑 현재 가구 배치 ===
 ${furnitureList}
 
-=== 📦 현재 제품 배치 (반드시 아래 ID만 사용) ===
+=== 📦 현재 제품 배치 ===
 ${productList}
 
-⚠️ CRITICAL: productPlacements의 productId는 반드시 위 목록의 [대괄호] 안에 있는 ID를 그대로 사용하세요.
-예: [SKU-TOP-001] 형식이면 productId는 "SKU-TOP-001"을 사용
-임의의 ID를 생성하지 마세요!
+🚨🚨🚨 CRITICAL - productId 규칙 🚨🚨🚨
+productPlacements 배열의 productId는 아래 목록 중 하나만 사용 가능합니다:
+[${validProductIdList}]
+
+⛔ 금지: "product-new-arrival-xxx", "product-promo-xxx" 같은 임의 ID 생성
+✅ 필수: 위 목록에 있는 정확한 productId 값만 사용
+
+예시:
+- 올바름: "productId": "SKU-TOP-001"
+- 틀림: "productId": "product-new-arrival-knit-01"
 
 === 📊 분석 신뢰도: ${confidenceResult.score}% ===
 신뢰도 근거: ${confidenceResult.explanation}
