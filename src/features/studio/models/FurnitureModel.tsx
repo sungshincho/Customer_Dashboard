@@ -81,16 +81,6 @@ function FurnitureGLTF({
     return cloned;
   }, [scene]);
 
-  // GLB 모델의 BoundingBox 계산
-  const boundingBox = useMemo(() => {
-    const box = new THREE.Box3().setFromObject(clonedScene);
-    const size = new THREE.Vector3();
-    box.getSize(size);
-    const center = new THREE.Vector3();
-    box.getCenter(center);
-    return { size, center };
-  }, [clonedScene]);
-
   const position: [number, number, number] = [
     asset.position.x,
     asset.position.y,
@@ -131,24 +121,10 @@ function FurnitureGLTF({
       <primitive object={clonedScene} />
 
       {/* 선택 표시 */}
-      {selected && (
-        <SelectionIndicator 
-          width={boundingBox.size.x} 
-          height={boundingBox.size.y} 
-          depth={boundingBox.size.z}
-          center={boundingBox.center}
-        />
-      )}
+      {selected && <SelectionIndicator />}
 
       {/* 호버 표시 */}
-      {hovered && !selected && (
-        <HoverIndicator 
-          width={boundingBox.size.x} 
-          height={boundingBox.size.y} 
-          depth={boundingBox.size.z}
-          center={boundingBox.center}
-        />
-      )}
+      {hovered && !selected && <HoverIndicator />}
     </group>
   );
 }
@@ -200,13 +176,7 @@ function FurniturePlaceholder({
         />
       </mesh>
 
-      {selected && (
-        <SelectionIndicator 
-          width={dimensions.width} 
-          height={dimensions.height} 
-          depth={dimensions.depth}
-        />
-      )}
+      {selected && <SelectionIndicator size={Math.max(dimensions.width, dimensions.height, dimensions.depth) * 1.1} />}
     </group>
   );
 }
@@ -214,28 +184,10 @@ function FurniturePlaceholder({
 // ============================================================================
 // 표시자
 // ============================================================================
-interface IndicatorProps {
-  width?: number;
-  height?: number;
-  depth?: number;
-  center?: { x: number; y: number; z: number };
-  size?: number; // 기존 호환용
-}
-
-function SelectionIndicator({ width, height, depth, center, size = 1.1 }: IndicatorProps) {
-  // width/height/depth가 있으면 사용, 없으면 기존 size 사용
-  const w = width ? width * 1.1 : size;
-  const h = height ? height * 1.1 : size;
-  const d = depth ? depth * 1.1 : size;
-  
-  // center가 있으면 해당 위치에, 없으면 원점에 배치
-  const pos: [number, number, number] = center 
-    ? [center.x, center.y, center.z] 
-    : [0, 0, 0];
-  
+function SelectionIndicator({ size = 1.1 }: { size?: number }) {
   return (
-    <mesh position={pos}>
-      <boxGeometry args={[w, h, d]} />
+    <mesh>
+      <boxGeometry args={[size, size, size]} />
       <meshBasicMaterial
         color="#3b82f6"
         transparent
@@ -247,20 +199,10 @@ function SelectionIndicator({ width, height, depth, center, size = 1.1 }: Indica
   );
 }
 
-function HoverIndicator({ width, height, depth, center, size = 1.05 }: IndicatorProps) {
-  // width/height/depth가 있으면 사용, 없으면 기존 size 사용
-  const w = width ? width * 1.05 : size;
-  const h = height ? height * 1.05 : size;
-  const d = depth ? depth * 1.05 : size;
-  
-  // center가 있으면 해당 위치에, 없으면 원점에 배치
-  const pos: [number, number, number] = center 
-    ? [center.x, center.y, center.z] 
-    : [0, 0, 0];
-  
+function HoverIndicator({ size = 1.05 }: { size?: number }) {
   return (
-    <mesh position={pos}>
-      <boxGeometry args={[w, h, d]} />
+    <mesh>
+      <boxGeometry args={[size, size, size]} />
       <meshBasicMaterial
         color="#60a5fa"
         transparent
