@@ -13,7 +13,7 @@ import { useLocation } from 'react-router-dom';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, Loader2, Sparkles, Layers, Save, Play, GitCompare, Pause, Square, RotateCcw, Users } from 'lucide-react';
+import { AlertCircle, Loader2, Sparkles, Layers, Save, Play, GitCompare, Pause, Square, RotateCcw, Users, FlaskConical, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 // 새 스튜디오 컴포넌트
@@ -23,6 +23,7 @@ import { HeatmapOverlay, CustomerFlowOverlay, ZoneBoundaryOverlay, CustomerAvata
 import { DraggablePanel } from './components/DraggablePanel';
 import { AIOptimizationTab } from './tabs/AIOptimizationTab';
 import { AISimulationTab } from './tabs/AISimulationTab';
+import { ApplyPanel } from './tabs/ApplyPanel';
 import {
   LayoutResultPanel,
   FlowResultPanel,
@@ -56,7 +57,7 @@ interface ModelLayer {
   metadata?: Record<string, any>;
 }
 
-type TabType = 'layer' | 'ai-optimization' | 'ai-simulation';
+type TabType = 'layer' | 'ai-simulation' | 'ai-optimization' | 'apply';
 
 // 시뮬레이션 결과 상태 타입
 interface SimulationResults {
@@ -804,11 +805,18 @@ export default function DigitalTwinStudioPage() {
             {/* ----- 왼쪽 패널 (고정) ----- */}
             <div className="absolute left-4 top-4 bottom-4 w-80 pointer-events-auto">
               <div className="h-full bg-black/80 backdrop-blur-sm border border-white/10 rounded-xl overflow-hidden flex flex-col">
-                {/* 탭 헤더 */}
+                {/* 탭 헤더 - 4패널 구조: 레이어 → AI시뮬레이션 → AI최적화 → 적용하기 */}
                 <div className="flex border-b border-white/10">
                   <TabButton active={activeTab === 'layer'} onClick={() => setActiveTab('layer')}>
                     <Layers className="w-3 h-3 mr-1 inline" />
                     레이어
+                  </TabButton>
+                  <TabButton
+                    active={activeTab === 'ai-simulation'}
+                    onClick={() => setActiveTab('ai-simulation')}
+                  >
+                    <FlaskConical className="w-3 h-3 mr-1 inline" />
+                    AI 시뮬레이션
                   </TabButton>
                   <TabButton
                     active={activeTab === 'ai-optimization'}
@@ -818,17 +826,31 @@ export default function DigitalTwinStudioPage() {
                     AI 최적화
                   </TabButton>
                   <TabButton
-                    active={activeTab === 'ai-simulation'}
-                    onClick={() => setActiveTab('ai-simulation')}
+                    active={activeTab === 'apply'}
+                    onClick={() => setActiveTab('apply')}
                   >
-                    <Play className="w-3 h-3 mr-1 inline" />
-                    AI 시뮬레이션
+                    <CheckCircle className="w-3 h-3 mr-1 inline" />
+                    적용하기
                   </TabButton>
                 </div>
 
                 {/* 탭 컨텐츠 */}
                 <div className="flex-1 overflow-y-auto">
                   {activeTab === 'layer' && <LayerPanel />}
+                  {activeTab === 'ai-simulation' && (
+                    <AISimulationTab
+                      storeId={selectedStore?.id || ''}
+                      sceneData={currentRecipe}
+                      onOverlayToggle={toggleOverlay}
+                      simulationZones={simulationZones}
+                      onResultsUpdate={(type, result) => {
+                        // AI 시뮬레이션 결과를 오른쪽 패널에 표시
+                        setSimulationResults((prev) => ({ ...prev, [type]: result }));
+                        const panelKey = `${type}Result` as keyof VisiblePanels;
+                        setVisiblePanels((prev) => ({ ...prev, [panelKey]: true }));
+                      }}
+                    />
+                  )}
                   {activeTab === 'ai-optimization' && (
                     <AIOptimizationTab
                       storeId={selectedStore?.id || ''}
@@ -849,17 +871,16 @@ export default function DigitalTwinStudioPage() {
                       }}
                     />
                   )}
-                  {activeTab === 'ai-simulation' && (
-                    <AISimulationTab
+                  {activeTab === 'apply' && (
+                    <ApplyPanel
                       storeId={selectedStore?.id || ''}
-                      sceneData={currentRecipe}
-                      onOverlayToggle={toggleOverlay}
-                      simulationZones={simulationZones}
-                      onResultsUpdate={(type, result) => {
-                        // AI 시뮬레이션 결과를 오른쪽 패널에 표시
-                        setSimulationResults((prev) => ({ ...prev, [type]: result }));
-                        const panelKey = `${type}Result` as keyof VisiblePanels;
-                        setVisiblePanels((prev) => ({ ...prev, [panelKey]: true }));
+                      onApplyScenario={(scenarioId) => {
+                        toast.success(`시나리오 ${scenarioId} 적용 시작`);
+                        logActivity('feature_use', {
+                          feature: 'scenario_apply',
+                          scenario_id: scenarioId,
+                          store_id: selectedStore?.id,
+                        });
                       }}
                     />
                   )}
