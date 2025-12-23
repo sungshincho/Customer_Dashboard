@@ -119,6 +119,16 @@ function StaffAvatarMarker({
     0.1, // 바닥 위에 배치
     member.avatar_position.z,
   ];
+  
+// avatar_rotation 적용 (degrees → radians 변환)
+  const degToRad = (deg: number) => (deg || 0) * Math.PI / 180;
+const rotation: [number, number, number] = member.avatar_rotation 
+  ? [
+      degToRad(member.avatar_rotation.x),
+      degToRad(member.avatar_rotation.y),
+      degToRad(member.avatar_rotation.z),
+    ]
+  : [0, 0, 0];
 
   console.log('[StaffAvatarMarker] Rendering:', member.staff_name, 'at', position);
 
@@ -134,7 +144,7 @@ function StaffAvatarMarker({
   });
 
   return (
-    <group ref={groupRef} position={position}>
+    <group ref={groupRef} position={position} rotation={rotation}>
       {/* GLB 모델이 있으면 GLB, 없으면 캡슐 폴백 */}
       {member.avatar_url ? (
         <Suspense fallback={<FallbackAvatar color={color} isHighlighted={isHovered || isSelected} onClick={onClick} onHover={onHover} />}>
