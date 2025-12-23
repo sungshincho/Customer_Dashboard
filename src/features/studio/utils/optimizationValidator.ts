@@ -177,13 +177,13 @@ function isPositionInZone(pos: Position, zone: Zone): boolean {
     const yi = typeof point_i === 'object' && 'z' in point_i
       ? point_i.z
       : typeof point_i === 'object' && 'y' in point_i
-        ? point_i.y
+        ? (point_i as any).y
         : (point_i as number[])[1];
     const xj = typeof point_j === 'object' && 'x' in point_j ? point_j.x : (point_j as number[])[0];
     const yj = typeof point_j === 'object' && 'z' in point_j
       ? point_j.z
       : typeof point_j === 'object' && 'y' in point_j
-        ? point_j.y
+        ? (point_j as any).y
         : (point_j as number[])[1];
 
     if (typeof xi !== 'number' || typeof yi !== 'number' || typeof xj !== 'number' || typeof yj !== 'number') {

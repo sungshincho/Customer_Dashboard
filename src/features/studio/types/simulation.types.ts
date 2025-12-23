@@ -269,6 +269,13 @@ export interface DiagnosticIssue {
   threshold_value: number;
   impact: string;
   suggested_action: string;
+  // 추가 호환 필드 (DiagnosticIssueList와 호환)
+  zone?: string;
+  metric?: string;
+  message?: string;
+  value?: number;
+  target?: number;
+  recommendation?: string;
 }
 
 export interface SimulationKPIs {

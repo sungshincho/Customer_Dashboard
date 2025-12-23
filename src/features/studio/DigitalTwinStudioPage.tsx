@@ -971,14 +971,14 @@ export default function DigitalTwinStudioPage() {
                     animateTimeProgress={false}
                   />
                 )}
-                {sceneSimulation.state.results.staffing && viewMode !== 'as-is' && (
+                {sceneSimulation.state.results.staffing && (viewMode as string) !== 'as-is' && (
                   <StaffingOverlay
                     result={sceneSimulation.state.results.staffing as any}
                     showStaffMarkers={true}
-                    showCurrentPositions={viewMode === 'split'}
-                    showSuggestedPositions={viewMode === 'to-be' || viewMode === 'split'}
-                    showCoverageZones={viewMode !== 'as-is'}
-                    showMovementPaths={viewMode === 'to-be' || viewMode === 'split'}
+                    showCurrentPositions={(viewMode as string) === 'split'}
+                    showSuggestedPositions={(viewMode as string) === 'to-be' || (viewMode as string) === 'split'}
+                    showCoverageZones={(viewMode as string) !== 'as-is'}
+                    showMovementPaths={(viewMode as string) === 'to-be' || (viewMode as string) === 'split'}
                     animateMovement={true}
                   />
                 )}

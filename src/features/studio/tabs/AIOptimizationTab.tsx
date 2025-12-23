@@ -377,13 +377,13 @@ export function AIOptimizationTab({
 
           // 검증된 결과로 교체
           if (results.layout.furnitureMoves) {
-            results.layout.furnitureMoves = validation.filteredResult.furniture_moves;
+            results.layout.furnitureMoves = validation.filteredResult.furniture_moves as any[];
           }
-          if (results.layout.layoutChanges) {
-            results.layout.layoutChanges = validation.filteredResult.furniture_moves;
+          if ((results.layout as any).layoutChanges) {
+            (results.layout as any).layoutChanges = validation.filteredResult.furniture_moves as any[];
           }
           if (results.layout.productPlacements) {
-            results.layout.productPlacements = validation.filteredResult.product_placements;
+            results.layout.productPlacements = validation.filteredResult.product_placements as any[];
           }
         }
       }
@@ -829,7 +829,7 @@ export function AIOptimizationTab({
                       setShowStaffOverlay(visible);
                       onOverlayToggle('staffingOptimization', visible);
                     }}
-                    showOverlay={showStaffOverlay}
+                    isOverlayVisible={showStaffOverlay}
                   />
                 )}
 

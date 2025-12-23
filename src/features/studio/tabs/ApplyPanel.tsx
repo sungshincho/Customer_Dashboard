@@ -344,11 +344,12 @@ export function ApplyPanel({ storeId, onApplyScenario, onNavigateToROI }: ApplyP
         description: `${selectedScenario.changesCount}건 변경, 예상 매출 +${selectedScenario.expectedRevenue}%`,
         settings: selectedScenario.originalData,
         startDate: new Date().toISOString(),
-        expectedRoi: selectedScenario.expectedRevenue,
-        expectedRevenue: selectedScenario.expectedRevenue * 10000, // 예상 추가 매출
+        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30일 후
+        expectedRoi: Number(selectedScenario.expectedRevenue) || 0,
+        expectedRevenue: (Number(selectedScenario.expectedRevenue) || 0) * 10000, // 예상 추가 매출
         baselineMetrics: {
           changesCount: selectedScenario.changesCount,
-          difficulty: selectedScenario.difficulty,
+          difficultyLevel: selectedScenario.difficulty === 'high' ? 3 : selectedScenario.difficulty === 'medium' ? 2 : 1,
           implementationCost: selectedScenario.implementationCost,
         },
       });
