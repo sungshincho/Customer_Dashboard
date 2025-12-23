@@ -149,7 +149,7 @@ export const useCustomerFlowData = ({
         const entranceZone = findEntranceZone(zones, zoneMap);
         const exitZones = findExitZones(zones, zoneMap);
 
-        return {
+        const result = {
           zones: Array.from(zoneMap.values()),
           flowPaths,
           transitionMatrix,
@@ -161,6 +161,14 @@ export const useCustomerFlowData = ({
           hotspotZones: [],
           bottlenecks: [],
         };
+
+        console.log('[useCustomerFlowData] 더미 데이터 생성 완료:', {
+          zonesCount: result.zones.length,
+          flowPathsCount: result.flowPaths.length,
+          maxTransitionCount: result.maxTransitionCount,
+        });
+
+        return result;
       }
 
       // 3. 존 쌍별로 집계 (days 추가)
