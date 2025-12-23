@@ -9,7 +9,7 @@
  */
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { Sparkles, Layout, Route, Users, Loader2, ChevronDown, ChevronUp, Check, RotateCcw, Eye, Layers, Target, TrendingUp, Clock, Footprints, Settings2 } from 'lucide-react';
+import { Sparkles, Layout, Route, Users, Loader2, ChevronDown, ChevronUp, Check, RotateCcw, Eye, Layers, Target, TrendingUp, Clock, Footprints, Settings2, Save, ArrowRight, BookmarkPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -17,6 +17,8 @@ import { buildStoreContext } from '../utils/store-context-builder';
 import { OptimizationResultPanel } from '../panels/OptimizationResultPanel';
 import { useScene } from '../core/SceneProvider';
 import { OptimizationSettingsPanel } from '../components/optimization';
+import { DiagnosticsSummary } from '../components/DiagnosticsSummary';
+import type { DiagnosticIssue } from '../components/DiagnosticIssueList';
 import type { UseSceneSimulationReturn } from '../hooks/useSceneSimulation';
 import type { SceneRecipe } from '../types';
 import type {
@@ -94,6 +96,10 @@ interface AIOptimizationTabProps {
   onSceneUpdate?: (newScene: any) => void;
   onOverlayToggle: (overlayType: string, visible: boolean) => void;
   onResultsUpdate?: (type: 'layout' | 'flow' | 'congestion' | 'staffing', result: any) => void;
+  /** AI 시뮬레이션에서 전달받은 진단 결과 */
+  diagnosticIssues?: DiagnosticIssue[];
+  /** 적용하기 탭으로 이동 */
+  onNavigateToApply?: () => void;
 }
 
 export function AIOptimizationTab({
@@ -103,6 +109,8 @@ export function AIOptimizationTab({
   onSceneUpdate,
   onOverlayToggle,
   onResultsUpdate,
+  diagnosticIssues = [],
+  onNavigateToApply,
 }: AIOptimizationTabProps) {
   // SceneProvider에서 applySimulationResults 가져오기
   const { applySimulationResults } = useScene();
@@ -509,8 +517,65 @@ export function AIOptimizationTab({
   const hasResults = results.layout || results.flow || results.staffing;
   const isRunning = sceneSimulation.isSimulating || runningTypes.length > 0;
 
+  // 시나리오 저장 (ApplyPanel로 전달)
+  const handleSaveScenario = useCallback(() => {
+    const { results } = sceneSimulation.state;
+    if (!results.layout && !results.flow && !results.staffing) {
+      toast.error('저장할 최적화 결과가 없습니다');
+      return;
+    }
+
+    // 시나리오 데이터 구성
+    const scenarioData = {
+      id: `scenario-${Date.now()}`,
+      name: `최적화 시나리오 ${new Date().toLocaleDateString('ko-KR')}`,
+      createdAt: new Date().toISOString(),
+      goal: selectedGoal,
+      optimizations: selectedOptimizations,
+      results: {
+        layout: results.layout,
+        flow: results.flow,
+        staffing: results.staffing,
+      },
+      settings: optimizationSettings,
+    };
+
+    // 로컬 스토리지에 저장
+    const savedScenarios = JSON.parse(localStorage.getItem('optimization_scenarios') || '[]');
+    savedScenarios.push(scenarioData);
+    localStorage.setItem('optimization_scenarios', JSON.stringify(savedScenarios));
+
+    toast.success('시나리오가 저장되었습니다', {
+      description: '적용하기 탭에서 저장된 시나리오를 확인할 수 있습니다.',
+    });
+  }, [sceneSimulation.state, selectedGoal, selectedOptimizations, optimizationSettings]);
+
   return (
     <div className="p-4 space-y-4">
+      {/* ========== 진단 결과 요약 (AI 시뮬레이션에서 전달) ========== */}
+      {diagnosticIssues.length > 0 && (
+        <DiagnosticsSummary
+          issues={diagnosticIssues}
+          defaultExpanded={true}
+          onOptimizeClick={() => {
+            // 진단 결과에 따라 최적화 유형 자동 선택
+            const hasCongestion = diagnosticIssues.some(
+              (i) => i.title.includes('혼잡') || i.title.includes('병목')
+            );
+            const hasFlow = diagnosticIssues.some(
+              (i) => i.title.includes('동선') || i.title.includes('유동')
+            );
+
+            // 기본 레이아웃 최적화 선택
+            setSelectedOptimizations(['layout']);
+
+            toast.info('진단 결과 기반 최적화 설정 완료', {
+              description: '아래 "최적화 실행" 버튼을 눌러주세요.',
+            });
+          }}
+        />
+      )}
+
       {/* ========== 최적화 목표 선택 ========== */}
       <div className="space-y-2">
         <div className="text-xs font-medium text-white/60 flex items-center gap-1.5">
@@ -782,15 +847,38 @@ export function AIOptimizationTab({
                   </Button>
                 </div>
 
-                {/* 저장 버튼 */}
-                <Button
-                  onClick={handleSaveToBe}
-                  variant="outline"
-                  size="sm"
-                  className="w-full border-white/20 text-white/70 hover:text-white hover:bg-white/10"
-                >
-                  최적화 씬 저장
-                </Button>
+                {/* 저장 버튼 그룹 */}
+                <div className="flex gap-2 pt-2 border-t border-white/10">
+                  <Button
+                    onClick={handleSaveToBe}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 border-white/20 text-white/70 hover:text-white hover:bg-white/10"
+                  >
+                    <Save className="h-3.5 w-3.5 mr-1.5" />
+                    씬 저장
+                  </Button>
+                  <Button
+                    onClick={handleSaveScenario}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 border-purple-500/50 text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
+                  >
+                    <BookmarkPlus className="h-3.5 w-3.5 mr-1.5" />
+                    시나리오 저장
+                  </Button>
+                </div>
+
+                {/* 적용하기 탭으로 이동 버튼 */}
+                {onNavigateToApply && (
+                  <Button
+                    onClick={onNavigateToApply}
+                    className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                  >
+                    <ArrowRight className="h-4 w-4 mr-2" />
+                    적용하기 탭에서 검토 및 실행
+                  </Button>
+                )}
               </>
             )}
           </div>
