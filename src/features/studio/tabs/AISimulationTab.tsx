@@ -12,13 +12,15 @@ import { useState, useCallback, useMemo } from 'react';
 import {
   Play, Pause, Square, RotateCcw, Users, Route, Activity,
   Thermometer, Monitor, Eye, Lightbulb, Lock, Loader2,
-  TrendingUp, TrendingDown, Sparkles,
+  TrendingUp, TrendingDown, Sparkles, Zap, Clock, DollarSign, AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useSimulationStore, STATE_COLORS, STATE_LABELS } from '@/stores/simulationStore';
+import { useSimulationStore as useAISimulationStore } from '../stores/simulationStore';
 import { buildStoreContext } from '../utils/store-context-builder';
 import { DiagnosticIssueList, type DiagnosticIssue } from '../components/DiagnosticIssueList';
 import type { SceneRecipe } from '../types';
@@ -553,6 +555,15 @@ export function AISimulationTab({
       {/* 구분선 */}
       <div className="border-t border-white/10" />
 
+      {/* ========== AI 예측 시뮬레이션 (새 Edge Function) ========== */}
+      <AISimulationSection
+        storeId={storeId}
+        onNavigateToOptimization={onNavigateToOptimization}
+      />
+
+      {/* 구분선 */}
+      <div className="border-t border-white/10" />
+
       {/* ========== 진단 결과 섹션 ========== */}
       {diagnosticIssues.length > 0 && (
         <>
@@ -693,6 +704,304 @@ export function AISimulationTab({
               </div>
             )}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===== AI 예측 시뮬레이션 섹션 (새 Edge Function 사용) =====
+interface AISimulationSectionProps {
+  storeId: string;
+  onNavigateToOptimization?: (issues?: DiagnosticIssue[]) => void;
+}
+
+function AISimulationSection({ storeId, onNavigateToOptimization }: AISimulationSectionProps) {
+  const {
+    isLoading,
+    progress,
+    error,
+    options,
+    result,
+    diagnosticIssues: aiDiagnosticIssues,
+    realtimeKpis,
+    setOptions,
+    runSimulation,
+    reset: resetAISimulation,
+    getIssuesForOptimization,
+  } = useAISimulationStore();
+
+  // 시뮬레이션 실행
+  const handleRunAISimulation = async () => {
+    if (!storeId) {
+      toast.error('매장을 선택해주세요');
+      return;
+    }
+
+    try {
+      toast.loading('AI 예측 시뮬레이션 실행 중...', { id: 'ai-sim' });
+      await runSimulation(storeId);
+      toast.success('AI 시뮬레이션 완료!', { id: 'ai-sim' });
+    } catch (err: any) {
+      toast.error(`시뮬레이션 실패: ${err.message}`, { id: 'ai-sim' });
+    }
+  };
+
+  // 최적화 탭으로 이동
+  const handleNavigateToOptimization = () => {
+    const issues = getIssuesForOptimization();
+    if (onNavigateToOptimization) {
+      onNavigateToOptimization(issues);
+      toast.info(`${issues.length}개 이슈를 AI 최적화로 전달합니다`);
+    }
+  };
+
+  const criticalCount = aiDiagnosticIssues.filter(i => i.severity === 'critical').length;
+  const warningCount = aiDiagnosticIssues.filter(i => i.severity === 'warning').length;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-medium text-white/80 flex items-center gap-2">
+          <Zap className="h-4 w-4 text-yellow-400" />
+          AI 예측 시뮬레이션
+        </div>
+        {result && (
+          <span className="text-xs text-white/40">
+            신뢰도: {result.confidence_score}%
+          </span>
+        )}
+      </div>
+
+      {/* 시뮬레이션 파라미터 */}
+      <div className="space-y-3 p-3 bg-white/5 rounded-lg">
+        {/* 시간대 선택 */}
+        <div>
+          <label className="text-xs text-white/50 mb-1.5 block">시간대</label>
+          <div className="grid grid-cols-4 gap-1.5">
+            {[
+              { value: 'morning', label: '오전', icon: '🌅' },
+              { value: 'afternoon', label: '오후', icon: '☀️' },
+              { value: 'evening', label: '저녁', icon: '🌆' },
+              { value: 'peak', label: '피크', icon: '🔥' },
+            ].map(({ value, label, icon }) => (
+              <button
+                key={value}
+                onClick={() => setOptions({ time_of_day: value as any })}
+                className={cn(
+                  'px-2 py-1.5 rounded text-xs transition-all',
+                  options.time_of_day === value
+                    ? 'bg-yellow-600 text-white'
+                    : 'bg-white/10 text-white/60 hover:bg-white/20'
+                )}
+              >
+                <span className="mr-1">{icon}</span>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 예상 고객 수 */}
+        <div>
+          <label className="text-xs text-white/50 mb-1.5 block">
+            예상 고객 수: {options.customer_count}명
+          </label>
+          <Slider
+            value={[options.customer_count]}
+            onValueChange={([v]) => setOptions({ customer_count: v })}
+            min={20}
+            max={200}
+            step={10}
+            className="w-full"
+          />
+        </div>
+
+        {/* 시뮬레이션 시간 */}
+        <div>
+          <label className="text-xs text-white/50 mb-1.5 block">
+            시뮬레이션 시간: {options.duration_minutes}분
+          </label>
+          <Slider
+            value={[options.duration_minutes]}
+            onValueChange={([v]) => setOptions({ duration_minutes: v })}
+            min={15}
+            max={180}
+            step={15}
+            className="w-full"
+          />
+        </div>
+      </div>
+
+      {/* 로딩 프로그레스 */}
+      {isLoading && (
+        <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
+          <div
+            className="h-full bg-yellow-500 transition-all duration-300"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      )}
+
+      {/* 실행 버튼 */}
+      <Button
+        onClick={handleRunAISimulation}
+        disabled={isLoading || !storeId}
+        className="w-full bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700"
+      >
+        {isLoading ? (
+          <>
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            AI 분석 중... {progress}%
+          </>
+        ) : (
+          <>
+            <Zap className="h-4 w-4 mr-2" />
+            AI 예측 시뮬레이션 실행
+          </>
+        )}
+      </Button>
+
+      {/* 에러 표시 */}
+      {error && (
+        <div className="p-2 bg-red-500/10 border border-red-500/20 rounded text-red-400 text-xs">
+          {error}
+        </div>
+      )}
+
+      {/* 결과 표시 */}
+      {result && (
+        <div className="space-y-3">
+          {/* KPI 요약 */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="p-2 bg-white/5 rounded-lg">
+              <div className="flex items-center gap-1 text-xs text-white/40 mb-0.5">
+                <Users className="h-3 w-3" />
+                예상 방문객
+              </div>
+              <div className="text-lg font-bold text-white">
+                {realtimeKpis.visitors.toLocaleString()}
+                <span className="text-xs text-white/40 font-normal ml-0.5">명</span>
+              </div>
+            </div>
+            <div className="p-2 bg-white/5 rounded-lg">
+              <div className="flex items-center gap-1 text-xs text-white/40 mb-0.5">
+                <TrendingUp className="h-3 w-3" />
+                전환율
+              </div>
+              <div className="text-lg font-bold text-blue-400">
+                {(realtimeKpis.conversion * 100).toFixed(1)}%
+              </div>
+            </div>
+            <div className="p-2 bg-white/5 rounded-lg">
+              <div className="flex items-center gap-1 text-xs text-white/40 mb-0.5">
+                <Clock className="h-3 w-3" />
+                평균 체류
+              </div>
+              <div className="text-lg font-bold text-purple-400">
+                {Math.round(realtimeKpis.avgDwell / 60)}분
+              </div>
+            </div>
+            <div className="p-2 bg-white/5 rounded-lg">
+              <div className="flex items-center gap-1 text-xs text-white/40 mb-0.5">
+                <DollarSign className="h-3 w-3" />
+                예상 매출
+              </div>
+              <div className="text-lg font-bold text-green-400">
+                ₩{(realtimeKpis.revenue / 10000).toFixed(0)}만
+              </div>
+            </div>
+          </div>
+
+          {/* 진단 이슈 요약 */}
+          {aiDiagnosticIssues.length > 0 && (
+            <div className="p-3 bg-white/5 rounded-lg space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm text-white/80">
+                  <AlertTriangle className="h-4 w-4" />
+                  발견된 이슈
+                </div>
+                <div className="flex gap-1">
+                  {criticalCount > 0 && (
+                    <span className="px-1.5 py-0.5 bg-red-500 text-white text-xs rounded-full">
+                      {criticalCount}
+                    </span>
+                  )}
+                  {warningCount > 0 && (
+                    <span className="px-1.5 py-0.5 bg-yellow-500 text-white text-xs rounded-full">
+                      {warningCount}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* 이슈 목록 (최대 3개) */}
+              <div className="space-y-1.5">
+                {aiDiagnosticIssues.slice(0, 3).map((issue) => (
+                  <div
+                    key={issue.id}
+                    className={cn(
+                      'p-2 rounded text-xs',
+                      issue.severity === 'critical'
+                        ? 'bg-red-500/20 text-red-300'
+                        : issue.severity === 'warning'
+                        ? 'bg-yellow-500/20 text-yellow-300'
+                        : 'bg-blue-500/20 text-blue-300'
+                    )}
+                  >
+                    <div className="font-medium">{issue.title}</div>
+                    <div className="text-white/50 mt-0.5">{issue.zone_name}</div>
+                  </div>
+                ))}
+                {aiDiagnosticIssues.length > 3 && (
+                  <div className="text-xs text-white/40 text-center">
+                    +{aiDiagnosticIssues.length - 3}개 더
+                  </div>
+                )}
+              </div>
+
+              {/* AI 최적화로 이동 버튼 */}
+              {(criticalCount > 0 || warningCount > 0) && onNavigateToOptimization && (
+                <Button
+                  onClick={handleNavigateToOptimization}
+                  className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-sm"
+                  size="sm"
+                >
+                  <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                  AI 최적화로 해결하기 ({criticalCount + warningCount}개 이슈)
+                </Button>
+              )}
+            </div>
+          )}
+
+          {/* AI 인사이트 */}
+          {result.ai_insights && result.ai_insights.length > 0 && (
+            <div className="p-3 bg-white/5 rounded-lg">
+              <div className="text-sm text-white/80 mb-2 flex items-center gap-2">
+                <Lightbulb className="h-4 w-4 text-yellow-400" />
+                AI 인사이트
+              </div>
+              <ul className="space-y-1.5">
+                {result.ai_insights.slice(0, 3).map((insight, idx) => (
+                  <li key={idx} className="text-xs text-white/60 flex items-start gap-1.5">
+                    <span className="text-yellow-400 mt-0.5">•</span>
+                    {insight}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* 초기화 버튼 */}
+          <Button
+            onClick={resetAISimulation}
+            variant="outline"
+            size="sm"
+            className="w-full border-white/20 text-white/60 hover:text-white"
+          >
+            <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+            결과 초기화
+          </Button>
         </div>
       )}
     </div>

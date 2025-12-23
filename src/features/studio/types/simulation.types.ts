@@ -250,6 +250,93 @@ export interface StaffSchedule {
   gap: number;
 }
 
+// ===== AI 시뮬레이션 진단 타입 =====
+
+export type IssueSeverity = 'critical' | 'warning' | 'info';
+export type IssueCategory = 'congestion' | 'flow' | 'conversion' | 'dwell_time' | 'staffing';
+
+export interface DiagnosticIssue {
+  id: string;
+  severity: IssueSeverity;
+  category: IssueCategory;
+  zone_id?: string;
+  zone_name?: string;
+  title: string;
+  description: string;
+  current_value: number;
+  threshold_value: number;
+  impact: string;
+  suggested_action: string;
+}
+
+export interface SimulationKPIs {
+  predicted_visitors: number;
+  predicted_conversion_rate: number;
+  predicted_revenue: number;
+  avg_dwell_time_seconds: number;
+  peak_congestion_percent: number;
+}
+
+export interface ZoneAnalysis {
+  zone_id: string;
+  zone_name: string;
+  visitor_count: number;
+  avg_dwell_seconds: number;
+  congestion_level: number;
+  conversion_contribution: number;
+  bottleneck_score: number;
+}
+
+export interface FlowAnalysis {
+  primary_paths: {
+    from_zone: string;
+    to_zone: string;
+    traffic_volume: number;
+    avg_transition_time: number;
+  }[];
+  dead_zones: string[];
+  congestion_points: string[];
+}
+
+export interface AISimulationResult {
+  simulation_id: string;
+  timestamp: string;
+  duration_minutes: number;
+  kpis: SimulationKPIs;
+  zone_analysis: ZoneAnalysis[];
+  flow_analysis: FlowAnalysis;
+  hourly_analysis: {
+    hour: string;
+    visitor_count: number;
+    congestion_level: number;
+    revenue_estimate: number;
+  }[];
+  diagnostic_issues: DiagnosticIssue[];
+  customer_journeys: {
+    journey_id: string;
+    customer_type: string;
+    zones_visited: string[];
+    total_time_seconds: number;
+    purchased: boolean;
+    purchase_amount?: number;
+  }[];
+  ai_insights: string[];
+  confidence_score: number;
+}
+
+export interface SimulationOptions {
+  duration_minutes: number;
+  customer_count: number;
+  time_of_day: 'morning' | 'afternoon' | 'evening' | 'peak';
+  simulation_type: 'realtime' | 'predictive' | 'scenario';
+
+  // UI 옵션
+  realTimeVisualization: boolean;
+  showCustomerStates: boolean;
+  showHeatmap: boolean;
+  showCongestion: boolean;
+}
+
 // 시뮬레이션 히스토리 항목
 export interface SimulationHistoryItem {
   id: string;

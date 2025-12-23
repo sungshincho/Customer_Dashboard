@@ -846,20 +846,20 @@ export default function DigitalTwinStudioPage() {
                 {/* CustomerAgents는 Canvas3D 내부에서 simulationStore.customers를 렌더링함 */}
 
                 {/* 🆕 개선된 동선 오버레이 (zone_transitions 기반) - DB 데이터 있을 때 */}
-                {isActive('flow') && storeId && (
+                {isActive('flow') && selectedStore?.id && (
                   <CustomerFlowOverlayEnhanced
                     visible={true}
-                    storeId={storeId}
+                    storeId={selectedStore.id}
                     showLabels={true}
                     minOpacity={0.3}
                   />
                 )}
 
                 {/* 🆕 고객 아바타 시뮬레이션 오버레이 (zone_transitions 기반) */}
-                {isActive('avatar') && storeId && (
+                {isActive('avatar') && selectedStore?.id && (
                   <CustomerAvatarsOverlay
                     visible={true}
-                    storeId={storeId}
+                    storeId={selectedStore.id}
                     showLabels={false}
                     autoStart={true}
                     maxCustomers={20}
