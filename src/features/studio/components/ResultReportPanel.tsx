@@ -124,7 +124,7 @@ export const ResultReportPanel = memo(function ResultReportPanel({
                 <div className="text-lg font-semibold text-green-400">
                   +₩{(totalImprovements.revenue / 10000).toFixed(0)}만
                 </div>
-                <div className="text-[10px] text-white/50">예상 매출</div>
+                <div className="text-[10px] text-white/50">예상 매출/월</div>
               </div>
               <div className="text-center">
                 <div className="text-lg font-semibold text-blue-400">
@@ -138,6 +138,71 @@ export const ResultReportPanel = memo(function ResultReportPanel({
               </div>
             </div>
           </div>
+
+          {/* 🆕 ROI 분석 */}
+          {totalImprovements.revenue > 0 && (
+            <div className="p-2.5 rounded-lg bg-green-500/10 border border-green-500/20">
+              <div className="flex items-center gap-1.5 mb-2">
+                <TrendingUp className="w-3.5 h-3.5 text-green-400" />
+                <span className="text-xs font-medium text-green-400">ROI 분석</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="p-2 rounded bg-black/30">
+                  <div className="text-white/50 text-[10px]">예상 투자 비용</div>
+                  <div className="text-white font-medium">₩{(totalImprovements.revenue * 0.3 / 10000).toFixed(0)}만</div>
+                </div>
+                <div className="p-2 rounded bg-black/30">
+                  <div className="text-white/50 text-[10px]">ROI</div>
+                  <div className="text-green-400 font-medium">
+                    {Math.round((totalImprovements.revenue / (totalImprovements.revenue * 0.3)) * 100)}%
+                  </div>
+                </div>
+                <div className="p-2 rounded bg-black/30">
+                  <div className="text-white/50 text-[10px]">투자 회수 기간</div>
+                  <div className="text-white font-medium">
+                    {Math.ceil((totalImprovements.revenue * 0.3) / totalImprovements.revenue)}개월
+                  </div>
+                </div>
+                <div className="p-2 rounded bg-black/30">
+                  <div className="text-white/50 text-[10px]">연간 추가 매출</div>
+                  <div className="text-green-400 font-medium">₩{(totalImprovements.revenue * 12 / 10000).toFixed(0)}만</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 🆕 적용 우선순위 가이드 */}
+          {totalImprovements.changes > 0 && (
+            <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <div className="flex items-center gap-1.5 mb-2">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                <span className="text-xs font-medium text-amber-400">적용 가이드</span>
+              </div>
+              <div className="space-y-1.5 text-[10px]">
+                {results.layout && (results.layout.changes?.length > 0 || (results.layout.productChanges?.length || 0) > 0) && (
+                  <div className="flex items-center gap-2 p-1.5 rounded bg-black/30">
+                    <span className="w-4 h-4 rounded-full bg-yellow-500 flex items-center justify-center text-black font-bold text-[9px]">1</span>
+                    <span className="text-white/80">레이아웃 변경 먼저 적용</span>
+                    <span className="ml-auto text-yellow-400">{(results.layout.changes?.length || 0) + (results.layout.productChanges?.length || 0)}건</span>
+                  </div>
+                )}
+                {results.flow && results.flow.bottlenecks?.length > 0 && (
+                  <div className="flex items-center gap-2 p-1.5 rounded bg-black/30">
+                    <span className="w-4 h-4 rounded-full bg-cyan-500 flex items-center justify-center text-black font-bold text-[9px]">2</span>
+                    <span className="text-white/80">병목 구간 개선</span>
+                    <span className="ml-auto text-cyan-400">{results.flow.bottlenecks.length}건</span>
+                  </div>
+                )}
+                {results.staffing && results.staffing.staffPositions?.length > 0 && (
+                  <div className="flex items-center gap-2 p-1.5 rounded bg-black/30">
+                    <span className="w-4 h-4 rounded-full bg-purple-500 flex items-center justify-center text-black font-bold text-[9px]">3</span>
+                    <span className="text-white/80">직원 배치 조정</span>
+                    <span className="ml-auto text-purple-400">{results.staffing.staffPositions.length}건</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* 결과별 섹션 */}
           {RESULT_TYPES.map((type) => {

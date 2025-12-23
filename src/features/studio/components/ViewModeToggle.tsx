@@ -7,6 +7,7 @@
  * - Split: 좌우 분할 비교
  */
 
+import { useEffect, useCallback } from 'react';
 import { Eye, GitCompare, Columns } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
@@ -54,6 +55,40 @@ export function ViewModeToggle({
   hasOptimizationResults = false,
 }: ViewModeToggleProps) {
   const canUseToBe = hasOptimizationResults;
+
+  // 🆕 키보드 단축키 핸들러
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // 입력 필드에서는 단축키 무시
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      return;
+    }
+
+    // Ctrl, Alt, Meta 키가 눌려있으면 무시
+    if (e.ctrlKey || e.altKey || e.metaKey) {
+      return;
+    }
+
+    const key = e.key.toLowerCase();
+
+    if (key === 'a') {
+      e.preventDefault();
+      onChange('as-is');
+    } else if (key === 't' && canUseToBe) {
+      e.preventDefault();
+      onChange('to-be');
+    } else if (key === 's' && canUseToBe) {
+      e.preventDefault();
+      onChange('split');
+    }
+  }, [onChange, canUseToBe]);
+
+  // 키보드 이벤트 등록
+  useEffect(() => {
+    if (disabled) return;
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [disabled, handleKeyDown]);
 
   return (
     <TooltipProvider>
