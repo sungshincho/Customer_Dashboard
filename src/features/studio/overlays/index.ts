@@ -25,6 +25,10 @@ export { SlotVisualizerOverlay, SlotCompatibilityPreview } from './SlotVisualize
 // zones_dim 기반 구역 오버레이
 export { ZonesFloorOverlay } from './ZonesFloorOverlay';
 
+// 개선된 고객 동선/시뮬레이션 오버레이 (zone_transitions 기반)
+export { CustomerFlowOverlayEnhanced } from './CustomerFlowOverlayEnhanced';
+export { CustomerAvatarsOverlay } from './CustomerAvatarsOverlay';
+
 // 기존 컴포넌트 re-export (호환성)
 // 점진적 마이그레이션을 위해 기존 경로도 유지
 export { HeatmapOverlay as HeatmapOverlay3D } from './HeatmapOverlay';
