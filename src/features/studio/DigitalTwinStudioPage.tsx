@@ -916,11 +916,11 @@ export default function DigitalTwinStudioPage() {
                 {sceneSimulation.state.results.layout && viewMode !== 'as-is' && (
                   <LayoutOptimizationOverlay
                     result={sceneSimulation.state.results.layout as any}
-                    showBefore={viewMode === 'split'}
-                    showAfter={viewMode === 'to-be' || viewMode === 'split'}
-                    showMoves={viewMode === 'to-be' || viewMode === 'split'}
-                    showProductMoves={viewMode === 'to-be' || viewMode === 'split'}
-                    showZoneHighlights={viewMode !== 'as-is'}
+                    showBefore={false}  /* 🔧 FIX: Before 히트맵 비활성화 (빨간 오버레이 방지) */
+                    showAfter={false}   /* 🔧 FIX: After 히트맵도 비활성화 (깔끔한 뷰) */
+                    showMoves={true}    /* 가구 이동 화살표는 항상 표시 */
+                    showProductMoves={true}  /* 제품 이동 화살표도 항상 표시 */
+                    showZoneHighlights={viewMode === 'to-be'}  /* To-Be에서만 존 하이라이트 */
                     storeBounds={storeBounds}
                     zonePositions={zonePositions}
                     zoneSizes={zoneSizes}
@@ -1028,16 +1028,24 @@ export default function DigitalTwinStudioPage() {
             <div className="absolute bottom-4 left-4 pointer-events-auto z-20 flex items-center gap-2">
               {/* 뷰 모드 인디케이터 */}
               {(sceneSimulation.state.results.layout || sceneSimulation.state.results.flow) && (
-                <div className={`px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-1.5 ${
+                <div className={`px-3 py-2 rounded-lg text-xs font-medium flex flex-col gap-1 ${
                   viewMode === 'as-is'
                     ? 'bg-blue-600/80 text-white'
                     : viewMode === 'to-be'
                     ? 'bg-green-600/80 text-white'
                     : 'bg-purple-600/80 text-white'
                 }`}>
-                  {viewMode === 'as-is' && '📍 As-Is (현재 배치)'}
-                  {viewMode === 'to-be' && '✨ To-Be (최적화 결과)'}
-                  {viewMode === 'split' && '⚡ Split (비교 뷰)'}
+                  <div className="flex items-center gap-1.5">
+                    {viewMode === 'as-is' && '📍 As-Is (현재 배치)'}
+                    {viewMode === 'to-be' && '✨ To-Be (최적화 결과)'}
+                    {viewMode === 'split' && '⚡ Split (비교 뷰)'}
+                  </div>
+                  {/* Split 뷰 안내 */}
+                  {viewMode === 'split' && (
+                    <div className="text-[10px] text-white/70">
+                      🔴 As-Is → 🟢 To-Be 화살표로 변경 확인
+                    </div>
+                  )}
                 </div>
               )}
               <div className="bg-black/70 backdrop-blur-sm border border-white/10 rounded-lg px-3 py-2 text-xs text-white/80">
