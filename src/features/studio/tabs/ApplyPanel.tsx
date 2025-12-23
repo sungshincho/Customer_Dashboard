@@ -2,17 +2,15 @@
  * ApplyPanel.tsx
  *
  * 적용하기 패널 - 4번째 탭
- * - 저장된 시나리오 관리
+ * - 저장된 시나리오 관리 (localStorage 연동)
  * - 시나리오 비교
- * - 실매장 적용 및 ROI 측정 연계
+ * - 실매장 적용 및 ROI 측정 연계 (applied_strategies 테이블)
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   CheckCircle,
-  Save,
-  BarChart3,
   FileText,
   ChevronDown,
   ChevronRight,
@@ -23,6 +21,9 @@ import {
   Clock,
   TrendingUp,
   AlertCircle,
+  BarChart3,
+  RefreshCw,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,22 +33,25 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useAppliedStrategies, useApplyStrategy } from '@/features/roi/hooks/useAppliedStrategies';
+import { useAuth } from '@/hooks/useAuth';
 
 // ============================================================================
 // 타입 정의
 // ============================================================================
 
-interface SavedScenario {
+interface StoredScenario {
   id: string;
   name: string;
   createdAt: string;
-  changesCount: number;
-  expectedRevenue: number;
-  expectedConversion: number;
-  implementationCost: number;
-  expectedROI: number;
-  difficulty: 'low' | 'medium' | 'high';
-  changes: ScenarioChange[];
+  goal: string;
+  optimizations: string[];
+  results: {
+    layout?: any;
+    flow?: any;
+    staffing?: any;
+  };
+  settings: any;
 }
 
 interface ScenarioChange {
@@ -61,12 +65,18 @@ interface ScenarioChange {
   completed?: boolean;
 }
 
-interface AppliedStrategy {
+interface TransformedScenario {
   id: string;
   name: string;
-  appliedAt: string;
-  currentROI: number;
-  status: 'active' | 'measuring' | 'completed';
+  createdAt: string;
+  changesCount: number;
+  expectedRevenue: number;
+  expectedConversion: number;
+  implementationCost: number;
+  expectedROI: number;
+  difficulty: 'low' | 'medium' | 'high';
+  changes: ScenarioChange[];
+  originalData: StoredScenario;
 }
 
 interface ApplyPanelProps {
@@ -76,59 +86,158 @@ interface ApplyPanelProps {
 }
 
 // ============================================================================
-// 데모 데이터
+// 헬퍼 함수
 // ============================================================================
 
-const DEMO_SCENARIOS: SavedScenario[] = [
-  {
-    id: 'scenario-a',
-    name: '시나리오 A (최신)',
-    createdAt: '2024-12-23 14:30',
-    changesCount: 9,
-    expectedRevenue: 23.5,
-    expectedConversion: 18.2,
-    implementationCost: 500000,
-    expectedROI: 340,
-    difficulty: 'medium',
-    changes: [
-      { id: 'c1', type: 'furniture', item: '라운지 소파', from: '입구 좌측', to: '입구 +2m 전방', expectedEffect: '체류 +15%', estimatedTime: '15분' },
-      { id: 'c2', type: 'furniture', item: '의류 행거', from: '벽면', to: '중앙 동선', expectedEffect: '노출 +40%', estimatedTime: '30분' },
-      { id: 'c3', type: 'product', item: '레더 재킷', from: 'RACK-001', to: 'MANNE-001', expectedEffect: '주목 +60%', estimatedTime: '5분' },
-      { id: 'c4', type: 'product', item: '캐시미어 코트', from: 'RACK-003', to: 'RACK-001', expectedEffect: '매출 +25%', estimatedTime: '5분' },
-    ],
-  },
-  {
-    id: 'scenario-b',
-    name: '시나리오 B',
-    createdAt: '2024-12-23 11:00',
-    changesCount: 5,
-    expectedRevenue: 15,
-    expectedConversion: 10,
-    implementationCost: 200000,
-    expectedROI: 300,
-    difficulty: 'low',
-    changes: [
-      { id: 'c5', type: 'furniture', item: '디스플레이 테이블', from: 'A존', to: 'B존 입구', expectedEffect: '동선 개선', estimatedTime: '20분' },
-    ],
-  },
-  {
-    id: 'scenario-c',
-    name: '시나리오 C',
-    createdAt: '2024-12-22 16:45',
-    changesCount: 12,
-    expectedRevenue: 28,
-    expectedConversion: 22,
-    implementationCost: 800000,
-    expectedROI: 280,
-    difficulty: 'high',
-    changes: [],
-  },
-];
+const LOCAL_STORAGE_KEY = 'optimization_scenarios';
 
-const DEMO_APPLIED_STRATEGIES: AppliedStrategy[] = [
-  { id: 'as1', name: '레이아웃 최적화 v1', appliedAt: '12/20', currentROI: 18.3, status: 'active' },
-  { id: 'as2', name: '동선 개선 v2', appliedAt: '12/15', currentROI: 12.1, status: 'active' },
-];
+// localStorage에서 시나리오 로드
+const loadScenariosFromStorage = (): StoredScenario[] => {
+  try {
+    const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (error) {
+    console.error('Error loading scenarios from localStorage:', error);
+  }
+  return [];
+};
+
+// 시나리오 삭제
+const deleteScenarioFromStorage = (scenarioId: string): StoredScenario[] => {
+  const scenarios = loadScenariosFromStorage();
+  const filtered = scenarios.filter((s) => s.id !== scenarioId);
+  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(filtered));
+  return filtered;
+};
+
+// 저장된 시나리오를 표시용으로 변환
+const transformScenario = (scenario: StoredScenario): TransformedScenario => {
+  const changes: ScenarioChange[] = [];
+  let furnitureMoves = 0;
+  let productMoves = 0;
+  let staffChanges = 0;
+
+  // Layout 결과에서 변경사항 추출
+  if (scenario.results?.layout) {
+    const layoutResult = scenario.results.layout;
+
+    // furniture_moves 추출
+    const furnitureMovesData = layoutResult.furniture_moves || layoutResult.furnitureMoves || [];
+    furnitureMovesData.forEach((move: any, idx: number) => {
+      changes.push({
+        id: `furniture-${idx}`,
+        type: 'furniture',
+        item: move.furniture_name || move.furniture_code || `가구 ${idx + 1}`,
+        from: move.current_position
+          ? `(${move.current_position.x?.toFixed(1)}, ${move.current_position.z?.toFixed(1)})`
+          : '현재 위치',
+        to: move.suggested_position || move.new_position
+          ? `(${(move.suggested_position?.x || move.new_position?.x || 0).toFixed(1)}, ${(move.suggested_position?.z || move.new_position?.z || 0).toFixed(1)})`
+          : '최적 위치',
+        expectedEffect: move.reason || move.expected_effect || '동선 개선',
+        estimatedTime: '예상 15분',
+      });
+      furnitureMoves++;
+    });
+
+    // product_placements 추출
+    const productPlacements = layoutResult.product_placements || layoutResult.productPlacements || [];
+    productPlacements.forEach((placement: any, idx: number) => {
+      changes.push({
+        id: `product-${idx}`,
+        type: 'product',
+        item: placement.product_name || placement.product_sku || `제품 ${idx + 1}`,
+        from: placement.from_slot || placement.current_slot || '현재 슬롯',
+        to: placement.to_slot || placement.suggested_slot || '추천 슬롯',
+        expectedEffect: placement.reason || '노출 증가',
+        estimatedTime: '예상 5분',
+      });
+      productMoves++;
+    });
+  }
+
+  // Flow 결과에서 변경사항 추출
+  if (scenario.results?.flow) {
+    const flowResult = scenario.results.flow;
+    const suggestions = flowResult.path_suggestions || flowResult.suggestions || [];
+
+    suggestions.forEach((suggestion: any, idx: number) => {
+      if (suggestion.type === 'furniture' || suggestion.action_type === 'move_furniture') {
+        changes.push({
+          id: `flow-furniture-${idx}`,
+          type: 'furniture',
+          item: suggestion.furniture_name || suggestion.target || `항목 ${idx + 1}`,
+          from: suggestion.from || '현재',
+          to: suggestion.to || suggestion.suggestion || '권장',
+          expectedEffect: suggestion.expected_improvement || '동선 개선',
+          estimatedTime: '예상 20분',
+        });
+        furnitureMoves++;
+      }
+    });
+  }
+
+  // Staffing 결과에서 변경사항 추출
+  if (scenario.results?.staffing) {
+    const staffingResult = scenario.results.staffing;
+    const recommendations = staffingResult.zone_recommendations || staffingResult.recommendations || [];
+
+    recommendations.forEach((rec: any, idx: number) => {
+      if (rec.change_needed || rec.recommended_count !== rec.current_count) {
+        changes.push({
+          id: `staff-${idx}`,
+          type: 'staff',
+          item: rec.zone_name || `구역 ${idx + 1}`,
+          from: `${rec.current_count || 0}명`,
+          to: `${rec.recommended_count || rec.suggested_count || 0}명`,
+          expectedEffect: rec.reason || '서비스 개선',
+          estimatedTime: '즉시 적용',
+        });
+        staffChanges++;
+      }
+    });
+  }
+
+  // 예상 지표 계산
+  const totalChanges = furnitureMoves + productMoves + staffChanges;
+  const expectedRevenue = scenario.results?.layout?.expected_revenue_increase
+    || scenario.results?.layout?.expectedRevenueIncrease
+    || Math.min(totalChanges * 3, 30); // 변경 건수당 3%, 최대 30%
+  const expectedConversion = expectedRevenue * 0.8; // 매출 대비 80%
+  const implementationCost = furnitureMoves * 50000 + productMoves * 10000 + staffChanges * 30000;
+  const expectedROI = implementationCost > 0
+    ? Math.round((expectedRevenue * 1000000 / implementationCost) * 100)
+    : 0;
+
+  // 난이도 계산
+  let difficulty: 'low' | 'medium' | 'high' = 'low';
+  if (totalChanges > 10 || furnitureMoves > 5) {
+    difficulty = 'high';
+  } else if (totalChanges > 5 || furnitureMoves > 2) {
+    difficulty = 'medium';
+  }
+
+  return {
+    id: scenario.id,
+    name: scenario.name,
+    createdAt: new Date(scenario.createdAt).toLocaleString('ko-KR', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }),
+    changesCount: totalChanges,
+    expectedRevenue,
+    expectedConversion,
+    implementationCost,
+    expectedROI,
+    difficulty,
+    changes,
+    originalData: scenario,
+  };
+};
 
 // ============================================================================
 // 메인 컴포넌트
@@ -136,17 +245,68 @@ const DEMO_APPLIED_STRATEGIES: AppliedStrategy[] = [
 
 export function ApplyPanel({ storeId, onApplyScenario, onNavigateToROI }: ApplyPanelProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
-  // 상태
-  const [selectedScenarioId, setSelectedScenarioId] = useState<string>(DEMO_SCENARIOS[0]?.id || '');
+  // localStorage 시나리오 상태
+  const [storedScenarios, setStoredScenarios] = useState<StoredScenario[]>([]);
+  const [isLoadingScenarios, setIsLoadingScenarios] = useState(true);
+
+  // 변환된 시나리오
+  const scenarios = useMemo(
+    () => storedScenarios.map(transformScenario),
+    [storedScenarios]
+  );
+
+  // UI 상태
+  const [selectedScenarioId, setSelectedScenarioId] = useState<string>('');
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['comparison', 'checklist']));
   const [completedTasks, setCompletedTasks] = useState<Set<string>>(new Set());
 
+  // Supabase에서 적용 중인 전략 조회
+  const { data: appliedStrategies, isLoading: isLoadingStrategies, refetch: refetchStrategies } = useAppliedStrategies('90d', { status: 'active' });
+
+  // 전략 적용 뮤테이션
+  const applyStrategyMutation = useApplyStrategy();
+
+  // 초기 로드
+  useEffect(() => {
+    const loadScenarios = () => {
+      setIsLoadingScenarios(true);
+      const loaded = loadScenariosFromStorage();
+      setStoredScenarios(loaded);
+      if (loaded.length > 0 && !selectedScenarioId) {
+        setSelectedScenarioId(loaded[0].id);
+      }
+      setIsLoadingScenarios(false);
+    };
+
+    loadScenarios();
+  }, []);
+
   // 선택된 시나리오
   const selectedScenario = useMemo(
-    () => DEMO_SCENARIOS.find((s) => s.id === selectedScenarioId),
-    [selectedScenarioId]
+    () => scenarios.find((s) => s.id === selectedScenarioId),
+    [scenarios, selectedScenarioId]
   );
+
+  // 시나리오 새로고침
+  const handleRefresh = useCallback(() => {
+    const loaded = loadScenariosFromStorage();
+    setStoredScenarios(loaded);
+    toast.success('시나리오 목록을 새로고침했습니다');
+  }, []);
+
+  // 시나리오 삭제
+  const handleDeleteScenario = useCallback((scenarioId: string) => {
+    const updated = deleteScenarioFromStorage(scenarioId);
+    setStoredScenarios(updated);
+    if (selectedScenarioId === scenarioId && updated.length > 0) {
+      setSelectedScenarioId(updated[0].id);
+    } else if (updated.length === 0) {
+      setSelectedScenarioId('');
+    }
+    toast.success('시나리오가 삭제되었습니다');
+  }, [selectedScenarioId]);
 
   // 섹션 토글
   const toggleSection = (sectionId: string) => {
@@ -169,26 +329,55 @@ export function ApplyPanel({ storeId, onApplyScenario, onNavigateToROI }: ApplyP
   };
 
   // 실매장 적용 핸들러
-  const handleApply = () => {
+  const handleApply = async () => {
     if (!selectedScenario) {
       toast.error('시나리오를 선택해주세요');
       return;
     }
 
-    toast.success(`"${selectedScenario.name}" 적용 및 ROI 측정을 시작합니다`);
-    onApplyScenario?.(selectedScenario.id);
+    try {
+      // Supabase에 전략 저장
+      const result = await applyStrategyMutation.mutateAsync({
+        source: '3d_simulation',
+        sourceModule: 'layout_optimization',
+        name: selectedScenario.name,
+        description: `${selectedScenario.changesCount}건 변경, 예상 매출 +${selectedScenario.expectedRevenue}%`,
+        settings: selectedScenario.originalData,
+        startDate: new Date().toISOString(),
+        expectedRoi: selectedScenario.expectedRevenue,
+        expectedRevenue: selectedScenario.expectedRevenue * 10000, // 예상 추가 매출
+        baselineMetrics: {
+          changesCount: selectedScenario.changesCount,
+          difficulty: selectedScenario.difficulty,
+          implementationCost: selectedScenario.implementationCost,
+        },
+      });
 
-    // ROI 페이지로 이동 옵션
-    setTimeout(() => {
-      if (window.confirm('ROI 대시보드로 이동하시겠습니까?')) {
-        navigate('/roi');
-      }
-    }, 1000);
+      toast.success(`"${selectedScenario.name}" 적용 및 ROI 측정을 시작합니다`);
+      onApplyScenario?.(selectedScenario.id);
+
+      // 전략 목록 새로고침
+      refetchStrategies();
+
+      // ROI 페이지로 이동 옵션
+      setTimeout(() => {
+        if (window.confirm('ROI 대시보드로 이동하시겠습니까?')) {
+          navigate(`/roi?strategy=${result.id}`);
+        }
+      }, 500);
+    } catch (error) {
+      console.error('Error applying strategy:', error);
+      toast.error('전략 적용에 실패했습니다');
+    }
   };
 
   // ROI 페이지 이동
-  const handleNavigateToROI = () => {
-    navigate('/roi');
+  const handleNavigateToROI = (strategyId?: string) => {
+    if (strategyId) {
+      navigate(`/roi?strategy=${strategyId}`);
+    } else {
+      navigate('/roi');
+    }
     onNavigateToROI?.();
   };
 
@@ -217,16 +406,26 @@ export function ApplyPanel({ storeId, onApplyScenario, onNavigateToROI }: ApplyP
           <CheckCircle className="w-5 h-5 text-green-400" />
           <h2 className="text-lg font-semibold text-white">적용하기</h2>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleNavigateToROI}
-          className="text-xs border-white/20 text-white/80 hover:bg-white/10"
-        >
-          <BarChart3 className="w-3 h-3 mr-1" />
-          ROI 대시보드
-          <ExternalLink className="w-3 h-3 ml-1" />
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleRefresh}
+            className="text-xs text-white/60 hover:text-white hover:bg-white/10"
+          >
+            <RefreshCw className="w-3 h-3" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleNavigateToROI()}
+            className="text-xs border-white/20 text-white/80 hover:bg-white/10"
+          >
+            <BarChart3 className="w-3 h-3 mr-1" />
+            ROI 대시보드
+            <ExternalLink className="w-3 h-3 ml-1" />
+          </Button>
+        </div>
       </div>
 
       {/* 저장된 시나리오 목록 */}
@@ -235,132 +434,165 @@ export function ApplyPanel({ storeId, onApplyScenario, onNavigateToROI }: ApplyP
           <CardTitle className="text-sm text-white/80 flex items-center gap-2">
             <FileText className="w-4 h-4 text-blue-400" />
             저장된 시나리오
+            {scenarios.length > 0 && (
+              <Badge variant="outline" className="text-[10px] border-white/30 text-white/60">
+                {scenarios.length}건
+              </Badge>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-2">
-          <RadioGroup
-            value={selectedScenarioId}
-            onValueChange={setSelectedScenarioId}
-            className="space-y-2"
-          >
-            {DEMO_SCENARIOS.map((scenario) => (
-              <div
-                key={scenario.id}
-                className={cn(
-                  'flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors',
-                  selectedScenarioId === scenario.id
-                    ? 'bg-primary/20 border border-primary/40'
-                    : 'bg-white/5 hover:bg-white/10 border border-transparent'
-                )}
-                onClick={() => setSelectedScenarioId(scenario.id)}
-              >
-                <RadioGroupItem value={scenario.id} id={scenario.id} className="mt-1" />
-                <div className="flex-1 min-w-0">
-                  <Label
-                    htmlFor={scenario.id}
-                    className="text-sm font-medium text-white cursor-pointer"
-                  >
-                    {scenario.name}
-                  </Label>
-                  <div className="flex flex-wrap gap-2 mt-1 text-xs text-white/60">
-                    <span>{scenario.changesCount}건 변경</span>
-                    <span>•</span>
-                    <span className="text-green-400">+{scenario.expectedRevenue}% 매출</span>
-                    <span>•</span>
-                    <span>{scenario.createdAt}</span>
+          {isLoadingScenarios ? (
+            <div className="flex items-center justify-center py-8 text-white/40">
+              <Loader2 className="w-5 h-5 animate-spin mr-2" />
+              불러오는 중...
+            </div>
+          ) : scenarios.length === 0 ? (
+            <div className="text-center py-8 text-white/40">
+              <FileText className="w-8 h-8 mx-auto mb-2 opacity-40" />
+              <p className="text-sm">저장된 시나리오가 없습니다</p>
+              <p className="text-xs mt-1">AI 최적화 탭에서 시나리오를 저장해주세요</p>
+            </div>
+          ) : (
+            <RadioGroup
+              value={selectedScenarioId}
+              onValueChange={setSelectedScenarioId}
+              className="space-y-2"
+            >
+              {scenarios.map((scenario) => (
+                <div
+                  key={scenario.id}
+                  className={cn(
+                    'flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors group',
+                    selectedScenarioId === scenario.id
+                      ? 'bg-primary/20 border border-primary/40'
+                      : 'bg-white/5 hover:bg-white/10 border border-transparent'
+                  )}
+                  onClick={() => setSelectedScenarioId(scenario.id)}
+                >
+                  <RadioGroupItem value={scenario.id} id={scenario.id} className="mt-1" />
+                  <div className="flex-1 min-w-0">
+                    <Label
+                      htmlFor={scenario.id}
+                      className="text-sm font-medium text-white cursor-pointer"
+                    >
+                      {scenario.name}
+                    </Label>
+                    <div className="flex flex-wrap gap-2 mt-1 text-xs text-white/60">
+                      <span>{scenario.changesCount}건 변경</span>
+                      <span>•</span>
+                      <span className="text-green-400">+{scenario.expectedRevenue.toFixed(1)}% 매출</span>
+                      <span>•</span>
+                      <span>{scenario.createdAt}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge className={getDifficultyColor(scenario.difficulty)}>
+                      난이도 {getDifficultyLabel(scenario.difficulty)}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteScenario(scenario.id);
+                      }}
+                    >
+                      <Trash2 className="w-3 h-3 text-red-400" />
+                    </Button>
                   </div>
                 </div>
-                <Badge className={getDifficultyColor(scenario.difficulty)}>
-                  난이도 {getDifficultyLabel(scenario.difficulty)}
-                </Badge>
-              </div>
-            ))}
-          </RadioGroup>
+              ))}
+            </RadioGroup>
+          )}
         </CardContent>
       </Card>
 
       {/* 시나리오 비교 테이블 */}
-      <div className="space-y-2">
-        <button
-          onClick={() => toggleSection('comparison')}
-          className="flex items-center gap-2 text-sm font-medium text-white/80 hover:text-white w-full"
-        >
-          {expandedSections.has('comparison') ? (
-            <ChevronDown className="w-4 h-4" />
-          ) : (
-            <ChevronRight className="w-4 h-4" />
-          )}
-          <BarChart3 className="w-4 h-4 text-purple-400" />
-          시나리오 비교
-        </button>
+      {scenarios.length > 0 && (
+        <div className="space-y-2">
+          <button
+            onClick={() => toggleSection('comparison')}
+            className="flex items-center gap-2 text-sm font-medium text-white/80 hover:text-white w-full"
+          >
+            {expandedSections.has('comparison') ? (
+              <ChevronDown className="w-4 h-4" />
+            ) : (
+              <ChevronRight className="w-4 h-4" />
+            )}
+            <BarChart3 className="w-4 h-4 text-purple-400" />
+            시나리오 비교
+          </button>
 
-        {expandedSections.has('comparison') && (
-          <div className="bg-white/5 rounded-lg overflow-hidden">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-white/10">
-                  <th className="text-left p-2 text-white/60">지표</th>
-                  {DEMO_SCENARIOS.map((s) => (
-                    <th
-                      key={s.id}
-                      className={cn(
-                        'text-center p-2',
-                        s.id === selectedScenarioId ? 'text-primary' : 'text-white/60'
-                      )}
-                    >
-                      {s.name.replace('시나리오 ', '')}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b border-white/5">
-                  <td className="p-2 text-white/60">예상 매출</td>
-                  {DEMO_SCENARIOS.map((s) => (
-                    <td key={s.id} className="text-center p-2 text-green-400">
-                      +{s.expectedRevenue}%
-                    </td>
-                  ))}
-                </tr>
-                <tr className="border-b border-white/5">
-                  <td className="p-2 text-white/60">전환율</td>
-                  {DEMO_SCENARIOS.map((s) => (
-                    <td key={s.id} className="text-center p-2 text-blue-400">
-                      +{s.expectedConversion}%
-                    </td>
-                  ))}
-                </tr>
-                <tr className="border-b border-white/5">
-                  <td className="p-2 text-white/60">구현 비용</td>
-                  {DEMO_SCENARIOS.map((s) => (
-                    <td key={s.id} className="text-center p-2 text-white/80">
-                      ₩{(s.implementationCost / 10000).toFixed(0)}만
-                    </td>
-                  ))}
-                </tr>
-                <tr className="border-b border-white/5">
-                  <td className="p-2 text-white/60">예상 ROI</td>
-                  {DEMO_SCENARIOS.map((s) => (
-                    <td key={s.id} className="text-center p-2 text-yellow-400 font-medium">
-                      {s.expectedROI}%
-                    </td>
-                  ))}
-                </tr>
-                <tr>
-                  <td className="p-2 text-white/60">난이도</td>
-                  {DEMO_SCENARIOS.map((s) => (
-                    <td key={s.id} className="text-center p-2">
-                      <Badge className={cn('text-[10px]', getDifficultyColor(s.difficulty))}>
-                        {getDifficultyLabel(s.difficulty)}
-                      </Badge>
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+          {expandedSections.has('comparison') && (
+            <div className="bg-white/5 rounded-lg overflow-hidden overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-white/10">
+                    <th className="text-left p-2 text-white/60">지표</th>
+                    {scenarios.slice(0, 3).map((s) => (
+                      <th
+                        key={s.id}
+                        className={cn(
+                          'text-center p-2',
+                          s.id === selectedScenarioId ? 'text-primary' : 'text-white/60'
+                        )}
+                      >
+                        {s.name.length > 15 ? s.name.slice(0, 15) + '...' : s.name}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-b border-white/5">
+                    <td className="p-2 text-white/60">예상 매출</td>
+                    {scenarios.slice(0, 3).map((s) => (
+                      <td key={s.id} className="text-center p-2 text-green-400">
+                        +{s.expectedRevenue.toFixed(1)}%
+                      </td>
+                    ))}
+                  </tr>
+                  <tr className="border-b border-white/5">
+                    <td className="p-2 text-white/60">전환율</td>
+                    {scenarios.slice(0, 3).map((s) => (
+                      <td key={s.id} className="text-center p-2 text-blue-400">
+                        +{s.expectedConversion.toFixed(1)}%
+                      </td>
+                    ))}
+                  </tr>
+                  <tr className="border-b border-white/5">
+                    <td className="p-2 text-white/60">구현 비용</td>
+                    {scenarios.slice(0, 3).map((s) => (
+                      <td key={s.id} className="text-center p-2 text-white/80">
+                        ₩{(s.implementationCost / 10000).toFixed(0)}만
+                      </td>
+                    ))}
+                  </tr>
+                  <tr className="border-b border-white/5">
+                    <td className="p-2 text-white/60">예상 ROI</td>
+                    {scenarios.slice(0, 3).map((s) => (
+                      <td key={s.id} className="text-center p-2 text-yellow-400 font-medium">
+                        {s.expectedROI}%
+                      </td>
+                    ))}
+                  </tr>
+                  <tr>
+                    <td className="p-2 text-white/60">난이도</td>
+                    {scenarios.slice(0, 3).map((s) => (
+                      <td key={s.id} className="text-center p-2">
+                        <Badge className={cn('text-[10px]', getDifficultyColor(s.difficulty))}>
+                          {getDifficultyLabel(s.difficulty)}
+                        </Badge>
+                      </td>
+                    ))}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 구현 체크리스트 */}
       {selectedScenario && selectedScenario.changes.length > 0 && (
@@ -375,7 +607,10 @@ export function ApplyPanel({ storeId, onApplyScenario, onNavigateToROI }: ApplyP
               <ChevronRight className="w-4 h-4" />
             )}
             <FileText className="w-4 h-4 text-orange-400" />
-            구현 체크리스트 ({selectedScenario.name})
+            구현 체크리스트
+            <Badge variant="outline" className="text-[10px] border-white/30 text-white/60">
+              {completedTasks.size}/{selectedScenario.changes.length}
+            </Badge>
           </button>
 
           {expandedSections.has('checklist') && (
@@ -433,16 +668,23 @@ export function ApplyPanel({ storeId, onApplyScenario, onNavigateToROI }: ApplyP
                   variant="outline"
                   size="sm"
                   className="flex-1 text-xs border-white/20 text-white/80 hover:bg-white/10"
-                  onClick={() => toast.info('체크리스트를 인쇄합니다')}
+                  onClick={() => {
+                    // 체크리스트 인쇄용 HTML 생성
+                    const printContent = selectedScenario.changes.map((c) =>
+                      `☐ [${c.type}] ${c.item}: ${c.from} → ${c.to} (${c.estimatedTime})`
+                    ).join('\n');
+                    navigator.clipboard.writeText(printContent);
+                    toast.success('체크리스트가 클립보드에 복사되었습니다');
+                  }}
                 >
                   <Printer className="w-3 h-3 mr-1" />
-                  인쇄
+                  복사
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   className="flex-1 text-xs border-white/20 text-white/80 hover:bg-white/10"
-                  onClick={() => toast.info('담당자를 할당합니다')}
+                  onClick={() => toast.info('담당자 할당 기능은 준비 중입니다')}
                 >
                   <Mail className="w-3 h-3 mr-1" />
                   담당자 할당
@@ -456,45 +698,56 @@ export function ApplyPanel({ storeId, onApplyScenario, onNavigateToROI }: ApplyP
       {/* 적용 버튼 */}
       <Button
         onClick={handleApply}
-        disabled={!selectedScenario}
+        disabled={!selectedScenario || applyStrategyMutation.isPending}
         className="w-full bg-green-600 hover:bg-green-700 text-white"
       >
-        <CheckCircle className="w-4 h-4 mr-2" />
-        실매장에 적용하고 ROI 측정 시작
+        {applyStrategyMutation.isPending ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            적용 중...
+          </>
+        ) : (
+          <>
+            <CheckCircle className="w-4 h-4 mr-2" />
+            실매장에 적용하고 ROI 측정 시작
+          </>
+        )}
       </Button>
 
       {/* 적용 중인 전략 */}
-      {DEMO_APPLIED_STRATEGIES.length > 0 && (
+      {(appliedStrategies && appliedStrategies.length > 0) && (
         <div className="space-y-2 pt-2 border-t border-white/10">
           <div className="flex items-center gap-2 text-sm font-medium text-white/80">
             <TrendingUp className="w-4 h-4 text-green-400" />
-            적용 중인 전략 ({DEMO_APPLIED_STRATEGIES.length}건)
+            적용 중인 전략 ({appliedStrategies.length}건)
           </div>
 
           <div className="space-y-2">
-            {DEMO_APPLIED_STRATEGIES.map((strategy) => (
+            {appliedStrategies.slice(0, 5).map((strategy) => (
               <div
                 key={strategy.id}
-                className="flex items-center justify-between p-2 rounded-lg bg-white/5"
+                className="flex items-center justify-between p-2 rounded-lg bg-white/5 cursor-pointer hover:bg-white/10 transition-colors"
+                onClick={() => handleNavigateToROI(strategy.id)}
               >
                 <div>
                   <div className="text-sm text-white">{strategy.name}</div>
-                  <div className="text-xs text-white/60">적용일: {strategy.appliedAt}</div>
+                  <div className="text-xs text-white/60">
+                    적용일: {new Date(strategy.startDate).toLocaleDateString('ko-KR')}
+                  </div>
                 </div>
                 <div className="text-right">
                   <div className="text-sm text-green-400 font-medium">
-                    +{strategy.currentROI}%
+                    {strategy.currentRoi !== null ? `+${strategy.currentRoi}%` : '측정중'}
                   </div>
                   <Badge
                     variant="outline"
                     className={cn(
                       'text-[10px]',
                       strategy.status === 'active' ? 'border-green-500/50 text-green-400' :
-                      strategy.status === 'measuring' ? 'border-yellow-500/50 text-yellow-400' :
                       'border-white/30 text-white/60'
                     )}
                   >
-                    {strategy.status === 'active' ? '측정중' : strategy.status === 'measuring' ? '분석중' : '완료'}
+                    {strategy.status === 'active' ? '측정중' : '완료'}
                   </Badge>
                 </div>
               </div>
