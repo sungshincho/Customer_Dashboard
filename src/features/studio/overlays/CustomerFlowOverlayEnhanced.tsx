@@ -50,8 +50,30 @@ export const CustomerFlowOverlayEnhanced: React.FC<CustomerFlowOverlayEnhancedPr
     );
   }
 
-  if (error || !data || data.flowPaths.length === 0) {
-    console.warn('[CustomerFlowOverlayEnhanced] 데이터 없음:', error);
+  if (error || !data) {
+    console.warn('[CustomerFlowOverlayEnhanced] 데이터 없음:', { error, data, storeId });
+    return null;
+  }
+
+  // flowPaths가 비어있어도 zones가 있으면 마커는 표시
+  if (data.flowPaths.length === 0) {
+    console.log('[CustomerFlowOverlayEnhanced] flowPaths 비어있음, zones:', data.zones.length);
+    // zones만 있으면 존 마커라도 표시
+    if (data.zones.length > 0 && showZoneMarkers) {
+      return (
+        <group name="customer-flow-overlay-enhanced">
+          {data.zones.map((zone) => (
+            <ZoneMarker
+              key={zone.id}
+              zone={zone}
+              isEntrance={zone.id === data.entranceZone?.id}
+              isExit={data.exitZones.some(e => e.id === zone.id)}
+              isHotspot={false}
+            />
+          ))}
+        </group>
+      );
+    }
     return null;
   }
 
