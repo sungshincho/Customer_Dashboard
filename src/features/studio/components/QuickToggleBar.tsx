@@ -4,8 +4,10 @@
  * 3D 뷰어 상단 중앙에 표시되는 오버레이 퀵 토글 바
  * - 히트맵, 동선, 고객, 존, 직원 5개 토글
  * - 플로팅 UI로 3D 뷰어 위에 오버레이됨
+ * - React.memo로 불필요한 리렌더링 방지
  */
 
+import { memo } from 'react';
 import { Flame, Route, Users, MapPin, UserCog } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -35,7 +37,11 @@ interface QuickToggleBarProps {
   className?: string;
 }
 
-export function QuickToggleBar({ activeOverlays, onToggle, className }: QuickToggleBarProps) {
+export const QuickToggleBar = memo(function QuickToggleBar({
+  activeOverlays,
+  onToggle,
+  className,
+}: QuickToggleBarProps) {
   return (
     <TooltipProvider delayDuration={300}>
       <div
@@ -60,9 +66,7 @@ export function QuickToggleBar({ activeOverlays, onToggle, className }: QuickTog
                   className={cn(
                     'h-8 w-8 p-0 rounded-lg transition-all',
                     'border border-transparent',
-                    isActive
-                      ? toggle.activeColor
-                      : 'hover:bg-white/10'
+                    isActive ? toggle.activeColor : 'hover:bg-white/10'
                   )}
                 >
                   <Icon
@@ -86,6 +90,6 @@ export function QuickToggleBar({ activeOverlays, onToggle, className }: QuickTog
       </div>
     </TooltipProvider>
   );
-}
+});
 
 export default QuickToggleBar;
