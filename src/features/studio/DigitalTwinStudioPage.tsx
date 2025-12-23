@@ -20,8 +20,9 @@ import { toast } from 'sonner';
 import { Canvas3D, SceneProvider, useScene } from './core';
 import { LayerPanel, SimulationPanel, ToolPanel, SceneSavePanel, OverlayControlPanel, PropertyPanel } from './panels';
 import { HeatmapOverlay, CustomerFlowOverlay, ZoneBoundaryOverlay, CustomerAvatarOverlay, LayoutOptimizationOverlay, FlowOptimizationOverlay, CongestionOverlay, StaffingOverlay, ZonesFloorOverlay, StaffAvatarsOverlay } from './overlays';
-import { DraggablePanel, QuickToggleBar } from './components';
+import { DraggablePanel, QuickToggleBar, ViewModeToggle, type ViewMode } from './components';
 import type { DiagnosticIssue } from './components/DiagnosticIssueList';
+import { PanelLeftClose, PanelLeft, Mouse } from 'lucide-react';
 import { AIOptimizationTab } from './tabs/AIOptimizationTab';
 import { AISimulationTab } from './tabs/AISimulationTab';
 import { ApplyPanel } from './tabs/ApplyPanel';
@@ -136,6 +137,28 @@ export default function DigitalTwinStudioPage() {
   const [sceneName, setSceneName] = useState('');
   const [transformMode, setTransformMode] = useState<TransformMode>('translate');
 
+  // 패널 리사이즈 상태
+  const PANEL_MIN_WIDTH = 280;
+  const PANEL_MAX_WIDTH = 500;
+  const PANEL_DEFAULT_WIDTH = 320;
+  const [panelWidth, setPanelWidth] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('studio_panel_width');
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= PANEL_MIN_WIDTH && parsed <= PANEL_MAX_WIDTH) {
+          return parsed;
+        }
+      }
+    }
+    return PANEL_DEFAULT_WIDTH;
+  });
+  const [isResizing, setIsResizing] = useState(false);
+  const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
+
+  // As-Is / To-Be / Split 뷰 모드
+  const [viewMode, setViewMode] = useState<ViewMode>('as-is');
+
   // 드래그 패널 표시 상태 (모든 패널 기본 표시)
   const [visiblePanels, setVisiblePanels] = useState<VisiblePanels>({
     tools: true,
@@ -173,6 +196,44 @@ export default function DigitalTwinStudioPage() {
       timestamp: new Date().toISOString(),
     });
   }, [location.pathname, mode]);
+
+  // 패널 너비 localStorage 저장
+  useEffect(() => {
+    if (!isPanelCollapsed) {
+      localStorage.setItem('studio_panel_width', panelWidth.toString());
+    }
+  }, [panelWidth, isPanelCollapsed]);
+
+  // 패널 리사이즈 핸들러
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+    const startX = e.clientX;
+    const startWidth = panelWidth;
+
+    const onMouseMove = (e: MouseEvent) => {
+      const newWidth = startWidth + (e.clientX - startX);
+      setPanelWidth(Math.min(PANEL_MAX_WIDTH, Math.max(PANEL_MIN_WIDTH, newWidth)));
+    };
+
+    const onMouseUp = () => {
+      setIsResizing(false);
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [panelWidth, PANEL_MAX_WIDTH, PANEL_MIN_WIDTH]);
+
+  // 패널 접기/펼치기
+  const togglePanelCollapse = useCallback(() => {
+    setIsPanelCollapsed((prev) => !prev);
+  }, []);
 
   // 모델 로드
   const loadModelsAsync = async () => {
@@ -814,99 +875,165 @@ export default function DigitalTwinStudioPage() {
               />
             </div>
 
-            {/* ----- 왼쪽 패널 (고정) ----- */}
-            <div className="absolute left-4 top-4 bottom-4 w-80 pointer-events-auto">
-              <div className="h-full bg-black/80 backdrop-blur-sm border border-white/10 rounded-xl overflow-hidden flex flex-col">
-                {/* 탭 헤더 - 4패널 구조: 레이어 → AI시뮬레이션 → AI최적화 → 적용하기 */}
-                <div className="flex border-b border-white/10">
-                  <TabButton active={activeTab === 'layer'} onClick={() => setActiveTab('layer')}>
-                    <Layers className="w-3 h-3 mr-1 inline" />
-                    레이어
-                  </TabButton>
-                  <TabButton
-                    active={activeTab === 'ai-simulation'}
-                    onClick={() => setActiveTab('ai-simulation')}
-                  >
-                    <FlaskConical className="w-3 h-3 mr-1 inline" />
-                    AI 시뮬레이션
-                  </TabButton>
-                  <TabButton
-                    active={activeTab === 'ai-optimization'}
-                    onClick={() => setActiveTab('ai-optimization')}
-                  >
-                    <Sparkles className="w-3 h-3 mr-1 inline" />
-                    AI 최적화
-                  </TabButton>
-                  <TabButton
-                    active={activeTab === 'apply'}
-                    onClick={() => setActiveTab('apply')}
-                  >
-                    <CheckCircle className="w-3 h-3 mr-1 inline" />
-                    적용하기
-                  </TabButton>
-                </div>
+            {/* ----- 상단 우측: As-Is / To-Be / Split 토글 ----- */}
+            <div className="absolute top-4 right-4 pointer-events-auto z-20">
+              <ViewModeToggle
+                mode={viewMode}
+                onChange={setViewMode}
+                hasOptimizationResults={!!sceneSimulation.state.results.layout || !!sceneSimulation.state.results.flow}
+              />
+            </div>
 
-                {/* 탭 컨텐츠 */}
-                <div className="flex-1 overflow-y-auto">
-                  {activeTab === 'layer' && <LayerPanel />}
-                  {activeTab === 'ai-simulation' && (
-                    <AISimulationTab
-                      storeId={selectedStore?.id || ''}
-                      sceneData={currentRecipe}
-                      onOverlayToggle={toggleOverlay}
-                      simulationZones={simulationZones}
-                      onResultsUpdate={(type, result) => {
-                        // AI 시뮬레이션 결과를 오른쪽 패널에 표시
-                        setSimulationResults((prev) => ({ ...prev, [type]: result }));
-                        const panelKey = `${type}Result` as keyof VisiblePanels;
-                        setVisiblePanels((prev) => ({ ...prev, [panelKey]: true }));
-                      }}
-                      onNavigateToOptimization={(issues) => {
-                        // AI 시뮬레이션에서 발견된 문제를 AI 최적화로 전달
-                        if (issues) {
-                          setDiagnosticIssues(issues);
-                        }
-                        setActiveTab('ai-optimization');
-                      }}
-                    />
-                  )}
-                  {activeTab === 'ai-optimization' && (
-                    <AIOptimizationTab
-                      storeId={selectedStore?.id || ''}
-                      sceneData={currentRecipe}
-                      sceneSimulation={sceneSimulation}
-                      onSceneUpdate={(newScene) => {
-                        // SceneProvider에 시뮬레이션 결과 적용
-                        if (newScene.furnitureMoves) {
-                          // applySimulationResults는 useScene에서 가져옴
-                        }
-                      }}
-                      onOverlayToggle={toggleOverlay}
-                      onResultsUpdate={(type, result) => {
-                        // AI 최적화 결과를 오른쪽 패널에 표시
-                        setSimulationResults((prev) => ({ ...prev, [type]: result }));
-                        const panelKey = `${type}Result` as keyof VisiblePanels;
-                        setVisiblePanels((prev) => ({ ...prev, [panelKey]: true }));
-                      }}
-                      diagnosticIssues={diagnosticIssues}
-                      onNavigateToApply={() => setActiveTab('apply')}
-                    />
-                  )}
-                  {activeTab === 'apply' && (
-                    <ApplyPanel
-                      storeId={selectedStore?.id || ''}
-                      onApplyScenario={(scenarioId) => {
-                        toast.success(`시나리오 ${scenarioId} 적용 시작`);
-                        logActivity('feature_use', {
-                          feature: 'scenario_apply',
-                          scenario_id: scenarioId,
-                          store_id: selectedStore?.id,
-                        });
-                      }}
-                    />
-                  )}
-                </div>
+            {/* ----- 하단 좌측: 현재 상태 정보 ----- */}
+            <div className="absolute bottom-4 left-4 pointer-events-auto z-20">
+              <div className="bg-black/70 backdrop-blur-sm border border-white/10 rounded-lg px-3 py-2 text-xs text-white/80">
+                <span>가구: {models.filter(m => m.type === 'furniture').length}개</span>
+                <span className="mx-2 text-white/30">|</span>
+                <span>제품: {models.filter(m => m.type === 'product').length}개</span>
+                <span className="mx-2 text-white/30">|</span>
+                <span>존: {dbZones?.length || 0}개</span>
               </div>
+            </div>
+
+            {/* ----- 하단 우측: 카메라 컨트롤 힌트 ----- */}
+            <div className="absolute bottom-4 right-4 pointer-events-auto z-20">
+              <div className="bg-black/70 backdrop-blur-sm border border-white/10 rounded-lg px-3 py-2 text-xs text-white/50 flex items-center gap-2">
+                <Mouse className="w-3.5 h-3.5" />
+                <span>회전</span>
+                <span className="text-white/30">|</span>
+                <span>Shift+🖱️ 이동</span>
+                <span className="text-white/30">|</span>
+                <span>스크롤 줌</span>
+              </div>
+            </div>
+
+            {/* ----- 왼쪽 패널 (리사이즈 가능) ----- */}
+            <div
+              className="absolute left-4 top-4 bottom-4 pointer-events-auto flex"
+              style={{ width: isPanelCollapsed ? 40 : panelWidth }}
+            >
+              {/* 패널 접기/펼치기 버튼 (접힌 상태) */}
+              {isPanelCollapsed ? (
+                <div className="h-full bg-black/80 backdrop-blur-sm border border-white/10 rounded-xl flex flex-col items-center py-4">
+                  <button
+                    onClick={togglePanelCollapse}
+                    className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/60 hover:text-white"
+                    title="패널 펼치기"
+                  >
+                    <PanelLeft className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex-1 h-full bg-black/80 backdrop-blur-sm border border-white/10 rounded-xl overflow-hidden flex flex-col">
+                    {/* 탭 헤더 - 4패널 구조: 레이어 → AI시뮬레이션 → AI최적화 → 적용하기 */}
+                    <div className="flex border-b border-white/10 items-center">
+                      <TabButton active={activeTab === 'layer'} onClick={() => setActiveTab('layer')}>
+                        <Layers className="w-3 h-3 mr-1 inline" />
+                        레이어
+                      </TabButton>
+                      <TabButton
+                        active={activeTab === 'ai-simulation'}
+                        onClick={() => setActiveTab('ai-simulation')}
+                      >
+                        <FlaskConical className="w-3 h-3 mr-1 inline" />
+                        AI 시뮬레이션
+                      </TabButton>
+                      <TabButton
+                        active={activeTab === 'ai-optimization'}
+                        onClick={() => setActiveTab('ai-optimization')}
+                      >
+                        <Sparkles className="w-3 h-3 mr-1 inline" />
+                        AI 최적화
+                      </TabButton>
+                      <TabButton
+                        active={activeTab === 'apply'}
+                        onClick={() => setActiveTab('apply')}
+                      >
+                        <CheckCircle className="w-3 h-3 mr-1 inline" />
+                        적용하기
+                      </TabButton>
+                      {/* 패널 접기 버튼 */}
+                      <button
+                        onClick={togglePanelCollapse}
+                        className="p-2 ml-auto hover:bg-white/10 rounded-lg transition-colors text-white/40 hover:text-white"
+                        title="패널 접기"
+                      >
+                        <PanelLeftClose className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* 탭 컨텐츠 */}
+                    <div className="flex-1 overflow-y-auto">
+                      {activeTab === 'layer' && <LayerPanel />}
+                      {activeTab === 'ai-simulation' && (
+                        <AISimulationTab
+                          storeId={selectedStore?.id || ''}
+                          sceneData={currentRecipe}
+                          onOverlayToggle={toggleOverlay}
+                          simulationZones={simulationZones}
+                          onResultsUpdate={(type, result) => {
+                            // AI 시뮬레이션 결과를 오른쪽 패널에 표시
+                            setSimulationResults((prev) => ({ ...prev, [type]: result }));
+                            const panelKey = `${type}Result` as keyof VisiblePanels;
+                            setVisiblePanels((prev) => ({ ...prev, [panelKey]: true }));
+                          }}
+                          onNavigateToOptimization={(issues) => {
+                            // AI 시뮬레이션에서 발견된 문제를 AI 최적화로 전달
+                            if (issues) {
+                              setDiagnosticIssues(issues);
+                            }
+                            setActiveTab('ai-optimization');
+                          }}
+                        />
+                      )}
+                      {activeTab === 'ai-optimization' && (
+                        <AIOptimizationTab
+                          storeId={selectedStore?.id || ''}
+                          sceneData={currentRecipe}
+                          sceneSimulation={sceneSimulation}
+                          onSceneUpdate={(newScene) => {
+                            // SceneProvider에 시뮬레이션 결과 적용
+                            if (newScene.furnitureMoves) {
+                              // applySimulationResults는 useScene에서 가져옴
+                            }
+                          }}
+                          onOverlayToggle={toggleOverlay}
+                          onResultsUpdate={(type, result) => {
+                            // AI 최적화 결과를 오른쪽 패널에 표시
+                            setSimulationResults((prev) => ({ ...prev, [type]: result }));
+                            const panelKey = `${type}Result` as keyof VisiblePanels;
+                            setVisiblePanels((prev) => ({ ...prev, [panelKey]: true }));
+                          }}
+                          diagnosticIssues={diagnosticIssues}
+                          onNavigateToApply={() => setActiveTab('apply')}
+                        />
+                      )}
+                      {activeTab === 'apply' && (
+                        <ApplyPanel
+                          storeId={selectedStore?.id || ''}
+                          onApplyScenario={(scenarioId) => {
+                            toast.success(`시나리오 ${scenarioId} 적용 시작`);
+                            logActivity('feature_use', {
+                              feature: 'scenario_apply',
+                              scenario_id: scenarioId,
+                              store_id: selectedStore?.id,
+                            });
+                          }}
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 리사이즈 핸들 */}
+                  <div
+                    className={`w-1.5 h-full cursor-col-resize flex items-center justify-center group hover:bg-primary/30 transition-colors ${isResizing ? 'bg-primary/50' : ''}`}
+                    onMouseDown={handleResizeStart}
+                  >
+                    <div className="w-0.5 h-12 bg-white/20 group-hover:bg-primary rounded-full transition-colors" />
+                  </div>
+                </>
+              )}
             </div>
 
             {/* ========== 드래그 가능한 플로팅 패널들 ========== */}

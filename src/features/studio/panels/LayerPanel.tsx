@@ -14,11 +14,6 @@ import {
   ChevronDown,
   Box,
   Folder,
-  Trash2,
-  Save,
-  FolderOpen,
-  Check,
-  Loader2,
   Search,
   MapPin,
   Package,
@@ -30,12 +25,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
 import { useScene } from '../core/SceneProvider';
-import { useScenePersistence } from '../hooks/useScenePersistence';
 import { useStoreBounds } from '../hooks/useStoreBounds';
-import { useAuth } from '@/hooks/useAuth';
-import { useSelectedStore } from '@/hooks/useSelectedStore';
 import type { LayerNode } from '../types';
 
 // ============================================================================
@@ -69,9 +60,7 @@ interface ChildProduct {
 // LayerPanel 컴포넌트
 // ============================================================================
 export function LayerPanel() {
-  const { user } = useAuth();
-  const { selectedStore } = useSelectedStore();
-  const { models, selectedId, select, updateModel, removeModel, loadScene, toggleProductVisibility, isProductVisible, focusOnModel } = useScene();
+  const { models, selectedId, select, updateModel, removeModel, toggleProductVisibility, isProductVisible, focusOnModel } = useScene();
   const { zones } = useStoreBounds();
 
   // 확장 상태
@@ -82,22 +71,6 @@ export function LayerPanel() {
   // 검색/필터
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'furniture' | 'product'>('all');
-
-  // 씬 저장/불러오기 훅
-  const {
-    scenes,
-    isSaving,
-    isLoading: scenesLoading,
-    saveScene,
-    deleteScene,
-    setActiveScene,
-  } = useScenePersistence({
-    userId: user?.id,
-    storeId: selectedStore?.id,
-  });
-
-  // 씬 저장 관련 상태
-  const [newSceneName, setNewSceneName] = useState('');
 
   // Zone ID → Name 매핑
   const zoneNameMap = useMemo(() => {
@@ -318,120 +291,6 @@ export function LayerPanel() {
     }
     select(modelId);
   }, [focusOnModel, select]);
-
-  // 씬 저장 핸들러
-  const handleSaveScene = async () => {
-    if (!newSceneName.trim()) {
-      toast.error('씬 이름을 입력하세요');
-      return;
-    }
-
-    const currentSceneData = {
-      space: models.find(m => m.type === 'space') ? {
-        id: models.find(m => m.type === 'space')!.id,
-        model_url: models.find(m => m.type === 'space')!.url,
-        type: 'space' as const,
-        position: { x: 0, y: 0, z: 0 },
-        rotation: { x: 0, y: 0, z: 0 },
-        scale: { x: 1, y: 1, z: 1 },
-      } : null,
-      furniture: models.filter(m => m.type === 'furniture').map(m => ({
-        id: m.id,
-        model_url: m.url,
-        type: 'furniture' as const,
-        furniture_type: m.name,
-        position: { x: m.position[0], y: m.position[1], z: m.position[2] },
-        rotation: { x: m.rotation[0], y: m.rotation[1], z: m.rotation[2] },
-        scale: { x: m.scale[0], y: m.scale[1], z: m.scale[2] },
-        movable: true,
-      })),
-      products: models.filter(m => m.type === 'product').map(m => ({
-        id: m.id,
-        model_url: m.url,
-        type: 'product' as const,
-        sku: m.name,
-        position: { x: m.position[0], y: m.position[1], z: m.position[2] },
-        rotation: { x: m.rotation[0], y: m.rotation[1], z: m.rotation[2] },
-        scale: { x: m.scale[0], y: m.scale[1], z: m.scale[2] },
-        movable: true,
-      })),
-      lighting: { name: 'default', description: 'Default lighting', lights: [] },
-      camera: { position: { x: 10, y: 10, z: 15 }, target: { x: 0, y: 0, z: 0 }, fov: 50 },
-    };
-
-    if (!currentSceneData.space) {
-      toast.error('저장할 공간 모델이 없습니다');
-      return;
-    }
-
-    try {
-      await saveScene(currentSceneData as any, newSceneName.trim());
-      setNewSceneName('');
-    } catch {
-      // 에러는 useScenePersistence에서 처리됨
-    }
-  };
-
-  // 씬 불러오기 핸들러
-  const handleLoadScene = async (sceneId: string) => {
-    const scene = scenes.find(s => s.id === sceneId);
-    if (scene && scene.recipe_data) {
-      const recipe = scene.recipe_data;
-      const loadedModels: any[] = [];
-
-      if (recipe.space) {
-        loadedModels.push({
-          id: recipe.space.id,
-          name: 'Space',
-          url: recipe.space.model_url,
-          position: [recipe.space.position?.x || 0, recipe.space.position?.y || 0, recipe.space.position?.z || 0],
-          rotation: [recipe.space.rotation?.x || 0, recipe.space.rotation?.y || 0, recipe.space.rotation?.z || 0],
-          scale: [recipe.space.scale?.x || 1, recipe.space.scale?.y || 1, recipe.space.scale?.z || 1],
-          visible: true,
-          type: 'space',
-        });
-      }
-
-      recipe.furniture?.forEach((f: any) => {
-        loadedModels.push({
-          id: f.id,
-          name: f.furniture_type || 'Furniture',
-          url: f.model_url,
-          position: [f.position?.x || 0, f.position?.y || 0, f.position?.z || 0],
-          rotation: [f.rotation?.x || 0, f.rotation?.y || 0, f.rotation?.z || 0],
-          scale: [f.scale?.x || 1, f.scale?.y || 1, f.scale?.z || 1],
-          visible: true,
-          type: 'furniture',
-        });
-      });
-
-      recipe.products?.forEach((p: any) => {
-        loadedModels.push({
-          id: p.id,
-          name: p.sku || 'Product',
-          url: p.model_url,
-          position: [p.position?.x || 0, p.position?.y || 0, p.position?.z || 0],
-          rotation: [p.rotation?.x || 0, p.rotation?.y || 0, p.rotation?.z || 0],
-          scale: [p.scale?.x || 1, p.scale?.y || 1, p.scale?.z || 1],
-          visible: true,
-          type: 'product',
-        });
-      });
-
-      loadScene({ models: loadedModels });
-      await setActiveScene(sceneId);
-      toast.success(`"${scene.name}" 씬을 불러왔습니다`);
-    }
-  };
-
-  const handleSetDefault = async (sceneId: string) => {
-    await setActiveScene(sceneId);
-    toast.success('기본 씬으로 설정되었습니다');
-  };
-
-  const handleDeleteScene = async (sceneId: string) => {
-    await deleteScene(sceneId);
-  };
 
   // Zone 타입별 아이콘
   const getZoneIcon = (zoneType: string) => {
@@ -802,92 +661,6 @@ export function LayerPanel() {
           <p className="text-xs">모델이 없습니다</p>
         </div>
       )}
-
-      {/* 구분선 */}
-      <div className="border-t border-white/10" />
-
-      {/* ========== 씬 관리 섹션 ========== */}
-      <div className="space-y-3">
-        <div className="text-sm font-medium text-white/80 flex items-center gap-2 px-1">
-          <FolderOpen className="h-4 w-4 text-green-400" />
-          씬 관리
-        </div>
-
-        {/* 새 씬 저장 */}
-        <div className="flex gap-2">
-          <Input
-            placeholder="씬 이름 입력..."
-            value={newSceneName}
-            onChange={(e) => setNewSceneName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSaveScene()}
-            className="flex-1 bg-white/5 border-white/10 text-sm h-8 text-white placeholder:text-white/30"
-          />
-          <Button
-            onClick={handleSaveScene}
-            disabled={!newSceneName.trim() || isSaving}
-            size="sm"
-            className="bg-blue-600 hover:bg-blue-700 h-8 px-3"
-          >
-            {isSaving ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
-
-        {/* 저장된 씬 목록 */}
-        <div className="space-y-1 max-h-32 overflow-y-auto">
-          {scenesLoading ? (
-            <div className="text-xs text-white/40 text-center py-2">불러오는 중...</div>
-          ) : scenes && scenes.length > 0 ? (
-            scenes.map((scene) => (
-              <div
-                key={scene.id}
-                className="flex items-center justify-between p-2 rounded-lg bg-white/5 hover:bg-white/10 group transition-colors"
-              >
-                <button
-                  onClick={() => handleLoadScene(scene.id)}
-                  className="flex-1 text-left text-xs text-white truncate"
-                >
-                  {scene.name}
-                  {scene.is_active && (
-                    <span className="ml-2 px-1.5 py-0.5 text-[10px] bg-blue-600 text-white rounded">
-                      기본
-                    </span>
-                  )}
-                </button>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  {!scene.is_active && (
-                    <button
-                      onClick={() => handleSetDefault(scene.id)}
-                      className="p-1 text-white/40 hover:text-blue-400 transition-colors"
-                      title="기본 씬으로 설정"
-                    >
-                      <Check className="h-3 w-3" />
-                    </button>
-                  )}
-                  <button
-                    onClick={() => handleDeleteScene(scene.id)}
-                    className="p-1 text-white/40 hover:text-red-400 transition-colors"
-                    title="삭제"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </button>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="text-xs text-white/40 text-center py-2">
-              저장된 씬이 없습니다
-            </div>
-          )}
-        </div>
-
-        <p className="text-[10px] text-white/40 px-1">
-          기본 씬으로 설정하면 페이지 진입 시 자동으로 불러옵니다.
-        </p>
-      </div>
     </div>
   );
 }
