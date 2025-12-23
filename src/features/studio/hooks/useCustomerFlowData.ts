@@ -28,6 +28,14 @@ export interface FlowPath {
   transition_count: number;       // 총 이동 횟수
   transition_probability: number; // 이동 확률 (0-1)
   avg_duration_seconds: number;   // 평균 이동 시간
+  daily_avg_count: number;        // 일평균 이동 횟수
+}
+
+export interface FlowBottleneck {
+  zone: ZoneInfo;
+  inbound: number;
+  outbound: number;
+  bottleneckScore: number;
 }
 
 export interface CustomerFlowData {
@@ -36,8 +44,11 @@ export interface CustomerFlowData {
   transitionMatrix: Map<string, FlowPath[]>; // from_zone_id → 가능한 경로들
   totalTransitions: number;
   maxTransitionCount: number;
+  avgPathDuration: number;                   // 평균 경로 이동 시간
   entranceZone: ZoneInfo | null;
   exitZones: ZoneInfo[];
+  hotspotZones: ZoneInfo[];                  // 트래픽 높은 존 (상위 3개)
+  bottlenecks: FlowBottleneck[];             // 병목 지점
 }
 
 interface UseCustomerFlowDataOptions {
@@ -109,7 +120,7 @@ export const useCustomerFlowData = ({
 
       const { data: transitions, error: transitionsError } = await supabase
         .from('zone_transitions')
-        .select('from_zone_id, to_zone_id, transition_count, avg_duration_seconds')
+        .select('from_zone_id, to_zone_id, transition_count, avg_duration_seconds, transition_date')
         .eq('store_id', storeId)
         .gte('transition_date', startDate.toISOString().split('T')[0]);
 
@@ -131,17 +142,21 @@ export const useCustomerFlowData = ({
           transitionMatrix,
           totalTransitions: flowPaths.reduce((sum, f) => sum + f.transition_count, 0),
           maxTransitionCount,
+          avgPathDuration: 45, // 기본값
           entranceZone,
           exitZones,
+          hotspotZones: [],
+          bottlenecks: [],
         };
       }
 
-      // 3. 존 쌍별로 집계
+      // 3. 존 쌍별로 집계 (days 추가)
       const aggregated = new Map<string, {
         from_zone_id: string;
         to_zone_id: string;
         total_count: number;
         total_duration_weighted: number;
+        days: Set<string>;
       }>();
 
       transitions.forEach(t => {
@@ -151,26 +166,35 @@ export const useCustomerFlowData = ({
         if (existing) {
           existing.total_count += t.transition_count || 1;
           existing.total_duration_weighted += (t.avg_duration_seconds || 60) * (t.transition_count || 1);
+          if (t.transition_date) existing.days.add(t.transition_date);
         } else {
           aggregated.set(key, {
             from_zone_id: t.from_zone_id,
             to_zone_id: t.to_zone_id,
             total_count: t.transition_count || 1,
             total_duration_weighted: (t.avg_duration_seconds || 60) * (t.transition_count || 1),
+            days: new Set(t.transition_date ? [t.transition_date] : []),
           });
         }
       });
 
-      // 4. 존별 총 이탈 횟수 계산 (확률 계산용)
+      // 4. 존별 총 이탈/유입 횟수 계산 (확률 및 병목 계산용)
       const zoneOutboundTotal = new Map<string, number>();
+      const zoneInboundTotal = new Map<string, number>();
       aggregated.forEach(agg => {
-        const current = zoneOutboundTotal.get(agg.from_zone_id) || 0;
-        zoneOutboundTotal.set(agg.from_zone_id, current + agg.total_count);
+        // 유출
+        const outCurrent = zoneOutboundTotal.get(agg.from_zone_id) || 0;
+        zoneOutboundTotal.set(agg.from_zone_id, outCurrent + agg.total_count);
+        // 유입
+        const inCurrent = zoneInboundTotal.get(agg.to_zone_id) || 0;
+        zoneInboundTotal.set(agg.to_zone_id, inCurrent + agg.total_count);
       });
 
       // 5. FlowPath 배열 생성
       const flowPaths: FlowPath[] = [];
       let maxTransitionCount = 0;
+      let totalDuration = 0;
+      let totalPathCount = 0;
 
       aggregated.forEach((agg) => {
         if (agg.total_count < minTransitionCount) return;
@@ -182,8 +206,12 @@ export const useCustomerFlowData = ({
 
         const outboundTotal = zoneOutboundTotal.get(agg.from_zone_id) || agg.total_count;
         const probability = agg.total_count / outboundTotal;
+        const avgDuration = Math.round(agg.total_duration_weighted / agg.total_count);
+        const dailyAvg = Math.round(agg.total_count / Math.max(agg.days.size, 1));
 
         maxTransitionCount = Math.max(maxTransitionCount, agg.total_count);
+        totalDuration += avgDuration;
+        totalPathCount++;
 
         flowPaths.push({
           id: `${agg.from_zone_id}->${agg.to_zone_id}`,
@@ -193,7 +221,8 @@ export const useCustomerFlowData = ({
           to_zone: toZone,
           transition_count: agg.total_count,
           transition_probability: probability,
-          avg_duration_seconds: Math.round(agg.total_duration_weighted / agg.total_count),
+          avg_duration_seconds: avgDuration,
+          daily_avg_count: dailyAvg,
         });
       });
 
@@ -214,7 +243,30 @@ export const useCustomerFlowData = ({
       const entranceZone = findEntranceZone(zones, zoneMap);
       const exitZones = findExitZones(zones, zoneMap);
 
-      // 8. 이동 횟수 기준 정렬
+      // 8. 핫스팟 존 식별 (트래픽 상위 3개)
+      const zoneTraffic = new Map<string, number>();
+      flowPaths.forEach(p => {
+        zoneTraffic.set(p.to_zone_id, (zoneTraffic.get(p.to_zone_id) || 0) + p.transition_count);
+      });
+      const hotspotZones = Array.from(zoneTraffic.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([zoneId]) => zoneMap.get(zoneId)!)
+        .filter(Boolean);
+
+      // 9. 병목 분석 (유입 > 유출인 존)
+      const bottlenecks: FlowBottleneck[] = Array.from(zoneMap.values())
+        .map(zone => {
+          const inbound = zoneInboundTotal.get(zone.id) || 0;
+          const outbound = zoneOutboundTotal.get(zone.id) || 0;
+          // 병목 점수: 유입이 많고 유출이 적으면 높음
+          const bottleneckScore = inbound > 0 ? Math.round((inbound - outbound) / inbound * 100) : 0;
+          return { zone, inbound, outbound, bottleneckScore };
+        })
+        .filter(b => b.bottleneckScore > 20) // 20% 이상 병목
+        .sort((a, b) => b.bottleneckScore - a.bottleneckScore);
+
+      // 10. 이동 횟수 기준 정렬
       flowPaths.sort((a, b) => b.transition_count - a.transition_count);
 
       console.log('[useCustomerFlowData] 로드 완료:', {
@@ -222,6 +274,8 @@ export const useCustomerFlowData = ({
         flowPaths: flowPaths.length,
         totalTransitions: flowPaths.reduce((sum, f) => sum + f.transition_count, 0),
         maxTransitionCount,
+        hotspots: hotspotZones.length,
+        bottlenecks: bottlenecks.length,
       });
 
       return {
@@ -230,8 +284,11 @@ export const useCustomerFlowData = ({
         transitionMatrix,
         totalTransitions: flowPaths.reduce((sum, f) => sum + f.transition_count, 0),
         maxTransitionCount,
+        avgPathDuration: totalPathCount > 0 ? Math.round(totalDuration / totalPathCount) : 0,
         entranceZone,
         exitZones,
+        hotspotZones,
+        bottlenecks,
       };
     },
     enabled: enabled && !!storeId,
@@ -312,6 +369,7 @@ function generateDefaultFlowPaths(zones: ZoneInfo[]): {
         transition_count: count,
         transition_probability: (100 - idx * 15) / 100,
         avg_duration_seconds: 30 + idx * 10,
+        daily_avg_count: Math.round(count / 30), // 30일 평균
       };
 
       flowPaths.push(path);
@@ -338,6 +396,7 @@ function generateDefaultFlowPaths(zones: ZoneInfo[]): {
           transition_count: count,
           transition_probability: 0.3 / Math.abs(i - j),
           avg_duration_seconds: 45,
+          daily_avg_count: Math.round(count / 30),
         };
 
         flowPaths.push(path);
@@ -364,6 +423,7 @@ function generateDefaultFlowPaths(zones: ZoneInfo[]): {
         transition_count: count,
         transition_probability: 0.2,
         avg_duration_seconds: 60,
+        daily_avg_count: Math.round(count / 30),
       };
 
       flowPaths.push(path);

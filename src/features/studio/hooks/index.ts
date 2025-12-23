@@ -55,6 +55,7 @@ export {
 export type {
   ZoneInfo,
   FlowPath as CustomerFlowPath,
+  FlowBottleneck,
   CustomerFlowData,
 } from './useCustomerFlowData';
 

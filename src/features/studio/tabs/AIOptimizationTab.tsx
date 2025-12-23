@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { buildStoreContext } from '../utils/store-context-builder';
 import { OptimizationResultPanel } from '../panels/OptimizationResultPanel';
+import { StaffOptimizationResultPanel } from '../components/StaffOptimizationResult';
 import { useScene } from '../core/SceneProvider';
 import { validateOptimizationResult } from '../utils/optimizationValidator';
 import { OptimizationSettingsPanel } from '../components/optimization';
@@ -28,6 +29,7 @@ import type {
   ProductItem,
 } from '../types/optimization.types';
 import { DEFAULT_OPTIMIZATION_SETTINGS, INTENSITY_LIMITS } from '../types/optimization.types';
+import type { StaffOptimizationResult } from '../types/staffOptimization.types';
 
 type OptimizationType = 'layout' | 'flow' | 'staffing';
 type ViewMode = 'all' | 'as-is' | 'to-be';
@@ -134,6 +136,9 @@ export function AIOptimizationTab({
   // 최적화 설정 상태
   const [optimizationSettings, setOptimizationSettings] = useState<OptimizationSettings>(DEFAULT_OPTIMIZATION_SETTINGS);
   const [isSettingsExpanded, setIsSettingsExpanded] = useState(false);
+
+  // 🆕 Staff overlay 표시 상태
+  const [showStaffOverlay, setShowStaffOverlay] = useState(false);
 
   // sceneData에서 가구/제품 목록 추출
   const furnitureItems: FurnitureItem[] = useMemo(() => {
@@ -816,13 +821,15 @@ export function AIOptimizationTab({
                   />
                 )}
 
-                {/* 인력 배치 최적화 결과 */}
+                {/* 인력 배치 최적화 결과 - 새로운 상세 패널 사용 */}
                 {results.staffing && (
-                  <OptimizationResultPanel
-                    type="staffing"
-                    title="인력 배치 최적화"
-                    result={results.staffing}
-                    onToggleOverlay={(visible) => onOverlayToggle('staffingOptimization', visible)}
+                  <StaffOptimizationResultPanel
+                    result={results.staffing as unknown as StaffOptimizationResult}
+                    onToggleOverlay={(visible) => {
+                      setShowStaffOverlay(visible);
+                      onOverlayToggle('staffingOptimization', visible);
+                    }}
+                    showOverlay={showStaffOverlay}
                   />
                 )}
 
