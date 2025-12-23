@@ -22,6 +22,8 @@ export interface StaffMember {
   zone_name?: string;
   avatar_url: string | null;
   avatar_position: { x: number; y: number; z: number };
+  avatar_rotation?: { x: number; y: number; z: number };
+  avatar_scale?: { x: number; y: number; z: number };
   is_active: boolean;
 }
 
