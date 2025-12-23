@@ -106,6 +106,9 @@ export default function DigitalTwinStudioPage() {
   // 실제 DB 스태프 데이터
   const { staff: dbStaff, loading: staffLoading, error: staffError } = useStaffData({ storeId: selectedStore?.id });
 
+  // 🆕 로그인된 계정의 스토어 ID
+  const storeId = selectedStore?.id;
+
   // 스태프 데이터 디버깅
   useEffect(() => {
     const debugInfo = {
