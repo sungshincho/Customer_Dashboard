@@ -20,7 +20,7 @@ import { toast } from 'sonner';
 import { Canvas3D, SceneProvider, useScene } from './core';
 import { LayerPanel, SimulationPanel, ToolPanel, SceneSavePanel, OverlayControlPanel, PropertyPanel } from './panels';
 import { HeatmapOverlay, CustomerFlowOverlay, ZoneBoundaryOverlay, CustomerAvatarOverlay, LayoutOptimizationOverlay, FlowOptimizationOverlay, CongestionOverlay, StaffingOverlay, ZonesFloorOverlay, StaffAvatarsOverlay } from './overlays';
-import { DraggablePanel, QuickToggleBar, ViewModeToggle, type ViewMode } from './components';
+import { DraggablePanel, QuickToggleBar, ViewModeToggle, ResultReportPanel, type ViewMode } from './components';
 import type { DiagnosticIssue } from './components/DiagnosticIssueList';
 import { PanelLeftClose, PanelLeft, Mouse } from 'lucide-react';
 import { AIOptimizationTab } from './tabs/AIOptimizationTab';
@@ -72,13 +72,9 @@ interface SimulationResults {
 // 패널 표시 상태 타입
 interface VisiblePanels {
   tools: boolean;
-  overlay: boolean;
   sceneSave: boolean;
   property: boolean;
-  layoutResult: boolean;
-  flowResult: boolean;
-  congestionResult: boolean;
-  staffingResult: boolean;
+  resultReport: boolean; // 통합 결과 리포트
 }
 
 // ============================================================================
@@ -159,16 +155,12 @@ export default function DigitalTwinStudioPage() {
   // As-Is / To-Be / Split 뷰 모드
   const [viewMode, setViewMode] = useState<ViewMode>('as-is');
 
-  // 드래그 패널 표시 상태 (모든 패널 기본 표시)
+  // 드래그 패널 표시 상태
   const [visiblePanels, setVisiblePanels] = useState<VisiblePanels>({
     tools: true,
-    overlay: true,
     sceneSave: true,
     property: true,
-    layoutResult: true,
-    flowResult: true,
-    congestionResult: true,
-    staffingResult: true,
+    resultReport: false, // 결과 있을 때만 자동 표시
   });
 
   // 시뮬레이션 결과 상태
@@ -889,7 +881,7 @@ export default function DigitalTwinStudioPage() {
               <div className="bg-black/70 backdrop-blur-sm border border-white/10 rounded-lg px-3 py-2 text-xs text-white/80">
                 <span>가구: {models.filter(m => m.type === 'furniture').length}개</span>
                 <span className="mx-2 text-white/30">|</span>
-                <span>제품: {models.filter(m => m.type === 'product').length}개</span>
+                <span>제품: {models.filter(m => m.type === 'furniture').reduce((acc, m) => acc + ((m.metadata as any)?.childProducts?.length || 0), 0)}개</span>
                 <span className="mx-2 text-white/30">|</span>
                 <span>존: {dbZones?.length || 0}개</span>
               </div>
@@ -973,10 +965,9 @@ export default function DigitalTwinStudioPage() {
                           onOverlayToggle={toggleOverlay}
                           simulationZones={simulationZones}
                           onResultsUpdate={(type, result) => {
-                            // AI 시뮬레이션 결과를 오른쪽 패널에 표시
+                            // AI 시뮬레이션 결과 저장 및 결과 리포트 패널 표시
                             setSimulationResults((prev) => ({ ...prev, [type]: result }));
-                            const panelKey = `${type}Result` as keyof VisiblePanels;
-                            setVisiblePanels((prev) => ({ ...prev, [panelKey]: true }));
+                            setVisiblePanels((prev) => ({ ...prev, resultReport: true }));
                           }}
                           onNavigateToOptimization={(issues) => {
                             // AI 시뮬레이션에서 발견된 문제를 AI 최적화로 전달
@@ -1000,10 +991,9 @@ export default function DigitalTwinStudioPage() {
                           }}
                           onOverlayToggle={toggleOverlay}
                           onResultsUpdate={(type, result) => {
-                            // AI 최적화 결과를 오른쪽 패널에 표시
+                            // AI 최적화 결과 저장 및 결과 리포트 패널 표시
                             setSimulationResults((prev) => ({ ...prev, [type]: result }));
-                            const panelKey = `${type}Result` as keyof VisiblePanels;
-                            setVisiblePanels((prev) => ({ ...prev, [panelKey]: true }));
+                            setVisiblePanels((prev) => ({ ...prev, resultReport: true }));
                           }}
                           diagnosticIssues={diagnosticIssues}
                           onNavigateToApply={() => setActiveTab('apply')}
@@ -1058,14 +1048,6 @@ export default function DigitalTwinStudioPage() {
               </DraggablePanel>
             )}
 
-            {/* 오버레이 컨트롤 패널 (고객 시뮬레이션 통합) */}
-            {visiblePanels.overlay && (
-              <OverlayControlPanelIntegrated
-                isActive={isActive}
-                toggleOverlay={toggleOverlay}
-              />
-            )}
-
             {/* 씬 저장 패널 */}
             {visiblePanels.sceneSave && (
               <DraggablePanel
@@ -1103,19 +1085,31 @@ export default function DigitalTwinStudioPage() {
               </DraggablePanel>
             )}
 
-            {/* ========== 시뮬레이션 결과 패널들 (우측 정렬) ========== */}
-            <SimulationResultPanels
-              visiblePanels={{
-                layoutResult: visiblePanels.layoutResult,
-                flowResult: visiblePanels.flowResult,
-                congestionResult: visiblePanels.congestionResult,
-                staffingResult: visiblePanels.staffingResult,
-              }}
-              simulationResults={simulationResults}
-              sceneSimulationResults={sceneSimulation.state.results}
-              onClose={closePanel}
-              toggleOverlay={toggleOverlay}
-            />
+            {/* 통합 결과 리포트 패널 */}
+            {visiblePanels.resultReport && (
+              <ResultReportPanel
+                results={simulationResults}
+                onClose={() => setVisiblePanels((prev) => ({ ...prev, resultReport: false }))}
+                onApply={(type) => {
+                  toast.success(`${type} 최적화 결과를 적용합니다`);
+                  setActiveTab('apply');
+                }}
+                onShowIn3D={(type) => {
+                  // 해당 오버레이 활성화
+                  const overlayMap: Record<string, OverlayType> = {
+                    layout: 'layoutOptimization',
+                    flow: 'flowOptimization',
+                    congestion: 'congestion',
+                    staffing: 'staffing',
+                  };
+                  const overlay = overlayMap[type];
+                  if (overlay && !isActive(overlay)) {
+                    toggleOverlay(overlay);
+                  }
+                }}
+                defaultPosition={{ x: window.innerWidth - 340, y: 100 }}
+              />
+            )}
 
             {/* ----- 하단 중앙: 실행 버튼 ----- */}
             <div className="absolute bottom-6 left-1/2 -translate-x-1/2 pointer-events-auto flex gap-3">

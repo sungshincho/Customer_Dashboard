@@ -15,3 +15,5 @@ export { DiagnosticsSummary } from './DiagnosticsSummary';
 // 시뮬레이션 컴포넌트
 export { CustomerAgents } from './CustomerAgents';
 export { RealtimeSimulationPanel } from './RealtimeSimulationPanel';
+export { SimulationControlPopup } from './SimulationControlPopup';
+export { ResultReportPanel } from './ResultReportPanel';
