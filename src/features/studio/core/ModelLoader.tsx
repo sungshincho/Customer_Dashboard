@@ -7,7 +7,7 @@
  * - 에러 처리
  */
 
-import { useRef, useMemo, useState, useEffect } from 'react';
+import { useRef, useMemo, useState } from 'react';
 import { useGLTF } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -127,6 +127,7 @@ function GLTFModel({
 }: GLTFModelProps) {
   const groupRef = useRef<THREE.Group>(null);
   const [boundingBox, setBoundingBox] = useState<{ width: number; height: number; depth: number; centerY: number } | null>(null);
+  const boundingBoxCalculated = useRef(false);
 
   // GLTF 로드
   const { scene } = useGLTF(url, true, true, (error) => {
@@ -156,30 +157,42 @@ function GLTFModel({
       }
     });
 
+    // 클론 변경 시 BoundingBox 재계산 필요
+    boundingBoxCalculated.current = false;
+
     return cloned;
   }, [scene, castShadow, receiveShadow, shouldUseBaked]);
 
-  // 렌더링 후 BoundingBox 계산
-  useEffect(() => {
-    if (clonedScene) {
-      const box = new THREE.Box3().setFromObject(clonedScene);
+  // 실제 렌더링 후 BoundingBox 계산 (useFrame으로 한 번만 실행)
+  useFrame(() => {
+    if (!boundingBoxCalculated.current && groupRef.current) {
+      // 스케일 적용 전 원본 크기 계산을 위해 임시로 스케일 리셋
+      const originalScale = groupRef.current.scale.clone();
+      groupRef.current.scale.set(1, 1, 1);
+      groupRef.current.updateMatrixWorld(true);
+      
+      const box = new THREE.Box3().setFromObject(groupRef.current);
       const size = new THREE.Vector3();
       box.getSize(size);
       const center = new THREE.Vector3();
       box.getCenter(center);
       
+      // 스케일 복원
+      groupRef.current.scale.copy(originalScale);
+      groupRef.current.updateMatrixWorld(true);
+      
+      // position을 빼서 로컬 좌표로 변환
+      const localCenterY = center.y - (position[1] || 0);
+      
       setBoundingBox({
         width: size.x,
         height: size.y,
         depth: size.z,
-        centerY: center.y,
+        centerY: localCenterY,
       });
+      
+      boundingBoxCalculated.current = true;
     }
-  }, [clonedScene]);
-
-  // 선택/호버 하이라이트 애니메이션
-  useFrame((_, delta) => {
-    if (!groupRef.current) return;
   });
 
   return (
