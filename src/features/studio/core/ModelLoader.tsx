@@ -7,7 +7,7 @@
  * - 에러 처리
  */
 
-import { useRef, useMemo, useState } from 'react';
+import { useRef, useMemo, useState, useEffect } from 'react';
 import { useGLTF } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -126,6 +126,7 @@ function GLTFModel({
   onError,
 }: GLTFModelProps) {
   const groupRef = useRef<THREE.Group>(null);
+  const [boundingBox, setBoundingBox] = useState<{ width: number; height: number; depth: number; centerY: number } | null>(null);
 
   // GLTF 로드
   const { scene } = useGLTF(url, true, true, (error) => {
@@ -158,6 +159,24 @@ function GLTFModel({
     return cloned;
   }, [scene, castShadow, receiveShadow, shouldUseBaked]);
 
+  // 렌더링 후 BoundingBox 계산
+  useEffect(() => {
+    if (clonedScene) {
+      const box = new THREE.Box3().setFromObject(clonedScene);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+      
+      setBoundingBox({
+        width: size.x,
+        height: size.y,
+        depth: size.z,
+        centerY: center.y,
+      });
+    }
+  }, [clonedScene]);
+
   // 선택/호버 하이라이트 애니메이션
   useFrame((_, delta) => {
     if (!groupRef.current) return;
@@ -186,7 +205,14 @@ function GLTFModel({
       <primitive object={clonedScene} />
 
       {/* 선택 표시 */}
-      {selected && <SelectionOutline />}
+      {selected && boundingBox && (
+        <SelectionOutline 
+          width={boundingBox.width} 
+          height={boundingBox.height} 
+          depth={boundingBox.depth}
+          centerY={boundingBox.centerY}
+        />
+      )}
     </group>
   );
 }
@@ -260,20 +286,32 @@ function FallbackModel({
 // ============================================================================
 // 선택 아웃라인
 // ============================================================================
-function SelectionOutline() {
+interface SelectionOutlineProps {
+  width?: number;
+  height?: number;
+  depth?: number;
+  centerY?: number;
+}
+
+function SelectionOutline({ width = 1, height = 1, depth = 1, centerY = 0.5 }: SelectionOutlineProps) {
   const outlineRef = useRef<THREE.Mesh>(null);
 
   useFrame((state) => {
     if (outlineRef.current) {
       // 펄스 애니메이션
-      const scale = 1 + Math.sin(state.clock.elapsedTime * 3) * 0.02;
-      outlineRef.current.scale.set(scale, scale, scale);
+      const pulse = 1 + Math.sin(state.clock.elapsedTime * 3) * 0.02;
+      outlineRef.current.scale.set(pulse, pulse, pulse);
     }
   });
 
+  // 약간의 여백 추가 (10%)
+  const w = width * 1.1;
+  const h = height * 1.1;
+  const d = depth * 1.1;
+
   return (
-    <mesh ref={outlineRef}>
-      <boxGeometry args={[1.1, 1.1, 1.1]} />
+    <mesh ref={outlineRef} position={[0, centerY, 0]}>
+      <boxGeometry args={[w, h, d]} />
       <meshBasicMaterial
         color="#3b82f6"
         transparent
