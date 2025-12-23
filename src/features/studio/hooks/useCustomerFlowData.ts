@@ -90,8 +90,11 @@ export const useCustomerFlowData = ({
           transitionMatrix: new Map(),
           totalTransitions: 0,
           maxTransitionCount: 0,
+          avgPathDuration: 0,
           entranceZone: null,
           exitZones: [],
+          hotspotZones: [],
+          bottlenecks: [],
         };
       }
 
