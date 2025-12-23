@@ -150,7 +150,7 @@ function ProductGLTF({
           width={boundingBox.size.x} 
           height={boundingBox.size.y} 
           depth={boundingBox.size.z}
-          centerY={boundingBox.center.y}
+          center={boundingBox.center}
         />
       )}
     </group>
@@ -232,19 +232,24 @@ interface ProductIndicatorProps {
   width?: number;
   height?: number;
   depth?: number;
-  centerY?: number;
+  center?: { x: number; y: number; z: number };
   size?: number; // 기존 호환용
 }
 
-function ProductSelectionIndicator({ width, height, depth, centerY = 0, size = 0.4 }: ProductIndicatorProps) {
+function ProductSelectionIndicator({ width, height, depth, center, size = 0.4 }: ProductIndicatorProps) {
   // width/height/depth가 있으면 박스 사용, 없으면 기존 sphere 사용
   if (width && height && depth) {
     const w = width * 1.2;
     const h = height * 1.2;
     const d = depth * 1.2;
     
+    // center가 있으면 해당 위치에, 없으면 원점에 배치
+    const pos: [number, number, number] = center 
+      ? [center.x, center.y, center.z] 
+      : [0, 0, 0];
+    
     return (
-      <mesh position={[0, centerY, 0]}>
+      <mesh position={pos}>
         <boxGeometry args={[w, h, d]} />
         <meshBasicMaterial
           color="#f59e0b"
