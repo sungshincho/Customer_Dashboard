@@ -64,9 +64,13 @@ export const useCustomerFlowData = ({
   minTransitionCount = 20,
   enabled = true,
 }: UseCustomerFlowDataOptions) => {
+  // 디버그: 훅 호출 시 파라미터 확인
+  console.log('[useCustomerFlowData] 호출:', { storeId, daysRange, minTransitionCount, enabled });
+
   return useQuery({
     queryKey: ['customer-flow-data', storeId, daysRange, minTransitionCount],
     queryFn: async (): Promise<CustomerFlowData> => {
+      console.log('[useCustomerFlowData] queryFn 실행, storeId:', storeId);
 
       // 1. 존 정보 가져오기 (zones_dim 테이블)
       // boundary 컬럼은 optional - 일부 스키마에만 존재할 수 있음
@@ -76,14 +80,20 @@ export const useCustomerFlowData = ({
         .eq('store_id', storeId)
         .order('zone_code');
 
+      console.log('[useCustomerFlowData] zones_dim 쿼리 결과:', {
+        count: zones?.length ?? 0,
+        error: zonesError,
+        storeId
+      });
+
       if (zonesError) {
         console.error('[useCustomerFlowData] 존 데이터 로드 실패:', zonesError);
         throw zonesError;
       }
 
       if (!zones || zones.length === 0) {
-        console.warn('[useCustomerFlowData] 존 데이터가 없습니다');
-        // 빈 데이터 반환
+        console.warn('[useCustomerFlowData] 존 데이터가 없습니다. storeId:', storeId);
+        // 빈 데이터 반환 (모든 필드 포함)
         return {
           zones: [],
           flowPaths: [],
