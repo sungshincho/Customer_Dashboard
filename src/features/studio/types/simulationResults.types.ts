@@ -72,6 +72,24 @@ export interface LayoutSimulationResultType {
   insights: string[];
   warnings?: string[];
 
+  // 🆕 레이아웃 변경 사항 (furnitureMoves의 별칭으로 사용될 수 있음)
+  layoutChanges?: Array<{
+    furnitureId: string;
+    furnitureName: string;
+    fromPosition: { x: number; y: number; z: number };
+    toPosition: { x: number; y: number; z: number };
+    rotation?: number;
+    reason?: string;
+  }>;
+
+  // 🆕 최적화 요약 정보
+  optimizationSummary?: {
+    totalChanges: number;
+    expectedRevenueIncrease: number;
+    expectedConversionIncrease: number;
+    confidence: number;
+  };
+
   // 🆕 데이터 소스 메타데이터
   dataSource?: {
     usedRealData: boolean;

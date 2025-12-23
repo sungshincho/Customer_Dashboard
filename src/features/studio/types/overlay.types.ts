@@ -18,7 +18,11 @@ export type OverlayType =
   | 'realtime'
   | 'wifi'
   | 'layout'
-  | 'staff';
+  | 'staff'
+  | 'layoutOptimization'
+  | 'flowOptimization'
+  | 'congestion'
+  | 'staffing';
 
 // 오버레이 설정
 export interface OverlayConfig {

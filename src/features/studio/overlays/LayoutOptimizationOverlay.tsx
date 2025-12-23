@@ -855,6 +855,9 @@ interface ProductMoveIndicatorProps {
     expectedImpact?: {
       revenueChangePct?: number;
       visibilityScore?: number;
+      // snake_case 버전도 지원 (API 응답 호환성)
+      revenue_change_pct?: number;
+      visibility_score?: number;
     };
   };
   storeBounds: { width: number; depth: number };
