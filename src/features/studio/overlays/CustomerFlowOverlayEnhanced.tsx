@@ -31,27 +31,40 @@ export const CustomerFlowOverlayEnhanced: React.FC<CustomerFlowOverlayEnhancedPr
   showZoneMarkers = true,
   minOpacity = 0.3,
 }) => {
-  const { data, isLoading, error } = useCustomerFlowData({
+  const { data, isLoading, error, status, fetchStatus } = useCustomerFlowData({
     storeId,
     daysRange: 30,
     minTransitionCount: 10,
-    enabled: visible,
+    enabled: visible && !!storeId,
+  });
+
+  // 디버그: 쿼리 상태 상세 로깅
+  console.log('[CustomerFlowOverlayEnhanced] 쿼리 상태:', {
+    visible,
+    storeId: storeId || '(empty)',
+    status,
+    fetchStatus,
+    isLoading,
+    hasData: !!data,
+    flowPathsCount: data?.flowPaths?.length ?? 0,
+    zonesCount: data?.zones?.length ?? 0,
+    errorMsg: error?.message,
   });
 
   if (!visible) return null;
 
-  if (isLoading) {
+  if (isLoading || status === 'pending') {
     return (
       <Html center>
         <div className="px-4 py-2 bg-black/80 rounded-lg text-sm text-white">
-          동선 데이터 로딩 중...
+          동선 데이터 로딩 중... (storeId: {storeId?.slice(0, 8) || 'N/A'})
         </div>
       </Html>
     );
   }
 
   if (error || !data) {
-    console.warn('[CustomerFlowOverlayEnhanced] 데이터 없음:', { error, data, storeId });
+    console.warn('[CustomerFlowOverlayEnhanced] 데이터 없음:', { error: error?.message, data, storeId });
     return null;
   }
 
