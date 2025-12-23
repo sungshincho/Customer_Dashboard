@@ -809,20 +809,21 @@ export default function DigitalTwinStudioPage() {
                   />
                 )}
 
-                {/* 시뮬레이션 결과 오버레이 */}
-                {sceneSimulation.state.results.layout && (
+                {/* 시뮬레이션 결과 오버레이 (viewMode에 따라 표시 제어) */}
+                {sceneSimulation.state.results.layout && viewMode !== 'as-is' && (
                   <LayoutOptimizationOverlay
                     result={sceneSimulation.state.results.layout as any}
-                    showBefore={false}
-                    showAfter={true}
-                    showMoves={true}
-                    showZoneHighlights={true}
+                    showBefore={viewMode === 'split'}
+                    showAfter={viewMode === 'to-be' || viewMode === 'split'}
+                    showMoves={viewMode === 'to-be' || viewMode === 'split'}
+                    showProductMoves={viewMode === 'to-be' || viewMode === 'split'}
+                    showZoneHighlights={viewMode !== 'as-is'}
                     storeBounds={storeBounds}
                     zonePositions={zonePositions}
                     zoneSizes={zoneSizes}
                   />
                 )}
-                {sceneSimulation.state.results.flow && (
+                {sceneSimulation.state.results.flow && viewMode !== 'as-is' && (
                   <FlowOptimizationOverlay
                     result={sceneSimulation.state.results.flow as any}
                     showPaths={true}
@@ -833,7 +834,7 @@ export default function DigitalTwinStudioPage() {
                     entrancePosition={entrancePosition}
                   />
                 )}
-                {sceneSimulation.state.results.congestion && (
+                {sceneSimulation.state.results.congestion && viewMode !== 'as-is' && (
                   <CongestionOverlay
                     result={sceneSimulation.state.results.congestion as any}
                     showHeatmap={true}
@@ -842,14 +843,14 @@ export default function DigitalTwinStudioPage() {
                     animateTimeProgress={false}
                   />
                 )}
-                {sceneSimulation.state.results.staffing && (
+                {sceneSimulation.state.results.staffing && viewMode !== 'as-is' && (
                   <StaffingOverlay
                     result={sceneSimulation.state.results.staffing as any}
                     showStaffMarkers={true}
-                    showCurrentPositions={true}
-                    showSuggestedPositions={true}
-                    showCoverageZones={true}
-                    showMovementPaths={true}
+                    showCurrentPositions={viewMode === 'split'}
+                    showSuggestedPositions={viewMode === 'to-be' || viewMode === 'split'}
+                    showCoverageZones={viewMode !== 'as-is'}
+                    showMovementPaths={viewMode === 'to-be' || viewMode === 'split'}
                     animateMovement={true}
                   />
                 )}
@@ -859,8 +860,52 @@ export default function DigitalTwinStudioPage() {
 
           {/* ========== UI 오버레이 ========== */}
           <div className="absolute inset-0 z-10 pointer-events-none">
-            {/* ----- 상단 중앙: 퀵 토글 바 ----- */}
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-auto z-20">
+            {/* ----- 상단 중앙: 통합 컨트롤 바 (패널 토글 + 퀵 토글) ----- */}
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-auto z-20 flex items-center gap-3">
+              {/* 패널 토글 버튼들 */}
+              <div className="flex items-center gap-1 px-2 py-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 shadow-lg">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setVisiblePanels(prev => ({ ...prev, tools: !prev.tools }))}
+                  className={`h-8 px-3 rounded-lg transition-all border border-transparent ${
+                    visiblePanels.tools ? 'bg-blue-500/30 border-blue-500 text-blue-400' : 'hover:bg-white/10 text-white/60'
+                  }`}
+                >
+                  <Layers className="w-4 h-4 mr-1.5" />
+                  <span className="text-xs">도구</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setVisiblePanels(prev => ({ ...prev, sceneSave: !prev.sceneSave }))}
+                  className={`h-8 px-3 rounded-lg transition-all border border-transparent ${
+                    visiblePanels.sceneSave ? 'bg-green-500/30 border-green-500 text-green-400' : 'hover:bg-white/10 text-white/60'
+                  }`}
+                >
+                  <Save className="w-4 h-4 mr-1.5" />
+                  <span className="text-xs">씬 저장</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setVisiblePanels(prev => ({ ...prev, resultReport: !prev.resultReport }))}
+                  className={`h-8 px-3 rounded-lg transition-all border border-transparent relative ${
+                    visiblePanels.resultReport ? 'bg-purple-500/30 border-purple-500 text-purple-400' : 'hover:bg-white/10 text-white/60'
+                  }`}
+                >
+                  <Sparkles className="w-4 h-4 mr-1.5" />
+                  <span className="text-xs">AI 리포트</span>
+                  {(simulationResults.layout || simulationResults.flow || simulationResults.congestion || simulationResults.staffing) && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full" />
+                  )}
+                </Button>
+              </div>
+
+              {/* 구분선 */}
+              <div className="w-px h-6 bg-white/20" />
+
+              {/* 퀵 토글 바 */}
               <QuickToggleBar
                 activeOverlays={activeOverlays as any[]}
                 onToggle={(id) => toggleOverlay(id as OverlayType)}
@@ -876,8 +921,22 @@ export default function DigitalTwinStudioPage() {
               />
             </div>
 
-            {/* ----- 하단 좌측: 현재 상태 정보 ----- */}
-            <div className="absolute bottom-4 left-4 pointer-events-auto z-20">
+            {/* ----- 하단 좌측: 현재 상태 정보 + 뷰모드 표시 ----- */}
+            <div className="absolute bottom-4 left-4 pointer-events-auto z-20 flex items-center gap-2">
+              {/* 뷰 모드 인디케이터 */}
+              {(sceneSimulation.state.results.layout || sceneSimulation.state.results.flow) && (
+                <div className={`px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-1.5 ${
+                  viewMode === 'as-is'
+                    ? 'bg-blue-600/80 text-white'
+                    : viewMode === 'to-be'
+                    ? 'bg-green-600/80 text-white'
+                    : 'bg-purple-600/80 text-white'
+                }`}>
+                  {viewMode === 'as-is' && '📍 As-Is (현재 배치)'}
+                  {viewMode === 'to-be' && '✨ To-Be (최적화 결과)'}
+                  {viewMode === 'split' && '⚡ Split (비교 뷰)'}
+                </div>
+              )}
               <div className="bg-black/70 backdrop-blur-sm border border-white/10 rounded-lg px-3 py-2 text-xs text-white/80">
                 <span>가구: {models.filter(m => m.type === 'furniture').length}개</span>
                 <span className="mx-2 text-white/30">|</span>
@@ -1026,16 +1085,16 @@ export default function DigitalTwinStudioPage() {
               )}
             </div>
 
-            {/* ========== 드래그 가능한 플로팅 패널들 ========== */}
+            {/* ========== 드래그 가능한 플로팅 패널들 (상단 바 아래에 배치) ========== */}
 
-            {/* 왼쪽 상단: 도구 패널 (드래그 가능, 접기/펼치기 가능) */}
+            {/* 도구 패널 - 상단 바 아래 좌측 */}
             {visiblePanels.tools && (
               <DraggablePanel
                 id="tool-panel"
                 title="도구"
-                defaultPosition={{ x: 352, y: 16 }}
+                defaultPosition={{ x: 16, y: 60 }}
                 collapsible={true}
-                defaultCollapsed={true}
+                defaultCollapsed={false}
                 width="w-auto"
                 resizable={false}
               >
@@ -1048,15 +1107,15 @@ export default function DigitalTwinStudioPage() {
               </DraggablePanel>
             )}
 
-            {/* 씬 저장 패널 */}
+            {/* 씬 저장 패널 - 상단 바 아래 좌측 */}
             {visiblePanels.sceneSave && (
               <DraggablePanel
                 id="scene-save"
                 title="씬 저장"
                 icon={<Save className="w-4 h-4" />}
-                defaultPosition={{ x: 352, y: 104 }}
-                defaultCollapsed={true}
-                width="w-48"
+                defaultPosition={{ x: 16, y: visiblePanels.tools ? 180 : 60 }}
+                defaultCollapsed={false}
+                width="w-52"
               >
                 <SceneSavePanel
                   currentSceneName={sceneName}
@@ -1077,7 +1136,7 @@ export default function DigitalTwinStudioPage() {
               <DraggablePanel
                 id="property-panel"
                 title="속성"
-                defaultPosition={{ x: 352, y: 148 }}
+                defaultPosition={{ x: 16, y: 300 }}
                 defaultCollapsed={false}
                 width="w-72"
               >
@@ -1085,7 +1144,7 @@ export default function DigitalTwinStudioPage() {
               </DraggablePanel>
             )}
 
-            {/* 통합 결과 리포트 패널 */}
+            {/* 통합 결과 리포트 패널 - 우측 상단 */}
             {visiblePanels.resultReport && (
               <ResultReportPanel
                 results={simulationResults}
@@ -1107,41 +1166,12 @@ export default function DigitalTwinStudioPage() {
                     toggleOverlay(overlay);
                   }
                 }}
-                defaultPosition={{ x: window.innerWidth - 340, y: 100 }}
+                defaultPosition={{ x: 16, y: 60 }}
+                rightOffset={16}
               />
             )}
 
-            {/* ----- 하단 중앙: 실행 버튼 ----- */}
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 pointer-events-auto flex gap-3">
-              <Button
-                className="px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-sm
-                           border border-white/20 rounded-xl text-white font-medium
-                           transition-all hover:scale-105"
-                onClick={handleRunAllSimulations}
-                disabled={isInferring}
-              >
-                {isInferring ? (
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                ) : (
-                  <Sparkles className="w-5 h-5 mr-2" />
-                )}
-                시뮬레이션 실행
-              </Button>
-              <Button
-                className="px-6 py-3 bg-primary/80 hover:bg-primary backdrop-blur-sm
-                           border border-primary/40 rounded-xl text-white font-medium
-                           transition-all hover:scale-105"
-                onClick={handleRunSceneSimulation}
-                disabled={sceneSimulation.isSimulating || !currentRecipe}
-              >
-                {sceneSimulation.isSimulating ? (
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                ) : (
-                  <GitCompare className="w-5 h-5 mr-2" />
-                )}
-                씬 최적화 (As-is → To-be)
-              </Button>
-            </div>
+            {/* 하단 중앙 버튼 제거됨 - 탭에서 동일 기능 제공 */}
           </div>
         </div>
       </SceneProvider>

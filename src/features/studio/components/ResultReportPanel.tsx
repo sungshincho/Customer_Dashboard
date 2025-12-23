@@ -223,8 +223,10 @@ export const ResultReportPanel = memo(function ResultReportPanel({
   );
 });
 
-// Layout 결과 내용
+// Layout 결과 내용 - 상세 정보 포함
 const LayoutResultContent = memo(function LayoutResultContent({ result }: { result: LayoutResult }) {
+  const [showFurnitureDetails, setShowFurnitureDetails] = useState(false);
+  const [showProductDetails, setShowProductDetails] = useState(false);
   const improvement = result.optimizedEfficiency - result.currentEfficiency;
 
   return (
@@ -261,16 +263,92 @@ const LayoutResultContent = memo(function LayoutResultContent({ result }: { resu
         </div>
       </div>
 
-      {/* 변경 사항 요약 */}
-      {(result.changes.length > 0 || (result.productChanges && result.productChanges.length > 0)) && (
-        <div className="text-xs text-white/60 flex items-center gap-2">
-          <Armchair className="w-3 h-3" />
-          <span>가구 {result.changes.length}건</span>
-          {result.productChanges && result.productChanges.length > 0 && (
-            <>
-              <Package className="w-3 h-3 ml-1" />
-              <span>제품 {result.productChanges.length}건</span>
-            </>
+      {/* 가구 변경 사항 상세 */}
+      {result.changes.length > 0 && (
+        <div className="space-y-1">
+          <button
+            onClick={() => setShowFurnitureDetails(!showFurnitureDetails)}
+            className="w-full flex items-center justify-between text-xs text-white/60 hover:text-white/80 p-1.5 rounded bg-orange-500/10 hover:bg-orange-500/20"
+          >
+            <div className="flex items-center gap-1.5">
+              <Armchair className="w-3 h-3 text-orange-400" />
+              <span>가구 재배치 {result.changes.length}건</span>
+            </div>
+            <ChevronDown className={cn('w-3 h-3 transition-transform', showFurnitureDetails && 'rotate-180')} />
+          </button>
+          {showFurnitureDetails && (
+            <div className="max-h-32 overflow-y-auto space-y-1.5 pl-1">
+              {result.changes.map((change, i) => (
+                <div key={i} className="p-2 rounded bg-black/30 text-xs">
+                  <div className="font-medium text-white mb-1">{change.item}</div>
+                  <div className="flex items-center gap-1 text-[10px]">
+                    <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-400">{change.from}</span>
+                    <ArrowRight className="w-3 h-3 text-white/40" />
+                    <span className="px-1.5 py-0.5 rounded bg-green-500/20 text-green-400">{change.to}</span>
+                  </div>
+                  {change.effect && (
+                    <div className="mt-1 text-[10px] text-white/50">💡 {change.effect}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 제품 변경 사항 상세 */}
+      {result.productChanges && result.productChanges.length > 0 && (
+        <div className="space-y-1">
+          <button
+            onClick={() => setShowProductDetails(!showProductDetails)}
+            className="w-full flex items-center justify-between text-xs text-white/60 hover:text-white/80 p-1.5 rounded bg-blue-500/10 hover:bg-blue-500/20"
+          >
+            <div className="flex items-center gap-1.5">
+              <Package className="w-3 h-3 text-blue-400" />
+              <span>제품 재배치 {result.productChanges.length}건</span>
+            </div>
+            <ChevronDown className={cn('w-3 h-3 transition-transform', showProductDetails && 'rotate-180')} />
+          </button>
+          {showProductDetails && (
+            <div className="max-h-40 overflow-y-auto space-y-1.5 pl-1">
+              {result.productChanges.map((change, i) => (
+                <div key={i} className="p-2 rounded bg-black/30 text-xs">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-medium text-white">{change.productName}</span>
+                    {change.productSku && (
+                      <span className="text-[9px] px-1 py-0.5 rounded bg-white/10 text-white/50 font-mono">
+                        {change.productSku}
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-1 text-[10px]">
+                    <div className="p-1 rounded bg-red-500/10">
+                      <div className="text-red-400 font-medium">From:</div>
+                      <div className="text-white/70">{change.fromFurniture}</div>
+                      <div className="text-white/50">슬롯: {change.fromSlot}</div>
+                    </div>
+                    <div className="p-1 rounded bg-green-500/10">
+                      <div className="text-green-400 font-medium">To:</div>
+                      <div className="text-white/70">{change.toFurniture}</div>
+                      <div className="text-white/50">슬롯: {change.toSlot}</div>
+                    </div>
+                  </div>
+                  {change.reason && (
+                    <div className="mt-1 text-[10px] text-white/50">💡 {change.reason}</div>
+                  )}
+                  {change.expectedImpact && (
+                    <div className="mt-1 flex gap-2 text-[10px]">
+                      <span className="text-green-400">
+                        📈 {change.expectedImpact.revenueChangePct >= 0 ? '+' : ''}{change.expectedImpact.revenueChangePct.toFixed(1)}%
+                      </span>
+                      <span className="text-yellow-400">
+                        👁 {(change.expectedImpact.visibilityScore * 100).toFixed(0)}점
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}

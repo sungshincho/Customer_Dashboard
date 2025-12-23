@@ -39,3 +39,6 @@ export type {
   SceneChange,
   SceneComparison,
 } from './ToBeSceneGenerator';
+
+// 최적화 결과 유효성 검증
+export { validateOptimizationResult } from './optimizationValidator';
