@@ -319,11 +319,6 @@ export function LayoutOptimizationOverlay({
       ))}
 
       {/* 제품 재배치 경로 (슬롯 기반) */}
-      {console.log('[LayoutOptimizationOverlay] Rendering product placements:', {
-        showProductMoves,
-        count: productPlacements.length,
-        placements: productPlacements.slice(0, 2),
-      }) && false}
       {showProductMoves && productPlacements.map((placement: any, idx: number) => (
         <ProductMoveIndicator
           key={placement.productId || placement.product_id || `product-${idx}`}
