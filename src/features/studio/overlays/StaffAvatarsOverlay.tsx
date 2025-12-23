@@ -130,7 +130,7 @@ const rotation: [number, number, number] = member.avatar_rotation
     ]
   : [0, 0, 0];
 
-  console.log('[StaffAvatarMarker] Rendering:', member.staff_name, 'at', position);
+  console.log('[StaffAvatarMarker] Rendering:', member.staff_name, 'at', position, 'rotation', rotation);
 
   // 호버/선택 시 부드러운 바운스 효과
   const baseY = 0.1;
