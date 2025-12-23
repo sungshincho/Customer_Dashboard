@@ -1,18 +1,17 @@
 /**
  * LayerPanel.tsx
  *
- * 레이어 관리 패널
- * - 레이어 트리 구조 표시
+ * 레이어 관리 패널 (v2 - Zone 기반 계층 구조)
+ * - Zone별 가구 그룹핑
+ * - 가구 → 제품 계층 표시
+ * - 검색/필터 기능
  * - 가시성 토글
- * - 씬 저장/불러오기 관리
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   ChevronRight,
   ChevronDown,
-  Eye,
-  EyeOff,
   Box,
   Folder,
   Trash2,
@@ -20,6 +19,12 @@ import {
   FolderOpen,
   Check,
   Loader2,
+  Search,
+  MapPin,
+  Package,
+  Focus,
+  Home,
+  X,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
@@ -28,9 +33,37 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useScene } from '../core/SceneProvider';
 import { useScenePersistence } from '../hooks/useScenePersistence';
+import { useStoreBounds } from '../hooks/useStoreBounds';
 import { useAuth } from '@/hooks/useAuth';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
-import type { LayerNode, ModelType } from '../types';
+import type { LayerNode } from '../types';
+
+// ============================================================================
+// 타입 정의
+// ============================================================================
+
+interface ZoneGroup {
+  zoneId: string;
+  zoneName: string;
+  zoneType: string;
+  furniture: FurnitureWithChildren[];
+}
+
+interface FurnitureWithChildren {
+  id: string;
+  name: string;
+  visible: boolean;
+  zoneId?: string;
+  children: ChildProduct[];
+}
+
+interface ChildProduct {
+  id: string;
+  name: string;
+  visible: boolean;
+  sku?: string;
+  slotCode?: string;
+}
 
 // ============================================================================
 // LayerPanel 컴포넌트
@@ -38,13 +71,21 @@ import type { LayerNode, ModelType } from '../types';
 export function LayerPanel() {
   const { user } = useAuth();
   const { selectedStore } = useSelectedStore();
-  const { models, selectedId, select, updateModel, removeModel, loadScene, toggleProductVisibility, isProductVisible } = useScene();
-  const [expanded, setExpanded] = useState<Set<string>>(new Set(['space', 'furniture', 'product']));
+  const { models, selectedId, select, updateModel, removeModel, loadScene, toggleProductVisibility, isProductVisible, focusOnModel } = useScene();
+  const { zones } = useStoreBounds();
+
+  // 확장 상태
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['space', 'furniture', 'zones']));
+  const [expandedZones, setExpandedZones] = useState<Set<string>>(new Set());
+  const [expandedFurniture, setExpandedFurniture] = useState<Set<string>>(new Set());
+
+  // 검색/필터
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState<'all' | 'furniture' | 'product'>('all');
 
   // 씬 저장/불러오기 훅
   const {
     scenes,
-    activeScene,
     isSaving,
     isLoading: scenesLoading,
     saveScene,
@@ -58,76 +99,163 @@ export function LayerPanel() {
   // 씬 저장 관련 상태
   const [newSceneName, setNewSceneName] = useState('');
 
-  // 모델을 타입별로 그룹화 (가구의 childProducts도 포함)
-  // childProducts는 별도로 관리하여 가시성 체크 시 부모 가구 기준으로 처리
-  const { groupedLayers, childProductMap } = useMemo(() => {
-    const groups: Record<ModelType, LayerNode[]> = {
-      space: [],
-      furniture: [],
-      product: [],
-      custom: [],
-      other: [],
-    };
-    // childProductId → parentFurnitureId 매핑
-    const cpMap = new Map<string, string>();
+  // Zone ID → Name 매핑
+  const zoneNameMap = useMemo(() => {
+    const map = new Map<string, { name: string; type: string }>();
+    if (zones) {
+      zones.forEach((zone) => {
+        map.set(zone.id, { name: zone.zone_name, type: zone.zone_type });
+      });
+    }
+    return map;
+  }, [zones]);
+
+  // 모델을 Zone별로 그룹화 (가구 → 제품 계층)
+  const { spaceModel, zoneGroups, unassignedFurniture, childProductMap, stats } = useMemo(() => {
+    let space: LayerNode | null = null;
+    const groups = new Map<string, ZoneGroup>();
+    const unassigned: FurnitureWithChildren[] = [];
+    const cpMap = new Map<string, string>(); // childProductId → furnitureId
+    let totalFurniture = 0;
+    let totalProducts = 0;
 
     if (!models || !Array.isArray(models)) {
-      return { groupedLayers: groups, childProductMap: cpMap };
+      return {
+        spaceModel: null,
+        zoneGroups: [],
+        unassignedFurniture: [],
+        childProductMap: cpMap,
+        stats: { furniture: 0, products: 0 }
+      };
     }
 
-    let totalChildProducts = 0;
-
     models.forEach((model) => {
-      const modelType: ModelType =
-        model.type && groups[model.type as ModelType]
-          ? (model.type as ModelType)
-          : 'custom';
+      // 공간 모델
+      if (model.type === 'space') {
+        space = {
+          id: model.id,
+          name: model.name,
+          type: 'model',
+          visible: model.visible,
+          locked: false,
+          modelId: model.id,
+        };
+        return;
+      }
 
-      groups[modelType].push({
-        id: model.id,
-        name: model.name,
-        type: 'model',
-        visible: model.visible,
-        locked: false,
-        modelId: model.id,
-      });
+      // 가구 모델
+      if (model.type === 'furniture') {
+        totalFurniture++;
+        const zoneId = (model.metadata as any)?.zoneId;
+        const childProducts = (model.metadata as any)?.childProducts || [];
 
-      // 🔧 FIX: 가구의 childProducts를 상품 목록에 추가 (개별 visible 속성 사용)
-      if (model.type === 'furniture' && (model.metadata as any)?.childProducts) {
-        const childProducts = (model.metadata as any).childProducts as any[];
-        totalChildProducts += childProducts.length;
-        childProducts.forEach((cp) => {
-          // childProduct → parentFurniture 매핑 저장
+        // childProduct 매핑 생성
+        childProducts.forEach((cp: any) => {
           cpMap.set(cp.id, model.id);
+          totalProducts++;
+        });
 
-          groups.product.push({
+        const furnitureItem: FurnitureWithChildren = {
+          id: model.id,
+          name: model.name,
+          visible: model.visible,
+          zoneId,
+          children: childProducts.map((cp: any) => ({
             id: cp.id,
-            name: cp.name || cp.metadata?.sku || 'Product',
-            type: 'model',
-            // 🔧 FIX: 개별 visible 속성 사용 (undefined면 기본 true)
+            name: cp.name || cp.metadata?.productName || 'Product',
             visible: cp.visible !== false,
-            locked: false,
-            modelId: cp.id,
-            parentFurnitureId: model.id, // 부모 가구 ID 추가
-          } as LayerNode & { parentFurnitureId?: string });
+            sku: cp.metadata?.sku,
+            slotCode: cp.metadata?.slotCode,
+          })),
+        };
+
+        if (zoneId && zoneNameMap.has(zoneId)) {
+          const zoneInfo = zoneNameMap.get(zoneId)!;
+          if (!groups.has(zoneId)) {
+            groups.set(zoneId, {
+              zoneId,
+              zoneName: zoneInfo.name,
+              zoneType: zoneInfo.type,
+              furniture: [],
+            });
+          }
+          groups.get(zoneId)!.furniture.push(furnitureItem);
+        } else {
+          unassigned.push(furnitureItem);
+        }
+      }
+
+      // 독립 제품 (placement가 아닌 경우)
+      if (model.type === 'product' && !(model.metadata as any)?.isRelativePosition) {
+        totalProducts++;
+        // 독립 제품은 미배정 그룹에 추가
+        unassigned.push({
+          id: model.id,
+          name: model.name,
+          visible: model.visible,
+          children: [],
         });
       }
     });
 
-    // 🔍 DEBUG: 그룹화 결과 로깅
-    console.log('[LayerPanel] groupedLayers:', {
-      furnitureCount: groups.furniture.length,
-      productCount: groups.product.length,
-      childProductMapSize: cpMap.size,
-      totalChildProducts,
-      furnitureWithChildren: models.filter(m => m.type === 'furniture' && (m.metadata as any)?.childProducts?.length > 0).length,
+    // Zone 정렬 (zone_type 우선순위: entrance > display > checkout > fitting > other)
+    const zoneTypeOrder: Record<string, number> = {
+      entrance: 0,
+      entry: 0,
+      display: 1,
+      clothing: 1,
+      accessory: 1,
+      cosmetics: 1,
+      checkout: 2,
+      fitting: 3,
+      exit: 4,
+    };
+
+    const sortedGroups = Array.from(groups.values()).sort((a, b) => {
+      const orderA = zoneTypeOrder[a.zoneType.toLowerCase()] ?? 5;
+      const orderB = zoneTypeOrder[b.zoneType.toLowerCase()] ?? 5;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.zoneName.localeCompare(b.zoneName);
     });
 
-    return { groupedLayers: groups, childProductMap: cpMap };
-  }, [models]);
+    return {
+      spaceModel: space,
+      zoneGroups: sortedGroups,
+      unassignedFurniture: unassigned,
+      childProductMap: cpMap,
+      stats: { furniture: totalFurniture, products: totalProducts }
+    };
+  }, [models, zoneNameMap]);
 
-  const toggleExpand = (id: string) => {
-    setExpanded((prev) => {
+  // 검색 필터링
+  const filteredZoneGroups = useMemo(() => {
+    if (!searchQuery && filterType === 'all') return zoneGroups;
+
+    const query = searchQuery.toLowerCase();
+
+    return zoneGroups.map((group) => ({
+      ...group,
+      furniture: group.furniture.filter((f) => {
+        // 타입 필터
+        if (filterType === 'product') return false;
+        if (filterType === 'furniture') {
+          return f.name.toLowerCase().includes(query);
+        }
+
+        // 검색 필터
+        if (!query) return true;
+        if (f.name.toLowerCase().includes(query)) return true;
+        return f.children.some((c) =>
+          c.name.toLowerCase().includes(query) ||
+          c.sku?.toLowerCase().includes(query)
+        );
+      }),
+    })).filter((group) => group.furniture.length > 0);
+  }, [zoneGroups, searchQuery, filterType]);
+
+  // 토글 핸들러
+  const toggleGroup = (id: string) => {
+    setExpandedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -135,45 +263,61 @@ export function LayerPanel() {
     });
   };
 
+  const toggleZone = (zoneId: string) => {
+    setExpandedZones((prev) => {
+      const next = new Set(prev);
+      if (next.has(zoneId)) next.delete(zoneId);
+      else next.add(zoneId);
+      return next;
+    });
+  };
+
+  const toggleFurnitureExpand = (furnitureId: string) => {
+    setExpandedFurniture((prev) => {
+      const next = new Set(prev);
+      if (next.has(furnitureId)) next.delete(furnitureId);
+      else next.add(furnitureId);
+      return next;
+    });
+  };
+
   // 가시성 토글 (childProduct인 경우 개별 가시성 토글)
-  const handleVisibilityToggle = (modelId: string) => {
-    // 1️⃣ 직접 모델인 경우
+  const handleVisibilityToggle = useCallback((modelId: string) => {
+    // 직접 모델인 경우
     const model = models.find((m) => m.id === modelId);
     if (model) {
       updateModel(modelId, { visible: !model.visible });
       return;
     }
 
-    // 2️⃣ childProduct인 경우 → 개별 가시성 토글 (SceneProvider의 toggleProductVisibility 사용)
-    const parentFurnitureId = childProductMap.get(modelId);
-    if (parentFurnitureId) {
+    // childProduct인 경우
+    if (childProductMap.has(modelId)) {
       toggleProductVisibility(modelId);
     }
-  };
+  }, [models, childProductMap, updateModel, toggleProductVisibility]);
 
   // 모델 또는 childProduct의 가시성 확인
-  const getModelVisibility = (modelId: string): boolean => {
-    // 1️⃣ 직접 모델인 경우
+  const getModelVisibility = useCallback((modelId: string): boolean => {
     const model = models.find((m) => m.id === modelId);
-    if (model) {
-      return model.visible;
-    }
+    if (model) return model.visible;
 
-    // 2️⃣ childProduct인 경우 → 개별 가시성 확인 (SceneProvider의 isProductVisible 사용)
     const parentFurnitureId = childProductMap.get(modelId);
     if (parentFurnitureId) {
-      // 부모 가구가 보이고 && 제품 자체도 보일 때만 true
       const parentModel = models.find((m) => m.id === parentFurnitureId);
       const parentVisible = parentModel?.visible ?? true;
       return parentVisible && isProductVisible(modelId);
     }
 
-    return true; // 기본값
-  };
+    return true;
+  }, [models, childProductMap, isProductVisible]);
 
-  const handleDelete = (modelId: string) => {
-    removeModel(modelId);
-  };
+  // 카메라 포커스
+  const handleFocus = useCallback((modelId: string) => {
+    if (focusOnModel) {
+      focusOnModel(modelId);
+    }
+    select(modelId);
+  }, [focusOnModel, select]);
 
   // 씬 저장 핸들러
   const handleSaveScene = async () => {
@@ -182,7 +326,6 @@ export function LayerPanel() {
       return;
     }
 
-    // 현재 씬 데이터 생성
     const currentSceneData = {
       space: models.find(m => m.type === 'space') ? {
         id: models.find(m => m.type === 'space')!.id,
@@ -212,16 +355,8 @@ export function LayerPanel() {
         scale: { x: m.scale[0], y: m.scale[1], z: m.scale[2] },
         movable: true,
       })),
-      lighting: {
-        name: 'default',
-        description: 'Default lighting',
-        lights: [],
-      },
-      camera: {
-        position: { x: 10, y: 10, z: 15 },
-        target: { x: 0, y: 0, z: 0 },
-        fov: 50,
-      },
+      lighting: { name: 'default', description: 'Default lighting', lights: [] },
+      camera: { position: { x: 10, y: 10, z: 15 }, target: { x: 0, y: 0, z: 0 }, fov: 50 },
     };
 
     if (!currentSceneData.space) {
@@ -232,7 +367,7 @@ export function LayerPanel() {
     try {
       await saveScene(currentSceneData as any, newSceneName.trim());
       setNewSceneName('');
-    } catch (error) {
+    } catch {
       // 에러는 useScenePersistence에서 처리됨
     }
   };
@@ -241,10 +376,7 @@ export function LayerPanel() {
   const handleLoadScene = async (sceneId: string) => {
     const scene = scenes.find(s => s.id === sceneId);
     if (scene && scene.recipe_data) {
-      // SceneProvider의 loadScene 호출
       const recipe = scene.recipe_data;
-
-      // recipe_data를 Model3D[] 형식으로 변환
       const loadedModels: any[] = [];
 
       if (recipe.space) {
@@ -292,156 +424,384 @@ export function LayerPanel() {
     }
   };
 
-  // 기본 씬으로 설정
   const handleSetDefault = async (sceneId: string) => {
     await setActiveScene(sceneId);
     toast.success('기본 씬으로 설정되었습니다');
   };
 
-  // 씬 삭제
-  const handleDeleteScene = async (sceneId: string, sceneName: string) => {
+  const handleDeleteScene = async (sceneId: string) => {
     await deleteScene(sceneId);
   };
 
-  const folders: { type: ModelType; name: string; icon: typeof Box }[] = [
-    { type: 'space', name: '매장 공간', icon: Folder },
-    { type: 'furniture', name: '가구', icon: Box },
-    { type: 'product', name: '상품', icon: Box },
-    { type: 'custom', name: '기타', icon: Folder },
-  ];
+  // Zone 타입별 아이콘
+  const getZoneIcon = (zoneType: string) => {
+    const type = zoneType.toLowerCase();
+    if (type.includes('entrance') || type.includes('entry')) return '🚪';
+    if (type.includes('checkout') || type.includes('counter')) return '💳';
+    if (type.includes('fitting')) return '👔';
+    if (type.includes('clothing') || type.includes('clothes')) return '👕';
+    if (type.includes('accessory')) return '👜';
+    if (type.includes('cosmetic')) return '💄';
+    return '📍';
+  };
 
   return (
     <div className="p-3 space-y-4">
-      {/* ========== 모델 레이어 섹션 ========== */}
+      {/* ========== 검색 & 필터 ========== */}
+      <div className="space-y-2">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/40" />
+          <Input
+            placeholder="이름 또는 SKU로 검색..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-8 pr-8 bg-white/5 border-white/10 text-sm h-8 text-white placeholder:text-white/30"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/60"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+        <div className="flex gap-1">
+          {(['all', 'furniture', 'product'] as const).map((type) => (
+            <button
+              key={type}
+              onClick={() => setFilterType(type)}
+              className={cn(
+                'flex-1 px-2 py-1 text-[10px] rounded transition-colors',
+                filterType === type
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white/5 text-white/50 hover:bg-white/10'
+              )}
+            >
+              {type === 'all' ? '전체' : type === 'furniture' ? '가구' : '제품'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ========== 통계 ========== */}
+      <div className="flex items-center gap-3 px-2 py-1.5 bg-white/5 rounded-lg text-[10px]">
+        <div className="flex items-center gap-1 text-white/50">
+          <Box className="h-3 w-3 text-yellow-400" />
+          <span>가구 {stats.furniture}</span>
+        </div>
+        <div className="flex items-center gap-1 text-white/50">
+          <Package className="h-3 w-3 text-blue-400" />
+          <span>제품 {stats.products}</span>
+        </div>
+        <div className="flex items-center gap-1 text-white/50">
+          <MapPin className="h-3 w-3 text-purple-400" />
+          <span>존 {zoneGroups.length}</span>
+        </div>
+      </div>
+
+      {/* ========== 공간 섹션 ========== */}
+      {spaceModel && (
+        <div className="space-y-1">
+          <div
+            className="flex items-center gap-1.5 py-1.5 px-2 rounded-md cursor-pointer hover:bg-white/5 transition-colors"
+            onClick={() => toggleGroup('space')}
+          >
+            <button className="p-0.5">
+              {expandedGroups.has('space') ? (
+                <ChevronDown className="w-3.5 h-3.5 text-white/60" />
+              ) : (
+                <ChevronRight className="w-3.5 h-3.5 text-white/60" />
+              )}
+            </button>
+            <Home className="w-4 h-4 text-green-400" />
+            <span className="flex-1 text-sm text-white font-medium">공간</span>
+          </div>
+
+          {expandedGroups.has('space') && (
+            <div className="ml-4">
+              <div
+                className={cn(
+                  'flex items-center gap-1.5 py-1.5 px-2 rounded-md cursor-pointer transition-colors group',
+                  selectedId === spaceModel.modelId ? 'bg-primary/20' : 'hover:bg-white/5'
+                )}
+                onClick={() => select(spaceModel.modelId || null)}
+              >
+                <Checkbox
+                  checked={spaceModel.visible}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (spaceModel.modelId) handleVisibilityToggle(spaceModel.modelId);
+                  }}
+                  className="h-3.5 w-3.5 border-white/40 data-[state=checked]:bg-primary"
+                />
+                <Folder className="w-4 h-4 text-green-400" />
+                <span className="flex-1 text-sm text-white truncate">{spaceModel.name}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (spaceModel.modelId) handleFocus(spaceModel.modelId);
+                  }}
+                >
+                  <Focus className="w-3 h-3 text-blue-400" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========== 가구 섹션 (Zone별 그룹) ========== */}
       <div className="space-y-1">
-        <div className="text-sm font-medium text-white/80 flex items-center gap-2 px-1 mb-2">
-          <Eye className="h-4 w-4 text-blue-400" />
-          모델 레이어
+        <div
+          className="flex items-center gap-1.5 py-1.5 px-2 rounded-md cursor-pointer hover:bg-white/5 transition-colors"
+          onClick={() => toggleGroup('furniture')}
+        >
+          <button className="p-0.5">
+            {expandedGroups.has('furniture') ? (
+              <ChevronDown className="w-3.5 h-3.5 text-white/60" />
+            ) : (
+              <ChevronRight className="w-3.5 h-3.5 text-white/60" />
+            )}
+          </button>
+          <Box className="w-4 h-4 text-yellow-400" />
+          <span className="flex-1 text-sm text-white font-medium">
+            가구 ({stats.furniture})
+          </span>
         </div>
 
-        {folders.map(({ type, name, icon: Icon }) => {
-          const items = groupedLayers[type];
-          const isExpanded = expanded.has(type);
-          // 🔧 FIX: childProduct도 부모 가구 기준으로 가시성 체크
-          const visibleCount = items.filter((i) => {
-            if (!i.modelId) return false;
-            return getModelVisibility(i.modelId);
-          }).length;
+        {expandedGroups.has('furniture') && (
+          <div className="ml-2 space-y-1">
+            {/* Zone별 그룹 */}
+            {filteredZoneGroups.map((group) => {
+              const isZoneExpanded = expandedZones.has(group.zoneId);
+              const visibleFurniture = group.furniture.filter(f => f.visible).length;
 
-          if (items.length === 0) return null;
+              return (
+                <div key={group.zoneId} className="space-y-1">
+                  {/* Zone 헤더 */}
+                  <div
+                    className="flex items-center gap-1.5 py-1 px-2 rounded-md cursor-pointer hover:bg-white/5 transition-colors ml-2"
+                    onClick={() => toggleZone(group.zoneId)}
+                  >
+                    <button className="p-0.5">
+                      {isZoneExpanded ? (
+                        <ChevronDown className="w-3 h-3 text-white/60" />
+                      ) : (
+                        <ChevronRight className="w-3 h-3 text-white/60" />
+                      )}
+                    </button>
+                    <span className="text-sm">{getZoneIcon(group.zoneType)}</span>
+                    <span className="flex-1 text-xs text-white font-medium truncate">
+                      {group.zoneName}
+                    </span>
+                    <span className="text-[10px] text-white/40">
+                      {visibleFurniture}/{group.furniture.length}
+                    </span>
+                  </div>
 
-          return (
-            <div key={type}>
-              {/* 폴더 헤더 */}
-              <div
-                className="flex items-center gap-1.5 py-1.5 px-2 rounded-md cursor-pointer hover:bg-white/5 transition-colors"
-                onClick={() => toggleExpand(type)}
-              >
-                <button className="p-0.5 hover:bg-white/10 rounded">
-                  {isExpanded ? (
-                    <ChevronDown className="w-3.5 h-3.5 text-white/60" />
-                  ) : (
-                    <ChevronRight className="w-3.5 h-3.5 text-white/60" />
+                  {/* Zone 내 가구 목록 */}
+                  {isZoneExpanded && (
+                    <div className="ml-6 space-y-0.5">
+                      {group.furniture.map((furniture) => {
+                        const isFurnitureExpanded = expandedFurniture.has(furniture.id);
+                        const hasChildren = furniture.children.length > 0;
+                        const isSelected = selectedId === furniture.id;
+                        const visibleChildren = furniture.children.filter(c =>
+                          getModelVisibility(c.id)
+                        ).length;
+
+                        return (
+                          <div key={furniture.id} className="space-y-0.5">
+                            {/* 가구 아이템 */}
+                            <div
+                              className={cn(
+                                'flex items-center gap-1.5 py-1 px-2 rounded-md cursor-pointer transition-colors group',
+                                isSelected ? 'bg-primary/20' : 'hover:bg-white/5'
+                              )}
+                              onClick={() => select(furniture.id)}
+                            >
+                              {hasChildren ? (
+                                <button
+                                  className="p-0.5"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleFurnitureExpand(furniture.id);
+                                  }}
+                                >
+                                  {isFurnitureExpanded ? (
+                                    <ChevronDown className="w-3 h-3 text-white/60" />
+                                  ) : (
+                                    <ChevronRight className="w-3 h-3 text-white/60" />
+                                  )}
+                                </button>
+                              ) : (
+                                <div className="w-4" />
+                              )}
+
+                              <Checkbox
+                                checked={furniture.visible}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleVisibilityToggle(furniture.id);
+                                }}
+                                className="h-3 w-3 border-white/40 data-[state=checked]:bg-primary"
+                              />
+
+                              <Box className="w-3.5 h-3.5 text-yellow-400" />
+
+                              <span
+                                className={cn(
+                                  'flex-1 text-xs truncate',
+                                  furniture.visible ? 'text-white' : 'text-white/40'
+                                )}
+                              >
+                                {furniture.name}
+                              </span>
+
+                              {hasChildren && (
+                                <span className="text-[9px] text-white/30">
+                                  ({visibleChildren}/{furniture.children.length})
+                                </span>
+                              )}
+
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-5 w-5 opacity-0 group-hover:opacity-100"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleFocus(furniture.id);
+                                }}
+                              >
+                                <Focus className="w-2.5 h-2.5 text-blue-400" />
+                              </Button>
+                            </div>
+
+                            {/* 가구 내 제품 (childProducts) */}
+                            {isFurnitureExpanded && hasChildren && (
+                              <div className="ml-6 space-y-0.5">
+                                {furniture.children.map((child) => {
+                                  const isChildVisible = getModelVisibility(child.id);
+                                  const isChildSelected = selectedId === child.id;
+
+                                  return (
+                                    <div
+                                      key={child.id}
+                                      className={cn(
+                                        'flex items-center gap-1.5 py-0.5 px-2 rounded cursor-pointer transition-colors group',
+                                        isChildSelected ? 'bg-blue-500/20' : 'hover:bg-white/5'
+                                      )}
+                                      onClick={() => select(child.id)}
+                                    >
+                                      <Checkbox
+                                        checked={isChildVisible}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleVisibilityToggle(child.id);
+                                        }}
+                                        className="h-2.5 w-2.5 border-yellow-500/50 data-[state=checked]:bg-yellow-600"
+                                      />
+
+                                      <Package className="w-3 h-3 text-blue-400" />
+
+                                      <span
+                                        className={cn(
+                                          'flex-1 text-[10px] truncate',
+                                          isChildVisible ? 'text-white/80' : 'text-white/30'
+                                        )}
+                                      >
+                                        {child.name}
+                                      </span>
+
+                                      {child.slotCode && (
+                                        <span className="text-[8px] text-white/30 font-mono">
+                                          [{child.slotCode}]
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
-                </button>
+                </div>
+              );
+            })}
 
-                <Icon className="w-4 h-4 text-yellow-400" />
+            {/* 미배정 가구 */}
+            {unassignedFurniture.length > 0 && (
+              <div className="space-y-1">
+                <div
+                  className="flex items-center gap-1.5 py-1 px-2 rounded-md cursor-pointer hover:bg-white/5 transition-colors ml-2"
+                  onClick={() => toggleZone('unassigned')}
+                >
+                  <button className="p-0.5">
+                    {expandedZones.has('unassigned') ? (
+                      <ChevronDown className="w-3 h-3 text-white/60" />
+                    ) : (
+                      <ChevronRight className="w-3 h-3 text-white/60" />
+                    )}
+                  </button>
+                  <span className="text-sm">📦</span>
+                  <span className="flex-1 text-xs text-white/60 font-medium">
+                    미배정
+                  </span>
+                  <span className="text-[10px] text-white/40">
+                    {unassignedFurniture.length}
+                  </span>
+                </div>
 
-                <span className="flex-1 text-sm text-white font-medium">{name}</span>
-
-                <span className="text-xs text-white/40">
-                  {visibleCount}/{items.length}
-                </span>
-              </div>
-
-              {/* 자식 아이템 */}
-              {isExpanded && (
-                <div className="ml-4">
-                  {items.map((item) => {
-                    const isSelected = selectedId === item.modelId;
-                    // 🔧 FIX: childProduct도 부모 가구 기준으로 가시성 체크
-                    const isVisible = item.modelId ? getModelVisibility(item.modelId) : true;
-                    // childProduct인지 확인 (부모 가구 ID가 있으면 childProduct)
-                    const isChildProduct = item.modelId ? childProductMap.has(item.modelId) : false;
-
-                    return (
+                {expandedZones.has('unassigned') && (
+                  <div className="ml-6 space-y-0.5">
+                    {unassignedFurniture.map((item) => (
                       <div
                         key={item.id}
                         className={cn(
-                          'flex items-center gap-1.5 py-1.5 px-2 rounded-md cursor-pointer transition-colors group',
-                          isSelected ? 'bg-primary/20' : 'hover:bg-white/5',
-                          isChildProduct && 'pl-4' // childProduct 들여쓰기
+                          'flex items-center gap-1.5 py-1 px-2 rounded-md cursor-pointer transition-colors group',
+                          selectedId === item.id ? 'bg-primary/20' : 'hover:bg-white/5'
                         )}
-                        onClick={() => select(item.modelId || null)}
-                        title={isChildProduct ? '가구에 배치된 제품 (개별 표시/숨김 가능)' : undefined}
+                        onClick={() => select(item.id)}
                       >
-                        {/* 가시성 체크박스 */}
                         <Checkbox
-                          checked={isVisible}
+                          checked={item.visible}
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (item.modelId) handleVisibilityToggle(item.modelId);
+                            handleVisibilityToggle(item.id);
                           }}
-                          className={cn(
-                            'h-3.5 w-3.5',
-                            isChildProduct
-                              ? 'border-yellow-500/50 data-[state=checked]:bg-yellow-600'
-                              : 'border-white/40 data-[state=checked]:bg-primary'
-                          )}
+                          className="h-3 w-3 border-white/40 data-[state=checked]:bg-primary"
                         />
-
-                        {/* 아이콘 - childProduct는 다른 색상 */}
-                        <Box className={cn(
-                          'w-4 h-4',
-                          isChildProduct ? 'text-yellow-400' : 'text-blue-400'
-                        )} />
-
-                        {/* 이름 */}
-                        <span
-                          className={cn(
-                            'flex-1 text-sm truncate',
-                            isVisible ? 'text-white' : 'text-white/40'
-                          )}
-                        >
+                        <Box className="w-3.5 h-3.5 text-white/40" />
+                        <span className={cn(
+                          'flex-1 text-xs truncate',
+                          item.visible ? 'text-white/60' : 'text-white/30'
+                        )}>
                           {item.name}
                         </span>
-
-                        {/* childProduct 표시 */}
-                        {isChildProduct && (
-                          <span className="text-[10px] text-yellow-500/60 mr-1">📍</span>
-                        )}
-
-                        {/* 삭제 버튼 - childProduct는 삭제 비활성 */}
-                        {!isChildProduct && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (item.modelId) handleDelete(item.modelId);
-                            }}
-                          >
-                            <Trash2 className="w-3 h-3 text-red-400" />
-                          </Button>
-                        )}
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
-
-        {/* 빈 상태 */}
-        {models.length === 0 && (
-          <div className="text-center py-4 text-white/40">
-            <Box className="w-8 h-8 mx-auto mb-2 opacity-20" />
-            <p className="text-xs">모델이 없습니다</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
+
+      {/* 빈 상태 */}
+      {models.length === 0 && (
+        <div className="text-center py-4 text-white/40">
+          <Box className="w-8 h-8 mx-auto mb-2 opacity-20" />
+          <p className="text-xs">모델이 없습니다</p>
+        </div>
+      )}
 
       {/* 구분선 */}
       <div className="border-t border-white/10" />
@@ -477,7 +837,7 @@ export function LayerPanel() {
         </div>
 
         {/* 저장된 씬 목록 */}
-        <div className="space-y-1 max-h-40 overflow-y-auto">
+        <div className="space-y-1 max-h-32 overflow-y-auto">
           {scenesLoading ? (
             <div className="text-xs text-white/40 text-center py-2">불러오는 중...</div>
           ) : scenes && scenes.length > 0 ? (
@@ -488,11 +848,11 @@ export function LayerPanel() {
               >
                 <button
                   onClick={() => handleLoadScene(scene.id)}
-                  className="flex-1 text-left text-sm text-white truncate"
+                  className="flex-1 text-left text-xs text-white truncate"
                 >
                   {scene.name}
                   {scene.is_active && (
-                    <span className="ml-2 px-1.5 py-0.5 text-xs bg-blue-600 text-white rounded">
+                    <span className="ml-2 px-1.5 py-0.5 text-[10px] bg-blue-600 text-white rounded">
                       기본
                     </span>
                   )}
@@ -504,15 +864,15 @@ export function LayerPanel() {
                       className="p-1 text-white/40 hover:text-blue-400 transition-colors"
                       title="기본 씬으로 설정"
                     >
-                      <Check className="h-3.5 w-3.5" />
+                      <Check className="h-3 w-3" />
                     </button>
                   )}
                   <button
-                    onClick={() => handleDeleteScene(scene.id, scene.name)}
+                    onClick={() => handleDeleteScene(scene.id)}
                     className="p-1 text-white/40 hover:text-red-400 transition-colors"
                     title="삭제"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash2 className="h-3 w-3" />
                   </button>
                 </div>
               </div>
