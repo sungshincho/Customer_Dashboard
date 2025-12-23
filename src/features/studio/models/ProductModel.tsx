@@ -86,16 +86,6 @@ function ProductGLTF({
     return cloned;
   }, [scene]);
 
-  // GLB 모델의 BoundingBox 계산
-  const boundingBox = useMemo(() => {
-    const box = new THREE.Box3().setFromObject(clonedScene);
-    const size = new THREE.Vector3();
-    box.getSize(size);
-    const center = new THREE.Vector3();
-    box.getCenter(center);
-    return { size, center };
-  }, [clonedScene]);
-
   const position: [number, number, number] = [
     asset.position.x,
     asset.position.y,
@@ -137,7 +127,7 @@ function ProductGLTF({
 
       {/* 라벨 */}
       {(showLabel || hovered) && (
-        <Html position={[0, boundingBox.size.y / 2 + 0.3, 0]} center>
+        <Html position={[0, 1, 0]} center>
           <div className="bg-black/80 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
             {asset.sku}
           </div>
@@ -145,14 +135,7 @@ function ProductGLTF({
       )}
 
       {/* 선택 표시 */}
-      {selected && (
-        <ProductSelectionIndicator 
-          width={boundingBox.size.x} 
-          height={boundingBox.size.y} 
-          depth={boundingBox.size.z}
-          center={boundingBox.center}
-        />
-      )}
+      {selected && <ProductSelectionIndicator />}
     </group>
   );
 }
@@ -214,13 +197,7 @@ function ProductPlaceholder({
         </Html>
       )}
 
-      {selected && (
-        <ProductSelectionIndicator 
-          width={dimensions.width} 
-          height={dimensions.height} 
-          depth={dimensions.depth}
-        />
-      )}
+      {selected && <ProductSelectionIndicator size={Math.max(dimensions.width, dimensions.height, dimensions.depth) * 1.2} />}
     </group>
   );
 }
@@ -228,41 +205,7 @@ function ProductPlaceholder({
 // ============================================================================
 // 선택 표시자
 // ============================================================================
-interface ProductIndicatorProps {
-  width?: number;
-  height?: number;
-  depth?: number;
-  center?: { x: number; y: number; z: number };
-  size?: number; // 기존 호환용
-}
-
-function ProductSelectionIndicator({ width, height, depth, center, size = 0.4 }: ProductIndicatorProps) {
-  // width/height/depth가 있으면 박스 사용, 없으면 기존 sphere 사용
-  if (width && height && depth) {
-    const w = width * 1.2;
-    const h = height * 1.2;
-    const d = depth * 1.2;
-    
-    // center가 있으면 해당 위치에, 없으면 원점에 배치
-    const pos: [number, number, number] = center 
-      ? [center.x, center.y, center.z] 
-      : [0, 0, 0];
-    
-    return (
-      <mesh position={pos}>
-        <boxGeometry args={[w, h, d]} />
-        <meshBasicMaterial
-          color="#f59e0b"
-          transparent
-          opacity={0.2}
-          side={THREE.BackSide}
-          depthWrite={false}
-        />
-      </mesh>
-    );
-  }
-  
-  // 기존 sphere 폴백
+function ProductSelectionIndicator({ size = 0.4 }: { size?: number }) {
   return (
     <mesh>
       <sphereGeometry args={[size, 16, 16]} />
