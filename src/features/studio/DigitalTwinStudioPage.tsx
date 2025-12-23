@@ -21,6 +21,7 @@ import { Canvas3D, SceneProvider, useScene } from './core';
 import { LayerPanel, SimulationPanel, ToolPanel, SceneSavePanel, OverlayControlPanel, PropertyPanel } from './panels';
 import { HeatmapOverlay, CustomerFlowOverlay, ZoneBoundaryOverlay, CustomerAvatarOverlay, LayoutOptimizationOverlay, FlowOptimizationOverlay, CongestionOverlay, StaffingOverlay, ZonesFloorOverlay, StaffAvatarsOverlay } from './overlays';
 import { DraggablePanel, QuickToggleBar } from './components';
+import type { DiagnosticIssue } from './components/DiagnosticIssueList';
 import { AIOptimizationTab } from './tabs/AIOptimizationTab';
 import { AISimulationTab } from './tabs/AISimulationTab';
 import { ApplyPanel } from './tabs/ApplyPanel';
@@ -154,6 +155,9 @@ export default function DigitalTwinStudioPage() {
     congestion: null,
     staffing: null,
   });
+
+  // AI 시뮬레이션에서 발견된 진단 결과
+  const [diagnosticIssues, setDiagnosticIssues] = useState<DiagnosticIssue[]>([]);
 
   // 시뮬레이션 데이터
   const days = getDays();
@@ -857,8 +861,11 @@ export default function DigitalTwinStudioPage() {
                         const panelKey = `${type}Result` as keyof VisiblePanels;
                         setVisiblePanels((prev) => ({ ...prev, [panelKey]: true }));
                       }}
-                      onNavigateToOptimization={() => {
+                      onNavigateToOptimization={(issues) => {
                         // AI 시뮬레이션에서 발견된 문제를 AI 최적화로 전달
+                        if (issues) {
+                          setDiagnosticIssues(issues);
+                        }
                         setActiveTab('ai-optimization');
                       }}
                     />
@@ -881,6 +888,8 @@ export default function DigitalTwinStudioPage() {
                         const panelKey = `${type}Result` as keyof VisiblePanels;
                         setVisiblePanels((prev) => ({ ...prev, [panelKey]: true }));
                       }}
+                      diagnosticIssues={diagnosticIssues}
+                      onNavigateToApply={() => setActiveTab('apply')}
                     />
                   )}
                   {activeTab === 'apply' && (
