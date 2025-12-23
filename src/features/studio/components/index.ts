@@ -8,6 +8,7 @@
 export { DraggablePanel } from './DraggablePanel';
 export { SceneComparisonView } from './SceneComparisonView';
 export { QuickToggleBar, type OverlayType } from './QuickToggleBar';
+export { ViewModeToggle, type ViewMode } from './ViewModeToggle';
 export { DiagnosticIssueList, type DiagnosticIssue, type IssueSeverity } from './DiagnosticIssueList';
 export { DiagnosticsSummary } from './DiagnosticsSummary';
 
