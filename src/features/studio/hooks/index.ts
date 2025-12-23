@@ -46,6 +46,21 @@ export type { StaffMember } from './useStaffData';
 // 배치 저장/관리 훅
 export { usePlacement } from './usePlacement';
 
+// 고객 동선 데이터 훅
+export {
+  useCustomerFlowData,
+  selectNextZone,
+  getRandomPositionInZone,
+} from './useCustomerFlowData';
+export type {
+  ZoneInfo,
+  FlowPath as CustomerFlowPath,
+  CustomerFlowData,
+} from './useCustomerFlowData';
+
+// 고객 시뮬레이션 훅
+export { useCustomerSimulation } from './useCustomerSimulation';
+
 // 타입 re-export
 export type {
   LayoutSimulationParams,
