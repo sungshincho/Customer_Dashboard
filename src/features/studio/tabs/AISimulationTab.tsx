@@ -1,16 +1,18 @@
 /**
  * AISimulationTab.tsx
  *
- * AI 시뮬레이션 탭 - 실시간 시뮬레이션 + 혼잡도/고객경로 분석
+ * AI 시뮬레이션 탭 - 실시간 시뮬레이션 + 혼잡도/고객경로 분석 + 진단
  * - 실시간 고객 AI 에이전트 시뮬레이션
  * - 고객 경로 표시/상태 범례
  * - 혼잡도 AI 시뮬레이션
+ * - 진단 결과 및 AI 최적화 연계
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import {
   Play, Pause, Square, RotateCcw, Users, Route, Activity,
   Thermometer, Monitor, Eye, Lightbulb, Lock, Loader2,
+  TrendingUp, TrendingDown, Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -18,6 +20,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useSimulationStore, STATE_COLORS, STATE_LABELS } from '@/stores/simulationStore';
 import { buildStoreContext } from '../utils/store-context-builder';
+import { DiagnosticIssueList, type DiagnosticIssue } from '../components/DiagnosticIssueList';
 import type { SceneRecipe } from '../types';
 
 type SimulationType =
@@ -99,6 +102,7 @@ interface AISimulationTabProps {
   onOverlayToggle: (overlayType: string, visible: boolean) => void;
   simulationZones: SimulationZone[];
   onResultsUpdate?: (type: 'congestion' | 'flow' | 'layout' | 'staffing', result: any) => void;
+  onNavigateToOptimization?: (diagnosticIssues?: DiagnosticIssue[]) => void;
 }
 
 export function AISimulationTab({
@@ -107,6 +111,7 @@ export function AISimulationTab({
   onOverlayToggle,
   simulationZones,
   onResultsUpdate,
+  onNavigateToOptimization,
 }: AISimulationTabProps) {
   // 시뮬레이션 스토어
   const {
@@ -129,6 +134,9 @@ export function AISimulationTab({
   // AI 시뮬레이션 실행 상태
   const [isAIRunning, setIsAIRunning] = useState(false);
   const [aiResults, setAIResults] = useState<Record<string, any>>({});
+
+  // 진단 결과 상태
+  const [diagnosticIssues, setDiagnosticIssues] = useState<DiagnosticIssue[]>([]);
 
   // 시간 포맷팅 (초 → HH:MM:SS) - 음수는 0으로 처리
   const formatTime = (seconds: number): string => {
@@ -319,6 +327,78 @@ export function AISimulationTab({
       });
 
       setAIResults((prev) => ({ ...prev, ...newResults }));
+
+      // 진단 이슈 생성
+      const issues: DiagnosticIssue[] = [];
+      let issueId = 0;
+
+      // 혼잡도 결과에서 이슈 추출
+      if (newResults.congestion) {
+        const congestionData = newResults.congestion;
+        const zoneCongestion = congestionData.zoneCongestion || [];
+
+        zoneCongestion.forEach((zone: any) => {
+          const congestionLevel = zone.congestionLevel || 0;
+          if (congestionLevel >= 0.8) {
+            issues.push({
+              id: `issue-${issueId++}`,
+              severity: 'critical',
+              zone: zone.zoneName || zone.zone_name || '알 수 없음',
+              title: '심각한 병목현상',
+              metric: `혼잡도 ${Math.round(congestionLevel * 100)}%`,
+              impact: `매출 -${Math.round((congestionLevel - 0.5) * 30)}% 예상`,
+              recommendation: '통로 확장 또는 가구 재배치 권장',
+            });
+          } else if (congestionLevel >= 0.6) {
+            issues.push({
+              id: `issue-${issueId++}`,
+              severity: 'warning',
+              zone: zone.zoneName || zone.zone_name || '알 수 없음',
+              title: '혼잡 주의 구역',
+              metric: `혼잡도 ${Math.round(congestionLevel * 100)}%`,
+              impact: '',
+              recommendation: '피크 시간대 모니터링 필요',
+            });
+          }
+        });
+
+        // 낮은 방문율 존 추가
+        zoneCongestion.forEach((zone: any) => {
+          const visitRate = zone.visitRate || zone.congestionLevel || 0;
+          if (visitRate < 0.15 && zone.zone_type !== 'entrance' && zone.zone_type !== 'checkout') {
+            issues.push({
+              id: `issue-${issueId++}`,
+              severity: 'info',
+              zone: zone.zoneName || zone.zone_name || '알 수 없음',
+              title: '저조한 방문율',
+              metric: `방문율 ${Math.round(visitRate * 100)}%`,
+              impact: '',
+              recommendation: '시선 유도 디스플레이 추가 권장',
+            });
+          }
+        });
+      }
+
+      // 동선 결과에서 이슈 추출
+      if (newResults.flow) {
+        const flowData = newResults.flow;
+        const bottlenecks = flowData.bottlenecks || [];
+
+        bottlenecks.forEach((bottleneck: any) => {
+          const severity = bottleneck.severity || 0.7;
+          issues.push({
+            id: `issue-${issueId++}`,
+            severity: severity >= 0.8 ? 'critical' : 'warning',
+            zone: bottleneck.location || bottleneck.zoneName || '알 수 없음',
+            title: '동선 병목 지점',
+            metric: `혼잡도 ${Math.round(severity * 100)}%`,
+            impact: bottleneck.cause || '고객 흐름 저하',
+            recommendation: bottleneck.suggestion || bottleneck.recommendation || '경로 재설계 권장',
+          });
+        });
+      }
+
+      setDiagnosticIssues(issues);
       toast.success('AI 시뮬레이션이 완료되었습니다');
     } catch (error) {
       console.error('AI Simulation error:', error);
@@ -416,13 +496,18 @@ export function AISimulationTab({
           </div>
         </div>
 
-        {/* 실시간 KPI */}
+        {/* 실시간 KPI (개선된 버전 - 트렌드 표시) */}
         {isRunning && (
           <div className="grid grid-cols-2 gap-2">
             <div className="bg-white/5 rounded-lg p-2">
-              <div className="flex items-center gap-1 text-xs text-white/40">
-                <Users className="h-3 w-3" />
-                현재 고객
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1 text-xs text-white/40">
+                  <Users className="h-3 w-3" />
+                  현재 고객
+                </div>
+                {kpi.currentCustomers > 10 && (
+                  <TrendingUp className="h-3 w-3 text-green-400" />
+                )}
               </div>
               <div className="text-lg font-bold text-white">
                 {kpi.currentCustomers}
@@ -432,9 +517,33 @@ export function AISimulationTab({
               </div>
             </div>
             <div className="bg-white/5 rounded-lg p-2">
-              <div className="text-xs text-white/40">매출</div>
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-white/40">매출</div>
+                {kpi.totalRevenue > 0 && (
+                  <TrendingUp className="h-3 w-3 text-green-400" />
+                )}
+              </div>
               <div className="text-lg font-bold text-green-400">
                 {formatCurrency(kpi.totalRevenue)}
+              </div>
+            </div>
+            <div className="bg-white/5 rounded-lg p-2">
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-white/40">전환</div>
+                {kpi.conversions > 0 && (
+                  <span className="text-[10px] text-green-400">+{kpi.conversions}</span>
+                )}
+              </div>
+              <div className="text-lg font-bold text-blue-400">
+                {kpi.conversionRate.toFixed(1)}%
+              </div>
+            </div>
+            <div className="bg-white/5 rounded-lg p-2">
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-white/40">평균 체류</div>
+              </div>
+              <div className="text-lg font-bold text-purple-400">
+                {kpi.avgDwellTime.toFixed(1)}분
               </div>
             </div>
           </div>
@@ -443,6 +552,20 @@ export function AISimulationTab({
 
       {/* 구분선 */}
       <div className="border-t border-white/10" />
+
+      {/* ========== 진단 결과 섹션 ========== */}
+      {diagnosticIssues.length > 0 && (
+        <>
+          <DiagnosticIssueList
+            issues={diagnosticIssues}
+            onNavigateToOptimization={onNavigateToOptimization ? (issues) => {
+              onNavigateToOptimization(issues);
+              toast.info('AI 최적화 탭으로 이동합니다');
+            } : undefined}
+          />
+          <div className="border-t border-white/10" />
+        </>
+      )}
 
       {/* ========== 시뮬레이션 옵션 ========== */}
       <div className="space-y-3">

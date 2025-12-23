@@ -20,7 +20,7 @@ import { toast } from 'sonner';
 import { Canvas3D, SceneProvider, useScene } from './core';
 import { LayerPanel, SimulationPanel, ToolPanel, SceneSavePanel, OverlayControlPanel, PropertyPanel } from './panels';
 import { HeatmapOverlay, CustomerFlowOverlay, ZoneBoundaryOverlay, CustomerAvatarOverlay, LayoutOptimizationOverlay, FlowOptimizationOverlay, CongestionOverlay, StaffingOverlay, ZonesFloorOverlay, StaffAvatarsOverlay } from './overlays';
-import { DraggablePanel } from './components/DraggablePanel';
+import { DraggablePanel, QuickToggleBar } from './components';
 import { AIOptimizationTab } from './tabs/AIOptimizationTab';
 import { AISimulationTab } from './tabs/AISimulationTab';
 import { ApplyPanel } from './tabs/ApplyPanel';
@@ -802,6 +802,14 @@ export default function DigitalTwinStudioPage() {
 
           {/* ========== UI 오버레이 ========== */}
           <div className="absolute inset-0 z-10 pointer-events-none">
+            {/* ----- 상단 중앙: 퀵 토글 바 ----- */}
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-auto z-20">
+              <QuickToggleBar
+                activeOverlays={activeOverlays as any[]}
+                onToggle={(id) => toggleOverlay(id as OverlayType)}
+              />
+            </div>
+
             {/* ----- 왼쪽 패널 (고정) ----- */}
             <div className="absolute left-4 top-4 bottom-4 w-80 pointer-events-auto">
               <div className="h-full bg-black/80 backdrop-blur-sm border border-white/10 rounded-xl overflow-hidden flex flex-col">
@@ -848,6 +856,10 @@ export default function DigitalTwinStudioPage() {
                         setSimulationResults((prev) => ({ ...prev, [type]: result }));
                         const panelKey = `${type}Result` as keyof VisiblePanels;
                         setVisiblePanels((prev) => ({ ...prev, [panelKey]: true }));
+                      }}
+                      onNavigateToOptimization={() => {
+                        // AI 시뮬레이션에서 발견된 문제를 AI 최적화로 전달
+                        setActiveTab('ai-optimization');
                       }}
                     />
                   )}
