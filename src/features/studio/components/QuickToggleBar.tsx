@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { SimulationControlPopup } from './SimulationControlPopup';
 
-export type OverlayType = 'heatmap' | 'flow' | 'avatar' | 'zone' | 'staff';
+export type OverlayType = 'heatmap' | 'flow' | 'avatar' | 'zone' | 'staff' | 'layoutOptimization' | 'flowOptimization' | 'congestion' | 'staffing';
 
 interface QuickToggle {
   id: OverlayType;

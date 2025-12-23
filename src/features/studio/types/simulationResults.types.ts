@@ -42,9 +42,10 @@ export interface LayoutSimulationResultType {
   // 변경 사항
   furnitureMoves: Array<{
     furnitureId: string;
-    furnitureName: string;
-    fromPosition: { x: number; y: number; z: number };
+    furnitureName?: string;
+    fromPosition?: { x: number; y: number; z: number };
     toPosition: { x: number; y: number; z: number };
+    suggestedPosition?: { x: number; y: number; z: number };
     rotation?: number;
     reason?: string;
   }>;

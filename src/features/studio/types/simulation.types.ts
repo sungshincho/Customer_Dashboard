@@ -125,23 +125,23 @@ export type SlotType = 'hanger' | 'mannequin' | 'shelf' | 'table' | 'rack' | 'ho
 
 // 🆕 상품 배치 변경
 export interface ProductPlacement {
-  productId: string;
-  productSku: string;
+  productId?: string;
+  productSku?: string;
   productName?: string;
   displayType?: DisplayType;
   // FROM (현재 위치)
   fromFurnitureId?: string | null;
-  fromSlotId: string | null;
+  fromSlotId?: string | null;
   fromPosition?: { x: number; y: number; z: number };
   fromSlotPosition?: { x: number; y: number; z: number };
   // TO (제안 위치)
-  toSlotId: string;
-  toFurnitureId: string;
+  toSlotId?: string;
+  toFurnitureId?: string;
   toPosition?: { x: number; y: number; z: number };
   toSlotPosition?: { x: number; y: number; z: number };
   // 메타데이터
   slotType?: SlotType;
-  reason: string;
+  reason?: string;
   priority?: 'high' | 'medium' | 'low';
   displayTypeMatch?: boolean;
 }
@@ -193,10 +193,12 @@ export interface ZoneChange {
 // 가구 이동
 export interface FurnitureMove {
   furnitureId: string;
-  furnitureName: string;
-  fromPosition: { x: number; y: number; z: number };
+  furnitureName?: string;
+  fromPosition?: { x: number; y: number; z: number };
   toPosition: { x: number; y: number; z: number };
+  suggestedPosition?: { x: number; y: number; z: number };
   rotation?: number;
+  reason?: string;
 }
 
 // 동선 시뮬레이션 결과
