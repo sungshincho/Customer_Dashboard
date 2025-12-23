@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { buildStoreContext } from '../utils/store-context-builder';
 import { OptimizationResultPanel } from '../panels/OptimizationResultPanel';
 import { useScene } from '../core/SceneProvider';
+import { validateOptimizationResult } from '../utils/optimizationValidator';
 import { OptimizationSettingsPanel } from '../components/optimization';
 import { DiagnosticsSummary } from '../components/DiagnosticsSummary';
 import type { DiagnosticIssue } from '../components/DiagnosticIssueList';
@@ -334,6 +335,53 @@ export function AIOptimizationTab({
         hasStaffing: !!results.staffing,
         results,
       });
+
+      // 🆕 레이아웃 결과 유효성 검증
+      if (results.layout) {
+        const storeDataForValidation = {
+          zones: storeContext.zones || [],
+          furniture: sceneData.furniture?.map((f) => ({
+            id: f.id,
+            furniture_code: f.furniture_type || f.metadata?.furniture_code,
+            metadata: f.metadata,
+            position: f.position,
+          })) || [],
+        };
+
+        const validation = validateOptimizationResult(
+          {
+            furniture_moves: results.layout.furnitureMoves || results.layout.layoutChanges || [],
+            product_placements: results.layout.productPlacements || [],
+          },
+          storeDataForValidation
+        );
+
+        console.log('[AIOptimizationTab] Validation result:', {
+          isValid: validation.isValid,
+          removedFurniture: validation.removedItems.furniture.length,
+          removedProducts: validation.removedItems.products.length,
+          warnings: validation.warnings,
+        });
+
+        // 유효하지 않은 항목이 있으면 경고 표시
+        if (!validation.isValid) {
+          const removedCount = validation.removedItems.furniture.length + validation.removedItems.products.length;
+          toast.warning(`${removedCount}개 항목이 유효성 검증에서 필터링됨`, {
+            description: validation.warnings.slice(0, 3).join('\n'),
+          });
+
+          // 검증된 결과로 교체
+          if (results.layout.furnitureMoves) {
+            results.layout.furnitureMoves = validation.filteredResult.furniture_moves;
+          }
+          if (results.layout.layoutChanges) {
+            results.layout.layoutChanges = validation.filteredResult.furniture_moves;
+          }
+          if (results.layout.productPlacements) {
+            results.layout.productPlacements = validation.filteredResult.product_placements;
+          }
+        }
+      }
 
       // 레이아웃 결과가 있으면 오버레이 활성화 및 오른쪽 패널 업데이트
       if (results.layout) {
