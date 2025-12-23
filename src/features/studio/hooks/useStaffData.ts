@@ -137,6 +137,8 @@ export function useStaffData(options: UseStaffDataOptions = {}): UseStaffDataRet
         zone_name: row.assigned_zone_id ? (zoneMap[row.assigned_zone_id] || '미배정') : '미배정',
         avatar_url: row.avatar_url,
         avatar_position: parsePosition(row.avatar_position),
+        avatar_rotation: parsePosition(row.avatar_rotation),
+        avatar_scale: parsePosition(row.avatar_scale),
         is_active: row.is_active ?? true,
       }));
 
