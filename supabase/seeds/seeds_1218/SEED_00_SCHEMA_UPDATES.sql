@@ -77,11 +77,18 @@ CREATE TABLE furniture_slots (
   -- 슬롯 식별
   slot_id TEXT NOT NULL,
   furniture_type TEXT NOT NULL,
-  slot_type TEXT NOT NULL CHECK (slot_type IN ('hanger', 'shelf', 'hook', 'stand', 'display', 'bin', 'drawer', 'table', 'mannequin', 'showcase', 'rack')),
-  
+  slot_type TEXT NOT NULL CHECK (slot_type IN (
+    'hanger', 'shelf', 'hook', 'stand', 'display', 'bin', 'drawer',
+    'table', 'mannequin', 'showcase', 'rack',
+    'mannequin_top', 'mannequin_bottom', 'mannequin_shoes'  -- 마네킹 세분화 타입
+  )),
+
   -- 슬롯 위치/회전 (가구 로컬 좌표)
   slot_position JSONB DEFAULT '{"x":0,"y":0,"z":0}'::jsonb,
   slot_rotation JSONB DEFAULT '{"x":0,"y":0,"z":0}'::jsonb,
+
+  -- 🆕 슬롯 추가 속성 (allowed_categories 등)
+  properties JSONB DEFAULT '{}'::jsonb,
   
   -- 호환 display_type 및 크기 제한
   compatible_display_types TEXT[] DEFAULT '{}',
@@ -114,6 +121,7 @@ CREATE INDEX idx_furniture_slots_compatible_types ON furniture_slots USING GIN(c
 COMMENT ON TABLE furniture_slots IS '가구별 상품 배치 슬롯 정의';
 COMMENT ON COLUMN furniture_slots.slot_position IS '가구 로컬 좌표 기준 슬롯 위치 {x,y,z}';
 COMMENT ON COLUMN furniture_slots.compatible_display_types IS '이 슬롯에 배치 가능한 display_type 배열';
+COMMENT ON COLUMN furniture_slots.properties IS '슬롯 추가 속성 (allowed_categories 등)';
 
 DO $$
 BEGIN

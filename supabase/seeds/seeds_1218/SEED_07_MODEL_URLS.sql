@@ -213,6 +213,94 @@ BEGIN
   RAISE NOTICE '    ✓ products model_3d_url: %건 설정됨', v_count;
 
   -- ═══════════════════════════════════════════════════════════════════════════
+  -- STEP 7.2.1: product_models 테이블 - standing 디스플레이 타입 URL 추가 (17개)
+  -- 마네킹 배치용 standing 모델 URL 매칭
+  -- ═══════════════════════════════════════════════════════════════════════════
+  RAISE NOTICE '  [STEP 7.2.1] product_models standing URL 추가 (17개)...';
+
+  -- 기존 standing 타입 레코드 정리
+  DELETE FROM product_models WHERE display_type = 'standing';
+
+  -- 상의 (tops/) - 5개: blouse, sweater, shirts, top, cardigan
+  INSERT INTO product_models (product_id, display_type, model_3d_url, is_default)
+  SELECT p.id, 'standing', v_base_url || '/products/tops/product_blouse_01_standing.glb', false
+  FROM products p WHERE p.store_id = v_store_id AND p.sku = 'SKU-TOP-001';
+
+  INSERT INTO product_models (product_id, display_type, model_3d_url, is_default)
+  SELECT p.id, 'standing', v_base_url || '/products/tops/product_sweater_01_standing.glb', false
+  FROM products p WHERE p.store_id = v_store_id AND p.sku = 'SKU-TOP-002';
+
+  INSERT INTO product_models (product_id, display_type, model_3d_url, is_default)
+  SELECT p.id, 'standing', v_base_url || '/products/tops/product_shirts_01_standing.glb', false
+  FROM products p WHERE p.store_id = v_store_id AND p.sku = 'SKU-TOP-003';
+
+  INSERT INTO product_models (product_id, display_type, model_3d_url, is_default)
+  SELECT p.id, 'standing', v_base_url || '/products/tops/product_top_01_standing.glb', false
+  FROM products p WHERE p.store_id = v_store_id AND p.sku = 'SKU-TOP-004';
+
+  INSERT INTO product_models (product_id, display_type, model_3d_url, is_default)
+  SELECT p.id, 'standing', v_base_url || '/products/tops/product_cardigan_01_standing.glb', false
+  FROM products p WHERE p.store_id = v_store_id AND p.sku = 'SKU-TOP-005'
+  ON CONFLICT (product_id, display_type) DO NOTHING;
+
+  -- 하의 (bottoms/) - 4개: jeans, pants, skirt_a, skirt_f
+  INSERT INTO product_models (product_id, display_type, model_3d_url, is_default)
+  SELECT p.id, 'standing', v_base_url || '/products/bottoms/product_jeans_01_standing.glb', false
+  FROM products p WHERE p.store_id = v_store_id AND p.sku = 'SKU-BTM-001';
+
+  INSERT INTO product_models (product_id, display_type, model_3d_url, is_default)
+  SELECT p.id, 'standing', v_base_url || '/products/bottoms/product_pants_01_standing.glb', false
+  FROM products p WHERE p.store_id = v_store_id AND p.sku = 'SKU-BTM-002';
+
+  INSERT INTO product_models (product_id, display_type, model_3d_url, is_default)
+  SELECT p.id, 'standing', v_base_url || '/products/bottoms/product_skirt_a_01_standing.glb', false
+  FROM products p WHERE p.store_id = v_store_id AND p.sku = 'SKU-BTM-003';
+
+  INSERT INTO product_models (product_id, display_type, model_3d_url, is_default)
+  SELECT p.id, 'standing', v_base_url || '/products/bottoms/product_skirt_f_01_standing.glb', false
+  FROM products p WHERE p.store_id = v_store_id AND p.sku = 'SKU-BTM-004'
+  ON CONFLICT (product_id, display_type) DO NOTHING;
+
+  -- 아우터 (outwear/) - 5개: coat, jacket, padding, vest, trench
+  INSERT INTO product_models (product_id, display_type, model_3d_url, is_default)
+  SELECT p.id, 'standing', v_base_url || '/products/outwear/product_coat_01_standing.glb', false
+  FROM products p WHERE p.store_id = v_store_id AND p.sku = 'SKU-OUT-001';
+
+  INSERT INTO product_models (product_id, display_type, model_3d_url, is_default)
+  SELECT p.id, 'standing', v_base_url || '/products/outwear/product_jacket_01_standing.glb', false
+  FROM products p WHERE p.store_id = v_store_id AND p.sku = 'SKU-OUT-002';
+
+  INSERT INTO product_models (product_id, display_type, model_3d_url, is_default)
+  SELECT p.id, 'standing', v_base_url || '/products/outwear/product_padding_01_standing.glb', false
+  FROM products p WHERE p.store_id = v_store_id AND p.sku = 'SKU-OUT-003';
+
+  INSERT INTO product_models (product_id, display_type, model_3d_url, is_default)
+  SELECT p.id, 'standing', v_base_url || '/products/outwear/product_vest_01_standing.glb', false
+  FROM products p WHERE p.store_id = v_store_id AND p.sku = 'SKU-OUT-004'
+  ON CONFLICT (product_id, display_type) DO NOTHING;
+
+  INSERT INTO product_models (product_id, display_type, model_3d_url, is_default)
+  SELECT p.id, 'standing', v_base_url || '/products/outwear/product_trench_01_standing.glb', false
+  FROM products p WHERE p.store_id = v_store_id AND p.sku = 'SKU-OUT-005'
+  ON CONFLICT (product_id, display_type) DO NOTHING;
+
+  -- 신발 (shoes/) - 3개: loafer, heels, sneakers → _standing (not _located_standing)
+  INSERT INTO product_models (product_id, display_type, model_3d_url, is_default)
+  SELECT p.id, 'standing', v_base_url || '/products/shoes/product_shoes_loafer_01_standing.glb', false
+  FROM products p WHERE p.store_id = v_store_id AND p.sku = 'SKU-SHO-001';
+
+  INSERT INTO product_models (product_id, display_type, model_3d_url, is_default)
+  SELECT p.id, 'standing', v_base_url || '/products/shoes/product_shoes_heels_01_standing.glb', false
+  FROM products p WHERE p.store_id = v_store_id AND p.sku = 'SKU-SHO-002';
+
+  INSERT INTO product_models (product_id, display_type, model_3d_url, is_default)
+  SELECT p.id, 'standing', v_base_url || '/products/shoes/product_shoes_sneakers_01_standing.glb', false
+  FROM products p WHERE p.store_id = v_store_id AND p.sku = 'SKU-SHO-003';
+
+  SELECT COUNT(*) INTO v_count FROM product_models WHERE display_type = 'standing';
+  RAISE NOTICE '    ✓ product_models standing: %건 추가됨', v_count;
+
+  -- ═══════════════════════════════════════════════════════════════════════════
   -- STEP 7.3: Staff avatar_url 자동 매칭 (실제 파일 기반)
   -- 📁 실제 파일: avatar_manager_01, avatar_sales_01/02, avatar_cashier_01/02,
   --              avatar_security_01, avatar_fitting_01, avatar_greeter_01
