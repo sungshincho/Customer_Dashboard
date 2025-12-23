@@ -199,18 +199,103 @@ function isPositionInZone(pos: Position, zone: Zone): boolean {
 }
 
 /**
- * 가구 찾기 (다양한 필드명 지원)
+ * 문자열 정규화 (대소문자, 공백, 특수문자 제거)
+ */
+function normalizeString(str: string | undefined): string {
+  if (!str) return '';
+  return str
+    .toLowerCase()
+    .replace(/[\s\-_]/g, '')  // 공백, 하이픈, 언더스코어 제거
+    .replace(/[^a-z0-9가-힣]/g, '');  // 특수문자 제거 (한글, 영문, 숫자만 유지)
+}
+
+/**
+ * 문자열 유사도 계산 (Levenshtein distance 기반)
+ */
+function calculateSimilarity(str1: string, str2: string): number {
+  const s1 = normalizeString(str1);
+  const s2 = normalizeString(str2);
+
+  if (s1 === s2) return 1;
+  if (s1.length === 0 || s2.length === 0) return 0;
+
+  // 부분 문자열 매칭
+  if (s1.includes(s2) || s2.includes(s1)) {
+    return 0.8;
+  }
+
+  // 간단한 유사도 계산 (공통 문자 비율)
+  const set1 = new Set(s1.split(''));
+  const set2 = new Set(s2.split(''));
+  const intersection = [...set1].filter(x => set2.has(x)).length;
+  const union = new Set([...set1, ...set2]).size;
+
+  return intersection / union;
+}
+
+/**
+ * 가구 찾기 (다양한 필드명 지원 + 퍼지 매칭)
  */
 function findFurniture(furniture: Furniture[], code: string | undefined): Furniture | undefined {
   if (!code) return undefined;
 
-  return furniture.find(f =>
+  // 1. 정확한 매칭 시도
+  const exactMatch = furniture.find(f =>
     f.id === code ||
     f.furniture_code === code ||
     f.metadata?.furniture_code === code ||
     f.metadata?.code === code ||
-    f.metadata?.name === code
+    f.metadata?.name === code ||
+    (f as any).furniture_type === code
   );
+
+  if (exactMatch) return exactMatch;
+
+  // 2. 정규화된 문자열로 매칭 시도
+  const normalizedCode = normalizeString(code);
+  const normalizedMatch = furniture.find(f => {
+    const candidates = [
+      f.id,
+      f.furniture_code,
+      f.metadata?.furniture_code,
+      f.metadata?.code,
+      f.metadata?.name,
+      (f as any).furniture_type,
+    ].filter(Boolean);
+
+    return candidates.some(c => normalizeString(c) === normalizedCode);
+  });
+
+  if (normalizedMatch) return normalizedMatch;
+
+  // 3. 퍼지 매칭 (유사도 0.6 이상)
+  let bestMatch: Furniture | undefined;
+  let bestSimilarity = 0.6;  // 최소 유사도 임계값
+
+  furniture.forEach(f => {
+    const candidates = [
+      f.id,
+      f.furniture_code,
+      f.metadata?.furniture_code,
+      f.metadata?.code,
+      f.metadata?.name,
+      (f as any).furniture_type,
+    ].filter(Boolean) as string[];
+
+    candidates.forEach(candidate => {
+      const similarity = calculateSimilarity(code, candidate);
+      if (similarity > bestSimilarity) {
+        bestSimilarity = similarity;
+        bestMatch = f;
+      }
+    });
+  });
+
+  if (bestMatch) {
+    console.log(`[optimizationValidator] Fuzzy matched '${code}' to furniture with similarity ${bestSimilarity.toFixed(2)}`);
+  }
+
+  return bestMatch;
 }
 
 // ============================================================================
