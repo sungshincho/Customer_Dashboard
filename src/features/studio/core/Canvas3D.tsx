@@ -441,9 +441,9 @@ function SelectionBox({ scale, url }: SelectionBoxProps) {
     >
       <boxGeometry args={[w, h, d]} />
       <meshBasicMaterial
-        color="#3b82f6"
+        color="#ea572a"
         transparent
-        opacity={0.15}
+        opacity={0.3}
         side={THREE.DoubleSide}
         depthWrite={false}
       />
