@@ -8,9 +8,10 @@
  * - 실시간 고객 시뮬레이션 지원
  */
 
-import { Suspense, ReactNode } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera, Preload } from '@react-three/drei';
+import { Suspense, ReactNode, useRef, useState, useMemo } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { OrbitControls, PerspectiveCamera, Preload, useGLTF } from '@react-three/drei';
+import * as THREE from 'three';
 import { cn } from '@/lib/utils';
 import { useScene } from './SceneProvider';
 import { SceneEnvironment } from './SceneEnvironment';
@@ -235,6 +236,9 @@ function SceneModels({ onAssetClick }: SceneModelsProps) {
               }))
             : undefined;
 
+          // 공간(space) 타입은 클릭 비활성화
+          const isSpace = model.type === 'space';
+
           return (
             <group
               key={model.id}
@@ -248,15 +252,23 @@ function SceneModels({ onAssetClick }: SceneModelsProps) {
                 position={[0, 0, 0]}  // group이 position 담당
                 rotation={[0, 0, 0]}  // group이 rotation 담당
                 scale={model.scale}
-                selected={model.id === selectedId}
-                hovered={model.id === hoveredId}
-                onClick={() => {
+                selected={false}  // 선택 박스는 바깥에서 렌더링
+                hovered={!isSpace && model.id === hoveredId}
+                onClick={isSpace ? undefined : () => {
                   select(model.id);
                   onAssetClick?.(model.id, model.type);
                 }}
-                onPointerOver={() => hover(model.id)}
-                onPointerOut={() => hover(null)}
+                onPointerOver={isSpace ? undefined : () => hover(model.id)}
+                onPointerOut={isSpace ? undefined : () => hover(null)}
               />
+
+              {/* 선택 박스 - 바깥 group에서 렌더링 (rotation 따라감) */}
+              {!isSpace && model.id === selectedId && (
+                <SelectionBox 
+                  scale={model.scale} 
+                  url={model.url}
+                />
+              )}
 
               {/* 자식 제품들 (가구 기준 상대 좌표) - 개별 visible 속성 사용 */}
               {hasChildren && childProducts!.map((child, idx) => {
@@ -367,6 +379,75 @@ export function StandaloneCanvas3D({
         </Suspense>
       </Canvas>
     </div>
+  );
+}
+
+// ============================================================================
+// 선택 박스 컴포넌트 (바깥 group에서 rotation 따라감)
+// ============================================================================
+interface SelectionBoxProps {
+  scale: [number, number, number];
+  url: string;
+}
+
+function SelectionBox({ scale, url }: SelectionBoxProps) {
+  const meshRef = useRef<THREE.Mesh>(null);
+
+  // GLB 로드해서 BoundingBox 계산
+  const { scene } = useGLTF(url);
+  
+  const boundingBox = useMemo(() => {
+    if (!scene) return null;
+    
+    const cloned = scene.clone(true);
+    const box = new THREE.Box3().setFromObject(cloned);
+    const sizeVec = new THREE.Vector3();
+    box.getSize(sizeVec);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    
+    return {
+      width: sizeVec.x,
+      height: sizeVec.y,
+      depth: sizeVec.z,
+      centerY: center.y,
+    };
+  }, [scene]);
+
+  // 펄스 애니메이션
+  useFrame((state) => {
+    if (meshRef.current) {
+      const pulse = 1 + Math.sin(state.clock.elapsedTime * 3) * 0.02;
+      meshRef.current.scale.set(
+        scale[0] * pulse, 
+        scale[1] * pulse, 
+        scale[2] * pulse
+      );
+    }
+  });
+
+  if (!boundingBox) return null;
+
+  // 여백 추가 (10%)
+  const w = boundingBox.width * 1.1;
+  const h = boundingBox.height * 1.1;
+  const d = boundingBox.depth * 1.1;
+
+  return (
+    <mesh 
+      ref={meshRef} 
+      position={[0, boundingBox.centerY, 0]}
+      scale={scale}
+    >
+      <boxGeometry args={[w, h, d]} />
+      <meshBasicMaterial
+        color="#3b82f6"
+        transparent
+        opacity={0.15}
+        side={THREE.DoubleSide}
+        depthWrite={false}
+      />
+    </mesh>
   );
 }
 
