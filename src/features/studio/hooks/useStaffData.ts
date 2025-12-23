@@ -91,6 +91,8 @@ export function useStaffData(options: UseStaffDataOptions = {}): UseStaffDataRet
           assigned_zone_id,
           avatar_url,
           avatar_position,
+          avatar_rotation,    
+          avatar_scale,       
           is_active
         `)
         .eq('store_id', storeId);
