@@ -43,7 +43,13 @@ export type SeverityLevel = keyof typeof SEVERITY_COLORS;
 // ============================================================================
 // As-Is / To-Be 뷰 모드 색상
 // ============================================================================
-export const VIEW_MODE_COLORS = {
+export const VIEW_MODE_COLORS: Record<string, {
+  text: string;
+  bg: string;
+  border: string;
+  solid: string;
+  gradient: string;
+}> = {
   'as-is': {
     text: 'text-blue-500',
     bg: 'bg-blue-500/10',
@@ -65,7 +71,7 @@ export const VIEW_MODE_COLORS = {
     solid: 'bg-purple-500',
     gradient: 'from-purple-600 to-purple-700',
   },
-} as const;
+};
 
 export type ViewModeType = keyof typeof VIEW_MODE_COLORS;
 
@@ -161,7 +167,7 @@ export function getSeverityClasses(
   options: { withBorder?: boolean } = {}
 ): string {
   const colors = SEVERITY_COLORS[severity];
-  const classes = [colors.text, colors.bg];
+  const classes: string[] = [colors.text, colors.bg];
   if (options.withBorder) {
     classes.push(colors.border, 'border');
   }
@@ -179,7 +185,7 @@ export function getViewModeClasses(
   if (options.gradient) {
     return `bg-gradient-to-r ${colors.gradient}`;
   }
-  const classes = [colors.text, colors.bg];
+  const classes: string[] = [colors.text, colors.bg];
   if (options.withBorder) {
     classes.push(colors.border, 'border');
   }
