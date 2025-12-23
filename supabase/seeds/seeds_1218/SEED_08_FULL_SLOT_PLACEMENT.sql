@@ -94,6 +94,7 @@ BEGIN
       fs.slot_position,
       fs.slot_rotation,
       fs.compatible_display_types,
+      fs.properties,  -- 마네킹 allowed_categories 접근용
       f.furniture_code,
       f.furniture_name,
       f.zone_id,
@@ -108,35 +109,74 @@ BEGIN
     ORDER BY f.furniture_code, fs.slot_id
   LOOP
     -- ────────────────────────────────────────────────────────────────────────
-    -- 호환되는 상품 찾기 (라운드 로빈 + display_type 매칭)
+    -- 호환되는 상품 찾기 (라운드 로빈 + display_type + 카테고리 매칭)
+    -- 마네킹 슬롯의 경우 properties.allowed_categories 확인
     -- ────────────────────────────────────────────────────────────────────────
     v_matched_product_id := NULL;
     v_matched_model_url := NULL;
     v_matched_display_type := NULL;
 
-    -- 라운드 로빈으로 상품 선택 시도 (최대 products_count번)
-    FOR i IN 0..v_products_count-1 LOOP
+    -- 마네킹 슬롯 특별 처리: properties.allowed_categories 기반 매칭
+    IF v_slot.slot_type IN ('mannequin_top', 'mannequin_bottom', 'mannequin_shoes') THEN
       DECLARE
-        v_try_index INT := ((v_product_index + i) % v_products_count) + 1;
-        v_try_product_id UUID := v_products_array[v_try_index];
+        v_allowed_categories TEXT[];
+        v_category_product RECORD;
       BEGIN
-        -- product_models에서 슬롯 호환 display_type 찾기
-        SELECT
-          pm.product_id,
-          pm.model_3d_url,
-          pm.display_type
-        INTO v_matched_product_id, v_matched_model_url, v_matched_display_type
-        FROM product_models pm
-        WHERE pm.product_id = v_try_product_id
-          AND pm.display_type = ANY(v_slot.compatible_display_types)
-        ORDER BY pm.is_default DESC
-        LIMIT 1;
+        -- properties에서 allowed_categories 직접 추출
+        SELECT ARRAY(
+          SELECT jsonb_array_elements_text(
+            COALESCE(v_slot.properties->'allowed_categories', '[]'::jsonb)
+          )
+        ) INTO v_allowed_categories;
 
-        IF v_matched_product_id IS NOT NULL THEN
-          EXIT;
+        -- 해당 카테고리의 제품 중 standing 모델이 있는 것 찾기
+        IF array_length(v_allowed_categories, 1) > 0 THEN
+          FOR v_category_product IN
+            SELECT
+              p.id AS product_id,
+              pm.model_3d_url,
+              pm.display_type
+            FROM products p
+            JOIN product_models pm ON pm.product_id = p.id
+            WHERE p.store_id = v_store_id
+              AND p.category = ANY(v_allowed_categories)
+              AND pm.display_type = 'standing'
+            ORDER BY RANDOM()
+            LIMIT 1
+          LOOP
+            v_matched_product_id := v_category_product.product_id;
+            v_matched_model_url := v_category_product.model_3d_url;
+            v_matched_display_type := v_category_product.display_type;
+          END LOOP;
         END IF;
       END;
-    END LOOP;
+    END IF;
+
+    -- 일반 슬롯 또는 마네킹 폴백: 라운드 로빈으로 상품 선택 시도 (최대 products_count번)
+    IF v_matched_product_id IS NULL THEN
+      FOR i IN 0..v_products_count-1 LOOP
+        DECLARE
+          v_try_index INT := ((v_product_index + i) % v_products_count) + 1;
+          v_try_product_id UUID := v_products_array[v_try_index];
+        BEGIN
+          -- product_models에서 슬롯 호환 display_type 찾기
+          SELECT
+            pm.product_id,
+            pm.model_3d_url,
+            pm.display_type
+          INTO v_matched_product_id, v_matched_model_url, v_matched_display_type
+          FROM product_models pm
+          WHERE pm.product_id = v_try_product_id
+            AND pm.display_type = ANY(v_slot.compatible_display_types)
+          ORDER BY pm.is_default DESC
+          LIMIT 1;
+
+          IF v_matched_product_id IS NOT NULL THEN
+            EXIT;
+          END IF;
+        END;
+      END LOOP;
+    END IF;
 
     -- product_models에서 못 찾으면 products.model_3d_url 사용
     IF v_matched_product_id IS NULL THEN

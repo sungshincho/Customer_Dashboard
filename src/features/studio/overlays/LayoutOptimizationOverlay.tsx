@@ -921,8 +921,10 @@ function ProductMoveIndicator({
   const clampedFrom = clampToStoreBounds(fromPos.x, fromPos.z, storeBounds);
   const clampedTo = clampToStoreBounds(toPos.x, toPos.z, storeBounds);
 
-  const from = [clampedFrom.x, fromPos.y || 0.8, clampedFrom.z] as [number, number, number];
-  const to = [clampedTo.x, toPos.y || 0.8, clampedTo.z] as [number, number, number];
+  // 🔧 FIX: y 좌표를 충분히 높게 설정 (가구 위에 표시되도록)
+  const minY = 1.2; // 최소 높이 1.2m
+  const from = [clampedFrom.x, Math.max(fromPos.y || 0.8, minY), clampedFrom.z] as [number, number, number];
+  const to = [clampedTo.x, Math.max(toPos.y || 0.8, minY), clampedTo.z] as [number, number, number];
 
   // 곡선 경로 생성 (더 높은 아크)
   const curvedPath = useMemo(() => {

@@ -201,14 +201,21 @@ BEGIN
   END LOOP;
 
 
-  -- mannequin_torso (4×1=4)
+  -- mannequin_torso (상반신 마네킹) - 4×1=4 슬롯
+  -- 🆕 slot_type을 mannequin_top으로 변경, properties에 allowed_categories 추가
   FOR v_furn IN SELECT id, furniture_type FROM furniture WHERE store_id = v_store_id AND furniture_type LIKE 'mannequin_torso_%' LOOP
-    INSERT INTO furniture_slots (id, furniture_id, store_id, user_id, slot_id, furniture_type, slot_type, slot_position, slot_rotation, compatible_display_types, max_product_width, max_product_height, max_product_depth, is_occupied, created_at, updated_at) VALUES
-
-  (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'M1', v_furn.furniture_type, 'mannequin', 
-   '{"x":0,"y":1.5,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, 
-   ARRAY['standing'], 0.5, 0.7, 0.3, false, NOW(), NOW());
-     END LOOP;
+    INSERT INTO furniture_slots (id, furniture_id, store_id, user_id, slot_id, furniture_type, slot_type, slot_position, slot_rotation, properties, compatible_display_types, max_product_width, max_product_height, max_product_depth, is_occupied, created_at, updated_at) VALUES
+    -- M-TOP: 상의/아우터 전용 슬롯
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'M-TOP-1', v_furn.furniture_type, 'mannequin_top',
+     '{"x":0,"y":0.5,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb,
+     '{"allowed_categories":["상의","아우터"]}'::jsonb,
+     ARRAY['standing'], 0.5, 0.7, 0.3, false, NOW(), NOW()),
+    -- M-TOP-2: 상의/아우터 전용 슬롯 (두 번째)
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'M-TOP-2', v_furn.furniture_type, 'mannequin_top',
+     '{"x":0,"y":0.3,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb,
+     '{"allowed_categories":["상의","아우터"]}'::jsonb,
+     ARRAY['standing'], 0.5, 0.5, 0.3, false, NOW(), NOW());
+  END LOOP;
 
 
   -- table_display_center (2×10=20)
@@ -237,26 +244,31 @@ BEGIN
   END LOOP;
 
 
-  -- mannequin_full (4×3=12)
-FOR v_furn IN SELECT id, furniture_type FROM furniture 
-  WHERE store_id = v_store_id AND furniture_type LIKE 'mannequin_full_%' 
-LOOP
-  INSERT INTO furniture_slots (id, furniture_id, store_id, user_id, slot_id, furniture_type, slot_type, slot_position, slot_rotation, compatible_display_types, max_product_width, max_product_height, max_product_depth, is_occupied, created_at, updated_at) VALUES
-  -- M1: 신발 슬롯 (발 높이)
-  (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'M1', v_furn.furniture_type, 'mannequin', 
-   '{"x":0,"y":0,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, 
-   ARRAY['standing'], 0.3, 0.15, 0.35, false, NOW(), NOW()),
-  
-  -- M2: 하의 슬롯 (허리~다리 높이)
-  (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'M2', v_furn.furniture_type, 'mannequin', 
-   '{"x":0,"y":1,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, 
-   ARRAY['standing'], 0.4, 0.9, 0.3, false, NOW(), NOW()),
-  
-  -- M3: 상의/아우터 슬롯 (가슴 높이)
-  (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'M3', v_furn.furniture_type, 'mannequin', 
-   '{"x":0,"y":1.5,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb, 
-   ARRAY['standing'], 0.5, 0.7, 0.3, false, NOW(), NOW());
-END LOOP;
+  -- mannequin_full (전신 마네킹) - 4×3=12 슬롯
+  -- 🆕 slot_type 세분화: mannequin_shoes, mannequin_bottom, mannequin_top
+  -- 🆕 properties에 allowed_categories 추가
+  FOR v_furn IN SELECT id, furniture_type FROM furniture
+    WHERE store_id = v_store_id AND furniture_type LIKE 'mannequin_full_%'
+  LOOP
+    INSERT INTO furniture_slots (id, furniture_id, store_id, user_id, slot_id, furniture_type, slot_type, slot_position, slot_rotation, properties, compatible_display_types, max_product_width, max_product_height, max_product_depth, is_occupied, created_at, updated_at) VALUES
+    -- M-SHOES: 신발 전용 슬롯 (바닥)
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'M-SHOES-1', v_furn.furniture_type, 'mannequin_shoes',
+     '{"x":0,"y":0,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb,
+     '{"allowed_categories":["신발"]}'::jsonb,
+     ARRAY['located'], 0.3, 0.15, 0.35, false, NOW(), NOW()),
+
+    -- M-BTM: 하의 전용 슬롯 (중간)
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'M-BTM-1', v_furn.furniture_type, 'mannequin_bottom',
+     '{"x":0,"y":1,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb,
+     '{"allowed_categories":["하의"]}'::jsonb,
+     ARRAY['standing'], 0.4, 0.9, 0.3, false, NOW(), NOW()),
+
+    -- M-TOP: 상의/아우터 전용 슬롯 (상단)
+    (gen_random_uuid(), v_furn.id, v_store_id, v_user_id, 'M-TOP-1', v_furn.furniture_type, 'mannequin_top',
+     '{"x":0,"y":1.5,"z":0}'::jsonb, '{"x":0,"y":0,"z":0}'::jsonb,
+     '{"allowed_categories":["상의","아우터"]}'::jsonb,
+     ARRAY['standing'], 0.5, 0.7, 0.3, false, NOW(), NOW());
+  END LOOP;
 
   -- stand_accessory (2×10=20)
   FOR v_furn IN SELECT id, furniture_type FROM furniture WHERE store_id = v_store_id AND furniture_type LIKE 'stand_accessory_%' LOOP
