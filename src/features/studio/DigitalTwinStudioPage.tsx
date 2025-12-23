@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 // 새 스튜디오 컴포넌트
 import { Canvas3D, SceneProvider, useScene } from './core';
 import { LayerPanel, SimulationPanel, ToolPanel, SceneSavePanel, OverlayControlPanel, PropertyPanel } from './panels';
-import { HeatmapOverlay, CustomerFlowOverlay, ZoneBoundaryOverlay, CustomerAvatarOverlay, LayoutOptimizationOverlay, FlowOptimizationOverlay, CongestionOverlay, StaffingOverlay, ZonesFloorOverlay, StaffAvatarsOverlay, CustomerFlowOverlayEnhanced, CustomerAvatarsOverlay } from './overlays';
+import { HeatmapOverlay, CustomerFlowOverlay, ZoneBoundaryOverlay, CustomerAvatarOverlay, LayoutOptimizationOverlay, FlowOptimizationOverlay, CongestionOverlay, StaffingOverlay, ZonesFloorOverlay, StaffAvatarsOverlay, CustomerFlowOverlayEnhanced, CustomerAvatarsOverlay, StaffReallocationOverlay } from './overlays';
 import { DraggablePanel, QuickToggleBar, ViewModeToggle, ResultReportPanel, type ViewMode } from './components';
 import type { DiagnosticIssue } from './components/DiagnosticIssueList';
 import { PanelLeftClose, PanelLeft, Mouse } from 'lucide-react';
@@ -979,6 +979,37 @@ export default function DigitalTwinStudioPage() {
                     animateMovement={true}
                   />
                 )}
+
+                {/* 🆕 인력 재배치 오버레이 (As-Is → To-Be 이동 경로 애니메이션) */}
+                {sceneSimulation.state.results.staffing && viewMode === 'to-be' && (() => {
+                  const staffingResult = sceneSimulation.state.results.staffing as any;
+                  // staffPositions를 StaffReallocation 형식으로 변환
+                  const reallocations = (staffingResult.staffPositions || []).map((sp: any, idx: number) => ({
+                    staff_id: sp.staffId || `staff-${idx}`,
+                    staff_code: `S${String(idx + 1).padStart(3, '0')}`,
+                    staff_name: sp.staffName || `직원 ${idx + 1}`,
+                    role: 'sales' as const,
+                    from_zone_id: sp.fromZoneId || `zone-${idx}`,
+                    from_zone_name: sp.fromZoneName || '이전 구역',
+                    from_position: sp.currentPosition || { x: 0, y: 0, z: 0 },
+                    to_zone_id: sp.toZoneId || `zone-opt-${idx}`,
+                    to_zone_name: sp.toZoneName || '최적 구역',
+                    to_position: sp.suggestedPosition || { x: 0, y: 0, z: 0 },
+                    reason: sp.reason || '커버리지 최적화',
+                    priority: (sp.coverageGain > 15 ? 'high' : sp.coverageGain > 8 ? 'medium' : 'low') as 'high' | 'medium' | 'low',
+                    expected_impact: {
+                      coverage_change_pct: sp.coverageGain || 0,
+                      response_time_change_sec: -5,
+                      customers_served_change: Math.floor((sp.coverageGain || 0) / 3),
+                    },
+                  }));
+                  return (
+                    <StaffReallocationOverlay
+                      visible={true}
+                      reallocations={reallocations}
+                    />
+                  );
+                })()}
               </Canvas3D>
             )}
           </div>

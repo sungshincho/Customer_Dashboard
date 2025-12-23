@@ -12,12 +12,14 @@ import React, { useRef, useMemo } from 'react';
 import * as THREE from 'three';
 import { Line, Html } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
-import { useCustomerFlowData, FlowPath, ZoneInfo } from '../hooks/useCustomerFlowData';
+import { useCustomerFlowData, FlowPath, ZoneInfo, FlowBottleneck } from '../hooks/useCustomerFlowData';
 
 interface CustomerFlowOverlayEnhancedProps {
   visible: boolean;
   storeId: string;
   showLabels?: boolean;
+  showBottlenecks?: boolean;
+  showZoneMarkers?: boolean;
   minOpacity?: number;
 }
 
@@ -25,6 +27,8 @@ export const CustomerFlowOverlayEnhanced: React.FC<CustomerFlowOverlayEnhancedPr
   visible,
   storeId,
   showLabels = true,
+  showBottlenecks = true,
+  showZoneMarkers = true,
   minOpacity = 0.3,
 }) => {
   const { data, isLoading, error } = useCustomerFlowData({
@@ -65,8 +69,19 @@ export const CustomerFlowOverlayEnhanced: React.FC<CustomerFlowOverlayEnhancedPr
       ))}
 
       {/* 존 마커 (선택적) */}
-      {data.zones.map((zone) => (
-        <ZoneMarker key={zone.id} zone={zone} />
+      {showZoneMarkers && data.zones.map((zone) => (
+        <ZoneMarker
+          key={zone.id}
+          zone={zone}
+          isEntrance={zone.id === data.entranceZone?.id}
+          isExit={data.exitZones.some(e => e.id === zone.id)}
+          isHotspot={data.hotspotZones.some(h => h.id === zone.id)}
+        />
+      ))}
+
+      {/* 병목 지점 표시 */}
+      {showBottlenecks && data.bottlenecks.map((bottleneck, idx) => (
+        <BottleneckMarker key={idx} bottleneck={bottleneck} />
       ))}
     </group>
   );
@@ -183,7 +198,7 @@ const FlowPathLine: React.FC<FlowPathLineProps> = ({
             <div className="text-white/70 flex items-center gap-2">
               <span>{path.transition_count.toLocaleString()}회</span>
               <span>•</span>
-              <span>평균 {Math.round(path.avg_duration_seconds)}초</span>
+              <span>{path.daily_avg_count}/일</span>
               <span>•</span>
               <span>{Math.round(path.transition_probability * 100)}%</span>
             </div>
@@ -234,14 +249,55 @@ const FlowArrow: React.FC<FlowArrowProps> = ({ points, color, size }) => {
 };
 
 // ===== 존 마커 =====
-const ZoneMarker: React.FC<{ zone: ZoneInfo }> = ({ zone }) => {
+interface ZoneMarkerProps {
+  zone: ZoneInfo;
+  isEntrance?: boolean;
+  isExit?: boolean;
+  isHotspot?: boolean;
+}
+
+const ZoneMarker: React.FC<ZoneMarkerProps> = ({ zone, isEntrance, isExit, isHotspot }) => {
+  const color = isEntrance ? '#3b82f6' : isExit ? '#22c55e' : isHotspot ? '#f59e0b' : '#6366f1';
+  const size = isEntrance || isExit ? 1.2 : isHotspot ? 1 : 0.8;
+
   return (
     <group position={[zone.center.x, 0.05, zone.center.z]}>
       {/* 존 중심 원 */}
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.8, 1, 32]} />
-        <meshBasicMaterial color="#6366f1" transparent opacity={0.3} side={THREE.DoubleSide} />
+        <ringGeometry args={[size * 0.8, size, 32]} />
+        <meshBasicMaterial color={color} transparent opacity={0.4} side={THREE.DoubleSide} />
       </mesh>
+
+      {/* 입구/출구/핫스팟 라벨 */}
+      {(isEntrance || isExit || isHotspot) && (
+        <Html position={[0, 0.5, 0]} center>
+          <div className={`px-2 py-0.5 rounded text-xs text-white ${
+            isEntrance ? 'bg-blue-500' : isExit ? 'bg-green-500' : 'bg-amber-500'
+          }`}>
+            {isEntrance ? '입구' : isExit ? '출구' : '🔥'}
+          </div>
+        </Html>
+      )}
+    </group>
+  );
+};
+
+// ===== 병목 지점 마커 =====
+const BottleneckMarker: React.FC<{ bottleneck: FlowBottleneck }> = ({ bottleneck }) => {
+  return (
+    <group position={[bottleneck.zone.center.x, 0.1, bottleneck.zone.center.z]}>
+      {/* 경고 링 */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[1.3, 1.5, 32]} />
+        <meshBasicMaterial color="#ef4444" transparent opacity={0.6} side={THREE.DoubleSide} />
+      </mesh>
+
+      {/* 라벨 */}
+      <Html position={[0, 1, 0]} center>
+        <div className="px-2 py-1 bg-red-500/90 text-white rounded text-xs whitespace-nowrap shadow-lg">
+          ⚠️ 병목 {bottleneck.bottleneckScore}%
+        </div>
+      </Html>
     </group>
   );
 };
