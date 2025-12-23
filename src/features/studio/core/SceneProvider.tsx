@@ -528,6 +528,9 @@ interface SceneContextValue {
   // 🆕 제품 개별 가시성 제어 (childProduct.visible 방식)
   toggleProductVisibility: (productId: string) => void;
   isProductVisible: (productId: string) => boolean;
+
+  // 🆕 카메라 포커스 (특정 모델에 포커싱)
+  focusOnModel?: (modelId: string) => void;
 }
 
 // ============================================================================
@@ -724,6 +727,11 @@ export function SceneProvider({ mode = 'view', children, initialModels = [] }: S
     // 🆕 제품 개별 가시성 제어 (childProduct.visible 방식)
     toggleProductVisibility,
     isProductVisible,
+    // 🆕 카메라 포커스 (특정 모델에 포커싱) - 현재는 선택만 수행
+    focusOnModel: (modelId: string) => {
+      select(modelId);
+      // TODO: 카메라 애니메이션으로 모델에 포커싱하는 로직 추가 가능
+    },
   };
 
   return <SceneContext.Provider value={value}>{children}</SceneContext.Provider>;
