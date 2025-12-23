@@ -136,7 +136,7 @@ function FurnitureGLTF({
           width={boundingBox.size.x} 
           height={boundingBox.size.y} 
           depth={boundingBox.size.z}
-          centerY={boundingBox.center.y}
+          center={boundingBox.center}
         />
       )}
 
@@ -146,7 +146,7 @@ function FurnitureGLTF({
           width={boundingBox.size.x} 
           height={boundingBox.size.y} 
           depth={boundingBox.size.z}
-          centerY={boundingBox.center.y}
+          center={boundingBox.center}
         />
       )}
     </group>
@@ -218,18 +218,23 @@ interface IndicatorProps {
   width?: number;
   height?: number;
   depth?: number;
-  centerY?: number;
+  center?: { x: number; y: number; z: number };
   size?: number; // 기존 호환용
 }
 
-function SelectionIndicator({ width, height, depth, centerY = 0, size = 1.1 }: IndicatorProps) {
+function SelectionIndicator({ width, height, depth, center, size = 1.1 }: IndicatorProps) {
   // width/height/depth가 있으면 사용, 없으면 기존 size 사용
   const w = width ? width * 1.1 : size;
   const h = height ? height * 1.1 : size;
   const d = depth ? depth * 1.1 : size;
   
+  // center가 있으면 해당 위치에, 없으면 원점에 배치
+  const pos: [number, number, number] = center 
+    ? [center.x, center.y, center.z] 
+    : [0, 0, 0];
+  
   return (
-    <mesh position={[0, centerY, 0]}>
+    <mesh position={pos}>
       <boxGeometry args={[w, h, d]} />
       <meshBasicMaterial
         color="#3b82f6"
@@ -242,14 +247,19 @@ function SelectionIndicator({ width, height, depth, centerY = 0, size = 1.1 }: I
   );
 }
 
-function HoverIndicator({ width, height, depth, centerY = 0, size = 1.05 }: IndicatorProps) {
+function HoverIndicator({ width, height, depth, center, size = 1.05 }: IndicatorProps) {
   // width/height/depth가 있으면 사용, 없으면 기존 size 사용
   const w = width ? width * 1.05 : size;
   const h = height ? height * 1.05 : size;
   const d = depth ? depth * 1.05 : size;
   
+  // center가 있으면 해당 위치에, 없으면 원점에 배치
+  const pos: [number, number, number] = center 
+    ? [center.x, center.y, center.z] 
+    : [0, 0, 0];
+  
   return (
-    <mesh position={[0, centerY, 0]}>
+    <mesh position={pos}>
       <boxGeometry args={[w, h, d]} />
       <meshBasicMaterial
         color="#60a5fa"
