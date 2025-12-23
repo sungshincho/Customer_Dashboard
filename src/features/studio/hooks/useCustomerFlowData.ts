@@ -58,9 +58,10 @@ export const useCustomerFlowData = ({
     queryFn: async (): Promise<CustomerFlowData> => {
 
       // 1. 존 정보 가져오기 (zones_dim 테이블)
+      // boundary 컬럼은 optional - 일부 스키마에만 존재할 수 있음
       const { data: zones, error: zonesError } = await supabase
         .from('zones_dim')
-        .select('id, zone_name, zone_code, zone_type, position_x, position_z, coordinates, boundary')
+        .select('id, zone_name, zone_code, zone_type, position_x, position_z, coordinates')
         .eq('store_id', storeId)
         .order('zone_code');
 
@@ -98,7 +99,7 @@ export const useCustomerFlowData = ({
           zone_code: z.zone_code || '',
           zone_type: z.zone_type,
           center,
-          boundary: z.boundary,
+          // boundary는 optional이며 별도 컬럼이 필요할 경우 추가
         });
       });
 
