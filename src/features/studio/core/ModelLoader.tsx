@@ -166,9 +166,12 @@ function GLTFModel({
   // 실제 렌더링 후 BoundingBox 계산 (useFrame으로 한 번만 실행)
   useFrame(() => {
     if (!boundingBoxCalculated.current && groupRef.current) {
-      // 스케일 적용 전 원본 크기 계산을 위해 임시로 스케일 리셋
+      // 스케일, 로테이션 적용 전 원본 크기 계산을 위해 임시로 리셋
       const originalScale = groupRef.current.scale.clone();
+      const originalRotation = groupRef.current.rotation.clone();
+      
       groupRef.current.scale.set(1, 1, 1);
+      groupRef.current.rotation.set(0, 0, 0);
       groupRef.current.updateMatrixWorld(true);
       
       const box = new THREE.Box3().setFromObject(groupRef.current);
@@ -177,8 +180,9 @@ function GLTFModel({
       const center = new THREE.Vector3();
       box.getCenter(center);
       
-      // 스케일 복원
+      // 스케일, 로테이션 복원
       groupRef.current.scale.copy(originalScale);
+      groupRef.current.rotation.copy(originalRotation);
       groupRef.current.updateMatrixWorld(true);
       
       // position을 빼서 로컬 좌표로 변환
@@ -328,8 +332,9 @@ function SelectionOutline({ width = 1, height = 1, depth = 1, centerY = 0.5 }: S
       <meshBasicMaterial
         color="#3b82f6"
         transparent
-        opacity={0.2}
-        side={THREE.BackSide}
+        opacity={0.15}
+        side={THREE.DoubleSide}
+        depthWrite={false}
       />
     </mesh>
   );
