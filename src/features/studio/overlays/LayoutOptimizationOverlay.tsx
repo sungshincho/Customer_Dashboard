@@ -443,10 +443,12 @@ function HeatmapMesh({ points, color, opacity, heightScale, label, storeBounds }
 interface FurnitureMoveIndicatorProps {
   move: {
     furnitureId: string;
-    furnitureName: string;
-    fromPosition: { x: number; y: number; z: number };
+    furnitureName?: string;
+    fromPosition?: { x: number; y: number; z: number };
     toPosition: { x: number; y: number; z: number };
+    suggestedPosition?: { x: number; y: number; z: number };
     rotation?: number;
+    reason?: string;
   };
   storeBounds: { width: number; depth: number };
   index: number;
@@ -503,9 +505,13 @@ function FurnitureMoveIndicator({
   const particleRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
 
+  // fromPosition이 없으면 toPosition을 사용 (suggestedPosition 사용 가능)
+  const fromPos = move.fromPosition || move.toPosition;
+  const toPos = move.suggestedPosition || move.toPosition;
+
   // 좌표를 매장 경계 내로 클램핑
-  const clampedFrom = clampToStoreBounds(move.fromPosition.x, move.fromPosition.z, storeBounds);
-  const clampedTo = clampToStoreBounds(move.toPosition.x, move.toPosition.z, storeBounds);
+  const clampedFrom = clampToStoreBounds(fromPos.x, fromPos.z, storeBounds);
+  const clampedTo = clampToStoreBounds(toPos.x, toPos.z, storeBounds);
 
   const from = [clampedFrom.x, 0.3, clampedFrom.z] as [number, number, number];
   const to = [clampedTo.x, 0.3, clampedTo.z] as [number, number, number];
@@ -642,7 +648,7 @@ function FurnitureMoveIndicator({
           center
         >
           <div className="px-3 py-1.5 bg-black/90 text-white text-xs rounded-lg shadow-lg border border-white/20">
-            <div className="font-medium">{move.furnitureName}</div>
+            <div className="font-medium">{move.furnitureName || 'Furniture'}</div>
             <div className="text-[10px] text-white/60 mt-0.5">
               {Math.sqrt(
                 Math.pow(to[0] - from[0], 2) + Math.pow(to[2] - from[2], 2)
@@ -747,18 +753,21 @@ function ZoneHighlight({ zone, externalZonePositions, externalZoneSizes }: ZoneH
 interface MovementInfoPanelProps {
   move: {
     furnitureId: string;
-    furnitureName: string;
-    fromPosition: { x: number; y: number; z: number };
+    furnitureName?: string;
+    fromPosition?: { x: number; y: number; z: number };
     toPosition: { x: number; y: number; z: number };
+    suggestedPosition?: { x: number; y: number; z: number };
   };
   storeBounds: { width: number; depth: number };
   onClose: () => void;
 }
 
 function MovementInfoPanel({ move, storeBounds, onClose }: MovementInfoPanelProps) {
+  const fromPos = move.fromPosition || move.toPosition;
+  const toPos = move.suggestedPosition || move.toPosition;
   const distance = Math.sqrt(
-    Math.pow(move.toPosition.x - move.fromPosition.x, 2) +
-    Math.pow(move.toPosition.z - move.fromPosition.z, 2)
+    Math.pow(toPos.x - fromPos.x, 2) +
+    Math.pow(toPos.z - fromPos.z, 2)
   );
 
   // 패널 위치 클램핑
@@ -775,7 +784,7 @@ function MovementInfoPanel({ move, storeBounds, onClose }: MovementInfoPanelProp
     >
       <div className="bg-background/95 backdrop-blur-sm border border-border rounded-lg p-3 shadow-lg min-w-[200px]">
         <div className="flex items-center justify-between mb-2">
-          <h4 className="font-semibold text-sm">{move.furnitureName}</h4>
+          <h4 className="font-semibold text-sm">{move.furnitureName || 'Furniture'}</h4>
           <button
             onClick={onClose}
             className="text-muted-foreground hover:text-foreground text-sm"
@@ -787,13 +796,13 @@ function MovementInfoPanel({ move, storeBounds, onClose }: MovementInfoPanelProp
           <div className="flex justify-between">
             <span className="text-muted-foreground">이동 전:</span>
             <span className="font-mono">
-              ({move.fromPosition.x.toFixed(1)}, {move.fromPosition.z.toFixed(1)})
+              ({fromPos.x.toFixed(1)}, {fromPos.z.toFixed(1)})
             </span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">이동 후:</span>
             <span className="font-mono text-green-500">
-              ({move.toPosition.x.toFixed(1)}, {move.toPosition.z.toFixed(1)})
+              ({toPos.x.toFixed(1)}, {toPos.z.toFixed(1)})
             </span>
           </div>
           <div className="flex justify-between pt-1 border-t border-border">
@@ -1079,14 +1088,14 @@ function ProductMoveIndicator({
             {/* 예상 효과 */}
             {impact && (
               <div className="flex gap-2 mt-1.5 pt-1 border-t border-purple-500/20 text-[9px]">
-                {(impact.revenueChangePct !== undefined || impact.revenue_change_pct !== undefined) && (
-                  <span className={(impact.revenueChangePct ?? impact.revenue_change_pct ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}>
-                    매출 {(impact.revenueChangePct ?? impact.revenue_change_pct ?? 0) >= 0 ? '+' : ''}{(impact.revenueChangePct ?? impact.revenue_change_pct ?? 0).toFixed(1)}%
+                {impact.revenue_change_pct !== undefined && (
+                  <span className={(impact.revenue_change_pct ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}>
+                    매출 {(impact.revenue_change_pct ?? 0) >= 0 ? '+' : ''}{(impact.revenue_change_pct ?? 0).toFixed(1)}%
                   </span>
                 )}
-                {(impact.visibilityScore !== undefined || impact.visibility_score !== undefined) && (
+                {impact.visibility_score !== undefined && (
                   <span className="text-yellow-400">
-                    노출 {((impact.visibilityScore ?? impact.visibility_score ?? 0) * 100).toFixed(0)}점
+                    노출 {((impact.visibility_score ?? 0) * 100).toFixed(0)}점
                   </span>
                 )}
               </div>

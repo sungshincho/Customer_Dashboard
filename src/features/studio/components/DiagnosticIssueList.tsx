@@ -31,11 +31,19 @@ export type IssueSeverity = 'critical' | 'warning' | 'info';
 export interface DiagnosticIssue {
   id: string;
   severity: IssueSeverity;
-  zone: string;
+  zone?: string;
   title: string;
-  metric: string;
+  metric?: string;
   impact: string;
   recommendation?: string;
+  // simulation.types.ts 호환
+  zone_name?: string;
+  zone_id?: string;
+  description?: string;
+  category?: string;
+  current_value?: number;
+  threshold_value?: number;
+  suggested_action?: string;
 }
 
 interface DiagnosticIssueListProps {

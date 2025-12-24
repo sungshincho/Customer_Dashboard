@@ -22,6 +22,8 @@ export interface StaffMember {
   zone_name?: string;
   avatar_url: string | null;
   avatar_position: { x: number; y: number; z: number };
+  avatar_rotation?: { x: number; y: number; z: number };
+  avatar_scale?: { x: number; y: number; z: number };
   is_active: boolean;
 }
 
@@ -89,6 +91,8 @@ export function useStaffData(options: UseStaffDataOptions = {}): UseStaffDataRet
           assigned_zone_id,
           avatar_url,
           avatar_position,
+          avatar_rotation,    
+          avatar_scale,       
           is_active
         `)
         .eq('store_id', storeId);
@@ -135,6 +139,8 @@ export function useStaffData(options: UseStaffDataOptions = {}): UseStaffDataRet
         zone_name: row.assigned_zone_id ? (zoneMap[row.assigned_zone_id] || '미배정') : '미배정',
         avatar_url: row.avatar_url,
         avatar_position: parsePosition(row.avatar_position),
+        avatar_rotation: parsePosition(row.avatar_rotation),
+        avatar_scale: parsePosition(row.avatar_scale),
         is_active: row.is_active ?? true,
       }));
 

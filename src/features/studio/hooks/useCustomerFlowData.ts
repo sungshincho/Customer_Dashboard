@@ -76,7 +76,7 @@ export const useCustomerFlowData = ({
       // boundary 컬럼은 optional - 일부 스키마에만 존재할 수 있음
       const { data: zones, error: zonesError } = await supabase
         .from('zones_dim')
-        .select('id, zone_name, zone_code, zone_type, position_x, position_z, coordinates')
+        .select('id, zone_name, zone_code, zone_type, position_x, position_y, position_z')
         .eq('store_id', storeId)
         .order('zone_code');
 
@@ -112,16 +112,16 @@ export const useCustomerFlowData = ({
       const zoneMap = new Map<string, ZoneInfo>();
       zones.forEach(z => {
         const center = {
-          x: z.position_x ?? z.coordinates?.x ?? 0,
-          y: 0,
-          z: z.position_z ?? z.coordinates?.z ?? 0,
+          x: z.position_x ?? 0,
+          y: z.position_y ?? 0,
+          z: z.position_z ?? 0,
         };
 
         zoneMap.set(z.id, {
           id: z.id,
           zone_name: z.zone_name || z.zone_code || 'Unknown',
           zone_code: z.zone_code || '',
-          zone_type: z.zone_type,
+          zone_type: z.zone_type ?? undefined,
           center,
           // boundary는 optional이며 별도 컬럼이 필요할 경우 추가
         });

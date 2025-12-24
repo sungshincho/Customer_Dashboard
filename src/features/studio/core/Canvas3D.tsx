@@ -8,12 +8,14 @@
  * - 실시간 고객 시뮬레이션 지원
  */
 
-import { Suspense, ReactNode } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera, Preload } from '@react-three/drei';
+import { Suspense, ReactNode, useRef, useState, useMemo } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { OrbitControls, PerspectiveCamera, Preload, useGLTF } from '@react-three/drei';
+import * as THREE from 'three';
 import { cn } from '@/lib/utils';
 import { useScene } from './SceneProvider';
 import { SceneEnvironment } from './SceneEnvironment';
+import { useEnvironmentModels } from '../hooks/useEnvironmentModels';
 import { ModelLoader } from './ModelLoader';
 import { SelectionManager } from './SelectionManager';
 import { TransformControls } from './TransformControls';
@@ -43,11 +45,12 @@ interface SimulationZone {
 }
 
 // ============================================================================
-// 확장된 Canvas3D Props (zones, storeId 추가)
+// 확장된 Canvas3D Props (zones, userId, storeId 추가)
 // ============================================================================
 interface ExtendedCanvas3DProps extends Canvas3DProps {
   zones?: SimulationZone[];
-  storeId?: string;  // 🆕 DB 기반 시뮬레이션용
+  userId?: string;
+  storeId?: string;
 }
 
 // ============================================================================
@@ -64,8 +67,15 @@ export function Canvas3D({
   children,
   onAssetClick,
   zones = [],
-  storeId,  // 🆕 DB 기반 시뮬레이션용
+  userId,
+  storeId,
 }: ExtendedCanvas3DProps) {
+  // environment 폴더에서 환경 모델 로드
+  const { models: environmentModels } = useEnvironmentModels({
+    userId,
+    storeId,
+    enabled: !!userId && !!storeId,
+  });
   return (
     <div className={cn('w-full h-full', className)}>
       <Canvas
@@ -89,6 +99,7 @@ export function Canvas3D({
           onAssetClick={onAssetClick}
           zones={zones}
           storeId={storeId}
+          environmentModels={environmentModels}
         >
           {children}
         </SceneContent>
@@ -100,6 +111,14 @@ export function Canvas3D({
 // ============================================================================
 // 씬 컨텐츠 (Canvas 내부)
 // ============================================================================
+interface EnvironmentModelProp {
+  url: string;
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+  scale?: [number, number, number];
+  isBaked?: boolean;
+}
+
 interface SceneContentProps {
   mode: StudioMode;
   transformMode: string;
@@ -111,6 +130,7 @@ interface SceneContentProps {
   children?: ReactNode;
   zones?: SimulationZone[];
   storeId?: string;  // 🆕 DB 기반 시뮬레이션용
+  environmentModels?: EnvironmentModelProp[];
 }
 
 function SceneContent({
@@ -124,6 +144,7 @@ function SceneContent({
   children,
   zones = [],
   storeId,  // 🆕 DB 기반 시뮬레이션용
+  environmentModels = [],
 }: SceneContentProps) {
   const { camera } = useScene();
 
@@ -152,7 +173,15 @@ function SceneContent({
 
       <Suspense fallback={<LoadingFallback />}>
         {/* 환경 설정 */}
-        <SceneEnvironment />
+        <SceneEnvironment
+          environmentModels={environmentModels.map((m) => ({
+            url: m.url,
+            position: m.position,
+            rotation: m.rotation,
+            scale: m.scale,
+            isBaked: m.isBaked,
+          }))}
+        />
 
         {/* 그리드 (편집 모드) */}
         {showGrid && (
@@ -166,10 +195,10 @@ function SceneContent({
             target={[camera.target.x, camera.target.y, camera.target.z]}
             enableDamping
             dampingFactor={0.05}
-            minDistance={2}
-            maxDistance={100}
-            maxPolarAngle={Math.PI / 2 + 0.1}
-            minPolarAngle={0.1}
+            minDistance={8}
+            maxDistance={40}
+            maxPolarAngle={Math.PI / 2.5}
+            minPolarAngle={0.3}
           />
         )}
 
@@ -242,6 +271,9 @@ function SceneModels({ onAssetClick }: SceneModelsProps) {
               }))
             : undefined;
 
+          // 공간(space) 타입은 클릭 비활성화
+          const isSpace = model.type === 'space';
+
           return (
             <group
               key={model.id}
@@ -255,15 +287,23 @@ function SceneModels({ onAssetClick }: SceneModelsProps) {
                 position={[0, 0, 0]}  // group이 position 담당
                 rotation={[0, 0, 0]}  // group이 rotation 담당
                 scale={model.scale}
-                selected={model.id === selectedId}
-                hovered={model.id === hoveredId}
-                onClick={() => {
+                selected={false}  // 선택 박스는 바깥에서 렌더링
+                hovered={!isSpace && model.id === hoveredId}
+                onClick={isSpace ? undefined : () => {
                   select(model.id);
                   onAssetClick?.(model.id, model.type);
                 }}
-                onPointerOver={() => hover(model.id)}
-                onPointerOut={() => hover(null)}
+                onPointerOver={isSpace ? undefined : () => hover(model.id)}
+                onPointerOut={isSpace ? undefined : () => hover(null)}
               />
+
+              {/* 선택 박스 - 바깥 group에서 렌더링 (rotation 따라감) */}
+              {!isSpace && model.id === selectedId && (
+                <SelectionBox 
+                  scale={model.scale} 
+                  url={model.url}
+                />
+              )}
 
               {/* 자식 제품들 (가구 기준 상대 좌표) - 개별 visible 속성 사용 */}
               {hasChildren && childProducts!.map((child, idx) => {
@@ -359,10 +399,10 @@ export function StandaloneCanvas3D({
               target={cameraTarget}
               enableDamping
               dampingFactor={0.05}
-              minDistance={2}
-              maxDistance={100}
-              maxPolarAngle={Math.PI / 2 + 0.1}
-              minPolarAngle={0.1}
+              minDistance={8}
+              maxDistance={40}
+              maxPolarAngle={Math.PI / 2.5}
+              minPolarAngle={0.3}
             />
           )}
 
@@ -374,6 +414,75 @@ export function StandaloneCanvas3D({
         </Suspense>
       </Canvas>
     </div>
+  );
+}
+
+// ============================================================================
+// 선택 박스 컴포넌트 (바깥 group에서 rotation 따라감)
+// ============================================================================
+interface SelectionBoxProps {
+  scale: [number, number, number];
+  url: string;
+}
+
+function SelectionBox({ scale, url }: SelectionBoxProps) {
+  const meshRef = useRef<THREE.Mesh>(null);
+
+  // GLB 로드해서 BoundingBox 계산
+  const { scene } = useGLTF(url);
+  
+  const boundingBox = useMemo(() => {
+    if (!scene) return null;
+    
+    const cloned = scene.clone(true);
+    const box = new THREE.Box3().setFromObject(cloned);
+    const sizeVec = new THREE.Vector3();
+    box.getSize(sizeVec);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    
+    return {
+      width: sizeVec.x,
+      height: sizeVec.y,
+      depth: sizeVec.z,
+      centerY: center.y,
+    };
+  }, [scene]);
+
+  // 펄스 애니메이션
+  useFrame((state) => {
+    if (meshRef.current) {
+      const pulse = 1 + Math.sin(state.clock.elapsedTime * 3) * 0.02;
+      meshRef.current.scale.set(
+        scale[0] * pulse, 
+        scale[1] * pulse, 
+        scale[2] * pulse
+      );
+    }
+  });
+
+  if (!boundingBox) return null;
+
+  // 여백 추가 (10%)
+  const w = boundingBox.width * 1.1;
+  const h = boundingBox.height * 1.1;
+  const d = boundingBox.depth * 1.1;
+
+  return (
+    <mesh 
+      ref={meshRef} 
+      position={[0, boundingBox.centerY, 0]}
+      scale={scale}
+    >
+      <boxGeometry args={[w, h, d]} />
+      <meshBasicMaterial
+        color="#ea572a"
+        transparent
+        opacity={0.3}
+        side={THREE.DoubleSide}
+        depthWrite={false}
+      />
+    </mesh>
   );
 }
 

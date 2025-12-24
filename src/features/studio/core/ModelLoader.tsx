@@ -126,6 +126,8 @@ function GLTFModel({
   onError,
 }: GLTFModelProps) {
   const groupRef = useRef<THREE.Group>(null);
+  const [boundingBox, setBoundingBox] = useState<{ width: number; height: number; depth: number; centerY: number } | null>(null);
+  const boundingBoxCalculated = useRef(false);
 
   // GLTF 로드
   const { scene } = useGLTF(url, true, true, (error) => {
@@ -155,12 +157,46 @@ function GLTFModel({
       }
     });
 
+    // 클론 변경 시 BoundingBox 재계산 필요
+    boundingBoxCalculated.current = false;
+
     return cloned;
   }, [scene, castShadow, receiveShadow, shouldUseBaked]);
 
-  // 선택/호버 하이라이트 애니메이션
-  useFrame((_, delta) => {
-    if (!groupRef.current) return;
+  // 실제 렌더링 후 BoundingBox 계산 (useFrame으로 한 번만 실행)
+  useFrame(() => {
+    if (!boundingBoxCalculated.current && groupRef.current) {
+      // 스케일, 로테이션 적용 전 원본 크기 계산을 위해 임시로 리셋
+      const originalScale = groupRef.current.scale.clone();
+      const originalRotation = groupRef.current.rotation.clone();
+      
+      groupRef.current.scale.set(1, 1, 1);
+      groupRef.current.rotation.set(0, 0, 0);
+      groupRef.current.updateMatrixWorld(true);
+      
+      const box = new THREE.Box3().setFromObject(groupRef.current);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+      
+      // 스케일, 로테이션 복원
+      groupRef.current.scale.copy(originalScale);
+      groupRef.current.rotation.copy(originalRotation);
+      groupRef.current.updateMatrixWorld(true);
+      
+      // position을 빼서 로컬 좌표로 변환
+      const localCenterY = center.y - (position[1] || 0);
+      
+      setBoundingBox({
+        width: size.x,
+        height: size.y,
+        depth: size.z,
+        centerY: localCenterY,
+      });
+      
+      boundingBoxCalculated.current = true;
+    }
   });
 
   return (
@@ -186,7 +222,14 @@ function GLTFModel({
       <primitive object={clonedScene} />
 
       {/* 선택 표시 */}
-      {selected && <SelectionOutline />}
+      {selected && boundingBox && (
+        <SelectionOutline 
+          width={boundingBox.width} 
+          height={boundingBox.height} 
+          depth={boundingBox.depth}
+          centerY={boundingBox.centerY}
+        />
+      )}
     </group>
   );
 }
@@ -260,25 +303,38 @@ function FallbackModel({
 // ============================================================================
 // 선택 아웃라인
 // ============================================================================
-function SelectionOutline() {
+interface SelectionOutlineProps {
+  width?: number;
+  height?: number;
+  depth?: number;
+  centerY?: number;
+}
+
+function SelectionOutline({ width = 1, height = 1, depth = 1, centerY = 0.5 }: SelectionOutlineProps) {
   const outlineRef = useRef<THREE.Mesh>(null);
 
   useFrame((state) => {
     if (outlineRef.current) {
       // 펄스 애니메이션
-      const scale = 1 + Math.sin(state.clock.elapsedTime * 3) * 0.02;
-      outlineRef.current.scale.set(scale, scale, scale);
+      const pulse = 1 + Math.sin(state.clock.elapsedTime * 3) * 0.02;
+      outlineRef.current.scale.set(pulse, pulse, pulse);
     }
   });
 
+  // 약간의 여백 추가 (10%)
+  const w = width * 1.1;
+  const h = height * 1.1;
+  const d = depth * 1.1;
+
   return (
-    <mesh ref={outlineRef}>
-      <boxGeometry args={[1.1, 1.1, 1.1]} />
+    <mesh ref={outlineRef} position={[0, centerY, 0]}>
+      <boxGeometry args={[w, h, d]} />
       <meshBasicMaterial
         color="#3b82f6"
         transparent
-        opacity={0.2}
-        side={THREE.BackSide}
+        opacity={0.15}
+        side={THREE.DoubleSide}
+        depthWrite={false}
       />
     </mesh>
   );

@@ -106,6 +106,9 @@ export default function DigitalTwinStudioPage() {
   // 실제 DB 스태프 데이터
   const { staff: dbStaff, loading: staffLoading, error: staffError } = useStaffData({ storeId: selectedStore?.id });
 
+  // 🆕 로그인된 계정의 스토어 ID
+  const storeId = selectedStore?.id;
+
   // 스태프 데이터 디버깅
   useEffect(() => {
     const debugInfo = {
@@ -706,6 +709,7 @@ export default function DigitalTwinStudioPage() {
                 enableTransform={isEditMode}
                 showGrid={isEditMode}
                 zones={simulationZones}
+                userId={user?.id}
                 storeId={selectedStore?.id}
               >
                 {/* zones_dim 기반 구역 바닥 오버레이 (DB 데이터 우선) */}
@@ -856,14 +860,14 @@ export default function DigitalTwinStudioPage() {
                     animateTimeProgress={false}
                   />
                 )}
-                {sceneSimulation.state.results.staffing && viewMode !== 'as-is' && (
+                {sceneSimulation.state.results.staffing && (viewMode as string) !== 'as-is' && (
                   <StaffingOverlay
                     result={sceneSimulation.state.results.staffing as any}
                     showStaffMarkers={true}
-                    showCurrentPositions={viewMode === 'split'}
-                    showSuggestedPositions={viewMode === 'to-be' || viewMode === 'split'}
-                    showCoverageZones={viewMode !== 'as-is'}
-                    showMovementPaths={viewMode === 'to-be' || viewMode === 'split'}
+                    showCurrentPositions={(viewMode as string) === 'split'}
+                    showSuggestedPositions={(viewMode as string) === 'to-be' || (viewMode as string) === 'split'}
+                    showCoverageZones={(viewMode as string) !== 'as-is'}
+                    showMovementPaths={(viewMode as string) === 'to-be' || (viewMode as string) === 'split'}
                     animateMovement={true}
                   />
                 )}
