@@ -160,10 +160,10 @@ function SceneContent({
             target={[camera.target.x, camera.target.y, camera.target.z]}
             enableDamping
             dampingFactor={0.05}
-            minDistance={2}
-            maxDistance={100}
-            maxPolarAngle={Math.PI / 2 + 0.1}
-            minPolarAngle={0.1}
+            minDistance={8}
+            maxDistance={40}
+            maxPolarAngle={Math.PI / 2.5}
+            minPolarAngle={0.3}
           />
         )}
 
@@ -364,10 +364,10 @@ export function StandaloneCanvas3D({
               target={cameraTarget}
               enableDamping
               dampingFactor={0.05}
-              minDistance={2}
-              maxDistance={100}
-              maxPolarAngle={Math.PI / 2 + 0.1}
-              minPolarAngle={0.1}
+              minDistance={8}
+              maxDistance={40}
+              maxPolarAngle={Math.PI / 2.5}
+              minPolarAngle={0.3}
             />
           )}
 
