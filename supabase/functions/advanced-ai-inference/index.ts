@@ -4314,8 +4314,40 @@ function generateBottlenecksFromZoneMetrics(
 async function performStaffingOptimization(request: InferenceRequest, apiKey: string) {
   const { params } = request;
   const storeContext = params?.storeContext;
-  const staffCount = params?.staffCount || 3;
+  const supabaseClient = params?.supabaseClient;
   const goal = params?.goal || 'customer_service';
+
+  // 🆕 실제 직원 데이터 조회
+  let realStaffData: any[] = [];
+  const storeId = storeContext?.storeInfo?.storeId;
+
+  if (supabaseClient && storeId) {
+    try {
+      const { data: staffRows, error: staffError } = await supabaseClient
+        .from('staff')
+        .select('id, staff_code, staff_name, role, department, is_active')
+        .eq('store_id', storeId)
+        .eq('is_active', true)
+        .limit(20);
+
+      if (!staffError && staffRows && staffRows.length > 0) {
+        realStaffData = staffRows;
+        console.log(`[performStaffingOptimization] Loaded ${realStaffData.length} staff members from DB`);
+      } else {
+        console.warn('[performStaffingOptimization] No staff data found, using AI-generated placeholders');
+      }
+    } catch (err) {
+      console.error('[performStaffingOptimization] Error loading staff data:', err);
+    }
+  }
+
+  const staffCount = realStaffData.length > 0 ? realStaffData.length : (params?.staffCount || 3);
+
+  // 🆕 실제 직원 정보를 프롬프트에 포함
+  const staffInfoSection = realStaffData.length > 0
+    ? `ACTUAL STAFF MEMBERS (use these exact IDs and names):
+${realStaffData.map((s: any, idx: number) => `- ${s.staff_code || `STAFF-${idx+1}`}: ${s.staff_name} (${s.role || 'sales'})`).join('\n')}`
+    : `- Available Staff Count: ${staffCount}`;
 
   // 프롬프트 빌드
   const prompt = `You are an expert retail operations AI specializing in staff placement optimization.
@@ -4328,7 +4360,7 @@ ${storeContext?.storeInfo ? `- Store: ${storeContext.storeInfo.name}
 - Business Type: ${storeContext.storeInfo.businessType || 'Retail'}` : '- Standard retail store'}
 
 STAFF PARAMETERS:
-- Available Staff: ${staffCount}
+${staffInfoSection}
 - Optimization Goal: ${goal}
 
 ${storeContext?.zones?.length ? `ZONES:
@@ -4340,6 +4372,8 @@ ${storeContext.zoneMetrics.slice(0, 8).map((z: any) => `- ${z.zoneName}: ${z.vis
 ${storeContext?.dailySales?.length ? `SALES PATTERNS:
 - Average daily visitors: ${Math.round(storeContext.dailySales.slice(0, 7).reduce((sum: number, d: any) => sum + (d.visitorCount || 0), 0) / Math.min(7, storeContext.dailySales.length))}
 - Average transactions: ${Math.round(storeContext.dailySales.slice(0, 7).reduce((sum: number, d: any) => sum + (d.transactionCount || 0), 0) / Math.min(7, storeContext.dailySales.length))}` : ''}
+
+${realStaffData.length > 0 ? `IMPORTANT: Use the exact staff IDs and names from ACTUAL STAFF MEMBERS above. Do NOT generate fake names.` : ''}
 
 Return a JSON object with this exact structure:
 {
@@ -4408,12 +4442,22 @@ Return a JSON object with this exact structure:
     const halfWidth = storeWidth / 2;
     const halfDepth = storeDepth / 2;
 
-    // AI 응답이 없거나 부족한 경우 기본 배치 생성
+    // AI 응답이 없거나 부족한 경우 기본 배치 생성 (🆕 실제 직원 데이터 사용)
     let staffPositions = aiResponse.staffPositions || [];
     if (staffPositions.length === 0) {
-      staffPositions = Array.from({ length: staffCount }, (_, idx) => ({
-        staffId: `staff-${idx}`,
-        staffName: `직원 ${idx + 1}`,
+      // 실제 직원 데이터가 있으면 그 정보 사용, 없으면 제네릭 데이터 사용
+      const staffSource = realStaffData.length > 0 ? realStaffData : Array.from({ length: staffCount }, (_, i) => ({
+        id: `staff-${i}`,
+        staff_code: `STAFF-${i + 1}`,
+        staff_name: `직원 ${i + 1}`,
+        role: 'sales',
+      }));
+
+      staffPositions = staffSource.map((staff: any, idx: number) => ({
+        staffId: staff.id || `staff-${idx}`,
+        staffCode: staff.staff_code || `STAFF-${idx + 1}`,
+        staffName: staff.staff_name || `직원 ${idx + 1}`,
+        role: staff.role || 'sales',
         currentPosition: {
           x: -halfWidth / 2 + (idx * halfWidth / staffCount),
           y: 0.5,
@@ -4427,6 +4471,18 @@ Return a JSON object with this exact structure:
         coverageGain: 10 + idx * 5,
         reason: '고객 밀집 구역 커버리지 확대를 위한 배치',
       }));
+    } else if (realStaffData.length > 0) {
+      // 🆕 AI 응답이 있는 경우, 실제 직원 데이터와 매핑
+      staffPositions = staffPositions.map((pos: any, idx: number) => {
+        const realStaff = realStaffData[idx] || realStaffData[0];
+        return {
+          ...pos,
+          staffId: realStaff?.id || pos.staffId,
+          staffCode: realStaff?.staff_code || pos.staffCode,
+          staffName: realStaff?.staff_name || pos.staffName,
+          role: realStaff?.role || pos.role || 'sales',
+        };
+      });
     }
 
     let zoneCoverage = aiResponse.zoneCoverage || [];
