@@ -13,9 +13,15 @@ import {
   Thermometer, Monitor, Eye, Lightbulb, Lock, Loader2,
   TrendingUp, Clock, DollarSign, AlertTriangle, Zap, Sparkles,
   Sun, Coffee, Moon, Flame, ChevronDown, ChevronUp,
-  Cloud, CloudRain, CloudSnow, Wind, Calendar,
+  Cloud, CloudRain, CloudSnow, Wind, Calendar, Settings,
 } from 'lucide-react';
 import { useEnvironmentContext } from '../hooks/useEnvironmentContext';
+import { SimulationEnvironmentSettings } from '../components/SimulationEnvironmentSettings';
+import type { SimulationEnvironmentConfig } from '../types/simulationEnvironment.types';
+import {
+  createDefaultSimulationConfig,
+  calculateSimulationImpacts,
+} from '../types/simulationEnvironment.types';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
@@ -108,6 +114,14 @@ export function AISimulationTab({
   const [duration, setDuration] = useState(60);
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
 
+  // 🆕 시뮬레이션 환경 설정 상태
+  const [showEnvironmentSettings, setShowEnvironmentSettings] = useState(false);
+  const [simulationEnvConfig, setSimulationEnvConfig] = useState<SimulationEnvironmentConfig>(() => {
+    const config = createDefaultSimulationConfig();
+    config.calculatedImpact = calculateSimulationImpacts(config);
+    return config;
+  });
+
   // 시각화 옵션
   const [showCustomerLabels, setShowCustomerLabels] = useState(false);
   const [showCongestionHeatmap, setShowCongestionHeatmap] = useState(false);
@@ -160,11 +174,25 @@ export function AISimulationTab({
     } else {
       // AI 예측 시뮬레이션 실행
       try {
+        // 🆕 환경 설정에 따른 옵션 구성
+        const envConfigForAI = simulationEnvConfig.mode === 'simulation'
+          ? {
+              weather: simulationEnvConfig.weather,
+              temperature: simulationEnvConfig.temperature,
+              humidity: simulationEnvConfig.humidity,
+              holiday_type: simulationEnvConfig.holidayType,
+              day_of_week: simulationEnvConfig.dayOfWeek,
+              time_of_day: simulationEnvConfig.timeOfDay,
+              impact: simulationEnvConfig.calculatedImpact,
+            }
+          : envAiContext; // 실시간 모드면 실제 환경 데이터 사용
+
         // 옵션 설정
         setAIOptions({
           customer_count: customerCount,
           duration_minutes: duration,
           time_of_day: timeOfDay,
+          environment_context: envConfigForAI, // 환경 컨텍스트 추가
         });
 
         toast.loading('AI 예측 시뮬레이션 실행 중...', { id: 'ai-sim' });
@@ -181,7 +209,8 @@ export function AISimulationTab({
     }
   }, [
     storeId, simulationType, customerCount, duration, timeOfDay,
-    showCongestionHeatmap, startRealtime, runAIPrediction, setAIOptions, onOverlayToggle
+    showCongestionHeatmap, startRealtime, runAIPrediction, setAIOptions, onOverlayToggle,
+    simulationEnvConfig, envAiContext
   ]);
 
   // 시뮬레이션 중지
@@ -335,6 +364,40 @@ export function AISimulationTab({
             )}
           </div>
         )}
+
+        {/* 🆕 환경 설정 패널 (접기/펼치기) */}
+        <div className="border border-white/10 rounded-lg">
+          <button
+            onClick={() => setShowEnvironmentSettings(!showEnvironmentSettings)}
+            className="w-full flex items-center justify-between p-3 text-sm text-white/80"
+          >
+            <span className="font-medium flex items-center gap-2">
+              <Settings className="w-4 h-4" />
+              환경 설정 (시뮬레이션)
+            </span>
+            <div className="flex items-center gap-2">
+              <span className={cn(
+                "text-xs px-1.5 py-0.5 rounded",
+                simulationEnvConfig.mode === 'simulation'
+                  ? "bg-purple-500/20 text-purple-400"
+                  : "bg-blue-500/20 text-blue-400"
+              )}>
+                {simulationEnvConfig.mode === 'simulation' ? '시뮬레이션' : '실시간'}
+              </span>
+              {showEnvironmentSettings ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </div>
+          </button>
+
+          {showEnvironmentSettings && (
+            <div className="p-3 pt-0 border-t border-white/10">
+              <SimulationEnvironmentSettings
+                config={simulationEnvConfig}
+                onChange={setSimulationEnvConfig}
+                compact={true}
+              />
+            </div>
+          )}
+        </div>
 
         {/* 시간대 선택 */}
         <div className="space-y-2">
