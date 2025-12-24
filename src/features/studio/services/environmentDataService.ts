@@ -401,10 +401,10 @@ export async function fetchStoreEvents(
   }
 
   try {
-    let query = supabase
-      .from('store_events')
+    let query = (supabase
+      .from('store_events' as any)
       .select('*')
-      .eq('store_id', storeId);
+      .eq('store_id', storeId)) as any;
 
     // 상태 필터
     const now = new Date().toISOString();
