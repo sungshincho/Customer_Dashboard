@@ -57,7 +57,11 @@ export const StaffOptimizationResultPanel: React.FC<StaffOptimizationResultPanel
 
   const reallocations = result?.reallocations ?? [];
   const insights = result?.insights ?? [];
-  const confidence = result?.confidence ?? 0;
+  // 🔧 FIX: confidence가 객체일 수 있음 - {overall, factors} 구조 처리
+  const confidenceValue = typeof result?.confidence === 'object'
+    ? (result?.confidence as any)?.overall ?? 0
+    : result?.confidence ?? 0;
+  const confidence = Math.round(confidenceValue * 100);
 
   return (
     <div className="bg-muted/30 rounded-lg border">
