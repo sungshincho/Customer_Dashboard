@@ -36,10 +36,10 @@ BEGIN
   -- ═══════════════════════════════════════════════════════════════════════
   -- 1. 공간 모델 URL (zones_dim)
   -- ═══════════════════════════════════════════════════════════════════════
-  -- 📁 파일명: store_simple_10x10.glb
+  -- 📁 파일명: store_simple_10x10_baked.glb
 
   UPDATE zones_dim SET
-    model_3d_url = v_storage_base || '/spaces/store_simple_10x10.glb'
+    model_3d_url = v_storage_base || '/spaces/store_simple_10x10_baked.glb'
   WHERE store_id = v_store_id AND zone_code = 'Z001';  -- 입구/통로
 
   RAISE NOTICE '  ✓ 공간 모델 URL 설정';
@@ -131,7 +131,7 @@ BEGIN
   RAISE NOTICE '════════════════════════════════════════════════════════════════';
   RAISE NOTICE '';
   RAISE NOTICE '  📦 설정된 모델:';
-  RAISE NOTICE '    - 공간: 1개 (store_simple_10x10.glb)';
+  RAISE NOTICE '    - 공간: 1개 (store_simple_10x10_baked.glb)';
   RAISE NOTICE '    - 가구: 4종 (rack_hanger, shelf, table, rack_shoes)';
   RAISE NOTICE '    - 상품: 5개 (coat, sweater, shoes, giftbox, tshirt_stack)';
   RAISE NOTICE '    - 아바타: 1개 (avatar_staff)';
