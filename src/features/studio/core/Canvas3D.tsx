@@ -199,9 +199,7 @@ function SceneContent({
             maxDistance={40}
             maxPolarAngle={Math.PI / 2.5}
             minPolarAngle={0.3}
-            enablePan={true}
-            panSpeed={0.5}
-            maxTargetRadius={15}
+            enablePan={false}
           />
         )}
 
@@ -406,9 +404,7 @@ export function StandaloneCanvas3D({
               maxDistance={40}
               maxPolarAngle={Math.PI / 2.5}
               minPolarAngle={0.3}
-              enablePan={true}
-              panSpeed={0.5}
-              maxTargetRadius={15}
+              enablePan={false}
             />
           )}
 
