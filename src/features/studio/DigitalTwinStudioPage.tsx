@@ -187,15 +187,28 @@ export default function DigitalTwinStudioPage() {
 
   // 🆕 환경 설정 변경 핸들러
   const handleEnvironmentConfigChange = useCallback((config: SimulationEnvironmentConfig) => {
+    console.log('[DigitalTwinStudio] Environment config changed:', {
+      mode: config.mode,
+      weather: config.manualSettings?.weather,
+      autoLoadedWeather: config.autoLoadedData?.weather?.condition,
+    });
+
     // 원본 설정 저장 (AI 최적화에서 사용)
     setSimulationEnvConfig(config);
 
-    // 시뮬레이션 모드일 때만 렌더링 설정 적용
-    if (config.mode === 'simulation') {
+    // 🔧 FIX: 날짜선택/직접설정 모드일 때 렌더링 설정 적용
+    if (config.mode === 'dateSelect' || config.mode === 'manual') {
       const renderingConfig = convertToRenderingConfig(config);
+      console.log('[DigitalTwinStudio] Setting rendering config:', {
+        weatherCondition: renderingConfig.weatherCondition,
+        particleType: renderingConfig.particles?.weatherParticles?.type,
+        particleCount: renderingConfig.particles?.weatherParticles?.count,
+        particleEnabled: renderingConfig.particles?.weatherParticles?.enabled,
+      });
       setEnvironmentRenderingConfig(renderingConfig);
     } else {
       // 실시간 모드일 때는 기본 환경으로 리셋
+      console.log('[DigitalTwinStudio] Realtime mode - clearing rendering config');
       setEnvironmentRenderingConfig(null);
     }
   }, []);

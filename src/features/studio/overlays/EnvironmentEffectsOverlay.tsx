@@ -323,8 +323,18 @@ export function EnvironmentEffectsOverlay({
   particleScale = 30,
   debugMode = false,
 }: EnvironmentEffectsOverlayProps) {
+  // 🔧 디버그 로그
+  console.log('[EnvironmentEffectsOverlay] Render:', {
+    hasConfig: !!renderingConfig,
+    enabled,
+    particleType: renderingConfig?.particles?.weatherParticles?.type,
+    particleCount: renderingConfig?.particles?.weatherParticles?.count,
+    particleEnabled: renderingConfig?.particles?.weatherParticles?.enabled,
+  });
+
   // 렌더링 설정이 없거나 비활성화되면 렌더링하지 않음
   if (!renderingConfig || !enabled) {
+    console.log('[EnvironmentEffectsOverlay] Skipping render - no config or disabled');
     return null;
   }
 
@@ -332,6 +342,7 @@ export function EnvironmentEffectsOverlay({
 
   // 파티클 설정이 변경될 때 컴포넌트를 재생성하기 위한 key
   const particleKey = `${particles.weatherParticles.type}-${particles.weatherParticles.count}-${particles.weatherParticles.intensity}`;
+  console.log('[EnvironmentEffectsOverlay] Particle key:', particleKey);
 
   return (
     <group name="environment-effects">

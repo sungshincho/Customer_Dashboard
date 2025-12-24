@@ -31,7 +31,7 @@ import type {
 import { DEFAULT_OPTIMIZATION_SETTINGS, INTENSITY_LIMITS } from '../types/optimization.types';
 import type { StaffOptimizationResult } from '../types/staffOptimization.types';
 import type { SimulationEnvironmentConfig } from '../types/simulationEnvironment.types';
-import { WEATHER_OPTIONS, HOLIDAY_OPTIONS, TIME_OF_DAY_OPTIONS } from '../types/simulationEnvironment.types';
+import { WEATHER_OPTIONS, HOLIDAY_OPTIONS, TIME_OF_DAY_OPTIONS, getEffectiveWeather, getEffectiveTimeOfDay, getEffectiveHoliday } from '../types/simulationEnvironment.types';
 
 type OptimizationType = 'layout' | 'flow' | 'staffing';
 type ViewMode = 'all' | 'as-is' | 'to-be';
@@ -278,15 +278,14 @@ export function AIOptimizationTab({
       // 선택된 최적화만 실행하도록 파라미터 구성
       const params: Record<string, Record<string, any>> = {};
 
-      // 🆕 환경 컨텍스트 구성 (시뮬레이션 모드일 때만 사용)
-      const environmentContext = simulationEnvConfig?.mode === 'simulation'
+      // 🔧 FIX: 환경 컨텍스트 구성 (날짜선택/직접설정 모드일 때 사용)
+      const environmentContext = simulationEnvConfig && (simulationEnvConfig.mode === 'dateSelect' || simulationEnvConfig.mode === 'manual')
         ? {
-            weather: simulationEnvConfig.weather,
-            temperature: simulationEnvConfig.temperature,
-            humidity: simulationEnvConfig.humidity,
-            holiday_type: simulationEnvConfig.holidayType,
-            day_of_week: simulationEnvConfig.dayOfWeek,
-            time_of_day: simulationEnvConfig.timeOfDay,
+            weather: getEffectiveWeather(simulationEnvConfig),
+            temperature: simulationEnvConfig.autoLoadedData?.weather?.temperature ?? 20,
+            humidity: simulationEnvConfig.autoLoadedData?.weather?.humidity ?? 50,
+            holiday_type: getEffectiveHoliday(simulationEnvConfig),
+            time_of_day: getEffectiveTimeOfDay(simulationEnvConfig),
             impact: simulationEnvConfig.calculatedImpact,
           }
         : null;
@@ -653,8 +652,8 @@ export function AIOptimizationTab({
         />
       )}
 
-      {/* ========== 🆕 환경 설정 컨텍스트 (AI 시뮬레이션에서 전달) ========== */}
-      {simulationEnvConfig?.mode === 'simulation' && (
+      {/* ========== 🔧 FIX: 환경 설정 컨텍스트 (날짜선택/직접설정 모드일 때 표시) ========== */}
+      {simulationEnvConfig && (simulationEnvConfig.mode === 'dateSelect' || simulationEnvConfig.mode === 'manual') && (
         <div className="p-3 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg border border-blue-500/30 space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-white/80 flex items-center gap-1.5">
@@ -662,7 +661,7 @@ export function AIOptimizationTab({
               환경 컨텍스트 적용됨
             </span>
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">
-              시뮬레이션 모드
+              {simulationEnvConfig.mode === 'dateSelect' ? '날짜 선택' : '직접 설정'}
             </span>
           </div>
 
@@ -670,30 +669,30 @@ export function AIOptimizationTab({
             {/* 날씨 */}
             <div className="flex items-center gap-1.5">
               <span className="text-sm">
-                {WEATHER_OPTIONS.find((w) => w.value === simulationEnvConfig.weather)?.emoji}
+                {WEATHER_OPTIONS.find((w) => w.value === getEffectiveWeather(simulationEnvConfig))?.emoji}
               </span>
               <span className="text-white/70">
-                {WEATHER_OPTIONS.find((w) => w.value === simulationEnvConfig.weather)?.label}
+                {WEATHER_OPTIONS.find((w) => w.value === getEffectiveWeather(simulationEnvConfig))?.label}
               </span>
             </div>
 
             {/* 휴일 */}
             <div className="flex items-center gap-1.5">
               <span className="text-sm">
-                {HOLIDAY_OPTIONS.find((h) => h.value === simulationEnvConfig.holidayType)?.emoji}
+                {HOLIDAY_OPTIONS.find((h) => h.value === getEffectiveHoliday(simulationEnvConfig))?.emoji}
               </span>
               <span className="text-white/70">
-                {HOLIDAY_OPTIONS.find((h) => h.value === simulationEnvConfig.holidayType)?.label}
+                {HOLIDAY_OPTIONS.find((h) => h.value === getEffectiveHoliday(simulationEnvConfig))?.label}
               </span>
             </div>
 
             {/* 시간대 */}
             <div className="flex items-center gap-1.5">
               <span className="text-sm">
-                {TIME_OF_DAY_OPTIONS.find((t) => t.value === simulationEnvConfig.timeOfDay)?.emoji}
+                {TIME_OF_DAY_OPTIONS.find((t) => t.value === getEffectiveTimeOfDay(simulationEnvConfig))?.emoji}
               </span>
               <span className="text-white/70">
-                {TIME_OF_DAY_OPTIONS.find((t) => t.value === simulationEnvConfig.timeOfDay)?.label}
+                {TIME_OF_DAY_OPTIONS.find((t) => t.value === getEffectiveTimeOfDay(simulationEnvConfig))?.label}
               </span>
             </div>
           </div>
