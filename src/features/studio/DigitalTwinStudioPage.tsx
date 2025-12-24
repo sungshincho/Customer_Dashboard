@@ -162,7 +162,7 @@ export default function DigitalTwinStudioPage() {
 
   // 드래그 패널 표시 상태
   const [visiblePanels, setVisiblePanels] = useState<VisiblePanels>({
-    tools: true,
+    tools: false,
     sceneSave: true,
     property: true,
     resultReport: false, // 결과 있을 때만 자동 표시
