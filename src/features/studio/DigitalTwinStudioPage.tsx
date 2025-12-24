@@ -182,8 +182,14 @@ export default function DigitalTwinStudioPage() {
   // 🆕 환경 효과 렌더링 설정 (날씨, 시간대 등)
   const [environmentRenderingConfig, setEnvironmentRenderingConfig] = useState<RenderingConfig | null>(null);
 
+  // 🆕 시뮬레이션 환경 설정 원본 (AI 최적화에 전달용)
+  const [simulationEnvConfig, setSimulationEnvConfig] = useState<SimulationEnvironmentConfig | null>(null);
+
   // 🆕 환경 설정 변경 핸들러
   const handleEnvironmentConfigChange = useCallback((config: SimulationEnvironmentConfig) => {
+    // 원본 설정 저장 (AI 최적화에서 사용)
+    setSimulationEnvConfig(config);
+
     // 시뮬레이션 모드일 때만 렌더링 설정 적용
     if (config.mode === 'simulation') {
       const renderingConfig = convertToRenderingConfig(config);
@@ -1131,6 +1137,7 @@ export default function DigitalTwinStudioPage() {
                           }}
                           diagnosticIssues={diagnosticIssues}
                           onNavigateToApply={() => setActiveTab('apply')}
+                          simulationEnvConfig={simulationEnvConfig}
                         />
                       )}
                       {activeTab === 'apply' && (
