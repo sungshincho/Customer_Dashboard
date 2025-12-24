@@ -2197,7 +2197,7 @@ Base ALL recommendations on the provided real data.`
       return aiProductId;
     }
 
-    const productArray = Array.from(productEntities);
+    const productArray = Array.from(productEntities) as any[];
     const lowerAiId = aiProductId.toLowerCase();
 
     // 2. productLabel과 AI의 productLabel 비교
@@ -2206,7 +2206,7 @@ Base ALL recommendations on the provided real data.`
       const byLabel = productArray.find((p: any) =>
         p.label?.toLowerCase().includes(aiProduct.productLabel.toLowerCase()) ||
         aiProduct.productLabel.toLowerCase().includes((p.label || '').toLowerCase())
-      );
+      ) as any;
       if (byLabel) {
         console.log(`[ProductMapping] Matched by label: ${aiProductId} → ${byLabel.id}`);
         return byLabel.id;
@@ -2216,30 +2216,30 @@ Base ALL recommendations on the provided real data.`
     // 3. 시맨틱 키워드로 매핑 (AI가 "product-new-arrival-knit-01" 같은 형식 생성 시)
     const semanticMap: Record<string, string[]> = {
       // 의류
-      'knit': ['TOP', 'SWT', 'KNI'],
-      'sweater': ['TOP', 'SWT', 'KNI'],
-      'tshirt': ['TOP', 'TSH'],
+      knit: ['TOP', 'SWT', 'KNI'],
+      sweater: ['TOP', 'SWT', 'KNI'],
+      tshirt: ['TOP', 'TSH'],
       't-shirt': ['TOP', 'TSH'],
-      'shirt': ['TOP', 'SHI'],
-      'blouse': ['TOP', 'BLO'],
-      'pants': ['BTM', 'PNT'],
-      'jeans': ['BTM', 'JNS'],
-      'skirt': ['BTM', 'SKI'],
-      'dress': ['DRS', 'ONE'],
-      'coat': ['OUT', 'COA'],
-      'jacket': ['OUT', 'JAC'],
+      shirt: ['TOP', 'SHI'],
+      blouse: ['TOP', 'BLO'],
+      pants: ['BTM', 'PNT'],
+      jeans: ['BTM', 'JNS'],
+      skirt: ['BTM', 'SKI'],
+      dress: ['DRS', 'ONE'],
+      coat: ['OUT', 'COA'],
+      jacket: ['OUT', 'JAC'],
       // 액세서리
-      'socks': ['SCA', 'SOC', 'ACC'],
-      'scarf': ['SCA', 'ACC'],
-      'hat': ['ACC', 'HAT'],
-      'bag': ['BAG'],
-      'shoes': ['SHO'],
-      'sneakers': ['SHO', 'SNE'],
+      socks: ['SCA', 'SOC', 'ACC'],
+      scarf: ['SCA', 'ACC'],
+      hat: ['ACC', 'HAT'],
+      bag: ['BAG'],
+      shoes: ['SHO'],
+      sneakers: ['SHO', 'SNE'],
       // 화장품
-      'lipstick': ['LIP', 'COS'],
-      'lip': ['LIP', 'COS'],
-      'perfume': ['PER', 'COS'],
-      'makeup': ['COS', 'MAK'],
+      lipstick: ['LIP', 'COS'],
+      lip: ['LIP', 'COS'],
+      perfume: ['PER', 'COS'],
+      makeup: ['COS', 'MAK'],
     };
 
     // AI ID에서 시맨틱 키워드 추출 시도
@@ -2250,9 +2250,11 @@ Base ALL recommendations on the provided real data.`
             (p.id || '').toUpperCase().includes(`-${cat}-`) ||
             (p.id || '').toUpperCase().includes(`SKU-${cat}`) ||
             (p.id || '').toUpperCase().includes(`-${cat}`)
-          );
+          ) as any;
           if (match) {
-            console.log(`[ProductMapping] Matched by semantic keyword "${keyword}": ${aiProductId} → ${match.id}`);
+            console.log(
+              `[ProductMapping] Matched by semantic keyword "${keyword}": ${aiProductId} → ${match.id}`
+            );
             return match.id;
           }
         }
@@ -2261,16 +2263,16 @@ Base ALL recommendations on the provided real data.`
 
     // 4. 카테고리 코드로 매핑 (예: "SWT" → "TOP")
     const categoryMap: Record<string, string[]> = {
-      'SWT': ['TOP', 'SWT'],
-      'TOP': ['TOP'],
-      'SCF': ['SCA', 'ACC'],
-      'SCA': ['SCA'],
-      'LIP': ['LIP'],
-      'BAG': ['BAG'],
-      'SHO': ['SHO'],
-      'ACC': ['ACC'],
-      'DRS': ['DRS'],
-      'PNT': ['PNT'],
+      SWT: ['TOP', 'SWT'],
+      TOP: ['TOP'],
+      SCF: ['SCA', 'ACC'],
+      SCA: ['SCA'],
+      LIP: ['LIP'],
+      BAG: ['BAG'],
+      SHO: ['SHO'],
+      ACC: ['ACC'],
+      DRS: ['DRS'],
+      PNT: ['PNT'],
     };
 
     const parts = aiProductId.split('-');
@@ -2280,9 +2282,8 @@ Base ALL recommendations on the provided real data.`
 
       for (const cat of possibleCategories) {
         const match = productArray.find((p: any) =>
-          (p.id || '').toUpperCase().includes(`-${cat}-`) ||
-          (p.id || '').toUpperCase().includes(`SKU-${cat}`)
-        );
+          (p.id || '').toUpperCase().includes(`-${cat}-`) || (p.id || '').toUpperCase().includes(`SKU-${cat}`)
+        ) as any;
         if (match) {
           console.log(`[ProductMapping] Matched by category ${aiCategory}→${cat}: ${aiProductId} → ${match.id}`);
           return match.id;
@@ -2293,9 +2294,9 @@ Base ALL recommendations on the provided real data.`
     // 5. 순서 기반 폴백: AI가 N번째 제품을 언급했다면 실제 목록의 N번째 제품 사용
     const aiIndex = aiResponse.productPlacements?.findIndex((p: any) => p.productId === aiProductId);
     if (aiIndex !== undefined && aiIndex >= 0 && aiIndex < productArray.length) {
-      const fallback = productArray[aiIndex];
-      console.log(`[ProductMapping] Fallback by index ${aiIndex}: ${aiProductId} → ${fallback.id}`);
-      return fallback.id;
+      const fallback = productArray[aiIndex] as any;
+      console.log(`[ProductMapping] Fallback by index ${aiIndex}: ${aiProductId} → ${fallback?.id}`);
+      return fallback?.id ?? null;
     }
 
     console.warn(`[ProductMapping] No match found for: ${aiProductId}`);
