@@ -615,3 +615,231 @@ export function getCacheStatus(): {
     },
   };
 }
+
+// ============================================================================
+// 7. 날짜 선택 모드용 간편 조회 함수
+// ============================================================================
+
+import type { AutoLoadedWeatherData, AutoLoadedEventData } from '../types/simulationEnvironment.types';
+
+/**
+ * 특정 날짜의 날씨 조회 (날짜 선택 모드용)
+ * - 최근 날짜: 실제 API 호출
+ * - 과거/미래: 계절 기반 추정
+ */
+export async function fetchHistoricalWeather(
+  date: Date,
+  lat?: number,
+  lon?: number
+): Promise<AutoLoadedWeatherData | null> {
+  const config = getConfig();
+  const latitude = lat ?? config.defaultLocation.lat;
+  const longitude = lon ?? config.defaultLocation.lon;
+
+  const now = new Date();
+  const targetDate = new Date(date);
+  const diffDays = Math.floor((targetDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+  // 오늘 또는 최근 날짜면 실제 API 호출
+  if (diffDays >= -1 && diffDays <= 1) {
+    const { data } = await fetchWeatherData(latitude, longitude);
+    if (data) {
+      return {
+        condition: data.condition,
+        temperature: Math.round(data.temperature),
+        humidity: data.humidity,
+        description: data.description,
+      };
+    }
+  }
+
+  // 그 외에는 계절 기반 추정
+  return estimateWeatherForDate(targetDate);
+}
+
+/**
+ * 날짜 기반 날씨 추정 (API 불가 시)
+ */
+function estimateWeatherForDate(date: Date): AutoLoadedWeatherData {
+  const month = date.getMonth() + 1;
+
+  // 계절별 평균 날씨 추정 (한국 기준)
+  if (month >= 3 && month <= 5) {
+    // 봄
+    return {
+      condition: 'clouds',
+      temperature: 15,
+      humidity: 60,
+      description: '봄 날씨 (추정)',
+    };
+  } else if (month >= 6 && month <= 8) {
+    // 여름
+    const isRainy = month === 7; // 7월은 장마
+    return {
+      condition: isRainy ? 'rain' : 'clouds',
+      temperature: 28,
+      humidity: 80,
+      description: isRainy ? '장마철 (추정)' : '여름 날씨 (추정)',
+    };
+  } else if (month >= 9 && month <= 11) {
+    // 가을
+    return {
+      condition: 'clear',
+      temperature: 18,
+      humidity: 50,
+      description: '가을 날씨 (추정)',
+    };
+  } else {
+    // 겨울
+    const isDecember = month === 12;
+    return {
+      condition: 'snow',
+      temperature: isDecember ? -2 : 2,
+      humidity: 40,
+      description: '겨울 날씨 (추정)',
+    };
+  }
+}
+
+/**
+ * 특정 날짜의 이벤트/휴일 조회 (날짜 선택 모드용)
+ */
+export async function fetchDateEvents(
+  storeId: string,
+  date: Date
+): Promise<AutoLoadedEventData[]> {
+  const events: AutoLoadedEventData[] = [];
+  const dateStr = date.toISOString().split('T')[0];
+  const monthDay = dateStr.slice(5); // "MM-DD"
+
+  // 1. 한국 공휴일 확인
+  const knownHolidays: Record<string, string> = {
+    '01-01': '신정',
+    '03-01': '삼일절',
+    '05-05': '어린이날',
+    '06-06': '현충일',
+    '08-15': '광복절',
+    '10-03': '개천절',
+    '10-09': '한글날',
+    '12-25': '크리스마스',
+  };
+
+  if (knownHolidays[monthDay]) {
+    events.push({
+      name: knownHolidays[monthDay],
+      type: 'holiday',
+    });
+  }
+
+  // 2. 특별 상업 이벤트 확인
+  const specialEvents: Record<string, string> = {
+    '02-14': '발렌타인데이',
+    '03-14': '화이트데이',
+    '05-08': '어버이날',
+    '11-11': '빼빼로데이',
+  };
+
+  if (specialEvents[monthDay]) {
+    events.push({
+      name: specialEvents[monthDay],
+      type: 'commercial',
+    });
+  }
+
+  // 3. 블랙프라이데이 (11월 네번째 금요일)
+  if (date.getMonth() === 10) {
+    const fourthFriday = getFourthFridayOfMonth(date.getFullYear(), 10);
+    if (date.getDate() === fourthFriday.getDate()) {
+      events.push({
+        name: '블랙프라이데이',
+        type: 'commercial',
+      });
+    }
+  }
+
+  // 4. DB에서 매장 이벤트 조회
+  if (storeId) {
+    try {
+      const { data: storeEvents } = await fetchStoreEvents(storeId, {
+        startDate: dateStr,
+        endDate: dateStr,
+      });
+      if (storeEvents.length > 0) {
+        events.push(
+          ...storeEvents.map((e) => ({
+            name: e.event_name || '매장 이벤트',
+            type: 'event' as const,
+          }))
+        );
+      }
+    } catch (e) {
+      console.warn('[Events] 날짜별 이벤트 조회 실패:', e);
+    }
+  }
+
+  // 5. 주말 확인
+  const dayOfWeek = date.getDay();
+  if (dayOfWeek === 0 || dayOfWeek === 6) {
+    if (events.length === 0) {
+      events.push({
+        name: dayOfWeek === 0 ? '일요일' : '토요일',
+        type: 'holiday',
+      });
+    }
+  }
+
+  return events;
+}
+
+/**
+ * 특정 월의 네번째 금요일 계산
+ */
+function getFourthFridayOfMonth(year: number, month: number): Date {
+  const firstDay = new Date(year, month, 1);
+  const dayOfWeek = firstDay.getDay();
+
+  // 첫번째 금요일 계산
+  let firstFriday = 1 + ((5 - dayOfWeek + 7) % 7);
+  if (dayOfWeek > 5) {
+    firstFriday += 7;
+  }
+
+  // 네번째 금요일
+  const fourthFriday = firstFriday + 21;
+  return new Date(year, month, fourthFriday);
+}
+
+/**
+ * 실시간 환경 데이터 (실시간 모드용)
+ */
+export interface RealTimeEnvironmentData {
+  weather: AutoLoadedWeatherData | null;
+  isHoliday: boolean;
+  isWeekend: boolean;
+  activeEvents: AutoLoadedEventData[];
+}
+
+/**
+ * 현재 환경 데이터 조회 (실시간 모드용)
+ */
+export async function fetchRealTimeEnvironment(
+  storeId?: string,
+  lat?: number,
+  lon?: number
+): Promise<RealTimeEnvironmentData> {
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+
+  // 병렬로 날씨와 이벤트 조회
+  const [weather, events] = await Promise.all([
+    fetchHistoricalWeather(now, lat, lon),
+    storeId ? fetchDateEvents(storeId, now) : Promise.resolve([]),
+  ]);
+
+  return {
+    weather,
+    isHoliday: events.some((e) => e.type === 'holiday'),
+    isWeekend: dayOfWeek === 0 || dayOfWeek === 6,
+    activeEvents: events,
+  };
+}

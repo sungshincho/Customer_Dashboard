@@ -11,8 +11,11 @@
 // 기본 타입
 // ============================================================================
 
-// 환경 모드
-export type EnvironmentMode = 'realtime' | 'simulation';
+// 환경 모드 (3가지)
+export type EnvironmentMode =
+  | 'realtime'    // 실시간 (현재 날씨/시간)
+  | 'dateSelect'  // 날짜 선택 (해당 날짜 날씨/이벤트 자동)
+  | 'manual';     // 직접 설정
 
 // 날씨 조건 옵션
 export type WeatherOption =
@@ -52,33 +55,62 @@ export type HolidayOption =
 export type TimeOfDayOption = 'morning' | 'afternoon' | 'evening' | 'night';
 
 // ============================================================================
-// 시뮬레이션 환경 설정
+// 자동 로드 데이터 타입
+// ============================================================================
+
+export interface AutoLoadedWeatherData {
+  condition: string;
+  temperature: number;
+  humidity: number;
+  description: string;
+}
+
+export interface AutoLoadedEventData {
+  name: string;
+  type: 'holiday' | 'commercial' | 'event';
+}
+
+// ============================================================================
+// 시뮬레이션 환경 설정 (개선된 구조)
 // ============================================================================
 
 export interface SimulationEnvironmentConfig {
   // 모드
   mode: EnvironmentMode;
 
-  // 날짜/시간 설정
-  date: Date;
-  timeOfDay: TimeOfDayOption;
-  dayOfWeek: DayOfWeekOption;
+  // 날짜 선택 모드용
+  selectedDate: Date;
 
-  // 날씨 설정
-  weather: WeatherOption;
-  temperature: number; // -20 ~ 40°C
-  humidity: number; // 0 ~ 100%
+  // 직접 설정 모드용
+  manualSettings: {
+    weather: WeatherOption;
+    timeOfDay: TimeOfDayOption;
+    holidayType: HolidayOption;
+  };
 
-  // 휴일/이벤트 설정
-  holidayType: HolidayOption;
-  customEventName?: string; // 커스텀 이벤트명
+  // 자동 로드된 데이터 (읽기 전용)
+  autoLoadedData?: {
+    weather?: AutoLoadedWeatherData;
+    events?: AutoLoadedEventData[];
+  };
 
-  // 계산된 영향도 (읽기 전용)
-  calculatedImpact?: {
+  // 계산된 영향도
+  calculatedImpact: {
     trafficMultiplier: number;
     dwellTimeMultiplier: number;
     conversionMultiplier: number;
   };
+
+  // === 레거시 호환용 (기존 코드 지원) ===
+  // @deprecated - 새 코드에서는 manualSettings 또는 autoLoadedData 사용
+  date?: Date;
+  timeOfDay?: TimeOfDayOption;
+  dayOfWeek?: DayOfWeekOption;
+  weather?: WeatherOption;
+  temperature?: number;
+  humidity?: number;
+  holidayType?: HolidayOption;
+  customEventName?: string;
 }
 
 // ============================================================================
@@ -249,52 +281,112 @@ export function getHolidayName(holiday: HolidayOption): string {
 }
 
 /**
- * 시뮬레이션 환경 설정에서 영향도 계산
+ * 날씨 조건에서 영향도 계산
  */
-export function calculateSimulationImpacts(config: SimulationEnvironmentConfig): {
+export function getWeatherImpactFromCondition(condition?: string): number {
+  const impacts: Record<string, number> = {
+    clear: 1.1, sunny: 1.1,
+    clouds: 1.0, cloudy: 0.95,
+    overcast: 0.95,
+    rain: 0.7, drizzle: 0.8,
+    thunderstorm: 0.4, heavyRain: 0.4,
+    snow: 0.65, heavySnow: 0.4,
+    mist: 0.85, fog: 0.85,
+    haze: 0.75,
+  };
+  return impacts[condition?.toLowerCase() || ''] || 1.0;
+}
+
+/**
+ * 시뮬레이션 환경 설정에서 영향도 계산 (개선된 버전)
+ */
+export function calculateSimulationImpacts(
+  config: SimulationEnvironmentConfig,
+  realTimeData?: { weather?: { condition: string }; isHoliday?: boolean; isWeekend?: boolean }
+): {
   trafficMultiplier: number;
   dwellTimeMultiplier: number;
   conversionMultiplier: number;
 } {
-  const weatherMeta = WEATHER_OPTIONS.find((w) => w.value === config.weather);
-  const holidayMeta = HOLIDAY_OPTIONS.find((h) => h.value === config.holidayType);
-  const dayMeta = DAY_OF_WEEK_OPTIONS.find((d) => d.value === config.dayOfWeek);
-  const timeMeta = TIME_OF_DAY_OPTIONS.find((t) => t.value === config.timeOfDay);
+  let weatherImpact = 1.0;
+  let holidayImpact = 1.0;
+  let timeImpact = 1.0;
+  let dwellTimeImpact = 1.0;
+  let conversionImpact = 1.0;
 
-  // 기온 영향
-  let tempImpact = 1.0;
-  if (config.temperature < 0) tempImpact = 0.85;
-  else if (config.temperature > 33) tempImpact = 0.8;
-  else if (config.temperature >= 18 && config.temperature <= 25) tempImpact = 1.05;
+  if (config.mode === 'manual') {
+    // 직접 설정 모드: 선택한 값 사용
+    const weatherMeta = WEATHER_OPTIONS.find((w) => w.value === config.manualSettings.weather);
+    const holidayMeta = HOLIDAY_OPTIONS.find((h) => h.value === config.manualSettings.holidayType);
+    const timeMeta = TIME_OF_DAY_OPTIONS.find((t) => t.value === config.manualSettings.timeOfDay);
 
-  // 트래픽 영향 계산
-  const trafficMultiplier =
-    (weatherMeta?.trafficImpact || 1) *
-    (holidayMeta?.trafficImpact || 1) *
-    (dayMeta?.trafficImpact || 1) *
-    (timeMeta?.trafficImpact || 1) *
-    tempImpact;
+    weatherImpact = weatherMeta?.trafficImpact || 1.0;
+    dwellTimeImpact = weatherMeta?.dwellTimeImpact || 1.0;
+    holidayImpact = holidayMeta?.trafficImpact || 1.0;
+    conversionImpact = holidayMeta?.conversionImpact || 1.0;
+    timeImpact = timeMeta?.trafficImpact || 1.0;
+  } else if (config.mode === 'dateSelect' && config.autoLoadedData) {
+    // 날짜 선택 모드: 자동 로드된 데이터 사용
+    weatherImpact = getWeatherImpactFromCondition(config.autoLoadedData.weather?.condition);
+    dwellTimeImpact = weatherImpact < 0.8 ? 1.2 : 1.0;
+    holidayImpact = config.autoLoadedData.events?.length ? 1.3 : 1.0;
+    conversionImpact = config.autoLoadedData.events?.some(e => e.type === 'commercial') ? 1.15 : 1.0;
+  } else if (config.mode === 'realtime' && realTimeData) {
+    // 실시간 모드: 현재 데이터 사용
+    weatherImpact = getWeatherImpactFromCondition(realTimeData.weather?.condition);
+    dwellTimeImpact = weatherImpact < 0.8 ? 1.2 : 1.0;
+    holidayImpact = realTimeData.isHoliday ? 1.2 : (realTimeData.isWeekend ? 1.35 : 1.0);
+    conversionImpact = realTimeData.isHoliday ? 1.1 : 1.0;
+  } else {
+    // 레거시 호환: 기존 필드 사용
+    const weatherMeta = WEATHER_OPTIONS.find((w) => w.value === config.weather);
+    const holidayMeta = HOLIDAY_OPTIONS.find((h) => h.value === config.holidayType);
+    const dayMeta = DAY_OF_WEEK_OPTIONS.find((d) => d.value === config.dayOfWeek);
+    const timeMeta = TIME_OF_DAY_OPTIONS.find((t) => t.value === config.timeOfDay);
 
-  // 체류시간 영향
-  const dwellTimeMultiplier = weatherMeta?.dwellTimeImpact || 1;
+    // 기온 영향 (레거시)
+    let tempImpact = 1.0;
+    if (config.temperature !== undefined) {
+      if (config.temperature < 0) tempImpact = 0.85;
+      else if (config.temperature > 33) tempImpact = 0.8;
+      else if (config.temperature >= 18 && config.temperature <= 25) tempImpact = 1.05;
+    }
 
-  // 전환율 영향
-  const conversionMultiplier = holidayMeta?.conversionImpact || 1;
+    weatherImpact = (weatherMeta?.trafficImpact || 1) * tempImpact;
+    dwellTimeImpact = weatherMeta?.dwellTimeImpact || 1;
+    holidayImpact = (holidayMeta?.trafficImpact || 1) * (dayMeta?.trafficImpact || 1);
+    conversionImpact = holidayMeta?.conversionImpact || 1;
+    timeImpact = timeMeta?.trafficImpact || 1;
+  }
+
+  const trafficMultiplier = weatherImpact * holidayImpact * timeImpact;
 
   return {
     trafficMultiplier: Math.round(trafficMultiplier * 100) / 100,
-    dwellTimeMultiplier: Math.round(dwellTimeMultiplier * 100) / 100,
-    conversionMultiplier: Math.round(conversionMultiplier * 100) / 100,
+    dwellTimeMultiplier: Math.round(dwellTimeImpact * 100) / 100,
+    conversionMultiplier: Math.round(conversionImpact * 100) / 100,
   };
 }
 
 /**
- * 기본 시뮬레이션 환경 설정 생성
+ * 기본 시뮬레이션 환경 설정 생성 (개선된 버전)
  */
 export function createDefaultSimulationConfig(): SimulationEnvironmentConfig {
   const now = new Date();
   return {
     mode: 'realtime',
+    selectedDate: now,
+    manualSettings: {
+      weather: 'clear',
+      timeOfDay: 'afternoon',
+      holidayType: 'none',
+    },
+    calculatedImpact: {
+      trafficMultiplier: 1.0,
+      dwellTimeMultiplier: 1.0,
+      conversionMultiplier: 1.0,
+    },
+    // 레거시 호환용
     date: now,
     timeOfDay: 'afternoon',
     dayOfWeek: getDayOfWeekFromDate(now),
@@ -303,6 +395,65 @@ export function createDefaultSimulationConfig(): SimulationEnvironmentConfig {
     humidity: 50,
     holidayType: 'none',
   };
+}
+
+/**
+ * 설정에서 현재 유효한 날씨 값 추출 (모드에 따라)
+ */
+export function getEffectiveWeather(config: SimulationEnvironmentConfig): WeatherOption {
+  if (config.mode === 'manual') {
+    return config.manualSettings.weather;
+  }
+  if (config.mode === 'dateSelect' && config.autoLoadedData?.weather) {
+    // API 응답 조건을 WeatherOption으로 매핑
+    const conditionMapping: Record<string, WeatherOption> = {
+      clear: 'clear', sunny: 'clear',
+      clouds: 'cloudy', cloudy: 'cloudy',
+      overcast: 'overcast',
+      rain: 'rain', drizzle: 'rain',
+      thunderstorm: 'heavyRain',
+      snow: 'snow',
+      mist: 'fog', fog: 'fog',
+      haze: 'haze',
+    };
+    return conditionMapping[config.autoLoadedData.weather.condition.toLowerCase()] || 'clear';
+  }
+  // 레거시/실시간 모드
+  return config.weather || 'clear';
+}
+
+/**
+ * 설정에서 현재 유효한 시간대 값 추출 (모드에 따라)
+ */
+export function getEffectiveTimeOfDay(config: SimulationEnvironmentConfig): TimeOfDayOption {
+  if (config.mode === 'manual') {
+    return config.manualSettings.timeOfDay;
+  }
+  // dateSelect 또는 realtime 모드에서는 현재 시간 기반
+  const hour = config.selectedDate?.getHours() || new Date().getHours();
+  if (hour >= 9 && hour < 12) return 'morning';
+  if (hour >= 12 && hour < 18) return 'afternoon';
+  if (hour >= 18 && hour < 21) return 'evening';
+  return 'night';
+}
+
+/**
+ * 설정에서 현재 유효한 휴일 값 추출 (모드에 따라)
+ */
+export function getEffectiveHoliday(config: SimulationEnvironmentConfig): HolidayOption {
+  if (config.mode === 'manual') {
+    return config.manualSettings.holidayType;
+  }
+  if (config.mode === 'dateSelect' && config.autoLoadedData?.events?.length) {
+    // 이벤트 타입에 따라 매핑
+    const event = config.autoLoadedData.events[0];
+    if (event.type === 'holiday') return 'holiday';
+    if (event.name?.includes('크리스마스')) return 'christmas';
+    if (event.name?.includes('블랙프라이데이')) return 'blackFriday';
+    return 'holiday';
+  }
+  // 레거시
+  return config.holidayType || 'none';
 }
 
 // ============================================================================
@@ -469,20 +620,25 @@ function getSeasonFromDate(date: Date): SeasonType {
 
 /**
  * SimulationEnvironmentConfig → RenderingConfig 변환
- * 3D 씬에서 사용할 렌더링 설정 생성
+ * 3D 씬에서 사용할 렌더링 설정 생성 (개선된 버전)
  */
 export function convertToRenderingConfig(config: SimulationEnvironmentConfig): RenderingConfig {
-  const timeLighting = TIME_OF_DAY_LIGHTING[config.timeOfDay];
-  const weatherParticles = getWeatherParticles(config.weather);
-  const atmosphericEffects = getAtmosphericEffects(config.weather);
+  // 모드에 따라 유효한 값 추출
+  const effectiveWeather = getEffectiveWeather(config);
+  const effectiveTimeOfDay = getEffectiveTimeOfDay(config);
+  const effectiveHoliday = getEffectiveHoliday(config);
+
+  const timeLighting = TIME_OF_DAY_LIGHTING[effectiveTimeOfDay];
+  const weatherParticles = getWeatherParticles(effectiveWeather);
+  const atmosphericEffects = getAtmosphericEffects(effectiveWeather);
 
   // 날씨에 따른 조명 조정
   let lightingModifier = 1.0;
-  if (['rain', 'heavyRain', 'overcast'].includes(config.weather)) {
+  if (['rain', 'heavyRain', 'overcast'].includes(effectiveWeather)) {
     lightingModifier = 0.6;
-  } else if (['cloudy', 'fog', 'haze'].includes(config.weather)) {
+  } else if (['cloudy', 'fog', 'haze'].includes(effectiveWeather)) {
     lightingModifier = 0.8;
-  } else if (['snow', 'heavySnow'].includes(config.weather)) {
+  } else if (['snow', 'heavySnow'].includes(effectiveWeather)) {
     lightingModifier = 0.9;
   }
 
@@ -493,7 +649,7 @@ export function convertToRenderingConfig(config: SimulationEnvironmentConfig): R
       directionalIntensity: timeLighting.directionalIntensity * lightingModifier,
       directionalColor: timeLighting.directionalColor,
       directionalPosition: timeLighting.directionalPosition,
-      shadowEnabled: config.timeOfDay !== 'night',
+      shadowEnabled: effectiveTimeOfDay !== 'night',
       shadowIntensity: 0.3,
       fillLightEnabled: true,
       fillLightIntensity: 0.3,
@@ -526,21 +682,21 @@ export function convertToRenderingConfig(config: SimulationEnvironmentConfig): R
     },
     postProcessing: {
       bloom: {
-        enabled: config.timeOfDay === 'evening' || config.timeOfDay === 'night',
-        intensity: config.timeOfDay === 'night' ? 0.4 : 0.2,
+        enabled: effectiveTimeOfDay === 'evening' || effectiveTimeOfDay === 'night',
+        intensity: effectiveTimeOfDay === 'night' ? 0.4 : 0.2,
         threshold: 0.8,
         radius: 0.4,
       },
       vignette: {
-        enabled: config.timeOfDay === 'night',
+        enabled: effectiveTimeOfDay === 'night',
         intensity: 0.3,
       },
       colorCorrection: {
         enabled: true,
         saturation: 1.0,
-        brightness: config.timeOfDay === 'night' ? 0.8 : 1.0,
+        brightness: effectiveTimeOfDay === 'night' ? 0.8 : 1.0,
         contrast: 1.0,
-        temperature: config.timeOfDay === 'evening' ? 0.1 : 0,
+        temperature: effectiveTimeOfDay === 'evening' ? 0.1 : 0,
       },
       depthOfField: {
         enabled: false,
@@ -549,14 +705,14 @@ export function convertToRenderingConfig(config: SimulationEnvironmentConfig): R
         bokehScale: 2,
       },
     },
-    timeOfDay: convertTimeOfDay(config.timeOfDay),
-    season: getSeasonFromDate(config.date),
-    weatherCondition: convertWeatherCondition(config.weather),
+    timeOfDay: convertTimeOfDay(effectiveTimeOfDay),
+    season: getSeasonFromDate(config.selectedDate || config.date || new Date()),
+    weatherCondition: convertWeatherCondition(effectiveWeather),
     generatedAt: new Date().toISOString(),
     basedOn: {
       weather: true,
-      holiday: config.holidayType !== 'none',
-      event: !!config.customEventName,
+      holiday: effectiveHoliday !== 'none',
+      event: config.mode === 'dateSelect' && (config.autoLoadedData?.events?.length ?? 0) > 0,
       timeOfDay: true,
     },
   };

@@ -1,41 +1,48 @@
 /**
  * SimulationEnvironmentSettings.tsx
  *
- * 시뮬레이션 환경 설정 UI 컴포넌트
- * - 실시간 / 시뮬레이션 모드 전환
- * - 날씨, 날짜, 시간, 휴일 설정
- * - 영향도 실시간 계산 및 표시
+ * 시뮬레이션 환경 설정 UI 컴포넌트 (개선된 버전)
+ * - 3가지 모드: 실시간 / 날짜 선택 / 직접 설정
+ * - 날짜 선택 시 날씨/이벤트 자동 로드
+ * - 기온/습도 슬라이더 제거 (날씨에 따라 자동)
  */
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   Cloud,
   Sun,
   Calendar,
   Clock,
-  Thermometer,
-  Droplets,
+  Gift,
   RefreshCw,
   TrendingUp,
   TrendingDown,
   Activity,
+  Loader2,
+  Settings2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type {
   SimulationEnvironmentConfig,
+  EnvironmentMode,
   WeatherOption,
-  DayOfWeekOption,
   HolidayOption,
   TimeOfDayOption,
 } from '../types/simulationEnvironment.types';
 import {
   WEATHER_OPTIONS,
   HOLIDAY_OPTIONS,
-  DAY_OF_WEEK_OPTIONS,
   TIME_OF_DAY_OPTIONS,
   calculateSimulationImpacts,
   createDefaultSimulationConfig,
+  getWeatherImpactFromCondition,
 } from '../types/simulationEnvironment.types';
+import {
+  fetchHistoricalWeather,
+  fetchDateEvents,
+  fetchRealTimeEnvironment,
+  type RealTimeEnvironmentData,
+} from '../services/environmentDataService';
 
 // ============================================================================
 // Props
@@ -44,8 +51,27 @@ import {
 interface SimulationEnvironmentSettingsProps {
   config: SimulationEnvironmentConfig;
   onChange: (config: SimulationEnvironmentConfig) => void;
+  storeId?: string;
   className?: string;
-  compact?: boolean; // 컴팩트 모드
+  compact?: boolean;
+}
+
+// ============================================================================
+// 헬퍼 함수
+// ============================================================================
+
+function getWeatherEmoji(condition?: string): string {
+  const emojis: Record<string, string> = {
+    clear: '☀️', sunny: '☀️',
+    clouds: '☁️', cloudy: '☁️',
+    overcast: '🌥️',
+    rain: '🌧️', drizzle: '🌦️',
+    thunderstorm: '⛈️', heavyrain: '⛈️',
+    snow: '❄️', heavysnow: '🌨️',
+    mist: '🌫️', fog: '🌫️',
+    haze: '😷',
+  };
+  return emojis[condition?.toLowerCase() || ''] || '🌤️';
 }
 
 // ============================================================================
@@ -55,19 +81,107 @@ interface SimulationEnvironmentSettingsProps {
 export const SimulationEnvironmentSettings: React.FC<SimulationEnvironmentSettingsProps> = ({
   config,
   onChange,
+  storeId,
   className,
   compact = false,
 }) => {
-  // 설정 업데이트 헬퍼
-  const updateConfig = useCallback(
-    (updates: Partial<SimulationEnvironmentConfig>) => {
-      const newConfig = { ...config, ...updates };
-      // 영향도 재계산
-      newConfig.calculatedImpact = calculateSimulationImpacts(newConfig);
-      onChange(newConfig);
-    },
-    [config, onChange]
-  );
+  const [isLoadingDateData, setIsLoadingDateData] = useState(false);
+  const [realTimeData, setRealTimeData] = useState<RealTimeEnvironmentData | null>(null);
+
+  // 실시간 모드일 때 환경 데이터 로드
+  useEffect(() => {
+    if (config.mode === 'realtime') {
+      fetchRealTimeEnvironment(storeId).then(setRealTimeData);
+    }
+  }, [config.mode, storeId]);
+
+  // 날짜 선택 시 해당 날짜의 날씨/이벤트 자동 로드
+  const handleDateChange = useCallback(async (date: Date) => {
+    const newConfig = { ...config, selectedDate: date };
+    onChange(newConfig);
+
+    if (config.mode === 'dateSelect') {
+      setIsLoadingDateData(true);
+      try {
+        const [weatherData, eventsData] = await Promise.all([
+          fetchHistoricalWeather(date),
+          storeId ? fetchDateEvents(storeId, date) : Promise.resolve([]),
+        ]);
+
+        const updatedConfig: SimulationEnvironmentConfig = {
+          ...newConfig,
+          autoLoadedData: {
+            weather: weatherData || undefined,
+            events: eventsData,
+          },
+        };
+        updatedConfig.calculatedImpact = calculateSimulationImpacts(updatedConfig);
+        onChange(updatedConfig);
+      } catch (error) {
+        console.warn('[EnvironmentSettings] 날짜 데이터 로드 실패:', error);
+      } finally {
+        setIsLoadingDateData(false);
+      }
+    }
+  }, [config, onChange, storeId]);
+
+  // 모드 변경 핸들러
+  const handleModeChange = useCallback(async (mode: EnvironmentMode) => {
+    const newConfig: SimulationEnvironmentConfig = {
+      ...config,
+      mode,
+      // 레거시 호환용 필드도 업데이트
+      date: config.selectedDate,
+      weather: mode === 'manual' ? config.manualSettings.weather : config.weather,
+      timeOfDay: mode === 'manual' ? config.manualSettings.timeOfDay : config.timeOfDay,
+      holidayType: mode === 'manual' ? config.manualSettings.holidayType : config.holidayType,
+    };
+
+    // 실시간 모드로 전환 시 현재 데이터 적용
+    if (mode === 'realtime') {
+      const rtData = await fetchRealTimeEnvironment(storeId);
+      setRealTimeData(rtData);
+      newConfig.autoLoadedData = {
+        weather: rtData.weather || undefined,
+        events: rtData.activeEvents,
+      };
+    }
+
+    // 날짜 선택 모드로 전환 시 데이터 로드
+    if (mode === 'dateSelect') {
+      setIsLoadingDateData(true);
+      try {
+        const [weatherData, eventsData] = await Promise.all([
+          fetchHistoricalWeather(config.selectedDate),
+          storeId ? fetchDateEvents(storeId, config.selectedDate) : Promise.resolve([]),
+        ]);
+        newConfig.autoLoadedData = {
+          weather: weatherData || undefined,
+          events: eventsData,
+        };
+      } finally {
+        setIsLoadingDateData(false);
+      }
+    }
+
+    newConfig.calculatedImpact = calculateSimulationImpacts(newConfig, realTimeData || undefined);
+    onChange(newConfig);
+  }, [config, onChange, storeId, realTimeData]);
+
+  // 직접 설정 업데이트
+  const updateManualSettings = useCallback((updates: Partial<typeof config.manualSettings>) => {
+    const newManualSettings = { ...config.manualSettings, ...updates };
+    const newConfig: SimulationEnvironmentConfig = {
+      ...config,
+      manualSettings: newManualSettings,
+      // 레거시 호환용
+      weather: newManualSettings.weather,
+      timeOfDay: newManualSettings.timeOfDay,
+      holidayType: newManualSettings.holidayType,
+    };
+    newConfig.calculatedImpact = calculateSimulationImpacts(newConfig);
+    onChange(newConfig);
+  }, [config, onChange]);
 
   // 리셋
   const handleReset = useCallback(() => {
@@ -78,341 +192,253 @@ export const SimulationEnvironmentSettings: React.FC<SimulationEnvironmentSettin
 
   // 계산된 영향도
   const impacts = useMemo(() => {
-    return config.calculatedImpact || calculateSimulationImpacts(config);
-  }, [config]);
+    return config.calculatedImpact || calculateSimulationImpacts(config, realTimeData || undefined);
+  }, [config, realTimeData]);
 
   return (
     <div className={cn('space-y-4', className)}>
-      {/* 모드 토글 */}
-      <ModeToggle
-        mode={config.mode}
-        onChange={(mode) => updateConfig({ mode })}
-      />
-
-      {/* 시뮬레이션 모드일 때만 상세 설정 표시 */}
-      {config.mode === 'simulation' && (
-        <>
-          {/* 날짜/시간 설정 */}
-          <DateTimeSettings
-            date={config.date}
-            dayOfWeek={config.dayOfWeek}
-            timeOfDay={config.timeOfDay}
-            onDateChange={(date) => updateConfig({ date })}
-            onDayChange={(dayOfWeek) => updateConfig({ dayOfWeek })}
-            onTimeChange={(timeOfDay) => updateConfig({ timeOfDay })}
-            compact={compact}
-          />
-
-          {/* 날씨 설정 */}
-          <WeatherSettings
-            weather={config.weather}
-            temperature={config.temperature}
-            humidity={config.humidity}
-            onWeatherChange={(weather) => updateConfig({ weather })}
-            onTemperatureChange={(temperature) => updateConfig({ temperature })}
-            onHumidityChange={(humidity) => updateConfig({ humidity })}
-            compact={compact}
-          />
-
-          {/* 휴일/이벤트 설정 */}
-          <HolidaySettings
-            holidayType={config.holidayType}
-            customEventName={config.customEventName}
-            onChange={(holidayType, customEventName) =>
-              updateConfig({ holidayType, customEventName })
-            }
-            compact={compact}
-          />
-
-          {/* 영향도 표시 */}
-          <ImpactDisplay impacts={impacts} />
-
-          {/* 리셋 버튼 */}
-          <button
-            onClick={handleReset}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded transition"
-          >
-            <RefreshCw className="w-3 h-3" />
-            기본값으로 초기화
-          </button>
-        </>
-      )}
-    </div>
-  );
-};
-
-// ============================================================================
-// 모드 토글
-// ============================================================================
-
-interface ModeToggleProps {
-  mode: 'realtime' | 'simulation';
-  onChange: (mode: 'realtime' | 'simulation') => void;
-}
-
-const ModeToggle: React.FC<ModeToggleProps> = ({ mode, onChange }) => {
-  return (
-    <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
-      <button
-        onClick={() => onChange('realtime')}
-        className={cn(
-          'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded text-sm transition',
-          mode === 'realtime'
-            ? 'bg-primary text-primary-foreground'
-            : 'hover:bg-muted'
-        )}
-      >
-        <Activity className="w-4 h-4" />
-        실시간
-      </button>
-      <button
-        onClick={() => onChange('simulation')}
-        className={cn(
-          'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded text-sm transition',
-          mode === 'simulation'
-            ? 'bg-primary text-primary-foreground'
-            : 'hover:bg-muted'
-        )}
-      >
-        <Cloud className="w-4 h-4" />
-        시뮬레이션
-      </button>
-    </div>
-  );
-};
-
-// ============================================================================
-// 날짜/시간 설정
-// ============================================================================
-
-interface DateTimeSettingsProps {
-  date: Date;
-  dayOfWeek: DayOfWeekOption;
-  timeOfDay: TimeOfDayOption;
-  onDateChange: (date: Date) => void;
-  onDayChange: (day: DayOfWeekOption) => void;
-  onTimeChange: (time: TimeOfDayOption) => void;
-  compact?: boolean;
-}
-
-const DateTimeSettings: React.FC<DateTimeSettingsProps> = ({
-  date,
-  dayOfWeek,
-  timeOfDay,
-  onDateChange,
-  onDayChange,
-  onTimeChange,
-  compact,
-}) => {
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2 text-sm font-medium">
-        <Calendar className="w-4 h-4 text-blue-500" />
-        날짜/시간 설정
+      {/* 3가지 모드 선택 */}
+      <div className="flex gap-1 p-1 bg-muted/50 rounded-lg">
+        <button
+          onClick={() => handleModeChange('realtime')}
+          className={cn(
+            'flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded text-xs font-medium transition',
+            config.mode === 'realtime'
+              ? 'bg-blue-500 text-white'
+              : 'hover:bg-muted'
+          )}
+        >
+          <Activity className="w-3.5 h-3.5" />
+          {!compact && '실시간'}
+        </button>
+        <button
+          onClick={() => handleModeChange('dateSelect')}
+          className={cn(
+            'flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded text-xs font-medium transition',
+            config.mode === 'dateSelect'
+              ? 'bg-purple-500 text-white'
+              : 'hover:bg-muted'
+          )}
+        >
+          <Calendar className="w-3.5 h-3.5" />
+          {!compact && '날짜 선택'}
+        </button>
+        <button
+          onClick={() => handleModeChange('manual')}
+          className={cn(
+            'flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded text-xs font-medium transition',
+            config.mode === 'manual'
+              ? 'bg-orange-500 text-white'
+              : 'hover:bg-muted'
+          )}
+        >
+          <Settings2 className="w-3.5 h-3.5" />
+          {!compact && '직접 설정'}
+        </button>
       </div>
 
-      {/* 날짜 선택 */}
-      <input
-        type="date"
-        value={date.toISOString().split('T')[0]}
-        onChange={(e) => onDateChange(new Date(e.target.value))}
-        className="w-full px-3 py-2 text-sm bg-muted/50 border rounded focus:outline-none focus:ring-2 focus:ring-primary/50"
-      />
+      {/* ===== 날짜 선택 모드 ===== */}
+      {config.mode === 'dateSelect' && (
+        <div className="space-y-3">
+          {/* 날짜 선택 */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+              <Calendar className="w-3 h-3" />
+              시뮬레이션 날짜
+            </label>
+            <input
+              type="date"
+              value={config.selectedDate.toISOString().split('T')[0]}
+              onChange={(e) => handleDateChange(new Date(e.target.value))}
+              className="w-full px-3 py-2 rounded-lg border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+            />
+          </div>
 
-      {/* 요일 선택 */}
-      <div className="flex flex-wrap gap-1">
-        {DAY_OF_WEEK_OPTIONS.map((day) => (
-          <button
-            key={day.value}
-            onClick={() => onDayChange(day.value)}
-            className={cn(
-              'px-2 py-1 text-xs rounded transition',
-              dayOfWeek === day.value
-                ? 'bg-blue-500 text-white'
-                : 'bg-muted/50 hover:bg-muted'
-            )}
-          >
-            {compact ? day.shortLabel : day.label}
-          </button>
-        ))}
-      </div>
+          {/* 자동 로드된 정보 표시 */}
+          {isLoadingDateData ? (
+            <div className="flex items-center justify-center py-4 text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              <span className="text-sm">날짜 정보 로딩 중...</span>
+            </div>
+          ) : config.autoLoadedData && (
+            <div className="p-3 bg-purple-500/10 rounded-lg space-y-2 border border-purple-500/20">
+              <div className="text-xs font-medium text-purple-400">자동 반영된 정보</div>
 
-      {/* 시간대 선택 */}
-      <div className="flex items-center gap-2">
-        <Clock className="w-4 h-4 text-muted-foreground" />
-        <div className="flex flex-1 gap-1">
-          {TIME_OF_DAY_OPTIONS.map((time) => (
-            <button
-              key={time.value}
-              onClick={() => onTimeChange(time.value)}
-              className={cn(
-                'flex-1 px-2 py-1.5 text-xs rounded transition',
-                timeOfDay === time.value
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-muted/50 hover:bg-muted'
+              {/* 날씨 */}
+              {config.autoLoadedData.weather && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">
+                    {getWeatherEmoji(config.autoLoadedData.weather.condition)}
+                  </span>
+                  <div>
+                    <div className="text-sm font-medium">
+                      {config.autoLoadedData.weather.description}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {config.autoLoadedData.weather.temperature}°C
+                    </div>
+                  </div>
+                </div>
               )}
-              title={time.hours}
-            >
-              {time.emoji} {compact ? '' : time.label}
-            </button>
-          ))}
+
+              {/* 이벤트 */}
+              {config.autoLoadedData.events && config.autoLoadedData.events.length > 0 && (
+                <div className="flex gap-1 flex-wrap">
+                  {config.autoLoadedData.events.map((event, idx) => (
+                    <span
+                      key={idx}
+                      className={cn(
+                        'px-2 py-0.5 rounded text-xs',
+                        event.type === 'holiday' ? 'bg-red-500/20 text-red-400' :
+                        event.type === 'commercial' ? 'bg-orange-500/20 text-orange-400' :
+                        'bg-blue-500/20 text-blue-400'
+                      )}
+                    >
+                      {event.type === 'holiday' ? '🎉' : event.type === 'commercial' ? '🛒' : '📅'} {event.name}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {!config.autoLoadedData.weather && (!config.autoLoadedData.events || config.autoLoadedData.events.length === 0) && (
+                <div className="text-sm text-muted-foreground">
+                  해당 날짜의 특별한 정보가 없습니다
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      </div>
-    </div>
-  );
-};
+      )}
 
-// ============================================================================
-// 날씨 설정
-// ============================================================================
-
-interface WeatherSettingsProps {
-  weather: WeatherOption;
-  temperature: number;
-  humidity: number;
-  onWeatherChange: (weather: WeatherOption) => void;
-  onTemperatureChange: (temp: number) => void;
-  onHumidityChange: (humidity: number) => void;
-  compact?: boolean;
-}
-
-const WeatherSettings: React.FC<WeatherSettingsProps> = ({
-  weather,
-  temperature,
-  humidity,
-  onWeatherChange,
-  onTemperatureChange,
-  onHumidityChange,
-  compact,
-}) => {
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2 text-sm font-medium">
-        <Sun className="w-4 h-4 text-yellow-500" />
-        날씨 설정
-      </div>
-
-      {/* 날씨 조건 그리드 */}
-      <div className="grid grid-cols-3 gap-1">
-        {WEATHER_OPTIONS.map((w) => (
-          <button
-            key={w.value}
-            onClick={() => onWeatherChange(w.value)}
-            className={cn(
-              'flex flex-col items-center gap-1 p-2 rounded text-xs transition',
-              weather === w.value
-                ? 'bg-blue-500 text-white'
-                : 'bg-muted/50 hover:bg-muted'
-            )}
-            title={`방문객 영향: ${Math.round((w.trafficImpact - 1) * 100)}%`}
-          >
-            <span className="text-lg">{w.emoji}</span>
-            {!compact && <span>{w.label}</span>}
-          </button>
-        ))}
-      </div>
-
-      {/* 기온 슬라이더 */}
-      <div className="space-y-1">
-        <div className="flex items-center justify-between text-xs">
-          <div className="flex items-center gap-1 text-muted-foreground">
-            <Thermometer className="w-3 h-3" />
-            기온
+      {/* ===== 직접 설정 모드 ===== */}
+      {config.mode === 'manual' && (
+        <div className="space-y-4">
+          {/* 시간대 선택 */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              시간대
+            </label>
+            <div className="grid grid-cols-4 gap-1">
+              {TIME_OF_DAY_OPTIONS.map((time) => (
+                <button
+                  key={time.value}
+                  onClick={() => updateManualSettings({ timeOfDay: time.value })}
+                  className={cn(
+                    'py-2 rounded text-xs transition flex flex-col items-center gap-0.5',
+                    config.manualSettings.timeOfDay === time.value
+                      ? 'bg-yellow-500 text-white'
+                      : 'bg-muted/50 hover:bg-muted'
+                  )}
+                >
+                  <span>{time.emoji}</span>
+                  {!compact && <span>{time.label}</span>}
+                </button>
+              ))}
+            </div>
           </div>
-          <span className="font-medium">{temperature}°C</span>
-        </div>
-        <input
-          type="range"
-          min="-20"
-          max="40"
-          value={temperature}
-          onChange={(e) => onTemperatureChange(Number(e.target.value))}
-          className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-red-500"
-        />
-        <div className="flex justify-between text-xs text-muted-foreground">
-          <span>-20°C</span>
-          <span>40°C</span>
-        </div>
-      </div>
 
-      {/* 습도 슬라이더 */}
-      <div className="space-y-1">
-        <div className="flex items-center justify-between text-xs">
-          <div className="flex items-center gap-1 text-muted-foreground">
-            <Droplets className="w-3 h-3" />
-            습도
+          {/* 날씨 선택 */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+              <Cloud className="w-3 h-3" />
+              날씨
+            </label>
+            <div className="grid grid-cols-3 gap-1">
+              {WEATHER_OPTIONS.map((weather) => (
+                <button
+                  key={weather.value}
+                  onClick={() => updateManualSettings({ weather: weather.value })}
+                  className={cn(
+                    'py-2 px-2 rounded text-xs transition flex items-center justify-center gap-1',
+                    config.manualSettings.weather === weather.value
+                      ? 'bg-cyan-500 text-white'
+                      : 'bg-muted/50 hover:bg-muted'
+                  )}
+                >
+                  <span>{weather.emoji}</span>
+                  {!compact && <span>{weather.label}</span>}
+                </button>
+              ))}
+            </div>
           </div>
-          <span className="font-medium">{humidity}%</span>
+
+          {/* 휴일/이벤트 선택 */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+              <Gift className="w-3 h-3" />
+              휴일/이벤트
+            </label>
+            <div className="grid grid-cols-3 gap-1">
+              {HOLIDAY_OPTIONS.map((holiday) => (
+                <button
+                  key={holiday.value}
+                  onClick={() => updateManualSettings({ holidayType: holiday.value })}
+                  className={cn(
+                    'py-2 px-1 rounded text-xs transition flex flex-col items-center gap-0.5',
+                    config.manualSettings.holidayType === holiday.value
+                      ? 'bg-purple-500 text-white'
+                      : 'bg-muted/50 hover:bg-muted'
+                  )}
+                >
+                  <span>{holiday.emoji}</span>
+                  {!compact && <span className="truncate w-full text-center">{holiday.label}</span>}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
-        <input
-          type="range"
-          min="0"
-          max="100"
-          value={humidity}
-          onChange={(e) => onHumidityChange(Number(e.target.value))}
-          className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-500"
-        />
-        <div className="flex justify-between text-xs text-muted-foreground">
-          <span>0%</span>
-          <span>100%</span>
+      )}
+
+      {/* ===== 실시간 모드 ===== */}
+      {config.mode === 'realtime' && realTimeData && (
+        <div className="p-3 bg-blue-500/10 rounded-lg space-y-2 border border-blue-500/20">
+          <div className="text-xs font-medium text-blue-400">현재 환경</div>
+
+          {realTimeData.weather && (
+            <div className="flex items-center gap-2">
+              <span className="text-xl">
+                {getWeatherEmoji(realTimeData.weather.condition)}
+              </span>
+              <div>
+                <div className="text-sm font-medium">
+                  {realTimeData.weather.description}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {realTimeData.weather.temperature}°C
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="text-xs text-muted-foreground flex gap-2">
+            {realTimeData.isHoliday && <span className="text-red-400">🎉 휴일</span>}
+            {realTimeData.isWeekend && <span className="text-purple-400">📅 주말</span>}
+            {!realTimeData.isHoliday && !realTimeData.isWeekend && <span>📅 평일</span>}
+          </div>
         </div>
-      </div>
-    </div>
-  );
-};
+      )}
 
-// ============================================================================
-// 휴일/이벤트 설정
-// ============================================================================
+      {config.mode === 'realtime' && !realTimeData && (
+        <div className="flex items-center justify-center py-4 text-muted-foreground">
+          <Loader2 className="w-4 h-4 animate-spin mr-2" />
+          <span className="text-sm">환경 정보 로딩 중...</span>
+        </div>
+      )}
 
-interface HolidaySettingsProps {
-  holidayType: HolidayOption;
-  customEventName?: string;
-  onChange: (holiday: HolidayOption, customEvent?: string) => void;
-  compact?: boolean;
-}
+      {/* ===== 예상 영향도 (공통) ===== */}
+      <ImpactDisplay impacts={impacts} />
 
-const HolidaySettings: React.FC<HolidaySettingsProps> = ({
-  holidayType,
-  customEventName,
-  onChange,
-  compact,
-}) => {
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2 text-sm font-medium">
-        <Calendar className="w-4 h-4 text-red-500" />
-        휴일/이벤트 설정
-      </div>
-
-      {/* 휴일/이벤트 선택 */}
-      <div className="grid grid-cols-3 gap-1">
-        {HOLIDAY_OPTIONS.map((h) => (
-          <button
-            key={h.value}
-            onClick={() => onChange(h.value)}
-            className={cn(
-              'flex flex-col items-center gap-1 p-2 rounded text-xs transition',
-              holidayType === h.value
-                ? 'bg-red-500 text-white'
-                : 'bg-muted/50 hover:bg-muted'
-            )}
-            title={`방문객 영향: ${Math.round((h.trafficImpact - 1) * 100)}%, 전환율 영향: ${Math.round((h.conversionImpact - 1) * 100)}%`}
-          >
-            <span className="text-lg">{h.emoji}</span>
-            {!compact && <span>{h.label}</span>}
-          </button>
-        ))}
-      </div>
-
-      {/* 커스텀 이벤트명 입력 */}
-      <input
-        type="text"
-        placeholder="커스텀 이벤트명 (선택사항)"
-        value={customEventName || ''}
-        onChange={(e) => onChange(holidayType, e.target.value || undefined)}
-        className="w-full px-3 py-2 text-sm bg-muted/50 border rounded focus:outline-none focus:ring-2 focus:ring-primary/50"
-      />
+      {/* 리셋 버튼 */}
+      {config.mode !== 'realtime' && (
+        <button
+          onClick={handleReset}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded transition"
+        >
+          <RefreshCw className="w-3 h-3" />
+          기본값으로 초기화
+        </button>
+      )}
     </div>
   );
 };
@@ -435,9 +461,17 @@ const ImpactDisplay: React.FC<ImpactDisplayProps> = ({ impacts }) => {
     return percent >= 0 ? `+${percent}%` : `${percent}%`;
   };
 
-  const getChangeColor = (value: number) => {
-    if (value > 1) return 'text-green-500';
-    if (value < 1) return 'text-red-500';
+  const getChangeColor = (value: number, type: 'traffic' | 'dwell' | 'conversion') => {
+    if (value > 1) {
+      return type === 'traffic' ? 'text-green-500' :
+             type === 'dwell' ? 'text-blue-500' :
+             'text-purple-500';
+    }
+    if (value < 1) {
+      return type === 'traffic' ? 'text-red-500' :
+             type === 'dwell' ? 'text-orange-500' :
+             'text-yellow-500';
+    }
     return 'text-muted-foreground';
   };
 
@@ -448,48 +482,28 @@ const ImpactDisplay: React.FC<ImpactDisplayProps> = ({ impacts }) => {
   };
 
   return (
-    <div className="p-3 bg-muted/30 rounded-lg border">
+    <div className="p-3 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg border border-white/10">
       <div className="text-xs font-medium mb-2 text-muted-foreground">
         예상 영향도
       </div>
       <div className="grid grid-cols-3 gap-2">
-        {/* 방문객 영향 */}
         <div className="text-center">
           <div className="text-xs text-muted-foreground mb-1">방문객</div>
-          <div
-            className={cn(
-              'flex items-center justify-center gap-1 font-bold',
-              getChangeColor(impacts.trafficMultiplier)
-            )}
-          >
+          <div className={cn('flex items-center justify-center gap-1 font-bold', getChangeColor(impacts.trafficMultiplier, 'traffic'))}>
             {getIcon(impacts.trafficMultiplier)}
             {formatChange(impacts.trafficMultiplier)}
           </div>
         </div>
-
-        {/* 체류시간 영향 */}
         <div className="text-center">
           <div className="text-xs text-muted-foreground mb-1">체류시간</div>
-          <div
-            className={cn(
-              'flex items-center justify-center gap-1 font-bold',
-              getChangeColor(impacts.dwellTimeMultiplier)
-            )}
-          >
+          <div className={cn('flex items-center justify-center gap-1 font-bold', getChangeColor(impacts.dwellTimeMultiplier, 'dwell'))}>
             {getIcon(impacts.dwellTimeMultiplier)}
             {formatChange(impacts.dwellTimeMultiplier)}
           </div>
         </div>
-
-        {/* 전환율 영향 */}
         <div className="text-center">
           <div className="text-xs text-muted-foreground mb-1">전환율</div>
-          <div
-            className={cn(
-              'flex items-center justify-center gap-1 font-bold',
-              getChangeColor(impacts.conversionMultiplier)
-            )}
-          >
+          <div className={cn('flex items-center justify-center gap-1 font-bold', getChangeColor(impacts.conversionMultiplier, 'conversion'))}>
             {getIcon(impacts.conversionMultiplier)}
             {formatChange(impacts.conversionMultiplier)}
           </div>
