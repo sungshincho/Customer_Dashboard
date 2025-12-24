@@ -38,7 +38,7 @@ import {
 } from './panels/results';
 import { useStudioMode, useOverlayVisibility, useScenePersistence, useSceneSimulation, useStoreBounds, useStaffData } from './hooks';
 import { loadUserModels } from './utils';
-import type { StudioMode, Model3D, OverlayType, HeatPoint, FlowVector, ZoneBoundary, CustomerAvatar, SceneRecipe, LightingPreset, Vector3, SimulationScenario, TransformMode } from './types';
+import type { StudioMode, Model3D, OverlayType, HeatPoint, ZoneBoundary, CustomerAvatar, SceneRecipe, LightingPreset, Vector3, SimulationScenario, TransformMode } from './types';
 
 // 기존 시뮬레이션 훅
 import { useStoreContext } from '@/features/simulation/hooks/useStoreContext';
@@ -560,14 +560,7 @@ export default function DigitalTwinStudioPage() {
     []
   );
 
-  const demoFlows: FlowVector[] = useMemo(
-    () => [
-      { start: [-5, 0.5, 0], end: [0, 0.5, 0], magnitude: 0.8 },
-      { start: [0, 0.5, 0], end: [3, 0.5, 3], magnitude: 0.6 },
-      { start: [3, 0.5, 3], end: [5, 0.5, 0], magnitude: 0.4 },
-    ],
-    []
-  );
+  // demoFlows 제거됨 - CustomerFlowOverlayEnhanced에서 DB 기반 데이터 사용
 
   const demoZones: ZoneBoundary[] = useMemo(
     () => [
@@ -757,95 +750,7 @@ export default function DigitalTwinStudioPage() {
                   return <HeatmapOverlay heatPoints={demoHeatPoints} />;
                 })()}
 
-                {/* 🔧 Flow 오버레이 - zones_dim 기반 동선 생성 */}
-                {isActive('flow') && (() => {
-                  // zones_dim 데이터가 있으면 존 간 동선 생성
-                  if (dbZones && dbZones.length > 1) {
-                    // 존 타입별로 그룹화
-                    const entranceZones = dbZones.filter(z => z.zone_type === 'entrance');
-                    const displayZones = dbZones.filter(z => z.zone_type === 'display' || !z.zone_type);
-                    const checkoutZones = dbZones.filter(z => z.zone_type === 'checkout');
-
-                    const generatedFlows: FlowVector[] = [];
-                    const Y_HEIGHT = 0.3;
-
-                    // 입구 → 디스플레이 존 연결
-                    entranceZones.forEach(entrance => {
-                      displayZones.forEach((display, idx) => {
-                        if (idx < 2) { // 최대 2개 디스플레이 존과 연결
-                          generatedFlows.push({
-                            start: [
-                              entrance.position_x || entrance.coordinates?.x || 0,
-                              Y_HEIGHT,
-                              entrance.position_z || entrance.coordinates?.z || 0
-                            ],
-                            end: [
-                              display.position_x || display.coordinates?.x || 0,
-                              Y_HEIGHT,
-                              display.position_z || display.coordinates?.z || 0
-                            ],
-                            magnitude: 0.8,
-                            count: 45,
-                          });
-                        }
-                      });
-                    });
-
-                    // 디스플레이 존 → 계산대 연결
-                    displayZones.forEach((display, idx) => {
-                      checkoutZones.forEach(checkout => {
-                        if (idx < 3) { // 최대 3개 디스플레이 존에서 계산대로
-                          generatedFlows.push({
-                            start: [
-                              display.position_x || display.coordinates?.x || 0,
-                              Y_HEIGHT,
-                              display.position_z || display.coordinates?.z || 0
-                            ],
-                            end: [
-                              checkout.position_x || checkout.coordinates?.x || 0,
-                              Y_HEIGHT,
-                              checkout.position_z || checkout.coordinates?.z || 0
-                            ],
-                            magnitude: 0.6,
-                            count: 30,
-                          });
-                        }
-                      });
-                    });
-
-                    // 디스플레이 존 간 연결 (인접한 존끼리)
-                    displayZones.forEach((display, idx) => {
-                      if (idx < displayZones.length - 1) {
-                        const next = displayZones[idx + 1];
-                        generatedFlows.push({
-                          start: [
-                            display.position_x || display.coordinates?.x || 0,
-                            Y_HEIGHT,
-                            display.position_z || display.coordinates?.z || 0
-                          ],
-                          end: [
-                            next.position_x || next.coordinates?.x || 0,
-                            Y_HEIGHT,
-                            next.position_z || next.coordinates?.z || 0
-                          ],
-                          magnitude: 0.4,
-                          count: 20,
-                        });
-                      }
-                    });
-
-                    if (generatedFlows.length > 0) {
-                      return <CustomerFlowOverlay flows={generatedFlows} animated={true} color="#00ffff" />;
-                    }
-                  }
-                  // 폴백: 데모 데이터
-                  return <CustomerFlowOverlay flows={demoFlows} animated={true} color="#00ffff" />;
-                })()}
-
-                {/* 🔧 FIX: 실시간 시뮬레이션이 실행 중이면 CustomerAgents가 렌더링하므로 데모 고객 표시 안함 */}
-                {/* CustomerAgents는 Canvas3D 내부에서 simulationStore.customers를 렌더링함 */}
-
-                {/* 🆕 개선된 동선 오버레이 (zone_transitions 기반) - DB 데이터 있을 때 */}
+                {/* 🆕 개선된 동선 오버레이 (zone_transitions 기반) - DB 데이터 사용 */}
                 {isActive('flow') && selectedStore?.id && (
                   <CustomerFlowOverlayEnhanced
                     visible={true}
@@ -854,6 +759,9 @@ export default function DigitalTwinStudioPage() {
                     minOpacity={0.3}
                   />
                 )}
+
+                {/* 🔧 FIX: 실시간 시뮬레이션이 실행 중이면 CustomerAgents가 렌더링하므로 데모 고객 표시 안함 */}
+                {/* CustomerAgents는 Canvas3D 내부에서 simulationStore.customers를 렌더링함 */}
 
                 {/* 🆕 고객 아바타 시뮬레이션 오버레이 (zone_transitions 기반) */}
                 {isActive('avatar') && selectedStore?.id && (
