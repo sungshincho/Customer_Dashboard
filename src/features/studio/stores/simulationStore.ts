@@ -5,6 +5,7 @@
  */
 
 import { create } from 'zustand';
+import { supabase } from '@/integrations/supabase/client';
 import type {
   AISimulationResult,
   SimulationOptions,
@@ -93,17 +94,9 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
 
       const options = get().options;
 
-      // Edge Function 호출
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-      const response = await fetch(`${supabaseUrl}/functions/v1/run-simulation`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${supabaseKey}`,
-        },
-        body: JSON.stringify({
+      // 🔧 FIX: supabase.functions.invoke 사용 (자동 인증 처리)
+      const { data, error } = await supabase.functions.invoke('run-simulation', {
+        body: {
           store_id: storeId,
           options: {
             duration_minutes: options.duration_minutes,
@@ -111,17 +104,16 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
             time_of_day: options.time_of_day,
             simulation_type: options.simulation_type,
           },
-        }),
+        },
       });
 
       clearInterval(progressInterval);
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `시뮬레이션 실패: ${response.statusText}`);
+      if (error) {
+        throw new Error(error.message || '시뮬레이션 실행 실패');
       }
 
-      const result: AISimulationResult = await response.json();
+      const result: AISimulationResult = data;
 
       set({
         result,

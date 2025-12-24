@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 // 새 스튜디오 컴포넌트
 import { Canvas3D, SceneProvider, useScene } from './core';
 import { LayerPanel, SimulationPanel, ToolPanel, SceneSavePanel, OverlayControlPanel, PropertyPanel } from './panels';
-import { HeatmapOverlay, CustomerFlowOverlay, ZoneBoundaryOverlay, CustomerAvatarOverlay, LayoutOptimizationOverlay, FlowOptimizationOverlay, CongestionOverlay, StaffingOverlay, ZonesFloorOverlay, StaffAvatarsOverlay, CustomerFlowOverlayEnhanced, CustomerAvatarsOverlay, StaffReallocationOverlay } from './overlays';
+import { HeatmapOverlay, CustomerFlowOverlay, ZoneBoundaryOverlay, LayoutOptimizationOverlay, FlowOptimizationOverlay, CongestionOverlay, StaffingOverlay, ZonesFloorOverlay, StaffAvatarsOverlay, CustomerFlowOverlayEnhanced, CustomerAvatarsOverlay, StaffReallocationOverlay } from './overlays';
 import { DraggablePanel, QuickToggleBar, ViewModeToggle, ResultReportPanel, type ViewMode } from './components';
 import type { DiagnosticIssue } from './components/DiagnosticIssueList';
 import { PanelLeftClose, PanelLeft, Mouse } from 'lucide-react';
@@ -38,7 +38,7 @@ import {
 } from './panels/results';
 import { useStudioMode, useOverlayVisibility, useScenePersistence, useSceneSimulation, useStoreBounds, useStaffData } from './hooks';
 import { loadUserModels } from './utils';
-import type { StudioMode, Model3D, OverlayType, HeatPoint, ZoneBoundary, CustomerAvatar, SceneRecipe, LightingPreset, Vector3, SimulationScenario, TransformMode } from './types';
+import type { StudioMode, Model3D, OverlayType, HeatPoint, ZoneBoundary, SceneRecipe, LightingPreset, Vector3, SimulationScenario, TransformMode } from './types';
 
 // 기존 시뮬레이션 훅
 import { useStoreContext } from '@/features/simulation/hooks/useStoreContext';
@@ -597,15 +597,6 @@ export default function DigitalTwinStudioPage() {
         ],
         color: '#f59e0b',
       },
-    ],
-    []
-  );
-
-  const demoCustomers: CustomerAvatar[] = useMemo(
-    () => [
-      { id: 'c1', position: [-4, 0, 1], status: 'browsing' },
-      { id: 'c2', position: [1, 0, 2], status: 'purchasing' },
-      { id: 'c3', position: [4, 0, -1], status: 'leaving' },
     ],
     []
   );
