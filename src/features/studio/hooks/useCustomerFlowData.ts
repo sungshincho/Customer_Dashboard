@@ -137,35 +137,31 @@ export const useCustomerFlowData = ({
         .eq('store_id', storeId)
         .gte('transition_date', startDate.toISOString().split('T')[0]);
 
-      // zone_transitions 테이블이 없거나 데이터가 없으면 zones_dim만으로 생성
+      // zone_transitions 테이블이 없거나 데이터가 없으면 빈 데이터 반환
+      // 🔧 FIX: 하드코딩된 더미 동선 제거 - 실제 데이터 없으면 빈 flowPaths 반환
       if (transitionsError || !transitions || transitions.length === 0) {
-        console.warn('[useCustomerFlowData] 전환 데이터 없음, 존 기반 더미 데이터 생성');
-
-        // 존 기반 기본 동선 생성
-        const { flowPaths, transitionMatrix, maxTransitionCount } = generateDefaultFlowPaths(
-          Array.from(zoneMap.values())
-        );
+        console.warn('[useCustomerFlowData] 전환 데이터 없음, 빈 flowPaths 반환 (더미 데이터 생성 안함)');
 
         const entranceZone = findEntranceZone(zones, zoneMap);
         const exitZones = findExitZones(zones, zoneMap);
 
+        // 더미 동선 생성하지 않고 존 정보만 반환
         const result = {
           zones: Array.from(zoneMap.values()),
-          flowPaths,
-          transitionMatrix,
-          totalTransitions: flowPaths.reduce((sum, f) => sum + f.transition_count, 0),
-          maxTransitionCount,
-          avgPathDuration: 45, // 기본값
+          flowPaths: [], // 🆕 빈 배열 - 더미 데이터 제거
+          transitionMatrix: new Map(),
+          totalTransitions: 0,
+          maxTransitionCount: 0,
+          avgPathDuration: 0,
           entranceZone,
           exitZones,
           hotspotZones: [],
           bottlenecks: [],
         };
 
-        console.log('[useCustomerFlowData] 더미 데이터 생성 완료:', {
+        console.log('[useCustomerFlowData] 전환 데이터 없음 - 존 마커만 표시:', {
           zonesCount: result.zones.length,
-          flowPathsCount: result.flowPaths.length,
-          maxTransitionCount: result.maxTransitionCount,
+          flowPathsCount: 0,
         });
 
         return result;
@@ -351,6 +347,10 @@ function findExitZones(
 }
 
 /**
+ * @deprecated 이 함수는 더 이상 사용되지 않습니다.
+ * 하드코딩된 더미 동선 데이터 생성이 제거되었습니다.
+ * 실제 zone_transitions 데이터가 없으면 빈 flowPaths가 반환됩니다.
+ *
  * zone_transitions 데이터가 없을 때 zones_dim 기반으로 기본 동선 생성
  * 동선 패턴: 입구 → 디스플레이존들 → 계산대 → 입구(출구)
  */
