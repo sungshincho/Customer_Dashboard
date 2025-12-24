@@ -187,15 +187,27 @@ export default function DigitalTwinStudioPage() {
 
   // 🆕 환경 설정 변경 핸들러
   const handleEnvironmentConfigChange = useCallback((config: SimulationEnvironmentConfig) => {
+    console.log('[DigitalTwinStudioPage] handleEnvironmentConfigChange called:', {
+      mode: config.mode,
+      weather: config.weather,
+      holidayType: config.holidayType,
+      timeOfDay: config.timeOfDay,
+    });
+
     // 원본 설정 저장 (AI 최적화에서 사용)
     setSimulationEnvConfig(config);
 
     // 시뮬레이션 모드일 때만 렌더링 설정 적용
     if (config.mode === 'simulation') {
       const renderingConfig = convertToRenderingConfig(config);
+      console.log('[DigitalTwinStudioPage] Converting to renderingConfig:', {
+        weatherParticles: renderingConfig.particles.weatherParticles,
+        lighting: renderingConfig.lighting,
+      });
       setEnvironmentRenderingConfig(renderingConfig);
     } else {
       // 실시간 모드일 때는 기본 환경으로 리셋
+      console.log('[DigitalTwinStudioPage] Resetting to null (realtime mode)');
       setEnvironmentRenderingConfig(null);
     }
   }, []);

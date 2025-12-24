@@ -323,8 +323,18 @@ export function EnvironmentEffectsOverlay({
   particleScale = 30,
   debugMode = false,
 }: EnvironmentEffectsOverlayProps) {
+  // 디버그 로깅
+  console.log('[EnvironmentEffectsOverlay] Rendering:', {
+    hasConfig: !!renderingConfig,
+    enabled,
+    weatherType: renderingConfig?.particles?.weatherParticles?.type,
+    weatherEnabled: renderingConfig?.particles?.weatherParticles?.enabled,
+    weatherCount: renderingConfig?.particles?.weatherParticles?.count,
+  });
+
   // 렌더링 설정이 없거나 비활성화되면 렌더링하지 않음
   if (!renderingConfig || !enabled) {
+    console.log('[EnvironmentEffectsOverlay] Skipping render - no config or disabled');
     return null;
   }
 
