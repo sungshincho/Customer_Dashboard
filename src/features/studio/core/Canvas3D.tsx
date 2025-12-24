@@ -24,8 +24,9 @@ import { CustomerAgents } from '../components/CustomerAgents';
 import { useSimulationEngine } from '@/hooks/useSimulationEngine';
 import { useSimulationStore } from '@/stores/simulationStore';
 import { ChildProductItem } from '@/features/simulation/components/digital-twin/ChildProductItem';
-import type { StudioMode, EnvironmentPreset, Canvas3DProps } from '../types';
+import type { StudioMode, EnvironmentPreset, Canvas3DProps, RenderingConfig } from '../types';
 import type { ProductAsset } from '@/types/scene3d';
+import { EnvironmentEffectsOverlay } from '../overlays/EnvironmentEffectsOverlay';
 
 // 시뮬레이션용 Zone 타입
 interface SimulationZone {
@@ -45,12 +46,14 @@ interface SimulationZone {
 }
 
 // ============================================================================
-// 확장된 Canvas3D Props (zones, userId, storeId 추가)
+// 확장된 Canvas3D Props (zones, userId, storeId, renderingConfig 추가)
 // ============================================================================
 interface ExtendedCanvas3DProps extends Canvas3DProps {
   zones?: SimulationZone[];
   userId?: string;
   storeId?: string;
+  /** 환경 효과 렌더링 설정 (날씨, 시간대 등) */
+  renderingConfig?: RenderingConfig | null;
 }
 
 // ============================================================================
@@ -69,6 +72,7 @@ export function Canvas3D({
   zones = [],
   userId,
   storeId,
+  renderingConfig,
 }: ExtendedCanvas3DProps) {
   // environment 폴더에서 환경 모델 로드
   const { models: environmentModels } = useEnvironmentModels({
@@ -100,6 +104,7 @@ export function Canvas3D({
           zones={zones}
           storeId={storeId}
           environmentModels={environmentModels}
+          renderingConfig={renderingConfig}
         >
           {children}
         </SceneContent>
@@ -131,6 +136,7 @@ interface SceneContentProps {
   zones?: SimulationZone[];
   storeId?: string;  // 🆕 DB 기반 시뮬레이션용
   environmentModels?: EnvironmentModelProp[];
+  renderingConfig?: RenderingConfig | null;  // 🆕 환경 효과 렌더링 설정
 }
 
 function SceneContent({
@@ -145,6 +151,7 @@ function SceneContent({
   zones = [],
   storeId,  // 🆕 DB 기반 시뮬레이션용
   environmentModels = [],
+  renderingConfig,  // 🆕 환경 효과 렌더링 설정
 }: SceneContentProps) {
   const { camera } = useScene();
 
@@ -233,6 +240,15 @@ function SceneContent({
 
         {/* 후처리 효과 (뷰/시뮬레이션 모드) */}
         <PostProcessing enabled={mode !== 'edit'} />
+
+        {/* 🆕 환경 효과 오버레이 (날씨, 시간대 등) */}
+        {renderingConfig && (
+          <EnvironmentEffectsOverlay
+            renderingConfig={renderingConfig}
+            enabled={true}
+            particleScale={30}
+          />
+        )}
 
         {/* 프리로드 */}
         <Preload all />
