@@ -936,6 +936,7 @@ export default function DigitalTwinStudioPage() {
             <div className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-auto z-20 flex items-center gap-3">
               {/* 패널 토글 버튼들 */}
               <div className="flex items-center gap-1 px-2 py-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 shadow-lg">
+                {/* 임시 비활성화 - 도구 버튼
                 <Button
                   variant="ghost"
                   size="sm"
@@ -947,6 +948,7 @@ export default function DigitalTwinStudioPage() {
                   <Layers className="w-4 h-4 mr-1.5" />
                   <span className="text-xs">도구</span>
                 </Button>
+                */}
                 <Button
                   variant="ghost"
                   size="sm"
