@@ -1184,7 +1184,7 @@ export default function DigitalTwinStudioPage() {
 
             {/* ========== 드래그 가능한 플로팅 패널들 (상단 바 아래에 배치) ========== */}
 
-            {/* 도구 패널 - 상단 바 아래 좌측 */}
+            {/* 임시 비활성화 - 도구 패널
             {visiblePanels.tools && (
               <DraggablePanel
                 id="tool-panel"
@@ -1203,6 +1203,7 @@ export default function DigitalTwinStudioPage() {
                 />
               </DraggablePanel>
             )}
+            */}
 
             {/* 씬 저장 패널 - 상단 바 아래 좌측 */}
             {visiblePanels.sceneSave && (
