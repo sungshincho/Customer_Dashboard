@@ -54,6 +54,8 @@ interface AISimulationTabProps {
   simulationZones: SimulationZone[];
   onResultsUpdate?: (type: 'congestion' | 'flow' | 'layout' | 'staffing', result: any) => void;
   onNavigateToOptimization?: (diagnosticIssues?: DiagnosticIssue[]) => void;
+  /** 환경 설정 변경 시 콜백 */
+  onEnvironmentConfigChange?: (config: SimulationEnvironmentConfig) => void;
 }
 
 export function AISimulationTab({
@@ -63,6 +65,7 @@ export function AISimulationTab({
   simulationZones,
   onResultsUpdate,
   onNavigateToOptimization,
+  onEnvironmentConfigChange,
 }: AISimulationTabProps) {
   // 실시간 시뮬레이션 스토어
   const {
@@ -121,6 +124,13 @@ export function AISimulationTab({
     config.calculatedImpact = calculateSimulationImpacts(config);
     return config;
   });
+
+  // 🆕 환경 설정 변경 시 부모에게 알림
+  useEffect(() => {
+    if (onEnvironmentConfigChange) {
+      onEnvironmentConfigChange(simulationEnvConfig);
+    }
+  }, [simulationEnvConfig, onEnvironmentConfigChange]);
 
   // 시각화 옵션
   const [showCustomerLabels, setShowCustomerLabels] = useState(false);

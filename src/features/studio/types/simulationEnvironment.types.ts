@@ -304,3 +304,260 @@ export function createDefaultSimulationConfig(): SimulationEnvironmentConfig {
     holidayType: 'none',
   };
 }
+
+// ============================================================================
+// 3D 렌더링 설정 변환
+// ============================================================================
+
+/**
+ * 시간대별 조명 프리셋
+ */
+const TIME_OF_DAY_LIGHTING: Record<
+  TimeOfDayOption,
+  {
+    ambientIntensity: number;
+    ambientColor: string;
+    directionalIntensity: number;
+    directionalColor: string;
+    directionalPosition: [number, number, number];
+    environmentPreset: 'city' | 'sunset' | 'dawn' | 'night' | 'warehouse' | 'studio';
+  }
+> = {
+  morning: {
+    ambientIntensity: 0.5,
+    ambientColor: '#ffeedd',
+    directionalIntensity: 0.8,
+    directionalColor: '#ffeecc',
+    directionalPosition: [-10, 15, 10],
+    environmentPreset: 'dawn',
+  },
+  afternoon: {
+    ambientIntensity: 0.6,
+    ambientColor: '#ffffff',
+    directionalIntensity: 1.0,
+    directionalColor: '#ffffff',
+    directionalPosition: [0, 20, 10],
+    environmentPreset: 'city',
+  },
+  evening: {
+    ambientIntensity: 0.4,
+    ambientColor: '#ffddbb',
+    directionalIntensity: 0.6,
+    directionalColor: '#ff9955',
+    directionalPosition: [15, 10, -5],
+    environmentPreset: 'sunset',
+  },
+  night: {
+    ambientIntensity: 0.2,
+    ambientColor: '#334466',
+    directionalIntensity: 0.1,
+    directionalColor: '#6688aa',
+    directionalPosition: [5, 15, 5],
+    environmentPreset: 'night',
+  },
+};
+
+/**
+ * 날씨별 파티클 설정
+ */
+function getWeatherParticles(
+  weather: WeatherOption
+): {
+  enabled: boolean;
+  type: 'rain' | 'snow' | 'dust' | 'none';
+  count: number;
+  speed: number;
+  intensity: number;
+} {
+  switch (weather) {
+    case 'rain':
+      return { enabled: true, type: 'rain', count: 2000, speed: 1.5, intensity: 0.7 };
+    case 'heavyRain':
+      return { enabled: true, type: 'rain', count: 5000, speed: 2.0, intensity: 1.0 };
+    case 'snow':
+      return { enabled: true, type: 'snow', count: 1500, speed: 0.3, intensity: 0.8 };
+    case 'heavySnow':
+      return { enabled: true, type: 'snow', count: 4000, speed: 0.5, intensity: 1.0 };
+    case 'haze':
+      return { enabled: true, type: 'dust', count: 500, speed: 0.1, intensity: 0.3 };
+    default:
+      return { enabled: false, type: 'none', count: 0, speed: 0, intensity: 0 };
+  }
+}
+
+/**
+ * 날씨별 안개/대기 설정
+ */
+function getAtmosphericEffects(weather: WeatherOption): {
+  enabled: boolean;
+  fog: { enabled: boolean; color: string; density: number };
+} {
+  switch (weather) {
+    case 'fog':
+      return {
+        enabled: true,
+        fog: { enabled: true, color: '#cccccc', density: 0.03 },
+      };
+    case 'haze':
+      return {
+        enabled: true,
+        fog: { enabled: true, color: '#ddddcc', density: 0.015 },
+      };
+    case 'rain':
+    case 'heavyRain':
+      return {
+        enabled: true,
+        fog: { enabled: true, color: '#aabbcc', density: 0.008 },
+      };
+    case 'snow':
+    case 'heavySnow':
+      return {
+        enabled: true,
+        fog: { enabled: true, color: '#eeeeff', density: 0.01 },
+      };
+    default:
+      return {
+        enabled: false,
+        fog: { enabled: false, color: '#ffffff', density: 0 },
+      };
+  }
+}
+
+import type { RenderingConfig, TimeOfDay, SeasonType, WeatherCondition } from './environment.types';
+
+/**
+ * TimeOfDayOption → TimeOfDay 변환
+ */
+function convertTimeOfDay(time: TimeOfDayOption): TimeOfDay {
+  const mapping: Record<TimeOfDayOption, TimeOfDay> = {
+    morning: 'morning',
+    afternoon: 'afternoon',
+    evening: 'evening',
+    night: 'night',
+  };
+  return mapping[time];
+}
+
+/**
+ * WeatherOption → WeatherCondition 변환
+ */
+function convertWeatherCondition(weather: WeatherOption): WeatherCondition {
+  const mapping: Record<WeatherOption, WeatherCondition> = {
+    clear: 'clear',
+    cloudy: 'clouds',
+    overcast: 'clouds',
+    rain: 'rain',
+    heavyRain: 'thunderstorm',
+    snow: 'snow',
+    heavySnow: 'snow',
+    fog: 'fog',
+    haze: 'haze',
+  };
+  return mapping[weather];
+}
+
+/**
+ * 현재 월에서 계절 추출
+ */
+function getSeasonFromDate(date: Date): SeasonType {
+  const month = date.getMonth() + 1; // 0-indexed
+  if (month >= 3 && month <= 5) return 'spring';
+  if (month >= 6 && month <= 8) return 'summer';
+  if (month >= 9 && month <= 11) return 'fall';
+  return 'winter';
+}
+
+/**
+ * SimulationEnvironmentConfig → RenderingConfig 변환
+ * 3D 씬에서 사용할 렌더링 설정 생성
+ */
+export function convertToRenderingConfig(config: SimulationEnvironmentConfig): RenderingConfig {
+  const timeLighting = TIME_OF_DAY_LIGHTING[config.timeOfDay];
+  const weatherParticles = getWeatherParticles(config.weather);
+  const atmosphericEffects = getAtmosphericEffects(config.weather);
+
+  // 날씨에 따른 조명 조정
+  let lightingModifier = 1.0;
+  if (['rain', 'heavyRain', 'overcast'].includes(config.weather)) {
+    lightingModifier = 0.6;
+  } else if (['cloudy', 'fog', 'haze'].includes(config.weather)) {
+    lightingModifier = 0.8;
+  } else if (['snow', 'heavySnow'].includes(config.weather)) {
+    lightingModifier = 0.9;
+  }
+
+  return {
+    lighting: {
+      ambientIntensity: timeLighting.ambientIntensity * lightingModifier,
+      ambientColor: timeLighting.ambientColor,
+      directionalIntensity: timeLighting.directionalIntensity * lightingModifier,
+      directionalColor: timeLighting.directionalColor,
+      directionalPosition: timeLighting.directionalPosition,
+      shadowEnabled: config.timeOfDay !== 'night',
+      shadowIntensity: 0.3,
+      fillLightEnabled: true,
+      fillLightIntensity: 0.3,
+      fillLightColor: '#aaccff',
+      environmentPreset: timeLighting.environmentPreset,
+      environmentIntensity: lightingModifier,
+    },
+    particles: {
+      weatherParticles: {
+        enabled: weatherParticles.enabled,
+        type: weatherParticles.type === 'dust' ? 'none' : weatherParticles.type as 'rain' | 'snow' | 'none',
+        count: weatherParticles.count,
+        speed: weatherParticles.speed,
+        intensity: weatherParticles.intensity,
+      },
+      atmosphericEffects: {
+        enabled: atmosphericEffects.enabled,
+        fog: {
+          enabled: atmosphericEffects.fog.enabled,
+          color: atmosphericEffects.fog.color,
+          near: 10,
+          far: 100,
+          density: atmosphericEffects.fog.density,
+        },
+        dust: {
+          enabled: weatherParticles.type === 'dust',
+          intensity: weatherParticles.type === 'dust' ? weatherParticles.intensity : 0,
+        },
+      },
+    },
+    postProcessing: {
+      bloom: {
+        enabled: config.timeOfDay === 'evening' || config.timeOfDay === 'night',
+        intensity: config.timeOfDay === 'night' ? 0.4 : 0.2,
+        threshold: 0.8,
+        radius: 0.4,
+      },
+      vignette: {
+        enabled: config.timeOfDay === 'night',
+        intensity: 0.3,
+      },
+      colorCorrection: {
+        enabled: true,
+        saturation: 1.0,
+        brightness: config.timeOfDay === 'night' ? 0.8 : 1.0,
+        contrast: 1.0,
+        temperature: config.timeOfDay === 'evening' ? 0.1 : 0,
+      },
+      depthOfField: {
+        enabled: false,
+        focusDistance: 10,
+        focalLength: 50,
+        bokehScale: 2,
+      },
+    },
+    timeOfDay: convertTimeOfDay(config.timeOfDay),
+    season: getSeasonFromDate(config.date),
+    weatherCondition: convertWeatherCondition(config.weather),
+    generatedAt: new Date().toISOString(),
+    basedOn: {
+      weather: true,
+      holiday: config.holidayType !== 'none',
+      event: !!config.customEventName,
+      timeOfDay: true,
+    },
+  };
+}

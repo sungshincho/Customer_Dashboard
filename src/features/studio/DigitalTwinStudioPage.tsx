@@ -38,7 +38,9 @@ import {
 } from './panels/results';
 import { useStudioMode, useOverlayVisibility, useScenePersistence, useSceneSimulation, useStoreBounds, useStaffData } from './hooks';
 import { loadUserModels } from './utils';
-import type { StudioMode, Model3D, OverlayType, HeatPoint, ZoneBoundary, SceneRecipe, LightingPreset, Vector3, SimulationScenario, TransformMode } from './types';
+import type { StudioMode, Model3D, OverlayType, HeatPoint, ZoneBoundary, SceneRecipe, LightingPreset, Vector3, SimulationScenario, TransformMode, RenderingConfig } from './types';
+import type { SimulationEnvironmentConfig } from './types/simulationEnvironment.types';
+import { convertToRenderingConfig } from './types/simulationEnvironment.types';
 
 // 기존 시뮬레이션 훅
 import { useStoreContext } from '@/features/simulation/hooks/useStoreContext';
@@ -176,6 +178,21 @@ export default function DigitalTwinStudioPage() {
 
   // AI 시뮬레이션에서 발견된 진단 결과
   const [diagnosticIssues, setDiagnosticIssues] = useState<DiagnosticIssue[]>([]);
+
+  // 🆕 환경 효과 렌더링 설정 (날씨, 시간대 등)
+  const [environmentRenderingConfig, setEnvironmentRenderingConfig] = useState<RenderingConfig | null>(null);
+
+  // 🆕 환경 설정 변경 핸들러
+  const handleEnvironmentConfigChange = useCallback((config: SimulationEnvironmentConfig) => {
+    // 시뮬레이션 모드일 때만 렌더링 설정 적용
+    if (config.mode === 'simulation') {
+      const renderingConfig = convertToRenderingConfig(config);
+      setEnvironmentRenderingConfig(renderingConfig);
+    } else {
+      // 실시간 모드일 때는 기본 환경으로 리셋
+      setEnvironmentRenderingConfig(null);
+    }
+  }, []);
 
   // 시뮬레이션 데이터
   const days = getDays();
@@ -711,6 +728,7 @@ export default function DigitalTwinStudioPage() {
                 zones={simulationZones}
                 userId={user?.id}
                 storeId={selectedStore?.id}
+                renderingConfig={environmentRenderingConfig}
               >
                 {/* zones_dim 기반 구역 바닥 오버레이 (DB 데이터 우선) */}
                 {isActive('zone') && dbZones && dbZones.length > 0 && (
@@ -1091,6 +1109,7 @@ export default function DigitalTwinStudioPage() {
                             }
                             setActiveTab('ai-optimization');
                           }}
+                          onEnvironmentConfigChange={handleEnvironmentConfigChange}
                         />
                       )}
                       {activeTab === 'ai-optimization' && (
