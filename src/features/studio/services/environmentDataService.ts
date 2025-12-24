@@ -401,45 +401,64 @@ export async function fetchStoreEvents(
   }
 
   try {
-    let query = supabase
-      .from('store_events')
-      .select('*')
-      .eq('store_id', storeId);
+    const today = new Date().toISOString().split('T')[0];
 
-    // 상태 필터
-    const now = new Date().toISOString();
+    let query = (supabase
+      .from('zone_events' as any)
+      .select('*')
+      .eq('store_id', storeId)) as any;
+
+    // 상태 필터 (zone_events는 "예정" 이벤트가 아닌 로그 성격이므로 날짜 기준으로 단순 매핑)
     if (options?.status === 'active') {
-      query = query
-        .lte('start_date', now)
-        .gte('end_date', now)
-        .eq('status', 'active');
+      query = query.eq('event_date', today);
     } else if (options?.status === 'scheduled') {
-      query = query.gt('start_date', now).eq('status', 'scheduled');
+      query = query.gt('event_date', today);
     }
 
-    // 날짜 범위 필터
+    // 날짜 범위 필터 (event_timestamp 기준)
     if (options?.startDate) {
-      query = query.gte('start_date', options.startDate);
+      query = query.gte('event_timestamp', options.startDate);
     }
     if (options?.endDate) {
-      query = query.lte('end_date', options.endDate);
+      query = query.lte('event_timestamp', options.endDate);
     }
 
-    query = query.order('start_date', { ascending: true });
+    query = query.order('event_timestamp', { ascending: false }).limit(200);
 
     const { data, error } = await query;
 
     if (error) {
-      // 테이블이 없는 경우 빈 배열 반환 (아직 테이블 미생성 가능)
       if (error.code === '42P01') {
-        console.warn('[EnvironmentData] store_events 테이블이 없습니다. 빈 배열 반환.');
+        console.warn('[EnvironmentData] zone_events 테이블이 없습니다. 빈 배열 반환.');
         return { data: [], error: null };
       }
-
       throw error;
     }
 
-    const events = (data || []) as StoreEventData[];
+    const rows = (data || []) as any[];
+    const events: StoreEventData[] = rows.map((row) => {
+      const start = String(row.event_timestamp ?? new Date().toISOString());
+      const durationSeconds = typeof row.duration_seconds === 'number' ? row.duration_seconds : 0;
+      const end = new Date(new Date(start).getTime() + durationSeconds * 1000).toISOString();
+
+      const status: StoreEventData['status'] =
+        row.event_date === today ? 'active' : String(row.event_date) > today ? 'scheduled' : 'completed';
+
+      return {
+        id: String(row.id),
+        store_id: String(row.store_id),
+        event_name: `${row.event_type ?? 'event'} (zone ${row.zone_id ?? '-'})`,
+        event_type: 'special',
+        description: row.metadata ? JSON.stringify(row.metadata) : undefined,
+        start_date: start,
+        end_date: end,
+        expected_traffic_increase: 0,
+        expected_conversion_boost: 0,
+        status,
+        created_at: String(row.created_at ?? start),
+        updated_at: String(row.created_at ?? start),
+      };
+    });
 
     // 캐시 업데이트 (5분)
     cache.events.set(cacheKey, {
@@ -448,7 +467,7 @@ export async function fetchStoreEvents(
       expiresAt: Date.now() + 5 * 60 * 1000,
     });
 
-    console.log('[EnvironmentData] 매장 이벤트 조회 성공:', events.length, '건');
+    console.log('[EnvironmentData] zone_events 기반 이벤트 조회 성공:', events.length, '건');
     return { data: events, error: null };
   } catch (error) {
     console.error('[EnvironmentData] 매장 이벤트 조회 실패:', error);
