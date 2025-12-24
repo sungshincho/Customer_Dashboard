@@ -9,10 +9,21 @@
  */
 
 import { useThree } from '@react-three/fiber';
-import { Environment, ContactShadows, BakeShadows } from '@react-three/drei';
-import { useEffect } from 'react';
+import { Environment, ContactShadows, BakeShadows, useGLTF } from '@react-three/drei';
+import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import type { EnvironmentPreset } from '../types';
+
+// ============================================================================
+// Environment Model 타입
+// ============================================================================
+export interface EnvironmentModelData {
+  url: string;
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+  scale?: [number, number, number];
+  isBaked?: boolean;
+}
 
 // ============================================================================
 // 씬 설정
@@ -122,6 +133,8 @@ interface SceneEnvironmentProps {
   backgroundColor?: string;
   /** 환경 강도 */
   environmentIntensity?: number;
+  /** 환경 모델 목록 (baked, 레이어에 표시 안됨) */
+  environmentModels?: EnvironmentModelData[];
 }
 
 // ============================================================================
@@ -133,6 +146,7 @@ export function SceneEnvironment({
   bakeShadows = false,
   backgroundColor,
   environmentIntensity,
+  environmentModels = [],
 }: SceneEnvironmentProps) {
   const preset = environmentPreset || SCENE_CONFIG.environment.preset;
   const bgColor = backgroundColor || SCENE_CONFIG.backgroundColor;
@@ -214,6 +228,18 @@ export function SceneEnvironment({
 
       {/* 그림자 베이크 */}
       {bakeShadows && <BakeShadows />}
+
+      {/* 환경 모델 (baked, 레이어에 표시 안됨) */}
+      {environmentModels.map((model, index) => (
+        <StaticEnvironmentModel
+          key={`env-model-${index}`}
+          url={model.url}
+          position={model.position}
+          rotation={model.rotation}
+          scale={model.scale}
+          isBaked={model.isBaked}
+        />
+      ))}
     </>
   );
 }
@@ -254,5 +280,70 @@ export const LIGHTING_PRESETS = {
     fillLight: { ...SCENE_CONFIG.fillLight, color: '#aaccff', intensity: 0.5 },
   },
 };
+
+// ============================================================================
+// StaticEnvironmentModel 컴포넌트 (Baked 처리)
+// ============================================================================
+interface StaticEnvironmentModelProps {
+  url: string;
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+  scale?: [number, number, number];
+  isBaked?: boolean;
+}
+
+function StaticEnvironmentModel({
+  url,
+  position = [0, 0, 0],
+  rotation = [0, 0, 0],
+  scale = [1, 1, 1],
+  isBaked = true,
+}: StaticEnvironmentModelProps) {
+  const { scene } = useGLTF(url);
+
+  // Baked 처리: MeshBasicMaterial로 변환, 조명/그림자 비활성화
+  const processedScene = useMemo(() => {
+    const cloned = scene.clone(true);
+
+    if (isBaked) {
+      cloned.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          // 그림자 비활성화
+          child.castShadow = false;
+          child.receiveShadow = false;
+
+          // 기존 material에서 텍스처 추출 후 MeshBasicMaterial로 변환
+          const originalMaterial = child.material as THREE.MeshStandardMaterial;
+          if (originalMaterial) {
+            const basicMaterial = new THREE.MeshBasicMaterial({
+              map: originalMaterial.map || null,
+              color: originalMaterial.color || new THREE.Color(0xffffff),
+              transparent: originalMaterial.transparent || false,
+              opacity: originalMaterial.opacity ?? 1,
+              side: originalMaterial.side || THREE.FrontSide,
+            });
+
+            // Baked 설정
+            basicMaterial.toneMapped = false;
+            basicMaterial.envMap = null;
+
+            child.material = basicMaterial;
+          }
+        }
+      });
+    }
+
+    return cloned;
+  }, [scene, isBaked]);
+
+  return (
+    <primitive
+      object={processedScene}
+      position={position}
+      rotation={rotation}
+      scale={scale}
+    />
+  );
+}
 
 export default SceneEnvironment;

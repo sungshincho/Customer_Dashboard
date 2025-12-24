@@ -135,3 +135,6 @@ export {
   useSceneOverlays,
   useSceneLayers,
 } from '../core/SceneProvider';
+
+// 환경 모델 훅
+export { useEnvironmentModels } from './useEnvironmentModels';
