@@ -9,7 +9,7 @@
  */
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { Sparkles, Layout, Route, Users, Loader2, ChevronDown, ChevronUp, Check, RotateCcw, Eye, Layers, Target, TrendingUp, Clock, Footprints, Settings2, Save, ArrowRight, BookmarkPlus } from 'lucide-react';
+import { Sparkles, Layout, Route, Users, Loader2, ChevronDown, ChevronUp, Check, RotateCcw, Eye, Layers, Target, TrendingUp, Clock, Footprints, Settings2, Save, ArrowRight, BookmarkPlus, Cloud, Calendar, Thermometer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -30,6 +30,8 @@ import type {
 } from '../types/optimization.types';
 import { DEFAULT_OPTIMIZATION_SETTINGS, INTENSITY_LIMITS } from '../types/optimization.types';
 import type { StaffOptimizationResult } from '../types/staffOptimization.types';
+import type { SimulationEnvironmentConfig } from '../types/simulationEnvironment.types';
+import { WEATHER_OPTIONS, HOLIDAY_OPTIONS, TIME_OF_DAY_OPTIONS } from '../types/simulationEnvironment.types';
 
 type OptimizationType = 'layout' | 'flow' | 'staffing';
 type ViewMode = 'all' | 'as-is' | 'to-be';
@@ -103,6 +105,8 @@ interface AIOptimizationTabProps {
   diagnosticIssues?: DiagnosticIssue[];
   /** 적용하기 탭으로 이동 */
   onNavigateToApply?: () => void;
+  /** 🆕 시뮬레이션 환경 설정 (날씨, 휴일, 시간대 등) */
+  simulationEnvConfig?: SimulationEnvironmentConfig | null;
 }
 
 export function AIOptimizationTab({
@@ -114,6 +118,7 @@ export function AIOptimizationTab({
   onResultsUpdate,
   diagnosticIssues = [],
   onNavigateToApply,
+  simulationEnvConfig,
 }: AIOptimizationTabProps) {
   // SceneProvider에서 applySimulationResults 가져오기
   const { applySimulationResults } = useScene();
@@ -273,6 +278,19 @@ export function AIOptimizationTab({
       // 선택된 최적화만 실행하도록 파라미터 구성
       const params: Record<string, Record<string, any>> = {};
 
+      // 🆕 환경 컨텍스트 구성 (시뮬레이션 모드일 때만 사용)
+      const environmentContext = simulationEnvConfig?.mode === 'simulation'
+        ? {
+            weather: simulationEnvConfig.weather,
+            temperature: simulationEnvConfig.temperature,
+            humidity: simulationEnvConfig.humidity,
+            holiday_type: simulationEnvConfig.holidayType,
+            day_of_week: simulationEnvConfig.dayOfWeek,
+            time_of_day: simulationEnvConfig.timeOfDay,
+            impact: simulationEnvConfig.calculatedImpact,
+          }
+        : null;
+
       if (selectedOptimizations.includes('layout')) {
         // 목표를 설정 패널의 objective로 매핑
         const goalMapping: Record<string, OptimizationGoal> = {
@@ -285,6 +303,8 @@ export function AIOptimizationTab({
         params.layout = {
           goal: goalMapping[optimizationSettings.objective] || selectedGoal,
           storeContext,
+          // 🆕 환경 컨텍스트 추가 (비 오는 날 → 실내 체류 증가 가정 등)
+          environment_context: environmentContext,
           // 설정 패널의 상세 설정 전달
           settings: {
             objective: optimizationSettings.objective,
@@ -312,6 +332,8 @@ export function AIOptimizationTab({
           duration: '1hour',
           customerCount: 100,
           storeContext,
+          // 🆕 환경 컨텍스트 추가 (날씨에 따른 동선 패턴 변화 등)
+          environment_context: environmentContext,
         };
       }
       if (selectedOptimizations.includes('staffing')) {
@@ -326,6 +348,8 @@ export function AIOptimizationTab({
           staffCount: 3,
           goal: staffingGoalMap[selectedGoal],
           storeContext,
+          // 🆕 환경 컨텍스트 추가 (블랙프라이데이 → 고트래픽 가정 등)
+          environment_context: environmentContext,
         };
       }
 
@@ -503,7 +527,7 @@ export function AIOptimizationTab({
     } finally {
       setRunningTypes([]);
     }
-  }, [selectedOptimizations, selectedGoal, storeId, sceneData, sceneSimulation, onOverlayToggle, onResultsUpdate, optimizationSettings]);
+  }, [selectedOptimizations, selectedGoal, storeId, sceneData, sceneSimulation, onOverlayToggle, onResultsUpdate, optimizationSettings, simulationEnvConfig]);
 
   // As-Is 씬으로 복원
   const handleRevertToAsIs = useCallback(() => {
@@ -627,6 +651,84 @@ export function AIOptimizationTab({
             });
           }}
         />
+      )}
+
+      {/* ========== 🆕 환경 설정 컨텍스트 (AI 시뮬레이션에서 전달) ========== */}
+      {simulationEnvConfig?.mode === 'simulation' && (
+        <div className="p-3 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg border border-blue-500/30 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-white/80 flex items-center gap-1.5">
+              <Cloud className="w-3.5 h-3.5 text-blue-400" />
+              환경 컨텍스트 적용됨
+            </span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">
+              시뮬레이션 모드
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            {/* 날씨 */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm">
+                {WEATHER_OPTIONS.find((w) => w.value === simulationEnvConfig.weather)?.emoji}
+              </span>
+              <span className="text-white/70">
+                {WEATHER_OPTIONS.find((w) => w.value === simulationEnvConfig.weather)?.label}
+              </span>
+            </div>
+
+            {/* 휴일 */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm">
+                {HOLIDAY_OPTIONS.find((h) => h.value === simulationEnvConfig.holidayType)?.emoji}
+              </span>
+              <span className="text-white/70">
+                {HOLIDAY_OPTIONS.find((h) => h.value === simulationEnvConfig.holidayType)?.label}
+              </span>
+            </div>
+
+            {/* 시간대 */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm">
+                {TIME_OF_DAY_OPTIONS.find((t) => t.value === simulationEnvConfig.timeOfDay)?.emoji}
+              </span>
+              <span className="text-white/70">
+                {TIME_OF_DAY_OPTIONS.find((t) => t.value === simulationEnvConfig.timeOfDay)?.label}
+              </span>
+            </div>
+          </div>
+
+          {/* 영향도 요약 */}
+          {simulationEnvConfig.calculatedImpact && (
+            <div className="text-[10px] text-white/50 pt-1 border-t border-white/10 flex gap-3">
+              <span>
+                트래픽: <span className={cn(
+                  simulationEnvConfig.calculatedImpact.trafficMultiplier > 1 ? 'text-green-400' : 'text-red-400'
+                )}>
+                  {(simulationEnvConfig.calculatedImpact.trafficMultiplier * 100).toFixed(0)}%
+                </span>
+              </span>
+              <span>
+                체류: <span className={cn(
+                  simulationEnvConfig.calculatedImpact.dwellTimeMultiplier > 1 ? 'text-green-400' : 'text-red-400'
+                )}>
+                  {(simulationEnvConfig.calculatedImpact.dwellTimeMultiplier * 100).toFixed(0)}%
+                </span>
+              </span>
+              <span>
+                전환: <span className={cn(
+                  simulationEnvConfig.calculatedImpact.conversionMultiplier > 1 ? 'text-green-400' : 'text-red-400'
+                )}>
+                  {(simulationEnvConfig.calculatedImpact.conversionMultiplier * 100).toFixed(0)}%
+                </span>
+              </span>
+            </div>
+          )}
+
+          <p className="text-[10px] text-white/40">
+            ⚡ AI 최적화 시 위 환경 조건을 고려하여 추천합니다
+          </p>
+        </div>
       )}
 
       {/* ========== 최적화 목표 선택 ========== */}
