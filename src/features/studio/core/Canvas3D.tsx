@@ -199,6 +199,17 @@ function SceneContent({
             maxDistance={40}
             maxPolarAngle={Math.PI / 2.5}
             minPolarAngle={0.3}
+            enablePan={true}
+            panSpeed={0.5}            
+            onChange={(e) => {
+              if (e?.target) {
+                const target = e.target.target;
+                const limit = 12;
+                target.x = Math.max(-limit, Math.min(limit, target.x));
+                target.z = Math.max(-limit, Math.min(limit, target.z));
+                target.y = Math.max(0, Math.min(5, target.y));
+              }
+            }}
           />
         )}
 
@@ -403,6 +414,17 @@ export function StandaloneCanvas3D({
               maxDistance={40}
               maxPolarAngle={Math.PI / 2.5}
               minPolarAngle={0.3}
+              enablePan={true}
+              panSpeed={0.5}            
+              onChange={(e) => {
+                if (e?.target) {
+                  const target = e.target.target;
+                  const limit = 12;
+                  target.x = Math.max(-limit, Math.min(limit, target.x));
+                  target.z = Math.max(-limit, Math.min(limit, target.z));
+                  target.y = Math.max(0, Math.min(5, target.y));
+                }
+              }}              
             />
           )}
 
