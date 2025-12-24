@@ -23,7 +23,7 @@ export interface SimulatedCustomer {
   targetZoneId: string | null;
   position: THREE.Vector3;
   targetPosition: THREE.Vector3 | null;
-  state: 'idle' | 'walking' | 'browsing' | 'exiting';
+  state: 'idle' | 'walking' | 'browsing' | 'returning' | 'exiting'; // 🆕 returning 상태 추가
   dwellTimeRemaining: number; // 현재 존에서 남은 체류 시간 (초)
   totalTimeInStore: number;   // 매장 내 총 시간
   visitedZones: string[];     // 방문한 존 목록
@@ -245,6 +245,30 @@ export class CustomerSimulationEngine {
         }
         break;
 
+      case 'returning':
+        // 🆕 입구로 돌아가는 중
+        if (customer.targetPosition) {
+          const direction = new THREE.Vector3()
+            .subVectors(customer.targetPosition, customer.position)
+            .normalize();
+
+          const distance = customer.position.distanceTo(customer.targetPosition);
+          const moveDistance = customer.speed * deltaTime * 1.2; // 돌아갈 때는 조금 더 빠르게
+
+          if (distance <= moveDistance) {
+            // 입구 도착 → 퇴장 완료
+            customer.position.copy(customer.targetPosition);
+            customer.state = 'exiting';
+          } else {
+            // 이동 중
+            customer.position.add(direction.multiplyScalar(moveDistance));
+          }
+        } else {
+          // targetPosition이 없으면 바로 퇴장
+          customer.state = 'exiting';
+        }
+        break;
+
       case 'idle':
         // 잠시 대기 후 다음 행동 결정
         customer.dwellTimeRemaining -= deltaTime;
@@ -261,8 +285,8 @@ export class CustomerSimulationEngine {
     const nextPath = selectNextZone(customer.currentZoneId, this.flowData.transitionMatrix);
 
     if (!nextPath) {
-      // 더 이상 갈 곳 없음 → 퇴장
-      customer.state = 'exiting';
+      // 더 이상 갈 곳 없음 → 입구로 돌아가기
+      this.startReturning(customer);
       return;
     }
 
@@ -273,7 +297,8 @@ export class CustomerSimulationEngine {
     const exitProbability = Math.min(0.3, customer.totalTimeInStore / 600); // 최대 30%
 
     if (isExitZone && Math.random() < 0.7 + exitProbability) {
-      customer.state = 'exiting';
+      // 🆕 바로 퇴장하지 않고 입구로 돌아가기
+      this.startReturning(customer);
       return;
     }
 
@@ -282,6 +307,21 @@ export class CustomerSimulationEngine {
     const targetPos = getRandomPositionInZone(nextPath.to_zone);
     customer.targetPosition = new THREE.Vector3(targetPos.x, 0, targetPos.z);
     customer.state = 'walking';
+  }
+
+  // 🆕 입구로 돌아가기 시작
+  private startReturning(customer: SimulatedCustomer): void {
+    if (!this.flowData.entranceZone) {
+      // 입구 존이 없으면 바로 퇴장
+      customer.state = 'exiting';
+      return;
+    }
+
+    // 입구 위치로 목표 설정
+    const entrancePos = getRandomPositionInZone(this.flowData.entranceZone);
+    customer.targetPosition = new THREE.Vector3(entrancePos.x, 0, entrancePos.z);
+    customer.targetZoneId = this.flowData.entranceZone.id;
+    customer.state = 'returning';
   }
 
   // 랜덤 체류 시간 (초)

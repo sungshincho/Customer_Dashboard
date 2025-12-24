@@ -63,13 +63,21 @@ export const CustomerAvatarsOverlay: React.FC<CustomerAvatarsOverlayProps> = ({
     return null;
   }
 
+  // 🆕 exiting 상태 제외하고 유효한 고객만 필터링 (고스트 아바타 방지)
+  const activeCustomers = state.customers.filter(
+    (c) => c.state !== 'exiting' && c.position && isValidPosition(c.position)
+  );
+
+  const returningCount = state.customers.filter((c) => c.state === 'returning').length;
+
   return (
     <group name="customer-avatars-overlay">
       {/* 통계 표시 */}
       <Html position={[0, 3, 0]} center>
         <div className="px-3 py-2 bg-black/80 rounded-lg text-xs text-white border border-white/20 pointer-events-none">
           <div className="flex items-center gap-3">
-            <span>👥 {state.customers.length}명 활동 중</span>
+            <span>👥 {activeCustomers.length}명 활동 중</span>
+            {returningCount > 0 && <span>🚶 {returningCount}명 퇴장 중</span>}
             <span>📊 총 {state.stats.totalCustomers}명</span>
             <span>🚪 {state.stats.exitedCustomers}명 퇴장</span>
             {state.stats.avgDwellTime > 0 && (
@@ -79,8 +87,8 @@ export const CustomerAvatarsOverlay: React.FC<CustomerAvatarsOverlayProps> = ({
         </div>
       </Html>
 
-      {/* 고객 아바타들 */}
-      {state.customers.map((customer) => (
+      {/* 고객 아바타들 - 유효한 고객만 렌더링 */}
+      {activeCustomers.map((customer) => (
         <CustomerAvatar
           key={customer.id}
           customer={customer}
@@ -90,6 +98,20 @@ export const CustomerAvatarsOverlay: React.FC<CustomerAvatarsOverlayProps> = ({
     </group>
   );
 };
+
+// 🆕 위치 유효성 검사 (고스트 아바타 방지)
+function isValidPosition(position: THREE.Vector3): boolean {
+  if (!position) return false;
+  const x = position.x;
+  const z = position.z;
+  // NaN, Infinity 체크 및 범위 검증
+  return (
+    Number.isFinite(x) &&
+    Number.isFinite(z) &&
+    Math.abs(x) < 1000 &&
+    Math.abs(z) < 1000
+  );
+}
 
 // ===== 개별 고객 아바타 =====
 interface CustomerAvatarProps {
@@ -104,12 +126,12 @@ const CustomerAvatar: React.FC<CustomerAvatarProps> = ({
   // 아바타 타입에 따른 색상
   const color = useMemo(() => getAvatarColor(customer.avatarType), [customer.avatarType]);
 
-  // 상태에 따른 투명도
-  const opacity = customer.state === 'walking' ? 0.8 : 1;
+  // 상태에 따른 투명도 (returning은 약간 더 투명하게)
+  const opacity = customer.state === 'walking' ? 0.8 : customer.state === 'returning' ? 0.6 : 1;
 
-  // 이동 방향 계산
+  // 이동 방향 계산 (walking, returning 모두 적용)
   const direction = useMemo(() => {
-    if (customer.state === 'walking' && customer.targetPosition) {
+    if ((customer.state === 'walking' || customer.state === 'returning') && customer.targetPosition) {
       return Math.atan2(
         customer.targetPosition.x - customer.position.x,
         customer.targetPosition.z - customer.position.z
@@ -149,14 +171,18 @@ const CustomerAvatar: React.FC<CustomerAvatarProps> = ({
         />
       </mesh>
 
-      {/* 이동 방향 표시 (걷는 중일 때) */}
-      {customer.state === 'walking' && customer.targetPosition && (
+      {/* 이동 방향 표시 (걷는 중 또는 돌아가는 중일 때) */}
+      {(customer.state === 'walking' || customer.state === 'returning') && customer.targetPosition && (
         <mesh
           position={[0, 0.1, 0]}
           rotation={[-Math.PI / 2, 0, -direction]}
         >
           <coneGeometry args={[0.15, 0.4, 8]} />
-          <meshBasicMaterial color={color} transparent opacity={0.5} />
+          <meshBasicMaterial
+            color={customer.state === 'returning' ? '#f97316' : color}
+            transparent
+            opacity={0.5}
+          />
         </mesh>
       )}
 
@@ -207,6 +233,7 @@ function getStateColor(state: string): string {
     browsing: '#22c55e',  // 초록 - 둘러보는 중
     walking: '#3b82f6',   // 파랑 - 이동 중
     idle: '#f59e0b',      // 노랑 - 대기 중
+    returning: '#f97316', // 🆕 주황 - 입구로 돌아가는 중
     exiting: '#ef4444',   // 빨강 - 퇴장
   };
 
@@ -219,7 +246,8 @@ function getStateLabel(state: string): string {
     browsing: '둘러보는 중',
     walking: '이동 중',
     idle: '대기 중',
-    exiting: '퇴장',
+    returning: '퇴장 중', // 🆕
+    exiting: '퇴장 완료',
   };
 
   return labels[state] || state;
