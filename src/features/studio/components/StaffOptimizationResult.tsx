@@ -39,6 +39,26 @@ export const StaffOptimizationResultPanel: React.FC<StaffOptimizationResultPanel
   const [isExpanded, setIsExpanded] = useState(true);
   const [showDetails, setShowDetails] = useState(false);
 
+  // 🔧 FIX: null/undefined 체크 - summary와 overall_impact가 없을 수 있음
+  const summary = result?.summary ?? {
+    total_staff: 0,
+    reallocated_count: result?.reallocations?.length ?? 0,
+    efficiency_before: 0,
+    efficiency_after: 0,
+    efficiency_change: 0,
+  };
+
+  const overallImpact = result?.overall_impact ?? {
+    customer_response_rate_change: 0,
+    wait_time_change: 0,
+    coverage_change: 0,
+    peak_hour_coverage: 0,
+  };
+
+  const reallocations = result?.reallocations ?? [];
+  const insights = result?.insights ?? [];
+  const confidence = result?.confidence ?? 0;
+
   return (
     <div className="bg-muted/30 rounded-lg border">
       {/* 헤더 */}
@@ -53,7 +73,7 @@ export const StaffOptimizationResultPanel: React.FC<StaffOptimizationResultPanel
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">
-            신뢰도 {result.confidence}%
+            신뢰도 {confidence}%
           </span>
           {isExpanded ? (
             <ChevronUp className="w-4 h-4" />
@@ -68,33 +88,35 @@ export const StaffOptimizationResultPanel: React.FC<StaffOptimizationResultPanel
           {/* 효율성 변화 */}
           <div className="flex items-center gap-2 text-sm">
             <span className="text-muted-foreground">
-              {result.summary.efficiency_before}%
+              {summary.efficiency_before}%
             </span>
             <ArrowRight className="w-4 h-4 text-muted-foreground" />
             <span className="font-bold text-green-500">
-              {result.summary.efficiency_after}%
+              {summary.efficiency_after}%
             </span>
-            <span className="text-xs text-green-500 bg-green-500/10 px-2 py-0.5 rounded">
-              +{result.summary.efficiency_change}%p
-            </span>
+            {summary.efficiency_change > 0 && (
+              <span className="text-xs text-green-500 bg-green-500/10 px-2 py-0.5 rounded">
+                +{summary.efficiency_change}%p
+              </span>
+            )}
           </div>
 
           {/* 요약 */}
           <div className="text-xs text-muted-foreground">
-            • 직원 {result.summary.total_staff}명 | 재배치{' '}
-            {result.summary.reallocated_count}명
+            • 직원 {summary.total_staff}명 | 재배치{' '}
+            {summary.reallocated_count}명
           </div>
 
           {/* 전체 효과 뱃지 */}
           <div className="flex flex-wrap gap-1">
             <span className="text-xs px-2 py-0.5 bg-green-500/10 text-green-500 rounded">
-              고객 응대율: +{result.overall_impact.customer_response_rate_change}%
+              고객 응대율: +{overallImpact.customer_response_rate_change}%
             </span>
             <span className="text-xs px-2 py-0.5 bg-blue-500/10 text-blue-500 rounded">
-              대기 시간: {result.overall_impact.wait_time_change}%
+              대기 시간: {overallImpact.wait_time_change}%
             </span>
             <span className="text-xs px-2 py-0.5 bg-purple-500/10 text-purple-500 rounded">
-              커버리지: +{result.overall_impact.coverage_change}%
+              커버리지: +{overallImpact.coverage_change}%
             </span>
           </div>
 
@@ -108,7 +130,7 @@ export const StaffOptimizationResultPanel: React.FC<StaffOptimizationResultPanel
           >
             {showDetails
               ? '상세 정보 숨기기'
-              : `상세 정보 보기 (${result.reallocations.length}명)`}
+              : `상세 정보 보기 (${reallocations.length}명)`}
             {showDetails ? (
               <ChevronUp className="w-3 h-3" />
             ) : (
@@ -119,19 +141,19 @@ export const StaffOptimizationResultPanel: React.FC<StaffOptimizationResultPanel
           {/* 상세 재배치 목록 */}
           {showDetails && (
             <div className="space-y-2 max-h-72 overflow-auto">
-              {result.reallocations.map((realloc, idx) => (
+              {reallocations.map((realloc, idx) => (
                 <StaffReallocationCard key={idx} reallocation={realloc} />
               ))}
 
               {/* AI 인사이트 */}
-              {result.insights && result.insights.length > 0 && (
+              {insights.length > 0 && (
                 <div className="mt-3 p-2 bg-yellow-500/10 rounded border border-yellow-500/20">
                   <div className="flex items-center gap-1 text-xs font-medium text-yellow-600 mb-1">
                     <Lightbulb className="w-3 h-3" />
                     AI 인사이트
                   </div>
                   <ul className="text-xs text-muted-foreground space-y-1">
-                    {result.insights.map((insight, i) => (
+                    {insights.map((insight, i) => (
                       <li key={i}>• {insight}</li>
                     ))}
                   </ul>
