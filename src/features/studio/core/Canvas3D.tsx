@@ -153,12 +153,6 @@ function SceneContent({
   environmentModels = [],
   renderingConfig,  // 🆕 환경 효과 렌더링 설정
 }: SceneContentProps) {
-  // 디버그 로깅
-  console.log('[Canvas3D SceneContent] renderingConfig:', {
-    hasConfig: !!renderingConfig,
-    weatherType: renderingConfig?.particles?.weatherParticles?.type,
-  });
-
   const { camera } = useScene();
 
   // 실시간 시뮬레이션 상태

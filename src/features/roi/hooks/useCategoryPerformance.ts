@@ -46,59 +46,74 @@ export const useCategoryPerformance = (dateRange: DateRange) => {
 
       const days = getDaysFromRange(dateRange);
 
-      // RPC 함수 호출 (함수가 없을 경우 applied_strategies에서 직접 집계)
-      const { data, error } = await supabase.rpc('get_category_performance' as any, {
-        p_store_id: selectedStore.id,
-        p_days: days,
-      });
+      // 기본 모듈 반환 함수
+      const getDefaultModules = () => ALL_MODULES.map(({ source, module }) => ({
+        source,
+        sourceModule: module,
+        appliedCount: 0,
+        successCount: 0,
+        averageRoi: 0,
+        totalImpact: 0,
+        trend: 'stable' as const,
+      }));
 
-      if (error) {
-        console.error('Category performance fetch error:', error);
-        // 에러 시 빈 데이터로 기본 모듈 반환
-        return ALL_MODULES.map(({ source, module }) => ({
-          source,
-          sourceModule: module,
-          appliedCount: 0,
-          successCount: 0,
-          averageRoi: 0,
-          totalImpact: 0,
-          trend: 'stable' as const,
-        }));
-      }
-
-      // RPC 결과를 CategoryPerformance로 변환
-      const resultMap = new Map<string, CategoryPerformance>();
-
-      if (Array.isArray(data)) {
-        data.forEach((item: any) => {
-          const key = `${item.source}-${item.source_module}`;
-          resultMap.set(key, {
-            source: item.source,
-            sourceModule: item.source_module,
-            appliedCount: item.applied_count || 0,
-            successCount: item.success_count || 0,
-            averageRoi: item.average_roi || 0,
-            totalImpact: item.total_impact || 0,
-            trend: item.trend || 'stable',
-          });
+      // RPC 함수 호출 (함수가 없을 경우 기본 데이터 반환)
+      try {
+        const { data, error } = await supabase.rpc('get_category_performance' as any, {
+          p_store_id: selectedStore.id,
+          p_days: days,
         });
-      }
 
-      // 모든 모듈에 대해 데이터 생성 (없는 것은 0으로)
-      return ALL_MODULES.map(({ source, module }) => {
-        const key = `${source}-${module}`;
-        return (
-          resultMap.get(key) || {
-            source,
-            sourceModule: module,
-            appliedCount: 0,
-            successCount: 0,
-            averageRoi: 0,
-            totalImpact: 0,
-            trend: 'stable' as const,
+        if (error) {
+          // 함수가 존재하지 않는 경우 조용히 기본값 반환
+          if (error.message?.includes('function') || error.code === '42883') {
+            return getDefaultModules();
           }
-        );
-      });
+          console.warn('Category performance fetch warning:', error.message);
+          return getDefaultModules();
+        }
+
+        if (!data) {
+          return getDefaultModules();
+        }
+
+        // RPC 결과를 CategoryPerformance로 변환
+        const resultMap = new Map<string, CategoryPerformance>();
+
+        if (Array.isArray(data)) {
+          data.forEach((item: any) => {
+            const key = `${item.source}-${item.source_module}`;
+            resultMap.set(key, {
+              source: item.source,
+              sourceModule: item.source_module,
+              appliedCount: item.applied_count || 0,
+              successCount: item.success_count || 0,
+              averageRoi: item.average_roi || 0,
+              totalImpact: item.total_impact || 0,
+              trend: item.trend || 'stable',
+            });
+          });
+        }
+
+        // 모든 모듈에 대해 데이터 생성 (없는 것은 0으로)
+        return ALL_MODULES.map(({ source, module }) => {
+          const key = `${source}-${module}`;
+          return (
+            resultMap.get(key) || {
+              source,
+              sourceModule: module,
+              appliedCount: 0,
+              successCount: 0,
+              averageRoi: 0,
+              totalImpact: 0,
+              trend: 'stable' as const,
+            }
+          );
+        });
+      } catch {
+        // RPC 함수가 없거나 네트워크 오류 시 기본값 반환
+        return getDefaultModules();
+      }
     },
     enabled: !!selectedStore?.id,
     staleTime: 1000 * 60 * 5, // 5분

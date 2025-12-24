@@ -323,34 +323,35 @@ export function EnvironmentEffectsOverlay({
   particleScale = 30,
   debugMode = false,
 }: EnvironmentEffectsOverlayProps) {
-  // 디버그 로깅
-  console.log('[EnvironmentEffectsOverlay] Rendering:', {
-    hasConfig: !!renderingConfig,
-    enabled,
-    weatherType: renderingConfig?.particles?.weatherParticles?.type,
-    weatherEnabled: renderingConfig?.particles?.weatherParticles?.enabled,
-    weatherCount: renderingConfig?.particles?.weatherParticles?.count,
-  });
-
   // 렌더링 설정이 없거나 비활성화되면 렌더링하지 않음
   if (!renderingConfig || !enabled) {
-    console.log('[EnvironmentEffectsOverlay] Skipping render - no config or disabled');
     return null;
   }
 
   const { particles, lighting } = renderingConfig;
+
+  // 파티클 설정이 변경될 때 컴포넌트를 재생성하기 위한 key
+  const particleKey = `${particles.weatherParticles.type}-${particles.weatherParticles.count}-${particles.weatherParticles.intensity}`;
 
   return (
     <group name="environment-effects">
       {/* 동적 조명 */}
       <DynamicLighting config={lighting} />
 
-      {/* 날씨 파티클 */}
+      {/* 날씨 파티클 - key를 사용해 설정 변경 시 재생성 */}
       {particles.weatherParticles.type === 'rain' && (
-        <RainParticles config={particles.weatherParticles} scale={particleScale} />
+        <RainParticles
+          key={`rain-${particleKey}`}
+          config={particles.weatherParticles}
+          scale={particleScale}
+        />
       )}
       {particles.weatherParticles.type === 'snow' && (
-        <SnowParticles config={particles.weatherParticles} scale={particleScale} />
+        <SnowParticles
+          key={`snow-${particleKey}`}
+          config={particles.weatherParticles}
+          scale={particleScale}
+        />
       )}
 
       {/* 안개 효과 */}

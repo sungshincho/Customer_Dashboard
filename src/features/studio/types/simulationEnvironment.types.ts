@@ -371,15 +371,15 @@ function getWeatherParticles(
 } {
   switch (weather) {
     case 'rain':
-      return { enabled: true, type: 'rain', count: 2000, speed: 1.5, intensity: 0.7 };
+      return { enabled: true, type: 'rain', count: 300, speed: 1.5, intensity: 0.7 };
     case 'heavyRain':
-      return { enabled: true, type: 'rain', count: 5000, speed: 2.0, intensity: 1.0 };
+      return { enabled: true, type: 'rain', count: 500, speed: 2.0, intensity: 1.0 };
     case 'snow':
-      return { enabled: true, type: 'snow', count: 1500, speed: 0.3, intensity: 0.8 };
+      return { enabled: true, type: 'snow', count: 200, speed: 0.3, intensity: 0.8 };
     case 'heavySnow':
-      return { enabled: true, type: 'snow', count: 4000, speed: 0.5, intensity: 1.0 };
+      return { enabled: true, type: 'snow', count: 400, speed: 0.5, intensity: 1.0 };
     case 'haze':
-      return { enabled: true, type: 'dust', count: 500, speed: 0.1, intensity: 0.3 };
+      return { enabled: true, type: 'dust', count: 100, speed: 0.1, intensity: 0.3 };
     default:
       return { enabled: false, type: 'none', count: 0, speed: 0, intensity: 0 };
   }
