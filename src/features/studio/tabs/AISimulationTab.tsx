@@ -115,7 +115,7 @@ export function AISimulationTab({
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
 
   // 🆕 시뮬레이션 환경 설정 상태
-  const [showEnvironmentSettings, setShowEnvironmentSettings] = useState(false);
+  const [showEnvironmentSettings, setShowEnvironmentSettings] = useState(true); // 기본 열림
   const [simulationEnvConfig, setSimulationEnvConfig] = useState<SimulationEnvironmentConfig>(() => {
     const config = createDefaultSimulationConfig();
     config.calculatedImpact = calculateSimulationImpacts(config);
