@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 // 새 스튜디오 컴포넌트
 import { Canvas3D, SceneProvider, useScene } from './core';
 import { LayerPanel, SimulationPanel, ToolPanel, SceneSavePanel, OverlayControlPanel, PropertyPanel } from './panels';
-import { HeatmapOverlay, CustomerFlowOverlay, ZoneBoundaryOverlay, LayoutOptimizationOverlay, FlowOptimizationOverlay, CongestionOverlay, StaffingOverlay, ZonesFloorOverlay, StaffAvatarsOverlay, CustomerFlowOverlayEnhanced, CustomerAvatarsOverlay, StaffReallocationOverlay } from './overlays';
+import { HeatmapOverlay, CustomerFlowOverlay, ZoneBoundaryOverlay, LayoutOptimizationOverlay, FlowOptimizationOverlay, CongestionOverlay, StaffingOverlay, ZonesFloorOverlay, StaffAvatarsOverlay, CustomerFlowOverlayEnhanced, StaffReallocationOverlay } from './overlays';
 import { DraggablePanel, QuickToggleBar, ViewModeToggle, ResultReportPanel, type ViewMode } from './components';
 import type { DiagnosticIssue } from './components/DiagnosticIssueList';
 import { PanelLeftClose, PanelLeft, Mouse } from 'lucide-react';
@@ -706,6 +706,7 @@ export default function DigitalTwinStudioPage() {
                 enableTransform={isEditMode}
                 showGrid={isEditMode}
                 zones={simulationZones}
+                storeId={selectedStore?.id}
               >
                 {/* zones_dim 기반 구역 바닥 오버레이 (DB 데이터 우선) */}
                 {isActive('zone') && dbZones && dbZones.length > 0 && (
@@ -751,20 +752,8 @@ export default function DigitalTwinStudioPage() {
                   />
                 )}
 
-                {/* 🔧 FIX: 실시간 시뮬레이션이 실행 중이면 CustomerAgents가 렌더링하므로 데모 고객 표시 안함 */}
-                {/* CustomerAgents는 Canvas3D 내부에서 simulationStore.customers를 렌더링함 */}
-
-                {/* 🆕 고객 아바타 시뮬레이션 오버레이 (zone_transitions 기반) */}
-                {isActive('avatar') && selectedStore?.id && (
-                  <CustomerAvatarsOverlay
-                    visible={true}
-                    storeId={selectedStore.id}
-                    showLabels={false}
-                    autoStart={true}
-                    maxCustomers={20}
-                    spawnInterval={5}
-                  />
-                )}
+                {/* 🆕 고객 시뮬레이션은 Canvas3D 내부 CustomerAgents에서 처리 */}
+                {/* useSimulationEngine이 storeId 기반으로 zones_dim, zone_transitions 데이터 로드 */}
 
                 {/* 스태프 오버레이 - 실제 DB 스태프 데이터 사용 */}
                 {(() => {

@@ -43,10 +43,11 @@ interface SimulationZone {
 }
 
 // ============================================================================
-// 확장된 Canvas3D Props (zones 추가)
+// 확장된 Canvas3D Props (zones, storeId 추가)
 // ============================================================================
 interface ExtendedCanvas3DProps extends Canvas3DProps {
   zones?: SimulationZone[];
+  storeId?: string;  // 🆕 DB 기반 시뮬레이션용
 }
 
 // ============================================================================
@@ -63,6 +64,7 @@ export function Canvas3D({
   children,
   onAssetClick,
   zones = [],
+  storeId,  // 🆕 DB 기반 시뮬레이션용
 }: ExtendedCanvas3DProps) {
   return (
     <div className={cn('w-full h-full', className)}>
@@ -86,6 +88,7 @@ export function Canvas3D({
           showGrid={showGrid}
           onAssetClick={onAssetClick}
           zones={zones}
+          storeId={storeId}
         >
           {children}
         </SceneContent>
@@ -107,6 +110,7 @@ interface SceneContentProps {
   onAssetClick?: (assetId: string, assetType: string) => void;
   children?: ReactNode;
   zones?: SimulationZone[];
+  storeId?: string;  // 🆕 DB 기반 시뮬레이션용
 }
 
 function SceneContent({
@@ -119,6 +123,7 @@ function SceneContent({
   onAssetClick,
   children,
   zones = [],
+  storeId,  // 🆕 DB 기반 시뮬레이션용
 }: SceneContentProps) {
   const { camera } = useScene();
 
@@ -126,8 +131,10 @@ function SceneContent({
   const isRunning = useSimulationStore((state) => state.isRunning);
   const config = useSimulationStore((state) => state.config);
 
-  // 시뮬레이션 엔진 활성화 (사용자가 시작 버튼을 클릭했을 때)
-  useSimulationEngine({
+  // 🆕 시뮬레이션 엔진 활성화 (DB 데이터 기반)
+  // storeId가 있으면 DB에서 zones_dim, zone_transitions 데이터 로드
+  const { hasDbData, transitionPathCount } = useSimulationEngine({
+    storeId,
     zones: zones || [],
     enabled: isRunning
   });
