@@ -339,6 +339,9 @@ export interface SimulationOptions {
   time_of_day: 'morning' | 'afternoon' | 'evening' | 'peak';
   simulation_type: 'realtime' | 'predictive' | 'scenario';
 
+  // 환경 컨텍스트 (시뮬레이션/실시간 환경 설정)
+  environment_context?: unknown;
+
   // UI 옵션
   realTimeVisualization: boolean;
   showCustomerStates: boolean;
