@@ -709,6 +709,8 @@ export default function DigitalTwinStudioPage() {
                 enableTransform={isEditMode}
                 showGrid={isEditMode}
                 zones={simulationZones}
+                userId={user?.id}
+                storeId={selectedStore?.id}
               >
                 {/* zones_dim 기반 구역 바닥 오버레이 (DB 데이터 우선) */}
                 {isActive('zone') && dbZones && dbZones.length > 0 && (

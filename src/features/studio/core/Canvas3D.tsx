@@ -15,6 +15,7 @@ import * as THREE from 'three';
 import { cn } from '@/lib/utils';
 import { useScene } from './SceneProvider';
 import { SceneEnvironment } from './SceneEnvironment';
+import { useEnvironmentModels } from '../hooks/useEnvironmentModels';
 import { ModelLoader } from './ModelLoader';
 import { SelectionManager } from './SelectionManager';
 import { TransformControls } from './TransformControls';
@@ -44,10 +45,12 @@ interface SimulationZone {
 }
 
 // ============================================================================
-// 확장된 Canvas3D Props (zones 추가)
+// 확장된 Canvas3D Props (zones, userId, storeId 추가)
 // ============================================================================
 interface ExtendedCanvas3DProps extends Canvas3DProps {
   zones?: SimulationZone[];
+  userId?: string;
+  storeId?: string;
 }
 
 // ============================================================================
@@ -64,7 +67,15 @@ export function Canvas3D({
   children,
   onAssetClick,
   zones = [],
+  userId,
+  storeId,
 }: ExtendedCanvas3DProps) {
+  // environment 폴더에서 환경 모델 로드
+  const { models: environmentModels } = useEnvironmentModels({
+    userId,
+    storeId,
+    enabled: !!userId && !!storeId,
+  });
   return (
     <div className={cn('w-full h-full', className)}>
       <Canvas
@@ -87,6 +98,7 @@ export function Canvas3D({
           showGrid={showGrid}
           onAssetClick={onAssetClick}
           zones={zones}
+          environmentModels={environmentModels}
         >
           {children}
         </SceneContent>
@@ -98,6 +110,14 @@ export function Canvas3D({
 // ============================================================================
 // 씬 컨텐츠 (Canvas 내부)
 // ============================================================================
+interface EnvironmentModelProp {
+  url: string;
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+  scale?: [number, number, number];
+  isBaked?: boolean;
+}
+
 interface SceneContentProps {
   mode: StudioMode;
   transformMode: string;
@@ -108,6 +128,7 @@ interface SceneContentProps {
   onAssetClick?: (assetId: string, assetType: string) => void;
   children?: ReactNode;
   zones?: SimulationZone[];
+  environmentModels?: EnvironmentModelProp[];
 }
 
 function SceneContent({
@@ -120,6 +141,7 @@ function SceneContent({
   onAssetClick,
   children,
   zones = [],
+  environmentModels = [],
 }: SceneContentProps) {
   const { camera } = useScene();
 
@@ -146,7 +168,15 @@ function SceneContent({
 
       <Suspense fallback={<LoadingFallback />}>
         {/* 환경 설정 */}
-        <SceneEnvironment />
+        <SceneEnvironment
+          environmentModels={environmentModels.map((m) => ({
+            url: m.url,
+            position: m.position,
+            rotation: m.rotation,
+            scale: m.scale,
+            isBaked: m.isBaked,
+          }))}
+        />
 
         {/* 그리드 (편집 모드) */}
         {showGrid && (
