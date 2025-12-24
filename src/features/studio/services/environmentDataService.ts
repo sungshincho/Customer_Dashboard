@@ -286,49 +286,27 @@ export async function fetchHolidayData(
   let holidays: HolidayData[] = [];
   let error: EnvironmentDataError | null = null;
 
-  // 1. 공공데이터포털 API 시도 (한국)
-  if (countryCode === 'KR' && config.holidayApiKey) {
+  // ✅ Edge Function 프록시를 통해 공휴일 데이터 조회
+  if (countryCode === 'KR') {
     try {
-      const url = `https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo?serviceKey=${config.holidayApiKey}&solYear=${targetYear}&solMonth=${String(targetMonth).padStart(2, '0')}&_type=json`;
+      const { data, error: fnError } = await supabase.functions.invoke('environment-proxy', {
+        body: { type: 'holidays', year: targetYear, month: targetMonth, countryCode },
+      });
 
-      const response = await fetch(url);
-      if (response.ok) {
-        const rawData: DataGoKrHolidayResponse = await response.json();
-        holidays = transformDataGoKrResponse(rawData);
-        console.log('[EnvironmentData] 공공데이터포털 공휴일 조회 성공:', holidays.length, '건');
+      if (fnError) {
+        throw new Error(fnError.message);
       }
-    } catch (e) {
-      console.warn('[EnvironmentData] 공공데이터포털 API 실패, Calendarific 폴백:', e);
-    }
-  }
 
-  // 2. Calendarific API 폴백
-  if (holidays.length === 0 && config.holidayCalendarificKey) {
-    try {
-      const url = `https://calendarific.com/api/v2/holidays?api_key=${config.holidayCalendarificKey}&country=${countryCode}&year=${targetYear}&month=${targetMonth}`;
-
-      const response = await fetch(url);
-      if (response.ok) {
-        const rawData: CalendarificResponse = await response.json();
-        holidays = transformCalendarificResponse(rawData);
-        console.log('[EnvironmentData] Calendarific 공휴일 조회 성공:', holidays.length, '건');
-      }
+      const rawData = data as DataGoKrHolidayResponse;
+      holidays = transformDataGoKrResponse(rawData);
+      console.log('[EnvironmentData] 공공데이터포털 공휴일 조회 성공:', holidays.length, '건');
     } catch (e) {
-      console.warn('[EnvironmentData] Calendarific API 실패:', e);
+      console.warn('[EnvironmentData] 공휴일 API 실패:', e);
       error = {
         type: 'HOLIDAY_API_ERROR',
         message: e instanceof Error ? e.message : 'Holiday API error',
       };
     }
-  }
-
-  // API 키가 모두 없는 경우
-  if (!config.holidayApiKey && !config.holidayCalendarificKey) {
-    console.warn('[EnvironmentData] 공휴일 API 키가 설정되지 않았습니다.');
-    error = {
-      type: 'CONFIG_ERROR',
-      message: 'VITE_DATA_GO_KR_API_KEY 또는 VITE_CALENDARIFIC_API_KEY 환경 변수가 필요합니다.',
-    };
   }
 
   // 캐시 업데이트
