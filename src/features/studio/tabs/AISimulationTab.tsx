@@ -125,8 +125,13 @@ export function AISimulationTab({
     return config;
   });
 
-  // 🆕 환경 설정 변경 시 부모에게 알림
+  // 🔧 FIX: 환경 설정 변경 시 부모에게 알림 (디버그 로그 추가)
   useEffect(() => {
+    console.log('[AISimulationTab] Environment config useEffect triggered:', {
+      hasCallback: !!onEnvironmentConfigChange,
+      mode: simulationEnvConfig.mode,
+      weather: simulationEnvConfig.manualSettings?.weather,
+    });
     if (onEnvironmentConfigChange) {
       onEnvironmentConfigChange(simulationEnvConfig);
     }
@@ -388,11 +393,13 @@ export function AISimulationTab({
             <div className="flex items-center gap-2">
               <span className={cn(
                 "text-xs px-1.5 py-0.5 rounded",
-                simulationEnvConfig.mode === 'simulation'
-                  ? "bg-purple-500/20 text-purple-400"
-                  : "bg-blue-500/20 text-blue-400"
+                simulationEnvConfig.mode === 'realtime'
+                  ? "bg-blue-500/20 text-blue-400"
+                  : simulationEnvConfig.mode === 'dateSelect'
+                  ? "bg-green-500/20 text-green-400"
+                  : "bg-purple-500/20 text-purple-400"
               )}>
-                {simulationEnvConfig.mode === 'simulation' ? '시뮬레이션' : '실시간'}
+                {simulationEnvConfig.mode === 'realtime' ? '실시간' : simulationEnvConfig.mode === 'dateSelect' ? '날짜선택' : '직접설정'}
               </span>
               {showEnvironmentSettings ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </div>
@@ -402,7 +409,11 @@ export function AISimulationTab({
             <div className="p-3 pt-0 border-t border-white/10">
               <SimulationEnvironmentSettings
                 config={simulationEnvConfig}
-                onChange={setSimulationEnvConfig}
+                onChange={(config) => {
+                  console.log('[AISimulationTab] SimulationEnvironmentSettings onChange:', config.mode);
+                  setSimulationEnvConfig(config);
+                }}
+                storeId={storeId}
                 compact={true}
               />
             </div>
