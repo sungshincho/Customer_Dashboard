@@ -17,3 +17,4 @@ export { CustomerAgents } from './CustomerAgents';
 export { RealtimeSimulationPanel } from './RealtimeSimulationPanel';
 export { SimulationControlPopup } from './SimulationControlPopup';
 export { ResultReportPanel } from './ResultReportPanel';
+export { SimulationEnvironmentSettings } from './SimulationEnvironmentSettings';

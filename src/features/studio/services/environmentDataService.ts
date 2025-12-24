@@ -141,6 +141,7 @@ function transformWeatherResponse(response: OpenWeatherMapResponse): RealWeather
 
 /**
  * 실시간 날씨 데이터 조회
+ * 📌 API 키가 없거나 CORS 에러 시 null 반환 (앱 동작에 영향 없음)
  */
 export async function fetchWeatherData(
   lat?: number,
@@ -148,8 +149,11 @@ export async function fetchWeatherData(
 ): Promise<{ data: RealWeatherData | null; error: EnvironmentDataError | null }> {
   const config = getConfig();
 
-  // ✅ 프론트엔드에서는 환경변수(API 키)를 직접 읽지 않고, Edge Function을 통해 프록시 호출
-  // (Settings > Environment Variables 값은 Edge Functions에서만 사용)
+  // API 키가 없으면 조용히 스킵 (에러 아님)
+  if (!config.weatherApiKey) {
+    console.info('[EnvironmentData] 날씨 API 키 미설정 - 날씨 기능 비활성화');
+    return { data: null, error: null };
+  }
 
   // 캐시 확인
   if (isCacheValid(cache.weather)) {
@@ -160,6 +164,17 @@ export async function fetchWeatherData(
   const longitude = lon ?? config.defaultLocation.lon;
 
   try {
+    const url = `${config.weatherApiBaseUrl}/weather?lat=${latitude}&lon=${longitude}&appid=${config.weatherApiKey}&units=metric&lang=kr`;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10초 타임아웃
+
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      console.warn('[EnvironmentData] 날씨 API 응답 에러:', response.status);
+      return { data: null, error: null }; // 에러여도 앱 동작에 영향 없음
     const { data, error } = await supabase.functions.invoke('environment-proxy', {
       body: { type: 'weather', lat: latitude, lon: longitude },
     });
@@ -181,14 +196,10 @@ export async function fetchWeatherData(
     console.log('[EnvironmentData] 날씨 데이터 조회 성공:', weatherData.condition, weatherData.temperature + '°C');
     return { data: weatherData, error: null };
   } catch (error) {
-    console.error('[EnvironmentData] 날씨 데이터 조회 실패:', error);
-    return {
-      data: null,
-      error: {
-        type: 'WEATHER_API_ERROR',
-        message: error instanceof Error ? error.message : 'Unknown weather API error',
-      },
-    };
+    // CORS, 네트워크, 타임아웃 에러 등 - 조용히 처리
+    console.info('[EnvironmentData] 날씨 데이터 조회 불가 (CORS/네트워크):',
+      error instanceof Error ? error.name : 'Unknown');
+    return { data: null, error: null }; // 에러여도 앱 동작에 영향 없음
   }
 }
 
@@ -268,6 +279,7 @@ function transformCalendarificResponse(response: CalendarificResponse): HolidayD
 
 /**
  * 공휴일 데이터 조회 (공공데이터포털 우선, Calendarific 폴백)
+ * 📌 API 키가 없거나 CORS 에러 시 빈 배열 반환 (앱 동작에 영향 없음)
  */
 export async function fetchHolidayData(
   year?: number,
@@ -283,9 +295,16 @@ export async function fetchHolidayData(
     return { data: cache.holidays!.data, error: null };
   }
 
-  let holidays: HolidayData[] = [];
-  let error: EnvironmentDataError | null = null;
+  // API 키가 모두 없으면 조용히 스킵 (에러 아님)
+  if (!config.holidayApiKey && !config.holidayCalendarificKey) {
+    console.info('[EnvironmentData] 공휴일 API 키 미설정 - 공휴일 기능 비활성화');
+    return { data: [], error: null };
+  }
 
+  let holidays: HolidayData[] = [];
+
+  // 1. 공공데이터포털 API 시도 (한국) - CORS 가능성 있음
+  if (countryCode === 'KR' && config.holidayApiKey) {
   // ✅ Edge Function 프록시를 통해 공휴일 데이터 조회
   if (countryCode === 'KR') {
     try {
@@ -293,6 +312,41 @@ export async function fetchHolidayData(
         body: { type: 'holidays', year: targetYear, month: targetMonth, countryCode },
       });
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        const rawData: DataGoKrHolidayResponse = await response.json();
+        holidays = transformDataGoKrResponse(rawData);
+        console.log('[EnvironmentData] 공공데이터포털 공휴일 조회 성공:', holidays.length, '건');
+      }
+    } catch (e) {
+      // CORS 에러 등 - 조용히 처리
+      console.info('[EnvironmentData] 공공데이터포털 API 불가 (CORS/네트워크)');
+    }
+  }
+
+  // 2. Calendarific API 폴백
+  if (holidays.length === 0 && config.holidayCalendarificKey) {
+    try {
+      const url = `https://calendarific.com/api/v2/holidays?api_key=${config.holidayCalendarificKey}&country=${countryCode}&year=${targetYear}&month=${targetMonth}`;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        const rawData: CalendarificResponse = await response.json();
+        holidays = transformCalendarificResponse(rawData);
+        console.log('[EnvironmentData] Calendarific 공휴일 조회 성공:', holidays.length, '건');
+      }
+    } catch (e) {
+      console.info('[EnvironmentData] Calendarific API 불가 (CORS/네트워크)');
       if (fnError) {
         throw new Error(fnError.message);
       }
@@ -318,7 +372,7 @@ export async function fetchHolidayData(
     };
   }
 
-  return { data: holidays, error };
+  return { data: holidays, error: null };
 }
 
 /**

@@ -47,6 +47,7 @@ export * from './simulation.types';
 export * from './simulationResults.types';
 export * from './optimization.types';
 export * from './environment.types';
+export * from './simulationEnvironment.types';
 
 // 🆕 슬롯 기반 최적화 타입 재export
 export type {
