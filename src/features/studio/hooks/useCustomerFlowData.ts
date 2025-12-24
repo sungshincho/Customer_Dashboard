@@ -336,13 +336,15 @@ function findExitZones(
   zones: any[],
   zoneMap: Map<string, ZoneInfo>
 ): ZoneInfo[] {
+  // 🆕 출구는 입구와 동일 (출입구 개념)
+  // 계산대는 경유지일 뿐, 최종 출구는 입구에서 나감
   return zones
     .filter(z =>
-      z.zone_type === 'checkout' ||
+      z.zone_type === 'entrance' ||
       z.zone_type === 'exit' ||
-      z.zone_name?.includes('계산대') ||
+      z.zone_name?.includes('입구') ||
       z.zone_name?.includes('출구') ||
-      z.zone_code === 'Z006'
+      z.zone_code === 'Z001'
     )
     .map(z => zoneMap.get(z.id))
     .filter((z): z is ZoneInfo => !!z);
@@ -350,6 +352,7 @@ function findExitZones(
 
 /**
  * zone_transitions 데이터가 없을 때 zones_dim 기반으로 기본 동선 생성
+ * 동선 패턴: 입구 → 디스플레이존들 → 계산대 → 입구(출구)
  */
 function generateDefaultFlowPaths(zones: ZoneInfo[]): {
   flowPaths: FlowPath[];
@@ -360,100 +363,91 @@ function generateDefaultFlowPaths(zones: ZoneInfo[]): {
   const transitionMatrix = new Map<string, FlowPath[]>();
   let maxTransitionCount = 0;
 
-  // 입구 존 찾기
+  console.log('[generateDefaultFlowPaths] 존 목록:', zones.map(z => ({
+    id: z.id.slice(0, 8),
+    name: z.zone_name,
+    type: z.zone_type
+  })));
+
+  // 입구 존 찾기 (출입구 역할)
   const entranceZones = zones.filter(z =>
     z.zone_type === 'entrance' || z.zone_name?.includes('입구')
   );
 
-  // 디스플레이 존 찾기
-  const displayZones = zones.filter(z =>
-    z.zone_type === 'display' || (!z.zone_type && !z.zone_name?.includes('입구') && !z.zone_name?.includes('계산대'))
-  );
+  // 디스플레이 존 찾기 (main, display, fitting, lounge 등 쇼핑 공간)
+  const displayZones = zones.filter(z => {
+    const type = z.zone_type?.toLowerCase();
+    const name = z.zone_name?.toLowerCase() || '';
+
+    // 입구, 계산대 제외한 모든 존을 쇼핑 공간으로 취급
+    const isEntrance = type === 'entrance' || name.includes('입구');
+    const isCheckout = type === 'checkout' || name.includes('계산대');
+
+    return !isEntrance && !isCheckout;
+  });
 
   // 계산대 존 찾기
   const checkoutZones = zones.filter(z =>
     z.zone_type === 'checkout' || z.zone_name?.includes('계산대')
   );
 
-  // 입구 → 디스플레이
+  console.log('[generateDefaultFlowPaths] 분류 결과:', {
+    entrance: entranceZones.map(z => z.zone_name),
+    display: displayZones.map(z => z.zone_name),
+    checkout: checkoutZones.map(z => z.zone_name),
+  });
+
+  // 헬퍼: 경로 추가
+  const addPath = (from: ZoneInfo, to: ZoneInfo, count: number, probability: number, duration: number) => {
+    maxTransitionCount = Math.max(maxTransitionCount, count);
+    const path: FlowPath = {
+      id: `${from.id}->${to.id}`,
+      from_zone_id: from.id,
+      to_zone_id: to.id,
+      from_zone: from,
+      to_zone: to,
+      transition_count: count,
+      transition_probability: probability,
+      avg_duration_seconds: duration,
+      daily_avg_count: Math.round(count / 30),
+    };
+    flowPaths.push(path);
+    const existing = transitionMatrix.get(from.id) || [];
+    existing.push(path);
+    transitionMatrix.set(from.id, existing);
+  };
+
+  // 1. 입구 → 디스플레이 존들
   entranceZones.forEach(entrance => {
-    displayZones.slice(0, 3).forEach((display, idx) => {
-      const count = 100 - idx * 20;
-      maxTransitionCount = Math.max(maxTransitionCount, count);
-
-      const path: FlowPath = {
-        id: `${entrance.id}->${display.id}`,
-        from_zone_id: entrance.id,
-        to_zone_id: display.id,
-        from_zone: entrance,
-        to_zone: display,
-        transition_count: count,
-        transition_probability: (100 - idx * 15) / 100,
-        avg_duration_seconds: 30 + idx * 10,
-        daily_avg_count: Math.round(count / 30), // 30일 평균
-      };
-
-      flowPaths.push(path);
-
-      const existing = transitionMatrix.get(entrance.id) || [];
-      existing.push(path);
-      transitionMatrix.set(entrance.id, existing);
+    displayZones.slice(0, 4).forEach((display, idx) => {
+      addPath(entrance, display, 100 - idx * 15, (85 - idx * 10) / 100, 30 + idx * 10);
     });
   });
 
-  // 디스플레이 → 디스플레이 (인접 존 간)
+  // 2. 디스플레이 → 디스플레이 (인접 존 간)
   displayZones.forEach((from, i) => {
     displayZones.forEach((to, j) => {
       if (i !== j && Math.abs(i - j) <= 2) {
-        const count = 50 - Math.abs(i - j) * 10;
-        maxTransitionCount = Math.max(maxTransitionCount, count);
-
-        const path: FlowPath = {
-          id: `${from.id}->${to.id}`,
-          from_zone_id: from.id,
-          to_zone_id: to.id,
-          from_zone: from,
-          to_zone: to,
-          transition_count: count,
-          transition_probability: 0.3 / Math.abs(i - j),
-          avg_duration_seconds: 45,
-          daily_avg_count: Math.round(count / 30),
-        };
-
-        flowPaths.push(path);
-
-        const existing = transitionMatrix.get(from.id) || [];
-        existing.push(path);
-        transitionMatrix.set(from.id, existing);
+        addPath(from, to, 50 - Math.abs(i - j) * 10, 0.3 / Math.abs(i - j), 45);
       }
     });
   });
 
-  // 디스플레이 → 계산대
+  // 3. 디스플레이 → 계산대
   displayZones.forEach((display, idx) => {
     checkoutZones.forEach(checkout => {
-      const count = 40 + (displayZones.length - idx) * 5;
-      maxTransitionCount = Math.max(maxTransitionCount, count);
-
-      const path: FlowPath = {
-        id: `${display.id}->${checkout.id}`,
-        from_zone_id: display.id,
-        to_zone_id: checkout.id,
-        from_zone: display,
-        to_zone: checkout,
-        transition_count: count,
-        transition_probability: 0.2,
-        avg_duration_seconds: 60,
-        daily_avg_count: Math.round(count / 30),
-      };
-
-      flowPaths.push(path);
-
-      const existing = transitionMatrix.get(display.id) || [];
-      existing.push(path);
-      transitionMatrix.set(display.id, existing);
+      addPath(display, checkout, 40 + (displayZones.length - idx) * 5, 0.25, 60);
     });
   });
+
+  // 4. 계산대 → 입구(출구) - 🆕 출구는 입구와 동일
+  checkoutZones.forEach(checkout => {
+    entranceZones.forEach(entrance => {
+      addPath(checkout, entrance, 80, 0.9, 30); // 계산 후 퇴장
+    });
+  });
+
+  console.log('[generateDefaultFlowPaths] 생성된 경로:', flowPaths.length, '개');
 
   return { flowPaths, transitionMatrix, maxTransitionCount };
 }
