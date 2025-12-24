@@ -459,17 +459,17 @@ END LOOP;
 
   -- ═══════════════════════════════════════════════════════════════════════════
   -- STEP 7.5: Space/Zone 모델 URL 업데이트 (stores.metadata, zones_dim.metadata)
-  -- 📁 실제 파일: store_simple_10x10.glb (20x20 없음)
+  -- 📁 실제 파일: store_simple_10x10_baked.glb (20x20 없음)
   -- ═══════════════════════════════════════════════════════════════════════════
   RAISE NOTICE '  [STEP 7.5] Space/Zone 모델 URL 업데이트...';
 
   -- Store 전체 모델 (10x10 버전 사용)
   UPDATE stores SET
     metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object(
-      'model_3d_url', v_base_url || '/space/store_simple_10x10.glb'
+      'model_3d_url', v_base_url || '/space/store_simple_10x10_baked.glb'
     )
   WHERE id = v_store_id;
-  RAISE NOTICE '    ✓ store model_3d_url: store_simple_10x10.glb';
+  RAISE NOTICE '    ✓ store model_3d_url: store_simple_10x10_baked.glb';
 
   -- Zone 모델은 현재 개별 파일 없음 - 향후 업로드 시 활성화
   -- UPDATE zones_dim SET metadata = ...
@@ -500,7 +500,7 @@ END LOOP;
   RAISE NOTICE '    - Customer avatars: 12개 (vip/regular/new/dormant/senior/teen × male/female)';
   RAISE NOTICE '    - Furniture models: ~60개 (rack_clothing, shelf, table, etc.)';
   RAISE NOTICE '    - Product models: ~20개 (outwear, tops, bottoms, shoes, accessories)';
-  RAISE NOTICE '    - Space models: 1개 (store_simple_10x10.glb)';
+  RAISE NOTICE '    - Space models: 1개 (store_simple_10x10_baked.glb)';
   RAISE NOTICE '';
   RAISE NOTICE '  완료 시간: %', NOW();
   RAISE NOTICE '════════════════════════════════════════════════════════════════════';

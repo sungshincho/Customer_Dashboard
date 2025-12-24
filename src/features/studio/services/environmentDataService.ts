@@ -175,9 +175,15 @@ export async function fetchWeatherData(
     if (!response.ok) {
       console.warn('[EnvironmentData] 날씨 API 응답 에러:', response.status);
       return { data: null, error: null }; // 에러여도 앱 동작에 영향 없음
+    const { data, error } = await supabase.functions.invoke('environment-proxy', {
+      body: { type: 'weather', lat: latitude, lon: longitude },
+    });
+
+    if (error) {
+      throw new Error(error.message);
     }
 
-    const rawData: OpenWeatherMapResponse = await response.json();
+    const rawData = data as OpenWeatherMapResponse;
     const weatherData = transformWeatherResponse(rawData);
 
     // 캐시 업데이트
@@ -299,8 +305,12 @@ export async function fetchHolidayData(
 
   // 1. 공공데이터포털 API 시도 (한국) - CORS 가능성 있음
   if (countryCode === 'KR' && config.holidayApiKey) {
+  // ✅ Edge Function 프록시를 통해 공휴일 데이터 조회
+  if (countryCode === 'KR') {
     try {
-      const url = `https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo?serviceKey=${config.holidayApiKey}&solYear=${targetYear}&solMonth=${String(targetMonth).padStart(2, '0')}&_type=json`;
+      const { data, error: fnError } = await supabase.functions.invoke('environment-proxy', {
+        body: { type: 'holidays', year: targetYear, month: targetMonth, countryCode },
+      });
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -337,6 +347,19 @@ export async function fetchHolidayData(
       }
     } catch (e) {
       console.info('[EnvironmentData] Calendarific API 불가 (CORS/네트워크)');
+      if (fnError) {
+        throw new Error(fnError.message);
+      }
+
+      const rawData = data as DataGoKrHolidayResponse;
+      holidays = transformDataGoKrResponse(rawData);
+      console.log('[EnvironmentData] 공공데이터포털 공휴일 조회 성공:', holidays.length, '건');
+    } catch (e) {
+      console.warn('[EnvironmentData] 공휴일 API 실패:', e);
+      error = {
+        type: 'HOLIDAY_API_ERROR',
+        message: e instanceof Error ? e.message : 'Holiday API error',
+      };
     }
   }
 
