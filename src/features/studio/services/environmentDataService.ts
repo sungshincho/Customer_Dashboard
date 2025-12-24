@@ -141,6 +141,7 @@ function transformWeatherResponse(response: OpenWeatherMapResponse): RealWeather
 
 /**
  * 실시간 날씨 데이터 조회
+ * 📌 API 키가 없거나 CORS 에러 시 null 반환 (앱 동작에 영향 없음)
  */
 export async function fetchWeatherData(
   lat?: number,
@@ -148,16 +149,10 @@ export async function fetchWeatherData(
 ): Promise<{ data: RealWeatherData | null; error: EnvironmentDataError | null }> {
   const config = getConfig();
 
-  // API 키가 없으면 에러
+  // API 키가 없으면 조용히 스킵 (에러 아님)
   if (!config.weatherApiKey) {
-    console.warn('[EnvironmentData] OpenWeatherMap API 키가 설정되지 않았습니다.');
-    return {
-      data: null,
-      error: {
-        type: 'CONFIG_ERROR',
-        message: 'VITE_OPENWEATHERMAP_API_KEY 환경 변수가 설정되지 않았습니다.',
-      },
-    };
+    console.info('[EnvironmentData] 날씨 API 키 미설정 - 날씨 기능 비활성화');
+    return { data: null, error: null };
   }
 
   // 캐시 확인
@@ -171,10 +166,15 @@ export async function fetchWeatherData(
   try {
     const url = `${config.weatherApiBaseUrl}/weather?lat=${latitude}&lon=${longitude}&appid=${config.weatherApiKey}&units=metric&lang=kr`;
 
-    const response = await fetch(url);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10초 타임아웃
+
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
-      throw new Error(`OpenWeatherMap API error: ${response.status} ${response.statusText}`);
+      console.warn('[EnvironmentData] 날씨 API 응답 에러:', response.status);
+      return { data: null, error: null }; // 에러여도 앱 동작에 영향 없음
     }
 
     const rawData: OpenWeatherMapResponse = await response.json();
@@ -190,14 +190,10 @@ export async function fetchWeatherData(
     console.log('[EnvironmentData] 날씨 데이터 조회 성공:', weatherData.condition, weatherData.temperature + '°C');
     return { data: weatherData, error: null };
   } catch (error) {
-    console.error('[EnvironmentData] 날씨 데이터 조회 실패:', error);
-    return {
-      data: null,
-      error: {
-        type: 'WEATHER_API_ERROR',
-        message: error instanceof Error ? error.message : 'Unknown weather API error',
-      },
-    };
+    // CORS, 네트워크, 타임아웃 에러 등 - 조용히 처리
+    console.info('[EnvironmentData] 날씨 데이터 조회 불가 (CORS/네트워크):',
+      error instanceof Error ? error.name : 'Unknown');
+    return { data: null, error: null }; // 에러여도 앱 동작에 영향 없음
   }
 }
 
@@ -277,6 +273,7 @@ function transformCalendarificResponse(response: CalendarificResponse): HolidayD
 
 /**
  * 공휴일 데이터 조회 (공공데이터포털 우선, Calendarific 폴백)
+ * 📌 API 키가 없거나 CORS 에러 시 빈 배열 반환 (앱 동작에 영향 없음)
  */
 export async function fetchHolidayData(
   year?: number,
@@ -292,22 +289,33 @@ export async function fetchHolidayData(
     return { data: cache.holidays!.data, error: null };
   }
 
-  let holidays: HolidayData[] = [];
-  let error: EnvironmentDataError | null = null;
+  // API 키가 모두 없으면 조용히 스킵 (에러 아님)
+  if (!config.holidayApiKey && !config.holidayCalendarificKey) {
+    console.info('[EnvironmentData] 공휴일 API 키 미설정 - 공휴일 기능 비활성화');
+    return { data: [], error: null };
+  }
 
-  // 1. 공공데이터포털 API 시도 (한국)
+  let holidays: HolidayData[] = [];
+
+  // 1. 공공데이터포털 API 시도 (한국) - CORS 가능성 있음
   if (countryCode === 'KR' && config.holidayApiKey) {
     try {
       const url = `https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo?serviceKey=${config.holidayApiKey}&solYear=${targetYear}&solMonth=${String(targetMonth).padStart(2, '0')}&_type=json`;
 
-      const response = await fetch(url);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
       if (response.ok) {
         const rawData: DataGoKrHolidayResponse = await response.json();
         holidays = transformDataGoKrResponse(rawData);
         console.log('[EnvironmentData] 공공데이터포털 공휴일 조회 성공:', holidays.length, '건');
       }
     } catch (e) {
-      console.warn('[EnvironmentData] 공공데이터포털 API 실패, Calendarific 폴백:', e);
+      // CORS 에러 등 - 조용히 처리
+      console.info('[EnvironmentData] 공공데이터포털 API 불가 (CORS/네트워크)');
     }
   }
 
@@ -316,28 +324,20 @@ export async function fetchHolidayData(
     try {
       const url = `https://calendarific.com/api/v2/holidays?api_key=${config.holidayCalendarificKey}&country=${countryCode}&year=${targetYear}&month=${targetMonth}`;
 
-      const response = await fetch(url);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
       if (response.ok) {
         const rawData: CalendarificResponse = await response.json();
         holidays = transformCalendarificResponse(rawData);
         console.log('[EnvironmentData] Calendarific 공휴일 조회 성공:', holidays.length, '건');
       }
     } catch (e) {
-      console.warn('[EnvironmentData] Calendarific API 실패:', e);
-      error = {
-        type: 'HOLIDAY_API_ERROR',
-        message: e instanceof Error ? e.message : 'Holiday API error',
-      };
+      console.info('[EnvironmentData] Calendarific API 불가 (CORS/네트워크)');
     }
-  }
-
-  // API 키가 모두 없는 경우
-  if (!config.holidayApiKey && !config.holidayCalendarificKey) {
-    console.warn('[EnvironmentData] 공휴일 API 키가 설정되지 않았습니다.');
-    error = {
-      type: 'CONFIG_ERROR',
-      message: 'VITE_DATA_GO_KR_API_KEY 또는 VITE_CALENDARIFIC_API_KEY 환경 변수가 필요합니다.',
-    };
   }
 
   // 캐시 업데이트
@@ -349,7 +349,7 @@ export async function fetchHolidayData(
     };
   }
 
-  return { data: holidays, error };
+  return { data: holidays, error: null };
 }
 
 /**
