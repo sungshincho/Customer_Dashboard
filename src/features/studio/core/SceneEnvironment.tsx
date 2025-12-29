@@ -183,7 +183,7 @@ export const NIGHT_SCENE_CONFIG = {
   indoorLight: {
     enabled: true,
     color: '#fff5e0',      // 따뜻한 실내등 색상
-    intensity: 3,          // RectAreaLight 강도
+    intensity: 2,          // RectAreaLight 강도
     width: 18,             // 조명 너비 (매장 전체 커버)
     height: 18,            // 조명 높이 (매장 전체 커버)
     position: [0, 3.7, 0] as [number, number, number],  // 천장 높이
