@@ -22,6 +22,13 @@ import {
   Settings2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import type {
   SimulationEnvironmentConfig,
   EnvironmentMode,
@@ -36,6 +43,8 @@ import {
   calculateSimulationImpacts,
   createDefaultSimulationConfig,
   getWeatherImpactFromCondition,
+  isCurrentTimeDayMode,
+  isDayTime,
 } from '../types/simulationEnvironment.types';
 import {
   fetchHistoricalWeather,
@@ -313,116 +322,174 @@ export const SimulationEnvironmentSettings: React.FC<SimulationEnvironmentSettin
       {/* ===== 직접 설정 모드 ===== */}
       {config.mode === 'manual' && (
         <div className="space-y-4">
-          {/* 시간대 선택 */}
+          {/* 시간대 선택 (드롭다운) */}
           <div className="space-y-2">
             <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
               <Clock className="w-3 h-3" />
               시간대
             </label>
-            <div className="grid grid-cols-2 gap-1">
-              {TIME_OF_DAY_OPTIONS.map((time) => (
-                <button
-                  key={time.value}
-                  onClick={() => updateManualSettings({ timeOfDay: time.value })}
-                  className={cn(
-                    'py-2 rounded text-xs transition flex flex-col items-center gap-0.5',
-                    config.manualSettings.timeOfDay === time.value
-                      ? 'bg-yellow-500 text-white'
-                      : 'bg-muted/50 hover:bg-muted'
-                  )}
-                >
-                  <span>{time.emoji}</span>
-                  {!compact && <span>{time.label}</span>}
-                </button>
-              ))}
-            </div>
+            <Select
+              value={config.manualSettings.timeOfDay}
+              onValueChange={(value: TimeOfDayOption) => updateManualSettings({ timeOfDay: value })}
+            >
+              <SelectTrigger className="w-full h-9 text-sm bg-background border-white/10">
+                <SelectValue placeholder="시간대 선택" />
+              </SelectTrigger>
+              <SelectContent>
+                {TIME_OF_DAY_OPTIONS.map((time) => (
+                  <SelectItem key={time.value} value={time.value}>
+                    <div className="flex items-center gap-2">
+                      <span>{time.emoji}</span>
+                      <span>{time.label}</span>
+                      <span className="text-muted-foreground text-xs">({time.hours})</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* 날씨 선택 */}
+          {/* 날씨 선택 (드롭다운) */}
           <div className="space-y-2">
             <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
               <Cloud className="w-3 h-3" />
               날씨
             </label>
-            <div className="grid grid-cols-3 gap-1">
-              {WEATHER_OPTIONS.map((weather) => (
-                <button
-                  key={weather.value}
-                  onClick={() => updateManualSettings({ weather: weather.value })}
-                  className={cn(
-                    'py-2 px-2 rounded text-xs transition flex items-center justify-center gap-1',
-                    config.manualSettings.weather === weather.value
-                      ? 'bg-cyan-500 text-white'
-                      : 'bg-muted/50 hover:bg-muted'
-                  )}
-                >
-                  <span>{weather.emoji}</span>
-                  {!compact && <span>{weather.label}</span>}
-                </button>
-              ))}
-            </div>
+            <Select
+              value={config.manualSettings.weather}
+              onValueChange={(value: WeatherOption) => updateManualSettings({ weather: value })}
+            >
+              <SelectTrigger className="w-full h-9 text-sm bg-background border-white/10">
+                <SelectValue placeholder="날씨 선택" />
+              </SelectTrigger>
+              <SelectContent>
+                {WEATHER_OPTIONS.map((weather) => (
+                  <SelectItem key={weather.value} value={weather.value}>
+                    <div className="flex items-center gap-2">
+                      <span>{weather.emoji}</span>
+                      <span>{weather.label}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* 휴일/이벤트 선택 */}
+          {/* 휴일/이벤트 선택 (드롭다운) */}
           <div className="space-y-2">
             <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
               <Gift className="w-3 h-3" />
               휴일/이벤트
             </label>
-            <div className="grid grid-cols-3 gap-1">
-              {HOLIDAY_OPTIONS.map((holiday) => (
-                <button
-                  key={holiday.value}
-                  onClick={() => updateManualSettings({ holidayType: holiday.value })}
-                  className={cn(
-                    'py-2 px-1 rounded text-xs transition flex flex-col items-center gap-0.5',
-                    config.manualSettings.holidayType === holiday.value
-                      ? 'bg-purple-500 text-white'
-                      : 'bg-muted/50 hover:bg-muted'
-                  )}
-                >
-                  <span>{holiday.emoji}</span>
-                  {!compact && <span className="truncate w-full text-center">{holiday.label}</span>}
-                </button>
-              ))}
+            <Select
+              value={config.manualSettings.holidayType}
+              onValueChange={(value: HolidayOption) => updateManualSettings({ holidayType: value })}
+            >
+              <SelectTrigger className="w-full h-9 text-sm bg-background border-white/10">
+                <SelectValue placeholder="휴일/이벤트 선택" />
+              </SelectTrigger>
+              <SelectContent>
+                {HOLIDAY_OPTIONS.map((holiday) => (
+                  <SelectItem key={holiday.value} value={holiday.value}>
+                    <div className="flex items-center gap-2">
+                      <span>{holiday.emoji}</span>
+                      <span>{holiday.label}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* 선택된 설정 요약 */}
+          <div className="p-3 bg-muted/30 rounded-lg">
+            <div className="text-xs text-muted-foreground mb-1">현재 설정</div>
+            <div className="flex flex-wrap gap-2">
+              <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs">
+                {TIME_OF_DAY_OPTIONS.find(t => t.value === config.manualSettings.timeOfDay)?.emoji}{' '}
+                {TIME_OF_DAY_OPTIONS.find(t => t.value === config.manualSettings.timeOfDay)?.label}
+                {' '}
+                ({config.manualSettings.timeOfDay === 'peak'
+                  ? '데이터 기반'
+                  : isDayTime(config.manualSettings.timeOfDay) ? '낮 씬' : '밤 씬'})
+              </span>
+              <span className="px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded text-xs">
+                {WEATHER_OPTIONS.find(w => w.value === config.manualSettings.weather)?.emoji}{' '}
+                {WEATHER_OPTIONS.find(w => w.value === config.manualSettings.weather)?.label}
+              </span>
+              {config.manualSettings.holidayType !== 'none' && (
+                <span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs">
+                  {HOLIDAY_OPTIONS.find(h => h.value === config.manualSettings.holidayType)?.emoji}{' '}
+                  {HOLIDAY_OPTIONS.find(h => h.value === config.manualSettings.holidayType)?.label}
+                </span>
+              )}
             </div>
           </div>
         </div>
       )}
 
       {/* ===== 실시간 모드 ===== */}
-      {config.mode === 'realtime' && realTimeData && (
-        <div className="p-3 bg-blue-500/10 rounded-lg space-y-2 border border-blue-500/20">
-          <div className="text-xs font-medium text-blue-400">현재 환경</div>
+      {config.mode === 'realtime' && (
+        <div className="space-y-3">
+          {/* 현재 환경 상태 표시 */}
+          <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <Activity className="w-4 h-4 text-blue-400" />
+              <span className="text-sm font-medium text-blue-400">실시간 환경</span>
+            </div>
 
-          {realTimeData.weather && (
-            <div className="flex items-center gap-2">
-              <span className="text-xl">
-                {getWeatherEmoji(realTimeData.weather.condition)}
-              </span>
-              <div>
-                <div className="text-sm font-medium">
-                  {realTimeData.weather.description}
+            {realTimeData ? (
+              <div className="space-y-2 text-sm">
+                {/* 현재 시간 */}
+                <div className="flex items-center gap-2">
+                  <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span>
+                    {new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                    {' '}
+                    <span className="text-muted-foreground">
+                      ({isCurrentTimeDayMode() ? '낮' : '밤'})
+                    </span>
+                  </span>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  {realTimeData.weather.temperature}°C
+
+                {/* 현재 날씨 */}
+                {realTimeData.weather && (
+                  <div className="flex items-center gap-2">
+                    <span>{getWeatherEmoji(realTimeData.weather.condition)}</span>
+                    <span>{realTimeData.weather.description}</span>
+                    <span className="text-muted-foreground">
+                      {realTimeData.weather.temperature}°C
+                    </span>
+                  </div>
+                )}
+
+                {/* 오늘 이벤트 */}
+                {realTimeData.todayEvents && realTimeData.todayEvents.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <Gift className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span>{realTimeData.todayEvents.map(e => e.name).join(', ')}</span>
+                  </div>
+                )}
+
+                {/* 휴일/주말 표시 */}
+                <div className="text-xs text-muted-foreground flex gap-2">
+                  {realTimeData.isHoliday && <span className="text-red-400">🎉 휴일</span>}
+                  {realTimeData.isWeekend && <span className="text-purple-400">📅 주말</span>}
+                  {!realTimeData.isHoliday && !realTimeData.isWeekend && <span>📅 평일</span>}
                 </div>
               </div>
-            </div>
-          )}
-
-          <div className="text-xs text-muted-foreground flex gap-2">
-            {realTimeData.isHoliday && <span className="text-red-400">🎉 휴일</span>}
-            {realTimeData.isWeekend && <span className="text-purple-400">📅 주말</span>}
-            {!realTimeData.isHoliday && !realTimeData.isWeekend && <span>📅 평일</span>}
+            ) : (
+              <div className="flex items-center text-sm text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                환경 데이터를 불러오는 중...
+              </div>
+            )}
           </div>
-        </div>
-      )}
 
-      {config.mode === 'realtime' && !realTimeData && (
-        <div className="flex items-center justify-center py-4 text-muted-foreground">
-          <Loader2 className="w-4 h-4 animate-spin mr-2" />
-          <span className="text-sm">환경 정보 로딩 중...</span>
+          {/* 안내 메시지 */}
+          <p className="text-xs text-muted-foreground text-center">
+            실시간 모드에서는 현재 시간과 날씨가 자동으로 반영됩니다
+          </p>
         </div>
       )}
 
