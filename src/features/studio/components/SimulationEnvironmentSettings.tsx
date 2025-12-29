@@ -263,6 +263,33 @@ export const SimulationEnvironmentSettings: React.FC<SimulationEnvironmentSettin
             />
           </div>
 
+          {/* 시간대 선택 (드롭다운) */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              시간대
+            </label>
+            <Select
+              value={config.manualSettings.timeOfDay}
+              onValueChange={(value: TimeOfDayOption) => updateManualSettings({ timeOfDay: value })}
+            >
+              <SelectTrigger className="w-full h-9 text-sm bg-background border-white/10">
+                <SelectValue placeholder="시간대 선택" />
+              </SelectTrigger>
+              <SelectContent>
+                {TIME_OF_DAY_OPTIONS.map((time) => (
+                  <SelectItem key={time.value} value={time.value}>
+                    <div className="flex items-center gap-2">
+                      <span>{time.emoji}</span>
+                      <span>{time.label}</span>
+                      <span className="text-muted-foreground text-xs">({time.hours})</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* 자동 로드된 정보 표시 */}
           {isLoadingDateData ? (
             <div className="flex items-center justify-center py-4 text-muted-foreground">
@@ -316,6 +343,24 @@ export const SimulationEnvironmentSettings: React.FC<SimulationEnvironmentSettin
               )}
             </div>
           )}
+
+          {/* 선택된 설정 요약 */}
+          <div className="p-3 bg-muted/30 rounded-lg">
+            <div className="text-xs text-muted-foreground mb-1">현재 설정</div>
+            <div className="flex flex-wrap gap-2">
+              <span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs">
+                📅 {config.selectedDate.toLocaleDateString('ko-KR')}
+              </span>
+              <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs">
+                {TIME_OF_DAY_OPTIONS.find(t => t.value === config.manualSettings.timeOfDay)?.emoji}{' '}
+                {TIME_OF_DAY_OPTIONS.find(t => t.value === config.manualSettings.timeOfDay)?.label}
+                {' '}
+                ({config.manualSettings.timeOfDay === 'peak'
+                  ? '데이터 기반'
+                  : isDayTime(config.manualSettings.timeOfDay) ? '낮 씬' : '밤 씬'})
+              </span>
+            </div>
+          </div>
         </div>
       )}
 
