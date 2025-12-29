@@ -208,10 +208,18 @@ export default function DigitalTwinStudioPage() {
       setEnvironmentRenderingConfig(null);  // 렌더링 설정은 SceneEnvironment에서 처리
 
     } else if (config.mode === 'dateSelect') {
-      // 날짜 선택 모드: 선택된 날짜의 시간 정보가 없으므로 기본 낮
-      console.log('[DigitalTwinStudio] DateSelect mode - default day mode');
-      setIsDayMode(true);
-      setEnvironmentRenderingConfig(null);
+      // 날짜 선택 모드: 선택한 시간대에 따라 판별
+      const timeOfDay = config.manualSettings?.timeOfDay || 'afternoon';
+      const dayMode = isDayTimeWithPeakData(timeOfDay);
+      console.log('[DigitalTwinStudio] DateSelect mode:', { timeOfDay, dayMode });
+      setIsDayMode(dayMode);
+
+      if (dayMode) {
+        setEnvironmentRenderingConfig(null);
+      } else {
+        const renderingConfig = convertToRenderingConfig(config);
+        setEnvironmentRenderingConfig(renderingConfig);
+      }
 
     } else if (config.mode === 'manual') {
       // 직접 설정 모드: 선택한 시간대에 따라 판별
