@@ -40,7 +40,7 @@ import { useStudioMode, useOverlayVisibility, useScenePersistence, useSceneSimul
 import { loadUserModels } from './utils';
 import type { StudioMode, Model3D, OverlayType, HeatPoint, ZoneBoundary, SceneRecipe, LightingPreset, Vector3, SimulationScenario, TransformMode, RenderingConfig } from './types';
 import type { SimulationEnvironmentConfig } from './types/simulationEnvironment.types';
-import { convertToRenderingConfig, isDayTime } from './types/simulationEnvironment.types';
+import { convertToRenderingConfig, isDayTime, isCurrentTimeDayMode, isDayTimeWithPeakData } from './types/simulationEnvironment.types';
 
 // 기존 시뮬레이션 훅
 import { useStoreContext } from '@/features/simulation/hooks/useStoreContext';
@@ -200,20 +200,28 @@ export default function DigitalTwinStudioPage() {
     // 원본 설정 저장 (AI 최적화에서 사용)
     setSimulationEnvConfig(config);
 
-    // 🆕 시간대에 따른 낮/밤 모드 설정
-    const timeOfDay = config.mode === 'manual'
-      ? config.manualSettings?.timeOfDay
-      : config.timeOfDay;
-
-    if (timeOfDay) {
-      const dayMode = isDayTime(timeOfDay);
-      console.log('[DigitalTwinStudio] Day/Night mode:', { timeOfDay, dayMode });
+    if (config.mode === 'realtime') {
+      // 🆕 실시간 모드: 현재 시간 기반으로 낮/밤 판별
+      const dayMode = isCurrentTimeDayMode();
+      console.log('[DigitalTwinStudio] Realtime mode - current time isDayMode:', dayMode);
       setIsDayMode(dayMode);
-    }
+      setEnvironmentRenderingConfig(null);  // 렌더링 설정은 SceneEnvironment에서 처리
 
-    // 🔧 FIX v3.0: 낮 모드일 때는 renderingConfig = null (초기 씬 상태 유지)
-    if (config.mode === 'dateSelect' || config.mode === 'manual') {
-      const dayMode = isDayTime(timeOfDay || 'afternoon');
+    } else if (config.mode === 'dateSelect') {
+      // 날짜 선택 모드: 선택된 날짜의 시간 정보가 없으므로 기본 낮
+      console.log('[DigitalTwinStudio] DateSelect mode - default day mode');
+      setIsDayMode(true);
+      setEnvironmentRenderingConfig(null);
+
+    } else if (config.mode === 'manual') {
+      // 직접 설정 모드: 선택한 시간대에 따라 판별
+      const timeOfDay = config.manualSettings?.timeOfDay || 'afternoon';
+
+      // 피크 시간대는 데이터 기반으로 판별 (현재는 기본값 사용)
+      // TODO: 실제 피크 시간 데이터 연동 시 peakHour 전달
+      const dayMode = isDayTimeWithPeakData(timeOfDay);
+      console.log('[DigitalTwinStudio] Manual mode:', { timeOfDay, dayMode });
+      setIsDayMode(dayMode);
 
       if (dayMode) {
         // 낮 모드: 렌더링 설정 제거 → 초기 씬 상태 유지
@@ -230,13 +238,23 @@ export default function DigitalTwinStudioPage() {
         });
         setEnvironmentRenderingConfig(renderingConfig);
       }
-    } else {
-      // 실시간 모드일 때는 기본 환경으로 리셋
-      console.log('[DigitalTwinStudio] Realtime mode - clearing rendering config');
-      setEnvironmentRenderingConfig(null);
-      setIsDayMode(true);  // 🆕 실시간 모드는 기본 낮
     }
   }, []);
+
+  // 실시간 모드에서 1분마다 낮/밤 상태 체크
+  useEffect(() => {
+    if (simulationEnvConfig?.mode !== 'realtime') return;
+
+    const checkTime = () => {
+      const dayMode = isCurrentTimeDayMode();
+      setIsDayMode(dayMode);
+    };
+
+    // 1분마다 체크
+    const interval = setInterval(checkTime, 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [simulationEnvConfig?.mode]);
 
   // 시뮬레이션 데이터
   const days = getDays();

@@ -52,8 +52,8 @@ export type HolidayOption =
   | 'summerSale' // 여름 세일
   | 'winterSale'; // 겨울 세일
 
-// 시간대 옵션 (v3.0: 2개로 축소 - 오후/저녁)
-export type TimeOfDayOption = 'afternoon' | 'evening';
+// 시간대 옵션 (v4.0: 3개 - 오후/저녁/피크)
+export type TimeOfDayOption = 'afternoon' | 'evening' | 'peak';
 
 // ============================================================================
 // 자동 로드 데이터 타입
@@ -240,7 +240,8 @@ export interface TimeOfDayOptionMeta {
 
 export const TIME_OF_DAY_OPTIONS: TimeOfDayOptionMeta[] = [
   { value: 'afternoon', label: '오후', emoji: '☀️', hours: '09:00-18:00', trafficImpact: 1.0 },
-  { value: 'evening', label: '저녁', emoji: '🌙', hours: '18:00-09:00', trafficImpact: 0.6 },
+  { value: 'evening', label: '저녁', emoji: '🌙', hours: '18:00-24:00', trafficImpact: 0.6 },
+  { value: 'peak', label: '피크', emoji: '🔥', hours: '데이터 기반', trafficImpact: 1.5 },
 ];
 
 // ============================================================================
@@ -423,7 +424,7 @@ export function getEffectiveWeather(config: SimulationEnvironmentConfig): Weathe
 
 /**
  * 설정에서 현재 유효한 시간대 값 추출 (모드에 따라)
- * v3.0: 2개 옵션으로 축소 (afternoon/evening)
+ * v4.0: 3개 옵션 (afternoon/evening/peak)
  */
 export function getEffectiveTimeOfDay(config: SimulationEnvironmentConfig): TimeOfDayOption {
   if (config.mode === 'manual') {
@@ -431,8 +432,8 @@ export function getEffectiveTimeOfDay(config: SimulationEnvironmentConfig): Time
   }
   // dateSelect 또는 realtime 모드에서는 현재 시간 기반
   const hour = config.selectedDate?.getHours() || new Date().getHours();
-  // 18시~9시: 저녁(밤), 9시~18시: 오후(낮)
-  if (hour >= 18 || hour < 9) return 'evening';
+  // 18시~6시: 저녁(밤), 6시~18시: 오후(낮)
+  if (hour >= 18 || hour < 6) return 'evening';
   return 'afternoon';
 }
 
@@ -460,7 +461,7 @@ export function getEffectiveHoliday(config: SimulationEnvironmentConfig): Holida
 // ============================================================================
 
 /**
- * 시간대별 조명 프리셋 (v3.0: 2개로 축소)
+ * 시간대별 조명 프리셋 (v4.0: 3개 - 오후/저녁/피크)
  */
 const TIME_OF_DAY_LIGHTING: Record<
   TimeOfDayOption,
@@ -488,6 +489,15 @@ const TIME_OF_DAY_LIGHTING: Record<
     directionalColor: '#6688aa',
     directionalPosition: [5, 15, 5],
     environmentPreset: 'night',
+  },
+  peak: {
+    // 피크 시간은 데이터에 따라 동적으로 결정됨 (기본값: 낮 설정)
+    ambientIntensity: 0.7,
+    ambientColor: '#fffaf0',
+    directionalIntensity: 1.1,
+    directionalColor: '#fff8e7',
+    directionalPosition: [0, 20, 10],
+    environmentPreset: 'city',
   },
 };
 
@@ -565,7 +575,8 @@ import type { RenderingConfig, TimeOfDay, SeasonType, WeatherCondition } from '.
 
 /**
  * 시간대가 낮인지 판별
- * v3.0: afternoon → true (낮)
+ * v4.0: afternoon → true (낮), evening → false (밤), peak → 데이터 기반
+ * peak의 경우 기본값 false, isPeakDayTime으로 별도 판별 필요
  */
 export function isDayTime(timeOfDay: TimeOfDayOption): boolean {
   return timeOfDay === 'afternoon';
@@ -573,20 +584,70 @@ export function isDayTime(timeOfDay: TimeOfDayOption): boolean {
 
 /**
  * 시간대가 밤인지 판별
- * v3.0: evening → true (밤)
+ * v4.0: evening → true (밤), afternoon → false (낮), peak → 데이터 기반
+ * peak의 경우 기본값 true, isPeakDayTime으로 별도 판별 필요
  */
 export function isNightTime(timeOfDay: TimeOfDayOption): boolean {
-  return timeOfDay === 'evening';
+  return timeOfDay === 'evening' || timeOfDay === 'peak';
+}
+
+// ============================================================================
+// 실시간 모드: 현재 시간 기반 낮/밤 판별
+// ============================================================================
+
+/**
+ * 현재 시간이 낮인지 판별 (06:00 ~ 17:59)
+ */
+export function isCurrentTimeDayMode(): boolean {
+  const now = new Date();
+  const hour = now.getHours();
+  return hour >= 6 && hour < 18;
+}
+
+/**
+ * 현재 시간이 밤인지 판별 (18:00 ~ 05:59)
+ */
+export function isCurrentTimeNightMode(): boolean {
+  return !isCurrentTimeDayMode();
+}
+
+/**
+ * 피크 시간대가 낮인지 판별
+ * @param peakHour 피크 시간 (0-23)
+ * @returns 06:00~17:59면 true (낮), 18:00~05:59면 false (밤)
+ */
+export function isPeakDayTime(peakHour: number): boolean {
+  return peakHour >= 6 && peakHour < 18;
+}
+
+/**
+ * 시간대에 따른 낮/밤 판별 (피크 시간 데이터 포함)
+ * @param timeOfDay 시간대 옵션
+ * @param peakHour 피크 시간대일 경우 실제 피크 시간 (0-23), 없으면 현재 시간 기준
+ */
+export function isDayTimeWithPeakData(timeOfDay: TimeOfDayOption, peakHour?: number): boolean {
+  if (timeOfDay === 'afternoon') return true;
+  if (timeOfDay === 'evening') return false;
+  // peak인 경우: 피크 시간 데이터가 있으면 그에 따라, 없으면 현재 시간 기준
+  if (timeOfDay === 'peak') {
+    if (peakHour !== undefined) {
+      return isPeakDayTime(peakHour);
+    }
+    // 피크 시간 데이터가 없으면 현재 시간 기준
+    return isCurrentTimeDayMode();
+  }
+  return true; // 기본값 낮
 }
 
 /**
  * TimeOfDayOption → TimeOfDay 변환
- * v3.0: 2개 옵션으로 축소
+ * v4.0: 3개 옵션 (오후/저녁/피크)
  */
 function convertTimeOfDay(time: TimeOfDayOption): TimeOfDay {
   const mapping: Record<TimeOfDayOption, TimeOfDay> = {
     afternoon: 'afternoon',
     evening: 'night',  // evening은 night으로 매핑
+    peak: 'afternoon', // peak는 기본 afternoon으로 매핑 (데이터에 따라 동적 결정)
   };
   return mapping[time];
 }

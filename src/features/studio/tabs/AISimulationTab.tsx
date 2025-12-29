@@ -12,8 +12,8 @@ import {
   Play, Pause, Square, RotateCcw, Users, Activity,
   Thermometer, Monitor, Eye, Lightbulb, Lock, Loader2,
   TrendingUp, Clock, DollarSign, AlertTriangle, Zap, Sparkles,
-  Sun, Coffee, Moon, Flame, ChevronDown, ChevronUp,
-  Cloud, CloudRain, CloudSnow, Wind, Calendar, Settings,
+  Sun, ChevronDown, ChevronUp,
+  Cloud, CloudRain, CloudSnow, Calendar, Settings,
 } from 'lucide-react';
 import { useEnvironmentContext } from '../hooks/useEnvironmentContext';
 import { SimulationEnvironmentSettings } from '../components/SimulationEnvironmentSettings';
@@ -35,7 +35,6 @@ import type { SceneRecipe } from '../types';
 
 // 시뮬레이션 타입
 type SimulationType = 'realtime' | 'prediction';
-type TimeOfDay = 'morning' | 'afternoon' | 'evening' | 'peak';
 
 interface SimulationZone {
   id: string;
@@ -112,7 +111,6 @@ export function AISimulationTab({
 
   // ===== 통합 시뮬레이션 상태 =====
   const [simulationType, setSimulationType] = useState<SimulationType>('realtime');
-  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('afternoon');
   const [customerCount, setCustomerCount] = useState(100);
   const [duration, setDuration] = useState(60);
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
@@ -146,14 +144,6 @@ export function AISimulationTab({
 
   // 현재 실행 중 여부 통합 체크
   const isAnyRunning = isRealtimeRunning || isAIPredictionLoading;
-
-  // 시간대 옵션
-  const timeOptions: { value: TimeOfDay; label: string; icon: React.ReactNode; color: string }[] = [
-    { value: 'morning', label: '오전', icon: <Sun className="w-3 h-3" />, color: 'bg-yellow-500' },
-    { value: 'afternoon', label: '오후', icon: <Coffee className="w-3 h-3" />, color: 'bg-orange-500' },
-    { value: 'evening', label: '저녁', icon: <Moon className="w-3 h-3" />, color: 'bg-indigo-500' },
-    { value: 'peak', label: '피크', icon: <Flame className="w-3 h-3" />, color: 'bg-red-500' },
-  ];
 
   // 시간 포맷팅
   const formatTime = (seconds: number): string => {
@@ -202,11 +192,15 @@ export function AISimulationTab({
             }
           : envAiContext; // 실시간 모드면 실제 환경 데이터 사용
 
-        // 옵션 설정
+        // 옵션 설정 - 시간대는 환경 설정에서 가져옴
+        const timeOfDayFromConfig = simulationEnvConfig.mode === 'manual'
+          ? simulationEnvConfig.manualSettings?.timeOfDay
+          : simulationEnvConfig.timeOfDay || 'afternoon';
+
         setAIOptions({
           customer_count: customerCount,
           duration_minutes: duration,
-          time_of_day: timeOfDay,
+          time_of_day: timeOfDayFromConfig,
           environment_context: envConfigForAI, // 환경 컨텍스트 추가
         });
 
@@ -223,7 +217,7 @@ export function AISimulationTab({
       }
     }
   }, [
-    storeId, simulationType, customerCount, duration, timeOfDay,
+    storeId, simulationType, customerCount, duration,
     showCongestionHeatmap, startRealtime, runAIPrediction, setAIOptions, onOverlayToggle,
     simulationEnvConfig, envAiContext
   ]);
@@ -418,30 +412,6 @@ export function AISimulationTab({
               />
             </div>
           )}
-        </div>
-
-        {/* 시간대 선택 */}
-        <div className="space-y-2">
-          <label className="text-xs font-medium text-white/60">시간대</label>
-          <div className="grid grid-cols-4 gap-1">
-            {timeOptions.map(opt => (
-              <button
-                key={opt.value}
-                onClick={() => setTimeOfDay(opt.value)}
-                disabled={isAnyRunning}
-                className={cn(
-                  "flex flex-col items-center gap-1 p-2 rounded-lg text-xs transition",
-                  timeOfDay === opt.value
-                    ? `${opt.color} text-white`
-                    : "bg-white/5 hover:bg-white/10 text-white/60",
-                  isAnyRunning && "opacity-50 cursor-not-allowed"
-                )}
-              >
-                {opt.icon}
-                <span>{opt.label}</span>
-              </button>
-            ))}
-          </div>
         </div>
 
         {/* 예상 고객 수 */}
