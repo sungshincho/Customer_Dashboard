@@ -577,6 +577,26 @@ function getAtmosphericEffects(weather: WeatherOption): {
 
 import type { RenderingConfig, TimeOfDay, SeasonType, WeatherCondition } from './environment.types';
 
+// ============================================================================
+// 시간대 → 낮/밤 판별 헬퍼 함수
+// ============================================================================
+
+/**
+ * 시간대가 낮인지 판별
+ * - morning, afternoon → true (낮)
+ * - evening, night → false (밤)
+ */
+export function isDayTime(timeOfDay: TimeOfDayOption): boolean {
+  return timeOfDay === 'morning' || timeOfDay === 'afternoon';
+}
+
+/**
+ * 시간대가 밤인지 판별
+ */
+export function isNightTime(timeOfDay: TimeOfDayOption): boolean {
+  return timeOfDay === 'evening' || timeOfDay === 'night';
+}
+
 /**
  * TimeOfDayOption → TimeOfDay 변환
  */

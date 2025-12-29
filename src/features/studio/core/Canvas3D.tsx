@@ -54,6 +54,8 @@ interface ExtendedCanvas3DProps extends Canvas3DProps {
   storeId?: string;
   /** 환경 효과 렌더링 설정 (날씨, 시간대 등) */
   renderingConfig?: RenderingConfig | null;
+  /** 낮/밤 모드 (true = 낮, false = 밤) */
+  isDayMode?: boolean;
 }
 
 // ============================================================================
@@ -73,12 +75,14 @@ export function Canvas3D({
   userId,
   storeId,
   renderingConfig,
+  isDayMode = true,  // 기본값: 낮
 }: ExtendedCanvas3DProps) {
-  // environment 폴더에서 환경 모델 로드
+  // environment 폴더에서 환경 모델 로드 (시간대 반영)
   const { models: environmentModels } = useEnvironmentModels({
     userId,
     storeId,
     enabled: !!userId && !!storeId,
+    isDayMode,  // 시간대 전달
   });
   return (
     <div className={cn('w-full h-full', className)}>
@@ -105,6 +109,7 @@ export function Canvas3D({
           storeId={storeId}
           environmentModels={environmentModels}
           renderingConfig={renderingConfig}
+          isDayMode={isDayMode}
         >
           {children}
         </SceneContent>
@@ -137,6 +142,7 @@ interface SceneContentProps {
   storeId?: string;  // 🆕 DB 기반 시뮬레이션용
   environmentModels?: EnvironmentModelProp[];
   renderingConfig?: RenderingConfig | null;  // 🆕 환경 효과 렌더링 설정
+  isDayMode?: boolean;  // 🆕 낮/밤 모드
 }
 
 function SceneContent({
@@ -152,6 +158,7 @@ function SceneContent({
   storeId,  // 🆕 DB 기반 시뮬레이션용
   environmentModels = [],
   renderingConfig,  // 🆕 환경 효과 렌더링 설정
+  isDayMode = true,  // 🆕 낮/밤 모드
 }: SceneContentProps) {
   const { camera } = useScene();
 
@@ -188,6 +195,7 @@ function SceneContent({
             scale: m.scale,
             isBaked: m.isBaked,
           }))}
+          isDayMode={isDayMode}
         />
 
         {/* 그리드 (편집 모드) */}

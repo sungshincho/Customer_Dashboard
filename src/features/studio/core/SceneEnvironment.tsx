@@ -102,19 +102,98 @@ export const SCENE_CONFIG = {
 };
 
 // ============================================================================
+// 밤 씬 설정 (시간대: evening, night)
+// ============================================================================
+export const NIGHT_SCENE_CONFIG = {
+  // 렌더러 설정
+  renderer: {
+    toneMappingExposure: 0.8,  // 약간 어둡게
+    physicallyCorrectLights: true,
+  },
+
+  // Environment Map 설정
+  environment: {
+    preset: 'night' as EnvironmentPreset,  // 밤 환경맵
+    background: false,
+    intensity: 0.5,  // 조명 낮춤
+  },
+
+  // 배경색
+  backgroundColor: '#0a0a12',  // 어두운 배경
+
+  // 주 광원 (달빛 느낌)
+  mainLight: {
+    color: '#6688aa',  // 푸른빛 달빛
+    intensity: 0.5,    // 약한 강도
+    position: [8, 20, 8] as [number, number, number],
+    castShadow: true,
+    shadow: {
+      mapSize: 2048,
+      bias: -0.0001,
+      normalBias: 0.02,
+      camera: {
+        near: 0.5,
+        far: 50,
+        left: -20,
+        right: 20,
+        top: 20,
+        bottom: -20,
+      },
+    },
+  },
+
+  // 보조 광원
+  fillLight: {
+    color: '#334466',  // 어두운 푸른빛
+    intensity: 0.3,
+    position: [-12, 8, -8] as [number, number, number],
+  },
+
+  // 림 라이트
+  rimLight: {
+    enabled: true,
+    color: '#445566',
+    intensity: 0.2,
+    position: [-5, 12, -15] as [number, number, number],
+  },
+
+  // Ambient Light
+  ambientLight: {
+    color: '#1a1a2e',  // 어두운 보라빛
+    intensity: 0.2,
+  },
+
+  // Contact Shadows (동일)
+  contactShadows: {
+    enabled: false,
+    opacity: 0.35,
+    blur: 2.0,
+    far: 10,
+    resolution: 512,
+    color: '#000000',
+    position: [0, -0.01, 0] as [number, number, number],
+    scale: 30,
+  },
+};
+
+// ============================================================================
 // 렌더러 설정 컴포넌트
 // ============================================================================
-function RendererSetup() {
+interface RendererSetupProps {
+  config?: typeof SCENE_CONFIG;
+}
+
+function RendererSetup({ config = SCENE_CONFIG }: RendererSetupProps) {
   const { gl } = useThree();
 
   useEffect(() => {
     // THREE 상수는 여기서 직접 사용 (TDZ 방지)
     gl.toneMapping = THREE.ACESFilmicToneMapping;
-    gl.toneMappingExposure = SCENE_CONFIG.renderer.toneMappingExposure;
+    gl.toneMappingExposure = config.renderer.toneMappingExposure;
     gl.outputColorSpace = THREE.SRGBColorSpace;
     gl.shadowMap.enabled = true;
     gl.shadowMap.type = THREE.PCFSoftShadowMap;
-  }, [gl]);
+  }, [gl, config]);
 
   return null;
 }
@@ -135,6 +214,8 @@ interface SceneEnvironmentProps {
   environmentIntensity?: number;
   /** 환경 모델 목록 (baked, 레이어에 표시 안됨) */
   environmentModels?: EnvironmentModelData[];
+  /** 낮/밤 모드 (true = 낮, false = 밤) */
+  isDayMode?: boolean;
 }
 
 // ============================================================================
@@ -147,82 +228,86 @@ export function SceneEnvironment({
   backgroundColor,
   environmentIntensity,
   environmentModels = [],
+  isDayMode = true,  // 기본값: 낮
 }: SceneEnvironmentProps) {
-  const preset = environmentPreset || SCENE_CONFIG.environment.preset;
-  const bgColor = backgroundColor || SCENE_CONFIG.backgroundColor;
-  const envIntensity = environmentIntensity ?? SCENE_CONFIG.environment.intensity;
+  // 낮/밤에 따른 설정 선택
+  const CONFIG = isDayMode ? SCENE_CONFIG : NIGHT_SCENE_CONFIG;
+
+  const preset = environmentPreset || CONFIG.environment.preset;
+  const bgColor = backgroundColor || CONFIG.backgroundColor;
+  const envIntensity = environmentIntensity ?? CONFIG.environment.intensity;
 
   return (
     <>
       {/* 렌더러 설정 */}
-      <RendererSetup />
+      <RendererSetup config={CONFIG} />
 
       {/* 배경색 */}
       <color attach="background" args={[bgColor]} />
 
       {/* Environment Map */}
       {hdriPath ? (
-        <Environment files={hdriPath} background={SCENE_CONFIG.environment.background} />
+        <Environment files={hdriPath} background={CONFIG.environment.background} />
       ) : (
         <Environment
           preset={preset}
-          background={SCENE_CONFIG.environment.background}
+          background={CONFIG.environment.background}
           environmentIntensity={envIntensity}
         />
       )}
 
       {/* Ambient Light */}
       <ambientLight
-        color={SCENE_CONFIG.ambientLight.color}
-        intensity={SCENE_CONFIG.ambientLight.intensity}
+        color={CONFIG.ambientLight.color}
+        intensity={CONFIG.ambientLight.intensity}
       />
 
       {/* Main Directional Light */}
       <directionalLight
-        color={SCENE_CONFIG.mainLight.color}
-        intensity={SCENE_CONFIG.mainLight.intensity}
-        position={SCENE_CONFIG.mainLight.position}
-        castShadow={SCENE_CONFIG.mainLight.castShadow}
-        shadow-mapSize-width={SCENE_CONFIG.mainLight.shadow.mapSize}
-        shadow-mapSize-height={SCENE_CONFIG.mainLight.shadow.mapSize}
-        shadow-bias={SCENE_CONFIG.mainLight.shadow.bias}
-        shadow-normalBias={SCENE_CONFIG.mainLight.shadow.normalBias}
-        shadow-camera-near={SCENE_CONFIG.mainLight.shadow.camera.near}
-        shadow-camera-far={SCENE_CONFIG.mainLight.shadow.camera.far}
-        shadow-camera-left={SCENE_CONFIG.mainLight.shadow.camera.left}
-        shadow-camera-right={SCENE_CONFIG.mainLight.shadow.camera.right}
-        shadow-camera-top={SCENE_CONFIG.mainLight.shadow.camera.top}
-        shadow-camera-bottom={SCENE_CONFIG.mainLight.shadow.camera.bottom}
+        color={CONFIG.mainLight.color}
+        intensity={CONFIG.mainLight.intensity}
+        position={CONFIG.mainLight.position}
+        castShadow={CONFIG.mainLight.castShadow}
+        shadow-mapSize-width={CONFIG.mainLight.shadow.mapSize}
+        shadow-mapSize-height={CONFIG.mainLight.shadow.mapSize}
+        shadow-bias={CONFIG.mainLight.shadow.bias}
+        shadow-normalBias={CONFIG.mainLight.shadow.normalBias}
+        shadow-camera-near={CONFIG.mainLight.shadow.camera.near}
+        shadow-camera-far={CONFIG.mainLight.shadow.camera.far}
+        shadow-camera-left={CONFIG.mainLight.shadow.camera.left}
+        shadow-camera-right={CONFIG.mainLight.shadow.camera.right}
+        shadow-camera-top={CONFIG.mainLight.shadow.camera.top}
+        shadow-camera-bottom={CONFIG.mainLight.shadow.camera.bottom}
       />
 
       {/* Fill Light */}
       <directionalLight
-        color={SCENE_CONFIG.fillLight.color}
-        intensity={SCENE_CONFIG.fillLight.intensity}
-        position={SCENE_CONFIG.fillLight.position}
+        color={CONFIG.fillLight.color}
+        intensity={CONFIG.fillLight.intensity}
+        position={CONFIG.fillLight.position}
         castShadow={false}
       />
 
       {/* Rim Light */}
-      {SCENE_CONFIG.rimLight.enabled && (
+      {CONFIG.rimLight.enabled && (
         <directionalLight
-          color={SCENE_CONFIG.rimLight.color}
-          intensity={SCENE_CONFIG.rimLight.intensity}
-          position={SCENE_CONFIG.rimLight.position}
+          color={CONFIG.rimLight.color}
+          intensity={CONFIG.rimLight.intensity}
+          position={CONFIG.rimLight.position}
           castShadow={false}
         />
       )}
 
       {/* Contact Shadows */}
-      {SCENE_CONFIG.contactShadows.enabled && (
+      {CONFIG.contactShadows.enabled && (
         <ContactShadows
-          opacity={SCENE_CONFIG.contactShadows.opacity}
-          blur={SCENE_CONFIG.contactShadows.blur}
-          far={SCENE_CONFIG.contactShadows.far}
-          resolution={SCENE_CONFIG.contactShadows.resolution}
-          color={SCENE_CONFIG.contactShadows.color}
-          position={SCENE_CONFIG.contactShadows.position}
-          scale={SCENE_CONFIG.contactShadows.scale}
+          opacity={CONFIG.contactShadows.opacity}
+          blur={CONFIG.contactShadows.blur}
+          far={CONFIG.contactShadows.far}
+          resolution={CONFIG.contactShadows.resolution}
+          color={CONFIG.contactShadows.color}
+          position={CONFIG.contactShadows.position}
+          scale={CONFIG.contactShadows.scale}
         />
       )}
 

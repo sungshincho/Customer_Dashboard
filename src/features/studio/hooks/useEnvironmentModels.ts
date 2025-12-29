@@ -22,12 +22,15 @@ interface UseEnvironmentModelsOptions {
   userId?: string;
   storeId?: string;
   enabled?: boolean;
+  /** 낮/밤 모드 (true = 낮, false = 밤) */
+  isDayMode?: boolean;
 }
 
 export function useEnvironmentModels({
   userId,
   storeId,
   enabled = true,
+  isDayMode = true,  // 기본값: 낮
 }: UseEnvironmentModelsOptions) {
   const [models, setModels] = useState<EnvironmentModel[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -72,12 +75,38 @@ export function useEnvironmentModels({
           (f) => f.name.endsWith('.glb') || f.name.endsWith('.gltf')
         );
 
+        // 시간대에 따른 파일 필터링
+        // 파일명 규칙: environment_day_baked.glb, environment_night_baked.glb
+        const timeFilteredFiles = glbFiles.filter((file) => {
+          const fileName = file.name.toLowerCase();
+
+          // _day_ 또는 _night_ 패턴이 있는 파일만 시간대 필터링 적용
+          const hasDayPattern = fileName.includes('_day_') || fileName.includes('_day.');
+          const hasNightPattern = fileName.includes('_night_') || fileName.includes('_night.');
+
+          // 시간대 패턴이 없는 파일은 항상 포함 (기존 호환성)
+          if (!hasDayPattern && !hasNightPattern) {
+            return true;
+          }
+
+          // 시간대에 맞는 파일만 포함
+          if (isDayMode) {
+            return hasDayPattern;
+          } else {
+            return hasNightPattern;
+          }
+        });
+
         // Public URL 생성
-        const environmentModels: EnvironmentModel[] = glbFiles.map((file) => {
+        const environmentModels: EnvironmentModel[] = timeFilteredFiles.map((file) => {
           const filePath = `${basePath}/${file.name}`;
           const {
             data: { publicUrl },
           } = supabase.storage.from('3d-models').getPublicUrl(filePath);
+
+          // 파일명에 _baked가 있으면 isBaked = true
+          const isBaked = file.name.toLowerCase().includes('_baked') ||
+                         file.name.toLowerCase().includes('baked');
 
           return {
             url: publicUrl,
@@ -85,7 +114,7 @@ export function useEnvironmentModels({
             position: [0, 0, 0],
             rotation: [0, 0, 0],
             scale: [1, 1, 1],
-            isBaked: true,
+            isBaked: isBaked,
           };
         });
 
@@ -100,7 +129,7 @@ export function useEnvironmentModels({
     };
 
     loadEnvironmentModels();
-  }, [userId, storeId, enabled]);
+  }, [userId, storeId, enabled, isDayMode]);  // isDayMode 의존성 추가
 
   return { models, isLoading, error };
 }
