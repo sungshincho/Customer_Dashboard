@@ -1,14 +1,14 @@
 /**
  * MetricCard.tsx
  *
- * 표준 용어 기반 KPI 카드 컴포넌트
- * 영문 라벨 + 한글 라벨 + 변화율 표시
+ * 3D Glassmorphism KPI Card Component
+ * 영문 라벨 + 한글 라벨 + 3D 입체 효과
  */
 
 import React from 'react';
-import { Card } from '@/components/ui/card';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Glass3DCard, Icon3D, Badge3D, text3DStyles } from '@/components/ui/glass-card';
 
 interface MetricCardProps {
   icon: React.ReactNode;
@@ -18,8 +18,9 @@ interface MetricCardProps {
   subLabel?: string;
   change?: number;
   changeLabel?: string;
-  changeUnit?: string; // '%' or '%p' or ''
+  changeUnit?: string;
   className?: string;
+  dark?: boolean;
 }
 
 export const MetricCard: React.FC<MetricCardProps> = ({
@@ -32,54 +33,113 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   changeLabel,
   changeUnit = '%',
   className,
+  dark = false,
 }) => {
   const isPositive = change !== undefined && change > 0;
   const isNegative = change !== undefined && change < 0;
   const TrendIcon = isPositive ? TrendingUp : isNegative ? TrendingDown : Minus;
 
   return (
-    <Card className={cn('p-4', className)}>
-      <div className="flex items-start justify-between">
-        <div className="flex-1 min-w-0">
-          {labelEn && (
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">
-              {labelEn}
+    <Glass3DCard dark={dark} className={className}>
+      <div className="p-6 h-full">
+        <div className="flex items-start justify-between">
+          <div className="flex-1 min-w-0">
+            {/* Labels */}
+            {labelEn && (
+              <p
+                className="mb-0.5"
+                style={dark ? text3DStyles.darkLabel : text3DStyles.label}
+              >
+                {labelEn}
+              </p>
+            )}
+            <p
+              className="text-sm"
+              style={dark ? text3DStyles.darkBody : text3DStyles.body}
+            >
+              {label}
             </p>
-          )}
-          <p className="text-sm text-muted-foreground">{label}</p>
-          <p className="text-2xl font-bold mt-1 truncate">{value}</p>
-          {subLabel && (
-            <p className="text-xs text-muted-foreground mt-1">{subLabel}</p>
-          )}
-          {change !== undefined && (
-            <div
+
+            {/* Main Value */}
+            <p
+              className="text-3xl mt-2 truncate"
+              style={dark ? text3DStyles.darkNumber : text3DStyles.heroNumber}
+            >
+              {value}
+            </p>
+
+            {/* Sub Label */}
+            {subLabel && (
+              <p
+                className="text-xs mt-2"
+                style={dark ? text3DStyles.darkBody : text3DStyles.body}
+              >
+                {subLabel}
+              </p>
+            )}
+
+            {/* Change Badge */}
+            {change !== undefined && (
+              <div className="mt-3">
+                <Badge3D dark={dark}>
+                  <TrendIcon
+                    className={cn(
+                      'h-3.5 w-3.5',
+                      dark
+                        ? 'text-white/80'
+                        : isPositive
+                        ? 'text-emerald-600'
+                        : isNegative
+                        ? 'text-red-500'
+                        : 'text-gray-500'
+                    )}
+                  />
+                  <span
+                    className="text-xs font-semibold"
+                    style={
+                      dark
+                        ? { color: 'rgba(255,255,255,0.9)' }
+                        : {
+                            color: isPositive
+                              ? '#059669'
+                              : isNegative
+                              ? '#dc2626'
+                              : '#6b7280',
+                          }
+                    }
+                  >
+                    {isPositive ? '+' : ''}
+                    {change.toFixed(1)}
+                    {changeUnit}
+                    {changeLabel && ` ${changeLabel}`}
+                  </span>
+                </Badge3D>
+              </div>
+            )}
+          </div>
+
+          {/* Icon */}
+          <Icon3D size={44} dark={dark}>
+            <span
               className={cn(
-                'flex items-center gap-1 mt-2 text-sm',
-                isPositive && 'text-green-500',
-                isNegative && 'text-red-500',
-                !isPositive && !isNegative && 'text-muted-foreground'
+                'text-lg',
+                dark ? 'text-white/80' : 'text-gray-800'
               )}
             >
-              <TrendIcon className="h-4 w-4" />
-              <span>
-                {isPositive ? '+' : ''}
-                {change.toFixed(1)}
-                {changeUnit}
-                {changeLabel && ` ${changeLabel}`}
-              </span>
-            </div>
-          )}
-        </div>
-        <div className="p-2 rounded-lg bg-primary/10 text-primary flex-shrink-0">
-          {icon}
+              {icon}
+            </span>
+          </Icon3D>
         </div>
       </div>
-    </Card>
+    </Glass3DCard>
   );
 };
 
-// 포맷 유틸리티 함수들
-export const formatCurrency = (value: number, unit: 'full' | 'man' | 'chun' = 'full'): string => {
+// ===== Format Utilities =====
+export const formatCurrency = (
+  value: number,
+  unit: 'full' | 'man' | 'chun' = 'full'
+): string => {
   if (unit === 'man') {
     return `₩${(value / 10000).toFixed(0)}만`;
   } else if (unit === 'chun') {
@@ -104,3 +164,5 @@ export const formatDuration = (seconds: number): string => {
   }
   return `${secs}초`;
 };
+
+export default MetricCard;
