@@ -3,7 +3,7 @@
  *
  * 3D Glassmorphism Dashboard Layout
  * - Glass cube background image
- * - Glassmorphism header
+ * - Dark glassmorphism header
  * - Ambient light effects
  */
 
@@ -108,9 +108,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <AppSidebar />
         
         <div className="flex-1 flex flex-col relative" style={{ zIndex: 10 }}>
-          {/* Glass Header */}
+          {/* Dark Glass Header */}
           <header
-            className="sticky top-0 z-40 flex h-16 items-center gap-4 px-4 lg:px-6"
+            className="sticky top-0 z-40 flex h-14 items-center gap-4 px-4 lg:px-6"
             style={{
               background: 'linear-gradient(165deg, rgba(48,48,58,0.98) 0%, rgba(32,32,40,0.97) 30%, rgba(42,42,52,0.98) 60%, rgba(35,35,45,0.97) 100%)',
               backdropFilter: 'blur(40px) saturate(180%)',
@@ -119,10 +119,16 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               boxShadow: '0 2px 4px rgba(0,0,0,0.2), 0 8px 16px rgba(0,0,0,0.15)',
             }}
           >
-            <SidebarTrigger />
+            {/* Sidebar Trigger - Light icon */}
+            <SidebarTrigger className="text-white/80 hover:text-white hover:bg-white/10" />
+            
             <div className="flex-1" />
-            <ThemeToggle />
-            <NotificationCenter />
+            
+            {/* Theme Toggle - Light icon */}
+            <ThemeToggle className="text-white/80 hover:text-white hover:bg-white/10" />
+            
+            {/* Notification Center - Light icon */}
+            <NotificationCenter className="text-white/80 hover:text-white hover:bg-white/10" />
             
             {/* User Menu */}
             <DropdownMenu>
@@ -130,18 +136,17 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="rounded-full"
+                  className="rounded-full hover:bg-white/10"
                   style={{
-                    background: 'linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(240,240,245,0.95) 100%)',
-                    border: '1px solid rgba(255,255,255,0.95)',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.05), inset 0 1px 2px rgba(255,255,255,1)',
+                    background: 'linear-gradient(145deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.05) 100%)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.1), 0 2px 4px rgba(0,0,0,0.2)',
                   }}
                 >
                   <Avatar className="h-8 w-8">
                     <AvatarFallback
                       style={{
-                        background: 'linear-gradient(145deg, #222228 0%, #2c2c35 45%, #1c1c24 100%)',
-                        color: 'transparent',
+                        background: 'transparent',
                         fontSize: '14px',
                         fontWeight: 700,
                       }}
@@ -163,20 +168,23 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 align="end"
                 className="w-56"
                 style={{
-                  background: 'linear-gradient(165deg, rgba(255,255,255,0.98) 0%, rgba(253,253,255,0.92) 100%)',
+                  background: 'linear-gradient(165deg, rgba(48,48,58,0.98) 0%, rgba(35,35,45,0.97) 100%)',
                   backdropFilter: 'blur(40px)',
-                  border: '1px solid rgba(255,255,255,0.8)',
-                  boxShadow: '0 4px 6px rgba(0,0,0,0.05), 0 10px 20px rgba(0,0,0,0.08)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  boxShadow: '0 4px 6px rgba(0,0,0,0.2), 0 10px 20px rgba(0,0,0,0.25)',
                 }}
               >
                 <DropdownMenuLabel>
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium">내 계정</p>
-                    <p className="text-xs text-muted-foreground">{user?.email}</p>
+                    <p className="text-sm font-medium text-white/90">내 계정</p>
+                    <p className="text-xs text-white/50">{user?.email}</p>
                   </div>
                 </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={signOut}>
+                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuItem 
+                  onClick={signOut}
+                  className="text-white/80 hover:text-white hover:bg-white/10 focus:bg-white/10 focus:text-white"
+                >
                   <LogOut className="mr-2 h-4 w-4" />
                   로그아웃
                 </DropdownMenuItem>
