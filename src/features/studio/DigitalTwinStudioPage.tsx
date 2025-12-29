@@ -40,7 +40,7 @@ import { useStudioMode, useOverlayVisibility, useScenePersistence, useSceneSimul
 import { loadUserModels } from './utils';
 import type { StudioMode, Model3D, OverlayType, HeatPoint, ZoneBoundary, SceneRecipe, LightingPreset, Vector3, SimulationScenario, TransformMode, RenderingConfig } from './types';
 import type { SimulationEnvironmentConfig } from './types/simulationEnvironment.types';
-import { convertToRenderingConfig } from './types/simulationEnvironment.types';
+import { convertToRenderingConfig, isDayTime } from './types/simulationEnvironment.types';
 
 // 기존 시뮬레이션 훅
 import { useStoreContext } from '@/features/simulation/hooks/useStoreContext';
@@ -182,6 +182,9 @@ export default function DigitalTwinStudioPage() {
   // 🆕 환경 효과 렌더링 설정 (날씨, 시간대 등)
   const [environmentRenderingConfig, setEnvironmentRenderingConfig] = useState<RenderingConfig | null>(null);
 
+  // 🆕 낮/밤 모드 상태
+  const [isDayMode, setIsDayMode] = useState<boolean>(true);
+
   // 🆕 시뮬레이션 환경 설정 원본 (AI 최적화에 전달용)
   const [simulationEnvConfig, setSimulationEnvConfig] = useState<SimulationEnvironmentConfig | null>(null);
 
@@ -190,11 +193,23 @@ export default function DigitalTwinStudioPage() {
     console.log('[DigitalTwinStudio] Environment config changed:', {
       mode: config.mode,
       weather: config.manualSettings?.weather,
+      timeOfDay: config.manualSettings?.timeOfDay,
       autoLoadedWeather: config.autoLoadedData?.weather?.condition,
     });
 
     // 원본 설정 저장 (AI 최적화에서 사용)
     setSimulationEnvConfig(config);
+
+    // 🆕 시간대에 따른 낮/밤 모드 설정
+    const timeOfDay = config.mode === 'manual'
+      ? config.manualSettings?.timeOfDay
+      : config.timeOfDay;
+
+    if (timeOfDay) {
+      const dayMode = isDayTime(timeOfDay);
+      console.log('[DigitalTwinStudio] Day/Night mode:', { timeOfDay, dayMode });
+      setIsDayMode(dayMode);
+    }
 
     // 🔧 FIX: 날짜선택/직접설정 모드일 때 렌더링 설정 적용
     if (config.mode === 'dateSelect' || config.mode === 'manual') {
@@ -210,6 +225,7 @@ export default function DigitalTwinStudioPage() {
       // 실시간 모드일 때는 기본 환경으로 리셋
       console.log('[DigitalTwinStudio] Realtime mode - clearing rendering config');
       setEnvironmentRenderingConfig(null);
+      setIsDayMode(true);  // 🆕 실시간 모드는 기본 낮
     }
   }, []);
 
@@ -748,6 +764,7 @@ export default function DigitalTwinStudioPage() {
                 userId={user?.id}
                 storeId={selectedStore?.id}
                 renderingConfig={environmentRenderingConfig}
+                isDayMode={isDayMode}
               >
                 {/* zones_dim 기반 구역 바닥 오버레이 (DB 데이터 우선) */}
                 {isActive('zone') && dbZones && dbZones.length > 0 && (
