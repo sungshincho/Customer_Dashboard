@@ -2,9 +2,10 @@
  * OverviewTab.tsx
  *
  * 인사이트 허브 - 개요 탭
- * 3D Glassmorphism + Bento Grid Layout
+ * 3D Glassmorphism + Bento Grid Layout + Dark Mode Support
  */
 
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Users,
@@ -29,9 +30,14 @@ import { cn } from '@/lib/utils';
 import { useInsightMetrics } from '../hooks/useInsightMetrics';
 import { GoalProgressWidget } from '@/components/goals/GoalProgressWidget';
 
-// ===== 3D Text Styles =====
-const text3D = {
-  heroNumber: {
+// ===== 3D Text Styles (동적) =====
+const getText3D = (isDark: boolean) => ({
+  heroNumber: isDark ? {
+    fontWeight: 800,
+    letterSpacing: '-0.04em',
+    color: '#ffffff',
+    textShadow: '0 2px 4px rgba(0,0,0,0.4)',
+  } as React.CSSProperties : {
     fontWeight: 800,
     letterSpacing: '-0.04em',
     background: 'linear-gradient(180deg, #1a1a1f 0%, #0a0a0c 35%, #1a1a1f 70%, #0c0c0e 100%)',
@@ -40,13 +46,24 @@ const text3D = {
     backgroundClip: 'text',
     filter: 'drop-shadow(0 3px 3px rgba(0,0,0,0.1))',
   } as React.CSSProperties,
-  number: {
+  number: isDark ? {
+    fontWeight: 800,
+    letterSpacing: '-0.03em',
+    color: '#ffffff',
+    textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+  } as React.CSSProperties : {
     fontWeight: 800,
     letterSpacing: '-0.03em',
     color: '#0a0a0c',
     textShadow: '0 1px 0 rgba(255,255,255,0.7), 0 2px 4px rgba(0,0,0,0.06)',
   } as React.CSSProperties,
-  label: {
+  label: isDark ? {
+    fontWeight: 700,
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase' as const,
+    fontSize: '9px',
+    color: 'rgba(255,255,255,0.5)',
+  } as React.CSSProperties : {
     fontWeight: 700,
     letterSpacing: '0.12em',
     textTransform: 'uppercase' as const,
@@ -56,31 +73,32 @@ const text3D = {
     WebkitTextFillColor: 'transparent',
     backgroundClip: 'text',
   } as React.CSSProperties,
-  body: {
+  body: isDark ? {
+    fontWeight: 500,
+    color: 'rgba(255,255,255,0.6)',
+  } as React.CSSProperties : {
     fontWeight: 500,
     color: '#515158',
     textShadow: '0 1px 0 rgba(255,255,255,0.5)',
   } as React.CSSProperties,
-  darkHeroNumber: {
+});
+
+// Revenue 카드용 (항상 다크)
+const darkCardText = {
+  heroNumber: {
     fontWeight: 800,
     letterSpacing: '-0.04em',
     color: '#ffffff',
     textShadow: '0 2px 4px rgba(0,0,0,0.4)',
   } as React.CSSProperties,
-  darkNumber: {
-    fontWeight: 800,
-    letterSpacing: '-0.03em',
-    color: '#ffffff',
-    textShadow: '0 2px 4px rgba(0,0,0,0.3)',
-  } as React.CSSProperties,
-  darkLabel: {
+  label: {
     fontWeight: 700,
     letterSpacing: '0.12em',
     textTransform: 'uppercase' as const,
     fontSize: '9px',
     color: 'rgba(255,255,255,0.5)',
   } as React.CSSProperties,
-  darkBody: {
+  body: {
     fontWeight: 500,
     color: 'rgba(255,255,255,0.6)',
   } as React.CSSProperties,
@@ -122,7 +140,6 @@ const GlassCard = ({
           overflow: 'hidden',
         }}
       >
-        {/* Chrome top edge */}
         <div
           style={{
             position: 'absolute',
@@ -136,7 +153,6 @@ const GlassCard = ({
             pointerEvents: 'none',
           }}
         />
-        {/* Surface reflection */}
         <div
           style={{
             position: 'absolute',
@@ -258,52 +274,81 @@ const CompactStatCard = ({
   labelEn, 
   value, 
   icon: IconComponent,
-  isCenter = false 
+  isCenter = false,
+  isDark = false,
 }: { 
   label: string;
   labelEn: string;
   value: string;
   icon: React.ReactNode;
   isCenter?: boolean;
-}) => (
-  <GlassCard>
-    <div style={{ 
-      padding: isCenter ? '20px' : '16px 20px', 
-      display: 'flex', 
-      flexDirection: isCenter ? 'column' : 'row',
-      alignItems: 'center',
-      justifyContent: isCenter ? 'center' : 'space-between',
-      height: '100%',
-      textAlign: isCenter ? 'center' : 'left',
-    }}>
-      {isCenter ? (
-        <>
-          <Icon3D size={48}>
-            {IconComponent}
-          </Icon3D>
-          <p style={{ fontSize: '9px', marginTop: '12px', ...text3D.label }}>{labelEn}</p>
-          <p style={{ fontSize: '36px', margin: '4px 0', ...text3D.heroNumber }}>{value}</p>
-          <p style={{ fontSize: '12px', ...text3D.body }}>{label}</p>
-        </>
-      ) : (
-        <>
-          <div>
-            <p style={{ fontSize: '9px', margin: 0, ...text3D.label }}>{labelEn}</p>
-            <p style={{ fontSize: '28px', margin: '4px 0 2px 0', ...text3D.heroNumber }}>{value}</p>
-            <p style={{ fontSize: '12px', margin: 0, ...text3D.body }}>{label}</p>
-          </div>
-          <Icon3D size={40}>
-            {IconComponent}
-          </Icon3D>
-        </>
-      )}
-    </div>
-  </GlassCard>
-);
+  isDark?: boolean;
+}) => {
+  const text3D = getText3D(isDark);
+  const iconColor = isDark ? 'rgba(255,255,255,0.8)' : '#1a1a1f';
+  
+  return (
+    <GlassCard dark={isDark}>
+      <div style={{ 
+        padding: isCenter ? '20px' : '16px 20px', 
+        display: 'flex', 
+        flexDirection: isCenter ? 'column' : 'row',
+        alignItems: 'center',
+        justifyContent: isCenter ? 'center' : 'space-between',
+        height: '100%',
+        textAlign: isCenter ? 'center' : 'left',
+      }}>
+        {isCenter ? (
+          <>
+            <Icon3D size={48} dark={isDark}>
+              {IconComponent}
+            </Icon3D>
+            <p style={{ fontSize: '9px', marginTop: '12px', ...text3D.label }}>{labelEn}</p>
+            <p style={{ fontSize: '36px', margin: '4px 0', ...text3D.heroNumber }}>{value}</p>
+            <p style={{ fontSize: '12px', ...text3D.body }}>{label}</p>
+          </>
+        ) : (
+          <>
+            <div>
+              <p style={{ fontSize: '9px', margin: 0, ...text3D.label }}>{labelEn}</p>
+              <p style={{ fontSize: '28px', margin: '4px 0 2px 0', ...text3D.heroNumber }}>{value}</p>
+              <p style={{ fontSize: '12px', margin: 0, ...text3D.body }}>{label}</p>
+            </div>
+            <Icon3D size={40} dark={isDark}>
+              {IconComponent}
+            </Icon3D>
+          </>
+        )}
+      </div>
+    </GlassCard>
+  );
+};
 
 // ===== Main Component =====
 export function OverviewTab() {
   const navigate = useNavigate();
+  const [isDark, setIsDark] = useState(false);
+  
+  // 다크모드 감지
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    
+    checkDarkMode();
+    
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, { 
+      attributes: true, 
+      attributeFilter: ['class'] 
+    });
+    
+    return () => observer.disconnect();
+  }, []);
+
+  const text3D = getText3D(isDark);
+  const iconColor = isDark ? 'rgba(255,255,255,0.8)' : '#1a1a1f';
+  
   const { selectedStore } = useSelectedStore();
   const { data: metrics, isLoading } = useInsightMetrics();
   const { data: recommendations } = useAIRecommendations(selectedStore?.id);
@@ -315,7 +360,7 @@ export function OverviewTab() {
       <div className="grid gap-5" style={{ gridTemplateColumns: 'repeat(12, 1fr)' }}>
         {[...Array(6)].map((_, i) => (
           <div key={i} className="col-span-3 animate-pulse">
-            <div className="h-40 rounded-3xl bg-white/50" />
+            <div className="h-40 rounded-3xl bg-white/50 dark:bg-white/10" />
           </div>
         ))}
       </div>
@@ -338,8 +383,9 @@ export function OverviewTab() {
             labelEn="TODAY"
             label="오늘 방문"
             value="892"
-            icon={<span style={{ fontSize: '18px', color: '#1a1a1f' }}>◈</span>}
+            icon={<span style={{ fontSize: '18px', color: iconColor }}>◈</span>}
             isCenter={true}
+            isDark={isDark}
           />
         </div>
         <div style={{ gridColumn: 'span 3' }}>
@@ -347,7 +393,8 @@ export function OverviewTab() {
             labelEn="AVG. STAY TIME"
             label="평균 체류 시간"
             value="12:34"
-            icon={<Clock className="h-5 w-5" style={{ color: '#1a1a1f' }} />}
+            icon={<Clock className="h-5 w-5" style={{ color: iconColor }} />}
+            isDark={isDark}
           />
         </div>
         <div style={{ gridColumn: 'span 3' }}>
@@ -355,7 +402,8 @@ export function OverviewTab() {
             labelEn="PEAK HOUR"
             label="피크 타임"
             value="14:00"
-            icon={<BarChart3 className="h-5 w-5" style={{ color: '#1a1a1f' }} />}
+            icon={<BarChart3 className="h-5 w-5" style={{ color: iconColor }} />}
+            isDark={isDark}
           />
         </div>
         <div style={{ gridColumn: 'span 4' }}>
@@ -363,18 +411,19 @@ export function OverviewTab() {
             labelEn="ACTIVE ZONES"
             label="활성 구역"
             value="12"
-            icon={<Target className="h-5 w-5" style={{ color: '#1a1a1f' }} />}
+            icon={<Target className="h-5 w-5" style={{ color: iconColor }} />}
+            isDark={isDark}
           />
         </div>
 
         {/* Row 2-3: Main KPIs */}
         {/* Footfall - Large Card */}
         <div style={{ gridColumn: 'span 3', gridRow: 'span 2' }}>
-          <GlassCard>
+          <GlassCard dark={isDark}>
             <div style={{ padding: '28px', height: '100%', display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '24px' }}>
-                <Icon3D size={48}>
-                  <Users className="h-6 w-6" style={{ color: '#1a1a1f' }} />
+                <Icon3D size={48} dark={isDark}>
+                  <Users className="h-6 w-6" style={{ color: iconColor }} />
                 </Icon3D>
                 <div>
                   <p style={text3D.label}>FOOTFALL</p>
@@ -390,13 +439,13 @@ export function OverviewTab() {
                 </p>
               </div>
               {metrics?.changes.footfall !== undefined && (
-                <Badge3D>
+                <Badge3D dark={isDark}>
                   {metrics.changes.footfall >= 0 ? (
-                    <TrendingUp className="h-3.5 w-3.5" style={{ color: '#059669' }} />
+                    <TrendingUp className="h-3.5 w-3.5" style={{ color: isDark ? 'rgba(255,255,255,0.8)' : '#059669' }} />
                   ) : (
                     <TrendingDown className="h-3.5 w-3.5" style={{ color: '#dc2626' }} />
                   )}
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: metrics.changes.footfall >= 0 ? '#059669' : '#dc2626' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.9)' : (metrics.changes.footfall >= 0 ? '#059669' : '#dc2626') }}>
                     전주 대비 {metrics.changes.footfall >= 0 ? '+' : ''}{metrics.changes.footfall.toFixed(1)}%
                   </span>
                 </Badge3D>
@@ -407,7 +456,7 @@ export function OverviewTab() {
 
         {/* Unique Visitors */}
         <div style={{ gridColumn: 'span 3' }}>
-          <GlassCard>
+          <GlassCard dark={isDark}>
             <div style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <p style={text3D.label}>UNIQUE VISITORS</p>
@@ -420,23 +469,23 @@ export function OverviewTab() {
                 </p>
                 {metrics?.changes.uniqueVisitors !== undefined && (
                   <div style={{ marginTop: '12px' }}>
-                    <Badge3D>
-                      <Minus className="h-3.5 w-3.5" style={{ color: '#6b7280' }} />
-                      <span style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280' }}>
+                    <Badge3D dark={isDark}>
+                      <Minus className="h-3.5 w-3.5" style={{ color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280' }} />
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.7)' : '#6b7280' }}>
                         {metrics.changes.uniqueVisitors.toFixed(1)}%
                       </span>
                     </Badge3D>
                   </div>
                 )}
               </div>
-              <Icon3D size={44}>
-                <UserCheck className="h-5 w-5" style={{ color: '#1a1a1f' }} />
+              <Icon3D size={44} dark={isDark}>
+                <UserCheck className="h-5 w-5" style={{ color: iconColor }} />
               </Icon3D>
             </div>
           </GlassCard>
         </div>
 
-        {/* Revenue - Dark Card */}
+        {/* Revenue - Always Dark Card */}
         <div style={{ gridColumn: 'span 3', gridRow: 'span 2' }}>
           <GlassCard dark>
             <div style={{ padding: '28px', height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -445,15 +494,15 @@ export function OverviewTab() {
                   <span style={{ fontSize: '20px', fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>₩</span>
                 </Icon3D>
                 <div>
-                  <p style={text3D.darkLabel}>REVENUE</p>
-                  <p style={{ fontSize: '14px', margin: '2px 0 0 0', ...text3D.darkBody }}>총 매출</p>
+                  <p style={darkCardText.label}>REVENUE</p>
+                  <p style={{ fontSize: '14px', margin: '2px 0 0 0', ...darkCardText.body }}>총 매출</p>
                 </div>
               </div>
               <div style={{ flex: 1 }}>
-                <span style={{ fontSize: '32px', display: 'block', lineHeight: 1.2, ...text3D.darkHeroNumber }}>
+                <span style={{ fontSize: '32px', display: 'block', lineHeight: 1.2, ...darkCardText.heroNumber }}>
                   {formatCurrency(metrics?.revenue || 0)}
                 </span>
-                <p style={{ fontSize: '13px', marginTop: '16px', ...text3D.darkBody }}>
+                <p style={{ fontSize: '13px', marginTop: '16px', ...darkCardText.body }}>
                   객단가 {formatCurrency(metrics?.atv || 0)}
                 </p>
               </div>
@@ -471,7 +520,7 @@ export function OverviewTab() {
 
         {/* Funnel Chart */}
         <div style={{ gridColumn: 'span 3', gridRow: 'span 2' }}>
-          <GlassCard>
+          <GlassCard dark={isDark}>
             <div style={{ padding: '24px', height: '100%', display: 'flex', flexDirection: 'column' }}>
               <div style={{ marginBottom: '16px' }}>
                 <h3 style={{ fontSize: '15px', margin: 0, ...text3D.number }}>고객 여정 퍼널</h3>
@@ -501,10 +550,12 @@ export function OverviewTab() {
                             borderRadius: '8px 8px 3px 3px',
                             background: stage.isAccent
                               ? 'linear-gradient(180deg, #2c2c35 0%, #1c1c24 35%, #252530 65%, #1a1a22 100%)'
-                              : 'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(235,235,242,0.95) 30%, rgba(248,248,252,0.98) 60%, rgba(242,242,248,0.95) 100%)',
+                              : (isDark 
+                                  ? 'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%)'
+                                  : 'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(235,235,242,0.95) 30%, rgba(248,248,252,0.98) 60%, rgba(242,242,248,0.95) 100%)'),
                             border: stage.isAccent 
                               ? '1px solid rgba(255,255,255,0.1)' 
-                              : '1px solid rgba(255,255,255,0.95)',
+                              : (isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(255,255,255,0.95)'),
                             boxShadow: stage.isAccent
                               ? '0 4px 8px rgba(0,0,0,0.18), inset 0 1px 1px rgba(255,255,255,0.1)'
                               : '0 2px 4px rgba(0,0,0,0.05)',
@@ -512,7 +563,7 @@ export function OverviewTab() {
                             overflow: 'hidden',
                           }}
                         >
-                          {!stage.isAccent && (
+                          {!stage.isAccent && !isDark && (
                             <div
                               style={{
                                 position: 'absolute',
@@ -542,7 +593,9 @@ export function OverviewTab() {
                 style={{
                   padding: '12px 14px',
                   borderRadius: '12px',
-                  background: 'linear-gradient(165deg, rgba(255,251,235,0.95) 0%, rgba(254,243,199,0.85) 100%)',
+                  background: isDark 
+                    ? 'rgba(251,191,36,0.15)'
+                    : 'linear-gradient(165deg, rgba(255,251,235,0.95) 0%, rgba(254,243,199,0.85) 100%)',
                   border: '1px solid rgba(251,191,36,0.3)',
                   display: 'flex',
                   alignItems: 'flex-start',
@@ -552,13 +605,13 @@ export function OverviewTab() {
               >
                 <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: '#d97706' }} />
                 <div style={{ fontSize: '12px' }}>
-                  <span style={{ fontWeight: 600, color: '#92400e' }}>최대 이탈 구간:</span>{' '}
-                  <span style={{ color: '#b45309' }}>입장 → 탐색</span>
+                  <span style={{ fontWeight: 600, color: isDark ? '#fbbf24' : '#92400e' }}>최대 이탈 구간:</span>{' '}
+                  <span style={{ color: isDark ? 'rgba(255,255,255,0.8)' : '#b45309' }}>입장 → 탐색</span>
                 </div>
               </div>
 
               {/* Conversion */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '12px', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '12px', borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'}` }}>
                 <span style={{ fontSize: '13px', ...text3D.body }}>최종 구매 전환율</span>
                 <span style={{ fontSize: '18px', ...text3D.heroNumber }}>
                   {funnel.entry > 0 ? ((funnel.purchase / funnel.entry) * 100).toFixed(1) : 0}%
@@ -570,7 +623,7 @@ export function OverviewTab() {
 
         {/* Conversion */}
         <div style={{ gridColumn: 'span 3' }}>
-          <GlassCard>
+          <GlassCard dark={isDark}>
             <div style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <p style={text3D.label}>CONVERSION</p>
@@ -583,31 +636,30 @@ export function OverviewTab() {
                 </p>
                 {metrics?.changes.conversionRate !== undefined && (
                   <div style={{ marginTop: '12px' }}>
-                    <Badge3D>
-                      <TrendingUp className="h-3.5 w-3.5" style={{ color: '#059669' }} />
-                      <span style={{ fontSize: '11px', fontWeight: 600, color: '#059669' }}>
+                    <Badge3D dark={isDark}>
+                      <TrendingUp className="h-3.5 w-3.5" style={{ color: isDark ? 'rgba(255,255,255,0.8)' : '#059669' }} />
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.9)' : '#059669' }}>
                         +{metrics.changes.conversionRate.toFixed(1)}%p
                       </span>
                     </Badge3D>
                   </div>
                 )}
               </div>
-              <Icon3D size={44}>
-                <TrendingUp className="h-5 w-5" style={{ color: '#1a1a1f' }} />
+              <Icon3D size={44} dark={isDark}>
+                <TrendingUp className="h-5 w-5" style={{ color: iconColor }} />
               </Icon3D>
             </div>
           </GlassCard>
         </div>
 
         {/* Row 4: Goals + AI Insight */}
-        {/* Goals Widget */}
         <div style={{ gridColumn: 'span 6' }}>
           <GoalProgressWidget />
         </div>
 
         {/* AI Insight */}
         <div style={{ gridColumn: 'span 6' }}>
-          <GlassCard>
+          <GlassCard dark={isDark}>
             <div style={{ padding: '24px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
                 <div
@@ -639,26 +691,29 @@ export function OverviewTab() {
                       style={{
                         padding: '16px',
                         borderRadius: '16px',
-                        background: 'linear-gradient(165deg, rgba(255,255,255,0.95) 0%, rgba(248,248,252,0.85) 100%)',
-                        border: '1px solid rgba(255,255,255,0.95)',
+                        background: isDark 
+                          ? 'linear-gradient(165deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)'
+                          : 'linear-gradient(165deg, rgba(255,255,255,0.95) 0%, rgba(248,248,252,0.85) 100%)',
+                        border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(255,255,255,0.95)',
                         boxShadow: '0 2px 4px rgba(0,0,0,0.03)',
                         position: 'relative',
                         overflow: 'hidden',
                       }}
                     >
-                      {/* Highlight */}
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          height: '45%',
-                          background: 'linear-gradient(180deg, rgba(255,255,255,0.65) 0%, transparent 100%)',
-                          borderRadius: '16px 16px 0 0',
-                          pointerEvents: 'none',
-                        }}
-                      />
+                      {!isDark && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            height: '45%',
+                            background: 'linear-gradient(180deg, rgba(255,255,255,0.65) 0%, transparent 100%)',
+                            borderRadius: '16px 16px 0 0',
+                            pointerEvents: 'none',
+                          }}
+                        />
+                      )}
                       <div style={{ position: 'relative', zIndex: 10 }}>
                         <div
                           style={{
@@ -690,8 +745,10 @@ export function OverviewTab() {
                       width: '100%',
                       padding: '12px',
                       borderRadius: '12px',
-                      background: 'linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(240,240,245,0.95) 100%)',
-                      border: '1px solid rgba(255,255,255,0.95)',
+                      background: isDark 
+                        ? 'linear-gradient(145deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.03) 100%)'
+                        : 'linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(240,240,245,0.95) 100%)',
+                      border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(255,255,255,0.95)',
                       boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
                       display: 'flex',
                       alignItems: 'center',
@@ -700,7 +757,7 @@ export function OverviewTab() {
                       cursor: 'pointer',
                       fontSize: '13px',
                       fontWeight: 500,
-                      color: '#515158',
+                      color: isDark ? 'rgba(255,255,255,0.8)' : '#515158',
                     }}
                   >
                     모든 AI 추천 보기
@@ -709,7 +766,7 @@ export function OverviewTab() {
                 </div>
               ) : (
                 <div style={{ textAlign: 'center', padding: '32px 0' }}>
-                  <Lightbulb className="h-12 w-12 mx-auto mb-3" style={{ color: '#d1d5db' }} />
+                  <Lightbulb className="h-12 w-12 mx-auto mb-3" style={{ color: isDark ? 'rgba(255,255,255,0.3)' : '#d1d5db' }} />
                   <p style={{ fontSize: '14px', ...text3D.body }}>AI 인사이트가 없습니다</p>
                   <p style={{ fontSize: '12px', marginTop: '4px', ...text3D.body }}>
                     데이터가 축적되면 AI가 인사이트를 생성합니다
