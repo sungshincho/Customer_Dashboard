@@ -12,7 +12,11 @@ import { useThree } from '@react-three/fiber';
 import { Environment, ContactShadows, BakeShadows, useGLTF } from '@react-three/drei';
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
+import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
 import type { EnvironmentPreset } from '../types';
+
+// RectAreaLight 유니폼 초기화 (앱 시작 시 한 번만 실행)
+RectAreaLightUniformsLib.init();
 
 // ============================================================================
 // Environment Model 타입
@@ -175,23 +179,15 @@ export const NIGHT_SCENE_CONFIG = {
     scale: 30,
   },
 
-  // 🆕 실내 조명 (SpotLight 그리드) - 밤에만 활성화
+  // 🆕 실내 조명 (RectAreaLight) - 밤에만 활성화
   indoorLight: {
     enabled: true,
     color: '#fff5e0',      // 따뜻한 실내등 색상
-    intensity: 1.2,
+    intensity: 3,          // RectAreaLight 강도
+    width: 18,             // 조명 너비 (매장 전체 커버)
+    height: 18,            // 조명 높이 (매장 전체 커버)
     position: [0, 3.7, 0] as [number, number, number],  // 천장 높이
-    angle: Math.PI / 4,    // 45도 확산
-    penumbra: 0.5,         // 부드러운 가장자리
-    decay: 1.5,
-    distance: 15,
-    castShadow: true,
-    // 그리드 설정 (3x3)
-    grid: {
-      rows: 3,
-      cols: 3,
-      spacing: 6,          // 조명 간 간격
-    },
+    rotation: [-Math.PI / 2, 0, 0] as [number, number, number],  // 아래 방향
   },
 };
 
@@ -345,9 +341,9 @@ export function SceneEnvironment({
         />
       ))}
 
-      {/* 🆕 실내 조명 그리드 (밤 모드에서만 활성화) */}
+      {/* 🆕 실내 RectAreaLight (밤 모드에서만 활성화) */}
       {!isDayMode && 'indoorLight' in CONFIG && (CONFIG as typeof NIGHT_SCENE_CONFIG).indoorLight.enabled && (
-        <IndoorLightGrid config={(CONFIG as typeof NIGHT_SCENE_CONFIG).indoorLight} />
+        <IndoorRectAreaLight config={(CONFIG as typeof NIGHT_SCENE_CONFIG).indoorLight} />
       )}
     </>
   );
@@ -456,87 +452,25 @@ function StaticEnvironmentModel({
 }
 
 // ============================================================================
-// IndoorLightGrid 컴포넌트 (실내 SpotLight 그리드)
+// IndoorRectAreaLight 컴포넌트 (실내 면광원)
 // ============================================================================
-interface IndoorLightGridProps {
+interface IndoorRectAreaLightProps {
   config: typeof NIGHT_SCENE_CONFIG.indoorLight;
 }
 
-function IndoorLightGrid({ config }: IndoorLightGridProps) {
-  const { rows, cols, spacing } = config.grid;
-
-  // 그리드 중심을 원점에 맞추기 위한 오프셋 계산
-  const offsetX = ((cols - 1) * spacing) / 2;
-  const offsetZ = ((rows - 1) * spacing) / 2;
-
-  // SpotLight 위치 배열 생성
-  const lightPositions: [number, number, number][] = [];
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      const x = col * spacing - offsetX + config.position[0];
-      const y = config.position[1];  // 천장 높이
-      const z = row * spacing - offsetZ + config.position[2];
-      lightPositions.push([x, y, z]);
-    }
-  }
+function IndoorRectAreaLight({ config }: IndoorRectAreaLightProps) {
+  const lightRef = useRef<THREE.RectAreaLight>(null);
 
   return (
-    <group name="indoor-light-grid">
-      {lightPositions.map((pos, index) => (
-        <IndoorSpotLight
-          key={`indoor-spot-${index}`}
-          position={pos}
-          targetPosition={[pos[0], 0, pos[2]]}
-          config={config}
-        />
-      ))}
-    </group>
-  );
-}
-
-// ============================================================================
-// IndoorSpotLight 컴포넌트 (개별 SpotLight + Target 설정)
-// ============================================================================
-
-interface IndoorSpotLightProps {
-  position: [number, number, number];
-  targetPosition: [number, number, number];
-  config: typeof NIGHT_SCENE_CONFIG.indoorLight;
-}
-
-function IndoorSpotLight({ position, targetPosition, config }: IndoorSpotLightProps) {
-  const spotLightRef = useRef<THREE.SpotLight>(null);
-  const targetRef = useRef<THREE.Object3D>(null);
-
-  // SpotLight target 연결
-  useEffect(() => {
-    if (spotLightRef.current && targetRef.current) {
-      spotLightRef.current.target = targetRef.current;
-    }
-  }, []);
-
-  // physicallyCorrectLights 모드에서는 intensity를 크게 높여야 함
-  // intensity 1.2 → 150 (실내 조명으로 충분한 밝기)
-  const adjustedIntensity = config.intensity * 125;
-
-  return (
-    <group>
-      <spotLight
-        ref={spotLightRef}
-        color={config.color}
-        intensity={adjustedIntensity}
-        position={position}
-        angle={config.angle}
-        penumbra={config.penumbra}
-        decay={config.decay}
-        distance={config.distance}
-        castShadow={config.castShadow}
-        shadow-mapSize-width={512}
-        shadow-mapSize-height={512}
-        shadow-bias={-0.0001}
-      />
-      <object3D ref={targetRef} position={targetPosition} />
-    </group>
+    <rectAreaLight
+      ref={lightRef}
+      color={config.color}
+      intensity={config.intensity}
+      width={config.width}
+      height={config.height}
+      position={config.position}
+      rotation={config.rotation}
+    />
   );
 }
 
