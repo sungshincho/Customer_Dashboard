@@ -7,7 +7,7 @@
  * - 에러 처리
  */
 
-import { useRef, useMemo, useState } from 'react';
+import { useRef, useMemo, useState, useEffect } from 'react';
 import { useGLTF } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -34,6 +34,12 @@ interface ModelLoaderProps {
   onPointerOut?: () => void;
   castShadow?: boolean;
   receiveShadow?: boolean;
+  /** 🆕 낮/밤 모드 (true = 낮, false = 밤) - 텍스처 교체용 */
+  isDayMode?: boolean;
+  /** 🆕 낮 텍스처 URL */
+  dayTextureUrl?: string | null;
+  /** 🆕 밤 텍스처 URL */
+  nightTextureUrl?: string | null;
 }
 
 // ============================================================================
@@ -52,6 +58,9 @@ export function ModelLoader({
   onPointerOut,
   castShadow = true,
   receiveShadow = true,
+  isDayMode = true,
+  dayTextureUrl,
+  nightTextureUrl,
 }: ModelLoaderProps) {
   const groupRef = useRef<THREE.Group>(null);
   const [hasError, setHasError] = useState(false);
@@ -99,6 +108,9 @@ export function ModelLoader({
       castShadow={castShadow}
       receiveShadow={receiveShadow}
       onError={() => setHasError(true)}
+      isDayMode={isDayMode}
+      dayTextureUrl={dayTextureUrl}
+      nightTextureUrl={nightTextureUrl}
     />
   );
 }
@@ -108,6 +120,9 @@ export function ModelLoader({
 // ============================================================================
 interface GLTFModelProps extends ModelLoaderProps {
   onError?: () => void;
+  isDayMode?: boolean;
+  dayTextureUrl?: string | null;
+  nightTextureUrl?: string | null;
 }
 
 function GLTFModel({
@@ -124,10 +139,55 @@ function GLTFModel({
   castShadow = true,
   receiveShadow = true,
   onError,
+  isDayMode = true,
+  dayTextureUrl,
+  nightTextureUrl,
 }: GLTFModelProps) {
   const groupRef = useRef<THREE.Group>(null);
   const [boundingBox, setBoundingBox] = useState<{ width: number; height: number; depth: number; centerY: number } | null>(null);
   const boundingBoxCalculated = useRef(false);
+
+  // 🆕 텍스처 로딩 (낮/밤)
+  const [dayTexture, setDayTexture] = useState<THREE.Texture | null>(null);
+  const [nightTexture, setNightTexture] = useState<THREE.Texture | null>(null);
+
+  // 🆕 텍스처 로드
+  useEffect(() => {
+    const textureLoader = new THREE.TextureLoader();
+
+    if (dayTextureUrl) {
+      textureLoader.load(
+        dayTextureUrl,
+        (texture) => {
+          texture.flipY = false;
+          texture.colorSpace = THREE.SRGBColorSpace;
+          setDayTexture(texture);
+          console.log('[GLTFModel] Day texture loaded:', dayTextureUrl);
+        },
+        undefined,
+        (err) => console.warn('[GLTFModel] Failed to load day texture:', err)
+      );
+    }
+
+    if (nightTextureUrl) {
+      textureLoader.load(
+        nightTextureUrl,
+        (texture) => {
+          texture.flipY = false;
+          texture.colorSpace = THREE.SRGBColorSpace;
+          setNightTexture(texture);
+          console.log('[GLTFModel] Night texture loaded:', nightTextureUrl);
+        },
+        undefined,
+        (err) => console.warn('[GLTFModel] Failed to load night texture:', err)
+      );
+    }
+
+    return () => {
+      dayTexture?.dispose();
+      nightTexture?.dispose();
+    };
+  }, [dayTextureUrl, nightTextureUrl]);
 
   // GLTF 로드
   const { scene } = useGLTF(url, true, true, (error) => {
@@ -162,6 +222,26 @@ function GLTFModel({
 
     return cloned;
   }, [scene, castShadow, receiveShadow, shouldUseBaked]);
+
+  // 🆕 텍스처 교체 (isDayMode 변경 시)
+  useEffect(() => {
+    const activeTexture = isDayMode ? dayTexture : nightTexture;
+
+    // 텍스처가 있을 때만 교체
+    if (!activeTexture) return;
+
+    clonedScene.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        const material = child.material as THREE.MeshStandardMaterial | THREE.MeshBasicMaterial;
+        if (material && material.map !== undefined) {
+          // 기존 텍스처가 있는 메시만 교체
+          material.map = activeTexture;
+          material.needsUpdate = true;
+          console.log('[GLTFModel] Texture swapped to:', isDayMode ? 'day' : 'night');
+        }
+      }
+    });
+  }, [isDayMode, dayTexture, nightTexture, clonedScene]);
 
   // 실제 렌더링 후 BoundingBox 계산 (useFrame으로 한 번만 실행)
   useFrame(() => {
