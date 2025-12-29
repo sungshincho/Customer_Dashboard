@@ -3,9 +3,11 @@
  *
  * 통합 인사이트 허브 - 3D Glassmorphism Design
  * 대시보드 + 분석 + AI 추천 + 예측
+ * 
+ * 수정: 탭 아이콘 색상 + 다크모드 지원
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { GlobalDateFilter } from '@/components/common/GlobalDateFilter';
@@ -37,6 +39,25 @@ const tabs = [
 
 export default function InsightHubPage() {
   const [activeTab, setActiveTab] = useState('overview');
+  const [isDark, setIsDark] = useState(false);
+
+  // 다크모드 감지
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    
+    checkDarkMode();
+    
+    // MutationObserver로 class 변경 감지
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, { 
+      attributes: true, 
+      attributeFilter: ['class'] 
+    });
+    
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <DashboardLayout>
@@ -84,10 +105,15 @@ export default function InsightHubPage() {
                 style={{
                   fontWeight: 800,
                   letterSpacing: '-0.03em',
-                  background: 'linear-gradient(180deg, #1a1a1f 0%, #0a0a0c 35%, #1a1a1f 70%, #0c0c0e 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.08))',
+                  ...(isDark ? {
+                    color: '#ffffff',
+                    textShadow: '0 2px 4px rgba(0,0,0,0.4)',
+                  } : {
+                    background: 'linear-gradient(180deg, #1a1a1f 0%, #0a0a0c 35%, #1a1a1f 70%, #0c0c0e 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.08))',
+                  }),
                 }}
               >
                 인사이트 허브
@@ -96,8 +122,8 @@ export default function InsightHubPage() {
                 className="text-sm mt-0.5"
                 style={{
                   fontWeight: 500,
-                  color: '#515158',
-                  textShadow: '0 1px 0 rgba(255,255,255,0.5)',
+                  color: isDark ? 'rgba(255,255,255,0.6)' : '#515158',
+                  textShadow: isDark ? 'none' : '0 1px 0 rgba(255,255,255,0.5)',
                 }}
               >
                 실시간 대시보드 + 분석 + AI 추천
@@ -114,70 +140,66 @@ export default function InsightHubPage() {
           <div
             className="inline-block rounded-2xl p-[1.5px]"
             style={{
-              background: 'linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(220,220,230,0.6) 50%, rgba(255,255,255,0.93) 100%)',
+              background: isDark
+                ? 'linear-gradient(145deg, rgba(75,75,85,0.8) 0%, rgba(50,50,60,0.6) 50%, rgba(65,65,75,0.8) 100%)'
+                : 'linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(220,220,230,0.6) 50%, rgba(255,255,255,0.93) 100%)',
               boxShadow: '0 2px 4px rgba(0,0,0,0.04), 0 4px 8px rgba(0,0,0,0.05), 0 8px 16px rgba(0,0,0,0.04)',
             }}
           >
             <TabsList
               className="h-auto p-1.5 gap-1"
               style={{
-                background: 'linear-gradient(165deg, rgba(255,255,255,0.92) 0%, rgba(250,250,254,0.85) 50%, rgba(255,255,255,0.9) 100%)',
+                background: isDark
+                  ? 'linear-gradient(165deg, rgba(40,40,50,0.95) 0%, rgba(30,30,40,0.9) 100%)'
+                  : 'linear-gradient(165deg, rgba(255,255,255,0.92) 0%, rgba(250,250,254,0.85) 50%, rgba(255,255,255,0.9) 100%)',
                 backdropFilter: 'blur(40px)',
                 borderRadius: '15px',
               }}
             >
-              {tabs.map((tab) => (
-                <TabsTrigger
-                  key={tab.value}
-                  value={tab.value}
-                  className="gap-2 px-5 py-2.5 rounded-xl transition-all duration-200 data-[state=inactive]:bg-transparent"
-                  style={
-                    activeTab === tab.value
-                      ? {
-                          background: 'linear-gradient(145deg, #222228 0%, #2c2c34 45%, #1c1c24 100%)',
-                          border: '1px solid rgba(255,255,255,0.08)',
-                          boxShadow: '0 2px 4px rgba(0,0,0,0.16), 0 4px 8px rgba(0,0,0,0.14), inset 0 1px 1px rgba(255,255,255,0.1)',
-                        }
-                      : {
-                          background: 'transparent',
-                          border: '1px solid transparent',
-                        }
-                  }
-                >
-                  <tab.icon
-                    className="h-4 w-4"
+              {tabs.map((tab) => {
+                const isActive = activeTab === tab.value;
+                return (
+                  <TabsTrigger
+                    key={tab.value}
+                    value={tab.value}
+                    className="gap-2 px-5 py-2.5 rounded-xl transition-all duration-200 data-[state=inactive]:bg-transparent"
                     style={
-                      activeTab === tab.value
+                      isActive
                         ? {
-                            color: 'transparent',
-                            background: 'linear-gradient(180deg, #ffffff 0%, #d0d0d5 100%)',
-                            WebkitBackgroundClip: 'text',
+                            background: 'linear-gradient(145deg, #222228 0%, #2c2c34 45%, #1c1c24 100%)',
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.16), 0 4px 8px rgba(0,0,0,0.14), inset 0 1px 1px rgba(255,255,255,0.1)',
                           }
                         : {
-                            color: '#515158',
-                          }
-                    }
-                  />
-                  <span
-                    className="hidden sm:inline text-xs font-medium"
-                    style={
-                      activeTab === tab.value
-                        ? {
-                            background: 'linear-gradient(180deg, #ffffff 0%, #d0d0d5 40%, #ffffff 100%)',
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
-                            filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.3))',
-                          }
-                        : {
-                            color: '#515158',
-                            textShadow: '0 1px 0 rgba(255,255,255,0.5)',
+                            background: 'transparent',
+                            border: '1px solid transparent',
                           }
                     }
                   >
-                    {tab.label}
-                  </span>
-                </TabsTrigger>
-              ))}
+                    {/* 아이콘 - 단순 color 사용 (gradient 제거) */}
+                    <tab.icon
+                      className="h-4 w-4"
+                      style={{
+                        color: isActive 
+                          ? '#ffffff' 
+                          : (isDark ? 'rgba(255,255,255,0.5)' : '#515158'),
+                      }}
+                    />
+                    {/* 텍스트 - 단순 color 사용 (gradient 제거) */}
+                    <span
+                      className="hidden sm:inline text-xs font-medium"
+                      style={{
+                        color: isActive 
+                          ? '#ffffff' 
+                          : (isDark ? 'rgba(255,255,255,0.5)' : '#515158'),
+                        textShadow: isActive ? '0 1px 2px rgba(0,0,0,0.3)' : 'none',
+                      }}
+                    >
+                      {tab.label}
+                    </span>
+                  </TabsTrigger>
+                );
+              })}
             </TabsList>
           </div>
 
