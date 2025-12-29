@@ -1,9 +1,9 @@
 /**
  * useSpaceTextures.ts
  *
- * Storage의 environment/textures 폴더에서 낮/밤 텍스처 로드
+ * Storage의 space-textures 폴더에서 낮/밤 텍스처 로드
  * - Space 모델에 적용할 텍스처 URL 반환
- * - 파일명 규칙: space_day.jpg, space_night.jpg
+ * - 파일명 규칙: *_day.png, *_night.png
  */
 
 import { useState, useEffect, useMemo } from 'react';
@@ -43,8 +43,8 @@ export function useSpaceTextures({
       setError(null);
 
       try {
-        // environment/textures 폴더의 파일 목록 조회
-        const basePath = `${userId}/${storeId}/environment/textures`;
+        // space-textures 폴더의 파일 목록 조회
+        const basePath = `${userId}/${storeId}/space-textures`;
 
         const { data: files, error: listError } = await supabase.storage
           .from('3d-models')
