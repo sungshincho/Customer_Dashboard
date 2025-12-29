@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { useScene } from './SceneProvider';
 import { SceneEnvironment } from './SceneEnvironment';
 import { useEnvironmentModels } from '../hooks/useEnvironmentModels';
+import { useSpaceTextures } from '../hooks/useSpaceTextures';
 import { ModelLoader } from './ModelLoader';
 import { SelectionManager } from './SelectionManager';
 import { TransformControls } from './TransformControls';
@@ -84,6 +85,14 @@ export function Canvas3D({
     enabled: !!userId && !!storeId,
     isDayMode,  // 시간대 전달
   });
+
+  // 🆕 Space 텍스처 로드 (낮/밤)
+  const { dayTextureUrl, nightTextureUrl } = useSpaceTextures({
+    userId,
+    storeId,
+    enabled: !!userId && !!storeId,
+  });
+
   return (
     <div className={cn('w-full h-full', className)}>
       <Canvas
@@ -110,6 +119,8 @@ export function Canvas3D({
           environmentModels={environmentModels}
           renderingConfig={renderingConfig}
           isDayMode={isDayMode}
+          dayTextureUrl={dayTextureUrl}
+          nightTextureUrl={nightTextureUrl}
         >
           {children}
         </SceneContent>
@@ -143,6 +154,8 @@ interface SceneContentProps {
   environmentModels?: EnvironmentModelProp[];
   renderingConfig?: RenderingConfig | null;  // 🆕 환경 효과 렌더링 설정
   isDayMode?: boolean;  // 🆕 낮/밤 모드
+  dayTextureUrl?: string | null;  // 🆕 낮 텍스처 URL
+  nightTextureUrl?: string | null;  // 🆕 밤 텍스처 URL
 }
 
 function SceneContent({
@@ -159,6 +172,8 @@ function SceneContent({
   environmentModels = [],
   renderingConfig,  // 🆕 환경 효과 렌더링 설정
   isDayMode = true,  // 🆕 낮/밤 모드
+  dayTextureUrl,  // 🆕 낮 텍스처 URL
+  nightTextureUrl,  // 🆕 밤 텍스처 URL
 }: SceneContentProps) {
   const { camera } = useScene();
 
@@ -229,7 +244,12 @@ function SceneContent({
         )}
 
         {/* 모델 렌더링 */}
-        <SceneModels onAssetClick={onAssetClick} />
+        <SceneModels
+          onAssetClick={onAssetClick}
+          isDayMode={isDayMode}
+          dayTextureUrl={dayTextureUrl}
+          nightTextureUrl={nightTextureUrl}
+        />
 
         {/* 🆕 고객 에이전트 시뮬레이션 (실시간 모드) */}
         <CustomerAgents
@@ -270,9 +290,17 @@ function SceneContent({
 // ============================================================================
 interface SceneModelsProps {
   onAssetClick?: (assetId: string, assetType: string) => void;
+  isDayMode?: boolean;
+  dayTextureUrl?: string | null;
+  nightTextureUrl?: string | null;
 }
 
-function SceneModels({ onAssetClick }: SceneModelsProps) {
+function SceneModels({
+  onAssetClick,
+  isDayMode = true,
+  dayTextureUrl,
+  nightTextureUrl,
+}: SceneModelsProps) {
   const { models, selectedId, hoveredId, select, hover } = useScene();
 
   return (
@@ -330,6 +358,10 @@ function SceneModels({ onAssetClick }: SceneModelsProps) {
                 }}
                 onPointerOver={isSpace ? undefined : () => hover(model.id)}
                 onPointerOut={isSpace ? undefined : () => hover(null)}
+                // 🆕 Space 모델에만 텍스처 교체 적용
+                isDayMode={isSpace ? isDayMode : undefined}
+                dayTextureUrl={isSpace ? dayTextureUrl : undefined}
+                nightTextureUrl={isSpace ? nightTextureUrl : undefined}
               />
 
               {/* 선택 박스 - 바깥 group에서 렌더링 (rotation 따라감) */}
