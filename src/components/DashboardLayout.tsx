@@ -112,11 +112,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           <header
             className="sticky top-0 z-40 flex h-16 items-center gap-4 px-4 lg:px-6"
             style={{
-              background: 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.7) 100%)',
+              background: 'linear-gradient(165deg, rgba(48,48,58,0.98) 0%, rgba(32,32,40,0.97) 30%, rgba(42,42,52,0.98) 60%, rgba(35,35,45,0.97) 100%)',
               backdropFilter: 'blur(40px) saturate(180%)',
               WebkitBackdropFilter: 'blur(40px) saturate(180%)',
-              borderBottom: '1px solid rgba(0,0,0,0.08)',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.03), 0 4px 6px rgba(0,0,0,0.02)',
+              borderBottom: '1px solid rgba(255,255,255,0.08)',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2), 0 8px 16px rgba(0,0,0,0.15)',
             }}
           >
             <SidebarTrigger />
