@@ -38,18 +38,18 @@ export const SCENE_CONFIG = {
 
   // Environment Map 설정
   environment: {
-    preset: 'night' as EnvironmentPreset,
+    preset: 'city' as EnvironmentPreset,
     background: false,
     intensity: 0.8,
   },
 
   // 배경색
-  backgroundColor: '#0a0a12',
+  backgroundColor: '#f5f3ef',
 
   // 주 광원
   mainLight: {
-    color: '#fff8f0',
-    intensity: 2.0,
+    color: '#4466aa',
+    intensity: 0.8,
     position: [8, 20, 8] as [number, number, number],
     castShadow: true,
     shadow: {
