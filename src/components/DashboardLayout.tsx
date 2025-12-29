@@ -112,10 +112,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           <header
             className="sticky top-0 z-40 flex h-16 items-center gap-4 px-4 lg:px-6"
             style={{
-              background: 'linear-gradient(180deg, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.7) 100%)',
+              background: 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.7) 100%)',
               backdropFilter: 'blur(40px) saturate(180%)',
               WebkitBackdropFilter: 'blur(40px) saturate(180%)',
-              borderBottom: '1px solid rgba(255,255,255,0.5)',
+              borderBottom: '1px solid rgba(0,0,0,0.08)',
               boxShadow: '0 1px 3px rgba(0,0,0,0.03), 0 4px 6px rgba(0,0,0,0.02)',
             }}
           >
