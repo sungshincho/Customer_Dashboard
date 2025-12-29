@@ -10,7 +10,7 @@
 
 import { useThree } from '@react-three/fiber';
 import { Environment, ContactShadows, BakeShadows, useGLTF } from '@react-three/drei';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import type { EnvironmentPreset } from '../types';
 
@@ -483,22 +483,59 @@ function IndoorLightGrid({ config }: IndoorLightGridProps) {
   return (
     <group name="indoor-light-grid">
       {lightPositions.map((pos, index) => (
-        <spotLight
+        <IndoorSpotLight
           key={`indoor-spot-${index}`}
-          color={config.color}
-          intensity={config.intensity}
           position={pos}
-          angle={config.angle}
-          penumbra={config.penumbra}
-          decay={config.decay}
-          distance={config.distance}
-          castShadow={config.castShadow}
-          shadow-mapSize-width={512}
-          shadow-mapSize-height={512}
-          shadow-bias={-0.0001}
-          target-position={[pos[0], 0, pos[2]]}
+          targetPosition={[pos[0], 0, pos[2]]}
+          config={config}
         />
       ))}
+    </group>
+  );
+}
+
+// ============================================================================
+// IndoorSpotLight 컴포넌트 (개별 SpotLight + Target 설정)
+// ============================================================================
+
+interface IndoorSpotLightProps {
+  position: [number, number, number];
+  targetPosition: [number, number, number];
+  config: typeof NIGHT_SCENE_CONFIG.indoorLight;
+}
+
+function IndoorSpotLight({ position, targetPosition, config }: IndoorSpotLightProps) {
+  const spotLightRef = useRef<THREE.SpotLight>(null);
+  const targetRef = useRef<THREE.Object3D>(null);
+
+  // SpotLight target 연결
+  useEffect(() => {
+    if (spotLightRef.current && targetRef.current) {
+      spotLightRef.current.target = targetRef.current;
+    }
+  }, []);
+
+  // physicallyCorrectLights 모드에서는 intensity를 크게 높여야 함
+  // intensity 1.2 → 150 (실내 조명으로 충분한 밝기)
+  const adjustedIntensity = config.intensity * 125;
+
+  return (
+    <group>
+      <spotLight
+        ref={spotLightRef}
+        color={config.color}
+        intensity={adjustedIntensity}
+        position={position}
+        angle={config.angle}
+        penumbra={config.penumbra}
+        decay={config.decay}
+        distance={config.distance}
+        castShadow={config.castShadow}
+        shadow-mapSize-width={512}
+        shadow-mapSize-height={512}
+        shadow-bias={-0.0001}
+      />
+      <object3D ref={targetRef} position={targetPosition} />
     </group>
   );
 }
