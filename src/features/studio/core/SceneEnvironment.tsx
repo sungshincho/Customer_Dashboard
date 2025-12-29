@@ -102,7 +102,7 @@ export const SCENE_CONFIG = {
 };
 
 // ============================================================================
-// 밤 씬 설정 (시간대: evening, night)
+// 밤 씬 설정 (시간대: evening)
 // ============================================================================
 export const NIGHT_SCENE_CONFIG = {
   // 렌더러 설정
@@ -173,6 +173,25 @@ export const NIGHT_SCENE_CONFIG = {
     color: '#000000',
     position: [0, -0.01, 0] as [number, number, number],
     scale: 30,
+  },
+
+  // 🆕 실내 조명 (SpotLight 그리드) - 밤에만 활성화
+  indoorLight: {
+    enabled: true,
+    color: '#fff5e0',      // 따뜻한 실내등 색상
+    intensity: 1.2,
+    position: [0, 3.7, 0] as [number, number, number],  // 천장 높이
+    angle: Math.PI / 4,    // 45도 확산
+    penumbra: 0.5,         // 부드러운 가장자리
+    decay: 1.5,
+    distance: 15,
+    castShadow: true,
+    // 그리드 설정 (3x3)
+    grid: {
+      rows: 3,
+      cols: 3,
+      spacing: 6,          // 조명 간 간격
+    },
   },
 };
 
@@ -325,6 +344,11 @@ export function SceneEnvironment({
           isBaked={model.isBaked}
         />
       ))}
+
+      {/* 🆕 실내 조명 그리드 (밤 모드에서만 활성화) */}
+      {!isDayMode && 'indoorLight' in CONFIG && (CONFIG as typeof NIGHT_SCENE_CONFIG).indoorLight.enabled && (
+        <IndoorLightGrid config={(CONFIG as typeof NIGHT_SCENE_CONFIG).indoorLight} />
+      )}
     </>
   );
 }
@@ -428,6 +452,54 @@ function StaticEnvironmentModel({
       rotation={rotation}
       scale={scale}
     />
+  );
+}
+
+// ============================================================================
+// IndoorLightGrid 컴포넌트 (실내 SpotLight 그리드)
+// ============================================================================
+interface IndoorLightGridProps {
+  config: typeof NIGHT_SCENE_CONFIG.indoorLight;
+}
+
+function IndoorLightGrid({ config }: IndoorLightGridProps) {
+  const { rows, cols, spacing } = config.grid;
+
+  // 그리드 중심을 원점에 맞추기 위한 오프셋 계산
+  const offsetX = ((cols - 1) * spacing) / 2;
+  const offsetZ = ((rows - 1) * spacing) / 2;
+
+  // SpotLight 위치 배열 생성
+  const lightPositions: [number, number, number][] = [];
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const x = col * spacing - offsetX + config.position[0];
+      const y = config.position[1];  // 천장 높이
+      const z = row * spacing - offsetZ + config.position[2];
+      lightPositions.push([x, y, z]);
+    }
+  }
+
+  return (
+    <group name="indoor-light-grid">
+      {lightPositions.map((pos, index) => (
+        <spotLight
+          key={`indoor-spot-${index}`}
+          color={config.color}
+          intensity={config.intensity}
+          position={pos}
+          angle={config.angle}
+          penumbra={config.penumbra}
+          decay={config.decay}
+          distance={config.distance}
+          castShadow={config.castShadow}
+          shadow-mapSize-width={512}
+          shadow-mapSize-height={512}
+          shadow-bias={-0.0001}
+          target-position={[pos[0], 0, pos[2]]}
+        />
+      ))}
+    </group>
   );
 }
 

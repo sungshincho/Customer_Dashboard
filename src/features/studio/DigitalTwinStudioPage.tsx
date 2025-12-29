@@ -211,16 +211,25 @@ export default function DigitalTwinStudioPage() {
       setIsDayMode(dayMode);
     }
 
-    // 🔧 FIX: 날짜선택/직접설정 모드일 때 렌더링 설정 적용
+    // 🔧 FIX v3.0: 낮 모드일 때는 renderingConfig = null (초기 씬 상태 유지)
     if (config.mode === 'dateSelect' || config.mode === 'manual') {
-      const renderingConfig = convertToRenderingConfig(config);
-      console.log('[DigitalTwinStudio] Setting rendering config:', {
-        weatherCondition: renderingConfig.weatherCondition,
-        particleType: renderingConfig.particles?.weatherParticles?.type,
-        particleCount: renderingConfig.particles?.weatherParticles?.count,
-        particleEnabled: renderingConfig.particles?.weatherParticles?.enabled,
-      });
-      setEnvironmentRenderingConfig(renderingConfig);
+      const dayMode = isDayTime(timeOfDay || 'afternoon');
+
+      if (dayMode) {
+        // 낮 모드: 렌더링 설정 제거 → 초기 씬 상태 유지
+        console.log('[DigitalTwinStudio] Day mode - clearing rendering config for initial state');
+        setEnvironmentRenderingConfig(null);
+      } else {
+        // 밤 모드: 렌더링 설정 적용
+        const renderingConfig = convertToRenderingConfig(config);
+        console.log('[DigitalTwinStudio] Night mode - Setting rendering config:', {
+          weatherCondition: renderingConfig.weatherCondition,
+          particleType: renderingConfig.particles?.weatherParticles?.type,
+          particleCount: renderingConfig.particles?.weatherParticles?.count,
+          particleEnabled: renderingConfig.particles?.weatherParticles?.enabled,
+        });
+        setEnvironmentRenderingConfig(renderingConfig);
+      }
     } else {
       // 실시간 모드일 때는 기본 환경으로 리셋
       console.log('[DigitalTwinStudio] Realtime mode - clearing rendering config');

@@ -52,8 +52,8 @@ export type HolidayOption =
   | 'summerSale' // 여름 세일
   | 'winterSale'; // 겨울 세일
 
-// 시간대 옵션
-export type TimeOfDayOption = 'morning' | 'afternoon' | 'evening' | 'night';
+// 시간대 옵션 (v3.0: 2개로 축소 - 오후/저녁)
+export type TimeOfDayOption = 'afternoon' | 'evening';
 
 // ============================================================================
 // 자동 로드 데이터 타입
@@ -239,10 +239,8 @@ export interface TimeOfDayOptionMeta {
 }
 
 export const TIME_OF_DAY_OPTIONS: TimeOfDayOptionMeta[] = [
-  { value: 'morning', label: '오전', emoji: '🌅', hours: '09:00-12:00', trafficImpact: 0.7 },
-  { value: 'afternoon', label: '오후', emoji: '☀️', hours: '12:00-18:00', trafficImpact: 1.2 },
-  { value: 'evening', label: '저녁', emoji: '🌆', hours: '18:00-21:00', trafficImpact: 0.9 },
-  { value: 'night', label: '야간', emoji: '🌙', hours: '21:00-09:00', trafficImpact: 0.3 },
+  { value: 'afternoon', label: '오후', emoji: '☀️', hours: '09:00-18:00', trafficImpact: 1.0 },
+  { value: 'evening', label: '저녁', emoji: '🌙', hours: '18:00-09:00', trafficImpact: 0.6 },
 ];
 
 // ============================================================================
@@ -425,6 +423,7 @@ export function getEffectiveWeather(config: SimulationEnvironmentConfig): Weathe
 
 /**
  * 설정에서 현재 유효한 시간대 값 추출 (모드에 따라)
+ * v3.0: 2개 옵션으로 축소 (afternoon/evening)
  */
 export function getEffectiveTimeOfDay(config: SimulationEnvironmentConfig): TimeOfDayOption {
   if (config.mode === 'manual') {
@@ -432,10 +431,9 @@ export function getEffectiveTimeOfDay(config: SimulationEnvironmentConfig): Time
   }
   // dateSelect 또는 realtime 모드에서는 현재 시간 기반
   const hour = config.selectedDate?.getHours() || new Date().getHours();
-  if (hour >= 9 && hour < 12) return 'morning';
-  if (hour >= 12 && hour < 18) return 'afternoon';
-  if (hour >= 18 && hour < 21) return 'evening';
-  return 'night';
+  // 18시~9시: 저녁(밤), 9시~18시: 오후(낮)
+  if (hour >= 18 || hour < 9) return 'evening';
+  return 'afternoon';
 }
 
 /**
@@ -462,7 +460,7 @@ export function getEffectiveHoliday(config: SimulationEnvironmentConfig): Holida
 // ============================================================================
 
 /**
- * 시간대별 조명 프리셋
+ * 시간대별 조명 프리셋 (v3.0: 2개로 축소)
  */
 const TIME_OF_DAY_LIGHTING: Record<
   TimeOfDayOption,
@@ -475,14 +473,6 @@ const TIME_OF_DAY_LIGHTING: Record<
     environmentPreset: 'city' | 'sunset' | 'dawn' | 'night' | 'warehouse' | 'studio';
   }
 > = {
-  morning: {
-    ambientIntensity: 0.5,
-    ambientColor: '#ffeedd',
-    directionalIntensity: 0.8,
-    directionalColor: '#ffeecc',
-    directionalPosition: [-10, 15, 10],
-    environmentPreset: 'dawn',
-  },
   afternoon: {
     ambientIntensity: 0.6,
     ambientColor: '#ffffff',
@@ -492,14 +482,6 @@ const TIME_OF_DAY_LIGHTING: Record<
     environmentPreset: 'city',
   },
   evening: {
-    ambientIntensity: 0.4,
-    ambientColor: '#ffddbb',
-    directionalIntensity: 0.6,
-    directionalColor: '#ff9955',
-    directionalPosition: [15, 10, -5],
-    environmentPreset: 'sunset',
-  },
-  night: {
     ambientIntensity: 0.2,
     ambientColor: '#334466',
     directionalIntensity: 0.1,
@@ -583,29 +565,28 @@ import type { RenderingConfig, TimeOfDay, SeasonType, WeatherCondition } from '.
 
 /**
  * 시간대가 낮인지 판별
- * - morning, afternoon → true (낮)
- * - evening, night → false (밤)
+ * v3.0: afternoon → true (낮)
  */
 export function isDayTime(timeOfDay: TimeOfDayOption): boolean {
-  return timeOfDay === 'morning' || timeOfDay === 'afternoon';
+  return timeOfDay === 'afternoon';
 }
 
 /**
  * 시간대가 밤인지 판별
+ * v3.0: evening → true (밤)
  */
 export function isNightTime(timeOfDay: TimeOfDayOption): boolean {
-  return timeOfDay === 'evening' || timeOfDay === 'night';
+  return timeOfDay === 'evening';
 }
 
 /**
  * TimeOfDayOption → TimeOfDay 변환
+ * v3.0: 2개 옵션으로 축소
  */
 function convertTimeOfDay(time: TimeOfDayOption): TimeOfDay {
   const mapping: Record<TimeOfDayOption, TimeOfDay> = {
-    morning: 'morning',
     afternoon: 'afternoon',
-    evening: 'evening',
-    night: 'night',
+    evening: 'night',  // evening은 night으로 매핑
   };
   return mapping[time];
 }
@@ -670,7 +651,7 @@ export function convertToRenderingConfig(config: SimulationEnvironmentConfig): R
       directionalIntensity: timeLighting.directionalIntensity * lightingModifier,
       directionalColor: timeLighting.directionalColor,
       directionalPosition: timeLighting.directionalPosition,
-      shadowEnabled: effectiveTimeOfDay !== 'night',
+      shadowEnabled: effectiveTimeOfDay !== 'evening',
       shadowIntensity: 0.3,
       fillLightEnabled: true,
       fillLightIntensity: 0.3,
@@ -703,19 +684,19 @@ export function convertToRenderingConfig(config: SimulationEnvironmentConfig): R
     },
     postProcessing: {
       bloom: {
-        enabled: effectiveTimeOfDay === 'evening' || effectiveTimeOfDay === 'night',
-        intensity: effectiveTimeOfDay === 'night' ? 0.4 : 0.2,
+        enabled: effectiveTimeOfDay === 'evening',
+        intensity: effectiveTimeOfDay === 'evening' ? 0.4 : 0.2,
         threshold: 0.8,
         radius: 0.4,
       },
       vignette: {
-        enabled: effectiveTimeOfDay === 'night',
+        enabled: effectiveTimeOfDay === 'evening',
         intensity: 0.3,
       },
       colorCorrection: {
         enabled: true,
         saturation: 1.0,
-        brightness: effectiveTimeOfDay === 'night' ? 0.8 : 1.0,
+        brightness: effectiveTimeOfDay === 'evening' ? 0.8 : 1.0,
         contrast: 1.0,
         temperature: effectiveTimeOfDay === 'evening' ? 0.1 : 0,
       },

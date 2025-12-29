@@ -319,7 +319,7 @@ export const SimulationEnvironmentSettings: React.FC<SimulationEnvironmentSettin
               <Clock className="w-3 h-3" />
               시간대
             </label>
-            <div className="grid grid-cols-4 gap-1">
+            <div className="grid grid-cols-2 gap-1">
               {TIME_OF_DAY_OPTIONS.map((time) => (
                 <button
                   key={time.value}
