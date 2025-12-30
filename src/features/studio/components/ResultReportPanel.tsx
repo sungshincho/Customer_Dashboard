@@ -44,6 +44,8 @@ interface ResultReportPanelProps {
   onShowIn3D: (type: keyof SimulationResults) => void;
   defaultPosition?: { x: number; y: number };
   rightOffset?: number;
+  /** 외부에서 y 위치 동기화 (변경 시 자동 업데이트) */
+  syncY?: number;
 }
 
 // 결과 유형 설정
@@ -61,6 +63,7 @@ export const ResultReportPanel = memo(function ResultReportPanel({
   onShowIn3D,
   defaultPosition = { x: 350, y: 100 },
   rightOffset,
+  syncY,
 }: ResultReportPanelProps) {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     layout: true,
@@ -96,6 +99,7 @@ export const ResultReportPanel = memo(function ResultReportPanel({
       icon={<FileBarChart className="w-4 h-4" />}
       defaultPosition={defaultPosition}
       rightOffset={rightOffset}
+      syncY={syncY}
       defaultCollapsed={false}
       closable
       onClose={onClose}

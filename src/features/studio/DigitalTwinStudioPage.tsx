@@ -197,6 +197,11 @@ export default function DigitalTwinStudioPage() {
   const [isResizing, setIsResizing] = useState(false);
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
 
+  // 플로팅 패널 위치 상수
+  const FLOATING_PANEL_TOP = 60;  // ViewModeToggle 아래 시작점
+  const FLOATING_PANEL_GAP = 8;   // 패널 간 간격
+  const SCENE_SAVE_PANEL_HEIGHT = 280;  // 씬 저장 패널 높이
+
   // As-Is / To-Be / Split 뷰 모드
   const [viewMode, setViewMode] = useState<ViewMode>('as-is');
 
@@ -1314,7 +1319,10 @@ export default function DigitalTwinStudioPage() {
                     toggleOverlay(overlay);
                   }
                 }}
-                defaultPosition={{ x: 0, y: visiblePanels.sceneSave ? 340 : 60 }}
+                defaultPosition={{ x: 0, y: FLOATING_PANEL_TOP }}
+                syncY={visiblePanels.sceneSave
+                  ? FLOATING_PANEL_TOP + SCENE_SAVE_PANEL_HEIGHT + FLOATING_PANEL_GAP
+                  : FLOATING_PANEL_TOP}
                 rightOffset={16}
               />
             )}
