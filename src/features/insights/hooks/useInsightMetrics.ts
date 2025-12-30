@@ -141,6 +141,111 @@ export const useInsightMetrics = () => {
         funnelCounts.set(e.event_type, count + 1);
       });
 
+      // 🆕 zone_daily_metrics에서 zone_type 기반 퍼널 데이터 조회
+      const { data: zoneMetrics } = await supabase
+        .from('zone_daily_metrics')
+        .select('zone_id, total_visitors')
+        .eq('org_id', orgId)
+        .eq('store_id', selectedStore.id)
+        .gte('date', startDate)
+        .lte('date', endDate);
+
+      // zones_dim에서 zone_type 매핑 조회 (id와 zone_code 모두)
+      const { data: zonesDim } = await supabase
+        .from('zones_dim')
+        .select('id, zone_code, zone_type')
+        .eq('org_id', orgId)
+        .eq('store_id', selectedStore.id);
+
+      // zone_type → 퍼널 단계 매핑
+      const FUNNEL_ZONE_GROUPS: Record<string, string[]> = {
+        entry: ['entrance', 'entry'],
+        browse: ['clothing', 'accessory', 'display', 'product', 'browse'],
+        engage: ['main', 'lounge', 'promotion', 'experience', 'engage'],
+        fitting: ['fitting', 'trial', 'dressing'],
+        purchase: ['checkout', 'cashier', 'pos', 'purchase'],
+      };
+
+      // zone_id → zone_type 맵 생성 (zone_daily_metrics용)
+      const zoneIdToTypeMap = new Map<string, string>();
+      // zone_code → zone_type 맵 생성 (store_visits.zones_visited용)
+      const zoneCodeToTypeMap = new Map<string, string>();
+
+      zonesDim?.forEach(z => {
+        if (z.zone_type) {
+          const zoneType = z.zone_type.toLowerCase();
+          zoneIdToTypeMap.set(z.id, zoneType);
+          if (z.zone_code) {
+            zoneCodeToTypeMap.set(z.zone_code, zoneType);
+          }
+        }
+      });
+
+      console.log('[useInsightMetrics] Zone mappings:', {
+        zoneIdToTypeMap: Object.fromEntries(zoneIdToTypeMap),
+        zoneCodeToTypeMap: Object.fromEntries(zoneCodeToTypeMap),
+      });
+
+      // zone_daily_metrics 기반 퍼널 계산
+      const zoneFunnel = { entry: 0, browse: 0, engage: 0, fitting: 0, purchase: 0 };
+      zoneMetrics?.forEach(m => {
+        const zoneType = zoneIdToTypeMap.get(m.zone_id);
+        if (!zoneType) return;
+
+        for (const [stage, types] of Object.entries(FUNNEL_ZONE_GROUPS)) {
+          if (types.includes(zoneType)) {
+            zoneFunnel[stage as keyof typeof zoneFunnel] += m.total_visitors || 0;
+            break;
+          }
+        }
+      });
+
+      // 🆕 store_visits.zones_visited 기반 퍼널 계산 (zone_code 사용)
+      const visitFunnel = { entry: 0, browse: 0, engage: 0, fitting: 0, purchase: 0 };
+
+      // store_visits 데이터에서 zones_visited, made_purchase 조회
+      const { data: visitsWithZones } = await supabase
+        .from('store_visits')
+        .select('zones_visited, made_purchase')
+        .eq('store_id', selectedStore.id)
+        .gte('visit_date', `${startDate}T00:00:00`)
+        .lte('visit_date', `${endDate}T23:59:59`);
+
+      visitsWithZones?.forEach(visit => {
+        visitFunnel.entry++; // 모든 방문 = ENTRY
+
+        // zones_visited의 zone_code를 zone_type으로 변환
+        const visitedTypes = ((visit.zones_visited as string[]) || [])
+          .map(zoneCode => zoneCodeToTypeMap.get(zoneCode))
+          .filter(Boolean) as string[];
+
+        // BROWSE: clothing 또는 accessory 방문
+        if (visitedTypes.some(type => FUNNEL_ZONE_GROUPS.browse.includes(type))) {
+          visitFunnel.browse++;
+        }
+
+        // ENGAGE: main 또는 lounge 방문
+        if (visitedTypes.some(type => FUNNEL_ZONE_GROUPS.engage.includes(type))) {
+          visitFunnel.engage++;
+        }
+
+        // FITTING: fitting 방문
+        if (visitedTypes.some(type => FUNNEL_ZONE_GROUPS.fitting.includes(type))) {
+          visitFunnel.fitting++;
+        }
+
+        // PURCHASE: made_purchase = true 또는 checkout 존 방문
+        if (visit.made_purchase || visitedTypes.some(type => FUNNEL_ZONE_GROUPS.purchase.includes(type))) {
+          visitFunnel.purchase++;
+        }
+      });
+
+      console.log('[useInsightMetrics] Funnel data:', {
+        zoneFunnel,
+        visitFunnel,
+        visitsWithZonesCount: visitsWithZones?.length || 0,
+      });
+
       // purchases 테이블에서 구매 수 조회 (fallback)
       const { count: purchaseCount } = await supabase
         .from('purchases')
@@ -149,29 +254,57 @@ export const useInsightMetrics = () => {
         .gte('purchase_date', `${startDate}T00:00:00`)
         .lte('purchase_date', `${endDate}T23:59:59`);
 
-      // funnel_events 데이터가 있으면 실제 데이터 사용, 없으면 추정치 사용
-      const hasFunnelData = funnelEvents && funnelEvents.length > 0;
+      // 퍼널 데이터 소스 선택 (우선순위: funnel_events > store_visits > zone_daily_metrics > 추정치)
+      const hasFunnelEvents = funnelEvents && funnelEvents.length > 0;
+      const hasVisitFunnel = visitFunnel.entry > 0 && (visitFunnel.browse > 0 || visitFunnel.engage > 0);
+      const hasZoneFunnel = zoneFunnel.entry > 0 || zoneFunnel.browse > 0 || zoneFunnel.engage > 0;
       const entryCount = footfall || visitStats?.length || 0;
 
-      const funnelByType = hasFunnelData ? {
-        // 실제 funnel_events 데이터 사용
-        entry: funnelCounts.get('entry') || entryCount,
-        browse: funnelCounts.get('browse') || 0,
-        engage: funnelCounts.get('engage') || 0,
-        fitting: funnelCounts.get('fitting') || 0,
-        purchase: funnelCounts.get('purchase') || purchaseCount || 0,
-      } : {
-        // funnel_events 데이터 없음: store_visits + purchases 기반 추정
-        entry: entryCount,
-        browse: Math.round(entryCount * 0.75), // 추정: 75%가 둘러봄
-        engage: Math.round(entryCount * 0.45), // 추정: 45%가 상호작용
-        fitting: Math.round(entryCount * 0.25), // 추정: 25%가 피팅
-        purchase: purchaseCount || 0, // 실제 구매 데이터
-      };
+      let funnelByType: typeof zoneFunnel;
+      let funnelSource: string;
 
-      console.log('[useInsightMetrics] Funnel data:', {
-        hasFunnelData,
-        funnelEventsCount: funnelEvents?.length || 0,
+      if (hasFunnelEvents) {
+        // 1순위: funnel_events 테이블 데이터
+        funnelByType = {
+          entry: funnelCounts.get('entry') || entryCount,
+          browse: funnelCounts.get('browse') || 0,
+          engage: funnelCounts.get('engage') || 0,
+          fitting: funnelCounts.get('fitting') || 0,
+          purchase: funnelCounts.get('purchase') || purchaseCount || 0,
+        };
+        funnelSource = 'funnel_events';
+      } else if (hasVisitFunnel) {
+        // 2순위: store_visits.zones_visited 기반 (zone_code → zone_type 매핑)
+        funnelByType = {
+          ...visitFunnel,
+          purchase: Math.max(visitFunnel.purchase, purchaseCount || 0),
+        };
+        funnelSource = 'store_visits.zones_visited';
+      } else if (hasZoneFunnel) {
+        // 3순위: zone_daily_metrics 기반
+        funnelByType = {
+          ...zoneFunnel,
+          entry: Math.max(zoneFunnel.entry, entryCount),
+          purchase: Math.max(zoneFunnel.purchase, purchaseCount || 0),
+        };
+        funnelSource = 'zone_daily_metrics';
+      } else {
+        // 4순위: 추정치 (데이터 없음)
+        funnelByType = {
+          entry: entryCount,
+          browse: Math.round(entryCount * 0.75),
+          engage: Math.round(entryCount * 0.45),
+          fitting: Math.round(entryCount * 0.25),
+          purchase: purchaseCount || 0,
+        };
+        funnelSource = 'estimated';
+      }
+
+      console.log('[useInsightMetrics] Funnel selection:', {
+        source: funnelSource,
+        hasFunnelEvents,
+        hasVisitFunnel,
+        hasZoneFunnel,
         funnelByType,
       });
 
