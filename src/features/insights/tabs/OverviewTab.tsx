@@ -2,7 +2,8 @@
  * OverviewTab.tsx
  *
  * 인사이트 허브 - 개요 탭
- * 3D Glassmorphism + Bento Grid Layout + Dark Mode Support
+ * 3D Glassmorphism + Dark Mode Support
+ * Original 4 KPI cards: Footfall, Unique Visitors, Revenue, Conversion
  */
 
 import { useState, useEffect } from 'react';
@@ -18,17 +19,18 @@ import {
   ArrowRight,
   BarChart3,
   Box,
-  Target,
-  Clock,
-  Sparkles,
-  AlertCircle,
+  Info,
 } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { useAIRecommendations } from '@/hooks/useAIRecommendations';
 import { useDateFilterStore } from '@/store/dateFilterStore';
 import { cn } from '@/lib/utils';
 import { useInsightMetrics } from '../hooks/useInsightMetrics';
 import { GoalProgressWidget } from '@/components/goals/GoalProgressWidget';
+import { AIRecommendationEffectWidget } from '@/components/dashboard/AIRecommendationEffectWidget';
 
 // ===== 3D Text Styles (동적) =====
 const getText3D = (isDark: boolean) => ({
@@ -82,27 +84,6 @@ const getText3D = (isDark: boolean) => ({
     textShadow: '0 1px 0 rgba(255,255,255,0.5)',
   } as React.CSSProperties,
 });
-
-// Revenue 카드용 (항상 다크)
-const darkCardText = {
-  heroNumber: {
-    fontWeight: 800,
-    letterSpacing: '-0.04em',
-    color: '#ffffff',
-    textShadow: '0 2px 4px rgba(0,0,0,0.4)',
-  } as React.CSSProperties,
-  label: {
-    fontWeight: 700,
-    letterSpacing: '0.12em',
-    textTransform: 'uppercase' as const,
-    fontSize: '9px',
-    color: 'rgba(255,255,255,0.5)',
-  } as React.CSSProperties,
-  body: {
-    fontWeight: 500,
-    color: 'rgba(255,255,255,0.6)',
-  } as React.CSSProperties,
-};
 
 // ===== Glass Card Component =====
 const GlassCard = ({ 
@@ -268,20 +249,24 @@ const Badge3D = ({
 const formatCurrency = (value: number): string => `₩${value.toLocaleString()}원`;
 const formatPercent = (value: number): string => `${value.toFixed(1)}%`;
 
-// ===== Compact Stat Card =====
-const CompactStatCard = ({ 
-  label, 
-  labelEn, 
-  value, 
-  icon: IconComponent,
-  isCenter = false,
+// ===== MetricCard Component =====
+const MetricCard = ({
+  icon,
+  labelEn,
+  label,
+  value,
+  subLabel,
+  change,
+  changeUnit = '%',
   isDark = false,
-}: { 
-  label: string;
-  labelEn: string;
-  value: string;
+}: {
   icon: React.ReactNode;
-  isCenter?: boolean;
+  labelEn: string;
+  label: string;
+  value: string;
+  subLabel?: string;
+  change?: number;
+  changeUnit?: string;
   isDark?: boolean;
 }) => {
   const text3D = getText3D(isDark);
@@ -289,36 +274,46 @@ const CompactStatCard = ({
   
   return (
     <GlassCard dark={isDark}>
-      <div style={{ 
-        padding: isCenter ? '20px' : '16px 20px', 
-        display: 'flex', 
-        flexDirection: isCenter ? 'column' : 'row',
-        alignItems: 'center',
-        justifyContent: isCenter ? 'center' : 'space-between',
-        height: '100%',
-        textAlign: isCenter ? 'center' : 'left',
-      }}>
-        {isCenter ? (
-          <>
-            <Icon3D size={48} dark={isDark}>
-              {IconComponent}
-            </Icon3D>
-            <p style={{ fontSize: '9px', marginTop: '12px', ...text3D.label }}>{labelEn}</p>
-            <p style={{ fontSize: '36px', margin: '4px 0', ...text3D.heroNumber }}>{value}</p>
-            <p style={{ fontSize: '12px', ...text3D.body }}>{label}</p>
-          </>
-        ) : (
-          <>
-            <div>
-              <p style={{ fontSize: '9px', margin: 0, ...text3D.label }}>{labelEn}</p>
-              <p style={{ fontSize: '28px', margin: '4px 0 2px 0', ...text3D.heroNumber }}>{value}</p>
-              <p style={{ fontSize: '12px', margin: 0, ...text3D.body }}>{label}</p>
+      <div style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', height: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div>
+            <p style={text3D.label}>{labelEn}</p>
+            <p style={{ fontSize: '13px', margin: '4px 0 0 0', ...text3D.body }}>{label}</p>
+          </div>
+          <p style={{ fontSize: '32px', margin: '12px 0 0 0', flex: 1, ...text3D.heroNumber }}>
+            {value}
+          </p>
+          {subLabel && (
+            <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>
+              {subLabel}
+            </p>
+          )}
+          {change !== undefined && (
+            <div style={{ marginTop: '12px' }}>
+              <Badge3D dark={isDark}>
+                {change >= 0 ? (
+                  <TrendingUp className="h-3.5 w-3.5" style={{ color: isDark ? 'rgba(255,255,255,0.8)' : '#059669' }} />
+                ) : change < 0 ? (
+                  <TrendingDown className="h-3.5 w-3.5" style={{ color: '#dc2626' }} />
+                ) : (
+                  <Minus className="h-3.5 w-3.5" style={{ color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280' }} />
+                )}
+                <span style={{ 
+                  fontSize: '11px', 
+                  fontWeight: 600, 
+                  color: isDark 
+                    ? 'rgba(255,255,255,0.9)' 
+                    : (change >= 0 ? '#059669' : change < 0 ? '#dc2626' : '#6b7280')
+                }}>
+                  {change >= 0 ? '+' : ''}{change.toFixed(1)}{changeUnit}
+                </span>
+              </Badge3D>
             </div>
-            <Icon3D size={40} dark={isDark}>
-              {IconComponent}
-            </Icon3D>
-          </>
-        )}
+          )}
+        </div>
+        <Icon3D size={44} dark={isDark}>
+          {icon}
+        </Icon3D>
       </div>
     </GlassCard>
   );
@@ -350,6 +345,7 @@ export function OverviewTab() {
   const iconColor = isDark ? 'rgba(255,255,255,0.8)' : '#1a1a1f';
   
   const { selectedStore } = useSelectedStore();
+  const { dateRange } = useDateFilterStore();
   const { data: metrics, isLoading } = useInsightMetrics();
   const { data: recommendations } = useAIRecommendations(selectedStore?.id);
 
@@ -357,428 +353,324 @@ export function OverviewTab() {
 
   if (isLoading) {
     return (
-      <div className="grid gap-5" style={{ gridTemplateColumns: 'repeat(12, 1fr)' }}>
-        {[...Array(6)].map((_, i) => (
-          <div key={i} className="col-span-3 animate-pulse">
-            <div className="h-40 rounded-3xl bg-white/50 dark:bg-white/10" />
-          </div>
-        ))}
+      <div className="space-y-6">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="animate-pulse">
+              <div className="h-40 rounded-3xl bg-white/50 dark:bg-white/10" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
 
-  const funnel = metrics?.funnel || { entry: 0, browse: 0, engage: 0, fitting: 0, purchase: 0 };
-  const maxFunnelValue = funnel.entry || 1;
-
   return (
-    <div className="space-y-5">
-      {/* ===== Bento Grid ===== */}
-      <div 
-        className="grid gap-5"
-        style={{ gridTemplateColumns: 'repeat(12, 1fr)' }}
-      >
-        {/* Row 1: Quick Stats */}
-        <div style={{ gridColumn: 'span 2' }}>
-          <CompactStatCard
-            labelEn="TODAY"
-            label="오늘 방문"
-            value="892"
-            icon={<span style={{ fontSize: '18px', color: iconColor }}>◈</span>}
-            isCenter={true}
-            isDark={isDark}
-          />
-        </div>
-        <div style={{ gridColumn: 'span 3' }}>
-          <CompactStatCard
-            labelEn="AVG. STAY TIME"
-            label="평균 체류 시간"
-            value="12:34"
-            icon={<Clock className="h-5 w-5" style={{ color: iconColor }} />}
-            isDark={isDark}
-          />
-        </div>
-        <div style={{ gridColumn: 'span 3' }}>
-          <CompactStatCard
-            labelEn="PEAK HOUR"
-            label="피크 타임"
-            value="14:00"
-            icon={<BarChart3 className="h-5 w-5" style={{ color: iconColor }} />}
-            isDark={isDark}
-          />
-        </div>
-        <div style={{ gridColumn: 'span 4' }}>
-          <CompactStatCard
-            labelEn="ACTIVE ZONES"
-            label="활성 구역"
-            value="12"
-            icon={<Target className="h-5 w-5" style={{ color: iconColor }} />}
-            isDark={isDark}
-          />
-        </div>
+    <div className="space-y-6">
+      {/* KPI 카드 - 표준 용어 (4개) */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <MetricCard
+          icon={<Users className="h-5 w-5" style={{ color: iconColor }} />}
+          labelEn="FOOTFALL"
+          label="총 입장"
+          value={metrics?.footfall.toLocaleString() || '0'}
+          subLabel="기간 내 총 입장 횟수"
+          change={metrics?.changes.footfall}
+          isDark={isDark}
+        />
+        <MetricCard
+          icon={<UserCheck className="h-5 w-5" style={{ color: iconColor }} />}
+          labelEn="UNIQUE VISITORS"
+          label="순 방문객"
+          value={metrics?.uniqueVisitors.toLocaleString() || '0'}
+          subLabel={metrics?.visitFrequency ? `평균 ${metrics.visitFrequency.toFixed(1)}회 방문` : undefined}
+          change={metrics?.changes.uniqueVisitors}
+          isDark={isDark}
+        />
+        {/* Revenue - 다크모드에서 반전됨 */}
+        <MetricCard
+          icon={<DollarSign className="h-5 w-5" style={{ color: isDark ? 'rgba(255,255,255,0.8)' : '#1a1a1f' }} />}
+          labelEn="REVENUE"
+          label="총 매출"
+          value={formatCurrency(metrics?.revenue || 0)}
+          subLabel={metrics?.atv ? `객단가 ${formatCurrency(metrics.atv)}` : undefined}
+          change={metrics?.changes.revenue}
+          isDark={isDark}
+        />
+        <MetricCard
+          icon={<TrendingUp className="h-5 w-5" style={{ color: iconColor }} />}
+          labelEn="CONVERSION"
+          label="구매 전환율"
+          value={formatPercent(metrics?.conversionRate || 0)}
+          subLabel={`${metrics?.transactions.toLocaleString() || 0}건 거래`}
+          change={metrics?.changes.conversionRate}
+          changeUnit="%p"
+          isDark={isDark}
+        />
+      </div>
 
-        {/* Row 2-3: Main KPIs */}
-        {/* Footfall - Large Card */}
-        <div style={{ gridColumn: 'span 3', gridRow: 'span 2' }}>
-          <GlassCard dark={isDark}>
-            <div style={{ padding: '28px', height: '100%', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '24px' }}>
-                <Icon3D size={48} dark={isDark}>
-                  <Users className="h-6 w-6" style={{ color: iconColor }} />
-                </Icon3D>
-                <div>
-                  <p style={text3D.label}>FOOTFALL</p>
-                  <p style={{ fontSize: '14px', margin: '2px 0 0 0', ...text3D.body }}>총 입장</p>
-                </div>
-              </div>
-              <div style={{ flex: 1 }}>
-                <span style={{ fontSize: '48px', display: 'block', lineHeight: 1, ...text3D.heroNumber }}>
-                  {metrics?.footfall.toLocaleString() || '0'}
-                </span>
-                <p style={{ fontSize: '13px', marginTop: '16px', ...text3D.body }}>
-                  기간 내 총 입장 횟수
-                </p>
-              </div>
-              {metrics?.changes.footfall !== undefined && (
-                <Badge3D dark={isDark}>
-                  {metrics.changes.footfall >= 0 ? (
-                    <TrendingUp className="h-3.5 w-3.5" style={{ color: isDark ? 'rgba(255,255,255,0.8)' : '#059669' }} />
-                  ) : (
-                    <TrendingDown className="h-3.5 w-3.5" style={{ color: '#dc2626' }} />
-                  )}
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.9)' : (metrics.changes.footfall >= 0 ? '#059669' : '#dc2626') }}>
-                    전주 대비 {metrics.changes.footfall >= 0 ? '+' : ''}{metrics.changes.footfall.toFixed(1)}%
-                  </span>
-                </Badge3D>
-              )}
+      {/* 방문 빈도 안내 */}
+      {metrics?.visitFrequency && metrics.visitFrequency > 1 && (
+        <div className={cn(
+          "p-3 rounded-lg flex items-start gap-2",
+          isDark 
+            ? "bg-blue-500/20 border border-blue-500/30" 
+            : "bg-blue-500/10 border border-blue-500/20"
+        )}>
+          <Info className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+          <p className={cn("text-sm", isDark ? "text-white/70" : "text-muted-foreground")}>
+            <span className={cn("font-medium", isDark ? "text-white" : "text-foreground")}>
+              평균 방문 빈도 {metrics.visitFrequency.toFixed(1)}회:
+            </span>{' '}
+            Footfall {metrics.footfall.toLocaleString()} / Unique Visitors {metrics.uniqueVisitors.toLocaleString()}
+          </p>
+        </div>
+      )}
+
+      {/* 고객 여정 퍼널 */}
+      {metrics?.funnel && (
+        <GlassCard dark={isDark}>
+          <div style={{ padding: '24px' }}>
+            <div style={{ marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '15px', margin: 0, ...text3D.number }}>고객 여정 퍼널</h3>
+              <p style={{ fontSize: '12px', margin: '4px 0 0 0', ...text3D.body }}>
+                방문 빈도 {metrics?.visitFrequency?.toFixed(1) || '0'}회
+              </p>
             </div>
-          </GlassCard>
-        </div>
-
-        {/* Unique Visitors */}
-        <div style={{ gridColumn: 'span 3' }}>
-          <GlassCard dark={isDark}>
-            <div style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <p style={text3D.label}>UNIQUE VISITORS</p>
-                <p style={{ fontSize: '13px', margin: '4px 0 0 0', ...text3D.body }}>순 방문객</p>
-                <p style={{ fontSize: '32px', margin: '12px 0 0 0', ...text3D.heroNumber }}>
-                  {metrics?.uniqueVisitors.toLocaleString() || '0'}
-                </p>
-                <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>
-                  {metrics?.visitFrequency ? `평균 ${metrics.visitFrequency.toFixed(1)}회 방문` : ''}
-                </p>
-                {metrics?.changes.uniqueVisitors !== undefined && (
-                  <div style={{ marginTop: '12px' }}>
-                    <Badge3D dark={isDark}>
-                      <Minus className="h-3.5 w-3.5" style={{ color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280' }} />
-                      <span style={{ fontSize: '11px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.7)' : '#6b7280' }}>
-                        {metrics.changes.uniqueVisitors.toFixed(1)}%
-                      </span>
-                    </Badge3D>
-                  </div>
-                )}
-              </div>
-              <Icon3D size={44} dark={isDark}>
-                <UserCheck className="h-5 w-5" style={{ color: iconColor }} />
-              </Icon3D>
-            </div>
-          </GlassCard>
-        </div>
-
-        {/* Revenue - Always Dark Card */}
-        <div style={{ gridColumn: 'span 3', gridRow: 'span 2' }}>
-          <GlassCard dark>
-            <div style={{ padding: '28px', height: '100%', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '24px' }}>
-                <Icon3D size={48} dark>
-                  <span style={{ fontSize: '20px', fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>₩</span>
-                </Icon3D>
-                <div>
-                  <p style={darkCardText.label}>REVENUE</p>
-                  <p style={{ fontSize: '14px', margin: '2px 0 0 0', ...darkCardText.body }}>총 매출</p>
-                </div>
-              </div>
-              <div style={{ flex: 1 }}>
-                <span style={{ fontSize: '32px', display: 'block', lineHeight: 1.2, ...darkCardText.heroNumber }}>
-                  {formatCurrency(metrics?.revenue || 0)}
-                </span>
-                <p style={{ fontSize: '13px', marginTop: '16px', ...darkCardText.body }}>
-                  객단가 {formatCurrency(metrics?.atv || 0)}
-                </p>
-              </div>
-              {metrics?.changes.revenue !== undefined && (
-                <Badge3D dark>
-                  <TrendingUp className="h-3.5 w-3.5" style={{ color: 'rgba(255,255,255,0.8)' }} />
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>
-                    전월 대비 {metrics.changes.revenue >= 0 ? '+' : ''}{metrics.changes.revenue.toFixed(1)}%
-                  </span>
-                </Badge3D>
-              )}
-            </div>
-          </GlassCard>
-        </div>
-
-        {/* Funnel Chart */}
-        <div style={{ gridColumn: 'span 3', gridRow: 'span 2' }}>
-          <GlassCard dark={isDark}>
-            <div style={{ padding: '24px', height: '100%', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '15px', margin: 0, ...text3D.number }}>고객 여정 퍼널</h3>
-                <p style={{ fontSize: '12px', margin: '4px 0 0 0', ...text3D.body }}>
-                  방문 빈도 {metrics?.visitFrequency?.toFixed(1) || '0'}회
-                </p>
-              </div>
-
-              {/* Funnel Bars */}
-              <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '8px', marginBottom: '16px' }}>
-                {[
-                  { key: 'entry', label: 'ENTRY', value: funnel.entry, isAccent: true },
-                  { key: 'browse', label: 'BROWSE', value: funnel.browse, isAccent: false },
-                  { key: 'engage', label: 'ENGAGE', value: funnel.engage, isAccent: false },
-                  { key: 'fitting', label: 'FITTING', value: funnel.fitting, isAccent: false },
-                  { key: 'purchase', label: 'PURCHASE', value: funnel.purchase, isAccent: true },
-                ].map((stage) => {
-                  const percentage = (stage.value / maxFunnelValue) * 100;
-                  const rate = ((stage.value / maxFunnelValue) * 100).toFixed(1);
-                  return (
-                    <div key={stage.key} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <div style={{ width: '100%', height: '100px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-                        <div
-                          style={{
-                            width: '100%',
-                            height: `${Math.max(percentage, 8)}%`,
-                            borderRadius: '8px 8px 3px 3px',
-                            background: stage.isAccent
-                              ? 'linear-gradient(180deg, #2c2c35 0%, #1c1c24 35%, #252530 65%, #1a1a22 100%)'
-                              : (isDark 
-                                  ? 'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%)'
-                                  : 'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(235,235,242,0.95) 30%, rgba(248,248,252,0.98) 60%, rgba(242,242,248,0.95) 100%)'),
-                            border: stage.isAccent 
-                              ? '1px solid rgba(255,255,255,0.1)' 
-                              : (isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(255,255,255,0.95)'),
-                            boxShadow: stage.isAccent
-                              ? '0 4px 8px rgba(0,0,0,0.18), inset 0 1px 1px rgba(255,255,255,0.1)'
-                              : '0 2px 4px rgba(0,0,0,0.05)',
-                            position: 'relative',
-                            overflow: 'hidden',
-                          }}
-                        >
-                          {!stage.isAccent && !isDark && (
-                            <div
-                              style={{
-                                position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                height: '50%',
-                                background: 'linear-gradient(180deg, rgba(255,255,255,0.7) 0%, transparent 100%)',
-                                borderRadius: '8px 8px 0 0',
-                              }}
-                            />
-                          )}
-                        </div>
-                      </div>
-                      <p style={{ fontSize: '8px', marginTop: '8px', ...text3D.label }}>{stage.label}</p>
-                      <p style={{ fontSize: '12px', fontWeight: 700, margin: '2px 0 0 0', ...text3D.number }}>
-                        {stage.value.toLocaleString()}
-                      </p>
-                      <p style={{ fontSize: '10px', margin: '2px 0 0 0', ...text3D.body }}>({rate}%)</p>
+            
+            {/* Funnel Bars */}
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '12px', height: '120px', marginBottom: '16px' }}>
+              {[
+                { key: 'entry', label: 'ENTRY', value: metrics.funnel.entry, isAccent: true },
+                { key: 'browse', label: 'BROWSE', value: metrics.funnel.browse, isAccent: false },
+                { key: 'engage', label: 'ENGAGE', value: metrics.funnel.engage, isAccent: false },
+                { key: 'fitting', label: 'FITTING', value: metrics.funnel.fitting, isAccent: false },
+                { key: 'purchase', label: 'PURCHASE', value: metrics.funnel.purchase, isAccent: true },
+              ].map((stage) => {
+                const maxValue = metrics.funnel.entry || 1;
+                const percentage = (stage.value / maxValue) * 100;
+                const rate = ((stage.value / maxValue) * 100).toFixed(1);
+                return (
+                  <div key={stage.key} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div style={{ width: '100%', height: '100px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+                      <div
+                        style={{
+                          width: '100%',
+                          height: `${Math.max(percentage, 8)}%`,
+                          borderRadius: '8px 8px 3px 3px',
+                          background: stage.isAccent
+                            ? (isDark 
+                                ? 'linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%)'
+                                : 'linear-gradient(180deg, #2c2c35 0%, #1c1c24 100%)')
+                            : (isDark
+                                ? 'linear-gradient(180deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.15) 100%)'
+                                : 'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(240,240,248,0.95) 100%)'),
+                          border: stage.isAccent 
+                            ? (isDark ? '1px solid rgba(255,255,255,0.3)' : '1px solid rgba(0,0,0,0.1)')
+                            : (isDark ? '1px solid rgba(255,255,255,0.15)' : '1px solid rgba(255,255,255,0.95)'),
+                          boxShadow: stage.isAccent
+                            ? (isDark 
+                                ? '0 2px 8px rgba(255,255,255,0.1)' 
+                                : '0 4px 8px rgba(0,0,0,0.15)')
+                            : (isDark 
+                                ? '0 2px 4px rgba(0,0,0,0.2)' 
+                                : '0 2px 4px rgba(0,0,0,0.05)'),
+                        }}
+                      />
                     </div>
-                  );
-                })}
-              </div>
-
-              {/* Alert */}
-              <div
-                style={{
-                  padding: '12px 14px',
-                  borderRadius: '12px',
-                  background: isDark 
-                    ? 'rgba(251,191,36,0.15)'
-                    : 'linear-gradient(165deg, rgba(255,251,235,0.95) 0%, rgba(254,243,199,0.85) 100%)',
-                  border: '1px solid rgba(251,191,36,0.3)',
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '10px',
-                  marginBottom: '12px',
-                }}
-              >
-                <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: '#d97706' }} />
-                <div style={{ fontSize: '12px' }}>
-                  <span style={{ fontWeight: 600, color: isDark ? '#fbbf24' : '#92400e' }}>최대 이탈 구간:</span>{' '}
-                  <span style={{ color: isDark ? 'rgba(255,255,255,0.8)' : '#b45309' }}>입장 → 탐색</span>
-                </div>
-              </div>
-
-              {/* Conversion */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '12px', borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'}` }}>
-                <span style={{ fontSize: '13px', ...text3D.body }}>최종 구매 전환율</span>
-                <span style={{ fontSize: '18px', ...text3D.heroNumber }}>
-                  {funnel.entry > 0 ? ((funnel.purchase / funnel.entry) * 100).toFixed(1) : 0}%
-                </span>
-              </div>
-            </div>
-          </GlassCard>
-        </div>
-
-        {/* Conversion */}
-        <div style={{ gridColumn: 'span 3' }}>
-          <GlassCard dark={isDark}>
-            <div style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <p style={text3D.label}>CONVERSION</p>
-                <p style={{ fontSize: '13px', margin: '4px 0 0 0', ...text3D.body }}>구매 전환율</p>
-                <p style={{ fontSize: '32px', margin: '12px 0 0 0', ...text3D.heroNumber }}>
-                  {formatPercent(metrics?.conversionRate || 0)}
-                </p>
-                <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>
-                  {metrics?.transactions.toLocaleString() || 0}건 거래
-                </p>
-                {metrics?.changes.conversionRate !== undefined && (
-                  <div style={{ marginTop: '12px' }}>
-                    <Badge3D dark={isDark}>
-                      <TrendingUp className="h-3.5 w-3.5" style={{ color: isDark ? 'rgba(255,255,255,0.8)' : '#059669' }} />
-                      <span style={{ fontSize: '11px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.9)' : '#059669' }}>
-                        +{metrics.changes.conversionRate.toFixed(1)}%p
-                      </span>
-                    </Badge3D>
+                    <p style={{ fontSize: '9px', marginTop: '8px', textAlign: 'center', ...text3D.label }}>{stage.label}</p>
+                    <p style={{ fontSize: '12px', fontWeight: 700, marginTop: '2px', color: isDark ? '#ffffff' : '#0a0a0c' }}>{stage.value}</p>
+                    <p style={{ fontSize: '10px', color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>({rate}%)</p>
                   </div>
-                )}
-              </div>
-              <Icon3D size={44} dark={isDark}>
-                <TrendingUp className="h-5 w-5" style={{ color: iconColor }} />
-              </Icon3D>
+                );
+              })}
             </div>
-          </GlassCard>
-        </div>
 
-        {/* Row 4: Goals + AI Insight */}
-        <div style={{ gridColumn: 'span 6' }}>
-          <GoalProgressWidget />
-        </div>
+            {/* Drop-off Alert */}
+            <div style={{
+              padding: '10px 14px',
+              borderRadius: '10px',
+              background: isDark ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.08)',
+              border: isDark ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(239,68,68,0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}>
+              <div style={{
+                width: '20px',
+                height: '20px',
+                borderRadius: '50%',
+                background: isDark ? 'rgba(239,68,68,0.3)' : 'rgba(239,68,68,0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <span style={{ color: '#ef4444', fontSize: '12px' }}>!</span>
+              </div>
+              <span style={{ fontSize: '12px', color: isDark ? 'rgba(255,255,255,0.8)' : '#515158' }}>
+                최대 이탈 구간: 입장 → 탐색
+              </span>
+            </div>
 
-        {/* AI Insight */}
-        <div style={{ gridColumn: 'span 6' }}>
-          <GlassCard dark={isDark}>
-            <div style={{ padding: '24px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+            {/* Final Conversion */}
+            <div style={{ marginTop: '16px', textAlign: 'right' }}>
+              <span style={{ fontSize: '12px', ...text3D.body }}>최종 구매 전환율</span>
+              <span style={{ fontSize: '24px', marginLeft: '12px', ...text3D.heroNumber }}>
+                {metrics.funnel.entry > 0 
+                  ? ((metrics.funnel.purchase / metrics.funnel.entry) * 100).toFixed(1) 
+                  : '0'}%
+              </span>
+            </div>
+          </div>
+        </GlassCard>
+      )}
+
+      {/* 목표 달성률 & AI 추천 효과 */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <GoalProgressWidget />
+        <AIRecommendationEffectWidget />
+      </div>
+
+      {/* 오늘의 AI 인사이트 */}
+      <GlassCard dark={isDark}>
+        <div style={{ padding: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+            <Icon3D size={40} dark={isDark}>
+              <Lightbulb className="h-5 w-5" style={{ color: '#eab308' }} />
+            </Icon3D>
+            <div>
+              <h3 style={{ fontSize: '15px', margin: 0, ...text3D.number }}>오늘의 AI 인사이트</h3>
+              <p style={{ fontSize: '12px', margin: '2px 0 0 0', ...text3D.body }}>
+                AI가 분석한 주요 인사이트와 추천 액션
+              </p>
+            </div>
+          </div>
+          
+          <div className="space-y-4">
+            {topRecommendations.length > 0 ? (
+              topRecommendations.map((rec) => (
                 <div
+                  key={rec.id}
                   style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '12px',
-                    background: 'linear-gradient(145deg, #222228 0%, #2c2c35 45%, #1c1c24 100%)',
-                    boxShadow: '0 4px 10px rgba(0,0,0,0.18), inset 0 1px 1px rgba(255,255,255,0.1)',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
+                    padding: '16px',
+                    borderRadius: '16px',
+                    borderLeft: `4px solid ${rec.priority === 'high' ? '#ef4444' : rec.priority === 'medium' ? '#eab308' : '#3b82f6'}`,
+                    background: isDark 
+                      ? (rec.priority === 'high' ? 'rgba(239,68,68,0.1)' : rec.priority === 'medium' ? 'rgba(234,179,8,0.1)' : 'rgba(59,130,246,0.1)')
+                      : (rec.priority === 'high' ? 'rgba(239,68,68,0.05)' : rec.priority === 'medium' ? 'rgba(234,179,8,0.05)' : 'rgba(59,130,246,0.05)'),
                   }}
                 >
-                  <Sparkles className="h-5 w-5" style={{ color: '#ffffff' }} />
-                </div>
-                <div>
-                  <h3 style={{ fontSize: '15px', margin: 0, ...text3D.number }}>오늘의 AI 인사이트</h3>
-                  <p style={{ fontSize: '12px', margin: '2px 0 0 0', ...text3D.body }}>AI가 분석한 주요 인사이트</p>
-                </div>
-              </div>
-
-              {topRecommendations.length > 0 ? (
-                <div className="space-y-3">
-                  {topRecommendations.map((rec) => (
-                    <div
-                      key={rec.id}
-                      style={{
-                        padding: '16px',
-                        borderRadius: '16px',
-                        background: isDark 
-                          ? 'linear-gradient(165deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)'
-                          : 'linear-gradient(165deg, rgba(255,255,255,0.95) 0%, rgba(248,248,252,0.85) 100%)',
-                        border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(255,255,255,0.95)',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.03)',
-                        position: 'relative',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      {!isDark && (
-                        <div
-                          style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            height: '45%',
-                            background: 'linear-gradient(180deg, rgba(255,255,255,0.65) 0%, transparent 100%)',
-                            borderRadius: '16px 16px 0 0',
-                            pointerEvents: 'none',
-                          }}
-                        />
-                      )}
-                      <div style={{ position: 'relative', zIndex: 10 }}>
-                        <div
-                          style={{
-                            display: 'inline-block',
-                            padding: '4px 10px',
-                            borderRadius: '6px',
-                            background: 'linear-gradient(145deg, #1c1c22 0%, #282830 100%)',
-                            marginBottom: '8px',
-                          }}
-                        >
-                          <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.85)' }}>
-                            {rec.priority === 'high' ? '높은 우선순위' : rec.priority === 'medium' ? '중간 우선순위' : '낮은 우선순위'}
-                          </span>
-                        </div>
-                        <h4 style={{ fontSize: '14px', margin: '0 0 4px 0', ...text3D.number }}>{rec.title}</h4>
-                        <p style={{ fontSize: '12px', margin: 0, lineHeight: 1.5, ...text3D.body }}>{rec.description}</p>
-                        {rec.expected_impact && (
-                          <p style={{ fontSize: '12px', marginTop: '8px', fontWeight: 600, color: '#059669' }}>
-                            예상 효과: 매출 +{rec.expected_impact.revenue_increase?.toLocaleString() || '?'}원
-                          </p>
-                        )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <span style={{
+                          padding: '4px 8px',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          background: rec.priority === 'high' ? '#ef4444' : rec.priority === 'medium' ? '#eab308' : '#3b82f6',
+                          color: '#ffffff',
+                        }}>
+                          {rec.priority === 'high' ? '높음' : rec.priority === 'medium' ? '중간' : '낮음'}
+                        </span>
+                        <span style={{ fontWeight: 600, color: isDark ? '#ffffff' : '#1a1a1f' }}>{rec.title}</span>
                       </div>
+                      <p style={{ fontSize: '13px', ...text3D.body }}>{rec.description}</p>
+                      {rec.expected_impact && (
+                        <p style={{ fontSize: '13px', marginTop: '8px', color: '#059669', fontWeight: 500 }}>
+                          예상 효과: 매출 +{rec.expected_impact.revenue_increase?.toLocaleString() || '?'}원
+                        </p>
+                      )}
                     </div>
-                  ))}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <button
+                        style={{
+                          padding: '8px 12px',
+                          borderRadius: '8px',
+                          border: isDark ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(0,0,0,0.1)',
+                          background: 'transparent',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          color: isDark ? 'rgba(255,255,255,0.8)' : '#515158',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <BarChart3 className="h-3 w-3" />
+                        분석
+                      </button>
+                      <button
+                        onClick={() => navigate('/studio')}
+                        style={{
+                          padding: '8px 12px',
+                          borderRadius: '8px',
+                          border: isDark ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(0,0,0,0.1)',
+                          background: 'transparent',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          color: isDark ? 'rgba(255,255,255,0.8)' : '#515158',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <Box className="h-3 w-3" />
+                        3D
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div style={{ textAlign: 'center', padding: '32px 0' }}>
+                <div style={{
+                  width: '64px',
+                  height: '64px',
+                  borderRadius: '50%',
+                  margin: '0 auto 16px',
+                  background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <Lightbulb className="h-7 w-7" style={{ color: isDark ? 'rgba(255,255,255,0.4)' : '#9ca3af' }} />
+                </div>
+                <p style={{ fontSize: '14px', ...text3D.body }}>AI 인사이트가 없습니다</p>
+                <p style={{ fontSize: '12px', marginTop: '4px', color: isDark ? 'rgba(255,255,255,0.4)' : '#9ca3af' }}>
+                  데이터가 축적되면 AI가 인사이트를 생성합니다
+                </p>
+              </div>
+            )}
 
-                  <button
-                    onClick={() => navigate('/insights?tab=ai')}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      borderRadius: '12px',
-                      background: isDark 
-                        ? 'linear-gradient(145deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.03) 100%)'
-                        : 'linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(240,240,245,0.95) 100%)',
-                      border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(255,255,255,0.95)',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      cursor: 'pointer',
-                      fontSize: '13px',
-                      fontWeight: 500,
-                      color: isDark ? 'rgba(255,255,255,0.8)' : '#515158',
-                    }}
-                  >
-                    모든 AI 추천 보기
-                    <ArrowRight className="h-4 w-4" />
-                  </button>
-                </div>
-              ) : (
-                <div style={{ textAlign: 'center', padding: '32px 0' }}>
-                  <Lightbulb className="h-12 w-12 mx-auto mb-3" style={{ color: isDark ? 'rgba(255,255,255,0.3)' : '#d1d5db' }} />
-                  <p style={{ fontSize: '14px', ...text3D.body }}>AI 인사이트가 없습니다</p>
-                  <p style={{ fontSize: '12px', marginTop: '4px', ...text3D.body }}>
-                    데이터가 축적되면 AI가 인사이트를 생성합니다
-                  </p>
-                </div>
-              )}
-            </div>
-          </GlassCard>
+            {topRecommendations.length > 0 && (
+              <button
+                onClick={() => navigate('/insights?tab=ai')}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  color: isDark ? 'rgba(255,255,255,0.8)' : '#515158',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                }}
+              >
+                모든 AI 추천 보기
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      </GlassCard>
     </div>
   );
 }
-
-export default OverviewTab;
