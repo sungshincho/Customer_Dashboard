@@ -6,15 +6,8 @@
  */
 
 import { useMemo, useState, useEffect, useRef } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Glass3DCard, Icon3D, text3DStyles } from '@/components/ui/glass-card';
-import {
-  Package,
-  DollarSign,
-  AlertTriangle,
-  Award,
-  Info,
-} from 'lucide-react';
+import { Package, DollarSign, AlertTriangle, Award, Info } from 'lucide-react';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { useInsightMetrics } from '../hooks/useInsightMetrics';
 import { formatCurrency } from '../components';
@@ -23,36 +16,24 @@ import { supabase } from '@/integrations/supabase/client';
 import { useDateFilterStore } from '@/store/dateFilterStore';
 import { useAuth } from '@/hooks/useAuth';
 
-// 3D Text 스타일 (다크모드 지원)
 const getText3D = (isDark: boolean) => ({
   heroNumber: isDark ? {
-    fontWeight: 800,
-    letterSpacing: '-0.04em',
-    color: '#ffffff',
+    fontWeight: 800, letterSpacing: '-0.04em', color: '#ffffff',
     textShadow: '0 2px 4px rgba(0,0,0,0.4)',
   } as React.CSSProperties : text3DStyles.heroNumber,
   number: isDark ? {
-    fontWeight: 800,
-    letterSpacing: '-0.03em',
-    color: '#ffffff',
+    fontWeight: 800, letterSpacing: '-0.03em', color: '#ffffff',
     textShadow: '0 2px 4px rgba(0,0,0,0.3)',
   } as React.CSSProperties : text3DStyles.number,
   label: isDark ? {
-    fontWeight: 700,
-    letterSpacing: '0.12em',
-    textTransform: 'uppercase' as const,
-    fontSize: '9px',
-    color: 'rgba(255,255,255,0.5)',
+    fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase' as const,
+    fontSize: '9px', color: 'rgba(255,255,255,0.5)',
   } as React.CSSProperties : text3DStyles.label,
   body: isDark ? {
-    fontWeight: 500,
-    color: 'rgba(255,255,255,0.6)',
+    fontWeight: 500, color: 'rgba(255,255,255,0.6)',
   } as React.CSSProperties : text3DStyles.body,
 });
 
-// ============================================================================
-// 툴팁 컴포넌트
-// ============================================================================
 interface TooltipData {
   x: number;
   y: number;
@@ -63,58 +44,26 @@ interface TooltipData {
 
 const ChartTooltip = ({ data, isDark }: { data: TooltipData | null; isDark: boolean }) => {
   if (!data) return null;
-  
   return (
-    <div
-      style={{
-        position: 'absolute',
-        left: data.x,
-        top: data.y,
-        transform: 'translate(-50%, -100%) translateY(-10px)',
-        background: isDark
-          ? 'linear-gradient(165deg, rgba(40,40,45,0.98) 0%, rgba(25,25,30,0.97) 100%)'
-          : 'linear-gradient(165deg, rgba(255,255,255,0.98) 0%, rgba(250,250,252,0.97) 100%)',
-        border: isDark ? '1px solid rgba(255,255,255,0.15)' : '1px solid rgba(0,0,0,0.1)',
-        borderRadius: '10px',
-        padding: '10px 14px',
-        boxShadow: isDark
-          ? '0 8px 24px rgba(0,0,0,0.4)'
-          : '0 8px 24px rgba(0,0,0,0.1)',
-        pointerEvents: 'none',
-        zIndex: 50,
-        minWidth: '120px',
-      }}
-    >
-      <p style={{
-        color: isDark ? '#fff' : '#1a1a1a',
-        fontWeight: 600,
-        fontSize: '13px',
-        marginBottom: '4px',
-      }}>
-        {data.title}
-      </p>
-      <p style={{
-        color: isDark ? 'rgba(255,255,255,0.7)' : '#6b7280',
-        fontSize: '12px',
-      }}>
-        {data.value}
-      </p>
-      {data.subValue && (
-        <p style={{
-          color: isDark ? 'rgba(255,255,255,0.5)' : '#9ca3af',
-          fontSize: '11px',
-          marginTop: '2px',
-        }}>
-          {data.subValue}
-        </p>
-      )}
+    <div style={{
+      position: 'absolute', left: data.x, top: data.y,
+      transform: 'translate(-50%, -100%) translateY(-10px)',
+      background: isDark
+        ? 'linear-gradient(165deg, rgba(40,40,45,0.98) 0%, rgba(25,25,30,0.97) 100%)'
+        : 'linear-gradient(165deg, rgba(255,255,255,0.98) 0%, rgba(250,250,252,0.97) 100%)',
+      border: isDark ? '1px solid rgba(255,255,255,0.15)' : '1px solid rgba(0,0,0,0.1)',
+      borderRadius: '10px', padding: '10px 14px',
+      boxShadow: isDark ? '0 8px 24px rgba(0,0,0,0.4)' : '0 8px 24px rgba(0,0,0,0.1)',
+      pointerEvents: 'none', zIndex: 50, minWidth: '120px',
+    }}>
+      <p style={{ color: isDark ? '#fff' : '#1a1a1a', fontWeight: 600, fontSize: '13px', marginBottom: '4px' }}>{data.title}</p>
+      <p style={{ color: isDark ? 'rgba(255,255,255,0.7)' : '#6b7280', fontSize: '12px' }}>{data.value}</p>
+      {data.subValue && <p style={{ color: isDark ? 'rgba(255,255,255,0.5)' : '#9ca3af', fontSize: '11px', marginTop: '2px' }}>{data.subValue}</p>}
     </div>
   );
 };
 
-// ============================================================================
-// 글로우 가로 바 차트 (상품별 매출 TOP 10)
-// ============================================================================
+// 글로우 가로 바 차트
 interface HorizontalBarChartProps {
   data: Array<{ name: string; revenue: number }>;
   isDark: boolean;
@@ -127,33 +76,25 @@ const GlowHorizontalBarChart = ({ data, isDark }: HorizontalBarChartProps) => {
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
   const barsRef = useRef<Array<{ x: number; y: number; width: number; height: number; data: { name: string; revenue: number } }>>([]);
   const animationRef = useRef<number>(0);
-  const [animationProgress, setAnimationProgress] = useState(0);
+  const [progress, setProgress] = useState(0);
 
   useEffect(() => {
-    const updateDimensions = () => {
-      if (containerRef.current) {
-        const width = containerRef.current.offsetWidth;
-        setDimensions({ width, height: 300 });
-      }
+    const update = () => {
+      if (containerRef.current) setDimensions({ width: containerRef.current.offsetWidth, height: 300 });
     };
-    updateDimensions();
-    window.addEventListener('resize', updateDimensions);
-    return () => window.removeEventListener('resize', updateDimensions);
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
   }, []);
 
   useEffect(() => {
     if (!data || data.length === 0) return;
-    setAnimationProgress(0);
-    const startTime = performance.now();
-    const duration = 700;
-    const animate = (currentTime: number) => {
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 4);
-      setAnimationProgress(eased);
-      if (progress < 1) {
-        animationRef.current = requestAnimationFrame(animate);
-      }
+    setProgress(0);
+    const start = performance.now();
+    const animate = (t: number) => {
+      const p = Math.min((t - start) / 700, 1);
+      setProgress(1 - Math.pow(1 - p, 4));
+      if (p < 1) animationRef.current = requestAnimationFrame(animate);
     };
     animationRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(animationRef.current);
@@ -172,105 +113,92 @@ const GlowHorizontalBarChart = ({ data, isDark }: HorizontalBarChartProps) => {
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, width, height);
     
-    const padding = { top: 10, right: 20, bottom: 10, left: 120 };
-    const chartWidth = width - padding.left - padding.right;
-    const itemCount = Math.min(data.length, 10);
-    const barHeight = 18;
-    const gap = (height - padding.top - padding.bottom) / itemCount;
-    const maxValue = Math.max(...data.map(d => d.revenue));
-    const bars: Array<{ x: number; y: number; width: number; height: number; data: { name: string; revenue: number } }> = [];
+    const pad = { top: 10, right: 20, bottom: 10, left: 120 };
+    const cw = width - pad.left - pad.right;
+    const cnt = Math.min(data.length, 10);
+    const bh = 18;
+    const gap = (height - pad.top - pad.bottom) / cnt;
+    const max = Math.max(...data.map(d => d.revenue));
+    const bars: typeof barsRef.current = [];
     
     for (let i = 0; i <= 4; i++) {
-      const x = padding.left + (chartWidth / 4) * i;
-      ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)';
-      ctx.lineWidth = 1;
+      const x = pad.left + (cw / 4) * i;
+      ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)';
       ctx.beginPath();
-      ctx.moveTo(x, padding.top);
-      ctx.lineTo(x, height - padding.bottom);
+      ctx.moveTo(x, pad.top);
+      ctx.lineTo(x, height - pad.bottom);
       ctx.stroke();
     }
     
     data.slice(0, 10).forEach((item, idx) => {
-      const y = padding.top + idx * gap + (gap - barHeight) / 2;
-      const fullBarWidth = (item.revenue / maxValue) * chartWidth;
-      const barWidth = fullBarWidth * animationProgress;
-      bars.push({ x: padding.left, y, width: fullBarWidth, height: barHeight, data: item });
+      const y = pad.top + idx * gap + (gap - bh) / 2;
+      const fw = (item.revenue / max) * cw;
+      const bw = fw * progress;
+      bars.push({ x: pad.left, y, width: fw, height: bh, data: item });
       
-      ctx.font = '500 11px system-ui, -apple-system, sans-serif';
-      ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)';
+      ctx.font = '500 11px system-ui';
+      ctx.fillStyle = isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.7)';
       ctx.textAlign = 'right';
-      const displayName = item.name.length > 12 ? item.name.substring(0, 12) + '...' : item.name;
-      ctx.fillText(displayName, padding.left - 10, y + barHeight / 2 + 4);
+      ctx.fillText(item.name.length > 12 ? item.name.slice(0, 12) + '...' : item.name, pad.left - 10, y + bh / 2 + 4);
       
-      ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)';
+      ctx.fillStyle = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)';
       ctx.beginPath();
-      ctx.roundRect(padding.left, y, chartWidth, barHeight, 3);
+      ctx.roundRect(pad.left, y, cw, bh, 3);
       ctx.fill();
       
-      if (barWidth > 0) {
-        const barGradient = ctx.createLinearGradient(padding.left, 0, padding.left + barWidth, 0);
+      if (bw > 0) {
+        const grad = ctx.createLinearGradient(pad.left, 0, pad.left + bw, 0);
         if (isDark) {
-          barGradient.addColorStop(0, 'rgba(255, 255, 255, 0.08)');
-          barGradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.25)');
-          barGradient.addColorStop(1, 'rgba(255, 255, 255, 0.55)');
+          grad.addColorStop(0, 'rgba(255,255,255,0.08)');
+          grad.addColorStop(0.7, 'rgba(255,255,255,0.25)');
+          grad.addColorStop(1, 'rgba(255,255,255,0.55)');
         } else {
-          barGradient.addColorStop(0, 'rgba(0, 0, 0, 0.06)');
-          barGradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.22)');
-          barGradient.addColorStop(1, 'rgba(0, 0, 0, 0.5)');
+          grad.addColorStop(0, 'rgba(0,0,0,0.06)');
+          grad.addColorStop(0.7, 'rgba(0,0,0,0.22)');
+          grad.addColorStop(1, 'rgba(0,0,0,0.5)');
         }
-        ctx.fillStyle = barGradient;
+        ctx.fillStyle = grad;
         ctx.beginPath();
-        ctx.roundRect(padding.left, y, barWidth, barHeight, 3);
+        ctx.roundRect(pad.left, y, bw, bh, 3);
         ctx.fill();
         
-        const glowX = padding.left + barWidth;
-        const glowY = y + barHeight / 2;
-        const glowColor = isDark ? '255, 255, 255' : '0, 0, 0';
-        const glow = ctx.createRadialGradient(glowX, glowY, 0, glowX, glowY, 10);
-        glow.addColorStop(0, \`rgba(\${glowColor}, \${0.6 * animationProgress})\`);
-        glow.addColorStop(0.5, \`rgba(\${glowColor}, \${0.15 * animationProgress})\`);
-        glow.addColorStop(1, \`rgba(\${glowColor}, 0)\`);
+        const gx = pad.left + bw, gy = y + bh / 2;
+        const gc = isDark ? '255,255,255' : '0,0,0';
+        const glow = ctx.createRadialGradient(gx, gy, 0, gx, gy, 10);
+        glow.addColorStop(0, `rgba(${gc},${0.6 * progress})`);
+        glow.addColorStop(0.5, `rgba(${gc},${0.15 * progress})`);
+        glow.addColorStop(1, `rgba(${gc},0)`);
         ctx.beginPath();
-        ctx.arc(glowX, glowY, 10, 0, Math.PI * 2);
+        ctx.arc(gx, gy, 10, 0, Math.PI * 2);
         ctx.fillStyle = glow;
         ctx.fill();
         
         ctx.beginPath();
-        ctx.arc(glowX, glowY, 2.5, 0, Math.PI * 2);
-        ctx.fillStyle = isDark ? \`rgba(255,255,255,\${0.9 * animationProgress})\` : \`rgba(0,0,0,\${0.8 * animationProgress})\`;
+        ctx.arc(gx, gy, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = isDark ? `rgba(255,255,255,${0.9 * progress})` : `rgba(0,0,0,${0.8 * progress})`;
         ctx.fill();
       }
     });
     barsRef.current = bars;
-  }, [data, isDark, dimensions, animationProgress]);
+  }, [data, isDark, dimensions, progress]);
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+  const onMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const x = e.clientX - rect.left, y = e.clientY - rect.top;
     const bar = barsRef.current.find(b => x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height);
-    if (bar) {
-      setTooltip({ x: e.clientX - rect.left, y: e.clientY - rect.top, title: bar.data.name, value: \`매출: \${formatCurrency(bar.data.revenue)}\` });
-    } else {
-      setTooltip(null);
-    }
+    setTooltip(bar ? { x, y, title: bar.data.name, value: `매출: ${formatCurrency(bar.data.revenue)}` } : null);
   };
 
-  const handleMouseLeave = () => setTooltip(null);
-  
   return (
     <div ref={containerRef} style={{ width: '100%', position: 'relative' }}>
-      <canvas ref={canvasRef} style={{ width: dimensions.width, height: dimensions.height, cursor: tooltip ? 'pointer' : 'default' }} onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave} />
+      <canvas ref={canvasRef} style={{ width: dimensions.width, height: dimensions.height, cursor: tooltip ? 'pointer' : 'default' }} onMouseMove={onMove} onMouseLeave={() => setTooltip(null)} />
       <ChartTooltip data={tooltip} isDark={isDark} />
     </div>
   );
 };
 
-// ============================================================================
-// 글로우 도넛 차트 (카테고리별 매출 분포)
-// ============================================================================
+// 글로우 도넛 차트
 interface DonutChartProps {
   data: Array<{ name: string; revenue: number }>;
   isDark: boolean;
@@ -281,35 +209,27 @@ const GlowDonutChart = ({ data, isDark }: DonutChartProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 300, height: 250 });
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
-  const segmentAnglesRef = useRef<Array<{ startAngle: number; endAngle: number; data: { name: string; revenue: number } }>>([]);
+  const anglesRef = useRef<Array<{ start: number; end: number; data: { name: string; revenue: number } }>>([]);
   const animationRef = useRef<number>(0);
-  const [animationProgress, setAnimationProgress] = useState(0);
+  const [progress, setProgress] = useState(0);
 
   useEffect(() => {
-    const updateDimensions = () => {
-      if (containerRef.current) {
-        const width = containerRef.current.offsetWidth;
-        setDimensions({ width: Math.min(width, 350), height: 250 });
-      }
+    const update = () => {
+      if (containerRef.current) setDimensions({ width: Math.min(containerRef.current.offsetWidth, 350), height: 250 });
     };
-    updateDimensions();
-    window.addEventListener('resize', updateDimensions);
-    return () => window.removeEventListener('resize', updateDimensions);
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
   }, []);
 
   useEffect(() => {
     if (!data || data.length === 0) return;
-    setAnimationProgress(0);
-    const startTime = performance.now();
-    const duration = 800;
-    const animate = (currentTime: number) => {
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setAnimationProgress(eased);
-      if (progress < 1) {
-        animationRef.current = requestAnimationFrame(animate);
-      }
+    setProgress(0);
+    const start = performance.now();
+    const animate = (t: number) => {
+      const p = Math.min((t - start) / 800, 1);
+      setProgress(1 - Math.pow(1 - p, 3));
+      if (p < 1) animationRef.current = requestAnimationFrame(animate);
     };
     animationRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(animationRef.current);
@@ -326,134 +246,108 @@ const GlowDonutChart = ({ data, isDark }: DonutChartProps) => {
     canvas.width = width * dpr;
     canvas.height = height * dpr;
     ctx.scale(dpr, dpr);
-    
-    const centerX = width / 2;
-    const centerY = height / 2;
-    const outerRadius = Math.min(width, height) / 2 - 45;
-    const innerRadius = outerRadius * 0.55;
-    const total = data.reduce((sum, d) => sum + d.revenue, 0);
     ctx.clearRect(0, 0, width, height);
     
-    let currentAngle = -Math.PI / 2;
-    const angles: Array<{ startAngle: number; endAngle: number; data: { name: string; revenue: number } }> = [];
+    const cx = width / 2, cy = height / 2;
+    const or = Math.min(width, height) / 2 - 45;
+    const ir = or * 0.55;
+    const total = data.reduce((s, d) => s + d.revenue, 0);
     
-    const getColor = (idx: number, opacity: number) => {
-      if (isDark) {
-        const brightness = [0.85, 0.6, 0.4, 0.25, 0.15, 0.1][idx] || 0.3;
-        return \`rgba(255, 255, 255, \${opacity * brightness})\`;
-      } else {
-        const darkness = [0.9, 0.65, 0.45, 0.3, 0.2, 0.12][idx] || 0.3;
-        return \`rgba(0, 0, 0, \${opacity * darkness})\`;
-      }
+    let cur = -Math.PI / 2;
+    const angles: typeof anglesRef.current = [];
+    const maxA = Math.PI * 2 * progress;
+    let acc = 0;
+    
+    const getColor = (i: number, o: number) => {
+      const b = isDark ? [0.85, 0.6, 0.4, 0.25, 0.15, 0.1][i] || 0.3 : [0.9, 0.65, 0.45, 0.3, 0.2, 0.12][i] || 0.3;
+      return isDark ? `rgba(255,255,255,${o * b})` : `rgba(0,0,0,${o * b})`;
     };
     
-    const maxAngle = Math.PI * 2 * animationProgress;
-    let accumulatedAngle = 0;
-    
-    data.forEach((segment, idx) => {
-      const fullSliceAngle = (segment.revenue / total) * Math.PI * 2;
-      const remainingAngle = maxAngle - accumulatedAngle;
-      if (remainingAngle <= 0) return;
+    data.forEach((seg, i) => {
+      const full = (seg.revenue / total) * Math.PI * 2;
+      const rem = maxA - acc;
+      if (rem <= 0) return;
+      const slice = Math.min(full, rem);
+      const mid = cur + full / 2;
       
-      const sliceAngle = Math.min(fullSliceAngle, remainingAngle);
-      const startAngle = currentAngle;
-      const midAngle = currentAngle + fullSliceAngle / 2;
+      if (progress >= 1) angles.push({ start: cur, end: cur + full, data: seg });
       
-      if (animationProgress >= 1) {
-        angles.push({ startAngle, endAngle: currentAngle + fullSliceAngle, data: segment });
-      }
-      
-      const gradient = ctx.createRadialGradient(centerX, centerY, innerRadius, centerX, centerY, outerRadius);
-      gradient.addColorStop(0, getColor(idx, 0.3));
-      gradient.addColorStop(0.6, getColor(idx, 0.55));
-      gradient.addColorStop(1, getColor(idx, 0.85));
+      const grad = ctx.createRadialGradient(cx, cy, ir, cx, cy, or);
+      grad.addColorStop(0, getColor(i, 0.3));
+      grad.addColorStop(0.6, getColor(i, 0.55));
+      grad.addColorStop(1, getColor(i, 0.85));
       
       ctx.beginPath();
-      ctx.arc(centerX, centerY, outerRadius, currentAngle, currentAngle + sliceAngle);
-      ctx.arc(centerX, centerY, innerRadius, currentAngle + sliceAngle, currentAngle, true);
+      ctx.arc(cx, cy, or, cur, cur + slice);
+      ctx.arc(cx, cy, ir, cur + slice, cur, true);
       ctx.closePath();
-      ctx.fillStyle = gradient;
+      ctx.fillStyle = grad;
       ctx.fill();
       
-      if (sliceAngle >= fullSliceAngle - 0.01) {
-        ctx.strokeStyle = isDark ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.9)';
+      if (slice >= full - 0.01) {
+        ctx.strokeStyle = isDark ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.9)';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(centerX + Math.cos(currentAngle + sliceAngle) * innerRadius, centerY + Math.sin(currentAngle + sliceAngle) * innerRadius);
-        ctx.lineTo(centerX + Math.cos(currentAngle + sliceAngle) * outerRadius, centerY + Math.sin(currentAngle + sliceAngle) * outerRadius);
+        ctx.moveTo(cx + Math.cos(cur + slice) * ir, cy + Math.sin(cur + slice) * ir);
+        ctx.lineTo(cx + Math.cos(cur + slice) * or, cy + Math.sin(cur + slice) * or);
         ctx.stroke();
       }
       
-      if (animationProgress >= 1) {
-        const labelRadius = outerRadius + 22;
-        const labelX = centerX + Math.cos(midAngle) * labelRadius;
-        const labelY = centerY + Math.sin(midAngle) * labelRadius;
-        const percent = ((segment.revenue / total) * 100).toFixed(0);
-        ctx.font = '600 10px system-ui, -apple-system, sans-serif';
-        ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.75)' : 'rgba(0, 0, 0, 0.75)';
-        ctx.textAlign = midAngle > Math.PI / 2 && midAngle < Math.PI * 1.5 ? 'right' : 'left';
-        const displayName = segment.name.length > 6 ? segment.name.substring(0, 6) + '..' : segment.name;
-        ctx.fillText(\`\${displayName} \${percent}%\`, labelX, labelY);
+      if (progress >= 1) {
+        const lr = or + 22;
+        const lx = cx + Math.cos(mid) * lr, ly = cy + Math.sin(mid) * lr;
+        const pct = ((seg.revenue / total) * 100).toFixed(0);
+        ctx.font = '600 10px system-ui';
+        ctx.fillStyle = isDark ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.75)';
+        ctx.textAlign = mid > Math.PI / 2 && mid < Math.PI * 1.5 ? 'right' : 'left';
+        ctx.fillText(`${seg.name.length > 6 ? seg.name.slice(0, 6) + '..' : seg.name} ${pct}%`, lx, ly);
       }
       
-      currentAngle += fullSliceAngle;
-      accumulatedAngle += fullSliceAngle;
+      cur += full;
+      acc += full;
     });
+    anglesRef.current = angles;
     
-    segmentAnglesRef.current = angles;
-    
-    const displayTotal = Math.round(total * animationProgress);
-    ctx.font = 'bold 14px system-ui, -apple-system, sans-serif';
-    ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.85)';
+    ctx.font = 'bold 14px system-ui';
+    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.85)';
     ctx.textAlign = 'center';
-    ctx.fillText(formatCurrency(displayTotal), centerX, centerY + 2);
-    ctx.font = '500 8px system-ui, -apple-system, sans-serif';
-    ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.35)' : 'rgba(0, 0, 0, 0.35)';
-    ctx.fillText('TOTAL', centerX, centerY + 16);
-  }, [data, isDark, dimensions, animationProgress]);
+    ctx.fillText(formatCurrency(Math.round(total * progress)), cx, cy + 2);
+    ctx.font = '500 8px system-ui';
+    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)';
+    ctx.fillText('TOTAL', cx, cy + 16);
+  }, [data, isDark, dimensions, progress]);
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas || !data || data.length === 0) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+  const onMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect || !data.length) return;
+    const x = e.clientX - rect.left, y = e.clientY - rect.top;
     const { width, height } = dimensions;
-    const centerX = width / 2;
-    const centerY = height / 2;
-    const outerRadius = Math.min(width, height) / 2 - 45;
-    const innerRadius = outerRadius * 0.55;
-    const dx = x - centerX;
-    const dy = y - centerY;
-    const distance = Math.sqrt(dx * dx + dy * dy);
+    const cx = width / 2, cy = height / 2;
+    const or = Math.min(width, height) / 2 - 45, ir = or * 0.55;
+    const dx = x - cx, dy = y - cy, dist = Math.sqrt(dx * dx + dy * dy);
     
-    if (distance >= innerRadius && distance <= outerRadius) {
+    if (dist >= ir && dist <= or) {
       let angle = Math.atan2(dy, dx);
       if (angle < -Math.PI / 2) angle += Math.PI * 2;
-      const total = data.reduce((sum, d) => sum + d.revenue, 0);
-      const segment = segmentAnglesRef.current.find(s => angle >= s.startAngle && angle < s.endAngle);
-      if (segment) {
-        const percent = ((segment.data.revenue / total) * 100).toFixed(1);
-        setTooltip({ x: e.clientX - rect.left, y: e.clientY - rect.top, title: segment.data.name, value: formatCurrency(segment.data.revenue), subValue: \`전체의 \${percent}%\` });
+      const total = data.reduce((s, d) => s + d.revenue, 0);
+      const seg = anglesRef.current.find(a => angle >= a.start && angle < a.end);
+      if (seg) {
+        setTooltip({ x, y, title: seg.data.name, value: formatCurrency(seg.data.revenue), subValue: `전체의 ${((seg.data.revenue / total) * 100).toFixed(1)}%` });
         return;
       }
     }
     setTooltip(null);
   };
 
-  const handleMouseLeave = () => setTooltip(null);
-  
   return (
     <div ref={containerRef} style={{ width: '100%', display: 'flex', justifyContent: 'center', position: 'relative' }}>
-      <canvas ref={canvasRef} style={{ width: dimensions.width, height: dimensions.height, cursor: tooltip ? 'pointer' : 'default' }} onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave} />
+      <canvas ref={canvasRef} style={{ width: dimensions.width, height: dimensions.height, cursor: tooltip ? 'pointer' : 'default' }} onMouseMove={onMove} onMouseLeave={() => setTooltip(null)} />
       <ChartTooltip data={tooltip} isDark={isDark} />
     </div>
   );
 };
 
-// ============================================================================
-// 글로우 세로 바 차트 (카테고리별 판매량)
-// ============================================================================
+// 글로우 세로 바 차트
 interface VerticalBarChartProps {
   data: Array<{ name: string; quantity: number }>;
   isDark: boolean;
@@ -466,33 +360,25 @@ const GlowVerticalBarChart = ({ data, isDark }: VerticalBarChartProps) => {
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
   const barsRef = useRef<Array<{ x: number; y: number; width: number; height: number; data: { name: string; quantity: number } }>>([]);
   const animationRef = useRef<number>(0);
-  const [animationProgress, setAnimationProgress] = useState(0);
+  const [progress, setProgress] = useState(0);
 
   useEffect(() => {
-    const updateDimensions = () => {
-      if (containerRef.current) {
-        const width = containerRef.current.offsetWidth;
-        setDimensions({ width, height: 250 });
-      }
+    const update = () => {
+      if (containerRef.current) setDimensions({ width: containerRef.current.offsetWidth, height: 250 });
     };
-    updateDimensions();
-    window.addEventListener('resize', updateDimensions);
-    return () => window.removeEventListener('resize', updateDimensions);
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
   }, []);
 
   useEffect(() => {
     if (!data || data.length === 0) return;
-    setAnimationProgress(0);
-    const startTime = performance.now();
-    const duration = 700;
-    const animate = (currentTime: number) => {
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 4);
-      setAnimationProgress(eased);
-      if (progress < 1) {
-        animationRef.current = requestAnimationFrame(animate);
-      }
+    setProgress(0);
+    const start = performance.now();
+    const animate = (t: number) => {
+      const p = Math.min((t - start) / 700, 1);
+      setProgress(1 - Math.pow(1 - p, 4));
+      if (p < 1) animationRef.current = requestAnimationFrame(animate);
     };
     animationRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(animationRef.current);
@@ -511,126 +397,108 @@ const GlowVerticalBarChart = ({ data, isDark }: VerticalBarChartProps) => {
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, width, height);
     
-    const padding = { top: 20, right: 20, bottom: 40, left: 50 };
-    const chartWidth = width - padding.left - padding.right;
-    const chartHeight = height - padding.top - padding.bottom;
-    const baseY = height - padding.bottom;
-    const maxValue = Math.max(...data.map(d => d.quantity)) * 1.1;
-    const barWidth = Math.min(40, (chartWidth / data.length) * 0.6);
-    const gap = chartWidth / data.length;
-    const bars: Array<{ x: number; y: number; width: number; height: number; data: { name: string; quantity: number } }> = [];
+    const pad = { top: 20, right: 20, bottom: 40, left: 50 };
+    const cw = width - pad.left - pad.right;
+    const ch = height - pad.top - pad.bottom;
+    const baseY = height - pad.bottom;
+    const max = Math.max(...data.map(d => d.quantity)) * 1.1;
+    const bw = Math.min(40, (cw / data.length) * 0.6);
+    const gap = cw / data.length;
+    const bars: typeof barsRef.current = [];
     
-    ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)';
     for (let i = 0; i <= 4; i++) {
-      const y = baseY - (chartHeight / 4) * i;
+      const y = baseY - (ch / 4) * i;
       ctx.beginPath();
-      ctx.moveTo(padding.left, y);
-      ctx.lineTo(width - padding.right, y);
+      ctx.moveTo(pad.left, y);
+      ctx.lineTo(width - pad.right, y);
       ctx.stroke();
     }
     
-    ctx.font = '10px system-ui, -apple-system, sans-serif';
-    ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)';
+    ctx.font = '10px system-ui';
+    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)';
     ctx.textAlign = 'right';
     for (let i = 0; i <= 4; i++) {
-      const value = Math.round((maxValue / 4) * i);
-      const y = baseY - (chartHeight / 4) * i;
-      ctx.fillText(value.toLocaleString(), padding.left - 8, y + 3);
+      ctx.fillText(Math.round((max / 4) * i).toLocaleString(), pad.left - 8, baseY - (ch / 4) * i + 3);
     }
     
     data.forEach((item, idx) => {
-      const x = padding.left + idx * gap + (gap - barWidth) / 2;
-      const fullBarHeight = (item.quantity / maxValue) * chartHeight;
-      const barHeight = fullBarHeight * animationProgress;
-      const y = baseY - barHeight;
-      bars.push({ x, y: baseY - fullBarHeight, width: barWidth, height: fullBarHeight, data: item });
+      const x = pad.left + idx * gap + (gap - bw) / 2;
+      const fh = (item.quantity / max) * ch;
+      const bh = fh * progress;
+      const y = baseY - bh;
+      bars.push({ x, y: baseY - fh, width: bw, height: fh, data: item });
       
-      if (barHeight > 0) {
-        const barGradient = ctx.createLinearGradient(0, baseY, 0, y);
+      if (bh > 0) {
+        const grad = ctx.createLinearGradient(0, baseY, 0, y);
         if (isDark) {
-          barGradient.addColorStop(0, 'rgba(255, 255, 255, 0.1)');
-          barGradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.3)');
-          barGradient.addColorStop(1, 'rgba(255, 255, 255, 0.6)');
+          grad.addColorStop(0, 'rgba(255,255,255,0.1)');
+          grad.addColorStop(0.5, 'rgba(255,255,255,0.3)');
+          grad.addColorStop(1, 'rgba(255,255,255,0.6)');
         } else {
-          barGradient.addColorStop(0, 'rgba(0, 0, 0, 0.08)');
-          barGradient.addColorStop(0.5, 'rgba(0, 0, 0, 0.25)');
-          barGradient.addColorStop(1, 'rgba(0, 0, 0, 0.55)');
+          grad.addColorStop(0, 'rgba(0,0,0,0.08)');
+          grad.addColorStop(0.5, 'rgba(0,0,0,0.25)');
+          grad.addColorStop(1, 'rgba(0,0,0,0.55)');
         }
-        ctx.fillStyle = barGradient;
+        ctx.fillStyle = grad;
         ctx.beginPath();
-        ctx.roundRect(x, y, barWidth, barHeight, [4, 4, 0, 0]);
+        ctx.roundRect(x, y, bw, bh, [4, 4, 0, 0]);
         ctx.fill();
         
-        const glowX = x + barWidth / 2;
-        const glowY = y;
-        const glowColor = isDark ? '255, 255, 255' : '0, 0, 0';
-        const glow = ctx.createRadialGradient(glowX, glowY, 0, glowX, glowY, 12);
-        glow.addColorStop(0, \`rgba(\${glowColor}, \${0.5 * animationProgress})\`);
-        glow.addColorStop(0.5, \`rgba(\${glowColor}, \${0.12 * animationProgress})\`);
-        glow.addColorStop(1, \`rgba(\${glowColor}, 0)\`);
+        const gx = x + bw / 2, gy = y;
+        const gc = isDark ? '255,255,255' : '0,0,0';
+        const glow = ctx.createRadialGradient(gx, gy, 0, gx, gy, 12);
+        glow.addColorStop(0, `rgba(${gc},${0.5 * progress})`);
+        glow.addColorStop(0.5, `rgba(${gc},${0.12 * progress})`);
+        glow.addColorStop(1, `rgba(${gc},0)`);
         ctx.beginPath();
-        ctx.arc(glowX, glowY, 12, 0, Math.PI * 2);
+        ctx.arc(gx, gy, 12, 0, Math.PI * 2);
         ctx.fillStyle = glow;
         ctx.fill();
         
         ctx.beginPath();
-        ctx.arc(glowX, glowY, 2.5, 0, Math.PI * 2);
-        ctx.fillStyle = isDark ? \`rgba(255,255,255,\${0.85 * animationProgress})\` : \`rgba(0,0,0,\${0.8 * animationProgress})\`;
+        ctx.arc(gx, gy, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = isDark ? `rgba(255,255,255,${0.85 * progress})` : `rgba(0,0,0,${0.8 * progress})`;
         ctx.fill();
       }
       
-      ctx.font = '10px system-ui, -apple-system, sans-serif';
-      ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)';
+      ctx.font = '10px system-ui';
+      ctx.fillStyle = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)';
       ctx.textAlign = 'center';
-      const displayName = item.name.length > 5 ? item.name.substring(0, 5) + '..' : item.name;
-      ctx.fillText(displayName, x + barWidth / 2, baseY + 18);
+      ctx.fillText(item.name.length > 5 ? item.name.slice(0, 5) + '..' : item.name, x + bw / 2, baseY + 18);
     });
     barsRef.current = bars;
-  }, [data, isDark, dimensions, animationProgress]);
+  }, [data, isDark, dimensions, progress]);
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+  const onMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const x = e.clientX - rect.left, y = e.clientY - rect.top;
     const bar = barsRef.current.find(b => x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height);
-    if (bar) {
-      setTooltip({ x: e.clientX - rect.left, y: e.clientY - rect.top, title: bar.data.name, value: \`판매량: \${bar.data.quantity.toLocaleString()}개\` });
-    } else {
-      setTooltip(null);
-    }
+    setTooltip(bar ? { x, y, title: bar.data.name, value: `판매량: ${bar.data.quantity.toLocaleString()}개` } : null);
   };
 
-  const handleMouseLeave = () => setTooltip(null);
-  
   return (
     <div ref={containerRef} style={{ width: '100%', position: 'relative' }}>
-      <canvas ref={canvasRef} style={{ width: dimensions.width, height: dimensions.height, cursor: tooltip ? 'pointer' : 'default' }} onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave} />
+      <canvas ref={canvasRef} style={{ width: dimensions.width, height: dimensions.height, cursor: tooltip ? 'pointer' : 'default' }} onMouseMove={onMove} onMouseLeave={() => setTooltip(null)} />
       <ChartTooltip data={tooltip} isDark={isDark} />
     </div>
   );
 };
 
-// ============================================================================
-// 메인 컴포넌트
-// ============================================================================
 export function ProductTab() {
   const { selectedStore } = useSelectedStore();
   const { dateRange } = useDateFilterStore();
-  const { user, orgId } = useAuth();
+  const { orgId } = useAuth();
   const { data: metrics, isLoading: metricsLoading } = useInsightMetrics();
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
-    const checkDarkMode = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkDarkMode();
-    const observer = new MutationObserver(checkDarkMode);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
+    const check = () => setIsDark(document.documentElement.classList.contains('dark'));
+    check();
+    const obs = new MutationObserver(check);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => obs.disconnect();
   }, []);
 
   const text3D = getText3D(isDark);
@@ -640,54 +508,46 @@ export function ProductTab() {
     queryKey: ['product-performance', selectedStore?.id, dateRange, orgId],
     queryFn: async () => {
       if (!selectedStore?.id || !orgId) return [];
-      const { data: perfData, error: perfError } = await supabase
+      const { data: perfData, error } = await supabase
         .from('product_performance_agg')
         .select('product_id, units_sold, revenue, stock_level')
         .eq('org_id', orgId)
         .eq('store_id', selectedStore.id)
         .gte('date', dateRange.startDate)
         .lte('date', dateRange.endDate);
-      if (perfError || !perfData || perfData.length === 0) return [];
-      const productMap = new Map<string, { quantity: number; revenue: number; stock: number }>();
-      perfData.forEach((d) => {
-        const existing = productMap.get(d.product_id) || { quantity: 0, revenue: 0, stock: 0 };
-        productMap.set(d.product_id, {
-          quantity: existing.quantity + (d.units_sold || 0),
-          revenue: existing.revenue + (d.revenue || 0),
-          stock: d.stock_level ?? existing.stock,
-        });
+      if (error || !perfData?.length) return [];
+      
+      const map = new Map<string, { quantity: number; revenue: number; stock: number }>();
+      perfData.forEach(d => {
+        const e = map.get(d.product_id) || { quantity: 0, revenue: 0, stock: 0 };
+        map.set(d.product_id, { quantity: e.quantity + (d.units_sold || 0), revenue: e.revenue + (d.revenue || 0), stock: d.stock_level ?? e.stock });
       });
-      const productIds = [...productMap.keys()];
-      const { data: productsInfo } = await supabase
-        .from('products')
-        .select('id, product_name, category')
-        .in('id', productIds) as { data: Array<{ id: string; product_name: string; category: string | null }> | null };
-      const productNameMap = new Map((productsInfo || []).map((p) => [p.id, { name: p.product_name, category: p.category || '기타' }]));
-      return Array.from(productMap.entries())
-        .map(([id, data]) => {
-          const info = productNameMap.get(id) || { name: id.substring(0, 8), category: '기타' };
-          return { id, name: info.name, category: info.category, ...data };
-        })
-        .sort((a, b) => b.revenue - a.revenue);
+      
+      const ids = [...map.keys()];
+      const { data: info } = await supabase.from('products').select('id, product_name, category').in('id', ids) as { data: Array<{ id: string; product_name: string; category: string | null }> | null };
+      const nameMap = new Map((info || []).map(p => [p.id, { name: p.product_name, category: p.category || '기타' }]));
+      
+      return [...map.entries()].map(([id, d]) => {
+        const i = nameMap.get(id) || { name: id.slice(0, 8), category: '기타' };
+        return { id, name: i.name, category: i.category, ...d };
+      }).sort((a, b) => b.revenue - a.revenue);
     },
     enabled: !!selectedStore?.id && !!orgId,
   });
 
   const categoryData = useMemo(() => {
-    if (!productData || productData.length === 0) return [];
-    const categoryMap = new Map<string, { revenue: number; quantity: number }>();
-    productData.forEach((p) => {
-      const existing = categoryMap.get(p.category) || { revenue: 0, quantity: 0 };
-      categoryMap.set(p.category, { revenue: existing.revenue + p.revenue, quantity: existing.quantity + p.quantity });
+    if (!productData?.length) return [];
+    const map = new Map<string, { revenue: number; quantity: number }>();
+    productData.forEach(p => {
+      const e = map.get(p.category) || { revenue: 0, quantity: 0 };
+      map.set(p.category, { revenue: e.revenue + p.revenue, quantity: e.quantity + p.quantity });
     });
-    return Array.from(categoryMap.entries())
-      .map(([name, data]) => ({ name, revenue: data.revenue, quantity: data.quantity }))
-      .sort((a, b) => b.revenue - a.revenue);
+    return [...map.entries()].map(([name, d]) => ({ name, ...d })).sort((a, b) => b.revenue - a.revenue);
   }, [productData]);
 
   const summary = useMemo(() => {
-    const totalRevenue = productData?.reduce((sum, p) => sum + p.revenue, 0) || 0;
-    const totalQuantity = productData?.reduce((sum, p) => sum + p.quantity, 0) || 0;
+    const totalRevenue = productData?.reduce((s, p) => s + p.revenue, 0) || 0;
+    const totalQuantity = productData?.reduce((s, p) => s + p.quantity, 0) || 0;
     const topProduct = productData?.[0];
     const lowStockCount = productData?.filter(p => p.stock > 0 && p.stock < 10).length || 0;
     return { totalRevenue, totalQuantity, topProduct, lowStockCount };
@@ -739,7 +599,7 @@ export function ProductTab() {
       </div>
 
       {metrics?.atv && metrics.atv > 0 && (
-        <div className={\`p-3 rounded-lg flex items-start gap-2 \${isDark ? 'bg-white/5 border border-white/10' : 'bg-black/5 border border-black/10'}\`}>
+        <div className={`p-3 rounded-lg flex items-start gap-2 ${isDark ? 'bg-white/5 border border-white/10' : 'bg-black/5 border border-black/10'}`}>
           <Info className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }} />
           <p style={{ fontSize: '13px', ...text3D.body }}>
             <span style={{ fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>평균 객단가 (ATV):</span>{' '}
@@ -801,16 +661,16 @@ export function ProductTab() {
                   </tr>
                 </thead>
                 <tbody>
-                  {productData?.slice(0, 10).map((product) => (
-                    <tr key={product.id} style={{ borderBottom: isDark ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(0,0,0,0.05)' }}>
-                      <td className="py-3 px-4" style={{ fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>{product.name}</td>
+                  {productData.slice(0, 10).map((p) => (
+                    <tr key={p.id} style={{ borderBottom: isDark ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(0,0,0,0.05)' }}>
+                      <td className="py-3 px-4" style={{ fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>{p.name}</td>
                       <td className="py-3 px-4">
-                        <span style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '11px', background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)', color: isDark ? 'rgba(255,255,255,0.8)' : '#6b7280' }}>{product.category}</span>
+                        <span style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '11px', background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)', color: isDark ? 'rgba(255,255,255,0.8)' : '#6b7280' }}>{p.category}</span>
                       </td>
-                      <td className="text-right py-3 px-4" style={text3D.body}>{formatCurrency(product.revenue)}</td>
-                      <td className="text-right py-3 px-4" style={text3D.body}>{product.quantity.toLocaleString()}개</td>
+                      <td className="text-right py-3 px-4" style={text3D.body}>{formatCurrency(p.revenue)}</td>
+                      <td className="text-right py-3 px-4" style={text3D.body}>{p.quantity.toLocaleString()}개</td>
                       <td className="text-right py-3 px-4">
-                        <span style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, background: product.stock < 10 ? 'rgba(239,68,68,0.15)' : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'), color: product.stock < 10 ? '#ef4444' : (isDark ? 'rgba(255,255,255,0.7)' : '#6b7280') }}>{product.stock}개</span>
+                        <span style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, background: p.stock < 10 ? 'rgba(239,68,68,0.15)' : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'), color: p.stock < 10 ? '#ef4444' : (isDark ? 'rgba(255,255,255,0.7)' : '#6b7280') }}>{p.stock}개</span>
                       </td>
                     </tr>
                   ))}
