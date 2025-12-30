@@ -99,7 +99,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             zIndex: 3,
           }}
         />
-        />
 
         {/* ===== Content ===== */}
         <AppSidebar />
