@@ -38,6 +38,18 @@ export const CustomerFlowOverlayEnhanced: React.FC<CustomerFlowOverlayEnhancedPr
     enabled: visible && !!storeId,
   });
 
+  // 🔧 FIX: 색상 정규화를 위한 min/max 계산 (필터된 paths 기준)
+  const { minCount, maxCount } = useMemo(() => {
+    if (!data?.flowPaths || data.flowPaths.length === 0) {
+      return { minCount: 0, maxCount: 1 };
+    }
+    const counts = data.flowPaths.map(p => p.transition_count);
+    return {
+      minCount: Math.min(...counts),
+      maxCount: Math.max(...counts),
+    };
+  }, [data?.flowPaths]);
+
   // 디버그: 쿼리 상태 상세 로깅
   console.log('[CustomerFlowOverlayEnhanced] 쿼리 상태:', {
     visible,
@@ -97,7 +109,8 @@ export const CustomerFlowOverlayEnhanced: React.FC<CustomerFlowOverlayEnhancedPr
         <FlowPathLine
           key={path.id}
           path={path}
-          maxCount={data.maxTransitionCount}
+          minCount={minCount}
+          maxCount={maxCount}
           showLabel={showLabels}
           minOpacity={minOpacity}
         />
@@ -125,6 +138,7 @@ export const CustomerFlowOverlayEnhanced: React.FC<CustomerFlowOverlayEnhancedPr
 // ===== 개별 동선 라인 =====
 interface FlowPathLineProps {
   path: FlowPath;
+  minCount: number;  // 🔧 FIX: 최소값 추가
   maxCount: number;
   showLabel: boolean;
   minOpacity: number;
@@ -132,6 +146,7 @@ interface FlowPathLineProps {
 
 const FlowPathLine: React.FC<FlowPathLineProps> = ({
   path,
+  minCount,
   maxCount,
   showLabel,
   minOpacity,
@@ -139,8 +154,13 @@ const FlowPathLine: React.FC<FlowPathLineProps> = ({
   const dotRef = useRef<THREE.Mesh>(null);
   const progressRef = useRef(Math.random()); // 시작 위치 랜덤
 
-  // 정규화 (0-1)
-  const normalizedCount = maxCount > 0 ? path.transition_count / maxCount : 0.5;
+  // 🔧 FIX: min-max 범위 기반 정규화 (0-1)
+  // 이전: path.transition_count / maxCount (절대값 기준 → 모두 빨간색 문제)
+  // 수정: (count - min) / (max - min) (상대값 기준 → 초록/노랑/빨강 분포)
+  const range = maxCount - minCount;
+  const normalizedCount = range > 0
+    ? (path.transition_count - minCount) / range
+    : 0.5;
 
   // 라인 스타일
   const lineWidth = 1 + normalizedCount * 4; // 1-5px
