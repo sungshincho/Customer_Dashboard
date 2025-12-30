@@ -692,6 +692,99 @@ export function SceneProvider({ mode = 'view', children, initialModels = [] }: S
     return true;
   }, [state.models]);
 
+  // 🆕 카메라 포커스 (특정 모델에 포커싱)
+  const focusOnModel = useCallback((modelId: string) => {
+    // 모델 찾기 (직접 모델 또는 childProduct)
+    let targetModel = state.models.find(m => m.id === modelId);
+    let parentFurniture: Model3D | undefined;
+
+    // childProduct인 경우 부모 가구 찾기
+    if (!targetModel) {
+      for (const model of state.models) {
+        if (model.type === 'furniture') {
+          const childProducts = (model.metadata as any)?.childProducts as any[] | undefined;
+          if (childProducts) {
+            const child = childProducts.find((cp: any) => cp.id === modelId);
+            if (child) {
+              parentFurniture = model;
+              // childProduct의 절대 위치 계산 (부모 가구 위치 + 상대 위치)
+              const childPos = child.position || { x: 0, y: 0, z: 0 };
+              targetModel = {
+                ...model,
+                id: modelId,
+                position: [
+                  model.position[0] + childPos.x,
+                  model.position[1] + childPos.y,
+                  model.position[2] + childPos.z,
+                ] as Vector3Tuple,
+                // 부모 가구의 회전값 사용
+                rotation: model.rotation,
+              };
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    if (!targetModel) {
+      select(modelId);
+      return;
+    }
+
+    const [x, y, z] = targetModel.position;
+    const rotationY = targetModel.rotation[1]; // 라디안 값
+
+    // 카메라 제한 사항
+    const FOCUS_DISTANCE = 10;  // minDistance(8) ~ maxDistance(40) 범위 내
+    const POLAR_ANGLE = Math.PI / 4;  // 45도 (17° ~ 72° 범위 내)
+
+    // 회전 적용된 카메라 오프셋 계산
+    const horizontalDist = FOCUS_DISTANCE * Math.sin(POLAR_ANGLE);
+    const verticalDist = FOCUS_DISTANCE * Math.cos(POLAR_ANGLE);
+
+    // 모델 정면에서 바라보도록 회전 적용
+    const cameraOffset = {
+      x: horizontalDist * Math.sin(rotationY + Math.PI), // 정면에서 바라보기 위해 +π
+      y: verticalDist,
+      z: horizontalDist * Math.cos(rotationY + Math.PI),
+    };
+
+    // 타겟 위치 클램핑 (OrbitControls 제한 범위 내)
+    const clampedTarget = {
+      x: Math.max(-12, Math.min(12, x)),
+      y: Math.max(0, Math.min(5, y)),
+      z: Math.max(-12, Math.min(12, z)),
+    };
+
+    // 카메라 위치 계산
+    const cameraPosition = {
+      x: clampedTarget.x + cameraOffset.x,
+      y: clampedTarget.y + cameraOffset.y,
+      z: clampedTarget.z + cameraOffset.z,
+    };
+
+    console.log('[SceneProvider] focusOnModel:', {
+      modelId,
+      targetPosition: [x, y, z],
+      rotationY: (rotationY * 180 / Math.PI).toFixed(1) + '°',
+      cameraTarget: clampedTarget,
+      cameraPosition,
+    });
+
+    // 카메라 상태 업데이트
+    dispatch({
+      type: 'SET_CAMERA',
+      payload: {
+        target: clampedTarget,
+        position: cameraPosition,
+      },
+    });
+
+    // 모델 선택
+    select(modelId);
+  }, [state.models, select, dispatch]);
+
   const value: SceneContextValue = {
     state,
     dispatch,
@@ -727,11 +820,8 @@ export function SceneProvider({ mode = 'view', children, initialModels = [] }: S
     // 🆕 제품 개별 가시성 제어 (childProduct.visible 방식)
     toggleProductVisibility,
     isProductVisible,
-    // 🆕 카메라 포커스 (특정 모델에 포커싱) - 현재는 선택만 수행
-    focusOnModel: (modelId: string) => {
-      select(modelId);
-      // TODO: 카메라 애니메이션으로 모델에 포커싱하는 로직 추가 가능
-    },
+    // 🆕 카메라 포커스 (특정 모델에 포커싱)
+    focusOnModel,
   };
 
   return <SceneContext.Provider value={value}>{children}</SceneContext.Provider>;
