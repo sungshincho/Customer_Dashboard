@@ -521,7 +521,7 @@ export async function loadUserModels(
           ...(model.metadata || {}),
           childProducts: childProducts.map(cp => ({
             id: cp.id,
-            name: cp.name,
+            name: cp.name || (cp.metadata as any)?.productName || 'Unknown Product',
             model_url: cp.model_url,
             position: cp.position,  // 상대 좌표
             rotation: cp.rotation,

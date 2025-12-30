@@ -8,7 +8,7 @@
  * - 가시성 토글
  */
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   ChevronRight,
   ChevronDown,
@@ -208,23 +208,81 @@ export function LayerPanel() {
 
     return zoneGroups.map((group) => ({
       ...group,
-      furniture: group.furniture.filter((f) => {
-        // 타입 필터
-        if (filterType === 'product') return false;
-        if (filterType === 'furniture') {
-          return f.name.toLowerCase().includes(query);
-        }
+      furniture: group.furniture
+        .map((f) => {
+          // 먼저 children(제품) 필터링
+          const filteredChildren = f.children.filter((c) => {
+            if (!query) return true;
+            return (
+              c.name.toLowerCase().includes(query) ||
+              c.sku?.toLowerCase().includes(query)
+            );
+          });
 
-        // 검색 필터
-        if (!query) return true;
-        if (f.name.toLowerCase().includes(query)) return true;
-        return f.children.some((c) =>
-          c.name.toLowerCase().includes(query) ||
-          c.sku?.toLowerCase().includes(query)
-        );
-      }),
+          // 타입별 필터링
+          if (filterType === 'product') {
+            // 제품 필터: 제품이 있는 가구만 유지 (가구는 표시, children만 보여줌)
+            if (filteredChildren.length === 0 && f.children.length === 0) {
+              return null; // 제품 없는 가구 제외
+            }
+            return {
+              ...f,
+              children: query ? filteredChildren : f.children,
+            };
+          }
+
+          if (filterType === 'furniture') {
+            // 가구 필터: 가구만 검색, children 숨김
+            if (query && !f.name.toLowerCase().includes(query)) {
+              return null;
+            }
+            return {
+              ...f,
+              children: [], // 가구 필터에서는 제품 숨김
+            };
+          }
+
+          // 전체 필터
+          if (query) {
+            const furnitureMatch = f.name.toLowerCase().includes(query);
+            const hasChildMatch = filteredChildren.length > 0;
+
+            if (!furnitureMatch && !hasChildMatch) {
+              return null;
+            }
+
+            return {
+              ...f,
+              children: hasChildMatch ? filteredChildren : f.children,
+            };
+          }
+
+          return f;
+        })
+        .filter((f): f is FurnitureWithChildren => f !== null),
     })).filter((group) => group.furniture.length > 0);
   }, [zoneGroups, searchQuery, filterType]);
+
+  // 제품 필터 선택 시 가구/Zone 자동 확장
+  useEffect(() => {
+    if (filterType === 'product') {
+      // 제품이 있는 모든 가구 확장
+      const furnitureWithProducts = new Set<string>();
+      zoneGroups.forEach((group) => {
+        group.furniture.forEach((f) => {
+          if (f.children.length > 0) {
+            furnitureWithProducts.add(f.id);
+          }
+        });
+      });
+      setExpandedFurniture(furnitureWithProducts);
+
+      // 모든 Zone도 확장
+      const allZones = new Set<string>(zoneGroups.map(g => g.zoneId));
+      allZones.add('unassigned');
+      setExpandedZones(allZones);
+    }
+  }, [filterType, zoneGroups]);
 
   // 토글 핸들러
   const toggleGroup = (id: string) => {
@@ -386,13 +444,11 @@ export function LayerPanel() {
                 )}
                 onClick={() => select(spaceModel.modelId || null)}
               >
+                {/* 공간 모델은 항상 표시 (숨김 불가) */}
                 <Checkbox
-                  checked={spaceModel.visible}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (spaceModel.modelId) handleVisibilityToggle(spaceModel.modelId);
-                  }}
-                  className="h-3.5 w-3.5 border-white/40 data-[state=checked]:bg-primary"
+                  checked={true}
+                  disabled={true}
+                  className="h-3.5 w-3.5 border-green-500/50 data-[state=checked]:bg-green-600 opacity-50 cursor-not-allowed"
                 />
                 <Folder className="w-4 h-4 text-green-400" />
                 <span className="flex-1 text-sm text-white truncate">{spaceModel.name}</span>
