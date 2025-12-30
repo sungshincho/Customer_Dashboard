@@ -15,7 +15,7 @@ import type { HeatPoint, HeatmapOverlayProps } from '../types';
 export function HeatmapOverlay({
   heatPoints,
   maxIntensity = 1,
-  colorScale = 'thermal',
+  colorScale = 'plasma',  // 🆕 기본값을 plasma로 변경 (보라/청록 계열)
   opacity = 0.6,
   heightScale = 2,
   onPointClick,
@@ -181,50 +181,66 @@ export function HeatmapOverlay({
 }
 
 // ============================================================================
-// 히트 색상 계산
+// 히트 색상 계산 - 고도화된 색상 스킴
 // ============================================================================
-type ColorScale = 'thermal' | 'viridis' | 'cool';
+type ColorScale = 'thermal' | 'viridis' | 'plasma' | 'cool';
+
+// 색상 스킴 정의 (정확한 그라데이션 스톱)
+const COLOR_SCHEMES = {
+  thermal: [
+    { stop: 0.0, r: 0, g: 0, b: 128 },      // 진한 파랑
+    { stop: 0.25, r: 0, g: 128, b: 255 },   // 밝은 파랑
+    { stop: 0.5, r: 0, g: 255, b: 128 },    // 청록
+    { stop: 0.75, r: 255, g: 255, b: 0 },   // 노랑
+    { stop: 1.0, r: 255, g: 0, b: 0 },      // 빨강
+  ],
+  viridis: [
+    { stop: 0.0, r: 68, g: 1, b: 84 },      // 진한 보라
+    { stop: 0.25, r: 59, g: 82, b: 139 },   // 파랑보라
+    { stop: 0.5, r: 33, g: 145, b: 140 },   // 청록
+    { stop: 0.75, r: 94, g: 201, b: 98 },   // 연두
+    { stop: 1.0, r: 253, g: 231, b: 37 },   // 노랑
+  ],
+  plasma: [
+    { stop: 0.0, r: 13, g: 8, b: 135 },     // 진한 파랑
+    { stop: 0.25, r: 126, g: 3, b: 168 },   // 보라
+    { stop: 0.5, r: 204, g: 71, b: 120 },   // 분홍보라
+    { stop: 0.75, r: 248, g: 149, b: 64 },  // 주황
+    { stop: 1.0, r: 240, g: 249, b: 33 },   // 노랑
+  ],
+  cool: [
+    { stop: 0.0, r: 100, g: 150, b: 255 },  // 연한 파랑
+    { stop: 0.5, r: 150, g: 100, b: 255 },  // 보라
+    { stop: 1.0, r: 255, g: 100, b: 150 },  // 분홍
+  ],
+};
 
 function getHeatColor(
   intensity: number,
-  scale: ColorScale = 'thermal'
+  scale: ColorScale = 'plasma'
 ): { r: number; g: number; b: number; hex: string } {
-  let r: number, g: number, b: number;
+  const stops = COLOR_SCHEMES[scale];
+  const clampedIntensity = Math.max(0, Math.min(1, intensity));
 
-  if (scale === 'thermal') {
-    // Blue -> Cyan -> Green -> Yellow -> Red
-    if (intensity < 0.25) {
-      const t = intensity / 0.25;
-      r = 0;
-      g = t;
-      b = 1;
-    } else if (intensity < 0.5) {
-      const t = (intensity - 0.25) / 0.25;
-      r = 0;
-      g = 1;
-      b = 1 - t;
-    } else if (intensity < 0.75) {
-      const t = (intensity - 0.5) / 0.25;
-      r = t;
-      g = 1;
-      b = 0;
-    } else {
-      const t = (intensity - 0.75) / 0.25;
-      r = 1;
-      g = 1 - t;
-      b = 0;
+  // 적절한 색상 구간 찾기
+  let lowerStop = stops[0];
+  let upperStop = stops[stops.length - 1];
+
+  for (let i = 0; i < stops.length - 1; i++) {
+    if (clampedIntensity >= stops[i].stop && clampedIntensity <= stops[i + 1].stop) {
+      lowerStop = stops[i];
+      upperStop = stops[i + 1];
+      break;
     }
-  } else if (scale === 'viridis') {
-    // Purple -> Blue -> Green -> Yellow
-    r = Math.min(1, 0.267004 + intensity * 0.329415);
-    g = Math.min(1, 0.004874 + intensity * 0.873449);
-    b = Math.min(1, 0.329415 + (1 - intensity) * 0.670585);
-  } else {
-    // Cool: Blue -> Purple -> Pink
-    r = intensity;
-    g = 0.2 + intensity * 0.3;
-    b = 1;
   }
+
+  // 선형 보간
+  const range = upperStop.stop - lowerStop.stop;
+  const t = range > 0 ? (clampedIntensity - lowerStop.stop) / range : 0;
+
+  const r = Math.round(lowerStop.r + (upperStop.r - lowerStop.r) * t) / 255;
+  const g = Math.round(lowerStop.g + (upperStop.g - lowerStop.g) * t) / 255;
+  const b = Math.round(lowerStop.b + (upperStop.b - lowerStop.b) * t) / 255;
 
   const toHex = (n: number) => {
     const hex = Math.round(n * 255).toString(16);

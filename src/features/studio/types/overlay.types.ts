@@ -46,7 +46,7 @@ export interface HeatPoint {
 export interface HeatmapOverlayProps {
   heatPoints: HeatPoint[];
   maxIntensity?: number;
-  colorScale?: 'thermal' | 'viridis' | 'cool';
+  colorScale?: 'thermal' | 'viridis' | 'plasma' | 'cool';  // 🆕 plasma 추가
   opacity?: number;
   heightScale?: number;
   onPointClick?: (point: HeatPoint) => void;
