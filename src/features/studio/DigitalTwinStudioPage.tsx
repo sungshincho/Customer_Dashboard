@@ -163,7 +163,7 @@ export default function DigitalTwinStudioPage() {
   // 드래그 패널 표시 상태
   const [visiblePanels, setVisiblePanels] = useState<VisiblePanels>({
     tools: false,
-    sceneSave: true,
+    sceneSave: false,  // 기본값 OFF
     property: true,
     resultReport: false, // 결과 있을 때만 자동 표시
   });
@@ -1257,14 +1257,17 @@ export default function DigitalTwinStudioPage() {
             )}
             */}
 
-            {/* 씬 저장 패널 - 상단 바 아래 좌측 */}
+            {/* 씬 저장 패널 - ViewModeToggle 아래 우측 */}
             {visiblePanels.sceneSave && (
               <DraggablePanel
                 id="scene-save"
                 title="씬 저장"
                 icon={<Save className="w-4 h-4" />}
-                defaultPosition={{ x: 16, y: visiblePanels.tools ? 180 : 60 }}
+                defaultPosition={{ x: 0, y: 60 }}
+                rightOffset={16}
                 defaultCollapsed={false}
+                closable={true}
+                onClose={() => closePanel('sceneSave')}
                 width="w-52"
               >
                 <SceneSavePanel
@@ -1294,7 +1297,7 @@ export default function DigitalTwinStudioPage() {
               </DraggablePanel>
             )}
 
-            {/* 통합 결과 리포트 패널 - 우측 상단 */}
+            {/* 통합 결과 리포트 패널 - 우측 (씬 저장 패널 아래 또는 ViewModeToggle 아래) */}
             {visiblePanels.resultReport && (
               <ResultReportPanel
                 results={simulationResults}
@@ -1316,7 +1319,7 @@ export default function DigitalTwinStudioPage() {
                     toggleOverlay(overlay);
                   }
                 }}
-                defaultPosition={{ x: 16, y: 60 }}
+                defaultPosition={{ x: 0, y: visiblePanels.sceneSave ? 340 : 60 }}
                 rightOffset={16}
               />
             )}
