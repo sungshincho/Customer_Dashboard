@@ -204,12 +204,14 @@ export const useInsightMetrics = () => {
       const visitFunnel = { entry: 0, browse: 0, engage: 0, fitting: 0, purchase: 0 };
 
       // store_visits 데이터에서 zones_visited, made_purchase 조회
+      // 🔧 FIX: Supabase 기본 1000개 제한 해제
       const { data: visitsWithZones } = await supabase
         .from('store_visits')
         .select('zones_visited, made_purchase')
         .eq('store_id', selectedStore.id)
         .gte('visit_date', `${startDate}T00:00:00`)
-        .lte('visit_date', `${endDate}T23:59:59`);
+        .lte('visit_date', `${endDate}T23:59:59`)
+        .limit(50000);
 
       visitsWithZones?.forEach(visit => {
         visitFunnel.entry++; // 모든 방문 = ENTRY
@@ -255,6 +257,7 @@ export const useInsightMetrics = () => {
         .lte('purchase_date', `${endDate}T23:59:59`);
 
       // 🆕 하이브리드 병합 방식: 각 소스에서 가장 좋은 데이터 선택
+      // 🔧 FIX: ENTRY는 항상 footfall 사용, 나머지는 zone_daily_metrics 우선
       const entryCount = footfall || visitStats?.length || 0;
 
       // funnel_events에서 가져온 값 (있으면 사용)
@@ -264,22 +267,25 @@ export const useInsightMetrics = () => {
       const funnelFitting = funnelCounts.get('fitting');
       const funnelPurchase = funnelCounts.get('purchase');
 
-      // 하이브리드 병합: funnel_events > store_visits > zone_daily_metrics > 추정치
+      // 하이브리드 병합: funnel_events > zone_daily_metrics > store_visits > 추정치
+      // 🔧 FIX: zone_daily_metrics 우선 (이미 집계된 데이터, 제한 없음)
       const funnelByType = {
-        entry: funnelEntry || visitFunnel.entry || zoneFunnel.entry || entryCount,
-        browse: funnelBrowse || visitFunnel.browse || zoneFunnel.browse || 0,
-        engage: funnelEngage || visitFunnel.engage || zoneFunnel.engage || 0,
-        fitting: funnelFitting || visitFunnel.fitting || zoneFunnel.fitting || 0,
-        purchase: funnelPurchase || visitFunnel.purchase || zoneFunnel.purchase || purchaseCount || 0,
+        // ENTRY는 항상 footfall 사용 (일관성)
+        entry: funnelEntry || entryCount,
+        // 나머지는 zone_daily_metrics 우선
+        browse: funnelBrowse || zoneFunnel.browse || visitFunnel.browse || 0,
+        engage: funnelEngage || zoneFunnel.engage || visitFunnel.engage || 0,
+        fitting: funnelFitting || zoneFunnel.fitting || visitFunnel.fitting || 0,
+        purchase: funnelPurchase || zoneFunnel.purchase || visitFunnel.purchase || purchaseCount || 0,
       };
 
       // 데이터 소스 추적 (디버깅용)
       const funnelSources = {
-        entry: funnelEntry ? 'funnel_events' : visitFunnel.entry ? 'store_visits' : zoneFunnel.entry ? 'zone_metrics' : 'footfall',
-        browse: funnelBrowse ? 'funnel_events' : visitFunnel.browse ? 'store_visits' : zoneFunnel.browse ? 'zone_metrics' : 'none',
-        engage: funnelEngage ? 'funnel_events' : visitFunnel.engage ? 'store_visits' : zoneFunnel.engage ? 'zone_metrics' : 'none',
-        fitting: funnelFitting ? 'funnel_events' : visitFunnel.fitting ? 'store_visits' : zoneFunnel.fitting ? 'zone_metrics' : 'none',
-        purchase: funnelPurchase ? 'funnel_events' : visitFunnel.purchase ? 'store_visits' : zoneFunnel.purchase ? 'zone_metrics' : 'purchases',
+        entry: funnelEntry ? 'funnel_events' : 'footfall',
+        browse: funnelBrowse ? 'funnel_events' : zoneFunnel.browse ? 'zone_metrics' : visitFunnel.browse ? 'store_visits' : 'none',
+        engage: funnelEngage ? 'funnel_events' : zoneFunnel.engage ? 'zone_metrics' : visitFunnel.engage ? 'store_visits' : 'none',
+        fitting: funnelFitting ? 'funnel_events' : zoneFunnel.fitting ? 'zone_metrics' : visitFunnel.fitting ? 'store_visits' : 'none',
+        purchase: funnelPurchase ? 'funnel_events' : zoneFunnel.purchase ? 'zone_metrics' : visitFunnel.purchase ? 'store_visits' : 'purchases',
       };
 
       console.log('[useInsightMetrics] Hybrid funnel merge:', {
