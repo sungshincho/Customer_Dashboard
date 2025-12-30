@@ -38,6 +38,8 @@ interface DraggablePanelProps {
   onClose?: () => void;
   /** 접힘 상태 변경 시 콜백 */
   onCollapseChange?: (isCollapsed: boolean) => void;
+  /** 패널 높이 변경 시 콜백 (리사이즈, 접힘/펼침 시 호출) */
+  onHeightChange?: (height: number) => void;
   width?: string;
   /** 리사이즈 가능 여부 */
   resizable?: boolean;
@@ -61,6 +63,7 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
   closable = false,
   onClose,
   onCollapseChange,
+  onHeightChange,
   width = 'w-64',
   resizable = true,
   minSize = { width: 180, height: 100 },
@@ -98,6 +101,20 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
   useEffect(() => {
     onCollapseChange?.(isCollapsed);
   }, [isCollapsed, onCollapseChange]);
+
+  // 패널 높이 변경 감지 (ResizeObserver)
+  useEffect(() => {
+    if (!panelRef.current || !onHeightChange) return;
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        onHeightChange(entry.contentRect.height);
+      }
+    });
+
+    observer.observe(panelRef.current);
+    return () => observer.disconnect();
+  }, [onHeightChange]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (!panelRef.current) return;
