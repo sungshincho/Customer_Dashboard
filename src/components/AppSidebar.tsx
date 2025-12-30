@@ -81,7 +81,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarContent className="bg-background">
+      <SidebarContent className="bg-background dark:bg-sidebar">
         {/* Store Selector */}
         {!collapsed && stores.length > 0 && (
           <div className="p-4 border-b border-border">
@@ -106,7 +106,7 @@ export function AppSidebar() {
           </div>
         )}
 
-        {/* 메인 메뉴 (3개) */}
+        {/* 메인 메뉴 (4개) */}
         <SidebarGroup className="mt-4">
           <SidebarGroupContent>
             <SidebarMenu className="space-y-2">
@@ -117,23 +117,23 @@ export function AppSidebar() {
                     <SidebarMenuButton asChild className="h-auto py-3">
                       <NavLink
                         to={item.url}
-                        className={`hover:bg-muted/50 rounded-lg transition-colors ${
-                          active ? 'bg-primary/10 border-l-4 border-primary' : ''
+                        className={`hover:bg-muted/50 dark:hover:bg-white/10 rounded-lg transition-colors ${
+                          active ? 'bg-primary/10 dark:bg-white/10 border-l-4 border-primary dark:border-white' : ''
                         }`}
-                        activeClassName="bg-primary/10 text-primary font-medium"
+                        activeClassName="bg-primary/10 dark:bg-white/10 text-primary dark:text-white font-medium"
                       >
                         <div className="flex items-center gap-3">
                           {collapsed ? (
                             <span className="text-lg">{item.emoji}</span>
                           ) : (
-                            <item.icon className={`h-5 w-5 ${active ? 'text-primary' : ''}`} />
+                            <item.icon className={`h-5 w-5 text-foreground dark:text-white ${active ? 'text-primary dark:text-white' : ''}`} />
                           )}
                           {!collapsed && (
                             <div className="flex flex-col">
-                              <span className={`font-medium ${active ? 'text-primary' : ''}`}>
+                              <span className={`font-medium text-foreground dark:text-white ${active ? 'text-primary dark:text-white' : ''}`}>
                                 {item.title}
                               </span>
-                              <span className="text-xs text-muted-foreground">
+                              <span className="text-xs text-muted-foreground dark:text-white/60">
                                 {item.description}
                               </span>
                             </div>
@@ -151,8 +151,8 @@ export function AppSidebar() {
         {/* 하단 브랜딩 */}
         {!collapsed && (
           <div className="absolute bottom-4 left-0 right-0 px-4">
-            <div className="text-center text-xs text-muted-foreground">
-              <div className="font-semibold text-primary">NEURALTWIN</div>
+            <div className="text-center text-xs text-muted-foreground dark:text-white/60">
+              <div className="font-semibold text-primary dark:text-white">NEURALTWIN</div>
               <div>AI-Powered Retail Platform</div>
             </div>
           </div>

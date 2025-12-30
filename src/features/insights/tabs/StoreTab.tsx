@@ -2,18 +2,12 @@
  * StoreTab.tsx
  *
  * 인사이트 허브 - 매장 탭
- * 시간대별 방문 패턴, 존별 체류시간, 피크타임 분석
- * 센서 커버율(Tracking Coverage) 표시
- *
- * 데이터 소스:
- * - funnel_events: 시간대별 방문 패턴 (Footfall 기준)
- * - zone_daily_metrics: 존별 체류시간 및 방문자
- * - zones_dim: 존 정보
+ * 3D Glassmorphism Design + Dark Mode Support
  */
 
-import { useMemo } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useMemo, useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { Glass3DCard, Icon3D, text3DStyles } from '@/components/ui/glass-card';
 import {
   BarChart,
   Bar,
@@ -44,13 +38,55 @@ import { formatDuration } from '../components';
 
 const ZONE_COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe'];
 
+// 3D Text 스타일 (다크모드 지원)
+const getText3D = (isDark: boolean) => ({
+  heroNumber: isDark ? {
+    fontWeight: 800,
+    letterSpacing: '-0.04em',
+    color: '#ffffff',
+    textShadow: '0 2px 4px rgba(0,0,0,0.4)',
+  } as React.CSSProperties : text3DStyles.heroNumber,
+  number: isDark ? {
+    fontWeight: 800,
+    letterSpacing: '-0.03em',
+    color: '#ffffff',
+    textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+  } as React.CSSProperties : text3DStyles.number,
+  label: isDark ? {
+    fontWeight: 700,
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase' as const,
+    fontSize: '9px',
+    color: 'rgba(255,255,255,0.5)',
+  } as React.CSSProperties : text3DStyles.label,
+  body: isDark ? {
+    fontWeight: 500,
+    color: 'rgba(255,255,255,0.6)',
+  } as React.CSSProperties : text3DStyles.body,
+});
+
 export function StoreTab() {
   const { selectedStore } = useSelectedStore();
   const { dateRange } = useDateFilterStore();
   const { user, orgId } = useAuth();
   const { data: metrics } = useInsightMetrics();
+  const [isDark, setIsDark] = useState(false);
 
-  // 시간대별 방문 데이터 (funnel_events에서 entry 이벤트 집계)
+  // 다크모드 감지
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkDarkMode();
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
+  const text3D = getText3D(isDark);
+  const iconColor = isDark ? 'rgba(255,255,255,0.8)' : '#1a1a1f';
+
+  // 시간대별 방문 데이터
   const { data: hourlyData } = useQuery({
     queryKey: ['store-hourly-visits', selectedStore?.id, dateRange, orgId],
     queryFn: async () => {
@@ -65,19 +101,14 @@ export function StoreTab() {
         .gte('event_date', dateRange.startDate)
         .lte('event_date', dateRange.endDate);
 
-      if (error) {
-        console.error('Error fetching hourly data:', error);
-        return [];
-      }
+      if (error) return [];
 
-      // 시간대별 집계
       const hourlyMap = new Map<number, number>();
       (data || []).forEach((d) => {
         const hour = d.event_hour || 0;
         hourlyMap.set(hour, (hourlyMap.get(hour) || 0) + 1);
       });
 
-      // 0-23시 데이터 생성
       return Array.from({ length: 24 }, (_, hour) => ({
         hour: `${hour}시`,
         visitors: hourlyMap.get(hour) || 0,
@@ -86,28 +117,18 @@ export function StoreTab() {
     enabled: !!selectedStore?.id && !!orgId,
   });
 
-  // 존별 데이터 (zone_daily_metrics 테이블)
+  // 존별 데이터
   const { data: rawZoneMetrics } = useZoneMetricsByDateRange(
     selectedStore?.id,
     dateRange.startDate,
     dateRange.endDate
   );
-
-  // 존 정보
   const { data: zonesDim } = useZonesDim(selectedStore?.id);
 
-  // 존별 집계 데이터
   const zoneData = useMemo(() => {
     if (!rawZoneMetrics || rawZoneMetrics.length === 0) return [];
 
-    // zone_id별 집계
-    const zoneMap = new Map<string, {
-      visitors: number;
-      dwell: number;
-      conversion: number;
-      count: number
-    }>();
-
+    const zoneMap = new Map<string, { visitors: number; dwell: number; conversion: number; count: number }>();
     rawZoneMetrics.forEach((m: any) => {
       const existing = zoneMap.get(m.zone_id) || { visitors: 0, dwell: 0, conversion: 0, count: 0 };
       zoneMap.set(m.zone_id, {
@@ -118,7 +139,6 @@ export function StoreTab() {
       });
     });
 
-    // zone_id를 zone 이름으로 매핑
     const zoneNameMap = new Map(
       (zonesDim || []).map((z: any) => [z.id, z.zone_name || z.name || z.id])
     );
@@ -126,173 +146,148 @@ export function StoreTab() {
     return Array.from(zoneMap.entries()).map(([zoneId, data]) => ({
       name: zoneNameMap.get(zoneId) || zoneId.substring(0, 8),
       visitors: data.visitors,
-      avgDwell: Math.round((data.dwell / Math.max(data.count, 1)) / 60), // 초 → 분 변환
-      conversion: data.visitors > 0
-        ? ((data.conversion / data.visitors) * 100).toFixed(1)
-        : '0',
+      avgDwell: Math.round((data.dwell / Math.max(data.count, 1)) / 60),
+      conversion: data.visitors > 0 ? ((data.conversion / data.visitors) * 100).toFixed(1) : '0',
     })).sort((a, b) => b.visitors - a.visitors);
   }, [rawZoneMetrics, zonesDim]);
 
-  // 피크타임 계산
   const peakHour = useMemo(() => {
     if (!hourlyData || hourlyData.length === 0) return null;
-    return hourlyData.reduce(
-      (max, item) => (item.visitors > (max?.visitors || 0) ? item : max),
-      hourlyData[0]
-    );
-  }, [hourlyData]);
-
-  // 총 방문자 수
-  const totalVisitors = useMemo(() => {
-    return hourlyData?.reduce((sum, h) => sum + h.visitors, 0) || 0;
+    return hourlyData.reduce((max, item) => (item.visitors > (max?.visitors || 0) ? item : max), hourlyData[0]);
   }, [hourlyData]);
 
   return (
     <div className="space-y-6">
       {/* 요약 카드 */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <span className="text-[10px] text-muted-foreground uppercase">Peak Time</span>
-            </CardTitle>
-            <p className="text-xs text-muted-foreground -mt-1">피크타임</p>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{peakHour?.hour || '-'}</div>
-            <p className="text-xs text-muted-foreground">
-              {peakHour?.visitors || 0}명 방문
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-muted-foreground" />
-              <span className="text-[10px] text-muted-foreground uppercase">Popular Zone</span>
-            </CardTitle>
-            <p className="text-xs text-muted-foreground -mt-1">인기 존</p>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {zoneData?.[0]?.name || '-'}
+        <Glass3DCard dark={isDark}>
+          <div className="p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <Icon3D size={40} dark={isDark}>
+                <Clock className="h-5 w-5" style={{ color: iconColor }} />
+              </Icon3D>
+              <div>
+                <p style={text3D.label}>PEAK TIME</p>
+                <p style={{ fontSize: '12px', ...text3D.body }}>피크타임</p>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {zoneData?.[0]?.visitors?.toLocaleString() || 0}회 방문
-            </p>
-          </CardContent>
-        </Card>
+            <p style={{ fontSize: '28px', ...text3D.heroNumber }}>{peakHour?.hour || '0시'}</p>
+            <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>{peakHour?.visitors || 0}명 방문</p>
+          </div>
+        </Glass3DCard>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Users className="h-4 w-4 text-muted-foreground" />
-              <span className="text-[10px] text-muted-foreground uppercase">Avg Dwell Time</span>
-            </CardTitle>
-            <p className="text-xs text-muted-foreground -mt-1">평균 체류시간</p>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
+        <Glass3DCard dark={isDark}>
+          <div className="p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <Icon3D size={40} dark={isDark}>
+                <MapPin className="h-5 w-5" style={{ color: iconColor }} />
+              </Icon3D>
+              <div>
+                <p style={text3D.label}>POPULAR ZONE</p>
+                <p style={{ fontSize: '12px', ...text3D.body }}>인기 존</p>
+              </div>
+            </div>
+            <p style={{ fontSize: '28px', ...text3D.heroNumber }}>{zoneData?.[0]?.name || '-'}</p>
+            <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>{zoneData?.[0]?.visitors?.toLocaleString() || 0}회 방문</p>
+          </div>
+        </Glass3DCard>
+
+        <Glass3DCard dark={isDark}>
+          <div className="p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <Icon3D size={40} dark={isDark}>
+                <Users className="h-5 w-5" style={{ color: iconColor }} />
+              </Icon3D>
+              <div>
+                <p style={text3D.label}>AVG DWELL TIME</p>
+                <p style={{ fontSize: '12px', ...text3D.body }}>평균 체류시간</p>
+              </div>
+            </div>
+            <p style={{ fontSize: '28px', ...text3D.heroNumber }}>
               {metrics?.avgDwellTime ? formatDuration(metrics.avgDwellTime) :
-                (zoneData?.length
-                  ? `${Math.round(zoneData.reduce((s, z) => s + z.avgDwell, 0) / zoneData.length)}분`
-                  : '0분')}
-            </div>
-            <p className="text-xs text-muted-foreground">전체 존 평균</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Radio className="h-4 w-4 text-muted-foreground" />
-              <span className="text-[10px] text-muted-foreground uppercase">Tracking Coverage</span>
-            </CardTitle>
-            <p className="text-xs text-muted-foreground -mt-1">센서 커버율</p>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {metrics?.trackingCoverage?.toFixed(1) || '0'}%
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {metrics?.trackedVisitors?.toLocaleString() || 0}명 추적
+                (zoneData?.length ? `${Math.round(zoneData.reduce((s, z) => s + z.avgDwell, 0) / zoneData.length)}분` : '0분')}
             </p>
-          </CardContent>
-        </Card>
+            <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>전체 존 평균</p>
+          </div>
+        </Glass3DCard>
+
+        <Glass3DCard dark={isDark}>
+          <div className="p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <Icon3D size={40} dark={isDark}>
+                <Radio className="h-5 w-5" style={{ color: iconColor }} />
+              </Icon3D>
+              <div>
+                <p style={text3D.label}>TRACKING COVERAGE</p>
+                <p style={{ fontSize: '12px', ...text3D.body }}>센서 커버율</p>
+              </div>
+            </div>
+            <p style={{ fontSize: '28px', ...text3D.heroNumber }}>{metrics?.trackingCoverage?.toFixed(1) || '0'}%</p>
+            <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>{metrics?.trackedVisitors?.toLocaleString() || 0}명 추적</p>
+          </div>
+        </Glass3DCard>
       </div>
 
       {/* 센서 커버율 안내 */}
       {metrics?.trackedVisitors && metrics.uniqueVisitors > 0 && (
-        <div className="p-3 bg-slate-500/10 border border-slate-500/20 rounded-lg flex items-start gap-2">
-          <Info className="h-4 w-4 text-slate-500 mt-0.5 flex-shrink-0" />
-          <p className="text-sm text-muted-foreground">
-            존 분석은 센서 감지 방문객{' '}
-            <span className="font-medium text-foreground">{metrics.trackedVisitors.toLocaleString()}명</span> 기준
-            (전체 {metrics.uniqueVisitors.toLocaleString()}명의{' '}
-            <span className="font-medium text-foreground">{metrics.trackingCoverage.toFixed(0)}%</span>)
+        <div className={`p-3 rounded-lg flex items-start gap-2 ${isDark ? 'bg-white/5 border border-white/10' : 'bg-black/5 border border-black/10'}`}>
+          <Info className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }} />
+          <p style={{ fontSize: '13px', ...text3D.body }}>
+            존 분석은 센서 감지 방문객 <span style={{ fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>{metrics.trackedVisitors.toLocaleString()}명</span> 기준
+            (전체 {metrics.uniqueVisitors.toLocaleString()}명의 <span style={{ fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>{metrics.trackingCoverage.toFixed(0)}%</span>)
           </p>
         </div>
       )}
 
       {/* 시간대별 방문 패턴 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>시간대별 방문 패턴 (Footfall 기준)</CardTitle>
-          <CardDescription>시간대별 입장 횟수 ({dateRange.startDate} ~ {dateRange.endDate})</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <Glass3DCard dark={isDark}>
+        <div className="p-6">
+          <h3 style={{ fontSize: '16px', marginBottom: '4px', ...text3D.number }}>시간대별 방문 패턴</h3>
+          <p style={{ fontSize: '12px', marginBottom: '20px', ...text3D.body }}>시간대별 입장 횟수</p>
           {hourlyData && hourlyData.some(h => h.visitors > 0) ? (
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={hourlyData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="hour" interval={2} />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="visitors" fill="hsl(var(--primary))" name="방문자" />
+                <CartesianGrid strokeDasharray="3 3" stroke={isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'} />
+                <XAxis dataKey="hour" interval={2} tick={{ fill: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280', fontSize: 11 }} />
+                <YAxis tick={{ fill: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280', fontSize: 11 }} />
+                <Tooltip contentStyle={{ background: isDark ? '#1a1a1f' : '#fff', border: 'none', borderRadius: 8 }} />
+                <Bar dataKey="visitors" fill={isDark ? '#ffffff' : '#1a1a1f'} name="방문자" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+            <div className="h-[300px] flex items-center justify-center" style={text3D.body}>
               해당 기간에 방문 데이터가 없습니다
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </Glass3DCard>
 
       {/* 존별 성과 */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>존별 체류시간</CardTitle>
-            <CardDescription>각 존별 평균 체류시간 (분)</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <Glass3DCard dark={isDark}>
+          <div className="p-6">
+            <h3 style={{ fontSize: '16px', marginBottom: '4px', ...text3D.number }}>존별 체류시간</h3>
+            <p style={{ fontSize: '12px', marginBottom: '20px', ...text3D.body }}>각 존별 평균 체류시간 (분)</p>
             {zoneData && zoneData.length > 0 ? (
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={zoneData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" />
-                  <YAxis dataKey="name" type="category" width={80} />
-                  <Tooltip />
-                  <Bar dataKey="avgDwell" fill="hsl(var(--chart-2))" name="체류시간(분)" />
+                  <CartesianGrid strokeDasharray="3 3" stroke={isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'} />
+                  <XAxis type="number" tick={{ fill: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280', fontSize: 11 }} />
+                  <YAxis dataKey="name" type="category" width={80} tick={{ fill: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280', fontSize: 11 }} />
+                  <Tooltip contentStyle={{ background: isDark ? '#1a1a1f' : '#fff', border: 'none', borderRadius: 8 }} />
+                  <Bar dataKey="avgDwell" fill={isDark ? 'rgba(255,255,255,0.7)' : '#6b7280'} name="체류시간(분)" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[250px] flex items-center justify-center text-muted-foreground">
-                존 데이터가 없습니다
-              </div>
+              <div className="h-[250px] flex items-center justify-center" style={text3D.body}>존 데이터가 없습니다</div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </Glass3DCard>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>존별 방문자 분포</CardTitle>
-            <CardDescription>각 존별 방문자 비율</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <Glass3DCard dark={isDark}>
+          <div className="p-6">
+            <h3 style={{ fontSize: '16px', marginBottom: '4px', ...text3D.number }}>존별 방문자 분포</h3>
+            <p style={{ fontSize: '12px', marginBottom: '20px', ...text3D.body }}>각 존별 방문자 비율</p>
             {zoneData && zoneData.length > 0 ? (
               <ResponsiveContainer width="100%" height={250}>
                 <PieChart>
@@ -309,45 +304,48 @@ export function StoreTab() {
                       <Cell key={index} fill={ZONE_COLORS[index % ZONE_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip contentStyle={{ background: isDark ? '#1a1a1f' : '#fff', border: 'none', borderRadius: 8 }} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[250px] flex items-center justify-center text-muted-foreground">
-                존 데이터가 없습니다
-              </div>
+              <div className="h-[250px] flex items-center justify-center" style={text3D.body}>존 데이터가 없습니다</div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </Glass3DCard>
       </div>
 
       {/* 존별 상세 테이블 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>존별 성과 비교</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <Glass3DCard dark={isDark}>
+        <div className="p-6">
+          <h3 style={{ fontSize: '16px', marginBottom: '20px', ...text3D.number }}>존별 성과 비교</h3>
           {zoneData && zoneData.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 px-4">존</th>
-                    <th className="text-right py-3 px-4">방문자</th>
-                    <th className="text-right py-3 px-4">체류시간</th>
-                    <th className="text-right py-3 px-4">전환율</th>
+                  <tr style={{ borderBottom: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.1)' }}>
+                    <th className="text-left py-3 px-4" style={text3D.body}>존</th>
+                    <th className="text-right py-3 px-4" style={text3D.body}>방문자</th>
+                    <th className="text-right py-3 px-4" style={text3D.body}>체류시간</th>
+                    <th className="text-right py-3 px-4" style={text3D.body}>전환율</th>
                   </tr>
                 </thead>
                 <tbody>
                   {zoneData?.map((zone) => (
-                    <tr key={zone.name} className="border-b hover:bg-muted/50">
-                      <td className="py-3 px-4 font-medium">{zone.name}</td>
-                      <td className="text-right py-3 px-4">{zone.visitors.toLocaleString()}명</td>
-                      <td className="text-right py-3 px-4">{zone.avgDwell}분</td>
+                    <tr key={zone.name} style={{ borderBottom: isDark ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(0,0,0,0.05)' }}>
+                      <td className="py-3 px-4" style={{ fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>{zone.name}</td>
+                      <td className="text-right py-3 px-4" style={text3D.body}>{zone.visitors.toLocaleString()}명</td>
+                      <td className="text-right py-3 px-4" style={text3D.body}>{zone.avgDwell}분</td>
                       <td className="text-right py-3 px-4">
-                        <Badge variant={parseFloat(zone.conversion) > 20 ? 'default' : 'secondary'}>
+                        <span style={{
+                          padding: '4px 8px',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          background: parseFloat(zone.conversion) > 20 ? (isDark ? 'rgba(255,255,255,0.2)' : '#1a1a1f') : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'),
+                          color: parseFloat(zone.conversion) > 20 ? (isDark ? '#fff' : '#fff') : (isDark ? 'rgba(255,255,255,0.7)' : '#6b7280'),
+                        }}>
                           {zone.conversion}%
-                        </Badge>
+                        </span>
                       </td>
                     </tr>
                   ))}
@@ -355,12 +353,10 @@ export function StoreTab() {
               </table>
             </div>
           ) : (
-            <div className="py-8 text-center text-muted-foreground">
-              해당 기간에 존 데이터가 없습니다
-            </div>
+            <div className="py-8 text-center" style={text3D.body}>해당 기간에 존 데이터가 없습니다</div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </Glass3DCard>
     </div>
   );
 }

@@ -2,11 +2,11 @@
  * DashboardLayout.tsx
  *
  * 3D Glassmorphism Dashboard Layout
- * - Glass cube background image
- * - Dark glassmorphism header
- * - Ambient light effects
+ * - Dark mode support for background
+ * - Monochrome (Black/White) theme
  */
 
+import { useState, useEffect } from "react";
 import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -30,6 +30,24 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const { user, signOut } = useAuth();
+  const [isDark, setIsDark] = useState(false);
+
+  // 다크모드 감지
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    
+    checkDarkMode();
+    
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, { 
+      attributes: true, 
+      attributeFilter: ['class'] 
+    });
+    
+    return () => observer.disconnect();
+  }, []);
 
   const getUserInitial = () => {
     return user?.email?.charAt(0).toUpperCase() || "U";
@@ -40,67 +58,45 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       <div className="flex min-h-screen w-full relative">
         {/* ===== Background Layers ===== */}
         
-        {/* Base gradient */}
+        {/* Base gradient - 다크모드 반전 */}
         <div
-          className="fixed inset-0 pointer-events-none"
+          className="fixed inset-0 pointer-events-none transition-colors duration-300"
           style={{
-            background: `linear-gradient(180deg, 
-              #C8CCD4 0%, 
-              #D4D8E0 20%, 
-              #CDD1D9 45%, 
-              #C5C9D2 70%, 
-              #D0D4DC 100%
-            )`,
+            background: isDark 
+              ? `linear-gradient(180deg, 
+                  #0a0a0c 0%, 
+                  #111114 20%, 
+                  #0d0d10 45%, 
+                  #0a0a0c 70%, 
+                  #0f0f12 100%
+                )`
+              : `linear-gradient(180deg, 
+                  #e8e8ec 0%, 
+                  #f0f0f4 20%, 
+                  #eaeaee 45%, 
+                  #e5e5e9 70%, 
+                  #ededed 100%
+                )`,
             zIndex: 0,
           }}
         />
 
-        {/* Glass cube image - main layer */}
+        {/* Gradient overlays - 다크모드 반전 */}
         <div
-          className="fixed inset-0 pointer-events-none"
+          className="fixed inset-0 pointer-events-none transition-opacity duration-300"
           style={{
-            backgroundImage: 'url(/images/glass-cube-bg.png)',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            opacity: 0.4,
-            mixBlendMode: 'soft-light',
-            zIndex: 1,
-          }}
-        />
-
-        {/* Glass cube image - blur layer for depth */}
-        <div
-          className="fixed inset-0 pointer-events-none"
-          style={{
-            backgroundImage: 'url(/images/glass-cube-bg.png)',
-            backgroundSize: '120% auto',
-            backgroundPosition: 'center 60%',
-            opacity: 0.15,
-            filter: 'blur(30px)',
-            zIndex: 2,
-          }}
-        />
-
-        {/* Gradient overlays for readability */}
-        <div
-          className="fixed inset-0 pointer-events-none"
-          style={{
-            background: `
-              radial-gradient(ellipse 100% 80% at 50% 0%, rgba(255,255,255,0.5) 0%, transparent 50%),
-              radial-gradient(ellipse 80% 50% at 0% 100%, rgba(200,205,215,0.4) 0%, transparent 40%),
-              radial-gradient(ellipse 60% 40% at 100% 80%, rgba(195,200,210,0.35) 0%, transparent 40%)
-            `,
+            background: isDark
+              ? `
+                radial-gradient(ellipse 100% 80% at 50% 0%, rgba(30,30,35,0.6) 0%, transparent 50%),
+                radial-gradient(ellipse 80% 50% at 0% 100%, rgba(20,20,25,0.4) 0%, transparent 40%),
+                radial-gradient(ellipse 60% 40% at 100% 80%, rgba(25,25,30,0.35) 0%, transparent 40%)
+              `
+              : `
+                radial-gradient(ellipse 100% 80% at 50% 0%, rgba(255,255,255,0.6) 0%, transparent 50%),
+                radial-gradient(ellipse 80% 50% at 0% 100%, rgba(220,220,228,0.4) 0%, transparent 40%),
+                radial-gradient(ellipse 60% 40% at 100% 80%, rgba(215,215,223,0.35) 0%, transparent 40%)
+              `,
             zIndex: 3,
-          }}
-        />
-
-        {/* Noise texture */}
-        <div
-          className="fixed inset-0 pointer-events-none"
-          style={{
-            opacity: 0.03,
-            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
-            zIndex: 4,
           }}
         />
 
@@ -108,27 +104,48 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <AppSidebar />
         
         <div className="flex-1 flex flex-col relative" style={{ zIndex: 10 }}>
-          {/* Dark Glass Header */}
+          {/* Header - 다크모드 반전 */}
           <header
-            className="sticky top-0 z-40 flex h-14 items-center gap-4 px-4 lg:px-6"
+            className="sticky top-0 z-40 flex h-14 items-center gap-4 px-4 lg:px-6 transition-all duration-300"
             style={{
-              background: 'linear-gradient(165deg, rgba(48,48,58,0.98) 0%, rgba(32,32,40,0.97) 30%, rgba(42,42,52,0.98) 60%, rgba(35,35,45,0.97) 100%)',
+              background: isDark 
+                ? 'linear-gradient(165deg, rgba(20,20,24,0.98) 0%, rgba(12,12,15,0.97) 30%, rgba(16,16,20,0.98) 60%, rgba(14,14,18,0.97) 100%)'
+                : 'linear-gradient(165deg, rgba(255,255,255,0.95) 0%, rgba(250,250,252,0.92) 30%, rgba(255,255,255,0.95) 60%, rgba(248,248,250,0.92) 100%)',
               backdropFilter: 'blur(40px) saturate(180%)',
               WebkitBackdropFilter: 'blur(40px) saturate(180%)',
-              borderBottom: '1px solid rgba(255,255,255,0.08)',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.2), 0 8px 16px rgba(0,0,0,0.15)',
+              borderBottom: isDark 
+                ? '1px solid rgba(255,255,255,0.08)' 
+                : '1px solid rgba(0,0,0,0.06)',
+              boxShadow: isDark 
+                ? '0 2px 4px rgba(0,0,0,0.3), 0 8px 16px rgba(0,0,0,0.2)' 
+                : '0 1px 2px rgba(0,0,0,0.03), 0 4px 8px rgba(0,0,0,0.04)',
             }}
           >
-            {/* Sidebar Trigger - Light icon */}
-            <SidebarTrigger className="text-white/80 hover:text-white hover:bg-white/10" />
+            {/* Sidebar Trigger */}
+            <SidebarTrigger 
+              className={isDark 
+                ? "text-white/80 hover:text-white hover:bg-white/10" 
+                : "text-black/70 hover:text-black hover:bg-black/5"
+              } 
+            />
             
             <div className="flex-1" />
             
-            {/* Theme Toggle - Light icon */}
-            <ThemeToggle className="text-white/80 hover:text-white hover:bg-white/10" />
+            {/* Theme Toggle */}
+            <ThemeToggle 
+              className={isDark 
+                ? "text-white/80 hover:text-white hover:bg-white/10" 
+                : "text-black/70 hover:text-black hover:bg-black/5"
+              } 
+            />
             
-            {/* Notification Center - Light icon */}
-            <NotificationCenter className="text-white/80 hover:text-white hover:bg-white/10" />
+            {/* Notification Center */}
+            <NotificationCenter 
+              className={isDark 
+                ? "text-white/80 hover:text-white hover:bg-white/10" 
+                : "text-black/70 hover:text-black hover:bg-black/5"
+              } 
+            />
             
             {/* User Menu */}
             <DropdownMenu>
@@ -136,11 +153,17 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="rounded-full hover:bg-white/10"
+                  className={`rounded-full ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/5'}`}
                   style={{
-                    background: 'linear-gradient(145deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.05) 100%)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.1), 0 2px 4px rgba(0,0,0,0.2)',
+                    background: isDark 
+                      ? 'linear-gradient(145deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.05) 100%)'
+                      : 'linear-gradient(145deg, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.03) 100%)',
+                    border: isDark 
+                      ? '1px solid rgba(255,255,255,0.1)' 
+                      : '1px solid rgba(0,0,0,0.08)',
+                    boxShadow: isDark 
+                      ? 'inset 0 1px 1px rgba(255,255,255,0.1), 0 2px 4px rgba(0,0,0,0.2)'
+                      : 'inset 0 1px 1px rgba(255,255,255,0.8), 0 1px 2px rgba(0,0,0,0.05)',
                   }}
                 >
                   <Avatar className="h-8 w-8">
@@ -153,9 +176,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     >
                       <span
                         style={{
-                          background: 'linear-gradient(180deg, #ffffff 0%, #d0d0d5 100%)',
-                          WebkitBackgroundClip: 'text',
-                          WebkitTextFillColor: 'transparent',
+                          color: isDark ? '#ffffff' : '#1a1a1f',
                         }}
                       >
                         {getUserInitial()}
@@ -168,22 +189,31 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 align="end"
                 className="w-56"
                 style={{
-                  background: 'linear-gradient(165deg, rgba(48,48,58,0.98) 0%, rgba(35,35,45,0.97) 100%)',
+                  background: isDark 
+                    ? 'linear-gradient(165deg, rgba(20,20,24,0.98) 0%, rgba(14,14,18,0.97) 100%)'
+                    : 'linear-gradient(165deg, rgba(255,255,255,0.98) 0%, rgba(250,250,252,0.97) 100%)',
                   backdropFilter: 'blur(40px)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  boxShadow: '0 4px 6px rgba(0,0,0,0.2), 0 10px 20px rgba(0,0,0,0.25)',
+                  border: isDark 
+                    ? '1px solid rgba(255,255,255,0.1)' 
+                    : '1px solid rgba(0,0,0,0.08)',
+                  boxShadow: isDark 
+                    ? '0 4px 6px rgba(0,0,0,0.3), 0 10px 20px rgba(0,0,0,0.35)'
+                    : '0 4px 6px rgba(0,0,0,0.05), 0 10px 20px rgba(0,0,0,0.08)',
                 }}
               >
                 <DropdownMenuLabel>
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium text-white/90">내 계정</p>
-                    <p className="text-xs text-white/50">{user?.email}</p>
+                    <p className={`text-sm font-medium ${isDark ? 'text-white/90' : 'text-black/90'}`}>내 계정</p>
+                    <p className={`text-xs ${isDark ? 'text-white/50' : 'text-black/50'}`}>{user?.email}</p>
                   </div>
                 </DropdownMenuLabel>
-                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuSeparator className={isDark ? 'bg-white/10' : 'bg-black/10'} />
                 <DropdownMenuItem 
                   onClick={signOut}
-                  className="text-white/80 hover:text-white hover:bg-white/10 focus:bg-white/10 focus:text-white"
+                  className={isDark 
+                    ? 'text-white/80 hover:text-white hover:bg-white/10 focus:bg-white/10 focus:text-white'
+                    : 'text-black/80 hover:text-black hover:bg-black/5 focus:bg-black/5 focus:text-black'
+                  }
                 >
                   <LogOut className="mr-2 h-4 w-4" />
                   로그아웃

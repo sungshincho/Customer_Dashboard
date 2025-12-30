@@ -4,7 +4,7 @@
  * 모든 시뮬레이션(2D/3D) 적용 결과를 한 곳에서 추적하고 ROI를 측정
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,18 @@ export const ROIMeasurementPage: React.FC = () => {
   const { selectedStore } = useSelectedStore();
   const [dateRange, setDateRange] = useState<DateRange>('90d');
   const [selectedStrategyId, setSelectedStrategyId] = useState<string | null>(null);
+  const [isDark, setIsDark] = useState(false);
+
+  // 다크모드 감지
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkDarkMode();
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   // 데이터 훅
   const {
@@ -99,20 +111,20 @@ export const ROIMeasurementPage: React.FC = () => {
         {/* 헤더 */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-              <div className="p-2 bg-primary/20 rounded-lg">
-                <TrendingUp className="w-6 h-6 text-primary" />
+            <h1 className={`text-2xl font-bold flex items-center gap-3 ${isDark ? 'text-white' : 'text-black'}`}>
+              <div className={`p-2 rounded-lg ${isDark ? 'bg-white/10' : 'bg-black/5'}`}>
+                <TrendingUp className={`w-6 h-6 ${isDark ? 'text-white' : 'text-black'}`} />
               </div>
               ROI 측정 대시보드
             </h1>
-            <p className="text-white/60 mt-1">
+            <p className={`mt-1 ${isDark ? 'text-white/60' : 'text-black/60'}`}>
               모든 시뮬레이션 적용 결과를 한눈에 추적하고 분석하세요
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRange)}>
-              <SelectTrigger className="w-32 bg-white/5 border-white/10 text-white">
+              <SelectTrigger className={`w-32 ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`}>
                 <SelectValue placeholder="기간 선택" />
               </SelectTrigger>
               <SelectContent>
@@ -127,12 +139,16 @@ export const ROIMeasurementPage: React.FC = () => {
               variant="outline"
               size="icon"
               onClick={handleRefresh}
-              className="border-white/10 hover:bg-white/5"
+              className={isDark ? 'border-white/10 hover:bg-white/5' : 'border-black/10 hover:bg-black/5'}
             >
               <RefreshCw className="w-4 h-4" />
             </Button>
 
-            <Button variant="outline" onClick={handleExportAll} className="border-white/10">
+            <Button 
+              variant="outline" 
+              onClick={handleExportAll} 
+              className={isDark ? 'border-white/10 hover:bg-white/5' : 'border-black/10 hover:bg-black/5'}
+            >
               <Download className="w-4 h-4 mr-2" />
               내보내기
             </Button>
