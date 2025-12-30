@@ -199,7 +199,7 @@ const iconMap = {
 };
 
 export function GoalProgressWidget() {
-  const { progressList, isLoading } = useGoalProgress();
+  const { data: progressList = [], isLoading } = useGoalProgress();
   const deleteGoal = useDeleteGoal();
   const [isDark, setIsDark] = useState(false);
 
