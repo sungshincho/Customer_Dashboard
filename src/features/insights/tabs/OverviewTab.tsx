@@ -402,9 +402,9 @@ export function OverviewTab() {
       {/* 방문 빈도 안내 */}
       {metrics?.visitFrequency && metrics.visitFrequency > 1 && (
         <div className={cn("p-3 rounded-lg flex items-start gap-2",
-          isDark ? "bg-blue-500/20 border border-blue-500/30" : "bg-blue-500/10 border border-blue-500/20"
+          isDark ? "bg-white/5 border border-white/10" : "bg-black/[0.02] border border-black/5"
         )}>
-          <Info className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+          <Info className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }} />
           <p className={cn("text-sm", isDark ? "text-white/70" : "text-muted-foreground")}>
             <span className={cn("font-medium", isDark ? "text-white" : "text-foreground")}>
               평균 방문 빈도 {metrics.visitFrequency.toFixed(1)}회:
@@ -430,16 +430,16 @@ export function OverviewTab() {
             {/* Drop-off Alert */}
             <div style={{
               padding: '10px 14px', borderRadius: '10px', marginTop: '16px',
-              background: isDark ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.08)',
-              border: isDark ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(239,68,68,0.15)',
+              background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+              border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.06)',
               display: 'flex', alignItems: 'center', gap: '8px',
             }}>
               <div style={{
                 width: '20px', height: '20px', borderRadius: '50%',
-                background: isDark ? 'rgba(239,68,68,0.3)' : 'rgba(239,68,68,0.15)',
+                background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <span style={{ color: '#ef4444', fontSize: '12px' }}>!</span>
+                <span style={{ color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280', fontSize: '12px' }}>!</span>
               </div>
               <span style={{ fontSize: '12px', color: isDark ? 'rgba(255,255,255,0.8)' : '#515158' }}>
                 최대 이탈 구간: 입장 → 탐색
