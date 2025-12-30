@@ -36,6 +36,8 @@ interface DraggablePanelProps {
   collapsible?: boolean;
   closable?: boolean;
   onClose?: () => void;
+  /** 접힘 상태 변경 시 콜백 */
+  onCollapseChange?: (isCollapsed: boolean) => void;
   width?: string;
   /** 리사이즈 가능 여부 */
   resizable?: boolean;
@@ -58,6 +60,7 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
   collapsible = true,
   closable = false,
   onClose,
+  onCollapseChange,
   width = 'w-64',
   resizable = true,
   minSize = { width: 180, height: 100 },
@@ -90,6 +93,11 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
       setPosition(prev => ({ ...prev, y: syncY }));
     }
   }, [syncY]);
+
+  // 접힘 상태 변경 시 부모에게 알림
+  useEffect(() => {
+    onCollapseChange?.(isCollapsed);
+  }, [isCollapsed, onCollapseChange]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (!panelRef.current) return;

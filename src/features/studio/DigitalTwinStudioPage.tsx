@@ -200,7 +200,11 @@ export default function DigitalTwinStudioPage() {
   // 플로팅 패널 위치 상수
   const FLOATING_PANEL_TOP = 60;  // ViewModeToggle 아래 시작점
   const FLOATING_PANEL_GAP = 8;   // 패널 간 간격
-  const SCENE_SAVE_PANEL_HEIGHT = 280;  // 씬 저장 패널 높이
+  const SCENE_SAVE_PANEL_HEIGHT = 280;  // 씬 저장 패널 높이 (펼침)
+  const SCENE_SAVE_PANEL_COLLAPSED_HEIGHT = 40;  // 씬 저장 패널 높이 (접힘, 헤더만)
+
+  // 씬 저장 패널 접힘 상태
+  const [isSceneSavePanelCollapsed, setIsSceneSavePanelCollapsed] = useState(false);
 
   // As-Is / To-Be / Split 뷰 모드
   const [viewMode, setViewMode] = useState<ViewMode>('as-is');
@@ -212,6 +216,13 @@ export default function DigitalTwinStudioPage() {
     property: true,
     resultReport: false // 결과 있을 때만 자동 표시
   });
+
+  // 씬 저장 패널이 닫히면 접힘 상태 초기화
+  useEffect(() => {
+    if (!visiblePanels.sceneSave) {
+      setIsSceneSavePanelCollapsed(false);
+    }
+  }, [visiblePanels.sceneSave]);
 
   // 시뮬레이션 결과 상태
   const [simulationResults, setSimulationResults] = useState<SimulationResults>({
@@ -1268,11 +1279,12 @@ export default function DigitalTwinStudioPage() {
                 id="scene-save"
                 title="씬 저장"
                 icon={<Save className="w-4 h-4" />}
-                defaultPosition={{ x: 0, y: 60 }}
+                defaultPosition={{ x: 0, y: FLOATING_PANEL_TOP }}
                 rightOffset={16}
                 defaultCollapsed={false}
                 closable={true}
                 onClose={() => closePanel('sceneSave')}
+                onCollapseChange={setIsSceneSavePanelCollapsed}
                 width="w-52"
               >
                 <SceneSavePanel
@@ -1321,7 +1333,7 @@ export default function DigitalTwinStudioPage() {
                 }}
                 defaultPosition={{ x: 0, y: FLOATING_PANEL_TOP }}
                 syncY={visiblePanels.sceneSave
-                  ? FLOATING_PANEL_TOP + SCENE_SAVE_PANEL_HEIGHT + FLOATING_PANEL_GAP
+                  ? FLOATING_PANEL_TOP + (isSceneSavePanelCollapsed ? SCENE_SAVE_PANEL_COLLAPSED_HEIGHT : SCENE_SAVE_PANEL_HEIGHT) + FLOATING_PANEL_GAP
                   : FLOATING_PANEL_TOP}
                 rightOffset={16}
               />
