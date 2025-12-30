@@ -30,6 +30,8 @@ interface DraggablePanelProps {
   defaultPosition?: Position;
   /** 오른쪽 끝에서의 오프셋 (픽셀) - 설정 시 left 대신 right 기준으로 배치 */
   rightOffset?: number;
+  /** 외부에서 y 위치 동기화 (변경 시 자동 업데이트) */
+  syncY?: number;
   defaultCollapsed?: boolean;
   collapsible?: boolean;
   closable?: boolean;
@@ -51,6 +53,7 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
   icon,
   defaultPosition = { x: 16, y: 16 },
   rightOffset,
+  syncY,
   defaultCollapsed = false,
   collapsible = true,
   closable = false,
@@ -80,6 +83,13 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
     const container = panelRef.current?.closest('.relative') as HTMLElement;
     containerRef.current = container;
   }, []);
+
+  // syncY가 변경되면 y 위치 동기화
+  useEffect(() => {
+    if (syncY !== undefined) {
+      setPosition(prev => ({ ...prev, y: syncY }));
+    }
+  }, [syncY]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (!panelRef.current) return;
