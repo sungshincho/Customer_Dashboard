@@ -62,15 +62,10 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
   children,
   className,
 }) => {
-  // rightOffset이 없으면 defaultPosition 사용, 있으면 나중에 계산
+  // rightOffset이 있으면 x는 사용하지 않음 (CSS right 속성 사용)
   const [position, setPosition] = useState<Position>(() => {
-    // rightOffset이 있으면 초기값은 임시로 설정 (useEffect에서 계산)
-    if (rightOffset !== undefined) {
-      return { x: 0, y: defaultPosition.y };
-    }
-    return defaultPosition;
+    return { x: defaultPosition.x, y: defaultPosition.y };
   });
-  const [isInitialized, setIsInitialized] = useState(rightOffset === undefined);
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
@@ -80,20 +75,11 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
   const dragOffset = useRef<Position>({ x: 0, y: 0 });
   const resizeStart = useRef<{ x: number; y: number; width: number; height: number }>({ x: 0, y: 0, width: 0, height: 0 });
 
-  // rightOffset이 있는 경우에만 위치 계산 (마운트 후)
+  // 컨테이너 참조 설정 (드래그 경계 계산용)
   useEffect(() => {
-    if (rightOffset === undefined || isInitialized) return;
-
-    // 부모 컨테이너 찾기
     const container = panelRef.current?.closest('.relative') as HTMLElement;
     containerRef.current = container;
-
-    const containerRect = container?.getBoundingClientRect();
-    const containerWidth = containerRect?.width || window.innerWidth;
-
-    setPosition({ x: containerWidth - rightOffset, y: defaultPosition.y });
-    setIsInitialized(true);
-  }, [rightOffset, defaultPosition.y, isInitialized]);
+  }, []);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (!panelRef.current) return;
@@ -169,11 +155,6 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
     document.addEventListener('mouseup', handleMouseUp);
   }, [size, minSize, maxSize]);
 
-  // rightOffset 사용 시 초기화 전에는 숨김
-  if (!isInitialized) {
-    return <div ref={panelRef} className="hidden" />;
-  }
-
   return (
     <div
       ref={panelRef}
@@ -185,8 +166,10 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
         className
       )}
       style={{
-        left: position.x,
-        top: position.y,
+        // rightOffset이 있으면 right 사용, 없으면 left 사용
+        ...(rightOffset !== undefined
+          ? { right: rightOffset, top: position.y }
+          : { left: position.x, top: position.y }),
         width: size?.width,
         transition: (isDragging || isResizing) ? 'none' : 'box-shadow 0.2s',
       }}
