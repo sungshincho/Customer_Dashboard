@@ -734,51 +734,10 @@ function generateFlowVisualization(
 
     console.log('[useFlowSimulation] Generated', zoneFlowArrows.length, 'flow arrows from DB data');
   } else {
-    // 폴백: 경로에서 연속적인 포인트 쌍의 이동 패턴 분석
-    console.log('[useFlowSimulation] No zone_transitions data, using path-based analysis');
-    const flowTransitions: Map<string, { from: { x: number; z: number }; to: { x: number; z: number }; count: number }> = new Map();
-
-    paths.forEach((path) => {
-      if (path.points.length < 4) return;
-
-      // 경로를 세그먼트로 나누어 주요 이동 패턴 추출
-      const segmentSize = Math.max(3, Math.floor(path.points.length / 4));
-      for (let i = 0; i < path.points.length - segmentSize; i += segmentSize) {
-        const fromPoint = path.points[i];
-        const toPoint = path.points[Math.min(i + segmentSize, path.points.length - 1)];
-
-        // 그리드화하여 키 생성 (2m 단위)
-        const fromKey = `${Math.round(fromPoint.x / 2) * 2},${Math.round(fromPoint.z / 2) * 2}`;
-        const toKey = `${Math.round(toPoint.x / 2) * 2},${Math.round(toPoint.z / 2) * 2}`;
-        const key = `${fromKey}->${toKey}`;
-
-        if (fromKey !== toKey) {
-          const existing = flowTransitions.get(key);
-          if (existing) {
-            existing.count += 1;
-          } else {
-            flowTransitions.set(key, {
-              from: { x: Math.round(fromPoint.x / 2) * 2, z: Math.round(fromPoint.z / 2) * 2 },
-              to: { x: Math.round(toPoint.x / 2) * 2, z: Math.round(toPoint.z / 2) * 2 },
-              count: 1,
-            });
-          }
-        }
-      }
-    });
-
-    // 상위 5개 이동 패턴을 화살표로 변환
-    const maxCount = Math.max(...Array.from(flowTransitions.values()).map((t) => t.count), 1);
-    Array.from(flowTransitions.values())
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5)
-      .forEach((transition) => {
-        zoneFlowArrows.push({
-          from: { x: transition.from.x, y: 0.5, z: transition.from.z },
-          to: { x: transition.to.x, y: 0.5, z: transition.to.z },
-          volume: transition.count / maxCount,
-        });
-      });
+    // 🔧 FIX: zone_transitions 데이터가 없으면 flow arrows를 표시하지 않음
+    // 이전에는 path-based mock 데이터를 생성했으나, 이는 실제 입구 위치와 무관한 잘못된 데이터였음
+    console.log('[useFlowSimulation] No zone_transitions data available - skipping flow arrows (no mock data)');
+    // zoneFlowArrows는 빈 배열로 유지
   }
 
   return {

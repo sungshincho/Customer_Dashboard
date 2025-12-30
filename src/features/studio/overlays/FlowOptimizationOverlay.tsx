@@ -101,8 +101,13 @@ export function FlowOptimizationOverlay({
   // 안전 체크: visualization 속성 확인
   const hasVisualization = visualization && typeof visualization === 'object';
   const hasFlowHeatmap = hasVisualization && Array.isArray(visualization.flowHeatmap) && visualization.flowHeatmap.length > 0;
-  const hasZoneFlowArrows = hasVisualization && Array.isArray(visualization.zoneFlowArrows);
-  const hasPaths = Array.isArray(paths);
+  // 🔧 FIX: zoneFlowArrows가 실제로 데이터를 가지고 있는지 체크 (length > 0)
+  const hasZoneFlowArrows = hasVisualization &&
+    Array.isArray(visualization.zoneFlowArrows) &&
+    visualization.zoneFlowArrows.length > 0;
+  // 🔧 FIX: paths는 zoneFlowArrows가 있을 때만 표시 (실제 zone_transitions 데이터 기반)
+  // zoneFlowArrows가 없으면 paths도 mock 데이터일 가능성이 높음
+  const hasPaths = Array.isArray(paths) && hasZoneFlowArrows;
   const hasBottlenecks = Array.isArray(bottlenecks);
 
   return (

@@ -518,7 +518,22 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
 
         const results: SimulationResults = {};
         if (layoutRes.status === 'fulfilled' && layoutRes.value.data?.result) {
-          results.layout = layoutRes.value.data.result;
+          // 🔧 FIX: productPlacements가 result 외부에 있을 수 있으므로 병합
+          const layoutData = layoutRes.value.data;
+          results.layout = {
+            ...layoutData.result,
+            // productPlacements는 result 내부 또는 외부에 있을 수 있음
+            productPlacements: layoutData.result?.productPlacements ||
+                               layoutData.productPlacements ||
+                               layoutData.result?.productMoves ||
+                               layoutData.productMoves ||
+                               [],
+          };
+          console.log('[useSceneSimulation] Layout result with productPlacements:', {
+            resultHasProductPlacements: !!layoutData.result?.productPlacements,
+            dataHasProductPlacements: !!layoutData.productPlacements,
+            productPlacementsCount: results.layout.productPlacements?.length || 0,
+          });
         } else {
           console.warn('[useSceneSimulation] No layout result:', layoutRes);
         }
@@ -528,9 +543,29 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
         } else {
           console.warn('[useSceneSimulation] No flow result:', flowRes);
         }
-        if (staffingRes.status === 'fulfilled' && staffingRes.value.data?.result) {
-          results.staffing = staffingRes.value.data.result;
-          console.log('[useSceneSimulation] Staffing result extracted:', results.staffing);
+        if (staffingRes.status === 'fulfilled') {
+          const staffingData = staffingRes.value.data;
+          // 🔧 FIX: staffing result가 다양한 위치에 있을 수 있음
+          const staffingResult = staffingData?.result || staffingData?.staffing || staffingData;
+
+          if (staffingResult && (staffingResult.staffPositions || staffingResult.metrics || staffingResult.zoneCoverage)) {
+            results.staffing = {
+              ...staffingResult,
+              // staffPositions가 다른 이름일 수 있음
+              staffPositions: staffingResult.staffPositions ||
+                              staffingResult.staff_positions ||
+                              staffingResult.positions ||
+                              [],
+            };
+            console.log('[useSceneSimulation] Staffing result extracted:', {
+              hasStaffPositions: !!results.staffing.staffPositions?.length,
+              positionsCount: results.staffing.staffPositions?.length || 0,
+              hasMetrics: !!staffingResult.metrics,
+              hasZoneCoverage: !!staffingResult.zoneCoverage,
+            });
+          } else {
+            console.warn('[useSceneSimulation] Staffing data structure unknown:', staffingData);
+          }
         } else {
           console.warn('[useSceneSimulation] No staffing result:', staffingRes);
         }
