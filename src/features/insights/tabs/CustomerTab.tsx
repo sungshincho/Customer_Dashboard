@@ -51,7 +51,69 @@ const getText3D = (isDark: boolean) => ({
 });
 
 // ============================================================================
-// 글로우 도넛 차트 (Canvas)
+// 툴팁 컴포넌트
+// ============================================================================
+interface TooltipData {
+  x: number;
+  y: number;
+  title: string;
+  value: string;
+  subValue?: string;
+}
+
+const ChartTooltip = ({ data, isDark }: { data: TooltipData | null; isDark: boolean }) => {
+  if (!data) return null;
+  
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: data.x,
+        top: data.y,
+        transform: 'translate(-50%, -100%) translateY(-10px)',
+        background: isDark
+          ? 'linear-gradient(165deg, rgba(40,40,45,0.98) 0%, rgba(25,25,30,0.97) 100%)'
+          : 'linear-gradient(165deg, rgba(255,255,255,0.98) 0%, rgba(250,250,252,0.97) 100%)',
+        border: isDark ? '1px solid rgba(255,255,255,0.15)' : '1px solid rgba(0,0,0,0.1)',
+        borderRadius: '10px',
+        padding: '10px 14px',
+        boxShadow: isDark
+          ? '0 8px 24px rgba(0,0,0,0.4)'
+          : '0 8px 24px rgba(0,0,0,0.1)',
+        pointerEvents: 'none',
+        zIndex: 50,
+        minWidth: '100px',
+      }}
+    >
+      <p style={{
+        color: isDark ? '#fff' : '#1a1a1a',
+        fontWeight: 600,
+        fontSize: '13px',
+        marginBottom: '4px',
+      }}>
+        {data.title}
+      </p>
+      <p style={{
+        color: isDark ? 'rgba(255,255,255,0.7)' : '#6b7280',
+        fontSize: '12px',
+      }}>
+        {data.value}
+      </p>
+      {data.subValue && (
+        <p style={{
+          color: isDark ? 'rgba(255,255,255,0.5)' : '#9ca3af',
+          fontSize: '11px',
+          marginTop: '2px',
+        }}>
+          {data.subValue}
+        </p>
+      )}
+    </div>
+  );
+};
+
+// ============================================================================
+// 글로우 도넛 차트 (Canvas + Tooltip)
 // ============================================================================
 interface DonutChartProps {
   data: Array<{ name: string; count: number }>;
@@ -62,6 +124,10 @@ const GlowDonutChart = ({ data, isDark }: DonutChartProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 300, height: 280 });
+  const [tooltip, setTooltip] = useState<TooltipData | null>(null);
+  const segmentAnglesRef = useRef<Array<{ startAngle: number; endAngle: number; data: { name: string; count: number } }>>([]);
+  const animationRef = useRef<number>(0);
+  const [animationProgress, setAnimationProgress] = useState(0);
 
   useEffect(() => {
     const updateDimensions = () => {
@@ -74,6 +140,30 @@ const GlowDonutChart = ({ data, isDark }: DonutChartProps) => {
     window.addEventListener('resize', updateDimensions);
     return () => window.removeEventListener('resize', updateDimensions);
   }, []);
+
+  // 애니메이션 시작
+  useEffect(() => {
+    if (!data || data.length === 0) return;
+    
+    setAnimationProgress(0);
+    const startTime = performance.now();
+    const duration = 800; // 0.8초
+    
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // easeOutCubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setAnimationProgress(eased);
+      
+      if (progress < 1) {
+        animationRef.current = requestAnimationFrame(animate);
+      }
+    };
+    
+    animationRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationRef.current);
+  }, [data]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -98,6 +188,7 @@ const GlowDonutChart = ({ data, isDark }: DonutChartProps) => {
     ctx.clearRect(0, 0, width, height);
     
     let currentAngle = -Math.PI / 2;
+    const angles: Array<{ startAngle: number; endAngle: number; data: { name: string; count: number } }> = [];
     
     const getColor = (idx: number, opacity: number) => {
       if (isDark) {
@@ -109,9 +200,23 @@ const GlowDonutChart = ({ data, isDark }: DonutChartProps) => {
       }
     };
     
+    // 애니메이션: 전체 각도를 progress에 따라 제한
+    const maxAngle = Math.PI * 2 * animationProgress;
+    let accumulatedAngle = 0;
+    
     data.forEach((segment, idx) => {
-      const sliceAngle = (segment.count / total) * Math.PI * 2;
-      const midAngle = currentAngle + sliceAngle / 2;
+      const fullSliceAngle = (segment.count / total) * Math.PI * 2;
+      const remainingAngle = maxAngle - accumulatedAngle;
+      if (remainingAngle <= 0) return;
+      
+      const sliceAngle = Math.min(fullSliceAngle, remainingAngle);
+      const startAngle = currentAngle;
+      const endAngle = currentAngle + sliceAngle;
+      const midAngle = currentAngle + fullSliceAngle / 2;
+      
+      if (animationProgress >= 1) {
+        angles.push({ startAngle, endAngle: currentAngle + fullSliceAngle, data: segment });
+      }
       
       // 세그먼트 그라데이션
       const gradient = ctx.createRadialGradient(centerX, centerY, innerRadius, centerX, centerY, outerRadius);
@@ -126,54 +231,110 @@ const GlowDonutChart = ({ data, isDark }: DonutChartProps) => {
       ctx.fillStyle = gradient;
       ctx.fill();
       
-      // 구분선
-      ctx.strokeStyle = isDark ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.9)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(
-        centerX + Math.cos(currentAngle + sliceAngle) * innerRadius,
-        centerY + Math.sin(currentAngle + sliceAngle) * innerRadius
-      );
-      ctx.lineTo(
-        centerX + Math.cos(currentAngle + sliceAngle) * outerRadius,
-        centerY + Math.sin(currentAngle + sliceAngle) * outerRadius
-      );
-      ctx.stroke();
+      // 구분선 (완료된 세그먼트만)
+      if (sliceAngle >= fullSliceAngle - 0.01) {
+        ctx.strokeStyle = isDark ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.9)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(
+          centerX + Math.cos(currentAngle + sliceAngle) * innerRadius,
+          centerY + Math.sin(currentAngle + sliceAngle) * innerRadius
+        );
+        ctx.lineTo(
+          centerX + Math.cos(currentAngle + sliceAngle) * outerRadius,
+          centerY + Math.sin(currentAngle + sliceAngle) * outerRadius
+        );
+        ctx.stroke();
+      }
       
-      // 라벨
-      const labelRadius = outerRadius + 28;
-      const labelX = centerX + Math.cos(midAngle) * labelRadius;
-      const labelY = centerY + Math.sin(midAngle) * labelRadius;
-      const percent = ((segment.count / total) * 100).toFixed(0);
+      // 라벨 (애니메이션 완료 후)
+      if (animationProgress >= 1) {
+        const labelRadius = outerRadius + 28;
+        const labelX = centerX + Math.cos(midAngle) * labelRadius;
+        const labelY = centerY + Math.sin(midAngle) * labelRadius;
+        const percent = ((segment.count / total) * 100).toFixed(0);
+        
+        ctx.font = '600 11px system-ui, -apple-system, sans-serif';
+        ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.8)';
+        ctx.textAlign = midAngle > Math.PI / 2 && midAngle < Math.PI * 1.5 ? 'right' : 'left';
+        ctx.fillText(`${segment.name} ${percent}%`, labelX, labelY);
+      }
       
-      ctx.font = '600 11px system-ui, -apple-system, sans-serif';
-      ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.8)';
-      ctx.textAlign = midAngle > Math.PI / 2 && midAngle < Math.PI * 1.5 ? 'right' : 'left';
-      ctx.fillText(`${segment.name} ${percent}%`, labelX, labelY);
-      
-      currentAngle += sliceAngle;
+      currentAngle += fullSliceAngle;
+      accumulatedAngle += fullSliceAngle;
     });
     
-    // 중심 텍스트
+    segmentAnglesRef.current = angles;
+    
+    // 중심 텍스트 (애니메이션 중에도 표시, 숫자는 카운트업)
+    const displayTotal = Math.round(total * animationProgress);
     ctx.font = 'bold 22px system-ui, -apple-system, sans-serif';
     ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.85)';
     ctx.textAlign = 'center';
-    ctx.fillText(total.toLocaleString(), centerX, centerY + 2);
+    ctx.fillText(displayTotal.toLocaleString(), centerX, centerY + 2);
     ctx.font = '500 9px system-ui, -apple-system, sans-serif';
     ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.35)' : 'rgba(0, 0, 0, 0.35)';
     ctx.fillText('TOTAL', centerX, centerY + 18);
     
-  }, [data, isDark, dimensions]);
+  }, [data, isDark, dimensions, animationProgress]);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !data || data.length === 0) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    const { width, height } = dimensions;
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const outerRadius = Math.min(width, height) / 2 - 50;
+    const innerRadius = outerRadius * 0.52;
+    
+    const dx = x - centerX;
+    const dy = y - centerY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    if (distance >= innerRadius && distance <= outerRadius) {
+      let angle = Math.atan2(dy, dx);
+      if (angle < -Math.PI / 2) angle += Math.PI * 2;
+      
+      const total = data.reduce((sum, d) => sum + d.count, 0);
+      const segment = segmentAnglesRef.current.find(s => angle >= s.startAngle && angle < s.endAngle);
+      
+      if (segment) {
+        const percent = ((segment.data.count / total) * 100).toFixed(1);
+        setTooltip({
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top,
+          title: segment.data.name,
+          value: `${segment.data.count.toLocaleString()}명`,
+          subValue: `전체의 ${percent}%`,
+        });
+        return;
+      }
+    }
+    setTooltip(null);
+  };
+
+  const handleMouseLeave = () => setTooltip(null);
   
   return (
-    <div ref={containerRef} style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
-      <canvas ref={canvasRef} style={{ width: dimensions.width, height: dimensions.height }} />
+    <div ref={containerRef} style={{ width: '100%', display: 'flex', justifyContent: 'center', position: 'relative' }}>
+      <canvas 
+        ref={canvasRef} 
+        style={{ width: dimensions.width, height: dimensions.height, cursor: tooltip ? 'pointer' : 'default' }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+      />
+      <ChartTooltip data={tooltip} isDark={isDark} />
     </div>
   );
 };
 
 // ============================================================================
-// 글로우 바 차트 (Canvas)
+// 글로우 바 차트 (Canvas + Tooltip)
 // ============================================================================
 interface BarChartProps {
   data: Array<{ name: string; avgValue: number }>;
@@ -184,6 +345,10 @@ const GlowBarChart = ({ data, isDark }: BarChartProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 400, height: 280 });
+  const [tooltip, setTooltip] = useState<TooltipData | null>(null);
+  const barsRef = useRef<Array<{ x: number; y: number; width: number; height: number; data: { name: string; avgValue: number } }>>([]);
+  const animationRef = useRef<number>(0);
+  const [animationProgress, setAnimationProgress] = useState(0);
 
   useEffect(() => {
     const updateDimensions = () => {
@@ -196,6 +361,30 @@ const GlowBarChart = ({ data, isDark }: BarChartProps) => {
     window.addEventListener('resize', updateDimensions);
     return () => window.removeEventListener('resize', updateDimensions);
   }, []);
+
+  // 애니메이션 시작
+  useEffect(() => {
+    if (!data || data.length === 0) return;
+    
+    setAnimationProgress(0);
+    const startTime = performance.now();
+    const duration = 600; // 0.6초
+    
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // easeOutQuart
+      const eased = 1 - Math.pow(1 - progress, 4);
+      setAnimationProgress(eased);
+      
+      if (progress < 1) {
+        animationRef.current = requestAnimationFrame(animate);
+      }
+    };
+    
+    animationRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationRef.current);
+  }, [data]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -219,6 +408,8 @@ const GlowBarChart = ({ data, isDark }: BarChartProps) => {
     const gap = Math.min(50, (height - padding.top - padding.bottom) / data.length);
     const maxValue = Math.max(...data.map(d => d.avgValue));
     
+    const bars: Array<{ x: number; y: number; width: number; height: number; data: { name: string; avgValue: number } }> = [];
+    
     // 그리드
     for (let i = 0; i <= 4; i++) {
       const x = padding.left + (chartWidth / 4) * i;
@@ -232,7 +423,11 @@ const GlowBarChart = ({ data, isDark }: BarChartProps) => {
     
     data.forEach((item, idx) => {
       const y = padding.top + idx * gap + 10;
-      const barWidth = (item.avgValue / maxValue) * chartWidth;
+      const fullBarWidth = (item.avgValue / maxValue) * chartWidth;
+      // 애니메이션: 바 너비를 progress에 따라 증가
+      const barWidth = fullBarWidth * animationProgress;
+      
+      bars.push({ x: padding.left, y, width: fullBarWidth, height: barHeight, data: item });
       
       // 라벨
       ctx.font = '500 12px system-ui, -apple-system, sans-serif';
@@ -247,60 +442,97 @@ const GlowBarChart = ({ data, isDark }: BarChartProps) => {
       ctx.fill();
       
       // 바 그라데이션
-      const barGradient = ctx.createLinearGradient(padding.left, 0, padding.left + barWidth, 0);
-      if (isDark) {
-        barGradient.addColorStop(0, 'rgba(255, 255, 255, 0.08)');
-        barGradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.25)');
-        barGradient.addColorStop(1, 'rgba(255, 255, 255, 0.55)');
-      } else {
-        barGradient.addColorStop(0, 'rgba(0, 0, 0, 0.06)');
-        barGradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.22)');
-        barGradient.addColorStop(1, 'rgba(0, 0, 0, 0.5)');
+      if (barWidth > 0) {
+        const barGradient = ctx.createLinearGradient(padding.left, 0, padding.left + barWidth, 0);
+        if (isDark) {
+          barGradient.addColorStop(0, 'rgba(255, 255, 255, 0.08)');
+          barGradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.25)');
+          barGradient.addColorStop(1, 'rgba(255, 255, 255, 0.55)');
+        } else {
+          barGradient.addColorStop(0, 'rgba(0, 0, 0, 0.06)');
+          barGradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.22)');
+          barGradient.addColorStop(1, 'rgba(0, 0, 0, 0.5)');
+        }
+        
+        ctx.fillStyle = barGradient;
+        ctx.beginPath();
+        ctx.roundRect(padding.left, y, barWidth, barHeight, 3);
+        ctx.fill();
+        
+        // 끝 포인트 (은은한 글로우)
+        const glowX = padding.left + barWidth;
+        const glowY = y + barHeight / 2;
+        const glowColor = isDark ? '255, 255, 255' : '0, 0, 0';
+        
+        const glow = ctx.createRadialGradient(glowX, glowY, 0, glowX, glowY, 10);
+        glow.addColorStop(0, `rgba(${glowColor}, ${0.6 * animationProgress})`);
+        glow.addColorStop(0.5, `rgba(${glowColor}, ${0.15 * animationProgress})`);
+        glow.addColorStop(1, `rgba(${glowColor}, 0)`);
+        ctx.beginPath();
+        ctx.arc(glowX, glowY, 10, 0, Math.PI * 2);
+        ctx.fillStyle = glow;
+        ctx.fill();
+        
+        // 중심 점
+        ctx.beginPath();
+        ctx.arc(glowX, glowY, 3, 0, Math.PI * 2);
+        ctx.fillStyle = isDark ? `rgba(255,255,255,${0.9 * animationProgress})` : `rgba(0,0,0,${0.8 * animationProgress})`;
+        ctx.fill();
       }
       
-      ctx.fillStyle = barGradient;
-      ctx.beginPath();
-      ctx.roundRect(padding.left, y, barWidth, barHeight, 3);
-      ctx.fill();
-      
-      // 끝 포인트 (은은한 글로우)
-      const glowX = padding.left + barWidth;
-      const glowY = y + barHeight / 2;
-      const glowColor = isDark ? '255, 255, 255' : '0, 0, 0';
-      
-      const glow = ctx.createRadialGradient(glowX, glowY, 0, glowX, glowY, 10);
-      glow.addColorStop(0, `rgba(${glowColor}, 0.6)`);
-      glow.addColorStop(0.5, `rgba(${glowColor}, 0.15)`);
-      glow.addColorStop(1, `rgba(${glowColor}, 0)`);
-      ctx.beginPath();
-      ctx.arc(glowX, glowY, 10, 0, Math.PI * 2);
-      ctx.fillStyle = glow;
-      ctx.fill();
-      
-      // 중심 점
-      ctx.beginPath();
-      ctx.arc(glowX, glowY, 3, 0, Math.PI * 2);
-      ctx.fillStyle = isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.8)';
-      ctx.fill();
-      
-      // 값 표시
+      // 값 표시 (애니메이션 완료 후 또는 페이드인)
+      const valueOpacity = animationProgress;
       ctx.font = '500 11px system-ui, -apple-system, sans-serif';
-      ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)';
+      ctx.fillStyle = isDark ? `rgba(255, 255, 255, ${0.6 * valueOpacity})` : `rgba(0, 0, 0, ${0.6 * valueOpacity})`;
       ctx.textAlign = 'left';
       ctx.fillText(`₩${(item.avgValue / 10000).toFixed(0)}만`, width - padding.right + 12, y + barHeight / 2 + 4);
     });
     
-  }, [data, isDark, dimensions]);
+    barsRef.current = bars;
+    
+  }, [data, isDark, dimensions, animationProgress]);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    const bar = barsRef.current.find(b => 
+      x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height
+    );
+    
+    if (bar) {
+      setTooltip({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+        title: bar.data.name,
+        value: `평균 구매액: ₩${bar.data.avgValue.toLocaleString()}`,
+      });
+    } else {
+      setTooltip(null);
+    }
+  };
+
+  const handleMouseLeave = () => setTooltip(null);
   
   return (
-    <div ref={containerRef} style={{ width: '100%' }}>
-      <canvas ref={canvasRef} style={{ width: dimensions.width, height: dimensions.height }} />
+    <div ref={containerRef} style={{ width: '100%', position: 'relative' }}>
+      <canvas 
+        ref={canvasRef} 
+        style={{ width: dimensions.width, height: dimensions.height, cursor: tooltip ? 'pointer' : 'default' }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+      />
+      <ChartTooltip data={tooltip} isDark={isDark} />
     </div>
   );
 };
 
 // ============================================================================
-// 글로우 영역 차트 (산맥 스타일)
+// 글로우 영역 차트 (산맥 스타일 + Tooltip)
 // ============================================================================
 interface AreaChartProps {
   data: Array<{ date: string; newVisitors: number; returningVisitors: number }>;
@@ -311,6 +543,10 @@ const GlowAreaChart = ({ data, isDark }: AreaChartProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 700, height: 320 });
+  const [tooltip, setTooltip] = useState<TooltipData | null>(null);
+  const pointsRef = useRef<Array<{ x: number; yTotal: number; data: { date: string; newVisitors: number; returningVisitors: number } }>>([]);
+  const animationRef = useRef<number>(0);
+  const [animationProgress, setAnimationProgress] = useState(0);
 
   useEffect(() => {
     const updateDimensions = () => {
@@ -323,6 +559,30 @@ const GlowAreaChart = ({ data, isDark }: AreaChartProps) => {
     window.addEventListener('resize', updateDimensions);
     return () => window.removeEventListener('resize', updateDimensions);
   }, []);
+
+  // 애니메이션 시작
+  useEffect(() => {
+    if (!data || data.length === 0) return;
+    
+    setAnimationProgress(0);
+    const startTime = performance.now();
+    const duration = 1000; // 1초
+    
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // easeOutQuart
+      const eased = 1 - Math.pow(1 - progress, 4);
+      setAnimationProgress(eased);
+      
+      if (progress < 1) {
+        animationRef.current = requestAnimationFrame(animate);
+      }
+    };
+    
+    animationRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationRef.current);
+  }, [data]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -347,11 +607,19 @@ const GlowAreaChart = ({ data, isDark }: AreaChartProps) => {
     
     const maxValue = Math.max(...data.map(d => d.newVisitors + d.returningVisitors)) * 1.15;
     
-    const points = data.map((d, i) => ({
-      x: padding.left + (i / (data.length - 1)) * chartWidth,
-      yNew: baseY - (d.newVisitors / maxValue) * chartHeight,
-      yTotal: baseY - ((d.newVisitors + d.returningVisitors) / maxValue) * chartHeight,
-    }));
+    // 애니메이션: Y 값을 baseY에서 시작해서 실제 값으로 이동
+    const points = data.map((d, i) => {
+      const targetYNew = baseY - (d.newVisitors / maxValue) * chartHeight;
+      const targetYTotal = baseY - ((d.newVisitors + d.returningVisitors) / maxValue) * chartHeight;
+      return {
+        x: padding.left + (i / (data.length - 1)) * chartWidth,
+        yNew: baseY - (baseY - targetYNew) * animationProgress,
+        yTotal: baseY - (baseY - targetYTotal) * animationProgress,
+        data: d,
+      };
+    });
+    
+    pointsRef.current = points;
     
     // 세로 그리드
     ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)';
@@ -377,8 +645,8 @@ const GlowAreaChart = ({ data, isDark }: AreaChartProps) => {
     
     // 신규 방문자 영역
     const newGradient = ctx.createLinearGradient(0, padding.top, 0, baseY);
-    newGradient.addColorStop(0, `rgba(${primaryColor}, 0.2)`);
-    newGradient.addColorStop(0.6, `rgba(${primaryColor}, 0.08)`);
+    newGradient.addColorStop(0, `rgba(${primaryColor}, ${0.2 * animationProgress})`);
+    newGradient.addColorStop(0.6, `rgba(${primaryColor}, ${0.08 * animationProgress})`);
     newGradient.addColorStop(1, `rgba(${primaryColor}, 0.01)`);
     
     ctx.beginPath();
@@ -399,8 +667,8 @@ const GlowAreaChart = ({ data, isDark }: AreaChartProps) => {
     
     // 재방문자 영역
     const returnGradient = ctx.createLinearGradient(0, padding.top, 0, baseY);
-    returnGradient.addColorStop(0, `rgba(${primaryColor}, 0.45)`);
-    returnGradient.addColorStop(0.5, `rgba(${primaryColor}, 0.2)`);
+    returnGradient.addColorStop(0, `rgba(${primaryColor}, ${0.45 * animationProgress})`);
+    returnGradient.addColorStop(0.5, `rgba(${primaryColor}, ${0.2 * animationProgress})`);
     returnGradient.addColorStop(1, `rgba(${primaryColor}, 0.02)`);
     
     ctx.beginPath();
@@ -428,35 +696,38 @@ const GlowAreaChart = ({ data, isDark }: AreaChartProps) => {
     ctx.fillStyle = returnGradient;
     ctx.fill();
     
-    // 반사 효과 (약하게)
-    const reflectionGradient = ctx.createLinearGradient(0, baseY, 0, baseY + 25);
-    reflectionGradient.addColorStop(0, `rgba(${primaryColor}, 0.06)`);
-    reflectionGradient.addColorStop(1, `rgba(${primaryColor}, 0)`);
-    
-    ctx.save();
-    ctx.translate(0, baseY * 2);
-    ctx.scale(1, -0.15);
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, baseY);
-    points.forEach((p, i) => {
-      if (i === 0) {
-        ctx.lineTo(p.x, p.yTotal);
-      } else {
-        const prev = points[i - 1];
-        const cpx = (prev.x + p.x) / 2;
-        ctx.bezierCurveTo(cpx, prev.yTotal, cpx, p.yTotal, p.x, p.yTotal);
-      }
-    });
-    ctx.lineTo(points[points.length - 1].x, baseY);
-    ctx.closePath();
-    ctx.fillStyle = reflectionGradient;
-    ctx.fill();
-    ctx.restore();
+    // 반사 효과 (약하게) - 애니메이션 완료 후
+    if (animationProgress > 0.5) {
+      const reflectionOpacity = (animationProgress - 0.5) * 2;
+      const reflectionGradient = ctx.createLinearGradient(0, baseY, 0, baseY + 25);
+      reflectionGradient.addColorStop(0, `rgba(${primaryColor}, ${0.06 * reflectionOpacity})`);
+      reflectionGradient.addColorStop(1, `rgba(${primaryColor}, 0)`);
+      
+      ctx.save();
+      ctx.translate(0, baseY * 2);
+      ctx.scale(1, -0.15);
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, baseY);
+      points.forEach((p, i) => {
+        if (i === 0) {
+          ctx.lineTo(p.x, p.yTotal);
+        } else {
+          const prev = points[i - 1];
+          const cpx = (prev.x + p.x) / 2;
+          ctx.bezierCurveTo(cpx, prev.yTotal, cpx, p.yTotal, p.x, p.yTotal);
+        }
+      });
+      ctx.lineTo(points[points.length - 1].x, baseY);
+      ctx.closePath();
+      ctx.fillStyle = reflectionGradient;
+      ctx.fill();
+      ctx.restore();
+    }
     
     // 상단 라인 (글로우 약하게)
-    ctx.shadowColor = `rgba(${primaryColor}, 0.3)`;
+    ctx.shadowColor = `rgba(${primaryColor}, ${0.3 * animationProgress})`;
     ctx.shadowBlur = 4;
-    ctx.strokeStyle = `rgba(${primaryColor}, 0.7)`;
+    ctx.strokeStyle = `rgba(${primaryColor}, ${0.7 * animationProgress})`;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     points.forEach((p, i) => {
@@ -475,8 +746,8 @@ const GlowAreaChart = ({ data, isDark }: AreaChartProps) => {
     points.forEach((p) => {
       // 작은 글로우
       const glow = ctx.createRadialGradient(p.x, p.yTotal, 0, p.x, p.yTotal, 8);
-      glow.addColorStop(0, `rgba(${primaryColor}, 0.5)`);
-      glow.addColorStop(0.5, `rgba(${primaryColor}, 0.1)`);
+      glow.addColorStop(0, `rgba(${primaryColor}, ${0.5 * animationProgress})`);
+      glow.addColorStop(0.5, `rgba(${primaryColor}, ${0.1 * animationProgress})`);
       glow.addColorStop(1, `rgba(${primaryColor}, 0)`);
       ctx.beginPath();
       ctx.arc(p.x, p.yTotal, 8, 0, Math.PI * 2);
@@ -486,7 +757,7 @@ const GlowAreaChart = ({ data, isDark }: AreaChartProps) => {
       // 중심 점
       ctx.beginPath();
       ctx.arc(p.x, p.yTotal, 2.5, 0, Math.PI * 2);
-      ctx.fillStyle = isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.8)';
+      ctx.fillStyle = isDark ? `rgba(255,255,255,${0.85 * animationProgress})` : `rgba(0,0,0,${0.8 * animationProgress})`;
       ctx.fill();
     });
     
@@ -504,11 +775,53 @@ const GlowAreaChart = ({ data, isDark }: AreaChartProps) => {
       }
     });
     
-  }, [data, isDark, dimensions]);
+  }, [data, isDark, dimensions, animationProgress]);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    
+    // 가장 가까운 포인트 찾기
+    let closestPoint = null;
+    let minDistance = Infinity;
+    
+    pointsRef.current.forEach(p => {
+      const distance = Math.abs(p.x - mouseX);
+      if (distance < minDistance && distance < 30) {
+        minDistance = distance;
+        closestPoint = p;
+      }
+    });
+    
+    if (closestPoint) {
+      const total = closestPoint.data.newVisitors + closestPoint.data.returningVisitors;
+      setTooltip({
+        x: closestPoint.x,
+        y: closestPoint.yTotal,
+        title: closestPoint.data.date,
+        value: `총 방문: ${total.toLocaleString()}명`,
+        subValue: `신규 ${closestPoint.data.newVisitors.toLocaleString()} / 재방문 ${closestPoint.data.returningVisitors.toLocaleString()}`,
+      });
+    } else {
+      setTooltip(null);
+    }
+  };
+
+  const handleMouseLeave = () => setTooltip(null);
   
   return (
-    <div ref={containerRef} style={{ width: '100%' }}>
-      <canvas ref={canvasRef} style={{ width: dimensions.width, height: dimensions.height }} />
+    <div ref={containerRef} style={{ width: '100%', position: 'relative' }}>
+      <canvas 
+        ref={canvasRef} 
+        style={{ width: dimensions.width, height: dimensions.height, cursor: tooltip ? 'pointer' : 'default' }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+      />
+      <ChartTooltip data={tooltip} isDark={isDark} />
     </div>
   );
 };
