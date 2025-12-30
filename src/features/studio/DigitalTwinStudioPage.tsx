@@ -200,11 +200,9 @@ export default function DigitalTwinStudioPage() {
   // 플로팅 패널 위치 상수
   const FLOATING_PANEL_TOP = 60;  // ViewModeToggle 아래 시작점
   const FLOATING_PANEL_GAP = 8;   // 패널 간 간격
-  const SCENE_SAVE_PANEL_HEIGHT = 280;  // 씬 저장 패널 높이 (펼침)
-  const SCENE_SAVE_PANEL_COLLAPSED_HEIGHT = 40;  // 씬 저장 패널 높이 (접힘, 헤더만)
 
-  // 씬 저장 패널 접힘 상태
-  const [isSceneSavePanelCollapsed, setIsSceneSavePanelCollapsed] = useState(false);
+  // 씬 저장 패널 실제 높이 (동적 추적)
+  const [sceneSavePanelHeight, setSceneSavePanelHeight] = useState(0);
 
   // As-Is / To-Be / Split 뷰 모드
   const [viewMode, setViewMode] = useState<ViewMode>('as-is');
@@ -217,10 +215,10 @@ export default function DigitalTwinStudioPage() {
     resultReport: false // 결과 있을 때만 자동 표시
   });
 
-  // 씬 저장 패널이 닫히면 접힘 상태 초기화
+  // 씬 저장 패널이 닫히면 높이 초기화
   useEffect(() => {
     if (!visiblePanels.sceneSave) {
-      setIsSceneSavePanelCollapsed(false);
+      setSceneSavePanelHeight(0);
     }
   }, [visiblePanels.sceneSave]);
 
@@ -1284,7 +1282,7 @@ export default function DigitalTwinStudioPage() {
                 defaultCollapsed={false}
                 closable={true}
                 onClose={() => closePanel('sceneSave')}
-                onCollapseChange={setIsSceneSavePanelCollapsed}
+                onHeightChange={setSceneSavePanelHeight}
                 width="w-52"
               >
                 <SceneSavePanel
@@ -1332,8 +1330,8 @@ export default function DigitalTwinStudioPage() {
                   }
                 }}
                 defaultPosition={{ x: 0, y: FLOATING_PANEL_TOP }}
-                syncY={visiblePanels.sceneSave
-                  ? FLOATING_PANEL_TOP + (isSceneSavePanelCollapsed ? SCENE_SAVE_PANEL_COLLAPSED_HEIGHT : SCENE_SAVE_PANEL_HEIGHT) + FLOATING_PANEL_GAP
+                syncY={visiblePanels.sceneSave && sceneSavePanelHeight > 0
+                  ? FLOATING_PANEL_TOP + sceneSavePanelHeight + FLOATING_PANEL_GAP
                   : FLOATING_PANEL_TOP}
                 rightOffset={16}
               />
