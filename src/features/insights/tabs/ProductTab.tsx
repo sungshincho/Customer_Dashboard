@@ -164,9 +164,9 @@ const GlowHorizontalBarChart = ({ data, isDark }: HorizontalBarChartProps) => {
         
         const gx = pad.left + bw, gy = y + bh / 2;
         const gc = isDark ? '255,255,255' : '0,0,0';
-        const glow = ctx.createRadialGradient(gx, gy, 0, gx, gy, 10);
-        glow.addColorStop(0, `rgba(${gc},${0.6 * progress})`);
-        glow.addColorStop(0.5, `rgba(${gc},${0.15 * progress})`);
+        const glow = ctx.createRadialGradient(gx, gy, 0, gx, gy, 8);
+        glow.addColorStop(0, `rgba(${gc},${0.3 * progress})`);
+        glow.addColorStop(0.5, `rgba(${gc},${0.08 * progress})`);
         glow.addColorStop(1, `rgba(${gc},0)`);
         ctx.beginPath();
         ctx.arc(gx, gy, 10, 0, Math.PI * 2);
@@ -174,7 +174,7 @@ const GlowHorizontalBarChart = ({ data, isDark }: HorizontalBarChartProps) => {
         ctx.fill();
         
         ctx.beginPath();
-        ctx.arc(gx, gy, 2.5, 0, Math.PI * 2);
+        ctx.arc(gx, gy, 2, 0, Math.PI * 2);
         ctx.fillStyle = isDark ? `rgba(255,255,255,${0.9 * progress})` : `rgba(0,0,0,${0.8 * progress})`;
         ctx.fill();
       }
