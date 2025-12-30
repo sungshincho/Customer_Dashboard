@@ -70,7 +70,7 @@ export function LayerPanel() {
 
   // 검색/필터
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'furniture' | 'product'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'furniture'>('all');
 
   // Zone ID → Name 매핑
   const zoneNameMap = useMemo(() => {
@@ -219,18 +219,6 @@ export function LayerPanel() {
             );
           });
 
-          // 타입별 필터링
-          if (filterType === 'product') {
-            // 제품 필터: 제품이 있는 가구만 유지 (가구는 표시, children만 보여줌)
-            if (filteredChildren.length === 0 && f.children.length === 0) {
-              return null; // 제품 없는 가구 제외
-            }
-            return {
-              ...f,
-              children: query ? filteredChildren : f.children,
-            };
-          }
-
           if (filterType === 'furniture') {
             // 가구 필터: 가구만 검색, children 숨김
             if (query && !f.name.toLowerCase().includes(query)) {
@@ -263,26 +251,11 @@ export function LayerPanel() {
     })).filter((group) => group.furniture.length > 0);
   }, [zoneGroups, searchQuery, filterType]);
 
-  // 제품 필터 선택 시 가구/Zone 자동 확장
+  // 필터 전환 시 트리 닫힘 상태로 초기화
   useEffect(() => {
-    if (filterType === 'product') {
-      // 제품이 있는 모든 가구 확장
-      const furnitureWithProducts = new Set<string>();
-      zoneGroups.forEach((group) => {
-        group.furniture.forEach((f) => {
-          if (f.children.length > 0) {
-            furnitureWithProducts.add(f.id);
-          }
-        });
-      });
-      setExpandedFurniture(furnitureWithProducts);
-
-      // 모든 Zone도 확장
-      const allZones = new Set<string>(zoneGroups.map(g => g.zoneId));
-      allZones.add('unassigned');
-      setExpandedZones(allZones);
-    }
-  }, [filterType, zoneGroups]);
+    setExpandedZones(new Set());
+    setExpandedFurniture(new Set());
+  }, [filterType]);
 
   // 토글 핸들러
   const toggleGroup = (id: string) => {
@@ -384,7 +357,7 @@ export function LayerPanel() {
           )}
         </div>
         <div className="flex gap-1">
-          {(['all', 'furniture', 'product'] as const).map((type) => (
+          {(['all', 'furniture'] as const).map((type) => (
             <button
               key={type}
               onClick={() => setFilterType(type)}
@@ -395,7 +368,7 @@ export function LayerPanel() {
                   : 'bg-white/5 text-white/50 hover:bg-white/10'
               )}
             >
-              {type === 'all' ? '전체' : type === 'furniture' ? '가구' : '제품'}
+              {type === 'all' ? '전체' : '가구'}
             </button>
           ))}
         </div>
@@ -469,7 +442,7 @@ export function LayerPanel() {
         </div>
       )}
 
-      {/* ========== 가구 섹션 (Zone별 그룹) ========== */}
+      {/* ========== 존 섹션 (Zone별 그룹) ========== */}
       <div className="space-y-1">
         <div
           className="flex items-center gap-1.5 py-1.5 px-2 rounded-md cursor-pointer hover:bg-white/5 transition-colors"
@@ -482,9 +455,9 @@ export function LayerPanel() {
               <ChevronRight className="w-3.5 h-3.5 text-white/60" />
             )}
           </button>
-          <Box className="w-4 h-4 text-yellow-400" />
+          <MapPin className="w-4 h-4 text-purple-400" />
           <span className="flex-1 text-sm text-white font-medium">
-            가구 ({stats.furniture})
+            존 ({zoneGroups.length})
           </span>
         </div>
 
@@ -631,12 +604,6 @@ export function LayerPanel() {
                                       >
                                         {child.name}
                                       </span>
-
-                                      {child.slotCode && (
-                                        <span className="text-[8px] text-white/30 font-mono">
-                                          [{child.slotCode}]
-                                        </span>
-                                      )}
                                     </div>
                                   );
                                 })}
