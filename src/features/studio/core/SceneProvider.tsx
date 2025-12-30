@@ -745,9 +745,9 @@ export function SceneProvider({ mode = 'view', children, initialModels = [] }: S
 
     // 모델 정면에서 바라보도록 회전 적용
     const cameraOffset = {
-      x: horizontalDist * Math.sin(rotationY + Math.PI), // 정면에서 바라보기 위해 +π
+      x: horizontalDist * Math.sin(rotationY),
       y: verticalDist,
-      z: horizontalDist * Math.cos(rotationY + Math.PI),
+      z: horizontalDist * Math.cos(rotationY),
     };
 
     // 타겟 위치 클램핑 (OrbitControls 제한 범위 내)
