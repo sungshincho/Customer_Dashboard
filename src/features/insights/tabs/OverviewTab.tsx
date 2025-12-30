@@ -470,7 +470,7 @@ export function OverviewTab() {
         <div style={{ padding: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
             <Icon3D size={40} dark={isDark}>
-              <Lightbulb className="h-5 w-5" style={{ color: '#eab308' }} />
+              <Lightbulb className="h-5 w-5" style={{ color: iconColor }} />
             </Icon3D>
             <div>
               <h3 style={{ fontSize: '15px', margin: 0, ...text3D.number }}>오늘의 AI 인사이트</h3>
@@ -485,18 +485,16 @@ export function OverviewTab() {
               topRecommendations.map((rec) => (
                 <div key={rec.id} style={{
                   padding: '16px', borderRadius: '16px',
-                  borderLeft: `4px solid ${rec.priority === 'high' ? '#ef4444' : rec.priority === 'medium' ? '#eab308' : '#3b82f6'}`,
-                  background: isDark
-                    ? (rec.priority === 'high' ? 'rgba(239,68,68,0.1)' : rec.priority === 'medium' ? 'rgba(234,179,8,0.1)' : 'rgba(59,130,246,0.1)')
-                    : (rec.priority === 'high' ? 'rgba(239,68,68,0.05)' : rec.priority === 'medium' ? 'rgba(234,179,8,0.05)' : 'rgba(59,130,246,0.05)'),
+                  borderLeft: isDark ? '4px solid rgba(255,255,255,0.3)' : '4px solid rgba(0,0,0,0.2)',
+                  background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                         <span style={{
                           padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600,
-                          background: rec.priority === 'high' ? '#ef4444' : rec.priority === 'medium' ? '#eab308' : '#3b82f6',
-                          color: '#ffffff',
+                          background: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)',
+                          color: isDark ? 'rgba(255,255,255,0.8)' : '#374151',
                         }}>
                           {rec.priority === 'high' ? '높음' : rec.priority === 'medium' ? '중간' : '낮음'}
                         </span>
@@ -504,7 +502,7 @@ export function OverviewTab() {
                       </div>
                       <p style={{ fontSize: '13px', ...text3D.body }}>{rec.description}</p>
                       {rec.expected_impact && (
-                        <p style={{ fontSize: '13px', marginTop: '8px', color: '#059669', fontWeight: 500 }}>
+                        <p style={{ fontSize: '13px', marginTop: '8px', fontWeight: 500, color: isDark ? 'rgba(255,255,255,0.7)' : '#374151' }}>
                           예상 효과: 매출 +{rec.expected_impact.revenue_increase?.toLocaleString() || '?'}원
                         </p>
                       )}
