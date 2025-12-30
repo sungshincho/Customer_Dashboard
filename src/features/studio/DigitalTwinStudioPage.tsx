@@ -203,7 +203,7 @@ export default function DigitalTwinStudioPage() {
   // 드래그 패널 표시 상태
   const [visiblePanels, setVisiblePanels] = useState<VisiblePanels>({
     tools: false,
-    sceneSave: true,
+    sceneSave: false,  // 기본값 OFF
     property: true,
     resultReport: false // 결과 있을 때만 자동 표시
   });
@@ -1257,13 +1257,32 @@ export default function DigitalTwinStudioPage() {
              )}
              */}
 
-            {/* 씬 저장 패널 - 상단 바 아래 좌측 */}
-            {visiblePanels.sceneSave && <DraggablePanel id="scene-save" title="씬 저장" icon={<Save className="w-4 h-4" />} defaultPosition={{
-            x: 16,
-            y: visiblePanels.tools ? 180 : 60
-          }} defaultCollapsed={false} width="w-52">
-                <SceneSavePanel currentSceneName={sceneName} savedScenes={scenes.slice(0, 3)} isSaving={isSaving} isDirty={false} onSave={handleSaveScene} onLoad={id => setActiveScene(id)} onDelete={id => deleteScene(id)} onNew={() => setSceneName('')} maxScenes={3} />
-              </DraggablePanel>}
+            {/* 씬 저장 패널 - ViewModeToggle 아래 우측 */}
+            {visiblePanels.sceneSave && (
+              <DraggablePanel
+                id="scene-save"
+                title="씬 저장"
+                icon={<Save className="w-4 h-4" />}
+                defaultPosition={{ x: 0, y: 60 }}
+                rightOffset={16}
+                defaultCollapsed={false}
+                closable={true}
+                onClose={() => closePanel('sceneSave')}
+                width="w-52"
+              >
+                <SceneSavePanel
+                  currentSceneName={sceneName}
+                  savedScenes={scenes.slice(0, 3)}
+                  isSaving={isSaving}
+                  isDirty={false}
+                  onSave={handleSaveScene}
+                  onLoad={(id) => setActiveScene(id)}
+                  onDelete={(id) => deleteScene(id)}
+                  onNew={() => setSceneName('')}
+                  maxScenes={3}
+                />
+              </DraggablePanel>
+            )}
 
             {/* 속성 패널 (편집 모드에서만 표시) */}
             {isEditMode && visiblePanels.property && <DraggablePanel id="property-panel" title="속성" defaultPosition={{
@@ -1273,29 +1292,32 @@ export default function DigitalTwinStudioPage() {
                 <PropertyPanel />
               </DraggablePanel>}
 
-            {/* 통합 결과 리포트 패널 - 우측 상단 */}
-            {visiblePanels.resultReport && <ResultReportPanel results={simulationResults} onClose={() => setVisiblePanels(prev => ({
-            ...prev,
-            resultReport: false
-          }))} onApply={type => {
-            toast.success(`${type} 최적화 결과를 적용합니다`);
-            setActiveTab('apply');
-          }} onShowIn3D={type => {
-            // 해당 오버레이 활성화
-            const overlayMap: Record<string, OverlayType> = {
-              layout: 'layoutOptimization',
-              flow: 'flowOptimization',
-              congestion: 'congestion',
-              staffing: 'staffing'
-            };
-            const overlay = overlayMap[type];
-            if (overlay && !isActive(overlay)) {
-              toggleOverlay(overlay);
-            }
-          }} defaultPosition={{
-            x: 16,
-            y: 60
-          }} rightOffset={16} />}
+            {/* 통합 결과 리포트 패널 - 우측 (씬 저장 패널 아래 또는 ViewModeToggle 아래) */}
+            {visiblePanels.resultReport && (
+              <ResultReportPanel
+                results={simulationResults}
+                onClose={() => setVisiblePanels((prev) => ({ ...prev, resultReport: false }))}
+                onApply={(type) => {
+                  toast.success(`${type} 최적화 결과를 적용합니다`);
+                  setActiveTab('apply');
+                }}
+                onShowIn3D={(type) => {
+                  // 해당 오버레이 활성화
+                  const overlayMap: Record<string, OverlayType> = {
+                    layout: 'layoutOptimization',
+                    flow: 'flowOptimization',
+                    congestion: 'congestion',
+                    staffing: 'staffing',
+                  };
+                  const overlay = overlayMap[type];
+                  if (overlay && !isActive(overlay)) {
+                    toggleOverlay(overlay);
+                  }
+                }}
+                defaultPosition={{ x: 0, y: visiblePanels.sceneSave ? 340 : 60 }}
+                rightOffset={16}
+              />
+            )}
 
             {/* 하단 중앙 버튼 제거됨 - 탭에서 동일 기능 제공 */}
           </div>
