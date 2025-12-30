@@ -201,9 +201,9 @@ const GlowHourlyBarChart = ({ data, isDark }: HourlyBarChartProps) => {
         const glowX = x + barWidth / 2;
         const glowY = y;
         const glowColor = isDark ? '255, 255, 255' : '0, 0, 0';
-        const glow = ctx.createRadialGradient(glowX, glowY, 0, glowX, glowY, 10);
-        glow.addColorStop(0, `rgba(${glowColor}, ${0.5 * animationProgress})`);
-        glow.addColorStop(0.5, `rgba(${glowColor}, ${0.12 * animationProgress})`);
+        const glow = ctx.createRadialGradient(glowX, glowY, 0, glowX, glowY, 8);
+        glow.addColorStop(0, `rgba(${glowColor}, ${0.3 * animationProgress})`);
+        glow.addColorStop(0.5, `rgba(${glowColor}, ${0.08 * animationProgress})`);
         glow.addColorStop(1, `rgba(${glowColor}, 0)`);
         ctx.beginPath();
         ctx.arc(glowX, glowY, 10, 0, Math.PI * 2);
