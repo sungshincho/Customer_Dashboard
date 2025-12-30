@@ -254,58 +254,43 @@ export const useInsightMetrics = () => {
         .gte('purchase_date', `${startDate}T00:00:00`)
         .lte('purchase_date', `${endDate}T23:59:59`);
 
-      // 퍼널 데이터 소스 선택 (우선순위: funnel_events > store_visits > zone_daily_metrics > 추정치)
-      const hasFunnelEvents = funnelEvents && funnelEvents.length > 0;
-      const hasVisitFunnel = visitFunnel.entry > 0 && (visitFunnel.browse > 0 || visitFunnel.engage > 0);
-      const hasZoneFunnel = zoneFunnel.entry > 0 || zoneFunnel.browse > 0 || zoneFunnel.engage > 0;
+      // 🆕 하이브리드 병합 방식: 각 소스에서 가장 좋은 데이터 선택
       const entryCount = footfall || visitStats?.length || 0;
 
-      let funnelByType: typeof zoneFunnel;
-      let funnelSource: string;
+      // funnel_events에서 가져온 값 (있으면 사용)
+      const funnelEntry = funnelCounts.get('entry');
+      const funnelBrowse = funnelCounts.get('browse');
+      const funnelEngage = funnelCounts.get('engage');
+      const funnelFitting = funnelCounts.get('fitting');
+      const funnelPurchase = funnelCounts.get('purchase');
 
-      if (hasFunnelEvents) {
-        // 1순위: funnel_events 테이블 데이터
-        funnelByType = {
-          entry: funnelCounts.get('entry') || entryCount,
-          browse: funnelCounts.get('browse') || 0,
-          engage: funnelCounts.get('engage') || 0,
-          fitting: funnelCounts.get('fitting') || 0,
-          purchase: funnelCounts.get('purchase') || purchaseCount || 0,
-        };
-        funnelSource = 'funnel_events';
-      } else if (hasVisitFunnel) {
-        // 2순위: store_visits.zones_visited 기반 (zone_code → zone_type 매핑)
-        funnelByType = {
-          ...visitFunnel,
-          purchase: Math.max(visitFunnel.purchase, purchaseCount || 0),
-        };
-        funnelSource = 'store_visits.zones_visited';
-      } else if (hasZoneFunnel) {
-        // 3순위: zone_daily_metrics 기반
-        funnelByType = {
-          ...zoneFunnel,
-          entry: Math.max(zoneFunnel.entry, entryCount),
-          purchase: Math.max(zoneFunnel.purchase, purchaseCount || 0),
-        };
-        funnelSource = 'zone_daily_metrics';
-      } else {
-        // 4순위: 추정치 (데이터 없음)
-        funnelByType = {
-          entry: entryCount,
-          browse: Math.round(entryCount * 0.75),
-          engage: Math.round(entryCount * 0.45),
-          fitting: Math.round(entryCount * 0.25),
-          purchase: purchaseCount || 0,
-        };
-        funnelSource = 'estimated';
-      }
+      // 하이브리드 병합: funnel_events > store_visits > zone_daily_metrics > 추정치
+      const funnelByType = {
+        entry: funnelEntry || visitFunnel.entry || zoneFunnel.entry || entryCount,
+        browse: funnelBrowse || visitFunnel.browse || zoneFunnel.browse || 0,
+        engage: funnelEngage || visitFunnel.engage || zoneFunnel.engage || 0,
+        fitting: funnelFitting || visitFunnel.fitting || zoneFunnel.fitting || 0,
+        purchase: funnelPurchase || visitFunnel.purchase || zoneFunnel.purchase || purchaseCount || 0,
+      };
 
-      console.log('[useInsightMetrics] Funnel selection:', {
-        source: funnelSource,
-        hasFunnelEvents,
-        hasVisitFunnel,
-        hasZoneFunnel,
+      // 데이터 소스 추적 (디버깅용)
+      const funnelSources = {
+        entry: funnelEntry ? 'funnel_events' : visitFunnel.entry ? 'store_visits' : zoneFunnel.entry ? 'zone_metrics' : 'footfall',
+        browse: funnelBrowse ? 'funnel_events' : visitFunnel.browse ? 'store_visits' : zoneFunnel.browse ? 'zone_metrics' : 'none',
+        engage: funnelEngage ? 'funnel_events' : visitFunnel.engage ? 'store_visits' : zoneFunnel.engage ? 'zone_metrics' : 'none',
+        fitting: funnelFitting ? 'funnel_events' : visitFunnel.fitting ? 'store_visits' : zoneFunnel.fitting ? 'zone_metrics' : 'none',
+        purchase: funnelPurchase ? 'funnel_events' : visitFunnel.purchase ? 'store_visits' : zoneFunnel.purchase ? 'zone_metrics' : 'purchases',
+      };
+
+      console.log('[useInsightMetrics] Hybrid funnel merge:', {
         funnelByType,
+        funnelSources,
+        rawData: {
+          funnelEvents: { entry: funnelEntry, browse: funnelBrowse, engage: funnelEngage, fitting: funnelFitting, purchase: funnelPurchase },
+          visitFunnel,
+          zoneFunnel,
+          purchaseCount,
+        },
       });
 
       // 디버깅 로그
