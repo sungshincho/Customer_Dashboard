@@ -47,6 +47,7 @@ import { useStoreContext } from '@/features/simulation/hooks/useStoreContext';
 import { useEnhancedAIInference } from '@/features/simulation/hooks/useEnhancedAIInference';
 import { useDateFilterStore } from '@/store/dateFilterStore';
 import { useSimulationStore, STATE_COLORS, STATE_LABELS, type CustomerState } from '@/stores/simulationStore';
+import { useZoneHeatmapData } from '@/hooks/useZoneMetrics';
 
 // 타입 변환 헬퍼
 interface ModelLayer {
@@ -110,6 +111,9 @@ export default function DigitalTwinStudioPage() {
 
   // 🆕 로그인된 계정의 스토어 ID
   const storeId = selectedStore?.id;
+
+  // 🆕 실제 히트맵 데이터 (zone_daily_metrics.heatmap_intensity 기반)
+  const { data: zoneHeatmapData, isLoading: heatmapLoading } = useZoneHeatmapData(storeId);
 
   // 스태프 데이터 디버깅
   useEffect(() => {
@@ -815,20 +819,56 @@ export default function DigitalTwinStudioPage() {
                   <ZoneBoundaryOverlay zones={demoZones} />
                 )}
 
-                {/* 🔧 히트맵 오버레이 - zones_dim 기반 동적 히트맵 또는 데모 데이터 */}
+                {/* 🔧 히트맵 오버레이 - zone_daily_metrics.heatmap_intensity 기반 실제 데이터 사용 */}
                 {isActive('heatmap') && (() => {
-                  // 🔧 FIX: zones_dim 데이터가 있으면 존 기반 히트맵 생성
+                  // 🔧 FIX: zone_daily_metrics 데이터 기반 실제 히트맵 생성
                   if (dbZones && dbZones.length > 0) {
-                    const zoneHeatPoints: HeatPoint[] = dbZones.map((zone) => ({
-                      x: zone.position_x || zone.coordinates?.x || 0,
-                      y: 0.1,
-                      z: zone.position_z || zone.coordinates?.z || 0,
-                      intensity: zone.zone_type === 'checkout' ? 0.9
-                        : zone.zone_type === 'entrance' ? 0.7
-                        : zone.zone_type === 'fitting' ? 0.8
-                        : zone.zone_type === 'display' ? 0.6
-                        : 0.5,
-                    }));
+                    // 히트맵 데이터 매핑 (zone_id → intensity)
+                    const heatmapByZone = new Map<string, number>();
+                    if (zoneHeatmapData && zoneHeatmapData.length > 0) {
+                      zoneHeatmapData.forEach(h => heatmapByZone.set(h.zone_id, h.intensity));
+                    }
+
+                    // min-max 정규화를 위한 값 수집
+                    const intensities = zoneHeatmapData?.map(h => h.intensity).filter(v => v > 0) || [];
+                    const minIntensity = intensities.length > 0 ? Math.min(...intensities) : 0;
+                    const maxIntensity = intensities.length > 0 ? Math.max(...intensities) : 1;
+                    const range = maxIntensity - minIntensity;
+
+                    console.log('[HeatmapOverlay] 실제 데이터 사용:', {
+                      zonesCount: dbZones.length,
+                      metricsCount: zoneHeatmapData?.length || 0,
+                      intensityRange: { min: minIntensity, max: maxIntensity, range },
+                    });
+
+                    const zoneHeatPoints: HeatPoint[] = dbZones.map((zone) => {
+                      // 실제 히트맵 데이터가 있으면 사용, 없으면 zone_type 기반 폴백
+                      const rawIntensity = heatmapByZone.get(zone.id);
+                      let intensity: number;
+
+                      if (rawIntensity !== undefined && range > 0) {
+                        // min-max 정규화 (0~1 범위)
+                        intensity = (rawIntensity - minIntensity) / range;
+                      } else if (rawIntensity !== undefined) {
+                        intensity = rawIntensity;
+                      } else {
+                        // 폴백: zone_type 기반 기본값
+                        intensity = zone.zone_type === 'checkout' ? 0.9
+                          : zone.zone_type === 'entrance' ? 0.7
+                          : zone.zone_type === 'fitting' ? 0.8
+                          : zone.zone_type === 'display' ? 0.6
+                          : 0.5;
+                      }
+
+                      return {
+                        x: zone.position_x || zone.coordinates?.x || 0,
+                        y: 0.1,
+                        z: zone.position_z || zone.coordinates?.z || 0,
+                        intensity,
+                        label: zone.zone_name,
+                      };
+                    });
+
                     return <HeatmapOverlay heatPoints={zoneHeatPoints} />;
                   }
                   // 폴백: 데모 데이터
