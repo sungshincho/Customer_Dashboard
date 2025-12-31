@@ -46,6 +46,10 @@ interface ResultReportPanelProps {
   rightOffset?: number;
   /** 외부에서 y 위치 동기화 (변경 시 자동 업데이트) */
   syncY?: number;
+  /** 최소 크기 */
+  minSize?: { width: number; height: number };
+  /** 최대 크기 */
+  maxSize?: { width: number; height: number };
 }
 
 // 결과 유형 설정
@@ -64,6 +68,8 @@ export const ResultReportPanel = memo(function ResultReportPanel({
   defaultPosition = { x: 350, y: 100 },
   rightOffset,
   syncY,
+  minSize,
+  maxSize,
 }: ResultReportPanelProps) {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     layout: true,
@@ -104,6 +110,8 @@ export const ResultReportPanel = memo(function ResultReportPanel({
       closable
       onClose={onClose}
       width="w-80"
+      minSize={minSize}
+      maxSize={maxSize}
     >
       {!hasAnyResult ? (
         <div className="py-8 text-center">

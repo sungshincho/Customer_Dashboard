@@ -1334,6 +1334,8 @@ export default function DigitalTwinStudioPage() {
                   ? FLOATING_PANEL_TOP + sceneSavePanelHeight + FLOATING_PANEL_GAP
                   : FLOATING_PANEL_TOP}
                 rightOffset={16}
+                minSize={{ width: 208, height: 100 }}
+                maxSize={{ width: 600, height: 600 }}
               />
             )}
 
