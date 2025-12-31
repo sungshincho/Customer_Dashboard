@@ -92,12 +92,13 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
     containerRef.current = container;
   }, []);
 
-  // syncY가 변경되면 y 위치 동기화
+  // syncY가 변경되면 y 위치 동기화 (드래그로 이동하지 않은 경우에만)
   useEffect(() => {
-    if (syncY !== undefined) {
+    // useLeftPosition이 true면 사용자가 드래그한 것이므로 syncY 무시
+    if (syncY !== undefined && !useLeftPosition) {
       setPosition(prev => ({ ...prev, y: syncY }));
     }
-  }, [syncY]);
+  }, [syncY, useLeftPosition]);
 
   // 접힘 상태 변경 시 부모에게 알림
   useEffect(() => {
