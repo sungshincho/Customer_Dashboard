@@ -1,15 +1,77 @@
 /**
  * AI 인사이트 카드 컴포넌트
+ * 3D Glassmorphism + Monochrome Design
  */
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Lightbulb, TrendingUp, AlertTriangle, Sparkles } from 'lucide-react';
+import { Lightbulb, TrendingUp, Sparkles } from 'lucide-react';
 import { useCategoryPerformanceGrouped } from '../hooks/useCategoryPerformance';
 import { useROISummary } from '../hooks/useROISummary';
 import { getModuleDisplayName } from '../utils/moduleConfig';
 import type { DateRange, CategoryPerformance } from '../types/roi.types';
-import { cn } from '@/lib/utils';
+
+// ============================================================================
+// 3D 스타일 시스템
+// ============================================================================
+const getText3D = (isDark: boolean) => ({
+  number: isDark ? {
+    fontWeight: 800, letterSpacing: '-0.03em', color: '#ffffff',
+    textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+  } as React.CSSProperties : {
+    fontWeight: 800, letterSpacing: '-0.03em', color: '#0a0a0c',
+  } as React.CSSProperties,
+  body: isDark ? {
+    fontWeight: 500, color: 'rgba(255,255,255,0.7)',
+  } as React.CSSProperties : {
+    fontWeight: 500, color: '#515158',
+  } as React.CSSProperties,
+});
+
+const GlassCard = ({ children, dark = false }: { children: React.ReactNode; dark?: boolean }) => (
+  <div style={{ perspective: '1200px' }}>
+    <div style={{
+      borderRadius: '20px', padding: '1.5px',
+      background: dark
+        ? 'linear-gradient(145deg, rgba(75,75,85,0.9) 0%, rgba(50,50,60,0.8) 50%, rgba(65,65,75,0.9) 100%)'
+        : 'linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(220,220,230,0.6) 50%, rgba(255,255,255,0.93) 100%)',
+      boxShadow: dark
+        ? '0 2px 4px rgba(0,0,0,0.2), 0 8px 16px rgba(0,0,0,0.25)'
+        : '0 1px 1px rgba(0,0,0,0.02), 0 2px 2px rgba(0,0,0,0.02), 0 4px 4px rgba(0,0,0,0.02), 0 8px 8px rgba(0,0,0,0.02)',
+    }}>
+      <div style={{
+        background: dark
+          ? 'linear-gradient(165deg, rgba(48,48,58,0.98) 0%, rgba(32,32,40,0.97) 30%, rgba(42,42,52,0.98) 60%, rgba(35,35,45,0.97) 100%)'
+          : 'linear-gradient(165deg, rgba(255,255,255,0.95) 0%, rgba(253,253,255,0.88) 25%, rgba(255,255,255,0.92) 50%, rgba(251,251,254,0.85) 75%, rgba(255,255,255,0.94) 100%)',
+        backdropFilter: 'blur(80px) saturate(200%)', borderRadius: '19px', position: 'relative', overflow: 'hidden',
+      }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '1px',
+          background: dark
+            ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.18) 20%, rgba(255,255,255,0.28) 50%, rgba(255,255,255,0.18) 80%, transparent 100%)'
+            : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.9) 10%, rgba(255,255,255,1) 50%, rgba(255,255,255,0.9) 90%, transparent 100%)',
+          pointerEvents: 'none',
+        }} />
+        <div style={{ position: 'relative', zIndex: 10 }}>{children}</div>
+      </div>
+    </div>
+  </div>
+);
+
+const Icon3D = ({ children, size = 20, dark = false }: { children: React.ReactNode; size?: number; dark?: boolean }) => (
+  <div style={{
+    width: size, height: size,
+    background: dark
+      ? 'linear-gradient(145deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.04) 50%, rgba(255,255,255,0.09) 100%)'
+      : 'linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(230,230,238,0.95) 40%, rgba(245,245,250,0.98) 100%)',
+    borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    border: dark ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(255,255,255,0.95)',
+    boxShadow: dark
+      ? 'inset 0 1px 2px rgba(255,255,255,0.12), 0 2px 6px rgba(0,0,0,0.2)'
+      : '0 1px 2px rgba(0,0,0,0.04), 0 2px 4px rgba(0,0,0,0.05), inset 0 1px 2px rgba(255,255,255,1)',
+  }}>
+    {children}
+  </div>
+);
 
 interface AIInsightsCardProps {
   dateRange: DateRange;
@@ -33,7 +95,6 @@ const generateInsights = (
     };
   }
 
-  // 전체 데이터 합치기
   const allCategories = [...categoryData['2d'], ...categoryData['3d']].filter(
     (c) => c.appliedCount > 0
   );
@@ -45,12 +106,10 @@ const generateInsights = (
     };
   }
 
-  // 최고 ROI 모듈 찾기
   const bestROI = allCategories.reduce((best, curr) =>
     curr.averageRoi > best.averageRoi ? curr : best
   );
 
-  // 최고 성공률 모듈 찾기 (적용 건수 2건 이상)
   const categoriesWithEnoughData = allCategories.filter((c) => c.appliedCount >= 2);
   const bestSuccessRate = categoriesWithEnoughData.length > 0
     ? categoriesWithEnoughData.reduce((best, curr) => {
@@ -60,10 +119,8 @@ const generateInsights = (
       })
     : null;
 
-  // ROI가 낮은 모듈 찾기
   const lowROI = allCategories.filter((c) => c.averageRoi < 100 && c.appliedCount > 0);
 
-  // 분석 생성
   if (bestROI.averageRoi > 0) {
     analysis.push(
       `"${getModuleDisplayName(bestROI.sourceModule)}" 전략이 가장 높은 평균 ROI (${bestROI.averageRoi.toFixed(0)}%)를 기록했습니다.`
@@ -82,7 +139,6 @@ const generateInsights = (
     analysis.push(`${lowROINames}은 예상 대비 실제 ROI 차이가 있어 개선이 필요합니다.`);
   }
 
-  // 추천 생성
   if (bestROI.averageRoi >= 200 && bestSuccessRate) {
     recommendations.push(
       `${getModuleDisplayName(bestROI.sourceModule)} + ${getModuleDisplayName(bestSuccessRate.sourceModule)} 조합 전략을 추천합니다.`
@@ -93,13 +149,11 @@ const generateInsights = (
     recommendations.push(`${lowROI.map(c => getModuleDisplayName(c.sourceModule)).join(', ')} 적용 전 A/B 테스트를 권장합니다.`);
   }
 
-  // 계절성 추천 (12월)
   const currentMonth = new Date().getMonth() + 1;
   if (currentMonth === 12) {
     recommendations.push('12월 성수기: 재고 최적화와 프로모션 우선 적용을 권장합니다.');
   }
 
-  // 기본 추천
   if (recommendations.length === 0) {
     recommendations.push('더 많은 전략을 적용하여 데이터를 축적하면 정교한 추천이 가능합니다.');
   }
@@ -110,73 +164,91 @@ const generateInsights = (
 export const AIInsightsCard: React.FC<AIInsightsCardProps> = ({ dateRange }) => {
   const { data: summary, isLoading: summaryLoading } = useROISummary(dateRange);
   const { data: categoryData, isLoading: categoryLoading } = useCategoryPerformanceGrouped(dateRange);
+  const [isDark, setIsDark] = useState(false);
 
+  useEffect(() => {
+    const check = () => setIsDark(document.documentElement.classList.contains('dark'));
+    check();
+    const obs = new MutationObserver(check);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => obs.disconnect();
+  }, []);
+
+  const text3D = getText3D(isDark);
+  const iconColor = isDark ? 'rgba(255,255,255,0.7)' : '#374151';
   const isLoading = summaryLoading || categoryLoading;
 
   if (isLoading) {
     return (
-      <Card className="bg-white/5 border-white/10">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg font-semibold text-white flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-primary" />
-            AI 인사이트
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <Skeleton className="h-4 w-full bg-white/10" />
-            <Skeleton className="h-4 w-3/4 bg-white/10" />
-            <Skeleton className="h-4 w-5/6 bg-white/10" />
+      <GlassCard dark={isDark}>
+        <div style={{ padding: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+            <Icon3D size={24} dark={isDark}>
+              <Sparkles className="w-3.5 h-3.5" style={{ color: iconColor }} />
+            </Icon3D>
+            <h3 style={{ fontSize: '16px', margin: 0, ...text3D.number }}>AI 인사이트</h3>
           </div>
-        </CardContent>
-      </Card>
+          <div className="animate-pulse" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ height: '14px', borderRadius: '4px', background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)', width: '100%' }} />
+            <div style={{ height: '14px', borderRadius: '4px', background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)', width: '75%' }} />
+            <div style={{ height: '14px', borderRadius: '4px', background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)', width: '85%' }} />
+          </div>
+        </div>
+      </GlassCard>
     );
   }
 
   const insights = generateInsights(summary, categoryData);
 
   return (
-    <Card className="bg-gradient-to-br from-primary/10 to-purple-500/10 border-primary/20">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg font-semibold text-white flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-primary" />
-          AI 인사이트
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* 성과 분석 */}
-        <div>
-          <h4 className="text-sm font-medium text-white/70 mb-2 flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-blue-400" />
-            성과 분석
-          </h4>
-          <ul className="space-y-1.5">
-            {insights.analysis.map((item, i) => (
-              <li key={i} className="text-sm text-white/80 flex items-start gap-2">
-                <span className="text-white/30 mt-1">•</span>
-                {item}
-              </li>
-            ))}
-          </ul>
+    <GlassCard dark={isDark}>
+      <div style={{ padding: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+          <Icon3D size={28} dark={isDark}>
+            <Sparkles className="w-4 h-4" style={{ color: iconColor }} />
+          </Icon3D>
+          <h3 style={{ fontSize: '16px', margin: 0, ...text3D.number }}>AI 인사이트</h3>
         </div>
 
-        {/* 추천 */}
-        <div>
-          <h4 className="text-sm font-medium text-white/70 mb-2 flex items-center gap-2">
-            <Lightbulb className="w-4 h-4 text-yellow-400" />
-            추천
-          </h4>
-          <ul className="space-y-1.5">
-            {insights.recommendations.map((item, i) => (
-              <li key={i} className="text-sm text-white/80 flex items-start gap-2">
-                <span className="text-yellow-400/50 mt-1">•</span>
-                {item}
-              </li>
-            ))}
-          </ul>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* 성과 분석 */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+              <Icon3D size={20} dark={isDark}>
+                <TrendingUp className="w-3 h-3" style={{ color: iconColor }} />
+              </Icon3D>
+              <h4 style={{ fontSize: '13px', fontWeight: 600, margin: 0, color: isDark ? 'rgba(255,255,255,0.7)' : '#374151' }}>성과 분석</h4>
+            </div>
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {insights.analysis.map((item, i) => (
+                <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '13px', ...text3D.body }}>
+                  <span style={{ color: isDark ? 'rgba(255,255,255,0.3)' : '#9ca3af', marginTop: '2px' }}>•</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* 추천 */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+              <Icon3D size={20} dark={isDark}>
+                <Lightbulb className="w-3 h-3" style={{ color: iconColor }} />
+              </Icon3D>
+              <h4 style={{ fontSize: '13px', fontWeight: 600, margin: 0, color: isDark ? 'rgba(255,255,255,0.7)' : '#374151' }}>추천</h4>
+            </div>
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {insights.recommendations.map((item, i) => (
+                <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '13px', ...text3D.body }}>
+                  <span style={{ color: isDark ? 'rgba(255,255,255,0.4)' : '#9ca3af', marginTop: '2px' }}>•</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </GlassCard>
   );
 };
 
