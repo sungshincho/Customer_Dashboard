@@ -1,6 +1,7 @@
 /**
  * SettingsPage.tsx
  * 3D Glassmorphism + Monochrome Design
+ * 탭 디자인: InsightHubPage와 동일
  */
 
 import { useState, useEffect } from 'react';
@@ -62,6 +63,14 @@ const Button3D = ({ children, onClick, disabled, variant = 'default', size = 'de
   return <button onClick={onClick} disabled={disabled} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', borderRadius: '10px', fontWeight: 600, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1, transition: 'all 0.2s', color: dark ? '#fff' : (variant === 'default' ? '#fff' : '#1a1a1f'), boxShadow: variant === 'ghost' ? 'none' : (dark ? 'inset 0 1px 1px rgba(255,255,255,0.1), 0 4px 12px rgba(0,0,0,0.3)' : '0 2px 4px rgba(0,0,0,0.1), 0 4px 8px rgba(0,0,0,0.08)'), ...getVariantStyle(), ...getSizeStyle(), ...style }}>{children}</button>;
 };
 
+const tabs = [
+  { value: 'stores', label: '매장 관리', icon: Store },
+  { value: 'data', label: '데이터', icon: Database },
+  { value: 'users', label: '사용자', icon: Users },
+  { value: 'system', label: '시스템', icon: Building2 },
+  { value: 'license', label: '플랜', icon: CreditCard },
+];
+
 export default function SettingsPage() {
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
@@ -122,22 +131,140 @@ export default function SettingsPage() {
 
   return (
     <DashboardLayout>
-      <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px', minHeight: '100vh' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <Icon3D size={48} dark={isDark}><Settings className="w-6 h-6" style={{ color: iconColor }} /></Icon3D>
-          <div><h1 style={{ fontSize: '28px', margin: 0, ...text3D.heroNumber }}>설정 & 관리</h1><p style={{ fontSize: '14px', margin: '4px 0 0 0', ...text3D.body }}>시스템 설정, 매장 관리, 사용자 권한</p></div>
+      <div className="space-y-6">
+        {/* Header - InsightHub 스타일과 동일 */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-5">
+            {/* Logo - InsightHub와 동일한 3D 스타일 */}
+            <div
+              className="w-12 h-12 rounded-2xl flex items-center justify-center relative"
+              style={{
+                background: 'linear-gradient(145deg, #2f2f38 0%, #1c1c22 35%, #282830 65%, #1e1e26 100%)',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.18), 0 4px 8px rgba(0,0,0,0.16), 0 8px 16px rgba(0,0,0,0.12), 0 16px 32px rgba(0,0,0,0.08), inset 0 1px 1px rgba(255,255,255,0.12)',
+                border: '1px solid rgba(255,255,255,0.1)',
+              }}
+            >
+              <div
+                className="absolute"
+                style={{
+                  top: '2px',
+                  left: '18%',
+                  right: '18%',
+                  height: '1px',
+                  background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent)',
+                }}
+              />
+              <Settings
+                className="w-6 h-6"
+                style={{
+                  color: '#ffffff',
+                  filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.4))',
+                }}
+              />
+            </div>
+
+            {/* Title */}
+            <div>
+              <h1
+                className="text-2xl"
+                style={{
+                  fontWeight: 800,
+                  letterSpacing: '-0.03em',
+                  ...(isDark ? {
+                    color: '#ffffff',
+                    textShadow: '0 2px 4px rgba(0,0,0,0.4)',
+                  } : {
+                    background: 'linear-gradient(180deg, #1a1a1f 0%, #0a0a0c 35%, #1a1a1f 70%, #0c0c0e 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.08))',
+                  }),
+                }}
+              >
+                설정 & 관리
+              </h1>
+              <p
+                className="text-sm mt-0.5"
+                style={{
+                  fontWeight: 500,
+                  color: isDark ? 'rgba(255,255,255,0.6)' : '#515158',
+                  textShadow: isDark ? 'none' : '0 1px 0 rgba(255,255,255,0.5)',
+                }}
+              >
+                시스템 설정, 매장 관리, 사용자 권한
+              </p>
+            </div>
+          </div>
         </div>
 
+        {/* Tabs - InsightHub와 동일한 디자인 */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList style={{ display: 'inline-flex', gap: '4px', padding: '4px', background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderRadius: '12px', border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.05)' }}>
-            {[{ value: 'stores', icon: Store, label: '매장 관리' }, { value: 'data', icon: Database, label: '데이터' }, { value: 'users', icon: Users, label: '사용자' }, { value: 'system', icon: Building2, label: '시스템' }, { value: 'license', icon: CreditCard, label: '플랜' }].map((tab) => (
-              <TabsTrigger key={tab.value} value={tab.value} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: 500, background: activeTab === tab.value ? (isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)') : 'transparent', color: activeTab === tab.value ? (isDark ? '#fff' : '#1a1a1f') : (isDark ? 'rgba(255,255,255,0.5)' : '#6b7280'), border: 'none', cursor: 'pointer' }}>
-                <tab.icon className="w-4 h-4" /><span className="hidden sm:inline">{tab.label}</span>
-              </TabsTrigger>
-            ))}
-          </TabsList>
+          {/* Glass Tab List - InsightHub와 동일 */}
+          <div
+            className="inline-block rounded-2xl p-[1.5px]"
+            style={{
+              background: isDark
+                ? 'linear-gradient(145deg, rgba(75,75,85,0.8) 0%, rgba(50,50,60,0.6) 50%, rgba(65,65,75,0.8) 100%)'
+                : 'linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(220,220,230,0.6) 50%, rgba(255,255,255,0.93) 100%)',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.04), 0 4px 8px rgba(0,0,0,0.05), 0 8px 16px rgba(0,0,0,0.04)',
+            }}
+          >
+            <TabsList
+              className="h-auto p-1.5 gap-1"
+              style={{
+                background: isDark
+                  ? 'linear-gradient(165deg, rgba(40,40,50,0.95) 0%, rgba(30,30,40,0.9) 100%)'
+                  : 'linear-gradient(165deg, rgba(255,255,255,0.92) 0%, rgba(250,250,254,0.85) 50%, rgba(255,255,255,0.9) 100%)',
+                backdropFilter: 'blur(40px)',
+                borderRadius: '15px',
+              }}
+            >
+              {tabs.map((tab) => {
+                const isActive = activeTab === tab.value;
+                return (
+                  <TabsTrigger
+                    key={tab.value}
+                    value={tab.value}
+                    className="gap-2 px-5 py-2.5 rounded-xl transition-all duration-200 data-[state=inactive]:bg-transparent"
+                    style={
+                      isActive
+                        ? {
+                            background: 'linear-gradient(145deg, #222228 0%, #2c2c34 45%, #1c1c24 100%)',
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.16), 0 4px 8px rgba(0,0,0,0.14), inset 0 1px 1px rgba(255,255,255,0.1)',
+                          }
+                        : {
+                            background: 'transparent',
+                            border: '1px solid transparent',
+                          }
+                    }
+                  >
+                    <tab.icon
+                      className="h-4 w-4"
+                      style={{
+                        color: isActive 
+                          ? '#ffffff' 
+                          : (isDark ? 'rgba(255,255,255,0.5)' : '#515158'),
+                      }}
+                    />
+                    <span
+                      className="hidden sm:inline text-xs font-medium"
+                      style={{
+                        color: isActive 
+                          ? '#ffffff' 
+                          : (isDark ? 'rgba(255,255,255,0.5)' : '#515158'),
+                        textShadow: isActive ? '0 1px 2px rgba(0,0,0,0.3)' : 'none',
+                      }}
+                    >
+                      {tab.label}
+                    </span>
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+          </div>
 
-          <TabsContent value="stores" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <TabsContent value="stores" className="space-y-4 mt-0">
             <GlassCard dark={isDark}><div style={{ padding: '24px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
                 <div><h3 style={{ fontSize: '16px', margin: 0, ...text3D.number }}>매장 목록</h3><p style={{ fontSize: '12px', margin: '4px 0 0 0', ...text3D.body }}>조직에 속한 모든 매장</p></div>
@@ -149,7 +276,7 @@ export default function SettingsPage() {
             </div></GlassCard>
           </TabsContent>
 
-          <TabsContent value="data" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <TabsContent value="data" className="space-y-4 mt-0">
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
               <GlassCard dark={isDark}><div style={{ padding: '20px' }}><div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}><Icon3D size={28} dark={isDark}><Boxes className="w-3.5 h-3.5" style={{ color: iconColor }} /></Icon3D><span style={{ fontSize: '12px', ...text3D.body }}>그래프 엔티티</span></div><p style={{ fontSize: '28px', margin: '0 0 4px 0', ...text3D.heroNumber }}>{importStatus.totalEntities}</p><p style={{ fontSize: '11px', ...text3D.body }}>데이터베이스 저장 엔티티</p></div></GlassCard>
               <GlassCard dark={isDark}><div style={{ padding: '20px' }}><div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}><Icon3D size={28} dark={isDark}><Network className="w-3.5 h-3.5" style={{ color: iconColor }} /></Icon3D><span style={{ fontSize: '12px', ...text3D.body }}>그래프 관계</span></div><p style={{ fontSize: '28px', margin: '0 0 4px 0', ...text3D.heroNumber }}>{importStatus.totalRelations}</p><p style={{ fontSize: '11px', ...text3D.body }}>엔티티 간 연결</p></div></GlassCard>
@@ -160,18 +287,18 @@ export default function SettingsPage() {
             <GlassCard dark={isDark}><div style={{ padding: '24px' }}><h3 style={{ fontSize: '16px', margin: '0 0 4px 0', ...text3D.number }}>API 연동</h3><p style={{ fontSize: '12px', margin: '0 0 16px 0', ...text3D.body }}>외부 시스템과의 데이터 연동</p><div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>{[{ name: 'POS 시스템', desc: '실시간 판매 데이터 연동' }, { name: 'ERP 시스템', desc: '재고 및 주문 데이터' }].map((item) => (<div key={item.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)', borderRadius: '12px' }}><div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><Icon3D size={40} dark={isDark}><Link className="w-5 h-5" style={{ color: iconColor }} /></Icon3D><div><p style={{ fontWeight: 600, margin: 0, color: isDark ? '#fff' : '#1a1a1f' }}>{item.name}</p><p style={{ fontSize: '12px', margin: '2px 0 0 0', ...text3D.body }}>{item.desc}</p></div></div><Badge3D variant="secondary" dark={isDark}>미연결</Badge3D></div>))}<Button3D variant="outline" dark={isDark} style={{ width: '100%' }}><Plus className="w-4 h-4" /> 새 연동 추가</Button3D></div></div></GlassCard>
           </TabsContent>
 
-          <TabsContent value="users" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <TabsContent value="users" className="space-y-4 mt-0">
             <GlassCard dark={isDark}><div style={{ padding: '24px' }}><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}><div><h3 style={{ fontSize: '16px', margin: 0, ...text3D.number }}>조직 멤버</h3><p style={{ fontSize: '12px', margin: '4px 0 0 0', ...text3D.body }}>사용자 및 역할 관리</p></div>{(isOrgHQ() || isOrgStore()) && (<Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}><DialogTrigger asChild><Button3D size="sm" dark={isDark}><Mail className="w-4 h-4" /> 사용자 초대</Button3D></DialogTrigger><DialogContent><DialogHeader><DialogTitle>Viewer 초대</DialogTitle><DialogDescription>읽기 전용 권한을 가진 사용자를 초대합니다</DialogDescription></DialogHeader><div className="space-y-4"><div className="space-y-2"><Label>이메일</Label><Input type="email" placeholder="viewer@example.com" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} /></div><Button onClick={sendViewerInvitation} disabled={loading || !inviteEmail} className="w-full">{loading ? '전송 중...' : '초대 전송'}</Button></div></DialogContent></Dialog>)}</div><div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}><thead><tr style={{ borderBottom: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)' }}><th style={{ textAlign: 'left', padding: '12px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>사용자 ID</th><th style={{ textAlign: 'left', padding: '12px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>역할</th><th style={{ textAlign: 'left', padding: '12px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>라이선스</th><th style={{ textAlign: 'left', padding: '12px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>가입일</th></tr></thead><tbody>{orgMembers.map((member) => (<tr key={member.id} style={{ borderBottom: isDark ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(0,0,0,0.04)' }}><td style={{ padding: '12px 8px', fontFamily: 'monospace', fontSize: '11px', color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280' }}>{member.user_id.substring(0, 8)}...</td><td style={{ padding: '12px 8px' }}>{getRoleBadge(member.role)}</td><td style={{ padding: '12px 8px' }}>{member.licenses ? getLicenseTypeBadge(member.licenses.license_type) : <Badge3D variant="secondary" dark={isDark}>없음</Badge3D>}</td><td style={{ padding: '12px 8px', ...text3D.body }}>{new Date(member.joined_at).toLocaleDateString('ko-KR')}</td></tr>))}</tbody></table></div></div></GlassCard>
             <GlassCard dark={isDark}><div style={{ padding: '24px' }}><h3 style={{ fontSize: '16px', margin: '0 0 16px 0', ...text3D.number }}>역할 설명</h3><div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>{[{ role: 'ORG_HQ', desc: '조직 관리, 모든 매장 접근 (HQ 라이선스 필요)' }, { role: 'ORG_STORE', desc: '매장 관리 및 데이터 분석 (Store 라이선스 필요)' }, { role: 'ORG_VIEWER', desc: '읽기 전용 권한 (무료)' }].map((item) => (<div key={item.role} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>{getRoleBadge(item.role)}<span style={{ fontSize: '13px', ...text3D.body }}>{item.desc}</span></div>))}</div></div></GlassCard>
           </TabsContent>
 
-          <TabsContent value="system" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <TabsContent value="system" className="space-y-4 mt-0">
             <GlassCard dark={isDark}><div style={{ padding: '24px' }}><h3 style={{ fontSize: '16px', margin: '0 0 4px 0', ...text3D.number }}>조직 정보</h3><p style={{ fontSize: '12px', margin: '0 0 20px 0', ...text3D.body }}>기본 조직 정보</p><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}><div><Label style={{ fontSize: '12px', ...text3D.body }}>조직 이름</Label><p style={{ fontWeight: 600, margin: '4px 0 0 0', color: isDark ? '#fff' : '#1a1a1f' }}>{orgName || '-'}</p></div><div><Label style={{ fontSize: '12px', ...text3D.body }}>내 역할</Label><div style={{ marginTop: '4px' }}>{getRoleBadge(role || '')}</div></div></div></div></GlassCard>
             <GlassCard dark={isDark}><div style={{ padding: '24px' }}><h3 style={{ fontSize: '16px', margin: '0 0 4px 0', ...text3D.number }}>조직 설정</h3><p style={{ fontSize: '12px', margin: '0 0 20px 0', ...text3D.body }}>타임존, 통화, 브랜딩</p><div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}><div><Label style={{ fontSize: '12px', marginBottom: '6px', display: 'block', ...text3D.body }}>타임존</Label><Select value={orgSettings.timezone} onValueChange={(v) => setOrgSettings({ ...orgSettings, timezone: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Asia/Seoul">Asia/Seoul (KST)</SelectItem><SelectItem value="America/New_York">America/New_York (EST)</SelectItem><SelectItem value="Europe/London">Europe/London (GMT)</SelectItem></SelectContent></Select></div><div><Label style={{ fontSize: '12px', marginBottom: '6px', display: 'block', ...text3D.body }}>통화</Label><Select value={orgSettings.currency} onValueChange={(v) => setOrgSettings({ ...orgSettings, currency: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="KRW">KRW (₩)</SelectItem><SelectItem value="USD">USD ($)</SelectItem><SelectItem value="EUR">EUR (€)</SelectItem></SelectContent></Select></div></div><div><Label style={{ fontSize: '12px', marginBottom: '6px', display: 'block', ...text3D.body }}>브랜드 컬러</Label><div style={{ display: 'flex', gap: '8px' }}><Input type="color" value={orgSettings.brandColor} onChange={(e) => setOrgSettings({ ...orgSettings, brandColor: e.target.value })} style={{ width: '64px', height: '40px' }} /><Input value={orgSettings.brandColor} onChange={(e) => setOrgSettings({ ...orgSettings, brandColor: e.target.value })} /></div></div><Button3D onClick={saveOrgSettings} disabled={loading} dark={isDark}>{loading ? '저장 중...' : '변경사항 저장'}</Button3D></div></div></GlassCard>
             <GlassCard dark={isDark}><div style={{ padding: '24px' }}><h3 style={{ fontSize: '16px', margin: '0 0 4px 0', ...text3D.number }}>알림 설정</h3><p style={{ fontSize: '12px', margin: '0 0 20px 0', ...text3D.body }}>이메일/슬랙 알림</p><div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><div><Label style={{ fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>이메일 알림</Label><p style={{ fontSize: '12px', margin: '2px 0 0 0', ...text3D.body }}>이메일로 알림을 받습니다</p></div><Switch checked={notificationSettings.emailEnabled} onCheckedChange={(checked) => setNotificationSettings({ ...notificationSettings, emailEnabled: checked })} /></div><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><div><Label style={{ fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>슬랙 알림</Label><p style={{ fontSize: '12px', margin: '2px 0 0 0', ...text3D.body }}>슬랙으로 알림을 받습니다</p></div><Switch checked={notificationSettings.slackEnabled} onCheckedChange={(checked) => setNotificationSettings({ ...notificationSettings, slackEnabled: checked })} /></div><div style={{ height: '1px', background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }} /><div><Label style={{ fontSize: '12px', marginBottom: '8px', display: 'block', ...text3D.body }}>알림 유형</Label><div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>{[{ type: 'stockout', label: '재고 부족' }, { type: 'anomaly', label: '이상 탐지' }, { type: 'milestone', label: '목표 달성' }].map((item) => (<div key={item.type} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><Label style={{ fontWeight: 400, color: isDark ? 'rgba(255,255,255,0.7)' : '#515158' }}>{item.label}</Label><Switch checked={notificationSettings.notificationTypes.includes(item.type)} onCheckedChange={() => toggleNotificationType(item.type)} /></div>))}</div></div><Button3D onClick={saveNotificationSettings} disabled={loading} dark={isDark}>{loading ? '저장 중...' : '알림 설정 저장'}</Button3D></div></div></GlassCard>
           </TabsContent>
 
-          <TabsContent value="license" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <TabsContent value="license" className="space-y-4 mt-0">
             <GlassCard dark={isDark}><div style={{ padding: '24px' }}><h3 style={{ fontSize: '16px', margin: '0 0 4px 0', ...text3D.number }}>구독 정보</h3><p style={{ fontSize: '12px', margin: '0 0 20px 0', ...text3D.body }}>현재 플랜 및 라이선스</p>{subscriptionInfo ? (<><div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '20px' }}>{[{ value: subscriptionInfo.hq_license_count || 0, label: 'HQ 라이선스', price: '$500/월' }, { value: subscriptionInfo.store_license_count || 0, label: 'Store 라이선스', price: '$250/월' }, { value: subscriptionInfo.viewer_count || 0, label: 'Viewer', price: '무료' }].map((item) => (<div key={item.label} style={{ textAlign: 'center', padding: '20px', border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)', borderRadius: '12px' }}><p style={{ fontSize: '32px', margin: '0 0 4px 0', ...text3D.heroNumber }}>{item.value}</p><p style={{ fontSize: '12px', margin: 0, ...text3D.body }}>{item.label}</p><p style={{ fontSize: '11px', marginTop: '2px', color: isDark ? 'rgba(255,255,255,0.4)' : '#9ca3af' }}>{item.price}</p></div>))}</div><div style={{ height: '1px', background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)', margin: '16px 0' }} /><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}><Label style={{ ...text3D.body }}>월 비용</Label><span style={{ fontSize: '24px', ...text3D.heroNumber }}>${subscriptionInfo.monthly_cost?.toLocaleString() || 0}</span></div><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><Label style={{ ...text3D.body }}>구독 상태</Label>{getStatusBadge(subscriptionInfo.status || 'active')}</div></>) : <div style={{ textAlign: 'center', padding: '32px 0', ...text3D.body }}>구독 정보 없음</div>}</div></GlassCard>
             <GlassCard dark={isDark}><div style={{ padding: '24px' }}><h3 style={{ fontSize: '16px', margin: '0 0 16px 0', ...text3D.number }}>라이선스 목록</h3><div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}><thead><tr style={{ borderBottom: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)' }}><th style={{ textAlign: 'left', padding: '12px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>라이선스 키</th><th style={{ textAlign: 'left', padding: '12px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>타입</th><th style={{ textAlign: 'left', padding: '12px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>상태</th><th style={{ textAlign: 'left', padding: '12px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>월 비용</th><th style={{ textAlign: 'left', padding: '12px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>유효기간</th></tr></thead><tbody>{licenses.map((license) => (<tr key={license.id} style={{ borderBottom: isDark ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(0,0,0,0.04)' }}><td style={{ padding: '12px 8px', fontFamily: 'monospace', fontSize: '11px', color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280' }}>{license.license_key || 'N/A'}</td><td style={{ padding: '12px 8px' }}>{getLicenseTypeBadge(license.license_type)}</td><td style={{ padding: '12px 8px' }}>{getStatusBadge(license.status)}</td><td style={{ padding: '12px 8px', color: isDark ? '#fff' : '#1a1a1f' }}>${license.monthly_price || 0}</td><td style={{ padding: '12px 8px', ...text3D.body }}>{license.expiry_date ? new Date(license.expiry_date).toLocaleDateString('ko-KR') : '무제한'}</td></tr>))}</tbody></table></div>{licenses.length === 0 && <div style={{ textAlign: 'center', padding: '32px 0', ...text3D.body }}>발급된 라이선스가 없습니다</div>}</div></GlassCard>
           </TabsContent>
