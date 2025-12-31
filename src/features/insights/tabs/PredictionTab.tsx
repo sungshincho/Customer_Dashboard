@@ -325,8 +325,8 @@ const GlowRevenueChart = ({ data, isDark }: { data: ChartDataPoint[]; isDark: bo
       ctx.setLineDash([]);
     }
 
-    // 예측 점 + 글로우
-    predPts.forEach(p => {
+    // 모든 점 + 글로우 (실적 + 예측 모두)
+    points.forEach(p => {
       const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 8);
       const gc = isDark ? '255,255,255' : '0,0,0';
       glow.addColorStop(0, `rgba(${gc},${0.4 * progress})`);
@@ -466,8 +466,8 @@ const GlowMiniLineChart = ({ data, dataKey, isDark, label }: { data: ChartDataPo
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // 예측 점
-    points.filter(p => p.isPrediction).forEach(p => {
+    // 모든 점 + 글로우 (실적 + 예측 모두)
+    points.forEach(p => {
       const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 6);
       const gc = isDark ? '255,255,255' : '0,0,0';
       glow.addColorStop(0, `rgba(${gc},0.35)`);
