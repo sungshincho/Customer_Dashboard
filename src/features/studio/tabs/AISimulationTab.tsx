@@ -254,7 +254,7 @@ export function AISimulationTab({
           <label className="text-xs font-medium text-white">시뮬레이션 타입</label>
           <div className="grid grid-cols-2 gap-2">
             <button onClick={() => setSimulationType('realtime')} disabled={isAnyRunning} className={cn("p-3 rounded-lg border text-left transition", simulationType === 'realtime' ? "bg-blue-500/20 border-blue-500 text-blue-400" : "bg-white/5 border-white/10 hover:bg-white/10 text-white/70", isAnyRunning && "opacity-50 cursor-not-allowed")}>
-              <div className="flex items-center gap-2 font-medium text-sm">
+              <div className="flex items-center gap-2 font-medium text-sm text-white">
                 <Play className="w-4 h-4" />
                 실시간
               </div>
@@ -326,7 +326,7 @@ export function AISimulationTab({
         {/* 🆕 환경 설정 패널 (접기/펼치기) */}
         <div className="border border-white/10 rounded-lg">
           <button onClick={() => setShowEnvironmentSettings(!showEnvironmentSettings)} className="w-full flex items-center justify-between p-3 text-sm text-white/80">
-            <span className="font-medium flex items-center gap-2 text-inherit">
+            <span className="font-medium flex items-center gap-2 text-white">
               <Settings className="w-4 h-4" />
               환경 설정 (시뮬레이션)
             </span>
@@ -349,7 +349,7 @@ export function AISimulationTab({
         {/* 예상 고객 수 */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <label className="text-xs font-medium text-white/60">예상 고객 수</label>
+            <label className="text-xs font-medium bg-inherit text-white">예상 고객 수</label>
             <span className="text-sm font-bold text-white">{customerCount}명</span>
           </div>
           <Slider value={[customerCount]} onValueChange={([v]) => setCustomerCount(v)} min={10} max={300} step={10} disabled={isAnyRunning} className="w-full" />
@@ -362,7 +362,7 @@ export function AISimulationTab({
         {/* 시뮬레이션 시간 */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <label className="text-xs font-medium text-white/60">시뮬레이션 시간</label>
+            <label className="text-xs font-medium text-white">시뮬레이션 시간</label>
             <span className="text-sm font-bold text-white">{duration}분</span>
           </div>
           <Slider value={[duration]} onValueChange={([v]) => setDuration(v)} min={15} max={180} step={15} disabled={isAnyRunning} className="w-full" />
@@ -375,7 +375,7 @@ export function AISimulationTab({
         {/* 고급 옵션 (접기/펼치기) */}
         <div className="border border-white/10 rounded-lg">
           <button onClick={() => setShowAdvancedOptions(!showAdvancedOptions)} className="w-full flex items-center justify-between p-3 text-sm text-white/80">
-            <span className="font-medium">시각화 옵션</span>
+            <span className="font-medium text-white">시각화 옵션</span>
             {showAdvancedOptions ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
 
