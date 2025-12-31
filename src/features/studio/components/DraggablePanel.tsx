@@ -71,10 +71,12 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
   children,
   className,
 }) => {
-  // rightOffset이 있으면 x는 사용하지 않음 (CSS right 속성 사용)
+  // 위치 상태 (left 기반으로 통일)
   const [position, setPosition] = useState<Position>(() => {
     return { x: defaultPosition.x, y: defaultPosition.y };
   });
+  // rightOffset에서 left 기반으로 전환되었는지 여부
+  const [useLeftPosition, setUseLeftPosition] = useState(!rightOffset);
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
@@ -82,7 +84,7 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
   const panelRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLElement | null>(null);
   const dragOffset = useRef<Position>({ x: 0, y: 0 });
-  const resizeStart = useRef<{ x: number; y: number; width: number; height: number }>({ x: 0, y: 0, width: 0, height: 0 });
+  const resizeStart = useRef<{ x: number; y: number; width: number; height: number; posX: number }>({ x: 0, y: 0, width: 0, height: 0, posX: 0 });
 
   // 컨테이너 참조 설정 (드래그 경계 계산용)
   useEffect(() => {
@@ -119,17 +121,29 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (!panelRef.current) return;
 
+    const rect = panelRef.current.getBoundingClientRect();
+    const container = containerRef.current;
+    const containerRect = container?.getBoundingClientRect();
+
+    // rightOffset 모드에서 드래그 시작 시 left 기반으로 전환
+    let currentX = position.x;
+    if (!useLeftPosition && containerRect) {
+      // right 기반 위치를 left 기반으로 변환
+      currentX = rect.left - containerRect.left;
+      setPosition(prev => ({ ...prev, x: currentX }));
+      setUseLeftPosition(true);
+    }
+
     setIsDragging(true);
     dragOffset.current = {
-      x: e.clientX - position.x,
+      x: e.clientX - currentX,
       y: e.clientY - position.y,
     };
 
     const handleMouseMove = (e: MouseEvent) => {
-      const container = containerRef.current;
-      const containerRect = container?.getBoundingClientRect();
-      const maxX = containerRect ? containerRect.width - 100 : window.innerWidth - 100;
-      const maxY = containerRect ? containerRect.height - 50 : window.innerHeight - 50;
+      const containerBounds = containerRef.current?.getBoundingClientRect();
+      const maxX = containerBounds ? containerBounds.width - 100 : window.innerWidth - 100;
+      const maxY = containerBounds ? containerBounds.height - 50 : window.innerHeight - 50;
 
       const newX = Math.max(0, Math.min(maxX, e.clientX - dragOffset.current.x));
       const newY = Math.max(0, Math.min(maxY, e.clientY - dragOffset.current.y));
@@ -145,7 +159,7 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-  }, [position]);
+  }, [position, useLeftPosition]);
 
   // 리사이즈 핸들러
   const handleResizeMouseDown = useCallback((e: React.MouseEvent, direction: string) => {
@@ -154,13 +168,25 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
 
     if (!panelRef.current) return;
 
-    setIsResizing(true);
     const rect = panelRef.current.getBoundingClientRect();
+    const container = containerRef.current;
+    const containerRect = container?.getBoundingClientRect();
+
+    // 리사이즈 시작 전 left 기반으로 전환 (좌측 리사이즈를 위해 필요)
+    let currentX = position.x;
+    if (!useLeftPosition && containerRect) {
+      currentX = rect.left - containerRect.left;
+      setPosition(prev => ({ ...prev, x: currentX }));
+      setUseLeftPosition(true);
+    }
+
+    setIsResizing(true);
     resizeStart.current = {
       x: e.clientX,
       y: e.clientY,
       width: size?.width || rect.width,
       height: size?.height || rect.height,
+      posX: currentX,
     };
 
     const handleMouseMove = (e: MouseEvent) => {
@@ -169,15 +195,29 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
 
       let newWidth = resizeStart.current.width;
       let newHeight = resizeStart.current.height;
+      let newPosX = resizeStart.current.posX;
 
+      // 우측 리사이즈 (동쪽)
       if (direction.includes('e')) {
         newWidth = Math.max(minSize.width, Math.min(maxSize.width, resizeStart.current.width + deltaX));
       }
+      // 좌측 리사이즈 (서쪽) - 위치도 함께 조정
+      if (direction.includes('w')) {
+        const widthChange = -deltaX; // 마우스 왼쪽 이동 시 너비 증가
+        newWidth = Math.max(minSize.width, Math.min(maxSize.width, resizeStart.current.width + widthChange));
+        // 실제 너비 변화량 계산 (min/max 제한 적용 후)
+        const actualWidthChange = newWidth - resizeStart.current.width;
+        newPosX = resizeStart.current.posX - actualWidthChange;
+      }
+      // 하단 리사이즈 (남쪽)
       if (direction.includes('s')) {
         newHeight = Math.max(minSize.height, Math.min(maxSize.height, resizeStart.current.height + deltaY));
       }
 
       setSize({ width: newWidth, height: newHeight });
+      if (direction.includes('w')) {
+        setPosition(prev => ({ ...prev, x: newPosX }));
+      }
     };
 
     const handleMouseUp = () => {
@@ -188,7 +228,7 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-  }, [size, minSize, maxSize]);
+  }, [size, minSize, maxSize, position.x, useLeftPosition]);
 
   return (
     <div
@@ -201,10 +241,10 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
         className
       )}
       style={{
-        // rightOffset이 있으면 right 사용, 없으면 left 사용
-        ...(rightOffset !== undefined
-          ? { right: rightOffset, top: position.y }
-          : { left: position.x, top: position.y }),
+        // useLeftPosition이면 left 사용, 아니면 rightOffset 사용
+        ...(useLeftPosition
+          ? { left: position.x, top: position.y }
+          : { right: rightOffset, top: position.y }),
         width: size?.width,
         transition: (isDragging || isResizing) ? 'none' : 'box-shadow 0.2s',
       }}
@@ -258,7 +298,9 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
         {/* 컨텐츠 */}
         <div
           className={cn(
-            'transition-all duration-200 ease-in-out overflow-hidden',
+            'overflow-hidden',
+            // 리사이즈 중이 아닐 때만 transition 적용 (접힘 애니메이션용)
+            !isResizing && 'transition-all duration-200 ease-in-out',
             isCollapsed ? 'max-h-0' : ''
           )}
           style={{
@@ -273,6 +315,11 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
         {/* 리사이즈 핸들 (펼쳐진 상태에서만) */}
         {resizable && !isCollapsed && (
           <>
+            {/* 좌측 핸들 */}
+            <div
+              className="absolute top-0 left-0 w-2 h-full cursor-w-resize hover:bg-primary/30 transition-colors"
+              onMouseDown={(e) => handleResizeMouseDown(e, 'w')}
+            />
             {/* 우측 핸들 */}
             <div
               className="absolute top-0 right-0 w-2 h-full cursor-e-resize hover:bg-primary/30 transition-colors"
@@ -282,6 +329,11 @@ export const DraggablePanel: React.FC<DraggablePanelProps> = ({
             <div
               className="absolute bottom-0 left-0 w-full h-2 cursor-s-resize hover:bg-primary/30 transition-colors"
               onMouseDown={(e) => handleResizeMouseDown(e, 's')}
+            />
+            {/* 좌하단 코너 핸들 */}
+            <div
+              className="absolute bottom-0 left-0 w-4 h-4 cursor-sw-resize hover:bg-primary/50 transition-colors rounded-tr"
+              onMouseDown={(e) => handleResizeMouseDown(e, 'sw')}
             />
             {/* 우하단 코너 핸들 */}
             <div
