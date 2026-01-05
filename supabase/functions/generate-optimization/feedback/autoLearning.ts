@@ -828,148 +828,191 @@ export function applyAdjustments(
 
 /**
  * Supabase에서 저장된 파라미터 로드
+ * 🔧 테이블이 없는 경우 graceful하게 기본값 반환
  */
 export async function loadStoredParameters(
   supabase: SupabaseClient,
   storeId: string
 ): Promise<ModelParameters> {
-  const { data, error } = await supabase
-    .from('stored_model_parameters')
-    .select('*')
-    .eq('store_id', storeId)
-    .eq('is_active', true);
+  try {
+    const { data, error } = await supabase
+      .from('stored_model_parameters')
+      .select('*')
+      .eq('store_id', storeId)
+      .eq('is_active', true);
 
-  if (error) {
-    console.error('파라미터 로드 실패:', error);
-    return { ...DEFAULT_MODEL_PARAMETERS };
-  }
-
-  if (!data || data.length === 0) {
-    return { ...DEFAULT_MODEL_PARAMETERS };
-  }
-
-  // 기본 파라미터에서 시작하여 저장된 값으로 덮어쓰기
-  const parameters = JSON.parse(JSON.stringify(DEFAULT_MODEL_PARAMETERS)) as ModelParameters;
-
-  for (const row of data as StoredModelParameters[]) {
-    try {
-      setNestedValue(
-        parameters as unknown as Record<string, unknown>,
-        row.parameter_key,
-        row.parameter_value
-      );
-    } catch (e) {
-      console.warn(`파라미터 설정 실패: ${row.parameter_key}`, e);
+    if (error) {
+      // 🔧 테이블이 없는 경우 (42P01) 조용히 기본값 반환
+      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        console.log('[AutoLearning] stored_model_parameters 테이블 없음, 기본값 사용');
+        return { ...DEFAULT_MODEL_PARAMETERS };
+      }
+      console.warn('[AutoLearning] 파라미터 로드 실패:', error.message);
+      return { ...DEFAULT_MODEL_PARAMETERS };
     }
-  }
 
-  return parameters;
+    if (!data || data.length === 0) {
+      return { ...DEFAULT_MODEL_PARAMETERS };
+    }
+
+    // 기본 파라미터에서 시작하여 저장된 값으로 덮어쓰기
+    const parameters = JSON.parse(JSON.stringify(DEFAULT_MODEL_PARAMETERS)) as ModelParameters;
+
+    for (const row of data as StoredModelParameters[]) {
+      try {
+        setNestedValue(
+          parameters as unknown as Record<string, unknown>,
+          row.parameter_key,
+          row.parameter_value
+        );
+      } catch (e) {
+        console.warn(`[AutoLearning] 파라미터 설정 실패: ${row.parameter_key}`, e);
+      }
+    }
+
+    return parameters;
+  } catch (e) {
+    console.warn('[AutoLearning] 파라미터 로드 예외:', e);
+    return { ...DEFAULT_MODEL_PARAMETERS };
+  }
 }
 
 /**
  * 파라미터를 Supabase에 저장
+ * 🔧 테이블이 없는 경우 graceful하게 false 반환
  */
 export async function saveParameters(
   supabase: SupabaseClient,
   storeId: string,
   parameters: ModelParameters
 ): Promise<boolean> {
-  const now = new Date().toISOString();
-  const updates: Partial<StoredModelParameters>[] = [];
+  try {
+    const now = new Date().toISOString();
+    const updates: Partial<StoredModelParameters>[] = [];
 
-  // 파라미터를 플랫하게 펼치기
-  function flattenParameters(obj: Record<string, unknown>, prefix = ''): void {
-    for (const key of Object.keys(obj)) {
-      const path = prefix ? `${prefix}.${key}` : key;
-      const value = obj[key];
+    // 파라미터를 플랫하게 펼치기
+    function flattenParameters(obj: Record<string, unknown>, prefix = ''): void {
+      for (const key of Object.keys(obj)) {
+        const path = prefix ? `${prefix}.${key}` : key;
+        const value = obj[key];
 
-      if (typeof value === 'number') {
-        updates.push({
-          store_id: storeId,
-          parameter_key: path,
-          parameter_value: value,
-          prediction_type: path.split('.')[0] as PredictionType,
-          updated_at: now,
-          is_active: true,
-        });
-      } else if (typeof value === 'object' && value !== null) {
-        flattenParameters(value as Record<string, unknown>, path);
+        if (typeof value === 'number') {
+          updates.push({
+            store_id: storeId,
+            parameter_key: path,
+            parameter_value: value,
+            prediction_type: path.split('.')[0] as PredictionType,
+            updated_at: now,
+            is_active: true,
+          });
+        } else if (typeof value === 'object' && value !== null) {
+          flattenParameters(value as Record<string, unknown>, path);
+        }
       }
     }
-  }
 
-  flattenParameters(parameters as unknown as Record<string, unknown>);
+    flattenParameters(parameters as unknown as Record<string, unknown>);
 
-  // Upsert 실행
-  const { error } = await supabase
-    .from('stored_model_parameters')
-    .upsert(updates, {
-      onConflict: 'store_id,parameter_key',
-    });
+    // Upsert 실행
+    const { error } = await supabase
+      .from('stored_model_parameters')
+      .upsert(updates, {
+        onConflict: 'store_id,parameter_key',
+      });
 
-  if (error) {
-    console.error('파라미터 저장 실패:', error);
+    if (error) {
+      // 🔧 테이블이 없는 경우 조용히 false 반환
+      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        console.log('[AutoLearning] stored_model_parameters 테이블 없음, 저장 스킵');
+        return false;
+      }
+      console.warn('[AutoLearning] 파라미터 저장 실패:', error.message);
+      return false;
+    }
+
+    return true;
+  } catch (e) {
+    console.warn('[AutoLearning] 파라미터 저장 예외:', e);
     return false;
   }
-
-  return true;
 }
 
 /**
  * 학습 세션 시작
+ * 🔧 테이블이 없는 경우 null 반환 (세션 없이 진행)
  */
 export async function startLearningSession(
   supabase: SupabaseClient,
   storeId: string
-): Promise<string> {
+): Promise<string | null> {
   const sessionId = crypto.randomUUID();
 
-  const { error } = await supabase
-    .from('learning_sessions')
-    .insert({
-      id: sessionId,
-      store_id: storeId,
-      started_at: new Date().toISOString(),
-      status: 'started',
-      predictions_evaluated: 0,
-      adjustments_proposed: 0,
-      adjustments_applied: 0,
-      improvement_metrics: {},
-    });
+  try {
+    const { error } = await supabase
+      .from('learning_sessions')
+      .insert({
+        id: sessionId,
+        store_id: storeId,
+        started_at: new Date().toISOString(),
+        status: 'started',
+        predictions_evaluated: 0,
+        adjustments_proposed: 0,
+        adjustments_applied: 0,
+        improvement_metrics: {},
+      });
 
-  if (error) {
-    console.error('학습 세션 시작 실패:', error);
-    throw new Error(`학습 세션 시작 실패: ${error.message}`);
+    if (error) {
+      // 🔧 테이블이 없는 경우 조용히 null 반환
+      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        console.log('[AutoLearning] learning_sessions 테이블 없음, 세션 기록 스킵');
+        return null;
+      }
+      console.warn('[AutoLearning] 학습 세션 시작 실패:', error.message);
+      return null;
+    }
+
+    return sessionId;
+  } catch (e) {
+    console.warn('[AutoLearning] 학습 세션 시작 예외:', e);
+    return null;
   }
-
-  return sessionId;
 }
 
 /**
  * 학습 세션 완료
+ * 🔧 테이블이 없는 경우 graceful하게 처리
  */
 export async function completeLearningSession(
   supabase: SupabaseClient,
   sessionId: string,
   summary: Partial<LearningSession>
 ): Promise<void> {
-  const { error } = await supabase
-    .from('learning_sessions')
-    .update({
-      ...summary,
-      completed_at: new Date().toISOString(),
-      status: 'completed',
-    })
-    .eq('id', sessionId);
+  try {
+    const { error } = await supabase
+      .from('learning_sessions')
+      .update({
+        ...summary,
+        completed_at: new Date().toISOString(),
+        status: 'completed',
+      })
+      .eq('id', sessionId);
 
-  if (error) {
-    console.error('학습 세션 완료 실패:', error);
-    throw new Error(`학습 세션 완료 실패: ${error.message}`);
+    if (error) {
+      // 🔧 테이블이 없는 경우 조용히 처리
+      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        console.log('[AutoLearning] learning_sessions 테이블 없음, 완료 기록 스킵');
+        return;
+      }
+      console.warn('[AutoLearning] 학습 세션 완료 실패:', error.message);
+    }
+  } catch (e) {
+    console.warn('[AutoLearning] 학습 세션 완료 예외:', e);
   }
 }
 
 /**
  * 조정 기록 저장
+ * 🔧 테이블이 없는 경우 graceful하게 처리
  */
 export async function saveAdjustmentRecord(
   supabase: SupabaseClient,
@@ -978,53 +1021,72 @@ export async function saveAdjustmentRecord(
   adjustment: ProposedAdjustment,
   status: AdjustmentStatus
 ): Promise<void> {
-  const { error } = await supabase
-    .from('learning_adjustments')
-    .insert({
-      id: crypto.randomUUID(),
-      store_id: storeId,
-      prediction_type: adjustment.predictionType,
-      adjustment_type: adjustment.adjustmentType,
-      parameter_key: adjustment.parameterKey,
-      old_value: adjustment.currentValue,
-      new_value: adjustment.proposedValue,
-      confidence: adjustment.confidence,
-      sample_size: 0, // 별도로 설정 필요
-      status,
-      session_id: sessionId,
-      created_at: new Date().toISOString(),
-      applied_at: status === 'applied' ? new Date().toISOString() : null,
-    });
+  try {
+    const { error } = await supabase
+      .from('learning_adjustments')
+      .insert({
+        id: crypto.randomUUID(),
+        store_id: storeId,
+        prediction_type: adjustment.predictionType,
+        adjustment_type: adjustment.adjustmentType,
+        parameter_key: adjustment.parameterKey,
+        old_value: adjustment.currentValue,
+        new_value: adjustment.proposedValue,
+        confidence: adjustment.confidence,
+        sample_size: 0, // 별도로 설정 필요
+        status,
+        session_id: sessionId,
+        created_at: new Date().toISOString(),
+        applied_at: status === 'applied' ? new Date().toISOString() : null,
+      });
 
-  if (error) {
-    console.error('조정 기록 저장 실패:', error);
+    if (error) {
+      // 🔧 테이블이 없는 경우 조용히 처리
+      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        return; // 조용히 스킵
+      }
+      console.warn('[AutoLearning] 조정 기록 저장 실패:', error.message);
+    }
+  } catch (e) {
+    console.warn('[AutoLearning] 조정 기록 저장 예외:', e);
   }
 }
 
 /**
  * 예측 기록 조회
+ * 🔧 테이블이 없는 경우 빈 배열 반환
  */
 export async function fetchPredictionRecords(
   supabase: SupabaseClient,
   storeId: string,
   days: number = 30
 ): Promise<PredictionRecord[]> {
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - days);
+  try {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
 
-  const { data, error } = await supabase
-    .from('prediction_records')
-    .select('*')
-    .eq('store_id', storeId)
-    .gte('prediction_date', startDate.toISOString())
-    .not('actual_value', 'is', null);
+    const { data, error } = await supabase
+      .from('prediction_records')
+      .select('*')
+      .eq('store_id', storeId)
+      .gte('prediction_date', startDate.toISOString())
+      .not('actual_value', 'is', null);
 
-  if (error) {
-    console.error('예측 기록 조회 실패:', error);
+    if (error) {
+      // 🔧 테이블이 없는 경우 조용히 빈 배열 반환
+      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        console.log('[AutoLearning] prediction_records 테이블 없음, 스킵');
+        return [];
+      }
+      console.warn('[AutoLearning] 예측 기록 조회 실패:', error.message);
+      return [];
+    }
+
+    return (data || []) as PredictionRecord[];
+  } catch (e) {
+    console.warn('[AutoLearning] 예측 기록 조회 예외:', e);
     return [];
   }
-
-  return (data || []) as PredictionRecord[];
 }
 
 // ============================================================================
@@ -1064,19 +1126,21 @@ export async function runAutoLearning(
 
     if (records.length < 30) {
       // 데이터 부족
-      await completeLearningSession(supabase, sessionId, {
-        predictions_evaluated: records.length,
-        adjustments_proposed: 0,
-        adjustments_applied: 0,
-        improvement_metrics: {
-          before: { mape: 0, rmse: 0, bias: 0 },
-          after: { mape: 0, rmse: 0, bias: 0 },
-          improvement_percentage: 0,
-        },
-      });
+      if (sessionId) {
+        await completeLearningSession(supabase, sessionId, {
+          predictions_evaluated: records.length,
+          adjustments_proposed: 0,
+          adjustments_applied: 0,
+          improvement_metrics: {
+            before: { mape: 0, rmse: 0, bias: 0 },
+            after: { mape: 0, rmse: 0, bias: 0 },
+            improvement_percentage: 0,
+          },
+        });
+      }
 
       return {
-        sessionId,
+        sessionId: sessionId || 'no-session',
         storeId,
         duration: (Date.now() - startTime) / 1000,
         predictionsEvaluated: records.length,
@@ -1127,15 +1191,17 @@ export async function runAutoLearning(
 
     const appliedResults = adjustmentResults.filter(r => r.applied);
 
-    // 7. 조정 기록 저장
-    for (const result of adjustmentResults) {
-      await saveAdjustmentRecord(
-        supabase,
-        storeId,
-        sessionId,
-        result.adjustment,
-        result.applied ? 'applied' : 'rejected'
-      );
+    // 7. 조정 기록 저장 (세션이 있을 때만)
+    if (sessionId) {
+      for (const result of adjustmentResults) {
+        await saveAdjustmentRecord(
+          supabase,
+          storeId,
+          sessionId,
+          result.adjustment,
+          result.applied ? 'applied' : 'rejected'
+        );
+      }
     }
 
     // 8. 파라미터 저장
@@ -1169,17 +1235,19 @@ export async function runAutoLearning(
       improvement_percentage: Math.round(expectedImprovement * 100) / 100,
     };
 
-    // 10. 세션 완료
-    await completeLearningSession(supabase, sessionId, {
-      predictions_evaluated: records.length,
-      adjustments_proposed: proposedAdjustments.length,
-      adjustments_applied: appliedResults.length,
-      improvement_metrics: improvementMetrics,
-    });
+    // 10. 세션 완료 (세션이 있을 때만)
+    if (sessionId) {
+      await completeLearningSession(supabase, sessionId, {
+        predictions_evaluated: records.length,
+        adjustments_proposed: proposedAdjustments.length,
+        adjustments_applied: appliedResults.length,
+        improvement_metrics: improvementMetrics,
+      });
+    }
 
     // 11. 결과 요약 반환
     return {
-      sessionId,
+      sessionId: sessionId || 'no-session',
       storeId,
       duration: (Date.now() - startTime) / 1000,
       predictionsEvaluated: records.length,

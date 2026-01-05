@@ -167,8 +167,8 @@ interface ZoneTransitionRow {
 
 interface ZoneDimRow {
   id: string;
-  zone_code: string;
-  zone_name: string;
+  code: string;      // 🔧 zone_code → code
+  name: string;      // 🔧 zone_name → name
   zone_type: string | null;
   store_id: string;
   org_id: string | null;
@@ -357,10 +357,10 @@ async function loadZones(
   supabase: any,
   storeId: string
 ): Promise<ZoneDimRow[]> {
-  // zones_dim 뷰 또는 zones 테이블에서 로드 시도
+  // 🔧 zones_dim 테이블에서 로드 (테이블명, 컬럼명 수정)
   let { data, error } = await supabase
-    .from('zones')
-    .select('id, zone_code, zone_name, zone_type, store_id, org_id, area_sqm, capacity, is_active')
+    .from('zones_dim')
+    .select('id, code, name, zone_type, store_id, org_id, area_sqm, capacity, is_active')
     .eq('store_id', storeId)
     .eq('is_active', true);
 
@@ -415,7 +415,7 @@ export function buildTransitionMatrix(
 
   // 존 이름 매핑
   const zoneNames = new Map<string, string>();
-  zones.forEach(z => zoneNames.set(z.id, z.zone_name));
+  zones.forEach(z => zoneNames.set(z.id, z.name));
 
   // 행렬 초기화
   const transitionCounts: number[][] = Array(n).fill(null).map(() => Array(n).fill(0));
@@ -486,15 +486,15 @@ export function extractKeyPaths(
   // 입구 존 찾기
   const entranceZones = zones.filter(z =>
     z.zone_type?.toLowerCase().includes('entrance') ||
-    z.zone_code?.toLowerCase().includes('entrance') ||
-    z.zone_name?.toLowerCase().includes('입구')
+    z.code?.toLowerCase().includes('entrance') ||
+    z.name?.toLowerCase().includes('입구')
   );
 
   // 계산대 존 찾기
   const checkoutZones = zones.filter(z =>
     z.zone_type?.toLowerCase().includes('checkout') ||
-    z.zone_code?.toLowerCase().includes('checkout') ||
-    z.zone_name?.toLowerCase().includes('계산')
+    z.code?.toLowerCase().includes('checkout') ||
+    z.name?.toLowerCase().includes('계산')
   );
 
   const entranceIds = new Set(entranceZones.map(z => z.id));
@@ -692,7 +692,7 @@ export function calculateZoneStats(
 
     stats.push({
       zoneId: zone.id,
-      zoneName: zone.zone_name,
+      zoneName: zone.name,
       zoneType: zone.zone_type || 'default',
       totalVisitors,
       uniqueVisitors,
