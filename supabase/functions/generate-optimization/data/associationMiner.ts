@@ -209,6 +209,11 @@ const DEFAULT_ANALYSIS_DAYS = 90;
 
 /**
  * 상품 연관 분석 메인 함수
+ *
+ * 분석 우선순위:
+ * 1. product_associations 테이블에서 사전 계산된 규칙 로드 (신뢰도 높음)
+ * 2. 거래 데이터 기반 실시간 마이닝 (충분한 데이터 필요)
+ * 3. 기본 카테고리 친화도 fallback (데이터 부족 시)
  */
 export async function analyzeProductAssociations(
   supabase: any,
@@ -222,6 +227,16 @@ export async function analyzeProductAssociations(
 
   console.log(`[AssociationMiner] Starting analysis for store ${storeId}`);
   console.log(`[AssociationMiner] Analysis period: ${startDateStr} to ${analysisDate}`);
+
+  // 0. 먼저 product_associations 테이블에서 사전 계산된 규칙 시도
+  const precomputedResult = await loadPrecomputedAssociations(supabase, storeId, daysBack);
+
+  if (precomputedResult) {
+    console.log(`[AssociationMiner] Using precomputed associations from product_associations table`);
+    return precomputedResult;
+  }
+
+  console.log(`[AssociationMiner] No precomputed associations, falling back to real-time mining`);
 
   // 1. 데이터 로드
   const [transactions, lineItems, products, placements] = await Promise.all([
@@ -319,6 +334,329 @@ export async function analyzeProductAssociations(
 // ============================================================================
 // Data Loading Functions
 // ============================================================================
+
+/**
+ * product_associations 테이블에서 사전 계산된 연관 규칙 로드
+ * 테이블에 데이터가 있으면 실시간 마이닝 대신 이 데이터를 사용
+ */
+async function loadPrecomputedAssociations(
+  supabase: any,
+  storeId: string,
+  daysBack: number
+): Promise<ProductAssociationResult | null> {
+  try {
+    // 1. product_associations 테이블에서 연관 규칙 로드
+    const { data: associations, error } = await supabase
+      .from('product_associations')
+      .select(`
+        id,
+        antecedent_product_id,
+        consequent_product_id,
+        support,
+        confidence,
+        lift,
+        conviction,
+        rule_type,
+        rule_strength,
+        placement_type,
+        co_occurrence_count,
+        avg_basket_value,
+        antecedent_category,
+        consequent_category,
+        category_pair,
+        sample_transaction_count,
+        metadata,
+        antecedent:antecedent_product_id(id, sku, product_name, category, price),
+        consequent:consequent_product_id(id, sku, product_name, category, price)
+      `)
+      .eq('store_id', storeId)
+      .eq('is_active', true)
+      .order('lift', { ascending: false });
+
+    if (error) {
+      console.error('[AssociationMiner] Error loading precomputed associations:', error);
+      return null;
+    }
+
+    // 데이터가 없으면 null 반환하여 실시간 마이닝으로 fallback
+    if (!associations || associations.length === 0) {
+      console.log('[AssociationMiner] No precomputed associations found');
+      return null;
+    }
+
+    console.log(`[AssociationMiner] Loaded ${associations.length} precomputed associations`);
+
+    // 2. 상품 정보 로드 (배치 정보용)
+    const products = await loadProducts(supabase, storeId);
+    const placements = await loadProductPlacements(supabase, storeId);
+
+    const productMap = new Map<string, ProductRow>();
+    products.forEach(p => productMap.set(p.id, p));
+
+    const placementMap = new Map<string, string>();
+    placements.forEach(p => {
+      if (p.zone_id) placementMap.set(p.product_id, p.zone_id);
+    });
+
+    // 3. AssociationRule 형식으로 변환
+    const associationRules: AssociationRule[] = associations.map((row: any, index: number) => {
+      const antProduct = row.antecedent;
+      const conProduct = row.consequent;
+
+      return {
+        ruleId: `precomputed_rule_${index + 1}`,
+        antecedent: [row.antecedent_product_id],
+        consequent: [row.consequent_product_id],
+        antecedentSkus: [antProduct?.sku || ''],
+        consequentSkus: [conProduct?.sku || ''],
+        antecedentNames: [antProduct?.product_name || 'Unknown'],
+        consequentNames: [conProduct?.product_name || 'Unknown'],
+        support: parseFloat(row.support) || 0.01,
+        confidence: parseFloat(row.confidence) || 0.3,
+        lift: parseFloat(row.lift) || 1.0,
+        conviction: parseFloat(row.conviction) || 1.0,
+        ruleStrength: row.rule_strength as AssociationRule['ruleStrength'],
+        metadata: {
+          coOccurrenceCount: row.co_occurrence_count || 0,
+          avgBasketValue: parseFloat(row.avg_basket_value) || 0,
+          categoryPair: row.category_pair || `${row.antecedent_category}+${row.consequent_category}`,
+        },
+      };
+    });
+
+    // 4. 카테고리 친화도 계산 (사전 계산된 규칙 기반)
+    const categoryAffinities = calculateCategoryAffinitiesFromRules(associationRules, productMap);
+
+    // 5. 배치 추천 생성
+    const productClusters = clusterProducts(associationRules, productMap);
+    const placementRecommendations = generatePlacementRecommendationsFromPrecomputed(
+      associations, productMap, placementMap
+    );
+
+    // 6. 요약 통계
+    const strongRulesCount = associationRules.filter(r =>
+      r.ruleStrength === 'strong' || r.ruleStrength === 'very_strong'
+    ).length;
+    const veryStrongRulesCount = associationRules.filter(r => r.ruleStrength === 'very_strong').length;
+
+    const topCategoryPair = categoryAffinities.length > 0
+      ? `${categoryAffinities[0].category1}+${categoryAffinities[0].category2}`
+      : 'N/A';
+
+    // 평균 sample_transaction_count로 데이터 품질 평가
+    const avgSampleCount = associations.reduce((sum: number, a: any) =>
+      sum + (a.sample_transaction_count || 0), 0) / associations.length;
+
+    let dataQuality: ProductAssociationResult['summary']['dataQuality'] = 'poor';
+    if (avgSampleCount >= 500) dataQuality = 'excellent';
+    else if (avgSampleCount >= 200) dataQuality = 'good';
+    else if (avgSampleCount >= 50) dataQuality = 'fair';
+
+    const summary = {
+      totalTransactions: Math.round(avgSampleCount),
+      avgBasketSize: 2.5, // 사전 계산 시 추정값
+      totalRulesFound: associationRules.length,
+      strongRulesCount,
+      veryStrongRulesCount,
+      topCategoryPair,
+      dataQuality,
+    };
+
+    // 7. AI 프롬프트 컨텍스트 생성
+    const aiPromptContext = buildAIPromptContext(
+      associationRules, categoryAffinities, placementRecommendations, summary
+    );
+
+    const analysisDate = new Date().toISOString().split('T')[0];
+
+    return {
+      storeId,
+      analysisDate,
+      analysisPeriodDays: daysBack,
+      associationRules,
+      productClusters,
+      categoryAffinities,
+      placementRecommendations,
+      summary,
+      aiPromptContext,
+    };
+  } catch (error) {
+    console.error('[AssociationMiner] Exception in loadPrecomputedAssociations:', error);
+    return null;
+  }
+}
+
+/**
+ * 사전 계산된 규칙에서 카테고리 친화도 계산
+ */
+function calculateCategoryAffinitiesFromRules(
+  rules: AssociationRule[],
+  productMap: Map<string, ProductRow>
+): CategoryAffinity[] {
+  const categoryPairs = new Map<string, {
+    count: number;
+    totalLift: number;
+    totalConfidence: number;
+    productPairs: Array<{ p1: string; p2: string; lift: number }>;
+  }>();
+
+  for (const rule of rules) {
+    const antCat = productMap.get(rule.antecedent[0])?.category || rule.metadata.categoryPair?.split('+')[0] || 'unknown';
+    const conCat = productMap.get(rule.consequent[0])?.category || rule.metadata.categoryPair?.split('+')[1] || 'unknown';
+
+    if (antCat === conCat) continue;
+
+    const pairKey = [antCat, conCat].sort().join('|');
+
+    if (!categoryPairs.has(pairKey)) {
+      categoryPairs.set(pairKey, { count: 0, totalLift: 0, totalConfidence: 0, productPairs: [] });
+    }
+
+    const pair = categoryPairs.get(pairKey)!;
+    pair.count += 1;
+    pair.totalLift += rule.lift;
+    pair.totalConfidence += rule.confidence;
+    pair.productPairs.push({
+      p1: rule.antecedent[0],
+      p2: rule.consequent[0],
+      lift: rule.lift,
+    });
+  }
+
+  const affinities: CategoryAffinity[] = [];
+
+  for (const [pairKey, pairData] of categoryPairs) {
+    const [cat1, cat2] = pairKey.split('|');
+    const avgLift = pairData.count > 0 ? pairData.totalLift / pairData.count : 1;
+    const avgConfidence = pairData.count > 0 ? pairData.totalConfidence / pairData.count : 0;
+
+    // 친화도 점수 계산
+    const affinityScore = Math.min(1, (avgLift - 1) / 3 + avgConfidence);
+
+    let recommendedProximity: CategoryAffinity['recommendedProximity'] = 'any';
+    if (affinityScore >= 0.7) recommendedProximity = 'adjacent';
+    else if (affinityScore >= 0.5) recommendedProximity = 'same_zone';
+    else if (affinityScore >= 0.3) recommendedProximity = 'visible';
+
+    const topPairs = pairData.productPairs
+      .sort((a, b) => b.lift - a.lift)
+      .slice(0, 5)
+      .map(pp => ({
+        product1Id: pp.p1,
+        product1Sku: productMap.get(pp.p1)?.sku || '',
+        product2Id: pp.p2,
+        product2Sku: productMap.get(pp.p2)?.sku || '',
+        lift: pp.lift,
+      }));
+
+    affinities.push({
+      category1: cat1,
+      category2: cat2,
+      affinityScore,
+      commonPurchaseRate: avgConfidence,
+      avgLift,
+      recommendedProximity,
+      topProductPairs: topPairs,
+    });
+  }
+
+  affinities.sort((a, b) => b.affinityScore - a.affinityScore);
+  return affinities;
+}
+
+/**
+ * 사전 계산된 연관 규칙에서 배치 추천 생성
+ */
+function generatePlacementRecommendationsFromPrecomputed(
+  associations: any[],
+  productMap: Map<string, ProductRow>,
+  placementMap: Map<string, string>
+): PlacementRecommendation[] {
+  const recommendations: PlacementRecommendation[] = [];
+  let recId = 1;
+
+  for (const assoc of associations) {
+    const antProduct = assoc.antecedent;
+    const conProduct = assoc.consequent;
+
+    if (!antProduct || !conProduct) continue;
+
+    const placementType = assoc.placement_type as PlacementRecommendation['type'];
+    const ruleStrength = assoc.rule_strength;
+
+    // 우선순위 결정
+    let priority: PlacementRecommendation['priority'] = 'low';
+    if (ruleStrength === 'very_strong') priority = 'critical';
+    else if (ruleStrength === 'strong') priority = 'high';
+    else if (ruleStrength === 'moderate') priority = 'medium';
+
+    const primaryZone = placementMap.get(assoc.antecedent_product_id) || 'unknown';
+    const secondaryZone = placementMap.get(assoc.consequent_product_id) || 'unknown';
+
+    // 같은 존에 이미 있으면 bundle/cross_sell 추천 스킵
+    if (placementType === 'cross_sell' && primaryZone === secondaryZone && primaryZone !== 'unknown') {
+      continue;
+    }
+
+    // 추천 사유 생성
+    let reason = '';
+    let implementationGuide = '';
+
+    switch (placementType) {
+      case 'bundle':
+        reason = `${(assoc.confidence * 100).toFixed(0)}% 동시 구매율, ${parseFloat(assoc.lift).toFixed(1)}x 향상도`;
+        implementationGuide = '번들 디스플레이 설치, 세트 프로모션 가격 책정 권장';
+        break;
+      case 'cross_sell':
+        reason = `크로스셀 기회 - 현재 다른 구역에 배치됨`;
+        implementationGuide = '연관 상품을 동일 구역 또는 인접 슬롯에 배치';
+        break;
+      case 'upsell':
+        reason = `업셀 기회 - 고가 상품으로 연결 가능`;
+        implementationGuide = '기본 상품 옆에 프리미엄 옵션 배치, 비교 디스플레이 활용';
+        break;
+      case 'impulse':
+        reason = `저가 충동구매 유도 상품 - 연관 구매 빈도 높음`;
+        implementationGuide = '계산대 또는 동선 마지막 구간에 배치';
+        break;
+    }
+
+    recommendations.push({
+      recommendationId: `rec_precomputed_${recId++}`,
+      type: placementType,
+      priority,
+      primaryProduct: {
+        id: assoc.antecedent_product_id,
+        sku: antProduct.sku || '',
+        name: antProduct.product_name || 'Unknown',
+        category: antProduct.category || assoc.antecedent_category || '',
+        currentZone: primaryZone,
+        price: antProduct.price || 0,
+      },
+      secondaryProducts: [{
+        id: assoc.consequent_product_id,
+        sku: conProduct.sku || '',
+        name: conProduct.product_name || 'Unknown',
+        category: conProduct.category || assoc.consequent_category || '',
+        currentZone: secondaryZone,
+        price: conProduct.price || 0,
+      }],
+      recommendedZone: placementType === 'impulse' ? 'checkout' : primaryZone,
+      expectedLift: parseFloat(assoc.lift) || 1.0,
+      confidence: parseFloat(assoc.confidence) || 0.3,
+      reason,
+      implementationGuide,
+    });
+  }
+
+  // 우선순위 순 정렬
+  recommendations.sort((a, b) => {
+    const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+    return priorityOrder[a.priority] - priorityOrder[b.priority];
+  });
+
+  return recommendations;
+}
 
 async function loadTransactions(
   supabase: any,
