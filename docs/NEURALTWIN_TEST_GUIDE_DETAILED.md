@@ -1,239 +1,573 @@
-# NEURALTWIN 기능 테스트 가이드 v1.0
+# NEURALTWIN 기능 테스트 가이드 v2.0
 
-## 테스트 환경
+## 📋 문서 정보
 | 항목 | 값 |
 |------|-----|
 | Store ID | `d9830554-2688-4032-af40-acccda787ac4` |
 | User ID | `e4200130-08e8-47da-8c92-3d0b90fafd77` |
 | Supabase Project ID | `bdrvowacecxnraaivlhr` |
-| 작성일 | 2026-01-05 |
+| 버전 | 2.0 |
+| 최종 수정일 | 2026-01-05 |
 
 ---
 
-## 프로젝트 아키텍처 개요
+# 📊 프로젝트 구현 현황 요약
 
-### 메인 라우트 (4개)
-| 경로 | 페이지 | 파일 위치 |
-|------|--------|----------|
-| `/` or `/insights` | Insight Hub | `src/features/insights/InsightHubPage.tsx` |
-| `/studio` | Digital Twin Studio | `src/features/studio/DigitalTwinStudioPage.tsx` |
-| `/roi` | ROI 측정 | `src/features/roi/ROIMeasurementPage.tsx` |
-| `/settings` | 설정 | `src/features/settings/SettingsPage.tsx` |
+## 전체 현황 Dashboard
 
-### Edge Functions (22개)
-| 함수명 | 용도 |
-|--------|------|
-| `generate-optimization` | AI 레이아웃 최적화 (메인) |
-| `environment-proxy` | 날씨/공휴일 API 프록시 |
-| `aggregate-dashboard-kpis` | KPI 집계 |
-| `aggregate-all-kpis` | 전체 KPI 집계 |
-| `retail-ai-inference` | 리테일 AI 추론 |
-| `unified-ai` | 통합 AI (추천/이상탐지) |
-| `run-simulation` | 시뮬레이션 실행 |
-| `graph-query` | 그래프 쿼리 |
-| `smart-ontology-mapping` | 온톨로지 매핑 |
-| `import-with-ontology` | 온톨로지 기반 임포트 |
-| `integrated-data-pipeline` | 통합 데이터 파이프라인 |
-| `unified-etl` | 통합 ETL |
-| `sync-api-data` | 외부 API 동기화 |
-| `process-wifi-data` | WiFi 데이터 처리 |
-| `inventory-monitor` | 재고 모니터링 |
-| `analyze-3d-model` | 3D 모델 분석 |
-| `auto-process-3d-models` | 3D 모델 자동 처리 |
-| `simulation-data-mapping` | 시뮬레이션 데이터 매핑 |
-| `datasource-mapper` | 데이터소스 매핑 |
-| `auto-map-etl` | 자동 ETL 매핑 |
-| `etl-scheduler` | ETL 스케줄러 |
-| `advanced-ai-inference` | 고급 AI 추론 |
+| 구분 | 항목 수 | 완료 | 부분작동 | 미작동 |
+|------|--------|------|---------|--------|
+| 메인 페이지 | 4 | ✅ 4 | - | - |
+| Edge Functions | 22 | ✅ 20 | ⚠️ 2 | - |
+| Studio 훅 | 21 | ✅ 19 | ⚠️ 2 | - |
+| Studio 패널 | 9 | ✅ 9 | - | - |
+| Studio 오버레이 | 11 | ✅ 10 | ⚠️ 1 | - |
+| 필수 데이터 테이블 | 10 | ✅ 6 | ⚠️ 2 | ❌ 2 |
 
 ---
 
-# 1. Insight Hub (인사이트 허브)
+# 🏗️ 프로젝트 아키텍처
 
-## 1.1 개요 탭 (Overview)
+## 디렉토리 구조
+```
+src/
+├── features/
+│   ├── studio/              # 🎯 디지털트윈 스튜디오 (핵심)
+│   │   ├── core/            # 3D 캔버스, 씬 관리
+│   │   ├── tabs/            # AI최적화, AI시뮬레이션, 적용
+│   │   ├── panels/          # 레이어, 시뮬레이션, Ultimate분석
+│   │   ├── hooks/           # 21개 훅 (시뮬레이션, 최적화)
+│   │   ├── overlays/        # 히트맵, 동선, 혼잡도 시각화
+│   │   ├── components/      # 공통 컴포넌트
+│   │   ├── services/        # 환경 데이터 서비스
+│   │   ├── types/           # 타입 정의
+│   │   └── utils/           # 유틸리티
+│   ├── insights/            # 인사이트 허브 (6개 탭)
+│   │   ├── tabs/            # Overview, Store, Customer, Product, Prediction, AI
+│   │   ├── hooks/           # 데이터 훅
+│   │   └── components/      # 공통 컴포넌트
+│   ├── roi/                 # ROI 측정 대시보드
+│   │   ├── components/      # ROI 컴포넌트
+│   │   ├── hooks/           # ROI 훅
+│   │   └── types/           # 타입 정의
+│   ├── simulation/          # 시뮬레이션 엔진
+│   ├── data-management/     # 데이터 관리
+│   └── settings/            # 설정
+├── hooks/                   # 전역 훅
+├── stores/                  # 상태 관리
+└── integrations/supabase/   # Supabase 연동
+
+supabase/functions/
+├── generate-optimization/   # 🆕 Ultimate AI 최적화 (1,449줄)
+│   ├── ai/                  # 프롬프트 빌더
+│   ├── data/                # 환경/동선/연관 분석
+│   ├── prediction/          # 매출/전환 예측
+│   ├── vmd/                 # VMD 엔진
+│   └── feedback/            # 자동 학습
+├── advanced-ai-inference/   # AI 추론 엔진 (4,715줄)
+├── environment-proxy/       # 날씨/공휴일 프록시 (367줄)
+└── [19개 기타 함수...]
+```
+
+## 메인 라우트 (4개)
+| 경로 | 페이지 | 파일 위치 | 상태 |
+|------|--------|----------|------|
+| `/` or `/insights` | Insight Hub | `src/features/insights/InsightHubPage.tsx` | ✅ |
+| `/studio` | Digital Twin Studio | `src/features/studio/DigitalTwinStudioPage.tsx` | ✅ |
+| `/roi` | ROI 측정 | `src/features/roi/ROIMeasurementPage.tsx` | ✅ |
+| `/settings` | 설정 | `src/features/settings/SettingsPage.tsx` | ✅ |
+
+## Edge Functions (22개)
+| 함수명 | 줄 수 | 용도 | 상태 |
+|--------|------|------|------|
+| `generate-optimization` | 1,449 | 🆕 Ultimate AI 레이아웃 최적화 | ✅ |
+| `advanced-ai-inference` | 4,715 | 고급 AI 추론 + 슬롯 시스템 | ✅ |
+| `unified-ai` | 1,094 | 통합 AI (추천/이상탐지) | ✅ |
+| `unified-etl` | 713 | 통합 ETL | ✅ |
+| `datasource-mapper` | 642 | 데이터소스 매핑 | ✅ |
+| `run-simulation` | 619 | 시뮬레이션 실행 | ✅ |
+| `retail-ai-inference` | 615 | 리테일 AI 추론 | ✅ |
+| `simulation-data-mapping` | 561 | 시뮬레이션 데이터 매핑 | ✅ |
+| `import-with-ontology` | 485 | 온톨로지 기반 임포트 | ✅ |
+| `integrated-data-pipeline` | 451 | 통합 데이터 파이프라인 | ✅ |
+| `auto-process-3d-models` | 420 | 3D 모델 자동 처리 | ✅ |
+| `smart-ontology-mapping` | 404 | 온톨로지 매핑 | ✅ |
+| `environment-proxy` | 367 | 날씨/공휴일 API 프록시 | ✅ |
+| `sync-api-data` | 359 | 외부 API 동기화 | ✅ |
+| `graph-query` | 307 | 그래프 쿼리 | ✅ |
+| `auto-map-etl` | 298 | 자동 ETL 매핑 | ✅ |
+| `process-wifi-data` | 286 | WiFi 데이터 처리 | ✅ |
+| `aggregate-dashboard-kpis` | 192 | KPI 집계 | ✅ |
+| `aggregate-all-kpis` | 191 | 전체 KPI 집계 | ✅ |
+| `inventory-monitor` | 169 | 재고 모니터링 | ✅ |
+| `analyze-3d-model` | 156 | 3D 모델 분석 | ✅ |
+| `etl-scheduler` | 79 | ETL 스케줄러 | ✅ |
+
+---
+
+# 🆕 Ultimate AI 최적화 시스템 (신규)
+
+## 개요
+`generate-optimization` Edge Function에 통합된 고급 AI 분석 시스템
+
+### 모듈 구성
+| 모듈 | 파일 | 기능 |
+|------|------|------|
+| 환경 분석 | `data/environmentLoader.ts` | 날씨/이벤트 영향 분석 |
+| 동선 분석 | `data/flowAnalyzer.ts` | 고객 동선 패턴 분석 |
+| 연관 분석 | `data/associationMiner.ts` | 상품 연관 규칙 마이닝 |
+| 프롬프트 빌더 | `ai/promptBuilder.ts` | Chain-of-Thought 프롬프트 |
+| 매출 예측 | `prediction/revenuePredictor.ts` | 배치 변경별 매출 예측 |
+| 전환 예측 | `prediction/conversionPredictor.ts` | 전환율 예측 |
+| VMD 엔진 | `vmd/vmdEngine.ts` | VMD 점수 및 위반 분석 |
+| 자동 학습 | `feedback/autoLearning.ts` | 파라미터 자동 최적화 |
+
+### 프론트엔드 통합
+| 컴포넌트 | 파일 | 역할 |
+|----------|------|------|
+| UltimateAnalysisPanel | `panels/UltimateAnalysisPanel.tsx` | Ultimate 분석 결과 표시 |
+| AIOptimizationTab | `tabs/AIOptimizationTab.tsx` | 최적화 탭 (Ultimate 통합) |
+| useSceneSimulation | `hooks/useSceneSimulation.ts` | Ultimate API 호출 |
+
+### 타입 정의
+- **파일:** `types/simulationResults.types.ts`
+- **추가된 타입:**
+  - `UltimateOptimizationResponse`
+  - `FlowAnalysisSummary`
+  - `EnvironmentSummary`
+  - `AssociationSummary`
+  - `PredictionSummary`
+  - `VMDAnalysis`
+  - `LearningSession`
+
+---
+
+# 1. Digital Twin Studio (디지털트윈 스튜디오)
+
+## 1.1 스튜디오 메인 페이지
 
 ### 파일 위치
-- **메인:** `src/features/insights/tabs/OverviewTab.tsx`
-- **훅:** `src/features/insights/hooks/useInsightMetrics.ts`
+- **메인:** `src/features/studio/DigitalTwinStudioPage.tsx`
+- **3D 코어:** `src/features/studio/core/`
+  - `Canvas3D.tsx` - 3D 캔버스
+  - `SceneProvider.tsx` - 씬 컨텍스트
+  - `ModelLoader.tsx` - 모델 로더
 
-### 데이터 소스
-| 테이블 | 용도 |
-|--------|------|
-| `dashboard_kpis` | 일별 KPI 데이터 |
-| `daily_kpis_agg` | 일별 집계 KPI |
-| `stores` | 매장 정보 |
+### 탭 구성
+| 탭 | 파일 | 기능 |
+|----|------|------|
+| 레이어 | `tabs/` (패널 사용) | 가구/상품 레이어 관리 |
+| AI 시뮬레이션 | `tabs/AISimulationTab.tsx` | 동선/혼잡/인력 시뮬레이션 |
+| AI 최적화 | `tabs/AIOptimizationTab.tsx` | 🆕 Ultimate AI 최적화 |
+| 적용 | `tabs/ApplyPanel.tsx` | 변경사항 적용 |
 
 ### 테스트 방법
-1. `/insights` 또는 `/` 접속
-2. "개요" 탭 선택 확인
-3. 다음 위젯 렌더링 확인:
-   - 총 매출 카드
-   - 방문자 수 카드
-   - 전환율 카드
-   - 객단가 카드
-   - 매출 트렌드 차트
-   - 시간대별 방문자 차트
-
-### 예상 결과
-- 모든 KPI 카드에 숫자 표시
-- 차트에 데이터 포인트 표시
-- 전일 대비 변화율 표시 (▲/▼)
+1. `/studio` 접속
+2. 3D 캔버스 로딩 확인 (2-5초)
+3. 마우스 드래그로 회전
+4. 스크롤로 줌 인/아웃
+5. 가구 클릭 시 선택 확인
 
 ### 테스트 결과 기록
 | 항목 | 상태 | 비고 |
 |------|------|------|
-| KPI 카드 렌더링 | | |
+| 3D 캔버스 로딩 | | |
+| GLB 모델 렌더링 | | |
+| 카메라 회전 | | |
+| 줌 인/아웃 | | |
+| 오브젝트 선택 | | |
+| 탭 전환 | | |
+
+---
+
+## 1.2 AI 최적화 탭 (Ultimate 통합)
+
+### 파일 위치
+- **메인:** `src/features/studio/tabs/AIOptimizationTab.tsx` (45,949 bytes)
+- **패널:** `src/features/studio/panels/UltimateAnalysisPanel.tsx` (18,696 bytes)
+- **훅:** `src/features/studio/hooks/useSceneSimulation.ts` (27,198 bytes)
+
+### API 호출
+```bash
+# generate-optimization (Ultimate)
+curl -X POST "https://bdrvowacecxnraaivlhr.supabase.co/functions/v1/generate-optimization" \
+  -H "Authorization: Bearer <ANON_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "store_id": "d9830554-2688-4032-af40-acccda787ac4",
+    "optimization_type": "both",
+    "parameters": {
+      "prioritize_revenue": true,
+      "max_changes": 30
+    }
+  }'
+```
+
+### 응답 구조 (Ultimate)
+```json
+{
+  "success": true,
+  "result": {
+    "furniture_changes": [...],
+    "product_changes": [...],
+    "summary": {
+      "total_furniture_changes": 5,
+      "total_product_changes": 12,
+      "expected_revenue_increase": 15.2,
+      "expected_conversion_increase": 8.5,
+      "overall_confidence": 0.83
+    }
+  },
+  "environment_summary": {
+    "weather": { "condition": "sunny", "temperature": 15 },
+    "events": [...],
+    "temporal": { "dayOfWeek": "월요일", "isWeekend": false },
+    "impact_multipliers": { "traffic": 1.1, "conversion": 1.05 }
+  },
+  "flow_analysis_summary": {
+    "flow_health_score": 72,
+    "total_zones": 10,
+    "key_paths": [...],
+    "bottlenecks": [...],
+    "dead_zones": [...],
+    "opportunities": [...]
+  },
+  "association_summary": {
+    "strong_rules_count": 5,
+    "top_rules": [...],
+    "recommendations": [...]
+  },
+  "prediction_summary": {
+    "predictions_applied": 12,
+    "high_confidence_changes": 8,
+    "total_expected_revenue_change": 15.2,
+    "total_daily_revenue_increase": 125000,
+    "overall_confidence": 83
+  },
+  "vmd_analysis": {
+    "score": {
+      "overall": 55,
+      "grade": "D",
+      "balance": 60,
+      "visibility": 50,
+      "flow_integration": 55,
+      "category_coherence": 55
+    },
+    "violations": [...],
+    "recommendations": [...]
+  },
+  "learning_session": null
+}
+```
+
+### Ultimate 분석 패널 섹션
+| 섹션 | 표시 항목 | 상태 |
+|------|----------|------|
+| 전체 신뢰도 | 신뢰도 % 배지 | ✅ |
+| 동선 분석 | 건강도, 병목, 데드존, 기회 | ✅ |
+| VMD 점수 | 등급, 세부점수, 위반사항 | ✅ |
+| 환경 영향 | 날씨, 이벤트, 시간대 | ⚠️ 데이터 부족 |
+| 연관 분석 | 규칙 수, 상위 규칙, 배치 추천 | ⚠️ 데이터 부족 |
+| 예측 분석 | 매출 변화, 신뢰도 | ✅ |
+
+### 테스트 체크리스트
+| 항목 | 상태 | 비고 |
+|------|------|------|
+| "최적화 실행" 버튼 클릭 | | |
+| 로딩 스피너 표시 | | |
+| Ultimate 분석 패널 렌더링 | | |
+| 동선 분석 섹션 접기/펼치기 | | |
+| VMD 점수 표시 | | |
+| 환경 영향 표시 | | weather_data 필요 |
+| 연관 상품 표시 | | association 데이터 필요 |
+| 예측 분석 표시 | | |
+| 가구 추천 목록 | | |
+| 상품 추천 목록 | | |
+| 3D 하이라이트 | | |
+
+---
+
+## 1.3 AI 시뮬레이션 탭
+
+### 파일 위치
+- **메인:** `src/features/studio/tabs/AISimulationTab.tsx` (29,413 bytes)
+- **훅:**
+  - `useLayoutSimulation.ts` (19,382 bytes)
+  - `useFlowSimulation.ts` (25,065 bytes)
+  - `useCongestionSimulation.ts` (18,998 bytes)
+  - `useStaffingSimulation.ts` (21,438 bytes)
+
+### 시뮬레이션 유형
+| 유형 | 설명 | 데이터 소스 |
+|------|------|-----------|
+| 레이아웃 | 가구 배치 최적화 | `furniture`, `zones_dim` |
+| 동선 | 고객 동선 분석 | `zone_transitions` |
+| 혼잡도 | 혼잡 구역 분석 | `zone_metrics` |
+| 인력 배치 | 직원 최적화 | `staff_schedules` |
+
+### 테스트 체크리스트
+| 항목 | 상태 | 비고 |
+|------|------|------|
+| 레이아웃 시뮬레이션 | | |
+| 동선 시뮬레이션 | | zone_transitions 필요 |
+| 혼잡도 시뮬레이션 | | |
+| 인력 배치 시뮬레이션 | | |
+| 통합 시뮬레이션 | | |
+| 결과 패널 표시 | | |
+| 3D 오버레이 반영 | | |
+
+---
+
+## 1.4 패널 시스템
+
+### 패널 목록
+| 패널 | 파일 | 크기 | 기능 |
+|------|------|------|------|
+| LayerPanel | `panels/LayerPanel.tsx` | 26KB | 레이어 관리 |
+| UltimateAnalysisPanel | `panels/UltimateAnalysisPanel.tsx` | 19KB | 🆕 Ultimate 분석 |
+| OptimizationResultPanel | `panels/OptimizationResultPanel.tsx` | 17KB | 최적화 결과 |
+| SimulationPanel | `panels/SimulationPanel.tsx` | 14KB | 시뮬레이션 설정 |
+| PropertyPanel | `panels/PropertyPanel.tsx` | 9KB | 속성 편집 |
+| OverlayControlPanel | `panels/OverlayControlPanel.tsx` | 9KB | 오버레이 토글 |
+| ToolPanel | `panels/ToolPanel.tsx` | 8KB | 도구 모음 |
+| SceneSavePanel | `panels/SceneSavePanel.tsx` | 7KB | 씬 저장/불러오기 |
+
+### 결과 패널 (results/)
+| 패널 | 용도 |
+|------|------|
+| LayoutResultPanel | 레이아웃 결과 |
+| FlowResultPanel | 동선 결과 |
+| CongestionResultPanel | 혼잡도 결과 |
+| StaffingResultPanel | 인력 결과 |
+
+---
+
+## 1.5 오버레이 시스템
+
+### 오버레이 목록
+| 오버레이 | 파일 | 기능 | 상태 |
+|----------|------|------|------|
+| HeatmapOverlay | `HeatmapOverlay.tsx` | 방문자 밀도 | ✅ |
+| CustomerFlowOverlay | `CustomerFlowOverlay.tsx` | 고객 동선 기본 | ✅ |
+| CustomerFlowOverlayEnhanced | `CustomerFlowOverlayEnhanced.tsx` | 고객 동선 강화 (zone_transitions) | ⚠️ |
+| ZoneBoundaryOverlay | `ZoneBoundaryOverlay.tsx` | 구역 경계 | ✅ |
+| ZonesFloorOverlay | `ZonesFloorOverlay.tsx` | 구역 바닥 | ✅ |
+| LayoutOptimizationOverlay | `LayoutOptimizationOverlay.tsx` | 레이아웃 제안 | ✅ |
+| FlowOptimizationOverlay | `FlowOptimizationOverlay.tsx` | 동선 최적화 | ✅ |
+| CongestionOverlay | `CongestionOverlay.tsx` | 혼잡도 | ✅ |
+| StaffingOverlay | `StaffingOverlay.tsx` | 인력 배치 | ✅ |
+| StaffAvatarsOverlay | `StaffAvatarsOverlay.tsx` | 직원 아바타 | ✅ |
+| StaffReallocationOverlay | `StaffReallocationOverlay.tsx` | 인력 재배치 | ✅ |
+
+### 테스트 체크리스트
+| 항목 | 상태 | 비고 |
+|------|------|------|
+| 히트맵 토글 | | |
+| 동선 화살표 표시 | | zone_transitions 데이터 필요 |
+| 구역 라벨 표시 | | |
+| 혼잡도 색상 | | |
+| 인력 배치 아이콘 | | |
+
+---
+
+## 1.6 환경 설정 (날씨/이벤트)
+
+### 파일 위치
+- **컴포넌트:** `components/SimulationEnvironmentSettings.tsx` (23,527 bytes)
+- **서비스:** `services/environmentDataService.ts`
+- **타입:** `types/environment.types.ts` (11,351 bytes)
+
+### API 호출
+```bash
+# 날씨 조회 + DB 저장
+curl -X POST "https://bdrvowacecxnraaivlhr.supabase.co/functions/v1/environment-proxy" \
+  -H "Authorization: Bearer <ANON_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "weather",
+    "lat": 37.5665,
+    "lon": 126.9780,
+    "store_id": "d9830554-2688-4032-af40-acccda787ac4",
+    "save_to_db": true
+  }'
+
+# 공휴일 조회 + DB 저장
+curl -X POST "https://bdrvowacecxnraaivlhr.supabase.co/functions/v1/environment-proxy" \
+  -H "Authorization: Bearer <ANON_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "holidays",
+    "year": 2026,
+    "month": 1,
+    "store_id": "d9830554-2688-4032-af40-acccda787ac4",
+    "save_to_db": true
+  }'
+```
+
+### 데이터 소스
+| 테이블 | 용도 | 현재 상태 |
+|--------|------|----------|
+| `weather_data` | 날씨 데이터 | ❌ 비어있음 |
+| `holidays_events` | 공휴일/이벤트 | ⚠️ 확인 필요 |
+| `zone_events` | 매장 이벤트 | ⚠️ 확인 필요 |
+
+### 테스트 체크리스트
+| 항목 | 상태 | 비고 |
+|------|------|------|
+| 환경 설정 패널 열기 | | |
+| 실시간 날씨 로드 | | API 키 필요 |
+| 과거 날씨 조회 | | DB 데이터 필요 |
+| 공휴일 표시 | | |
+| 환경 영향도 계산 | | |
+| DB 저장 확인 | | |
+
+---
+
+## 1.7 훅 시스템
+
+### 훅 목록 (21개)
+| 훅 | 파일 | 크기 | 용도 |
+|----|------|------|------|
+| useSceneSimulation | `useSceneSimulation.ts` | 27KB | 🆕 통합 시뮬레이션 + Ultimate |
+| useFlowSimulation | `useFlowSimulation.ts` | 25KB | 동선 시뮬레이션 |
+| useStaffingSimulation | `useStaffingSimulation.ts` | 21KB | 인력 시뮬레이션 |
+| useLayoutSimulation | `useLayoutSimulation.ts` | 19KB | 레이아웃 시뮬레이션 |
+| useCongestionSimulation | `useCongestionSimulation.ts` | 19KB | 혼잡도 시뮬레이션 |
+| useCustomerFlowData | `useCustomerFlowData.ts` | 17KB | 고객 동선 데이터 |
+| useSceneRecipe | `useSceneRecipe.ts` | 14KB | 씬 레시피 관리 |
+| usePlacement | `usePlacement.ts` | 13KB | 배치 관리 |
+| useOptimization | `useOptimization.ts` | 12KB | 최적화 API |
+| useFurnitureSlots | `useFurnitureSlots.ts` | 11KB | 슬롯 시스템 |
+| useEnvironmentContext | `useEnvironmentContext.ts` | 10KB | 환경 컨텍스트 |
+| useStoreBounds | `useStoreBounds.ts` | 8KB | 매장 경계 |
+| useStaffData | `useStaffData.ts` | 6KB | 직원 데이터 |
+| useScenePersistence | `useScenePersistence.ts` | 5KB | 씬 저장 |
+| useSpaceTextures | `useSpaceTextures.ts` | 4KB | 공간 텍스처 |
+| useEnvironmentModels | `useEnvironmentModels.ts` | 4KB | 환경 모델 |
+| useCustomerSimulation | `useCustomerSimulation.ts` | 4KB | 고객 시뮬레이션 |
+| useOverlayVisibility | `useOverlayVisibility.ts` | 2KB | 오버레이 표시 |
+| useStudioMode | `useStudioMode.ts` | 1KB | 스튜디오 모드 |
+
+---
+
+# 2. Insight Hub (인사이트 허브)
+
+## 2.1 페이지 구조
+
+### 파일 위치
+- **메인:** `src/features/insights/InsightHubPage.tsx` (8,768 bytes)
+- **탭:** `src/features/insights/tabs/`
+
+### 탭 구성
+| 탭 | 파일 | 크기 | 기능 |
+|----|------|------|------|
+| 개요 | `OverviewTab.tsx` | 27KB | KPI 대시보드 |
+| 매장 | `StoreTab.tsx` | 36KB | 매장/구역 분석 |
+| 고객 | `CustomerTab.tsx` | 43KB | 고객 세그먼트/퍼널 |
+| 상품 | `ProductTab.tsx` | 31KB | 상품 성과 |
+| 예측 | `PredictionTab.tsx` | 41KB | AI 예측 |
+| AI추천 | `AIRecommendationTab.tsx` | 43KB | AI 추천 |
+
+---
+
+## 2.2 개요 탭 (Overview)
+
+### 데이터 소스
+| 테이블 | 용도 |
+|--------|------|
+| `dashboard_kpis` | 일별 KPI |
+| `daily_kpis_agg` | 집계 KPI |
+| `stores` | 매장 정보 |
+
+### 테스트 체크리스트
+| 항목 | 상태 | 비고 |
+|------|------|------|
+| KPI 카드 렌더링 (매출/방문자/전환율/객단가) | | |
 | 매출 트렌드 차트 | | |
-| 시간대별 방문자 | | |
+| 시간대별 방문자 차트 | | |
+| 전일 대비 변화율 표시 | | |
 | 날짜 필터 동작 | | |
 
 ---
 
-## 1.2 매장 탭 (Store)
-
-### 파일 위치
-- **메인:** `src/features/insights/tabs/StoreTab.tsx`
-- **훅:** `src/hooks/useStoreData.ts`, `src/hooks/useZoneMetrics.ts`
+## 2.3 매장 탭 (Store)
 
 ### 데이터 소스
 | 테이블 | 용도 |
 |--------|------|
 | `zones_dim` | 구역 정보 |
 | `zone_metrics` | 구역별 지표 |
-| `zone_performance` | 구역 성과 |
 | `zone_daily_metrics` | 일별 구역 지표 |
 
-### 테스트 방법
-1. "매장" 탭 선택
-2. 구역별 성과 테이블 확인
-3. 히트맵 시각화 확인
-4. 동선 분석 차트 확인
-
-### 예상 결과
-- 구역 목록 표시 (입구, 진열대 A/B/C 등)
-- 각 구역별 체류시간, 방문자 수 표시
-- 히트맵 색상 표시
-
-### 테스트 결과 기록
+### 테스트 체크리스트
 | 항목 | 상태 | 비고 |
 |------|------|------|
 | 구역 목록 로딩 | | |
-| 구역 성과 데이터 | | |
+| 구역별 체류시간 | | |
+| 구역별 방문자 수 | | |
 | 히트맵 렌더링 | | |
-| 동선 분석 | | |
 
 ---
 
-## 1.3 고객 탭 (Customer)
-
-### 파일 위치
-- **메인:** `src/features/insights/tabs/CustomerTab.tsx`
-- **훅:** `src/hooks/useCustomerSegments.ts`, `src/hooks/useCustomerJourney.ts`
+## 2.4 고객 탭 (Customer)
 
 ### 데이터 소스
 | 테이블 | 용도 |
 |--------|------|
 | `customer_segments` | 고객 세그먼트 |
 | `customer_segments_agg` | 세그먼트 집계 |
-| `visits` | 방문 이력 |
 | `funnel_events` | 퍼널 이벤트 |
 | `funnel_metrics` | 퍼널 지표 |
 
-### 테스트 방법
-1. "고객" 탭 선택
-2. 고객 세그먼트 파이 차트 확인
-3. 퍼널 분석 시각화 확인
-4. 체류시간 분포 확인
-
-### 예상 결과
-- 세그먼트별 고객 비율 표시 (VIP, 일반, 신규 등)
-- 퍼널 단계별 전환율 표시
-- Browse → Engage → Purchase 흐름
-
-### 테스트 결과 기록
+### 테스트 체크리스트
 | 항목 | 상태 | 비고 |
 |------|------|------|
-| 세그먼트 차트 | | |
+| 세그먼트 파이 차트 | | |
 | 퍼널 시각화 | | |
 | 체류시간 분포 | | |
 | 재방문율 | | |
 
 ---
 
-## 1.4 상품 탭 (Product)
-
-### 파일 위치
-- **메인:** `src/features/insights/tabs/ProductTab.tsx`
-- **훅:** `src/hooks/useProductPerformance.ts`
+## 2.5 상품 탭 (Product)
 
 ### 데이터 소스
 | 테이블 | 용도 |
 |--------|------|
 | `products` | 상품 마스터 |
-| `product_performance_agg` | 상품 성과 집계 |
+| `product_performance_agg` | 상품 성과 |
 | `inventory` | 재고 현황 |
-| `realtime_inventory` | 실시간 재고 |
 
-### 테스트 방법
-1. "상품" 탭 선택
-2. 상품 성과 테이블 확인
-3. 카테고리별 매출 차트 확인
-4. 베스트셀러 목록 확인
-
-### 예상 결과
-- 상품별 매출, 판매량, 전환율 표시
-- 카테고리 필터 동작
-- 정렬 기능 동작
-
-### 테스트 결과 기록
+### 테스트 체크리스트
 | 항목 | 상태 | 비고 |
 |------|------|------|
 | 상품 목록 로딩 | | |
-| 성과 지표 표시 | | |
+| 매출/판매량/전환율 | | |
 | 카테고리 필터 | | |
 | 정렬 기능 | | |
 
 ---
 
-## 1.5 예측 탭 (Prediction)
-
-### 파일 위치
-- **메인:** `src/features/insights/tabs/PredictionTab.tsx`
-- **훅:** `src/features/insights/hooks/useAIPrediction.ts`
+## 2.6 예측 탭 (Prediction)
 
 ### 데이터 소스
 | 테이블 | 용도 |
 |--------|------|
 | `ai_inference_results` | AI 추론 결과 |
 | `trend_signals` | 트렌드 신호 |
-| `daily_kpis_agg` | 과거 KPI 데이터 |
+| `daily_kpis_agg` | 과거 KPI |
 
-### 테스트 방법
-1. "예측" 탭 선택
-2. 매출 예측 차트 확인
-3. 방문자 예측 차트 확인
-4. 신뢰 구간 표시 확인
-
-### 예상 결과
-- 7일/30일 예측 데이터 표시
-- 과거 실제값 vs 예측값 비교
-- 신뢰도 점수 표시
-
-### 테스트 결과 기록
+### 테스트 체크리스트
 | 항목 | 상태 | 비고 |
 |------|------|------|
 | 매출 예측 차트 | | |
 | 방문자 예측 | | |
-| 신뢰 구간 | | |
-| 예측 정확도 | | |
+| 신뢰 구간 표시 | | |
+| 7일/30일 예측 | | |
 
 ---
 
-## 1.6 AI 추천 탭
-
-### 파일 위치
-- **메인:** `src/features/insights/tabs/AIRecommendationTab.tsx`
-- **훅:** `src/hooks/useAIRecommendations.ts`, `src/hooks/useUnifiedAI.ts`
+## 2.7 AI 추천 탭
 
 ### 데이터 소스
 | 테이블 | 용도 |
@@ -253,18 +587,7 @@ curl -X POST "https://bdrvowacecxnraaivlhr.supabase.co/functions/v1/unified-ai" 
   }'
 ```
 
-### 테스트 방법
-1. "AI추천" 탭 선택
-2. 추천 카드 목록 확인
-3. 우선순위별 분류 확인
-4. 추천 적용 버튼 클릭
-
-### 예상 결과
-- 카테고리별 추천 카드 표시
-- Critical/High/Medium/Low 우선순위 표시
-- 예상 효과 수치 표시
-
-### 테스트 결과 기록
+### 테스트 체크리스트
 | 항목 | 상태 | 비고 |
 |------|------|------|
 | 추천 목록 로딩 | | |
@@ -274,197 +597,365 @@ curl -X POST "https://bdrvowacecxnraaivlhr.supabase.co/functions/v1/unified-ai" 
 
 ---
 
-# 2. Digital Twin Studio (디지털트윈 스튜디오)
+# 3. ROI 측정 페이지
 
-## 2.1 3D 뷰어
+## 3.1 페이지 구조
 
 ### 파일 위치
-- **메인:** `src/features/studio/DigitalTwinStudioPage.tsx`
-- **3D 컴포넌트:** `src/features/studio/core/`
-- **훅:** `src/features/studio/hooks/`
+- **메인:** `src/features/roi/ROIMeasurementPage.tsx` (6,126 bytes)
+- **컴포넌트:** `src/features/roi/components/`
+- **훅:** `src/features/roi/hooks/`
+
+### 컴포넌트 목록
+| 컴포넌트 | 파일 | 크기 | 기능 |
+|----------|------|------|------|
+| AppliedStrategyTable | `AppliedStrategyTable.tsx` | 19KB | 적용 전략 테이블 |
+| StrategyDetailModal | `StrategyDetailModal.tsx` | 12KB | 전략 상세 모달 |
+| AIInsightsCard | `AIInsightsCard.tsx` | 11KB | AI 인사이트 |
+| CategoryPerformanceTable | `CategoryPerformanceTable.tsx` | 11KB | 카테고리별 성과 |
+| ApplyStrategyModal | `ApplyStrategyModal.tsx` | 9KB | 전략 적용 모달 |
+| ROISummaryCards | `ROISummaryCards.tsx` | 8KB | ROI 요약 카드 |
+
+### 훅 목록
+| 훅 | 파일 | 용도 |
+|----|------|------|
+| useAppliedStrategies | `useAppliedStrategies.ts` | 적용 전략 조회 |
+| useCategoryPerformance | `useCategoryPerformance.ts` | 카테고리 성과 |
+| useROISummary | `useROISummary.ts` | ROI 요약 |
 
 ### 데이터 소스
 | 테이블 | 용도 |
 |--------|------|
-| `store_scenes` | 3D 씬 데이터 |
-| `furniture` | 가구 정보 |
-| `furniture_slots` | 슬롯 정보 |
-| `product_placements` | 상품 배치 |
-| `models` | 3D 모델 메타데이터 |
+| `applied_strategies` | 적용된 전략 |
+| `recommendation_applications` | 추천 적용 이력 |
+| `daily_kpis_agg` | KPI 비교 |
 
-### 테스트 방법
-1. `/studio` 접속
-2. 3D 캔버스 로딩 확인
-3. 마우스 드래그로 회전
-4. 스크롤로 줌 인/아웃
-5. 가구 클릭 시 선택
-
-### 예상 결과
-- 매장 3D 모델 렌더링
-- 가구/상품 배치 표시
-- 카메라 컨트롤 동작
-
-### 테스트 결과 기록
+### 테스트 체크리스트
 | 항목 | 상태 | 비고 |
 |------|------|------|
-| 3D 캔버스 로딩 | | |
-| 모델 렌더링 | | |
-| 카메라 회전 | | |
-| 줌 인/아웃 | | |
-| 오브젝트 선택 | | |
+| ROI 요약 카드 | | |
+| 카테고리별 ROI | | |
+| 적용 전략 테이블 | | |
+| 전략 상세 모달 | | |
+| AI 인사이트 카드 | | |
+| 데이터 내보내기 | | |
 
 ---
 
-## 2.2 레이어 패널
+# 4. 데이터베이스 테이블 검증
 
-### 파일 위치
-- **메인:** `src/features/studio/panels/LayerPanel.tsx`
+## 4.1 필수 데이터 현황
 
-### 테스트 방법
-1. 좌측 레이어 패널 확인
-2. 레이어 토글 (가구/상품/고객 동선)
-3. 레이어별 표시/숨김
+```sql
+-- 1. 매장 확인
+SELECT id, name, address FROM stores
+WHERE id = 'd9830554-2688-4032-af40-acccda787ac4';
 
-### 예상 결과
-- 레이어 목록 표시
-- 체크박스로 표시/숨김 전환
-- 3D 뷰에 즉시 반영
+-- 2. 구역 확인
+SELECT COUNT(*) as zone_count FROM zones_dim
+WHERE store_id = 'd9830554-2688-4032-af40-acccda787ac4';
 
-### 테스트 결과 기록
-| 항목 | 상태 | 비고 |
-|------|------|------|
-| 레이어 목록 | | |
-| 토글 동작 | | |
-| 3D 뷰 반영 | | |
+-- 3. KPI 확인 (최근 7일)
+SELECT date, total_revenue, total_visitors, conversion_rate
+FROM daily_kpis_agg
+WHERE store_id = 'd9830554-2688-4032-af40-acccda787ac4'
+ORDER BY date DESC LIMIT 7;
+
+-- 4. 동선 데이터 확인 ⚠️ 중요
+SELECT COUNT(*) as transition_count,
+       MIN(occurred_at) as first_record,
+       MAX(occurred_at) as last_record
+FROM zone_transitions
+WHERE store_id = 'd9830554-2688-4032-af40-acccda787ac4';
+
+-- 5. 날씨 데이터 확인 ⚠️ 중요
+SELECT COUNT(*) as weather_count,
+       MIN(date) as first_date,
+       MAX(date) as last_date
+FROM weather_data
+WHERE store_id = 'd9830554-2688-4032-af40-acccda787ac4';
+
+-- 6. 공휴일 확인
+SELECT COUNT(*) as holiday_count FROM holidays_events
+WHERE date >= '2026-01-01' AND date <= '2026-12-31';
+
+-- 7. 가구 확인
+SELECT COUNT(*) as furniture_count FROM furniture
+WHERE store_id = 'd9830554-2688-4032-af40-acccda787ac4';
+
+-- 8. 슬롯 확인
+SELECT COUNT(*) as slot_count FROM furniture_slots
+WHERE store_id = 'd9830554-2688-4032-af40-acccda887ac4';
+
+-- 9. 상품 성과 확인
+SELECT COUNT(*) as product_count FROM product_performance_agg
+WHERE store_id = 'd9830554-2688-4032-af40-acccda787ac4';
+
+-- 10. 연관 규칙 확인 ⚠️ 중요
+SELECT COUNT(*) as rule_count FROM product_associations
+WHERE store_id = 'd9830554-2688-4032-af40-acccda787ac4';
+```
+
+## 4.2 데이터 상태 체크리스트
+
+| 테이블 | 예상 데이터 | 현재 상태 | 건수 | 영향 기능 |
+|--------|-----------|----------|------|----------|
+| `stores` | 매장 정보 | | | 전체 |
+| `zones_dim` | 10+ 존 | | | 구역 분석 |
+| `daily_kpis_agg` | 90일 | | | KPI 대시보드 |
+| `zone_transitions` | 63,000+ | | | 동선 분석 |
+| `weather_data` | 90일 | ❌ 비어있음 | 0 | 환경 분석 |
+| `holidays_events` | 연간 | ⚠️ | | 이벤트 영향 |
+| `furniture` | 가구 목록 | | | 레이아웃 |
+| `furniture_slots` | 슬롯 정보 | | | 슬롯 시스템 |
+| `product_performance_agg` | 상품 성과 | | | 상품 분석 |
+| `product_associations` | 연관 규칙 | ⚠️ | | 연관 추천 |
 
 ---
 
-## 2.3 오버레이 컨트롤
+# 5. 발견된 이슈 및 개선 사항
 
-### 파일 위치
-- **메인:** `src/features/studio/panels/OverlayControlPanel.tsx`
-- **오버레이:** `src/features/studio/overlays/`
+## 5.1 발견된 이슈
 
-### 오버레이 종류
-| 오버레이 | 설명 |
-|----------|------|
-| Heatmap | 방문자 밀도 히트맵 |
-| FlowArrows | 고객 동선 화살표 |
-| ZoneLabels | 구역 라벨 |
-| ProductHighlight | 상품 하이라이트 |
+| ID | 영역 | 설명 | 심각도 | 파일 | 상태 |
+|----|------|------|--------|------|------|
+| ISS-001 | 데이터 | weather_data 테이블 비어있음 | 🔴 높음 | DB | ❌ 미해결 |
+| ISS-002 | 데이터 | product_associations 0건 (연관 분석 불가) | 🔴 높음 | DB | ❌ 미해결 |
+| ISS-003 | Ultimate | 신뢰도 0.83% (매우 낮음) | 🟡 중간 | generate-optimization | ⚠️ 데이터 부족 |
+| ISS-004 | Ultimate | VMD 점수 D등급 55점 | 🟡 중간 | vmd/vmdEngine.ts | ⚠️ 데이터 부족 |
+| ISS-005 | 동선 | zone_transitions 없으면 빈 화살표 | 🟡 중간 | useFlowSimulation.ts:597 | ⚠️ |
+| ISS-006 | 실시간 | iot_sensors 테이블 미생성 | 🟡 중간 | useRealtimeTracking.ts:76 | ❌ TODO |
+| ISS-007 | 3D | 기본 GLB 모델 URL 미설정 | 🟢 낮음 | modelLayerLoader.ts:585 | ❌ TODO |
+| ISS-008 | 데이터 | user_data_imports file_path 컬럼 없음 | 🟢 낮음 | DataValidation.tsx:83 | ❌ TODO |
 
-### 테스트 방법
-1. 오버레이 패널 열기
-2. 각 오버레이 토글
-3. 히트맵 색상 확인
-4. 동선 화살표 방향 확인
+## 5.2 TODO 주석 현황
 
-### 테스트 결과 기록
-| 항목 | 상태 | 비고 |
-|------|------|------|
-| 히트맵 오버레이 | | |
-| 동선 화살표 | | |
-| 구역 라벨 | | |
-| 상품 하이라이트 | | |
+| 파일 | 라인 | 내용 | 우선순위 |
+|------|------|------|----------|
+| `DigitalTwinStudioPage.tsx` | 282 | 피크 시간 데이터 연동 | P2 |
+| `modelLayerLoader.ts` | 585 | 기본 모델 URL 교체 | P2 |
+| `useRealtimeTracking.ts` | 76 | iot_sensors 테이블 생성 | P1 |
+| `useDataSourceMapping.ts` | 444 | 프리셋 API 활성화 로직 | P3 |
+| `DataValidation.tsx` | 83 | file_path 컬럼 추가 | P3 |
+| `DataImportHistory.tsx` | 221 | 스토리지 정리 구현 | P3 |
+| `SceneViewer.tsx` | 119, 193 | GLB 모델 로드 | P2 |
+
+## 5.3 콘솔 경고 현황
+
+| 파일 | 경고 내용 | 원인 |
+|------|----------|------|
+| `CustomerSimulation.ts:180` | 입구 존이 없습니다 | zones_dim 데이터 부족 |
+| `environmentDataService.ts:432` | zone_events 테이블이 없습니다 | 테이블 미생성 |
+| `CustomerFlowOverlayEnhanced.tsx:79` | 데이터 없음 | zone_transitions 부족 |
+| `useFlowSimulation.ts:597` | No zone data available | zones_dim 부족 |
 
 ---
 
-## 2.4 AI 최적화 탭
+# 6. 개선 작업 우선순위
 
-### 파일 위치
-- **메인:** `src/features/studio/tabs/AIOptimizationTab.tsx`
-- **훅:** `src/features/studio/hooks/useOptimization.ts`
+## P0: 긴급 (즉시 수정)
 
-### API 호출 (generate-optimization)
+| # | 작업 | 파일/테이블 | 설명 | 담당 |
+|---|------|-----------|------|------|
+| 1 | 날씨 데이터 자동 수집 설정 | `environment-proxy` + Cron | weather_data 테이블 채우기 | |
+| 2 | zone_transitions 데이터 확인 | DB | 동선 분석 기본 데이터 | |
+
+## P1: 높음 (이번 주)
+
+| # | 작업 | 파일/테이블 | 설명 | 담당 |
+|---|------|-----------|------|------|
+| 1 | holidays_events 데이터 로드 | `environment-proxy` | 연간 공휴일 데이터 | |
+| 2 | product_associations 데이터 생성 | 거래 데이터 ETL | 연관 규칙 마이닝 | |
+| 3 | iot_sensors 테이블 생성 | DB 스키마 | 실시간 트래킹 활성화 | |
+| 4 | VMD 규칙 데이터 보강 | `vmd_rules` 테이블 | VMD 점수 개선 | |
+
+## P2: 중간 (다음 주)
+
+| # | 작업 | 파일 | 설명 | 담당 |
+|---|------|------|------|------|
+| 1 | 피크 시간 데이터 연동 | `DigitalTwinStudioPage.tsx:282` | TODO 해결 | |
+| 2 | 기본 3D 모델 URL 설정 | `modelLayerLoader.ts:585` | 폴백 모델 | |
+| 3 | zone_events 테이블 생성 | DB 스키마 | 매장 이벤트 | |
+| 4 | 콘솔 경고 정리 | 다수 파일 | 프로덕션 로그 | |
+
+## P3: 낮음 (백로그)
+
+| # | 작업 | 파일 | 설명 | 담당 |
+|---|------|------|------|------|
+| 1 | advanced-ai-inference 리팩토링 | Edge Function | 4,715줄 모듈 분리 | |
+| 2 | API 응답 캐싱 | hooks | 성능 최적화 | |
+| 3 | user_data_imports 컬럼 추가 | DB 스키마 | file_path | |
+| 4 | 스토리지 정리 로직 | `DataImportHistory.tsx` | 구현 | |
+| 5 | 프리셋 API | `useDataSourceMapping.ts` | 구현 | |
+
+---
+
+# 7. 통합 테스트 시나리오
+
+## 7.1 시나리오 1: Ultimate AI 최적화 전체 플로우
+
+### 사전 조건
+- [ ] weather_data에 최소 1건 데이터 존재
+- [ ] zone_transitions에 데이터 존재
+- [ ] zones_dim에 매장 구역 정의됨
+
+### 테스트 단계
+1. **Studio 접속**
+   - `/studio` 이동
+   - 3D 캔버스 로딩 확인 (2-5초)
+
+2. **AI 최적화 탭 선택**
+   - "AI 최적화" 탭 클릭
+   - 탭 전환 확인
+
+3. **최적화 실행**
+   - "최적화 실행" 버튼 클릭
+   - 로딩 스피너 표시 확인
+   - 예상 소요시간: 5-15초
+
+4. **Ultimate 분석 패널 확인**
+   - [ ] 전체 신뢰도 배지 표시
+   - [ ] 동선 분석 섹션 (건강도 점수)
+   - [ ] VMD 점수 섹션 (등급/점수)
+   - [ ] 환경 영향 섹션 (날씨/이벤트)
+   - [ ] 연관 분석 섹션 (규칙/추천)
+   - [ ] 예측 분석 섹션 (매출 변화)
+
+5. **추천 결과 확인**
+   - [ ] 가구 이동 추천 목록
+   - [ ] 상품 배치 변경 추천
+   - [ ] 3D 하이라이트 표시
+
+6. **적용 테스트**
+   - "적용" 버튼 클릭
+   - 확인 모달 표시
+   - applied_strategies 테이블 저장 확인
+
+### 테스트 결과
+| 단계 | 상태 | 소요시간 | 비고 |
+|------|------|---------|------|
+| Studio 로딩 | | | |
+| 최적화 실행 | | | |
+| Ultimate 패널 | | | |
+| 추천 결과 | | | |
+| 적용 저장 | | | |
+
+---
+
+## 7.2 시나리오 2: 환경 데이터 수집 → 분석
+
+### 테스트 단계
+1. **환경 프록시 호출 (날씨)**
+   ```bash
+   curl -X POST "https://bdrvowacecxnraaivlhr.supabase.co/functions/v1/environment-proxy" \
+     -H "Authorization: Bearer <ANON_KEY>" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "type": "weather",
+       "lat": 37.5665,
+       "lon": 126.9780,
+       "store_id": "d9830554-2688-4032-af40-acccda787ac4",
+       "save_to_db": true
+     }'
+   ```
+
+2. **DB 저장 확인**
+   ```sql
+   SELECT * FROM weather_data
+   WHERE store_id = 'd9830554-2688-4032-af40-acccda787ac4'
+   ORDER BY date DESC LIMIT 1;
+   ```
+
+3. **최적화 재실행**
+   - Studio AI 최적화 탭에서 재실행
+   - 환경 영향 섹션에 날씨 표시 확인
+
+### 테스트 결과
+| 단계 | 상태 | 비고 |
+|------|------|------|
+| 날씨 API 호출 | | |
+| DB 저장 | | |
+| 환경 영향 표시 | | |
+
+---
+
+## 7.3 시나리오 3: ROI 측정 플로우
+
+### 사전 조건
+- [ ] applied_strategies에 최소 1건 데이터 존재
+
+### 테스트 단계
+1. **ROI 페이지 접속**
+   - `/roi` 이동
+
+2. **ROI 요약 확인**
+   - [ ] 총 ROI 카드
+   - [ ] 적용 전략 수
+   - [ ] 성공률
+
+3. **적용 전략 테이블 확인**
+   - [ ] 전략 목록 표시
+   - [ ] 상태 표시 (활성/완료)
+   - [ ] 측정된 효과
+
+4. **상세 모달 테스트**
+   - 전략 행 클릭
+   - 상세 모달 표시 확인
+
+### 테스트 결과
+| 단계 | 상태 | 비고 |
+|------|------|------|
+| ROI 요약 | | |
+| 전략 테이블 | | |
+| 상세 모달 | | |
+
+---
+
+# 8. API 테스트 명령어
+
+## 8.1 generate-optimization (Ultimate)
 ```bash
+# 기본 최적화
 curl -X POST "https://bdrvowacecxnraaivlhr.supabase.co/functions/v1/generate-optimization" \
   -H "Authorization: Bearer <ANON_KEY>" \
   -H "Content-Type: application/json" \
   -d '{
     "store_id": "d9830554-2688-4032-af40-acccda787ac4",
-    "mode": "ai",
-    "options": {
-      "include_predictions": true,
-      "include_vmd": true
+    "optimization_type": "both"
+  }'
+
+# 매출 우선 최적화
+curl -X POST "https://bdrvowacecxnraaivlhr.supabase.co/functions/v1/generate-optimization" \
+  -H "Authorization: Bearer <ANON_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "store_id": "d9830554-2688-4032-af40-acccda787ac4",
+    "optimization_type": "both",
+    "parameters": {
+      "prioritize_revenue": true,
+      "max_changes": 30
     }
   }'
 ```
 
-### 테스트 방법
-1. "AI 최적화" 탭 선택
-2. "최적화 실행" 버튼 클릭
-3. 로딩 상태 확인
-4. 결과 패널 확인
-
-### 예상 결과
-- 가구 이동 추천 목록
-- 상품 배치 변경 추천
-- 예상 매출 증가율
-- 추천 이유 (Chain-of-Thought)
-
-### 응답 형식
-```json
-{
-  "success": true,
-  "data": {
-    "furniture_changes": [...],
-    "product_changes": [...],
-    "summary": {
-      "expectedRevenueIncrease": 15.2,
-      "confidenceScore": 0.85
-    },
-    "reasoning": "..."
-  }
-}
+## 8.2 advanced-ai-inference
+```bash
+# 레이아웃 최적화
+curl -X POST "https://bdrvowacecxnraaivlhr.supabase.co/functions/v1/advanced-ai-inference" \
+  -H "Authorization: Bearer <ANON_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "inference_type": "layout_optimization",
+    "store_id": "d9830554-2688-4032-af40-acccda787ac4",
+    "parameters": {
+      "simulation_type": "layout"
+    }
+  }'
 ```
 
-### 테스트 결과 기록
-| 항목 | 상태 | 비고 |
-|------|------|------|
-| 최적화 요청 | | |
-| 결과 수신 | | |
-| 가구 추천 | | |
-| 상품 추천 | | |
-| 매출 예측 | | |
-
----
-
-## 2.5 AI 시뮬레이션 탭
-
-### 파일 위치
-- **메인:** `src/features/studio/tabs/AISimulationTab.tsx`
-- **훅:** `src/features/studio/hooks/useSceneSimulation.ts`
-
-### 테스트 방법
-1. "AI 시뮬레이션" 탭 선택
-2. 시뮬레이션 설정 (방문자 수, 시간대)
-3. "시뮬레이션 시작" 클릭
-4. 고객 에이전트 움직임 확인
-
-### 예상 결과
-- 가상 고객 에이전트 표시
-- 동선 애니메이션
-- 실시간 지표 업데이트
-
-### 테스트 결과 기록
-| 항목 | 상태 | 비고 |
-|------|------|------|
-| 시뮬레이션 설정 | | |
-| 에이전트 생성 | | |
-| 동선 애니메이션 | | |
-| 지표 업데이트 | | |
-
----
-
-## 2.6 환경 설정 (날씨/이벤트)
-
-### 파일 위치
-- **메인:** `src/features/studio/components/SimulationEnvironmentSettings.tsx`
-- **서비스:** `src/features/studio/services/environmentDataService.ts`
-
-### API 호출 (environment-proxy)
+## 8.3 environment-proxy
 ```bash
-# 날씨 조회 + DB 저장
+# 날씨 (저장 포함)
 curl -X POST "https://bdrvowacecxnraaivlhr.supabase.co/functions/v1/environment-proxy" \
   -H "Authorization: Bearer <ANON_KEY>" \
   -H "Content-Type: application/json" \
@@ -476,301 +967,20 @@ curl -X POST "https://bdrvowacecxnraaivlhr.supabase.co/functions/v1/environment-
     "save_to_db": true
   }'
 
-# 공휴일 조회
+# 공휴일
 curl -X POST "https://bdrvowacecxnraaivlhr.supabase.co/functions/v1/environment-proxy" \
   -H "Authorization: Bearer <ANON_KEY>" \
   -H "Content-Type: application/json" \
   -d '{
     "type": "holidays",
     "year": 2026,
-    "month": 1
-  }'
-```
-
-### 데이터 소스
-| 테이블 | 용도 |
-|--------|------|
-| `weather_data` | 날씨 데이터 |
-| `holidays_events` | 공휴일/이벤트 |
-
-### 테스트 방법
-1. 환경 설정 패널 열기
-2. 날씨 모드 선택 (실시간/과거/수동)
-3. 날짜 선택 시 이벤트 로드 확인
-4. 환경 영향도 계산 확인
-
-### 테스트 결과 기록
-| 항목 | 상태 | 비고 |
-|------|------|------|
-| 실시간 날씨 로드 | | |
-| 공휴일 데이터 | | |
-| 환경 영향도 | | |
-| DB 저장 | | |
-
----
-
-## 2.7 씬 저장/불러오기
-
-### 파일 위치
-- **메인:** `src/features/studio/panels/SceneSavePanel.tsx`
-- **훅:** `src/features/studio/hooks/useScenePersistence.ts`
-
-### 데이터 소스
-| 테이블 | 용도 |
-|--------|------|
-| `store_scenes` | 저장된 씬 |
-
-### 테스트 방법
-1. 가구/상품 배치 변경
-2. "씬 저장" 버튼 클릭
-3. 씬 이름 입력
-4. 저장 확인
-5. 다른 씬 불러오기
-
-### 테스트 결과 기록
-| 항목 | 상태 | 비고 |
-|------|------|------|
-| 씬 저장 | | |
-| 씬 목록 | | |
-| 씬 불러오기 | | |
-| 씬 삭제 | | |
-
----
-
-# 3. ROI 측정 페이지
-
-## 3.1 ROI 요약
-
-### 파일 위치
-- **메인:** `src/features/roi/ROIMeasurementPage.tsx`
-- **컴포넌트:** `src/features/roi/components/ROISummaryCards.tsx`
-- **훅:** `src/hooks/useROITracking.ts`
-
-### 데이터 소스
-| 테이블 | 용도 |
-|--------|------|
-| `applied_strategies` | 적용된 전략 |
-| `recommendation_applications` | 추천 적용 이력 |
-| `daily_kpis_agg` | KPI 비교 |
-
-### DB 함수
-- `get_roi_summary()` - ROI 요약
-- `get_roi_by_category()` - 카테고리별 ROI
-- `get_strategy_roi_trend()` - ROI 트렌드
-
-### 테스트 방법
-1. `/roi` 접속
-2. ROI 요약 카드 확인:
-   - 총 ROI
-   - 적용 전략 수
-   - 성공률
-3. 카테고리별 ROI 차트 확인
-
-### 테스트 결과 기록
-| 항목 | 상태 | 비고 |
-|------|------|------|
-| ROI 요약 카드 | | |
-| 카테고리별 ROI | | |
-| 트렌드 차트 | | |
-
----
-
-## 3.2 적용 전략 테이블
-
-### 파일 위치
-- **메인:** `src/features/roi/components/AppliedStrategyTable.tsx`
-
-### 테스트 방법
-1. 적용 전략 테이블 확인
-2. 각 전략의 상태 확인 (활성/완료/중단)
-3. 측정된 효과 확인
-4. 전략 상세 모달 열기
-
-### 테스트 결과 기록
-| 항목 | 상태 | 비고 |
-|------|------|------|
-| 전략 목록 | | |
-| 상태 표시 | | |
-| 효과 측정 | | |
-| 상세 모달 | | |
-
----
-
-## 3.3 AI 인사이트
-
-### 파일 위치
-- **메인:** `src/features/roi/components/AIInsightsCard.tsx`
-
-### 테스트 방법
-1. AI 인사이트 카드 확인
-2. 성공/실패 패턴 분석 확인
-3. 개선 제안 확인
-
-### 테스트 결과 기록
-| 항목 | 상태 | 비고 |
-|------|------|------|
-| 인사이트 로딩 | | |
-| 패턴 분석 | | |
-| 개선 제안 | | |
-
----
-
-# 4. 설정 페이지
-
-## 4.1 매장 설정
-
-### 파일 위치
-- **메인:** `src/features/settings/SettingsPage.tsx`
-
-### 데이터 소스
-| 테이블 | 용도 |
-|--------|------|
-| `stores` | 매장 정보 |
-| `organizations` | 조직 정보 |
-
-### 테스트 방법
-1. `/settings` 접속
-2. 매장 목록 확인
-3. 매장 선택/전환
-4. 매장 정보 수정
-
-### 테스트 결과 기록
-| 항목 | 상태 | 비고 |
-|------|------|------|
-| 매장 목록 | | |
-| 매장 전환 | | |
-| 정보 수정 | | |
-
----
-
-## 4.2 데이터 관리
-
-### 데이터 소스
-| 테이블 | 용도 |
-|--------|------|
-| `data_sources` | 데이터 소스 |
-| `upload_sessions` | 업로드 세션 |
-| `raw_imports` | 원시 임포트 |
-
-### 테스트 방법
-1. "데이터" 탭 선택
-2. 데이터 소스 목록 확인
-3. 파일 업로드 테스트
-4. 매핑 설정 확인
-
-### 테스트 결과 기록
-| 항목 | 상태 | 비고 |
-|------|------|------|
-| 데이터 소스 목록 | | |
-| 파일 업로드 | | |
-| 컬럼 매핑 | | |
-| 임포트 실행 | | |
-
----
-
-## 4.3 알림 설정
-
-### 데이터 소스
-| 테이블 | 용도 |
-|--------|------|
-| `notification_settings` | 알림 설정 |
-| `alerts` | 알림 규칙 |
-
-### 테스트 방법
-1. "알림" 탭 선택
-2. 알림 유형별 토글 확인
-3. 임계값 설정 확인
-
-### 테스트 결과 기록
-| 항목 | 상태 | 비고 |
-|------|------|------|
-| 알림 설정 로드 | | |
-| 토글 동작 | | |
-| 임계값 설정 | | |
-
----
-
-# 5. Edge Function API 테스트
-
-## 5.1 generate-optimization (AI 최적화)
-
-### 요청 형식
-```bash
-curl -X POST "https://bdrvowacecxnraaivlhr.supabase.co/functions/v1/generate-optimization" \
-  -H "Authorization: Bearer <ANON_KEY>" \
-  -H "Content-Type: application/json" \
-  -d '{
+    "month": 1,
     "store_id": "d9830554-2688-4032-af40-acccda787ac4",
-    "mode": "ai",
-    "options": {
-      "include_predictions": true,
-      "include_vmd": true,
-      "include_flow_analysis": true,
-      "include_association_analysis": true
-    }
+    "save_to_db": true
   }'
 ```
 
-### 응답 확인 사항
-- [ ] `success: true`
-- [ ] `data.furniture_changes` 배열 존재
-- [ ] `data.product_changes` 배열 존재
-- [ ] `data.summary.expectedRevenueIncrease` 숫자
-- [ ] `data.thinking` 또는 `data.reasoning` 존재
-- [ ] `meta.processingTimeMs` 존재
-
-### 에러 케이스 테스트
-| 케이스 | 요청 | 예상 응답 |
-|--------|------|----------|
-| 잘못된 store_id | `{"store_id": "invalid"}` | 400/404 에러 |
-| 누락된 store_id | `{}` | 400 에러 |
-| 잘못된 mode | `{"mode": "invalid"}` | 400 에러 |
-
----
-
-## 5.2 retail-ai-inference (리테일 AI)
-
-### 요청 형식
-```bash
-# 레이아웃 최적화
-curl -X POST "https://bdrvowacecxnraaivlhr.supabase.co/functions/v1/retail-ai-inference" \
-  -H "Authorization: Bearer <ANON_KEY>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "inference_type": "layout_optimization",
-    "store_id": "d9830554-2688-4032-af40-acccda787ac4"
-  }'
-
-# 수요 예측
-curl -X POST "https://bdrvowacecxnraaivlhr.supabase.co/functions/v1/retail-ai-inference" \
-  -H "Authorization: Bearer <ANON_KEY>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "inference_type": "demand_forecast",
-    "store_id": "d9830554-2688-4032-af40-acccda787ac4",
-    "parameters": {
-      "forecast_days": 7
-    }
-  }'
-```
-
-### Inference Types 테스트
-| Type | 설명 | 테스트 결과 |
-|------|------|------------|
-| `layout_optimization` | 레이아웃 최적화 | |
-| `zone_analysis` | 구역 분석 | |
-| `traffic_flow` | 고객 동선 | |
-| `demand_forecast` | 수요 예측 | |
-| `inventory_optimization` | 재고 최적화 | |
-| `cross_sell` | 교차 판매 | |
-| `customer_segmentation` | 고객 세분화 | |
-| `anomaly_detection` | 이상 탐지 | |
-
----
-
-## 5.3 unified-ai (통합 AI)
-
-### 요청 형식
+## 8.4 unified-ai
 ```bash
 # 추천 생성
 curl -X POST "https://bdrvowacecxnraaivlhr.supabase.co/functions/v1/unified-ai" \
@@ -791,209 +1001,6 @@ curl -X POST "https://bdrvowacecxnraaivlhr.supabase.co/functions/v1/unified-ai" 
   }'
 ```
 
-### Action Types 테스트
-| Action | 설명 | 테스트 결과 |
-|--------|------|------------|
-| `generate_recommendations` | 추천 생성 | |
-| `ontology_recommendation` | 온톨로지 기반 추천 | |
-| `anomaly_detection` | 이상 탐지 | |
-| `pattern_analysis` | 패턴 분석 | |
-| `infer_relations` | 관계 추론 | |
-
----
-
-## 5.4 environment-proxy (환경 데이터)
-
-### 날씨 API 테스트
-```bash
-curl -X POST "https://bdrvowacecxnraaivlhr.supabase.co/functions/v1/environment-proxy" \
-  -H "Authorization: Bearer <ANON_KEY>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "weather",
-    "lat": 37.5665,
-    "lon": 126.9780,
-    "store_id": "d9830554-2688-4032-af40-acccda787ac4",
-    "save_to_db": true
-  }'
-```
-
-### 공휴일 API 테스트
-```bash
-curl -X POST "https://bdrvowacecxnraaivlhr.supabase.co/functions/v1/environment-proxy" \
-  -H "Authorization: Bearer <ANON_KEY>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "holidays",
-    "year": 2026,
-    "month": 1,
-    "save_to_db": true
-  }'
-```
-
-### 확인 사항
-| 항목 | 상태 | 비고 |
-|------|------|------|
-| 날씨 API 응답 | | |
-| weather_data 저장 | | |
-| 공휴일 API 응답 | | |
-| holidays_events 저장 | | |
-
----
-
-# 6. 데이터베이스 테이블 검증
-
-## 6.1 핵심 테이블 데이터 확인
-
-```sql
--- 매장 확인
-SELECT id, name, address FROM stores
-WHERE id = 'd9830554-2688-4032-af40-acccda787ac4';
-
--- 구역 확인
-SELECT id, zone_code, zone_name, zone_type FROM zones_dim
-WHERE store_id = 'd9830554-2688-4032-af40-acccda787ac4';
-
--- KPI 확인
-SELECT date, total_revenue, total_visitors, conversion_rate
-FROM daily_kpis_agg
-WHERE store_id = 'd9830554-2688-4032-af40-acccda787ac4'
-ORDER BY date DESC LIMIT 7;
-
--- 상품 성과 확인
-SELECT product_id, revenue, units_sold, conversion_rate
-FROM product_performance_agg
-WHERE store_id = 'd9830554-2688-4032-af40-acccda787ac4'
-ORDER BY revenue DESC LIMIT 10;
-
--- 날씨 데이터 확인
-SELECT date, weather_condition, temperature, humidity
-FROM weather_data
-WHERE store_id = 'd9830554-2688-4032-af40-acccda787ac4'
-ORDER BY date DESC LIMIT 7;
-
--- 공휴일 확인
-SELECT date, event_name, event_type FROM holidays_events
-WHERE date >= CURRENT_DATE
-ORDER BY date LIMIT 10;
-```
-
-### 데이터 존재 여부
-| 테이블 | 데이터 존재 | 건수 | 비고 |
-|--------|------------|------|------|
-| `stores` | | | |
-| `zones_dim` | | | |
-| `daily_kpis_agg` | | | |
-| `product_performance_agg` | | | |
-| `weather_data` | | | |
-| `holidays_events` | | | |
-| `furniture` | | | |
-| `furniture_slots` | | | |
-| `products` | | | |
-| `customer_segments` | | | |
-
----
-
-# 7. 통합 테스트 시나리오
-
-## 7.1 시나리오 1: AI 최적화 → 적용 → ROI 측정
-
-### 단계
-1. **Studio에서 최적화 실행**
-   - `/studio` 접속
-   - AI 최적화 탭 선택
-   - 최적화 실행
-
-2. **추천 적용**
-   - 추천 결과 확인
-   - "적용" 버튼 클릭
-   - 적용 확인 모달에서 확인
-
-3. **ROI 확인**
-   - `/roi` 이동
-   - 적용된 전략 목록 확인
-   - ROI 측정값 확인
-
-### 테스트 결과
-| 단계 | 상태 | 비고 |
-|------|------|------|
-| 최적화 실행 | | |
-| 추천 결과 표시 | | |
-| 전략 적용 | | |
-| ROI 페이지 반영 | | |
-
----
-
-## 7.2 시나리오 2: 환경 데이터 → 시뮬레이션 → 예측
-
-### 단계
-1. **환경 데이터 설정**
-   - Studio 환경 설정 패널 열기
-   - 날씨 모드: 실시간
-   - 날씨 데이터 로드 확인
-
-2. **시뮬레이션 실행**
-   - AI 시뮬레이션 탭
-   - 방문자 수 설정: 100
-   - 시뮬레이션 시작
-
-3. **예측 확인**
-   - Insights → 예측 탭
-   - 환경 영향 반영 확인
-
-### 테스트 결과
-| 단계 | 상태 | 비고 |
-|------|------|------|
-| 환경 데이터 로드 | | |
-| 시뮬레이션 실행 | | |
-| 예측 데이터 반영 | | |
-
----
-
-## 7.3 시나리오 3: 데이터 임포트 → KPI 집계 → 인사이트
-
-### 단계
-1. **데이터 임포트**
-   - Settings → 데이터 탭
-   - CSV 파일 업로드
-   - 컬럼 매핑 설정
-   - 임포트 실행
-
-2. **KPI 집계 실행**
-   ```bash
-   curl -X POST ".../functions/v1/aggregate-dashboard-kpis" \
-     -d '{"store_id": "...", "date": "2026-01-05"}'
-   ```
-
-3. **인사이트 확인**
-   - Insights → 개요 탭
-   - KPI 업데이트 확인
-
-### 테스트 결과
-| 단계 | 상태 | 비고 |
-|------|------|------|
-| 데이터 임포트 | | |
-| KPI 집계 | | |
-| 인사이트 반영 | | |
-
----
-
-# 8. 알려진 이슈 및 개선 사항
-
-## 8.1 발견된 이슈
-
-| ID | 영역 | 설명 | 심각도 | 상태 |
-|----|------|------|--------|------|
-| ISS-001 | | | | |
-| ISS-002 | | | | |
-
-## 8.2 개선 제안
-
-| ID | 영역 | 제안 | 우선순위 |
-|----|------|------|----------|
-| IMP-001 | | | |
-| IMP-002 | | | |
-
 ---
 
 # 부록
@@ -1005,19 +1012,13 @@ ORDER BY date LIMIT 10;
 VITE_SUPABASE_URL=https://bdrvowacecxnraaivlhr.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=eyJhbGci...
 
-# 외부 API (필요시 설정)
-VITE_OPENWEATHERMAP_API_KEY=
-VITE_DATA_GO_KR_API_KEY=
+# 외부 API (선택)
+VITE_OPENWEATHERMAP_API_KEY=<your_key>
+VITE_DATA_GO_KR_API_KEY=<your_key>
+VITE_CALENDARIFIC_API_KEY=<your_key>
 ```
 
-## B. 테스트 데이터 시딩
-
-```bash
-# 시딩 스크립트 실행
-psql -f scripts/seed_missing_data_v4.sql
-```
-
-## C. Edge Function 배포
+## B. Edge Function 배포
 
 ```bash
 # 전체 함수 배포
@@ -1026,10 +1027,23 @@ supabase functions deploy
 # 개별 함수 배포
 supabase functions deploy generate-optimization
 supabase functions deploy environment-proxy
+supabase functions deploy advanced-ai-inference
 ```
+
+## C. 데이터 시딩
+
+```bash
+# 필요시 시딩 스크립트 실행
+psql -f scripts/seed_missing_data_v4.sql
+```
+
+## D. 참고 문서
+
+- Supabase Dashboard: https://supabase.com/dashboard/project/bdrvowacecxnraaivlhr
+- Edge Functions Logs: https://supabase.com/dashboard/project/bdrvowacecxnraaivlhr/functions
 
 ---
 
 **작성자:** Claude AI
-**버전:** 1.0
+**버전:** 2.0
 **최종 수정:** 2026-01-05
