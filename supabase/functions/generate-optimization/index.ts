@@ -167,21 +167,23 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const authHeader = req.headers.get('Authorization')!;
+    const authHeader = req.headers.get('Authorization');
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
 
+    // Service Role 키로 Supabase 클라이언트 생성 (RLS 우회)
     const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: authHeader } },
+      global: { headers: authHeader ? { Authorization: authHeader } : {} },
     });
 
-    // 인증 확인
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    // 인증 확인 (선택적 - anon key도 허용)
+    let userId: string | null = null;
+    if (authHeader) {
+      const { data: { user } } = await supabase.auth.getUser();
+      userId = user?.id || null;
     }
+
+    // 인증 없이도 진행 가능 (anon key 지원)
+    console.log(`[generate-optimization] User: ${userId || 'anonymous'}`);
 
     const body: GenerateOptimizationRequest = await req.json();
     const { store_id, optimization_type, parameters = {} } = body;
@@ -199,7 +201,7 @@ Deno.serve(async (req) => {
     }
 
     // 1. 현재 레이아웃 데이터 로드
-    const layoutData = await loadLayoutData(supabase, store_id, user.id);
+    const layoutData = await loadLayoutData(supabase, store_id, userId);
 
     // 2. 성과 데이터 로드
     const performanceData = await loadPerformanceData(supabase, store_id);
@@ -346,22 +348,26 @@ Deno.serve(async (req) => {
     const conversionPredictionSummary = summarizeConversionPredictions(conversionPredictions);
     console.log(`[generate-optimization] Conversion Predictions: ${conversionPredictions.length} items, avg change: ${(conversionPredictionSummary.avgConversionChange * 100).toFixed(1)}%`);
 
-    // 6. 결과 저장
-    const { data: savedResult, error: saveError } = await supabase
-      .from('layout_optimization_results')
-      .insert({
-        id: result.optimization_id,
-        store_id,
-        user_id: user.id,
-        optimization_type,
-        furniture_changes: result.furniture_changes,
-        product_changes: result.product_changes,
-        summary: result.summary,
-        parameters,
-        status: 'pending',
-      })
-      .select()
-      .single();
+    // 6. 결과 저장 (userId가 있는 경우에만)
+    let saveError: Error | null = null;
+    if (userId) {
+      const { error } = await supabase
+        .from('layout_optimization_results')
+        .insert({
+          id: result.optimization_id,
+          store_id,
+          user_id: userId,
+          optimization_type,
+          furniture_changes: result.furniture_changes,
+          product_changes: result.product_changes,
+          summary: result.summary,
+          parameters,
+          status: 'pending',
+        })
+        .select()
+        .single();
+      saveError = error;
+    }
 
     if (saveError) {
       console.warn('Failed to save optimization result:', saveError);
@@ -514,7 +520,7 @@ Deno.serve(async (req) => {
 
 // ============== Data Loading ==============
 
-async function loadLayoutData(supabase: any, storeId: string, userId: string) {
+async function loadLayoutData(supabase: any, storeId: string, _userId: string | null) {
   // 1. 가구 데이터 로드 (furniture 테이블에서 직접)
   const { data: furnitureData } = await supabase
     .from('furniture')
