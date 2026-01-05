@@ -728,6 +728,17 @@
   .shadow-3d { box-shadow: var(--shadow-3d); }
   .shadow-3d-dark { box-shadow: var(--shadow-3d-dark); }
 
+  /* Shake Animation */
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+    20%, 40%, 60%, 80% { transform: translateX(4px); }
+  }
+
+  .animate-shake {
+    animation: shake 0.5s ease-in-out;
+  }
+
   /* Noise Texture */
   .noise-texture {
     position: relative;

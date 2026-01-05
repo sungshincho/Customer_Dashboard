@@ -52,8 +52,9 @@ export function SceneSavePanel({
 
   const handleSave = () => {
     if (!sceneName.trim()) {
-      // 빈 입력 상태에서 저장 클릭 시 경고 표시
+      // 빈 입력 상태에서 저장 클릭 시 경고 표시 (2초 후 자동 복귀)
       setShowInputWarning(true);
+      setTimeout(() => setShowInputWarning(false), 2000);
       return;
     }
     setShowInputWarning(false);
@@ -96,16 +97,16 @@ export function SceneSavePanel({
           className={cn(
             "bg-white/5 border-0 text-white h-8 text-xs",
             showInputWarning
-              ? "placeholder:text-orange-400"
-              : "placeholder:text-white/40"
+              ? "placeholder:text-orange-400 animate-shake"
+              : "placeholder:text-white/70"
           )}
         />
         <Button
           className={cn(
             "w-full h-7 text-xs transition-all",
             isDisabled
-              ? "bg-white/5 text-white/70 hover:bg-white/10"
-              : "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+              ? "bg-white/5 text-white/70"
+              : "bg-white/10 text-white/70 hover:bg-gradient-to-r hover:from-purple-700 hover:to-pink-700 hover:text-white"
           )}
           onClick={handleSave}
         >
@@ -125,7 +126,7 @@ export function SceneSavePanel({
 
       {/* 새 씬 버튼 */}
       <Button
-        className="w-full bg-white/5 text-white/70 hover:bg-gradient-to-r hover:from-purple-600 hover:to-pink-600 hover:text-white h-7 text-xs transition-all"
+        className="w-full bg-white/10 text-white/70 hover:bg-gradient-to-r hover:from-purple-600 hover:to-pink-600 hover:text-white h-7 text-xs transition-all"
         onClick={onNew}
       >
         <Plus className="w-3 h-3 mr-1" />
