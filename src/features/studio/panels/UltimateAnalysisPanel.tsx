@@ -105,11 +105,11 @@ export function UltimateAnalysisPanel({
           badge={
             <span className={cn(
               "text-xs font-medium px-1.5 py-0.5 rounded",
-              flowAnalysis.flow_health_score >= 80 ? "bg-green-500/20 text-green-400" :
-              flowAnalysis.flow_health_score >= 60 ? "bg-yellow-500/20 text-yellow-400" :
+              (flowAnalysis?.flow_health_score ?? 0) >= 80 ? "bg-green-500/20 text-green-400" :
+              (flowAnalysis?.flow_health_score ?? 0) >= 60 ? "bg-yellow-500/20 text-yellow-400" :
               "bg-red-500/20 text-red-400"
             )}>
-              건강도 {flowAnalysis.flow_health_score}점
+              건강도 {flowAnalysis?.flow_health_score ?? 0}점
             </span>
           }
         >
@@ -118,30 +118,30 @@ export function UltimateAnalysisPanel({
             <div className="grid grid-cols-3 gap-2">
               <MetricCard
                 label="주요 경로"
-                value={flowAnalysis.key_paths.length}
+                value={flowAnalysis?.key_paths?.length ?? 0}
                 unit="개"
                 color="blue"
               />
               <MetricCard
                 label="병목"
-                value={flowAnalysis.bottleneck_count}
+                value={flowAnalysis?.bottleneck_count ?? 0}
                 unit="개"
-                color={flowAnalysis.bottleneck_count > 2 ? "red" : "yellow"}
+                color={(flowAnalysis?.bottleneck_count ?? 0) > 2 ? "red" : "yellow"}
               />
               <MetricCard
                 label="데드존"
-                value={flowAnalysis.dead_zone_count}
+                value={flowAnalysis?.dead_zone_count ?? 0}
                 unit="개"
-                color={flowAnalysis.dead_zone_count > 0 ? "red" : "green"}
+                color={(flowAnalysis?.dead_zone_count ?? 0) > 0 ? "red" : "green"}
               />
             </div>
 
             {/* 병목 지점 */}
-            {flowAnalysis.bottlenecks.length > 0 && (
+            {(flowAnalysis?.bottlenecks?.length ?? 0) > 0 && (
               <div className="mt-2">
                 <div className="text-[10px] text-white/50 mb-1">병목 지점</div>
                 <div className="space-y-1">
-                  {flowAnalysis.bottlenecks.slice(0, 3).map((b, i) => (
+                  {(flowAnalysis?.bottlenecks ?? []).slice(0, 3).map((b, i) => (
                     <div
                       key={i}
                       className="flex items-center justify-between text-[10px] bg-red-500/10 rounded px-2 py-1"
@@ -161,11 +161,11 @@ export function UltimateAnalysisPanel({
             )}
 
             {/* 기회 영역 */}
-            {flowAnalysis.opportunities.length > 0 && (
+            {(flowAnalysis?.opportunities?.length ?? 0) > 0 && (
               <div className="mt-2">
                 <div className="text-[10px] text-white/50 mb-1">개선 기회</div>
                 <div className="space-y-1">
-                  {flowAnalysis.opportunities.slice(0, 2).map((o, i) => (
+                  {(flowAnalysis?.opportunities ?? []).slice(0, 2).map((o, i) => (
                     <div
                       key={i}
                       className="text-[10px] bg-green-500/10 rounded px-2 py-1 text-green-300"
@@ -192,30 +192,30 @@ export function UltimateAnalysisPanel({
           badge={
             <span className={cn(
               "text-xs font-bold px-2 py-0.5 rounded",
-              vmd.score.grade === 'A' ? "bg-green-500/30 text-green-400" :
-              vmd.score.grade === 'B' ? "bg-blue-500/30 text-blue-400" :
-              vmd.score.grade === 'C' ? "bg-yellow-500/30 text-yellow-400" :
+              vmd?.score?.grade === 'A' ? "bg-green-500/30 text-green-400" :
+              vmd?.score?.grade === 'B' ? "bg-blue-500/30 text-blue-400" :
+              vmd?.score?.grade === 'C' ? "bg-yellow-500/30 text-yellow-400" :
               "bg-red-500/30 text-red-400"
             )}>
-              {vmd.score.grade}등급 ({vmd.score.overall}점)
+              {vmd?.score?.grade ?? '-'}등급 ({vmd?.score?.overall ?? 0}점)
             </span>
           }
         >
           <div className="space-y-2">
             {/* 세부 점수 */}
             <div className="grid grid-cols-2 gap-2">
-              <ScoreBar label="균형" value={vmd.score.balance} />
-              <ScoreBar label="가시성" value={vmd.score.visibility} />
-              <ScoreBar label="동선연계" value={vmd.score.flow_integration} />
-              <ScoreBar label="카테고리" value={vmd.score.category_coherence} />
+              <ScoreBar label="균형" value={vmd?.score?.balance ?? 0} />
+              <ScoreBar label="가시성" value={vmd?.score?.visibility ?? 0} />
+              <ScoreBar label="동선연계" value={vmd?.score?.flow_integration ?? 0} />
+              <ScoreBar label="카테고리" value={vmd?.score?.category_coherence ?? 0} />
             </div>
 
             {/* 위반 사항 */}
-            {vmd.violations.length > 0 && (
+            {(vmd?.violations?.length ?? 0) > 0 && (
               <div className="mt-2">
                 <div className="text-[10px] text-white/50 mb-1">개선 필요</div>
                 <div className="space-y-1">
-                  {vmd.violations.slice(0, 3).map((v, i) => (
+                  {(vmd?.violations ?? []).slice(0, 3).map((v, i) => (
                     <div
                       key={i}
                       className={cn(
@@ -264,21 +264,21 @@ export function UltimateAnalysisPanel({
                 </div>
                 <span className={cn(
                   "text-xs font-medium",
-                  environment.impact_multipliers.traffic > 1 ? "text-green-400" :
-                  environment.impact_multipliers.traffic < 1 ? "text-red-400" :
+                  (environment?.impact_multipliers?.traffic ?? 1) > 1 ? "text-green-400" :
+                  (environment?.impact_multipliers?.traffic ?? 1) < 1 ? "text-red-400" :
                   "text-white/60"
                 )}>
-                  트래픽 {environment.impact_multipliers.traffic > 1 ? '+' : ''}
-                  {((environment.impact_multipliers.traffic - 1) * 100).toFixed(0)}%
+                  트래픽 {(environment?.impact_multipliers?.traffic ?? 1) > 1 ? '+' : ''}
+                  {(((environment?.impact_multipliers?.traffic ?? 1) - 1) * 100).toFixed(0)}%
                 </span>
               </div>
             )}
 
             {/* 이벤트 */}
-            {environment.events.length > 0 && (
+            {(environment?.events?.length ?? 0) > 0 && (
               <div>
                 <div className="text-[10px] text-white/50 mb-1">오늘의 이벤트</div>
-                {environment.events.slice(0, 2).map((e, i) => (
+                {(environment?.events ?? []).slice(0, 2).map((e, i) => (
                   <div
                     key={i}
                     className="text-[10px] bg-purple-500/10 rounded px-2 py-1 text-purple-300 mb-1"
@@ -299,11 +299,11 @@ export function UltimateAnalysisPanel({
 
             {/* 시간대 정보 */}
             <div className="flex items-center gap-2 text-[10px] text-white/50">
-              <span>{environment.temporal.dayOfWeek}</span>
+              <span>{environment?.temporal?.dayOfWeek ?? '-'}</span>
               <span>•</span>
-              <span>{environment.temporal.isWeekend ? '주말' : '평일'}</span>
+              <span>{environment?.temporal?.isWeekend ? '주말' : '평일'}</span>
               <span>•</span>
-              <span>{environment.temporal.timeOfDay}</span>
+              <span>{environment?.temporal?.timeOfDay ?? '-'}</span>
             </div>
           </div>
         </CollapsibleSection>
@@ -319,13 +319,13 @@ export function UltimateAnalysisPanel({
           onToggle={() => toggleSection('association')}
           badge={
             <span className="text-xs text-white/60">
-              {association.strong_rules_count}개 규칙
+              {association?.strong_rules_count ?? 0}개 규칙
             </span>
           }
         >
           <div className="space-y-2">
             {/* 상위 연관 규칙 */}
-            {association.top_rules.slice(0, 3).map((rule, i) => (
+            {(association?.top_rules ?? []).slice(0, 3).map((rule, i) => (
               <div
                 key={i}
                 className="text-[10px] bg-white/5 rounded px-2 py-1.5"
@@ -345,10 +345,10 @@ export function UltimateAnalysisPanel({
             ))}
 
             {/* 배치 추천 */}
-            {association.recommendations.length > 0 && (
+            {(association?.recommendations?.length ?? 0) > 0 && (
               <div className="mt-2 pt-2 border-t border-white/10">
                 <div className="text-[10px] text-white/50 mb-1">배치 추천</div>
-                {association.recommendations.slice(0, 2).map((r, i) => (
+                {(association?.recommendations ?? []).slice(0, 2).map((r, i) => (
                   <div
                     key={i}
                     className="text-[10px] text-blue-300 flex items-start gap-1.5"
@@ -374,10 +374,10 @@ export function UltimateAnalysisPanel({
           badge={
             <span className={cn(
               "text-xs font-medium",
-              prediction.total_expected_revenue_change > 0 ? "text-green-400" : "text-red-400"
+              (prediction?.total_expected_revenue_change ?? 0) > 0 ? "text-green-400" : "text-red-400"
             )}>
-              매출 {prediction.total_expected_revenue_change > 0 ? '+' : ''}
-              {prediction.total_expected_revenue_change.toFixed(1)}%
+              매출 {(prediction?.total_expected_revenue_change ?? 0) > 0 ? '+' : ''}
+              {(prediction?.total_expected_revenue_change ?? 0).toFixed(1)}%
             </span>
           }
         >
@@ -385,13 +385,13 @@ export function UltimateAnalysisPanel({
             <div className="grid grid-cols-2 gap-2">
               <MetricCard
                 label="고신뢰 변경"
-                value={prediction.high_confidence_changes}
+                value={prediction?.high_confidence_changes ?? 0}
                 unit="건"
                 color="green"
               />
               <MetricCard
                 label="일 매출 증가"
-                value={prediction.total_daily_revenue_increase}
+                value={prediction?.total_daily_revenue_increase ?? 0}
                 unit="원"
                 color="blue"
                 format="currency"
@@ -400,14 +400,14 @@ export function UltimateAnalysisPanel({
 
             <div className="flex items-center gap-2 text-[10px]">
               <span className="text-white/50">예측 적용:</span>
-              <span className="text-white">{prediction.predictions_applied}건</span>
+              <span className="text-white">{prediction?.predictions_applied ?? 0}건</span>
               <span className="text-white/30">|</span>
               <span className="text-white/50">신뢰도:</span>
               <span className={cn(
-                prediction.overall_confidence >= 80 ? "text-green-400" :
-                prediction.overall_confidence >= 60 ? "text-yellow-400" : "text-red-400"
+                (prediction?.overall_confidence ?? 0) >= 80 ? "text-green-400" :
+                (prediction?.overall_confidence ?? 0) >= 60 ? "text-yellow-400" : "text-red-400"
               )}>
-                {prediction.overall_confidence}%
+                {prediction?.overall_confidence ?? 0}%
               </span>
             </div>
           </div>
