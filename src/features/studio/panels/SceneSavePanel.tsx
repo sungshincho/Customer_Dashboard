@@ -95,7 +95,7 @@ export function SceneSavePanel({
           onChange={handleInputChange}
           placeholder="씬 이름을 입력하세요"
           className={cn(
-            "bg-white/5 border-0 text-white h-8 text-xs",
+            "bg-white/10 border-0 text-white h-8 text-xs",
             showInputWarning
               ? "placeholder:text-orange-400 animate-shake"
               : "placeholder:text-white/70"
