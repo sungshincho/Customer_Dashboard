@@ -56,6 +56,16 @@ import {
   type VMDAnalysisResult,
 } from './vmd/vmdEngine.ts';
 
+// Phase 4.2: 자동 학습 시스템
+import {
+  loadStoredParameters,
+  runAutoLearning,
+  formatLearningSessionForResponse,
+  DEFAULT_MODEL_PARAMETERS,
+  type ModelParameters,
+  type LearningSessionSummary,
+} from './feedback/autoLearning.ts';
+
 /**
  * generate-optimization Edge Function
  *
@@ -177,6 +187,16 @@ Deno.serve(async (req) => {
     const { store_id, optimization_type, parameters = {} } = body;
 
     console.log(`[generate-optimization] Type: ${optimization_type}, Store: ${store_id}`);
+
+    // 🆕 Phase 4.2: 학습된 모델 파라미터 로드
+    let modelParameters: ModelParameters;
+    try {
+      modelParameters = await loadStoredParameters(supabase, store_id);
+      console.log(`[generate-optimization] Loaded learned parameters for store: ${store_id}`);
+    } catch (paramError) {
+      console.warn(`[generate-optimization] Failed to load parameters, using defaults:`, paramError);
+      modelParameters = { ...DEFAULT_MODEL_PARAMETERS };
+    }
 
     // 1. 현재 레이아웃 데이터 로드
     const layoutData = await loadLayoutData(supabase, store_id, user.id);
@@ -347,6 +367,24 @@ Deno.serve(async (req) => {
       console.warn('Failed to save optimization result:', saveError);
     }
 
+    // 🆕 Phase 4.2: 자동 학습 실행 (백그라운드)
+    let learningSession: LearningSessionSummary | null = null;
+    try {
+      // 매장에 충분한 예측 기록이 있는 경우에만 학습 실행
+      // 실제 운영에서는 비동기로 실행하거나 별도 워커로 분리 권장
+      learningSession = await runAutoLearning(supabase, store_id, {
+        minConfidence: 0.5,
+        maxAdjustmentsPerType: 3,
+        lookbackDays: 30,
+      });
+
+      if (learningSession.adjustmentsApplied > 0) {
+        console.log(`[generate-optimization] Auto-learning: ${learningSession.adjustmentsApplied} adjustments applied, improvement: ${learningSession.improvementMetrics.improvement_percentage}%`);
+      }
+    } catch (learningError) {
+      console.warn('[generate-optimization] Auto-learning skipped:', learningError);
+    }
+
     return new Response(JSON.stringify({
       success: true,
       result,
@@ -456,6 +494,10 @@ Deno.serve(async (req) => {
       },
       // 🆕 VMD 분석 (Phase 3)
       vmd_analysis: formatVMDAnalysisForResponse(vmdAnalysis),
+      // 🆕 자동 학습 세션 (Phase 4.2)
+      learning_session: learningSession
+        ? formatLearningSessionForResponse(learningSession)
+        : null,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
