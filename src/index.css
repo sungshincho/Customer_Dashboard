@@ -739,6 +739,48 @@
     animation: shake 0.5s ease-in-out;
   }
 
+  /* Select Dropdown Scrollbar - Always Visible */
+  [data-radix-select-viewport] {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(128,128,128,0.5) rgba(128,128,128,0.15);
+  }
+
+  [data-radix-select-viewport]::-webkit-scrollbar {
+    width: 6px;
+    display: block !important;
+  }
+
+  [data-radix-select-viewport]::-webkit-scrollbar-track {
+    background: rgba(128,128,128,0.15);
+    border-radius: 3px;
+  }
+
+  [data-radix-select-viewport]::-webkit-scrollbar-thumb {
+    background: rgba(128,128,128,0.5);
+    border-radius: 3px;
+  }
+
+  [data-radix-select-viewport]::-webkit-scrollbar-thumb:hover {
+    background: rgba(128,128,128,0.7);
+  }
+
+  /* Dark mode scrollbar - brighter for visibility */
+  .dark [data-radix-select-viewport] {
+    scrollbar-color: rgba(200,200,200,0.5) rgba(200,200,200,0.15);
+  }
+
+  .dark [data-radix-select-viewport]::-webkit-scrollbar-track {
+    background: rgba(200,200,200,0.15);
+  }
+
+  .dark [data-radix-select-viewport]::-webkit-scrollbar-thumb {
+    background: rgba(200,200,200,0.5);
+  }
+
+  .dark [data-radix-select-viewport]::-webkit-scrollbar-thumb:hover {
+    background: rgba(200,200,200,0.7);
+  }
+
   /* Noise Texture */
   .noise-texture {
     position: relative;
