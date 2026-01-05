@@ -739,6 +739,31 @@
     animation: shake 0.5s ease-in-out;
   }
 
+  /* Select Dropdown Scrollbar - Always Visible */
+  [data-radix-select-viewport] {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.3) transparent;
+  }
+
+  [data-radix-select-viewport]::-webkit-scrollbar {
+    width: 6px;
+    display: block !important;
+  }
+
+  [data-radix-select-viewport]::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.1);
+    border-radius: 3px;
+  }
+
+  [data-radix-select-viewport]::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.3);
+    border-radius: 3px;
+  }
+
+  [data-radix-select-viewport]::-webkit-scrollbar-thumb:hover {
+    background: rgba(255,255,255,0.5);
+  }
+
   /* Noise Texture */
   .noise-texture {
     position: relative;
