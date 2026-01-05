@@ -42,14 +42,30 @@ export function SceneSavePanel({
   maxScenes,
 }: SceneSavePanelProps) {
   const [sceneName, setSceneName] = useState(currentSceneName);
+  const [showInputWarning, setShowInputWarning] = useState(false);
 
   // 최대 개수 제한 (maxScenes가 설정된 경우)
   const displayedScenes = maxScenes ? savedScenes.slice(0, maxScenes) : savedScenes;
   const canSaveNew = maxScenes ? savedScenes.length < maxScenes : true;
 
+  const isDisabled = !sceneName.trim() || isSaving || !canSaveNew;
+
   const handleSave = () => {
-    if (!sceneName.trim()) return;
+    if (!sceneName.trim()) {
+      // 빈 입력 상태에서 저장 클릭 시 경고 표시
+      setShowInputWarning(true);
+      return;
+    }
+    setShowInputWarning(false);
     onSave?.(sceneName.trim());
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSceneName(e.target.value);
+    // 입력 시작하면 경고 해제
+    if (e.target.value.trim()) {
+      setShowInputWarning(false);
+    }
   };
 
   const formatDate = (dateStr: string) => {
@@ -75,14 +91,23 @@ export function SceneSavePanel({
         </div>
         <Input
           value={sceneName}
-          onChange={(e) => setSceneName(e.target.value)}
-          placeholder="씬 이름"
-          className="bg-white/5 border-white/10 text-white placeholder:text-white/30 h-8 text-xs"
+          onChange={handleInputChange}
+          placeholder="씬 이름을 입력하세요"
+          className={cn(
+            "bg-white/5 border-0 text-white h-8 text-xs",
+            showInputWarning
+              ? "placeholder:text-orange-400"
+              : "placeholder:text-white/40"
+          )}
         />
         <Button
-          className="w-full bg-primary/80 hover:bg-primary text-white h-7 text-xs"
+          className={cn(
+            "w-full h-7 text-xs transition-all",
+            isDisabled
+              ? "bg-white/5 text-white/70 hover:bg-white/10"
+              : "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+          )}
           onClick={handleSave}
-          disabled={!sceneName.trim() || isSaving || !canSaveNew}
         >
           {isSaving ? (
             <>
@@ -100,8 +125,7 @@ export function SceneSavePanel({
 
       {/* 새 씬 버튼 */}
       <Button
-        variant="outline"
-        className="w-full border-white/10 text-white/80 hover:text-white hover:bg-white/5 h-7 text-xs"
+        className="w-full bg-white/5 text-white/70 hover:bg-gradient-to-r hover:from-purple-600 hover:to-pink-600 hover:text-white h-7 text-xs transition-all"
         onClick={onNew}
       >
         <Plus className="w-3 h-3 mr-1" />
