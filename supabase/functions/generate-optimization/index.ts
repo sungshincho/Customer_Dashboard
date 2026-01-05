@@ -19,6 +19,15 @@ import {
   type ProductAssociationResult,
 } from './data/associationMiner.ts';
 
+// Phase 1.1: Chain-of-Thought 프롬프트 빌더
+import {
+  buildAdvancedOptimizationPrompt,
+  extractThinkingBlock,
+  createPromptContext,
+  createPromptConfig,
+  type BuiltPrompt,
+} from './ai/promptBuilder.ts';
+
 /**
  * generate-optimization Edge Function
  *
@@ -500,7 +509,37 @@ async function generateAIOptimization(
   flowAnalysis?: FlowAnalysisResult,        // 🆕 동선 분석 (Phase 0.2)
   associationData?: ProductAssociationResult // 🆕 연관성 분석 (Phase 0.3)
 ): Promise<AILayoutOptimizationResult> {
-  const prompt = buildOptimizationPrompt(layoutData, performanceData, slotsData, optimizationType, parameters, environmentData, flowAnalysis, associationData);
+  // 🆕 Phase 1.1: Chain-of-Thought 프롬프트 빌더 사용
+  const promptContext = createPromptContext(
+    layoutData,
+    performanceData,
+    slotsData,
+    optimizationType,
+    parameters,
+    environmentData || null,
+    flowAnalysis || null,
+    associationData || null
+  );
+
+  const promptConfig = createPromptConfig({
+    strategy: 'chain_of_thought',
+    chainOfThought: {
+      enabled: true,
+      steps: [], // 기본 5단계 사용
+      requireExplicitReasoning: true,
+    },
+    constraints: {
+      maxFurnitureChanges: parameters.max_changes ? Math.floor(parameters.max_changes / 3) : 10,
+      maxProductChanges: parameters.max_changes || 30,
+      respectMovableFlag: true,
+      validateSlotCompatibility: true,
+    },
+  });
+
+  const builtPrompt: BuiltPrompt = buildAdvancedOptimizationPrompt(promptContext, promptConfig);
+
+  console.log(`[generateAIOptimization] CoT Prompt built: tokens~${builtPrompt.totalTokenEstimate}, strategy=${builtPrompt.metadata.strategy}`);
+  console.log(`[generateAIOptimization] Data included: env=${builtPrompt.metadata.dataIncluded.environment}, flow=${builtPrompt.metadata.dataIncluded.flowAnalysis}, assoc=${builtPrompt.metadata.dataIncluded.associations}`);
 
   try {
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -511,9 +550,12 @@ async function generateAIOptimization(
       },
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
-        messages: [{ role: 'user', content: prompt }],
+        messages: [
+          { role: 'system', content: builtPrompt.systemPrompt },
+          { role: 'user', content: builtPrompt.userPrompt }
+        ],
         response_format: { type: 'json_object' },
-        max_tokens: 4000,
+        max_tokens: 6000, // 🆕 CoT 추론을 위해 토큰 증가
       }),
     });
 
@@ -522,7 +564,26 @@ async function generateAIOptimization(
     }
 
     const data = await response.json();
-    const result = JSON.parse(data.choices[0].message.content);
+    const rawContent = data.choices[0].message.content;
+
+    // 🆕 Phase 1.1: <thinking> 블록 추출 및 로깅
+    const { thinking, jsonContent } = extractThinkingBlock(rawContent);
+
+    if (thinking) {
+      console.log(`[generateAIOptimization] 🧠 AI Reasoning (${thinking.length} chars):`);
+      // 추론 내용 요약 로깅 (첫 500자)
+      console.log(`[generateAIOptimization] Thinking preview: ${thinking.substring(0, 500)}...`);
+    }
+
+    // JSON 파싱
+    let result;
+    try {
+      result = JSON.parse(jsonContent);
+    } catch (parseError) {
+      console.error('[generateAIOptimization] JSON parse error:', parseError);
+      console.error('[generateAIOptimization] Raw content:', rawContent.substring(0, 1000));
+      throw new Error('Failed to parse AI response as JSON');
+    }
 
     return {
       optimization_id: '',
@@ -531,7 +592,13 @@ async function generateAIOptimization(
       optimization_type: optimizationType as any,
       furniture_changes: result.furniture_changes || [],
       product_changes: result.product_changes || [],
-      summary: result.summary || {
+      summary: {
+        ...result.summary,
+        // 🆕 AI 추론 메타데이터 추가
+        ai_reasoning_included: !!thinking,
+        ai_reasoning_length: thinking?.length || 0,
+        prompt_strategy: builtPrompt.metadata.strategy,
+      } || {
         total_furniture_changes: 0,
         total_product_changes: 0,
         expected_revenue_improvement: 0,
@@ -545,6 +612,10 @@ async function generateAIOptimization(
   }
 }
 
+/**
+ * @deprecated Phase 1.1에서 buildAdvancedOptimizationPrompt로 대체됨
+ * 이 함수는 하위 호환성을 위해 유지되며, 향후 버전에서 제거될 예정
+ */
 function buildOptimizationPrompt(
   layoutData: any,
   performanceData: any,

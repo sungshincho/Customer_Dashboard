@@ -1,0 +1,903 @@
+/**
+ * promptBuilder.ts - Phase 1.1: Advanced Chain-of-Thought Prompt Builder
+ *
+ * NEURALTWIN AI 최적화 Ultimate 명세서 v2.0
+ * AI가 5단계 명시적 추론을 수행하도록 설계된 고급 프롬프트 빌더
+ *
+ * 주요 기능:
+ * - Chain-of-Thought (CoT) 5단계 추론 프레임워크
+ * - 환경/동선/연관성 데이터 통합
+ * - 구조화된 출력 형식 강제
+ * - 토큰 최적화
+ */
+
+import type { EnvironmentDataBundle } from '../data/environmentLoader.ts';
+import type { FlowAnalysisResult } from '../data/flowAnalyzer.ts';
+import type { ProductAssociationResult } from '../data/associationMiner.ts';
+
+// ============================================================================
+// Type Definitions
+// ============================================================================
+
+/**
+ * 프롬프트 전략 설정
+ */
+export interface PromptConfig {
+  strategy: 'basic' | 'chain_of_thought' | 'few_shot' | 'hybrid';
+  chainOfThought: {
+    enabled: boolean;
+    steps: ReasoningStep[];
+    requireExplicitReasoning: boolean;
+  };
+  fewShot: {
+    enabled: boolean;
+    exampleCount: number;
+  };
+  constraints: {
+    maxFurnitureChanges: number;
+    maxProductChanges: number;
+    respectMovableFlag: boolean;
+    validateSlotCompatibility: boolean;
+  };
+  tokenLimits: {
+    maxLayoutData: number;
+    maxPerformanceData: number;
+    maxSlotData: number;
+  };
+}
+
+/**
+ * 추론 단계 정의
+ */
+export interface ReasoningStep {
+  stepNumber: number;
+  stepName: string;
+  description: string;
+  requiredAnalysis: string[];
+  expectedOutput: string;
+}
+
+/**
+ * 최적화 설정
+ */
+export interface OptimizationSettings {
+  optimizationType: 'furniture' | 'product' | 'both';
+  optimizationGoal: 'revenue' | 'conversion' | 'traffic' | 'balanced';
+  intensity: 'low' | 'medium' | 'high';
+  maxChanges: number;
+  weights: {
+    revenue: number;
+    conversion: number;
+    traffic: number;
+    experience: number;
+  };
+  parameters: Record<string, any>;
+}
+
+/**
+ * 레이아웃 데이터
+ */
+export interface LayoutData {
+  zones: any[];
+  furniture: any[];
+  products: any[];
+  productDetails?: any[];
+}
+
+/**
+ * 성과 데이터
+ */
+export interface PerformanceData {
+  zoneMetrics: Record<string, any>;
+  productPerformance: any[];
+}
+
+/**
+ * 프롬프트 컨텍스트 (모든 입력 데이터 통합)
+ */
+export interface PromptContext {
+  layout: LayoutData;
+  performance: PerformanceData;
+  slots: any[];
+  environment: EnvironmentDataBundle | null;
+  flowAnalysis: FlowAnalysisResult | null;
+  associations: ProductAssociationResult | null;
+  settings: OptimizationSettings;
+}
+
+/**
+ * 빌드된 프롬프트 결과
+ */
+export interface BuiltPrompt {
+  systemPrompt: string;
+  userPrompt: string;
+  expectedOutputFormat: string;
+  totalTokenEstimate: number;
+  metadata: {
+    strategy: string;
+    cotEnabled: boolean;
+    fewShotEnabled: boolean;
+    dataIncluded: {
+      environment: boolean;
+      flowAnalysis: boolean;
+      associations: boolean;
+    };
+  };
+}
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+/**
+ * 5단계 추론 프레임워크
+ */
+export const REASONING_STEPS: ReasoningStep[] = [
+  {
+    stepNumber: 1,
+    stepName: 'Environment Assessment',
+    description: '현재 환경 조건이 고객 행동에 미치는 영향 분석',
+    requiredAnalysis: [
+      '날씨 영향 분석 (traffic, dwell, conversion multipliers)',
+      '이벤트/휴일 영향 평가',
+      '시간대별 패턴 (피크/오프피크)',
+      '리스크 요인 식별',
+    ],
+    expectedOutput: '환경 기반 최적화 방향성 도출',
+  },
+  {
+    stepNumber: 2,
+    stepName: 'Flow Analysis',
+    description: '고객 동선 패턴과 최적화 기회 분석',
+    requiredAnalysis: [
+      '주요 고객 경로 식별 (high-value path)',
+      '병목 구간 분석 (가구 재배치 필요 여부)',
+      '데드존 활성화 전략 수립',
+      '크로스셀 기회 (경로 기반)',
+    ],
+    expectedOutput: '동선 기반 가구/상품 배치 후보 도출',
+  },
+  {
+    stepNumber: 3,
+    stepName: 'Product Performance Review',
+    description: '상품 배치 효율성 평가 및 연관성 분석',
+    requiredAnalysis: [
+      '저성과 상품 in 프리미엄 위치 → 재배치 필요',
+      '고성과 상품 in 서브옵티멀 위치 → 업그레이드 기회',
+      '연관 규칙 기반 번들/크로스셀 기회',
+      '재고 및 시즌성 고려',
+    ],
+    expectedOutput: '상품 재배치 우선순위 목록',
+  },
+  {
+    stepNumber: 4,
+    stepName: 'VMD Principles Application',
+    description: '시각적 머천다이징 원칙 적용',
+    requiredAnalysis: [
+      '골든존 최적화 (눈높이 = 구매 높이)',
+      '컬러 블로킹 기회 탐색',
+      '포컬 포인트 설정 (존 입구/교차점)',
+      '여백 및 접근성 확보',
+    ],
+    expectedOutput: 'VMD 기반 배치 조정 사항',
+  },
+  {
+    stepNumber: 5,
+    stepName: 'Impact Estimation & Prioritization',
+    description: '예상 효과 정량화 및 우선순위 결정',
+    requiredAnalysis: [
+      '변경별 예상 매출 영향 (% 단위)',
+      '전환율 개선 예측',
+      '구현 난이도 평가 (easy/medium/hard)',
+      '리스크 평가 (low/medium/high)',
+    ],
+    expectedOutput: '최종 최적화 권고안 (우선순위 포함)',
+  },
+];
+
+/**
+ * 기본 프롬프트 설정
+ */
+export const DEFAULT_PROMPT_CONFIG: PromptConfig = {
+  strategy: 'chain_of_thought',
+  chainOfThought: {
+    enabled: true,
+    steps: REASONING_STEPS,
+    requireExplicitReasoning: true,
+  },
+  fewShot: {
+    enabled: false,
+    exampleCount: 0,
+  },
+  constraints: {
+    maxFurnitureChanges: 10,
+    maxProductChanges: 30,
+    respectMovableFlag: true,
+    validateSlotCompatibility: true,
+  },
+  tokenLimits: {
+    maxLayoutData: 20,
+    maxPerformanceData: 20,
+    maxSlotData: 30,
+  },
+};
+
+/**
+ * 기본 최적화 설정
+ */
+export const DEFAULT_OPTIMIZATION_SETTINGS: OptimizationSettings = {
+  optimizationType: 'both',
+  optimizationGoal: 'balanced',
+  intensity: 'medium',
+  maxChanges: 30,
+  weights: {
+    revenue: 0.35,
+    conversion: 0.25,
+    traffic: 0.20,
+    experience: 0.20,
+  },
+  parameters: {},
+};
+
+// ============================================================================
+// System Prompt Builder
+// ============================================================================
+
+/**
+ * 시스템 프롬프트 생성
+ * AI의 역할과 전문성을 정의
+ */
+export function buildSystemPrompt(config: PromptConfig): string {
+  const cotInstruction = config.chainOfThought.enabled
+    ? `
+
+## REASONING PROTOCOL
+You MUST follow a structured Chain-of-Thought reasoning process.
+Before providing your final JSON output, work through each analysis step explicitly.
+Your reasoning should be thorough but concise.`
+    : '';
+
+  return `You are an elite retail optimization AI with deep expertise in:
+- Visual Merchandising (VMD) principles and retail psychology
+- Customer behavior analysis and journey optimization
+- Retail space economics and revenue maximization
+- Data-driven decision making with confidence scoring
+
+Your mission is to optimize retail store layouts for maximum revenue, conversion, and customer experience while respecting all operational constraints.
+${cotInstruction}
+
+## CORE PRINCIPLES
+1. **Data-Driven**: Every recommendation must be backed by provided data
+2. **Constraint-Aware**: Never violate physical or business constraints
+3. **Impact-Focused**: Prioritize changes with highest expected ROI
+4. **Risk-Conscious**: Flag high-risk changes clearly
+5. **Actionable**: Provide specific, implementable recommendations`;
+}
+
+// ============================================================================
+// Section Builders
+// ============================================================================
+
+/**
+ * 5단계 추론 프레임워크 섹션 생성
+ */
+export function buildReasoningFramework(steps: ReasoningStep[]): string {
+  const stepsText = steps.map(step => `
+### Step ${step.stepNumber}: ${step.stepName}
+**Goal**: ${step.description}
+
+**Required Analysis:**
+${step.requiredAnalysis.map(a => `- ${a}`).join('\n')}
+
+**Expected Output**: ${step.expectedOutput}
+`).join('\n');
+
+  return `## 🧠 REASONING FRAMEWORK (Required)
+
+You must work through these 5 steps in order. Show your reasoning for each step.
+
+${stepsText}
+
+After completing all steps, synthesize your findings into the final JSON output.`;
+}
+
+/**
+ * 제약조건 섹션 생성
+ */
+export function buildConstraintsSection(
+  settings: OptimizationSettings,
+  config: PromptConfig
+): string {
+  return `## 🎯 CRITICAL CONSTRAINTS
+
+### Hard Constraints (MUST follow)
+1. **Product IDs**: ONLY use exact product IDs from the provided data
+2. **Furniture Movability**: ONLY suggest relocation for furniture with \`movable: true\`
+3. **Slot Compatibility**: Product \`display_type\` MUST match slot's \`compatible_display_types\`
+4. **Change Limits**: Max ${config.constraints.maxFurnitureChanges} furniture + ${config.constraints.maxProductChanges} product changes
+
+### Optimization Parameters
+- **Type**: ${settings.optimizationType}
+- **Goal**: ${settings.optimizationGoal}
+- **Intensity**: ${settings.intensity}
+- **Weights**: Revenue ${Math.round(settings.weights.revenue * 100)}% | Conversion ${Math.round(settings.weights.conversion * 100)}% | Traffic ${Math.round(settings.weights.traffic * 100)}% | Experience ${Math.round(settings.weights.experience * 100)}%`;
+}
+
+/**
+ * 환경 컨텍스트 섹션 생성
+ */
+export function buildEnvironmentSection(environment: EnvironmentDataBundle | null): string {
+  if (!environment) {
+    return `## 🌤️ ENVIRONMENT CONTEXT
+*No environment data available - apply standard optimization strategies*`;
+  }
+
+  const weather = environment.weather;
+  const impact = environment.impact;
+  const events = environment.events;
+
+  // 영향도 아이콘 결정
+  const getImpactIcon = (value: number) => {
+    if (value > 1.2) return '📈';
+    if (value < 0.8) return '📉';
+    return '➖';
+  };
+
+  return `## 🌤️ ENVIRONMENT CONTEXT
+
+### Current Conditions
+${weather ? `- Weather: **${weather.weatherCondition}** (${weather.temperature}°C, Humidity: ${weather.humidity}%)` : '- Weather: Unknown'}
+- Day: **${environment.temporal.dayOfWeek}** (${environment.temporal.isWeekend ? 'Weekend' : 'Weekday'})
+- Time: **${environment.temporal.timeOfDay}** (${environment.temporal.isBusinessHour ? 'Business Hours' : 'Off-peak'})
+
+### Impact Multipliers
+| Factor | Multiplier | Trend |
+|--------|-----------|-------|
+| Traffic | ${impact.combined.traffic.toFixed(2)}x | ${getImpactIcon(impact.combined.traffic)} |
+| Dwell Time | ${impact.combined.dwell.toFixed(2)}x | ${getImpactIcon(impact.combined.dwell)} |
+| Conversion | ${impact.combined.conversion.toFixed(2)}x | ${getImpactIcon(impact.combined.conversion)} |
+
+**Confidence**: ${Math.round(impact.confidence * 100)}%
+
+### Active Events
+${events.length > 0
+  ? events.map(e => `- **${e.eventName}** (${e.eventType}, Impact: ${e.impactLevel})`).join('\n')
+  : '- No special events'}
+
+### Environment-Based Recommendations
+${impact.weather.recommendations.length > 0
+  ? impact.weather.recommendations.map(r => `- ${r}`).join('\n')
+  : ''}
+${impact.event.recommendations.length > 0
+  ? impact.event.recommendations.map(r => `- ${r}`).join('\n')
+  : ''}
+${impact.weather.recommendations.length === 0 && impact.event.recommendations.length === 0
+  ? '- Standard optimization applies'
+  : ''}
+
+### Key Insight
+${impact.summary}`;
+}
+
+/**
+ * 동선 분석 섹션 생성
+ */
+export function buildFlowAnalysisSection(flowAnalysis: FlowAnalysisResult | null): string {
+  if (!flowAnalysis) {
+    return `## 🚶 CUSTOMER FLOW ANALYSIS
+*No flow data available - focus on general traffic patterns*`;
+  }
+
+  const summary = flowAnalysis.summary;
+  const healthIcon = summary.flowHealthScore >= 70 ? '✅' : summary.flowHealthScore >= 50 ? '⚡' : '⚠️';
+
+  // 주요 경로 포맷
+  const topPaths = flowAnalysis.keyPaths.slice(0, 5).map((p, i) =>
+    `${i + 1}. ${p.zoneNames.join(' → ')} (freq: ${p.frequency}, type: ${p.pathType})`
+  ).join('\n');
+
+  // 병목 포맷
+  const bottlenecks = flowAnalysis.bottlenecks.length > 0
+    ? flowAnalysis.bottlenecks.map(b =>
+        `- **${b.zoneName}** [${b.severity.toUpperCase()}]: Congestion ${(b.congestionScore * 100).toFixed(0)}%`
+      ).join('\n')
+    : '- No critical bottlenecks';
+
+  // 데드존 포맷
+  const deadZones = flowAnalysis.deadZones.length > 0
+    ? flowAnalysis.deadZones.map(d =>
+        `- **${d.zoneName}** [${d.severity.toUpperCase()}]: Visit rate ${(d.visitRate * 100).toFixed(1)}%`
+      ).join('\n')
+    : '- No critical dead zones';
+
+  return `## 🚶 CUSTOMER FLOW ANALYSIS
+
+### Flow Health Score: ${summary.flowHealthScore}/100 ${healthIcon}
+
+### Key Metrics
+- Total Zones: ${summary.totalZones}
+- Total Transitions: ${summary.totalTransitions.toLocaleString()}
+- Avg Path Length: ${summary.avgPathLength.toFixed(1)} zones
+- Avg Path Duration: ${Math.round(summary.avgPathDuration)}s
+- Overall Conversion: ${(summary.overallConversionRate * 100).toFixed(1)}%
+
+### Top Customer Paths
+${topPaths}
+
+### Bottleneck Zones (Action Required)
+${bottlenecks}
+
+### Dead Zones (Activation Opportunity)
+${deadZones}
+
+### Optimization Opportunities
+${flowAnalysis.opportunities.slice(0, 5).map(o =>
+  `- [${o.priority.toUpperCase()}/${o.type}] ${o.description}`
+).join('\n') || '- No specific opportunities identified'}
+
+### Flow-Based Guidelines
+${summary.flowHealthScore < 50
+  ? '⚠️ **LOW FLOW HEALTH**: Prioritize fixing bottlenecks and activating dead zones'
+  : summary.flowHealthScore < 70
+    ? '⚡ **MODERATE FLOW HEALTH**: Focus on opportunity zones and path optimization'
+    : '✅ **GOOD FLOW HEALTH**: Fine-tune for marginal improvements'}`;
+}
+
+/**
+ * 연관성 분석 섹션 생성
+ */
+export function buildAssociationSection(associations: ProductAssociationResult | null): string {
+  if (!associations) {
+    return `## 🔗 PRODUCT ASSOCIATION ANALYSIS
+*No association data available - apply standard merchandising rules*`;
+  }
+
+  const summary = associations.summary;
+
+  // 상위 규칙 포맷
+  const topRules = associations.associationRules.slice(0, 8).map(r =>
+    `- [${r.ruleStrength.toUpperCase()}] ${r.antecedentNames.join(', ')} → ${r.consequentNames.join(', ')} ` +
+    `(conf: ${(r.confidence * 100).toFixed(0)}%, lift: ${r.lift.toFixed(1)}x)`
+  ).join('\n');
+
+  // 카테고리 친화도 포맷
+  const categoryAffinities = associations.categoryAffinities.slice(0, 5).map(a =>
+    `- ${a.category1} + ${a.category2}: ${(a.affinityScore * 100).toFixed(0)}% → ${a.recommendedProximity}`
+  ).join('\n');
+
+  // 배치 추천 포맷
+  const recommendations = associations.placementRecommendations.slice(0, 5).map(r =>
+    `- [${r.type.toUpperCase()}] ${r.primaryProduct.name} | ${r.reason}`
+  ).join('\n');
+
+  return `## 🔗 PRODUCT ASSOCIATION ANALYSIS
+
+### Data Quality: ${summary.dataQuality.toUpperCase()}
+- Total Transactions: ${summary.totalTransactions.toLocaleString()}
+- Avg Basket Size: ${summary.avgBasketSize.toFixed(1)} items
+- Strong Rules: ${summary.strongRulesCount} (Very Strong: ${summary.veryStrongRulesCount})
+
+### Top Association Rules
+${topRules || '- No significant rules found'}
+
+### Category Affinities
+${categoryAffinities || '- Using default affinities'}
+
+### Placement Recommendations
+${recommendations || '- No specific recommendations'}
+
+### Association-Based Guidelines
+${summary.veryStrongRulesCount > 0
+  ? '🔥 **VERY STRONG ASSOCIATIONS FOUND**: Prioritize bundle displays for these products'
+  : ''}
+${summary.strongRulesCount > 3
+  ? '💡 **MULTIPLE STRONG ASSOCIATIONS**: Apply cross-sell placement actively'
+  : ''}
+${associations.placementRecommendations.length > 0
+  ? `📍 **${associations.placementRecommendations.length} placement recommendations** available`
+  : ''}`;
+}
+
+/**
+ * 레이아웃 데이터 섹션 생성
+ */
+export function buildLayoutDataSection(
+  layout: LayoutData,
+  config: PromptConfig
+): string {
+  const maxFurniture = config.tokenLimits.maxLayoutData;
+  const maxProducts = config.tokenLimits.maxLayoutData + 10;
+
+  // 존 테이블 포맷
+  const zonesTable = layout.zones.length > 0
+    ? `| Zone ID | Name | Type | Area |
+|---------|------|------|------|
+${layout.zones.slice(0, 10).map(z =>
+  `| ${z.id?.slice(0, 8) || 'N/A'} | ${z.zone_name || z.zoneName || 'N/A'} | ${z.zone_type || z.zoneType || 'N/A'} | ${z.area_sqm || 'N/A'}m² |`
+).join('\n')}`
+    : '*No zone data*';
+
+  // 가구 목록 포맷 (movable 강조)
+  const furnitureList = layout.furniture.slice(0, maxFurniture).map(f =>
+    `- ${f.furniture_name || f.id?.slice(0, 8)} [${f.furniture_type}] ` +
+    `${f.movable !== false ? '✅ movable' : '🔒 fixed'} @ Zone ${f.zone_id?.slice(0, 8) || 'N/A'}`
+  ).join('\n');
+
+  // 상품 목록 포맷 (현재 위치 포함)
+  const productsList = layout.products.slice(0, maxProducts).map(p =>
+    `- ${p.product_name || p.sku || p.id?.slice(0, 8)} | ` +
+    `Zone: ${p.zone_id?.slice(0, 8) || 'N/A'} | ` +
+    `Slot: ${p.slot_code || p.slot_id?.slice(0, 8) || 'N/A'} | ` +
+    `Display: ${p.display_type || 'N/A'}`
+  ).join('\n');
+
+  return `## 🏪 CURRENT LAYOUT DATA
+
+### Zones (${layout.zones.length} total)
+${zonesTable}
+
+### Furniture (${layout.furniture.length} total, showing ${Math.min(layout.furniture.length, maxFurniture)})
+${furnitureList || '*No furniture data*'}
+
+### Products with Placements (${layout.products.length} total, showing ${Math.min(layout.products.length, maxProducts)})
+${productsList || '*No product placement data*'}
+
+### Raw Data (for exact IDs)
+\`\`\`json
+{
+  "furniture_sample": ${JSON.stringify(layout.furniture.slice(0, 5), null, 2)},
+  "products_sample": ${JSON.stringify(layout.products.slice(0, 5), null, 2)}
+}
+\`\`\``;
+}
+
+/**
+ * 슬롯 데이터 섹션 생성
+ */
+export function buildSlotsSection(slots: any[], config: PromptConfig): string {
+  const maxSlots = config.tokenLimits.maxSlotData;
+
+  // 빈 슬롯 우선 필터링
+  const availableSlots = slots.filter(s => !s.is_occupied).slice(0, maxSlots);
+  const occupiedSlots = slots.filter(s => s.is_occupied).slice(0, 10);
+
+  const availableList = availableSlots.map(s =>
+    `- Slot ${s.slot_id || s.id?.slice(0, 8)} | ` +
+    `Furniture: ${s.furniture_code || s.furniture_id?.slice(0, 8) || 'N/A'} | ` +
+    `Zone: ${s.zone_id?.slice(0, 8) || 'N/A'} | ` +
+    `Types: ${(s.compatible_display_types || []).join(', ') || 'any'}`
+  ).join('\n');
+
+  return `## 📦 AVAILABLE SLOTS
+
+### Empty Slots (${availableSlots.length} available for placement)
+${availableList || '*No available slots*'}
+
+### Slot Data (for exact IDs)
+\`\`\`json
+${JSON.stringify(availableSlots.slice(0, 10), null, 2)}
+\`\`\``;
+}
+
+/**
+ * 성과 데이터 섹션 생성
+ */
+export function buildPerformanceSection(
+  performance: PerformanceData,
+  config: PromptConfig
+): string {
+  const maxProducts = config.tokenLimits.maxPerformanceData;
+
+  // 존 메트릭 요약
+  const zoneEntries = Object.entries(performance.zoneMetrics || {});
+  const zonesSummary = zoneEntries.slice(0, 10).map(([zoneId, metrics]: [string, any]) =>
+    `- Zone ${zoneId.slice(0, 8)}: Visitors ${metrics.visitors?.toLocaleString() || 'N/A'} | ` +
+    `Revenue ${metrics.revenue?.toLocaleString() || 'N/A'} | ` +
+    `Conv ${((metrics.conversions / (metrics.visitors || 1)) * 100).toFixed(1)}%`
+  ).join('\n');
+
+  // 상품 성과 요약
+  const topProducts = (performance.productPerformance || [])
+    .slice(0, maxProducts)
+    .map((p: any, i: number) =>
+      `${i + 1}. ${p.product_id?.slice(0, 8) || 'N/A'} | ` +
+      `Revenue: ${p.total_revenue?.toLocaleString() || 'N/A'} | ` +
+      `Units: ${p.units_sold || 'N/A'} | ` +
+      `Conv: ${((p.conversion_rate || 0) * 100).toFixed(1)}%`
+    ).join('\n');
+
+  return `## 📊 PERFORMANCE DATA
+
+### Zone Performance (${zoneEntries.length} zones)
+${zonesSummary || '*No zone metrics*'}
+
+### Top Performing Products
+${topProducts || '*No product performance data*'}`;
+}
+
+/**
+ * 출력 형식 섹션 생성
+ */
+export function buildOutputFormatSection(config: PromptConfig): string {
+  const thinkingBlock = config.chainOfThought.requireExplicitReasoning
+    ? `
+### Reasoning Block (Required)
+Before your JSON output, provide your reasoning in a <thinking> block:
+
+\`\`\`
+<thinking>
+Step 1 - Environment Assessment:
+[Your analysis of environment impact...]
+
+Step 2 - Flow Analysis:
+[Your analysis of customer flow patterns...]
+
+Step 3 - Product Performance Review:
+[Your analysis of product placements...]
+
+Step 4 - VMD Principles Application:
+[How you applied VMD rules...]
+
+Step 5 - Impact Estimation:
+[Your prioritization logic...]
+</thinking>
+\`\`\`
+`
+    : '';
+
+  return `## 📤 OUTPUT FORMAT
+
+${thinkingBlock}
+### JSON Output (Required)
+Respond with valid JSON in this exact structure:
+
+\`\`\`json
+{
+  "reasoning_summary": "Brief summary of key optimization decisions",
+  "furniture_changes": [
+    {
+      "furniture_id": "exact-uuid-from-data",
+      "furniture_type": "string",
+      "movable": true,
+      "current": {
+        "zone_id": "current-zone-uuid",
+        "position": { "x": 0, "y": 0, "z": 0 },
+        "rotation": { "x": 0, "y": 0, "z": 0 }
+      },
+      "suggested": {
+        "zone_id": "target-zone-uuid",
+        "position": { "x": 0, "y": 0, "z": 0 },
+        "rotation": { "x": 0, "y": 0, "z": 0 }
+      },
+      "reason": "Specific reason for this change",
+      "priority": "high|medium|low",
+      "expected_impact": 0.15,
+      "risk_level": "low|medium|high"
+    }
+  ],
+  "product_changes": [
+    {
+      "product_id": "exact-uuid-from-data",
+      "sku": "exact-sku",
+      "current": {
+        "zone_id": "current-zone-uuid",
+        "furniture_id": "current-furniture-uuid",
+        "slot_id": "current-slot-uuid",
+        "position": { "x": 0, "y": 0, "z": 0 }
+      },
+      "suggested": {
+        "zone_id": "target-zone-uuid",
+        "furniture_id": "target-furniture-uuid",
+        "slot_id": "target-slot-uuid",
+        "position": { "x": 0, "y": 0, "z": 0 }
+      },
+      "reason": "Specific reason referencing data",
+      "priority": "high|medium|low",
+      "expected_revenue_impact": 0.12,
+      "expected_visibility_impact": 0.20,
+      "association_based": false
+    }
+  ],
+  "summary": {
+    "total_furniture_changes": 3,
+    "total_product_changes": 8,
+    "expected_revenue_improvement": 0.18,
+    "expected_traffic_improvement": 0.10,
+    "expected_conversion_improvement": 0.12,
+    "confidence_score": 0.85,
+    "key_strategies": [
+      "Strategy 1 description",
+      "Strategy 2 description"
+    ],
+    "environmental_adaptations": [
+      "Adaptation for current conditions"
+    ],
+    "risk_factors": [
+      "Potential risk to monitor"
+    ]
+  }
+}
+\`\`\`
+
+### Validation Rules
+- All IDs must match exactly from provided data
+- furniture_changes: only include if movable: true
+- product_changes: slot must support product's display_type
+- Numbers should be realistic (improvements typically 5-25%)
+- Include reasoning for each change`;
+}
+
+// ============================================================================
+// Main Builder Function
+// ============================================================================
+
+/**
+ * 고급 최적화 프롬프트 생성 (메인 함수)
+ */
+export function buildAdvancedOptimizationPrompt(
+  context: PromptContext,
+  config: PromptConfig = DEFAULT_PROMPT_CONFIG
+): BuiltPrompt {
+  // 1. 시스템 프롬프트 생성
+  const systemPrompt = buildSystemPrompt(config);
+
+  // 2. 유저 프롬프트 섹션들 생성
+  const sections: string[] = [];
+
+  // 제약조건
+  sections.push(buildConstraintsSection(context.settings, config));
+
+  // 추론 프레임워크 (CoT 활성화 시)
+  if (config.chainOfThought.enabled) {
+    sections.push(buildReasoningFramework(config.chainOfThought.steps));
+  }
+
+  // 환경 컨텍스트
+  sections.push(buildEnvironmentSection(context.environment));
+
+  // 동선 분석
+  sections.push(buildFlowAnalysisSection(context.flowAnalysis));
+
+  // 연관성 분석
+  sections.push(buildAssociationSection(context.associations));
+
+  // 레이아웃 데이터
+  sections.push(buildLayoutDataSection(context.layout, config));
+
+  // 슬롯 데이터
+  sections.push(buildSlotsSection(context.slots, config));
+
+  // 성과 데이터
+  sections.push(buildPerformanceSection(context.performance, config));
+
+  // 출력 형식
+  sections.push(buildOutputFormatSection(config));
+
+  // 유저 프롬프트 조합
+  const userPrompt = sections.join('\n\n---\n\n');
+
+  // 3. 토큰 수 추정 (대략 4글자 = 1토큰 기준)
+  const totalChars = systemPrompt.length + userPrompt.length;
+  const totalTokenEstimate = Math.ceil(totalChars / 4);
+
+  return {
+    systemPrompt,
+    userPrompt,
+    expectedOutputFormat: 'json_object',
+    totalTokenEstimate,
+    metadata: {
+      strategy: config.strategy,
+      cotEnabled: config.chainOfThought.enabled,
+      fewShotEnabled: config.fewShot.enabled,
+      dataIncluded: {
+        environment: context.environment !== null,
+        flowAnalysis: context.flowAnalysis !== null,
+        associations: context.associations !== null,
+      },
+    },
+  };
+}
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+/**
+ * AI 응답에서 <thinking> 블록 추출
+ */
+export function extractThinkingBlock(response: string): {
+  thinking: string | null;
+  jsonContent: string;
+} {
+  const thinkingMatch = response.match(/<thinking>([\s\S]*?)<\/thinking>/);
+  const thinking = thinkingMatch ? thinkingMatch[1].trim() : null;
+
+  // <thinking> 블록 제거 후 JSON 추출
+  let jsonContent = response.replace(/<thinking>[\s\S]*?<\/thinking>/, '').trim();
+
+  // JSON 블록만 추출
+  const jsonMatch = jsonContent.match(/```json\s*([\s\S]*?)\s*```/);
+  if (jsonMatch) {
+    jsonContent = jsonMatch[1].trim();
+  } else {
+    // 직접 JSON 객체 찾기
+    const jsonObjectMatch = jsonContent.match(/\{[\s\S]*\}/);
+    if (jsonObjectMatch) {
+      jsonContent = jsonObjectMatch[0];
+    }
+  }
+
+  return { thinking, jsonContent };
+}
+
+/**
+ * 프롬프트 컨텍스트 생성 헬퍼
+ */
+export function createPromptContext(
+  layoutData: any,
+  performanceData: any,
+  slotsData: any[],
+  optimizationType: string,
+  parameters: any,
+  environmentData: EnvironmentDataBundle | null,
+  flowAnalysis: FlowAnalysisResult | null,
+  associationData: ProductAssociationResult | null
+): PromptContext {
+  return {
+    layout: {
+      zones: layoutData.zones || [],
+      furniture: layoutData.furniture || [],
+      products: layoutData.products || [],
+      productDetails: layoutData.productDetails || [],
+    },
+    performance: {
+      zoneMetrics: performanceData.zoneMetrics || {},
+      productPerformance: performanceData.productPerformance || [],
+    },
+    slots: slotsData || [],
+    environment: environmentData,
+    flowAnalysis: flowAnalysis,
+    associations: associationData,
+    settings: {
+      optimizationType: optimizationType as any,
+      optimizationGoal: parameters.goal || 'balanced',
+      intensity: parameters.intensity || 'medium',
+      maxChanges: parameters.max_changes || 30,
+      weights: {
+        revenue: parameters.prioritize_revenue ? 0.5 : 0.25,
+        conversion: 0.25,
+        traffic: 0.25,
+        experience: parameters.prioritize_accessibility ? 0.4 : 0.25,
+      },
+      parameters,
+    },
+  };
+}
+
+/**
+ * 프롬프트 설정 생성 헬퍼
+ */
+export function createPromptConfig(
+  options: Partial<PromptConfig> = {}
+): PromptConfig {
+  return {
+    ...DEFAULT_PROMPT_CONFIG,
+    ...options,
+    chainOfThought: {
+      ...DEFAULT_PROMPT_CONFIG.chainOfThought,
+      ...(options.chainOfThought || {}),
+    },
+    fewShot: {
+      ...DEFAULT_PROMPT_CONFIG.fewShot,
+      ...(options.fewShot || {}),
+    },
+    constraints: {
+      ...DEFAULT_PROMPT_CONFIG.constraints,
+      ...(options.constraints || {}),
+    },
+    tokenLimits: {
+      ...DEFAULT_PROMPT_CONFIG.tokenLimits,
+      ...(options.tokenLimits || {}),
+    },
+  };
+}
