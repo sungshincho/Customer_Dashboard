@@ -142,15 +142,22 @@ function transformWeatherResponse(response: OpenWeatherMapResponse): RealWeather
 /**
  * 실시간 날씨 데이터 조회
  * 📌 Edge Function (environment-proxy)을 통해 API 호출 (CORS/시크릿 처리)
+ * 📌 store_id가 제공되면 weather_data 테이블에 자동 저장
  */
 export async function fetchWeatherData(
   lat?: number,
-  lon?: number
+  lon?: number,
+  options?: {
+    store_id?: string;
+    user_id?: string;
+    org_id?: string;
+    save_to_db?: boolean;
+  }
 ): Promise<{ data: RealWeatherData | null; error: EnvironmentDataError | null }> {
   const config = getConfig();
 
-  // 캐시 확인
-  if (isCacheValid(cache.weather)) {
+  // 캐시 확인 (DB 저장 옵션이 없을 때만)
+  if (!options?.save_to_db && isCacheValid(cache.weather)) {
     return { data: cache.weather!.data, error: null };
   }
 
@@ -160,7 +167,16 @@ export async function fetchWeatherData(
   try {
     // Edge Function을 통해 날씨 API 호출 (API 키는 서버에서 처리)
     const { data, error } = await supabase.functions.invoke('environment-proxy', {
-      body: { type: 'weather', lat: latitude, lon: longitude },
+      body: {
+        type: 'weather',
+        lat: latitude,
+        lon: longitude,
+        // DB 저장용 파라미터 (선택적)
+        store_id: options?.store_id,
+        user_id: options?.user_id,
+        org_id: options?.org_id,
+        save_to_db: options?.save_to_db ?? (options?.store_id ? true : false),
+      },
     });
 
     if (error) {
@@ -184,6 +200,11 @@ export async function fetchWeatherData(
       timestamp: Date.now(),
       expiresAt: Date.now() + config.weatherCacheMinutes * 60 * 1000,
     };
+
+    // DB 저장 결과 로깅
+    if (data._db_save) {
+      console.log('[EnvironmentData] DB 저장 결과:', data._db_save);
+    }
 
     console.log('[EnvironmentData] 날씨 데이터 조회 성공:', weatherData.condition, weatherData.temperature + '°C');
     return { data: weatherData, error: null };
