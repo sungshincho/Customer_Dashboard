@@ -120,6 +120,8 @@ function calculateConfidence(dataPoints: number, dayIndex: number): number {
 }
 
 // 예측값 생성
+// 중요: 예측은 항상 실제 오늘 날짜(new Date()) 기준으로 생성
+// DB 데이터의 마지막 날짜가 아닌 현재 시점 기준
 function generatePredictions(
   data: RawDailyData[],
   dayPatterns: Record<number, number>,
@@ -128,7 +130,9 @@ function generatePredictions(
   if (data.length < 7) return [];
 
   const last7Days = data.slice(-7);
-  const lastDate = new Date(data[data.length - 1].date);
+  // 🔧 수정: 마지막 데이터 날짜 대신 실제 오늘 날짜 사용
+  // 예측은 항상 "오늘"을 기준으로 내일(+1)부터 시작해야 함
+  const today = new Date();
 
   // 기본 평균 계산
   const avgRevenue = last7Days.reduce((s, d) => s + d.revenue, 0) / 7;
@@ -143,7 +147,8 @@ function generatePredictions(
   const predictions: DailyPrediction[] = [];
 
   for (let i = 1; i <= 7; i++) {
-    const predictedDate = addDays(lastDate, i);
+    // 🔧 수정: 오늘 기준으로 예측 날짜 계산 (i=1이면 내일)
+    const predictedDate = addDays(today, i);
     const dayOfWeek = getDay(predictedDate);
     const confidence = calculateConfidence(data.length, i);
 
