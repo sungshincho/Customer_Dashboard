@@ -49,6 +49,12 @@ export function convertToBasicMaterial(
     // 베이스 컬러/텍스처 복사
     if (originalMaterial.map) {
       basicMaterial.map = originalMaterial.map;
+      // 텍스처 품질 설정
+      basicMaterial.map.anisotropy = 16;
+      basicMaterial.map.minFilter = THREE.LinearMipmapLinearFilter;
+      basicMaterial.map.magFilter = THREE.LinearFilter;
+      basicMaterial.map.generateMipmaps = true;
+      basicMaterial.map.needsUpdate = true;
     }
     basicMaterial.color.copy(originalMaterial.color);
 
