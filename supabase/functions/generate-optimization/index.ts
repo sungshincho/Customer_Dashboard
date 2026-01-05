@@ -689,6 +689,123 @@ async function loadSlotsData(supabase: any, storeId: string) {
 
 // ============== AI Optimization ==============
 
+/**
+ * 🔧 불완전 JSON 복구 함수
+ * 토큰 한도로 잘린 JSON을 복구 시도
+ */
+function repairIncompleteJSON(jsonStr: string): string | null {
+  if (!jsonStr || jsonStr.trim().length === 0) {
+    return null;
+  }
+
+  let repaired = jsonStr.trim();
+
+  // 1. 불완전한 문자열 닫기 (열린 따옴표 찾기)
+  const quoteCount = (repaired.match(/"/g) || []).length;
+  if (quoteCount % 2 !== 0) {
+    // 마지막 열린 따옴표 닫기
+    repaired += '"';
+  }
+
+  // 2. 열린 괄호 카운트
+  const openBraces = (repaired.match(/\{/g) || []).length;
+  const closeBraces = (repaired.match(/\}/g) || []).length;
+  const openBrackets = (repaired.match(/\[/g) || []).length;
+  const closeBrackets = (repaired.match(/\]/g) || []).length;
+
+  // 3. 불완전한 배열/객체 정리
+  // 마지막 불완전한 항목 제거 (trailing comma 또는 불완전한 키-값)
+  repaired = repaired.replace(/,\s*$/, ''); // trailing comma 제거
+  repaired = repaired.replace(/,\s*"[^"]*$/, ''); // 불완전한 키 제거
+  repaired = repaired.replace(/:\s*$/, ': null'); // 불완전한 값 null로 대체
+  repaired = repaired.replace(/:\s*"[^"]*$/, ': ""'); // 불완전한 문자열 값
+
+  // 4. 닫히지 않은 배열 닫기
+  for (let i = 0; i < openBrackets - closeBrackets; i++) {
+    repaired += ']';
+  }
+
+  // 5. 닫히지 않은 객체 닫기
+  for (let i = 0; i < openBraces - closeBraces; i++) {
+    repaired += '}';
+  }
+
+  return repaired;
+}
+
+/**
+ * 🔧 부분 데이터 추출 함수
+ * JSON 파싱 실패 시 가능한 데이터라도 추출
+ */
+function extractPartialData(jsonStr: string): any {
+  const result: any = {
+    furniture_changes: [],
+    product_changes: [],
+    summary: {
+      total_furniture_changes: 0,
+      total_product_changes: 0,
+      expected_revenue_improvement: 0,
+      expected_traffic_improvement: 0,
+      expected_conversion_improvement: 0,
+      partial_extraction: true, // 부분 추출 플래그
+    },
+  };
+
+  try {
+    // furniture_changes 배열 추출 시도
+    const furnitureMatch = jsonStr.match(/"furniture_changes"\s*:\s*\[([\s\S]*?)\]/);
+    if (furnitureMatch) {
+      try {
+        const furnitureStr = '[' + furnitureMatch[1] + ']';
+        const repaired = repairIncompleteJSON(furnitureStr);
+        if (repaired) {
+          result.furniture_changes = JSON.parse(repaired);
+        }
+      } catch (e) {
+        console.warn('[extractPartialData] furniture_changes extraction failed');
+      }
+    }
+
+    // product_changes 배열 추출 시도
+    const productMatch = jsonStr.match(/"product_changes"\s*:\s*\[([\s\S]*?)\]/);
+    if (productMatch) {
+      try {
+        const productStr = '[' + productMatch[1] + ']';
+        const repaired = repairIncompleteJSON(productStr);
+        if (repaired) {
+          result.product_changes = JSON.parse(repaired);
+        }
+      } catch (e) {
+        console.warn('[extractPartialData] product_changes extraction failed');
+      }
+    }
+
+    // summary 객체 추출 시도
+    const summaryMatch = jsonStr.match(/"summary"\s*:\s*\{([\s\S]*?)\}/);
+    if (summaryMatch) {
+      try {
+        const summaryStr = '{' + summaryMatch[1] + '}';
+        const repaired = repairIncompleteJSON(summaryStr);
+        if (repaired) {
+          const parsed = JSON.parse(repaired);
+          result.summary = { ...result.summary, ...parsed };
+        }
+      } catch (e) {
+        console.warn('[extractPartialData] summary extraction failed');
+      }
+    }
+
+    // 카운트 업데이트
+    result.summary.total_furniture_changes = result.furniture_changes.length;
+    result.summary.total_product_changes = result.product_changes.length;
+
+  } catch (e) {
+    console.error('[extractPartialData] Partial extraction failed:', e);
+  }
+
+  return result;
+}
+
 async function generateAIOptimization(
   apiKey: string,
   layoutData: any,
@@ -759,7 +876,7 @@ async function generateAIOptimization(
           { role: 'user', content: enhancedUserPrompt }  // 🆕 VMD 컨텍스트 포함
         ],
         response_format: { type: 'json_object' },
-        max_tokens: 6000, // 🆕 CoT 추론을 위해 토큰 증가
+        max_tokens: 16000, // 🔧 토큰 한도 증가 (6000 → 16000)
       }),
     });
 
@@ -779,14 +896,31 @@ async function generateAIOptimization(
       console.log(`[generateAIOptimization] Thinking preview: ${thinking.substring(0, 500)}...`);
     }
 
-    // JSON 파싱
+    // JSON 파싱 (불완전 JSON 복구 시도 포함)
     let result;
     try {
       result = JSON.parse(jsonContent);
     } catch (parseError) {
-      console.error('[generateAIOptimization] JSON parse error:', parseError);
-      console.error('[generateAIOptimization] Raw content:', rawContent.substring(0, 1000));
-      throw new Error('Failed to parse AI response as JSON');
+      console.warn('[generateAIOptimization] JSON parse error, attempting repair:', parseError);
+      console.warn('[generateAIOptimization] Raw content length:', rawContent.length);
+
+      // 🔧 불완전 JSON 복구 시도
+      const repairedJson = repairIncompleteJSON(jsonContent);
+      if (repairedJson) {
+        try {
+          result = JSON.parse(repairedJson);
+          console.log('[generateAIOptimization] JSON repair successful');
+        } catch (repairError) {
+          console.error('[generateAIOptimization] JSON repair failed:', repairError);
+          // 🔧 부분 데이터 추출 시도
+          result = extractPartialData(jsonContent);
+          console.log('[generateAIOptimization] Extracted partial data');
+        }
+      } else {
+        // 🔧 부분 데이터 추출 시도
+        result = extractPartialData(jsonContent);
+        console.log('[generateAIOptimization] Extracted partial data from incomplete response');
+      }
     }
 
     return {
