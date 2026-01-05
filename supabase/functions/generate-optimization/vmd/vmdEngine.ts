@@ -1558,7 +1558,7 @@ export function buildVMDContext(
   const performanceMap = new Map<string, ProductPerformance>();
   productPerformance.forEach(p => {
     const conversionRate = p.conversion_rate || 0;
-    const revenue = p.total_revenue || 0;
+    const revenue = p.revenue || p.total_revenue || 0;
     let performance: ProductPerformance = 'medium';
 
     if (conversionRate > 0.1 || revenue > 500000) performance = 'high';

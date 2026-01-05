@@ -615,7 +615,7 @@ export function buildPerformanceSection(
     .slice(0, maxProducts)
     .map((p: any, i: number) =>
       `${i + 1}. ${p.product_id?.slice(0, 8) || 'N/A'} | ` +
-      `Revenue: ${p.total_revenue?.toLocaleString() || 'N/A'} | ` +
+      `Revenue: ${p.revenue?.toLocaleString() || 'N/A'} | ` +
       `Units: ${p.units_sold || 'N/A'} | ` +
       `Conv: ${((p.conversion_rate || 0) * 100).toFixed(1)}%`
     ).join('\n');

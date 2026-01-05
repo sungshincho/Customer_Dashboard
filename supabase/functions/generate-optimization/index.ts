@@ -627,9 +627,9 @@ async function loadPerformanceData(supabase: any, storeId: string) {
   // 상품별 성과
   const { data: productPerformance } = await supabase
     .from('product_performance_agg')
-    .select('product_id, total_revenue, units_sold, view_count, conversion_rate')
+    .select('product_id, revenue, units_sold, conversion_rate')
     .eq('store_id', storeId)
-    .order('total_revenue', { ascending: false })
+    .order('revenue', { ascending: false })
     .limit(100);
 
   // 구역별 집계
