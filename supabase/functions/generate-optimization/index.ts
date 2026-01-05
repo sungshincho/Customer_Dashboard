@@ -28,6 +28,16 @@ import {
   type BuiltPrompt,
 } from './ai/promptBuilder.ts';
 
+// Phase 2.1: 매출 예측 모델
+import {
+  predictRevenue,
+  summarizePredictions,
+  createPredictionInput,
+  formatPredictionForResponse,
+  type RevenuePredictionOutput,
+  type PredictionSummary,
+} from './prediction/revenuePredictor.ts';
+
 /**
  * generate-optimization Edge Function
  *
@@ -206,6 +216,49 @@ Deno.serve(async (req) => {
     result.created_at = new Date().toISOString();
     result.optimization_type = optimization_type;
 
+    // 🆕 Phase 2.1: 매출 예측 적용
+    const predictions: RevenuePredictionOutput[] = [];
+    const environmentMultipliers = {
+      weather: environmentData?.impact.combined.traffic || 1.0,
+      event: environmentData?.impact.combined.conversion || 1.0,
+      temporal: environmentData?.impact.combined.dwell || 1.0,
+    };
+
+    // 상품 ID와 상세 정보 매핑
+    const productDetailsMap = new Map<string, any>();
+    (layoutData.productDetails || []).forEach((p: any) => {
+      productDetailsMap.set(p.id, p);
+    });
+
+    // 각 product_change에 대해 예측 수행
+    for (const change of result.product_changes) {
+      const productInfo = productDetailsMap.get(change.product_id) || {};
+      const predictionInput = createPredictionInput(
+        change,
+        productInfo,
+        performanceData.zoneMetrics,
+        environmentMultipliers
+      );
+
+      if (predictionInput) {
+        const prediction = predictRevenue(predictionInput);
+        predictions.push(prediction);
+
+        // 변경 사항에 예측 결과 추가
+        (change as any).prediction = formatPredictionForResponse(prediction);
+
+        // 예측 기반 priority 업데이트
+        if (prediction.recommendation.priority === 'critical' ||
+            prediction.recommendation.priority === 'high') {
+          change.priority = 'high';
+        }
+      }
+    }
+
+    // 예측 요약 생성
+    const predictionSummary = summarizePredictions(predictions);
+    console.log(`[generate-optimization] Predictions: ${predictions.length} items, expected revenue change: ${(predictionSummary.totalExpectedRevenueChange * 100).toFixed(1)}%`);
+
     // 6. 결과 저장
     const { data: savedResult, error: saveError } = await supabase
       .from('layout_optimization_results')
@@ -312,6 +365,17 @@ Deno.serve(async (req) => {
           product: r.primaryProduct.name,
           reason: r.reason,
         })),
+      },
+      // 🆕 매출 예측 요약 (Phase 2.1)
+      prediction_summary: {
+        total_expected_revenue_change: predictionSummary.totalExpectedRevenueChange,
+        total_daily_revenue_increase: predictionSummary.totalDailyRevenueIncrease,
+        high_confidence_changes: predictionSummary.highConfidenceChanges,
+        medium_confidence_changes: predictionSummary.mediumConfidenceChanges,
+        low_confidence_changes: predictionSummary.lowConfidenceChanges,
+        overall_confidence: predictionSummary.overallConfidence,
+        top_priority_changes: predictionSummary.topPriorityChanges,
+        predictions_applied: predictions.length,
       },
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
