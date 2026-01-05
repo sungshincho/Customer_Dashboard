@@ -739,49 +739,6 @@
     animation: shake 0.5s ease-in-out;
   }
 
-  /* Select Dropdown Scrollbar - Always Visible */
-  .select-dropdown-viewport {
-    scrollbar-width: thin !important;
-    scrollbar-color: rgba(100,100,100,0.6) rgba(100,100,100,0.2) !important;
-  }
-
-  .select-dropdown-viewport::-webkit-scrollbar {
-    width: 8px !important;
-    display: block !important;
-  }
-
-  .select-dropdown-viewport::-webkit-scrollbar-track {
-    background: rgba(100,100,100,0.2) !important;
-    border-radius: 4px !important;
-  }
-
-  .select-dropdown-viewport::-webkit-scrollbar-thumb {
-    background: rgba(100,100,100,0.6) !important;
-    border-radius: 4px !important;
-    min-height: 30px !important;
-  }
-
-  .select-dropdown-viewport::-webkit-scrollbar-thumb:hover {
-    background: rgba(100,100,100,0.8) !important;
-  }
-
-  /* Dark mode scrollbar */
-  .dark .select-dropdown-viewport {
-    scrollbar-color: rgba(180,180,180,0.6) rgba(180,180,180,0.2) !important;
-  }
-
-  .dark .select-dropdown-viewport::-webkit-scrollbar-track {
-    background: rgba(180,180,180,0.2) !important;
-  }
-
-  .dark .select-dropdown-viewport::-webkit-scrollbar-thumb {
-    background: rgba(180,180,180,0.6) !important;
-  }
-
-  .dark .select-dropdown-viewport::-webkit-scrollbar-thumb:hover {
-    background: rgba(180,180,180,0.8) !important;
-  }
-
   /* Noise Texture */
   .noise-texture {
     position: relative;
@@ -795,4 +752,70 @@
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
     pointer-events: none;
   }
+}
+
+/* ============================================
+   Select Dropdown Scrollbar - Always Visible
+   @layer 밖에 위치하여 높은 특이성 확보
+   ============================================ */
+
+/* 기본 스크롤바 설정 */
+.select-dropdown-viewport,
+[data-radix-select-viewport].select-dropdown-viewport {
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(100,100,100,0.6) rgba(100,100,100,0.2) !important;
+  scrollbar-gutter: stable !important;
+  overflow-y: scroll !important;
+}
+
+/* WebKit 기반 브라우저 (Chrome, Safari, Edge) */
+.select-dropdown-viewport::-webkit-scrollbar,
+[data-radix-select-viewport].select-dropdown-viewport::-webkit-scrollbar {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  width: 8px !important;
+  display: block !important;
+  background: transparent !important;
+}
+
+.select-dropdown-viewport::-webkit-scrollbar-track,
+[data-radix-select-viewport].select-dropdown-viewport::-webkit-scrollbar-track {
+  background: rgba(100,100,100,0.15) !important;
+  border-radius: 4px !important;
+  margin: 4px 0 !important;
+}
+
+.select-dropdown-viewport::-webkit-scrollbar-thumb,
+[data-radix-select-viewport].select-dropdown-viewport::-webkit-scrollbar-thumb {
+  background: rgba(100,100,100,0.5) !important;
+  border-radius: 4px !important;
+  min-height: 30px !important;
+  border: 1px solid rgba(100,100,100,0.2) !important;
+}
+
+.select-dropdown-viewport::-webkit-scrollbar-thumb:hover,
+[data-radix-select-viewport].select-dropdown-viewport::-webkit-scrollbar-thumb:hover {
+  background: rgba(100,100,100,0.7) !important;
+}
+
+/* Dark 모드 스크롤바 */
+.dark .select-dropdown-viewport,
+.dark [data-radix-select-viewport].select-dropdown-viewport {
+  scrollbar-color: rgba(180,180,180,0.6) rgba(60,60,60,0.3) !important;
+}
+
+.dark .select-dropdown-viewport::-webkit-scrollbar-track,
+.dark [data-radix-select-viewport].select-dropdown-viewport::-webkit-scrollbar-track {
+  background: rgba(60,60,60,0.4) !important;
+}
+
+.dark .select-dropdown-viewport::-webkit-scrollbar-thumb,
+.dark [data-radix-select-viewport].select-dropdown-viewport::-webkit-scrollbar-thumb {
+  background: rgba(180,180,180,0.5) !important;
+  border: 1px solid rgba(180,180,180,0.2) !important;
+}
+
+.dark .select-dropdown-viewport::-webkit-scrollbar-thumb:hover,
+.dark [data-radix-select-viewport].select-dropdown-viewport::-webkit-scrollbar-thumb:hover {
+  background: rgba(180,180,180,0.7) !important;
 }
