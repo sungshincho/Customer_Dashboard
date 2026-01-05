@@ -209,6 +209,29 @@ function GLTFModel({
 
   // 씬 클론 (여러 인스턴스 사용 가능)
   const clonedScene = useMemo(() => {
+    // 1️⃣ 원본 scene의 텍스처에 먼저 품질 설정 적용 (클론 전에!)
+    scene.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.material) {
+        const materials = Array.isArray(child.material)
+          ? child.material
+          : [child.material];
+
+        materials.forEach((mat) => {
+          if (mat && mat.map) {
+            // 색공간 먼저 설정
+            mat.map.colorSpace = THREE.SRGBColorSpace;
+            // 텍스처 품질 설정
+            mat.map.anisotropy = 16;
+            mat.map.minFilter = THREE.LinearMipmapLinearFilter;
+            mat.map.magFilter = THREE.LinearFilter;
+            mat.map.generateMipmaps = true;
+            mat.map.needsUpdate = true;
+          }
+        });
+      }
+    });
+
+    // 2️⃣ 이제 클론 (최적화된 텍스처가 복제됨)
     const cloned = scene.clone(true);
 
     // Baked 모델 처리
@@ -219,26 +242,11 @@ function GLTFModel({
       });
     }
 
-    // 그림자 설정 + 텍스처 품질 설정
+    // 그림자 설정
     cloned.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         child.castShadow = castShadow;
         child.receiveShadow = receiveShadow;
-
-        // GLB 내장 텍스처 품질 설정
-        const materials = Array.isArray(child.material)
-          ? child.material
-          : [child.material];
-
-        materials.forEach((mat) => {
-          if (mat && mat.map) {
-            mat.map.anisotropy = 16;
-            mat.map.minFilter = THREE.LinearMipmapLinearFilter;
-            mat.map.magFilter = THREE.LinearFilter;
-            mat.map.generateMipmaps = true;
-            mat.map.needsUpdate = true;
-          }
-        });
       }
     });
 
