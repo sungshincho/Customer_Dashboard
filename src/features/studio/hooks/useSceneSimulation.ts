@@ -31,6 +31,15 @@ import type {
   CongestionSimulationResultType,
   StaffingSimulationResultType,
   FurnitureAsset,
+  // 🆕 Ultimate 타입
+  UltimateOptimizationResponse,
+  FlowAnalysisSummary,
+  EnvironmentSummary,
+  AssociationSummary,
+  PredictionSummary,
+  ConversionPredictionSummary,
+  VMDAnalysis,
+  LearningSession,
 } from '../types';
 
 // ============================================================================
@@ -173,6 +182,17 @@ export interface SimulationResults {
   flow?: FlowSimulationResult;
   congestion?: CongestionSimulationResult;
   staffing?: StaffingSimulationResult;
+  // 🆕 Ultimate 분석 결과
+  ultimateAnalysis?: {
+    flowAnalysis?: FlowAnalysisSummary;
+    environment?: EnvironmentSummary;
+    association?: AssociationSummary;
+    prediction?: PredictionSummary;
+    conversionPrediction?: ConversionPredictionSummary;
+    vmd?: VMDAnalysis;
+    learningSession?: LearningSession | null;
+    overallConfidence?: number;
+  };
 }
 
 export interface SceneSimulationState {
@@ -483,7 +503,7 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
         // 🔍 DEBUG: 실제 Edge Function 호출 직전 로그
         console.log('[useSceneSimulation] 🚀 Starting Edge Function calls NOW...');
 
-        const [layoutRes, flowRes, staffingRes] = await Promise.allSettled([
+        const [layoutRes, flowRes, staffingRes, ultimateRes] = await Promise.allSettled([
           supabase.functions.invoke('advanced-ai-inference', {
             body: {
               type: 'layout_optimization',
@@ -508,12 +528,24 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
               params: { ...params?.staffing, sceneData },
             },
           }),
+          // 🆕 Ultimate AI 최적화 호출 (동선/환경/연관/VMD 분석 포함)
+          supabase.functions.invoke('generate-optimization', {
+            body: {
+              store_id: selectedStore.id,
+              optimization_type: 'both',
+              parameters: {
+                prioritize_revenue: params?.layout?.goal === 'revenue',
+                max_changes: 30,
+              },
+            },
+          }),
         ]);
 
         console.log('[useSceneSimulation] Edge Function responses:', {
           layout: layoutRes.status === 'fulfilled' ? { data: layoutRes.value.data, error: layoutRes.value.error } : { reason: layoutRes.reason },
           flow: flowRes.status === 'fulfilled' ? { data: flowRes.value.data, error: flowRes.value.error } : { reason: flowRes.reason },
           staffing: staffingRes.status === 'fulfilled' ? { data: staffingRes.value.data, error: staffingRes.value.error } : { reason: staffingRes.reason },
+          ultimate: ultimateRes.status === 'fulfilled' ? { success: ultimateRes.value.data?.success } : { reason: ultimateRes.reason },
         });
 
         const results: SimulationResults = {};
@@ -568,6 +600,31 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
           }
         } else {
           console.warn('[useSceneSimulation] No staffing result:', staffingRes);
+        }
+
+        // 🆕 Ultimate 분석 결과 처리
+        if (ultimateRes.status === 'fulfilled' && ultimateRes.value.data?.success) {
+          const ultimateData = ultimateRes.value.data as UltimateOptimizationResponse;
+          console.log('[useSceneSimulation] 🎯 Ultimate analysis received:', {
+            hasFlowAnalysis: !!ultimateData.flow_analysis_summary,
+            hasVMD: !!ultimateData.vmd_analysis,
+            hasEnvironment: !!ultimateData.environment_summary,
+            hasAssociation: !!ultimateData.association_summary,
+            hasPrediction: !!ultimateData.prediction_summary,
+          });
+
+          results.ultimateAnalysis = {
+            flowAnalysis: ultimateData.flow_analysis_summary,
+            environment: ultimateData.environment_summary,
+            association: ultimateData.association_summary,
+            prediction: ultimateData.prediction_summary,
+            conversionPrediction: ultimateData.conversion_prediction_summary,
+            vmd: ultimateData.vmd_analysis,
+            learningSession: ultimateData.learning_session,
+            overallConfidence: ultimateData.prediction_summary?.overall_confidence ?? 75,
+          };
+        } else {
+          console.warn('[useSceneSimulation] No Ultimate analysis result:', ultimateRes);
         }
 
         // 통합 To-be 씬 생성

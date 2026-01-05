@@ -341,3 +341,266 @@ export interface StaffingSimulationResultType {
   // 인사이트
   insights: string[];
 }
+
+// ============================================================================
+// 🆕 Ultimate AI 최적화 응답 타입 (generate-optimization)
+// ============================================================================
+
+/**
+ * 동선 분석 요약
+ */
+export interface FlowAnalysisSummary {
+  total_zones: number;
+  total_transitions: number;
+  avg_path_length: number;
+  avg_path_duration: number;
+  overall_conversion_rate: number;
+  bottleneck_count: number;
+  dead_zone_count: number;
+  opportunity_count: number;
+  flow_health_score: number;
+  key_paths: Array<{
+    path: string;
+    frequency: number;
+    type: string;
+  }>;
+  bottlenecks: Array<{
+    zone: string;
+    severity: string;
+    congestion: number;
+  }>;
+  dead_zones: Array<{
+    zone: string;
+    severity: string;
+    visit_rate: number;
+  }>;
+  opportunities: Array<{
+    type: string;
+    priority: string;
+    description: string;
+  }>;
+}
+
+/**
+ * 환경 분석 요약
+ */
+export interface EnvironmentSummary {
+  weather: {
+    condition: string;
+    temperature: number;
+    severity: string;
+  } | null;
+  events: Array<{
+    name: string;
+    type: string;
+    impact: string;
+  }>;
+  temporal: {
+    dayOfWeek: string;
+    isWeekend: boolean;
+    timeOfDay: string;
+  };
+  impact_multipliers: {
+    traffic: number;
+    dwell: number;
+    conversion: number;
+  };
+  data_quality: {
+    hasWeatherData: boolean;
+    hasEventData: boolean;
+    hasTemporalData: boolean;
+  };
+}
+
+/**
+ * 연관 분석 요약
+ */
+export interface AssociationSummary {
+  total_transactions: number;
+  avg_basket_size: number;
+  strong_rules_count: number;
+  very_strong_rules_count: number;
+  data_quality: string;
+  top_rules: Array<{
+    rule: string;
+    confidence: string;
+    lift: string;
+    strength: string;
+  }>;
+  category_affinities: Array<{
+    pair: string;
+    affinity: string;
+    proximity: string;
+  }>;
+  placement_recommendations: number;
+  recommendations: Array<{
+    type: string;
+    priority: string;
+    product: string;
+    reason: string;
+  }>;
+}
+
+/**
+ * 예측 요약
+ */
+export interface PredictionSummary {
+  total_expected_revenue_change: number;
+  total_daily_revenue_increase: number;
+  high_confidence_changes: number;
+  medium_confidence_changes: number;
+  low_confidence_changes: number;
+  overall_confidence: number;
+  top_priority_changes: number;
+  predictions_applied: number;
+}
+
+/**
+ * 전환율 예측 요약
+ */
+export interface ConversionPredictionSummary {
+  avg_conversion_change: number;
+  changes_above_benchmark: number;
+  changes_at_benchmark: number;
+  changes_below_benchmark: number;
+  high_confidence_count: number;
+  avg_confidence: number;
+  predictions_applied: number;
+}
+
+/**
+ * VMD 분석 결과
+ */
+export interface VMDAnalysis {
+  score: {
+    overall: number;
+    grade: 'A' | 'B' | 'C' | 'D' | 'F';
+    balance: number;
+    visibility: number;
+    flow_integration: number;
+    category_coherence: number;
+    promotion_placement: number;
+  };
+  violations: Array<{
+    type: string;
+    severity: 'high' | 'medium' | 'low';
+    description: string;
+    location?: string;
+    suggestion?: string;
+  }>;
+  recommendations: Array<{
+    type: string;
+    priority: 'high' | 'medium' | 'low';
+    description: string;
+    expected_impact: number;
+  }>;
+  zone_scores: Array<{
+    zone_id: string;
+    zone_name: string;
+    score: number;
+    grade: string;
+    issues: string[];
+  }>;
+}
+
+/**
+ * 자동 학습 세션
+ */
+export interface LearningSession {
+  session_id: string;
+  store_id: string;
+  started_at: string;
+  adjustments_applied: number;
+  improvement_metrics: {
+    improvement_percentage: number;
+    predictions_validated: number;
+    accuracy_change: number;
+  };
+  parameter_updates: Array<{
+    parameter: string;
+    old_value: number;
+    new_value: number;
+    change_reason: string;
+  }>;
+}
+
+/**
+ * Ultimate 최적화 응답 전체 타입
+ */
+export interface UltimateOptimizationResponse {
+  success: boolean;
+  result: {
+    optimization_id: string;
+    store_id: string;
+    created_at: string;
+    optimization_type: 'furniture' | 'product' | 'both';
+    furniture_changes: Array<{
+      furniture_id: string;
+      furniture_type: string;
+      movable: boolean;
+      current: {
+        zone_id: string;
+        position: { x: number; y: number; z: number };
+        rotation: { x: number; y: number; z: number };
+      };
+      suggested: {
+        zone_id: string;
+        position: { x: number; y: number; z: number };
+        rotation: { x: number; y: number; z: number };
+      };
+      reason: string;
+      priority: 'high' | 'medium' | 'low';
+      expected_impact: number;
+    }>;
+    product_changes: Array<{
+      product_id: string;
+      sku: string;
+      current: {
+        zone_id: string;
+        furniture_id: string;
+        slot_id: string;
+        position: { x: number; y: number; z: number };
+      };
+      suggested: {
+        zone_id: string;
+        furniture_id: string;
+        slot_id: string;
+        position: { x: number; y: number; z: number };
+      };
+      reason: string;
+      priority: 'high' | 'medium' | 'low';
+      expected_revenue_impact: number;
+      expected_visibility_impact: number;
+      prediction?: {
+        expected_revenue_change: number;
+        confidence: number;
+        factors: string[];
+      };
+      conversion_prediction?: {
+        expected_conversion_change: number;
+        confidence: number;
+        benchmark_comparison: string;
+      };
+    }>;
+    summary: {
+      total_furniture_changes: number;
+      total_product_changes: number;
+      expected_revenue_improvement: number;
+      expected_traffic_improvement: number;
+      expected_conversion_improvement: number;
+    };
+  };
+  data_summary: {
+    furniture_analyzed: number;
+    products_analyzed: number;
+    slots_analyzed: number;
+  };
+  // 🆕 Ultimate 분석 결과
+  environment_summary: EnvironmentSummary;
+  flow_analysis_summary: FlowAnalysisSummary;
+  association_summary: AssociationSummary;
+  prediction_summary: PredictionSummary;
+  conversion_prediction_summary: ConversionPredictionSummary;
+  vmd_analysis: VMDAnalysis;
+  learning_session: LearningSession | null;
+}
