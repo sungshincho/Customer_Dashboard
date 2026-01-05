@@ -211,6 +211,19 @@ function RendererSetup({ config = SCENE_CONFIG }: RendererSetupProps) {
     gl.outputColorSpace = THREE.SRGBColorSpace;
     gl.shadowMap.enabled = true;
     gl.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    // 🔍 디버그: WebGL 정보 출력
+    console.log('[RendererSetup] WebGL Info:', {
+      maxTextureSize: gl.capabilities.maxTextureSize,
+      maxAnisotropy: gl.capabilities.getMaxAnisotropy(),
+      precision: gl.capabilities.precision,
+      maxTextures: gl.capabilities.maxTextures,
+      pixelRatio: gl.getPixelRatio(),
+      drawingBufferSize: {
+        width: gl.domElement.width,
+        height: gl.domElement.height,
+      },
+    });
   }, [gl, config]);
 
   return null;

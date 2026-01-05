@@ -167,7 +167,14 @@ function GLTFModel({
           texture.magFilter = THREE.LinearFilter;
           texture.generateMipmaps = true;
           setDayTexture(texture);
-          console.log('[GLTFModel] Day texture loaded:', dayTextureUrl);
+          // 🔍 디버그: 텍스처 해상도 확인
+          console.log('[GLTFModel] Day texture loaded:', {
+            url: dayTextureUrl,
+            width: texture.image?.width,
+            height: texture.image?.height,
+            format: texture.format,
+            type: texture.type,
+          });
         },
         undefined,
         (err) => console.warn('[GLTFModel] Failed to load day texture:', err)
@@ -186,7 +193,14 @@ function GLTFModel({
           texture.magFilter = THREE.LinearFilter;
           texture.generateMipmaps = true;
           setNightTexture(texture);
-          console.log('[GLTFModel] Night texture loaded:', nightTextureUrl);
+          // 🔍 디버그: 텍스처 해상도 확인
+          console.log('[GLTFModel] Night texture loaded:', {
+            url: nightTextureUrl,
+            width: texture.image?.width,
+            height: texture.image?.height,
+            format: texture.format,
+            type: texture.type,
+          });
         },
         undefined,
         (err) => console.warn('[GLTFModel] Failed to load night texture:', err)
@@ -209,6 +223,9 @@ function GLTFModel({
 
   // 씬 클론 (여러 인스턴스 사용 가능)
   const clonedScene = useMemo(() => {
+    // 🔍 디버그: GLB 내장 텍스처 해상도 확인
+    const textureInfo: Array<{mesh: string, width: number, height: number, name: string}> = [];
+
     // 1️⃣ 원본 scene의 텍스처에 먼저 품질 설정 적용 (클론 전에!)
     scene.traverse((child) => {
       if (child instanceof THREE.Mesh && child.material) {
@@ -218,6 +235,14 @@ function GLTFModel({
 
         materials.forEach((mat) => {
           if (mat && mat.map) {
+            // 🔍 디버그: 텍스처 정보 수집
+            textureInfo.push({
+              mesh: child.name || 'unnamed',
+              width: mat.map.image?.width || 0,
+              height: mat.map.image?.height || 0,
+              name: mat.map.name || mat.name || 'unnamed',
+            });
+
             // 색공간 먼저 설정
             mat.map.colorSpace = THREE.SRGBColorSpace;
             // 텍스처 품질 설정
@@ -230,6 +255,14 @@ function GLTFModel({
         });
       }
     });
+
+    // 🔍 디버그: GLB 내장 텍스처 정보 출력
+    if (textureInfo.length > 0) {
+      console.log('[GLTFModel] GLB embedded textures:', {
+        modelUrl: url,
+        textures: textureInfo,
+      });
+    }
 
     // 2️⃣ 이제 클론 (최적화된 텍스처가 복제됨)
     const cloned = scene.clone(true);
