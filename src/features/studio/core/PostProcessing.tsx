@@ -50,9 +50,9 @@ export const POSTPROCESS_CONFIG = {
     darkness: 0.4,
   },
 
-  // Tone Mapping 설정 (mode는 컴포넌트에서 설정)
+  // Tone Mapping 설정 (gl 레벨에서 적용하므로 PostProcessing에서는 비활성화)
   toneMapping: {
-    enabled: true,
+    enabled: false,
   },
 
   // Brightness/Contrast 설정
@@ -102,7 +102,7 @@ export function PostProcessing({
   const ssaoQuality = quality ?? POSTPROCESS_CONFIG.ssao.quality;
 
   return (
-    <EffectComposer multisampling={4}>
+    <EffectComposer multisampling={8}>
       {/* Bloom */}
       {bloomEnabled && (
         <Bloom

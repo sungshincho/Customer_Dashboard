@@ -202,6 +202,9 @@ function RendererSetup({ config = SCENE_CONFIG }: RendererSetupProps) {
   const { gl } = useThree();
 
   useEffect(() => {
+    // ColorManagement 명시 설정 (색공간 일관성 보장)
+    THREE.ColorManagement.enabled = true;
+
     // THREE 상수는 여기서 직접 사용 (TDZ 방지)
     gl.toneMapping = THREE.ACESFilmicToneMapping;
     gl.toneMappingExposure = config.renderer.toneMappingExposure;
