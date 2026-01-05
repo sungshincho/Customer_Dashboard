@@ -740,45 +740,46 @@
   }
 
   /* Select Dropdown Scrollbar - Always Visible */
-  [data-radix-select-viewport] {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(128,128,128,0.5) rgba(128,128,128,0.15);
+  .select-dropdown-viewport {
+    scrollbar-width: thin !important;
+    scrollbar-color: rgba(100,100,100,0.6) rgba(100,100,100,0.2) !important;
   }
 
-  [data-radix-select-viewport]::-webkit-scrollbar {
-    width: 6px;
+  .select-dropdown-viewport::-webkit-scrollbar {
+    width: 8px !important;
     display: block !important;
   }
 
-  [data-radix-select-viewport]::-webkit-scrollbar-track {
-    background: rgba(128,128,128,0.15);
-    border-radius: 3px;
+  .select-dropdown-viewport::-webkit-scrollbar-track {
+    background: rgba(100,100,100,0.2) !important;
+    border-radius: 4px !important;
   }
 
-  [data-radix-select-viewport]::-webkit-scrollbar-thumb {
-    background: rgba(128,128,128,0.5);
-    border-radius: 3px;
+  .select-dropdown-viewport::-webkit-scrollbar-thumb {
+    background: rgba(100,100,100,0.6) !important;
+    border-radius: 4px !important;
+    min-height: 30px !important;
   }
 
-  [data-radix-select-viewport]::-webkit-scrollbar-thumb:hover {
-    background: rgba(128,128,128,0.7);
+  .select-dropdown-viewport::-webkit-scrollbar-thumb:hover {
+    background: rgba(100,100,100,0.8) !important;
   }
 
-  /* Dark mode scrollbar - brighter for visibility */
-  .dark [data-radix-select-viewport] {
-    scrollbar-color: rgba(200,200,200,0.5) rgba(200,200,200,0.15);
+  /* Dark mode scrollbar */
+  .dark .select-dropdown-viewport {
+    scrollbar-color: rgba(180,180,180,0.6) rgba(180,180,180,0.2) !important;
   }
 
-  .dark [data-radix-select-viewport]::-webkit-scrollbar-track {
-    background: rgba(200,200,200,0.15);
+  .dark .select-dropdown-viewport::-webkit-scrollbar-track {
+    background: rgba(180,180,180,0.2) !important;
   }
 
-  .dark [data-radix-select-viewport]::-webkit-scrollbar-thumb {
-    background: rgba(200,200,200,0.5);
+  .dark .select-dropdown-viewport::-webkit-scrollbar-thumb {
+    background: rgba(180,180,180,0.6) !important;
   }
 
-  .dark [data-radix-select-viewport]::-webkit-scrollbar-thumb:hover {
-    background: rgba(200,200,200,0.7);
+  .dark .select-dropdown-viewport::-webkit-scrollbar-thumb:hover {
+    background: rgba(180,180,180,0.8) !important;
   }
 
   /* Noise Texture */
