@@ -345,7 +345,12 @@ export function LayerPanel() {
             placeholder="이름 또는 SKU로 검색..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-8 pr-8 bg-white/10 border-0 text-sm h-8 text-white placeholder:text-white/70"
+            className="pl-8 pr-8 border-0 text-sm h-8 text-white placeholder:text-white/70"
+            style={{
+              background: 'linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.06), 0 2px 4px rgba(0,0,0,0.2)',
+            }}
           />
           {searchQuery && (
             <button

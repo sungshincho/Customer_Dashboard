@@ -95,11 +95,16 @@ export function SceneSavePanel({
           onChange={handleInputChange}
           placeholder="씬 이름을 입력하세요"
           className={cn(
-            "bg-white/10 border-0 text-white h-8 text-xs",
+            "border-0 text-white h-8 text-xs",
             showInputWarning
               ? "placeholder:text-orange-400 animate-shake"
               : "placeholder:text-white/70"
           )}
+          style={{
+            background: 'linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.06), 0 2px 4px rgba(0,0,0,0.2)',
+          }}
         />
         <Button
           className={cn(
