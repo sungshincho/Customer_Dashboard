@@ -1,5 +1,12 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.79.0';
 
+// Phase 0.1: 환경 데이터 로딩 시스템
+import {
+  loadEnvironmentDataBundle,
+  type EnvironmentDataBundle,
+  type EnvironmentImpact,
+} from './data/environmentLoader.ts';
+
 /**
  * generate-optimization Edge Function
  *
@@ -131,7 +138,11 @@ Deno.serve(async (req) => {
     // 3. 슬롯 데이터 로드
     const slotsData = await loadSlotsData(supabase, store_id);
 
-    // 4. 최적화 생성
+    // 4. 🆕 환경 데이터 로드 (Phase 0.1)
+    const environmentData = await loadEnvironmentDataBundle(supabase, store_id);
+    console.log(`[generate-optimization] Environment: weather=${environmentData.dataQuality.hasWeatherData}, events=${environmentData.events.length}`);
+
+    // 5. 최적화 생성
     let result: AILayoutOptimizationResult;
 
     if (lovableApiKey) {
@@ -141,7 +152,8 @@ Deno.serve(async (req) => {
         performanceData,
         slotsData,
         optimization_type,
-        parameters
+        parameters,
+        environmentData  // 🆕 환경 데이터 추가
       );
     } else {
       // AI 키 없을 경우 룰 기반 최적화
@@ -150,7 +162,8 @@ Deno.serve(async (req) => {
         performanceData,
         slotsData,
         optimization_type,
-        parameters
+        parameters,
+        environmentData  // 🆕 환경 데이터 추가
       );
     }
 
@@ -188,6 +201,26 @@ Deno.serve(async (req) => {
         furniture_analyzed: layoutData.furniture.length,
         products_analyzed: layoutData.products.length,
         slots_analyzed: slotsData.length,
+      },
+      // 🆕 환경 컨텍스트 요약
+      environment_summary: {
+        weather: environmentData.weather ? {
+          condition: environmentData.impact.weather.condition,
+          temperature: environmentData.weather.temperature,
+          severity: environmentData.impact.weather.severity,
+        } : null,
+        events: environmentData.events.map(e => ({
+          name: e.eventName,
+          type: e.eventType,
+          impact: e.impactLevel,
+        })),
+        temporal: {
+          dayOfWeek: environmentData.temporal.dayOfWeek,
+          isWeekend: environmentData.temporal.isWeekend,
+          timeOfDay: environmentData.temporal.timeOfDay,
+        },
+        impact_multipliers: environmentData.impact.combined,
+        data_quality: environmentData.dataQuality,
       },
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -380,9 +413,10 @@ async function generateAIOptimization(
   performanceData: any,
   slotsData: any[],
   optimizationType: string,
-  parameters: any
+  parameters: any,
+  environmentData?: EnvironmentDataBundle  // 🆕 환경 데이터
 ): Promise<AILayoutOptimizationResult> {
-  const prompt = buildOptimizationPrompt(layoutData, performanceData, slotsData, optimizationType, parameters);
+  const prompt = buildOptimizationPrompt(layoutData, performanceData, slotsData, optimizationType, parameters, environmentData);
 
   try {
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -423,7 +457,7 @@ async function generateAIOptimization(
     };
   } catch (e) {
     console.error('AI optimization failed, falling back to rule-based:', e);
-    return generateRuleBasedOptimization(layoutData, performanceData, slotsData, optimizationType, parameters);
+    return generateRuleBasedOptimization(layoutData, performanceData, slotsData, optimizationType, parameters, environmentData);
   }
 }
 
@@ -432,10 +466,45 @@ function buildOptimizationPrompt(
   performanceData: any,
   slotsData: any[],
   optimizationType: string,
-  parameters: any
+  parameters: any,
+  environmentData?: EnvironmentDataBundle  // 🆕 환경 데이터
 ): string {
+  // 🆕 환경 컨텍스트 섹션 생성
+  const environmentSection = environmentData ? `
+## 🌤️ Environment Context (IMPORTANT - Adjust recommendations accordingly)
+${environmentData.impact.summary}
+
+### Impact Multipliers
+- Traffic: ${environmentData.impact.combined.traffic}x (${environmentData.impact.combined.traffic > 1 ? '📈 above average' : environmentData.impact.combined.traffic < 0.8 ? '📉 significantly below average' : '➖ average'})
+- Dwell Time: ${environmentData.impact.combined.dwell}x (${environmentData.impact.combined.dwell > 1.1 ? '⏱️ customers staying longer' : '➖ normal'})
+- Conversion: ${environmentData.impact.combined.conversion}x
+- Confidence: ${Math.round(environmentData.impact.confidence * 100)}%
+
+### Active Events
+${environmentData.events.length > 0
+  ? environmentData.events.map(e => `- ${e.eventName} (${e.eventType}, impact: ${e.impactLevel})`).join('\n')
+  : '- No special events today'}
+
+### Weather-Based Recommendations
+${environmentData.impact.weather.recommendations.length > 0
+  ? environmentData.impact.weather.recommendations.map(r => `- ${r}`).join('\n')
+  : '- No weather-specific recommendations'}
+
+### Event-Based Recommendations
+${environmentData.impact.event.recommendations.length > 0
+  ? environmentData.impact.event.recommendations.map(r => `- ${r}`).join('\n')
+  : '- Standard optimization applies'}
+
+` : '';
+
   return `You are a retail store layout optimization expert.
 
+## CRITICAL CONSTRAINTS
+1. ONLY use exact product IDs and SKUs from the provided data
+2. ONLY suggest movable=true furniture for relocation
+3. ENSURE slot compatibility (display_type must match slot's compatible_display_types)
+4. Consider environment context when prioritizing changes
+${environmentSection}
 ## Current Layout
 Furniture: ${JSON.stringify(layoutData.furniture.slice(0, 20), null, 2)}
 Products: ${JSON.stringify(layoutData.products.slice(0, 30), null, 2)}
@@ -453,11 +522,16 @@ Type: ${optimizationType}
 ${JSON.stringify(parameters, null, 2)}
 
 ## Task
-Generate layout optimization recommendations. For each recommendation:
+Generate layout optimization recommendations considering the environment context:
 1. Identify underperforming products/furniture
 2. Find better positions based on performance data
 3. Ensure slot compatibility for products
 4. Only move furniture if marked as movable
+5. ${environmentData?.impact.combined.traffic && environmentData.impact.combined.traffic < 0.7
+  ? 'LOW TRAFFIC EXPECTED: Focus on high-impact changes, prioritize experience products'
+  : environmentData?.impact.combined.traffic && environmentData.impact.combined.traffic > 1.3
+    ? 'HIGH TRAFFIC EXPECTED: Optimize flow paths, ensure popular items are accessible'
+    : 'Apply standard optimization strategies'}
 
 ## Response Format (JSON)
 {
@@ -502,12 +576,23 @@ function generateRuleBasedOptimization(
   performanceData: any,
   slotsData: any[],
   optimizationType: string,
-  parameters: any
+  parameters: any,
+  environmentData?: EnvironmentDataBundle  // 🆕 환경 데이터
 ): AILayoutOptimizationResult {
   const furnitureChanges: FurnitureChange[] = [];
   const productChanges: ProductChange[] = [];
 
   const maxChanges = parameters.max_changes || 30;
+
+  // 🆕 환경 기반 최적화 조정
+  const envImpact = environmentData?.impact.combined;
+  const isLowTrafficExpected = envImpact && envImpact.traffic < 0.7;
+  const isHighTrafficExpected = envImpact && envImpact.traffic > 1.3;
+  const isHighDwellExpected = envImpact && envImpact.dwell > 1.15;
+
+  if (environmentData) {
+    console.log(`[RuleBasedOpt] Environment: traffic=${envImpact?.traffic}x, dwell=${envImpact?.dwell}x, conversion=${envImpact?.conversion}x`);
+  }
 
   // 상품 최적화
   if (optimizationType === 'product' || optimizationType === 'both') {
@@ -748,12 +833,27 @@ function generateRuleBasedOptimization(
   }
 
   // 요약 계산
+  const baseRevenueImprovement = productChanges.reduce((sum, p) => sum + p.expected_revenue_impact, 0) / Math.max(productChanges.length, 1);
+  const baseTrafficImprovement = furnitureChanges.reduce((sum, f) => sum + f.expected_impact, 0) / Math.max(furnitureChanges.length, 1);
+  const baseConversionImprovement = productChanges.length > 0 ? 0.05 + Math.random() * 0.03 : 0;
+
+  // 🆕 환경 영향도 반영
+  const trafficMultiplier = envImpact?.traffic || 1.0;
+  const conversionMultiplier = envImpact?.conversion || 1.0;
+
   const summary = {
     total_furniture_changes: furnitureChanges.length,
     total_product_changes: productChanges.length,
-    expected_revenue_improvement: productChanges.reduce((sum, p) => sum + p.expected_revenue_impact, 0) / Math.max(productChanges.length, 1),
-    expected_traffic_improvement: furnitureChanges.reduce((sum, f) => sum + f.expected_impact, 0) / Math.max(furnitureChanges.length, 1),
-    expected_conversion_improvement: productChanges.length > 0 ? 0.05 + Math.random() * 0.03 : 0,
+    expected_revenue_improvement: Math.round(baseRevenueImprovement * trafficMultiplier * conversionMultiplier * 100) / 100,
+    expected_traffic_improvement: Math.round(baseTrafficImprovement * trafficMultiplier * 100) / 100,
+    expected_conversion_improvement: Math.round(baseConversionImprovement * conversionMultiplier * 100) / 100,
+    // 🆕 환경 컨텍스트 정보 추가
+    environment_context: environmentData ? {
+      weather: environmentData.impact.weather.condition,
+      events: environmentData.events.map(e => e.eventName),
+      multipliers: envImpact,
+      confidence: environmentData.impact.confidence,
+    } : null,
   };
 
   return {
