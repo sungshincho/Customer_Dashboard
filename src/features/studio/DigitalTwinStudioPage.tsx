@@ -1104,14 +1104,16 @@ export default function DigitalTwinStudioPage() {
                 <Button variant="ghost" size="sm" onClick={() => setVisiblePanels(prev => ({
                 ...prev,
                 sceneSave: !prev.sceneSave
-              }))} className={`h-8 px-3 rounded-lg transition-all border border-transparent ${visiblePanels.sceneSave ? 'bg-green-500/30 border-green-500 text-green-400' : 'hover:bg-white/10 text-white/60'}`}>
+              }))} className={`h-8 px-3 rounded-lg transition-all border border-transparent ${visiblePanels.sceneSave ? 'bg-green-500/30 border-green-500' : 'hover:bg-white/10'}`}
+                  style={{ color: visiblePanels.sceneSave ? '#4ade80' : 'rgba(255,255,255,0.6)' }}>
                   <Save className="w-4 h-4 mr-1.5" />
                   <span className="text-xs">씬 저장</span>
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => setVisiblePanels(prev => ({
                 ...prev,
                 resultReport: !prev.resultReport
-              }))} className={`h-8 px-3 rounded-lg transition-all border border-transparent relative ${visiblePanels.resultReport ? 'bg-purple-500/30 border-purple-500 text-purple-400' : 'hover:bg-white/10 text-white/60'}`}>
+              }))} className={`h-8 px-3 rounded-lg transition-all border border-transparent relative ${visiblePanels.resultReport ? 'bg-purple-500/30 border-purple-500' : 'hover:bg-white/10'}`}
+                  style={{ color: visiblePanels.resultReport ? '#a78bfa' : 'rgba(255,255,255,0.6)' }}>
                   <Sparkles className="w-4 h-4 mr-1.5" />
                   <span className="text-xs">AI 리포트</span>
                   {(simulationResults.layout || simulationResults.flow || simulationResults.congestion || simulationResults.staffing) && <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full" />}
