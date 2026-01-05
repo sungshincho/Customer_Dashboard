@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { useAIPrediction, DailyPrediction } from '../hooks/useAIPrediction';
 import { formatCurrency } from '../components';
-import { format } from 'date-fns';
+import { format, isSameDay, addDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
 // ============================================================================
@@ -777,12 +777,20 @@ export function PredictionTab() {
               <tbody>
                 {dailyPredictions.map((pred, idx) => {
                   const conf = Math.round(pred.confidence * 100);
+                  const predDate = new Date(pred.date);
+                  // 🔧 수정: 실제 내일 날짜와 비교하여 "내일" 배지 표시
+                  const tomorrow = addDays(new Date(), 1);
+                  const isTomorrow = isSameDay(predDate, tomorrow);
+                  // 오늘인지도 확인
+                  const isToday = isSameDay(predDate, new Date());
+
                   return (
                     <tr key={pred.date} style={{ borderBottom: isDark ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(0,0,0,0.04)' }}>
                       <td style={{ padding: '12px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ color: isDark ? '#fff' : '#1a1a1f' }}>{format(new Date(pred.date), 'M월 d일 (EEE)', { locale: ko })}</span>
-                          {idx === 0 && <Badge3D dark={isDark}><span style={{ fontSize: '10px' }}>내일</span></Badge3D>}
+                          <span style={{ color: isDark ? '#fff' : '#1a1a1f' }}>{format(predDate, 'M월 d일 (EEE)', { locale: ko })}</span>
+                          {isToday && <Badge3D dark={isDark}><span style={{ fontSize: '10px' }}>오늘</span></Badge3D>}
+                          {isTomorrow && <Badge3D dark={isDark}><span style={{ fontSize: '10px' }}>내일</span></Badge3D>}
                         </div>
                       </td>
                       <td style={{ textAlign: 'right', padding: '12px 16px', fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>{formatCurrency(pred.predicted_revenue)}</td>
