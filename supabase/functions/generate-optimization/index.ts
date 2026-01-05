@@ -522,11 +522,16 @@ async function generateAIOptimization(
   );
 
   const promptConfig = createPromptConfig({
-    strategy: 'chain_of_thought',
+    strategy: 'hybrid',  // 🆕 Phase 1.2: CoT + Few-shot 하이브리드 전략
     chainOfThought: {
       enabled: true,
       steps: [], // 기본 5단계 사용
       requireExplicitReasoning: true,
+    },
+    fewShot: {
+      enabled: true,  // 🆕 Phase 1.2: Few-shot 활성화
+      exampleCount: 3,  // 3개 예시 포함
+      selectionStrategy: 'similar',  // 현재 상황과 유사한 예시 선택
     },
     constraints: {
       maxFurnitureChanges: parameters.max_changes ? Math.floor(parameters.max_changes / 3) : 10,
@@ -538,7 +543,8 @@ async function generateAIOptimization(
 
   const builtPrompt: BuiltPrompt = buildAdvancedOptimizationPrompt(promptContext, promptConfig);
 
-  console.log(`[generateAIOptimization] CoT Prompt built: tokens~${builtPrompt.totalTokenEstimate}, strategy=${builtPrompt.metadata.strategy}`);
+  console.log(`[generateAIOptimization] Prompt built: tokens~${builtPrompt.totalTokenEstimate}, strategy=${builtPrompt.metadata.strategy}`);
+  console.log(`[generateAIOptimization] CoT=${builtPrompt.metadata.cotEnabled}, FewShot=${builtPrompt.metadata.fewShotEnabled}(${builtPrompt.metadata.fewShotCount} examples, ${builtPrompt.metadata.fewShotStrategy})`);
   console.log(`[generateAIOptimization] Data included: env=${builtPrompt.metadata.dataIncluded.environment}, flow=${builtPrompt.metadata.dataIncluded.flowAnalysis}, assoc=${builtPrompt.metadata.dataIncluded.associations}`);
 
   try {
