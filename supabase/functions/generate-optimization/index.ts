@@ -38,6 +38,16 @@ import {
   type PredictionSummary,
 } from './prediction/revenuePredictor.ts';
 
+// Phase 2.2: 전환율 예측 모델
+import {
+  predictConversion,
+  summarizeConversionPredictions,
+  createConversionPredictionInput,
+  formatConversionPredictionForResponse,
+  type ConversionPredictionOutput,
+  type ConversionPredictionSummary,
+} from './prediction/conversionPredictor.ts';
+
 /**
  * generate-optimization Edge Function
  *
@@ -259,6 +269,41 @@ Deno.serve(async (req) => {
     const predictionSummary = summarizePredictions(predictions);
     console.log(`[generate-optimization] Predictions: ${predictions.length} items, expected revenue change: ${(predictionSummary.totalExpectedRevenueChange * 100).toFixed(1)}%`);
 
+    // 🆕 Phase 2.2: 전환율 예측 적용
+    const conversionPredictions: ConversionPredictionOutput[] = [];
+    const storeAvgConversion = 0.05; // 기본 매장 평균 전환율
+
+    for (const change of result.product_changes) {
+      const productInfo = productDetailsMap.get(change.product_id) || {};
+      const conversionInput = createConversionPredictionInput(
+        change,
+        productInfo,
+        performanceData.zoneMetrics,
+        flowAnalysis || null,
+        storeAvgConversion
+      );
+
+      if (conversionInput) {
+        const conversionPrediction = predictConversion(conversionInput);
+        conversionPredictions.push(conversionPrediction);
+
+        // 변경 사항에 전환율 예측 결과 추가
+        (change as any).conversion_prediction = formatConversionPredictionForResponse(conversionPrediction);
+
+        // 전환율이 벤치마크 대비 우수하면 priority 상향
+        if (conversionPrediction.benchmarkComparison.vsCategory === 'above' &&
+            conversionPrediction.confidence >= 0.7) {
+          if (change.priority === 'low') {
+            change.priority = 'medium';
+          }
+        }
+      }
+    }
+
+    // 전환율 예측 요약 생성
+    const conversionPredictionSummary = summarizeConversionPredictions(conversionPredictions);
+    console.log(`[generate-optimization] Conversion Predictions: ${conversionPredictions.length} items, avg change: ${(conversionPredictionSummary.avgConversionChange * 100).toFixed(1)}%`);
+
     // 6. 결과 저장
     const { data: savedResult, error: saveError } = await supabase
       .from('layout_optimization_results')
@@ -376,6 +421,16 @@ Deno.serve(async (req) => {
         overall_confidence: predictionSummary.overallConfidence,
         top_priority_changes: predictionSummary.topPriorityChanges,
         predictions_applied: predictions.length,
+      },
+      // 🆕 전환율 예측 요약 (Phase 2.2)
+      conversion_prediction_summary: {
+        avg_conversion_change: conversionPredictionSummary.avgConversionChange,
+        changes_above_benchmark: conversionPredictionSummary.changesAboveBenchmark,
+        changes_at_benchmark: conversionPredictionSummary.changesAtBenchmark,
+        changes_below_benchmark: conversionPredictionSummary.changesBelowBenchmark,
+        high_confidence_count: conversionPredictionSummary.highConfidenceCount,
+        avg_confidence: conversionPredictionSummary.avgConfidence,
+        predictions_applied: conversionPredictions.length,
       },
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
