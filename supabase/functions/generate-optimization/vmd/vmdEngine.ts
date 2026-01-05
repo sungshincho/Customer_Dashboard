@@ -907,7 +907,7 @@ export function createVMDRules(): VMDRule[] {
         if (!context.flowAnalysis?.bottlenecks) return violations;
 
         context.flowAnalysis.bottlenecks.forEach(bottleneck => {
-          if (bottleneck.severity === 'severe' || bottleneck.severity === 'high') {
+          if (bottleneck.severity === 'critical' || bottleneck.severity === 'high') {
             const zone = context.zones.find(z => z.id === bottleneck.zoneId);
             const zoneFurniture = context.furniture.filter(f => f.zoneId === bottleneck.zoneId);
 
@@ -916,7 +916,7 @@ export function createVMDRules(): VMDRule[] {
               ruleId: 'VMD_FLOW_002',
               ruleName: '주요 동선 장애물',
               category: 'visual_flow',
-              severity: bottleneck.severity === 'severe' ? 'critical' : 'major',
+              severity: bottleneck.severity === 'critical' ? 'critical' : 'major',
               location: {
                 zoneId: bottleneck.zoneId,
                 zoneCode: zone?.code,

@@ -400,9 +400,9 @@ export const SimulationEnvironmentSettings: React.FC<SimulationEnvironmentSettin
                   </div>}
 
                 {/* 오늘 이벤트 */}
-                {realTimeData.todayEvents && realTimeData.todayEvents.length > 0 && <div className="flex items-center gap-2">
+                {realTimeData.activeEvents && realTimeData.activeEvents.length > 0 && <div className="flex items-center gap-2">
                     <Gift className="w-3.5 h-3.5 text-muted-foreground" />
-                    <span>{realTimeData.todayEvents.map(e => e.name).join(', ')}</span>
+                    <span>{realTimeData.activeEvents.map(e => e.name).join(', ')}</span>
                   </div>}
 
                 {/* 휴일/주말 표시 */}
