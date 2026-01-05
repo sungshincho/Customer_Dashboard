@@ -130,3 +130,24 @@ export { useToast, toast } from './use-toast';
 // 시뮬레이션 훅
 // ============================================================================
 export { useSimulationEngine } from './useSimulationEngine';
+
+// ============================================================================
+// 리테일 AI 훅 (실제 AI - Gemini 2.5 Flash)
+// ============================================================================
+export {
+  useRetailAI,
+  useDemandForecast,
+  useRiskPrediction,
+  useOptimizationSuggestions,
+  useSeasonTrend,
+} from './useRetailAI';
+
+export type {
+  InferenceType,
+  RetailAIParams,
+  AIRecommendationItem,
+  AIInferenceResult as RetailAIInferenceResultType,
+  RetailAIResponse,
+  DemandForecastResult,
+  RiskPredictionResult,
+} from './useRetailAI';
