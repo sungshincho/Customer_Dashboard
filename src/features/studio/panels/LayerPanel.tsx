@@ -345,7 +345,7 @@ export function LayerPanel() {
             placeholder="이름 또는 SKU로 검색..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-8 pr-8 bg-white/5 border-white/10 text-sm h-8 text-white placeholder:text-white/30"
+            className="pl-8 pr-8 bg-white/10 border-0 text-sm h-8 text-white placeholder:text-white/70"
           />
           {searchQuery && (
             <button
