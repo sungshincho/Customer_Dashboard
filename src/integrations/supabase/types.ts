@@ -3246,6 +3246,53 @@ export type Database = {
           },
         ]
       }
+      learning_sessions: {
+        Row: {
+          adjustments_applied: number | null
+          adjustments_proposed: number | null
+          completed_at: string | null
+          error_message: string | null
+          id: string
+          improvement_metrics: Json | null
+          predictions_evaluated: number | null
+          started_at: string | null
+          status: string
+          store_id: string
+        }
+        Insert: {
+          adjustments_applied?: number | null
+          adjustments_proposed?: number | null
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          improvement_metrics?: Json | null
+          predictions_evaluated?: number | null
+          started_at?: string | null
+          status?: string
+          store_id: string
+        }
+        Update: {
+          adjustments_applied?: number | null
+          adjustments_proposed?: number | null
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          improvement_metrics?: Json | null
+          predictions_evaluated?: number | null
+          started_at?: string | null
+          status?: string
+          store_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "learning_sessions_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       license_billing_history: {
         Row: {
           amount: number
@@ -4334,6 +4381,44 @@ export type Database = {
           },
           {
             foreignKeyName: "pos_integrations_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prediction_records: {
+        Row: {
+          actual_value: number | null
+          context: Json | null
+          id: string
+          predicted_value: number
+          prediction_date: string
+          prediction_type: string
+          store_id: string
+        }
+        Insert: {
+          actual_value?: number | null
+          context?: Json | null
+          id?: string
+          predicted_value: number
+          prediction_date: string
+          prediction_type: string
+          store_id: string
+        }
+        Update: {
+          actual_value?: number | null
+          context?: Json | null
+          id?: string
+          predicted_value?: number
+          prediction_date?: string
+          prediction_type?: string
+          store_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prediction_records_store_id_fkey"
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
@@ -6319,6 +6404,50 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "store_visits_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stored_model_parameters: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          parameter_key: string
+          parameter_value: number
+          prediction_type: string
+          store_id: string
+          updated_at: string | null
+          version: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          parameter_key: string
+          parameter_value: number
+          prediction_type: string
+          store_id: string
+          updated_at?: string | null
+          version?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          parameter_key?: string
+          parameter_value?: number
+          prediction_type?: string
+          store_id?: string
+          updated_at?: string | null
+          version?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stored_model_parameters_store_id_fkey"
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
