@@ -236,8 +236,8 @@ export default function DigitalTwinStudioPage() {
   // 🆕 환경 효과 렌더링 설정 (날씨, 시간대 등)
   const [environmentRenderingConfig, setEnvironmentRenderingConfig] = useState<RenderingConfig | null>(null);
 
-  // 🆕 낮/밤 모드 상태
-  const [isDayMode, setIsDayMode] = useState<boolean>(true);
+  // 🆕 낮/밤 모드 상태 (현재 시간 기반으로 초기화)
+  const [isDayMode, setIsDayMode] = useState<boolean>(() => isCurrentTimeDayMode());
 
   // 🆕 시뮬레이션 환경 설정 원본 (AI 최적화에 전달용)
   const [simulationEnvConfig, setSimulationEnvConfig] = useState<SimulationEnvironmentConfig | null>(null);
