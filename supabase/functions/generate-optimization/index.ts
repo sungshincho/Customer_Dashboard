@@ -531,7 +531,7 @@ async function loadLayoutData(supabase: any, storeId: string, _userId: string | 
   // 2. 존 데이터 로드
   const { data: zonesData } = await supabase
     .from('zones_dim')
-    .select('id, zone_code, zone_name, zone_type, area_sqm')
+    .select('id, code, name, zone_type, area_sqm')
     .eq('store_id', storeId);
 
   // 3. 상품 데이터 로드
