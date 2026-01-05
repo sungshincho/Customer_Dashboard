@@ -2,15 +2,11 @@
  * PredictSection.tsx
  *
  * 1단계: 예측 섹션
- * - 수요 예측
- * - 방문자 예측
- * - 시즌 트렌드
- * - 리스크 예측
+ * 3D Glassmorphism + Monochrome
  */
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   TrendingUp,
   TrendingDown,
@@ -19,9 +15,90 @@ import {
   AlertTriangle,
   BarChart3,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import type { DemandForecast, SeasonTrend, RiskPrediction } from '../types/aiDecision.types';
 import { formatCurrency } from '../../../components';
+
+// ============================================================================
+// 3D 스타일 시스템
+// ============================================================================
+const getText3D = (isDark: boolean) => ({
+  heroNumber: isDark ? {
+    fontWeight: 800, letterSpacing: '-0.04em', color: '#ffffff',
+    textShadow: '0 2px 4px rgba(0,0,0,0.4)',
+  } as React.CSSProperties : {
+    fontWeight: 800, letterSpacing: '-0.04em',
+    background: 'linear-gradient(180deg, #1a1a1f 0%, #0a0a0c 35%, #1a1a1f 70%, #0c0c0e 100%)',
+    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+  } as React.CSSProperties,
+  number: isDark ? {
+    fontWeight: 800, letterSpacing: '-0.03em', color: '#ffffff',
+    textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+  } as React.CSSProperties : {
+    fontWeight: 800, letterSpacing: '-0.03em', color: '#0a0a0c',
+  } as React.CSSProperties,
+  body: isDark ? {
+    fontWeight: 500, color: 'rgba(255,255,255,0.6)',
+  } as React.CSSProperties : {
+    fontWeight: 500, color: '#515158',
+  } as React.CSSProperties,
+});
+
+const GlassCard = ({ children, dark = false }: { children: React.ReactNode; dark?: boolean }) => (
+  <div style={{ perspective: '1200px', height: '100%' }}>
+    <div style={{
+      borderRadius: '20px', padding: '1.5px',
+      background: dark
+        ? 'linear-gradient(145deg, rgba(75,75,85,0.9) 0%, rgba(50,50,60,0.8) 50%, rgba(65,65,75,0.9) 100%)'
+        : 'linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(220,220,230,0.6) 50%, rgba(255,255,255,0.93) 100%)',
+      boxShadow: dark
+        ? '0 2px 4px rgba(0,0,0,0.2), 0 8px 16px rgba(0,0,0,0.25)'
+        : '0 1px 1px rgba(0,0,0,0.02), 0 2px 2px rgba(0,0,0,0.02), 0 4px 4px rgba(0,0,0,0.02), 0 8px 8px rgba(0,0,0,0.02)',
+      height: '100%',
+    }}>
+      <div style={{
+        background: dark
+          ? 'linear-gradient(165deg, rgba(48,48,58,0.98) 0%, rgba(32,32,40,0.97) 30%, rgba(42,42,52,0.98) 60%, rgba(35,35,45,0.97) 100%)'
+          : 'linear-gradient(165deg, rgba(255,255,255,0.95) 0%, rgba(253,253,255,0.88) 25%, rgba(255,255,255,0.92) 50%, rgba(251,251,254,0.85) 75%, rgba(255,255,255,0.94) 100%)',
+        backdropFilter: 'blur(80px) saturate(200%)', borderRadius: '19px', height: '100%', position: 'relative', overflow: 'hidden',
+      }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '1px',
+          background: dark
+            ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.18) 20%, rgba(255,255,255,0.28) 50%, rgba(255,255,255,0.18) 80%, transparent 100%)'
+            : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.9) 10%, rgba(255,255,255,1) 50%, rgba(255,255,255,0.9) 90%, transparent 100%)',
+          pointerEvents: 'none',
+        }} />
+        <div style={{ position: 'relative', zIndex: 10, height: '100%' }}>{children}</div>
+      </div>
+    </div>
+  </div>
+);
+
+const Icon3D = ({ children, size = 32, dark = false }: { children: React.ReactNode; size?: number; dark?: boolean }) => (
+  <div style={{
+    width: size, height: size,
+    background: dark
+      ? 'linear-gradient(145deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.04) 50%, rgba(255,255,255,0.09) 100%)'
+      : 'linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(230,230,238,0.95) 40%, rgba(245,245,250,0.98) 100%)',
+    borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    border: dark ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(255,255,255,0.95)',
+    boxShadow: dark
+      ? 'inset 0 1px 2px rgba(255,255,255,0.12), 0 4px 12px rgba(0,0,0,0.3)'
+      : '0 2px 4px rgba(0,0,0,0.05), 0 4px 8px rgba(0,0,0,0.06), inset 0 2px 4px rgba(255,255,255,1)',
+  }}>
+    <span style={{ position: 'relative', zIndex: 10 }}>{children}</span>
+  </div>
+);
+
+const Badge3D = ({ children, dark = false }: { children: React.ReactNode; dark?: boolean }) => (
+  <div style={{
+    display: 'inline-flex', alignItems: 'center', padding: '4px 8px',
+    background: dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+    borderRadius: '6px', border: dark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.05)',
+    fontSize: '10px', fontWeight: 600,
+  }}>
+    {children}
+  </div>
+);
 
 interface PredictSectionProps {
   demandForecast: DemandForecast | null;
@@ -40,234 +117,223 @@ export function PredictSection({
   onViewDetails,
   isLoading,
 }: PredictSectionProps) {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsDark(document.documentElement.classList.contains('dark'));
+    check();
+    const obs = new MutationObserver(check);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => obs.disconnect();
+  }, []);
+
+  const text3D = getText3D(isDark);
+  const iconColor = isDark ? 'rgba(255,255,255,0.7)' : '#374151';
   const highRiskCount = riskPredictions.filter(r => r.severity === 'high').length;
 
+  const LoadingSkeleton = () => (
+    <div className="animate-pulse" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <div style={{ height: '32px', borderRadius: '6px', background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)', width: '75%' }} />
+      <div style={{ height: '16px', borderRadius: '4px', background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)', width: '50%' }} />
+    </div>
+  );
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 text-xs font-bold">
-          1
-        </div>
-        <h3 className="text-lg font-semibold">예측 (Predict)</h3>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {/* 섹션 헤더 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{
+          width: '24px', height: '24px', borderRadius: '50%',
+          background: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '11px', fontWeight: 700, color: isDark ? '#fff' : '#374151',
+        }}>1</div>
+        <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0, color: isDark ? '#fff' : '#1a1a1f' }}>예측 (Predict)</h3>
       </div>
 
+      {/* 4개 카드 그리드 */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* 수요 예측 카드 */}
-        <Card className="relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/10 rounded-bl-full" />
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-blue-500" />
-              수요 예측
-            </CardTitle>
-            <p className="text-xs text-muted-foreground">다음 7일 예상 매출</p>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="animate-pulse space-y-2">
-                <div className="h-8 bg-muted rounded w-3/4" />
-                <div className="h-4 bg-muted rounded w-1/2" />
-              </div>
-            ) : demandForecast ? (
-              <>
-                <div className="text-2xl font-bold">
+        {/* 수요 예측 */}
+        <GlassCard dark={isDark}>
+          <div style={{ padding: '16px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <Icon3D size={28} dark={isDark}>
+                <TrendingUp className="h-3.5 w-3.5" style={{ color: iconColor }} />
+              </Icon3D>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>수요 예측</span>
+            </div>
+            <p style={{ fontSize: '11px', marginBottom: '12px', ...text3D.body }}>다음 7일 예상 매출</p>
+            
+            {isLoading ? <LoadingSkeleton /> : demandForecast ? (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <p style={{ fontSize: '22px', margin: '0 0 4px 0', ...text3D.heroNumber }}>
                   {formatCurrency(demandForecast.predictedRevenue)}
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '12px' }}>
+                  {demandForecast.trend === 'up' ? <TrendingUp className="w-3 h-3" style={{ color: iconColor }} /> :
+                   demandForecast.trend === 'down' ? <TrendingDown className="w-3 h-3" style={{ color: iconColor }} /> : null}
+                  <span style={{ fontSize: '12px', fontWeight: 500, color: isDark ? 'rgba(255,255,255,0.7)' : '#515158' }}>
+                    전주 대비 {demandForecast.percentChange >= 0 ? '+' : ''}{demandForecast.percentChange.toFixed(1)}%
+                  </span>
                 </div>
-                <div className={cn(
-                  "flex items-center gap-1 text-sm",
-                  demandForecast.trend === 'up' ? 'text-green-500' :
-                  demandForecast.trend === 'down' ? 'text-red-500' : 'text-gray-500'
-                )}>
-                  {demandForecast.trend === 'up' ? (
-                    <TrendingUp className="w-3 h-3" />
-                  ) : demandForecast.trend === 'down' ? (
-                    <TrendingDown className="w-3 h-3" />
-                  ) : null}
-                  전주 대비 {demandForecast.percentChange >= 0 ? '+' : ''}
-                  {demandForecast.percentChange.toFixed(1)}%
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="mt-2 w-full text-xs"
+                <button
                   onClick={() => onViewDetails('demand')}
+                  style={{
+                    marginTop: 'auto', width: '100%', padding: '8px', borderRadius: '8px',
+                    background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+                    border: 'none', fontSize: '11px', fontWeight: 500,
+                    color: isDark ? 'rgba(255,255,255,0.7)' : '#515158',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                  }}
                 >
-                  <BarChart3 className="w-3 h-3 mr-1" />
-                  상세 분석
-                </Button>
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">데이터 없음</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* 방문자 예측 카드 */}
-        <Card className="relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-green-500/10 rounded-bl-full" />
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Users className="h-4 w-4 text-green-500" />
-              방문자 예측
-            </CardTitle>
-            <p className="text-xs text-muted-foreground">다음 7일 예상 방문</p>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="animate-pulse space-y-2">
-                <div className="h-8 bg-muted rounded w-3/4" />
-                <div className="h-4 bg-muted rounded w-1/2" />
+                  <BarChart3 className="w-3 h-3" /> 상세 분석
+                </button>
               </div>
-            ) : visitorForecast ? (
-              <>
-                <div className="text-2xl font-bold">
+            ) : (
+              <p style={{ fontSize: '13px', ...text3D.body }}>데이터 없음</p>
+            )}
+          </div>
+        </GlassCard>
+
+        {/* 방문자 예측 */}
+        <GlassCard dark={isDark}>
+          <div style={{ padding: '16px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <Icon3D size={28} dark={isDark}>
+                <Users className="h-3.5 w-3.5" style={{ color: iconColor }} />
+              </Icon3D>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>방문자 예측</span>
+            </div>
+            <p style={{ fontSize: '11px', marginBottom: '12px', ...text3D.body }}>다음 7일 예상 방문</p>
+            
+            {isLoading ? <LoadingSkeleton /> : visitorForecast ? (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <p style={{ fontSize: '22px', margin: '0 0 4px 0', ...text3D.heroNumber }}>
                   {visitorForecast.predictedVisitors.toLocaleString()}명
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '12px' }}>
+                  {visitorForecast.trend === 'up' ? <TrendingUp className="w-3 h-3" style={{ color: iconColor }} /> :
+                   visitorForecast.trend === 'down' ? <TrendingDown className="w-3 h-3" style={{ color: iconColor }} /> : null}
+                  <span style={{ fontSize: '12px', fontWeight: 500, color: isDark ? 'rgba(255,255,255,0.7)' : '#515158' }}>
+                    전주 대비 {visitorForecast.percentChange >= 0 ? '+' : ''}{visitorForecast.percentChange.toFixed(1)}%
+                  </span>
                 </div>
-                <div className={cn(
-                  "flex items-center gap-1 text-sm",
-                  visitorForecast.trend === 'up' ? 'text-green-500' :
-                  visitorForecast.trend === 'down' ? 'text-red-500' : 'text-gray-500'
-                )}>
-                  {visitorForecast.trend === 'up' ? (
-                    <TrendingUp className="w-3 h-3" />
-                  ) : visitorForecast.trend === 'down' ? (
-                    <TrendingDown className="w-3 h-3" />
-                  ) : null}
-                  전주 대비 {visitorForecast.percentChange >= 0 ? '+' : ''}
-                  {visitorForecast.percentChange.toFixed(1)}%
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="mt-2 w-full text-xs"
+                <button
                   onClick={() => onViewDetails('visitor')}
+                  style={{
+                    marginTop: 'auto', width: '100%', padding: '8px', borderRadius: '8px',
+                    background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+                    border: 'none', fontSize: '11px', fontWeight: 500,
+                    color: isDark ? 'rgba(255,255,255,0.7)' : '#515158',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                  }}
                 >
-                  <BarChart3 className="w-3 h-3 mr-1" />
-                  상세 분석
-                </Button>
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">데이터 없음</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* 시즌 트렌드 카드 */}
-        <Card className="relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-purple-500/10 rounded-bl-full" />
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-purple-500" />
-              시즌 트렌드
-            </CardTitle>
-            <p className="text-xs text-muted-foreground">계절성 분석</p>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="animate-pulse space-y-2">
-                <div className="h-8 bg-muted rounded w-3/4" />
-                <div className="h-4 bg-muted rounded w-1/2" />
+                  <BarChart3 className="w-3 h-3" /> 상세 분석
+                </button>
               </div>
-            ) : seasonTrend ? (
-              <>
-                <div className="text-xl font-bold">{seasonTrend.currentSeason}</div>
-                <p className="text-sm text-muted-foreground">
-                  예상 피크: {seasonTrend.peakPeriod.start} - {seasonTrend.peakPeriod.end}
-                </p>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="mt-2 w-full text-xs"
-                  onClick={() => onViewDetails('season')}
-                >
-                  <BarChart3 className="w-3 h-3 mr-1" />
-                  상세 분석
-                </Button>
-              </>
             ) : (
-              <>
-                <div className="text-xl font-bold">12월 성수기</div>
-                <p className="text-sm text-muted-foreground">예상 피크: 12/20-25</p>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="mt-2 w-full text-xs"
-                  onClick={() => onViewDetails('season')}
-                >
-                  <BarChart3 className="w-3 h-3 mr-1" />
-                  상세 분석
-                </Button>
-              </>
+              <p style={{ fontSize: '13px', ...text3D.body }}>데이터 없음</p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </GlassCard>
 
-        {/* 리스크 예측 카드 */}
-        <Card className={cn(
-          "relative overflow-hidden",
-          highRiskCount > 0 && "border-red-500/50"
-        )}>
-          <div className="absolute top-0 right-0 w-20 h-20 bg-red-500/10 rounded-bl-full" />
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <AlertTriangle className={cn(
-                "h-4 w-4",
-                highRiskCount > 0 ? "text-red-500" : "text-yellow-500"
-              )} />
-              리스크 예측
-            </CardTitle>
-            <p className="text-xs text-muted-foreground">위험 요소 모니터링</p>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="animate-pulse space-y-2">
-                <div className="h-8 bg-muted rounded w-3/4" />
-                <div className="h-4 bg-muted rounded w-1/2" />
-              </div>
-            ) : riskPredictions.length > 0 ? (
-              <>
-                <div className="space-y-1">
-                  {highRiskCount > 0 && (
-                    <div className="flex items-center gap-2">
-                      <Badge variant="destructive" className="text-xs">높음</Badge>
-                      <span className="text-sm">{highRiskCount}건</span>
-                    </div>
-                  )}
-                  <p className="text-sm text-muted-foreground">
-                    재고 부족 위험: {riskPredictions.filter(r => r.type === 'stockout').length}품목
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="mt-2 w-full text-xs"
-                  onClick={() => onViewDetails('risk')}
-                >
-                  <BarChart3 className="w-3 h-3 mr-1" />
-                  상세 분석
-                </Button>
-              </>
-            ) : (
-              <>
-                <div className="flex items-center gap-2">
-                  <Badge className="bg-green-500/20 text-green-500 text-xs">정상</Badge>
-                </div>
-                <p className="text-sm text-muted-foreground mt-1">
-                  현재 감지된 위험 없음
+        {/* 시즌 트렌드 */}
+        <GlassCard dark={isDark}>
+          <div style={{ padding: '16px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <Icon3D size={28} dark={isDark}>
+                <Calendar className="h-3.5 w-3.5" style={{ color: iconColor }} />
+              </Icon3D>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>시즌 트렌드</span>
+            </div>
+            <p style={{ fontSize: '11px', marginBottom: '12px', ...text3D.body }}>계절성 분석</p>
+            
+            {isLoading ? <LoadingSkeleton /> : (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <p style={{ fontSize: '18px', margin: '0 0 4px 0', ...text3D.number }}>
+                  {seasonTrend?.currentSeason || '12월 성수기'}
                 </p>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="mt-2 w-full text-xs"
-                  onClick={() => onViewDetails('risk')}
+                <p style={{ fontSize: '12px', marginBottom: '12px', ...text3D.body }}>
+                  예상 피크: {seasonTrend?.peakPeriod?.start || '12/20'} - {seasonTrend?.peakPeriod?.end || '12/25'}
+                </p>
+                <button
+                  onClick={() => onViewDetails('season')}
+                  style={{
+                    marginTop: 'auto', width: '100%', padding: '8px', borderRadius: '8px',
+                    background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+                    border: 'none', fontSize: '11px', fontWeight: 500,
+                    color: isDark ? 'rgba(255,255,255,0.7)' : '#515158',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                  }}
                 >
-                  <BarChart3 className="w-3 h-3 mr-1" />
-                  상세 분석
-                </Button>
-              </>
+                  <BarChart3 className="w-3 h-3" /> 상세 분석
+                </button>
+              </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </GlassCard>
+
+        {/* 리스크 예측 */}
+        <GlassCard dark={isDark}>
+          <div style={{ padding: '16px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <Icon3D size={28} dark={isDark}>
+                <AlertTriangle className="h-3.5 w-3.5" style={{ color: iconColor }} />
+              </Icon3D>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>리스크 예측</span>
+            </div>
+            <p style={{ fontSize: '11px', marginBottom: '12px', ...text3D.body }}>위험 요소 모니터링</p>
+            
+            {isLoading ? <LoadingSkeleton /> : riskPredictions.length > 0 ? (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                {highRiskCount > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <Badge3D dark={isDark}>
+                      <span style={{ color: isDark ? 'rgba(255,255,255,0.8)' : '#374151' }}>높음</span>
+                    </Badge3D>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>{highRiskCount}건</span>
+                  </div>
+                )}
+                <p style={{ fontSize: '12px', marginBottom: '12px', ...text3D.body }}>
+                  재고 부족 위험: {riskPredictions.filter(r => r.type === 'stockout').length}품목
+                </p>
+                <button
+                  onClick={() => onViewDetails('risk')}
+                  style={{
+                    marginTop: 'auto', width: '100%', padding: '8px', borderRadius: '8px',
+                    background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+                    border: 'none', fontSize: '11px', fontWeight: 500,
+                    color: isDark ? 'rgba(255,255,255,0.7)' : '#515158',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                  }}
+                >
+                  <BarChart3 className="w-3 h-3" /> 상세 분석
+                </button>
+              </div>
+            ) : (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <Badge3D dark={isDark}>
+                    <span style={{ color: isDark ? 'rgba(255,255,255,0.8)' : '#374151' }}>정상</span>
+                  </Badge3D>
+                </div>
+                <p style={{ fontSize: '12px', marginBottom: '12px', ...text3D.body }}>현재 감지된 위험 없음</p>
+                <button
+                  onClick={() => onViewDetails('risk')}
+                  style={{
+                    marginTop: 'auto', width: '100%', padding: '8px', borderRadius: '8px',
+                    background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+                    border: 'none', fontSize: '11px', fontWeight: 500,
+                    color: isDark ? 'rgba(255,255,255,0.7)' : '#515158',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                  }}
+                >
+                  <BarChart3 className="w-3 h-3" /> 상세 분석
+                </button>
+              </div>
+            )}
+          </div>
+        </GlassCard>
       </div>
     </div>
   );

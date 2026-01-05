@@ -3,14 +3,11 @@
  *
  * 인사이트 허브 - AI 추천 탭
  * AI 의사결정 허브 (예측 → 최적화 → 추천 → 실행 → 측정)
+ * 3D Glassmorphism + Monochrome Design
  */
 
-import { useState, useMemo } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
 import {
   Sparkles,
   CheckCircle,
@@ -28,15 +25,154 @@ import {
   FlaskConical,
   Plus,
   ArrowRight,
+  Minus,
 } from 'lucide-react';
-import { Progress } from '@/components/ui/progress';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { formatCurrency } from '../components';
 import { useAIRecommendations } from '@/hooks/useAIRecommendations';
-import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { ApplyStrategyModal } from '@/features/roi/components/ApplyStrategyModal';
 import type { SourceModule } from '@/features/roi/types/roi.types';
+
+// ============================================================================
+// 3D 스타일 시스템
+// ============================================================================
+const getText3D = (isDark: boolean) => ({
+  heroNumber: isDark ? {
+    fontWeight: 800, letterSpacing: '-0.04em', color: '#ffffff',
+    textShadow: '0 2px 4px rgba(0,0,0,0.4)',
+  } as React.CSSProperties : {
+    fontWeight: 800, letterSpacing: '-0.04em',
+    background: 'linear-gradient(180deg, #1a1a1f 0%, #0a0a0c 35%, #1a1a1f 70%, #0c0c0e 100%)',
+    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+  } as React.CSSProperties,
+  number: isDark ? {
+    fontWeight: 800, letterSpacing: '-0.03em', color: '#ffffff',
+    textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+  } as React.CSSProperties : {
+    fontWeight: 800, letterSpacing: '-0.03em', color: '#0a0a0c',
+  } as React.CSSProperties,
+  body: isDark ? {
+    fontWeight: 500, color: 'rgba(255,255,255,0.6)',
+  } as React.CSSProperties : {
+    fontWeight: 500, color: '#515158',
+  } as React.CSSProperties,
+});
+
+const GlassCard = ({ children, dark = false, className = '' }: { children: React.ReactNode; dark?: boolean; className?: string }) => (
+  <div style={{ perspective: '1200px', height: '100%' }} className={className}>
+    <div style={{
+      borderRadius: '20px', padding: '1.5px',
+      background: dark
+        ? 'linear-gradient(145deg, rgba(75,75,85,0.9) 0%, rgba(50,50,60,0.8) 50%, rgba(65,65,75,0.9) 100%)'
+        : 'linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(220,220,230,0.6) 50%, rgba(255,255,255,0.93) 100%)',
+      boxShadow: dark
+        ? '0 2px 4px rgba(0,0,0,0.2), 0 8px 16px rgba(0,0,0,0.25)'
+        : '0 1px 1px rgba(0,0,0,0.02), 0 2px 2px rgba(0,0,0,0.02), 0 4px 4px rgba(0,0,0,0.02), 0 8px 8px rgba(0,0,0,0.02)',
+      height: '100%',
+    }}>
+      <div style={{
+        background: dark
+          ? 'linear-gradient(165deg, rgba(48,48,58,0.98) 0%, rgba(32,32,40,0.97) 30%, rgba(42,42,52,0.98) 60%, rgba(35,35,45,0.97) 100%)'
+          : 'linear-gradient(165deg, rgba(255,255,255,0.95) 0%, rgba(253,253,255,0.88) 25%, rgba(255,255,255,0.92) 50%, rgba(251,251,254,0.85) 75%, rgba(255,255,255,0.94) 100%)',
+        backdropFilter: 'blur(80px) saturate(200%)', borderRadius: '19px', height: '100%', position: 'relative', overflow: 'hidden',
+      }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '1px',
+          background: dark
+            ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.18) 20%, rgba(255,255,255,0.28) 50%, rgba(255,255,255,0.18) 80%, transparent 100%)'
+            : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.9) 10%, rgba(255,255,255,1) 50%, rgba(255,255,255,0.9) 90%, transparent 100%)',
+          pointerEvents: 'none',
+        }} />
+        <div style={{ position: 'relative', zIndex: 10, height: '100%' }}>{children}</div>
+      </div>
+    </div>
+  </div>
+);
+
+const Icon3D = ({ children, size = 32, dark = false }: { children: React.ReactNode; size?: number; dark?: boolean }) => (
+  <div style={{
+    width: size, height: size,
+    background: dark
+      ? 'linear-gradient(145deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.04) 50%, rgba(255,255,255,0.09) 100%)'
+      : 'linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(230,230,238,0.95) 40%, rgba(245,245,250,0.98) 100%)',
+    borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    border: dark ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(255,255,255,0.95)',
+    boxShadow: dark
+      ? 'inset 0 1px 2px rgba(255,255,255,0.12), 0 4px 12px rgba(0,0,0,0.3)'
+      : '0 2px 4px rgba(0,0,0,0.05), 0 4px 8px rgba(0,0,0,0.06), inset 0 2px 4px rgba(255,255,255,1)',
+  }}>
+    <span style={{ position: 'relative', zIndex: 10 }}>{children}</span>
+  </div>
+);
+
+const Badge3D = ({ children, dark = false }: { children: React.ReactNode; dark?: boolean }) => (
+  <div style={{
+    display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px',
+    background: dark
+      ? 'linear-gradient(145deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 50%, rgba(255,255,255,0.08) 100%)'
+      : 'linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(240,240,245,0.95) 40%, rgba(250,250,252,0.98) 100%)',
+    borderRadius: '8px',
+    border: dark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.06)',
+    boxShadow: dark
+      ? 'inset 0 1px 1px rgba(255,255,255,0.08), 0 2px 6px rgba(0,0,0,0.2)'
+      : '0 2px 4px rgba(0,0,0,0.04), inset 0 1px 2px rgba(255,255,255,1)',
+    fontSize: '11px', fontWeight: 600,
+  }}>
+    {children}
+  </div>
+);
+
+// Canvas 프로그레스 바
+const GlowProgressBar = ({ progress, isDark }: { progress: number; isDark: boolean }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const width = canvas.offsetWidth;
+    const height = 6;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, width, height);
+
+    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+    ctx.beginPath();
+    ctx.roundRect(0, 0, width, height, 3);
+    ctx.fill();
+
+    const fillW = (progress / 100) * width;
+    if (fillW > 0) {
+      const grad = ctx.createLinearGradient(0, 0, fillW, 0);
+      if (isDark) {
+        grad.addColorStop(0, 'rgba(255,255,255,0.2)');
+        grad.addColorStop(1, 'rgba(255,255,255,0.6)');
+      } else {
+        grad.addColorStop(0, 'rgba(0,0,0,0.15)');
+        grad.addColorStop(1, 'rgba(0,0,0,0.45)');
+      }
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.roundRect(0, 0, fillW, height, 3);
+      ctx.fill();
+
+      const glow = ctx.createRadialGradient(fillW, height / 2, 0, fillW, height / 2, 4);
+      const gc = isDark ? '255,255,255' : '0,0,0';
+      glow.addColorStop(0, `rgba(${gc},0.3)`);
+      glow.addColorStop(1, `rgba(${gc},0)`);
+      ctx.beginPath();
+      ctx.arc(fillW, height / 2, 4, 0, Math.PI * 2);
+      ctx.fillStyle = glow;
+      ctx.fill();
+    }
+  }, [progress, isDark]);
+
+  return <canvas ref={canvasRef} style={{ width: '100%', height: 6, display: 'block' }} />;
+};
 
 // ============================================================================
 // 타입 정의
@@ -79,6 +215,19 @@ export function AIRecommendationTab() {
   const { selectedStore } = useSelectedStore();
   const { data: recommendations = [], isLoading } = useAIRecommendations(selectedStore?.id);
 
+  // 다크모드 감지
+  const [isDark, setIsDark] = useState(false);
+  useEffect(() => {
+    const check = () => setIsDark(document.documentElement.classList.contains('dark'));
+    check();
+    const obs = new MutationObserver(check);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => obs.disconnect();
+  }, []);
+
+  const text3D = getText3D(isDark);
+  const iconColor = isDark ? 'rgba(255,255,255,0.7)' : '#374151';
+
   // 적용 모달 상태
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [applyModalData, setApplyModalData] = useState<{
@@ -93,7 +242,7 @@ export function AIRecommendationTab() {
     baselineMetrics: Record<string, number>;
   } | null>(null);
 
-  // Mock 데이터 (실제 구현 시 API 연동)
+  // Mock 데이터
   const activeStrategies: ActiveStrategy[] = useMemo(() => [
     {
       id: '1',
@@ -155,7 +304,7 @@ export function AIRecommendationTab() {
       }));
   }, [recommendations]);
 
-  // 가격 최적화 적용
+  // 핸들러들
   const handleApplyPriceOptimization = () => {
     setApplyModalData({
       source: '2d_simulation',
@@ -173,7 +322,6 @@ export function AIRecommendationTab() {
     setShowApplyModal(true);
   };
 
-  // 재고 최적화 적용
   const handleApplyInventoryOptimization = () => {
     setApplyModalData({
       source: '2d_simulation',
@@ -191,7 +339,6 @@ export function AIRecommendationTab() {
     setShowApplyModal(true);
   };
 
-  // AI 추천 전략 실행
   const handleApplyStrategy = (strategy: typeof strategyRecommendations[0]) => {
     setApplyModalData({
       source: '2d_simulation',
@@ -209,19 +356,20 @@ export function AIRecommendationTab() {
     setShowApplyModal(true);
   };
 
+  // 로딩 스켈레톤
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         <div className="grid gap-4 sm:grid-cols-4">
           {[1, 2, 3, 4].map(i => (
-            <Card key={i}>
-              <CardContent className="p-6">
-                <div className="animate-pulse space-y-2">
-                  <div className="h-4 bg-muted rounded w-1/2" />
-                  <div className="h-8 bg-muted rounded w-3/4" />
+            <GlassCard key={i} dark={isDark}>
+              <div style={{ padding: '24px' }}>
+                <div className="animate-pulse" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ height: '16px', borderRadius: '4px', background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)', width: '50%' }} />
+                  <div style={{ height: '32px', borderRadius: '6px', background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)', width: '75%' }} />
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </GlassCard>
           ))}
         </div>
       </div>
@@ -229,375 +377,488 @@ export function AIRecommendationTab() {
   }
 
   return (
-    <div className="space-y-8">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
       {/* 헤더 */}
       <div>
-        <h2 className="text-xl font-semibold flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-yellow-500" />
+        <h2 style={{ fontSize: '20px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: isDark ? '#fff' : '#1a1a1f' }}>
+          <Sparkles className="h-5 w-5" style={{ color: iconColor }} />
           AI 의사결정 허브
         </h2>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p style={{ fontSize: '13px', marginTop: '4px', ...text3D.body }}>
           데이터 기반 예측 → 최적화 → 추천 → 실행 → 측정
         </p>
       </div>
 
       {/* 진행 중인 전략 */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-base font-medium flex items-center gap-2">
-            진행 중인 전략
-            <Badge variant="secondary">{activeStrategies.length}</Badge>
-          </CardTitle>
-          <Button size="sm" variant="outline" className="gap-1">
-            <Plus className="w-4 h-4" />
-            새 전략
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <GlassCard dark={isDark}>
+        <div style={{ padding: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <h3 style={{ fontSize: '15px', margin: 0, ...text3D.number }}>진행 중인 전략</h3>
+              <Badge3D dark={isDark}><span style={{ color: isDark ? '#fff' : '#374151' }}>{activeStrategies.length}</span></Badge3D>
+            </div>
+            <button style={{
+              display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px',
+              background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+              borderRadius: '8px', border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.06)',
+              fontSize: '12px', fontWeight: 500, color: isDark ? '#fff' : '#1a1a1f', cursor: 'pointer',
+            }}>
+              <Plus className="w-4 h-4" style={{ color: iconColor }} />
+              새 전략
+            </button>
+          </div>
+
           {activeStrategies.map((strategy) => (
-            <div
-              key={strategy.id}
-              className="p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
-                      실행 중
-                    </Badge>
-                    <span className="font-medium truncate">{strategy.name}</span>
+            <div key={strategy.id} style={{
+              padding: '14px', borderRadius: '14px',
+              background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
+              border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.05)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                    <Badge3D dark={isDark}>
+                      <span style={{ color: isDark ? 'rgba(255,255,255,0.8)' : '#374151' }}>실행 중</span>
+                    </Badge3D>
+                    <span style={{ fontWeight: 600, fontSize: '13px', color: isDark ? '#fff' : '#1a1a1f' }}>{strategy.name}</span>
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', ...text3D.body }}>
                     <span>D+{strategy.daysActive}</span>
                     <span>|</span>
-                    <span className="flex items-center gap-1">
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                       예상 ROI: {strategy.expectedROI}%
-                      <ArrowRight className="w-3 h-3" />
-                      <span className={cn(
-                        'font-medium',
-                        strategy.currentROI >= strategy.expectedROI ? 'text-green-500' : 'text-yellow-500'
-                      )}>
-                        현재: {strategy.currentROI}%
-                      </span>
-                      {strategy.trend === 'up' && <TrendingUp className="w-3 h-3 text-green-500" />}
-                      {strategy.trend === 'down' && <TrendingDown className="w-3 h-3 text-red-500" />}
+                      <ArrowRight className="w-3 h-3" style={{ color: iconColor }} />
+                      <span style={{ fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>현재: {strategy.currentROI}%</span>
+                      {strategy.trend === 'up' && <TrendingUp className="w-3 h-3" style={{ color: iconColor }} />}
+                      {strategy.trend === 'down' && <TrendingDown className="w-3 h-3" style={{ color: iconColor }} />}
+                      {strategy.trend === 'stable' && <Minus className="w-3 h-3" style={{ color: iconColor }} />}
                     </span>
                   </div>
                 </div>
-                <Button size="sm" variant="ghost" className="text-xs">
+                <button style={{
+                  padding: '6px 10px', borderRadius: '6px', border: 'none',
+                  background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+                  fontSize: '11px', fontWeight: 500, color: isDark ? 'rgba(255,255,255,0.7)' : '#515158', cursor: 'pointer',
+                }}>
                   상세보기
-                </Button>
+                </button>
               </div>
-              <Progress value={strategy.progress} className="h-1.5 mt-2" />
+              <div style={{ marginTop: '10px' }}>
+                <GlowProgressBar progress={strategy.progress} isDark={isDark} />
+              </div>
             </div>
           ))}
-        </CardContent>
-      </Card>
+        </div>
+      </GlassCard>
 
-      <Separator />
+      {/* 구분선 */}
+      <div style={{ height: '1px', background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }} />
 
       {/* 1단계: 예측 */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 text-xs font-bold">
-            1
-          </div>
-          <h3 className="text-lg font-semibold">예측 (Predict)</h3>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{
+            width: '24px', height: '24px', borderRadius: '50%',
+            background: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '11px', fontWeight: 700, color: isDark ? '#fff' : '#374151',
+          }}>1</div>
+          <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0, color: isDark ? '#fff' : '#1a1a1f' }}>예측 (Predict)</h3>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card className="relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/10 rounded-bl-full" />
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-blue-500" />
-                수요 예측
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">다음 7일 예상 매출</p>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
+          {/* 수요 예측 */}
+          <GlassCard dark={isDark}>
+            <div style={{ padding: '16px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <Icon3D size={28} dark={isDark}>
+                  <TrendingUp className="h-3.5 w-3.5" style={{ color: iconColor }} />
+                </Icon3D>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>수요 예측</span>
+              </div>
+              <p style={{ fontSize: '11px', marginBottom: '12px', ...text3D.body }}>다음 7일 예상 매출</p>
+              <p style={{ fontSize: '22px', margin: '0 0 4px 0', ...text3D.heroNumber }}>
                 {formatCurrency(demandForecast.predictedRevenue)}
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <TrendingUp className="w-3 h-3" style={{ color: iconColor }} />
+                <span style={{ fontSize: '12px', fontWeight: 500, color: isDark ? 'rgba(255,255,255,0.7)' : '#515158' }}>
+                  전주 대비 +{demandForecast.percentChange}%
+                </span>
               </div>
-              <div className="flex items-center gap-1 text-sm text-green-500">
-                <TrendingUp className="w-3 h-3" />
-                전주 대비 +{demandForecast.percentChange}%
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+          </GlassCard>
 
-          <Card className="relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-20 h-20 bg-green-500/10 rounded-bl-full" />
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Users className="h-4 w-4 text-green-500" />
-                방문자 예측
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">다음 7일 예상 방문</p>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
+          {/* 방문자 예측 */}
+          <GlassCard dark={isDark}>
+            <div style={{ padding: '16px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <Icon3D size={28} dark={isDark}>
+                  <Users className="h-3.5 w-3.5" style={{ color: iconColor }} />
+                </Icon3D>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>방문자 예측</span>
+              </div>
+              <p style={{ fontSize: '11px', marginBottom: '12px', ...text3D.body }}>다음 7일 예상 방문</p>
+              <p style={{ fontSize: '22px', margin: '0 0 4px 0', ...text3D.heroNumber }}>
                 {visitorForecast.predictedVisitors.toLocaleString()}명
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <TrendingUp className="w-3 h-3" style={{ color: iconColor }} />
+                <span style={{ fontSize: '12px', fontWeight: 500, color: isDark ? 'rgba(255,255,255,0.7)' : '#515158' }}>
+                  전주 대비 +{visitorForecast.percentChange}%
+                </span>
               </div>
-              <div className="flex items-center gap-1 text-sm text-green-500">
-                <TrendingUp className="w-3 h-3" />
-                전주 대비 +{visitorForecast.percentChange}%
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+          </GlassCard>
 
-          <Card className="relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-20 h-20 bg-purple-500/10 rounded-bl-full" />
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-purple-500" />
-                시즌 트렌드
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">계절성 분석</p>
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl font-bold">12월 성수기</div>
-              <p className="text-sm text-muted-foreground">예상 피크: 12/20-25</p>
-            </CardContent>
-          </Card>
-
-          <Card className="relative overflow-hidden border-red-500/50">
-            <div className="absolute top-0 right-0 w-20 h-20 bg-red-500/10 rounded-bl-full" />
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-red-500" />
-                리스크 예측
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">위험 요소</p>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <Badge variant="destructive" className="text-xs">높음</Badge>
-                <span className="text-sm">2건</span>
+          {/* 시즌 트렌드 */}
+          <GlassCard dark={isDark}>
+            <div style={{ padding: '16px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <Icon3D size={28} dark={isDark}>
+                  <Calendar className="h-3.5 w-3.5" style={{ color: iconColor }} />
+                </Icon3D>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>시즌 트렌드</span>
               </div>
-              <p className="text-sm text-muted-foreground">재고 부족 위험: 3품목</p>
-            </CardContent>
-          </Card>
+              <p style={{ fontSize: '11px', marginBottom: '12px', ...text3D.body }}>계절성 분석</p>
+              <p style={{ fontSize: '18px', margin: '0 0 4px 0', ...text3D.number }}>12월 성수기</p>
+              <p style={{ fontSize: '12px', ...text3D.body }}>예상 피크: 12/20-25</p>
+            </div>
+          </GlassCard>
+
+          {/* 리스크 예측 */}
+          <GlassCard dark={isDark}>
+            <div style={{ padding: '16px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <Icon3D size={28} dark={isDark}>
+                  <AlertTriangle className="h-3.5 w-3.5" style={{ color: iconColor }} />
+                </Icon3D>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>리스크 예측</span>
+              </div>
+              <p style={{ fontSize: '11px', marginBottom: '12px', ...text3D.body }}>위험 요소</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <Badge3D dark={isDark}>
+                  <span style={{ color: isDark ? 'rgba(255,255,255,0.8)' : '#374151' }}>높음</span>
+                </Badge3D>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>2건</span>
+              </div>
+              <p style={{ fontSize: '12px', ...text3D.body }}>재고 부족 위험: 3품목</p>
+            </div>
+          </GlassCard>
         </div>
       </div>
 
-      <Separator />
+      {/* 구분선 */}
+      <div style={{ height: '1px', background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }} />
 
       {/* 2단계: 최적화 */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center w-6 h-6 rounded-full bg-yellow-500/20 text-yellow-400 text-xs font-bold">
-            2
-          </div>
-          <h3 className="text-lg font-semibold">최적화 (Optimize)</h3>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{
+            width: '24px', height: '24px', borderRadius: '50%',
+            background: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '11px', fontWeight: 700, color: isDark ? '#fff' : '#374151',
+          }}>2</div>
+          <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0, color: isDark ? '#fff' : '#1a1a1f' }}>최적화 (Optimize)</h3>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <div className="p-1.5 rounded bg-yellow-500/20">
-                  <DollarSign className="h-4 w-4 text-yellow-500" />
+          {/* 가격 최적화 */}
+          <GlassCard dark={isDark}>
+            <div style={{ padding: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                <Icon3D size={32} dark={isDark}>
+                  <DollarSign className="h-4 w-4" style={{ color: iconColor }} />
+                </Icon3D>
+                <span style={{ fontSize: '14px', fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>가격 최적화</span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                <div style={{
+                  textAlign: 'center', padding: '12px', borderRadius: '12px',
+                  background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+                }}>
+                  <p style={{ fontSize: '11px', marginBottom: '4px', ...text3D.body }}>분석 대상</p>
+                  <p style={{ fontSize: '18px', margin: 0, ...text3D.number }}>{priceOptimization.totalProducts}개</p>
                 </div>
-                가격 최적화
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="text-center p-2 bg-muted/50 rounded">
-                  <p className="text-xs text-muted-foreground">분석 대상</p>
-                  <p className="text-lg font-bold">{priceOptimization.totalProducts}개</p>
-                </div>
-                <div className="text-center p-2 bg-muted/50 rounded">
-                  <p className="text-xs text-muted-foreground">최적화 가능</p>
-                  <p className="text-lg font-bold text-yellow-500">{priceOptimization.optimizableCount}개</p>
+                <div style={{
+                  textAlign: 'center', padding: '12px', borderRadius: '12px',
+                  background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+                }}>
+                  <p style={{ fontSize: '11px', marginBottom: '4px', ...text3D.body }}>최적화 가능</p>
+                  <p style={{ fontSize: '18px', margin: 0, ...text3D.number }}>{priceOptimization.optimizableCount}개</p>
                 </div>
               </div>
-              <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-green-500" />
-                  <span className="text-sm font-medium">잠재 수익 증가</span>
+
+              <div style={{
+                padding: '14px', borderRadius: '12px', marginBottom: '16px',
+                background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)',
+                border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.05)',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                  <TrendingUp className="w-4 h-4" style={{ color: iconColor }} />
+                  <span style={{ fontSize: '12px', fontWeight: 500, color: isDark ? 'rgba(255,255,255,0.8)' : '#374151' }}>잠재 수익 증가</span>
                 </div>
-                <p className="text-xl font-bold text-green-500 mt-1">
+                <p style={{ fontSize: '20px', margin: 0, ...text3D.heroNumber }}>
                   +{priceOptimization.potentialRevenueIncreasePercent}%
                 </p>
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="flex-1">상세 보기</Button>
-                <Button size="sm" className="flex-1 gap-1" onClick={handleApplyPriceOptimization}>
-                  <CheckCircle className="w-3 h-3" />
-                  적용
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <div className="p-1.5 rounded bg-green-500/20">
-                  <Package className="h-4 w-4 text-green-500" />
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button style={{
+                  flex: 1, padding: '10px', borderRadius: '10px',
+                  background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+                  border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.06)',
+                  fontSize: '12px', fontWeight: 500, color: isDark ? '#fff' : '#1a1a1f', cursor: 'pointer',
+                }}>
+                  상세 보기
+                </button>
+                <button
+                  onClick={handleApplyPriceOptimization}
+                  style={{
+                    flex: 1, padding: '10px', borderRadius: '10px',
+                    background: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)',
+                    border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+                    color: isDark ? '#fff' : '#1a1a1f',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                  }}
+                >
+                  <CheckCircle className="w-3 h-3" /> 적용
+                </button>
+              </div>
+            </div>
+          </GlassCard>
+
+          {/* 재고 최적화 */}
+          <GlassCard dark={isDark}>
+            <div style={{ padding: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                <Icon3D size={32} dark={isDark}>
+                  <Package className="h-4 w-4" style={{ color: iconColor }} />
+                </Icon3D>
+                <span style={{ fontSize: '14px', fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>재고 최적화</span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                <div style={{
+                  textAlign: 'center', padding: '12px', borderRadius: '12px',
+                  background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+                }}>
+                  <p style={{ fontSize: '11px', marginBottom: '4px', ...text3D.body }}>분석 대상</p>
+                  <p style={{ fontSize: '18px', margin: 0, ...text3D.number }}>{inventoryOptimization.totalItems}개</p>
                 </div>
-                재고 최적화
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="text-center p-2 bg-muted/50 rounded">
-                  <p className="text-xs text-muted-foreground">분석 대상</p>
-                  <p className="text-lg font-bold">{inventoryOptimization.totalItems}개</p>
-                </div>
-                <div className="text-center p-2 bg-muted/50 rounded">
-                  <p className="text-xs text-muted-foreground">발주 추천</p>
-                  <p className="text-lg font-bold text-green-500">{inventoryOptimization.orderRecommendations}건</p>
+                <div style={{
+                  textAlign: 'center', padding: '12px', borderRadius: '12px',
+                  background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+                }}>
+                  <p style={{ fontSize: '11px', marginBottom: '4px', ...text3D.body }}>발주 추천</p>
+                  <p style={{ fontSize: '18px', margin: 0, ...text3D.number }}>{inventoryOptimization.orderRecommendations}건</p>
                 </div>
               </div>
-              <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-center">
-                <p className="text-xs text-muted-foreground">품절 방지</p>
-                <p className="text-xl font-bold text-red-500">{inventoryOptimization.stockoutPrevention}건</p>
+
+              <div style={{
+                textAlign: 'center', padding: '14px', borderRadius: '12px', marginBottom: '16px',
+                background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)',
+                border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.05)',
+              }}>
+                <p style={{ fontSize: '11px', marginBottom: '4px', ...text3D.body }}>품절 방지</p>
+                <p style={{ fontSize: '20px', margin: 0, ...text3D.heroNumber }}>{inventoryOptimization.stockoutPrevention}건</p>
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="flex-1">상세 보기</Button>
-                <Button size="sm" className="flex-1 gap-1" onClick={handleApplyInventoryOptimization}>
-                  <CheckCircle className="w-3 h-3" />
-                  적용
-                </Button>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button style={{
+                  flex: 1, padding: '10px', borderRadius: '10px',
+                  background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+                  border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.06)',
+                  fontSize: '12px', fontWeight: 500, color: isDark ? '#fff' : '#1a1a1f', cursor: 'pointer',
+                }}>
+                  상세 보기
+                </button>
+                <button
+                  onClick={handleApplyInventoryOptimization}
+                  style={{
+                    flex: 1, padding: '10px', borderRadius: '10px',
+                    background: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)',
+                    border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+                    color: isDark ? '#fff' : '#1a1a1f',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                  }}
+                >
+                  <CheckCircle className="w-3 h-3" /> 적용
+                </button>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </GlassCard>
         </div>
       </div>
 
-      <Separator />
+      {/* 구분선 */}
+      <div style={{ height: '1px', background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }} />
 
       {/* 3단계: 추천 */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center w-6 h-6 rounded-full bg-purple-500/20 text-purple-400 text-xs font-bold">
-            3
-          </div>
-          <h3 className="text-lg font-semibold">추천 전략 (Recommend)</h3>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{
+            width: '24px', height: '24px', borderRadius: '50%',
+            background: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '11px', fontWeight: 700, color: isDark ? '#fff' : '#374151',
+          }}>3</div>
+          <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0, color: isDark ? '#fff' : '#1a1a1f' }}>추천 전략 (Recommend)</h3>
         </div>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-yellow-500" />
-                  이번 주 AI 추천 전략
-                </CardTitle>
-                <CardDescription className="mt-1">
-                  데이터 분석 기반 최적 전략 추천
-                </CardDescription>
+        <GlassCard dark={isDark}>
+          <div style={{ padding: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <Icon3D size={36} dark={isDark}>
+                  <Sparkles className="h-4 w-4" style={{ color: iconColor }} />
+                </Icon3D>
+                <div>
+                  <h4 style={{ fontSize: '15px', fontWeight: 600, margin: 0, color: isDark ? '#fff' : '#1a1a1f' }}>이번 주 AI 추천 전략</h4>
+                  <p style={{ fontSize: '12px', margin: '2px 0 0 0', ...text3D.body }}>데이터 분석 기반 최적 전략 추천</p>
+                </div>
               </div>
-              <Badge variant="outline">신뢰도 기준</Badge>
+              <Badge3D dark={isDark}>
+                <span style={{ color: isDark ? 'rgba(255,255,255,0.8)' : '#374151' }}>신뢰도 기준</span>
+              </Badge3D>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
+
             {strategyRecommendations.length > 0 ? (
-              strategyRecommendations.map((strategy) => (
-                <div
-                  key={strategy.id}
-                  className={cn(
-                    'p-4 rounded-lg border border-l-4 transition-all hover:shadow-md',
-                    strategy.rank === 1
-                      ? 'border-l-yellow-500 bg-yellow-50/50 dark:bg-yellow-950/20'
-                      : strategy.rank === 2
-                      ? 'border-l-gray-400 bg-gray-50/50 dark:bg-gray-950/20'
-                      : 'border-l-orange-600 bg-orange-50/50 dark:bg-orange-950/20'
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div className="flex items-start gap-3">
-                      <Badge className={cn(
-                        'text-xs font-bold',
-                        strategy.rank === 1 ? 'bg-yellow-500/20 text-yellow-500' :
-                        strategy.rank === 2 ? 'bg-gray-400/20 text-gray-400' :
-                        'bg-orange-600/20 text-orange-600'
-                      )}>
-                        {strategy.rank}위
-                      </Badge>
-                      <div>
-                        <h4 className="font-semibold">{strategy.title}</h4>
-                        <p className="text-sm text-muted-foreground mt-0.5">{strategy.description}</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {strategyRecommendations.map((strategy) => (
+                  <div key={strategy.id} style={{
+                    padding: '16px', borderRadius: '16px',
+                    borderLeft: isDark ? '4px solid rgba(255,255,255,0.3)' : '4px solid rgba(0,0,0,0.15)',
+                    background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                        <Badge3D dark={isDark}>
+                          <span style={{ color: isDark ? 'rgba(255,255,255,0.9)' : '#374151', fontWeight: 700 }}>{strategy.rank}위</span>
+                        </Badge3D>
+                        <div>
+                          <h4 style={{ fontSize: '14px', fontWeight: 600, margin: 0, color: isDark ? '#fff' : '#1a1a1f' }}>{strategy.title}</h4>
+                          <p style={{ fontSize: '12px', marginTop: '4px', ...text3D.body }}>{strategy.description}</p>
+                        </div>
+                      </div>
+                      <Badge3D dark={isDark}>
+                        <span style={{ color: isDark ? 'rgba(255,255,255,0.7)' : '#515158' }}>신뢰도 {strategy.confidence}%</span>
+                      </Badge3D>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px', fontSize: '11px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', ...text3D.body }}>
+                        <Target className="w-3 h-3" style={{ color: iconColor }} />
+                        {strategy.targetAudience}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', ...text3D.body }}>
+                        <Calendar className="w-3 h-3" style={{ color: iconColor }} />
+                        {strategy.duration}일
                       </div>
                     </div>
-                    <Badge variant="outline" className="shrink-0">
-                      신뢰도 {strategy.confidence}%
-                    </Badge>
-                  </div>
 
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3">
-                    <div className="flex items-center gap-1">
-                      <Target className="w-3 h-3" />
-                      {strategy.targetAudience}
+                    <div style={{
+                      display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px',
+                      padding: '12px', borderRadius: '12px', marginBottom: '12px',
+                      background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+                    }}>
+                      <div style={{ textAlign: 'center' }}>
+                        <p style={{ fontSize: '10px', marginBottom: '4px', ...text3D.body }}>추가 매출</p>
+                        <p style={{ fontSize: '13px', margin: 0, fontWeight: 700, color: isDark ? '#fff' : '#1a1a1f' }}>
+                          +{formatCurrency(strategy.expectedResults.revenueIncrease)}
+                        </p>
+                      </div>
+                      <div style={{ textAlign: 'center', borderLeft: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.06)', borderRight: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.06)' }}>
+                        <p style={{ fontSize: '10px', marginBottom: '4px', ...text3D.body }}>전환율 증가</p>
+                        <p style={{ fontSize: '13px', margin: 0, fontWeight: 700, color: isDark ? '#fff' : '#1a1a1f' }}>
+                          +{strategy.expectedResults.conversionIncrease}%p
+                        </p>
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        <p style={{ fontSize: '10px', marginBottom: '4px', ...text3D.body }}>예상 ROI</p>
+                        <p style={{ fontSize: '13px', margin: 0, fontWeight: 700, color: isDark ? '#fff' : '#1a1a1f' }}>
+                          {strategy.expectedResults.roi}%
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Calendar className="w-3 h-3" />
-                      {strategy.duration}일
-                    </div>
-                  </div>
 
-                  <div className="grid grid-cols-3 gap-3 p-3 bg-background/50 rounded-lg mb-3">
-                    <div className="text-center">
-                      <p className="text-xs text-muted-foreground">추가 매출</p>
-                      <p className="text-sm font-bold text-green-500">
-                        +{formatCurrency(strategy.expectedResults.revenueIncrease)}
-                      </p>
-                    </div>
-                    <div className="text-center border-x">
-                      <p className="text-xs text-muted-foreground">전환율 증가</p>
-                      <p className="text-sm font-bold text-blue-500">
-                        +{strategy.expectedResults.conversionIncrease}%p
-                      </p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-xs text-muted-foreground">예상 ROI</p>
-                      <p className="text-sm font-bold text-purple-500">
-                        {strategy.expectedResults.roi}%
-                      </p>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => navigate('/studio')}
+                        style={{
+                          flex: 1, padding: '10px', borderRadius: '10px',
+                          background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+                          border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.06)',
+                          fontSize: '11px', fontWeight: 500, color: isDark ? 'rgba(255,255,255,0.8)' : '#515158',
+                          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                        }}
+                      >
+                        <FlaskConical className="w-3 h-3" /> 시뮬레이션
+                      </button>
+                      <button style={{
+                        flex: 1, padding: '10px', borderRadius: '10px',
+                        background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+                        border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.06)',
+                        fontSize: '11px', fontWeight: 500, color: isDark ? 'rgba(255,255,255,0.8)' : '#515158',
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                      }}>
+                        <Settings className="w-3 h-3" /> 상세 설정
+                      </button>
+                      <button
+                        onClick={() => handleApplyStrategy(strategy)}
+                        style={{
+                          flex: 1, padding: '10px', borderRadius: '10px',
+                          background: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)',
+                          border: 'none', fontSize: '11px', fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f',
+                          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                        }}
+                      >
+                        <Play className="w-3 h-3" /> 실행하기
+                      </button>
                     </div>
                   </div>
-
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="flex-1 gap-1" onClick={() => navigate('/studio')}>
-                      <FlaskConical className="w-3 h-3" />
-                      시뮬레이션
-                    </Button>
-                    <Button variant="outline" size="sm" className="flex-1 gap-1">
-                      <Settings className="w-3 h-3" />
-                      상세 설정
-                    </Button>
-                    <Button size="sm" className="flex-1 gap-1" onClick={() => handleApplyStrategy(strategy)}>
-                      <Play className="w-3 h-3" />
-                      실행하기
-                    </Button>
-                  </div>
-                </div>
-              ))
+                ))}
+              </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <Sparkles className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p>추천 전략을 분석 중입니다</p>
-                <p className="text-sm mt-1">충분한 데이터가 수집되면 AI가 전략을 추천합니다</p>
+              <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                <Sparkles className="h-12 w-12" style={{ margin: '0 auto 12px', color: isDark ? 'rgba(255,255,255,0.3)' : '#d1d5db' }} />
+                <p style={{ fontSize: '14px', ...text3D.body }}>추천 전략을 분석 중입니다</p>
+                <p style={{ fontSize: '12px', marginTop: '4px', color: isDark ? 'rgba(255,255,255,0.4)' : '#9ca3af' }}>
+                  충분한 데이터가 수집되면 AI가 전략을 추천합니다
+                </p>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </GlassCard>
       </div>
 
-      {/* ROI 측정 - 별도 페이지로 이동 */}
-      <div className="flex items-center justify-center p-6 bg-muted/30 rounded-lg border border-dashed">
-        <div className="text-center">
-          <BarChart3 className="h-8 w-8 mx-auto mb-3 text-muted-foreground/50" />
-          <p className="text-sm text-muted-foreground mb-3">
+      {/* ROI 측정 바로가기 */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '24px', borderRadius: '16px',
+        background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+        border: isDark ? '1px dashed rgba(255,255,255,0.15)' : '1px dashed rgba(0,0,0,0.1)',
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <BarChart3 className="h-8 w-8" style={{ margin: '0 auto 12px', color: isDark ? 'rgba(255,255,255,0.3)' : '#9ca3af' }} />
+          <p style={{ fontSize: '13px', marginBottom: '12px', ...text3D.body }}>
             적용된 전략의 ROI를 측정하고 성과를 추적하세요
           </p>
-          <Button variant="outline" onClick={() => navigate('/roi')} className="gap-2">
-            <TrendingUp className="w-4 h-4" />
+          <button
+            onClick={() => navigate('/roi')}
+            style={{
+              padding: '10px 20px', borderRadius: '10px',
+              background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+              border: isDark ? '1px solid rgba(255,255,255,0.15)' : '1px solid rgba(0,0,0,0.08)',
+              fontSize: '13px', fontWeight: 500, color: isDark ? '#fff' : '#1a1a1f',
+              cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px',
+            }}
+          >
+            <TrendingUp className="w-4 h-4" style={{ color: iconColor }} />
             ROI 측정 대시보드 바로가기
-          </Button>
+          </button>
         </div>
       </div>
 

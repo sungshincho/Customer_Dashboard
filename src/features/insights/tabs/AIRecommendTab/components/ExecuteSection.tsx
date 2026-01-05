@@ -2,14 +2,10 @@
  * ExecuteSection.tsx
  *
  * 4단계: 실행 섹션
- * - 현재 실행 중인 캠페인
- * - 진행률 및 실시간 성과
+ * 3D Glassmorphism + Monochrome
  */
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+import { useState, useEffect, useRef } from 'react';
 import {
   Play,
   Pause,
@@ -19,9 +15,141 @@ import {
   TrendingDown,
   Minus,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import type { Campaign, CampaignStatus } from '../types/aiDecision.types';
 import { formatCurrency } from '../../../components';
+
+// ============================================================================
+// 3D 스타일 시스템
+// ============================================================================
+const getText3D = (isDark: boolean) => ({
+  number: isDark ? {
+    fontWeight: 800, letterSpacing: '-0.03em', color: '#ffffff',
+  } as React.CSSProperties : {
+    fontWeight: 800, letterSpacing: '-0.03em', color: '#0a0a0c',
+  } as React.CSSProperties,
+  body: isDark ? {
+    fontWeight: 500, color: 'rgba(255,255,255,0.6)',
+  } as React.CSSProperties : {
+    fontWeight: 500, color: '#515158',
+  } as React.CSSProperties,
+});
+
+const GlassCard = ({ children, dark = false }: { children: React.ReactNode; dark?: boolean }) => (
+  <div style={{ perspective: '1200px', height: '100%' }}>
+    <div style={{
+      borderRadius: '24px', padding: '1.5px',
+      background: dark
+        ? 'linear-gradient(145deg, rgba(75,75,85,0.9) 0%, rgba(50,50,60,0.8) 50%, rgba(65,65,75,0.9) 100%)'
+        : 'linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(220,220,230,0.6) 50%, rgba(255,255,255,0.93) 100%)',
+      boxShadow: dark
+        ? '0 2px 4px rgba(0,0,0,0.2), 0 8px 16px rgba(0,0,0,0.25)'
+        : '0 1px 1px rgba(0,0,0,0.02), 0 2px 2px rgba(0,0,0,0.02), 0 4px 4px rgba(0,0,0,0.02), 0 8px 8px rgba(0,0,0,0.02)',
+      height: '100%',
+    }}>
+      <div style={{
+        background: dark
+          ? 'linear-gradient(165deg, rgba(48,48,58,0.98) 0%, rgba(32,32,40,0.97) 30%, rgba(42,42,52,0.98) 60%, rgba(35,35,45,0.97) 100%)'
+          : 'linear-gradient(165deg, rgba(255,255,255,0.95) 0%, rgba(253,253,255,0.88) 25%, rgba(255,255,255,0.92) 50%, rgba(251,251,254,0.85) 75%, rgba(255,255,255,0.94) 100%)',
+        backdropFilter: 'blur(80px) saturate(200%)', borderRadius: '23px', height: '100%', position: 'relative', overflow: 'hidden',
+      }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '1px',
+          background: dark
+            ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.18) 20%, rgba(255,255,255,0.28) 50%, rgba(255,255,255,0.18) 80%, transparent 100%)'
+            : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.9) 10%, rgba(255,255,255,1) 50%, rgba(255,255,255,0.9) 90%, transparent 100%)',
+          pointerEvents: 'none',
+        }} />
+        <div style={{ position: 'relative', zIndex: 10, height: '100%' }}>{children}</div>
+      </div>
+    </div>
+  </div>
+);
+
+const Icon3D = ({ children, size = 36, dark = false }: { children: React.ReactNode; size?: number; dark?: boolean }) => (
+  <div style={{
+    width: size, height: size,
+    background: dark
+      ? 'linear-gradient(145deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.04) 50%, rgba(255,255,255,0.09) 100%)'
+      : 'linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(230,230,238,0.95) 40%, rgba(245,245,250,0.98) 100%)',
+    borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    border: dark ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(255,255,255,0.95)',
+    boxShadow: dark
+      ? 'inset 0 1px 2px rgba(255,255,255,0.12), 0 4px 12px rgba(0,0,0,0.3)'
+      : '0 2px 4px rgba(0,0,0,0.05), 0 4px 8px rgba(0,0,0,0.06), inset 0 2px 4px rgba(255,255,255,1)',
+  }}>
+    <span style={{ position: 'relative', zIndex: 10 }}>{children}</span>
+  </div>
+);
+
+const Badge3D = ({ children, dark = false }: { children: React.ReactNode; dark?: boolean }) => (
+  <div style={{
+    display: 'inline-flex', alignItems: 'center', padding: '4px 10px',
+    background: dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+    borderRadius: '8px', border: dark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.05)',
+    fontSize: '11px', fontWeight: 600,
+  }}>
+    {children}
+  </div>
+);
+
+// Canvas 프로그레스 바
+const GlowProgressBar = ({ progress, isDark }: { progress: number; isDark: boolean }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const width = canvas.offsetWidth;
+    const height = 8;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, width, height);
+
+    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+    ctx.beginPath();
+    ctx.roundRect(0, 0, width, height, 4);
+    ctx.fill();
+
+    const fillW = (progress / 100) * width;
+    if (fillW > 0) {
+      const grad = ctx.createLinearGradient(0, 0, fillW, 0);
+      if (isDark) {
+        grad.addColorStop(0, 'rgba(255,255,255,0.2)');
+        grad.addColorStop(1, 'rgba(255,255,255,0.6)');
+      } else {
+        grad.addColorStop(0, 'rgba(0,0,0,0.15)');
+        grad.addColorStop(1, 'rgba(0,0,0,0.45)');
+      }
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.roundRect(0, 0, fillW, height, 4);
+      ctx.fill();
+
+      const glow = ctx.createRadialGradient(fillW, height / 2, 0, fillW, height / 2, 5);
+      const gc = isDark ? '255,255,255' : '0,0,0';
+      glow.addColorStop(0, `rgba(${gc},0.35)`);
+      glow.addColorStop(1, `rgba(${gc},0)`);
+      ctx.beginPath();
+      ctx.arc(fillW, height / 2, 5, 0, Math.PI * 2);
+      ctx.fillStyle = glow;
+      ctx.fill();
+    }
+  }, [progress, isDark]);
+
+  return <canvas ref={canvasRef} style={{ width: '100%', height: 8, display: 'block' }} />;
+};
+
+const statusLabels: Record<CampaignStatus, string> = {
+  scheduled: '예정',
+  active: '실행 중',
+  paused: '일시정지',
+  completed: '완료',
+  cancelled: '취소됨',
+};
 
 interface ExecuteSectionProps {
   campaigns: Campaign[];
@@ -32,14 +160,6 @@ interface ExecuteSectionProps {
   isLoading?: boolean;
 }
 
-const statusConfig: Record<CampaignStatus, { label: string; className: string }> = {
-  scheduled: { label: '예정', className: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
-  active: { label: '실행 중', className: 'bg-green-500/20 text-green-400 border-green-500/30' },
-  paused: { label: '일시정지', className: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
-  completed: { label: '완료', className: 'bg-gray-500/20 text-gray-400 border-gray-500/30' },
-  cancelled: { label: '취소됨', className: 'bg-red-500/20 text-red-400 border-red-500/30' },
-};
-
 export function ExecuteSection({
   campaigns,
   onPause,
@@ -48,44 +168,71 @@ export function ExecuteSection({
   onEdit,
   isLoading,
 }: ExecuteSectionProps) {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsDark(document.documentElement.classList.contains('dark'));
+    check();
+    const obs = new MutationObserver(check);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => obs.disconnect();
+  }, []);
+
+  const text3D = getText3D(isDark);
+  const iconColor = isDark ? 'rgba(255,255,255,0.7)' : '#374151';
   const activeCampaigns = campaigns.filter(c => c.status === 'active' || c.status === 'paused');
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-green-500/20 text-green-400 text-xs font-bold">
-          4
-        </div>
-        <h3 className="text-lg font-semibold">실행 이력 (Execute)</h3>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {/* 섹션 헤더 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{
+          width: '24px', height: '24px', borderRadius: '50%',
+          background: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '11px', fontWeight: 700, color: isDark ? '#fff' : '#374151',
+        }}>4</div>
+        <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0, color: isDark ? '#fff' : '#1a1a1f' }}>실행 이력 (Execute)</h3>
       </div>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Play className="h-4 w-4 text-green-500" />
-            현재 실행 중
+      <GlassCard dark={isDark}>
+        <div style={{ padding: '24px' }}>
+          {/* 카드 헤더 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+            <Icon3D size={36} dark={isDark}>
+              <Play className="h-4 w-4" style={{ color: iconColor }} />
+            </Icon3D>
+            <h4 style={{ fontSize: '15px', fontWeight: 600, margin: 0, color: isDark ? '#fff' : '#1a1a1f' }}>현재 실행 중</h4>
             {activeCampaigns.length > 0 && (
-              <Badge variant="secondary">{activeCampaigns.length}</Badge>
+              <Badge3D dark={isDark}>
+                <span style={{ color: isDark ? 'rgba(255,255,255,0.8)' : '#374151' }}>{activeCampaigns.length}</span>
+              </Badge3D>
             )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+          </div>
+
+          {/* 캠페인 목록 */}
           {isLoading ? (
-            <div className="space-y-4">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {[1, 2].map(i => (
-                <div key={i} className="animate-pulse p-4 border rounded-lg">
-                  <div className="h-6 bg-muted rounded w-1/3 mb-2" />
-                  <div className="h-2 bg-muted rounded w-full mb-3" />
-                  <div className="h-4 bg-muted rounded w-2/3" />
+                <div key={i} className="animate-pulse" style={{
+                  padding: '16px', borderRadius: '16px',
+                  background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+                }}>
+                  <div style={{ height: '24px', borderRadius: '6px', background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)', width: '33%', marginBottom: '8px' }} />
+                  <div style={{ height: '8px', borderRadius: '4px', background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)', width: '100%', marginBottom: '12px' }} />
+                  <div style={{ height: '16px', borderRadius: '4px', background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)', width: '66%' }} />
                 </div>
               ))}
             </div>
           ) : activeCampaigns.length > 0 ? (
-            <div className="space-y-4">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {activeCampaigns.map((campaign) => (
                 <CampaignCard
                   key={campaign.id}
                   campaign={campaign}
+                  isDark={isDark}
+                  text3D={text3D}
+                  iconColor={iconColor}
                   onPause={() => onPause(campaign.id)}
                   onResume={() => onResume(campaign.id)}
                   onStop={() => onStop(campaign.id)}
@@ -94,14 +241,16 @@ export function ExecuteSection({
               ))}
             </div>
           ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <Play className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p>실행 중인 캠페인이 없습니다</p>
-              <p className="text-sm mt-1">AI 추천 전략을 실행해보세요</p>
+            <div style={{ textAlign: 'center', padding: '40px 0' }}>
+              <Play className="h-12 w-12" style={{ margin: '0 auto 12px', color: isDark ? 'rgba(255,255,255,0.3)' : '#d1d5db' }} />
+              <p style={{ fontSize: '14px', ...text3D.body }}>실행 중인 캠페인이 없습니다</p>
+              <p style={{ fontSize: '12px', marginTop: '4px', color: isDark ? 'rgba(255,255,255,0.4)' : '#9ca3af' }}>
+                AI 추천 전략을 실행해보세요
+              </p>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </GlassCard>
     </div>
   );
 }
@@ -109,6 +258,9 @@ export function ExecuteSection({
 // 캠페인 카드 컴포넌트
 interface CampaignCardProps {
   campaign: Campaign;
+  isDark: boolean;
+  text3D: ReturnType<typeof getText3D>;
+  iconColor: string;
   onPause: () => void;
   onResume: () => void;
   onStop: () => void;
@@ -117,107 +269,101 @@ interface CampaignCardProps {
 
 function CampaignCard({
   campaign,
+  isDark,
+  text3D,
+  iconColor,
   onPause,
   onResume,
   onStop,
   onEdit,
 }: CampaignCardProps) {
-  const status = statusConfig[campaign.status];
   const roiDiff = campaign.currentROI - campaign.expectedROI;
-  const isPerformingWell = roiDiff >= 0;
-
-  // 날짜 계산
   const startDate = new Date(campaign.startDate);
   const endDate = new Date(campaign.endDate);
-  const today = new Date();
-  const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-  const daysElapsed = Math.max(0, Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+
+  const IconButton = ({ onClick, children }: { onClick: () => void; children: React.ReactNode }) => (
+    <button
+      onClick={onClick}
+      style={{
+        width: '28px', height: '28px', borderRadius: '6px',
+        background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+        border: 'none', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}
+    >
+      {children}
+    </button>
+  );
 
   return (
-    <div className="p-4 border rounded-lg bg-card">
+    <div style={{
+      padding: '16px', borderRadius: '16px',
+      background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
+      border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.05)',
+    }}>
       {/* 헤더 */}
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div className="flex items-center gap-2">
-          <Badge className={cn('text-xs', status.className)}>
-            {status.label}
-          </Badge>
-          <span className="font-semibold">{campaign.name}</span>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Badge3D dark={isDark}>
+            <span style={{ color: isDark ? 'rgba(255,255,255,0.8)' : '#374151' }}>{statusLabels[campaign.status]}</span>
+          </Badge3D>
+          <span style={{ fontSize: '14px', fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>{campaign.name}</span>
         </div>
-        <div className="flex items-center gap-1">
+        <div style={{ display: 'flex', gap: '4px' }}>
           {campaign.status === 'active' ? (
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onPause}>
-              <Pause className="h-3 w-3" />
-            </Button>
+            <IconButton onClick={onPause}><Pause className="h-3 w-3" style={{ color: iconColor }} /></IconButton>
           ) : campaign.status === 'paused' ? (
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onResume}>
-              <Play className="h-3 w-3" />
-            </Button>
+            <IconButton onClick={onResume}><Play className="h-3 w-3" style={{ color: iconColor }} /></IconButton>
           ) : null}
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onStop}>
-            <Square className="h-3 w-3" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit}>
-            <Edit className="h-3 w-3" />
-          </Button>
+          <IconButton onClick={onStop}><Square className="h-3 w-3" style={{ color: iconColor }} /></IconButton>
+          <IconButton onClick={onEdit}><Edit className="h-3 w-3" style={{ color: iconColor }} /></IconButton>
         </div>
       </div>
 
       {/* 기간 및 진행률 */}
-      <div className="mb-3">
-        <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-          <span>
-            시작: {startDate.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
-          </span>
+      <div style={{ marginBottom: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px', fontSize: '11px', ...text3D.body }}>
+          <span>시작: {startDate.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}</span>
           <span>진행률: {campaign.progress}%</span>
-          <span>
-            종료: {endDate.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
-          </span>
+          <span>종료: {endDate.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}</span>
         </div>
-        <Progress value={campaign.progress} className="h-2" />
+        <GlowProgressBar progress={campaign.progress} isDark={isDark} />
       </div>
 
       {/* 성과 지표 */}
-      <div className="grid grid-cols-3 gap-3 p-3 bg-muted/30 rounded-lg">
-        <div className="text-center">
-          <p className="text-xs text-muted-foreground">현재 매출</p>
-          <p className="text-sm font-bold">
+      <div style={{
+        display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px',
+        padding: '12px', borderRadius: '12px',
+        background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <p style={{ fontSize: '10px', marginBottom: '4px', ...text3D.body }}>현재 매출</p>
+          <p style={{ fontSize: '13px', margin: 0, fontWeight: 700, color: isDark ? '#fff' : '#1a1a1f' }}>
             {formatCurrency(campaign.metrics.revenue)}
           </p>
         </div>
-        <div className="text-center border-x border-border/50">
-          <p className="text-xs text-muted-foreground">전환</p>
-          <p className="text-sm font-bold">
+        <div style={{ textAlign: 'center', borderLeft: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.05)', borderRight: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.05)' }}>
+          <p style={{ fontSize: '10px', marginBottom: '4px', ...text3D.body }}>전환</p>
+          <p style={{ fontSize: '13px', margin: 0, fontWeight: 700, color: isDark ? '#fff' : '#1a1a1f' }}>
             {campaign.metrics.conversions.toLocaleString()}건
           </p>
         </div>
-        <div className="text-center">
-          <p className="text-xs text-muted-foreground">현재 ROI</p>
-          <p className={cn(
-            'text-sm font-bold flex items-center justify-center gap-1',
-            isPerformingWell ? 'text-green-500' : 'text-yellow-500'
-          )}>
-            {campaign.currentROI}%
-            {isPerformingWell ? (
-              <TrendingUp className="w-3 h-3" />
-            ) : roiDiff < -10 ? (
-              <TrendingDown className="w-3 h-3" />
-            ) : (
-              <Minus className="w-3 h-3" />
-            )}
-          </p>
+        <div style={{ textAlign: 'center' }}>
+          <p style={{ fontSize: '10px', marginBottom: '4px', ...text3D.body }}>현재 ROI</p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+            <span style={{ fontSize: '13px', fontWeight: 700, color: isDark ? '#fff' : '#1a1a1f' }}>{campaign.currentROI}%</span>
+            {roiDiff >= 0 ? <TrendingUp className="w-3 h-3" style={{ color: iconColor }} /> :
+             roiDiff < -10 ? <TrendingDown className="w-3 h-3" style={{ color: iconColor }} /> :
+             <Minus className="w-3 h-3" style={{ color: iconColor }} />}
+          </div>
         </div>
       </div>
 
       {/* ROI 비교 */}
-      <div className="mt-3 flex items-center justify-between text-xs">
-        <span className="text-muted-foreground">
-          예상 ROI: {campaign.expectedROI}%
-        </span>
-        <span className={cn(
-          'font-medium',
-          isPerformingWell ? 'text-green-500' : 'text-yellow-500'
-        )}>
-          {isPerformingWell ? '+' : ''}{roiDiff.toFixed(0)}%p 차이
+      <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px' }}>
+        <span style={{ ...text3D.body }}>예상 ROI: {campaign.expectedROI}%</span>
+        <span style={{ fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.8)' : '#374151' }}>
+          {roiDiff >= 0 ? '+' : ''}{roiDiff.toFixed(0)}%p 차이
         </span>
       </div>
     </div>

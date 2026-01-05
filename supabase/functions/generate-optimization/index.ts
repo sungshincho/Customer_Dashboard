@@ -1,5 +1,24 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.79.0';
 
+// Phase 0.1: 환경 데이터 로딩 시스템
+import {
+  loadEnvironmentDataBundle,
+  type EnvironmentDataBundle,
+  type EnvironmentImpact,
+} from './data/environmentLoader.ts';
+
+// Phase 0.2: 고객 동선 분석 시스템
+import {
+  analyzeCustomerFlow,
+  type FlowAnalysisResult,
+} from './data/flowAnalyzer.ts';
+
+// Phase 0.3: 상품 연관성 분석 시스템
+import {
+  analyzeProductAssociations,
+  type ProductAssociationResult,
+} from './data/associationMiner.ts';
+
 /**
  * generate-optimization Edge Function
  *
@@ -131,7 +150,19 @@ Deno.serve(async (req) => {
     // 3. 슬롯 데이터 로드
     const slotsData = await loadSlotsData(supabase, store_id);
 
-    // 4. 최적화 생성
+    // 4. 🆕 환경 데이터 로드 (Phase 0.1)
+    const environmentData = await loadEnvironmentDataBundle(supabase, store_id);
+    console.log(`[generate-optimization] Environment: weather=${environmentData.dataQuality.hasWeatherData}, events=${environmentData.events.length}`);
+
+    // 5. 🆕 고객 동선 분석 (Phase 0.2)
+    const flowAnalysis = await analyzeCustomerFlow(supabase, store_id, 30);
+    console.log(`[generate-optimization] Flow: zones=${flowAnalysis.summary.totalZones}, transitions=${flowAnalysis.summary.totalTransitions}, health=${flowAnalysis.summary.flowHealthScore}`);
+
+    // 6. 🆕 상품 연관성 분석 (Phase 0.3)
+    const associationData = await analyzeProductAssociations(supabase, store_id, 90);
+    console.log(`[generate-optimization] Associations: rules=${associationData.summary.totalRulesFound}, strong=${associationData.summary.strongRulesCount}, quality=${associationData.summary.dataQuality}`);
+
+    // 7. 최적화 생성
     let result: AILayoutOptimizationResult;
 
     if (lovableApiKey) {
@@ -141,7 +172,10 @@ Deno.serve(async (req) => {
         performanceData,
         slotsData,
         optimization_type,
-        parameters
+        parameters,
+        environmentData,  // 🆕 환경 데이터 추가
+        flowAnalysis,     // 🆕 동선 분석 추가 (Phase 0.2)
+        associationData   // 🆕 연관성 분석 추가 (Phase 0.3)
       );
     } else {
       // AI 키 없을 경우 룰 기반 최적화
@@ -150,7 +184,10 @@ Deno.serve(async (req) => {
         performanceData,
         slotsData,
         optimization_type,
-        parameters
+        parameters,
+        environmentData,  // 🆕 환경 데이터 추가
+        flowAnalysis,     // 🆕 동선 분석 추가 (Phase 0.2)
+        associationData   // 🆕 연관성 분석 추가 (Phase 0.3)
       );
     }
 
@@ -188,6 +225,84 @@ Deno.serve(async (req) => {
         furniture_analyzed: layoutData.furniture.length,
         products_analyzed: layoutData.products.length,
         slots_analyzed: slotsData.length,
+      },
+      // 🆕 환경 컨텍스트 요약
+      environment_summary: {
+        weather: environmentData.weather ? {
+          condition: environmentData.impact.weather.condition,
+          temperature: environmentData.weather.temperature,
+          severity: environmentData.impact.weather.severity,
+        } : null,
+        events: environmentData.events.map(e => ({
+          name: e.eventName,
+          type: e.eventType,
+          impact: e.impactLevel,
+        })),
+        temporal: {
+          dayOfWeek: environmentData.temporal.dayOfWeek,
+          isWeekend: environmentData.temporal.isWeekend,
+          timeOfDay: environmentData.temporal.timeOfDay,
+        },
+        impact_multipliers: environmentData.impact.combined,
+        data_quality: environmentData.dataQuality,
+      },
+      // 🆕 동선 분석 요약 (Phase 0.2)
+      flow_analysis_summary: {
+        total_zones: flowAnalysis.summary.totalZones,
+        total_transitions: flowAnalysis.summary.totalTransitions,
+        avg_path_length: flowAnalysis.summary.avgPathLength,
+        avg_path_duration: flowAnalysis.summary.avgPathDuration,
+        overall_conversion_rate: flowAnalysis.summary.overallConversionRate,
+        bottleneck_count: flowAnalysis.summary.bottleneckCount,
+        dead_zone_count: flowAnalysis.summary.deadZoneCount,
+        opportunity_count: flowAnalysis.summary.opportunityCount,
+        flow_health_score: flowAnalysis.summary.flowHealthScore,
+        key_paths: flowAnalysis.keyPaths.slice(0, 5).map(p => ({
+          path: p.zoneNames.join(' → '),
+          frequency: p.frequency,
+          type: p.pathType,
+        })),
+        bottlenecks: flowAnalysis.bottlenecks.map(b => ({
+          zone: b.zoneName,
+          severity: b.severity,
+          congestion: b.congestionScore,
+        })),
+        dead_zones: flowAnalysis.deadZones.map(d => ({
+          zone: d.zoneName,
+          severity: d.severity,
+          visit_rate: d.visitRate,
+        })),
+        opportunities: flowAnalysis.opportunities.slice(0, 5).map(o => ({
+          type: o.type,
+          priority: o.priority,
+          description: o.description,
+        })),
+      },
+      // 🆕 연관성 분석 요약 (Phase 0.3)
+      association_summary: {
+        total_transactions: associationData.summary.totalTransactions,
+        avg_basket_size: associationData.summary.avgBasketSize,
+        strong_rules_count: associationData.summary.strongRulesCount,
+        very_strong_rules_count: associationData.summary.veryStrongRulesCount,
+        data_quality: associationData.summary.dataQuality,
+        top_rules: associationData.associationRules.slice(0, 5).map(r => ({
+          rule: `${r.antecedentNames.join(', ')} → ${r.consequentNames.join(', ')}`,
+          confidence: `${(r.confidence * 100).toFixed(0)}%`,
+          lift: `${r.lift.toFixed(1)}x`,
+          strength: r.ruleStrength,
+        })),
+        category_affinities: associationData.categoryAffinities.slice(0, 5).map(a => ({
+          pair: `${a.category1} + ${a.category2}`,
+          affinity: `${(a.affinityScore * 100).toFixed(0)}%`,
+          proximity: a.recommendedProximity,
+        })),
+        placement_recommendations: associationData.placementRecommendations.length,
+        recommendations: associationData.placementRecommendations.slice(0, 5).map(r => ({
+          type: r.type,
+          priority: r.priority,
+          product: r.primaryProduct.name,
+          reason: r.reason,
+        })),
       },
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -380,9 +495,12 @@ async function generateAIOptimization(
   performanceData: any,
   slotsData: any[],
   optimizationType: string,
-  parameters: any
+  parameters: any,
+  environmentData?: EnvironmentDataBundle,  // 🆕 환경 데이터
+  flowAnalysis?: FlowAnalysisResult,        // 🆕 동선 분석 (Phase 0.2)
+  associationData?: ProductAssociationResult // 🆕 연관성 분석 (Phase 0.3)
 ): Promise<AILayoutOptimizationResult> {
-  const prompt = buildOptimizationPrompt(layoutData, performanceData, slotsData, optimizationType, parameters);
+  const prompt = buildOptimizationPrompt(layoutData, performanceData, slotsData, optimizationType, parameters, environmentData, flowAnalysis, associationData);
 
   try {
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -423,7 +541,7 @@ async function generateAIOptimization(
     };
   } catch (e) {
     console.error('AI optimization failed, falling back to rule-based:', e);
-    return generateRuleBasedOptimization(layoutData, performanceData, slotsData, optimizationType, parameters);
+    return generateRuleBasedOptimization(layoutData, performanceData, slotsData, optimizationType, parameters, environmentData, flowAnalysis, associationData);
   }
 }
 
@@ -432,10 +550,75 @@ function buildOptimizationPrompt(
   performanceData: any,
   slotsData: any[],
   optimizationType: string,
-  parameters: any
+  parameters: any,
+  environmentData?: EnvironmentDataBundle,  // 🆕 환경 데이터
+  flowAnalysis?: FlowAnalysisResult,        // 🆕 동선 분석 (Phase 0.2)
+  associationData?: ProductAssociationResult // 🆕 연관성 분석 (Phase 0.3)
 ): string {
+  // 🆕 환경 컨텍스트 섹션 생성
+  const environmentSection = environmentData ? `
+## 🌤️ Environment Context (IMPORTANT - Adjust recommendations accordingly)
+${environmentData.impact.summary}
+
+### Impact Multipliers
+- Traffic: ${environmentData.impact.combined.traffic}x (${environmentData.impact.combined.traffic > 1 ? '📈 above average' : environmentData.impact.combined.traffic < 0.8 ? '📉 significantly below average' : '➖ average'})
+- Dwell Time: ${environmentData.impact.combined.dwell}x (${environmentData.impact.combined.dwell > 1.1 ? '⏱️ customers staying longer' : '➖ normal'})
+- Conversion: ${environmentData.impact.combined.conversion}x
+- Confidence: ${Math.round(environmentData.impact.confidence * 100)}%
+
+### Active Events
+${environmentData.events.length > 0
+  ? environmentData.events.map(e => `- ${e.eventName} (${e.eventType}, impact: ${e.impactLevel})`).join('\n')
+  : '- No special events today'}
+
+### Weather-Based Recommendations
+${environmentData.impact.weather.recommendations.length > 0
+  ? environmentData.impact.weather.recommendations.map(r => `- ${r}`).join('\n')
+  : '- No weather-specific recommendations'}
+
+### Event-Based Recommendations
+${environmentData.impact.event.recommendations.length > 0
+  ? environmentData.impact.event.recommendations.map(r => `- ${r}`).join('\n')
+  : '- Standard optimization applies'}
+
+` : '';
+
+  // 🆕 동선 분석 섹션 생성 (Phase 0.2)
+  const flowAnalysisSection = flowAnalysis ? `
+## 🚶 Customer Flow Analysis (CRITICAL - Use this data to optimize layout)
+${flowAnalysis.aiPromptContext}
+
+### Flow-Based Optimization Guidelines
+${flowAnalysis.summary.flowHealthScore < 50 ? '⚠️ LOW FLOW HEALTH: Prioritize fixing bottlenecks and activating dead zones' :
+  flowAnalysis.summary.flowHealthScore < 70 ? '⚡ MODERATE FLOW HEALTH: Focus on opportunity zones' :
+  '✅ GOOD FLOW HEALTH: Fine-tune for marginal improvements'}
+
+` : '';
+
+  // 🆕 연관성 분석 섹션 생성 (Phase 0.3)
+  const associationSection = associationData ? `
+## 🔗 Product Association Analysis (Use for cross-sell and bundle placement)
+${associationData.aiPromptContext}
+
+### Association-Based Placement Rules
+${associationData.summary.veryStrongRulesCount > 0 ? '🔥 VERY STRONG ASSOCIATIONS FOUND: Prioritize bundle displays for these products' : ''}
+${associationData.summary.strongRulesCount > 3 ? '💡 MULTIPLE STRONG ASSOCIATIONS: Apply cross-sell placement actively' : ''}
+${associationData.placementRecommendations.length > 0 ? `📍 ${associationData.placementRecommendations.length} placement recommendations available` : ''}
+
+` : '';
+
   return `You are a retail store layout optimization expert.
 
+## CRITICAL CONSTRAINTS
+1. ONLY use exact product IDs and SKUs from the provided data
+2. ONLY suggest movable=true furniture for relocation
+3. ENSURE slot compatibility (display_type must match slot's compatible_display_types)
+4. Consider environment context when prioritizing changes
+5. Use customer flow analysis to identify optimal placement zones
+6. Apply product association rules for cross-sell and bundle placement
+${environmentSection}
+${flowAnalysisSection}
+${associationSection}
 ## Current Layout
 Furniture: ${JSON.stringify(layoutData.furniture.slice(0, 20), null, 2)}
 Products: ${JSON.stringify(layoutData.products.slice(0, 30), null, 2)}
@@ -453,11 +636,29 @@ Type: ${optimizationType}
 ${JSON.stringify(parameters, null, 2)}
 
 ## Task
-Generate layout optimization recommendations. For each recommendation:
+Generate layout optimization recommendations considering the environment context and customer flow:
 1. Identify underperforming products/furniture
-2. Find better positions based on performance data
+2. Find better positions based on performance data AND flow analysis
 3. Ensure slot compatibility for products
 4. Only move furniture if marked as movable
+5. ${environmentData?.impact.combined.traffic && environmentData.impact.combined.traffic < 0.7
+  ? 'LOW TRAFFIC EXPECTED: Focus on high-impact changes, prioritize experience products'
+  : environmentData?.impact.combined.traffic && environmentData.impact.combined.traffic > 1.3
+    ? 'HIGH TRAFFIC EXPECTED: Optimize flow paths, ensure popular items are accessible'
+    : 'Apply standard optimization strategies'}
+6. ${flowAnalysis?.bottlenecks && flowAnalysis.bottlenecks.length > 0
+  ? `ADDRESS BOTTLENECKS: ${flowAnalysis.bottlenecks.map(b => b.zoneName).join(', ')} - Consider redistributing products from these zones`
+  : 'No critical bottlenecks detected'}
+7. ${flowAnalysis?.deadZones && flowAnalysis.deadZones.length > 0
+  ? `ACTIVATE DEAD ZONES: ${flowAnalysis.deadZones.map(d => d.zoneName).join(', ')} - Place high-interest products to attract traffic`
+  : 'No critical dead zones detected'}
+8. Use high-traffic paths for premium/promotional product placement
+9. ${associationData?.summary.veryStrongRulesCount && associationData.summary.veryStrongRulesCount > 0
+  ? `BUNDLE OPPORTUNITIES: ${associationData.summary.veryStrongRulesCount} very strong associations found - Create bundle displays`
+  : 'Apply standard cross-sell strategies'}
+10. ${associationData?.placementRecommendations && associationData.placementRecommendations.length > 0
+  ? `CROSS-SELL PLACEMENT: Apply ${associationData.placementRecommendations.length} association-based placement recommendations`
+  : 'No specific association recommendations'}
 
 ## Response Format (JSON)
 {
@@ -502,12 +703,50 @@ function generateRuleBasedOptimization(
   performanceData: any,
   slotsData: any[],
   optimizationType: string,
-  parameters: any
+  parameters: any,
+  environmentData?: EnvironmentDataBundle,  // 🆕 환경 데이터
+  flowAnalysis?: FlowAnalysisResult,        // 🆕 동선 분석 (Phase 0.2)
+  associationData?: ProductAssociationResult // 🆕 연관성 분석 (Phase 0.3)
 ): AILayoutOptimizationResult {
   const furnitureChanges: FurnitureChange[] = [];
   const productChanges: ProductChange[] = [];
 
   const maxChanges = parameters.max_changes || 30;
+
+  // 🆕 환경 기반 최적화 조정
+  const envImpact = environmentData?.impact.combined;
+  const isLowTrafficExpected = envImpact && envImpact.traffic < 0.7;
+  const isHighTrafficExpected = envImpact && envImpact.traffic > 1.3;
+  const isHighDwellExpected = envImpact && envImpact.dwell > 1.15;
+
+  if (environmentData) {
+    console.log(`[RuleBasedOpt] Environment: traffic=${envImpact?.traffic}x, dwell=${envImpact?.dwell}x, conversion=${envImpact?.conversion}x`);
+  }
+
+  // 🆕 동선 분석 기반 최적화 조정 (Phase 0.2)
+  const bottleneckZoneIds = flowAnalysis?.bottlenecks?.map(b => b.zoneId) || [];
+  const deadZoneIds = flowAnalysis?.deadZones?.map(d => d.zoneId) || [];
+  const highFlowZoneIds = flowAnalysis?.zoneStats
+    ?.filter(z => z.totalVisitors > 0)
+    ?.sort((a, b) => b.totalVisitors - a.totalVisitors)
+    ?.slice(0, 3)
+    ?.map(z => z.zoneId) || [];
+
+  if (flowAnalysis) {
+    console.log(`[RuleBasedOpt] Flow: health=${flowAnalysis.summary.flowHealthScore}, bottlenecks=${bottleneckZoneIds.length}, deadZones=${deadZoneIds.length}`);
+  }
+
+  // 🆕 연관성 분석 데이터 (Phase 0.3)
+  const strongAssociations = associationData?.associationRules?.filter(r =>
+    r.ruleStrength === 'very_strong' || r.ruleStrength === 'strong'
+  ) || [];
+  const bundleRecommendations = associationData?.placementRecommendations?.filter(r =>
+    r.type === 'bundle' || r.type === 'cross_sell'
+  ) || [];
+
+  if (associationData) {
+    console.log(`[RuleBasedOpt] Associations: strongRules=${strongAssociations.length}, bundleRecs=${bundleRecommendations.length}`);
+  }
 
   // 상품 최적화
   if (optimizationType === 'product' || optimizationType === 'both') {
@@ -748,12 +987,45 @@ function generateRuleBasedOptimization(
   }
 
   // 요약 계산
+  const baseRevenueImprovement = productChanges.reduce((sum, p) => sum + p.expected_revenue_impact, 0) / Math.max(productChanges.length, 1);
+  const baseTrafficImprovement = furnitureChanges.reduce((sum, f) => sum + f.expected_impact, 0) / Math.max(furnitureChanges.length, 1);
+  const baseConversionImprovement = productChanges.length > 0 ? 0.05 + Math.random() * 0.03 : 0;
+
+  // 🆕 환경 영향도 반영
+  const trafficMultiplier = envImpact?.traffic || 1.0;
+  const conversionMultiplier = envImpact?.conversion || 1.0;
+
   const summary = {
     total_furniture_changes: furnitureChanges.length,
     total_product_changes: productChanges.length,
-    expected_revenue_improvement: productChanges.reduce((sum, p) => sum + p.expected_revenue_impact, 0) / Math.max(productChanges.length, 1),
-    expected_traffic_improvement: furnitureChanges.reduce((sum, f) => sum + f.expected_impact, 0) / Math.max(furnitureChanges.length, 1),
-    expected_conversion_improvement: productChanges.length > 0 ? 0.05 + Math.random() * 0.03 : 0,
+    expected_revenue_improvement: Math.round(baseRevenueImprovement * trafficMultiplier * conversionMultiplier * 100) / 100,
+    expected_traffic_improvement: Math.round(baseTrafficImprovement * trafficMultiplier * 100) / 100,
+    expected_conversion_improvement: Math.round(baseConversionImprovement * conversionMultiplier * 100) / 100,
+    // 🆕 환경 컨텍스트 정보 추가
+    environment_context: environmentData ? {
+      weather: environmentData.impact.weather.condition,
+      events: environmentData.events.map(e => e.eventName),
+      multipliers: envImpact,
+      confidence: environmentData.impact.confidence,
+    } : null,
+    // 🆕 동선 분석 컨텍스트 정보 추가 (Phase 0.2)
+    flow_context: flowAnalysis ? {
+      health_score: flowAnalysis.summary.flowHealthScore,
+      bottleneck_zones: bottleneckZoneIds,
+      dead_zones: deadZoneIds,
+      high_flow_zones: highFlowZoneIds,
+      total_transitions: flowAnalysis.summary.totalTransitions,
+      conversion_rate: flowAnalysis.summary.overallConversionRate,
+    } : null,
+    // 🆕 연관성 분석 컨텍스트 정보 추가 (Phase 0.3)
+    association_context: associationData ? {
+      total_transactions: associationData.summary.totalTransactions,
+      avg_basket_size: associationData.summary.avgBasketSize,
+      strong_rules_count: strongAssociations.length,
+      bundle_recommendations: bundleRecommendations.length,
+      data_quality: associationData.summary.dataQuality,
+      top_category_pair: associationData.summary.topCategoryPair,
+    } : null,
   };
 
   return {
