@@ -369,8 +369,8 @@ export function LayerPanel() {
               className={cn(
                 'flex-1 px-2 py-1 text-[10px] rounded transition-colors',
                 filterType === type
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white/5 text-white/50 hover:bg-white/10'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-white/5 text-white/50 hover:bg-transparent'
               )}
             >
               {type === 'all' ? '전체' : '가구'}
