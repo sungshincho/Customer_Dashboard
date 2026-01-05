@@ -13,6 +13,12 @@ import {
   type FlowAnalysisResult,
 } from './data/flowAnalyzer.ts';
 
+// Phase 0.3: 상품 연관성 분석 시스템
+import {
+  analyzeProductAssociations,
+  type ProductAssociationResult,
+} from './data/associationMiner.ts';
+
 /**
  * generate-optimization Edge Function
  *
@@ -152,7 +158,11 @@ Deno.serve(async (req) => {
     const flowAnalysis = await analyzeCustomerFlow(supabase, store_id, 30);
     console.log(`[generate-optimization] Flow: zones=${flowAnalysis.summary.totalZones}, transitions=${flowAnalysis.summary.totalTransitions}, health=${flowAnalysis.summary.flowHealthScore}`);
 
-    // 6. 최적화 생성
+    // 6. 🆕 상품 연관성 분석 (Phase 0.3)
+    const associationData = await analyzeProductAssociations(supabase, store_id, 90);
+    console.log(`[generate-optimization] Associations: rules=${associationData.summary.totalRulesFound}, strong=${associationData.summary.strongRulesCount}, quality=${associationData.summary.dataQuality}`);
+
+    // 7. 최적화 생성
     let result: AILayoutOptimizationResult;
 
     if (lovableApiKey) {
@@ -164,7 +174,8 @@ Deno.serve(async (req) => {
         optimization_type,
         parameters,
         environmentData,  // 🆕 환경 데이터 추가
-        flowAnalysis      // 🆕 동선 분석 추가 (Phase 0.2)
+        flowAnalysis,     // 🆕 동선 분석 추가 (Phase 0.2)
+        associationData   // 🆕 연관성 분석 추가 (Phase 0.3)
       );
     } else {
       // AI 키 없을 경우 룰 기반 최적화
@@ -175,7 +186,8 @@ Deno.serve(async (req) => {
         optimization_type,
         parameters,
         environmentData,  // 🆕 환경 데이터 추가
-        flowAnalysis      // 🆕 동선 분석 추가 (Phase 0.2)
+        flowAnalysis,     // 🆕 동선 분석 추가 (Phase 0.2)
+        associationData   // 🆕 연관성 분석 추가 (Phase 0.3)
       );
     }
 
@@ -264,6 +276,32 @@ Deno.serve(async (req) => {
           type: o.type,
           priority: o.priority,
           description: o.description,
+        })),
+      },
+      // 🆕 연관성 분석 요약 (Phase 0.3)
+      association_summary: {
+        total_transactions: associationData.summary.totalTransactions,
+        avg_basket_size: associationData.summary.avgBasketSize,
+        strong_rules_count: associationData.summary.strongRulesCount,
+        very_strong_rules_count: associationData.summary.veryStrongRulesCount,
+        data_quality: associationData.summary.dataQuality,
+        top_rules: associationData.associationRules.slice(0, 5).map(r => ({
+          rule: `${r.antecedentNames.join(', ')} → ${r.consequentNames.join(', ')}`,
+          confidence: `${(r.confidence * 100).toFixed(0)}%`,
+          lift: `${r.lift.toFixed(1)}x`,
+          strength: r.ruleStrength,
+        })),
+        category_affinities: associationData.categoryAffinities.slice(0, 5).map(a => ({
+          pair: `${a.category1} + ${a.category2}`,
+          affinity: `${(a.affinityScore * 100).toFixed(0)}%`,
+          proximity: a.recommendedProximity,
+        })),
+        placement_recommendations: associationData.placementRecommendations.length,
+        recommendations: associationData.placementRecommendations.slice(0, 5).map(r => ({
+          type: r.type,
+          priority: r.priority,
+          product: r.primaryProduct.name,
+          reason: r.reason,
         })),
       },
     }), {
@@ -459,9 +497,10 @@ async function generateAIOptimization(
   optimizationType: string,
   parameters: any,
   environmentData?: EnvironmentDataBundle,  // 🆕 환경 데이터
-  flowAnalysis?: FlowAnalysisResult         // 🆕 동선 분석 (Phase 0.2)
+  flowAnalysis?: FlowAnalysisResult,        // 🆕 동선 분석 (Phase 0.2)
+  associationData?: ProductAssociationResult // 🆕 연관성 분석 (Phase 0.3)
 ): Promise<AILayoutOptimizationResult> {
-  const prompt = buildOptimizationPrompt(layoutData, performanceData, slotsData, optimizationType, parameters, environmentData, flowAnalysis);
+  const prompt = buildOptimizationPrompt(layoutData, performanceData, slotsData, optimizationType, parameters, environmentData, flowAnalysis, associationData);
 
   try {
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -502,7 +541,7 @@ async function generateAIOptimization(
     };
   } catch (e) {
     console.error('AI optimization failed, falling back to rule-based:', e);
-    return generateRuleBasedOptimization(layoutData, performanceData, slotsData, optimizationType, parameters, environmentData, flowAnalysis);
+    return generateRuleBasedOptimization(layoutData, performanceData, slotsData, optimizationType, parameters, environmentData, flowAnalysis, associationData);
   }
 }
 
@@ -513,7 +552,8 @@ function buildOptimizationPrompt(
   optimizationType: string,
   parameters: any,
   environmentData?: EnvironmentDataBundle,  // 🆕 환경 데이터
-  flowAnalysis?: FlowAnalysisResult         // 🆕 동선 분석 (Phase 0.2)
+  flowAnalysis?: FlowAnalysisResult,        // 🆕 동선 분석 (Phase 0.2)
+  associationData?: ProductAssociationResult // 🆕 연관성 분석 (Phase 0.3)
 ): string {
   // 🆕 환경 컨텍스트 섹션 생성
   const environmentSection = environmentData ? `
@@ -555,6 +595,18 @@ ${flowAnalysis.summary.flowHealthScore < 50 ? '⚠️ LOW FLOW HEALTH: Prioritiz
 
 ` : '';
 
+  // 🆕 연관성 분석 섹션 생성 (Phase 0.3)
+  const associationSection = associationData ? `
+## 🔗 Product Association Analysis (Use for cross-sell and bundle placement)
+${associationData.aiPromptContext}
+
+### Association-Based Placement Rules
+${associationData.summary.veryStrongRulesCount > 0 ? '🔥 VERY STRONG ASSOCIATIONS FOUND: Prioritize bundle displays for these products' : ''}
+${associationData.summary.strongRulesCount > 3 ? '💡 MULTIPLE STRONG ASSOCIATIONS: Apply cross-sell placement actively' : ''}
+${associationData.placementRecommendations.length > 0 ? `📍 ${associationData.placementRecommendations.length} placement recommendations available` : ''}
+
+` : '';
+
   return `You are a retail store layout optimization expert.
 
 ## CRITICAL CONSTRAINTS
@@ -563,8 +615,10 @@ ${flowAnalysis.summary.flowHealthScore < 50 ? '⚠️ LOW FLOW HEALTH: Prioritiz
 3. ENSURE slot compatibility (display_type must match slot's compatible_display_types)
 4. Consider environment context when prioritizing changes
 5. Use customer flow analysis to identify optimal placement zones
+6. Apply product association rules for cross-sell and bundle placement
 ${environmentSection}
 ${flowAnalysisSection}
+${associationSection}
 ## Current Layout
 Furniture: ${JSON.stringify(layoutData.furniture.slice(0, 20), null, 2)}
 Products: ${JSON.stringify(layoutData.products.slice(0, 30), null, 2)}
@@ -599,6 +653,12 @@ Generate layout optimization recommendations considering the environment context
   ? `ACTIVATE DEAD ZONES: ${flowAnalysis.deadZones.map(d => d.zoneName).join(', ')} - Place high-interest products to attract traffic`
   : 'No critical dead zones detected'}
 8. Use high-traffic paths for premium/promotional product placement
+9. ${associationData?.summary.veryStrongRulesCount && associationData.summary.veryStrongRulesCount > 0
+  ? `BUNDLE OPPORTUNITIES: ${associationData.summary.veryStrongRulesCount} very strong associations found - Create bundle displays`
+  : 'Apply standard cross-sell strategies'}
+10. ${associationData?.placementRecommendations && associationData.placementRecommendations.length > 0
+  ? `CROSS-SELL PLACEMENT: Apply ${associationData.placementRecommendations.length} association-based placement recommendations`
+  : 'No specific association recommendations'}
 
 ## Response Format (JSON)
 {
@@ -645,7 +705,8 @@ function generateRuleBasedOptimization(
   optimizationType: string,
   parameters: any,
   environmentData?: EnvironmentDataBundle,  // 🆕 환경 데이터
-  flowAnalysis?: FlowAnalysisResult         // 🆕 동선 분석 (Phase 0.2)
+  flowAnalysis?: FlowAnalysisResult,        // 🆕 동선 분석 (Phase 0.2)
+  associationData?: ProductAssociationResult // 🆕 연관성 분석 (Phase 0.3)
 ): AILayoutOptimizationResult {
   const furnitureChanges: FurnitureChange[] = [];
   const productChanges: ProductChange[] = [];
@@ -673,6 +734,18 @@ function generateRuleBasedOptimization(
 
   if (flowAnalysis) {
     console.log(`[RuleBasedOpt] Flow: health=${flowAnalysis.summary.flowHealthScore}, bottlenecks=${bottleneckZoneIds.length}, deadZones=${deadZoneIds.length}`);
+  }
+
+  // 🆕 연관성 분석 데이터 (Phase 0.3)
+  const strongAssociations = associationData?.associationRules?.filter(r =>
+    r.ruleStrength === 'very_strong' || r.ruleStrength === 'strong'
+  ) || [];
+  const bundleRecommendations = associationData?.placementRecommendations?.filter(r =>
+    r.type === 'bundle' || r.type === 'cross_sell'
+  ) || [];
+
+  if (associationData) {
+    console.log(`[RuleBasedOpt] Associations: strongRules=${strongAssociations.length}, bundleRecs=${bundleRecommendations.length}`);
   }
 
   // 상품 최적화
@@ -943,6 +1016,15 @@ function generateRuleBasedOptimization(
       high_flow_zones: highFlowZoneIds,
       total_transitions: flowAnalysis.summary.totalTransitions,
       conversion_rate: flowAnalysis.summary.overallConversionRate,
+    } : null,
+    // 🆕 연관성 분석 컨텍스트 정보 추가 (Phase 0.3)
+    association_context: associationData ? {
+      total_transactions: associationData.summary.totalTransactions,
+      avg_basket_size: associationData.summary.avgBasketSize,
+      strong_rules_count: strongAssociations.length,
+      bundle_recommendations: bundleRecommendations.length,
+      data_quality: associationData.summary.dataQuality,
+      top_category_pair: associationData.summary.topCategoryPair,
     } : null,
   };
 
