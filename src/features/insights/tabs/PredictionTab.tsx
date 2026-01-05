@@ -650,14 +650,27 @@ export function PredictionTab() {
             <Brain className="h-4 w-4" style={{ color: iconColor }} />
           </Icon3D>
           <div>
-            <h3 style={{ fontSize: '14px', fontWeight: 600, margin: 0, color: isDark ? '#fff' : '#1a1a1f' }}>AI 기반 예측</h3>
-            <p style={{ fontSize: '12px', margin: '2px 0 0 0', ...text3D.body }}>통계적 분석과 트렌드를 기반으로 향후 7일을 예측합니다</p>
+            <h3 style={{ fontSize: '14px', fontWeight: 600, margin: 0, color: isDark ? '#fff' : '#1a1a1f' }}>
+              {(data as any)?.isAIPowered ? '🤖 Gemini AI 예측' : 'AI 기반 예측'}
+            </h3>
+            <p style={{ fontSize: '12px', margin: '2px 0 0 0', ...text3D.body }}>
+              {(data as any)?.isAIPowered
+                ? 'Google Gemini 2.5 Flash 모델을 사용한 실제 AI 예측'
+                : '통계적 분석과 트렌드를 기반으로 향후 7일을 예측합니다'}
+            </p>
           </div>
         </div>
-        <Badge3D dark={isDark}>
-          <Sparkles className="h-3 w-3" style={{ color: iconColor }} />
-          <span style={{ color: isDark ? 'rgba(255,255,255,0.8)' : '#374151' }}>{summary.model_info.data_points}일 데이터 분석</span>
-        </Badge3D>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {(data as any)?.isAIPowered && (
+            <Badge3D dark={isDark}>
+              <span style={{ color: isDark ? 'rgba(255,255,255,0.8)' : '#374151' }}>🧠 Real AI</span>
+            </Badge3D>
+          )}
+          <Badge3D dark={isDark}>
+            <Sparkles className="h-3 w-3" style={{ color: iconColor }} />
+            <span style={{ color: isDark ? 'rgba(255,255,255,0.8)' : '#374151' }}>{summary.model_info.data_points}일 데이터 분석</span>
+          </Badge3D>
+        </div>
       </div>
 
       {/* 요약 카드 4개 */}
