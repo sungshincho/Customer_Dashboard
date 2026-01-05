@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.79.0';
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.89.0';
 
 // Phase 0.1: 환경 데이터 로딩 시스템
 import {
@@ -790,13 +790,13 @@ async function generateAIOptimization(
       optimization_type: optimizationType as any,
       furniture_changes: result.furniture_changes || [],
       product_changes: result.product_changes || [],
-      summary: {
+      summary: result.summary ? {
         ...result.summary,
         // 🆕 AI 추론 메타데이터 추가
         ai_reasoning_included: !!thinking,
         ai_reasoning_length: thinking?.length || 0,
         prompt_strategy: builtPrompt.metadata.strategy,
-      } || {
+      } : {
         total_furniture_changes: 0,
         total_product_changes: 0,
         expected_revenue_improvement: 0,

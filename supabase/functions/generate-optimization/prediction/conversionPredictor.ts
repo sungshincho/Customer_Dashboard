@@ -430,10 +430,12 @@ export function generateInsights(
   }
 
   // 골든존 분석
-  if (input.suggestedPlacement.slotHeight === 'eye') {
+  const eyeLevelHeights = ['high', 'top'];
+  const isEyeLevel = (height: string) => eyeLevelHeights.includes(height);
+  if (isEyeLevel(input.suggestedPlacement.slotHeight)) {
     strengths.push('골든존(눈높이) 배치로 구매 접근성 최적');
-  } else if (input.currentPlacement.slotHeight === 'eye' &&
-             input.suggestedPlacement.slotHeight !== 'eye') {
+  } else if (isEyeLevel(input.currentPlacement.slotHeight) &&
+             !isEyeLevel(input.suggestedPlacement.slotHeight)) {
     weaknesses.push('골든존 이탈로 가시성 감소 예상');
   }
 

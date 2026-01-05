@@ -360,9 +360,9 @@ export function buildEnvironmentSection(environment: EnvironmentDataBundle | nul
   return `## 🌤️ ENVIRONMENT CONTEXT
 
 ### Current Conditions
-${weather ? `- Weather: **${weather.weatherCondition}** (${weather.temperature}°C, Humidity: ${weather.humidity}%)` : '- Weather: Unknown'}
+${weather ? `- Weather: **${weather.condition}** (${weather.temperature}°C, Humidity: ${weather.humidity}%)` : '- Weather: Unknown'}
 - Day: **${environment.temporal.dayOfWeek}** (${environment.temporal.isWeekend ? 'Weekend' : 'Weekday'})
-- Time: **${environment.temporal.timeOfDay}** (${environment.temporal.isBusinessHour ? 'Business Hours' : 'Off-peak'})
+- Time: **${environment.temporal.timeOfDay}** (${environment.temporal.businessHourWeight > 0.5 ? 'Business Hours' : 'Off-peak'})
 
 ### Impact Multipliers
 | Factor | Multiplier | Trend |
