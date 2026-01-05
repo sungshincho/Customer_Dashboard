@@ -15,6 +15,16 @@ import type { EnvironmentDataBundle } from '../data/environmentLoader.ts';
 import type { FlowAnalysisResult } from '../data/flowAnalyzer.ts';
 import type { ProductAssociationResult } from '../data/associationMiner.ts';
 
+// Phase 1.2: Few-Shot Learning
+import {
+  selectExamples,
+  buildFewShotSection,
+  createScenarioFromEnvironment,
+  type SelectionStrategy,
+  type ExampleScenario,
+  type OptimizationExample,
+} from './fewShotExamples.ts';
+
 // ============================================================================
 // Type Definitions
 // ============================================================================
@@ -32,6 +42,7 @@ export interface PromptConfig {
   fewShot: {
     enabled: boolean;
     exampleCount: number;
+    selectionStrategy: SelectionStrategy;
   };
   constraints: {
     maxFurnitureChanges: number;
@@ -117,6 +128,8 @@ export interface BuiltPrompt {
     strategy: string;
     cotEnabled: boolean;
     fewShotEnabled: boolean;
+    fewShotCount: number;
+    fewShotStrategy: SelectionStrategy;
     dataIncluded: {
       environment: boolean;
       flowAnalysis: boolean;
@@ -207,7 +220,8 @@ export const DEFAULT_PROMPT_CONFIG: PromptConfig = {
   },
   fewShot: {
     enabled: false,
-    exampleCount: 0,
+    exampleCount: 3,
+    selectionStrategy: 'similar',
   },
   constraints: {
     maxFurnitureChanges: 10,
@@ -747,6 +761,30 @@ export function buildAdvancedOptimizationPrompt(
   // 제약조건
   sections.push(buildConstraintsSection(context.settings, config));
 
+  // 🆕 Phase 1.2: Few-Shot 예시 (CoT 프레임워크 앞에 배치)
+  if (config.fewShot.enabled && config.fewShot.exampleCount > 0) {
+    // 현재 환경에서 시나리오 생성
+    const currentScenario = context.environment
+      ? createScenarioFromEnvironment(
+          context.environment.weather,
+          context.environment.events,
+          context.environment.temporal,
+          context.flowAnalysis?.summary?.flowHealthScore
+        )
+      : null;
+
+    // 예시 선택 및 섹션 빌드
+    const selectedExamples = selectExamples(
+      currentScenario,
+      config.fewShot.exampleCount,
+      config.fewShot.selectionStrategy
+    );
+
+    if (selectedExamples.length > 0) {
+      sections.push(buildFewShotSection(selectedExamples));
+    }
+  }
+
   // 추론 프레임워크 (CoT 활성화 시)
   if (config.chainOfThought.enabled) {
     sections.push(buildReasoningFramework(config.chainOfThought.steps));
@@ -789,6 +827,8 @@ export function buildAdvancedOptimizationPrompt(
       strategy: config.strategy,
       cotEnabled: config.chainOfThought.enabled,
       fewShotEnabled: config.fewShot.enabled,
+      fewShotCount: config.fewShot.enabled ? config.fewShot.exampleCount : 0,
+      fewShotStrategy: config.fewShot.selectionStrategy,
       dataIncluded: {
         environment: context.environment !== null,
         flowAnalysis: context.flowAnalysis !== null,
