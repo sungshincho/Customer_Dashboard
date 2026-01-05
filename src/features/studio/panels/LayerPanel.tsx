@@ -399,7 +399,7 @@ export function LayerPanel() {
       {spaceModel && (
         <div className="space-y-1">
           <div
-            className="flex items-center gap-1.5 py-1.5 px-2 rounded-md cursor-pointer hover:bg-white/5 transition-colors"
+            className="flex items-center gap-1.5 py-1.5 px-2 rounded-md cursor-pointer border border-transparent hover:bg-white/5 hover:border-white/10 transition-colors"
             onClick={() => toggleGroup('space')}
           >
             <button className="p-0.5">
@@ -417,8 +417,10 @@ export function LayerPanel() {
             <div className="ml-4">
               <div
                 className={cn(
-                  'flex items-center gap-1.5 py-1.5 px-2 rounded-md cursor-pointer transition-colors group',
-                  selectedId === spaceModel.modelId ? 'bg-blue-500/20 text-blue-400' : 'hover:bg-white/5'
+                  'flex items-center gap-1.5 py-1.5 px-2 rounded-md cursor-pointer border border-transparent transition-colors group',
+                  selectedId === spaceModel.modelId
+                    ? 'bg-blue-500/20 border-blue-500 text-blue-400'
+                    : 'hover:bg-white/5 hover:border-white/10'
                 )}
                 onClick={() => select(spaceModel.modelId || null)}
               >
@@ -450,7 +452,7 @@ export function LayerPanel() {
       {/* ========== 존 섹션 (Zone별 그룹) ========== */}
       <div className="space-y-1">
         <div
-          className="flex items-center gap-1.5 py-1.5 px-2 rounded-md cursor-pointer hover:bg-white/5 transition-colors"
+          className="flex items-center gap-1.5 py-1.5 px-2 rounded-md cursor-pointer border border-transparent hover:bg-white/5 hover:border-white/10 transition-colors"
           onClick={() => toggleGroup('furniture')}
         >
           <button className="p-0.5">
@@ -477,7 +479,7 @@ export function LayerPanel() {
                 <div key={group.zoneId} className="space-y-1">
                   {/* Zone 헤더 */}
                   <div
-                    className="flex items-center gap-1.5 py-1 px-2 rounded-md cursor-pointer hover:bg-white/5 transition-colors ml-2"
+                    className="flex items-center gap-1.5 py-1 px-2 rounded-md cursor-pointer border border-transparent hover:bg-white/5 hover:border-white/10 transition-colors ml-2"
                     onClick={() => toggleZone(group.zoneId)}
                   >
                     <button className="p-0.5">
@@ -512,8 +514,10 @@ export function LayerPanel() {
                             {/* 가구 아이템 */}
                             <div
                               className={cn(
-                                'flex items-center gap-1.5 py-1 px-2 rounded-md cursor-pointer transition-colors group',
-                                isSelected ? 'bg-blue-500/20 text-blue-400' : 'hover:bg-white/5'
+                                'flex items-center gap-1.5 py-1 px-2 rounded-md cursor-pointer border border-transparent transition-colors group',
+                                isSelected
+                                  ? 'bg-blue-500/20 border-blue-500 text-blue-400'
+                                  : 'hover:bg-white/5 hover:border-white/10'
                               )}
                               onClick={() => select(furniture.id)}
                             >
@@ -585,8 +589,10 @@ export function LayerPanel() {
                                     <div
                                       key={child.id}
                                       className={cn(
-                                        'flex items-center gap-1.5 py-0.5 px-2 rounded cursor-pointer transition-colors group',
-                                        isChildSelected ? 'bg-blue-500/20 text-blue-400' : 'hover:bg-white/5'
+                                        'flex items-center gap-1.5 py-0.5 px-2 rounded cursor-pointer border border-transparent transition-colors group',
+                                        isChildSelected
+                                          ? 'bg-blue-500/20 border-blue-500 text-blue-400'
+                                          : 'hover:bg-white/5 hover:border-white/10'
                                       )}
                                       onClick={() => select(child.id)}
                                     >
@@ -627,7 +633,7 @@ export function LayerPanel() {
             {unassignedFurniture.length > 0 && (
               <div className="space-y-1">
                 <div
-                  className="flex items-center gap-1.5 py-1 px-2 rounded-md cursor-pointer hover:bg-white/5 transition-colors ml-2"
+                  className="flex items-center gap-1.5 py-1 px-2 rounded-md cursor-pointer border border-transparent hover:bg-white/5 hover:border-white/10 transition-colors ml-2"
                   onClick={() => toggleZone('unassigned')}
                 >
                   <button className="p-0.5">
@@ -652,8 +658,10 @@ export function LayerPanel() {
                       <div
                         key={item.id}
                         className={cn(
-                          'flex items-center gap-1.5 py-1 px-2 rounded-md cursor-pointer transition-colors group',
-                          selectedId === item.id ? 'bg-blue-500/20 text-blue-400' : 'hover:bg-white/5'
+                          'flex items-center gap-1.5 py-1 px-2 rounded-md cursor-pointer border border-transparent transition-colors group',
+                          selectedId === item.id
+                            ? 'bg-blue-500/20 border-blue-500 text-blue-400'
+                            : 'hover:bg-white/5 hover:border-white/10'
                         )}
                         onClick={() => select(item.id)}
                       >
