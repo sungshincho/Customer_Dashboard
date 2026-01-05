@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { buildStoreContext } from '../utils/store-context-builder';
 import { OptimizationResultPanel } from '../panels/OptimizationResultPanel';
+import { UltimateAnalysisPanel } from '../panels/UltimateAnalysisPanel';
 import { StaffOptimizationResultPanel } from '../components/StaffOptimizationResult';
 import { useScene } from '../core/SceneProvider';
 import { validateOptimizationResult } from '../utils/optimizationValidator';
@@ -591,6 +592,7 @@ export function AIOptimizationTab({
 
   const { results } = sceneSimulation.state;
   const hasResults = results.layout || results.flow || results.staffing;
+  const hasUltimateAnalysis = !!results.ultimateAnalysis;
   const isRunning = sceneSimulation.isSimulating || runningTypes.length > 0;
 
   // 시나리오 저장 (ApplyPanel로 전달)
@@ -932,6 +934,24 @@ export function AIOptimizationTab({
                     }}
                     isOverlayVisible={showStaffOverlay}
                   />
+                )}
+
+                {/* 🆕 Ultimate AI 분석 결과 */}
+                {hasUltimateAnalysis && results.ultimateAnalysis && (
+                  <div className="border-t border-purple-500/30 pt-3 mt-3">
+                    <div className="text-xs font-medium text-purple-300 mb-2 flex items-center gap-1.5">
+                      <Sparkles className="h-3.5 w-3.5" />
+                      고급 AI 분석
+                    </div>
+                    <UltimateAnalysisPanel
+                      flowAnalysis={results.ultimateAnalysis.flowAnalysis}
+                      environment={results.ultimateAnalysis.environment}
+                      association={results.ultimateAnalysis.association}
+                      prediction={results.ultimateAnalysis.prediction}
+                      vmd={results.ultimateAnalysis.vmd}
+                      overallConfidence={results.ultimateAnalysis.overallConfidence}
+                    />
+                  </div>
                 )}
 
                 {/* 비교 모드 토글 */}
