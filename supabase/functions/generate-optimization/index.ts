@@ -7,6 +7,12 @@ import {
   type EnvironmentImpact,
 } from './data/environmentLoader.ts';
 
+// Phase 0.2: 고객 동선 분석 시스템
+import {
+  analyzeCustomerFlow,
+  type FlowAnalysisResult,
+} from './data/flowAnalyzer.ts';
+
 /**
  * generate-optimization Edge Function
  *
@@ -142,7 +148,11 @@ Deno.serve(async (req) => {
     const environmentData = await loadEnvironmentDataBundle(supabase, store_id);
     console.log(`[generate-optimization] Environment: weather=${environmentData.dataQuality.hasWeatherData}, events=${environmentData.events.length}`);
 
-    // 5. 최적화 생성
+    // 5. 🆕 고객 동선 분석 (Phase 0.2)
+    const flowAnalysis = await analyzeCustomerFlow(supabase, store_id, 30);
+    console.log(`[generate-optimization] Flow: zones=${flowAnalysis.summary.totalZones}, transitions=${flowAnalysis.summary.totalTransitions}, health=${flowAnalysis.summary.flowHealthScore}`);
+
+    // 6. 최적화 생성
     let result: AILayoutOptimizationResult;
 
     if (lovableApiKey) {
@@ -153,7 +163,8 @@ Deno.serve(async (req) => {
         slotsData,
         optimization_type,
         parameters,
-        environmentData  // 🆕 환경 데이터 추가
+        environmentData,  // 🆕 환경 데이터 추가
+        flowAnalysis      // 🆕 동선 분석 추가 (Phase 0.2)
       );
     } else {
       // AI 키 없을 경우 룰 기반 최적화
@@ -163,7 +174,8 @@ Deno.serve(async (req) => {
         slotsData,
         optimization_type,
         parameters,
-        environmentData  // 🆕 환경 데이터 추가
+        environmentData,  // 🆕 환경 데이터 추가
+        flowAnalysis      // 🆕 동선 분석 추가 (Phase 0.2)
       );
     }
 
@@ -221,6 +233,38 @@ Deno.serve(async (req) => {
         },
         impact_multipliers: environmentData.impact.combined,
         data_quality: environmentData.dataQuality,
+      },
+      // 🆕 동선 분석 요약 (Phase 0.2)
+      flow_analysis_summary: {
+        total_zones: flowAnalysis.summary.totalZones,
+        total_transitions: flowAnalysis.summary.totalTransitions,
+        avg_path_length: flowAnalysis.summary.avgPathLength,
+        avg_path_duration: flowAnalysis.summary.avgPathDuration,
+        overall_conversion_rate: flowAnalysis.summary.overallConversionRate,
+        bottleneck_count: flowAnalysis.summary.bottleneckCount,
+        dead_zone_count: flowAnalysis.summary.deadZoneCount,
+        opportunity_count: flowAnalysis.summary.opportunityCount,
+        flow_health_score: flowAnalysis.summary.flowHealthScore,
+        key_paths: flowAnalysis.keyPaths.slice(0, 5).map(p => ({
+          path: p.zoneNames.join(' → '),
+          frequency: p.frequency,
+          type: p.pathType,
+        })),
+        bottlenecks: flowAnalysis.bottlenecks.map(b => ({
+          zone: b.zoneName,
+          severity: b.severity,
+          congestion: b.congestionScore,
+        })),
+        dead_zones: flowAnalysis.deadZones.map(d => ({
+          zone: d.zoneName,
+          severity: d.severity,
+          visit_rate: d.visitRate,
+        })),
+        opportunities: flowAnalysis.opportunities.slice(0, 5).map(o => ({
+          type: o.type,
+          priority: o.priority,
+          description: o.description,
+        })),
       },
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -414,9 +458,10 @@ async function generateAIOptimization(
   slotsData: any[],
   optimizationType: string,
   parameters: any,
-  environmentData?: EnvironmentDataBundle  // 🆕 환경 데이터
+  environmentData?: EnvironmentDataBundle,  // 🆕 환경 데이터
+  flowAnalysis?: FlowAnalysisResult         // 🆕 동선 분석 (Phase 0.2)
 ): Promise<AILayoutOptimizationResult> {
-  const prompt = buildOptimizationPrompt(layoutData, performanceData, slotsData, optimizationType, parameters, environmentData);
+  const prompt = buildOptimizationPrompt(layoutData, performanceData, slotsData, optimizationType, parameters, environmentData, flowAnalysis);
 
   try {
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -457,7 +502,7 @@ async function generateAIOptimization(
     };
   } catch (e) {
     console.error('AI optimization failed, falling back to rule-based:', e);
-    return generateRuleBasedOptimization(layoutData, performanceData, slotsData, optimizationType, parameters, environmentData);
+    return generateRuleBasedOptimization(layoutData, performanceData, slotsData, optimizationType, parameters, environmentData, flowAnalysis);
   }
 }
 
@@ -467,7 +512,8 @@ function buildOptimizationPrompt(
   slotsData: any[],
   optimizationType: string,
   parameters: any,
-  environmentData?: EnvironmentDataBundle  // 🆕 환경 데이터
+  environmentData?: EnvironmentDataBundle,  // 🆕 환경 데이터
+  flowAnalysis?: FlowAnalysisResult         // 🆕 동선 분석 (Phase 0.2)
 ): string {
   // 🆕 환경 컨텍스트 섹션 생성
   const environmentSection = environmentData ? `
@@ -497,6 +543,18 @@ ${environmentData.impact.event.recommendations.length > 0
 
 ` : '';
 
+  // 🆕 동선 분석 섹션 생성 (Phase 0.2)
+  const flowAnalysisSection = flowAnalysis ? `
+## 🚶 Customer Flow Analysis (CRITICAL - Use this data to optimize layout)
+${flowAnalysis.aiPromptContext}
+
+### Flow-Based Optimization Guidelines
+${flowAnalysis.summary.flowHealthScore < 50 ? '⚠️ LOW FLOW HEALTH: Prioritize fixing bottlenecks and activating dead zones' :
+  flowAnalysis.summary.flowHealthScore < 70 ? '⚡ MODERATE FLOW HEALTH: Focus on opportunity zones' :
+  '✅ GOOD FLOW HEALTH: Fine-tune for marginal improvements'}
+
+` : '';
+
   return `You are a retail store layout optimization expert.
 
 ## CRITICAL CONSTRAINTS
@@ -504,7 +562,9 @@ ${environmentData.impact.event.recommendations.length > 0
 2. ONLY suggest movable=true furniture for relocation
 3. ENSURE slot compatibility (display_type must match slot's compatible_display_types)
 4. Consider environment context when prioritizing changes
+5. Use customer flow analysis to identify optimal placement zones
 ${environmentSection}
+${flowAnalysisSection}
 ## Current Layout
 Furniture: ${JSON.stringify(layoutData.furniture.slice(0, 20), null, 2)}
 Products: ${JSON.stringify(layoutData.products.slice(0, 30), null, 2)}
@@ -522,9 +582,9 @@ Type: ${optimizationType}
 ${JSON.stringify(parameters, null, 2)}
 
 ## Task
-Generate layout optimization recommendations considering the environment context:
+Generate layout optimization recommendations considering the environment context and customer flow:
 1. Identify underperforming products/furniture
-2. Find better positions based on performance data
+2. Find better positions based on performance data AND flow analysis
 3. Ensure slot compatibility for products
 4. Only move furniture if marked as movable
 5. ${environmentData?.impact.combined.traffic && environmentData.impact.combined.traffic < 0.7
@@ -532,6 +592,13 @@ Generate layout optimization recommendations considering the environment context
   : environmentData?.impact.combined.traffic && environmentData.impact.combined.traffic > 1.3
     ? 'HIGH TRAFFIC EXPECTED: Optimize flow paths, ensure popular items are accessible'
     : 'Apply standard optimization strategies'}
+6. ${flowAnalysis?.bottlenecks && flowAnalysis.bottlenecks.length > 0
+  ? `ADDRESS BOTTLENECKS: ${flowAnalysis.bottlenecks.map(b => b.zoneName).join(', ')} - Consider redistributing products from these zones`
+  : 'No critical bottlenecks detected'}
+7. ${flowAnalysis?.deadZones && flowAnalysis.deadZones.length > 0
+  ? `ACTIVATE DEAD ZONES: ${flowAnalysis.deadZones.map(d => d.zoneName).join(', ')} - Place high-interest products to attract traffic`
+  : 'No critical dead zones detected'}
+8. Use high-traffic paths for premium/promotional product placement
 
 ## Response Format (JSON)
 {
@@ -577,7 +644,8 @@ function generateRuleBasedOptimization(
   slotsData: any[],
   optimizationType: string,
   parameters: any,
-  environmentData?: EnvironmentDataBundle  // 🆕 환경 데이터
+  environmentData?: EnvironmentDataBundle,  // 🆕 환경 데이터
+  flowAnalysis?: FlowAnalysisResult         // 🆕 동선 분석 (Phase 0.2)
 ): AILayoutOptimizationResult {
   const furnitureChanges: FurnitureChange[] = [];
   const productChanges: ProductChange[] = [];
@@ -592,6 +660,19 @@ function generateRuleBasedOptimization(
 
   if (environmentData) {
     console.log(`[RuleBasedOpt] Environment: traffic=${envImpact?.traffic}x, dwell=${envImpact?.dwell}x, conversion=${envImpact?.conversion}x`);
+  }
+
+  // 🆕 동선 분석 기반 최적화 조정 (Phase 0.2)
+  const bottleneckZoneIds = flowAnalysis?.bottlenecks?.map(b => b.zoneId) || [];
+  const deadZoneIds = flowAnalysis?.deadZones?.map(d => d.zoneId) || [];
+  const highFlowZoneIds = flowAnalysis?.zoneStats
+    ?.filter(z => z.totalVisitors > 0)
+    ?.sort((a, b) => b.totalVisitors - a.totalVisitors)
+    ?.slice(0, 3)
+    ?.map(z => z.zoneId) || [];
+
+  if (flowAnalysis) {
+    console.log(`[RuleBasedOpt] Flow: health=${flowAnalysis.summary.flowHealthScore}, bottlenecks=${bottleneckZoneIds.length}, deadZones=${deadZoneIds.length}`);
   }
 
   // 상품 최적화
@@ -853,6 +934,15 @@ function generateRuleBasedOptimization(
       events: environmentData.events.map(e => e.eventName),
       multipliers: envImpact,
       confidence: environmentData.impact.confidence,
+    } : null,
+    // 🆕 동선 분석 컨텍스트 정보 추가 (Phase 0.2)
+    flow_context: flowAnalysis ? {
+      health_score: flowAnalysis.summary.flowHealthScore,
+      bottleneck_zones: bottleneckZoneIds,
+      dead_zones: deadZoneIds,
+      high_flow_zones: highFlowZoneIds,
+      total_transitions: flowAnalysis.summary.totalTransitions,
+      conversion_rate: flowAnalysis.summary.overallConversionRate,
     } : null,
   };
 
