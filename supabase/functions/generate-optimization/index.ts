@@ -48,6 +48,14 @@ import {
   type ConversionPredictionSummary,
 } from './prediction/conversionPredictor.ts';
 
+// Phase 3: VMD 엔진
+import {
+  analyzeVMD,
+  buildVMDContext,
+  formatVMDAnalysisForResponse,
+  type VMDAnalysisResult,
+} from './vmd/vmdEngine.ts';
+
 /**
  * generate-optimization Edge Function
  *
@@ -191,7 +199,20 @@ Deno.serve(async (req) => {
     const associationData = await analyzeProductAssociations(supabase, store_id, 90);
     console.log(`[generate-optimization] Associations: rules=${associationData.summary.totalRulesFound}, strong=${associationData.summary.strongRulesCount}, quality=${associationData.summary.dataQuality}`);
 
-    // 7. 최적화 생성
+    // 7. 🆕 VMD 분석 (Phase 3)
+    const vmdContext = buildVMDContext(
+      layoutData.zones,
+      layoutData.furniture,
+      layoutData.products,
+      slotsData,
+      flowAnalysis,
+      associationData,
+      performanceData.productPerformance
+    );
+    const vmdAnalysis = analyzeVMD(vmdContext);
+    console.log(`[generate-optimization] VMD: score=${vmdAnalysis.score.overall}, grade=${vmdAnalysis.score.grade}, violations=${vmdAnalysis.violations.length}`);
+
+    // 8. 최적화 생성
     let result: AILayoutOptimizationResult;
 
     if (lovableApiKey) {
@@ -204,7 +225,8 @@ Deno.serve(async (req) => {
         parameters,
         environmentData,  // 🆕 환경 데이터 추가
         flowAnalysis,     // 🆕 동선 분석 추가 (Phase 0.2)
-        associationData   // 🆕 연관성 분석 추가 (Phase 0.3)
+        associationData,  // 🆕 연관성 분석 추가 (Phase 0.3)
+        vmdAnalysis       // 🆕 VMD 분석 추가 (Phase 3)
       );
     } else {
       // AI 키 없을 경우 룰 기반 최적화
@@ -432,6 +454,8 @@ Deno.serve(async (req) => {
         avg_confidence: conversionPredictionSummary.avgConfidence,
         predictions_applied: conversionPredictions.length,
       },
+      // 🆕 VMD 분석 (Phase 3)
+      vmd_analysis: formatVMDAnalysisForResponse(vmdAnalysis),
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -626,7 +650,8 @@ async function generateAIOptimization(
   parameters: any,
   environmentData?: EnvironmentDataBundle,  // 🆕 환경 데이터
   flowAnalysis?: FlowAnalysisResult,        // 🆕 동선 분석 (Phase 0.2)
-  associationData?: ProductAssociationResult // 🆕 연관성 분석 (Phase 0.3)
+  associationData?: ProductAssociationResult, // 🆕 연관성 분석 (Phase 0.3)
+  vmdAnalysis?: VMDAnalysisResult            // 🆕 VMD 분석 (Phase 3)
 ): Promise<AILayoutOptimizationResult> {
   // 🆕 Phase 1.1: Chain-of-Thought 프롬프트 빌더 사용
   const promptContext = createPromptContext(
@@ -662,9 +687,15 @@ async function generateAIOptimization(
 
   const builtPrompt: BuiltPrompt = buildAdvancedOptimizationPrompt(promptContext, promptConfig);
 
+  // 🆕 Phase 3: VMD 분석 컨텍스트 추가
+  let enhancedUserPrompt = builtPrompt.userPrompt;
+  if (vmdAnalysis) {
+    enhancedUserPrompt += `\n\n${vmdAnalysis.aiPromptContext}`;
+  }
+
   console.log(`[generateAIOptimization] Prompt built: tokens~${builtPrompt.totalTokenEstimate}, strategy=${builtPrompt.metadata.strategy}`);
   console.log(`[generateAIOptimization] CoT=${builtPrompt.metadata.cotEnabled}, FewShot=${builtPrompt.metadata.fewShotEnabled}(${builtPrompt.metadata.fewShotCount} examples, ${builtPrompt.metadata.fewShotStrategy})`);
-  console.log(`[generateAIOptimization] Data included: env=${builtPrompt.metadata.dataIncluded.environment}, flow=${builtPrompt.metadata.dataIncluded.flowAnalysis}, assoc=${builtPrompt.metadata.dataIncluded.associations}`);
+  console.log(`[generateAIOptimization] Data included: env=${builtPrompt.metadata.dataIncluded.environment}, flow=${builtPrompt.metadata.dataIncluded.flowAnalysis}, assoc=${builtPrompt.metadata.dataIncluded.associations}, vmd=${!!vmdAnalysis}`);
 
   try {
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -677,7 +708,7 @@ async function generateAIOptimization(
         model: 'google/gemini-2.5-flash',
         messages: [
           { role: 'system', content: builtPrompt.systemPrompt },
-          { role: 'user', content: builtPrompt.userPrompt }
+          { role: 'user', content: enhancedUserPrompt }  // 🆕 VMD 컨텍스트 포함
         ],
         response_format: { type: 'json_object' },
         max_tokens: 6000, // 🆕 CoT 추론을 위해 토큰 증가
