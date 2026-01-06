@@ -211,19 +211,6 @@ function RendererSetup({ config = SCENE_CONFIG }: RendererSetupProps) {
     gl.outputColorSpace = THREE.SRGBColorSpace;
     gl.shadowMap.enabled = true;
     gl.shadowMap.type = THREE.PCFSoftShadowMap;
-
-    // 🔍 디버그: WebGL 정보 출력
-    console.log('[RendererSetup] WebGL Info:', {
-      maxTextureSize: gl.capabilities.maxTextureSize,
-      maxAnisotropy: gl.capabilities.getMaxAnisotropy(),
-      precision: gl.capabilities.precision,
-      maxTextures: gl.capabilities.maxTextures,
-      pixelRatio: gl.getPixelRatio(),
-      drawingBufferSize: {
-        width: gl.domElement.width,
-        height: gl.domElement.height,
-      },
-    });
   }, [gl, config]);
 
   return null;
@@ -443,6 +430,16 @@ function StaticEnvironmentModel({
               opacity: originalMaterial.opacity ?? 1,
               side: originalMaterial.side || THREE.FrontSide,
             });
+
+            // 텍스처 품질 설정
+            if (basicMaterial.map) {
+              basicMaterial.map.colorSpace = THREE.SRGBColorSpace;
+              basicMaterial.map.anisotropy = 16;
+              basicMaterial.map.minFilter = THREE.LinearMipmapLinearFilter;
+              basicMaterial.map.magFilter = THREE.LinearFilter;
+              basicMaterial.map.generateMipmaps = true;
+              basicMaterial.map.needsUpdate = true;
+            }
 
             // Baked 설정
             basicMaterial.toneMapped = false;

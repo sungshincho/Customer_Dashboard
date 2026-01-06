@@ -51,7 +51,7 @@ export function StoreSpace({ asset, onClick }: StoreSpaceProps) {
 
     // scene을 clone하고 baked 모델이면 material 변환
     const clonedScene = useMemo(() => {
-      const cloned = scene.clone();
+      const cloned = scene.clone(true);
       if (shouldUseBaked) {
         // MeshBasicMaterial로 변환하여 조명/환경 영향 제외
         prepareClonedSceneForBaked(cloned, {
