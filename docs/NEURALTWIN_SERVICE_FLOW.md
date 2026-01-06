@@ -687,7 +687,92 @@ flowchart TB
     AI_CALL --> RESULT
 ```
 
-### 6.3 AI 응답 로깅 플로우
+### 6.3 AI 시뮬레이션 → AI 최적화 연결 플로우
+
+```mermaid
+sequenceDiagram
+    participant User as 사용자
+    participant SimTab as AISimulationTab
+    participant OptTab as AIOptimizationTab
+    participant SIM_EF as run-simulation
+    participant OPT_EF as generate-optimization
+    participant AI as Lovable Gateway
+    participant DB as ai_response_logs
+
+    User->>SimTab: 시뮬레이션 실행
+    SimTab->>SIM_EF: POST /run-simulation
+    Note over SimTab,SIM_EF: environment_context, preset_scenario
+
+    SIM_EF->>AI: AI 시뮬레이션 요청
+    AI-->>SIM_EF: simulation_result + diagnostic_issues
+
+    SIM_EF->>DB: 응답 로깅
+    SIM_EF-->>SimTab: 결과 + 문제점 목록
+
+    SimTab->>User: "AI 최적화로 실행하시겠습니까?"
+
+    User->>SimTab: 문제점 선택 → 최적화 탭으로 이동 클릭
+    SimTab->>OptTab: navigate with diagnostic_issues
+    Note over SimTab,OptTab: scenario_context, environment_context,<br/>simulation_kpis, priority_issues
+
+    OptTab->>User: "문제점 시나리오" 표시
+    User->>OptTab: 옵션 설정 후 최적화 실행
+
+    OptTab->>OPT_EF: POST /generate-optimization
+    Note over OptTab,OPT_EF: diagnostic_issues를 최우선 해결 대상으로 전달
+
+    OPT_EF->>OPT_EF: buildDiagnosticIssuesSection()
+    Note over OPT_EF: 진단 이슈를 프롬프트 최상단에 배치
+
+    OPT_EF->>AI: AI 최적화 요청 (이슈 우선 해결)
+    AI-->>OPT_EF: optimization_result
+
+    OPT_EF->>DB: 응답 로깅
+    OPT_EF-->>OptTab: 최적화 결과
+    OptTab->>User: 최적화 제안 표시
+```
+
+### 6.4 진단 이슈 컨텍스트 구조
+
+```typescript
+interface DiagnosticIssuesContext {
+  priority_issues: {
+    id: string;
+    type: string;              // 'congestion' | 'bottleneck' | 'deadzone'
+    severity: 'critical' | 'warning' | 'info';
+    title: string;
+    zone_id: string;
+    zone_name: string;
+    description: string;
+    impact: {
+      revenueImpact: number;   // 예상 매출 손실
+      trafficImpact: number;
+      conversionImpact: number;
+    };
+    recommendations: string[];
+  }[];
+  scenario_context: {          // 시뮬레이션 프리셋 시나리오
+    id: string;
+    name: string;
+    description: string;
+    risk_tags: string[];
+  } | null;
+  environment_context: {       // 환경 설정
+    weather: string;
+    holiday_type: string;
+    time_of_day: string;
+    traffic_multiplier: number;
+  } | null;
+  simulation_kpis: {           // 시뮬레이션 KPI
+    visitors: number;
+    revenue: number;
+    conversion: number;
+    avg_dwell: number;
+  } | null;
+}
+```
+
+### 6.5 AI 응답 로깅 플로우
 
 ```mermaid
 sequenceDiagram
@@ -823,3 +908,4 @@ flowchart TB
 | 버전 | 날짜 | 변경 내용 |
 |------|------|-----------|
 | 1.0 | 2026-01-06 | 초기 문서 작성 |
+| 1.1 | 2026-01-06 | AI 시뮬레이션 → AI 최적화 연결 플로우 추가 (섹션 6.3, 6.4) |

@@ -50,6 +50,28 @@ AI 시뮬레이션 및 최적화 응답을 수집하여:
 | `generate-optimization` | Gemini 2.5 Flash | 레이아웃 최적화 | ✅ |
 | `advanced-ai-inference` | Gemini 2.5 Flash/Pro | 고급 AI 추론 | ✅ |
 
+### 1.4 시뮬레이션 → 최적화 연결 데이터 흐름
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│ AI 시뮬레이션    │───▶│  진단 이슈 감지   │───▶│   AI 최적화     │
+│ run-simulation  │    │ diagnostic_issues│    │ generate-optim  │
+└────────┬────────┘    └─────────────────┘    └────────┬────────┘
+         │                                             │
+         ▼                                             ▼
+┌─────────────────┐                          ┌─────────────────┐
+│ ai_response_logs│                          │ ai_response_logs│
+│ (simulation)    │                          │ (optimization)  │
+│ + env_context   │                          │ + diag_issues   │
+└─────────────────┘                          └─────────────────┘
+```
+
+**진단 이슈 컨텍스트 전달 항목:**
+- `priority_issues`: 해결해야 할 문제점 목록
+- `scenario_context`: 시뮬레이션 프리셋 시나리오
+- `environment_context`: 환경 설정 (날씨, 휴일 등)
+- `simulation_kpis`: 시뮬레이션 KPI 결과
+
 ---
 
 ## 2. 로깅 시스템 현황
@@ -174,6 +196,50 @@ CREATE TABLE ai_response_logs (
   "trafficMultiplier": 0.7,
   "hasEnvironmentContext": true,
   "hasPresetScenario": true
+}
+```
+
+#### diagnostic_issues (generate-optimization 입력) 예시
+
+시뮬레이션에서 최적화로 전달되는 진단 이슈 컨텍스트:
+
+```json
+{
+  "priority_issues": [
+    {
+      "id": "issue-1",
+      "type": "congestion",
+      "severity": "critical",
+      "title": "입구 존 혼잡 위험",
+      "zone_id": "zone-entrance",
+      "zone_name": "입구 존",
+      "description": "피크 시간대 입구 혼잡도가 100%를 초과합니다",
+      "impact": {
+        "revenueImpact": 500000,
+        "trafficImpact": 50,
+        "conversionImpact": 0.02
+      },
+      "recommendations": ["입구 확장", "안내 인력 배치"]
+    }
+  ],
+  "scenario_context": {
+    "id": "blackFriday",
+    "name": "블랙프라이데이",
+    "description": "연중 최대 세일 이벤트",
+    "risk_tags": ["혼잡 위험", "인력 부족", "병목 위험"]
+  },
+  "environment_context": {
+    "weather": "clear",
+    "holiday_type": "blackFriday",
+    "time_of_day": "afternoon",
+    "traffic_multiplier": 2.5
+  },
+  "simulation_kpis": {
+    "visitors": 250,
+    "revenue": 5000000,
+    "conversion": 0.08,
+    "avg_dwell": 180
+  }
 }
 ```
 
@@ -448,6 +514,61 @@ GROUP BY context_metadata->>'holidayType'
 ORDER BY log_count DESC;
 ```
 
+### 4.7 진단 이슈 컨텍스트 로깅 검증 (최적화)
+
+시뮬레이션에서 전달된 진단 이슈가 최적화 로그에 포함되었는지 확인:
+
+```sql
+-- 진단 이슈가 포함된 최적화 로그 조회
+SELECT
+  id,
+  input_variables->'layout'->'diagnostic_issues' as diag_issues,
+  jsonb_array_length(
+    input_variables->'layout'->'diagnostic_issues'->'priority_issues'
+  ) as issue_count,
+  input_variables->'layout'->'diagnostic_issues'->>'scenario_context' as scenario,
+  response_summary,
+  created_at
+FROM ai_response_logs
+WHERE function_name = 'generate-optimization'
+  AND input_variables->'layout'->'diagnostic_issues' IS NOT NULL
+ORDER BY created_at DESC
+LIMIT 10;
+
+-- 진단 이슈 포함 최적화 vs 일반 최적화 비교
+SELECT
+  CASE
+    WHEN input_variables->'layout'->'diagnostic_issues' IS NOT NULL
+    THEN '진단 이슈 기반'
+    ELSE '일반 최적화'
+  END as optimization_type,
+  COUNT(*) as count,
+  ROUND(AVG(quality_score), 2) as avg_quality,
+  ROUND(AVG(execution_time_ms)) as avg_time_ms
+FROM ai_response_logs
+WHERE function_name = 'generate-optimization'
+GROUP BY
+  CASE
+    WHEN input_variables->'layout'->'diagnostic_issues' IS NOT NULL
+    THEN '진단 이슈 기반'
+    ELSE '일반 최적화'
+  END;
+
+-- 시나리오별 진단 이슈 최적화 결과
+SELECT
+  input_variables->'layout'->'diagnostic_issues'->'scenario_context'->>'name' as scenario_name,
+  COUNT(*) as count,
+  ROUND(AVG(
+    (input_variables->'layout'->'diagnostic_issues'->'simulation_kpis'->>'revenue')::NUMERIC
+  )) as avg_sim_revenue,
+  ROUND(AVG(quality_score), 2) as avg_quality
+FROM ai_response_logs
+WHERE function_name = 'generate-optimization'
+  AND input_variables->'layout'->'diagnostic_issues'->'scenario_context' IS NOT NULL
+GROUP BY input_variables->'layout'->'diagnostic_issues'->'scenario_context'->>'name'
+ORDER BY count DESC;
+```
+
 ---
 
 ## 5. 데이터셋 추출 방법
@@ -688,7 +809,16 @@ FROM ranked;
 - [ ] 학습/검증 분리 비율 확인
 - [ ] 환경 컨텍스트 포함 데이터셋 추출 확인
 
-### 7.6 파인튜닝 준비
+### 7.6 진단 이슈 기반 최적화 로깅 검증
+
+- [ ] `generate-optimization` 호출 시 `diagnostic_issues` 포함 확인
+- [ ] `diagnostic_issues.priority_issues` 배열 존재
+- [ ] `diagnostic_issues.scenario_context` 포함 (시뮬레이션 연결 시)
+- [ ] `diagnostic_issues.environment_context` 포함
+- [ ] `diagnostic_issues.simulation_kpis` 포함
+- [ ] AI 프롬프트에 진단 이슈가 최우선으로 반영되는지 확인
+
+### 7.7 파인튜닝 준비
 
 - [ ] 데이터셋 크기 충분 (최소 100개 권장)
 - [ ] 다양한 시나리오 포함 확인 (7개 프리셋 각각 포함)
@@ -822,6 +952,7 @@ supabase/
 |------|------|----------|
 | 1.0 | 2026-01-06 | 초기 문서 작성 |
 | 1.1 | 2026-01-06 | 환경/시나리오 컨텍스트 로깅 검증 추가, 단계별 QA 가이드 확장 |
+| 1.2 | 2026-01-06 | 시뮬레이션→최적화 연결 데이터 흐름 추가, 진단 이슈 컨텍스트 로깅 검증 추가 |
 
 ---
 
