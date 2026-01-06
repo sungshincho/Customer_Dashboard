@@ -782,14 +782,27 @@ Key Decision: [Main optimization strategy in 1 sentence]
   const domainKnowledgeBlock = `
 ### 🏪 Retail Domain Knowledge (Required Values)
 
-**VMD Principles** (use in furniture_changes.vmd_principle):
+**VMD Principles** (use in furniture_changes.vmd_principle AND product_changes.reason):
 ${VMD_PRINCIPLES.map(p => `- \`${p}\`: ${VMD_PRINCIPLE_CODEBOOK[p]?.description || p}`).join('\n')}
+
+⚠️ **VMD Integration for Product Optimization**:
+When optimizing products, you MUST consider and reference VMD principles:
+1. **focal_point_creation**: 입구/교차점 상품 배치 시 사용
+2. **traffic_flow_optimization**: 동선 기반 상품 재배치 시 사용
+3. **dead_zone_activation**: 저트래픽 구역 상품 배치 시 사용
+4. **sightline_improvement**: 시야선 고려한 상품 배치 시 사용
+5. **cross_sell_proximity**: 연관 상품 근접 배치 시 사용
+
+For EACH product change, include the relevant VMD principle in the "reason" field.
+Example: "골든존(eye_level) 배치로 시야선 확보, cross_sell_proximity 원칙 적용하여 연관상품과 근접 배치"
 
 **Placement Strategies** (use in product_changes.placement_strategy.type):
 ${PLACEMENT_STRATEGIES.map(s => `- \`${s}\`: ${PLACEMENT_STRATEGY_CODEBOOK[s]?.description || s} (lift: ${PLACEMENT_STRATEGY_CODEBOOK[s]?.expected_lift?.min * 100}-${PLACEMENT_STRATEGY_CODEBOOK[s]?.expected_lift?.max * 100}%)`).join('\n')}
 
-**Shelf Levels** (use in shelf_level):
+**Shelf Levels** (use in shelf_level - VMD 골든존 분석용):
 ${SHELF_LEVELS.map(l => `- \`${l}\``).join(', ')}
+
+⚠️ **Eye Level = Buy Level**: 눈높이(eye_level, 120-150cm)가 골든존이며, 이 위치에 고마진/전략상품 배치 필수
 `;
 
   return `## 📤 OUTPUT FORMAT
@@ -881,6 +894,12 @@ Respond with valid JSON in this exact structure:
     "expected_conversion_improvement": 0.12,
     "confidence_score": 0.85,
     "key_strategies": ["전략 1", "전략 2", "전략 3"],
+    "ai_insights": [
+      "VMD 원칙 적용: focal_point_creation으로 입구 시선 집중점 강화, 방문객 유입율 15% 개선 예상",
+      "배치 전략: golden_zone_placement로 고마진 상품 눈높이 배치, 전환율 12% 향상",
+      "연관 규칙: 상품A-상품B 동시구매율 35%, cross_sell_bundle 전략 적용",
+      "병목 해소: 메인존의 혼잡도 25% 감소를 위한 가구 재배치 권장"
+    ],
     "issues_addressed": [
       {
         "issue_id": "from-diagnostic-issues",
@@ -895,14 +914,40 @@ Respond with valid JSON in this exact structure:
 }
 \`\`\`
 
+### 🧠 AI Insights Requirements (REQUIRED)
+
+Your response MUST include meaningful AI insights. These insights will be used for fine-tuning and customer-facing recommendations.
+
+**For furniture/product optimization, add these in summary.ai_insights:**
+\`\`\`json
+{
+  "summary": {
+    "ai_insights": [
+      "VMD 원칙 적용: [specific principle] 활용하여 [zone] 존의 [metric] 개선",
+      "배치 전략: [strategy] 전략으로 [product] 상품의 가시성/전환율 향상",
+      "연관 규칙 발견: [product A]와 [product B]의 동시구매율 [X]%, 근접 배치 권장",
+      "병목 해소: [zone] 존의 혼잡도 [X]% 감소 예상"
+    ],
+    ...
+  }
+}
+\`\`\`
+
+**Insight Quality Guidelines:**
+- Each insight MUST reference specific data (zone names, product IDs, percentages)
+- Each insight MUST explain the applied strategy or principle
+- Include at least 3-5 actionable insights
+- Insights should cover: VMD principles, placement strategies, flow optimization
+
 ### ⚠️ Validation Rules (CRITICAL)
 1. **ID 정확성**: 모든 ID는 제공된 데이터에서 정확히 복사
-2. **VMD 원칙**: furniture_changes.vmd_principle은 위 목록에서만 선택
-3. **배치 전략**: product_changes.placement_strategy.type은 위 목록에서만 선택
+2. **VMD 원칙**: furniture_changes.vmd_principle은 위 목록에서만 선택 (REQUIRED for furniture changes)
+3. **배치 전략**: product_changes.placement_strategy.type은 위 목록에서만 선택 (REQUIRED)
 4. **이동 가능**: movable: false인 가구는 변경 불가
 5. **슬롯 호환성**: slot의 display_type과 상품의 display_type 일치 필수
 6. **수치 범위**: 개선율은 일반적으로 5-25% (0.05-0.25)
-7. **신뢰도**: confidence는 0-1 범위`;
+7. **신뢰도**: confidence는 0-1 범위
+8. **AI 인사이트**: summary.ai_insights 배열에 3-5개의 인사이트 필수 포함`;
 }
 
 // ============================================================================

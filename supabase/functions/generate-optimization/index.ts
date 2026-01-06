@@ -1871,7 +1871,7 @@ async function performStaffingOptimization(
 ${realStaffData.map((s: any, idx: number) => `- ${s.staff_code || `STAFF-${idx+1}`}: ${s.staff_name} (${s.role || 'sales'})`).join('\n')}`
     : `- Available Staff Count: ${staffCount}`;
 
-  // 4. AI 프롬프트 생성
+  // 4. AI 프롬프트 생성 (🆕 assignment_strategy 필드 추가)
   const prompt = `You are an expert retail operations AI specializing in staff placement optimization.
 
 TASK: Analyze the store layout and customer patterns to suggest optimal staff positions that maximize ${goal === 'customer_service' ? 'customer service quality and response time' : goal === 'sales' ? 'sales conversion and upselling opportunities' : 'operational efficiency'}.
@@ -1893,6 +1893,24 @@ ${Object.entries(performanceData.zoneMetrics).slice(0, 8).map(([zoneId, data]: [
   `- ${data.zoneName || zoneId}: ${data.visitors || 0} visitors, ${data.avgDwellTime || 30}s dwell time, ${((data.conversionRate || 0.05) * 100).toFixed(1)}% conversion`
 ).join('\n')}` : ''}
 
+## 🧑‍💼 STAFFING STRATEGY CODEBOOK (MUST USE)
+
+Each staff member MUST be assigned one of these strategies in the "assignment_strategy" field:
+
+- **peak_coverage**: 피크타임 커버리지 - 혼잡 시간대 대응
+- **bottleneck_support**: 병목 지원 - 체류시간이 길고 혼잡한 구역 배치
+- **high_value_zone_focus**: 고가치 존 집중 - 전환율/매출이 높은 구역에 집중
+- **cross_zone_flexibility**: 교차 존 유연배치 - 여러 존 커버리지 최적화
+- **customer_service_boost**: 고객 서비스 강화 - 고객 응대 품질 향상
+- **queue_management**: 대기줄 관리 - 결제/피팅룸 대기 관리
+- **fitting_room_priority**: 피팅룸 우선 배치 - 피팅룸 서비스 강화
+- **entrance_greeting**: 입구 환영 서비스 - 입구에서 고객 응대
+
+## 🏷️ STAFF ROLES (MUST USE)
+
+Each staff member MUST be assigned one of these roles:
+- manager, sales, cashier, security, greeter, fitting_room_attendant, stock, visual_merchandiser
+
 ${realStaffData.length > 0 ? `IMPORTANT: Use the exact staff IDs and names from ACTUAL STAFF MEMBERS above. Do NOT generate fake names.` : ''}
 
 Return a JSON object with this exact structure:
@@ -1900,11 +1918,16 @@ Return a JSON object with this exact structure:
   "staffPositions": [
     {
       "staffId": "string",
+      "staffCode": "string",
       "staffName": "string",
+      "role": "sales|manager|cashier|security|greeter|fitting_room_attendant|stock|visual_merchandiser",
       "currentPosition": {"x": number, "y": 0.5, "z": number},
       "suggestedPosition": {"x": number, "y": 0.5, "z": number},
-      "coverageGain": number (percentage),
-      "reason": "string explaining the placement in Korean"
+      "current_zone": "zone_id or zone_name",
+      "suggested_zone": "zone_id or zone_name",
+      "assignment_strategy": "peak_coverage|bottleneck_support|high_value_zone_focus|cross_zone_flexibility|customer_service_boost|queue_management|fitting_room_priority|entrance_greeting",
+      "coverageGain": number (percentage improvement, 5-30%),
+      "reason": "string explaining the placement strategy in Korean"
     }
   ],
   "zoneCoverage": [
@@ -1920,12 +1943,18 @@ Return a JSON object with this exact structure:
   "metrics": {
     "totalCoverage": number (0-100),
     "avgResponseTime": number (seconds),
-    "coverageGain": number (percentage),
-    "customerServiceRateIncrease": number (percentage)
+    "coverageGain": number (percentage, 5-30%),
+    "customerServiceRateIncrease": number (percentage, 5-25%)
   },
-  "insights": ["string array of 3-5 actionable insights in Korean"],
+  "insights": ["string array of 3-5 actionable insights in Korean - REQUIRED"],
   "confidence": number (0-1)
-}`;
+}
+
+⚠️ CRITICAL REQUIREMENTS:
+1. EVERY staff member MUST have an "assignment_strategy" from the STAFFING STRATEGY CODEBOOK
+2. EVERY staff member MUST have a "role" from the STAFF ROLES list
+3. The "insights" array MUST contain 3-5 meaningful, actionable insights in Korean
+4. Each insight should reference the assignment_strategy being applied`;
 
   // 5. AI 호출 또는 룰 기반 생성
   if (apiKey) {
