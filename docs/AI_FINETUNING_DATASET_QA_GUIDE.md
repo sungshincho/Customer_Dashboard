@@ -105,6 +105,33 @@ CREATE TABLE ai_response_logs (
     "zone_stats": [...],
     "transition_probabilities": [...],
     "historical_kpis": {...}
+  },
+  "environment_context": {
+    "weather": "rain",
+    "temperature": 15,
+    "humidity": 80,
+    "holiday_type": "none",
+    "day_of_week": "friday",
+    "time_of_day": "afternoon",
+    "impact": {
+      "trafficMultiplier": 0.7,
+      "dwellTimeMultiplier": 1.25,
+      "conversionMultiplier": 1.0
+    },
+    "preset_scenario": {
+      "id": "rainyWeekday",
+      "name": "비 오는 평일",
+      "traffic_multiplier": 0.7,
+      "discount_percent": null,
+      "event_type": null,
+      "expected_impact": {
+        "visitorsMultiplier": 0.7,
+        "conversionMultiplier": 1.0,
+        "basketMultiplier": 1.05,
+        "dwellTimeMultiplier": 1.25
+      },
+      "risk_tags": ["매출 감소"]
+    }
   }
 }
 ```
@@ -137,9 +164,29 @@ CREATE TABLE ai_response_logs (
 ```json
 {
   "model_used": "gemini-2.5-flash",
-  "zone_count": 8,
-  "issue_count": 3,
-  "critical_issues": 1
+  "zoneCount": 8,
+  "issueCount": 3,
+  "criticalIssues": 1,
+  "weather": "rain",
+  "holidayType": "none",
+  "presetScenarioId": "rainyWeekday",
+  "presetScenarioName": "비 오는 평일",
+  "trafficMultiplier": 0.7,
+  "hasEnvironmentContext": true,
+  "hasPresetScenario": true
+}
+```
+
+#### response_summary 예시 (run-simulation)
+
+```json
+{
+  "text": "예상 방문객: 70명 | 예상 전환율: 5.0% | 예상 매출: 2,450,000원 | 발견 이슈: 2개 | 신뢰도: 75%",
+  "visitors": 70,
+  "conversionRate": 0.05,
+  "revenue": 2450000,
+  "issueCount": 2,
+  "confidence": 75
 }
 ```
 
@@ -334,6 +381,72 @@ LIMIT 50;
 | `ai_response = '{}'` | 빈 응답 |
 | `execution_time_ms > 30000` | 타임아웃 근접 |
 | `context_metadata->>'model_used' = 'rule-based'` | 규칙 기반 응답 (AI 아님) |
+
+### 4.5 프리셋 시나리오별 데이터 조회
+
+```sql
+-- 프리셋 시나리오가 포함된 로그 조회
+SELECT
+  id,
+  context_metadata->>'presetScenarioId' as scenario_id,
+  context_metadata->>'presetScenarioName' as scenario_name,
+  context_metadata->>'weather' as weather,
+  context_metadata->>'trafficMultiplier' as traffic_mult,
+  (ai_response->'kpis'->>'predicted_visitors')::INTEGER as visitors,
+  quality_score,
+  created_at
+FROM ai_response_logs
+WHERE function_name = 'run-simulation'
+  AND context_metadata->>'hasPresetScenario' = 'true'
+ORDER BY created_at DESC;
+
+-- 시나리오별 통계
+SELECT
+  context_metadata->>'presetScenarioId' as scenario_id,
+  context_metadata->>'presetScenarioName' as scenario_name,
+  COUNT(*) as total_logs,
+  ROUND(AVG(quality_score), 2) as avg_quality,
+  SUM(CASE WHEN is_good_example THEN 1 ELSE 0 END) as good_examples,
+  ROUND(AVG((ai_response->'kpis'->>'predicted_visitors')::NUMERIC)) as avg_visitors,
+  ROUND(AVG((ai_response->'kpis'->>'predicted_revenue')::NUMERIC)) as avg_revenue
+FROM ai_response_logs
+WHERE function_name = 'run-simulation'
+  AND context_metadata->>'hasPresetScenario' = 'true'
+GROUP BY
+  context_metadata->>'presetScenarioId',
+  context_metadata->>'presetScenarioName'
+ORDER BY total_logs DESC;
+```
+
+### 4.6 환경 컨텍스트별 분석
+
+```sql
+-- 날씨별 시뮬레이션 결과 분석
+SELECT
+  context_metadata->>'weather' as weather,
+  COUNT(*) as log_count,
+  ROUND(AVG((ai_response->'kpis'->>'predicted_visitors')::NUMERIC)) as avg_visitors,
+  ROUND(AVG((ai_response->'kpis'->>'predicted_conversion_rate')::NUMERIC * 100), 2) as avg_conv_pct,
+  ROUND(AVG((context_metadata->>'trafficMultiplier')::NUMERIC), 2) as avg_traffic_mult
+FROM ai_response_logs
+WHERE function_name = 'run-simulation'
+  AND context_metadata->>'hasEnvironmentContext' = 'true'
+  AND context_metadata->>'weather' IS NOT NULL
+GROUP BY context_metadata->>'weather'
+ORDER BY log_count DESC;
+
+-- 휴일 타입별 분석
+SELECT
+  context_metadata->>'holidayType' as holiday_type,
+  COUNT(*) as log_count,
+  ROUND(AVG((ai_response->'kpis'->>'predicted_revenue')::NUMERIC)) as avg_revenue
+FROM ai_response_logs
+WHERE function_name = 'run-simulation'
+  AND context_metadata->>'hasEnvironmentContext' = 'true'
+  AND context_metadata->>'holidayType' IS NOT NULL
+GROUP BY context_metadata->>'holidayType'
+ORDER BY log_count DESC;
+```
 
 ---
 

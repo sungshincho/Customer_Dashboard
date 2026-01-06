@@ -29,7 +29,12 @@ export type SimulationType =
   | 'zone_analysis'    // 존 분석
   | 'product'          // 상품 배치 최적화
   | 'furniture'        // 가구 배치 최적화
-  | 'both';            // 가구 + 상품 최적화
+  | 'both'             // 가구 + 상품 최적화
+  // 🆕 run-simulation 시뮬레이션 타입
+  | 'traffic_flow'     // 트래픽 플로우 시뮬레이션
+  | 'demand_prediction' // 수요 예측 시뮬레이션
+  // 🆕 프리셋 시나리오 시뮬레이션 (동적 타입)
+  | `scenario_${string}`; // scenario_christmas, scenario_blackFriday 등
 
 /**
  * 함수명
