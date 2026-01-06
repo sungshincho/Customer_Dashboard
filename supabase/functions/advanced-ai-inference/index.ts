@@ -1,5 +1,14 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.79.0';
 
+// AI 응답 로깅 시스템
+import {
+  logAIResponse,
+  createInferenceSummary,
+  createInferenceContextMetadata,
+  createExecutionTimer,
+  type SimulationType,
+} from '../_shared/aiResponseLogger.ts';
+
 // Continuous Learning 모듈 import
 import {
   calculatePastPerformance,
@@ -1632,12 +1641,16 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // 🆕 실행 시간 측정 시작
+  const executionTimer = createExecutionTimer();
+  executionTimer.start();
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const authHeader = req.headers.get('Authorization')!;
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')!;
-    
+
     const supabase = createClient(supabaseUrl, supabaseKey, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -1694,12 +1707,89 @@ Deno.serve(async (req) => {
         throw new Error('Invalid inference type: ' + inferenceType);
     }
 
+    // 🆕 AI 응답 로깅 (파인튜닝 데이터 수집)
+    const executionTimeMs = executionTimer.getElapsedMs();
+    try {
+      // 시뮬레이션 유형별 로깅
+      const simulationTypeMap: Record<string, SimulationType> = {
+        'layout_optimization': 'layout_optimization',
+        'flow_simulation': 'flow_simulation',
+        'congestion_simulation': 'congestion',
+        'staffing_optimization': 'staffing',
+        'causal': 'layout',
+        'anomaly': 'layout',
+        'prediction': 'layout',
+        'pattern': 'layout',
+      };
+
+      const simulationType = simulationTypeMap[inferenceType] || 'layout';
+
+      await logAIResponse(supabase, {
+        storeId: body.storeId || body.store_id || 'unknown',
+        userId: user.id,
+        functionName: 'advanced-ai-inference',
+        simulationType,
+        inputVariables: {
+          inference_type: inferenceType,
+          params: body.params,
+          storeContext: body.params?.storeContext ? {
+            // 컨텍스트 요약 (전체 저장하면 너무 큼)
+            hasEntities: !!body.params.storeContext.entities,
+            entityCount: body.params.storeContext.entities?.length || 0,
+            hasZones: !!body.params.storeContext.zones,
+            zoneCount: body.params.storeContext.zones?.length || 0,
+            hasZoneTransitions: !!body.params.storeContext.zoneTransitions,
+            transitionCount: body.params.storeContext.zoneTransitions?.length || 0,
+            dataQuality: body.params.storeContext.dataQuality,
+          } : null,
+        },
+        aiResponse: {
+          result: result.result || result,
+          success: result.success !== false,
+        },
+        responseSummary: createInferenceSummary(result.result || result, simulationType),
+        contextMetadata: createInferenceContextMetadata(
+          body.params?.storeContext || {},
+          body.params || {}
+        ),
+        executionTimeMs,
+        modelUsed: 'gemini-2.5-flash',
+      });
+      console.log(`[advanced-ai-inference] Response logged successfully (${executionTimeMs}ms)`);
+    } catch (logError) {
+      // 로깅 실패해도 메인 응답은 정상 반환
+      console.warn('[advanced-ai-inference] Failed to log response:', logError);
+    }
+
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
     console.error('Advanced AI inference error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    // 🆕 에러 발생 시에도 로깅 시도
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL');
+      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+      if (supabaseUrl && supabaseKey) {
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        const body = await req.clone().json().catch(() => ({}));
+        await logAIResponse(supabase, {
+          storeId: body.storeId || body.store_id || 'unknown',
+          functionName: 'advanced-ai-inference',
+          simulationType: (body.inference_type || body.type || 'unknown') as SimulationType,
+          inputVariables: body,
+          aiResponse: {},
+          executionTimeMs: executionTimer.getElapsedMs(),
+          hadError: true,
+          errorMessage,
+        });
+      }
+    } catch (logError) {
+      console.warn('[advanced-ai-inference] Failed to log error:', logError);
+    }
+
     return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

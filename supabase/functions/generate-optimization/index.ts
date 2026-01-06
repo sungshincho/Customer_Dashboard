@@ -1,5 +1,14 @@
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.89.0';
 
+// AI 응답 로깅 시스템
+import {
+  logAIResponse,
+  createOptimizationSummary,
+  createOptimizationContextMetadata,
+  createExecutionTimer,
+  type AIResponseLogInput,
+} from '../_shared/aiResponseLogger.ts';
+
 // Phase 0.1: 환경 데이터 로딩 시스템
 import {
   loadEnvironmentDataBundle,
@@ -163,6 +172,10 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  // 🆕 실행 시간 측정 시작
+  const executionTimer = createExecutionTimer();
+  executionTimer.start();
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -391,6 +404,74 @@ Deno.serve(async (req) => {
       console.warn('[generate-optimization] Auto-learning skipped:', learningError);
     }
 
+    // 🆕 AI 응답 로깅 (파인튜닝 데이터 수집)
+    const executionTimeMs = executionTimer.getElapsedMs();
+    const fullResponse = {
+      success: true,
+      result,
+      data_summary: {
+        furniture_analyzed: layoutData.furniture.length,
+        products_analyzed: layoutData.products.length,
+        slots_analyzed: slotsData.length,
+      },
+      environment_summary: environmentData ? {
+        weather: environmentData.weather ? {
+          condition: environmentData.impact.weather.condition,
+          temperature: environmentData.weather.temperature,
+        } : null,
+        events_count: environmentData.events.length,
+      } : null,
+      flow_analysis_summary: {
+        flow_health_score: flowAnalysis.summary.flowHealthScore,
+        bottleneck_count: flowAnalysis.summary.bottleneckCount,
+        dead_zone_count: flowAnalysis.summary.deadZoneCount,
+      },
+      prediction_summary: predictionSummary,
+      vmd_analysis: vmdAnalysis ? {
+        score: vmdAnalysis.score.overall,
+        grade: vmdAnalysis.score.grade,
+      } : null,
+    };
+
+    try {
+      await logAIResponse(supabase, {
+        storeId: store_id,
+        userId: userId || undefined,
+        functionName: 'generate-optimization',
+        simulationType: optimization_type,
+        inputVariables: {
+          optimization_type,
+          parameters,
+          context: {
+            furniture_count: layoutData.furniture.length,
+            product_count: layoutData.products.length,
+            zone_count: layoutData.zones.length,
+            slot_count: slotsData.length,
+          },
+        },
+        aiResponse: {
+          furniture_changes: result.furniture_changes,
+          product_changes: result.product_changes,
+          summary: result.summary,
+        },
+        responseSummary: createOptimizationSummary(result),
+        contextMetadata: createOptimizationContextMetadata(
+          layoutData,
+          slotsData,
+          flowAnalysis,
+          associationData,
+          environmentData,
+          vmdAnalysis
+        ),
+        executionTimeMs,
+        modelUsed: lovableApiKey ? 'gemini-2.5-flash' : 'rule-based',
+      });
+      console.log(`[generate-optimization] Response logged successfully (${executionTimeMs}ms)`);
+    } catch (logError) {
+      // 로깅 실패해도 메인 응답은 정상 반환
+      console.warn('[generate-optimization] Failed to log response:', logError);
+    }
+
     return new Response(JSON.stringify({
       success: true,
       result,
@@ -511,6 +592,29 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('[generate-optimization] Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    // 🆕 에러 발생 시에도 로깅 시도
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL');
+      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+      if (supabaseUrl && supabaseKey) {
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        const body = await req.clone().json().catch(() => ({}));
+        await logAIResponse(supabase, {
+          storeId: body.store_id || 'unknown',
+          functionName: 'generate-optimization',
+          simulationType: body.optimization_type || 'unknown',
+          inputVariables: body,
+          aiResponse: {},
+          executionTimeMs: executionTimer.getElapsedMs(),
+          hadError: true,
+          errorMessage,
+        });
+      }
+    } catch (logError) {
+      console.warn('[generate-optimization] Failed to log error:', logError);
+    }
+
     return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
