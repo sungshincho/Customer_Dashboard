@@ -22,10 +22,10 @@ export type SimulationType =
   | 'layout'           // 레이아웃 최적화
   | 'flow'             // 동선 시뮬레이션
   | 'congestion'       // 혼잡도 시뮬레이션
-  | 'staffing'         // 인력 배치 시뮬레이션
+  | 'staffing'         // 인력 배치 최적화 (🆕 generate-optimization에서 통합)
   | 'ultimate'         // Ultimate AI 최적화
-  | 'layout_optimization' // advanced-ai-inference layout
-  | 'flow_simulation'  // advanced-ai-inference flow
+  | 'layout_optimization' // advanced-ai-inference layout (deprecated)
+  | 'flow_simulation'  // advanced-ai-inference flow (deprecated)
   | 'zone_analysis'    // 존 분석
   | 'product'          // 상품 배치 최적화
   | 'furniture'        // 가구 배치 최적화
