@@ -214,7 +214,8 @@ Deno.serve(async (req: Request) => {
 
     if (LOVABLE_API_KEY) {
       // Gemini 2.5 Flash AI 호출 (Lovable API Gateway)
-      const aiResponse = await callGeminiForSimulation(analysisContext, LOVABLE_API_KEY);
+      // 🆕 environment_context를 AI 프롬프트에 전달하여 시뮬레이션 정확도 향상
+      const aiResponse = await callGeminiForSimulation(analysisContext, LOVABLE_API_KEY, environment_context);
       simulationResult = parseAndValidateResult(aiResponse, zones || [], options);
     } else {
       // 규칙 기반 시뮬레이션 (API 키 없을 때)
@@ -473,7 +474,11 @@ function buildAnalysisContext(data: any) {
 }
 
 // ===== Gemini AI 호출 (Lovable API Gateway) =====
-async function callGeminiForSimulation(context: any, apiKey: string): Promise<string> {
+async function callGeminiForSimulation(
+  context: any,
+  apiKey: string,
+  environmentContext?: EnvironmentContext | null
+): Promise<string> {
   const systemPrompt = `당신은 리테일 매장 시뮬레이션 전문가입니다. 주어진 매장 데이터를 분석하여 고객 행동을 시뮬레이션하고 잠재적 문제점을 진단해주세요.
 
 응답 형식 (JSON만 응답, 마크다운 코드블록 없이):
@@ -506,6 +511,66 @@ async function callGeminiForSimulation(context: any, apiKey: string): Promise<st
   "confidence_score": number (0-100)
 }`;
 
+  // 🆕 환경 컨텍스트 섹션 생성
+  let environmentSection = '';
+  if (environmentContext) {
+    const envParts: string[] = [];
+
+    if (environmentContext.weather) {
+      envParts.push(`- 날씨: ${environmentContext.weather}`);
+    }
+    if (environmentContext.temperature !== undefined) {
+      envParts.push(`- 기온: ${environmentContext.temperature}°C`);
+    }
+    if (environmentContext.humidity !== undefined) {
+      envParts.push(`- 습도: ${environmentContext.humidity}%`);
+    }
+    if (environmentContext.holiday_type) {
+      envParts.push(`- 휴일 유형: ${environmentContext.holiday_type}`);
+    }
+    if (environmentContext.day_of_week) {
+      envParts.push(`- 요일: ${environmentContext.day_of_week}`);
+    }
+    if (environmentContext.time_of_day) {
+      envParts.push(`- 시간대: ${environmentContext.time_of_day}`);
+    }
+    if (environmentContext.impact) {
+      const impact = environmentContext.impact;
+      if (impact.trafficMultiplier) {
+        envParts.push(`- 트래픽 배율: ${impact.trafficMultiplier}x`);
+      }
+      if (impact.dwellTimeMultiplier) {
+        envParts.push(`- 체류시간 배율: ${impact.dwellTimeMultiplier}x`);
+      }
+      if (impact.conversionMultiplier) {
+        envParts.push(`- 전환율 배율: ${impact.conversionMultiplier}x`);
+      }
+    }
+
+    // 프리셋 시나리오 정보
+    if (environmentContext.preset_scenario) {
+      const scenario = environmentContext.preset_scenario;
+      envParts.push(`\n### 🎯 프리셋 시나리오`);
+      envParts.push(`- 시나리오: ${scenario.name}`);
+      if (scenario.traffic_multiplier) {
+        envParts.push(`- 트래픽 배율: ${scenario.traffic_multiplier}x`);
+      }
+      if (scenario.discount_percent) {
+        envParts.push(`- 할인율: ${scenario.discount_percent}%`);
+      }
+      if (scenario.event_type) {
+        envParts.push(`- 이벤트 유형: ${scenario.event_type}`);
+      }
+      if (scenario.risk_tags?.length) {
+        envParts.push(`- 리스크 태그: ${scenario.risk_tags.join(', ')}`);
+      }
+    }
+
+    if (envParts.length > 0) {
+      environmentSection = `\n### 🌤️ 환경 컨텍스트 (시뮬레이션 시 반드시 반영)\n${envParts.join('\n')}\n\n⚠️ **중요**: 위 환경/시나리오 조건을 KPI 예측 및 존 분석에 반영하세요.\n`;
+    }
+  }
+
   const userPrompt = `## 매장 데이터
 
 ### 존 통계 (최근 30일 평균)
@@ -521,16 +586,21 @@ ${JSON.stringify(context.historical_kpis, null, 2)}
 - 시뮬레이션 시간: ${context.simulation_options.duration_minutes}분
 - 예상 고객 수: ${context.simulation_options.customer_count}명
 - 시간대: ${context.simulation_options.time_of_day}
-
+${environmentSection}
 ## 분석 요청
 
 1. **KPI 예측**: 주어진 조건에서의 방문자 수, 전환율, 매출, 평균 체류시간, 피크 혼잡도를 예측해주세요.
+${environmentContext ? '   - 환경 컨텍스트(날씨, 휴일, 시나리오 등)를 반드시 반영하세요.' : ''}
 
 2. **존별 분석**: 각 존의 예상 방문자 수, 체류시간, 혼잡도, 병목 점수(0-100)를 분석해주세요.
 
 3. **동선 분석**: 주요 이동 경로, 방문이 적은 존(dead zones), 혼잡 지점을 식별해주세요.
 
-4. **AI 인사이트**: 데이터에서 발견한 주요 패턴과 개선 기회를 3-5개 한국어로 제시해주세요.
+4. **AI 인사이트 (파인튜닝용 - 필수)**:
+   - 데이터에서 발견한 주요 패턴과 개선 기회를 3-5개 한국어로 제시
+   - 각 인사이트는 구체적 수치와 존 이름을 포함해야 함
+   - 예시: "입구 존의 체류시간(평균 45초)이 전체 평균(30초) 대비 50% 높아 병목 발생 가능"
+   - 예시: "프로모션 존 방문율(15%)이 낮아 동선 개선 또는 위치 변경 권장"
 
 JSON 형식으로만 응답해주세요.`;
 
