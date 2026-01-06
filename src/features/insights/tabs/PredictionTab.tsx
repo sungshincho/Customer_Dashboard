@@ -845,11 +845,11 @@ export function PredictionTab() {
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
               <Badge3D dark={isDark}><span>트렌드</span></Badge3D>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                {summary.model_info.trend_direction === 'up' ? <TrendingUp className="h-4 w-4" style={{ color: iconColor }} /> :
-                 summary.model_info.trend_direction === 'down' ? <TrendingDown className="h-4 w-4" style={{ color: iconColor }} /> :
-                 <Activity className="h-4 w-4" style={{ color: iconColor }} />}
+                {summary.model_info.trend_direction === 'up' ? <TrendingUp className="h-4 w-4" style={{ color: '#22c55e' }} /> :
+                 summary.model_info.trend_direction === 'down' ? <TrendingDown className="h-4 w-4" style={{ color: '#ef4444' }} /> :
+                 <Activity className="h-4 w-4" style={{ color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280' }} />}
                 <div>
-                  <p style={{ fontSize: '13px', fontWeight: 600, margin: 0, color: isDark ? '#fff' : '#1a1a1f' }}>
+                  <p style={{ fontSize: '13px', fontWeight: 600, margin: 0, color: summary.model_info.trend_direction === 'up' ? '#22c55e' : summary.model_info.trend_direction === 'down' ? '#ef4444' : (isDark ? '#fff' : '#1a1a1f') }}>
                     {summary.model_info.trend_direction === 'up' ? '상승' : summary.model_info.trend_direction === 'down' ? '하락' : '안정'}
                   </p>
                   <p style={{ fontSize: '11px', margin: '2px 0 0 0', ...text3D.body }}>최근 매출 추세</p>
