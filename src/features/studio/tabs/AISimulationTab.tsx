@@ -122,7 +122,7 @@ export function AISimulationTab({
   // 🆕 AI 최적화 연결 모달 상태
   const [showOptimizationModal, setShowOptimizationModal] = useState(false);
   const [selectedIssuesForOptimization, setSelectedIssuesForOptimization] = useState<Set<string>>(new Set());
-  const [isOptimizationLoading, setIsOptimizationLoading] = useState(false);
+  // isOptimizationLoading state removed - optimization runs in AIOptimizationTab
 
   // 🆕 시뮬레이션 환경 설정 상태
   const [showEnvironmentSettings, setShowEnvironmentSettings] = useState(true); // 기본 열림
@@ -355,95 +355,63 @@ export function AISimulationTab({
     });
   }, []);
 
-  // 🆕 AI 최적화 실행
-  const handleRunOptimization = useCallback(async () => {
+  // 🆕 AI 최적화 탭으로 이동 (이슈 전달)
+  const handleNavigateToOptimizationTab = useCallback(() => {
     if (selectedIssuesForOptimization.size === 0) {
       toast.error('해결할 문제를 선택해주세요');
       return;
     }
 
-    setIsOptimizationLoading(true);
-    try {
-      // 선택된 이슈들
-      const selectedIssues = analyzedIssues.filter(i => selectedIssuesForOptimization.has(i.id));
+    // 선택된 이슈들
+    const selectedIssues = analyzedIssues.filter(i => selectedIssuesForOptimization.has(i.id));
 
-      // 현재 프리셋 시나리오 정보
-      const currentPreset = selectedPreset ? PRESET_SCENARIOS.find(p => p.id === selectedPreset) : null;
+    // 현재 프리셋 시나리오 정보
+    const currentPreset = selectedPreset ? PRESET_SCENARIOS.find(p => p.id === selectedPreset) : null;
 
-      // 최적화 컨텍스트 구성
-      const optimizationContext = {
-        scenario: currentPreset ? {
+    // 최적화 탭으로 이동 (이슈와 시나리오 컨텍스트 전달)
+    if (onNavigateToOptimization) {
+      const diagnosticIssues = selectedIssues.map(i => ({
+        id: i.id,
+        type: i.type,
+        severity: i.severity,
+        title: i.title,
+        zone_id: i.location.zoneId,
+        zone_name: i.location.zoneName,
+        message: i.details.description,
+        recommendations: i.recommendations,
+        impact: i.impact,
+        details: i.details,
+        // 🆕 시나리오 및 환경 컨텍스트
+        scenario_context: currentPreset ? {
           id: currentPreset.id,
           name: currentPreset.name,
           description: currentPreset.description,
           expected_impact: currentPreset.expectedImpact,
           risk_tags: currentPreset.riskTags,
         } : null,
-        environment: {
+        environment_context: {
           weather: simulationEnvConfig.manualSettings?.weather || simulationEnvConfig.weather,
           holiday_type: simulationEnvConfig.manualSettings?.holidayType || simulationEnvConfig.holidayType,
           time_of_day: simulationEnvConfig.manualSettings?.timeOfDay || simulationEnvConfig.timeOfDay,
           traffic_multiplier: trafficMultiplier,
         },
-        simulation_params: {
-          customer_count: customerCount,
-          duration_minutes: duration,
-        },
-        detected_issues: selectedIssues.map(issue => ({
-          type: issue.type,
-          severity: issue.severity,
-          title: issue.title,
-          zone_id: issue.location.zoneId,
-          zone_name: issue.location.zoneName,
-          details: issue.details,
-          impact: issue.impact,
-          recommendations: issue.recommendations,
-        })),
-        kpis: {
+        simulation_kpis: {
           visitors: realtimeKpis.visitors,
           revenue: realtimeKpis.revenue,
           conversion: realtimeKpis.conversion,
           avg_dwell: realtimeKpis.avgDwell,
         },
-      };
+      }));
 
-      // generate-optimization Edge Function 호출
-      const { data, error } = await supabase.functions.invoke('generate-optimization', {
-        body: {
-          store_id: storeId,
-          simulation_context: optimizationContext,
-          optimize_for: selectedIssues.map(i => i.type),
-        },
+      onNavigateToOptimization(diagnosticIssues as any);
+
+      toast.success('AI 최적화 탭으로 이동합니다', {
+        description: `${selectedIssues.length}개 문제점을 우선 해결하도록 설정됩니다`,
       });
-
-      if (error) throw error;
-
-      toast.success('AI 최적화 분석 완료!', {
-        description: `${selectedIssues.length}개 문제에 대한 해결방안이 생성되었습니다`,
-      });
-
-      // 최적화 탭으로 이동 (결과 전달)
-      if (onNavigateToOptimization) {
-        const diagnosticIssues = selectedIssues.map(i => ({
-          id: i.id,
-          type: i.type,
-          severity: i.severity,
-          title: i.title,
-          zone_id: i.location.zoneId,
-          zone_name: i.location.zoneName,
-          message: i.details.description,
-          recommendations: i.recommendations,
-        }));
-        onNavigateToOptimization(diagnosticIssues as any);
-      }
-
-      setShowOptimizationModal(false);
-    } catch (err: any) {
-      toast.error(`최적화 실패: ${err.message}`);
-    } finally {
-      setIsOptimizationLoading(false);
     }
-  }, [selectedIssuesForOptimization, analyzedIssues, selectedPreset, simulationEnvConfig, trafficMultiplier, customerCount, duration, realtimeKpis, storeId, onNavigateToOptimization]);
+
+    setShowOptimizationModal(false);
+  }, [selectedIssuesForOptimization, analyzedIssues, selectedPreset, simulationEnvConfig, trafficMultiplier, realtimeKpis, onNavigateToOptimization]);
 
   // 🆕 분석된 이슈 카운트 (memoized)
   const { analyzedCriticalCount, analyzedWarningCount, analyzedInfoCount, totalRevenueImpact } = useMemo(() => {
@@ -955,15 +923,23 @@ export function AISimulationTab({
 
                 {/* AI 최적화 연결 버튼 */}
                 {(analyzedCriticalCount > 0 || analyzedWarningCount > 0) && (
-                  <Button
-                    onClick={handleOpenOptimizationModal}
-                    className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-sm"
-                    size="sm"
-                  >
-                    <Wrench className="h-3.5 w-3.5 mr-1.5" />
-                    AI 최적화로 해결하기
-                    <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
-                  </Button>
+                  <div className="space-y-2">
+                    <div className="p-2.5 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-lg border border-purple-500/30">
+                      <p className="text-xs text-white/80 text-center">
+                        <Sparkles className="h-3.5 w-3.5 inline mr-1 text-purple-400" />
+                        <strong>AI 최적화</strong>로 위 문제점들을 해결할 수 있습니다
+                      </p>
+                    </div>
+                    <Button
+                      onClick={handleOpenOptimizationModal}
+                      className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-sm py-3"
+                      size="sm"
+                    >
+                      <Wrench className="h-4 w-4 mr-2" />
+                      AI 최적화로 실행하시겠습니까?
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  </div>
                 )}
               </div>
             )}
@@ -1195,21 +1171,12 @@ export function AISimulationTab({
                 취소
               </Button>
               <Button
-                onClick={handleRunOptimization}
-                disabled={selectedIssuesForOptimization.size === 0 || isOptimizationLoading}
+                onClick={handleNavigateToOptimizationTab}
+                disabled={selectedIssuesForOptimization.size === 0}
                 className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
               >
-                {isOptimizationLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    분석 중...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    AI 최적화 실행
-                  </>
-                )}
+                <ArrowRight className="h-4 w-4 mr-2" />
+                AI 최적화 탭으로 이동
               </Button>
             </div>
           </div>

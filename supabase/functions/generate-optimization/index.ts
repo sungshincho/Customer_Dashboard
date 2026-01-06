@@ -250,6 +250,12 @@ Deno.serve(async (req) => {
     // 8. 최적화 생성
     let result: AILayoutOptimizationResult;
 
+    // 🆕 진단 이슈 추출 (시뮬레이션에서 전달받은 경우)
+    const diagnosticIssues = (parameters as any)?.diagnostic_issues || null;
+    if (diagnosticIssues?.priority_issues?.length > 0) {
+      console.log(`[generate-optimization] 🚨 Received ${diagnosticIssues.priority_issues.length} diagnostic issues from simulation`);
+    }
+
     if (lovableApiKey) {
       result = await generateAIOptimization(
         lovableApiKey,
@@ -261,7 +267,8 @@ Deno.serve(async (req) => {
         environmentData,  // 🆕 환경 데이터 추가
         flowAnalysis,     // 🆕 동선 분석 추가 (Phase 0.2)
         associationData,  // 🆕 연관성 분석 추가 (Phase 0.3)
-        vmdAnalysis       // 🆕 VMD 분석 추가 (Phase 3)
+        vmdAnalysis,      // 🆕 VMD 분석 추가 (Phase 3)
+        diagnosticIssues  // 🆕 시뮬레이션 진단 이슈 추가
       );
     } else {
       // AI 키 없을 경우 룰 기반 최적화
@@ -920,8 +927,15 @@ async function generateAIOptimization(
   environmentData?: EnvironmentDataBundle,  // 🆕 환경 데이터
   flowAnalysis?: FlowAnalysisResult,        // 🆕 동선 분석 (Phase 0.2)
   associationData?: ProductAssociationResult, // 🆕 연관성 분석 (Phase 0.3)
-  vmdAnalysis?: VMDAnalysisResult            // 🆕 VMD 분석 (Phase 3)
+  vmdAnalysis?: VMDAnalysisResult,           // 🆕 VMD 분석 (Phase 3)
+  diagnosticIssues?: any                     // 🆕 시뮬레이션 진단 이슈
 ): Promise<AILayoutOptimizationResult> {
+  // 🆕 진단 이슈 로깅
+  if (diagnosticIssues?.priority_issues?.length > 0) {
+    console.log(`[generateAIOptimization] 🚨 Diagnostic issues from simulation: ${diagnosticIssues.priority_issues.length} issues to prioritize`);
+    console.log(`[generateAIOptimization] Scenario: ${diagnosticIssues.scenario_context?.name || 'none'}`);
+  }
+
   // 🆕 Phase 1.1: Chain-of-Thought 프롬프트 빌더 사용
   const promptContext = createPromptContext(
     layoutData,
@@ -931,7 +945,8 @@ async function generateAIOptimization(
     parameters,
     environmentData || null,
     flowAnalysis || null,
-    associationData || null
+    associationData || null,
+    diagnosticIssues || null  // 🆕 진단 이슈 전달
   );
 
   const promptConfig = createPromptConfig({
