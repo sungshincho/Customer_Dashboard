@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.79.0';
+import { logAIResponse, createExecutionTimer } from '../_shared/aiResponseLogger.ts';
 
 /**
  * run-simulation Edge Function
@@ -96,6 +97,9 @@ Deno.serve(async (req: Request) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  // 🆕 실행 시간 측정 시작
+  const timer = createExecutionTimer();
+
   try {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -191,12 +195,79 @@ Deno.serve(async (req: Request) => {
 
     console.log(`[Simulation] 완료: ${simulationResult.diagnostic_issues.length}개 이슈 발견`);
 
+    // 🆕 AI 응답 로깅 (파인튜닝 데이터셋 수집)
+    try {
+      const executionTime = timer.getElapsedMs();
+
+      // 시뮬레이션 결과 요약 생성
+      const responseSummary = [
+        `예상 방문객: ${simulationResult.kpis.predicted_visitors}명`,
+        `예상 전환율: ${(simulationResult.kpis.predicted_conversion_rate * 100).toFixed(1)}%`,
+        `예상 매출: ${simulationResult.kpis.predicted_revenue.toLocaleString()}원`,
+        `발견 이슈: ${simulationResult.diagnostic_issues.length}개`,
+        `신뢰도: ${simulationResult.confidence_score}%`,
+      ].join(' | ');
+
+      // 입력 변수 구성
+      const inputVariables = {
+        simulation_options: options,
+        store_context: {
+          zone_count: zones?.length || 0,
+          furniture_count: furniture?.length || 0,
+          transition_count: transitions?.length || 0,
+        },
+        analysis_context: analysisContext,
+      };
+
+      await logAIResponse(supabaseClient, {
+        store_id,
+        function_name: 'run-simulation',
+        simulation_type: options.simulation_type === 'predictive' ? 'demand_prediction' : 'traffic_flow',
+        input_variables: inputVariables,
+        ai_response: simulationResult,
+        response_summary: responseSummary,
+        execution_time_ms: executionTime,
+        context_metadata: {
+          model_used: ANTHROPIC_API_KEY ? 'claude-sonnet-4-20250514' : 'rule-based',
+          zone_count: zones?.length || 0,
+          issue_count: simulationResult.diagnostic_issues.length,
+          critical_issues: simulationResult.diagnostic_issues.filter((i: any) => i.severity === 'critical').length,
+        },
+      });
+
+      console.log(`[Simulation] 로깅 완료: ${executionTime}ms`);
+    } catch (logError) {
+      console.warn('[Simulation] 로깅 실패 (무시):', logError);
+    }
+
     return new Response(JSON.stringify(simulationResult), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error: any) {
     console.error('[Simulation] 오류:', error);
+
+    // 🆕 에러 로깅
+    try {
+      const supabaseClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+
+      await logAIResponse(supabaseClient, {
+        store_id: 'unknown',
+        function_name: 'run-simulation',
+        simulation_type: 'traffic_flow',
+        input_variables: {},
+        ai_response: { error: error.message },
+        response_summary: `에러: ${error.message}`,
+        execution_time_ms: timer.getElapsedMs(),
+        context_metadata: { error: true },
+      });
+    } catch {
+      // 로깅 실패 무시
+    }
+
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
