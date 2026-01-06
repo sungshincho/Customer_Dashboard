@@ -835,55 +835,127 @@ function calculateSimulationQuality(
   response: any,
   scenarioId?: string | null
 ): { score: number; metrics: Record<string, unknown> } {
+  /**
+   * 파인튜닝 품질 점수 체계 (100점 만점)
+   *
+   * 1. KPI 완전성 (35점) - 핵심 예측 지표 생성
+   * 2. 진단 이슈 품질 (25점) - 문제점 파악 및 심각도
+   * 3. AI 인사이트 (20점) - 유용한 분석 제공
+   * 4. Zone 분석 (10점) - 영역별 상세 분석
+   * 5. 신뢰도 (10점) - 예측 신뢰도 (합리적 범위)
+   */
   let score = 0;
   const metrics: Record<string, unknown> = {};
+  const scoreBreakdown: Record<string, number> = {};
 
-  // KPIs 완전성 (30점)
-  const kpis = response?.kpis || {};
-  const kpiFields = ['predicted_visitors', 'predicted_conversion_rate', 'predicted_revenue', 'avg_dwell_time_seconds', 'peak_congestion_percent'];
+  // 🔧 응답 구조 정규화
+  const data = response?.result || response;
+
+  // ============================================================================
+  // 1. KPI 완전성 (35점)
+  // ============================================================================
+  let kpiScore = 0;
+  const kpis = data?.kpis || {};
+  const kpiFields = [
+    'predicted_visitors',
+    'predicted_conversion_rate',
+    'predicted_revenue',
+    'avg_dwell_time_seconds',
+    'peak_congestion_percent'
+  ];
   const kpiCount = kpiFields.filter(f => kpis[f] !== undefined && kpis[f] !== null).length;
-  score += Math.round((kpiCount / kpiFields.length) * 30);
+  kpiScore = Math.round((kpiCount / kpiFields.length) * 35);
+
+  score += kpiScore;
+  scoreBreakdown.kpi_completeness = kpiScore;
   metrics.kpi_completeness = kpiCount;
+  metrics.kpi_total = kpiFields.length;
 
-  // AI Insights (20점)
-  const insights = response?.ai_insights || [];
-  const insightScore = Math.min(insights.length, 5) * 4;
-  score += insightScore;
-  metrics.insights_count = insights.length;
+  // ============================================================================
+  // 2. 진단 이슈 품질 (25점)
+  // ============================================================================
+  let diagnosticScore = 0;
+  const issues = data?.diagnostic_issues || [];
 
-  // Diagnostic Issues (20점)
-  const issues = response?.diagnostic_issues || [];
-  const issueScore = Math.min(issues.length, 5) * 4;
-  score += issueScore;
-  metrics.diagnostic_issues_count = issues.length;
-
-  // Zone Analysis (15점)
-  const zoneAnalysis = response?.zone_analysis || [];
-  const zoneScore = zoneAnalysis.length > 0 ? 15 : 0;
-  score += zoneScore;
-  metrics.zone_analysis_count = zoneAnalysis.length;
-
-  // Confidence Score (15점)
-  const confidence = response?.confidence_score || 0;
-  score += Math.round((confidence / 100) * 15);
-  metrics.confidence_score = confidence;
-
-  // 🆕 시나리오 기대값 검증 (최대 35점 추가)
-  if (scenarioId) {
-    const validation = validateSimulationAgainstExpectations(response, scenarioId);
-    score += validation.score;
-    metrics.expectation_validation = {
-      isValid: validation.isValid,
-      violations: validation.violations,
-      bonus_score: validation.score,
-    };
+  // 이슈 존재 (5점)
+  if (issues.length > 0) {
+    diagnosticScore += 5;
   }
 
-  // 🔧 점수 정규화: DB 제약조건 (0-100) 준수
-  const normalizedScore = Math.min(Math.max(score, 0), 100);
-  metrics.raw_score = score;  // 원점수 보존
+  // 이슈 수 (최대 10점): 추가 이슈당 2점, 최대 5개
+  diagnosticScore += Math.min(Math.max(issues.length - 1, 0), 5) * 2;
 
-  return { score: normalizedScore, metrics };
+  // 심각도 다양성 (최대 10점): priority/severity 다양하게 있으면 가점
+  const severities = issues.map((i: any) => i.severity || i.priority).filter(Boolean);
+  const uniqueSeverities = [...new Set(severities)];
+  diagnosticScore += Math.min(uniqueSeverities.length, 2) * 5;
+
+  score += diagnosticScore;
+  scoreBreakdown.diagnostic_issues = diagnosticScore;
+  metrics.diagnostic_issues_count = issues.length;
+
+  // ============================================================================
+  // 3. AI 인사이트 (20점)
+  // ============================================================================
+  let insightScore = 0;
+  const insights = data?.ai_insights || [];
+
+  // 인사이트 존재 (5점)
+  if (insights.length > 0) {
+    insightScore += 5;
+  }
+
+  // 다양한 인사이트 (최대 15점): 추가 인사이트당 3점, 최대 5개
+  insightScore += Math.min(Math.max(insights.length - 1, 0), 5) * 3;
+
+  score += insightScore;
+  scoreBreakdown.ai_insights = insightScore;
+  metrics.insights_count = insights.length;
+
+  // ============================================================================
+  // 4. Zone 분석 (10점)
+  // ============================================================================
+  let zoneScore = 0;
+  const zoneAnalysis = data?.zone_analysis || [];
+
+  // zone 분석 존재 (5점)
+  if (zoneAnalysis.length > 0) {
+    zoneScore += 5;
+  }
+
+  // 다양한 zone (최대 5점)
+  zoneScore += Math.min(zoneAnalysis.length, 5);
+
+  score += zoneScore;
+  scoreBreakdown.zone_analysis = zoneScore;
+  metrics.zone_analysis_count = zoneAnalysis.length;
+
+  // ============================================================================
+  // 5. 신뢰도 (10점)
+  // ============================================================================
+  let confidenceScore = 0;
+  const confidence = data?.confidence_score || 0;
+
+  // 신뢰도 범위별 점수 (40-100% 범위가 합리적)
+  if (confidence >= 40 && confidence <= 100) {
+    // 40-100 범위에서 선형 점수 (최대 10점)
+    confidenceScore = Math.round(((confidence - 40) / 60) * 10);
+  } else if (confidence > 0 && confidence < 40) {
+    // 너무 낮은 신뢰도는 부분 점수
+    confidenceScore = Math.round((confidence / 40) * 5);
+  }
+
+  score += confidenceScore;
+  scoreBreakdown.confidence = confidenceScore;
+  metrics.confidence_score = confidence;
+
+  // ============================================================================
+  // 최종 점수 및 메트릭
+  // ============================================================================
+  metrics.score_breakdown = scoreBreakdown;
+
+  // 점수는 이미 100점 만점 기준으로 설계됨
+  return { score: Math.min(score, 100), metrics };
 }
 
 function calculateOptimizationQuality(
@@ -891,8 +963,18 @@ function calculateOptimizationQuality(
   scenarioId?: string | null,
   inputOptimizationType?: string
 ): { score: number; metrics: Record<string, unknown> } {
+  /**
+   * 파인튜닝 품질 점수 체계 (100점 만점)
+   *
+   * 1. 핵심 출력 품질 (40점) - AI가 실제 추천을 생성했는가?
+   * 2. 도메인 지식 활용 (20점) - VMD/배치 전략 올바른 사용
+   * 3. 예측 정확성 (15점) - 개선율 예측의 합리성
+   * 4. 스키마 준수 (10점) - Structured Output 검증
+   * 5. 인사이트 품질 (15점) - AI 인사이트 유용성
+   */
   let score = 0;
   const metrics: Record<string, unknown> = {};
+  const scoreBreakdown: Record<string, number> = {};
 
   // 🔧 응답 구조 정규화: response.result 또는 response 직접 사용
   const data = response?.result || response;
@@ -901,109 +983,203 @@ function calculateOptimizationQuality(
   const isStaffingType = optimizationType === 'staffing';
   const isBothType = optimizationType === 'both';
 
-  // Furniture Changes (20점) - staffing 전용이 아닐 때
+  // ============================================================================
+  // 1. 핵심 출력 품질 (40점)
+  // ============================================================================
+  let coreOutputScore = 0;
+
   const furnitureChanges = data?.furniture_changes || [];
-  if (!isStaffingType) {
-    const furnitureScore = furnitureChanges.length > 0 ? Math.min(furnitureChanges.length, 5) * 4 : 0;
-    score += furnitureScore;
-  }
-  metrics.furniture_changes_count = furnitureChanges.length;
-
-  // Product Changes (20점) - staffing 전용이 아닐 때
   const productChanges = data?.product_changes || [];
-  if (!isStaffingType) {
-    const productScore = productChanges.length > 0 ? Math.min(productChanges.length, 5) * 4 : 0;
-    score += productScore;
-  }
-  metrics.product_changes_count = productChanges.length;
-
-  // Staffing Result (20점) - staffing 또는 both 타입일 때
   const staffingResult = data?.staffing_result;
-  if (staffingResult) {
-    const staffPositions = staffingResult?.staffPositions || [];
-    score += staffPositions.length > 0 ? 20 : 0;
-    metrics.staffing_positions_count = staffPositions.length;
-    metrics.staffing_coverage_gain = staffingResult?.metrics?.coverageGain || 0;
+  const staffPositions = staffingResult?.staffPositions || [];
 
-    // 🆕 Staffing insights도 점수에 반영 (10점)
-    const staffingInsights = staffingResult?.insights || [];
-    if (staffingInsights.length > 0) {
-      score += Math.min(staffingInsights.length, 5) * 2;
-    }
-    metrics.staffing_insights_count = staffingInsights.length;
+  metrics.furniture_changes_count = furnitureChanges.length;
+  metrics.product_changes_count = productChanges.length;
+  metrics.staffing_positions_count = staffPositions.length;
+
+  if (isStaffingType) {
+    // staffing 타입: 직원 배치만 평가
+    // 직원 배치 수 (최대 25점): 1명당 5점, 최대 5명
+    coreOutputScore += Math.min(staffPositions.length, 5) * 5;
+    // zone coverage 정보 (최대 15점)
+    const zoneCoverage = staffingResult?.zoneCoverage || [];
+    coreOutputScore += zoneCoverage.length > 0 ? Math.min(zoneCoverage.length, 3) * 5 : 0;
+  } else if (isBothType) {
+    // both 타입: 가구/상품 + 직원 모두 평가
+    // 가구 변경 (최대 10점)
+    coreOutputScore += Math.min(furnitureChanges.length, 2) * 5;
+    // 상품 변경 (최대 10점)
+    coreOutputScore += Math.min(productChanges.length, 2) * 5;
+    // 직원 배치 (최대 20점)
+    coreOutputScore += Math.min(staffPositions.length, 4) * 5;
   } else {
-    metrics.staffing_positions_count = 0;
-    metrics.staffing_insights_count = 0;
+    // furniture/product 타입: 해당 변경만 평가
+    // 가구 변경 (최대 20점): 1개당 4점, 최대 5개
+    coreOutputScore += Math.min(furnitureChanges.length, 5) * 4;
+    // 상품 변경 (최대 20점): 1개당 4점, 최대 5개
+    coreOutputScore += Math.min(productChanges.length, 5) * 4;
   }
 
-  // Summary & Impact (20점)
-  const summary = data?.summary || {};
-  const hasRevenueImpact = summary.expected_revenue_improvement !== undefined && summary.expected_revenue_improvement > 0;
-  const hasConversionImpact = summary.expected_conversion_improvement !== undefined && summary.expected_conversion_improvement > 0;
-  const hasStaffingSummary = summary.staffing_summary?.coverage_improvement !== undefined;
+  score += coreOutputScore;
+  scoreBreakdown.core_output = coreOutputScore;
 
-  if (isStaffingType || isBothType) {
-    // staffing/both: staffing_summary 기반 점수
-    score += hasStaffingSummary ? 20 : 0;
-  } else {
-    // furniture/product: revenue/conversion 기반 점수
-    score += (hasRevenueImpact ? 10 : 0) + (hasConversionImpact ? 10 : 0);
-  }
-  metrics.expected_revenue_improvement = summary.expected_revenue_improvement;
-  metrics.expected_conversion_improvement = summary.expected_conversion_improvement;
-  metrics.has_staffing_summary = hasStaffingSummary;
+  // ============================================================================
+  // 2. 도메인 지식 활용 (20점)
+  // ============================================================================
+  let domainKnowledgeScore = 0;
 
-  // AI Insights (20점) - 최상위 또는 staffing_result 내부
-  const topLevelInsights = data?.ai_insights || [];
-  const staffingInsights = staffingResult?.insights || [];
-  const allInsights = [...topLevelInsights, ...staffingInsights];
-  const insightScore = Math.min(allInsights.length, 5) * 4;
-  score += insightScore;
-  metrics.insights_count = allInsights.length;
-
-  // 🆕 시나리오 기대값 검증 (최대 50점 추가)
-  if (scenarioId || optimizationType) {
-    const validation = validateOptimizationAgainstExpectations(data, scenarioId, optimizationType);
-    score += validation.score;
-    metrics.expectation_validation = {
-      isValid: validation.isValid,
-      violations: validation.violations,
-      bonus_score: validation.score,
-    };
-  }
-
-  // 🆕 Phase 5: Structured Output 스키마 검증 (최대 30점 추가)
   if (!isStaffingType) {
-    const schemaValidation = validateStructuredOutputSchema(data);
-    score += schemaValidation.score;
-    metrics.schema_validation = {
-      isValid: schemaValidation.isValid,
-      score: schemaValidation.score,
-      details: schemaValidation.details,
-      errors: schemaValidation.errors.length > 0 ? schemaValidation.errors : undefined,
-    };
-
-    // 도메인 지식 활용 메트릭 추가
-    const vmdPrinciplesUsed = (data?.furniture_changes || [])
-      .filter((fc: any) => fc.vmd_principle)
+    // VMD 원칙 사용 (최대 10점)
+    const vmdPrinciplesUsed = furnitureChanges
+      .filter((fc: any) => fc.vmd_principle && VMD_PRINCIPLES.includes(fc.vmd_principle))
       .map((fc: any) => fc.vmd_principle);
-    const placementStrategiesUsed = (data?.product_changes || [])
-      .filter((pc: any) => pc.placement_strategy?.type)
+    const uniqueVmdPrinciples = [...new Set(vmdPrinciplesUsed)];
+    domainKnowledgeScore += Math.min(uniqueVmdPrinciples.length, 2) * 5;
+
+    // 배치 전략 사용 (최대 10점)
+    const placementStrategiesUsed = productChanges
+      .filter((pc: any) => pc.placement_strategy?.type && PLACEMENT_STRATEGIES.includes(pc.placement_strategy.type))
       .map((pc: any) => pc.placement_strategy.type);
+    const uniquePlacementStrategies = [...new Set(placementStrategiesUsed)];
+    domainKnowledgeScore += Math.min(uniquePlacementStrategies.length, 2) * 5;
 
     metrics.domain_knowledge_usage = {
-      vmd_principles_used: [...new Set(vmdPrinciplesUsed)],
-      placement_strategies_used: [...new Set(placementStrategiesUsed)],
+      vmd_principles_used: uniqueVmdPrinciples,
+      placement_strategies_used: uniquePlacementStrategies,
       vmd_count: vmdPrinciplesUsed.length,
       placement_count: placementStrategiesUsed.length,
     };
+  } else {
+    // staffing 타입: 배치 전략 기반 점수 (최대 20점)
+    const staffingStrategiesUsed = staffPositions
+      .filter((sp: any) => sp.assignment_strategy)
+      .map((sp: any) => sp.assignment_strategy);
+    const uniqueStrategies = [...new Set(staffingStrategiesUsed)];
+    domainKnowledgeScore += Math.min(uniqueStrategies.length, 4) * 5;
+
+    metrics.domain_knowledge_usage = {
+      staffing_strategies_used: uniqueStrategies,
+      strategy_count: staffingStrategiesUsed.length,
+    };
   }
 
-  // 🔧 점수 정규화: DB 제약조건 (0-100) 준수
-  const normalizedScore = Math.min(Math.max(score, 0), 100);
-  metrics.raw_score = score;  // 원점수 보존
+  score += domainKnowledgeScore;
+  scoreBreakdown.domain_knowledge = domainKnowledgeScore;
 
-  return { score: normalizedScore, metrics };
+  // ============================================================================
+  // 3. 예측 정확성 (15점)
+  // ============================================================================
+  let predictionScore = 0;
+  const summary = data?.summary || {};
+
+  if (isStaffingType || isBothType) {
+    // staffing: coverage/service rate 기반
+    const coverageImprovement = summary.staffing_summary?.coverage_improvement;
+    const serviceRateImprovement = summary.staffing_summary?.service_rate_improvement;
+
+    if (coverageImprovement !== undefined && coverageImprovement > 0) {
+      predictionScore += 7;
+    }
+    if (serviceRateImprovement !== undefined && serviceRateImprovement > 0) {
+      predictionScore += 8;
+    }
+    metrics.staffing_coverage_gain = staffingResult?.metrics?.coverageGain || 0;
+    metrics.has_staffing_summary = !!summary.staffing_summary;
+  } else {
+    // furniture/product: revenue/conversion 기반
+    const revenueImprovement = summary.expected_revenue_improvement;
+    const conversionImprovement = summary.expected_conversion_improvement;
+
+    // 예측값 존재 및 합리적 범위 (0.01 ~ 0.5 = 1%~50%)
+    if (revenueImprovement !== undefined && revenueImprovement > 0 && revenueImprovement <= 0.5) {
+      predictionScore += 7;
+    }
+    if (conversionImprovement !== undefined && conversionImprovement > 0 && conversionImprovement <= 0.5) {
+      predictionScore += 8;
+    }
+  }
+
+  metrics.expected_revenue_improvement = summary.expected_revenue_improvement;
+  metrics.expected_conversion_improvement = summary.expected_conversion_improvement;
+
+  score += predictionScore;
+  scoreBreakdown.prediction_accuracy = predictionScore;
+
+  // ============================================================================
+  // 4. 스키마 준수 (10점)
+  // ============================================================================
+  let schemaScore = 0;
+
+  // Structured Output 메타데이터 확인
+  if (summary.structured_output_enabled === true) {
+    schemaScore += 3;
+  }
+  if (summary.schema_validation_passed === true) {
+    schemaScore += 3;
+  }
+
+  // 유효한 enum 값 사용 여부 (최대 4점)
+  let validEnumCount = 0;
+
+  // VMD 원칙 enum 유효성
+  const invalidVmd = furnitureChanges.filter((fc: any) =>
+    fc.vmd_principle && !VMD_PRINCIPLES.includes(fc.vmd_principle)
+  );
+  if (furnitureChanges.length > 0 && invalidVmd.length === 0) {
+    validEnumCount += 2;
+  }
+
+  // 배치 전략 enum 유효성
+  const invalidPlacement = productChanges.filter((pc: any) =>
+    pc.placement_strategy?.type && !PLACEMENT_STRATEGIES.includes(pc.placement_strategy.type)
+  );
+  if (productChanges.length > 0 && invalidPlacement.length === 0) {
+    validEnumCount += 2;
+  }
+
+  schemaScore += validEnumCount;
+
+  metrics.schema_validation = {
+    structured_output_enabled: summary.structured_output_enabled || false,
+    schema_validation_passed: summary.schema_validation_passed || false,
+    invalid_vmd_count: invalidVmd.length,
+    invalid_placement_count: invalidPlacement.length,
+  };
+
+  score += schemaScore;
+  scoreBreakdown.schema_compliance = schemaScore;
+
+  // ============================================================================
+  // 5. 인사이트 품질 (15점)
+  // ============================================================================
+  let insightScore = 0;
+
+  const topLevelInsights = data?.ai_insights || [];
+  const staffingInsights = staffingResult?.insights || [];
+  const allInsights = [...topLevelInsights, ...staffingInsights];
+
+  // 인사이트 존재 (5점)
+  if (allInsights.length > 0) {
+    insightScore += 5;
+  }
+
+  // 다양한 인사이트 (최대 10점): 추가 인사이트당 2점, 최대 5개 추가
+  insightScore += Math.min(Math.max(allInsights.length - 1, 0), 5) * 2;
+
+  metrics.insights_count = allInsights.length;
+  metrics.staffing_insights_count = staffingInsights.length;
+
+  score += insightScore;
+  scoreBreakdown.insight_quality = insightScore;
+
+  // ============================================================================
+  // 최종 점수 및 메트릭
+  // ============================================================================
+  metrics.score_breakdown = scoreBreakdown;
+  metrics.optimization_type = optimizationType;
+
+  // 점수는 이미 100점 만점 기준으로 설계됨
+  return { score: Math.min(score, 100), metrics };
 }
 
 // ============================================================================
