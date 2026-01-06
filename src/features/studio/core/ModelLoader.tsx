@@ -161,12 +161,8 @@ function GLTFModel({
         (texture) => {
           texture.flipY = false;
           texture.colorSpace = THREE.SRGBColorSpace;
-          // 텍스처 품질 설정
-          texture.anisotropy = 16;
-          texture.minFilter = THREE.LinearMipmapLinearFilter;
-          texture.magFilter = THREE.LinearFilter;
-          texture.generateMipmaps = true;
           setDayTexture(texture);
+          console.log('[GLTFModel] Day texture loaded:', dayTextureUrl);
         },
         undefined,
         (err) => console.warn('[GLTFModel] Failed to load day texture:', err)
@@ -179,12 +175,8 @@ function GLTFModel({
         (texture) => {
           texture.flipY = false;
           texture.colorSpace = THREE.SRGBColorSpace;
-          // 텍스처 품질 설정
-          texture.anisotropy = 16;
-          texture.minFilter = THREE.LinearMipmapLinearFilter;
-          texture.magFilter = THREE.LinearFilter;
-          texture.generateMipmaps = true;
           setNightTexture(texture);
+          console.log('[GLTFModel] Night texture loaded:', nightTextureUrl);
         },
         undefined,
         (err) => console.warn('[GLTFModel] Failed to load night texture:', err)
@@ -207,29 +199,6 @@ function GLTFModel({
 
   // 씬 클론 (여러 인스턴스 사용 가능)
   const clonedScene = useMemo(() => {
-    // 원본 scene의 텍스처에 먼저 품질 설정 적용 (클론 전에!)
-    scene.traverse((child) => {
-      if (child instanceof THREE.Mesh && child.material) {
-        const materials = Array.isArray(child.material)
-          ? child.material
-          : [child.material];
-
-        materials.forEach((mat) => {
-          if (mat && mat.map) {
-            // 색공간 먼저 설정
-            mat.map.colorSpace = THREE.SRGBColorSpace;
-            // 텍스처 품질 설정
-            mat.map.anisotropy = 16;
-            mat.map.minFilter = THREE.LinearMipmapLinearFilter;
-            mat.map.magFilter = THREE.LinearFilter;
-            mat.map.generateMipmaps = true;
-            mat.map.needsUpdate = true;
-          }
-        });
-      }
-    });
-
-    // 클론 (최적화된 텍스처가 복제됨)
     const cloned = scene.clone(true);
 
     // Baked 모델 처리

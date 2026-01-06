@@ -202,9 +202,6 @@ function RendererSetup({ config = SCENE_CONFIG }: RendererSetupProps) {
   const { gl } = useThree();
 
   useEffect(() => {
-    // ColorManagement 명시 설정 (색공간 일관성 보장)
-    THREE.ColorManagement.enabled = true;
-
     // THREE 상수는 여기서 직접 사용 (TDZ 방지)
     gl.toneMapping = THREE.ACESFilmicToneMapping;
     gl.toneMappingExposure = config.renderer.toneMappingExposure;
@@ -429,21 +426,8 @@ function StaticEnvironmentModel({
               transparent: originalMaterial.transparent || false,
               opacity: originalMaterial.opacity ?? 1,
               side: originalMaterial.side || THREE.FrontSide,
+              toneMapped: false,
             });
-
-            // 텍스처 품질 설정
-            if (basicMaterial.map) {
-              basicMaterial.map.colorSpace = THREE.SRGBColorSpace;
-              basicMaterial.map.anisotropy = 16;
-              basicMaterial.map.minFilter = THREE.LinearMipmapLinearFilter;
-              basicMaterial.map.magFilter = THREE.LinearFilter;
-              basicMaterial.map.generateMipmaps = true;
-              basicMaterial.map.needsUpdate = true;
-            }
-
-            // Baked 설정
-            basicMaterial.toneMapped = false;
-            basicMaterial.envMap = null;
 
             child.material = basicMaterial;
           }

@@ -102,7 +102,7 @@ export function PostProcessing({
   const ssaoQuality = quality ?? POSTPROCESS_CONFIG.ssao.quality;
 
   return (
-    <EffectComposer multisampling={8}>
+    <EffectComposer multisampling={4}>
       {/* Bloom */}
       {bloomEnabled && (
         <Bloom
