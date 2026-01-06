@@ -291,6 +291,28 @@ export function AIOptimizationTab({
           }
         : null;
 
+      // 🆕 진단 이슈 컨텍스트 구성 (시뮬레이션에서 전달받은 문제점들)
+      const diagnosticIssuesContext = diagnosticIssues.length > 0
+        ? {
+            priority_issues: diagnosticIssues.map(issue => ({
+              id: issue.id,
+              type: (issue as any).type || 'unknown',
+              severity: issue.severity,
+              title: issue.title,
+              zone_id: (issue as any).zone_id || issue.zone,
+              zone_name: (issue as any).zone_name || issue.zone,
+              description: issue.message || (issue as any).details?.description,
+              impact: (issue as any).impact,
+              recommendations: issue.recommendation ? [issue.recommendation] : (issue as any).recommendations || [],
+            })),
+            scenario_context: (diagnosticIssues[0] as any)?.scenario_context || null,
+            environment_context: (diagnosticIssues[0] as any)?.environment_context || null,
+            simulation_kpis: (diagnosticIssues[0] as any)?.simulation_kpis || null,
+          }
+        : null;
+
+      console.log('[AIOptimizationTab] Diagnostic issues context:', diagnosticIssuesContext);
+
       if (selectedOptimizations.includes('layout')) {
         // 목표를 설정 패널의 objective로 매핑
         const goalMapping: Record<string, OptimizationGoal> = {
@@ -305,6 +327,8 @@ export function AIOptimizationTab({
           storeContext,
           // 🆕 환경 컨텍스트 추가 (비 오는 날 → 실내 체류 증가 가정 등)
           environment_context: environmentContext,
+          // 🆕 진단 이슈 컨텍스트 추가 (시뮬레이션에서 발견한 문제점 우선 해결)
+          diagnostic_issues: diagnosticIssuesContext,
           // 설정 패널의 상세 설정 전달
           settings: {
             objective: optimizationSettings.objective,
@@ -630,28 +654,98 @@ export function AIOptimizationTab({
 
   return (
     <div className="p-4 space-y-4">
-      {/* ========== 진단 결과 요약 (AI 시뮬레이션에서 전달) ========== */}
+      {/* ========== 🆕 문제점 시나리오 (AI 시뮬레이션에서 전달) ========== */}
       {diagnosticIssues.length > 0 && (
-        <DiagnosticsSummary
-          issues={diagnosticIssues}
-          defaultExpanded={true}
-          onOptimizeClick={() => {
-            // 진단 결과에 따라 최적화 유형 자동 선택
-            const hasCongestion = diagnosticIssues.some(
-              (i) => i.title.includes('혼잡') || i.title.includes('병목')
-            );
-            const hasFlow = diagnosticIssues.some(
-              (i) => i.title.includes('동선') || i.title.includes('유동')
-            );
+        <div className="space-y-3">
+          {/* 시나리오 컨텍스트 헤더 */}
+          <div className="p-3 bg-gradient-to-r from-red-500/10 via-orange-500/10 to-yellow-500/10 rounded-lg border border-red-500/30">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-semibold text-white flex items-center gap-2">
+                <Target className="w-4 h-4 text-red-400" />
+                해결할 문제점 시나리오
+              </span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30">
+                {diagnosticIssues.length}건 발견
+              </span>
+            </div>
 
-            // 기본 레이아웃 최적화 선택
-            setSelectedOptimizations(['layout']);
+            {/* 시나리오/환경 컨텍스트 (있는 경우) */}
+            {diagnosticIssues[0]?.scenario_context && (
+              <div className="mb-2 p-2 bg-purple-500/10 rounded border border-purple-500/20">
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-purple-300 font-medium">📊 시뮬레이션 시나리오:</span>
+                  <span className="text-white">{(diagnosticIssues[0] as any).scenario_context.name}</span>
+                </div>
+                {(diagnosticIssues[0] as any).scenario_context.description && (
+                  <p className="text-[10px] text-white/50 mt-1">
+                    {(diagnosticIssues[0] as any).scenario_context.description}
+                  </p>
+                )}
+              </div>
+            )}
 
-            toast.info('진단 결과 기반 최적화 설정 완료', {
-              description: '아래 "최적화 실행" 버튼을 눌러주세요.',
-            });
-          }}
-        />
+            {/* 문제점 목록 */}
+            <div className="space-y-1.5">
+              {diagnosticIssues.slice(0, 5).map((issue, idx) => (
+                <div
+                  key={issue.id || idx}
+                  className={cn(
+                    'p-2 rounded flex items-start gap-2',
+                    issue.severity === 'critical'
+                      ? 'bg-red-500/20 border border-red-500/30'
+                      : issue.severity === 'warning'
+                      ? 'bg-yellow-500/20 border border-yellow-500/30'
+                      : 'bg-blue-500/20 border border-blue-500/30'
+                  )}
+                >
+                  <span className="text-sm">
+                    {issue.severity === 'critical' ? '🔴' : issue.severity === 'warning' ? '🟠' : '🔵'}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-white truncate">{issue.title}</p>
+                    <p className="text-[10px] text-white/50">
+                      {issue.zone || issue.zone_name} • {issue.message || (issue as any).details?.description}
+                    </p>
+                    {(issue as any).impact?.revenueImpact > 0 && (
+                      <p className="text-[10px] text-red-400 mt-0.5">
+                        예상 손실: {((issue as any).impact.revenueImpact / 10000).toLocaleString()}만원
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {diagnosticIssues.length > 5 && (
+                <p className="text-[10px] text-white/40 text-center pt-1">
+                  +{diagnosticIssues.length - 5}건 더 있음
+                </p>
+              )}
+            </div>
+
+            {/* 안내 메시지 */}
+            <div className="mt-3 p-2 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded border border-purple-500/20">
+              <p className="text-xs text-purple-300 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" />
+                <strong>AI 최적화</strong>가 위 문제점들을 최우선으로 해결합니다
+              </p>
+              <p className="text-[10px] text-white/50 mt-1">
+                아래에서 최적화 목표와 옵션을 설정하고 실행하세요
+              </p>
+            </div>
+          </div>
+
+          {/* 기존 DiagnosticsSummary (접힌 상태로 상세 보기) */}
+          <DiagnosticsSummary
+            issues={diagnosticIssues}
+            defaultExpanded={false}
+            onOptimizeClick={() => {
+              // 진단 결과에 따라 최적화 유형 자동 선택
+              setSelectedOptimizations(['layout']);
+              toast.info('진단 결과 기반 최적화 설정 완료', {
+                description: '아래 "최적화 실행" 버튼을 눌러주세요.',
+              });
+            }}
+          />
+        </div>
       )}
 
       {/* ========== 🔧 FIX: 환경 설정 컨텍스트 (날짜선택/직접설정 모드일 때 표시) ========== */}
