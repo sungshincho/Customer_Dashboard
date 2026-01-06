@@ -95,6 +95,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       const options = get().options;
 
       // 🔧 FIX: supabase.functions.invoke 사용 (자동 인증 처리)
+      // 🆕 환경/시나리오 컨텍스트를 포함하여 Edge Function 호출
       const { data, error } = await supabase.functions.invoke('run-simulation', {
         body: {
           store_id: storeId,
@@ -104,6 +105,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
             time_of_day: options.time_of_day,
             simulation_type: options.simulation_type,
           },
+          // 🆕 파인튜닝용 환경/시나리오 컨텍스트
+          environment_context: options.environment_context || null,
         },
       });
 

@@ -16,6 +16,37 @@ const corsHeaders = {
 };
 
 // ===== 타입 정의 =====
+
+// 🆕 환경/시나리오 컨텍스트 타입 (파인튜닝 데이터셋용)
+interface EnvironmentContext {
+  weather?: string;
+  temperature?: number;
+  humidity?: number;
+  holiday_type?: string;
+  day_of_week?: string;
+  time_of_day?: string;
+  impact?: {
+    trafficMultiplier?: number;
+    dwellTimeMultiplier?: number;
+    conversionMultiplier?: number;
+  };
+  // 프리셋 시나리오 정보
+  preset_scenario?: {
+    id: string;
+    name: string;
+    traffic_multiplier?: number;
+    discount_percent?: number;
+    event_type?: string | null;
+    expected_impact?: {
+      visitorsMultiplier?: number;
+      conversionMultiplier?: number;
+      basketMultiplier?: number;
+      dwellTimeMultiplier?: number;
+    };
+    risk_tags?: string[];
+  } | null;
+}
+
 interface SimulationRequest {
   store_id: string;
   options: {
@@ -24,6 +55,8 @@ interface SimulationRequest {
     time_of_day: 'morning' | 'afternoon' | 'evening' | 'peak';
     simulation_type: 'realtime' | 'predictive' | 'scenario';
   };
+  // 🆕 환경/시나리오 컨텍스트 (파인튜닝용)
+  environment_context?: EnvironmentContext | null;
 }
 
 interface DiagnosticIssue {
@@ -106,9 +139,12 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { store_id, options }: SimulationRequest = await req.json();
+    const { store_id, options, environment_context }: SimulationRequest = await req.json();
 
     console.log(`[Simulation] 시작: store_id=${store_id}, options=`, options);
+    if (environment_context) {
+      console.log(`[Simulation] 환경 컨텍스트:`, environment_context);
+    }
 
     // ===== 1. 매장 데이터 로드 =====
     const { data: zones } = await supabaseClient
@@ -208,7 +244,7 @@ Deno.serve(async (req: Request) => {
         `신뢰도: ${simulationResult.confidence_score}%`,
       ].join(' | ');
 
-      // 입력 변수 구성
+      // 🆕 입력 변수 구성 (환경/시나리오 컨텍스트 포함)
       const inputVariables = {
         simulation_options: options,
         store_context: {
@@ -217,21 +253,44 @@ Deno.serve(async (req: Request) => {
           transition_count: transitions?.length || 0,
         },
         analysis_context: analysisContext,
+        // 🆕 파인튜닝용 환경/시나리오 컨텍스트
+        environment_context: environment_context || null,
       };
 
+      // 🆕 시나리오 타입 결정 (프리셋 시나리오 사용 시 반영)
+      const logSimulationType = environment_context?.preset_scenario
+        ? `scenario_${environment_context.preset_scenario.id}`
+        : (options.simulation_type === 'predictive' ? 'demand_prediction' : 'traffic_flow');
+
       await logAIResponse(supabaseClient, {
-        store_id,
-        function_name: 'run-simulation',
-        simulation_type: options.simulation_type === 'predictive' ? 'demand_prediction' : 'traffic_flow',
-        input_variables: inputVariables,
-        ai_response: simulationResult,
-        response_summary: responseSummary,
-        execution_time_ms: executionTime,
-        context_metadata: {
+        storeId: store_id,
+        functionName: 'run-simulation',
+        simulationType: logSimulationType as any, // 동적 타입 허용
+        inputVariables: inputVariables,
+        aiResponse: simulationResult,
+        responseSummary: {
+          text: responseSummary,
+          visitors: simulationResult.kpis.predicted_visitors,
+          conversionRate: simulationResult.kpis.predicted_conversion_rate,
+          revenue: simulationResult.kpis.predicted_revenue,
+          issueCount: simulationResult.diagnostic_issues.length,
+          confidence: simulationResult.confidence_score,
+        },
+        executionTimeMs: executionTime,
+        modelUsed: LOVABLE_API_KEY ? 'gemini-2.5-flash' : 'rule-based',
+        contextMetadata: {
           model_used: LOVABLE_API_KEY ? 'gemini-2.5-flash' : 'rule-based',
-          zone_count: zones?.length || 0,
-          issue_count: simulationResult.diagnostic_issues.length,
-          critical_issues: simulationResult.diagnostic_issues.filter((i: any) => i.severity === 'critical').length,
+          zoneCount: zones?.length || 0,
+          issueCount: simulationResult.diagnostic_issues.length,
+          criticalIssues: simulationResult.diagnostic_issues.filter((i: any) => i.severity === 'critical').length,
+          // 🆕 파인튜닝용 환경/시나리오 메타데이터
+          weather: environment_context?.weather || null,
+          holidayType: environment_context?.holiday_type || null,
+          presetScenarioId: environment_context?.preset_scenario?.id || null,
+          presetScenarioName: environment_context?.preset_scenario?.name || null,
+          trafficMultiplier: environment_context?.impact?.trafficMultiplier || 1.0,
+          hasEnvironmentContext: !!environment_context,
+          hasPresetScenario: !!environment_context?.preset_scenario,
         },
       });
 
@@ -255,14 +314,14 @@ Deno.serve(async (req: Request) => {
       );
 
       await logAIResponse(supabaseClient, {
-        store_id: 'unknown',
-        function_name: 'run-simulation',
-        simulation_type: 'traffic_flow',
-        input_variables: {},
-        ai_response: { error: error.message },
-        response_summary: `에러: ${error.message}`,
-        execution_time_ms: timer.getElapsedMs(),
-        context_metadata: { error: true },
+        storeId: 'unknown',
+        functionName: 'run-simulation',
+        simulationType: 'traffic_flow',
+        inputVariables: {},
+        aiResponse: { error: error.message },
+        executionTimeMs: timer.getElapsedMs(),
+        hadError: true,
+        errorMessage: error.message,
       });
     } catch {
       // 로깅 실패 무시
