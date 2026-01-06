@@ -12,6 +12,39 @@
 
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.89.0';
 
+// 🆕 Phase 5: Structured Output 스키마 검증용 상수
+const VMD_PRINCIPLES = [
+  'focal_point_creation',
+  'traffic_flow_optimization',
+  'bottleneck_resolution',
+  'dead_zone_activation',
+  'sightline_improvement',
+  'accessibility_enhancement',
+  'cross_sell_proximity',
+  'negative_space_balance',
+] as const;
+
+const PLACEMENT_STRATEGIES = [
+  'golden_zone_placement',
+  'eye_level_optimization',
+  'impulse_buy_position',
+  'cross_sell_bundle',
+  'high_margin_spotlight',
+  'slow_mover_activation',
+  'seasonal_highlight',
+  'new_arrival_feature',
+  'clearance_optimization',
+  'hero_product_display',
+] as const;
+
+const SHELF_LEVELS = [
+  'floor',
+  'bottom',
+  'middle',
+  'eye_level',
+  'top',
+] as const;
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -284,6 +317,132 @@ const SCENARIO_EXPECTATIONS: Record<string, ScenarioExpectations> = {
 function isWithinRange(value: number | undefined, range: ExpectedRange): boolean {
   if (value === undefined || value === null) return false;
   return value >= range.min && value <= range.max;
+}
+
+// ============================================================================
+// 🆕 Phase 5: Structured Output 스키마 검증
+// ============================================================================
+
+interface SchemaValidationResult {
+  isValid: boolean;
+  score: number;  // 0-30 추가 점수
+  details: {
+    vmdPrinciplesValid: boolean;
+    placementStrategiesValid: boolean;
+    expectedImpactStructureValid: boolean;
+    shelfLevelsValid: boolean;
+    schemaMetadataPresent: boolean;
+  };
+  errors: string[];
+}
+
+/**
+ * Structured Output 스키마 준수 여부 검증
+ */
+function validateStructuredOutputSchema(response: any): SchemaValidationResult {
+  const errors: string[] = [];
+  let score = 0;
+  const details = {
+    vmdPrinciplesValid: true,
+    placementStrategiesValid: true,
+    expectedImpactStructureValid: true,
+    shelfLevelsValid: true,
+    schemaMetadataPresent: false,
+  };
+
+  // 1. Schema 메타데이터 확인 (summary에서)
+  const summary = response?.summary || {};
+  if (summary.structured_output_enabled === true) {
+    details.schemaMetadataPresent = true;
+    score += 5;
+
+    if (summary.schema_validation_passed === true) {
+      score += 5;
+    } else if (summary.schema_validation_errors?.length > 0) {
+      errors.push(`서버 측 스키마 검증 오류: ${summary.schema_validation_errors.join(', ')}`);
+    }
+  }
+
+  // 2. furniture_changes의 vmd_principle 검증
+  const furnitureChanges = response?.furniture_changes || [];
+  for (const fc of furnitureChanges) {
+    // vmd_principle 필드 검증
+    if (fc.vmd_principle) {
+      if (!VMD_PRINCIPLES.includes(fc.vmd_principle)) {
+        details.vmdPrinciplesValid = false;
+        errors.push(`유효하지 않은 vmd_principle: ${fc.vmd_principle}`);
+      }
+    }
+
+    // expected_impact 구조 검증 (새 스키마는 객체, 기존은 숫자)
+    if (fc.expected_impact !== undefined) {
+      if (typeof fc.expected_impact === 'object' && fc.expected_impact !== null) {
+        // 새 스키마 구조
+        if (typeof fc.expected_impact.traffic_change === 'number' ||
+            typeof fc.expected_impact.confidence === 'number') {
+          details.expectedImpactStructureValid = true;
+        }
+      } else if (typeof fc.expected_impact === 'number') {
+        // 기존 단순 숫자 구조도 허용
+        details.expectedImpactStructureValid = true;
+      }
+    }
+  }
+
+  // 3. product_changes의 placement_strategy 검증
+  const productChanges = response?.product_changes || [];
+  for (const pc of productChanges) {
+    // placement_strategy 필드 검증
+    if (pc.placement_strategy?.type) {
+      if (!PLACEMENT_STRATEGIES.includes(pc.placement_strategy.type)) {
+        details.placementStrategiesValid = false;
+        errors.push(`유효하지 않은 placement_strategy: ${pc.placement_strategy.type}`);
+      }
+    }
+
+    // shelf_level 검증 (current, suggested 모두)
+    const checkShelfLevel = (pos: any, label: string) => {
+      if (pos?.shelf_level) {
+        if (!SHELF_LEVELS.includes(pos.shelf_level)) {
+          details.shelfLevelsValid = false;
+          errors.push(`유효하지 않은 shelf_level (${label}): ${pos.shelf_level}`);
+        }
+      }
+    };
+    checkShelfLevel(pc.current, 'current');
+    checkShelfLevel(pc.suggested, 'suggested');
+
+    // expected_impact 구조 검증
+    if (pc.expected_impact !== undefined) {
+      if (typeof pc.expected_impact === 'object' && pc.expected_impact !== null) {
+        if (typeof pc.expected_impact.revenue_change === 'number' ||
+            typeof pc.expected_impact.confidence === 'number') {
+          details.expectedImpactStructureValid = true;
+        }
+      }
+    }
+  }
+
+  // 점수 계산
+  if (details.vmdPrinciplesValid && furnitureChanges.some((fc: any) => fc.vmd_principle)) {
+    score += 5;  // VMD 원칙 올바르게 사용
+  }
+  if (details.placementStrategiesValid && productChanges.some((pc: any) => pc.placement_strategy?.type)) {
+    score += 5;  // 배치 전략 올바르게 사용
+  }
+  if (details.expectedImpactStructureValid) {
+    score += 5;  // expected_impact 구조 올바름
+  }
+  if (details.shelfLevelsValid) {
+    score += 5;  // shelf_level 올바름
+  }
+
+  return {
+    isValid: errors.length === 0,
+    score: Math.min(score, 30),
+    details,
+    errors,
+  };
 }
 
 /**
@@ -803,6 +962,33 @@ function calculateOptimizationQuality(
       isValid: validation.isValid,
       violations: validation.violations,
       bonus_score: validation.score,
+    };
+  }
+
+  // 🆕 Phase 5: Structured Output 스키마 검증 (최대 30점 추가)
+  if (!isStaffingType) {
+    const schemaValidation = validateStructuredOutputSchema(response);
+    score += schemaValidation.score;
+    metrics.schema_validation = {
+      isValid: schemaValidation.isValid,
+      score: schemaValidation.score,
+      details: schemaValidation.details,
+      errors: schemaValidation.errors.length > 0 ? schemaValidation.errors : undefined,
+    };
+
+    // 도메인 지식 활용 메트릭 추가
+    const vmdPrinciplesUsed = (response?.furniture_changes || [])
+      .filter((fc: any) => fc.vmd_principle)
+      .map((fc: any) => fc.vmd_principle);
+    const placementStrategiesUsed = (response?.product_changes || [])
+      .filter((pc: any) => pc.placement_strategy?.type)
+      .map((pc: any) => pc.placement_strategy.type);
+
+    metrics.domain_knowledge_usage = {
+      vmd_principles_used: [...new Set(vmdPrinciplesUsed)],
+      placement_strategies_used: [...new Set(placementStrategiesUsed)],
+      vmd_count: vmdPrinciplesUsed.length,
+      placement_count: placementStrategiesUsed.length,
     };
   }
 
