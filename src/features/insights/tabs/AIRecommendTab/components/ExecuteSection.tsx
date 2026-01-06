@@ -352,9 +352,9 @@ function CampaignCard({
           <p style={{ fontSize: '10px', marginBottom: '4px', ...text3D.body }}>현재 ROI</p>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
             <span style={{ fontSize: '13px', fontWeight: 700, color: isDark ? '#fff' : '#1a1a1f' }}>{campaign.currentROI}%</span>
-            {roiDiff >= 0 ? <TrendingUp className="w-3 h-3" style={{ color: iconColor }} /> :
-             roiDiff < -10 ? <TrendingDown className="w-3 h-3" style={{ color: iconColor }} /> :
-             <Minus className="w-3 h-3" style={{ color: iconColor }} />}
+            {roiDiff > 0 ? <TrendingUp className="w-3 h-3" style={{ color: '#22c55e' }} /> :
+             roiDiff < 0 ? <TrendingDown className="w-3 h-3" style={{ color: '#ef4444' }} /> :
+             <Minus className="w-3 h-3" style={{ color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280' }} />}
           </div>
         </div>
       </div>
@@ -362,8 +362,8 @@ function CampaignCard({
       {/* ROI 비교 */}
       <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px' }}>
         <span style={{ ...text3D.body }}>예상 ROI: {campaign.expectedROI}%</span>
-        <span style={{ fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.8)' : '#374151' }}>
-          {roiDiff >= 0 ? '+' : ''}{roiDiff.toFixed(0)}%p 차이
+        <span style={{ fontWeight: 600, color: roiDiff > 0 ? '#22c55e' : roiDiff < 0 ? '#ef4444' : (isDark ? 'rgba(255,255,255,0.6)' : '#6b7280') }}>
+          {roiDiff > 0 ? '+' : ''}{roiDiff.toFixed(0)}%p 차이
         </span>
       </div>
     </div>

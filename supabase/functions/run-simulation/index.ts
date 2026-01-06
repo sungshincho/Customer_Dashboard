@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.79.0';
+import { logAIResponse, createExecutionTimer } from '../_shared/aiResponseLogger.ts';
 
 /**
  * run-simulation Edge Function
@@ -15,6 +16,37 @@ const corsHeaders = {
 };
 
 // ===== 타입 정의 =====
+
+// 🆕 환경/시나리오 컨텍스트 타입 (파인튜닝 데이터셋용)
+interface EnvironmentContext {
+  weather?: string;
+  temperature?: number;
+  humidity?: number;
+  holiday_type?: string;
+  day_of_week?: string;
+  time_of_day?: string;
+  impact?: {
+    trafficMultiplier?: number;
+    dwellTimeMultiplier?: number;
+    conversionMultiplier?: number;
+  };
+  // 프리셋 시나리오 정보
+  preset_scenario?: {
+    id: string;
+    name: string;
+    traffic_multiplier?: number;
+    discount_percent?: number;
+    event_type?: string | null;
+    expected_impact?: {
+      visitorsMultiplier?: number;
+      conversionMultiplier?: number;
+      basketMultiplier?: number;
+      dwellTimeMultiplier?: number;
+    };
+    risk_tags?: string[];
+  } | null;
+}
+
 interface SimulationRequest {
   store_id: string;
   options: {
@@ -23,6 +55,8 @@ interface SimulationRequest {
     time_of_day: 'morning' | 'afternoon' | 'evening' | 'peak';
     simulation_type: 'realtime' | 'predictive' | 'scenario';
   };
+  // 🆕 환경/시나리오 컨텍스트 (파인튜닝용)
+  environment_context?: EnvironmentContext | null;
 }
 
 interface DiagnosticIssue {
@@ -96,15 +130,36 @@ Deno.serve(async (req: Request) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+  // 🆕 실행 시간 측정 시작
+  const timer = createExecutionTimer();
 
-    const { store_id, options }: SimulationRequest = await req.json();
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const authHeader = req.headers.get('Authorization');
+
+    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
+      global: { headers: authHeader ? { Authorization: authHeader } : {} },
+    });
+
+    // 🆕 사용자 인증 확인 (user_id 추출)
+    let userId: string | null = null;
+    if (authHeader) {
+      try {
+        const { data: { user } } = await supabaseClient.auth.getUser();
+        userId = user?.id || null;
+      } catch (authError) {
+        console.warn('[Simulation] Auth check failed:', authError);
+      }
+    }
+    console.log(`[Simulation] User: ${userId || 'anonymous'}`);
+
+    const { store_id, options, environment_context }: SimulationRequest = await req.json();
 
     console.log(`[Simulation] 시작: store_id=${store_id}, options=`, options);
+    if (environment_context) {
+      console.log(`[Simulation] 환경 컨텍스트:`, environment_context);
+    }
 
     // ===== 1. 매장 데이터 로드 =====
     const { data: zones } = await supabaseClient
@@ -155,11 +210,11 @@ Deno.serve(async (req: Request) => {
     // ===== 3. AI 추론 또는 규칙 기반 시뮬레이션 =====
     let simulationResult: SimulationResult;
 
-    const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 
-    if (ANTHROPIC_API_KEY) {
-      // Claude AI 호출
-      const aiResponse = await callClaudeForSimulation(analysisContext, ANTHROPIC_API_KEY);
+    if (LOVABLE_API_KEY) {
+      // Gemini 2.5 Flash AI 호출 (Lovable API Gateway)
+      const aiResponse = await callGeminiForSimulation(analysisContext, LOVABLE_API_KEY);
       simulationResult = parseAndValidateResult(aiResponse, zones || [], options);
     } else {
       // 규칙 기반 시뮬레이션 (API 키 없을 때)
@@ -191,12 +246,139 @@ Deno.serve(async (req: Request) => {
 
     console.log(`[Simulation] 완료: ${simulationResult.diagnostic_issues.length}개 이슈 발견`);
 
+    // 🆕 AI 응답 로깅 (파인튜닝 데이터셋 수집)
+    try {
+      const executionTime = timer.getElapsedMs();
+
+      // 시뮬레이션 결과 요약 생성
+      const responseSummary = [
+        `예상 방문객: ${simulationResult.kpis.predicted_visitors}명`,
+        `예상 전환율: ${(simulationResult.kpis.predicted_conversion_rate * 100).toFixed(1)}%`,
+        `예상 매출: ${simulationResult.kpis.predicted_revenue.toLocaleString()}원`,
+        `발견 이슈: ${simulationResult.diagnostic_issues.length}개`,
+        `신뢰도: ${simulationResult.confidence_score}%`,
+      ].join(' | ');
+
+      // 🆕 입력 변수 구성 (환경/시나리오 컨텍스트 포함)
+      const inputVariables = {
+        simulation_options: options,
+        store_context: {
+          zone_count: zones?.length || 0,
+          furniture_count: furniture?.length || 0,
+          transition_count: transitions?.length || 0,
+        },
+        analysis_context: analysisContext,
+        // 🆕 파인튜닝용 환경/시나리오 컨텍스트
+        environment_context: environment_context || null,
+      };
+
+      // 🆕 시나리오 타입 결정 (프리셋 시나리오 사용 시 반영)
+      const logSimulationType = environment_context?.preset_scenario
+        ? `scenario_${environment_context.preset_scenario.id}`
+        : (options.simulation_type === 'predictive' ? 'demand_prediction' : 'traffic_flow');
+
+      // 🆕 파인튜닝용: 사용자 화면에 표시되는 텍스트 응답 추출
+      const userFacingTexts = {
+        // AI 인사이트 (핵심 추천 메시지)
+        ai_insights: simulationResult.ai_insights || [],
+        // 진단 이슈 설명 및 권장 액션
+        diagnostic_texts: simulationResult.diagnostic_issues.map((issue: DiagnosticIssue) => ({
+          title: issue.title,
+          description: issue.description,
+          impact: issue.impact,
+          suggested_action: issue.suggested_action,
+          severity: issue.severity,
+        })),
+        // 요약 텍스트
+        summary_text: responseSummary,
+      };
+
+      await logAIResponse(supabaseClient, {
+        storeId: store_id,
+        userId: userId || undefined, // 🆕 user_id 추가
+        functionName: 'run-simulation',
+        simulationType: logSimulationType as any, // 동적 타입 허용
+        inputVariables: inputVariables,
+        // 🆕 aiResponse를 user_facing_texts로 변경 (파인튜닝 최적화)
+        aiResponse: {
+          user_facing_texts: userFacingTexts,
+          // 핵심 지표만 포함 (전체 결과 제외)
+          key_metrics: {
+            predicted_visitors: simulationResult.kpis.predicted_visitors,
+            predicted_conversion_rate: simulationResult.kpis.predicted_conversion_rate,
+            predicted_revenue: simulationResult.kpis.predicted_revenue,
+            peak_congestion_percent: simulationResult.kpis.peak_congestion_percent,
+            confidence_score: simulationResult.confidence_score,
+          },
+          zone_summary: simulationResult.zone_analysis.map((z: ZoneAnalysis) => ({
+            zone_name: z.zone_name,
+            congestion_level: z.congestion_level,
+            bottleneck_score: z.bottleneck_score,
+          })),
+          flow_summary: {
+            dead_zones: simulationResult.flow_analysis.dead_zones,
+            congestion_points: simulationResult.flow_analysis.congestion_points,
+          },
+        },
+        responseSummary: {
+          text: responseSummary,
+          visitors: simulationResult.kpis.predicted_visitors,
+          conversionRate: simulationResult.kpis.predicted_conversion_rate,
+          revenue: simulationResult.kpis.predicted_revenue,
+          issueCount: simulationResult.diagnostic_issues.length,
+          confidence: simulationResult.confidence_score,
+        },
+        executionTimeMs: executionTime,
+        modelUsed: LOVABLE_API_KEY ? 'gemini-2.5-flash' : 'rule-based',
+        contextMetadata: {
+          model_used: LOVABLE_API_KEY ? 'gemini-2.5-flash' : 'rule-based',
+          zoneCount: zones?.length || 0,
+          issueCount: simulationResult.diagnostic_issues.length,
+          criticalIssues: simulationResult.diagnostic_issues.filter((i: any) => i.severity === 'critical').length,
+          // 🆕 파인튜닝용 환경/시나리오 메타데이터
+          weather: environment_context?.weather || null,
+          holidayType: environment_context?.holiday_type || null,
+          presetScenarioId: environment_context?.preset_scenario?.id || null,
+          presetScenarioName: environment_context?.preset_scenario?.name || null,
+          trafficMultiplier: environment_context?.impact?.trafficMultiplier || 1.0,
+          hasEnvironmentContext: !!environment_context,
+          hasPresetScenario: !!environment_context?.preset_scenario,
+        },
+      });
+
+      console.log(`[Simulation] 로깅 완료: ${executionTime}ms`);
+    } catch (logError) {
+      console.warn('[Simulation] 로깅 실패 (무시):', logError);
+    }
+
     return new Response(JSON.stringify(simulationResult), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error: any) {
     console.error('[Simulation] 오류:', error);
+
+    // 🆕 에러 로깅
+    try {
+      const supabaseClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+
+      await logAIResponse(supabaseClient, {
+        storeId: 'unknown',
+        functionName: 'run-simulation',
+        simulationType: 'traffic_flow',
+        inputVariables: {},
+        aiResponse: { error: error.message },
+        executionTimeMs: timer.getElapsedMs(),
+        hadError: true,
+        errorMessage: error.message,
+      });
+    } catch {
+      // 로깅 실패 무시
+    }
+
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -290,40 +472,11 @@ function buildAnalysisContext(data: any) {
   };
 }
 
-// ===== Claude AI 호출 =====
-async function callClaudeForSimulation(context: any, apiKey: string): Promise<string> {
-  const prompt = `
-당신은 리테일 매장 시뮬레이션 전문가입니다. 주어진 매장 데이터를 분석하여 고객 행동을 시뮬레이션하고 잠재적 문제점을 진단해주세요.
+// ===== Gemini AI 호출 (Lovable API Gateway) =====
+async function callGeminiForSimulation(context: any, apiKey: string): Promise<string> {
+  const systemPrompt = `당신은 리테일 매장 시뮬레이션 전문가입니다. 주어진 매장 데이터를 분석하여 고객 행동을 시뮬레이션하고 잠재적 문제점을 진단해주세요.
 
-## 매장 데이터
-
-### 존 통계 (최근 30일 평균)
-${JSON.stringify(context.zone_stats, null, 2)}
-
-### 존 간 이동 확률
-${JSON.stringify(context.transition_probabilities.slice(0, 15), null, 2)}
-
-### 역사적 KPI
-${JSON.stringify(context.historical_kpis, null, 2)}
-
-### 시뮬레이션 옵션
-- 시뮬레이션 시간: ${context.simulation_options.duration_minutes}분
-- 예상 고객 수: ${context.simulation_options.customer_count}명
-- 시간대: ${context.simulation_options.time_of_day}
-
-## 분석 요청
-
-1. **KPI 예측**: 주어진 조건에서의 방문자 수, 전환율, 매출, 평균 체류시간, 피크 혼잡도를 예측해주세요.
-
-2. **존별 분석**: 각 존의 예상 방문자 수, 체류시간, 혼잡도, 병목 점수(0-100)를 분석해주세요.
-
-3. **동선 분석**: 주요 이동 경로, 방문이 적은 존(dead zones), 혼잡 지점을 식별해주세요.
-
-4. **AI 인사이트**: 데이터에서 발견한 주요 패턴과 개선 기회를 3-5개 제시해주세요.
-
-## 응답 형식 (JSON만 응답)
-
-\`\`\`json
+응답 형식 (JSON만 응답, 마크다운 코드블록 없이):
 {
   "kpis": {
     "predicted_visitors": number,
@@ -351,31 +504,74 @@ ${JSON.stringify(context.historical_kpis, null, 2)}
   },
   "ai_insights": ["인사이트1", "인사이트2", ...],
   "confidence_score": number (0-100)
-}
-\`\`\`
-`;
+}`;
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const userPrompt = `## 매장 데이터
+
+### 존 통계 (최근 30일 평균)
+${JSON.stringify(context.zone_stats, null, 2)}
+
+### 존 간 이동 확률
+${JSON.stringify(context.transition_probabilities.slice(0, 15), null, 2)}
+
+### 역사적 KPI
+${JSON.stringify(context.historical_kpis, null, 2)}
+
+### 시뮬레이션 옵션
+- 시뮬레이션 시간: ${context.simulation_options.duration_minutes}분
+- 예상 고객 수: ${context.simulation_options.customer_count}명
+- 시간대: ${context.simulation_options.time_of_day}
+
+## 분석 요청
+
+1. **KPI 예측**: 주어진 조건에서의 방문자 수, 전환율, 매출, 평균 체류시간, 피크 혼잡도를 예측해주세요.
+
+2. **존별 분석**: 각 존의 예상 방문자 수, 체류시간, 혼잡도, 병목 점수(0-100)를 분석해주세요.
+
+3. **동선 분석**: 주요 이동 경로, 방문이 적은 존(dead zones), 혼잡 지점을 식별해주세요.
+
+4. **AI 인사이트**: 데이터에서 발견한 주요 패턴과 개선 기회를 3-5개 한국어로 제시해주세요.
+
+JSON 형식으로만 응답해주세요.`;
+
+  console.log('[Simulation] Gemini API 호출 시작...');
+
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
     headers: {
+      'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: 'google/gemini-2.5-flash',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
       max_tokens: 4096,
-      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.7,
     }),
   });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[Simulation] Gemini API 에러:', response.status, errorText);
+    throw new Error(`Gemini API 오류 (${response.status}): ${errorText}`);
+  }
 
   const result = await response.json();
 
   if (result.error) {
-    throw new Error(`Claude API 오류: ${result.error.message}`);
+    throw new Error(`Gemini API 오류: ${result.error.message || JSON.stringify(result.error)}`);
   }
 
-  return result.content[0].text;
+  const content = result.choices?.[0]?.message?.content;
+  if (!content) {
+    throw new Error('Gemini API 응답에 content가 없습니다');
+  }
+
+  console.log('[Simulation] Gemini API 응답 수신 완료');
+  return content;
 }
 
 // ===== 규칙 기반 시뮬레이션 (API 키 없을 때) =====

@@ -161,12 +161,12 @@ const MetricCard = ({
           {change !== undefined && (
             <div style={{ marginTop: '12px' }}>
               <Badge3D dark={isDark}>
-                {change >= 0 ? <TrendingUp className="h-3.5 w-3.5" style={{ color: isDark ? 'rgba(255,255,255,0.8)' : '#059669' }} />
-                  : change < 0 ? <TrendingDown className="h-3.5 w-3.5" style={{ color: '#dc2626' }} />
+                {change > 0 ? <TrendingUp className="h-3.5 w-3.5" style={{ color: '#22c55e' }} />
+                  : change < 0 ? <TrendingDown className="h-3.5 w-3.5" style={{ color: '#ef4444' }} />
                   : <Minus className="h-3.5 w-3.5" style={{ color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280' }} />}
                 <span style={{ fontSize: '11px', fontWeight: 600,
-                  color: isDark ? 'rgba(255,255,255,0.9)' : (change >= 0 ? '#059669' : change < 0 ? '#dc2626' : '#6b7280')
-                }}>{change >= 0 ? '+' : ''}{change.toFixed(1)}{changeUnit}</span>
+                  color: change > 0 ? '#22c55e' : change < 0 ? '#ef4444' : (isDark ? 'rgba(255,255,255,0.6)' : '#6b7280')
+                }}>{change > 0 ? '+' : ''}{change.toFixed(1)}{changeUnit}</span>
               </Badge3D>
             </div>
           )}

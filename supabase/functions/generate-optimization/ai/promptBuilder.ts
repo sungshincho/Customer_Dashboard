@@ -104,6 +104,41 @@ export interface PerformanceData {
 }
 
 /**
+ * 진단 이슈 (시뮬레이션에서 발견된 문제점)
+ */
+export interface DiagnosticIssue {
+  id: string;
+  type: string;
+  severity: 'critical' | 'warning' | 'info';
+  title: string;
+  zone_id?: string;
+  zone_name?: string;
+  description?: string;
+  impact?: {
+    revenueImpact?: number;
+    trafficImpact?: number;
+    conversionImpact?: number;
+  };
+  recommendations?: string[];
+}
+
+/**
+ * 진단 이슈 컨텍스트
+ */
+export interface DiagnosticIssuesContext {
+  priority_issues: DiagnosticIssue[];
+  scenario_context?: {
+    id: string;
+    name: string;
+    description?: string;
+    expected_impact?: any;
+    risk_tags?: string[];
+  } | null;
+  environment_context?: any | null;
+  simulation_kpis?: any | null;
+}
+
+/**
  * 프롬프트 컨텍스트 (모든 입력 데이터 통합)
  */
 export interface PromptContext {
@@ -114,6 +149,8 @@ export interface PromptContext {
   flowAnalysis: FlowAnalysisResult | null;
   associations: ProductAssociationResult | null;
   settings: OptimizationSettings;
+  // 🆕 시뮬레이션에서 전달받은 진단 이슈
+  diagnosticIssues?: DiagnosticIssuesContext | null;
 }
 
 /**
@@ -335,6 +372,83 @@ export function buildConstraintsSection(
 - **Goal**: ${settings.optimizationGoal}
 - **Intensity**: ${settings.intensity}
 - **Weights**: Revenue ${Math.round(settings.weights.revenue * 100)}% | Conversion ${Math.round(settings.weights.conversion * 100)}% | Traffic ${Math.round(settings.weights.traffic * 100)}% | Experience ${Math.round(settings.weights.experience * 100)}%`;
+}
+
+/**
+ * 🆕 진단 이슈 섹션 생성 (시뮬레이션에서 발견된 문제점)
+ * - 최적화 시 이 문제점들을 최우선으로 해결하도록 지시
+ */
+export function buildDiagnosticIssuesSection(diagnosticIssues: DiagnosticIssuesContext | null): string {
+  if (!diagnosticIssues || !diagnosticIssues.priority_issues || diagnosticIssues.priority_issues.length === 0) {
+    return '';
+  }
+
+  const issues = diagnosticIssues.priority_issues;
+  const criticalIssues = issues.filter(i => i.severity === 'critical');
+  const warningIssues = issues.filter(i => i.severity === 'warning');
+  const totalRevenueImpact = issues.reduce((sum, i) => sum + (i.impact?.revenueImpact || 0), 0);
+
+  // 시나리오 컨텍스트 (있는 경우)
+  const scenarioSection = diagnosticIssues.scenario_context
+    ? `
+### Simulation Scenario
+- **Name**: ${diagnosticIssues.scenario_context.name}
+${diagnosticIssues.scenario_context.description ? `- **Description**: ${diagnosticIssues.scenario_context.description}` : ''}
+${diagnosticIssues.scenario_context.risk_tags?.length ? `- **Risk Tags**: ${diagnosticIssues.scenario_context.risk_tags.join(', ')}` : ''}
+`
+    : '';
+
+  // KPI 컨텍스트 (있는 경우)
+  const kpiSection = diagnosticIssues.simulation_kpis
+    ? `
+### Simulation KPIs
+- Visitors: ${diagnosticIssues.simulation_kpis.visitors?.toLocaleString() || 'N/A'}
+- Revenue: ₩${diagnosticIssues.simulation_kpis.revenue?.toLocaleString() || 'N/A'}
+- Conversion: ${((diagnosticIssues.simulation_kpis.conversion || 0) * 100).toFixed(1)}%
+- Avg Dwell: ${diagnosticIssues.simulation_kpis.avg_dwell?.toFixed(0) || 'N/A'}s
+`
+    : '';
+
+  // 이슈 목록
+  const issuesList = issues.map((issue, idx) => {
+    const severityIcon = issue.severity === 'critical' ? '🔴' : issue.severity === 'warning' ? '🟠' : '🔵';
+    const impactStr = issue.impact?.revenueImpact
+      ? ` | Revenue Impact: ₩${(issue.impact.revenueImpact / 10000).toLocaleString()}만원`
+      : '';
+    const recsStr = issue.recommendations?.length
+      ? `\n   - Recommendations: ${issue.recommendations.slice(0, 2).join('; ')}`
+      : '';
+
+    return `${idx + 1}. ${severityIcon} **[${issue.severity.toUpperCase()}]** ${issue.title}
+   - Type: ${issue.type}
+   - Zone: ${issue.zone_name || issue.zone_id || 'N/A'}
+   - Description: ${issue.description || 'N/A'}${impactStr}${recsStr}`;
+  }).join('\n\n');
+
+  return `## 🚨 PRIORITY ISSUES TO SOLVE (FROM AI SIMULATION)
+
+**CRITICAL**: The following issues were identified by the AI simulation.
+**YOUR PRIMARY OBJECTIVE is to solve these issues through layout/product optimization.**
+
+### Issue Summary
+- **Total Issues**: ${issues.length}
+- **Critical**: ${criticalIssues.length} 🔴
+- **Warning**: ${warningIssues.length} 🟠
+- **Estimated Revenue Impact**: ₩${(totalRevenueImpact / 10000).toLocaleString()}만원/day
+
+${scenarioSection}
+${kpiSection}
+### Issue Details (MUST ADDRESS)
+${issuesList}
+
+### Optimization Directive
+1. **PRIORITIZE** solving the critical issues (🔴) first
+2. **FOCUS** changes on the affected zones: ${[...new Set(issues.map(i => i.zone_name || i.zone_id).filter(Boolean))].join(', ')}
+3. **APPLY** the recommended solutions where possible
+4. **QUANTIFY** expected improvement for each issue resolved
+5. **CROSS-REFERENCE** with flow analysis and performance data to validate solutions
+
+---`;
 }
 
 /**
@@ -761,6 +875,12 @@ export function buildAdvancedOptimizationPrompt(
   // 제약조건
   sections.push(buildConstraintsSection(context.settings, config));
 
+  // 🆕 진단 이슈 (시뮬레이션에서 발견된 문제점) - 제약조건 바로 다음에 배치하여 최우선으로 처리
+  const diagnosticSection = buildDiagnosticIssuesSection(context.diagnosticIssues || null);
+  if (diagnosticSection) {
+    sections.push(diagnosticSection);
+  }
+
   // 🆕 Phase 1.2: Few-Shot 예시 (CoT 프레임워크 앞에 배치)
   if (config.fewShot.enabled && config.fewShot.exampleCount > 0) {
     // 현재 환경에서 시나리오 생성
@@ -881,7 +1001,8 @@ export function createPromptContext(
   parameters: any,
   environmentData: EnvironmentDataBundle | null,
   flowAnalysis: FlowAnalysisResult | null,
-  associationData: ProductAssociationResult | null
+  associationData: ProductAssociationResult | null,
+  diagnosticIssues?: DiagnosticIssuesContext | null
 ): PromptContext {
   return {
     layout: {
@@ -911,6 +1032,8 @@ export function createPromptContext(
       },
       parameters,
     },
+    // 🆕 시뮬레이션에서 전달받은 진단 이슈
+    diagnosticIssues: diagnosticIssues || null,
   };
 }
 

@@ -170,10 +170,10 @@ export function PredictSection({
                   {formatCurrency(demandForecast.predictedRevenue)}
                 </p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '12px' }}>
-                  {demandForecast.trend === 'up' ? <TrendingUp className="w-3 h-3" style={{ color: iconColor }} /> :
-                   demandForecast.trend === 'down' ? <TrendingDown className="w-3 h-3" style={{ color: iconColor }} /> : null}
-                  <span style={{ fontSize: '12px', fontWeight: 500, color: isDark ? 'rgba(255,255,255,0.7)' : '#515158' }}>
-                    전주 대비 {demandForecast.percentChange >= 0 ? '+' : ''}{demandForecast.percentChange.toFixed(1)}%
+                  {demandForecast.trend === 'up' ? <TrendingUp className="w-3 h-3" style={{ color: '#22c55e' }} /> :
+                   demandForecast.trend === 'down' ? <TrendingDown className="w-3 h-3" style={{ color: '#ef4444' }} /> : null}
+                  <span style={{ fontSize: '12px', fontWeight: 500, color: demandForecast.percentChange > 0 ? '#22c55e' : demandForecast.percentChange < 0 ? '#ef4444' : (isDark ? 'rgba(255,255,255,0.6)' : '#6b7280') }}>
+                    전주 대비 {demandForecast.percentChange > 0 ? '+' : ''}{demandForecast.percentChange.toFixed(1)}%
                   </span>
                 </div>
                 <button
@@ -212,10 +212,10 @@ export function PredictSection({
                   {visitorForecast.predictedVisitors.toLocaleString()}명
                 </p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '12px' }}>
-                  {visitorForecast.trend === 'up' ? <TrendingUp className="w-3 h-3" style={{ color: iconColor }} /> :
-                   visitorForecast.trend === 'down' ? <TrendingDown className="w-3 h-3" style={{ color: iconColor }} /> : null}
-                  <span style={{ fontSize: '12px', fontWeight: 500, color: isDark ? 'rgba(255,255,255,0.7)' : '#515158' }}>
-                    전주 대비 {visitorForecast.percentChange >= 0 ? '+' : ''}{visitorForecast.percentChange.toFixed(1)}%
+                  {visitorForecast.trend === 'up' ? <TrendingUp className="w-3 h-3" style={{ color: '#22c55e' }} /> :
+                   visitorForecast.trend === 'down' ? <TrendingDown className="w-3 h-3" style={{ color: '#ef4444' }} /> : null}
+                  <span style={{ fontSize: '12px', fontWeight: 500, color: visitorForecast.percentChange > 0 ? '#22c55e' : visitorForecast.percentChange < 0 ? '#ef4444' : (isDark ? 'rgba(255,255,255,0.6)' : '#6b7280') }}>
+                    전주 대비 {visitorForecast.percentChange > 0 ? '+' : ''}{visitorForecast.percentChange.toFixed(1)}%
                   </span>
                 </div>
                 <button

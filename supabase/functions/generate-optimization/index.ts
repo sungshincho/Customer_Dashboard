@@ -250,6 +250,12 @@ Deno.serve(async (req) => {
     // 8. 최적화 생성
     let result: AILayoutOptimizationResult;
 
+    // 🆕 진단 이슈 추출 (시뮬레이션에서 전달받은 경우)
+    const diagnosticIssues = (parameters as any)?.diagnostic_issues || null;
+    if (diagnosticIssues?.priority_issues?.length > 0) {
+      console.log(`[generate-optimization] 🚨 Received ${diagnosticIssues.priority_issues.length} diagnostic issues from simulation`);
+    }
+
     if (lovableApiKey) {
       result = await generateAIOptimization(
         lovableApiKey,
@@ -261,7 +267,8 @@ Deno.serve(async (req) => {
         environmentData,  // 🆕 환경 데이터 추가
         flowAnalysis,     // 🆕 동선 분석 추가 (Phase 0.2)
         associationData,  // 🆕 연관성 분석 추가 (Phase 0.3)
-        vmdAnalysis       // 🆕 VMD 분석 추가 (Phase 3)
+        vmdAnalysis,      // 🆕 VMD 분석 추가 (Phase 3)
+        diagnosticIssues  // 🆕 시뮬레이션 진단 이슈 추가
       );
     } else {
       // AI 키 없을 경우 룰 기반 최적화
@@ -434,6 +441,36 @@ Deno.serve(async (req) => {
     };
 
     try {
+      // 🆕 파인튜닝용: 사용자 화면에 표시되는 텍스트 응답 추출
+      const userFacingTexts = {
+        // 가구 변경 이유들 (사용자에게 표시되는 핵심 메시지)
+        furniture_reasons: result.furniture_changes.map((fc: FurnitureChange) => ({
+          furniture_type: fc.furniture_type,
+          reason: fc.reason,
+          priority: fc.priority,
+          expected_impact: fc.expected_impact,
+        })),
+        // 상품 변경 이유들
+        product_reasons: result.product_changes.map((pc: ProductChange) => ({
+          sku: pc.sku,
+          reason: pc.reason,
+          priority: pc.priority,
+          expected_revenue_impact: pc.expected_revenue_impact,
+          expected_visibility_impact: pc.expected_visibility_impact,
+        })),
+        // 요약 메시지
+        summary_text: `가구 ${result.summary.total_furniture_changes}개, 상품 ${result.summary.total_product_changes}개 변경 권장. ` +
+          `예상 매출 증가: ${(result.summary.expected_revenue_improvement * 100).toFixed(1)}%, ` +
+          `트래픽 증가: ${(result.summary.expected_traffic_improvement * 100).toFixed(1)}%, ` +
+          `전환율 증가: ${(result.summary.expected_conversion_improvement * 100).toFixed(1)}%`,
+        // VMD 분석 요약 (있는 경우)
+        vmd_summary: vmdAnalysis ? {
+          score: vmdAnalysis.score.overall,
+          grade: vmdAnalysis.score.grade,
+          top_violations: vmdAnalysis.violations.slice(0, 3).map((v: any) => v.description),
+        } : null,
+      };
+
       await logAIResponse(supabase, {
         storeId: store_id,
         userId: userId || undefined,
@@ -449,10 +486,30 @@ Deno.serve(async (req) => {
             slot_count: slotsData.length,
           },
         },
+        // 🆕 aiResponse를 user_facing_texts 중심으로 변경 (파인튜닝 최적화)
         aiResponse: {
-          furniture_changes: result.furniture_changes,
-          product_changes: result.product_changes,
-          summary: result.summary,
+          user_facing_texts: userFacingTexts,
+          // 핵심 지표만 포함 (전체 changes 배열 제외)
+          key_metrics: {
+            total_furniture_changes: result.summary.total_furniture_changes,
+            total_product_changes: result.summary.total_product_changes,
+            expected_revenue_improvement: result.summary.expected_revenue_improvement,
+            expected_traffic_improvement: result.summary.expected_traffic_improvement,
+            expected_conversion_improvement: result.summary.expected_conversion_improvement,
+          },
+          // Top 5 변경사항만 포함
+          top_changes: {
+            furniture: result.furniture_changes.slice(0, 5).map((fc: FurnitureChange) => ({
+              furniture_type: fc.furniture_type,
+              reason: fc.reason,
+              priority: fc.priority,
+            })),
+            product: result.product_changes.slice(0, 5).map((pc: ProductChange) => ({
+              sku: pc.sku,
+              reason: pc.reason,
+              priority: pc.priority,
+            })),
+          },
         },
         responseSummary: createOptimizationSummary(result),
         contextMetadata: createOptimizationContextMetadata(
@@ -920,8 +977,15 @@ async function generateAIOptimization(
   environmentData?: EnvironmentDataBundle,  // 🆕 환경 데이터
   flowAnalysis?: FlowAnalysisResult,        // 🆕 동선 분석 (Phase 0.2)
   associationData?: ProductAssociationResult, // 🆕 연관성 분석 (Phase 0.3)
-  vmdAnalysis?: VMDAnalysisResult            // 🆕 VMD 분석 (Phase 3)
+  vmdAnalysis?: VMDAnalysisResult,           // 🆕 VMD 분석 (Phase 3)
+  diagnosticIssues?: any                     // 🆕 시뮬레이션 진단 이슈
 ): Promise<AILayoutOptimizationResult> {
+  // 🆕 진단 이슈 로깅
+  if (diagnosticIssues?.priority_issues?.length > 0) {
+    console.log(`[generateAIOptimization] 🚨 Diagnostic issues from simulation: ${diagnosticIssues.priority_issues.length} issues to prioritize`);
+    console.log(`[generateAIOptimization] Scenario: ${diagnosticIssues.scenario_context?.name || 'none'}`);
+  }
+
   // 🆕 Phase 1.1: Chain-of-Thought 프롬프트 빌더 사용
   const promptContext = createPromptContext(
     layoutData,
@@ -931,7 +995,8 @@ async function generateAIOptimization(
     parameters,
     environmentData || null,
     flowAnalysis || null,
-    associationData || null
+    associationData || null,
+    diagnosticIssues || null  // 🆕 진단 이슈 전달
   );
 
   const promptConfig = createPromptConfig({

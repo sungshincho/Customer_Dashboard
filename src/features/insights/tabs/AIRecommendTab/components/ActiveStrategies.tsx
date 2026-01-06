@@ -160,11 +160,10 @@ export function ActiveStrategies({ strategies, onViewDetails, onCreateNew }: Act
   };
 
   const getTrendIcon = (trend: 'up' | 'down' | 'stable') => {
-    const color = iconColor;
     switch (trend) {
-      case 'up': return <TrendingUp className="w-3 h-3" style={{ color }} />;
-      case 'down': return <TrendingDown className="w-3 h-3" style={{ color }} />;
-      default: return <Minus className="w-3 h-3" style={{ color }} />;
+      case 'up': return <TrendingUp className="w-3 h-3" style={{ color: '#22c55e' }} />;
+      case 'down': return <TrendingDown className="w-3 h-3" style={{ color: '#ef4444' }} />;
+      default: return <Minus className="w-3 h-3" style={{ color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280' }} />;
     }
   };
 

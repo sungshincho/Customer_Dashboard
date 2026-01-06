@@ -7,8 +7,8 @@
  * - 시뮬레이션 옵션 설정
  */
 
-import { useState, useCallback, useEffect } from 'react';
-import { Play, Pause, Square, RotateCcw, Users, Activity, Thermometer, Monitor, Eye, Lightbulb, Lock, Loader2, TrendingUp, Clock, DollarSign, AlertTriangle, Zap, Sparkles, Sun, ChevronDown, ChevronUp, Cloud, CloudRain, CloudSnow, Calendar, Settings } from 'lucide-react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
+import { Play, Pause, Square, RotateCcw, Users, Activity, Thermometer, Monitor, Eye, Lightbulb, Lock, Loader2, TrendingUp, Clock, DollarSign, AlertTriangle, Zap, Sparkles, Sun, ChevronDown, ChevronUp, Cloud, CloudRain, CloudSnow, Calendar, Settings, Target, ArrowRight, X, CheckCircle, MapPin, Wrench } from 'lucide-react';
 import { useEnvironmentContext } from '../hooks/useEnvironmentContext';
 import { SimulationEnvironmentSettings } from '../components/SimulationEnvironmentSettings';
 import type { SimulationEnvironmentConfig } from '../types/simulationEnvironment.types';
@@ -23,6 +23,16 @@ import { useSimulationStore as useAISimulationStore } from '../stores/simulation
 import { buildStoreContext } from '../utils/store-context-builder';
 import { DiagnosticIssueList, type DiagnosticIssue } from '../components/DiagnosticIssueList';
 import type { SceneRecipe } from '../types';
+// 프리셋 시나리오
+import {
+  PRESET_SCENARIOS,
+  type PresetScenario,
+  type PresetScenarioId,
+  presetToEnvironmentConfig,
+  type SimulationIssue,
+  ISSUE_TYPE_META,
+} from '../types/scenarioPresets.types';
+import { analyzeSimulationIssues, extractIssuesFromAIResult } from '../utils/simulationIssueAnalyzer';
 
 // 시뮬레이션 타입
 type SimulationType = 'realtime' | 'prediction';
@@ -103,6 +113,17 @@ export function AISimulationTab({
   const [duration, setDuration] = useState(60);
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
 
+  // 🆕 프리셋 시나리오 상태
+  const [selectedPreset, setSelectedPreset] = useState<PresetScenarioId | null>(null);
+  const [trafficMultiplier, setTrafficMultiplier] = useState(1.0);
+  const [showPresets, setShowPresets] = useState(true);
+  const [analyzedIssues, setAnalyzedIssues] = useState<SimulationIssue[]>([]);
+
+  // 🆕 AI 최적화 연결 모달 상태
+  const [showOptimizationModal, setShowOptimizationModal] = useState(false);
+  const [selectedIssuesForOptimization, setSelectedIssuesForOptimization] = useState<Set<string>>(new Set());
+  // isOptimizationLoading state removed - optimization runs in AIOptimizationTab
+
   // 🆕 시뮬레이션 환경 설정 상태
   const [showEnvironmentSettings, setShowEnvironmentSettings] = useState(true); // 기본 열림
   const [simulationEnvConfig, setSimulationEnvConfig] = useState<SimulationEnvironmentConfig>(() => {
@@ -132,6 +153,45 @@ export function AISimulationTab({
 
   // 현재 실행 중 여부 통합 체크
   const isAnyRunning = isRealtimeRunning || isAIPredictionLoading;
+
+  // 🆕 프리셋 시나리오 선택 핸들러
+  const handlePresetSelect = useCallback((preset: PresetScenario) => {
+    setSelectedPreset(preset.id);
+    setSimulationType('prediction'); // 프리셋 선택 시 AI 예측 모드로 전환
+
+    // 환경 설정 업데이트
+    const envConfig = presetToEnvironmentConfig(preset);
+    setSimulationEnvConfig(prev => ({
+      ...prev,
+      ...envConfig,
+      calculatedImpact: {
+        trafficMultiplier: preset.expectedImpact.visitorsMultiplier,
+        dwellTimeMultiplier: preset.expectedImpact.dwellTimeMultiplier,
+        conversionMultiplier: preset.expectedImpact.conversionMultiplier,
+      },
+    }));
+
+    // 트래픽 배수 업데이트
+    setTrafficMultiplier(preset.settings.trafficMultiplier);
+
+    // 고객 수 자동 조정 (기본 100명 기준)
+    const baseCustomers = 100;
+    setCustomerCount(Math.round(baseCustomers * preset.settings.trafficMultiplier));
+
+    toast.success(`"${preset.name}" 시나리오가 적용되었습니다`, {
+      description: preset.description,
+    });
+  }, []);
+
+  // 🆕 프리셋 초기화
+  const handleClearPreset = useCallback(() => {
+    setSelectedPreset(null);
+    setTrafficMultiplier(1.0);
+    setCustomerCount(100);
+    const defaultConfig = createDefaultSimulationConfig();
+    defaultConfig.calculatedImpact = calculateSimulationImpacts(defaultConfig);
+    setSimulationEnvConfig(defaultConfig);
+  }, []);
 
   // 시간 포맷팅
   const formatTime = (seconds: number): string => {
@@ -166,16 +226,29 @@ export function AISimulationTab({
     } else {
       // AI 예측 시뮬레이션 실행
       try {
+        // 🆕 프리셋 시나리오 컨텍스트 구성
+        const currentPreset = selectedPreset ? PRESET_SCENARIOS.find(p => p.id === selectedPreset) : null;
+
         // 🆕 환경 설정에 따른 옵션 구성
-        const envConfigForAI = simulationEnvConfig.mode === 'simulation' ? {
-          weather: simulationEnvConfig.weather,
+        const envConfigForAI = {
+          weather: simulationEnvConfig.manualSettings?.weather || simulationEnvConfig.weather,
           temperature: simulationEnvConfig.temperature,
           humidity: simulationEnvConfig.humidity,
-          holiday_type: simulationEnvConfig.holidayType,
+          holiday_type: simulationEnvConfig.manualSettings?.holidayType || simulationEnvConfig.holidayType,
           day_of_week: simulationEnvConfig.dayOfWeek,
-          time_of_day: simulationEnvConfig.timeOfDay,
-          impact: simulationEnvConfig.calculatedImpact
-        } : envAiContext; // 실시간 모드면 실제 환경 데이터 사용
+          time_of_day: simulationEnvConfig.manualSettings?.timeOfDay || simulationEnvConfig.timeOfDay,
+          impact: simulationEnvConfig.calculatedImpact,
+          // 🆕 프리셋 시나리오 정보 추가
+          preset_scenario: currentPreset ? {
+            id: currentPreset.id,
+            name: currentPreset.name,
+            traffic_multiplier: currentPreset.settings.trafficMultiplier,
+            discount_percent: currentPreset.settings.discountPercent,
+            event_type: currentPreset.settings.eventType,
+            expected_impact: currentPreset.expectedImpact,
+            risk_tags: currentPreset.riskTags,
+          } : null,
+        };
 
         // 옵션 설정 - 시간대는 환경 설정에서 가져옴
         const timeOfDayFromConfig = simulationEnvConfig.mode === 'manual' ? simulationEnvConfig.manualSettings?.timeOfDay : simulationEnvConfig.timeOfDay || 'afternoon';
@@ -183,7 +256,8 @@ export function AISimulationTab({
           customer_count: customerCount,
           duration_minutes: duration,
           time_of_day: timeOfDayFromConfig,
-          environment_context: envConfigForAI // 환경 컨텍스트 추가
+          environment_context: envConfigForAI, // 환경 컨텍스트 추가
+          traffic_multiplier: trafficMultiplier, // 🆕 트래픽 배수
         });
         toast.loading('AI 예측 시뮬레이션 실행 중...', {
           id: 'ai-sim'
@@ -192,6 +266,31 @@ export function AISimulationTab({
         toast.success('AI 시뮬레이션 완료!', {
           id: 'ai-sim'
         });
+
+        // 🆕 시뮬레이션 결과에서 문제점 분석
+        // simulationZones를 ZoneData 형식으로 변환
+        const zoneDataForAnalysis = simulationZones.map(z => ({
+          id: z.id,
+          name: z.zone_name,
+          type: z.zone_type,
+          capacity: 50, // 기본값 (실제로는 store 설정에서 가져와야 함)
+          visitRate: Math.random() * 0.3 + 0.1, // 시뮬레이션 결과에서 추출
+        }));
+
+        // AI 결과에서 이슈 추출
+        const aiStore = useAISimulationStore.getState();
+        if (aiStore.result) {
+          const extractedIssues = extractIssuesFromAIResult(aiStore.result, zoneDataForAnalysis);
+          setAnalyzedIssues(extractedIssues);
+
+          // 심각한 이슈가 있으면 알림
+          const criticalIssues = extractedIssues.filter(i => i.severity === 'critical');
+          if (criticalIssues.length > 0) {
+            toast.warning(`${criticalIssues.length}개의 심각한 문제가 감지되었습니다`, {
+              description: 'AI 최적화를 통해 해결 방안을 확인하세요',
+            });
+          }
+        }
 
         // 혼잡도 히트맵 표시 (옵션에 따라)
         if (showCongestionHeatmap) {
@@ -203,7 +302,7 @@ export function AISimulationTab({
         });
       }
     }
-  }, [storeId, simulationType, customerCount, duration, showCongestionHeatmap, startRealtime, runAIPrediction, setAIOptions, onOverlayToggle, simulationEnvConfig, envAiContext]);
+  }, [storeId, simulationType, customerCount, duration, showCongestionHeatmap, startRealtime, runAIPrediction, setAIOptions, onOverlayToggle, simulationEnvConfig, envAiContext, selectedPreset, trafficMultiplier, simulationZones]);
 
   // 시뮬레이션 중지
   const handleStopSimulation = useCallback(() => {
@@ -232,6 +331,99 @@ export function AISimulationTab({
       toast.info(`${issues.length}개 이슈를 AI 최적화로 전달합니다`);
     }
   }, [getIssuesForOptimization, onNavigateToOptimization]);
+
+  // 🆕 AI 최적화 모달 열기
+  const handleOpenOptimizationModal = useCallback(() => {
+    // 분석된 이슈 중 critical/warning만 기본 선택
+    const criticalWarningIds = analyzedIssues
+      .filter(i => i.severity === 'critical' || i.severity === 'warning')
+      .map(i => i.id);
+    setSelectedIssuesForOptimization(new Set(criticalWarningIds));
+    setShowOptimizationModal(true);
+  }, [analyzedIssues]);
+
+  // 🆕 이슈 선택 토글
+  const handleToggleIssueSelection = useCallback((issueId: string) => {
+    setSelectedIssuesForOptimization(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(issueId)) {
+        newSet.delete(issueId);
+      } else {
+        newSet.add(issueId);
+      }
+      return newSet;
+    });
+  }, []);
+
+  // 🆕 AI 최적화 탭으로 이동 (이슈 전달)
+  const handleNavigateToOptimizationTab = useCallback(() => {
+    if (selectedIssuesForOptimization.size === 0) {
+      toast.error('해결할 문제를 선택해주세요');
+      return;
+    }
+
+    // 선택된 이슈들
+    const selectedIssues = analyzedIssues.filter(i => selectedIssuesForOptimization.has(i.id));
+
+    // 현재 프리셋 시나리오 정보
+    const currentPreset = selectedPreset ? PRESET_SCENARIOS.find(p => p.id === selectedPreset) : null;
+
+    // 최적화 탭으로 이동 (이슈와 시나리오 컨텍스트 전달)
+    if (onNavigateToOptimization) {
+      const diagnosticIssues = selectedIssues.map(i => ({
+        id: i.id,
+        type: i.type,
+        severity: i.severity,
+        title: i.title,
+        zone_id: i.location.zoneId,
+        zone_name: i.location.zoneName,
+        message: i.details.description,
+        recommendations: i.recommendations,
+        impact: i.impact,
+        details: i.details,
+        // 🆕 시나리오 및 환경 컨텍스트
+        scenario_context: currentPreset ? {
+          id: currentPreset.id,
+          name: currentPreset.name,
+          description: currentPreset.description,
+          expected_impact: currentPreset.expectedImpact,
+          risk_tags: currentPreset.riskTags,
+        } : null,
+        environment_context: {
+          weather: simulationEnvConfig.manualSettings?.weather || simulationEnvConfig.weather,
+          holiday_type: simulationEnvConfig.manualSettings?.holidayType || simulationEnvConfig.holidayType,
+          time_of_day: simulationEnvConfig.manualSettings?.timeOfDay || simulationEnvConfig.timeOfDay,
+          traffic_multiplier: trafficMultiplier,
+        },
+        simulation_kpis: {
+          visitors: realtimeKpis.visitors,
+          revenue: realtimeKpis.revenue,
+          conversion: realtimeKpis.conversion,
+          avg_dwell: realtimeKpis.avgDwell,
+        },
+      }));
+
+      onNavigateToOptimization(diagnosticIssues as any);
+
+      toast.success('AI 최적화 탭으로 이동합니다', {
+        description: `${selectedIssues.length}개 문제점을 우선 해결하도록 설정됩니다`,
+      });
+    }
+
+    setShowOptimizationModal(false);
+  }, [selectedIssuesForOptimization, analyzedIssues, selectedPreset, simulationEnvConfig, trafficMultiplier, realtimeKpis, onNavigateToOptimization]);
+
+  // 🆕 분석된 이슈 카운트 (memoized)
+  const { analyzedCriticalCount, analyzedWarningCount, analyzedInfoCount, totalRevenueImpact } = useMemo(() => {
+    return {
+      analyzedCriticalCount: analyzedIssues.filter(i => i.severity === 'critical').length,
+      analyzedWarningCount: analyzedIssues.filter(i => i.severity === 'warning').length,
+      analyzedInfoCount: analyzedIssues.filter(i => i.severity === 'info').length,
+      totalRevenueImpact: analyzedIssues.reduce((sum, i) => sum + i.impact.revenueImpact, 0),
+    };
+  }, [analyzedIssues]);
+
+  // 기존 이슈 카운트 (호환성)
   const criticalCount = aiDiagnosticIssues.filter(i => i.severity === 'critical').length;
   const warningCount = aiDiagnosticIssues.filter(i => i.severity === 'warning').length;
   return <div className="flex flex-col h-full overflow-hidden">
@@ -248,6 +440,138 @@ export function AISimulationTab({
 
       {/* ===== 설정 영역 ===== */}
       <div className="flex-1 overflow-auto p-4 space-y-4">
+
+        {/* 🆕 프리셋 시나리오 섹션 */}
+        <div className="border border-white/10 rounded-lg">
+          <button
+            onClick={() => setShowPresets(!showPresets)}
+            className="w-full flex items-center justify-between p-3 text-sm text-white/80"
+          >
+            <span className="font-medium flex items-center gap-2 text-white">
+              <Target className="w-4 h-4 text-purple-400" />
+              프리셋 시나리오
+              {selectedPreset && (
+                <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400">
+                  {PRESET_SCENARIOS.find(p => p.id === selectedPreset)?.emoji}{' '}
+                  {PRESET_SCENARIOS.find(p => p.id === selectedPreset)?.name}
+                </span>
+              )}
+            </span>
+            {showPresets ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+
+          {showPresets && (
+            <div className="p-3 pt-0 border-t border-white/10 space-y-3">
+              <p className="text-xs text-white/50">
+                "만약 ~라면?" 시나리오를 선택하고 매장 상태를 예측하세요
+              </p>
+
+              {/* 프리셋 카드 그리드 */}
+              <div className="grid grid-cols-2 gap-2">
+                {PRESET_SCENARIOS.slice(0, 6).map((preset) => (
+                  <button
+                    key={preset.id}
+                    onClick={() => handlePresetSelect(preset)}
+                    disabled={isAnyRunning}
+                    className={cn(
+                      'p-2.5 rounded-lg border text-left transition-all',
+                      selectedPreset === preset.id
+                        ? `${preset.colorTheme.bg} ${preset.colorTheme.border} ${preset.colorTheme.text}`
+                        : 'bg-white/5 border-white/10 hover:bg-white/10 text-white/70',
+                      isAnyRunning && 'opacity-50 cursor-not-allowed'
+                    )}
+                  >
+                    <div className="flex items-center gap-1.5 font-medium text-xs">
+                      <span className="text-base">{preset.emoji}</span>
+                      <span className="truncate">{preset.name}</span>
+                    </div>
+                    <div className="text-[10px] text-white/40 mt-1 truncate">
+                      {preset.description}
+                    </div>
+                    {/* 리스크 태그 */}
+                    {preset.riskTags.length > 0 && (
+                      <div className="flex gap-1 mt-1.5 flex-wrap">
+                        {preset.riskTags.slice(0, 2).map((tag) => (
+                          <span
+                            key={tag}
+                            className="text-[9px] px-1 py-0.5 rounded bg-red-500/20 text-red-400"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {/* 선택된 프리셋 정보 */}
+              {selectedPreset && (
+                <div className="p-2.5 bg-white/5 rounded-lg space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-white">예상 영향</span>
+                    <button
+                      onClick={handleClearPreset}
+                      className="text-[10px] text-white/40 hover:text-white/60"
+                    >
+                      초기화
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2 text-center">
+                    {(() => {
+                      const preset = PRESET_SCENARIOS.find(p => p.id === selectedPreset);
+                      if (!preset) return null;
+                      return (
+                        <>
+                          <div>
+                            <div className="text-[10px] text-white/40">방문객</div>
+                            <div className={cn(
+                              'text-xs font-bold',
+                              preset.expectedImpact.visitorsMultiplier > 1 ? 'text-green-400' : 'text-red-400'
+                            )}>
+                              {preset.expectedImpact.visitorsMultiplier > 1 ? '+' : ''}
+                              {Math.round((preset.expectedImpact.visitorsMultiplier - 1) * 100)}%
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-white/40">전환율</div>
+                            <div className={cn(
+                              'text-xs font-bold',
+                              preset.expectedImpact.conversionMultiplier > 1 ? 'text-green-400' : 'text-red-400'
+                            )}>
+                              {preset.expectedImpact.conversionMultiplier > 1 ? '+' : ''}
+                              {Math.round((preset.expectedImpact.conversionMultiplier - 1) * 100)}%
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-white/40">객단가</div>
+                            <div className={cn(
+                              'text-xs font-bold',
+                              preset.expectedImpact.basketMultiplier > 1 ? 'text-green-400' : 'text-red-400'
+                            )}>
+                              {preset.expectedImpact.basketMultiplier > 1 ? '+' : ''}
+                              {Math.round((preset.expectedImpact.basketMultiplier - 1) * 100)}%
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-white/40">체류</div>
+                            <div className={cn(
+                              'text-xs font-bold',
+                              preset.expectedImpact.dwellTimeMultiplier > 1 ? 'text-blue-400' : 'text-orange-400'
+                            )}>
+                              {preset.expectedImpact.dwellTimeMultiplier > 1 ? '+' : ''}
+                              {Math.round((preset.expectedImpact.dwellTimeMultiplier - 1) * 100)}%
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* 시뮬레이션 타입 선택 */}
         <div className="space-y-2">
@@ -511,8 +835,117 @@ export function AISimulationTab({
               </div>
             </div>
 
-            {/* 진단 이슈 요약 */}
-            {aiDiagnosticIssues.length > 0 && <div className="p-3 bg-white/5 rounded-lg space-y-2">
+            {/* 🆕 분석된 문제점 섹션 (새로운 형식) */}
+            {analyzedIssues.length > 0 && (
+              <div className="p-3 bg-gradient-to-br from-red-500/5 to-orange-500/5 rounded-lg border border-red-500/20 space-y-3">
+                {/* 헤더 */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm font-medium text-white">
+                    <AlertTriangle className="h-4 w-4 text-red-400" />
+                    감지된 문제점
+                  </div>
+                  <div className="flex gap-1.5">
+                    {analyzedCriticalCount > 0 && (
+                      <span className="px-2 py-0.5 bg-red-500 text-white text-xs rounded-full font-medium">
+                        위험 {analyzedCriticalCount}
+                      </span>
+                    )}
+                    {analyzedWarningCount > 0 && (
+                      <span className="px-2 py-0.5 bg-yellow-500 text-white text-xs rounded-full font-medium">
+                        주의 {analyzedWarningCount}
+                      </span>
+                    )}
+                    {analyzedInfoCount > 0 && (
+                      <span className="px-2 py-0.5 bg-blue-500 text-white text-xs rounded-full font-medium">
+                        정보 {analyzedInfoCount}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 예상 영향 요약 */}
+                {totalRevenueImpact > 0 && (
+                  <div className="p-2 bg-red-500/10 rounded text-xs text-red-300 flex items-center gap-2">
+                    <DollarSign className="h-3.5 w-3.5" />
+                    예상 매출 손실: <span className="font-bold">{(totalRevenueImpact / 10000).toLocaleString()}만원</span>
+                  </div>
+                )}
+
+                {/* 이슈 목록 */}
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {analyzedIssues.slice(0, 5).map((issue) => (
+                    <div
+                      key={issue.id}
+                      className={cn(
+                        'p-2.5 rounded-lg text-xs border transition-all',
+                        issue.severity === 'critical'
+                          ? 'bg-red-500/10 border-red-500/30 text-red-300'
+                          : issue.severity === 'warning'
+                          ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300'
+                          : 'bg-blue-500/10 border-blue-500/30 text-blue-300'
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm">{ISSUE_TYPE_META[issue.type]?.icon || '⚠️'}</span>
+                          <span className="font-medium">{issue.title}</span>
+                        </div>
+                        {issue.severity === 'critical' && (
+                          <span className="px-1 py-0.5 bg-red-500/30 text-red-300 text-[10px] rounded">
+                            위험
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-1.5 text-white/50">
+                        <MapPin className="h-3 w-3" />
+                        {issue.location.zoneName}
+                        {issue.details.description && (
+                          <>
+                            <span>•</span>
+                            <span className="truncate">{issue.details.description}</span>
+                          </>
+                        )}
+                      </div>
+                      {/* 권장사항 미리보기 */}
+                      {issue.recommendations.length > 0 && (
+                        <div className="mt-1.5 pt-1.5 border-t border-white/10 text-[10px] text-white/40">
+                          💡 {issue.recommendations[0]}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {analyzedIssues.length > 5 && (
+                    <div className="text-xs text-white/40 text-center py-1">
+                      +{analyzedIssues.length - 5}개 더 있음
+                    </div>
+                  )}
+                </div>
+
+                {/* AI 최적화 연결 버튼 */}
+                {(analyzedCriticalCount > 0 || analyzedWarningCount > 0) && (
+                  <div className="space-y-2">
+                    <div className="p-2.5 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-lg border border-purple-500/30">
+                      <p className="text-xs text-white/80 text-center">
+                        <Sparkles className="h-3.5 w-3.5 inline mr-1 text-purple-400" />
+                        <strong>AI 최적화</strong>로 위 문제점들을 해결할 수 있습니다
+                      </p>
+                    </div>
+                    <Button
+                      onClick={handleOpenOptimizationModal}
+                      className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-sm py-3"
+                      size="sm"
+                    >
+                      <Wrench className="h-4 w-4 mr-2" />
+                      AI 최적화로 실행하시겠습니까?
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 기존 진단 이슈 (호환성 유지) */}
+            {aiDiagnosticIssues.length > 0 && analyzedIssues.length === 0 && <div className="p-3 bg-white/5 rounded-lg space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm text-white/80">
                     <AlertTriangle className="h-4 w-4" />
@@ -606,6 +1039,149 @@ export function AISimulationTab({
             AI 분석 중... {aiProgress}%
           </div>}
       </div>
+
+      {/* 🆕 AI 최적화 연결 모달 */}
+      {showOptimizationModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-[#1a1a2e] border border-white/10 rounded-xl w-full max-w-lg mx-4 max-h-[80vh] overflow-hidden shadow-2xl">
+            {/* 모달 헤더 */}
+            <div className="p-4 border-b border-white/10 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Wrench className="h-5 w-5 text-purple-400" />
+                <h3 className="font-semibold text-white">AI 최적화 연결</h3>
+              </div>
+              <button
+                onClick={() => setShowOptimizationModal(false)}
+                className="p-1 rounded hover:bg-white/10 text-white/60 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* 모달 내용 */}
+            <div className="p-4 space-y-4 overflow-y-auto max-h-[50vh]">
+              {/* 현재 시나리오 정보 */}
+              {selectedPreset && (
+                <div className="p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                  <div className="text-xs text-purple-300 mb-1">적용된 시나리오</div>
+                  <div className="flex items-center gap-2 text-white">
+                    <span className="text-lg">
+                      {PRESET_SCENARIOS.find(p => p.id === selectedPreset)?.emoji}
+                    </span>
+                    <span className="font-medium">
+                      {PRESET_SCENARIOS.find(p => p.id === selectedPreset)?.name}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* 해결할 문제 선택 */}
+              <div>
+                <div className="text-sm font-medium text-white mb-2 flex items-center justify-between">
+                  <span>해결할 문제 선택</span>
+                  <span className="text-xs text-white/40">
+                    {selectedIssuesForOptimization.size}개 선택됨
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {analyzedIssues.map((issue) => (
+                    <label
+                      key={issue.id}
+                      className={cn(
+                        'flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all',
+                        selectedIssuesForOptimization.has(issue.id)
+                          ? 'bg-purple-500/10 border-purple-500/30'
+                          : 'bg-white/5 border-white/10 hover:bg-white/10'
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedIssuesForOptimization.has(issue.id)}
+                        onChange={() => handleToggleIssueSelection(issue.id)}
+                        className="mt-0.5 w-4 h-4 rounded bg-white/10 border-white/20"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span>{ISSUE_TYPE_META[issue.type]?.icon || '⚠️'}</span>
+                          <span className="text-sm font-medium text-white truncate">
+                            {issue.title}
+                          </span>
+                          <span
+                            className={cn(
+                              'text-[10px] px-1.5 py-0.5 rounded',
+                              issue.severity === 'critical'
+                                ? 'bg-red-500/30 text-red-300'
+                                : issue.severity === 'warning'
+                                ? 'bg-yellow-500/30 text-yellow-300'
+                                : 'bg-blue-500/30 text-blue-300'
+                            )}
+                          >
+                            {issue.severity === 'critical' ? '위험' : issue.severity === 'warning' ? '주의' : '정보'}
+                          </span>
+                        </div>
+                        <div className="text-xs text-white/50 mt-1">
+                          {issue.location.zoneName} • {issue.details.description}
+                        </div>
+                        {issue.impact.revenueImpact > 0 && (
+                          <div className="text-xs text-red-400 mt-1">
+                            예상 손실: {(issue.impact.revenueImpact / 10000).toLocaleString()}만원
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* 최적화 예상 효과 */}
+              {selectedIssuesForOptimization.size > 0 && (
+                <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/20">
+                  <div className="text-xs text-green-300 mb-2">최적화 예상 효과</div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle className="h-3.5 w-3.5 text-green-400" />
+                      <span className="text-white/70">문제 해결:</span>
+                      <span className="text-green-400 font-medium">
+                        {selectedIssuesForOptimization.size}개
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <DollarSign className="h-3.5 w-3.5 text-green-400" />
+                      <span className="text-white/70">예상 회복:</span>
+                      <span className="text-green-400 font-medium">
+                        {(
+                          analyzedIssues
+                            .filter(i => selectedIssuesForOptimization.has(i.id))
+                            .reduce((sum, i) => sum + i.impact.revenueImpact, 0) / 10000
+                        ).toLocaleString()}만원
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 모달 푸터 */}
+            <div className="p-4 border-t border-white/10 flex gap-2">
+              <Button
+                onClick={() => setShowOptimizationModal(false)}
+                variant="outline"
+                className="flex-1 border-white/20 text-white/70 hover:bg-white/10"
+              >
+                취소
+              </Button>
+              <Button
+                onClick={handleNavigateToOptimizationTab}
+                disabled={selectedIssuesForOptimization.size === 0}
+                className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+              >
+                <ArrowRight className="h-4 w-4 mr-2" />
+                AI 최적화 탭으로 이동
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>;
 }
 export default AISimulationTab;

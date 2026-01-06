@@ -429,9 +429,9 @@ export function AIRecommendationTab() {
                       예상 ROI: {strategy.expectedROI}%
                       <ArrowRight className="w-3 h-3" style={{ color: iconColor }} />
                       <span style={{ fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>현재: {strategy.currentROI}%</span>
-                      {strategy.trend === 'up' && <TrendingUp className="w-3 h-3" style={{ color: iconColor }} />}
-                      {strategy.trend === 'down' && <TrendingDown className="w-3 h-3" style={{ color: iconColor }} />}
-                      {strategy.trend === 'stable' && <Minus className="w-3 h-3" style={{ color: iconColor }} />}
+                      {strategy.trend === 'up' && <TrendingUp className="w-3 h-3" style={{ color: '#22c55e' }} />}
+                      {strategy.trend === 'down' && <TrendingDown className="w-3 h-3" style={{ color: '#ef4444' }} />}
+                      {strategy.trend === 'stable' && <Minus className="w-3 h-3" style={{ color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280' }} />}
                     </span>
                   </div>
                 </div>
@@ -481,9 +481,11 @@ export function AIRecommendationTab() {
                 {formatCurrency(demandForecast.predictedRevenue)}
               </p>
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <TrendingUp className="w-3 h-3" style={{ color: iconColor }} />
-                <span style={{ fontSize: '12px', fontWeight: 500, color: isDark ? 'rgba(255,255,255,0.7)' : '#515158' }}>
-                  전주 대비 +{demandForecast.percentChange}%
+                {demandForecast.percentChange > 0 ? <TrendingUp className="w-3 h-3" style={{ color: '#22c55e' }} /> :
+                 demandForecast.percentChange < 0 ? <TrendingDown className="w-3 h-3" style={{ color: '#ef4444' }} /> :
+                 <Minus className="w-3 h-3" style={{ color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280' }} />}
+                <span style={{ fontSize: '12px', fontWeight: 500, color: demandForecast.percentChange > 0 ? '#22c55e' : demandForecast.percentChange < 0 ? '#ef4444' : (isDark ? 'rgba(255,255,255,0.6)' : '#6b7280') }}>
+                  전주 대비 {demandForecast.percentChange > 0 ? '+' : ''}{demandForecast.percentChange}%
                 </span>
               </div>
             </div>
@@ -503,9 +505,11 @@ export function AIRecommendationTab() {
                 {visitorForecast.predictedVisitors.toLocaleString()}명
               </p>
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <TrendingUp className="w-3 h-3" style={{ color: iconColor }} />
-                <span style={{ fontSize: '12px', fontWeight: 500, color: isDark ? 'rgba(255,255,255,0.7)' : '#515158' }}>
-                  전주 대비 +{visitorForecast.percentChange}%
+                {visitorForecast.percentChange > 0 ? <TrendingUp className="w-3 h-3" style={{ color: '#22c55e' }} /> :
+                 visitorForecast.percentChange < 0 ? <TrendingDown className="w-3 h-3" style={{ color: '#ef4444' }} /> :
+                 <Minus className="w-3 h-3" style={{ color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280' }} />}
+                <span style={{ fontSize: '12px', fontWeight: 500, color: visitorForecast.percentChange > 0 ? '#22c55e' : visitorForecast.percentChange < 0 ? '#ef4444' : (isDark ? 'rgba(255,255,255,0.6)' : '#6b7280') }}>
+                  전주 대비 {visitorForecast.percentChange > 0 ? '+' : ''}{visitorForecast.percentChange}%
                 </span>
               </div>
             </div>
@@ -597,10 +601,10 @@ export function AIRecommendationTab() {
                 border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.05)',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                  <TrendingUp className="w-4 h-4" style={{ color: iconColor }} />
+                  <TrendingUp className="w-4 h-4" style={{ color: '#22c55e' }} />
                   <span style={{ fontSize: '12px', fontWeight: 500, color: isDark ? 'rgba(255,255,255,0.8)' : '#374151' }}>잠재 수익 증가</span>
                 </div>
-                <p style={{ fontSize: '20px', margin: 0, ...text3D.heroNumber }}>
+                <p style={{ fontSize: '20px', margin: 0, color: '#22c55e', fontWeight: 800 }}>
                   +{priceOptimization.potentialRevenueIncreasePercent}%
                 </p>
               </div>
