@@ -574,7 +574,90 @@ flowchart TB
     SAVE --> VERIFY_SIM --> COMPARE
 ```
 
-### 5.3 데이터 임포트 플로우
+### 5.3 AI 시뮬레이션 → AI 최적화 연결 플로우
+
+시뮬레이션에서 발견된 문제점을 최적화로 연결하는 통합 사용자 플로우입니다.
+
+```mermaid
+flowchart TB
+    subgraph "Step 1: AI 시뮬레이션"
+        SIM_START[AI 시뮬레이션 탭]
+        PRESET_SELECT[프리셋 시나리오 선택]
+        SIM_RUN[시뮬레이션 실행]
+        SIM_RESULT[결과 확인]
+        ISSUE_DETECT[문제점 감지]
+    end
+
+    subgraph "Step 2: 문제점 분석"
+        ISSUE_LIST[문제점 목록 표시]
+        ISSUE_DETAIL[이슈 상세 정보]
+        ISSUE_IMPACT[예상 매출 손실]
+        OPT_PROMPT["AI 최적화로 실행하시겠습니까?" 모달]
+    end
+
+    subgraph "Step 3: 최적화 연결"
+        SELECT_ISSUES[해결할 문제 선택]
+        NAV_OPT["AI 최적화 탭으로 이동" 클릭]
+        TAB_SWITCH[AI 최적화 탭 전환]
+    end
+
+    subgraph "Step 4: AI 최적화 실행"
+        DIAG_DISPLAY["문제점 시나리오" 섹션 표시]
+        SCENARIO_INFO[시나리오 컨텍스트 표시]
+        ISSUE_PREVIEW[이슈 목록 및 예상 영향]
+        OPT_OPTION[최적화 옵션 설정]
+        OPT_RUN[AI 최적화 실행]
+        OPT_RESULT[최적화 결과 표시]
+    end
+
+    SIM_START --> PRESET_SELECT
+    PRESET_SELECT --> SIM_RUN
+    SIM_RUN --> SIM_RESULT
+    SIM_RESULT --> ISSUE_DETECT
+
+    ISSUE_DETECT -->|이슈 있음| ISSUE_LIST
+    ISSUE_LIST --> ISSUE_DETAIL
+    ISSUE_DETAIL --> ISSUE_IMPACT
+    ISSUE_IMPACT --> OPT_PROMPT
+
+    OPT_PROMPT --> SELECT_ISSUES
+    SELECT_ISSUES --> NAV_OPT
+    NAV_OPT --> TAB_SWITCH
+
+    TAB_SWITCH --> DIAG_DISPLAY
+    DIAG_DISPLAY --> SCENARIO_INFO
+    SCENARIO_INFO --> ISSUE_PREVIEW
+    ISSUE_PREVIEW --> OPT_OPTION
+    OPT_OPTION --> OPT_RUN
+    OPT_RUN --> OPT_RESULT
+```
+
+#### 사용자 인터랙션 상세
+
+| 단계 | 사용자 액션 | 시스템 응답 |
+|------|------------|------------|
+| 1 | 프리셋 시나리오 선택 (예: 블랙프라이데이) | 환경 설정 자동 적용, 고객 수 조정 |
+| 2 | "AI 예측 시뮬레이션 실행" 클릭 | 시뮬레이션 실행, 결과 및 문제점 표시 |
+| 3 | 문제점 목록에서 해결할 이슈 확인 | 각 이슈의 위험도, 위치, 예상 영향 표시 |
+| 4 | "AI 최적화로 해결하기" 클릭 | 최적화 모달 표시 |
+| 5 | 해결할 문제 체크박스 선택 | 선택된 이슈 수 및 예상 회복 금액 표시 |
+| 6 | "AI 최적화 탭으로 이동" 클릭 | AI 최적화 탭으로 전환, 문제점 시나리오 전달 |
+| 7 | 최적화 옵션 설정 (유형, 변수) | 옵션 선택 UI |
+| 8 | "AI 최적화 실행" 클릭 | AI가 진단 이슈를 최우선으로 해결하는 최적화 실행 |
+| 9 | 최적화 결과 검토 | 권장사항, 예상 개선 효과, 3D 미리보기 |
+
+#### 전달되는 진단 이슈 컨텍스트
+
+시뮬레이션에서 최적화로 전달되는 데이터:
+
+| 항목 | 설명 |
+|------|------|
+| `priority_issues` | 선택된 문제점 목록 (type, severity, zone, impact) |
+| `scenario_context` | 적용된 프리셋 시나리오 정보 |
+| `environment_context` | 환경 설정 (날씨, 시간대, 휴일) |
+| `simulation_kpis` | 시뮬레이션 KPI 결과 |
+
+### 5.4 데이터 임포트 플로우
 
 ```mermaid
 flowchart TB
@@ -862,3 +945,4 @@ flowchart TB
 | 버전 | 날짜 | 변경 내용 |
 |------|------|-----------|
 | 1.0 | 2026-01-06 | 초기 문서 작성 |
+| 1.1 | 2026-01-06 | AI 시뮬레이션 → AI 최적화 연결 플로우 추가 (섹션 5.3) |
