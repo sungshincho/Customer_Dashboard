@@ -749,25 +749,20 @@ ${topProducts || '*No product performance data*'}`;
 export function buildOutputFormatSection(config: PromptConfig): string {
   const thinkingBlock = config.chainOfThought.requireExplicitReasoning
     ? `
-### Reasoning Block (Required)
-Before your JSON output, provide your reasoning in a <thinking> block:
+### Reasoning Block (Required but CONCISE)
+Before your JSON output, provide BRIEF reasoning in a <thinking> block.
+
+**⚠️ CRITICAL**: Keep the <thinking> block under 500 words total. Focus on key decisions only.
+**⚠️ PRIORITY**: The JSON output is MORE IMPORTANT than the reasoning. Never let reasoning truncate the JSON.
 
 \`\`\`
 <thinking>
-Step 1 - Environment Assessment:
-[Your analysis of environment impact...]
-
-Step 2 - Flow Analysis:
-[Your analysis of customer flow patterns...]
-
-Step 3 - Product Performance Review:
-[Your analysis of product placements...]
-
-Step 4 - VMD Principles Application:
-[How you applied VMD rules...]
-
-Step 5 - Impact Estimation:
-[Your prioritization logic...]
+Step 1 - Environment: [1-2 sentences on key environmental factors]
+Step 2 - Flow: [1-2 sentences on critical flow patterns]
+Step 3 - Products: [1-2 sentences on product performance issues]
+Step 4 - VMD: [1-2 sentences on VMD adjustments]
+Step 5 - Impact: [1-2 sentences on prioritization]
+Key Decision: [Main optimization strategy in 1 sentence]
 </thinking>
 \`\`\`
 `
