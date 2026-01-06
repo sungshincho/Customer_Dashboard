@@ -565,15 +565,36 @@ async function callEdgeFunction(
     const timeMs = Date.now() - startTime;
 
     if (!response.ok) {
-      const errorText = await response.text();
+      let errorText = '';
+      try {
+        errorText = await response.text();
+      } catch {
+        errorText = 'Failed to read error response';
+      }
       return { success: false, error: `HTTP ${response.status}: ${errorText}`, timeMs };
     }
 
-    const data = await response.json();
+    let data: any = null;
+    try {
+      data = await response.json();
+    } catch {
+      return { success: false, error: 'Failed to parse response JSON', timeMs };
+    }
+
+    // 응답 데이터 내 에러 체크
+    if (data?.error) {
+      return {
+        success: false,
+        error: typeof data.error === 'string' ? data.error : data.error?.message || JSON.stringify(data.error),
+        timeMs
+      };
+    }
+
     return { success: true, data, timeMs };
   } catch (error) {
     const timeMs = Date.now() - startTime;
-    return { success: false, error: error instanceof Error ? error.message : String(error), timeMs };
+    const errorMessage = error instanceof Error ? error.message : String(error ?? 'Unknown error');
+    return { success: false, error: errorMessage, timeMs };
   }
 }
 
@@ -596,22 +617,37 @@ async function runSimulationTests(
   console.log(`[BatchQA] Running ${combinations.length} simulation tests`);
 
   for (const combo of combinations) {
-    const { success, data, error, timeMs } = await callEdgeFunction(
-      supabaseUrl,
-      serviceRoleKey,
-      'run-simulation',
-      combo.request_body
-    );
+    let success = false;
+    let data: any = null;
+    let errorMessage: string | null = null;
+    let timeMs = 0;
 
-    const { score, metrics } = success
+    try {
+      const response = await callEdgeFunction(
+        supabaseUrl,
+        serviceRoleKey,
+        'run-simulation',
+        combo.request_body
+      );
+      success = response?.success ?? false;
+      data = response?.data ?? null;
+      errorMessage = response?.error ?? null;
+      timeMs = response?.timeMs ?? 0;
+    } catch (e) {
+      success = false;
+      errorMessage = e instanceof Error ? e.message : String(e ?? 'Unknown error');
+      timeMs = 0;
+    }
+
+    const { score, metrics } = success && data != null
       ? calculateSimulationQuality(data)
       : { score: 0, metrics: {} };
 
     const result: TestResult = {
       combination_id: combo.id,
       success,
-      response_data: success ? data : undefined,
-      error_message: error,
+      response_data: success && data != null ? data : undefined,
+      error_message: errorMessage ?? undefined,
       execution_time_ms: timeMs,
       quality_score: score,
       response_metrics: metrics,
@@ -620,20 +656,27 @@ async function runSimulationTests(
     results.push(result);
 
     // DB에 저장
-    await supabase.from('ai_batch_test_results').insert({
-      test_type: 'simulation',
-      test_batch_id: batchId,
-      combination_id: combo.id,
-      combination_variables: combo.variables,
-      function_name: 'run-simulation',
-      request_body: combo.request_body,
-      success,
-      response_data: success ? data : null,
-      error_message: error || null,
-      execution_time_ms: timeMs,
-      response_quality_score: score,
-      response_metrics: metrics,
-    });
+    try {
+      const { error: dbError } = await supabase.from('ai_batch_test_results').insert({
+        test_type: 'simulation',
+        test_batch_id: batchId,
+        combination_id: combo.id,
+        combination_variables: combo.variables ?? {},
+        function_name: 'run-simulation',
+        request_body: combo.request_body ?? {},
+        success,
+        response_data: success && data != null ? data : null,
+        error_message: errorMessage,
+        execution_time_ms: timeMs,
+        response_quality_score: score,
+        response_metrics: metrics,
+      });
+      if (dbError) {
+        console.error(`[BatchQA] DB insert error for ${combo.id}:`, dbError.message);
+      }
+    } catch (dbErr) {
+      console.error(`[BatchQA] DB insert exception for ${combo.id}:`, dbErr);
+    }
 
     console.log(`[BatchQA] Simulation ${combo.id}: ${success ? 'OK' : 'FAIL'} (${timeMs}ms, score: ${score})`);
 
@@ -661,22 +704,37 @@ async function runOptimizationTests(
   console.log(`[BatchQA] Running ${combinations.length} optimization tests`);
 
   for (const combo of combinations) {
-    const { success, data, error, timeMs } = await callEdgeFunction(
-      supabaseUrl,
-      serviceRoleKey,
-      'generate-optimization',
-      combo.request_body
-    );
+    let success = false;
+    let data: any = null;
+    let errorMessage: string | null = null;
+    let timeMs = 0;
 
-    const { score, metrics } = success
+    try {
+      const response = await callEdgeFunction(
+        supabaseUrl,
+        serviceRoleKey,
+        'generate-optimization',
+        combo.request_body
+      );
+      success = response?.success ?? false;
+      data = response?.data ?? null;
+      errorMessage = response?.error ?? null;
+      timeMs = response?.timeMs ?? 0;
+    } catch (e) {
+      success = false;
+      errorMessage = e instanceof Error ? e.message : String(e ?? 'Unknown error');
+      timeMs = 0;
+    }
+
+    const { score, metrics } = success && data != null
       ? calculateOptimizationQuality(data)
       : { score: 0, metrics: {} };
 
     const result: TestResult = {
       combination_id: combo.id,
       success,
-      response_data: success ? data : undefined,
-      error_message: error,
+      response_data: success && data != null ? data : undefined,
+      error_message: errorMessage ?? undefined,
       execution_time_ms: timeMs,
       quality_score: score,
       response_metrics: metrics,
@@ -685,20 +743,27 @@ async function runOptimizationTests(
     results.push(result);
 
     // DB에 저장
-    await supabase.from('ai_batch_test_results').insert({
-      test_type: 'optimization',
-      test_batch_id: batchId,
-      combination_id: combo.id,
-      combination_variables: combo.variables,
-      function_name: 'generate-optimization',
-      request_body: combo.request_body,
-      success,
-      response_data: success ? data : null,
-      error_message: error || null,
-      execution_time_ms: timeMs,
-      response_quality_score: score,
-      response_metrics: metrics,
-    });
+    try {
+      const { error: dbError } = await supabase.from('ai_batch_test_results').insert({
+        test_type: 'optimization',
+        test_batch_id: batchId,
+        combination_id: combo.id,
+        combination_variables: combo.variables ?? {},
+        function_name: 'generate-optimization',
+        request_body: combo.request_body ?? {},
+        success,
+        response_data: success && data != null ? data : null,
+        error_message: errorMessage,
+        execution_time_ms: timeMs,
+        response_quality_score: score,
+        response_metrics: metrics,
+      });
+      if (dbError) {
+        console.error(`[BatchQA] DB insert error for ${combo.id}:`, dbError.message);
+      }
+    } catch (dbErr) {
+      console.error(`[BatchQA] DB insert exception for ${combo.id}:`, dbErr);
+    }
 
     console.log(`[BatchQA] Optimization ${combo.id}: ${success ? 'OK' : 'FAIL'} (${timeMs}ms, score: ${score})`);
 
@@ -766,37 +831,63 @@ async function runLinkedTests(
       },
     };
 
-    const simResult = await callEdgeFunction(supabaseUrl, serviceRoleKey, 'run-simulation', simRequest);
+    // 시뮬레이션 호출 (안전한 처리)
+    let simSuccess = false;
+    let simData: any = null;
+    let simError: string | null = null;
+    let simTimeMs = 0;
 
-    const { score: simScore, metrics: simMetrics } = simResult.success
-      ? calculateSimulationQuality(simResult.data)
+    try {
+      const simResponse = await callEdgeFunction(supabaseUrl, serviceRoleKey, 'run-simulation', simRequest);
+      simSuccess = simResponse?.success ?? false;
+      simData = simResponse?.data ?? null;
+      simError = simResponse?.error ?? null;
+      simTimeMs = simResponse?.timeMs ?? 0;
+    } catch (e) {
+      simSuccess = false;
+      simError = e instanceof Error ? e.message : String(e ?? 'Unknown error');
+      simTimeMs = 0;
+    }
+
+    const { score: simScore, metrics: simMetrics } = simSuccess && simData != null
+      ? calculateSimulationQuality(simData)
       : { score: 0, metrics: {} };
 
     // 시뮬레이션 결과 저장
-    const { data: simRecord } = await supabase.from('ai_batch_test_results').insert({
-      test_type: 'simulation',
-      test_batch_id: batchId,
-      combination_id: `linked_sim_${scenario.id}`,
-      combination_variables: { preset_scenario: scenario.id, linked_test: true },
-      function_name: 'run-simulation',
-      request_body: simRequest,
-      success: simResult.success,
-      response_data: simResult.success ? simResult.data : null,
-      error_message: simResult.error || null,
-      execution_time_ms: simResult.timeMs,
-      response_quality_score: simScore,
-      response_metrics: simMetrics,
-    }).select('id').single();
+    let simRecordId: string | null = null;
+    try {
+      const { data: simRecord, error: dbError } = await supabase.from('ai_batch_test_results').insert({
+        test_type: 'simulation',
+        test_batch_id: batchId,
+        combination_id: `linked_sim_${scenario.id}`,
+        combination_variables: { preset_scenario: scenario.id, linked_test: true },
+        function_name: 'run-simulation',
+        request_body: simRequest,
+        success: simSuccess,
+        response_data: simSuccess && simData != null ? simData : null,
+        error_message: simError,
+        execution_time_ms: simTimeMs,
+        response_quality_score: simScore,
+        response_metrics: simMetrics,
+      }).select('id').single();
 
-    if (!simResult.success) {
-      console.log(`[BatchQA] Linked sim ${scenario.id}: FAIL - ${simResult.error}`);
+      if (dbError) {
+        console.error(`[BatchQA] DB insert error for linked_sim_${scenario.id}:`, dbError.message);
+      }
+      simRecordId = simRecord?.id ?? null;
+    } catch (dbErr) {
+      console.error(`[BatchQA] DB insert exception for linked_sim_${scenario.id}:`, dbErr);
+    }
+
+    if (!simSuccess) {
+      console.log(`[BatchQA] Linked sim ${scenario.id}: FAIL - ${simError ?? 'Unknown error'}`);
       continue;
     }
 
-    // 2. 진단 이슈 추출
-    const diagnosticIssues = simResult.data?.diagnostic_issues || [];
+    // 2. 진단 이슈 추출 (안전한 접근)
+    const diagnosticIssues = Array.isArray(simData?.diagnostic_issues) ? simData.diagnostic_issues : [];
     const priorityIssues = diagnosticIssues.filter((i: any) =>
-      i.severity === 'critical' || i.severity === 'warning'
+      i?.severity === 'critical' || i?.severity === 'warning'
     );
 
     if (delayMs > 0) {
@@ -815,7 +906,7 @@ async function runLinkedTests(
             name: scenario.name,
           },
           environment_context: simRequest.environment_context,
-          simulation_kpis: simResult.data?.kpis,
+          simulation_kpis: simData?.kpis ?? null,
         },
       };
 
@@ -830,50 +921,73 @@ async function runLinkedTests(
         parameters: optParams,
       };
 
-      const optResult = await callEdgeFunction(supabaseUrl, serviceRoleKey, 'generate-optimization', optRequest);
+      // 최적화 호출 (안전한 처리)
+      let optSuccess = false;
+      let optData: any = null;
+      let optError: string | null = null;
+      let optTimeMs = 0;
 
-      const { score: optScore, metrics: optMetrics } = optResult.success
-        ? calculateOptimizationQuality(optResult.data)
+      try {
+        const optResponse = await callEdgeFunction(supabaseUrl, serviceRoleKey, 'generate-optimization', optRequest);
+        optSuccess = optResponse?.success ?? false;
+        optData = optResponse?.data ?? null;
+        optError = optResponse?.error ?? null;
+        optTimeMs = optResponse?.timeMs ?? 0;
+      } catch (e) {
+        optSuccess = false;
+        optError = e instanceof Error ? e.message : String(e ?? 'Unknown error');
+        optTimeMs = 0;
+      }
+
+      const { score: optScore, metrics: optMetrics } = optSuccess && optData != null
+        ? calculateOptimizationQuality(optData)
         : { score: 0, metrics: {} };
 
       const linkedCombinationId = `linked_${scenario.id}_${optType}`;
 
       results.push({
         combination_id: linkedCombinationId,
-        success: optResult.success,
-        response_data: optResult.success ? optResult.data : undefined,
-        error_message: optResult.error,
-        execution_time_ms: optResult.timeMs,
+        success: optSuccess,
+        response_data: optSuccess && optData != null ? optData : undefined,
+        error_message: optError ?? undefined,
+        execution_time_ms: optTimeMs,
         quality_score: optScore,
         response_metrics: optMetrics,
       });
 
       // DB에 저장 (연결 정보 포함)
-      await supabase.from('ai_batch_test_results').insert({
-        test_type: 'linked',
-        test_batch_id: batchId,
-        combination_id: linkedCombinationId,
-        combination_variables: {
-          preset_scenario: scenario.id,
-          optimization_type: optType,
-          issues_count: priorityIssues.length,
-        },
-        function_name: 'generate-optimization',
-        request_body: optRequest,
-        success: optResult.success,
-        response_data: optResult.success ? optResult.data : null,
-        error_message: optResult.error || null,
-        execution_time_ms: optResult.timeMs,
-        response_quality_score: optScore,
-        response_metrics: optMetrics,
-        linked_simulation_id: simRecord?.id || null,
-        diagnostic_issues_passed: {
-          issue_count: priorityIssues.length,
-          issues: priorityIssues.slice(0, 3),
-        },
-      });
+      try {
+        const { error: dbError } = await supabase.from('ai_batch_test_results').insert({
+          test_type: 'linked',
+          test_batch_id: batchId,
+          combination_id: linkedCombinationId,
+          combination_variables: {
+            preset_scenario: scenario.id,
+            optimization_type: optType,
+            issues_count: priorityIssues.length,
+          },
+          function_name: 'generate-optimization',
+          request_body: optRequest,
+          success: optSuccess,
+          response_data: optSuccess && optData != null ? optData : null,
+          error_message: optError,
+          execution_time_ms: optTimeMs,
+          response_quality_score: optScore,
+          response_metrics: optMetrics,
+          linked_simulation_id: simRecordId,
+          diagnostic_issues_passed: {
+            issue_count: priorityIssues.length,
+            issues: priorityIssues.slice(0, 3),
+          },
+        });
+        if (dbError) {
+          console.error(`[BatchQA] DB insert error for ${linkedCombinationId}:`, dbError.message);
+        }
+      } catch (dbErr) {
+        console.error(`[BatchQA] DB insert exception for ${linkedCombinationId}:`, dbErr);
+      }
 
-      console.log(`[BatchQA] Linked ${scenario.id}→${optType}: ${optResult.success ? 'OK' : 'FAIL'} (${optResult.timeMs}ms, score: ${optScore})`);
+      console.log(`[BatchQA] Linked ${scenario.id}→${optType}: ${optSuccess ? 'OK' : 'FAIL'} (${optTimeMs}ms, score: ${optScore})`);
 
       if (delayMs > 0) {
         await new Promise(resolve => setTimeout(resolve, delayMs));
