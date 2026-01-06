@@ -159,11 +159,11 @@ Deno.serve(async (req: Request) => {
     // ===== 3. AI 추론 또는 규칙 기반 시뮬레이션 =====
     let simulationResult: SimulationResult;
 
-    const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 
-    if (ANTHROPIC_API_KEY) {
-      // Claude AI 호출
-      const aiResponse = await callClaudeForSimulation(analysisContext, ANTHROPIC_API_KEY);
+    if (LOVABLE_API_KEY) {
+      // Gemini 2.5 Flash AI 호출 (Lovable API Gateway)
+      const aiResponse = await callGeminiForSimulation(analysisContext, LOVABLE_API_KEY);
       simulationResult = parseAndValidateResult(aiResponse, zones || [], options);
     } else {
       // 규칙 기반 시뮬레이션 (API 키 없을 때)
@@ -228,7 +228,7 @@ Deno.serve(async (req: Request) => {
         response_summary: responseSummary,
         execution_time_ms: executionTime,
         context_metadata: {
-          model_used: ANTHROPIC_API_KEY ? 'claude-sonnet-4-20250514' : 'rule-based',
+          model_used: LOVABLE_API_KEY ? 'gemini-2.5-flash' : 'rule-based',
           zone_count: zones?.length || 0,
           issue_count: simulationResult.diagnostic_issues.length,
           critical_issues: simulationResult.diagnostic_issues.filter((i: any) => i.severity === 'critical').length,
@@ -361,40 +361,11 @@ function buildAnalysisContext(data: any) {
   };
 }
 
-// ===== Claude AI 호출 =====
-async function callClaudeForSimulation(context: any, apiKey: string): Promise<string> {
-  const prompt = `
-당신은 리테일 매장 시뮬레이션 전문가입니다. 주어진 매장 데이터를 분석하여 고객 행동을 시뮬레이션하고 잠재적 문제점을 진단해주세요.
+// ===== Gemini AI 호출 (Lovable API Gateway) =====
+async function callGeminiForSimulation(context: any, apiKey: string): Promise<string> {
+  const systemPrompt = `당신은 리테일 매장 시뮬레이션 전문가입니다. 주어진 매장 데이터를 분석하여 고객 행동을 시뮬레이션하고 잠재적 문제점을 진단해주세요.
 
-## 매장 데이터
-
-### 존 통계 (최근 30일 평균)
-${JSON.stringify(context.zone_stats, null, 2)}
-
-### 존 간 이동 확률
-${JSON.stringify(context.transition_probabilities.slice(0, 15), null, 2)}
-
-### 역사적 KPI
-${JSON.stringify(context.historical_kpis, null, 2)}
-
-### 시뮬레이션 옵션
-- 시뮬레이션 시간: ${context.simulation_options.duration_minutes}분
-- 예상 고객 수: ${context.simulation_options.customer_count}명
-- 시간대: ${context.simulation_options.time_of_day}
-
-## 분석 요청
-
-1. **KPI 예측**: 주어진 조건에서의 방문자 수, 전환율, 매출, 평균 체류시간, 피크 혼잡도를 예측해주세요.
-
-2. **존별 분석**: 각 존의 예상 방문자 수, 체류시간, 혼잡도, 병목 점수(0-100)를 분석해주세요.
-
-3. **동선 분석**: 주요 이동 경로, 방문이 적은 존(dead zones), 혼잡 지점을 식별해주세요.
-
-4. **AI 인사이트**: 데이터에서 발견한 주요 패턴과 개선 기회를 3-5개 제시해주세요.
-
-## 응답 형식 (JSON만 응답)
-
-\`\`\`json
+응답 형식 (JSON만 응답, 마크다운 코드블록 없이):
 {
   "kpis": {
     "predicted_visitors": number,
@@ -422,31 +393,74 @@ ${JSON.stringify(context.historical_kpis, null, 2)}
   },
   "ai_insights": ["인사이트1", "인사이트2", ...],
   "confidence_score": number (0-100)
-}
-\`\`\`
-`;
+}`;
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const userPrompt = `## 매장 데이터
+
+### 존 통계 (최근 30일 평균)
+${JSON.stringify(context.zone_stats, null, 2)}
+
+### 존 간 이동 확률
+${JSON.stringify(context.transition_probabilities.slice(0, 15), null, 2)}
+
+### 역사적 KPI
+${JSON.stringify(context.historical_kpis, null, 2)}
+
+### 시뮬레이션 옵션
+- 시뮬레이션 시간: ${context.simulation_options.duration_minutes}분
+- 예상 고객 수: ${context.simulation_options.customer_count}명
+- 시간대: ${context.simulation_options.time_of_day}
+
+## 분석 요청
+
+1. **KPI 예측**: 주어진 조건에서의 방문자 수, 전환율, 매출, 평균 체류시간, 피크 혼잡도를 예측해주세요.
+
+2. **존별 분석**: 각 존의 예상 방문자 수, 체류시간, 혼잡도, 병목 점수(0-100)를 분석해주세요.
+
+3. **동선 분석**: 주요 이동 경로, 방문이 적은 존(dead zones), 혼잡 지점을 식별해주세요.
+
+4. **AI 인사이트**: 데이터에서 발견한 주요 패턴과 개선 기회를 3-5개 한국어로 제시해주세요.
+
+JSON 형식으로만 응답해주세요.`;
+
+  console.log('[Simulation] Gemini API 호출 시작...');
+
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
     headers: {
+      'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: 'google/gemini-2.5-flash',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
       max_tokens: 4096,
-      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.7,
     }),
   });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[Simulation] Gemini API 에러:', response.status, errorText);
+    throw new Error(`Gemini API 오류 (${response.status}): ${errorText}`);
+  }
 
   const result = await response.json();
 
   if (result.error) {
-    throw new Error(`Claude API 오류: ${result.error.message}`);
+    throw new Error(`Gemini API 오류: ${result.error.message || JSON.stringify(result.error)}`);
   }
 
-  return result.content[0].text;
+  const content = result.choices?.[0]?.message?.content;
+  if (!content) {
+    throw new Error('Gemini API 응답에 content가 없습니다');
+  }
+
+  console.log('[Simulation] Gemini API 응답 수신 완료');
+  return content;
 }
 
 // ===== 규칙 기반 시뮬레이션 (API 키 없을 때) =====
