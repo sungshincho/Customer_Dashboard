@@ -185,10 +185,10 @@ export function OptimizeSection({
                   border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.05)',
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                    <TrendingUp className="w-4 h-4" style={{ color: iconColor }} />
+                    <TrendingUp className="w-4 h-4" style={{ color: '#22c55e' }} />
                     <span style={{ fontSize: '12px', fontWeight: 500, color: isDark ? 'rgba(255,255,255,0.8)' : '#374151' }}>잠재 수익 증가</span>
                   </div>
-                  <p style={{ fontSize: '20px', margin: '0 0 4px 0', ...text3D.heroNumber }}>
+                  <p style={{ fontSize: '20px', margin: '0 0 4px 0', color: '#22c55e', fontWeight: 800 }}>
                     +{priceOptimization.potentialRevenueIncreasePercent.toFixed(1)}%
                   </p>
                   <p style={{ fontSize: '11px', margin: 0, ...text3D.body }}>
