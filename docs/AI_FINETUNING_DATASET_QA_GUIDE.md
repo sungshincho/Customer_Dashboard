@@ -653,30 +653,104 @@ FROM ranked;
 - [ ] `ai_response_logs` 테이블 데이터 삽입 확인
 - [ ] 에러 케이스 로깅 확인
 
-### 7.2 데이터 품질 검증
+### 7.2 환경/시나리오 컨텍스트 로깅 검증
+
+- [ ] `input_variables`에 `environment_context` 포함 확인
+- [ ] `context_metadata`에 환경 메타데이터 포함 확인
+  - [ ] `weather` 필드 존재
+  - [ ] `holidayType` 필드 존재
+  - [ ] `presetScenarioId` 필드 존재 (프리셋 사용 시)
+  - [ ] `presetScenarioName` 필드 존재 (프리셋 사용 시)
+  - [ ] `trafficMultiplier` 필드 존재
+  - [ ] `hasEnvironmentContext` = true
+  - [ ] `hasPresetScenario` = true (프리셋 사용 시)
+- [ ] `simulation_type`이 프리셋 시나리오 반영 확인
+  - 프리셋 사용 시: `scenario_christmas`, `scenario_blackFriday` 등
+  - 일반 사용 시: `demand_prediction` 또는 `traffic_flow`
+
+### 7.3 데이터 품질 검증
 
 - [ ] 필수 필드 완전성 (input_variables, ai_response)
 - [ ] 응답 구조 검증 (kpis, zone_analysis, ai_insights)
 - [ ] 이상치 없음 확인 (음수 값, 범위 초과)
 - [ ] 에러 케이스 분리 확인
 
-### 7.3 품질 평가 시스템
+### 7.4 품질 평가 시스템
 
 - [ ] quality_score 자동 계산 동작 확인
 - [ ] is_good_example 마킹 기준 적절성
 - [ ] 수동 검토 대상 목록 생성
 
-### 7.4 데이터셋 추출
+### 7.5 데이터셋 추출
 
 - [ ] 시뮬레이션 JSONL 추출 확인
 - [ ] 최적화 JSONL 추출 확인
 - [ ] 학습/검증 분리 비율 확인
+- [ ] 환경 컨텍스트 포함 데이터셋 추출 확인
 
-### 7.5 파인튜닝 준비
+### 7.6 파인튜닝 준비
 
 - [ ] 데이터셋 크기 충분 (최소 100개 권장)
-- [ ] 다양한 시나리오 포함 확인
+- [ ] 다양한 시나리오 포함 확인 (7개 프리셋 각각 포함)
+- [ ] 다양한 환경 조건 포함 확인 (날씨, 휴일 등)
 - [ ] 포맷 변환 정상 동작
+
+### 7.7 단계별 환경 컨텍스트 QA
+
+#### Step 1: 프리셋 시나리오 로깅 테스트
+
+1. 디지털트윈 스튜디오에서 "크리스마스 시즌" 프리셋 선택
+2. AI 시뮬레이션 실행
+3. DB 확인:
+   ```sql
+   SELECT
+     context_metadata->>'presetScenarioId',
+     context_metadata->>'presetScenarioName',
+     simulation_type
+   FROM ai_response_logs
+   WHERE function_name = 'run-simulation'
+   ORDER BY created_at DESC
+   LIMIT 1;
+   ```
+4. 예상 결과:
+   - `presetScenarioId` = 'christmas'
+   - `presetScenarioName` = '크리스마스 시즌'
+   - `simulation_type` = 'scenario_christmas'
+
+#### Step 2: 환경 설정 로깅 테스트
+
+1. "환경 설정" → "직접 설정" 모드 선택
+2. 날씨: 비, 시간대: 오후, 공휴일: 주말 설정
+3. AI 시뮬레이션 실행
+4. DB 확인:
+   ```sql
+   SELECT
+     input_variables->'environment_context'->>'weather' as weather,
+     input_variables->'environment_context'->>'holiday_type' as holiday,
+     context_metadata->>'weather',
+     context_metadata->>'holidayType'
+   FROM ai_response_logs
+   WHERE function_name = 'run-simulation'
+   ORDER BY created_at DESC
+   LIMIT 1;
+   ```
+5. 예상 결과:
+   - `weather` = 'rain'
+   - `holidayType` = 'weekend'
+
+#### Step 3: 다양한 시나리오 데이터 수집
+
+7개 프리셋 시나리오 각각에 대해 최소 1회 이상 실행하여 다양한 파인튜닝 데이터 확보:
+
+| 시나리오 | simulation_type | 예상 weather | 예상 holidayType |
+|---------|-----------------|--------------|------------------|
+| christmas | scenario_christmas | snow | christmas |
+| rainyWeekday | scenario_rainyWeekday | rain | none |
+| blackFriday | scenario_blackFriday | clear | blackFriday |
+| newArrival | scenario_newArrival | clear | weekend |
+| normalWeekend | scenario_normalWeekend | clear | weekend |
+| coldWave | scenario_coldWave | heavySnow | none |
+| yearEndParty | scenario_yearEndParty | clear | weekend |
 
 ---
 
@@ -741,6 +815,13 @@ supabase/
 - [디지털트윈 스튜디오 QA 가이드](./DIGITAL_TWIN_STUDIO_QA_GUIDE.md)
 - [데이터 흐름 아키텍처](./DATA_FLOW_ARCHITECTURE.md)
 - [AI 추론 시스템](./ONTOLOGY_AI_INFERENCE_PHASE3.md)
+
+### D. 버전 히스토리
+
+| 버전 | 날짜 | 변경 사항 |
+|------|------|----------|
+| 1.0 | 2026-01-06 | 초기 문서 작성 |
+| 1.1 | 2026-01-06 | 환경/시나리오 컨텍스트 로깅 검증 추가, 단계별 QA 가이드 확장 |
 
 ---
 
