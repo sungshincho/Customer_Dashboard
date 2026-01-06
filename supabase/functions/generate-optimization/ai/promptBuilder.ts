@@ -25,6 +25,16 @@ import {
   type OptimizationExample,
 } from './fewShotExamples.ts';
 
+// 🆕 Phase 5: Structured Output 스키마 (리테일 도메인 지식)
+import {
+  VMD_PRINCIPLES,
+  PLACEMENT_STRATEGIES,
+  FURNITURE_TYPES,
+  SHELF_LEVELS,
+  PLACEMENT_STRATEGY_CODEBOOK,
+  VMD_PRINCIPLE_CODEBOOK,
+} from '../schemas/retailOptimizationSchema.ts';
+
 // ============================================================================
 // Type Definitions
 // ============================================================================
@@ -768,19 +778,35 @@ Key Decision: [Main optimization strategy in 1 sentence]
 `
     : '';
 
+  // 🆕 Phase 5: 도메인 지식 enum 값 정의
+  const domainKnowledgeBlock = `
+### 🏪 Retail Domain Knowledge (Required Values)
+
+**VMD Principles** (use in furniture_changes.vmd_principle):
+${VMD_PRINCIPLES.map(p => `- \`${p}\`: ${VMD_PRINCIPLE_CODEBOOK[p]?.description || p}`).join('\n')}
+
+**Placement Strategies** (use in product_changes.placement_strategy.type):
+${PLACEMENT_STRATEGIES.map(s => `- \`${s}\`: ${PLACEMENT_STRATEGY_CODEBOOK[s]?.description || s} (lift: ${PLACEMENT_STRATEGY_CODEBOOK[s]?.expected_lift?.min * 100}-${PLACEMENT_STRATEGY_CODEBOOK[s]?.expected_lift?.max * 100}%)`).join('\n')}
+
+**Shelf Levels** (use in shelf_level):
+${SHELF_LEVELS.map(l => `- \`${l}\``).join(', ')}
+`;
+
   return `## 📤 OUTPUT FORMAT
 
 ${thinkingBlock}
-### JSON Output (Required)
+${domainKnowledgeBlock}
+
+### JSON Output (Required - Structured Output Schema)
 Respond with valid JSON in this exact structure:
 
 \`\`\`json
 {
-  "reasoning_summary": "Brief summary of key optimization decisions",
+  "reasoning_summary": "핵심 최적화 전략 요약 (500자 이내)",
   "furniture_changes": [
     {
       "furniture_id": "exact-uuid-from-data",
-      "furniture_type": "string",
+      "furniture_type": "${FURNITURE_TYPES.slice(0, 3).join('|')}|...",
       "movable": true,
       "current": {
         "zone_id": "current-zone-uuid",
@@ -792,10 +818,17 @@ Respond with valid JSON in this exact structure:
         "position": { "x": 0, "y": 0, "z": 0 },
         "rotation": { "x": 0, "y": 0, "z": 0 }
       },
-      "reason": "Specific reason for this change",
+      "vmd_principle": "${VMD_PRINCIPLES[0]}",
+      "reason": "데이터 기반 변경 이유",
       "priority": "high|medium|low",
-      "expected_impact": 0.15,
-      "risk_level": "low|medium|high"
+      "expected_impact": {
+        "traffic_change": 0.15,
+        "dwell_time_change": 0.10,
+        "visibility_score": 85,
+        "confidence": 0.8
+      },
+      "risk_level": "low|medium|high",
+      "implementation_difficulty": "easy|medium|hard"
     }
   ],
   "product_changes": [
@@ -806,19 +839,38 @@ Respond with valid JSON in this exact structure:
         "zone_id": "current-zone-uuid",
         "furniture_id": "current-furniture-uuid",
         "slot_id": "current-slot-uuid",
-        "position": { "x": 0, "y": 0, "z": 0 }
+        "position": { "x": 0, "y": 0, "z": 0 },
+        "shelf_level": "eye_level"
       },
       "suggested": {
         "zone_id": "target-zone-uuid",
         "furniture_id": "target-furniture-uuid",
         "slot_id": "target-slot-uuid",
-        "position": { "x": 0, "y": 0, "z": 0 }
+        "position": { "x": 0, "y": 0, "z": 0 },
+        "shelf_level": "${SHELF_LEVELS[3]}"
       },
-      "reason": "Specific reason referencing data",
+      "placement_strategy": {
+        "type": "${PLACEMENT_STRATEGIES[0]}",
+        "associated_products": ["uuid-1", "uuid-2"],
+        "association_rule": {
+          "confidence": 0.75,
+          "lift": 2.1,
+          "support": 0.08
+        }
+      },
+      "reason": "데이터 기반 변경 이유",
       "priority": "high|medium|low",
-      "expected_revenue_impact": 0.12,
-      "expected_visibility_impact": 0.20,
-      "association_based": false
+      "expected_impact": {
+        "revenue_change": 0.12,
+        "visibility_change": 0.20,
+        "conversion_change": 0.08,
+        "confidence": 0.85
+      },
+      "slot_compatibility": {
+        "is_compatible": true,
+        "display_type_match": true,
+        "size_fit": "exact|acceptable|tight"
+      }
     }
   ],
   "summary": {
@@ -828,26 +880,29 @@ Respond with valid JSON in this exact structure:
     "expected_traffic_improvement": 0.10,
     "expected_conversion_improvement": 0.12,
     "confidence_score": 0.85,
-    "key_strategies": [
-      "Strategy 1 description",
-      "Strategy 2 description"
+    "key_strategies": ["전략 1", "전략 2", "전략 3"],
+    "issues_addressed": [
+      {
+        "issue_id": "from-diagnostic-issues",
+        "issue_type": "bottleneck|dead_zone|low_conversion",
+        "resolution_approach": "해결 방법",
+        "expected_resolution_rate": 0.8
+      }
     ],
-    "environmental_adaptations": [
-      "Adaptation for current conditions"
-    ],
-    "risk_factors": [
-      "Potential risk to monitor"
-    ]
+    "environmental_adaptations": ["환경 적응 1"],
+    "risk_factors": ["리스크 1"]
   }
 }
 \`\`\`
 
-### Validation Rules
-- All IDs must match exactly from provided data
-- furniture_changes: only include if movable: true
-- product_changes: slot must support product's display_type
-- Numbers should be realistic (improvements typically 5-25%)
-- Include reasoning for each change`;
+### ⚠️ Validation Rules (CRITICAL)
+1. **ID 정확성**: 모든 ID는 제공된 데이터에서 정확히 복사
+2. **VMD 원칙**: furniture_changes.vmd_principle은 위 목록에서만 선택
+3. **배치 전략**: product_changes.placement_strategy.type은 위 목록에서만 선택
+4. **이동 가능**: movable: false인 가구는 변경 불가
+5. **슬롯 호환성**: slot의 display_type과 상품의 display_type 일치 필수
+6. **수치 범위**: 개선율은 일반적으로 5-25% (0.05-0.25)
+7. **신뢰도**: confidence는 0-1 범위`;
 }
 
 // ============================================================================

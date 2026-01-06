@@ -75,6 +75,14 @@ import {
   type LearningSessionSummary,
 } from './feedback/autoLearning.ts';
 
+// 🆕 Phase 5: Structured Output 스키마 (리테일 도메인 지식 기반)
+import {
+  createResponseFormat,
+  validateOptimizationResponse,
+  VMD_PRINCIPLES,
+  PLACEMENT_STRATEGIES,
+} from './schemas/retailOptimizationSchema.ts';
+
 /**
  * generate-optimization Edge Function
  *
@@ -1199,6 +1207,14 @@ async function generateAIOptimization(
   console.log(`[generateAIOptimization] CoT=${builtPrompt.metadata.cotEnabled}, FewShot=${builtPrompt.metadata.fewShotEnabled}(${builtPrompt.metadata.fewShotCount} examples, ${builtPrompt.metadata.fewShotStrategy})`);
   console.log(`[generateAIOptimization] Data included: env=${builtPrompt.metadata.dataIncluded.environment}, flow=${builtPrompt.metadata.dataIncluded.flowAnalysis}, assoc=${builtPrompt.metadata.dataIncluded.associations}, vmd=${!!vmdAnalysis}`);
 
+  // 🆕 Phase 5: Structured Output 포맷 결정
+  // staffing 타입이 아닌 경우에만 retail optimization 스키마 사용
+  const responseFormat = optimizationType === 'staffing'
+    ? { type: 'json_object' as const }  // staffing은 별도 함수에서 처리
+    : createResponseFormat(optimizationType);
+
+  console.log(`[generateAIOptimization] 📋 Response format: ${JSON.stringify(responseFormat).substring(0, 100)}...`);
+
   try {
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -1212,7 +1228,7 @@ async function generateAIOptimization(
           { role: 'system', content: builtPrompt.systemPrompt },
           { role: 'user', content: enhancedUserPrompt }  // 🆕 VMD 컨텍스트 포함
         ],
-        response_format: { type: 'json_object' },
+        response_format: responseFormat,
         max_tokens: 16000, // 🔧 토큰 한도 증가 (6000 → 16000)
       }),
     });
@@ -1260,6 +1276,14 @@ async function generateAIOptimization(
       }
     }
 
+    // 🆕 Phase 5: Structured Output 검증
+    const validation = validateOptimizationResponse(result, optimizationType);
+    if (!validation.valid) {
+      console.warn(`[generateAIOptimization] ⚠️ Schema validation warnings: ${validation.errors.join(', ')}`);
+    } else {
+      console.log(`[generateAIOptimization] ✅ Schema validation passed`);
+    }
+
     return {
       optimization_id: '',
       store_id: '',
@@ -1273,6 +1297,10 @@ async function generateAIOptimization(
         ai_reasoning_included: !!thinking,
         ai_reasoning_length: thinking?.length || 0,
         prompt_strategy: builtPrompt.metadata.strategy,
+        // 🆕 Phase 5: Structured Output 메타데이터
+        structured_output_enabled: true,
+        schema_validation_passed: validation.valid,
+        schema_validation_errors: validation.errors.length > 0 ? validation.errors : undefined,
       } : {
         total_furniture_changes: 0,
         total_product_changes: 0,
