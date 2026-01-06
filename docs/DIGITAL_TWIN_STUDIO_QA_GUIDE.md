@@ -62,9 +62,9 @@
 
 | Function | 용도 | AI 모델 | 로깅 |
 |----------|------|---------|------|
-| `run-simulation` | AI 시뮬레이션 실행 | Claude Sonnet 4 / Rule-based | ✅ |
+| `run-simulation` | AI 시뮬레이션 실행 | Gemini 2.5 Flash / Rule-based | ✅ |
 | `generate-optimization` | AI 최적화 생성 | Gemini 2.5 Flash | ✅ |
-| `advanced-ai-inference` | AI 추론 (존/혼잡도) | Gemini 2.5 Flash | ✅ |
+| `advanced-ai-inference` | AI 추론 (존/혼잡도) | Gemini 2.5 Flash/Pro | ✅ |
 
 ### 1.4 프리셋 시나리오
 
