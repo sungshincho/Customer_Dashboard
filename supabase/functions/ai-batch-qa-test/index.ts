@@ -890,12 +890,15 @@ function calculateOptimizationQuality(
   let score = 0;
   const metrics: Record<string, unknown> = {};
 
-  const optimizationType = inputOptimizationType || response?.optimization_type || 'unknown';
+  // 🔧 응답 구조 정규화: response.result 또는 response 직접 사용
+  const data = response?.result || response;
+
+  const optimizationType = inputOptimizationType || data?.optimization_type || 'unknown';
   const isStaffingType = optimizationType === 'staffing';
   const isBothType = optimizationType === 'both';
 
   // Furniture Changes (20점) - staffing 전용이 아닐 때
-  const furnitureChanges = response?.furniture_changes || [];
+  const furnitureChanges = data?.furniture_changes || [];
   if (!isStaffingType) {
     const furnitureScore = furnitureChanges.length > 0 ? Math.min(furnitureChanges.length, 5) * 4 : 0;
     score += furnitureScore;
@@ -903,7 +906,7 @@ function calculateOptimizationQuality(
   metrics.furniture_changes_count = furnitureChanges.length;
 
   // Product Changes (20점) - staffing 전용이 아닐 때
-  const productChanges = response?.product_changes || [];
+  const productChanges = data?.product_changes || [];
   if (!isStaffingType) {
     const productScore = productChanges.length > 0 ? Math.min(productChanges.length, 5) * 4 : 0;
     score += productScore;
@@ -911,7 +914,7 @@ function calculateOptimizationQuality(
   metrics.product_changes_count = productChanges.length;
 
   // Staffing Result (20점) - staffing 또는 both 타입일 때
-  const staffingResult = response?.staffing_result;
+  const staffingResult = data?.staffing_result;
   if (staffingResult) {
     const staffPositions = staffingResult?.staffPositions || [];
     score += staffPositions.length > 0 ? 20 : 0;
@@ -930,7 +933,7 @@ function calculateOptimizationQuality(
   }
 
   // Summary & Impact (20점)
-  const summary = response?.summary || {};
+  const summary = data?.summary || {};
   const hasRevenueImpact = summary.expected_revenue_improvement !== undefined && summary.expected_revenue_improvement > 0;
   const hasConversionImpact = summary.expected_conversion_improvement !== undefined && summary.expected_conversion_improvement > 0;
   const hasStaffingSummary = summary.staffing_summary?.coverage_improvement !== undefined;
@@ -947,7 +950,7 @@ function calculateOptimizationQuality(
   metrics.has_staffing_summary = hasStaffingSummary;
 
   // AI Insights (20점) - 최상위 또는 staffing_result 내부
-  const topLevelInsights = response?.ai_insights || [];
+  const topLevelInsights = data?.ai_insights || [];
   const staffingInsights = staffingResult?.insights || [];
   const allInsights = [...topLevelInsights, ...staffingInsights];
   const insightScore = Math.min(allInsights.length, 5) * 4;
@@ -956,7 +959,7 @@ function calculateOptimizationQuality(
 
   // 🆕 시나리오 기대값 검증 (최대 50점 추가)
   if (scenarioId || optimizationType) {
-    const validation = validateOptimizationAgainstExpectations(response, scenarioId, optimizationType);
+    const validation = validateOptimizationAgainstExpectations(data, scenarioId, optimizationType);
     score += validation.score;
     metrics.expectation_validation = {
       isValid: validation.isValid,
@@ -967,7 +970,7 @@ function calculateOptimizationQuality(
 
   // 🆕 Phase 5: Structured Output 스키마 검증 (최대 30점 추가)
   if (!isStaffingType) {
-    const schemaValidation = validateStructuredOutputSchema(response);
+    const schemaValidation = validateStructuredOutputSchema(data);
     score += schemaValidation.score;
     metrics.schema_validation = {
       isValid: schemaValidation.isValid,
@@ -977,10 +980,10 @@ function calculateOptimizationQuality(
     };
 
     // 도메인 지식 활용 메트릭 추가
-    const vmdPrinciplesUsed = (response?.furniture_changes || [])
+    const vmdPrinciplesUsed = (data?.furniture_changes || [])
       .filter((fc: any) => fc.vmd_principle)
       .map((fc: any) => fc.vmd_principle);
-    const placementStrategiesUsed = (response?.product_changes || [])
+    const placementStrategiesUsed = (data?.product_changes || [])
       .filter((pc: any) => pc.placement_strategy?.type)
       .map((pc: any) => pc.placement_strategy.type);
 
