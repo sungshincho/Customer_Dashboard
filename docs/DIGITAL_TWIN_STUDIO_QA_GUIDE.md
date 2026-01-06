@@ -225,9 +225,10 @@ created_at: TIMESTAMPTZ
 # Supabase Edge Functions 환경 변수
 SUPABASE_URL=<your-supabase-url>
 SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
-ANTHROPIC_API_KEY=<claude-api-key>          # run-simulation용
-GEMINI_API_KEY=<gemini-api-key>             # generate-optimization용
+LOVABLE_API_KEY=<lovable-api-gateway-key>   # run-simulation, generate-optimization용 (Gemini 2.5 Flash)
 ```
+
+> **참고**: `LOVABLE_API_KEY`가 없으면 `run-simulation`은 규칙 기반(rule-based) 모드로 폴백됩니다.
 
 #### 테스트 데이터 확인
 
@@ -368,6 +369,75 @@ SELECT id, name, category FROM furniture WHERE store_id = '<store-id>';
    - 속도 조절 (1x, 2x, 4x, 10x)
    - 중지 버튼
 
+### 3.6 환경 컨텍스트 로깅 QA
+
+#### Step 1: 프리셋 시나리오 로깅 테스트
+
+1. **프리셋 시나리오 선택**
+   - "프리셋 시나리오" 섹션 열기
+   - "🎄 크리스마스 시즌" 선택
+   - AI 시뮬레이션 실행
+
+2. **로깅 확인 (Supabase 대시보드 또는 SQL)**
+   ```sql
+   SELECT
+     simulation_type,
+     context_metadata->>'presetScenarioId' as scenario_id,
+     context_metadata->>'weather' as weather,
+     context_metadata->>'hasPresetScenario' as has_preset
+   FROM ai_response_logs
+   WHERE function_name = 'run-simulation'
+   ORDER BY created_at DESC
+   LIMIT 1;
+   ```
+
+3. **예상 결과**
+   - `simulation_type` = 'scenario_christmas'
+   - `scenario_id` = 'christmas'
+   - `weather` = 'snow'
+   - `has_preset` = 'true'
+
+#### Step 2: 환경 설정 로깅 테스트
+
+1. **환경 설정 직접 지정**
+   - "환경 설정 (시뮬레이션)" 섹션 열기
+   - 모드: "직접 설정"
+   - 날씨: "🌧️ 비"
+   - 시간대: "🌙 저녁"
+   - 공휴일: "🎉 주말"
+
+2. **시뮬레이션 실행 및 로깅 확인**
+   ```sql
+   SELECT
+     input_variables->'environment_context' as env_ctx,
+     context_metadata->>'weather' as weather,
+     context_metadata->>'holidayType' as holiday,
+     context_metadata->>'trafficMultiplier' as traffic_mult
+   FROM ai_response_logs
+   WHERE function_name = 'run-simulation'
+   ORDER BY created_at DESC
+   LIMIT 1;
+   ```
+
+3. **예상 결과**
+   - `weather` = 'rain'
+   - `holiday` = 'weekend'
+   - `traffic_mult` = 날씨/휴일 영향 반영된 값
+
+#### Step 3: 다양한 시나리오 테스트
+
+각 프리셋 시나리오별로 1회씩 실행하여 데이터 수집:
+
+| 테스트 | 프리셋 | 확인 포인트 |
+|--------|--------|------------|
+| 1 | 크리스마스 시즌 | `simulation_type='scenario_christmas'` |
+| 2 | 비 오는 평일 | `simulation_type='scenario_rainyWeekday'`, `weather='rain'` |
+| 3 | 블랙프라이데이 | `simulation_type='scenario_blackFriday'` |
+| 4 | 신상품 런칭 | `simulation_type='scenario_newArrival'` |
+| 5 | 평범한 주말 | `simulation_type='scenario_normalWeekend'` |
+| 6 | 한파 주의보 | `simulation_type='scenario_coldWave'`, `weather='heavySnow'` |
+| 7 | 연말 파티 시즌 | `simulation_type='scenario_yearEndParty'` |
+
 ---
 
 ## 4. 검증 방법
@@ -377,7 +447,7 @@ SELECT id, name, category FROM furniture WHERE store_id = '<store-id>';
 #### Supabase Edge Function 직접 호출
 
 ```bash
-# run-simulation 테스트
+# run-simulation 테스트 (기본)
 curl -X POST \
   'https://<project-id>.supabase.co/functions/v1/run-simulation' \
   -H 'Authorization: Bearer <anon-key>' \
@@ -389,6 +459,39 @@ curl -X POST \
       "customer_count": 100,
       "time_of_day": "afternoon",
       "simulation_type": "predictive"
+    }
+  }'
+
+# run-simulation 테스트 (환경/시나리오 컨텍스트 포함)
+curl -X POST \
+  'https://<project-id>.supabase.co/functions/v1/run-simulation' \
+  -H 'Authorization: Bearer <anon-key>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "store_id": "<store-uuid>",
+    "options": {
+      "duration_minutes": 60,
+      "customer_count": 180,
+      "time_of_day": "afternoon",
+      "simulation_type": "predictive"
+    },
+    "environment_context": {
+      "weather": "snow",
+      "holiday_type": "christmas",
+      "time_of_day": "afternoon",
+      "impact": {
+        "trafficMultiplier": 1.8,
+        "dwellTimeMultiplier": 1.1,
+        "conversionMultiplier": 1.2
+      },
+      "preset_scenario": {
+        "id": "christmas",
+        "name": "크리스마스 시즌",
+        "traffic_multiplier": 1.8,
+        "discount_percent": 30,
+        "event_type": "sale",
+        "risk_tags": ["혼잡 위험", "계산대 대기"]
+      }
     }
   }'
 ```
@@ -432,6 +535,53 @@ SELECT
 FROM ai_response_logs
 WHERE store_id = '<store-uuid>'
 GROUP BY function_name;
+```
+
+#### 환경/시나리오 컨텍스트 로깅 검증
+
+```sql
+-- 환경 컨텍스트가 포함된 로그 조회
+SELECT
+  id,
+  simulation_type,
+  context_metadata->>'weather' as weather,
+  context_metadata->>'holidayType' as holiday_type,
+  context_metadata->>'presetScenarioId' as scenario_id,
+  context_metadata->>'presetScenarioName' as scenario_name,
+  context_metadata->>'trafficMultiplier' as traffic_mult,
+  context_metadata->>'hasEnvironmentContext' as has_env_ctx,
+  context_metadata->>'hasPresetScenario' as has_preset,
+  created_at
+FROM ai_response_logs
+WHERE function_name = 'run-simulation'
+  AND store_id = '<store-uuid>'
+ORDER BY created_at DESC
+LIMIT 10;
+
+-- 프리셋 시나리오별 로그 카운트
+SELECT
+  context_metadata->>'presetScenarioId' as scenario_id,
+  context_metadata->>'presetScenarioName' as scenario_name,
+  COUNT(*) as count
+FROM ai_response_logs
+WHERE function_name = 'run-simulation'
+  AND context_metadata->>'hasPresetScenario' = 'true'
+GROUP BY
+  context_metadata->>'presetScenarioId',
+  context_metadata->>'presetScenarioName'
+ORDER BY count DESC;
+
+-- 입력 변수에 환경 컨텍스트 포함 확인
+SELECT
+  id,
+  input_variables->'environment_context'->>'weather' as weather,
+  input_variables->'environment_context'->'preset_scenario'->>'id' as preset_id,
+  input_variables->'environment_context'->'preset_scenario'->>'name' as preset_name
+FROM ai_response_logs
+WHERE function_name = 'run-simulation'
+  AND input_variables->'environment_context' IS NOT NULL
+ORDER BY created_at DESC
+LIMIT 5;
 ```
 
 #### 시뮬레이션 이력 확인
@@ -653,6 +803,7 @@ supabase/migrations/
 | 버전 | 날짜 | 변경 사항 |
 |------|------|----------|
 | 1.0 | 2026-01-06 | 초기 문서 작성 |
+| 1.1 | 2026-01-06 | 환경/시나리오 컨텍스트 로깅 QA 추가, API 키 정보 업데이트 |
 
 ---
 
