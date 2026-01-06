@@ -50,6 +50,7 @@ export function convertToBasicMaterial(
     if (originalMaterial.map) {
       basicMaterial.map = originalMaterial.map;
       // 텍스처 품질 설정
+      basicMaterial.map.colorSpace = THREE.SRGBColorSpace;
       basicMaterial.map.anisotropy = 16;
       basicMaterial.map.minFilter = THREE.LinearMipmapLinearFilter;
       basicMaterial.map.magFilter = THREE.LinearFilter;
