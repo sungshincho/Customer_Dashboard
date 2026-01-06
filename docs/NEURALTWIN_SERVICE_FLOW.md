@@ -1,7 +1,9 @@
 # NEURALTWIN 서비스 플로우 가이드
 
-> **버전**: 1.0
+> **버전**: 1.1
 > **최종 업데이트**: 2026-01-06
+> **변경 이력**:
+> - v1.1: AI 함수 역할 분담 아키텍처 추가, advanced-ai-inference deprecated 처리, staffing 최적화 추가
 > **문서 목적**: NEURALTWIN Customer Dashboard의 전체 시스템 아키텍처 및 서비스 플로우 정의
 
 ---
@@ -37,13 +39,16 @@ graph TB
     end
 
     subgraph "Backend Services"
-        subgraph "Edge Functions"
-            EF_OPT[generate-optimization]
-            EF_SIM[run-simulation]
+        subgraph "Edge Functions - Active"
+            EF_OPT[generate-optimization<br/>가구/상품/인력 최적화]
+            EF_SIM[run-simulation<br/>트래픽/시나리오 시뮬레이션]
             EF_AI[retail-ai-inference]
             EF_UNI[unified-ai]
-            EF_ADV[advanced-ai-inference]
             EF_ETL[etl-*]
+        end
+
+        subgraph "Edge Functions - Deprecated"
+            EF_ADV[advanced-ai-inference ⚠️]
         end
 
         subgraph "Database"
@@ -346,13 +351,43 @@ flowchart TB
 
 ### 4.1 Edge Function 목록
 
+| 함수명 | 유형 | 설명 | 상태 |
+|--------|------|------|------|
+| `generate-optimization` | AI | 가구/상품/인력 배치 최적화 | ✅ Active |
+| `run-simulation` | AI | 트래픽/매출/시나리오 시뮬레이션 | ✅ Active |
+| `retail-ai-inference` | AI | 소매 AI 추론 | ✅ Active |
+| `advanced-ai-inference` | AI | 고급 AI 분석 | ⚠️ Deprecated |
+| `unified-ai` | AI | 통합 AI 인터페이스 | ✅ Active |
+
+#### AI 함수 역할 분담 (2024-01 아키텍처)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     현재 아키텍처                            │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  [시뮬레이션 담당]              [최적화 담당]                  │
+│                                                              │
+│   run-simulation              generate-optimization          │
+│   ├─ 트래픽/매출 예측          ├─ 가구 배치 최적화 (furniture)│
+│   ├─ 혼잡도 분석               ├─ 상품 배치 최적화 (product)  │
+│   ├─ diagnostic_issues        ├─ 인력 배치 최적화 (staffing) │
+│   └─ 시나리오 시뮬레이션       ├─ 통합 최적화 (both)          │
+│                                ├─ 동선/VMD/연관성 분석         │
+│                                └─ 매출/전환율 예측             │
+│                                                              │
+│  [Deprecated - 마이그레이션 중]                              │
+│   advanced-ai-inference                                      │
+│   ├─ layout_optimization → generate-optimization (both)     │
+│   ├─ staffing_optimization → generate-optimization (staffing)│
+│   ├─ flow_simulation → 유지 (분석용)                         │
+│   └─ congestion_simulation → 유지 (분석용)                   │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
 | 함수명 | 유형 | 설명 |
 |--------|------|------|
-| `generate-optimization` | AI | 레이아웃/상품 배치 최적화 |
-| `run-simulation` | AI | 트래픽/매출 시뮬레이션 |
-| `retail-ai-inference` | AI | 소매 AI 추론 |
-| `advanced-ai-inference` | AI | 고급 AI 분석 |
-| `unified-ai` | AI | 통합 AI 인터페이스 |
 | `etl-hourly-visitors` | ETL | 시간별 방문자 집계 |
 | `etl-daily-kpis` | ETL | 일별 KPI 집계 |
 | `etl-zone-transitions` | ETL | 존 이동 집계 |
@@ -586,11 +621,14 @@ flowchart LR
 
 ```mermaid
 flowchart TB
-    subgraph "Edge Functions"
-        EF1[run-simulation]
-        EF2[generate-optimization]
+    subgraph "Edge Functions - Active"
+        EF1[run-simulation<br/>시뮬레이션 전담]
+        EF2[generate-optimization<br/>최적화 전담]
         EF3[retail-ai-inference]
-        EF4[advanced-ai-inference]
+    end
+
+    subgraph "Edge Functions - Deprecated"
+        EF4[advanced-ai-inference<br/>⚠️ 점진적 제거 예정]
     end
 
     subgraph "Lovable API Gateway"

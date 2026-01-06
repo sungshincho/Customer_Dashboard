@@ -1,7 +1,9 @@
 # NEURALTWIN 사용자 플로우 가이드
 
-> **버전**: 1.0
+> **버전**: 1.1
 > **최종 업데이트**: 2026-01-06
+> **변경 이력**:
+> - v1.1: 인력 배치 최적화 (staffing) 유형 추가
 > **문서 목적**: NEURALTWIN Customer Dashboard의 사용자 경험 및 기능별 유저 플로우 정의
 
 ---
@@ -527,6 +529,7 @@ flowchart TB
         TYPE{최적화 유형}
         TYPE -->|가구 배치| FURNITURE[가구 최적화]
         TYPE -->|상품 배치| PRODUCT[상품 최적화]
+        TYPE -->|인력 배치| STAFFING[인력 최적화]
         TYPE -->|통합| BOTH[통합 최적화]
     end
 
@@ -561,6 +564,7 @@ flowchart TB
     START --> ISSUE_SELECT --> TYPE
     FURNITURE --> AI_REQUEST
     PRODUCT --> AI_REQUEST
+    STAFFING --> AI_REQUEST
     BOTH --> AI_REQUEST
 
     AI_REQUEST --> AI_PROCESS --> AI_RESPONSE
