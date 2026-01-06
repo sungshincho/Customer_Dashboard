@@ -441,6 +441,36 @@ Deno.serve(async (req) => {
     };
 
     try {
+      // 🆕 파인튜닝용: 사용자 화면에 표시되는 텍스트 응답 추출
+      const userFacingTexts = {
+        // 가구 변경 이유들 (사용자에게 표시되는 핵심 메시지)
+        furniture_reasons: result.furniture_changes.map((fc: FurnitureChange) => ({
+          furniture_type: fc.furniture_type,
+          reason: fc.reason,
+          priority: fc.priority,
+          expected_impact: fc.expected_impact,
+        })),
+        // 상품 변경 이유들
+        product_reasons: result.product_changes.map((pc: ProductChange) => ({
+          sku: pc.sku,
+          reason: pc.reason,
+          priority: pc.priority,
+          expected_revenue_impact: pc.expected_revenue_impact,
+          expected_visibility_impact: pc.expected_visibility_impact,
+        })),
+        // 요약 메시지
+        summary_text: `가구 ${result.summary.total_furniture_changes}개, 상품 ${result.summary.total_product_changes}개 변경 권장. ` +
+          `예상 매출 증가: ${(result.summary.expected_revenue_improvement * 100).toFixed(1)}%, ` +
+          `트래픽 증가: ${(result.summary.expected_traffic_improvement * 100).toFixed(1)}%, ` +
+          `전환율 증가: ${(result.summary.expected_conversion_improvement * 100).toFixed(1)}%`,
+        // VMD 분석 요약 (있는 경우)
+        vmd_summary: vmdAnalysis ? {
+          score: vmdAnalysis.score.overall,
+          grade: vmdAnalysis.score.grade,
+          top_violations: vmdAnalysis.violations.slice(0, 3).map((v: any) => v.description),
+        } : null,
+      };
+
       await logAIResponse(supabase, {
         storeId: store_id,
         userId: userId || undefined,
@@ -456,10 +486,30 @@ Deno.serve(async (req) => {
             slot_count: slotsData.length,
           },
         },
+        // 🆕 aiResponse를 user_facing_texts 중심으로 변경 (파인튜닝 최적화)
         aiResponse: {
-          furniture_changes: result.furniture_changes,
-          product_changes: result.product_changes,
-          summary: result.summary,
+          user_facing_texts: userFacingTexts,
+          // 핵심 지표만 포함 (전체 changes 배열 제외)
+          key_metrics: {
+            total_furniture_changes: result.summary.total_furniture_changes,
+            total_product_changes: result.summary.total_product_changes,
+            expected_revenue_improvement: result.summary.expected_revenue_improvement,
+            expected_traffic_improvement: result.summary.expected_traffic_improvement,
+            expected_conversion_improvement: result.summary.expected_conversion_improvement,
+          },
+          // Top 5 변경사항만 포함
+          top_changes: {
+            furniture: result.furniture_changes.slice(0, 5).map((fc: FurnitureChange) => ({
+              furniture_type: fc.furniture_type,
+              reason: fc.reason,
+              priority: fc.priority,
+            })),
+            product: result.product_changes.slice(0, 5).map((pc: ProductChange) => ({
+              sku: pc.sku,
+              reason: pc.reason,
+              priority: pc.priority,
+            })),
+          },
         },
         responseSummary: createOptimizationSummary(result),
         contextMetadata: createOptimizationContextMetadata(
