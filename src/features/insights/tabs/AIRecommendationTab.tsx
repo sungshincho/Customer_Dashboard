@@ -429,9 +429,9 @@ export function AIRecommendationTab() {
                       예상 ROI: {strategy.expectedROI}%
                       <ArrowRight className="w-3 h-3" style={{ color: iconColor }} />
                       <span style={{ fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>현재: {strategy.currentROI}%</span>
-                      {strategy.trend === 'up' && <TrendingUp className="w-3 h-3" style={{ color: iconColor }} />}
-                      {strategy.trend === 'down' && <TrendingDown className="w-3 h-3" style={{ color: iconColor }} />}
-                      {strategy.trend === 'stable' && <Minus className="w-3 h-3" style={{ color: iconColor }} />}
+                      {strategy.trend === 'up' && <TrendingUp className="w-3 h-3" style={{ color: '#22c55e' }} />}
+                      {strategy.trend === 'down' && <TrendingDown className="w-3 h-3" style={{ color: '#ef4444' }} />}
+                      {strategy.trend === 'stable' && <Minus className="w-3 h-3" style={{ color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280' }} />}
                     </span>
                   </div>
                 </div>
