@@ -1030,10 +1030,39 @@ function calculateOptimizationQuality(
 
   if (!isStaffingType) {
     // VMD 원칙 사용 (최대 10점)
+    // 1. furniture_changes의 vmd_principle 필드에서 확인
     const vmdPrinciplesUsed = furnitureChanges
       .filter((fc: any) => fc.vmd_principle && VMD_PRINCIPLES.includes(fc.vmd_principle))
       .map((fc: any) => fc.vmd_principle);
-    const uniqueVmdPrinciples = [...new Set(vmdPrinciplesUsed)];
+
+    // 2. 🆕 product_changes의 reason 필드에서 VMD 원칙 언급 확인
+    const vmdInProductReasons = productChanges
+      .filter((pc: any) => {
+        const reason = (pc.reason || '').toLowerCase();
+        return VMD_PRINCIPLES.some(vmd => reason.includes(vmd) || reason.includes(vmd.replace(/_/g, ' ')));
+      })
+      .map((pc: any) => {
+        const reason = (pc.reason || '').toLowerCase();
+        return VMD_PRINCIPLES.find(vmd => reason.includes(vmd) || reason.includes(vmd.replace(/_/g, ' ')));
+      })
+      .filter(Boolean);
+
+    // 3. 🆕 summary.ai_insights에서 VMD 원칙 언급 확인
+    const summaryData = data?.summary || {};
+    const aiInsights = summaryData.ai_insights || data?.ai_insights || [];
+    const vmdInInsights = aiInsights
+      .filter((insight: string) => {
+        const insightLower = (insight || '').toLowerCase();
+        return VMD_PRINCIPLES.some(vmd => insightLower.includes(vmd) || insightLower.includes(vmd.replace(/_/g, ' ')));
+      })
+      .map((insight: string) => {
+        const insightLower = (insight || '').toLowerCase();
+        return VMD_PRINCIPLES.find(vmd => insightLower.includes(vmd) || insightLower.includes(vmd.replace(/_/g, ' ')));
+      })
+      .filter(Boolean);
+
+    const allVmdPrinciples = [...vmdPrinciplesUsed, ...vmdInProductReasons, ...vmdInInsights];
+    const uniqueVmdPrinciples = [...new Set(allVmdPrinciples)];
     domainKnowledgeScore += Math.min(uniqueVmdPrinciples.length, 2) * 5;
 
     // 배치 전략 사용 (최대 10점)
@@ -1045,8 +1074,11 @@ function calculateOptimizationQuality(
 
     metrics.domain_knowledge_usage = {
       vmd_principles_used: uniqueVmdPrinciples,
+      vmd_in_furniture: vmdPrinciplesUsed.length,
+      vmd_in_product_reasons: vmdInProductReasons.length,
+      vmd_in_insights: vmdInInsights.length,
       placement_strategies_used: uniquePlacementStrategies,
-      vmd_count: vmdPrinciplesUsed.length,
+      vmd_count: allVmdPrinciples.length,
       placement_count: placementStrategiesUsed.length,
     };
   } else {
@@ -1154,9 +1186,14 @@ function calculateOptimizationQuality(
   // ============================================================================
   let insightScore = 0;
 
+  // 🆕 다양한 위치에서 인사이트 수집
   const topLevelInsights = data?.ai_insights || [];
+  const summaryInsights = summary?.ai_insights || [];
   const staffingInsights = staffingResult?.insights || [];
-  const allInsights = [...topLevelInsights, ...staffingInsights];
+
+  // 중복 제거를 위한 Set 사용
+  const allInsightsSet = new Set([...topLevelInsights, ...summaryInsights, ...staffingInsights]);
+  const allInsights = Array.from(allInsightsSet);
 
   // 인사이트 존재 (5점)
   if (allInsights.length > 0) {
@@ -1167,6 +1204,8 @@ function calculateOptimizationQuality(
   insightScore += Math.min(Math.max(allInsights.length - 1, 0), 5) * 2;
 
   metrics.insights_count = allInsights.length;
+  metrics.top_level_insights_count = topLevelInsights.length;
+  metrics.summary_insights_count = summaryInsights.length;
   metrics.staffing_insights_count = staffingInsights.length;
 
   score += insightScore;

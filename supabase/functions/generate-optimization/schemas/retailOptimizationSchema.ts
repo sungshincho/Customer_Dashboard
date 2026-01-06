@@ -577,6 +577,12 @@ export const RETAIL_OPTIMIZATION_SCHEMA = {
           description: '핵심 전략 (3개 이내)'
         },
 
+        ai_insights: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'AI 인사이트 (3-5개, VMD 원칙/배치 전략/연관 규칙/병목 해소 등 구체적 데이터 포함)'
+        },
+
         issues_addressed: {
           type: 'array',
           items: {
