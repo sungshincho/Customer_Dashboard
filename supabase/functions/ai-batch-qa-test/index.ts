@@ -198,6 +198,218 @@ const STAFFING_GOAL_OPTIONS = ['customer_service', 'sales', 'efficiency'] as con
 const MAX_CHANGES_OPTIONS = [10, 20, 30];
 
 // ============================================================================
+// 🆕 시나리오별 기대값 범위 (일관성 검증용)
+// ============================================================================
+
+interface ExpectedRange {
+  min: number;
+  max: number;
+}
+
+interface ScenarioExpectations {
+  // 최적화 결과 기대값
+  optimization: {
+    revenueImprovement: ExpectedRange;       // 매출 개선율 (0.05 = 5%)
+    conversionImprovement: ExpectedRange;    // 전환율 개선율
+    staffingCoverageGain?: ExpectedRange;    // staffing 커버리지 개선
+    minProductChanges?: number;              // 최소 상품 변경 수
+    minFurnitureChanges?: number;            // 최소 가구 변경 수
+  };
+  // 시뮬레이션 결과 기대값
+  simulation: {
+    confidenceScore: ExpectedRange;          // 신뢰도 점수 (0-100)
+    minDiagnosticIssues?: number;            // 최소 진단 이슈 수
+    minInsights?: number;                    // 최소 인사이트 수
+  };
+}
+
+const SCENARIO_EXPECTATIONS: Record<string, ScenarioExpectations> = {
+  // 블랙프라이데이: 높은 트래픽 → 높은 혼잡도 → 최적화 효과 높음
+  blackFriday: {
+    optimization: {
+      revenueImprovement: { min: 0.10, max: 0.35 },
+      conversionImprovement: { min: 0.08, max: 0.25 },
+      staffingCoverageGain: { min: 8, max: 25 },
+      minProductChanges: 3,
+      minFurnitureChanges: 1,
+    },
+    simulation: {
+      confidenceScore: { min: 60, max: 100 },
+      minDiagnosticIssues: 3,
+      minInsights: 2,
+    },
+  },
+  // 크리스마스: 중간~높은 트래픽
+  christmas: {
+    optimization: {
+      revenueImprovement: { min: 0.08, max: 0.30 },
+      conversionImprovement: { min: 0.06, max: 0.20 },
+      staffingCoverageGain: { min: 5, max: 20 },
+      minProductChanges: 2,
+    },
+    simulation: {
+      confidenceScore: { min: 55, max: 100 },
+      minDiagnosticIssues: 2,
+      minInsights: 1,
+    },
+  },
+  // 비 오는 평일: 낮은 트래픽 → 최적화 효과 제한적
+  rainyWeekday: {
+    optimization: {
+      revenueImprovement: { min: 0.05, max: 0.25 },
+      conversionImprovement: { min: 0.03, max: 0.20 },
+      staffingCoverageGain: { min: 3, max: 20 },
+    },
+    simulation: {
+      confidenceScore: { min: 50, max: 100 },
+      minDiagnosticIssues: 1,
+    },
+  },
+  // 기본값 (시나리오 없음)
+  default: {
+    optimization: {
+      revenueImprovement: { min: 0.05, max: 0.30 },
+      conversionImprovement: { min: 0.03, max: 0.25 },
+      staffingCoverageGain: { min: 5, max: 25 },
+    },
+    simulation: {
+      confidenceScore: { min: 40, max: 100 },
+    },
+  },
+};
+
+/**
+ * 값이 기대 범위 내에 있는지 확인
+ */
+function isWithinRange(value: number | undefined, range: ExpectedRange): boolean {
+  if (value === undefined || value === null) return false;
+  return value >= range.min && value <= range.max;
+}
+
+/**
+ * 시나리오 기대값 검증 결과
+ */
+interface ValidationResult {
+  isValid: boolean;
+  violations: string[];
+  score: number;  // 0-100 추가 점수
+}
+
+/**
+ * 최적화 결과를 시나리오 기대값과 비교하여 검증
+ */
+function validateOptimizationAgainstExpectations(
+  response: any,
+  scenarioId: string | null,
+  optimizationType: string
+): ValidationResult {
+  const expectations = SCENARIO_EXPECTATIONS[scenarioId || 'default'] || SCENARIO_EXPECTATIONS.default;
+  const violations: string[] = [];
+  let score = 0;
+
+  const summary = response?.summary || {};
+  const staffingResult = response?.staffing_result;
+
+  // 1. 매출 개선율 검증
+  const revenueImprovement = summary.expected_revenue_improvement;
+  if (revenueImprovement !== undefined) {
+    if (isWithinRange(revenueImprovement, expectations.optimization.revenueImprovement)) {
+      score += 15;
+    } else {
+      violations.push(`매출 개선율 ${(revenueImprovement * 100).toFixed(1)}%가 기대 범위 (${expectations.optimization.revenueImprovement.min * 100}-${expectations.optimization.revenueImprovement.max * 100}%) 밖`);
+    }
+  }
+
+  // 2. 전환율 개선율 검증
+  const conversionImprovement = summary.expected_conversion_improvement;
+  if (conversionImprovement !== undefined) {
+    if (isWithinRange(conversionImprovement, expectations.optimization.conversionImprovement)) {
+      score += 15;
+    } else {
+      violations.push(`전환율 개선율 ${(conversionImprovement * 100).toFixed(1)}%가 기대 범위 밖`);
+    }
+  }
+
+  // 3. Staffing 커버리지 검증 (staffing/both 타입)
+  if ((optimizationType === 'staffing' || optimizationType === 'both') && staffingResult) {
+    const coverageGain = staffingResult.metrics?.coverageGain;
+    if (coverageGain !== undefined && expectations.optimization.staffingCoverageGain) {
+      if (isWithinRange(coverageGain, expectations.optimization.staffingCoverageGain)) {
+        score += 10;
+      } else {
+        violations.push(`커버리지 개선 ${coverageGain}%가 기대 범위 밖`);
+      }
+    }
+  }
+
+  // 4. 변경 수 최소 요구사항
+  const productChanges = response?.product_changes?.length || 0;
+  const furnitureChanges = response?.furniture_changes?.length || 0;
+
+  if (optimizationType !== 'staffing') {
+    if (expectations.optimization.minProductChanges && productChanges < expectations.optimization.minProductChanges) {
+      violations.push(`상품 변경 ${productChanges}개가 최소 요구사항 ${expectations.optimization.minProductChanges}개 미만`);
+    } else if (productChanges > 0) {
+      score += 10;
+    }
+
+    if (expectations.optimization.minFurnitureChanges && furnitureChanges < expectations.optimization.minFurnitureChanges) {
+      violations.push(`가구 변경 ${furnitureChanges}개가 최소 요구사항 ${expectations.optimization.minFurnitureChanges}개 미만`);
+    } else if (furnitureChanges > 0) {
+      score += 5;
+    }
+  }
+
+  return {
+    isValid: violations.length === 0,
+    violations,
+    score: Math.min(score, 50),  // 최대 50점 추가
+  };
+}
+
+/**
+ * 시뮬레이션 결과를 시나리오 기대값과 비교하여 검증
+ */
+function validateSimulationAgainstExpectations(
+  response: any,
+  scenarioId: string | null
+): ValidationResult {
+  const expectations = SCENARIO_EXPECTATIONS[scenarioId || 'default'] || SCENARIO_EXPECTATIONS.default;
+  const violations: string[] = [];
+  let score = 0;
+
+  // 1. 신뢰도 점수 검증
+  const confidenceScore = response?.confidence_score || 0;
+  if (isWithinRange(confidenceScore, expectations.simulation.confidenceScore)) {
+    score += 15;
+  } else {
+    violations.push(`신뢰도 ${confidenceScore}점이 기대 범위 밖`);
+  }
+
+  // 2. 진단 이슈 수 검증
+  const diagnosticIssues = response?.diagnostic_issues?.length || 0;
+  if (expectations.simulation.minDiagnosticIssues && diagnosticIssues < expectations.simulation.minDiagnosticIssues) {
+    violations.push(`진단 이슈 ${diagnosticIssues}개가 최소 요구사항 ${expectations.simulation.minDiagnosticIssues}개 미만`);
+  } else if (diagnosticIssues > 0) {
+    score += 10;
+  }
+
+  // 3. 인사이트 수 검증
+  const insights = response?.ai_insights?.length || 0;
+  if (expectations.simulation.minInsights && insights < expectations.simulation.minInsights) {
+    violations.push(`인사이트 ${insights}개가 최소 요구사항 ${expectations.simulation.minInsights}개 미만`);
+  } else if (insights > 0) {
+    score += 10;
+  }
+
+  return {
+    isValid: violations.length === 0,
+    violations,
+    score: Math.min(score, 35),
+  };
+}
+
+// ============================================================================
 // 테스트 조합 생성
 // ============================================================================
 
@@ -460,7 +672,10 @@ function generateOptimizationCombinations(storeId: string, mode: string): TestCo
 // 품질 점수 계산
 // ============================================================================
 
-function calculateSimulationQuality(response: any): { score: number; metrics: Record<string, unknown> } {
+function calculateSimulationQuality(
+  response: any,
+  scenarioId?: string | null
+): { score: number; metrics: Record<string, unknown> } {
   let score = 0;
   const metrics: Record<string, unknown> = {};
 
@@ -494,48 +709,102 @@ function calculateSimulationQuality(response: any): { score: number; metrics: Re
   score += Math.round((confidence / 100) * 15);
   metrics.confidence_score = confidence;
 
+  // 🆕 시나리오 기대값 검증 (최대 35점 추가)
+  if (scenarioId) {
+    const validation = validateSimulationAgainstExpectations(response, scenarioId);
+    score += validation.score;
+    metrics.expectation_validation = {
+      isValid: validation.isValid,
+      violations: validation.violations,
+      bonus_score: validation.score,
+    };
+  }
+
   return { score, metrics };
 }
 
-function calculateOptimizationQuality(response: any): { score: number; metrics: Record<string, unknown> } {
+function calculateOptimizationQuality(
+  response: any,
+  scenarioId?: string | null,
+  inputOptimizationType?: string
+): { score: number; metrics: Record<string, unknown> } {
   let score = 0;
   const metrics: Record<string, unknown> = {};
 
-  // Furniture Changes (20점)
+  const optimizationType = inputOptimizationType || response?.optimization_type || 'unknown';
+  const isStaffingType = optimizationType === 'staffing';
+  const isBothType = optimizationType === 'both';
+
+  // Furniture Changes (20점) - staffing 전용이 아닐 때
   const furnitureChanges = response?.furniture_changes || [];
-  const furnitureScore = furnitureChanges.length > 0 ? Math.min(furnitureChanges.length, 5) * 4 : 0;
-  score += furnitureScore;
+  if (!isStaffingType) {
+    const furnitureScore = furnitureChanges.length > 0 ? Math.min(furnitureChanges.length, 5) * 4 : 0;
+    score += furnitureScore;
+  }
   metrics.furniture_changes_count = furnitureChanges.length;
 
-  // Product Changes (20점)
+  // Product Changes (20점) - staffing 전용이 아닐 때
   const productChanges = response?.product_changes || [];
-  const productScore = productChanges.length > 0 ? Math.min(productChanges.length, 5) * 4 : 0;
-  score += productScore;
+  if (!isStaffingType) {
+    const productScore = productChanges.length > 0 ? Math.min(productChanges.length, 5) * 4 : 0;
+    score += productScore;
+  }
   metrics.product_changes_count = productChanges.length;
 
-  // Staffing Result (20점) - staffing 타입일 때
+  // Staffing Result (20점) - staffing 또는 both 타입일 때
   const staffingResult = response?.staffing_result;
   if (staffingResult) {
     const staffPositions = staffingResult?.staffPositions || [];
     score += staffPositions.length > 0 ? 20 : 0;
     metrics.staffing_positions_count = staffPositions.length;
     metrics.staffing_coverage_gain = staffingResult?.metrics?.coverageGain || 0;
+
+    // 🆕 Staffing insights도 점수에 반영 (10점)
+    const staffingInsights = staffingResult?.insights || [];
+    if (staffingInsights.length > 0) {
+      score += Math.min(staffingInsights.length, 5) * 2;
+    }
+    metrics.staffing_insights_count = staffingInsights.length;
   } else {
     metrics.staffing_positions_count = 0;
+    metrics.staffing_insights_count = 0;
   }
 
   // Summary & Impact (20점)
   const summary = response?.summary || {};
-  const hasRevenueImpact = summary.expected_revenue_improvement !== undefined;
-  const hasTrafficImpact = summary.expected_traffic_improvement !== undefined;
-  score += (hasRevenueImpact ? 10 : 0) + (hasTrafficImpact ? 10 : 0);
-  metrics.expected_revenue_improvement = summary.expected_revenue_improvement;
-  metrics.expected_traffic_improvement = summary.expected_traffic_improvement;
+  const hasRevenueImpact = summary.expected_revenue_improvement !== undefined && summary.expected_revenue_improvement > 0;
+  const hasConversionImpact = summary.expected_conversion_improvement !== undefined && summary.expected_conversion_improvement > 0;
+  const hasStaffingSummary = summary.staffing_summary?.coverage_improvement !== undefined;
 
-  // AI Insights (20점)
-  const insights = response?.ai_insights || [];
-  score += Math.min(insights.length, 5) * 4;
-  metrics.insights_count = insights.length;
+  if (isStaffingType || isBothType) {
+    // staffing/both: staffing_summary 기반 점수
+    score += hasStaffingSummary ? 20 : 0;
+  } else {
+    // furniture/product: revenue/conversion 기반 점수
+    score += (hasRevenueImpact ? 10 : 0) + (hasConversionImpact ? 10 : 0);
+  }
+  metrics.expected_revenue_improvement = summary.expected_revenue_improvement;
+  metrics.expected_conversion_improvement = summary.expected_conversion_improvement;
+  metrics.has_staffing_summary = hasStaffingSummary;
+
+  // AI Insights (20점) - 최상위 또는 staffing_result 내부
+  const topLevelInsights = response?.ai_insights || [];
+  const staffingInsights = staffingResult?.insights || [];
+  const allInsights = [...topLevelInsights, ...staffingInsights];
+  const insightScore = Math.min(allInsights.length, 5) * 4;
+  score += insightScore;
+  metrics.insights_count = allInsights.length;
+
+  // 🆕 시나리오 기대값 검증 (최대 50점 추가)
+  if (scenarioId || optimizationType) {
+    const validation = validateOptimizationAgainstExpectations(response, scenarioId, optimizationType);
+    score += validation.score;
+    metrics.expectation_validation = {
+      isValid: validation.isValid,
+      violations: validation.violations,
+      bonus_score: validation.score,
+    };
+  }
 
   return { score, metrics };
 }
@@ -639,8 +908,11 @@ async function runSimulationTests(
       timeMs = 0;
     }
 
+    // 🆕 시나리오 ID 추출
+    const scenarioId = (combo.variables as any)?.preset_scenario || null;
+
     const { score, metrics } = success && data != null
-      ? calculateSimulationQuality(data)
+      ? calculateSimulationQuality(data, scenarioId)
       : { score: 0, metrics: {} };
 
     const result: TestResult = {
@@ -726,8 +998,11 @@ async function runOptimizationTests(
       timeMs = 0;
     }
 
+    // 🆕 최적화 타입 추출
+    const optimizationType = (combo.variables as any)?.optimization_type || null;
+
     const { score, metrics } = success && data != null
-      ? calculateOptimizationQuality(data)
+      ? calculateOptimizationQuality(data, null, optimizationType)
       : { score: 0, metrics: {} };
 
     const result: TestResult = {
@@ -849,8 +1124,9 @@ async function runLinkedTests(
       simTimeMs = 0;
     }
 
+    // 🆕 시나리오 ID로 검증
     const { score: simScore, metrics: simMetrics } = simSuccess && simData != null
-      ? calculateSimulationQuality(simData)
+      ? calculateSimulationQuality(simData, scenario.id)
       : { score: 0, metrics: {} };
 
     // 시뮬레이션 결과 저장
@@ -939,8 +1215,9 @@ async function runLinkedTests(
         optTimeMs = 0;
       }
 
+      // 🆕 시나리오 ID와 최적화 타입으로 검증
       const { score: optScore, metrics: optMetrics } = optSuccess && optData != null
-        ? calculateOptimizationQuality(optData)
+        ? calculateOptimizationQuality(optData, scenario.id, optType)
         : { score: 0, metrics: {} };
 
       const linkedCombinationId = `linked_${scenario.id}_${optType}`;

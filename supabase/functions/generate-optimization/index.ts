@@ -303,10 +303,12 @@ Deno.serve(async (req) => {
       console.log(`[generate-optimization] 🚨 Received ${diagnosticIssues.priority_issues.length} diagnostic issues from simulation`);
     }
 
-    // 🆕 Staffing 최적화 분기 처리
-    if (optimization_type === 'staffing') {
-      console.log(`[generate-optimization] 🧑‍💼 Staffing optimization requested`);
-      const staffingResult = await performStaffingOptimization(
+    // 🆕 Staffing 최적화 분기 처리 (staffing 또는 both 타입)
+    let staffingResult: StaffingResult | undefined;
+
+    if (optimization_type === 'staffing' || optimization_type === 'both') {
+      console.log(`[generate-optimization] 🧑‍💼 Staffing optimization requested (type: ${optimization_type})`);
+      staffingResult = await performStaffingOptimization(
         supabase,
         lovableApiKey || '',
         store_id,
@@ -314,7 +316,10 @@ Deno.serve(async (req) => {
         performanceData,
         parameters
       );
+    }
 
+    if (optimization_type === 'staffing') {
+      // staffing 전용: staffing 결과만 반환
       result = {
         optimization_id: '',
         store_id: '',
@@ -326,17 +331,18 @@ Deno.serve(async (req) => {
         summary: {
           total_furniture_changes: 0,
           total_product_changes: 0,
-          expected_revenue_improvement: staffingResult.metrics.customerServiceRateIncrease / 100,
+          expected_revenue_improvement: staffingResult!.metrics.customerServiceRateIncrease / 100,
           expected_traffic_improvement: 0,
-          expected_conversion_improvement: staffingResult.metrics.coverageGain / 100,
+          expected_conversion_improvement: staffingResult!.metrics.coverageGain / 100,
           staffing_summary: {
-            total_staff_changes: staffingResult.staffPositions.length,
-            coverage_improvement: staffingResult.metrics.coverageGain,
-            service_rate_improvement: staffingResult.metrics.customerServiceRateIncrease,
+            total_staff_changes: staffingResult!.staffPositions.length,
+            coverage_improvement: staffingResult!.metrics.coverageGain,
+            service_rate_improvement: staffingResult!.metrics.customerServiceRateIncrease,
           },
         },
       };
     } else if (lovableApiKey) {
+      // both, furniture, product 타입: AI 최적화 수행
       result = await generateAIOptimization(
         lovableApiKey,
         layoutData,
@@ -350,6 +356,17 @@ Deno.serve(async (req) => {
         vmdAnalysis,      // 🆕 VMD 분석 추가 (Phase 3)
         diagnosticIssues  // 🆕 시뮬레이션 진단 이슈 추가
       );
+
+      // 🆕 both 타입일 때 staffing 결과 병합
+      if (optimization_type === 'both' && staffingResult) {
+        console.log(`[generate-optimization] 🔀 Merging staffing result into 'both' optimization`);
+        result.staffing_result = staffingResult;
+        result.summary.staffing_summary = {
+          total_staff_changes: staffingResult.staffPositions.length,
+          coverage_improvement: staffingResult.metrics.coverageGain,
+          service_rate_improvement: staffingResult.metrics.customerServiceRateIncrease,
+        };
+      }
     } else {
       // AI 키 없을 경우 룰 기반 최적화
       result = generateRuleBasedOptimization(
@@ -525,7 +542,7 @@ Deno.serve(async (req) => {
       let userFacingTexts: any;
 
       if (optimization_type === 'staffing' && result.staffing_result) {
-        // Staffing 최적화 결과 로깅
+        // Staffing 전용 최적화 결과 로깅
         const staffingResult = result.staffing_result;
         userFacingTexts = {
           // 인력 배치 이유들
@@ -546,8 +563,52 @@ Deno.serve(async (req) => {
             improvement: zc.suggestedCoverage - zc.currentCoverage,
           })),
         };
+      } else if (optimization_type === 'both' && result.staffing_result) {
+        // 🆕 both 타입: staffing + furniture/product 모두 포함
+        const staffingResult = result.staffing_result;
+        userFacingTexts = {
+          // 인력 배치 이유들
+          staffing_reasons: staffingResult.staffPositions.map((sp: StaffPosition) => ({
+            staffName: sp.staffName,
+            reason: sp.reason,
+            coverageGain: sp.coverageGain,
+          })),
+          // AI 인사이트 (staffing)
+          staffing_insights: staffingResult.insights,
+          // 존 커버리지 요약
+          zone_coverage_summary: staffingResult.zoneCoverage.slice(0, 3).map((zc: ZoneCoverage) => ({
+            zoneName: zc.zoneName,
+            improvement: zc.suggestedCoverage - zc.currentCoverage,
+          })),
+          // 가구 변경 이유들
+          furniture_reasons: result.furniture_changes.map((fc: FurnitureChange) => ({
+            furniture_type: fc.furniture_type,
+            reason: fc.reason,
+            priority: fc.priority,
+            expected_impact: fc.expected_impact,
+          })),
+          // 상품 변경 이유들
+          product_reasons: result.product_changes.map((pc: ProductChange) => ({
+            sku: pc.sku,
+            reason: pc.reason,
+            priority: pc.priority,
+            expected_revenue_impact: pc.expected_revenue_impact,
+            expected_visibility_impact: pc.expected_visibility_impact,
+          })),
+          // 요약 메시지 (통합)
+          summary_text: `[통합 최적화] 인력 ${staffingResult.staffPositions.length}명 배치, ` +
+            `가구 ${result.summary.total_furniture_changes}개, 상품 ${result.summary.total_product_changes}개 변경 권장. ` +
+            `커버리지 개선: ${staffingResult.metrics.coverageGain}%, ` +
+            `예상 매출 증가: ${(result.summary.expected_revenue_improvement * 100).toFixed(1)}%`,
+          // VMD 분석 요약 (있는 경우)
+          vmd_summary: vmdAnalysis ? {
+            score: vmdAnalysis.score.overall,
+            grade: vmdAnalysis.score.grade,
+            top_violations: vmdAnalysis.violations.slice(0, 3).map((v: any) => v.description),
+          } : null,
+        };
       } else {
-        // 기존 가구/상품 최적화 결과 로깅
+        // 기존 가구/상품 최적화 결과 로깅 (furniture, product 타입)
         userFacingTexts = {
           // 가구 변경 이유들 (사용자에게 표시되는 핵심 메시지)
           furniture_reasons: result.furniture_changes.map((fc: FurnitureChange) => ({
