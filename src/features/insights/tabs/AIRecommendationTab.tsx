@@ -481,9 +481,11 @@ export function AIRecommendationTab() {
                 {formatCurrency(demandForecast.predictedRevenue)}
               </p>
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <TrendingUp className="w-3 h-3" style={{ color: iconColor }} />
-                <span style={{ fontSize: '12px', fontWeight: 500, color: isDark ? 'rgba(255,255,255,0.7)' : '#515158' }}>
-                  전주 대비 +{demandForecast.percentChange}%
+                {demandForecast.percentChange > 0 ? <TrendingUp className="w-3 h-3" style={{ color: '#22c55e' }} /> :
+                 demandForecast.percentChange < 0 ? <TrendingDown className="w-3 h-3" style={{ color: '#ef4444' }} /> :
+                 <Minus className="w-3 h-3" style={{ color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280' }} />}
+                <span style={{ fontSize: '12px', fontWeight: 500, color: demandForecast.percentChange > 0 ? '#22c55e' : demandForecast.percentChange < 0 ? '#ef4444' : (isDark ? 'rgba(255,255,255,0.6)' : '#6b7280') }}>
+                  전주 대비 {demandForecast.percentChange > 0 ? '+' : ''}{demandForecast.percentChange}%
                 </span>
               </div>
             </div>
@@ -503,9 +505,11 @@ export function AIRecommendationTab() {
                 {visitorForecast.predictedVisitors.toLocaleString()}명
               </p>
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <TrendingUp className="w-3 h-3" style={{ color: iconColor }} />
-                <span style={{ fontSize: '12px', fontWeight: 500, color: isDark ? 'rgba(255,255,255,0.7)' : '#515158' }}>
-                  전주 대비 +{visitorForecast.percentChange}%
+                {visitorForecast.percentChange > 0 ? <TrendingUp className="w-3 h-3" style={{ color: '#22c55e' }} /> :
+                 visitorForecast.percentChange < 0 ? <TrendingDown className="w-3 h-3" style={{ color: '#ef4444' }} /> :
+                 <Minus className="w-3 h-3" style={{ color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280' }} />}
+                <span style={{ fontSize: '12px', fontWeight: 500, color: visitorForecast.percentChange > 0 ? '#22c55e' : visitorForecast.percentChange < 0 ? '#ef4444' : (isDark ? 'rgba(255,255,255,0.6)' : '#6b7280') }}>
+                  전주 대비 {visitorForecast.percentChange > 0 ? '+' : ''}{visitorForecast.percentChange}%
                 </span>
               </div>
             </div>
