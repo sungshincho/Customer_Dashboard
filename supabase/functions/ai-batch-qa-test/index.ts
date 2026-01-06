@@ -45,6 +45,18 @@ const SHELF_LEVELS = [
   'top',
 ] as const;
 
+// 🆕 staffing 타입 assignment_strategy 검증용
+const STAFFING_STRATEGIES = [
+  'peak_coverage',
+  'bottleneck_support',
+  'high_value_zone_focus',
+  'cross_zone_flexibility',
+  'customer_service_boost',
+  'queue_management',
+  'fitting_room_priority',
+  'entrance_greeting',
+] as const;
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -1083,15 +1095,23 @@ function calculateOptimizationQuality(
     };
   } else {
     // staffing 타입: 배치 전략 기반 점수 (최대 20점)
+    // 🆕 유효한 STAFFING_STRATEGIES만 카운트
     const staffingStrategiesUsed = staffPositions
-      .filter((sp: any) => sp.assignment_strategy)
+      .filter((sp: any) => sp.assignment_strategy && STAFFING_STRATEGIES.includes(sp.assignment_strategy))
       .map((sp: any) => sp.assignment_strategy);
     const uniqueStrategies = [...new Set(staffingStrategiesUsed)];
     domainKnowledgeScore += Math.min(uniqueStrategies.length, 4) * 5;
 
+    // 유효하지 않은 전략 추적
+    const invalidStrategies = staffPositions
+      .filter((sp: any) => sp.assignment_strategy && !STAFFING_STRATEGIES.includes(sp.assignment_strategy))
+      .map((sp: any) => sp.assignment_strategy);
+
     metrics.domain_knowledge_usage = {
       staffing_strategies_used: uniqueStrategies,
       strategy_count: staffingStrategiesUsed.length,
+      invalid_strategies: invalidStrategies,
+      invalid_strategy_count: invalidStrategies.length,
     };
   }
 
@@ -1152,21 +1172,34 @@ function calculateOptimizationQuality(
 
   // 유효한 enum 값 사용 여부 (최대 4점)
   let validEnumCount = 0;
+  let invalidVmd: any[] = [];
+  let invalidPlacement: any[] = [];
+  let invalidStaffingStrategy: any[] = [];
 
-  // VMD 원칙 enum 유효성
-  const invalidVmd = furnitureChanges.filter((fc: any) =>
-    fc.vmd_principle && !VMD_PRINCIPLES.includes(fc.vmd_principle)
-  );
-  if (furnitureChanges.length > 0 && invalidVmd.length === 0) {
-    validEnumCount += 2;
-  }
+  if (!isStaffingType) {
+    // VMD 원칙 enum 유효성
+    invalidVmd = furnitureChanges.filter((fc: any) =>
+      fc.vmd_principle && !VMD_PRINCIPLES.includes(fc.vmd_principle)
+    );
+    if (furnitureChanges.length > 0 && invalidVmd.length === 0) {
+      validEnumCount += 2;
+    }
 
-  // 배치 전략 enum 유효성
-  const invalidPlacement = productChanges.filter((pc: any) =>
-    pc.placement_strategy?.type && !PLACEMENT_STRATEGIES.includes(pc.placement_strategy.type)
-  );
-  if (productChanges.length > 0 && invalidPlacement.length === 0) {
-    validEnumCount += 2;
+    // 배치 전략 enum 유효성
+    invalidPlacement = productChanges.filter((pc: any) =>
+      pc.placement_strategy?.type && !PLACEMENT_STRATEGIES.includes(pc.placement_strategy.type)
+    );
+    if (productChanges.length > 0 && invalidPlacement.length === 0) {
+      validEnumCount += 2;
+    }
+  } else {
+    // 🆕 staffing 타입: assignment_strategy enum 유효성
+    invalidStaffingStrategy = staffPositions.filter((sp: any) =>
+      sp.assignment_strategy && !STAFFING_STRATEGIES.includes(sp.assignment_strategy)
+    );
+    if (staffPositions.length > 0 && invalidStaffingStrategy.length === 0) {
+      validEnumCount += 4; // staffing은 4점 모두
+    }
   }
 
   schemaScore += validEnumCount;
@@ -1176,6 +1209,7 @@ function calculateOptimizationQuality(
     schema_validation_passed: summary.schema_validation_passed || false,
     invalid_vmd_count: invalidVmd.length,
     invalid_placement_count: invalidPlacement.length,
+    invalid_staffing_strategy_count: invalidStaffingStrategy.length,
   };
 
   score += schemaScore;
