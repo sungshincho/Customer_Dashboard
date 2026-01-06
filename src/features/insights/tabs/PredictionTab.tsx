@@ -683,9 +683,9 @@ export function PredictionTab() {
             </div>
             <p style={{ fontSize: '24px', margin: 0, ...text3D.heroNumber }}>{formatCurrency(summary.total_predicted_revenue)}</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px' }}>
-              {summary.revenue_change_percent >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-              <span style={{ fontSize: '12px', fontWeight: 500, color: isDark ? 'rgba(255,255,255,0.7)' : '#374151' }}>
-                전주 대비 {summary.revenue_change_percent >= 0 ? '+' : ''}{summary.revenue_change_percent.toFixed(1)}%
+              {summary.revenue_change_percent > 0 ? <TrendingUp className="h-3 w-3" style={{ color: '#22c55e' }} /> : summary.revenue_change_percent < 0 ? <TrendingDown className="h-3 w-3" style={{ color: '#ef4444' }} /> : <TrendingUp className="h-3 w-3" style={{ color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280' }} />}
+              <span style={{ fontSize: '12px', fontWeight: 500, color: summary.revenue_change_percent > 0 ? '#22c55e' : summary.revenue_change_percent < 0 ? '#ef4444' : (isDark ? 'rgba(255,255,255,0.6)' : '#6b7280') }}>
+                전주 대비 {summary.revenue_change_percent > 0 ? '+' : ''}{summary.revenue_change_percent.toFixed(1)}%
               </span>
             </div>
           </div>
