@@ -85,28 +85,26 @@ export const MetricCard: React.FC<MetricCardProps> = ({
                   <TrendIcon
                     className={cn(
                       'h-3.5 w-3.5',
-                      dark
-                        ? 'text-white/80'
-                        : isPositive
-                        ? 'text-emerald-600'
+                      isPositive
+                        ? 'text-green-500'
                         : isNegative
                         ? 'text-red-500'
+                        : dark
+                        ? 'text-white/60'
                         : 'text-gray-500'
                     )}
                   />
                   <span
                     className="text-xs font-semibold"
-                    style={
-                      dark
-                        ? { color: 'rgba(255,255,255,0.9)' }
-                        : {
-                            color: isPositive
-                              ? '#059669'
-                              : isNegative
-                              ? '#dc2626'
-                              : '#6b7280',
-                          }
-                    }
+                    style={{
+                      color: isPositive
+                        ? '#22c55e'
+                        : isNegative
+                        ? '#ef4444'
+                        : dark
+                        ? 'rgba(255,255,255,0.6)'
+                        : '#6b7280',
+                    }}
                   >
                     {isPositive ? '+' : ''}
                     {change.toFixed(1)}
