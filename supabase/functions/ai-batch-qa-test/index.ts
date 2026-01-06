@@ -879,7 +879,11 @@ function calculateSimulationQuality(
     };
   }
 
-  return { score, metrics };
+  // 🔧 점수 정규화: DB 제약조건 (0-100) 준수
+  const normalizedScore = Math.min(Math.max(score, 0), 100);
+  metrics.raw_score = score;  // 원점수 보존
+
+  return { score: normalizedScore, metrics };
 }
 
 function calculateOptimizationQuality(
@@ -995,7 +999,11 @@ function calculateOptimizationQuality(
     };
   }
 
-  return { score, metrics };
+  // 🔧 점수 정규화: DB 제약조건 (0-100) 준수
+  const normalizedScore = Math.min(Math.max(score, 0), 100);
+  metrics.raw_score = score;  // 원점수 보존
+
+  return { score: normalizedScore, metrics };
 }
 
 // ============================================================================
