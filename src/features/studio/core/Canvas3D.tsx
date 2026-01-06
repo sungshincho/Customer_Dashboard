@@ -97,7 +97,7 @@ export function Canvas3D({
     <div className={cn('w-full h-full', className)}>
       <Canvas
         shadows
-        dpr={[1, 2]}
+        dpr={2}
         gl={{
           antialias: true,
           alpha: false,
@@ -436,7 +436,7 @@ export function StandaloneCanvas3D({
     <div className={cn('w-full h-full', className)}>
       <Canvas
         shadows
-        dpr={[1, 2]}
+        dpr={2}
         gl={{
           antialias: true,
           alpha: false,
