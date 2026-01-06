@@ -5,6 +5,9 @@
  * - 직원 위치별 커버리지 분석
  * - 시간대별 최적 인력 배치
  * - 고객 응대 효율 예측
+ *
+ * 🆕 마이그레이션 (2026-01):
+ * - advanced-ai-inference (deprecated) → generate-optimization (staffing 타입)
  */
 
 import { useState, useCallback } from 'react';
@@ -217,19 +220,21 @@ export function useStaffingSimulation(): UseStaffingSimulationReturn {
 
       setProgress(30);
 
-      // advanced-ai-inference Edge Function 호출 (storeContext 포함)
-      const { data, error } = await supabase.functions.invoke('advanced-ai-inference', {
+      // 🆕 generate-optimization Edge Function 호출 (staffing 타입)
+      // 마이그레이션: advanced-ai-inference (deprecated) → generate-optimization
+      const { data, error } = await supabase.functions.invoke('generate-optimization', {
         body: {
-          type: 'staffing_optimization',
-          storeId: selectedStore.id,
-          orgId,
-          params: {
-            staffCount: params.staffCount,
-            goal: params.goal,
-            timeSlot: params.timeSlot,
-            includeBreaks: params.includeBreaks ?? true,
+          store_id: selectedStore.id,
+          optimization_type: 'staffing',
+          parameters: {
+            staffing_goal: params.goal === 'zone_coverage' ? 'efficiency'
+              : params.goal === 'sales_support' ? 'sales'
+              : params.goal === 'balanced' ? 'customer_service'
+              : params.goal,
+            staff_count: params.staffCount,
+            time_slot: params.timeSlot,
+            include_breaks: params.includeBreaks ?? true,
             constraints: params.constraints || {},
-            storeContext, // 실제 매장 데이터 전달
           },
         },
       });
@@ -237,10 +242,10 @@ export function useStaffingSimulation(): UseStaffingSimulationReturn {
       setProgress(70);
 
       if (error) throw error;
-      if (!data?.result) throw new Error('시뮬레이션 결과를 받지 못했습니다.');
+      if (!data?.staffing_result) throw new Error('인력 배치 최적화 결과를 받지 못했습니다.');
 
-      // 결과 변환
-      const simulationResult = transformStaffingResult(data.result, params);
+      // 결과 변환 (generate-optimization 결과 구조에 맞춤)
+      const simulationResult = transformStaffingResult(data.staffing_result, params);
 
       setProgress(100);
 

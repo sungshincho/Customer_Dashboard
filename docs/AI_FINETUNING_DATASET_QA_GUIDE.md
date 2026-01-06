@@ -1,8 +1,11 @@
 # AI 파인튜닝 데이터셋 QA 가이드
 
 > 작성일: 2026-01-06
-> 버전: 1.0
+> 버전: 1.1
 > 목적: AI 응답 로그 품질 검증 및 파인튜닝 데이터셋 추출
+>
+> **변경 이력**:
+> - v1.1: user_facing_texts 구조 반영, staffing 최적화 추가, advanced-ai-inference deprecated 표시
 
 ---
 
@@ -44,11 +47,15 @@ AI 시뮬레이션 및 최적화 응답을 수집하여:
 
 ### 1.3 로깅 대상 Edge Functions
 
-| Function | AI 모델 | 용도 | 로깅 |
-|----------|---------|------|------|
-| `run-simulation` | Gemini 2.5 Flash | 매장 시뮬레이션 | ✅ |
-| `generate-optimization` | Gemini 2.5 Flash | 레이아웃 최적화 | ✅ |
-| `advanced-ai-inference` | Gemini 2.5 Flash/Pro | 고급 AI 추론 | ✅ |
+| Function | AI 모델 | 용도 | 로깅 | 상태 |
+|----------|---------|------|------|------|
+| `run-simulation` | Gemini 2.5 Flash | 매장 시뮬레이션 | ✅ | Active |
+| `generate-optimization` | Gemini 2.5 Flash | 레이아웃/상품/인력 최적화 | ✅ | Active |
+| `advanced-ai-inference` | Gemini 2.5 Flash/Pro | 고급 AI 추론 | ✅ | ⚠️ Deprecated |
+
+> **참고**: `advanced-ai-inference`는 점진적으로 deprecated 예정입니다.
+> - `layout_optimization` → `generate-optimization (both)` 로 마이그레이션
+> - `staffing_optimization` → `generate-optimization (staffing)` 로 마이그레이션
 
 ### 1.4 시뮬레이션 → 최적화 연결 데이터 흐름
 
@@ -86,7 +93,12 @@ CREATE TABLE ai_response_logs (
 
   -- 함수 정보
   function_name TEXT NOT NULL,  -- 'run-simulation', 'generate-optimization', etc.
-  simulation_type TEXT,          -- 'demand_prediction', 'traffic_flow', 'layout_optimization'
+  simulation_type TEXT,          -- 아래 타입 참조
+
+  -- simulation_type 목록:
+  -- run-simulation: 'traffic_flow', 'demand_prediction', 'scenario_*'
+  -- generate-optimization: 'furniture', 'product', 'staffing', 'both'
+  -- advanced-ai-inference (deprecated): 'layout_optimization', 'flow_simulation', 'congestion'
 
   -- 입출력 데이터
   input_variables JSONB NOT NULL,   -- 전체 입력 파라미터
@@ -158,26 +170,42 @@ CREATE TABLE ai_response_logs (
 }
 ```
 
-#### ai_response 예시
+#### ai_response 예시 (파인튜닝 최적화 구조)
+
+> **변경사항 (v1.1)**: `ai_response`는 이제 `user_facing_texts` 중심으로 저장하여 파인튜닝 데이터 품질을 높입니다.
 
 ```json
 {
-  "simulation_id": "sim-1704499200000",
-  "kpis": {
+  "user_facing_texts": {
+    "ai_insights": [
+      "피크 시간대 입구 혼잡이 예상됩니다",
+      "상품존 체류시간이 평균보다 낮습니다"
+    ],
+    "diagnostic_texts": [
+      {
+        "title": "입구 혼잡 예상",
+        "description": "피크 시간대 입구에서 고객 체류가 증가할 것으로 예상됩니다",
+        "impact": "매출 손실 5-10% 예상",
+        "suggested_action": "입구 레이아웃 조정 또는 인력 배치 강화",
+        "severity": "warning"
+      }
+    ],
+    "summary_text": "예상 방문객 120명, 전환율 6.5%, 혼잡도 75%"
+  },
+  "key_metrics": {
     "predicted_visitors": 120,
     "predicted_conversion_rate": 0.065,
     "predicted_revenue": 3500000,
-    "avg_dwell_time_seconds": 180,
-    "peak_congestion_percent": 75
+    "peak_congestion_percent": 75,
+    "confidence_score": 78
   },
-  "zone_analysis": [...],
-  "flow_analysis": {...},
-  "diagnostic_issues": [...],
-  "ai_insights": [
-    "피크 시간대 입구 혼잡이 예상됩니다",
-    "상품존 체류시간이 평균보다 낮습니다"
+  "zone_summary": [
+    {"zone_name": "입구", "congestion_level": "high", "bottleneck_score": 8.5}
   ],
-  "confidence_score": 78
+  "flow_summary": {
+    "dead_zones": ["창고 앞 통로"],
+    "congestion_points": ["메인 진열대 앞"]
+  }
 }
 ```
 

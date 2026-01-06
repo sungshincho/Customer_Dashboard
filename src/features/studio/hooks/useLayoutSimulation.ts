@@ -2,9 +2,12 @@
  * useLayoutSimulation.ts
  *
  * 레이아웃 최적화 시뮬레이션 훅
- * - AI 기반 가구/존 배치 최적화
- * - advanced-ai-inference Edge Function 연동
+ * - AI 기반 가구/상품 배치 최적화
+ * - generate-optimization Edge Function 연동
  * - 3D 시각화용 데이터 제공
+ *
+ * 🆕 마이그레이션 (2026-01):
+ * - advanced-ai-inference (deprecated) → generate-optimization (both 타입)
  */
 
 import { useState, useCallback } from 'react';
@@ -163,17 +166,19 @@ export function useLayoutSimulation(): UseLayoutSimulationReturn {
 
       setProgress(30);
 
-      // advanced-ai-inference Edge Function 호출 (storeContext 포함)
-      const { data, error } = await supabase.functions.invoke('advanced-ai-inference', {
+      // 🆕 generate-optimization Edge Function 호출 (both 타입)
+      // 마이그레이션: advanced-ai-inference (deprecated) → generate-optimization
+      const { data, error } = await supabase.functions.invoke('generate-optimization', {
         body: {
-          type: 'layout_optimization',
-          storeId: selectedStore.id,
-          orgId,
-          params: {
-            goal: params.goal,
-            constraints: params.constraints || {},
-            analysisDepth: params.analysisDepth || 'standard',
-            storeContext, // 실제 매장 데이터 전달
+          store_id: selectedStore.id,
+          optimization_type: 'both', // 가구 + 상품 통합 최적화
+          parameters: {
+            prioritize_revenue: params.goal === 'revenue',
+            prioritize_visibility: params.goal === 'dwell_time',
+            prioritize_accessibility: params.goal === 'traffic',
+            max_changes: params.constraints?.maxMoves,
+            fixed_furniture_ids: params.constraints?.fixedFurniture,
+            preserve_zone_ids: params.constraints?.preserveZones,
           },
         },
       });
@@ -181,10 +186,19 @@ export function useLayoutSimulation(): UseLayoutSimulationReturn {
       setProgress(80);
 
       if (error) throw error;
-      if (!data?.result) throw new Error('시뮬레이션 결과를 받지 못했습니다.');
+      if (!data) throw new Error('최적화 결과를 받지 못했습니다.');
 
-      // 결과 변환
-      const simulationResult = transformLayoutResult(data.result, params);
+      // 결과 변환 (generate-optimization 결과 구조에 맞춤)
+      // generate-optimization은 furniture_changes, product_changes 필드 사용
+      const normalizedResult = {
+        layoutChanges: data.furniture_changes || [],
+        productPlacements: data.product_changes || [],
+        zoneChanges: [],
+        optimizationSummary: data.summary || {},
+        confidence: data.summary?.overall_confidence || 0.7,
+        insights: data.ai_insights || [],
+      };
+      const simulationResult = transformLayoutResult(normalizedResult, params);
 
       setProgress(100);
 
