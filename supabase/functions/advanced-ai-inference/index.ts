@@ -65,6 +65,140 @@ function safeParseAIResponse(aiContent: string, defaultValue: any): any {
 
 
 // ============================================================================
+// 🆕 파인튜닝용: 사용자 화면에 표시되는 텍스트 추출 헬퍼
+// ============================================================================
+
+/**
+ * 시뮬레이션 유형에 따라 사용자에게 표시되는 텍스트 응답을 추출
+ */
+function extractUserFacingTexts(result: any, simulationType: string): any {
+  const texts: any = {
+    summary_text: '',
+    recommendations: [],
+    insights: [],
+  };
+
+  try {
+    switch (simulationType) {
+      case 'layout_optimization':
+      case 'layout':
+        // 레이아웃 최적화 결과에서 텍스트 추출
+        texts.summary_text = result.optimizationSummary?.explanation ||
+          `레이아웃 최적화: ${result.layoutChanges?.length || 0}개 변경 권장`;
+        texts.recommendations = (result.layoutChanges || []).slice(0, 5).map((change: any) => ({
+          entity: change.entityLabel || change.entity_id,
+          reason: change.reason,
+          priority: change.priority,
+        }));
+        texts.insights = result.insights || [];
+        break;
+
+      case 'flow_simulation':
+      case 'flow':
+        // 동선 시뮬레이션 결과에서 텍스트 추출
+        texts.summary_text = result.summary?.explanation ||
+          `동선 분석: 건강 점수 ${result.summary?.flowHealthScore || 0}%, 병목 ${result.bottlenecks?.length || 0}개`;
+        texts.recommendations = (result.recommendations || []).slice(0, 5).map((rec: any) => ({
+          type: rec.type,
+          description: rec.description,
+          priority: rec.priority,
+        }));
+        texts.bottlenecks = (result.bottlenecks || []).map((b: any) => ({
+          zone: b.zoneName,
+          severity: b.severity,
+          suggestion: b.suggestion,
+        }));
+        texts.dead_zones = (result.deadZones || []).map((d: any) => ({
+          zone: d.zoneName,
+          reason: d.reason,
+          suggestion: d.suggestion,
+        }));
+        break;
+
+      case 'congestion':
+      case 'congestion_simulation':
+        // 혼잡도 시뮬레이션 결과에서 텍스트 추출
+        texts.summary_text = result.summary?.explanation ||
+          `혼잡도 분석: ${result.congestionPoints?.length || 0}개 혼잡 지점 발견`;
+        texts.congestion_alerts = (result.congestionPoints || []).slice(0, 5).map((cp: any) => ({
+          zone: cp.zoneName,
+          level: cp.congestionLevel,
+          suggestion: cp.suggestion,
+        }));
+        break;
+
+      case 'staffing':
+      case 'staffing_optimization':
+        // 인력 배치 최적화 결과에서 텍스트 추출
+        texts.summary_text = result.summary?.explanation ||
+          `인력 배치 최적화: ${result.staffingRecommendations?.length || 0}개 권장사항`;
+        texts.staffing_recommendations = (result.staffingRecommendations || []).slice(0, 5).map((sr: any) => ({
+          zone: sr.zoneName,
+          current_staff: sr.currentStaff,
+          recommended_staff: sr.recommendedStaff,
+          reason: sr.reason,
+        }));
+        break;
+
+      default:
+        // 기본 추출
+        texts.summary_text = result.explanation || result.summary?.explanation || '분석 완료';
+        texts.insights = result.insights || result.aiInsights || [];
+    }
+  } catch (error) {
+    console.warn('[extractUserFacingTexts] Error:', error);
+  }
+
+  return texts;
+}
+
+/**
+ * 시뮬레이션 유형에 따라 핵심 지표 추출
+ */
+function extractKeyMetrics(result: any, simulationType: string): any {
+  const metrics: any = {};
+
+  try {
+    switch (simulationType) {
+      case 'layout_optimization':
+      case 'layout':
+        metrics.changes_count = result.layoutChanges?.length || 0;
+        metrics.expected_revenue_increase = result.optimizationSummary?.expectedRevenueIncreasePercent || 0;
+        metrics.confidence = result.confidence || 0;
+        break;
+
+      case 'flow_simulation':
+      case 'flow':
+        metrics.flow_health_score = result.summary?.flowHealthScore || 0;
+        metrics.bottleneck_count = result.bottlenecks?.length || 0;
+        metrics.dead_zone_count = result.deadZones?.length || 0;
+        metrics.conversion_rate = result.summary?.conversionRate || 0;
+        break;
+
+      case 'congestion':
+      case 'congestion_simulation':
+        metrics.congestion_points_count = result.congestionPoints?.length || 0;
+        metrics.peak_congestion = result.summary?.peakCongestion || 0;
+        break;
+
+      case 'staffing':
+      case 'staffing_optimization':
+        metrics.staffing_recommendations_count = result.staffingRecommendations?.length || 0;
+        metrics.total_staff_change = result.summary?.totalStaffChange || 0;
+        break;
+
+      default:
+        metrics.confidence = result.confidence || 0;
+    }
+  } catch (error) {
+    console.warn('[extractKeyMetrics] Error:', error);
+  }
+
+  return metrics;
+}
+
+
+// ============================================================================
 // 🆕 Slot-Based Optimization System (Unified from generate-optimization)
 // ============================================================================
 
@@ -1724,6 +1858,10 @@ Deno.serve(async (req) => {
 
       const simulationType = simulationTypeMap[inferenceType] || 'layout';
 
+      // 🆕 파인튜닝용: 사용자 화면에 표시되는 텍스트 응답 추출
+      const actualResult = result.result || result;
+      const userFacingTexts = extractUserFacingTexts(actualResult, simulationType);
+
       await logAIResponse(supabase, {
         storeId: body.storeId || body.store_id || 'unknown',
         userId: user.id,
@@ -1743,11 +1881,14 @@ Deno.serve(async (req) => {
             dataQuality: body.params.storeContext.dataQuality,
           } : null,
         },
+        // 🆕 aiResponse를 user_facing_texts 중심으로 변경 (파인튜닝 최적화)
         aiResponse: {
-          result: result.result || result,
+          user_facing_texts: userFacingTexts,
           success: result.success !== false,
+          // 핵심 지표만 포함
+          key_metrics: extractKeyMetrics(actualResult, simulationType),
         },
-        responseSummary: createInferenceSummary(result.result || result, simulationType),
+        responseSummary: createInferenceSummary(actualResult, simulationType),
         contextMetadata: createInferenceContextMetadata(
           body.params?.storeContext || {},
           body.params || {}

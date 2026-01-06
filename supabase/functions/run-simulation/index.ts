@@ -134,10 +134,25 @@ Deno.serve(async (req: Request) => {
   const timer = createExecutionTimer();
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const authHeader = req.headers.get('Authorization');
+
+    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
+      global: { headers: authHeader ? { Authorization: authHeader } : {} },
+    });
+
+    // 🆕 사용자 인증 확인 (user_id 추출)
+    let userId: string | null = null;
+    if (authHeader) {
+      try {
+        const { data: { user } } = await supabaseClient.auth.getUser();
+        userId = user?.id || null;
+      } catch (authError) {
+        console.warn('[Simulation] Auth check failed:', authError);
+      }
+    }
+    console.log(`[Simulation] User: ${userId || 'anonymous'}`);
 
     const { store_id, options, environment_context }: SimulationRequest = await req.json();
 
@@ -262,12 +277,49 @@ Deno.serve(async (req: Request) => {
         ? `scenario_${environment_context.preset_scenario.id}`
         : (options.simulation_type === 'predictive' ? 'demand_prediction' : 'traffic_flow');
 
+      // 🆕 파인튜닝용: 사용자 화면에 표시되는 텍스트 응답 추출
+      const userFacingTexts = {
+        // AI 인사이트 (핵심 추천 메시지)
+        ai_insights: simulationResult.ai_insights || [],
+        // 진단 이슈 설명 및 권장 액션
+        diagnostic_texts: simulationResult.diagnostic_issues.map((issue: DiagnosticIssue) => ({
+          title: issue.title,
+          description: issue.description,
+          impact: issue.impact,
+          suggested_action: issue.suggested_action,
+          severity: issue.severity,
+        })),
+        // 요약 텍스트
+        summary_text: responseSummary,
+      };
+
       await logAIResponse(supabaseClient, {
         storeId: store_id,
+        userId: userId || undefined, // 🆕 user_id 추가
         functionName: 'run-simulation',
         simulationType: logSimulationType as any, // 동적 타입 허용
         inputVariables: inputVariables,
-        aiResponse: simulationResult,
+        // 🆕 aiResponse를 user_facing_texts로 변경 (파인튜닝 최적화)
+        aiResponse: {
+          user_facing_texts: userFacingTexts,
+          // 핵심 지표만 포함 (전체 결과 제외)
+          key_metrics: {
+            predicted_visitors: simulationResult.kpis.predicted_visitors,
+            predicted_conversion_rate: simulationResult.kpis.predicted_conversion_rate,
+            predicted_revenue: simulationResult.kpis.predicted_revenue,
+            peak_congestion_percent: simulationResult.kpis.peak_congestion_percent,
+            confidence_score: simulationResult.confidence_score,
+          },
+          zone_summary: simulationResult.zone_analysis.map((z: ZoneAnalysis) => ({
+            zone_name: z.zone_name,
+            congestion_level: z.congestion_level,
+            bottleneck_score: z.bottleneck_score,
+          })),
+          flow_summary: {
+            dead_zones: simulationResult.flow_analysis.dead_zones,
+            congestion_points: simulationResult.flow_analysis.congestion_points,
+          },
+        },
         responseSummary: {
           text: responseSummary,
           visitors: simulationResult.kpis.predicted_visitors,
