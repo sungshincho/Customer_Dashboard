@@ -535,7 +535,18 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
               optimization_type: 'both',
               parameters: {
                 prioritize_revenue: params?.layout?.goal === 'revenue',
-                max_changes: 30,
+                // 🔧 P0 FIX: Frontend intensity 설정 연동
+                max_changes: (params?.layout?.settings?.products?.maxRelocations || 30) +
+                             (params?.layout?.settings?.furniture?.maxMoves || 12),
+                max_product_changes: params?.layout?.settings?.products?.maxRelocations || 30,
+                max_furniture_changes: params?.layout?.settings?.furniture?.maxMoves || 12,
+                intensity: params?.layout?.settings?.intensity || 'medium',
+                // 🔧 P1 FIX: 환경 컨텍스트 전달
+                environment_context: params?.layout?.environment_context || null,
+                // 🔧 P1 FIX: 진단 이슈 전달
+                diagnostic_issues: params?.layout?.diagnostic_issues || null,
+                // 최적화 목표 전달
+                goal: params?.layout?.settings?.objective || params?.layout?.goal || 'balanced',
               },
             },
           }),
