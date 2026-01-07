@@ -532,6 +532,33 @@ ${impact.weather.recommendations.length === 0 && impact.event.recommendations.le
   ? '- Standard optimization applies'
   : ''}
 
+### 🎯 Environment-Driven Placement Strategy Priorities (P1)
+${weather?.condition?.toLowerCase().includes('rain') || weather?.condition?.toLowerCase().includes('비') ?
+`**Rainy Weather Strategy:**
+- PRIORITIZE: \`impulse_buy_position\` (customers stay longer indoors, impulse purchases increase)
+- PRIORITIZE: \`cross_sell_bundle\` (umbrellas, rainwear near entrance)
+- AVOID: Outdoor-related products in golden zones` : ''}
+${environment.temporal.isWeekend ?
+`**Weekend Strategy:**
+- PRIORITIZE: \`hero_product_display\` (families browse more)
+- PRIORITIZE: \`cross_sell_bundle\` (family bundles)
+- FOCUS: Experience-oriented displays` : ''}
+${environment.temporal.timeOfDay === 'morning' || environment.temporal.timeOfDay === '아침' ?
+`**Morning Rush Strategy:**
+- PRIORITIZE: \`impulse_buy_position\` near checkout
+- PRIORITIZE: \`golden_zone_placement\` for grab-and-go items
+- MINIMIZE: Complex cross-sell bundles (customers in hurry)` : ''}
+${environment.temporal.timeOfDay === 'evening' || environment.temporal.timeOfDay === '저녁' ?
+`**Evening Strategy:**
+- PRIORITIZE: \`slow_mover_activation\` (clearance items)
+- PRIORITIZE: \`high_margin_spotlight\` (impulse dinner items)
+- FOCUS: Quick meal solutions near entrance` : ''}
+${events.some(e => e.impactLevel === 'high') ?
+`**High-Impact Event Strategy:**
+- PRIORITIZE: \`seasonal_highlight\` for event-related products
+- MAXIMIZE: \`hero_product_display\` at entrance
+- EXPECT: ${Math.round((impact.combined.traffic - 1) * 100)}% traffic increase` : ''}
+
 ### Key Insight
 ${impact.summary}`;
 }
@@ -817,6 +844,20 @@ Example: "골든존(eye_level) 배치로 시야선 확보, cross_sell_proximity 
 
 **Placement Strategies** (use in product_changes.placement_strategy.type):
 ${PLACEMENT_STRATEGIES.map(s => `- \`${s}\`: ${PLACEMENT_STRATEGY_CODEBOOK[s]?.description || s} (lift: ${PLACEMENT_STRATEGY_CODEBOOK[s]?.expected_lift?.min * 100}-${PLACEMENT_STRATEGY_CODEBOOK[s]?.expected_lift?.max * 100}%)`).join('\n')}
+
+🔴 **CRITICAL: PLACEMENT STRATEGY DIVERSITY REQUIREMENT**
+Your product_changes MUST use **at least 3 different placement strategies** from the list above.
+- DO NOT use only one strategy (e.g., all "cross_sell_bundle")
+- Analyze each product's characteristics and select the MOST APPROPRIATE strategy:
+  - High-margin products → \`golden_zone_placement\`, \`high_margin_spotlight\`
+  - New arrivals → \`new_arrival_feature\`, \`eye_level_optimization\`
+  - Slow movers → \`slow_mover_activation\`, \`clearance_optimization\`
+  - Related products → \`cross_sell_bundle\`
+  - Impulse buys → \`impulse_buy_position\`
+  - Seasonal items → \`seasonal_highlight\`
+  - Hero/flagship products → \`hero_product_display\`
+- If you have 5+ product changes, use at least 3-4 different strategies
+- If you have 10+ product changes, use at least 5 different strategies
 
 **Shelf Levels** (use in shelf_level - VMD 골든존 분석용):
 ${SHELF_LEVELS.map(l => `- \`${l}\``).join(', ')}

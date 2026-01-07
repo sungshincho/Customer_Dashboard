@@ -117,6 +117,26 @@ interface GenerateOptimizationRequest {
     prioritize_visibility?: boolean;
     prioritize_accessibility?: boolean;
     max_changes?: number;
+    // 🆕 P0 FIX: Intensity 설정 연동 파라미터
+    max_product_changes?: number;
+    max_furniture_changes?: number;
+    intensity?: 'low' | 'medium' | 'high';
+    goal?: 'revenue' | 'conversion' | 'traffic' | 'balanced';
+    // 🆕 P1 FIX: 환경 컨텍스트 및 진단 이슈
+    environment_context?: {
+      weather?: string;
+      temperature?: number;
+      humidity?: number;
+      holiday_type?: string;
+      time_of_day?: string;
+      impact?: any;
+    };
+    diagnostic_issues?: {
+      priority_issues?: any[];
+      scenario_context?: any;
+      environment_context?: any;
+      simulation_kpis?: any;
+    };
     // 🆕 Staffing 최적화 파라미터
     staffing_goal?: 'customer_service' | 'sales' | 'efficiency';
     staff_count?: number;
@@ -1175,6 +1195,15 @@ async function generateAIOptimization(
     diagnosticIssues || null  // 🆕 진단 이슈 전달
   );
 
+  // 🔧 P0 FIX: intensity 기반 제한 설정
+  const intensityLimits = {
+    low: { maxFurniture: 5, maxProduct: 15 },
+    medium: { maxFurniture: 12, maxProduct: 35 },
+    high: { maxFurniture: 25, maxProduct: 60 },
+  };
+  const currentIntensity = (parameters.intensity as keyof typeof intensityLimits) || 'medium';
+  const defaultLimits = intensityLimits[currentIntensity] || intensityLimits.medium;
+
   const promptConfig = createPromptConfig({
     strategy: 'hybrid',  // 🆕 Phase 1.2: CoT + Few-shot 하이브리드 전략
     chainOfThought: {
@@ -1188,12 +1217,15 @@ async function generateAIOptimization(
       selectionStrategy: 'similar',  // 현재 상황과 유사한 예시 선택
     },
     constraints: {
-      maxFurnitureChanges: parameters.max_changes ? Math.floor(parameters.max_changes / 3) : 10,
-      maxProductChanges: parameters.max_changes || 30,
+      // 🔧 P0 FIX: Frontend intensity 설정 연동
+      maxFurnitureChanges: parameters.max_furniture_changes || defaultLimits.maxFurniture,
+      maxProductChanges: parameters.max_product_changes || defaultLimits.maxProduct,
       respectMovableFlag: true,
       validateSlotCompatibility: true,
     },
   });
+
+  console.log(`[generateAIOptimization] Constraints: intensity=${currentIntensity}, maxFurniture=${promptConfig.constraints.maxFurnitureChanges}, maxProduct=${promptConfig.constraints.maxProductChanges}`);
 
   const builtPrompt: BuiltPrompt = buildAdvancedOptimizationPrompt(promptContext, promptConfig);
 
