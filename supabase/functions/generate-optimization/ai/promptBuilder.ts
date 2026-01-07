@@ -381,7 +381,26 @@ export function buildConstraintsSection(
 - **Type**: ${settings.optimizationType}
 - **Goal**: ${settings.optimizationGoal}
 - **Intensity**: ${settings.intensity}
-- **Weights**: Revenue ${Math.round(settings.weights.revenue * 100)}% | Conversion ${Math.round(settings.weights.conversion * 100)}% | Traffic ${Math.round(settings.weights.traffic * 100)}% | Experience ${Math.round(settings.weights.experience * 100)}%`;
+- **Weights**: Revenue ${Math.round(settings.weights.revenue * 100)}% | Conversion ${Math.round(settings.weights.conversion * 100)}% | Traffic ${Math.round(settings.weights.traffic * 100)}% | Experience ${Math.round(settings.weights.experience * 100)}%
+
+### ⚠️ MINIMUM CHANGE REQUIREMENTS (CRITICAL)
+${settings.optimizationType === 'furniture' || settings.optimizationType === 'both' ? `
+**Furniture Optimization Required**: You MUST provide at least 2-3 furniture change suggestions.
+- Analyze ALL movable furniture in the layout
+- Even without explicit diagnostic issues, identify optimization opportunities
+- Consider: traffic flow improvement, dead zone activation, bottleneck resolution
+- If no critical issues exist, suggest PROACTIVE improvements based on VMD principles
+` : ''}
+${settings.optimizationType === 'product' || settings.optimizationType === 'both' ? `
+**Product Optimization Required**: You MUST provide at least 3-5 product change suggestions.
+- Analyze product placement efficiency based on performance data
+- Apply golden_zone_placement for high-margin products
+- Consider cross-sell opportunities based on association rules
+` : ''}
+${settings.optimizationType === 'both' ? `
+**Combined Optimization**: For 'both' type, you MUST provide changes for BOTH furniture AND products.
+` : ''}
+**IMPORTANT**: Empty arrays are NOT acceptable. Always provide actionable recommendations.`;
 }
 
 /**
