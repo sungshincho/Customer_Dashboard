@@ -542,7 +542,7 @@ export const RETAIL_OPTIMIZATION_SCHEMA = {
       type: 'object',
       required: ['total_furniture_changes', 'total_product_changes',
                  'expected_revenue_improvement', 'expected_conversion_improvement',
-                 'confidence_score'],
+                 'confidence_score', 'ai_insights'],
       properties: {
         total_furniture_changes: {
           type: 'integer',

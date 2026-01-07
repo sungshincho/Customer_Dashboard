@@ -1040,14 +1040,66 @@ function calculateOptimizationQuality(
   // ============================================================================
   let domainKnowledgeScore = 0;
 
-  if (!isStaffingType) {
+  // 🆕 both 타입은 furniture/product + staffing 모두 검증
+  if (isBothType) {
+    // VMD 원칙 사용 (최대 5점)
+    const vmdPrinciplesUsed = furnitureChanges
+      .filter((fc: any) => fc.vmd_principle && VMD_PRINCIPLES.includes(fc.vmd_principle))
+      .map((fc: any) => fc.vmd_principle);
+
+    const summaryData = data?.summary || {};
+    const aiInsights = summaryData.ai_insights || data?.ai_insights || [];
+    const vmdInInsights = aiInsights
+      .filter((insight: string) => {
+        const insightLower = (insight || '').toLowerCase();
+        return VMD_PRINCIPLES.some(vmd => insightLower.includes(vmd) || insightLower.includes(vmd.replace(/_/g, ' ')));
+      })
+      .map((insight: string) => {
+        const insightLower = (insight || '').toLowerCase();
+        return VMD_PRINCIPLES.find(vmd => insightLower.includes(vmd) || insightLower.includes(vmd.replace(/_/g, ' ')));
+      })
+      .filter(Boolean);
+
+    const allVmdPrinciples = [...vmdPrinciplesUsed, ...vmdInInsights];
+    const uniqueVmdPrinciples = [...new Set(allVmdPrinciples)];
+    domainKnowledgeScore += Math.min(uniqueVmdPrinciples.length, 1) * 5;
+
+    // 배치 전략 사용 (최대 5점)
+    const placementStrategiesUsed = productChanges
+      .filter((pc: any) => pc.placement_strategy?.type && PLACEMENT_STRATEGIES.includes(pc.placement_strategy.type))
+      .map((pc: any) => pc.placement_strategy.type);
+    const uniquePlacementStrategies = [...new Set(placementStrategiesUsed)];
+    domainKnowledgeScore += Math.min(uniquePlacementStrategies.length, 1) * 5;
+
+    // 🆕 staffing 전략 사용 (최대 10점) - both 타입에서도 검증
+    const staffingStrategiesUsed = staffPositions
+      .filter((sp: any) => sp.assignment_strategy && STAFFING_STRATEGIES.includes(sp.assignment_strategy))
+      .map((sp: any) => sp.assignment_strategy);
+    const uniqueStaffingStrategies = [...new Set(staffingStrategiesUsed)];
+    domainKnowledgeScore += Math.min(uniqueStaffingStrategies.length, 2) * 5;
+
+    const invalidStaffingStrategies = staffPositions
+      .filter((sp: any) => sp.assignment_strategy && !STAFFING_STRATEGIES.includes(sp.assignment_strategy))
+      .map((sp: any) => sp.assignment_strategy);
+
+    metrics.domain_knowledge_usage = {
+      vmd_principles_used: uniqueVmdPrinciples,
+      vmd_count: allVmdPrinciples.length,
+      placement_strategies_used: uniquePlacementStrategies,
+      placement_count: placementStrategiesUsed.length,
+      staffing_strategies_used: uniqueStaffingStrategies,
+      staffing_strategy_count: staffingStrategiesUsed.length,
+      invalid_staffing_strategies: invalidStaffingStrategies,
+    };
+  } else if (!isStaffingType) {
+    // furniture/product 타입: VMD + 배치 전략 (최대 20점)
     // VMD 원칙 사용 (최대 10점)
     // 1. furniture_changes의 vmd_principle 필드에서 확인
     const vmdPrinciplesUsed = furnitureChanges
       .filter((fc: any) => fc.vmd_principle && VMD_PRINCIPLES.includes(fc.vmd_principle))
       .map((fc: any) => fc.vmd_principle);
 
-    // 2. 🆕 product_changes의 reason 필드에서 VMD 원칙 언급 확인
+    // 2. product_changes의 reason 필드에서 VMD 원칙 언급 확인
     const vmdInProductReasons = productChanges
       .filter((pc: any) => {
         const reason = (pc.reason || '').toLowerCase();
@@ -1059,7 +1111,7 @@ function calculateOptimizationQuality(
       })
       .filter(Boolean);
 
-    // 3. 🆕 summary.ai_insights에서 VMD 원칙 언급 확인
+    // 3. summary.ai_insights에서 VMD 원칙 언급 확인
     const summaryData = data?.summary || {};
     const aiInsights = summaryData.ai_insights || data?.ai_insights || [];
     const vmdInInsights = aiInsights
@@ -1095,7 +1147,7 @@ function calculateOptimizationQuality(
     };
   } else {
     // staffing 타입: 배치 전략 기반 점수 (최대 20점)
-    // 🆕 유효한 STAFFING_STRATEGIES만 카운트
+    // 유효한 STAFFING_STRATEGIES만 카운트
     const staffingStrategiesUsed = staffPositions
       .filter((sp: any) => sp.assignment_strategy && STAFFING_STRATEGIES.includes(sp.assignment_strategy))
       .map((sp: any) => sp.assignment_strategy);
