@@ -14,6 +14,71 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_batch_test_results: {
+        Row: {
+          combination_id: string | null
+          combination_variables: Json
+          created_at: string | null
+          diagnostic_issues_passed: Json | null
+          error_message: string | null
+          execution_time_ms: number | null
+          function_name: string
+          id: string
+          linked_simulation_id: string | null
+          request_body: Json
+          response_data: Json | null
+          response_metrics: Json | null
+          response_quality_score: number | null
+          success: boolean
+          test_batch_id: string
+          test_type: string
+        }
+        Insert: {
+          combination_id?: string | null
+          combination_variables?: Json
+          created_at?: string | null
+          diagnostic_issues_passed?: Json | null
+          error_message?: string | null
+          execution_time_ms?: number | null
+          function_name: string
+          id?: string
+          linked_simulation_id?: string | null
+          request_body?: Json
+          response_data?: Json | null
+          response_metrics?: Json | null
+          response_quality_score?: number | null
+          success?: boolean
+          test_batch_id: string
+          test_type: string
+        }
+        Update: {
+          combination_id?: string | null
+          combination_variables?: Json
+          created_at?: string | null
+          diagnostic_issues_passed?: Json | null
+          error_message?: string | null
+          execution_time_ms?: number | null
+          function_name?: string
+          id?: string
+          linked_simulation_id?: string | null
+          request_body?: Json
+          response_data?: Json | null
+          response_metrics?: Json | null
+          response_quality_score?: number | null
+          success?: boolean
+          test_batch_id?: string
+          test_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_batch_test_results_linked_simulation_id_fkey"
+            columns: ["linked_simulation_id"]
+            isOneToOne: false
+            referencedRelation: "ai_batch_test_results"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_inference_logs: {
         Row: {
           application_id: string | null
@@ -334,6 +399,83 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "ai_recommendations_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_response_logs: {
+        Row: {
+          ai_response: Json
+          completion_tokens: number | null
+          context_metadata: Json | null
+          created_at: string | null
+          error_message: string | null
+          execution_time_ms: number | null
+          function_name: string
+          had_error: boolean | null
+          id: string
+          input_variables: Json
+          is_good_example: boolean | null
+          model_used: string | null
+          prompt_tokens: number | null
+          quality_notes: string | null
+          quality_score: number | null
+          response_summary: Json | null
+          simulation_type: string
+          store_id: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          ai_response?: Json
+          completion_tokens?: number | null
+          context_metadata?: Json | null
+          created_at?: string | null
+          error_message?: string | null
+          execution_time_ms?: number | null
+          function_name: string
+          had_error?: boolean | null
+          id?: string
+          input_variables?: Json
+          is_good_example?: boolean | null
+          model_used?: string | null
+          prompt_tokens?: number | null
+          quality_notes?: string | null
+          quality_score?: number | null
+          response_summary?: Json | null
+          simulation_type: string
+          store_id: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          ai_response?: Json
+          completion_tokens?: number | null
+          context_metadata?: Json | null
+          created_at?: string | null
+          error_message?: string | null
+          execution_time_ms?: number | null
+          function_name?: string
+          had_error?: boolean | null
+          id?: string
+          input_variables?: Json
+          is_good_example?: boolean | null
+          model_used?: string | null
+          prompt_tokens?: number | null
+          quality_notes?: string | null
+          quality_score?: number | null
+          response_summary?: Json | null
+          simulation_type?: string
+          store_id?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_response_logs_store_id_fkey"
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
@@ -4426,6 +4568,122 @@ export type Database = {
           },
         ]
       }
+      product_associations: {
+        Row: {
+          analysis_period_end: string | null
+          analysis_period_start: string | null
+          antecedent_category: string | null
+          antecedent_product_id: string
+          avg_basket_value: number | null
+          category_pair: string | null
+          co_occurrence_count: number | null
+          confidence: number
+          consequent_category: string | null
+          consequent_product_id: string
+          conviction: number | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          is_verified: boolean | null
+          lift: number
+          metadata: Json | null
+          org_id: string | null
+          placement_type: string | null
+          rule_strength: string | null
+          rule_type: string | null
+          sample_transaction_count: number | null
+          store_id: string
+          support: number
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          analysis_period_end?: string | null
+          analysis_period_start?: string | null
+          antecedent_category?: string | null
+          antecedent_product_id: string
+          avg_basket_value?: number | null
+          category_pair?: string | null
+          co_occurrence_count?: number | null
+          confidence?: number
+          consequent_category?: string | null
+          consequent_product_id: string
+          conviction?: number | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_verified?: boolean | null
+          lift?: number
+          metadata?: Json | null
+          org_id?: string | null
+          placement_type?: string | null
+          rule_strength?: string | null
+          rule_type?: string | null
+          sample_transaction_count?: number | null
+          store_id: string
+          support?: number
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          analysis_period_end?: string | null
+          analysis_period_start?: string | null
+          antecedent_category?: string | null
+          antecedent_product_id?: string
+          avg_basket_value?: number | null
+          category_pair?: string | null
+          co_occurrence_count?: number | null
+          confidence?: number
+          consequent_category?: string | null
+          consequent_product_id?: string
+          conviction?: number | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_verified?: boolean | null
+          lift?: number
+          metadata?: Json | null
+          org_id?: string | null
+          placement_type?: string | null
+          rule_strength?: string | null
+          rule_type?: string | null
+          sample_transaction_count?: number | null
+          store_id?: string
+          support?: number
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_associations_antecedent_product_id_fkey"
+            columns: ["antecedent_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_associations_consequent_product_id_fkey"
+            columns: ["consequent_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_associations_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_associations_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_models: {
         Row: {
           created_at: string | null
@@ -8399,6 +8657,151 @@ export type Database = {
       }
     }
     Views: {
+      v_ai_response_stats: {
+        Row: {
+          avg_execution_time_ms: number | null
+          avg_quality_score: number | null
+          error_count: number | null
+          first_log_at: string | null
+          function_name: string | null
+          good_example_count: number | null
+          last_log_at: string | null
+          rated_count: number | null
+          simulation_type: string | null
+          total_count: number | null
+        }
+        Relationships: []
+      }
+      v_batch_test_failures: {
+        Row: {
+          combination_id: string | null
+          combination_variables: Json | null
+          created_at: string | null
+          error_message: string | null
+          execution_time_ms: number | null
+          function_name: string | null
+          test_batch_id: string | null
+          test_type: string | null
+        }
+        Insert: {
+          combination_id?: string | null
+          combination_variables?: Json | null
+          created_at?: string | null
+          error_message?: string | null
+          execution_time_ms?: number | null
+          function_name?: string | null
+          test_batch_id?: string | null
+          test_type?: string | null
+        }
+        Update: {
+          combination_id?: string | null
+          combination_variables?: Json | null
+          created_at?: string | null
+          error_message?: string | null
+          execution_time_ms?: number | null
+          function_name?: string | null
+          test_batch_id?: string | null
+          test_type?: string | null
+        }
+        Relationships: []
+      }
+      v_batch_test_linked_analysis: {
+        Row: {
+          both_success: boolean | null
+          created_at: string | null
+          issues_passed: string | null
+          optimization_combination: string | null
+          optimization_quality: number | null
+          optimization_success: boolean | null
+          optimization_time_ms: number | null
+          simulation_combination: string | null
+          simulation_quality: number | null
+          simulation_success: boolean | null
+          simulation_time_ms: number | null
+          test_batch_id: string | null
+        }
+        Relationships: []
+      }
+      v_batch_test_scenario_stats: {
+        Row: {
+          avg_quality: number | null
+          optimization_type: string | null
+          preset_scenario: string | null
+          success_count: number | null
+          success_rate: number | null
+          test_batch_id: string | null
+          test_type: string | null
+          total_tests: number | null
+        }
+        Relationships: []
+      }
+      v_batch_test_summary: {
+        Row: {
+          avg_quality_score: number | null
+          avg_time_ms: number | null
+          completed_at: string | null
+          failure_count: number | null
+          max_time_ms: number | null
+          min_time_ms: number | null
+          started_at: string | null
+          success_count: number | null
+          success_rate: number | null
+          test_batch_id: string | null
+          test_type: string | null
+          total_tests: number | null
+        }
+        Relationships: []
+      }
+      v_finetuning_dataset: {
+        Row: {
+          ai_response: Json | null
+          context_metadata: Json | null
+          created_at: string | null
+          execution_time_ms: number | null
+          function_name: string | null
+          id: string | null
+          input_variables: Json | null
+          quality_notes: string | null
+          quality_score: number | null
+          simulation_type: string | null
+          store_id: string | null
+        }
+        Insert: {
+          ai_response?: Json | null
+          context_metadata?: Json | null
+          created_at?: string | null
+          execution_time_ms?: number | null
+          function_name?: string | null
+          id?: string | null
+          input_variables?: Json | null
+          quality_notes?: string | null
+          quality_score?: number | null
+          simulation_type?: string | null
+          store_id?: string | null
+        }
+        Update: {
+          ai_response?: Json | null
+          context_metadata?: Json | null
+          created_at?: string | null
+          execution_time_ms?: number | null
+          function_name?: string | null
+          id?: string | null
+          input_variables?: Json | null
+          quality_notes?: string | null
+          quality_score?: number | null
+          simulation_type?: string | null
+          store_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_response_logs_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_user_orgs: {
         Row: {
           org_id: string | null
@@ -8545,6 +8948,14 @@ export type Database = {
         Args: { p_product_display_type: string; p_slot_id: string }
         Returns: boolean
       }
+      cleanup_old_ai_response_logs: {
+        Args: { days_to_keep?: number }
+        Returns: number
+      }
+      cleanup_old_batch_test_results: {
+        Args: { days_to_keep?: number }
+        Returns: number
+      }
       compute_all_retail_concepts: {
         Args: { p_days?: number; p_store_id: string }
         Returns: Json
@@ -8601,6 +9012,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      get_association_summary: { Args: { p_store_id: string }; Returns: Json }
       get_available_slots_for_display_type: {
         Args: { p_display_type: string; p_store_id: string }
         Returns: {
@@ -8614,6 +9026,10 @@ export type Database = {
       }
       get_cached_concept_value: {
         Args: { p_concept_name: string; p_store_id: string }
+        Returns: Json
+      }
+      get_category_affinities: {
+        Args: { p_limit?: number; p_store_id: string }
         Returns: Json
       }
       get_compatible_slots_for_product: {
@@ -8660,6 +9076,16 @@ export type Database = {
           transaction_count: number
           visitor_count: number
         }[]
+      }
+      get_product_associations: {
+        Args: {
+          p_limit?: number
+          p_min_confidence?: number
+          p_min_lift?: number
+          p_product_id?: string
+          p_store_id: string
+        }
+        Returns: Json
       }
       get_roi_by_category: {
         Args: { p_org_id: string; p_store_id?: string }
