@@ -15,23 +15,15 @@ import type { EnvironmentDataBundle } from '../data/environmentLoader.ts';
 import type { FlowAnalysisResult } from '../data/flowAnalyzer.ts';
 import type { ProductAssociationResult } from '../data/associationMiner.ts';
 
-// Phase 1.2: Few-Shot Learning (임시 비활성화 - 배포 문제 해결용)
-// import {
-//   selectExamples,
-//   buildFewShotSection,
-//   createScenarioFromEnvironment,
-//   type SelectionStrategy,
-//   type ExampleScenario,
-//   type OptimizationExample,
-// } from './fewShotExamples.ts';
-
-// 🔧 임시 스텁 함수들 (배포 문제 해결 후 제거)
-type SelectionStrategy = 'similar' | 'diverse' | 'random';
-type ExampleScenario = any;
-type OptimizationExample = any;
-const selectExamples = (_scenario: any, _count: number, _strategy: SelectionStrategy): OptimizationExample[] => [];
-const buildFewShotSection = (_examples: OptimizationExample[]): string => '';
-const createScenarioFromEnvironment = (..._args: any[]): ExampleScenario | null => null;
+// Phase 1.2: Few-Shot Learning
+import {
+  selectExamples,
+  buildFewShotSection,
+  createScenarioFromEnvironment,
+  type SelectionStrategy,
+  type ExampleScenario,
+  type OptimizationExample,
+} from './fewShotExamples.ts';
 
 // 🆕 Phase 5: Structured Output 스키마 (리테일 도메인 지식)
 import {
