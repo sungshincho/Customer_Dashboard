@@ -183,9 +183,23 @@ const GlowDonutChart = ({ data, isDark }: DonutChartProps) => {
     const centerY = height / 2;
     const outerRadius = Math.min(width, height) / 2 - 50;
     const innerRadius = outerRadius * 0.52;
-    const total = data.reduce((sum, d) => sum + d.count, 0);
-    
+    const rawTotal = data.reduce((sum, d) => sum + d.count, 0);
+    // total이 0이면 차트를 그리지 않음
+    const total = rawTotal > 0 ? rawTotal : 1;
+
     ctx.clearRect(0, 0, width, height);
+
+    // 데이터가 없으면 빈 차트만 표시
+    if (rawTotal === 0) {
+      ctx.font = 'bold 22px system-ui, -apple-system, sans-serif';
+      ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)';
+      ctx.textAlign = 'center';
+      ctx.fillText('0', centerX, centerY + 2);
+      ctx.font = '500 9px system-ui, -apple-system, sans-serif';
+      ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.35)' : 'rgba(0, 0, 0, 0.35)';
+      ctx.fillText('TOTAL', centerX, centerY + 18);
+      return;
+    }
     
     let currentAngle = -Math.PI / 2;
     const angles: Array<{ startAngle: number; endAngle: number; data: { name: string; count: number } }> = [];
@@ -406,7 +420,9 @@ const GlowBarChart = ({ data, isDark }: BarChartProps) => {
     const chartWidth = width - padding.left - padding.right;
     const barHeight = 20;
     const gap = Math.min(50, (height - padding.top - padding.bottom) / data.length);
-    const maxValue = Math.max(...data.map(d => d.avgValue));
+    const rawMaxValue = Math.max(...data.map(d => d.avgValue));
+    // maxValue가 0이면 1로 설정하여 division by zero 방지
+    const maxValue = rawMaxValue > 0 ? rawMaxValue : 1;
     
     const bars: Array<{ x: number; y: number; width: number; height: number; data: { name: string; avgValue: number } }> = [];
     
@@ -460,10 +476,13 @@ const GlowBarChart = ({ data, isDark }: BarChartProps) => {
         ctx.fill();
         
         // 끝 포인트 (은은한 글로우)
-        const glowX = padding.left + barWidth;
-        const glowY = y + barHeight / 2;
+        const rawGlowX = padding.left + barWidth;
+        const rawGlowY = y + barHeight / 2;
+        // 안전한 좌표 값 확보
+        const glowX = Number.isFinite(rawGlowX) ? rawGlowX : padding.left;
+        const glowY = Number.isFinite(rawGlowY) ? rawGlowY : padding.top;
         const glowColor = isDark ? '255, 255, 255' : '0, 0, 0';
-        
+
         const glow = ctx.createRadialGradient(glowX, glowY, 0, glowX, glowY, 10);
         glow.addColorStop(0, `rgba(${glowColor}, ${0.6 * animationProgress})`);
         glow.addColorStop(0.5, `rgba(${glowColor}, ${0.15 * animationProgress})`);
@@ -539,6 +558,10 @@ interface AreaChartProps {
   isDark: boolean;
 }
 
+// 안전한 숫자 값 반환 헬퍼 함수
+const safeNumber = (val: number, fallback = 0): number =>
+  Number.isFinite(val) ? val : fallback;
+
 const GlowAreaChart = ({ data, isDark }: AreaChartProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -605,16 +628,20 @@ const GlowAreaChart = ({ data, isDark }: AreaChartProps) => {
     const chartHeight = height - padding.top - padding.bottom;
     const baseY = height - padding.bottom;
     
-    const maxValue = Math.max(...data.map(d => d.newVisitors + d.returningVisitors)) * 1.15;
-    
+    const rawMaxValue = Math.max(...data.map(d => d.newVisitors + d.returningVisitors));
+    // maxValue가 0이면 1로 설정하여 division by zero 방지
+    const maxValue = rawMaxValue > 0 ? rawMaxValue * 1.15 : 1;
+
     // 애니메이션: Y 값을 baseY에서 시작해서 실제 값으로 이동
     const points = data.map((d, i) => {
       const targetYNew = baseY - (d.newVisitors / maxValue) * chartHeight;
       const targetYTotal = baseY - ((d.newVisitors + d.returningVisitors) / maxValue) * chartHeight;
+      // data.length가 1일 때 division by zero 방지
+      const xRatio = data.length > 1 ? i / (data.length - 1) : 0.5;
       return {
-        x: padding.left + (i / (data.length - 1)) * chartWidth,
-        yNew: baseY - (baseY - targetYNew) * animationProgress,
-        yTotal: baseY - (baseY - targetYTotal) * animationProgress,
+        x: safeNumber(padding.left + xRatio * chartWidth, padding.left),
+        yNew: safeNumber(baseY - (baseY - targetYNew) * animationProgress, baseY),
+        yTotal: safeNumber(baseY - (baseY - targetYTotal) * animationProgress, baseY),
         data: d,
       };
     });
@@ -744,19 +771,23 @@ const GlowAreaChart = ({ data, isDark }: AreaChartProps) => {
     
     // 포인트 (작게)
     points.forEach((p) => {
+      // 안전한 좌표 값 확보
+      const px = safeNumber(p.x, padding.left);
+      const py = safeNumber(p.yTotal, baseY);
+
       // 작은 글로우
-      const glow = ctx.createRadialGradient(p.x, p.yTotal, 0, p.x, p.yTotal, 8);
+      const glow = ctx.createRadialGradient(px, py, 0, px, py, 8);
       glow.addColorStop(0, `rgba(${primaryColor}, ${0.5 * animationProgress})`);
       glow.addColorStop(0.5, `rgba(${primaryColor}, ${0.1 * animationProgress})`);
       glow.addColorStop(1, `rgba(${primaryColor}, 0)`);
       ctx.beginPath();
-      ctx.arc(p.x, p.yTotal, 8, 0, Math.PI * 2);
+      ctx.arc(px, py, 8, 0, Math.PI * 2);
       ctx.fillStyle = glow;
       ctx.fill();
-      
+
       // 중심 점
       ctx.beginPath();
-      ctx.arc(p.x, p.yTotal, 2.5, 0, Math.PI * 2);
+      ctx.arc(px, py, 2.5, 0, Math.PI * 2);
       ctx.fillStyle = isDark ? `rgba(255,255,255,${0.85 * animationProgress})` : `rgba(0,0,0,${0.8 * animationProgress})`;
       ctx.fill();
     });
@@ -770,7 +801,9 @@ const GlowAreaChart = ({ data, isDark }: AreaChartProps) => {
     const labelInterval = data.length > 10 ? Math.ceil(data.length / 10) : 1;
     data.forEach((d, i) => {
       if (i % labelInterval === 0 || i === data.length - 1) {
-        const x = padding.left + (i / (data.length - 1)) * chartWidth;
+        // data.length가 1일 때 division by zero 방지
+        const xRatio = data.length > 1 ? i / (data.length - 1) : 0.5;
+        const x = safeNumber(padding.left + xRatio * chartWidth, padding.left);
         ctx.fillText(d.date, x, baseY + 22);
       }
     });
