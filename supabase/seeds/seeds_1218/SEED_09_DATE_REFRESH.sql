@@ -172,26 +172,34 @@ AND NOT EXISTS (
 );
 
 -- 3-3. 오늘 daily_kpis_agg 추가
+-- ⚠️ 주의: CURRENT_DATE 대신 과거 날짜 사용 (실시간 데이터와 충돌 방지)
+-- 실제 오늘 데이터는 unified-etl이 L2 테이블 기반으로 생성해야 함
+-- INSERT INTO daily_kpis_agg 비활성화 - 오늘 날짜 데이터 자동 생성 중단
+/*
 INSERT INTO daily_kpis_agg (
   id, org_id, store_id, date,
-  total_visitors, unique_visitors, returning_visitors, total_revenue,
+  total_visitors, unique_visitors, returning_visitors,
+  total_transactions, total_revenue, conversion_rate,  -- ✅ 누락 필드 추가
   created_at
 )
 SELECT
   gen_random_uuid(),
   (SELECT org_id FROM stores WHERE id = 'd9830554-2688-4032-af40-acccda787ac4'),
   'd9830554-2688-4032-af40-acccda787ac4',
-  CURRENT_DATE,
+  CURRENT_DATE - INTERVAL '1 day',  -- ✅ 어제 날짜로 변경 (오늘 데이터 충돌 방지)
   (180 + FLOOR(RANDOM() * 70))::INTEGER as total_visitors,
   (140 + FLOOR(RANDOM() * 50))::INTEGER as unique_visitors,
   (30 + FLOOR(RANDOM() * 20))::INTEGER as returning_visitors,
+  (25 + FLOOR(RANDOM() * 15))::INTEGER as total_transactions,  -- ✅ 추가
   (850000 + FLOOR(RANDOM() * 350000))::NUMERIC as total_revenue,
+  (12 + FLOOR(RANDOM() * 8))::NUMERIC as conversion_rate,  -- ✅ 추가
   NOW()
 WHERE NOT EXISTS (
   SELECT 1 FROM daily_kpis_agg
   WHERE store_id = 'd9830554-2688-4032-af40-acccda787ac4'
-  AND date = CURRENT_DATE
+  AND date = CURRENT_DATE - INTERVAL '1 day'
 );
+*/
 
 -- =====================================================
 -- PART 4: 최근 7일 빈 날짜 데이터 보강
@@ -225,9 +233,11 @@ WHERE NOT EXISTS (
 );
 
 -- 4-2. 최근 7일 daily_kpis_agg 보강
+-- ✅ total_transactions, conversion_rate 필드 추가로 데이터 일관성 보장
 INSERT INTO daily_kpis_agg (
   id, org_id, store_id, date,
-  total_visitors, unique_visitors, returning_visitors, total_revenue,
+  total_visitors, unique_visitors, returning_visitors,
+  total_transactions, total_revenue, conversion_rate,  -- ✅ 누락 필드 추가
   created_at
 )
 SELECT
@@ -238,11 +248,13 @@ SELECT
   (150 + FLOOR(RANDOM() * 80))::INTEGER as total_visitors,
   (120 + FLOOR(RANDOM() * 60))::INTEGER as unique_visitors,
   (25 + FLOOR(RANDOM() * 25))::INTEGER as returning_visitors,
+  (20 + FLOOR(RANDOM() * 20))::INTEGER as total_transactions,  -- ✅ 추가
   (700000 + FLOOR(RANDOM() * 500000))::NUMERIC as total_revenue,
+  (10 + FLOOR(RANDOM() * 10))::NUMERIC as conversion_rate,  -- ✅ 추가
   NOW()
 FROM generate_series(
-  CURRENT_DATE - INTERVAL '6 days',
-  CURRENT_DATE - INTERVAL '1 day',
+  CURRENT_DATE - INTERVAL '7 days',  -- ✅ 오늘 제외 (6 days -> 7 days)
+  CURRENT_DATE - INTERVAL '1 day',   -- 어제까지만
   INTERVAL '1 day'
 ) as d(date)
 WHERE NOT EXISTS (

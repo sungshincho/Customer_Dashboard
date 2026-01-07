@@ -17,8 +17,10 @@ Deno.serve(async (req) => {
 
     console.log('[ETL Scheduler] Starting scheduled ETL pipeline...');
 
-    const today = new Date().toISOString().split('T')[0];
+    // ⚠️ 오늘 날짜 제외: 오늘 데이터는 아직 완전하지 않으므로 집계하지 않음
+    // ETL은 어제까지의 확정된 데이터만 집계해야 데이터 일관성 보장
     const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    const twoDaysAgo = new Date(Date.now() - 2 * 86400000).toISOString().split('T')[0];
 
     // Get all organizations
     const { data: orgs } = await supabase
@@ -41,8 +43,8 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             etl_type: 'full_pipeline',
             org_id: org.id,
-            date_from: yesterday,
-            date_to: today,
+            date_from: twoDaysAgo,
+            date_to: yesterday,  // ✅ 오늘 제외 - 어제까지만 집계
           }),
         });
         const pipelineResult = await pipelineResponse.json();
