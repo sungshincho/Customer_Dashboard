@@ -88,7 +88,8 @@ export const useInsightMetrics = () => {
         .gte('date', startDate)
         .lte('date', endDate);
 
-      const footfall = kpis?.reduce((sum, k) => sum + (k.total_visitors || 0), 0) || 0;
+      // KPI 집계값 (캐시 테이블)
+      const kpiTotalVisitors = kpis?.reduce((sum, k) => sum + (k.total_visitors || 0), 0) || 0;
       const uniqueVisitors = kpis?.reduce((sum, k) => sum + (k.unique_visitors || 0), 0) || 0;
       const revenue = kpis?.reduce((sum, k) => sum + Number(k.total_revenue || 0), 0) || 0;
       const kpiReturningSum = kpis?.reduce((sum, k) => sum + (k.returning_visitors || 0), 0) || 0;
@@ -126,16 +127,20 @@ export const useInsightMetrics = () => {
       };
 
       // ═══════════════════════════════════════════════════════════════
-      // 3. 데이터 일관성 검증 및 로깅
+      // 3. FOOTFALL = funnel.entry (싱글 소스)
       // ═══════════════════════════════════════════════════════════════
-      // footfall(daily_kpis_agg)과 funnel.entry(funnel_events)는 같아야 함
-      if (Math.abs(footfall - funnel.entry) > Math.max(footfall, funnel.entry) * 0.01) {
-        console.warn('[useInsightMetrics] Data inconsistency detected:', {
-          footfall,
+      // 🔧 FIX: funnel.entry를 단일 소스로 사용
+      // daily_kpis_agg.total_visitors는 캐시 테이블이므로 참조용으로만 사용
+      const footfall = funnel.entry;
+
+      // 데이터 일관성 검증 (경고 로깅만, footfall은 funnel.entry 사용)
+      if (Math.abs(kpiTotalVisitors - funnel.entry) > Math.max(kpiTotalVisitors, funnel.entry) * 0.01) {
+        console.warn('[useInsightMetrics] KPI cache vs funnel_events mismatch:', {
+          kpiTotalVisitors,
           funnelEntry: funnel.entry,
-          diff: Math.abs(footfall - funnel.entry),
-          percentDiff: footfall > 0 ? ((Math.abs(footfall - funnel.entry) / footfall) * 100).toFixed(1) + '%' : 'N/A',
-          suggestion: 'SEED_06 재실행 또는 RLS 정책 확인 필요'
+          diff: Math.abs(kpiTotalVisitors - funnel.entry),
+          percentDiff: kpiTotalVisitors > 0 ? ((Math.abs(kpiTotalVisitors - funnel.entry) / kpiTotalVisitors) * 100).toFixed(1) + '%' : 'N/A',
+          note: 'Using funnel.entry as source of truth'
         });
       }
 
@@ -191,28 +196,40 @@ export const useInsightMetrics = () => {
 
       const { data: prevKpis } = await supabase
         .from('daily_kpis_agg')
-        .select('total_visitors, unique_visitors, total_revenue')
+        .select('unique_visitors, total_revenue')
         .eq('org_id', orgId)
         .eq('store_id', selectedStore.id)
         .gte('date', prevStartDate.toISOString().split('T')[0])
         .lte('date', prevEndDate.toISOString().split('T')[0]);
 
-      const prevFootfall = prevKpis?.reduce((sum, k) => sum + (k.total_visitors || 0), 0) || 0;
       const prevUniqueVisitors = prevKpis?.reduce((sum, k) => sum + (k.unique_visitors || 0), 0) || 0;
       const prevRevenue = prevKpis?.reduce((sum, k) => sum + Number(k.total_revenue || 0), 0) || 0;
 
-      // 이전 기간 purchase count (전환율 변화 계산용)
-      const { count: prevPurchaseCount } = await supabase
-        .from('funnel_events')
-        .select('*', { count: 'exact', head: true })
-        .eq('org_id', orgId)
-        .eq('store_id', selectedStore.id)
-        .eq('event_type', 'purchase')
-        .gte('event_date', prevStartDate.toISOString().split('T')[0])
-        .lte('event_date', prevEndDate.toISOString().split('T')[0]);
+      // 이전 기간 entry/purchase count (전환율 변화 계산용) - funnel_events 싱글 소스
+      const [prevEntryResult, prevPurchaseResult] = await Promise.all([
+        supabase
+          .from('funnel_events')
+          .select('*', { count: 'exact', head: true })
+          .eq('org_id', orgId)
+          .eq('store_id', selectedStore.id)
+          .eq('event_type', 'entry')
+          .gte('event_date', prevStartDate.toISOString().split('T')[0])
+          .lte('event_date', prevEndDate.toISOString().split('T')[0]),
+        supabase
+          .from('funnel_events')
+          .select('*', { count: 'exact', head: true })
+          .eq('org_id', orgId)
+          .eq('store_id', selectedStore.id)
+          .eq('event_type', 'purchase')
+          .gte('event_date', prevStartDate.toISOString().split('T')[0])
+          .lte('event_date', prevEndDate.toISOString().split('T')[0])
+      ]);
+
+      const prevFootfall = prevEntryResult.count || 0;
+      const prevPurchaseCount = prevPurchaseResult.count || 0;
 
       const prevConversionRate = prevFootfall > 0
-        ? ((prevPurchaseCount || 0) / prevFootfall) * 100
+        ? (prevPurchaseCount / prevFootfall) * 100
         : 0;
 
       // ═══════════════════════════════════════════════════════════════

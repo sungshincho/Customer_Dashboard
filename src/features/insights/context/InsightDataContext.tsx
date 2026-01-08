@@ -682,11 +682,6 @@ export function useIntegratedMetrics(): {
     const kpi = baseKPIs.data;
     const funnel = funnelData.data;
 
-    // 방문 빈도: total / unique
-    const visitFrequency = kpi.uniqueVisitors > 0
-      ? kpi.totalVisitors / kpi.uniqueVisitors
-      : 0;
-
     // 재방문율: returning / unique * 100
     const repeatRate = kpi.uniqueVisitors > 0
       ? (kpi.returningVisitors / kpi.uniqueVisitors) * 100
@@ -697,8 +692,18 @@ export function useIntegratedMetrics(): {
       ? (funnel.purchase / funnel.entry) * 100
       : kpi.conversionRate;
 
+    // 🔧 FIX: FOOTFALL도 funnel.entry 기준으로 통일
+    // 이유: 개요탭의 FOOTFALL 카드와 퍼널차트 ENTRY가 동일 소스 사용
+    // daily_kpis_agg.total_visitors는 캐시/집계 테이블이므로 원본(funnel_events)과 다를 수 있음
+    const footfall = funnel.entry;
+
+    // 방문 빈도: footfall / unique (funnel 기준으로 계산)
+    const visitFrequency = kpi.uniqueVisitors > 0
+      ? footfall / kpi.uniqueVisitors
+      : 0;
+
     return {
-      footfall: kpi.totalVisitors,
+      footfall,
       uniqueVisitors: kpi.uniqueVisitors,
       visitFrequency,
       repeatRate,
