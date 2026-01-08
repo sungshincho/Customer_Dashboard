@@ -534,6 +534,7 @@ BEGIN
 END $$;
 
 -- 4-5. product_performance_agg 파생
+-- 4-5. product_performance_agg 파생
 DO $$
 DECLARE
   v_store_id UUID;
@@ -561,8 +562,9 @@ BEGIN
     CASE WHEN SUM(li.quantity) > 0 THEN ROUND(SUM(li.line_total)::NUMERIC / SUM(li.quantity), 0) ELSE 0 END,
     ROUND((RANDOM() * 0.2)::NUMERIC, 2),
     ROUND((RANDOM() * 0.05)::NUMERIC, 3),
-    COALESCE(p.stock_quantity, 50 + FLOOR(RANDOM() * 100)::INT),
-    CASE WHEN RANDOM() < 0.05 THEN FLOOR(RANDOM() * 4) ELSE 0 END,
+    -- ✅ 수정: p.stock_quantity 제거, 고정 랜덤 값 사용
+    (50 + FLOOR(RANDOM() * 100))::INT as stock_level,
+    CASE WHEN RANDOM() < 0.05 THEN FLOOR(RANDOM() * 4)::INT ELSE 0 END,
     ROW_NUMBER() OVER (PARTITION BY li.transaction_date, p.category ORDER BY SUM(li.line_total) DESC),
     ROW_NUMBER() OVER (PARTITION BY li.transaction_date ORDER BY SUM(li.line_total) DESC),
     NOW(),
@@ -572,7 +574,8 @@ BEGIN
   WHERE li.store_id = v_store_id
     AND li.transaction_date >= CURRENT_DATE - INTERVAL '6 days'
     AND li.product_id IS NOT NULL
-  GROUP BY li.product_id, li.transaction_date, p.stock_quantity, p.product_name, p.category
+  -- ✅ 수정: GROUP BY에서 p.stock_quantity 제거
+  GROUP BY li.product_id, li.transaction_date, p.product_name, p.category
   ON CONFLICT (store_id, product_id, date) DO UPDATE SET
     units_sold = EXCLUDED.units_sold,
     revenue = EXCLUDED.revenue,
