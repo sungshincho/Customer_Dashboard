@@ -510,13 +510,16 @@ export function ProductTab() {
     queryKey: ['product-performance', selectedStore?.id, dateRange, orgId],
     queryFn: async () => {
       if (!selectedStore?.id || !orgId) return [];
+      // 🔧 FIX: limit(10000) 추가 - Supabase 기본 1000행 제한 해결
+      // 90일 × 20상품 = 1800행 가능, 기본 limit 없으면 1000행만 반환됨
       const { data: perfData, error } = await supabase
         .from('product_performance_agg')
         .select('product_id, units_sold, revenue, stock_level')
         .eq('org_id', orgId)
         .eq('store_id', selectedStore.id)
         .gte('date', dateRange.startDate)
-        .lte('date', dateRange.endDate);
+        .lte('date', dateRange.endDate)
+        .limit(10000); // ⚠️ 기본 1000행 제한 해제
       if (error || !perfData?.length) return [];
       
       const map = new Map<string, { quantity: number; revenue: number; stock: number }>();
