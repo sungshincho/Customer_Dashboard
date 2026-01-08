@@ -6,11 +6,18 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { Target, DollarSign, Users, TrendingUp, ShoppingCart, Trash2, Trophy } from 'lucide-react';
+import { Target, DollarSign, Users, TrendingUp, ShoppingCart, Trash2, Trophy, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useGoalProgress, useDeleteGoal, formatGoalValue, GOAL_TYPES, GoalType } from '@/hooks/useGoals';
+import { useGoalProgress, useDeleteGoal, formatGoalValue, GOAL_TYPES, GoalType, PeriodType } from '@/hooks/useGoals';
 import { GoalSettingDialog } from './GoalSettingDialog';
 import React from 'react';
+
+// 기간 유형 라벨
+const PERIOD_LABELS: Record<PeriodType, string> = {
+  daily: '일간',
+  weekly: '주간',
+  monthly: '월간',
+};
 
 const getText3D = (isDark: boolean) => ({
   number: isDark ? {
@@ -291,6 +298,21 @@ export function GoalProgressWidget() {
                       <Icon className="h-3.5 w-3.5" style={{ color: isDark ? 'rgba(255,255,255,0.7)' : '#374151' }} />
                     </div>
                     <span style={{ fontSize: '14px', ...text3D.number }}>{goalType?.label}</span>
+                    {/* M-2: 기간 표시 (일간/주간/월간) */}
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '3px',
+                      padding: '3px 6px',
+                      borderRadius: '4px',
+                      fontSize: '10px',
+                      fontWeight: 500,
+                      background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                      color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280',
+                    }}>
+                      <Calendar className="h-2.5 w-2.5" />
+                      {PERIOD_LABELS[goal.period_type as PeriodType] || goal.period_type}
+                    </span>
                     {isAchieved && (
                       <Badge3D dark={isDark}>
                         <Trophy className="h-3 w-3" style={{ color: isDark ? 'rgba(255,255,255,0.8)' : '#374151' }} />
