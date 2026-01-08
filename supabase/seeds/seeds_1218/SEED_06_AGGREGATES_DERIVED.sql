@@ -423,7 +423,7 @@ BEGIN
     -- return_rate: 추정 (0~5%)
     ROUND((RANDOM() * 0.05)::NUMERIC, 3) as return_rate,
     -- stock_level: products 테이블에서 조회 또는 추정
-    COALESCE(p.stock_quantity, 50 + FLOOR(RANDOM() * 100)::INT) as stock_level,
+    COALESCE(p.stock, 50 + FLOOR(RANDOM() * 100)::INT) as stock_level,
     -- stockout_hours: 5% 확률로 품절
     CASE WHEN RANDOM() < 0.05 THEN FLOOR(RANDOM() * 4) ELSE 0 END as stockout_hours,
     -- category_rank: products 테이블 기준 (임시)
@@ -442,7 +442,7 @@ BEGIN
   JOIN products p ON p.id = li.product_id
   WHERE li.store_id = v_store_id
     AND li.product_id IS NOT NULL
-  GROUP BY li.product_id, li.transaction_date, p.stock_quantity, p.product_name, p.category
+  GROUP BY li.product_id, li.transaction_date, p.stock, p.product_name, p.category
   ORDER BY li.transaction_date, revenue DESC;
 
   GET DIAGNOSTICS v_count = ROW_COUNT;
