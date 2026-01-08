@@ -584,6 +584,7 @@ DECLARE
   v_kpi_revenue NUMERIC;
   v_li_units INT;
   v_kpi_units INT;
+  r RECORD;  -- ✅ 추가: RECORD 변수 선언
 BEGIN
   RAISE NOTICE '';
   RAISE NOTICE '═══════════════════════════════════════════════════════════════';
