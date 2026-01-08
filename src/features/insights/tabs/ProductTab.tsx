@@ -542,15 +542,34 @@ export function ProductTab() {
     enabled: !!selectedStore?.id && !!orgId,
   });
 
+  // 🔧 FIX: 하이브리드 정규화 - daily_kpis_agg 총액 기준으로 product_performance_agg 비율 적용
+  // 차트 중앙 총액 = daily_kpis_agg.total_revenue, 카테고리 비율 = product_performance_agg 기준
   const categoryData = useMemo(() => {
     if (!productData?.length) return [];
+
+    // 1. product_performance_agg에서 카테고리별 원본 합계 계산
     const map = new Map<string, { revenue: number; quantity: number }>();
     productData.forEach(p => {
       const e = map.get(p.category) || { revenue: 0, quantity: 0 };
       map.set(p.category, { revenue: e.revenue + p.revenue, quantity: e.quantity + p.quantity });
     });
-    return [...map.entries()].map(([name, d]) => ({ name, ...d })).sort((a, b) => b.revenue - a.revenue);
-  }, [productData]);
+
+    // 2. product_performance_agg 매출 총합
+    const productPerfTotal = productData.reduce((s, p) => s + p.revenue, 0);
+
+    // 3. daily_kpis_agg 기준 총 매출 (개요탭과 동일)
+    const kpiTotalRevenue = metrics?.revenue || productPerfTotal;
+
+    // 4. 정규화 비율 계산 (product_performance_agg → daily_kpis_agg 스케일링)
+    const revenueRatio = productPerfTotal > 0 ? kpiTotalRevenue / productPerfTotal : 1;
+
+    // 5. 각 카테고리에 정규화 적용
+    return [...map.entries()].map(([name, d]) => ({
+      name,
+      revenue: Math.round(d.revenue * revenueRatio), // 정규화된 매출 (합계 = kpiTotalRevenue)
+      quantity: d.quantity, // 판매량은 원본 유지 (product_performance_agg 기준)
+    })).sort((a, b) => b.revenue - a.revenue);
+  }, [productData, metrics?.revenue]);
 
   const summary = useMemo(() => {
     const totalRevenue = productData?.reduce((s, p) => s + p.revenue, 0) || 0;
