@@ -571,8 +571,8 @@ export function ProductTab() {
               <Icon3D size={40} dark={isDark}><DollarSign className="h-5 w-5" style={{ color: iconColor }} /></Icon3D>
               <div><p style={text3D.label}>REVENUE</p><p style={{ fontSize: '12px', ...text3D.body }}>총 매출</p></div>
             </div>
-            {/* 🔧 FIX: 카테고리 분포와 일관성을 위해 product_performance_agg 기준 사용 */}
-            <p style={{ fontSize: '28px', ...text3D.heroNumber }}>{formatCurrency(summary.totalRevenue)}</p>
+            {/* 🔧 FIX: 개요탭과 동일 소스(daily_kpis_agg) 사용으로 데이터 일관성 확보 */}
+            <p style={{ fontSize: '28px', ...text3D.heroNumber }}>{formatCurrency(metrics?.revenue || 0)}</p>
             <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>분석 기간 총 매출</p>
           </div>
         </Glass3DCard>
