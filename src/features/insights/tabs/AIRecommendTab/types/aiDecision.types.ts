@@ -9,7 +9,7 @@
 // ============================================================================
 
 export interface DemandForecast {
-  period: '7d' | '14d' | '30d';
+  period: '7d' | '14d' | '30d' | string;
   predictedRevenue: number;
   predictedVisitors: number;
   confidence: number;
@@ -34,8 +34,8 @@ export interface SeasonTrend {
 
 export interface RiskPrediction {
   id: string;
-  type: 'stockout' | 'demand_drop' | 'competition' | 'seasonal';
-  severity: 'high' | 'medium' | 'low';
+  type: 'stockout' | 'demand_drop' | 'competition' | 'seasonal' | 'conversion_drop' | 'demand_spike' | 'overstock';
+  severity: 'critical' | 'high' | 'medium' | 'low';
   productName?: string;
   description: string;
   probability: number;

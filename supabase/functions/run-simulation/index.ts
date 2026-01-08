@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.79.0';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.89.0';
 import { logAIResponse, createExecutionTimer } from '../_shared/aiResponseLogger.ts';
 
 /**

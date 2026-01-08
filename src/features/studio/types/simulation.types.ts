@@ -342,6 +342,9 @@ export interface SimulationOptions {
   // 환경 컨텍스트 (시뮬레이션/실시간 환경 설정)
   environment_context?: unknown;
 
+  // 트래픽 배수 (이벤트/프로모션 시 증가율)
+  traffic_multiplier?: number;
+
   // UI 옵션
   realTimeVisualization: boolean;
   showCustomerStates: boolean;
