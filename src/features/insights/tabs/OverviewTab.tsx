@@ -24,7 +24,7 @@ import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { useAIRecommendations } from '@/hooks/useAIRecommendations';
 import { useDateFilterStore } from '@/store/dateFilterStore';
 import { cn } from '@/lib/utils';
-import { useInsightMetrics } from '../hooks/useInsightMetrics';
+import { useIntegratedMetrics } from '../context/InsightDataContext';
 import { GoalProgressWidget } from '@/components/goals/GoalProgressWidget';
 import { AIRecommendationEffectWidget } from '@/components/dashboard/AIRecommendationEffectWidget';
 
@@ -346,7 +346,7 @@ export function OverviewTab() {
 
   const { selectedStore } = useSelectedStore();
   const { dateRange } = useDateFilterStore();
-  const { data: metrics, isLoading } = useInsightMetrics();
+  const { data: metrics, isLoading } = useIntegratedMetrics();
   const { data: recommendations } = useAIRecommendations(selectedStore?.id);
 
   const topRecommendations = recommendations?.slice(0, 2) || [];

@@ -18,10 +18,8 @@ import {
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { useDateFilterStore } from '@/store/dateFilterStore';
 import { useZoneMetricsByDateRange, useZonesDim } from '@/hooks/useZoneMetrics';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { useInsightMetrics } from '../hooks/useInsightMetrics';
+import { useIntegratedMetrics, useHourlyVisitors } from '../context/InsightDataContext';
 import { formatDuration } from '../components';
 
 // 3D Text 스타일 (다크모드 지원)
@@ -590,8 +588,9 @@ const GlowZoneDonutChart = ({ data, isDark }: ZoneDonutChartProps) => {
 export function StoreTab() {
   const { selectedStore } = useSelectedStore();
   const { dateRange } = useDateFilterStore();
-  const { user, orgId } = useAuth();
-  const { data: metrics } = useInsightMetrics();
+  const { orgId } = useAuth();
+  const { data: metrics } = useIntegratedMetrics();
+  const { data: hourlyRawData } = useHourlyVisitors();
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
@@ -607,28 +606,14 @@ export function StoreTab() {
   const text3D = getText3D(isDark);
   const iconColor = isDark ? 'rgba(255,255,255,0.8)' : '#1a1a1f';
 
-  const { data: hourlyData } = useQuery({
-    queryKey: ['store-hourly-visits', selectedStore?.id, dateRange, orgId],
-    queryFn: async () => {
-      if (!selectedStore?.id || !orgId) return [];
-      const { data, error } = await supabase
-        .from('funnel_events')
-        .select('event_hour')
-        .eq('org_id', orgId)
-        .eq('store_id', selectedStore.id)
-        .eq('event_type', 'entry')
-        .gte('event_date', dateRange.startDate)
-        .lte('event_date', dateRange.endDate);
-      if (error) return [];
-      const hourlyMap = new Map<number, number>();
-      (data || []).forEach((d) => {
-        const hour = d.event_hour || 0;
-        hourlyMap.set(hour, (hourlyMap.get(hour) || 0) + 1);
-      });
-      return Array.from({ length: 24 }, (_, hour) => ({ hour: `${hour}시`, visitors: hourlyMap.get(hour) || 0 }));
-    },
-    enabled: !!selectedStore?.id && !!orgId,
-  });
+  // 시간대별 데이터 변환 (Context에서 제공하는 데이터 형식 → 차트 형식)
+  const hourlyData = useMemo(() => {
+    if (!hourlyRawData) return [];
+    return hourlyRawData.map(d => ({
+      hour: `${d.hour}시`,
+      visitors: d.count,
+    }));
+  }, [hourlyRawData]);
 
   const { data: rawZoneMetrics } = useZoneMetricsByDateRange(selectedStore?.id, dateRange.startDate, dateRange.endDate);
   const { data: zonesDim } = useZonesDim(selectedStore?.id);

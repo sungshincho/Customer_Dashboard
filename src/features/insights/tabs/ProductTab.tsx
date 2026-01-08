@@ -9,7 +9,7 @@ import { useMemo, useState, useEffect, useRef } from 'react';
 import { Glass3DCard, Icon3D, text3DStyles } from '@/components/ui/glass-card';
 import { Package, DollarSign, AlertTriangle, Award, Info } from 'lucide-react';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
-import { useInsightMetrics } from '../hooks/useInsightMetrics';
+import { useIntegratedMetrics } from '../context/InsightDataContext';
 import { formatCurrency } from '../components';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -490,7 +490,7 @@ export function ProductTab() {
   const { selectedStore } = useSelectedStore();
   const { dateRange } = useDateFilterStore();
   const { orgId } = useAuth();
-  const { data: metrics, isLoading: metricsLoading } = useInsightMetrics();
+  const { data: metrics, isLoading: metricsLoading } = useIntegratedMetrics();
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {

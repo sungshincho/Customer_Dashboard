@@ -21,7 +21,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useDateFilterStore } from '@/store/dateFilterStore';
 import { useAuth } from '@/hooks/useAuth';
-import { useInsightMetrics } from '../hooks/useInsightMetrics';
+import { useIntegratedMetrics } from '../context/InsightDataContext';
 
 // 3D Text 스타일 (다크모드 지원)
 const getText3D = (isDark: boolean) => ({
@@ -866,7 +866,7 @@ export function CustomerTab() {
   const { selectedStore } = useSelectedStore();
   const { dateRange } = useDateFilterStore();
   const { user, orgId } = useAuth();
-  const { data: metrics, isLoading: metricsLoading } = useInsightMetrics();
+  const { data: metrics, isLoading: metricsLoading } = useIntegratedMetrics();
   const [isDark, setIsDark] = useState(false);
 
   // 다크모드 감지
