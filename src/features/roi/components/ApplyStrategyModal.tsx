@@ -124,8 +124,23 @@ export const ApplyStrategyModal: React.FC<ApplyStrategyModalProps> = ({
           (new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)
         );
 
+        const effectiveStoreId = selectedStore?.id || input.settings?.storeId;
+
+        if (!effectiveStoreId) {
+          // storeId가 없으면 ROI 추적 없이 전략만 적용
+          console.warn('storeId가 없어 ROI 추적을 건너뜁니다');
+          toast.success('전략이 적용되었습니다', {
+            description: '매장을 선택하면 ROI 추적이 가능합니다',
+          });
+          onClose();
+          if (navigateToROI) {
+            navigate('/roi');
+          }
+          return;
+        }
+
         applyRecommendation({
-          storeId: selectedStore?.id || input.settings?.storeId || '',
+          storeId: effectiveStoreId,
           recommendationType: getRecommendationType(strategyData.sourceModule),
           recommendationSummary: name.trim(),
           recommendationDetails: {
@@ -155,9 +170,9 @@ export const ApplyStrategyModal: React.FC<ApplyStrategyModalProps> = ({
           },
           onError: (error) => {
             // recommendation_applications 저장 실패해도 applied_strategies는 이미 저장됨
-            console.warn('recommendation_applications 저장 실패:', error);
-            toast.success('전략이 적용되었습니다', {
-              description: 'ROI 측정 대시보드에서 성과를 추적할 수 있습니다',
+            console.error('ROI 추적 저장 실패:', error);
+            toast.warning('전략이 적용되었으나 ROI 추적에 실패했습니다', {
+              description: error instanceof Error ? error.message : '잠시 후 다시 시도해주세요',
             });
             onClose();
             if (navigateToROI) {
