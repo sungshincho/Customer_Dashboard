@@ -267,14 +267,29 @@ export function InsightDataProvider({ children, initialTab = 'overview' }: Insig
       const counts = { entry: 0, browse: 0, engage: 0, fitting: 0, purchase: 0 };
       const hourlyEntryMap = new Map<number, number>();
 
+      // 구 event_type → 신 event_type 매핑 (데이터 마이그레이션 전 호환성)
+      const eventTypeMapping: Record<string, keyof typeof counts> = {
+        // 신규 값 (그대로)
+        'entry': 'entry',
+        'browse': 'browse',
+        'engage': 'engage',
+        'fitting': 'fitting',
+        'purchase': 'purchase',
+        // 구 값 → 신 값 매핑
+        'awareness': 'entry',
+        'interest': 'browse',
+        'consideration': 'engage',
+        'intent': 'fitting',
+      };
+
       (data || []).forEach(event => {
-        const eventType = event.event_type as keyof typeof counts;
-        if (counts[eventType] !== undefined) {
-          counts[eventType]++;
+        const mappedType = eventTypeMapping[event.event_type];
+        if (mappedType) {
+          counts[mappedType]++;
         }
 
-        // 시간대별 entry 집계
-        if (event.event_type === 'entry' && event.event_hour !== null) {
+        // 시간대별 entry 집계 (awareness도 entry로 간주)
+        if ((event.event_type === 'entry' || event.event_type === 'awareness') && event.event_hour !== null) {
           const hour = event.event_hour;
           hourlyEntryMap.set(hour, (hourlyEntryMap.get(hour) || 0) + 1);
         }
