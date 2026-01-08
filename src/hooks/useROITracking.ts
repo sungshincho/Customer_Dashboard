@@ -317,6 +317,7 @@ export function useApplyRecommendation() {
       measurementDays?: number;
     }) => {
       if (!user?.id || !orgId) throw new Error('User not authenticated');
+      if (!storeId) throw new Error('Store ID is required for ROI tracking');
 
       // 현재 KPI를 베이스라인으로 캡처
       const baselineKpis = await fetchCurrentKPIs(storeId, 7);
