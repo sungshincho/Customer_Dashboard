@@ -19,6 +19,13 @@ export interface AIRecommendation {
   created_at: string;
 }
 
+// 우선순위 정렬을 위한 매핑 (high > medium > low)
+const PRIORITY_ORDER: Record<string, number> = {
+  high: 3,
+  medium: 2,
+  low: 1,
+};
+
 export function useAIRecommendations(storeId?: string) {
   const { user, orgId } = useAuth();
   const queryClient = useQueryClient();
@@ -35,12 +42,20 @@ export function useAIRecommendations(storeId?: string) {
         .eq('org_id', orgId)
         .eq('store_id', storeId)
         .eq('is_displayed', true)
-        .order('priority', { ascending: false })
         .order('created_at', { ascending: false })
-        .limit(3);
+        .limit(10); // 더 많이 가져와서 클라이언트에서 정렬
 
       if (error) throw error;
-      return (data || []) as AIRecommendation[];
+
+      // 클라이언트 측 우선순위 정렬 (high > medium > low)
+      const sorted = (data || []).sort((a, b) => {
+        const priorityDiff = (PRIORITY_ORDER[b.priority] || 0) - (PRIORITY_ORDER[a.priority] || 0);
+        if (priorityDiff !== 0) return priorityDiff;
+        // 같은 우선순위면 생성일 기준 최신순
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+
+      return sorted.slice(0, 3) as AIRecommendation[];
     },
     enabled: !!user && !!storeId,
   });

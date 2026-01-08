@@ -427,24 +427,38 @@ export function OverviewTab() {
 
             <GlowFunnelChart data={metrics.funnel} isDark={isDark} />
 
-            {/* Drop-off Alert */}
-            <div style={{
-              padding: '10px 14px', borderRadius: '10px', marginTop: '16px',
-              background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-              border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.06)',
-              display: 'flex', alignItems: 'center', gap: '8px',
-            }}>
-              <div style={{
-                width: '20px', height: '20px', borderRadius: '50%',
-                background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <span style={{ color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280', fontSize: '12px' }}>!</span>
-              </div>
-              <span style={{ fontSize: '12px', color: isDark ? 'rgba(255,255,255,0.8)' : '#515158' }}>
-                최대 이탈 구간: 입장 → 탐색
-              </span>
-            </div>
+            {/* Drop-off Alert - 동적 계산 */}
+            {(() => {
+              // 퍼널 단계별 이탈률 계산
+              const funnel = metrics.funnel;
+              const stages = [
+                { from: '입장', to: '탐색', dropoff: funnel.entry > 0 ? ((funnel.entry - funnel.browse) / funnel.entry) * 100 : 0 },
+                { from: '탐색', to: '관심', dropoff: funnel.browse > 0 ? ((funnel.browse - funnel.engage) / funnel.browse) * 100 : 0 },
+                { from: '관심', to: '피팅', dropoff: funnel.engage > 0 ? ((funnel.engage - funnel.fitting) / funnel.engage) * 100 : 0 },
+                { from: '피팅', to: '구매', dropoff: funnel.fitting > 0 ? ((funnel.fitting - funnel.purchase) / funnel.fitting) * 100 : 0 },
+              ];
+              const maxDropoff = stages.reduce((max, stage) => stage.dropoff > max.dropoff ? stage : max, stages[0]);
+
+              return (
+                <div style={{
+                  padding: '10px 14px', borderRadius: '10px', marginTop: '16px',
+                  background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                  border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.06)',
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                }}>
+                  <div style={{
+                    width: '20px', height: '20px', borderRadius: '50%',
+                    background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <span style={{ color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280', fontSize: '12px' }}>!</span>
+                  </div>
+                  <span style={{ fontSize: '12px', color: isDark ? 'rgba(255,255,255,0.8)' : '#515158' }}>
+                    최대 이탈 구간: {maxDropoff.from} → {maxDropoff.to} ({maxDropoff.dropoff.toFixed(1)}%)
+                  </span>
+                </div>
+              );
+            })()}
 
             {/* Final Conversion */}
             <div style={{ marginTop: '16px', textAlign: 'right' }}>

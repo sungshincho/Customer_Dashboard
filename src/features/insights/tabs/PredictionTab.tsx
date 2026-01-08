@@ -222,7 +222,7 @@ const GlowRevenueChart = ({ data, isDark }: { data: ChartDataPoint[]; isDark: bo
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, width, height);
 
-    const pad = { top: 30, right: 20, bottom: 50, left: 80 };
+    const pad = { top: 30, right: 20, bottom: 50, left: 90 }; // Y축 라벨 공간 확보
     const chartW = width - pad.left - pad.right;
     const chartH = height - pad.top - pad.bottom;
 
@@ -241,14 +241,19 @@ const GlowRevenueChart = ({ data, isDark }: { data: ChartDataPoint[]; isDark: bo
       ctx.stroke();
     }
 
-    // Y축 라벨
+    // Y축 라벨 (간략 포맷)
+    const formatCompact = (val: number): string => {
+      if (val >= 100000000) return `${(val / 100000000).toFixed(1)}억`;
+      if (val >= 10000) return `${Math.round(val / 10000)}만`;
+      return formatCurrency(val);
+    };
     ctx.font = '11px system-ui';
     ctx.fillStyle = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)';
     ctx.textAlign = 'right';
     for (let i = 0; i <= 5; i++) {
       const y = pad.top + (chartH / 5) * i;
       const val = maxRev - ((maxRev - minRev) / 5) * i;
-      ctx.fillText(formatCurrency(val), pad.left - 10, y + 4);
+      ctx.fillText(formatCompact(val), pad.left - 10, y + 4);
     }
 
     // X축 라벨
