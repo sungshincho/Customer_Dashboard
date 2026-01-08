@@ -242,69 +242,80 @@ export function InsightDataProvider({ children, initialTab = 'overview' }: Insig
   });
 
   // ========================================================================
-  // 2. 퍼널 데이터 - funnel_events 단일 소스 (항상 로드)
+  // 2. 퍼널 데이터 - funnel_events 서버사이드 COUNT (항상 로드)
   // ========================================================================
   const funnelData = useQuery({
     queryKey: ['insight-funnel', storeId, startDate, endDate, orgId],
     queryFn: async (): Promise<FunnelData | null> => {
       if (!storeId || !orgId) return null;
 
-      const { data, error } = await supabase
-        .from('funnel_events')
-        .select('event_type, event_hour')
-        .eq('org_id', orgId)
-        .eq('store_id', storeId)
-        .gte('event_date', startDate)
-        .lte('event_date', endDate)
-        .limit(50000); // 충분한 limit 설정
+      // 🔧 FIX: 서버사이드 COUNT 사용 - 클라이언트 집계 대신 DB에서 직접 카운트
+      // 이렇게 하면 RLS 통과 후에도 정확한 COUNT를 반환받을 수 있음
+      const eventTypes = ['entry', 'browse', 'engage', 'fitting', 'purchase'] as const;
 
-      if (error) {
+      try {
+        // 병렬로 각 event_type별 COUNT 쿼리 실행
+        const countResults = await Promise.all(
+          eventTypes.map(async (type) => {
+            const { count, error } = await supabase
+              .from('funnel_events')
+              .select('*', { count: 'exact', head: true })
+              .eq('org_id', orgId)
+              .eq('store_id', storeId)
+              .eq('event_type', type)
+              .gte('event_date', startDate)
+              .lte('event_date', endDate);
+
+            if (error) {
+              console.error(`[InsightDataProvider] Funnel count error for ${type}:`, error);
+              return 0;
+            }
+            return count || 0;
+          })
+        );
+
+        const counts = {
+          entry: countResults[0],
+          browse: countResults[1],
+          engage: countResults[2],
+          fitting: countResults[3],
+          purchase: countResults[4],
+        };
+
+        // 시간대별 entry 데이터 (별도 쿼리 - 최대 24개 행만 필요)
+        const { data: hourlyData, error: hourlyError } = await supabase
+          .rpc('get_hourly_entry_counts', {
+            p_org_id: orgId,
+            p_store_id: storeId,
+            p_start_date: startDate,
+            p_end_date: endDate,
+          });
+
+        let hourlyEntry: { hour: number; count: number }[] = [];
+
+        if (hourlyError || !hourlyData) {
+          // RPC 함수가 없으면 기본값 사용 (hourly 데이터는 선택적)
+          console.warn('[InsightDataProvider] Hourly data RPC not available, using empty array');
+          hourlyEntry = Array.from({ length: 24 }, (_, hour) => ({ hour, count: 0 }));
+        } else {
+          // RPC 결과를 배열로 변환
+          const hourlyMap = new Map(hourlyData.map((h: { hour: number; count: number }) => [h.hour, h.count]));
+          hourlyEntry = Array.from({ length: 24 }, (_, hour) => ({
+            hour,
+            count: hourlyMap.get(hour) || 0,
+          }));
+        }
+
+        console.log('[InsightDataProvider] Funnel counts (server-side):', counts);
+
+        return {
+          ...counts,
+          hourlyEntry,
+        };
+      } catch (error) {
         console.error('[InsightDataProvider] Funnel data error:', error);
         return null;
       }
-
-      // 이벤트 타입별 카운트
-      const counts = { entry: 0, browse: 0, engage: 0, fitting: 0, purchase: 0 };
-      const hourlyEntryMap = new Map<number, number>();
-
-      // 구 event_type → 신 event_type 매핑 (데이터 마이그레이션 전 호환성)
-      const eventTypeMapping: Record<string, keyof typeof counts> = {
-        // 신규 값 (그대로)
-        'entry': 'entry',
-        'browse': 'browse',
-        'engage': 'engage',
-        'fitting': 'fitting',
-        'purchase': 'purchase',
-        // 구 값 → 신 값 매핑
-        'awareness': 'entry',
-        'interest': 'browse',
-        'consideration': 'engage',
-        'intent': 'fitting',
-      };
-
-      (data || []).forEach(event => {
-        const mappedType = eventTypeMapping[event.event_type];
-        if (mappedType) {
-          counts[mappedType]++;
-        }
-
-        // 시간대별 entry 집계 (awareness도 entry로 간주)
-        if ((event.event_type === 'entry' || event.event_type === 'awareness') && event.event_hour !== null) {
-          const hour = event.event_hour;
-          hourlyEntryMap.set(hour, (hourlyEntryMap.get(hour) || 0) + 1);
-        }
-      });
-
-      // 시간대별 데이터 배열로 변환 (0-23시)
-      const hourlyEntry = Array.from({ length: 24 }, (_, hour) => ({
-        hour,
-        count: hourlyEntryMap.get(hour) || 0,
-      }));
-
-      return {
-        ...counts,
-        hourlyEntry,
-      };
     },
     enabled: !!storeId && !!orgId,
     staleTime: STALE_TIME,
