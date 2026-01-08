@@ -1,10 +1,15 @@
 -- =====================================================
--- SEED_09_DATE_REFRESH.sql (v3.1 - 전체 L3 재생성)
+-- SEED_09_DATE_REFRESH.sql (v3.2 - org/store 일관성 수정)
 --
 -- 인사이트 허브 데이터 날짜 업데이트 및 보강
 -- 수정일: 2026-01-08
 --
--- 핵심 변경 (v3.1):
+-- 핵심 변경 (v3.2):
+-- - 모든 PART에서 일관된 org_id/store_id 선택 로직 적용
+-- - 프론트엔드와 동일한 org 기준으로 store 선택
+-- - TCAG/MVP org 우선, 없으면 첫 번째 org 사용
+--
+-- v3.1 변경:
 -- - PART 3: 전체 L3 데이터 삭제 (7일만이 아닌 전체)
 -- - PART 4: 전체 기간 L3 데이터 재생성 (7일만이 아닌 전체)
 -- - 이를 통해 모든 기간에서 L2-L3 값 일관성 보장
@@ -17,7 +22,7 @@
 -- - L3 집계 데이터는 L2에서 파생 (SEED_06_DERIVED 방식 적용)
 -- =====================================================
 
--- 대상 store_id (동적으로 조회)
+-- 대상 store_id (일관된 선택 로직)
 
 -- =====================================================
 -- PART 1: 기존 데이터 날짜 업데이트 (동적 shift)
@@ -31,16 +36,30 @@ DECLARE
   v_max_date DATE;
   v_shift_days INT;
 BEGIN
-  -- Store/Org 정보 가져오기
-  SELECT id, org_id INTO v_store_id, v_org_id FROM stores LIMIT 1;
+  -- 일관된 Org/Store 선택 (프론트엔드와 동일한 로직)
+  -- 1. TCAG 또는 MVP org 우선 선택
+  SELECT id INTO v_org_id FROM organizations
+  WHERE org_name ILIKE '%TCAG%' OR org_name ILIKE '%MVP%'
+  LIMIT 1;
+
+  -- 2. 없으면 첫 번째 org 선택
+  IF v_org_id IS NULL THEN
+    SELECT id INTO v_org_id FROM organizations LIMIT 1;
+  END IF;
+
+  -- 3. 해당 org의 store 선택 (created_at ASC 순서 - 프론트엔드와 동일)
+  SELECT id INTO v_store_id FROM stores
+  WHERE org_id = v_org_id
+  ORDER BY created_at ASC
+  LIMIT 1;
 
   IF v_store_id IS NULL THEN
-    RAISE EXCEPTION 'stores 테이블에 데이터가 없습니다.';
+    RAISE EXCEPTION 'stores 테이블에 org_id=%에 해당하는 데이터가 없습니다.', v_org_id;
   END IF;
 
   RAISE NOTICE '═══════════════════════════════════════════════════════════════';
-  RAISE NOTICE 'SEED_09 v2: L2 기반 날짜 갱신 시작';
-  RAISE NOTICE 'store_id: %', v_store_id;
+  RAISE NOTICE 'SEED_09 v3.2: L2 기반 날짜 갱신 시작';
+  RAISE NOTICE 'org_id: %, store_id: %', v_org_id, v_store_id;
   RAISE NOTICE '═══════════════════════════════════════════════════════════════';
 
   -- 가장 최근 funnel_events 날짜 확인
@@ -146,8 +165,15 @@ DECLARE
   v_i INT;
   v_tx_amount NUMERIC;
 BEGIN
-  -- Store/Org/User 정보 가져오기
-  SELECT id, org_id, user_id INTO v_store_id, v_org_id, v_user_id FROM stores LIMIT 1;
+  -- 일관된 Org/Store 선택 (PART 1과 동일)
+  SELECT id INTO v_org_id FROM organizations
+  WHERE org_name ILIKE '%TCAG%' OR org_name ILIKE '%MVP%' LIMIT 1;
+  IF v_org_id IS NULL THEN
+    SELECT id INTO v_org_id FROM organizations LIMIT 1;
+  END IF;
+
+  SELECT id, user_id INTO v_store_id, v_user_id FROM stores
+  WHERE org_id = v_org_id ORDER BY created_at ASC LIMIT 1;
 
   -- 상품/존 ID 배열
   SELECT ARRAY_AGG(id) INTO v_product_ids FROM products WHERE store_id = v_store_id;
@@ -291,9 +317,17 @@ DECLARE
   v_store_id UUID;
   v_org_id UUID;
 BEGIN
-  SELECT id, org_id INTO v_store_id, v_org_id FROM stores LIMIT 1;
+  -- 일관된 Org/Store 선택 (PART 1과 동일)
+  SELECT id INTO v_org_id FROM organizations
+  WHERE org_name ILIKE '%TCAG%' OR org_name ILIKE '%MVP%' LIMIT 1;
+  IF v_org_id IS NULL THEN
+    SELECT id INTO v_org_id FROM organizations LIMIT 1;
+  END IF;
 
-  RAISE NOTICE '[PART 3] 전체 L3 집계 데이터 삭제 (L2 기반 완전 재생성 준비)...';
+  SELECT id INTO v_store_id FROM stores
+  WHERE org_id = v_org_id ORDER BY created_at ASC LIMIT 1;
+
+  RAISE NOTICE '[PART 3] 전체 L3 집계 데이터 삭제 (org_id: %, store_id: %)...', v_org_id, v_store_id;
 
   DELETE FROM daily_kpis_agg WHERE org_id = v_org_id AND store_id = v_store_id;
   DELETE FROM daily_sales WHERE org_id = v_org_id AND store_id = v_store_id;
@@ -318,9 +352,17 @@ DECLARE
   v_org_id UUID;
   v_count INT := 0;
 BEGIN
-  SELECT id, org_id INTO v_store_id, v_org_id FROM stores LIMIT 1;
+  -- 일관된 Org/Store 선택 (PART 1과 동일)
+  SELECT id INTO v_org_id FROM organizations
+  WHERE org_name ILIKE '%TCAG%' OR org_name ILIKE '%MVP%' LIMIT 1;
+  IF v_org_id IS NULL THEN
+    SELECT id INTO v_org_id FROM organizations LIMIT 1;
+  END IF;
 
-  RAISE NOTICE '[PART 4-1] daily_kpis_agg 파생 (funnel_events + transactions 기반)...';
+  SELECT id INTO v_store_id FROM stores
+  WHERE org_id = v_org_id ORDER BY created_at ASC LIMIT 1;
+
+  RAISE NOTICE '[PART 4-1] daily_kpis_agg 파생 (org: %, store: %)...', v_org_id, v_store_id;
 
   INSERT INTO daily_kpis_agg (
     org_id, store_id, date,
@@ -411,7 +453,15 @@ DECLARE
   v_count INT := 0;
   v_table_exists BOOLEAN;
 BEGIN
-  SELECT id, org_id INTO v_store_id, v_org_id FROM stores LIMIT 1;
+  -- 일관된 Org/Store 선택 (PART 1과 동일)
+  SELECT id INTO v_org_id FROM organizations
+  WHERE org_name ILIKE '%TCAG%' OR org_name ILIKE '%MVP%' LIMIT 1;
+  IF v_org_id IS NULL THEN
+    SELECT id INTO v_org_id FROM organizations LIMIT 1;
+  END IF;
+
+  SELECT id INTO v_store_id FROM stores
+  WHERE org_id = v_org_id ORDER BY created_at ASC LIMIT 1;
 
   -- daily_sales 테이블 존재 여부 확인
   SELECT EXISTS (
@@ -454,9 +504,17 @@ DECLARE
   v_org_id UUID;
   v_count INT := 0;
 BEGIN
-  SELECT id, org_id INTO v_store_id, v_org_id FROM stores LIMIT 1;
+  -- 일관된 Org/Store 선택 (PART 1과 동일)
+  SELECT id INTO v_org_id FROM organizations
+  WHERE org_name ILIKE '%TCAG%' OR org_name ILIKE '%MVP%' LIMIT 1;
+  IF v_org_id IS NULL THEN
+    SELECT id INTO v_org_id FROM organizations LIMIT 1;
+  END IF;
 
-  RAISE NOTICE '[PART 4-3] hourly_metrics 파생 (funnel_events 기반)...';
+  SELECT id INTO v_store_id FROM stores
+  WHERE org_id = v_org_id ORDER BY created_at ASC LIMIT 1;
+
+  RAISE NOTICE '[PART 4-3] hourly_metrics 파생 (org: %, store: %)...', v_org_id, v_store_id;
 
   INSERT INTO hourly_metrics (
     org_id, store_id, date, hour,
@@ -512,9 +570,17 @@ DECLARE
   v_org_id UUID;
   v_count INT := 0;
 BEGIN
-  SELECT id, org_id INTO v_store_id, v_org_id FROM stores LIMIT 1;
+  -- 일관된 Org/Store 선택 (PART 1과 동일)
+  SELECT id INTO v_org_id FROM organizations
+  WHERE org_name ILIKE '%TCAG%' OR org_name ILIKE '%MVP%' LIMIT 1;
+  IF v_org_id IS NULL THEN
+    SELECT id INTO v_org_id FROM organizations LIMIT 1;
+  END IF;
 
-  RAISE NOTICE '[PART 4-4] zone_daily_metrics 파생 (zone_events 기반)...';
+  SELECT id INTO v_store_id FROM stores
+  WHERE org_id = v_org_id ORDER BY created_at ASC LIMIT 1;
+
+  RAISE NOTICE '[PART 4-4] zone_daily_metrics 파생 (org: %, store: %)...', v_org_id, v_store_id;
 
   INSERT INTO zone_daily_metrics (
     org_id, store_id, zone_id, date,
@@ -569,9 +635,17 @@ DECLARE
   v_org_id UUID;
   v_count INT := 0;
 BEGIN
-  SELECT id, org_id INTO v_store_id, v_org_id FROM stores LIMIT 1;
+  -- 일관된 Org/Store 선택 (PART 1과 동일)
+  SELECT id INTO v_org_id FROM organizations
+  WHERE org_name ILIKE '%TCAG%' OR org_name ILIKE '%MVP%' LIMIT 1;
+  IF v_org_id IS NULL THEN
+    SELECT id INTO v_org_id FROM organizations LIMIT 1;
+  END IF;
 
-  RAISE NOTICE '[PART 4-5] product_performance_agg 파생 (line_items 기반)...';
+  SELECT id INTO v_store_id FROM stores
+  WHERE org_id = v_org_id ORDER BY created_at ASC LIMIT 1;
+
+  RAISE NOTICE '[PART 4-5] product_performance_agg 파생 (org: %, store: %)...', v_org_id, v_store_id;
 
   INSERT INTO product_performance_agg (
     org_id, store_id, product_id, date,
@@ -623,9 +697,17 @@ DECLARE
   v_count INT := 0;
   v_seg_data RECORD;
 BEGIN
-  SELECT id, org_id INTO v_store_id, v_org_id FROM stores LIMIT 1;
+  -- 일관된 Org/Store 선택 (PART 1과 동일)
+  SELECT id INTO v_org_id FROM organizations
+  WHERE org_name ILIKE '%TCAG%' OR org_name ILIKE '%MVP%' LIMIT 1;
+  IF v_org_id IS NULL THEN
+    SELECT id INTO v_org_id FROM organizations LIMIT 1;
+  END IF;
 
-  RAISE NOTICE '[PART 4-6] customer_segments_agg 파생 (transactions 기반)...';
+  SELECT id INTO v_store_id FROM stores
+  WHERE org_id = v_org_id ORDER BY created_at ASC LIMIT 1;
+
+  RAISE NOTICE '[PART 4-6] customer_segments_agg 파생 (org: %, store: %)...', v_org_id, v_store_id;
 
   FOR v_date IN
     SELECT DISTINCT transaction_datetime::date
@@ -697,9 +779,17 @@ DECLARE
   v_org_id UUID;
   v_count INT := 0;
 BEGIN
-  SELECT id, org_id INTO v_store_id, v_org_id FROM stores LIMIT 1;
+  -- 일관된 Org/Store 선택 (PART 1과 동일)
+  SELECT id INTO v_org_id FROM organizations
+  WHERE org_name ILIKE '%TCAG%' OR org_name ILIKE '%MVP%' LIMIT 1;
+  IF v_org_id IS NULL THEN
+    SELECT id INTO v_org_id FROM organizations LIMIT 1;
+  END IF;
 
-  RAISE NOTICE '[PART 5] zone_transitions 갱신...';
+  SELECT id INTO v_store_id FROM stores
+  WHERE org_id = v_org_id ORDER BY created_at ASC LIMIT 1;
+
+  RAISE NOTICE '[PART 5] zone_transitions 갱신 (org: %, store: %)...', v_org_id, v_store_id;
 
   -- 최근 7일 데이터 삭제
   DELETE FROM zone_transitions
@@ -741,6 +831,7 @@ END $$;
 DO $$
 DECLARE
   v_store_id UUID;
+  v_org_id UUID;
   v_funnel_entry INT;
   v_kpi_visitors INT;
   v_funnel_purchase INT;
@@ -750,11 +841,19 @@ DECLARE
   v_funnel_purchase_all INT;
   v_kpi_transactions_all INT;
 BEGIN
-  SELECT id INTO v_store_id FROM stores LIMIT 1;
+  -- 일관된 Org/Store 선택 (PART 1과 동일)
+  SELECT id INTO v_org_id FROM organizations
+  WHERE org_name ILIKE '%TCAG%' OR org_name ILIKE '%MVP%' LIMIT 1;
+  IF v_org_id IS NULL THEN
+    SELECT id INTO v_org_id FROM organizations LIMIT 1;
+  END IF;
+
+  SELECT id INTO v_store_id FROM stores
+  WHERE org_id = v_org_id ORDER BY created_at ASC LIMIT 1;
 
   RAISE NOTICE '';
   RAISE NOTICE '═══════════════════════════════════════════════════════════════';
-  RAISE NOTICE '[PART 6] 데이터 정합성 검증';
+  RAISE NOTICE '[PART 6] 데이터 정합성 검증 (org: %, store: %)', v_org_id, v_store_id;
   RAISE NOTICE '═══════════════════════════════════════════════════════════════';
 
   -- 1. 전체 기간 검증
@@ -828,7 +927,7 @@ BEGIN
 
   RAISE NOTICE '';
   RAISE NOTICE '═══════════════════════════════════════════════════════════════';
-  RAISE NOTICE 'SEED_09 v3.1 완료: 전체 L3 재생성으로 L2-L3 값 일관성 보장';
+  RAISE NOTICE 'SEED_09 v3.2 완료: 일관된 org/store 선택으로 L2-L3 값 일관성 보장';
   RAISE NOTICE '═══════════════════════════════════════════════════════════════';
 END $$;
 
@@ -890,5 +989,5 @@ FROM zone_daily_metrics
 ORDER BY tbl;
 
 -- =====================================================
--- End of SEED_09_DATE_REFRESH.sql (v3.1)
+-- End of SEED_09_DATE_REFRESH.sql (v3.2)
 -- =====================================================
