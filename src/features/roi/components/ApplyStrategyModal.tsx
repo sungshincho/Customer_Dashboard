@@ -16,11 +16,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { AlertCircle, Calendar, Target, TrendingUp, Loader2 } from 'lucide-react';
 import { useApplyStrategy } from '../hooks/useAppliedStrategies';
+import { useApplyRecommendation, RecommendationType } from '@/hooks/useROITracking';
 import { getModuleConfig, getSourceDisplayName } from '../utils/moduleConfig';
 import type { ApplyStrategyInput, SimulationSource, SourceModule } from '../types/roi.types';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import { useSelectedStore } from '@/hooks/useSelectedStore';
 
 interface ApplyStrategyModalProps {
   isOpen: boolean;
@@ -54,6 +56,7 @@ export const ApplyStrategyModal: React.FC<ApplyStrategyModalProps> = ({
   navigateToROI = false,
 }) => {
   const navigate = useNavigate();
+  const { selectedStore } = useSelectedStore();
   const [name, setName] = useState(strategyData.name);
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(
@@ -62,8 +65,30 @@ export const ApplyStrategyModal: React.FC<ApplyStrategyModalProps> = ({
   const [targetRoi, setTargetRoi] = useState(strategyData.expectedRoi.toString());
   const [notes, setNotes] = useState('');
 
-  const { mutate: applyStrategy, isPending } = useApplyStrategy();
+  const { mutate: applyStrategy, isPending: isApplyingStrategy } = useApplyStrategy();
+  const { mutate: applyRecommendation, isPending: isApplyingRecommendation } = useApplyRecommendation();
+  const isPending = isApplyingStrategy || isApplyingRecommendation;
   const config = getModuleConfig(strategyData.sourceModule);
+
+  // sourceModule을 recommendation_type으로 매핑
+  const getRecommendationType = (sourceModule: SourceModule): RecommendationType => {
+    switch (sourceModule) {
+      case 'price_optimization':
+        return 'pricing';
+      case 'inventory_optimization':
+        return 'inventory';
+      case 'flow_optimization':
+      case 'layout_optimization':
+        return 'layout';
+      case 'staffing_optimization':
+        return 'staffing';
+      case 'promotion_optimization':
+        return 'promotion';
+      case 'ai_recommendation':
+      default:
+        return 'marketing';
+    }
+  };
 
   const handleApply = () => {
     if (!name.trim()) {
@@ -91,21 +116,55 @@ export const ApplyStrategyModal: React.FC<ApplyStrategyModalProps> = ({
       notes: notes.trim() || undefined,
     };
 
+    // applied_strategies 테이블에 저장
     applyStrategy(input, {
       onSuccess: () => {
-        toast.success('전략이 적용되었습니다', {
-          description: 'ROI 측정 대시보드에서 성과를 추적할 수 있습니다',
-          action: navigateToROI
-            ? undefined
-            : {
-                label: 'ROI 대시보드 보기',
-                onClick: () => navigate('/roi'),
-              },
+        // recommendation_applications 테이블에도 저장하여 ROI 추적 활성화
+        const measurementDays = Math.ceil(
+          (new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)
+        );
+
+        applyRecommendation({
+          storeId: selectedStore?.id || input.settings?.storeId || '',
+          recommendationType: getRecommendationType(strategyData.sourceModule),
+          recommendationSummary: name.trim(),
+          recommendationDetails: {
+            ...strategyData.settings,
+            expectedROI: strategyData.expectedRoi,
+            expectedRevenue: strategyData.expectedRevenue,
+            source: strategyData.source,
+            sourceModule: strategyData.sourceModule,
+            notes: notes.trim() || undefined,
+          },
+          measurementDays: measurementDays > 0 ? measurementDays : 7,
+        }, {
+          onSuccess: () => {
+            toast.success('전략이 적용되었습니다', {
+              description: 'ROI 측정 대시보드에서 성과를 추적할 수 있습니다',
+              action: navigateToROI
+                ? undefined
+                : {
+                    label: 'ROI 대시보드 보기',
+                    onClick: () => navigate('/roi'),
+                  },
+            });
+            onClose();
+            if (navigateToROI) {
+              navigate('/roi');
+            }
+          },
+          onError: (error) => {
+            // recommendation_applications 저장 실패해도 applied_strategies는 이미 저장됨
+            console.warn('recommendation_applications 저장 실패:', error);
+            toast.success('전략이 적용되었습니다', {
+              description: 'ROI 측정 대시보드에서 성과를 추적할 수 있습니다',
+            });
+            onClose();
+            if (navigateToROI) {
+              navigate('/roi');
+            }
+          },
         });
-        onClose();
-        if (navigateToROI) {
-          navigate('/roi');
-        }
       },
       onError: (error) => {
         toast.error('전략 적용 실패', {

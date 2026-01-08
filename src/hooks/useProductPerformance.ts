@@ -65,12 +65,14 @@ export function useTopProducts(storeId?: string, limit: number = 10, days: numbe
 
       try {
         // 1차 시도: L3 product_performance_agg
+        // limit(10000) 추가: 90일 × 25상품 = 2,250 rows, Supabase 기본 limit 1000 초과 방지
         const { data, error } = await supabase
           .from('product_performance_agg')
           .select('product_id, units_sold, revenue')
           .eq('org_id', orgId)
           .eq('store_id', storeId)
-          .gte('date', startDate);
+          .gte('date', startDate)
+          .limit(10000);
 
         if (!error && data && data.length > 0) {
           // 제품별 집계
@@ -165,12 +167,14 @@ export function useCategoryPerformance(storeId?: string, days: number = 7) {
 
       try {
         // 1차 시도: L3 product_performance_agg + products 테이블 조인
+        // limit(10000) 추가: 90일 × 25상품 = 2,250 rows, Supabase 기본 limit 1000 초과 방지
         const { data: perfData, error: perfError } = await supabase
           .from('product_performance_agg')
           .select('product_id, units_sold, revenue')
           .eq('org_id', orgId)
           .eq('store_id', storeId)
-          .gte('date', startDate);
+          .gte('date', startDate)
+          .limit(10000);
 
         if (!perfError && perfData && perfData.length > 0) {
           // L3 데이터 사용
