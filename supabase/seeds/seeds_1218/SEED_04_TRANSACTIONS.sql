@@ -39,7 +39,7 @@ DECLARE
   v_total_funnel_events INT := 0;
   v_total_zone_events INT := 0;
   v_total_visit_zone_events INT := 0;
-  v_event_types TEXT[] := ARRAY['awareness','interest','consideration','intent','purchase'];
+  v_event_types TEXT[] := ARRAY['entry','browse','engage','fitting','purchase'];
 BEGIN
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════════';
@@ -106,22 +106,76 @@ BEGIN
       );
       v_total_visits := v_total_visits + 1;
 
-      -- 2) funnel_events (방문당 3~5개)
-      FOR v_j IN 1..(3 + FLOOR(RANDOM() * 3)::INT) LOOP
+      -- 2) funnel_events (확률 기반 퍼널: entry → browse → engage → fitting)
+      -- entry (100%)
+      INSERT INTO public.funnel_events (
+        id, store_id, org_id, customer_id, event_type,
+        event_date, event_timestamp, event_hour, zone_id, product_id, metadata, created_at
+      ) VALUES (
+        gen_random_uuid(), v_store_id, v_org_id, v_customer_id,
+        'entry',
+        v_visit_date,
+        v_entry_time,
+        v_hour,
+        v_zone_ids[1],
+        NULL,
+        '{}'::jsonb, NOW()
+      );
+      v_total_funnel_events := v_total_funnel_events + 1;
+
+      -- browse (87% 확률)
+      IF RANDOM() < 0.87 THEN
         INSERT INTO public.funnel_events (
           id, store_id, org_id, customer_id, event_type,
-          event_date, event_timestamp, zone_id, product_id, metadata, created_at
+          event_date, event_timestamp, event_hour, zone_id, product_id, metadata, created_at
         ) VALUES (
           gen_random_uuid(), v_store_id, v_org_id, v_customer_id,
-          v_event_types[LEAST(v_j, 5)],
+          'browse',
           v_visit_date,
-          v_entry_time + ((v_j * 3) || ' minutes')::INTERVAL,
+          v_entry_time + '3 minutes'::INTERVAL,
+          v_hour,
           v_zone_ids[1 + FLOOR(RANDOM() * ARRAY_LENGTH(v_zone_ids, 1))::INT],
           v_product_ids[1 + FLOOR(RANDOM() * ARRAY_LENGTH(v_product_ids, 1))::INT],
           '{}'::jsonb, NOW()
         );
         v_total_funnel_events := v_total_funnel_events + 1;
-      END LOOP;
+
+        -- engage (browse의 75% = 전체 65%)
+        IF RANDOM() < 0.75 THEN
+          INSERT INTO public.funnel_events (
+            id, store_id, org_id, customer_id, event_type,
+            event_date, event_timestamp, event_hour, zone_id, product_id, metadata, created_at
+          ) VALUES (
+            gen_random_uuid(), v_store_id, v_org_id, v_customer_id,
+            'engage',
+            v_visit_date,
+            v_entry_time + '6 minutes'::INTERVAL,
+            v_hour,
+            v_zone_ids[1 + FLOOR(RANDOM() * ARRAY_LENGTH(v_zone_ids, 1))::INT],
+            v_product_ids[1 + FLOOR(RANDOM() * ARRAY_LENGTH(v_product_ids, 1))::INT],
+            '{}'::jsonb, NOW()
+          );
+          v_total_funnel_events := v_total_funnel_events + 1;
+
+          -- fitting (engage의 30% = 전체 19%)
+          IF RANDOM() < 0.30 THEN
+            INSERT INTO public.funnel_events (
+              id, store_id, org_id, customer_id, event_type,
+              event_date, event_timestamp, event_hour, zone_id, product_id, metadata, created_at
+            ) VALUES (
+              gen_random_uuid(), v_store_id, v_org_id, v_customer_id,
+              'fitting',
+              v_visit_date,
+              v_entry_time + '9 minutes'::INTERVAL,
+              v_hour,
+              v_zone_ids[5],
+              v_product_ids[1 + FLOOR(RANDOM() * ARRAY_LENGTH(v_product_ids, 1))::INT],
+              '{}'::jsonb, NOW()
+            );
+            v_total_funnel_events := v_total_funnel_events + 1;
+          END IF;
+        END IF;
+      END IF;
 
       -- 3) zone_events (방문당 3~6개)
       FOR v_j IN 1..(3 + FLOOR(RANDOM() * 4)::INT) LOOP
@@ -182,6 +236,23 @@ BEGIN
           NOW()
         );
         v_total_transactions := v_total_transactions + 1;
+
+        -- funnel_events에 purchase 이벤트 동기화 추가
+        INSERT INTO public.funnel_events (
+          id, store_id, org_id, customer_id, event_type,
+          event_date, event_timestamp, event_hour, zone_id, product_id, metadata, created_at
+        ) VALUES (
+          gen_random_uuid(), v_store_id, v_org_id, v_customer_id,
+          'purchase',
+          v_visit_date,
+          v_entry_time + (v_dwell_minutes || ' minutes')::INTERVAL,
+          EXTRACT(HOUR FROM (v_entry_time + (v_dwell_minutes || ' minutes')::INTERVAL))::INT,
+          v_zone_ids[6],  -- 계산대 존
+          v_product_ids[1 + FLOOR(RANDOM() * ARRAY_LENGTH(v_product_ids, 1))::INT],
+          jsonb_build_object('transaction_id', v_transaction_id),
+          NOW()
+        );
+        v_total_funnel_events := v_total_funnel_events + 1;
 
         -- line_items (1~3개)
         FOR v_j IN 1..(1 + FLOOR(RANDOM() * 3)::INT) LOOP
