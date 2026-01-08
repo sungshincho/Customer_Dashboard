@@ -359,7 +359,7 @@ BEGIN
   WHERE fe.store_id = v_store_id
     AND fe.event_date >= CURRENT_DATE - INTERVAL '6 days'
   GROUP BY fe.event_date, tx.total_revenue, li.total_units
-  ON CONFLICT (org_id, store_id, date) DO UPDATE SET
+  ON CONFLICT (store_id, date) DO UPDATE SET
     total_visitors = EXCLUDED.total_visitors,
     total_transactions = EXCLUDED.total_transactions,
     total_revenue = EXCLUDED.total_revenue,
@@ -369,16 +369,32 @@ BEGIN
   RAISE NOTICE '  - daily_kpis_agg: %건 삽입/갱신', v_count;
 END $$;
 
--- 4-2. daily_sales 파생
+-- 4-2. daily_sales 파생 (테이블이 존재하는 경우에만 - ON CONFLICT 없이 DELETE+INSERT)
 DO $$
 DECLARE
   v_store_id UUID;
   v_org_id UUID;
   v_count INT := 0;
+  v_table_exists BOOLEAN;
 BEGIN
   SELECT id, org_id INTO v_store_id, v_org_id FROM stores LIMIT 1;
 
+  -- daily_sales 테이블 존재 여부 확인
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'daily_sales'
+  ) INTO v_table_exists;
+
+  IF NOT v_table_exists THEN
+    RAISE NOTICE '[PART 4-2] daily_sales 테이블 없음 - 스킵';
+    RETURN;
+  END IF;
+
   RAISE NOTICE '[PART 4-2] daily_sales 파생 (transactions 기반)...';
+
+  -- 기존 데이터 삭제 후 삽입 (ON CONFLICT 대신)
+  DELETE FROM daily_sales
+  WHERE store_id = v_store_id AND date >= CURRENT_DATE - INTERVAL '6 days';
 
   INSERT INTO daily_sales (
     org_id, store_id, date,
@@ -395,10 +411,7 @@ BEGIN
   FROM transactions t
   WHERE t.store_id = v_store_id
     AND t.transaction_datetime::date >= CURRENT_DATE - INTERVAL '6 days'
-  GROUP BY t.transaction_datetime::date
-  ON CONFLICT (org_id, store_id, date) DO UPDATE SET
-    total_revenue = EXCLUDED.total_revenue,
-    total_transactions = EXCLUDED.total_transactions;
+  GROUP BY t.transaction_datetime::date;
 
   GET DIAGNOSTICS v_count = ROW_COUNT;
   RAISE NOTICE '  - daily_sales: %건 삽입/갱신', v_count;
@@ -454,7 +467,7 @@ BEGIN
     AND fe.event_date >= CURRENT_DATE - INTERVAL '6 days'
     AND fe.event_hour IS NOT NULL
   GROUP BY fe.event_date, fe.event_hour, tx.hourly_revenue, li.hourly_units
-  ON CONFLICT (org_id, store_id, date, hour) DO UPDATE SET
+  ON CONFLICT (store_id, date, hour) DO UPDATE SET
     visitor_count = EXCLUDED.visitor_count,
     transaction_count = EXCLUDED.transaction_count,
     revenue = EXCLUDED.revenue;
@@ -511,7 +524,7 @@ BEGIN
   WHERE ze.store_id = v_store_id
     AND ze.event_date >= CURRENT_DATE - INTERVAL '6 days'
   GROUP BY ze.zone_id, ze.event_date, zd.zone_type, zd.zone_code
-  ON CONFLICT (org_id, store_id, zone_id, date) DO UPDATE SET
+  ON CONFLICT (store_id, zone_id, date) DO UPDATE SET
     total_visitors = EXCLUDED.total_visitors,
     entry_count = EXCLUDED.entry_count,
     calculated_at = NOW();
@@ -560,7 +573,7 @@ BEGIN
     AND li.transaction_date >= CURRENT_DATE - INTERVAL '6 days'
     AND li.product_id IS NOT NULL
   GROUP BY li.product_id, li.transaction_date, p.stock_quantity, p.product_name, p.category
-  ON CONFLICT (org_id, store_id, product_id, date) DO UPDATE SET
+  ON CONFLICT (store_id, product_id, date) DO UPDATE SET
     units_sold = EXCLUDED.units_sold,
     revenue = EXCLUDED.revenue,
     calculated_at = NOW();
@@ -632,7 +645,7 @@ BEGIN
              WHEN 'New' THEN 800000 + FLOOR(RANDOM() * 400000) WHEN 'Dormant' THEN 200000 + FLOOR(RANDOM() * 150000) END,
         jsonb_build_object('source', 'SEED_09_v2', 'derived_from', 'transactions', 'segment', v_segment),
         NOW()
-      ON CONFLICT (org_id, store_id, date, segment_type, segment_name) DO UPDATE SET
+      ON CONFLICT (store_id, date, segment_type, segment_name) DO UPDATE SET
         customer_count = EXCLUDED.customer_count,
         total_revenue = EXCLUDED.total_revenue,
         calculated_at = NOW();
