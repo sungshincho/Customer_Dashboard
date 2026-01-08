@@ -54,10 +54,17 @@ DECLARE
   v_store_id UUID;
   v_count INTEGER := 0;
 BEGIN
-  SELECT s.org_id, s.id INTO v_org_id, v_store_id
-  FROM stores s LIMIT 1;
+  -- 일관된 Org/Store 선택 (STEP 1과 동일 로직)
+  SELECT id INTO v_org_id FROM organizations
+  WHERE org_name ILIKE '%TCAG%' OR org_name ILIKE '%MVP%' LIMIT 1;
+  IF v_org_id IS NULL THEN
+    SELECT id INTO v_org_id FROM organizations LIMIT 1;
+  END IF;
 
-  RAISE NOTICE '[STEP 2] daily_kpis_agg 생성 중 (funnel_events + transactions 기반)...';
+  SELECT id INTO v_store_id FROM stores
+  WHERE org_id = v_org_id ORDER BY created_at ASC LIMIT 1;
+
+  RAISE NOTICE '[STEP 2] daily_kpis_agg 생성 중 (org: %, store: %)...', v_org_id, v_store_id;
 
   -- funnel_events에서 방문자/퍼널 데이터 집계
   -- transactions에서 매출/거래 데이터 집계
@@ -178,10 +185,17 @@ DECLARE
   v_store_id UUID;
   v_count INTEGER := 0;
 BEGIN
-  SELECT s.org_id, s.id INTO v_org_id, v_store_id
-  FROM stores s LIMIT 1;
+  -- 일관된 Org/Store 선택 (STEP 1과 동일 로직)
+  SELECT id INTO v_org_id FROM organizations
+  WHERE org_name ILIKE '%TCAG%' OR org_name ILIKE '%MVP%' LIMIT 1;
+  IF v_org_id IS NULL THEN
+    SELECT id INTO v_org_id FROM organizations LIMIT 1;
+  END IF;
 
-  RAISE NOTICE '[STEP 3] daily_sales 생성 중 (transactions 기반)...';
+  SELECT id INTO v_store_id FROM stores
+  WHERE org_id = v_org_id ORDER BY created_at ASC LIMIT 1;
+
+  RAISE NOTICE '[STEP 3] daily_sales 생성 중 (org: %, store: %)...', v_org_id, v_store_id;
 
   INSERT INTO daily_sales (
     org_id, store_id, date,
@@ -221,10 +235,17 @@ DECLARE
   v_store_id UUID;
   v_count INTEGER := 0;
 BEGIN
-  SELECT s.org_id, s.id INTO v_org_id, v_store_id
-  FROM stores s LIMIT 1;
+  -- 일관된 Org/Store 선택 (STEP 1과 동일 로직)
+  SELECT id INTO v_org_id FROM organizations
+  WHERE org_name ILIKE '%TCAG%' OR org_name ILIKE '%MVP%' LIMIT 1;
+  IF v_org_id IS NULL THEN
+    SELECT id INTO v_org_id FROM organizations LIMIT 1;
+  END IF;
 
-  RAISE NOTICE '[STEP 4] hourly_metrics 생성 중 (funnel_events + transactions 기반)...';
+  SELECT id INTO v_store_id FROM stores
+  WHERE org_id = v_org_id ORDER BY created_at ASC LIMIT 1;
+
+  RAISE NOTICE '[STEP 4] hourly_metrics 생성 중 (org: %, store: %)...', v_org_id, v_store_id;
 
   INSERT INTO hourly_metrics (
     org_id, store_id, date, hour,
@@ -306,10 +327,17 @@ DECLARE
   v_store_id UUID;
   v_count INTEGER := 0;
 BEGIN
-  SELECT s.org_id, s.id INTO v_org_id, v_store_id
-  FROM stores s LIMIT 1;
+  -- 일관된 Org/Store 선택 (STEP 1과 동일 로직)
+  SELECT id INTO v_org_id FROM organizations
+  WHERE org_name ILIKE '%TCAG%' OR org_name ILIKE '%MVP%' LIMIT 1;
+  IF v_org_id IS NULL THEN
+    SELECT id INTO v_org_id FROM organizations LIMIT 1;
+  END IF;
 
-  RAISE NOTICE '[STEP 5] zone_daily_metrics 생성 중 (zone_events 기반)...';
+  SELECT id INTO v_store_id FROM stores
+  WHERE org_id = v_org_id ORDER BY created_at ASC LIMIT 1;
+
+  RAISE NOTICE '[STEP 5] zone_daily_metrics 생성 중 (org: %, store: %)...', v_org_id, v_store_id;
 
   INSERT INTO zone_daily_metrics (
     org_id, store_id, zone_id, date,
@@ -385,10 +413,17 @@ DECLARE
   v_store_id UUID;
   v_count INTEGER := 0;
 BEGIN
-  SELECT s.org_id, s.id INTO v_org_id, v_store_id
-  FROM stores s LIMIT 1;
+  -- 일관된 Org/Store 선택 (STEP 1과 동일 로직)
+  SELECT id INTO v_org_id FROM organizations
+  WHERE org_name ILIKE '%TCAG%' OR org_name ILIKE '%MVP%' LIMIT 1;
+  IF v_org_id IS NULL THEN
+    SELECT id INTO v_org_id FROM organizations LIMIT 1;
+  END IF;
 
-  RAISE NOTICE '[STEP 6] product_performance_agg 생성 중 (line_items + products 기반)...';
+  SELECT id INTO v_store_id FROM stores
+  WHERE org_id = v_org_id ORDER BY created_at ASC LIMIT 1;
+
+  RAISE NOTICE '[STEP 6] product_performance_agg 생성 중 (org: %, store: %)...', v_org_id, v_store_id;
 
   INSERT INTO product_performance_agg (
     org_id, store_id, product_id, date,
@@ -463,10 +498,17 @@ DECLARE
   v_count INTEGER := 0;
   v_seg_data RECORD;
 BEGIN
-  SELECT s.org_id, s.id INTO v_org_id, v_store_id
-  FROM stores s LIMIT 1;
+  -- 일관된 Org/Store 선택 (STEP 1과 동일 로직)
+  SELECT id INTO v_org_id FROM organizations
+  WHERE org_name ILIKE '%TCAG%' OR org_name ILIKE '%MVP%' LIMIT 1;
+  IF v_org_id IS NULL THEN
+    SELECT id INTO v_org_id FROM organizations LIMIT 1;
+  END IF;
 
-  RAISE NOTICE '[STEP 7] customer_segments_agg 생성 중 (transactions 기반)...';
+  SELECT id INTO v_store_id FROM stores
+  WHERE org_id = v_org_id ORDER BY created_at ASC LIMIT 1;
+
+  RAISE NOTICE '[STEP 7] customer_segments_agg 생성 중 (org: %, store: %)...', v_org_id, v_store_id;
 
   -- 각 날짜에 대해 세그먼트 데이터 생성
   FOR v_date IN
