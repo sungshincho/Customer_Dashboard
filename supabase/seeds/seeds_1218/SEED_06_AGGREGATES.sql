@@ -1,6 +1,7 @@
 -- ═══════════════════════════════════════════════════════════════════════════════
--- NEURALTWIN v8.6 SEED_06_AGGREGATES.sql
+-- NEURALTWIN v8.6 SEED_06_AGGREGATES.sql (FIXED)
 -- 집계 데이터 + 검증 쿼리
+-- 수정사항: Idempotent 실행 지원, purchases 검증 제거
 -- 실행 순서: SEED_00 → SEED_01 → SEED_02 → SEED_03 → SEED_04 → SEED_05 → SEED_06
 -- ═══════════════════════════════════════════════════════════════════════════════
 
@@ -88,6 +89,21 @@ BEGIN
   RAISE NOTICE 'org_id: %, store_id: %', v_org_id, v_store_id;
   RAISE NOTICE 'Date Range: % ~ %', v_start_date, v_current_date;
   RAISE NOTICE '═══════════════════════════════════════════════════════════════';
+
+  -- ═══════════════════════════════════════════════════════════════════════════
+  -- [추가] 기존 집계 데이터 삭제 (Idempotent 실행)
+  -- ═══════════════════════════════════════════════════════════════════════════
+  RAISE NOTICE '';
+  RAISE NOTICE '[CLEANUP] 기존 집계 데이터 삭제 중...';
+  
+  DELETE FROM daily_kpis_agg WHERE store_id = v_store_id;
+  DELETE FROM daily_sales WHERE store_id = v_store_id;
+  DELETE FROM hourly_metrics WHERE store_id = v_store_id;
+  DELETE FROM zone_daily_metrics WHERE store_id = v_store_id;
+  DELETE FROM product_performance_agg WHERE store_id = v_store_id;
+  DELETE FROM customer_segments_agg WHERE store_id = v_store_id;
+  
+  RAISE NOTICE '[CLEANUP] 완료';
 
   -- STEP 13.1: daily_kpis_agg (90일 KPI)
   RAISE NOTICE '[STEP 13.1] daily_kpis_agg 시딩 시작 (90건)';
@@ -589,15 +605,7 @@ BEGIN
     RAISE WARNING '  ✗ store_visits: % 건 (예상: 7,500+) - 부족!', v_count;
   END IF;
 
-  -- purchases
-  SELECT COUNT(*) INTO v_count FROM purchases;
-  v_check_count := v_check_count + 1;
-  IF v_count >= 3750 THEN
-    v_passed_count := v_passed_count + 1;
-    RAISE NOTICE '  ✓ purchases: % 건 (예상: 3,750+)', v_count;
-  ELSE
-    RAISE WARNING '  ✗ purchases: % 건 (예상: 3,750+) - 부족!', v_count;
-  END IF;
+  -- [삭제됨] purchases 검증 - SEED_04에서 purchases 테이블 미사용
 
   -- transactions
   SELECT COUNT(*) INTO v_count FROM transactions;
@@ -872,5 +880,5 @@ ORDER BY avg_revenue DESC;
 */
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- End of SEED_06_AGGREGATES.sql
+-- End of SEED_06_AGGREGATES.sql (FIXED)
 -- ═══════════════════════════════════════════════════════════════════════════════

@@ -611,7 +611,8 @@ BEGIN
   RAISE NOTICE '  - zone_daily_metrics: 총 %건 삽입/갱신 (%개 Store)', v_total_count, v_store_count;
 END $$;
 
--- 4-5. product_performance_agg 파생 (모든 Store)
+-- 4-5. product_performance_agg 파생
+-- 4-5. product_performance_agg 파생
 DO $$
 DECLARE
   v_store RECORD;
@@ -619,51 +620,51 @@ DECLARE
   v_store_count INT := 0;
   v_total_count INT := 0;
 BEGIN
-  RAISE NOTICE '[PART 4-5] product_performance_agg 파생 - 모든 Store...';
+  -- 일관된 Org/Store 선택 (데이터가 있는 store 우선 - PART 1과 동일)
+  SELECT s.id, s.org_id INTO v_store_id, v_org_id
+  FROM stores s
+  LEFT JOIN (SELECT store_id, COUNT(*) as cnt FROM funnel_events GROUP BY store_id) fe ON fe.store_id = s.id
+  ORDER BY COALESCE(fe.cnt, 0) DESC, s.created_at ASC LIMIT 1;
 
-  -- 모든 store 순회
-  FOR v_store IN SELECT s.id as store_id, s.org_id FROM stores s ORDER BY s.created_at
-  LOOP
-    v_store_count := v_store_count + 1;
+  RAISE NOTICE '[PART 4-5] product_performance_agg 파생 (org: %, store: %)...', v_org_id, v_store_id;
 
-    INSERT INTO product_performance_agg (
-      org_id, store_id, product_id, date,
-      units_sold, revenue, transactions,
-      conversion_rate, avg_selling_price,
-      discount_rate, return_rate, stock_level, stockout_hours,
-      category_rank, store_rank,
-      calculated_at, metadata
-    )
-    SELECT
-      v_store.org_id, v_store.store_id, li.product_id, li.transaction_date,
-      COALESCE(SUM(li.quantity), 0),
-      COALESCE(SUM(li.line_total), 0),
-      COUNT(DISTINCT li.transaction_id),
-      ROUND(((RANDOM() * 0.15 + 0.02) * 100)::NUMERIC, 2),
-      CASE WHEN SUM(li.quantity) > 0 THEN ROUND(SUM(li.line_total)::NUMERIC / SUM(li.quantity), 0) ELSE 0 END,
-      ROUND((RANDOM() * 0.2)::NUMERIC, 2),
-      ROUND((RANDOM() * 0.05)::NUMERIC, 3),
-      COALESCE(p.stock_quantity, 50 + FLOOR(RANDOM() * 100)::INT),
-      CASE WHEN RANDOM() < 0.05 THEN FLOOR(RANDOM() * 4) ELSE 0 END,
-      ROW_NUMBER() OVER (PARTITION BY li.transaction_date, p.category ORDER BY SUM(li.line_total) DESC),
-      ROW_NUMBER() OVER (PARTITION BY li.transaction_date ORDER BY SUM(li.line_total) DESC),
-      NOW(),
-      jsonb_build_object('source', 'SEED_09_v3.4', 'derived_from', 'line_items', 'product_name', p.product_name)
-    FROM line_items li
-    JOIN products p ON p.id = li.product_id
-    WHERE li.store_id = v_store.store_id
-      AND li.product_id IS NOT NULL
-    GROUP BY li.product_id, li.transaction_date, p.stock_quantity, p.product_name, p.category
-    ON CONFLICT (store_id, product_id, date) DO UPDATE SET
-      units_sold = EXCLUDED.units_sold,
-      revenue = EXCLUDED.revenue,
-      calculated_at = NOW();
+  INSERT INTO product_performance_agg (
+    org_id, store_id, product_id, date,
+    units_sold, revenue, transactions,
+    conversion_rate, avg_selling_price,
+    discount_rate, return_rate, stock_level, stockout_hours,
+    category_rank, store_rank,
+    calculated_at, metadata
+  )
+  SELECT
+    v_org_id, v_store_id, li.product_id, li.transaction_date,
+    COALESCE(SUM(li.quantity), 0),
+    COALESCE(SUM(li.line_total), 0),
+    COUNT(DISTINCT li.transaction_id),
+    ROUND(((RANDOM() * 0.15 + 0.02) * 100)::NUMERIC, 2),
+    CASE WHEN SUM(li.quantity) > 0 THEN ROUND(SUM(li.line_total)::NUMERIC / SUM(li.quantity), 0) ELSE 0 END,
+    ROUND((RANDOM() * 0.2)::NUMERIC, 2),
+    ROUND((RANDOM() * 0.05)::NUMERIC, 3),
+    -- ✅ 수정: p.stock_quantity 제거, 고정 랜덤 값 사용
+    (50 + FLOOR(RANDOM() * 100))::INT as stock_level,
+    CASE WHEN RANDOM() < 0.05 THEN FLOOR(RANDOM() * 4)::INT ELSE 0 END,
+    ROW_NUMBER() OVER (PARTITION BY li.transaction_date, p.category ORDER BY SUM(li.line_total) DESC),
+    ROW_NUMBER() OVER (PARTITION BY li.transaction_date ORDER BY SUM(li.line_total) DESC),
+    NOW(),
+    jsonb_build_object('source', 'SEED_09_v3.1', 'derived_from', 'line_items', 'product_name', p.product_name)
+  FROM line_items li
+  JOIN products p ON p.id = li.product_id
+  WHERE li.store_id = v_store_id
+    AND li.product_id IS NOT NULL
+  -- ✅ 수정: GROUP BY에서 p.stock_quantity 제거
+  GROUP BY li.product_id, li.transaction_date, p.product_name, p.category
+  ON CONFLICT (store_id, product_id, date) DO UPDATE SET
+    units_sold = EXCLUDED.units_sold,
+    revenue = EXCLUDED.revenue,
+    calculated_at = NOW();
 
-    GET DIAGNOSTICS v_count = ROW_COUNT;
-    v_total_count := v_total_count + v_count;
-  END LOOP;
-
-  RAISE NOTICE '  - product_performance_agg: 총 %건 삽입/갱신 (%개 Store)', v_total_count, v_store_count;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RAISE NOTICE '  - product_performance_agg: %건 삽입/갱신', v_count;
 END $$;
 
 -- 4-6. customer_segments_agg 파생 (모든 Store)
