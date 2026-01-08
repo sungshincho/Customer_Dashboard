@@ -162,14 +162,14 @@ const GlowHourlyBarChart = ({ data, isDark }: HourlyBarChartProps) => {
       ctx.stroke();
     }
     
-    // Y축 라벨
+    // Y축 라벨 (M-3: "명" 단위 추가)
     ctx.font = '10px system-ui, -apple-system, sans-serif';
     ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)';
     ctx.textAlign = 'right';
     for (let i = 0; i <= 4; i++) {
       const value = Math.round((maxValue / 4) * i);
       const y = baseY - (chartHeight / 4) * i;
-      ctx.fillText(value.toString(), padding.left - 8, y + 3);
+      ctx.fillText(`${value}명`, padding.left - 8, y + 3);
     }
     
     data.forEach((item, idx) => {

@@ -508,7 +508,10 @@ export function OverviewTab() {
                       )}
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <button style={{
+                      {/* M-4: 분석 버튼 핸들러 구현 - AI 예측 탭으로 이동 */}
+                      <button
+                        onClick={() => navigate('/insights?tab=prediction')}
+                        style={{
                         padding: '8px 12px', borderRadius: '8px',
                         border: isDark ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(0,0,0,0.1)',
                         background: 'transparent', fontSize: '12px', fontWeight: 500,
