@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.79.0';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.89.0';
 
 // ============================================================================
 // ⚠️ DEPRECATION NOTICE ⚠️
@@ -1843,10 +1843,6 @@ Deno.serve(async (req) => {
         // ⚠️ DEPRECATED: generate-optimization 함수의 'both' 타입 사용 권장
         console.warn('[DEPRECATED] layout_optimization: 향후 generate-optimization 함수로 마이그레이션 예정');
         result = await performLayoutOptimization(enrichedBody, lovableApiKey);
-        // 응답에 deprecation 경고 추가
-        if (result && typeof result === 'object') {
-          result._deprecationWarning = 'layout_optimization은 향후 deprecated 예정입니다. generate-optimization 함수를 사용해주세요.';
-        }
         break;
       case 'flow_simulation':
         result = await performFlowSimulation(enrichedBody, lovableApiKey);
@@ -1855,10 +1851,6 @@ Deno.serve(async (req) => {
         // ⚠️ DEPRECATED: generate-optimization 함수의 'staffing' 타입 사용 권장
         console.warn('[DEPRECATED] staffing_optimization: generate-optimization 함수의 staffing 타입으로 마이그레이션 권장');
         result = await performStaffingOptimization(enrichedBody, lovableApiKey);
-        // 응답에 deprecation 경고 추가
-        if (result && typeof result === 'object') {
-          result._deprecationWarning = 'staffing_optimization은 deprecated 예정입니다. generate-optimization?optimization_type=staffing을 사용해주세요.';
-        }
         break;
       case 'congestion_simulation':
         result = await performCongestionSimulation(enrichedBody, lovableApiKey);
@@ -1889,7 +1881,7 @@ Deno.serve(async (req) => {
       const userFacingTexts = extractUserFacingTexts(actualResult, simulationType);
 
       await logAIResponse(supabase, {
-        storeId: body.storeId || body.store_id || 'unknown',
+        storeId: body.storeId || 'unknown',
         userId: user.id,
         functionName: 'advanced-ai-inference',
         simulationType,
@@ -1943,7 +1935,7 @@ Deno.serve(async (req) => {
         const supabase = createClient(supabaseUrl, supabaseKey);
         const body = await req.clone().json().catch(() => ({}));
         await logAIResponse(supabase, {
-          storeId: body.storeId || body.store_id || 'unknown',
+          storeId: body.storeId || 'unknown',
           functionName: 'advanced-ai-inference',
           simulationType: (body.inference_type || body.type || 'unknown') as SimulationType,
           inputVariables: body,
