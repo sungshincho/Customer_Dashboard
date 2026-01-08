@@ -20,6 +20,9 @@ import {
   Sparkles,
 } from 'lucide-react';
 
+// Data Provider (통합 데이터소스)
+import { InsightDataProvider, InsightTabType, useInsightData } from '@/features/insights/context/InsightDataContext';
+
 // Tab Components
 import { OverviewTab } from '@/features/insights/tabs/OverviewTab';
 import { StoreTab } from '@/features/insights/tabs/StoreTab';
@@ -37,8 +40,11 @@ const tabs = [
   { value: 'ai', label: 'AI추천', icon: Sparkles },
 ];
 
-export default function InsightHubPage() {
-  const [activeTab, setActiveTab] = useState('overview');
+// 내부 컴포넌트 (Provider 내에서 사용)
+function InsightHubContent({ activeTab, setActiveTab }: {
+  activeTab: InsightTabType;
+  setActiveTab: (tab: InsightTabType) => void;
+}) {
   const [isDark, setIsDark] = useState(false);
 
   // 다크모드 감지
@@ -46,22 +52,21 @@ export default function InsightHubPage() {
     const checkDarkMode = () => {
       setIsDark(document.documentElement.classList.contains('dark'));
     };
-    
+
     checkDarkMode();
-    
+
     // MutationObserver로 class 변경 감지
     const observer = new MutationObserver(checkDarkMode);
-    observer.observe(document.documentElement, { 
-      attributes: true, 
-      attributeFilter: ['class'] 
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
     });
-    
+
     return () => observer.disconnect();
   }, []);
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-5">
@@ -134,8 +139,8 @@ export default function InsightHubPage() {
           <GlobalDateFilter />
         </div>
 
-        {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as InsightTabType)} className="space-y-6">
           {/* Glass Tab List */}
           <div
             className="inline-block rounded-2xl p-[1.5px]"
@@ -228,6 +233,33 @@ export default function InsightHubPage() {
           </TabsContent>
         </Tabs>
       </div>
+  );
+}
+
+// 메인 컴포넌트 - Provider로 감싸기
+export default function InsightHubPage() {
+  const [activeTab, setActiveTab] = useState<InsightTabType>('overview');
+
+  return (
+    <DashboardLayout>
+      <InsightDataProvider initialTab={activeTab}>
+        <InsightHubContentWrapper activeTab={activeTab} setActiveTab={setActiveTab} />
+      </InsightDataProvider>
     </DashboardLayout>
   );
+}
+
+// Provider와 activeTab 동기화를 위한 래퍼
+function InsightHubContentWrapper({ activeTab, setActiveTab }: {
+  activeTab: InsightTabType;
+  setActiveTab: (tab: InsightTabType) => void;
+}) {
+  const { setActiveTab: setProviderActiveTab } = useInsightData();
+
+  // activeTab 변경 시 Provider에도 전달
+  useEffect(() => {
+    setProviderActiveTab(activeTab);
+  }, [activeTab, setProviderActiveTab]);
+
+  return <InsightHubContent activeTab={activeTab} setActiveTab={setActiveTab} />;
 }
