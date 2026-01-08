@@ -50,10 +50,10 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
     ? "bg-white text-black hover:bg-white hover:text-black focus:bg-white focus:text-black"
     : "bg-black text-white hover:bg-black hover:text-white focus:bg-black focus:text-white";
 
-  // Today style (monochrome)
+  // Today style (monochrome - more prominent)
   const dayTodayClass = isDark
-    ? "bg-white/10 text-white"
-    : "bg-black/5 text-black";
+    ? "bg-white/20 text-white font-bold ring-1 ring-white/30"
+    : "bg-black/10 text-black font-bold ring-1 ring-black/20";
 
   return (
     <DayPicker

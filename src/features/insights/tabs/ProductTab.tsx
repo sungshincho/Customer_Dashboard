@@ -139,7 +139,9 @@ const GlowHorizontalBarChart = ({ data, isDark }: HorizontalBarChartProps) => {
       ctx.font = '500 11px system-ui';
       ctx.fillStyle = isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.7)';
       ctx.textAlign = 'right';
-      ctx.fillText(item.name.length > 12 ? item.name.slice(0, 12) + '...' : item.name, pad.left - 10, y + bh / 2 + 4);
+      // 상품명 뒤에서 잘리도록 수정 (앞글자 보존)
+      const displayName = item.name.length > 12 ? item.name.substring(0, 12) + '...' : item.name;
+      ctx.fillText(displayName, pad.left - 10, y + bh / 2 + 4);
       
       ctx.fillStyle = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)';
       ctx.beginPath();
@@ -519,8 +521,10 @@ export function ProductTab() {
       
       const map = new Map<string, { quantity: number; revenue: number; stock: number }>();
       perfData.forEach(d => {
-        const e = map.get(d.product_id) || { quantity: 0, revenue: 0, stock: 0 };
-        map.set(d.product_id, { quantity: e.quantity + (d.units_sold || 0), revenue: e.revenue + (d.revenue || 0), stock: d.stock_level ?? e.stock });
+        const e = map.get(d.product_id) || { quantity: 0, revenue: 0, stock: -1 }; // -1은 재고 정보 없음
+        // 가장 최신의 재고 수준을 사용 (null이 아닌 경우에만 업데이트)
+        const newStock = d.stock_level !== null && d.stock_level !== undefined ? d.stock_level : e.stock;
+        map.set(d.product_id, { quantity: e.quantity + (d.units_sold || 0), revenue: e.revenue + (d.revenue || 0), stock: newStock });
       });
       
       const ids = [...map.keys()];
@@ -549,7 +553,9 @@ export function ProductTab() {
     const totalRevenue = productData?.reduce((s, p) => s + p.revenue, 0) || 0;
     const totalQuantity = productData?.reduce((s, p) => s + p.quantity, 0) || 0;
     const topProduct = productData?.[0];
-    const lowStockCount = productData?.filter(p => p.stock > 0 && p.stock < 10).length || 0;
+    // 재고 부족: 0 < stock < 10 (재고 정보 있고, 10개 미만)
+    // 또는 stock === 0 (품절)도 포함
+    const lowStockCount = productData?.filter(p => p.stock >= 0 && p.stock < 10).length || 0;
     return { totalRevenue, totalQuantity, topProduct, lowStockCount };
   }, [productData]);
 
