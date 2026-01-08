@@ -6,8 +6,9 @@
  * 3D Glassmorphism + Monochrome Design
  */
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 import {
   Sparkles,
   CheckCircle,
@@ -26,6 +27,7 @@ import {
   Plus,
   ArrowRight,
   Minus,
+  X,
 } from 'lucide-react';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { formatCurrency } from '../components';
@@ -228,6 +230,8 @@ export function AIRecommendationTab() {
   const text3D = getText3D(isDark);
   const iconColor = isDark ? 'rgba(255,255,255,0.7)' : '#374151';
 
+  const { toast } = useToast();
+
   // 적용 모달 상태
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [applyModalData, setApplyModalData] = useState<{
@@ -240,6 +244,14 @@ export function AIRecommendationTab() {
     expectedRevenue?: number;
     confidence?: number;
     baselineMetrics: Record<string, number>;
+  } | null>(null);
+
+  // H-5: 상세 모달 상태
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [detailModalData, setDetailModalData] = useState<{
+    type: 'strategy' | 'price' | 'inventory' | 'settings';
+    title: string;
+    content: React.ReactNode;
   } | null>(null);
 
   // Mock 데이터
@@ -356,6 +368,127 @@ export function AIRecommendationTab() {
     setShowApplyModal(true);
   };
 
+  // H-5: 새 전략 버튼 핸들러
+  const handleNewStrategy = useCallback(() => {
+    navigate('/studio', { state: { mode: 'create_strategy' } });
+    toast({
+      title: '전략 생성',
+      description: '시뮬레이션 스튜디오에서 새 전략을 생성할 수 있습니다.',
+    });
+  }, [navigate, toast]);
+
+  // H-5: 활성 전략 상세보기 핸들러
+  const handleActiveStrategyDetail = useCallback((strategy: ActiveStrategy) => {
+    setDetailModalData({
+      type: 'strategy',
+      title: strategy.name,
+      content: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div style={{ padding: '12px', borderRadius: '8px', background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>
+              <p style={{ fontSize: '11px', color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>상태</p>
+              <p style={{ fontSize: '14px', fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>
+                {strategy.status === 'active' ? '실행 중' : strategy.status === 'paused' ? '일시정지' : '예정됨'}
+              </p>
+            </div>
+            <div style={{ padding: '12px', borderRadius: '8px', background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>
+              <p style={{ fontSize: '11px', color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>진행일</p>
+              <p style={{ fontSize: '14px', fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>D+{strategy.daysActive}</p>
+            </div>
+            <div style={{ padding: '12px', borderRadius: '8px', background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>
+              <p style={{ fontSize: '11px', color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>예상 ROI</p>
+              <p style={{ fontSize: '14px', fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>{strategy.expectedROI}%</p>
+            </div>
+            <div style={{ padding: '12px', borderRadius: '8px', background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>
+              <p style={{ fontSize: '11px', color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>현재 ROI</p>
+              <p style={{ fontSize: '14px', fontWeight: 600, color: strategy.currentROI >= strategy.expectedROI ? '#22c55e' : '#ef4444' }}>
+                {strategy.currentROI}%
+              </p>
+            </div>
+          </div>
+          <div style={{ padding: '12px', borderRadius: '8px', background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>
+            <p style={{ fontSize: '11px', marginBottom: '8px', color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>진행률</p>
+            <div style={{ height: '8px', borderRadius: '4px', background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${strategy.progress}%`, background: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.3)', borderRadius: '4px' }} />
+            </div>
+            <p style={{ fontSize: '12px', marginTop: '4px', fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>{strategy.progress}%</p>
+          </div>
+        </div>
+      ),
+    });
+    setShowDetailModal(true);
+  }, [isDark]);
+
+  // H-5: 최적화 상세보기 핸들러
+  const handleOptimizationDetail = useCallback((type: 'price' | 'inventory') => {
+    if (type === 'price') {
+      setDetailModalData({
+        type: 'price',
+        title: '가격 최적화 상세',
+        content: (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <p style={{ fontSize: '13px', color: isDark ? 'rgba(255,255,255,0.7)' : '#515158' }}>
+              AI가 분석한 {priceOptimization.totalProducts}개 상품 중 {priceOptimization.optimizableCount}개의 가격 조정이 권장됩니다.
+            </p>
+            <div style={{ padding: '12px', borderRadius: '8px', background: '#22c55e10', border: '1px solid #22c55e30' }}>
+              <p style={{ fontSize: '12px', color: '#22c55e' }}>예상 효과: 매출 +{priceOptimization.potentialRevenueIncreasePercent}%</p>
+            </div>
+            <p style={{ fontSize: '12px', color: isDark ? 'rgba(255,255,255,0.5)' : '#9ca3af' }}>
+              상세 분석 결과는 가격 최적화 페이지에서 확인할 수 있습니다.
+            </p>
+          </div>
+        ),
+      });
+    } else {
+      setDetailModalData({
+        type: 'inventory',
+        title: '재고 최적화 상세',
+        content: (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <p style={{ fontSize: '13px', color: isDark ? 'rgba(255,255,255,0.7)' : '#515158' }}>
+              {inventoryOptimization.totalItems}개 품목 분석 결과, {inventoryOptimization.orderRecommendations}건의 발주가 권장됩니다.
+            </p>
+            <div style={{ padding: '12px', borderRadius: '8px', background: '#ef444410', border: '1px solid #ef444430' }}>
+              <p style={{ fontSize: '12px', color: '#ef4444' }}>품절 위험: {inventoryOptimization.stockoutPrevention}건 예방 가능</p>
+            </div>
+            <p style={{ fontSize: '12px', color: isDark ? 'rgba(255,255,255,0.5)' : '#9ca3af' }}>
+              상세 분석 결과는 재고 관리 페이지에서 확인할 수 있습니다.
+            </p>
+          </div>
+        ),
+      });
+    }
+    setShowDetailModal(true);
+  }, [isDark, priceOptimization, inventoryOptimization]);
+
+  // H-5: 전략 상세 설정 핸들러
+  const handleStrategySettings = useCallback((strategy: typeof strategyRecommendations[0]) => {
+    setDetailModalData({
+      type: 'settings',
+      title: `${strategy.title} 설정`,
+      content: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ padding: '12px', borderRadius: '8px', background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>
+            <p style={{ fontSize: '11px', marginBottom: '4px', color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>대상 고객</p>
+            <p style={{ fontSize: '13px', fontWeight: 500, color: isDark ? '#fff' : '#1a1a1f' }}>{strategy.targetAudience}</p>
+          </div>
+          <div style={{ padding: '12px', borderRadius: '8px', background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>
+            <p style={{ fontSize: '11px', marginBottom: '4px', color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>실행 기간</p>
+            <p style={{ fontSize: '13px', fontWeight: 500, color: isDark ? '#fff' : '#1a1a1f' }}>{strategy.duration}일</p>
+          </div>
+          <div style={{ padding: '12px', borderRadius: '8px', background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>
+            <p style={{ fontSize: '11px', marginBottom: '4px', color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>신뢰도</p>
+            <p style={{ fontSize: '13px', fontWeight: 500, color: isDark ? '#fff' : '#1a1a1f' }}>{strategy.confidence}%</p>
+          </div>
+          <p style={{ fontSize: '12px', color: isDark ? 'rgba(255,255,255,0.5)' : '#9ca3af' }}>
+            상세 설정을 변경하려면 시뮬레이션 스튜디오를 이용해주세요.
+          </p>
+        </div>
+      ),
+    });
+    setShowDetailModal(true);
+  }, [isDark]);
+
   // 로딩 스켈레톤
   if (isLoading) {
     return (
@@ -397,12 +530,15 @@ export function AIRecommendationTab() {
               <h3 style={{ fontSize: '15px', margin: 0, ...text3D.number }}>진행 중인 전략</h3>
               <Badge3D dark={isDark}><span style={{ color: isDark ? '#fff' : '#374151' }}>{activeStrategies.length}</span></Badge3D>
             </div>
-            <button style={{
-              display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px',
-              background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-              borderRadius: '8px', border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.06)',
-              fontSize: '12px', fontWeight: 500, color: isDark ? '#fff' : '#1a1a1f', cursor: 'pointer',
-            }}>
+            <button
+              onClick={handleNewStrategy}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px',
+                background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                borderRadius: '8px', border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.06)',
+                fontSize: '12px', fontWeight: 500, color: isDark ? '#fff' : '#1a1a1f', cursor: 'pointer',
+              }}
+            >
               <Plus className="w-4 h-4" style={{ color: iconColor }} />
               새 전략
             </button>
@@ -435,11 +571,14 @@ export function AIRecommendationTab() {
                     </span>
                   </div>
                 </div>
-                <button style={{
-                  padding: '6px 10px', borderRadius: '6px', border: 'none',
-                  background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
-                  fontSize: '11px', fontWeight: 500, color: isDark ? 'rgba(255,255,255,0.7)' : '#515158', cursor: 'pointer',
-                }}>
+                <button
+                  onClick={() => handleActiveStrategyDetail(strategy)}
+                  style={{
+                    padding: '6px 10px', borderRadius: '6px', border: 'none',
+                    background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+                    fontSize: '11px', fontWeight: 500, color: isDark ? 'rgba(255,255,255,0.7)' : '#515158', cursor: 'pointer',
+                  }}
+                >
                   상세보기
                 </button>
               </div>
@@ -610,12 +749,15 @@ export function AIRecommendationTab() {
               </div>
 
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button style={{
-                  flex: 1, padding: '10px', borderRadius: '10px',
-                  background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
-                  border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.06)',
-                  fontSize: '12px', fontWeight: 500, color: isDark ? '#fff' : '#1a1a1f', cursor: 'pointer',
-                }}>
+                <button
+                  onClick={() => handleOptimizationDetail('price')}
+                  style={{
+                    flex: 1, padding: '10px', borderRadius: '10px',
+                    background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+                    border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.06)',
+                    fontSize: '12px', fontWeight: 500, color: isDark ? '#fff' : '#1a1a1f', cursor: 'pointer',
+                  }}
+                >
                   상세 보기
                 </button>
                 <button
@@ -671,12 +813,15 @@ export function AIRecommendationTab() {
               </div>
 
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button style={{
-                  flex: 1, padding: '10px', borderRadius: '10px',
-                  background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
-                  border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.06)',
-                  fontSize: '12px', fontWeight: 500, color: isDark ? '#fff' : '#1a1a1f', cursor: 'pointer',
-                }}>
+                <button
+                  onClick={() => handleOptimizationDetail('inventory')}
+                  style={{
+                    flex: 1, padding: '10px', borderRadius: '10px',
+                    background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+                    border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.06)',
+                    fontSize: '12px', fontWeight: 500, color: isDark ? '#fff' : '#1a1a1f', cursor: 'pointer',
+                  }}
+                >
                   상세 보기
                 </button>
                 <button
@@ -801,13 +946,16 @@ export function AIRecommendationTab() {
                       >
                         <FlaskConical className="w-3 h-3" /> 시뮬레이션
                       </button>
-                      <button style={{
-                        flex: 1, padding: '10px', borderRadius: '10px',
-                        background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
-                        border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.06)',
-                        fontSize: '11px', fontWeight: 500, color: isDark ? 'rgba(255,255,255,0.8)' : '#515158',
-                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
-                      }}>
+                      <button
+                        onClick={() => handleStrategySettings(strategy)}
+                        style={{
+                          flex: 1, padding: '10px', borderRadius: '10px',
+                          background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+                          border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.06)',
+                          fontSize: '11px', fontWeight: 500, color: isDark ? 'rgba(255,255,255,0.8)' : '#515158',
+                          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                        }}
+                      >
                         <Settings className="w-3 h-3" /> 상세 설정
                       </button>
                       <button
@@ -876,6 +1024,47 @@ export function AIRecommendationTab() {
           }}
           strategyData={applyModalData}
         />
+      )}
+
+      {/* H-5: 상세 정보 모달 */}
+      {showDetailModal && detailModalData && (
+        <div
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 100,
+          }}
+          onClick={() => setShowDetailModal(false)}
+        >
+          <div
+            style={{
+              maxWidth: '400px', width: '90%', padding: '24px', borderRadius: '16px',
+              background: isDark ? '#1e1e2a' : '#fff',
+              border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0, color: isDark ? '#fff' : '#1a1a1f' }}>
+                {detailModalData.title}
+              </h3>
+              <button
+                onClick={() => setShowDetailModal(false)}
+                style={{
+                  width: '28px', height: '28px', borderRadius: '8px',
+                  background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                  border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <X className="w-4 h-4" style={{ color: isDark ? 'rgba(255,255,255,0.7)' : '#6b7280' }} />
+              </button>
+            </div>
+            {detailModalData.content}
+          </div>
+        </div>
       )}
     </div>
   );

@@ -422,9 +422,10 @@ async function callAIForecast(storeId: string): Promise<{
       });
     } else {
       // AI metrics에서 기본 예측 생성
+      // H-3 수정: 기본값을 과거 데이터 평균으로 변경 (100명/50% → 합리적 기본값)
       const baseRevenue = metrics.predicted_revenue || metrics.avg_daily_revenue || 5000000;
-      const baseVisitors = metrics.predicted_visitors || metrics.avg_daily_visitors || 100;
-      const baseConversion = metrics.predicted_conversion || 50;
+      const baseVisitors = metrics.predicted_visitors || metrics.avg_daily_visitors || 150; // 100 → 150
+      const baseConversion = metrics.predicted_conversion || 5; // 50% → 5% (현실적인 전환율)
 
       for (let i = 1; i <= 7; i++) {
         const predDate = addDays(today, i);
@@ -484,11 +485,26 @@ async function callAIForecast(storeId: string): Promise<{
     const totalPredictedVisitors = dailyPredictions.reduce((s, p) => s + p.predicted_visitors, 0);
     const avgConversion = dailyPredictions.reduce((s, p) => s + p.predicted_conversion, 0) / dailyPredictions.length;
 
+    // H-4 수정: 전주 대비 변화율을 실제 데이터로 계산
+    let revenueChangePercent = metrics.revenue_change_percent;
+    if (revenueChangePercent === undefined || revenueChangePercent === null) {
+      // 과거 7일 매출 합계로 계산
+      const last7DaysRevenue = historicalData
+        .slice(-7)
+        .reduce((s, d) => s + (d.predicted_revenue || 0), 0);
+
+      if (last7DaysRevenue > 0) {
+        revenueChangePercent = ((totalPredictedRevenue - last7DaysRevenue) / last7DaysRevenue) * 100;
+      } else {
+        revenueChangePercent = 0;
+      }
+    }
+
     const summary: PredictionSummary = {
       total_predicted_revenue: totalPredictedRevenue,
       total_predicted_visitors: totalPredictedVisitors,
       avg_predicted_conversion: parseFloat(avgConversion.toFixed(1)),
-      revenue_change_percent: metrics.revenue_change_percent || 0,
+      revenue_change_percent: parseFloat(revenueChangePercent.toFixed(1)),
       overall_confidence: Math.round(aiConfidence * 100),
       model_info: {
         data_points: metrics.data_points || 60,
