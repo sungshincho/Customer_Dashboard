@@ -543,12 +543,12 @@ ${environment.temporal.isWeekend ?
 - PRIORITIZE: \`hero_product_display\` (families browse more)
 - PRIORITIZE: \`cross_sell_bundle\` (family bundles)
 - FOCUS: Experience-oriented displays` : ''}
-${environment.temporal.timeOfDay === 'morning' || environment.temporal.timeOfDay === '아침' ?
+${['morning', '아침'].includes(environment.temporal.timeOfDay as string) ?
 `**Morning Rush Strategy:**
 - PRIORITIZE: \`impulse_buy_position\` near checkout
 - PRIORITIZE: \`golden_zone_placement\` for grab-and-go items
 - MINIMIZE: Complex cross-sell bundles (customers in hurry)` : ''}
-${environment.temporal.timeOfDay === 'evening' || environment.temporal.timeOfDay === '저녁' ?
+${['evening', '저녁'].includes(environment.temporal.timeOfDay as string) ?
 `**Evening Strategy:**
 - PRIORITIZE: \`slow_mover_activation\` (clearance items)
 - PRIORITIZE: \`high_margin_spotlight\` (impulse dinner items)

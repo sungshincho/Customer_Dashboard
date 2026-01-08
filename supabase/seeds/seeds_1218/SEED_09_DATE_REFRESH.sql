@@ -667,7 +667,9 @@ BEGIN
   RAISE NOTICE '  - product_performance_agg: %건 삽입/갱신', v_count;
 END $$;
 
--- 4-6. customer_segments_agg 파생 (모든 Store)
+-- 4-6. customer_segments_agg 파생 (모든 Store) - v3.5: funnel_events entry 기준
+-- 🔧 v3.5 수정: transactions → funnel_events entry 기준으로 변경
+-- 이유: unique_visitors (daily_kpis_agg)와 segment total 일치 필요
 DO $$
 DECLARE
   v_store RECORD;
@@ -677,23 +679,31 @@ DECLARE
   v_count INT := 0;
   v_store_count INT := 0;
   v_total_count INT := 0;
-  v_seg_data RECORD;
+  v_visitor_count INT;
+  v_tx_data RECORD;
 BEGIN
-  RAISE NOTICE '[PART 4-6] customer_segments_agg 파생 - 모든 Store...';
+  RAISE NOTICE '[PART 4-6] customer_segments_agg 파생 (v3.5) - funnel_events entry 기준...';
 
   -- 모든 store 순회
   FOR v_store IN SELECT s.id as store_id, s.org_id FROM stores s ORDER BY s.created_at
   LOOP
     v_store_count := v_store_count + 1;
 
+    -- funnel_events entry 기준으로 날짜 순회
     FOR v_date IN
-      SELECT DISTINCT transaction_datetime::date
-      FROM transactions
-      WHERE store_id = v_store.store_id
+      SELECT DISTINCT event_date
+      FROM funnel_events
+      WHERE store_id = v_store.store_id AND event_type = 'entry'
       ORDER BY 1
     LOOP
-      SELECT COUNT(DISTINCT customer_id), SUM(total_amount), AVG(total_amount)
-      INTO v_seg_data
+      -- 방문자 수: funnel_events entry 기준
+      SELECT COUNT(DISTINCT customer_id) INTO v_visitor_count
+      FROM funnel_events
+      WHERE store_id = v_store.store_id AND event_date = v_date AND event_type = 'entry';
+
+      -- 매출 데이터: transactions 기준
+      SELECT COALESCE(SUM(total_amount), 0) as revenue, COALESCE(AVG(total_amount), 100000) as avg_txn
+      INTO v_tx_data
       FROM transactions
       WHERE store_id = v_store.store_id AND transaction_datetime::date = v_date;
 
@@ -706,23 +716,27 @@ BEGIN
         )
         SELECT
           v_store.org_id, v_store.store_id, v_date, 'customer_tier', v_segment,
+          -- customer_count: unique_visitors 기준 (합계 100%)
           CASE v_segment
-            WHEN 'VIP' THEN FLOOR(COALESCE(v_seg_data.count, 0) * 0.15) + FLOOR(RANDOM() * 5)
-            WHEN 'Regular' THEN FLOOR(COALESCE(v_seg_data.count, 0) * 0.40) + FLOOR(RANDOM() * 10)
-            WHEN 'New' THEN FLOOR(COALESCE(v_seg_data.count, 0) * 0.30) + FLOOR(RANDOM() * 8)
-            WHEN 'Dormant' THEN FLOOR(COALESCE(v_seg_data.count, 0) * 0.15) + FLOOR(RANDOM() * 5)
+            WHEN 'VIP' THEN FLOOR(COALESCE(v_visitor_count, 0) * 0.15)
+            WHEN 'Regular' THEN FLOOR(COALESCE(v_visitor_count, 0) * 0.40)
+            WHEN 'New' THEN FLOOR(COALESCE(v_visitor_count, 0) * 0.30)
+            WHEN 'Dormant' THEN COALESCE(v_visitor_count, 0)
+                              - FLOOR(COALESCE(v_visitor_count, 0) * 0.15)
+                              - FLOOR(COALESCE(v_visitor_count, 0) * 0.40)
+                              - FLOOR(COALESCE(v_visitor_count, 0) * 0.30)
           END,
           CASE v_segment
-            WHEN 'VIP' THEN FLOOR(COALESCE(v_seg_data.sum, 0) * 0.45)
-            WHEN 'Regular' THEN FLOOR(COALESCE(v_seg_data.sum, 0) * 0.35)
-            WHEN 'New' THEN FLOOR(COALESCE(v_seg_data.sum, 0) * 0.15)
-            WHEN 'Dormant' THEN FLOOR(COALESCE(v_seg_data.sum, 0) * 0.05)
+            WHEN 'VIP' THEN FLOOR(v_tx_data.revenue * 0.45)
+            WHEN 'Regular' THEN FLOOR(v_tx_data.revenue * 0.35)
+            WHEN 'New' THEN FLOOR(v_tx_data.revenue * 0.15)
+            WHEN 'Dormant' THEN FLOOR(v_tx_data.revenue * 0.05)
           END,
           CASE v_segment
-            WHEN 'VIP' THEN COALESCE(v_seg_data.avg, 100000) * 1.8
-            WHEN 'Regular' THEN COALESCE(v_seg_data.avg, 100000) * 1.0
-            WHEN 'New' THEN COALESCE(v_seg_data.avg, 100000) * 0.7
-            WHEN 'Dormant' THEN COALESCE(v_seg_data.avg, 100000) * 0.5
+            WHEN 'VIP' THEN v_tx_data.avg_txn * 1.8
+            WHEN 'Regular' THEN v_tx_data.avg_txn * 1.0
+            WHEN 'New' THEN v_tx_data.avg_txn * 0.7
+            WHEN 'Dormant' THEN v_tx_data.avg_txn * 0.5
           END,
           CASE v_segment WHEN 'VIP' THEN 3.5 + RANDOM() * 1.5 WHEN 'Regular' THEN 2.0 + RANDOM()
                WHEN 'New' THEN 1.0 + RANDOM() * 0.5 WHEN 'Dormant' THEN 0.2 + RANDOM() * 0.3 END,
@@ -732,7 +746,7 @@ BEGIN
                WHEN 'New' THEN 0.30 + RANDOM() * 0.15 WHEN 'Dormant' THEN 0.60 + RANDOM() * 0.2 END,
           CASE v_segment WHEN 'VIP' THEN 5000000 + FLOOR(RANDOM() * 2000000) WHEN 'Regular' THEN 2000000 + FLOOR(RANDOM() * 800000)
                WHEN 'New' THEN 800000 + FLOOR(RANDOM() * 400000) WHEN 'Dormant' THEN 200000 + FLOOR(RANDOM() * 150000) END,
-          jsonb_build_object('source', 'SEED_09_v3.4', 'derived_from', 'transactions', 'segment', v_segment),
+          jsonb_build_object('source', 'SEED_09_v3.5', 'derived_from', 'funnel_events.entry + transactions', 'segment', v_segment),
           NOW()
         ON CONFLICT (store_id, date, segment_type, segment_name) DO UPDATE SET
           customer_count = EXCLUDED.customer_count,
