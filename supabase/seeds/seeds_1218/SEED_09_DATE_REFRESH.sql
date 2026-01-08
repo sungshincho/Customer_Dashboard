@@ -36,21 +36,14 @@ DECLARE
   v_max_date DATE;
   v_shift_days INT;
 BEGIN
-  -- 일관된 Org/Store 선택 (프론트엔드와 동일한 로직)
-  -- 1. TCAG 또는 MVP org 우선 선택
-  SELECT id INTO v_org_id FROM organizations
-  WHERE org_name ILIKE '%TCAG%' OR org_name ILIKE '%MVP%'
-  LIMIT 1;
-
-  -- 2. 없으면 첫 번째 org 선택
-  IF v_org_id IS NULL THEN
-    SELECT id INTO v_org_id FROM organizations LIMIT 1;
-  END IF;
-
-  -- 3. 해당 org의 store 선택 (created_at ASC 순서 - 프론트엔드와 동일)
-  SELECT id INTO v_store_id FROM stores
-  WHERE org_id = v_org_id
-  ORDER BY created_at ASC
+  -- 일관된 Org/Store 선택 (데이터가 있는 store 우선)
+  -- 1. funnel_events가 가장 많은 store 선택 (실제 사용 중인 store)
+  SELECT s.id, s.org_id INTO v_store_id, v_org_id
+  FROM stores s
+  LEFT JOIN (
+    SELECT store_id, COUNT(*) as cnt FROM funnel_events GROUP BY store_id
+  ) fe ON fe.store_id = s.id
+  ORDER BY COALESCE(fe.cnt, 0) DESC, s.created_at ASC
   LIMIT 1;
 
   IF v_store_id IS NULL THEN
@@ -165,15 +158,11 @@ DECLARE
   v_i INT;
   v_tx_amount NUMERIC;
 BEGIN
-  -- 일관된 Org/Store 선택 (PART 1과 동일)
-  SELECT id INTO v_org_id FROM organizations
-  WHERE org_name ILIKE '%TCAG%' OR org_name ILIKE '%MVP%' LIMIT 1;
-  IF v_org_id IS NULL THEN
-    SELECT id INTO v_org_id FROM organizations LIMIT 1;
-  END IF;
-
-  SELECT id, user_id INTO v_store_id, v_user_id FROM stores
-  WHERE org_id = v_org_id ORDER BY created_at ASC LIMIT 1;
+  -- 일관된 Org/Store 선택 (데이터가 있는 store 우선 - PART 1과 동일)
+  SELECT s.id, s.org_id, s.user_id INTO v_store_id, v_org_id, v_user_id
+  FROM stores s
+  LEFT JOIN (SELECT store_id, COUNT(*) as cnt FROM funnel_events GROUP BY store_id) fe ON fe.store_id = s.id
+  ORDER BY COALESCE(fe.cnt, 0) DESC, s.created_at ASC LIMIT 1;
 
   -- 상품/존 ID 배열
   SELECT ARRAY_AGG(id) INTO v_product_ids FROM products WHERE store_id = v_store_id;
@@ -317,15 +306,11 @@ DECLARE
   v_store_id UUID;
   v_org_id UUID;
 BEGIN
-  -- 일관된 Org/Store 선택 (PART 1과 동일)
-  SELECT id INTO v_org_id FROM organizations
-  WHERE org_name ILIKE '%TCAG%' OR org_name ILIKE '%MVP%' LIMIT 1;
-  IF v_org_id IS NULL THEN
-    SELECT id INTO v_org_id FROM organizations LIMIT 1;
-  END IF;
-
-  SELECT id INTO v_store_id FROM stores
-  WHERE org_id = v_org_id ORDER BY created_at ASC LIMIT 1;
+  -- 일관된 Org/Store 선택 (데이터가 있는 store 우선 - PART 1과 동일)
+  SELECT s.id, s.org_id INTO v_store_id, v_org_id
+  FROM stores s
+  LEFT JOIN (SELECT store_id, COUNT(*) as cnt FROM funnel_events GROUP BY store_id) fe ON fe.store_id = s.id
+  ORDER BY COALESCE(fe.cnt, 0) DESC, s.created_at ASC LIMIT 1;
 
   RAISE NOTICE '[PART 3] 전체 L3 집계 데이터 삭제 (org_id: %, store_id: %)...', v_org_id, v_store_id;
 
@@ -352,15 +337,11 @@ DECLARE
   v_org_id UUID;
   v_count INT := 0;
 BEGIN
-  -- 일관된 Org/Store 선택 (PART 1과 동일)
-  SELECT id INTO v_org_id FROM organizations
-  WHERE org_name ILIKE '%TCAG%' OR org_name ILIKE '%MVP%' LIMIT 1;
-  IF v_org_id IS NULL THEN
-    SELECT id INTO v_org_id FROM organizations LIMIT 1;
-  END IF;
-
-  SELECT id INTO v_store_id FROM stores
-  WHERE org_id = v_org_id ORDER BY created_at ASC LIMIT 1;
+  -- 일관된 Org/Store 선택 (데이터가 있는 store 우선 - PART 1과 동일)
+  SELECT s.id, s.org_id INTO v_store_id, v_org_id
+  FROM stores s
+  LEFT JOIN (SELECT store_id, COUNT(*) as cnt FROM funnel_events GROUP BY store_id) fe ON fe.store_id = s.id
+  ORDER BY COALESCE(fe.cnt, 0) DESC, s.created_at ASC LIMIT 1;
 
   RAISE NOTICE '[PART 4-1] daily_kpis_agg 파생 (org: %, store: %)...', v_org_id, v_store_id;
 
@@ -453,15 +434,11 @@ DECLARE
   v_count INT := 0;
   v_table_exists BOOLEAN;
 BEGIN
-  -- 일관된 Org/Store 선택 (PART 1과 동일)
-  SELECT id INTO v_org_id FROM organizations
-  WHERE org_name ILIKE '%TCAG%' OR org_name ILIKE '%MVP%' LIMIT 1;
-  IF v_org_id IS NULL THEN
-    SELECT id INTO v_org_id FROM organizations LIMIT 1;
-  END IF;
-
-  SELECT id INTO v_store_id FROM stores
-  WHERE org_id = v_org_id ORDER BY created_at ASC LIMIT 1;
+  -- 일관된 Org/Store 선택 (데이터가 있는 store 우선 - PART 1과 동일)
+  SELECT s.id, s.org_id INTO v_store_id, v_org_id
+  FROM stores s
+  LEFT JOIN (SELECT store_id, COUNT(*) as cnt FROM funnel_events GROUP BY store_id) fe ON fe.store_id = s.id
+  ORDER BY COALESCE(fe.cnt, 0) DESC, s.created_at ASC LIMIT 1;
 
   -- daily_sales 테이블 존재 여부 확인
   SELECT EXISTS (
@@ -504,15 +481,11 @@ DECLARE
   v_org_id UUID;
   v_count INT := 0;
 BEGIN
-  -- 일관된 Org/Store 선택 (PART 1과 동일)
-  SELECT id INTO v_org_id FROM organizations
-  WHERE org_name ILIKE '%TCAG%' OR org_name ILIKE '%MVP%' LIMIT 1;
-  IF v_org_id IS NULL THEN
-    SELECT id INTO v_org_id FROM organizations LIMIT 1;
-  END IF;
-
-  SELECT id INTO v_store_id FROM stores
-  WHERE org_id = v_org_id ORDER BY created_at ASC LIMIT 1;
+  -- 일관된 Org/Store 선택 (데이터가 있는 store 우선 - PART 1과 동일)
+  SELECT s.id, s.org_id INTO v_store_id, v_org_id
+  FROM stores s
+  LEFT JOIN (SELECT store_id, COUNT(*) as cnt FROM funnel_events GROUP BY store_id) fe ON fe.store_id = s.id
+  ORDER BY COALESCE(fe.cnt, 0) DESC, s.created_at ASC LIMIT 1;
 
   RAISE NOTICE '[PART 4-3] hourly_metrics 파생 (org: %, store: %)...', v_org_id, v_store_id;
 
@@ -570,15 +543,11 @@ DECLARE
   v_org_id UUID;
   v_count INT := 0;
 BEGIN
-  -- 일관된 Org/Store 선택 (PART 1과 동일)
-  SELECT id INTO v_org_id FROM organizations
-  WHERE org_name ILIKE '%TCAG%' OR org_name ILIKE '%MVP%' LIMIT 1;
-  IF v_org_id IS NULL THEN
-    SELECT id INTO v_org_id FROM organizations LIMIT 1;
-  END IF;
-
-  SELECT id INTO v_store_id FROM stores
-  WHERE org_id = v_org_id ORDER BY created_at ASC LIMIT 1;
+  -- 일관된 Org/Store 선택 (데이터가 있는 store 우선 - PART 1과 동일)
+  SELECT s.id, s.org_id INTO v_store_id, v_org_id
+  FROM stores s
+  LEFT JOIN (SELECT store_id, COUNT(*) as cnt FROM funnel_events GROUP BY store_id) fe ON fe.store_id = s.id
+  ORDER BY COALESCE(fe.cnt, 0) DESC, s.created_at ASC LIMIT 1;
 
   RAISE NOTICE '[PART 4-4] zone_daily_metrics 파생 (org: %, store: %)...', v_org_id, v_store_id;
 
@@ -635,15 +604,11 @@ DECLARE
   v_org_id UUID;
   v_count INT := 0;
 BEGIN
-  -- 일관된 Org/Store 선택 (PART 1과 동일)
-  SELECT id INTO v_org_id FROM organizations
-  WHERE org_name ILIKE '%TCAG%' OR org_name ILIKE '%MVP%' LIMIT 1;
-  IF v_org_id IS NULL THEN
-    SELECT id INTO v_org_id FROM organizations LIMIT 1;
-  END IF;
-
-  SELECT id INTO v_store_id FROM stores
-  WHERE org_id = v_org_id ORDER BY created_at ASC LIMIT 1;
+  -- 일관된 Org/Store 선택 (데이터가 있는 store 우선 - PART 1과 동일)
+  SELECT s.id, s.org_id INTO v_store_id, v_org_id
+  FROM stores s
+  LEFT JOIN (SELECT store_id, COUNT(*) as cnt FROM funnel_events GROUP BY store_id) fe ON fe.store_id = s.id
+  ORDER BY COALESCE(fe.cnt, 0) DESC, s.created_at ASC LIMIT 1;
 
   RAISE NOTICE '[PART 4-5] product_performance_agg 파생 (org: %, store: %)...', v_org_id, v_store_id;
 
@@ -697,15 +662,11 @@ DECLARE
   v_count INT := 0;
   v_seg_data RECORD;
 BEGIN
-  -- 일관된 Org/Store 선택 (PART 1과 동일)
-  SELECT id INTO v_org_id FROM organizations
-  WHERE org_name ILIKE '%TCAG%' OR org_name ILIKE '%MVP%' LIMIT 1;
-  IF v_org_id IS NULL THEN
-    SELECT id INTO v_org_id FROM organizations LIMIT 1;
-  END IF;
-
-  SELECT id INTO v_store_id FROM stores
-  WHERE org_id = v_org_id ORDER BY created_at ASC LIMIT 1;
+  -- 일관된 Org/Store 선택 (데이터가 있는 store 우선 - PART 1과 동일)
+  SELECT s.id, s.org_id INTO v_store_id, v_org_id
+  FROM stores s
+  LEFT JOIN (SELECT store_id, COUNT(*) as cnt FROM funnel_events GROUP BY store_id) fe ON fe.store_id = s.id
+  ORDER BY COALESCE(fe.cnt, 0) DESC, s.created_at ASC LIMIT 1;
 
   RAISE NOTICE '[PART 4-6] customer_segments_agg 파생 (org: %, store: %)...', v_org_id, v_store_id;
 
@@ -779,15 +740,11 @@ DECLARE
   v_org_id UUID;
   v_count INT := 0;
 BEGIN
-  -- 일관된 Org/Store 선택 (PART 1과 동일)
-  SELECT id INTO v_org_id FROM organizations
-  WHERE org_name ILIKE '%TCAG%' OR org_name ILIKE '%MVP%' LIMIT 1;
-  IF v_org_id IS NULL THEN
-    SELECT id INTO v_org_id FROM organizations LIMIT 1;
-  END IF;
-
-  SELECT id INTO v_store_id FROM stores
-  WHERE org_id = v_org_id ORDER BY created_at ASC LIMIT 1;
+  -- 일관된 Org/Store 선택 (데이터가 있는 store 우선 - PART 1과 동일)
+  SELECT s.id, s.org_id INTO v_store_id, v_org_id
+  FROM stores s
+  LEFT JOIN (SELECT store_id, COUNT(*) as cnt FROM funnel_events GROUP BY store_id) fe ON fe.store_id = s.id
+  ORDER BY COALESCE(fe.cnt, 0) DESC, s.created_at ASC LIMIT 1;
 
   RAISE NOTICE '[PART 5] zone_transitions 갱신 (org: %, store: %)...', v_org_id, v_store_id;
 
@@ -841,15 +798,11 @@ DECLARE
   v_funnel_purchase_all INT;
   v_kpi_transactions_all INT;
 BEGIN
-  -- 일관된 Org/Store 선택 (PART 1과 동일)
-  SELECT id INTO v_org_id FROM organizations
-  WHERE org_name ILIKE '%TCAG%' OR org_name ILIKE '%MVP%' LIMIT 1;
-  IF v_org_id IS NULL THEN
-    SELECT id INTO v_org_id FROM organizations LIMIT 1;
-  END IF;
-
-  SELECT id INTO v_store_id FROM stores
-  WHERE org_id = v_org_id ORDER BY created_at ASC LIMIT 1;
+  -- 일관된 Org/Store 선택 (데이터가 있는 store 우선 - PART 1과 동일)
+  SELECT s.id, s.org_id INTO v_store_id, v_org_id
+  FROM stores s
+  LEFT JOIN (SELECT store_id, COUNT(*) as cnt FROM funnel_events GROUP BY store_id) fe ON fe.store_id = s.id
+  ORDER BY COALESCE(fe.cnt, 0) DESC, s.created_at ASC LIMIT 1;
 
   RAISE NOTICE '';
   RAISE NOTICE '═══════════════════════════════════════════════════════════════';
