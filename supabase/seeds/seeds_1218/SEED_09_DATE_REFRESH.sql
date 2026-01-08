@@ -1,14 +1,16 @@
 -- =====================================================
--- SEED_09_DATE_REFRESH.sql (v3 - L2 + L3 날짜 동시 갱신)
+-- SEED_09_DATE_REFRESH.sql (v3.1 - 전체 L3 재생성)
 --
 -- 인사이트 허브 데이터 날짜 업데이트 및 보강
 -- 수정일: 2026-01-08
 --
--- 핵심 변경 (v3):
+-- 핵심 변경 (v3.1):
+-- - PART 3: 전체 L3 데이터 삭제 (7일만이 아닌 전체)
+-- - PART 4: 전체 기간 L3 데이터 재생성 (7일만이 아닌 전체)
+-- - 이를 통해 모든 기간에서 L2-L3 값 일관성 보장
+--
+-- v3 변경:
 -- - PART 1: L2 날짜 shift 시 L3 테이블도 함께 shift
---   (daily_kpis_agg, hourly_metrics, zone_daily_metrics 등)
--- - 이를 통해 7일/30일/90일 등 모든 기간에서 L2-L3 일관성 보장
--- - 버그 수정: KPI 카드와 퍼널 차트 간 날짜 불일치 해결
 --
 -- v2 변경:
 -- - L2 데이터 먼저 생성 (funnel_events, transactions, line_items, zone_events)
@@ -280,7 +282,8 @@ BEGIN
 END $$;
 
 -- =====================================================
--- PART 3: L3 집계 데이터 삭제 (재생성 전 정리)
+-- PART 3: L3 집계 데이터 삭제 (전체 재생성 전 정리)
+-- v3.1: 7일만이 아닌 전체 삭제로 변경
 -- =====================================================
 
 DO $$
@@ -290,26 +293,21 @@ DECLARE
 BEGIN
   SELECT id, org_id INTO v_store_id, v_org_id FROM stores LIMIT 1;
 
-  RAISE NOTICE '[PART 3] 최근 7일 L3 집계 데이터 정리...';
+  RAISE NOTICE '[PART 3] 전체 L3 집계 데이터 삭제 (L2 기반 완전 재생성 준비)...';
 
-  DELETE FROM daily_kpis_agg WHERE org_id = v_org_id AND store_id = v_store_id
-    AND date >= CURRENT_DATE - INTERVAL '6 days';
-  DELETE FROM daily_sales WHERE org_id = v_org_id AND store_id = v_store_id
-    AND date >= CURRENT_DATE - INTERVAL '6 days';
-  DELETE FROM hourly_metrics WHERE org_id = v_org_id AND store_id = v_store_id
-    AND date >= CURRENT_DATE - INTERVAL '6 days';
-  DELETE FROM zone_daily_metrics WHERE org_id = v_org_id AND store_id = v_store_id
-    AND date >= CURRENT_DATE - INTERVAL '6 days';
-  DELETE FROM product_performance_agg WHERE org_id = v_org_id AND store_id = v_store_id
-    AND date >= CURRENT_DATE - INTERVAL '6 days';
-  DELETE FROM customer_segments_agg WHERE org_id = v_org_id AND store_id = v_store_id
-    AND date >= CURRENT_DATE - INTERVAL '6 days';
+  DELETE FROM daily_kpis_agg WHERE org_id = v_org_id AND store_id = v_store_id;
+  DELETE FROM daily_sales WHERE org_id = v_org_id AND store_id = v_store_id;
+  DELETE FROM hourly_metrics WHERE org_id = v_org_id AND store_id = v_store_id;
+  DELETE FROM zone_daily_metrics WHERE org_id = v_org_id AND store_id = v_store_id;
+  DELETE FROM product_performance_agg WHERE org_id = v_org_id AND store_id = v_store_id;
+  DELETE FROM customer_segments_agg WHERE org_id = v_org_id AND store_id = v_store_id;
 
-  RAISE NOTICE '[PART 3] L3 정리 완료';
+  RAISE NOTICE '[PART 3] L3 전체 삭제 완료';
 END $$;
 
 -- =====================================================
--- PART 4: L3 집계 데이터 파생 (L2 기반 - 최근 7일)
+-- PART 4: L3 집계 데이터 파생 (L2 기반 - 전체 기간)
+-- v3.1: 7일만이 아닌 전체 기간 재생성
 -- SEED_06_DERIVED 방식 적용
 -- =====================================================
 
@@ -383,7 +381,7 @@ BEGIN
     64,
     ROUND(COALESCE(tx.total_revenue, 0)::NUMERIC / 64, 0),
     NOW(),
-    jsonb_build_object('source', 'SEED_09_v2', 'derived_from', 'funnel_events + transactions')
+    jsonb_build_object('source', 'SEED_09_v3.1', 'derived_from', 'funnel_events + transactions')
   FROM funnel_events fe
   LEFT JOIN (
     SELECT transaction_datetime::date as tx_date, SUM(total_amount) as total_revenue
@@ -394,7 +392,6 @@ BEGIN
     FROM line_items WHERE store_id = v_store_id GROUP BY transaction_date
   ) li ON li.transaction_date = fe.event_date
   WHERE fe.store_id = v_store_id
-    AND fe.event_date >= CURRENT_DATE - INTERVAL '6 days'
   GROUP BY fe.event_date, tx.total_revenue, li.total_units
   ON CONFLICT (store_id, date) DO UPDATE SET
     total_visitors = EXCLUDED.total_visitors,
@@ -429,10 +426,7 @@ BEGIN
 
   RAISE NOTICE '[PART 4-2] daily_sales 파생 (transactions 기반)...';
 
-  -- 기존 데이터 삭제 후 삽입 (ON CONFLICT 대신)
-  DELETE FROM daily_sales
-  WHERE store_id = v_store_id AND date >= CURRENT_DATE - INTERVAL '6 days';
-
+  -- PART 3에서 이미 전체 삭제함, 여기서는 전체 기간 삽입
   INSERT INTO daily_sales (
     org_id, store_id, date,
     total_revenue, total_transactions, avg_transaction_value, total_customers,
@@ -444,10 +438,9 @@ BEGIN
     COUNT(*),
     ROUND(AVG(t.total_amount), 0),
     COUNT(DISTINCT t.customer_id),
-    jsonb_build_object('source', 'SEED_09_v2', 'derived_from', 'transactions')
+    jsonb_build_object('source', 'SEED_09_v3.1', 'derived_from', 'transactions')
   FROM transactions t
   WHERE t.store_id = v_store_id
-    AND t.transaction_datetime::date >= CURRENT_DATE - INTERVAL '6 days'
   GROUP BY t.transaction_datetime::date;
 
   GET DIAGNOSTICS v_count = ROW_COUNT;
@@ -489,7 +482,7 @@ BEGIN
       ELSE 0
     END,
     NOW(),
-    jsonb_build_object('source', 'SEED_09_v2', 'derived_from', 'funnel_events')
+    jsonb_build_object('source', 'SEED_09_v3.1', 'derived_from', 'funnel_events')
   FROM funnel_events fe
   LEFT JOIN (
     SELECT transaction_datetime::date as tx_date, EXTRACT(HOUR FROM transaction_datetime)::INT as tx_hour,
@@ -501,7 +494,6 @@ BEGIN
     FROM line_items WHERE store_id = v_store_id GROUP BY transaction_date, transaction_hour
   ) li ON li.transaction_date = fe.event_date AND li.transaction_hour = fe.event_hour
   WHERE fe.store_id = v_store_id
-    AND fe.event_date >= CURRENT_DATE - INTERVAL '6 days'
     AND fe.event_hour IS NOT NULL
   GROUP BY fe.event_date, fe.event_hour, tx.hourly_revenue, li.hourly_units
   ON CONFLICT (store_id, date, hour) DO UPDATE SET
@@ -555,11 +547,10 @@ BEGIN
     13 + FLOOR(RANDOM() * 8),
     COALESCE(SUM(CASE WHEN ze.event_type = 'enter' THEN 1 ELSE 0 END), 0) + FLOOR(RANDOM() * 10),
     NOW(),
-    jsonb_build_object('source', 'SEED_09_v2', 'derived_from', 'zone_events', 'zone_code', zd.zone_code)
+    jsonb_build_object('source', 'SEED_09_v3.1', 'derived_from', 'zone_events', 'zone_code', zd.zone_code)
   FROM zone_events ze
   JOIN zones_dim zd ON zd.id = ze.zone_id
   WHERE ze.store_id = v_store_id
-    AND ze.event_date >= CURRENT_DATE - INTERVAL '6 days'
   GROUP BY ze.zone_id, ze.event_date, zd.zone_type, zd.zone_code
   ON CONFLICT (store_id, zone_id, date) DO UPDATE SET
     total_visitors = EXCLUDED.total_visitors,
@@ -605,11 +596,10 @@ BEGIN
     ROW_NUMBER() OVER (PARTITION BY li.transaction_date, p.category ORDER BY SUM(li.line_total) DESC),
     ROW_NUMBER() OVER (PARTITION BY li.transaction_date ORDER BY SUM(li.line_total) DESC),
     NOW(),
-    jsonb_build_object('source', 'SEED_09_v2', 'derived_from', 'line_items', 'product_name', p.product_name)
+    jsonb_build_object('source', 'SEED_09_v3.1', 'derived_from', 'line_items', 'product_name', p.product_name)
   FROM line_items li
   JOIN products p ON p.id = li.product_id
   WHERE li.store_id = v_store_id
-    AND li.transaction_date >= CURRENT_DATE - INTERVAL '6 days'
     AND li.product_id IS NOT NULL
   -- ✅ 수정: GROUP BY에서 p.stock_quantity 제거
   GROUP BY li.product_id, li.transaction_date, p.product_name, p.category
@@ -640,7 +630,7 @@ BEGIN
   FOR v_date IN
     SELECT DISTINCT transaction_datetime::date
     FROM transactions
-    WHERE store_id = v_store_id AND transaction_datetime::date >= CURRENT_DATE - INTERVAL '6 days'
+    WHERE store_id = v_store_id
     ORDER BY 1
   LOOP
     SELECT COUNT(DISTINCT customer_id), SUM(total_amount), AVG(total_amount)
@@ -683,7 +673,7 @@ BEGIN
              WHEN 'New' THEN 0.30 + RANDOM() * 0.15 WHEN 'Dormant' THEN 0.60 + RANDOM() * 0.2 END,
         CASE v_segment WHEN 'VIP' THEN 5000000 + FLOOR(RANDOM() * 2000000) WHEN 'Regular' THEN 2000000 + FLOOR(RANDOM() * 800000)
              WHEN 'New' THEN 800000 + FLOOR(RANDOM() * 400000) WHEN 'Dormant' THEN 200000 + FLOOR(RANDOM() * 150000) END,
-        jsonb_build_object('source', 'SEED_09_v2', 'derived_from', 'transactions', 'segment', v_segment),
+        jsonb_build_object('source', 'SEED_09_v3.1', 'derived_from', 'transactions', 'segment', v_segment),
         NOW()
       ON CONFLICT (store_id, date, segment_type, segment_name) DO UPDATE SET
         customer_count = EXCLUDED.customer_count,
@@ -838,7 +828,7 @@ BEGIN
 
   RAISE NOTICE '';
   RAISE NOTICE '═══════════════════════════════════════════════════════════════';
-  RAISE NOTICE 'SEED_09 v3 완료: L2 + L3 날짜 동시 갱신';
+  RAISE NOTICE 'SEED_09 v3.1 완료: 전체 L3 재생성으로 L2-L3 값 일관성 보장';
   RAISE NOTICE '═══════════════════════════════════════════════════════════════';
 END $$;
 
@@ -900,5 +890,5 @@ FROM zone_daily_metrics
 ORDER BY tbl;
 
 -- =====================================================
--- End of SEED_09_DATE_REFRESH.sql (v3)
+-- End of SEED_09_DATE_REFRESH.sql (v3.1)
 -- =====================================================
