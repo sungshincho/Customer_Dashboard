@@ -7596,6 +7596,18 @@ export type Database = {
         }
         Relationships: []
       }
+      v_org_id: {
+        Row: {
+          id: string | null
+        }
+        Insert: {
+          id?: string | null
+        }
+        Update: {
+          id?: string | null
+        }
+        Relationships: []
+      }
       visit_zone_events: {
         Row: {
           created_at: string | null
@@ -9065,6 +9077,18 @@ export type Database = {
         Returns: {
           event_type: string
           unique_visitors: number
+        }[]
+      }
+      get_hourly_entry_counts: {
+        Args: {
+          p_end_date: string
+          p_org_id: string
+          p_start_date: string
+          p_store_id: string
+        }
+        Returns: {
+          count: number
+          hour: number
         }[]
       }
       get_hourly_traffic: {
