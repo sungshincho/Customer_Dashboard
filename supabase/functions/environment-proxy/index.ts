@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.79.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.89.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -99,9 +99,10 @@ async function saveWeatherToDb(
       updated_at: new Date().toISOString(),
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await supabase
       .from('weather_data')
-      .upsert(weatherRecord, {
+      .upsert(weatherRecord as any, {
         onConflict: 'store_id,date',
         ignoreDuplicates: false
       });
@@ -163,9 +164,10 @@ async function saveHolidaysToDb(
       };
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await supabase
       .from('holidays_events')
-      .upsert(records, {
+      .upsert(records as any, {
         onConflict: 'date,event_name',
         ignoreDuplicates: false
       });

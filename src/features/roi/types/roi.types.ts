@@ -9,6 +9,7 @@ export type SourceModule =
   | 'price_optimization'
   | 'inventory_optimization'
   | 'promotion'
+  | 'promotion_optimization'
   | 'demand_forecast'
   | 'ai_recommendation'
   // 3D 시뮬레이션

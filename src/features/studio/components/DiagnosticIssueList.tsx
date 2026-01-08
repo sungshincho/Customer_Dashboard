@@ -44,6 +44,14 @@ export interface DiagnosticIssue {
   current_value?: number;
   threshold_value?: number;
   suggested_action?: string;
+  // AIOptimizationTab 호환
+  message?: string;
+  scenario_context?: {
+    name: string;
+    description?: string;
+  };
+  environment_context?: unknown;
+  simulation_kpis?: unknown;
 }
 
 interface DiagnosticIssueListProps {
