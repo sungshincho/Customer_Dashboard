@@ -17,7 +17,7 @@ DECLARE
   v_zone_ids UUID[];
   v_product_ids UUID[];
   v_customer_ids UUID[];
-  v_visit_id UUID; -- store_visits용(참조만), visits는 별도 시드하지 않음
+  v_visit_id UUID;
   v_transaction_id UUID;
   v_visit_date DATE;
   v_entry_time TIMESTAMPTZ;
@@ -51,6 +51,21 @@ BEGIN
   -- Store/User/Org
   SELECT id, user_id, org_id INTO v_store_id, v_user_id, v_org_id FROM public.stores LIMIT 1;
 
+  -- ═══════════════════════════════════════════════════════════════════════════
+  -- 기존 데이터 삭제 (Idempotent 실행을 위해)
+  -- ═══════════════════════════════════════════════════════════════════════════
+  RAISE NOTICE '  [CLEANUP] 기존 시드 데이터 삭제 중...';
+  
+  DELETE FROM public.line_items WHERE store_id = v_store_id;
+  DELETE FROM public.transactions WHERE store_id = v_store_id;
+  DELETE FROM public.funnel_events WHERE store_id = v_store_id;
+  DELETE FROM public.zone_events WHERE store_id = v_store_id;
+  DELETE FROM public.visit_zone_events WHERE store_id = v_store_id;
+  DELETE FROM public.store_visits WHERE store_id = v_store_id;
+  DELETE FROM public.zone_transitions WHERE store_id = v_store_id;
+  
+  RAISE NOTICE '  [CLEANUP] 완료';
+
   -- Zones, Products, Customers
   SELECT ARRAY_AGG(id ORDER BY zone_code) INTO v_zone_ids
   FROM public.zones_dim WHERE store_id = v_store_id;
@@ -64,6 +79,15 @@ BEGIN
   IF v_zone_ids IS NULL OR ARRAY_LENGTH(v_zone_ids, 1) = 0 THEN
     RAISE EXCEPTION 'zones_dim 데이터가 없습니다. SEED_02를 먼저 실행하세요.';
   END IF;
+
+  IF v_product_ids IS NULL OR ARRAY_LENGTH(v_product_ids, 1) = 0 THEN
+    RAISE EXCEPTION 'products 데이터가 없습니다. SEED_03를 먼저 실행하세요.';
+  END IF;
+
+  RAISE NOTICE '  Store ID: %', v_store_id;
+  RAISE NOTICE '  Zones: % 개', ARRAY_LENGTH(v_zone_ids, 1);
+  RAISE NOTICE '  Products: % 개', ARRAY_LENGTH(v_product_ids, 1);
+  RAISE NOTICE '  Customers: % 개', ARRAY_LENGTH(v_customer_ids, 1);
 
   -- 90일간 생성
   FOR v_day IN 0..89 LOOP
@@ -168,7 +192,7 @@ BEGIN
               v_visit_date,
               v_entry_time + '9 minutes'::INTERVAL,
               v_hour,
-              v_zone_ids[5],
+              v_zone_ids[LEAST(5, ARRAY_LENGTH(v_zone_ids, 1))],
               v_product_ids[1 + FLOOR(RANDOM() * ARRAY_LENGTH(v_product_ids, 1))::INT],
               '{}'::jsonb, NOW()
             );
@@ -247,7 +271,7 @@ BEGIN
           v_visit_date,
           v_entry_time + (v_dwell_minutes || ' minutes')::INTERVAL,
           EXTRACT(HOUR FROM (v_entry_time + (v_dwell_minutes || ' minutes')::INTERVAL))::INT,
-          v_zone_ids[6],  -- 계산대 존
+          v_zone_ids[LEAST(6, ARRAY_LENGTH(v_zone_ids, 1))],  -- 계산대 존 (안전한 인덱스)
           v_product_ids[1 + FLOOR(RANDOM() * ARRAY_LENGTH(v_product_ids, 1))::INT],
           jsonb_build_object('transaction_id', v_transaction_id),
           NOW()
@@ -256,38 +280,37 @@ BEGIN
 
         -- line_items (1~3개)
         FOR v_j IN 1..(1 + FLOOR(RANDOM() * 3)::INT) LOOP
-  v_product_id := v_product_ids[1 + FLOOR(RANDOM() * ARRAY_LENGTH(v_product_ids, 1))::INT];
+          v_product_id := v_product_ids[1 + FLOOR(RANDOM() * ARRAY_LENGTH(v_product_ids, 1))::INT];
 
-  -- derive quantities and prices once to keep consistent in expressions
-  PERFORM 1; -- no-op placeholder
-
-  INSERT INTO public.line_items (
-    id, store_id, org_id, transaction_id, purchase_id, product_id, customer_id,
-    quantity, unit_price, discount_amount, tax_amount, line_total,
-    transaction_date, transaction_hour, payment_method, created_at
-  ) VALUES (
-    gen_random_uuid(), v_store_id, v_org_id, v_transaction_id::text, NULL, v_product_id, v_customer_id,
-    1 + FLOOR(RANDOM() * 2)::INT,
-    (SELECT price FROM public.products WHERE id = v_product_id),
-    FLOOR(RANDOM() * 10000)::NUMERIC,
-    0, -- or compute if you need tax
-    (SELECT price FROM public.products WHERE id = v_product_id) * (1 + FLOOR(RANDOM() * 2)::INT),
-    (v_entry_time + (v_dwell_minutes || ' minutes')::INTERVAL)::date,
-    EXTRACT(HOUR FROM (v_entry_time + (v_dwell_minutes || ' minutes')::INTERVAL))::int,
-    (ARRAY['card','cash','mobile'])[1 + FLOOR(RANDOM() * 3)::INT],
-    NOW()
-  );
-  v_total_line_items := v_total_line_items + 1;
-END LOOP;
+          INSERT INTO public.line_items (
+            id, store_id, org_id, transaction_id, purchase_id, product_id, customer_id,
+            quantity, unit_price, discount_amount, tax_amount, line_total,
+            transaction_date, transaction_hour, payment_method, created_at
+          ) VALUES (
+            gen_random_uuid(), v_store_id, v_org_id, v_transaction_id::text, NULL, v_product_id, v_customer_id,
+            1 + FLOOR(RANDOM() * 2)::INT,
+            (SELECT price FROM public.products WHERE id = v_product_id),
+            FLOOR(RANDOM() * 10000)::NUMERIC,
+            0,
+            (SELECT price FROM public.products WHERE id = v_product_id) * (1 + FLOOR(RANDOM() * 2)::INT),
+            (v_entry_time + (v_dwell_minutes || ' minutes')::INTERVAL)::date,
+            EXTRACT(HOUR FROM (v_entry_time + (v_dwell_minutes || ' minutes')::INTERVAL))::int,
+            (ARRAY['card','cash','mobile'])[1 + FLOOR(RANDOM() * 3)::INT],
+            NOW()
+          );
+          v_total_line_items := v_total_line_items + 1;
+        END LOOP;
       END IF;
 
     END LOOP; -- visits loop
 
     IF v_day % 10 = 0 THEN
-      RAISE NOTICE '    - Day % 진행: visits=%, tx=%, items=%', 90 - v_day, v_total_visits, v_total_transactions, v_total_line_items;
+      RAISE NOTICE '    - Day % 진행: visits=%, tx=%, funnel=%', 90 - v_day, v_total_visits, v_total_transactions, v_total_funnel_events;
     END IF;
   END LOOP; -- 90 days
 
+  RAISE NOTICE '';
+  RAISE NOTICE '  [STEP 1~5 완료]';
   RAISE NOTICE '    ✓ store_visits: %', v_total_visits;
   RAISE NOTICE '    ✓ transactions: %', v_total_transactions;
   RAISE NOTICE '    ✓ line_items: %', v_total_line_items;
@@ -296,7 +319,9 @@ END LOOP;
   RAISE NOTICE '    ✓ visit_zone_events: %', v_total_visit_zone_events;
 
   -- 6) zone_transitions (90일 × 17패턴/일)
-  RAISE NOTICE '  [STEP] zone_transitions 시딩...';
+  RAISE NOTICE '';
+  RAISE NOTICE '  [STEP 6] zone_transitions 시딩...';
+  
   FOR v_day IN 0..89 LOOP
     v_visit_date := CURRENT_DATE - v_day;
 
@@ -305,24 +330,23 @@ END LOOP;
     (gen_random_uuid(), v_store_id, v_org_id, v_zone_ids[1], v_zone_ids[2], v_visit_date, 70 + FLOOR(RANDOM() * 30)::INT, 30 + FLOOR(RANDOM() * 60)::INT, NOW()),
     (gen_random_uuid(), v_store_id, v_org_id, v_zone_ids[2], v_zone_ids[3], v_visit_date, 50 + FLOOR(RANDOM() * 25)::INT, 60 + FLOOR(RANDOM() * 120)::INT, NOW()),
     (gen_random_uuid(), v_store_id, v_org_id, v_zone_ids[2], v_zone_ids[4], v_visit_date, 40 + FLOOR(RANDOM() * 20)::INT, 60 + FLOOR(RANDOM() * 90)::INT, NOW()),
-    (gen_random_uuid(), v_store_id, v_org_id, v_zone_ids[3], v_zone_ids[5], v_visit_date, 25 + FLOOR(RANDOM() * 15)::INT, 120 + FLOOR(RANDOM() * 180)::INT, NOW()),
-    (gen_random_uuid(), v_store_id, v_org_id, v_zone_ids[5], v_zone_ids[3], v_visit_date, 20 + FLOOR(RANDOM() * 15)::INT, 60 + FLOOR(RANDOM() * 60)::INT, NOW()),
-    (gen_random_uuid(), v_store_id, v_org_id, v_zone_ids[3], v_zone_ids[6], v_visit_date, 30 + FLOOR(RANDOM() * 15)::INT, 90 + FLOOR(RANDOM() * 60)::INT, NOW()),
-    (gen_random_uuid(), v_store_id, v_org_id, v_zone_ids[4], v_zone_ids[6], v_visit_date, 25 + FLOOR(RANDOM() * 15)::INT, 60 + FLOOR(RANDOM() * 60)::INT, NOW()),
-    (gen_random_uuid(), v_store_id, v_org_id, v_zone_ids[2], v_zone_ids[7], v_visit_date, 15 + FLOOR(RANDOM() * 10)::INT, 180 + FLOOR(RANDOM() * 120)::INT, NOW()),
-    (gen_random_uuid(), v_store_id, v_org_id, v_zone_ids[7], v_zone_ids[2], v_visit_date, 12 + FLOOR(RANDOM() * 8)::INT, 120 + FLOOR(RANDOM() * 60)::INT, NOW()),
-    (gen_random_uuid(), v_store_id, v_org_id, v_zone_ids[6], v_zone_ids[1], v_visit_date, 35 + FLOOR(RANDOM() * 20)::INT, 30 + FLOOR(RANDOM() * 30)::INT, NOW()),
+    (gen_random_uuid(), v_store_id, v_org_id, v_zone_ids[3], v_zone_ids[LEAST(5, ARRAY_LENGTH(v_zone_ids, 1))], v_visit_date, 25 + FLOOR(RANDOM() * 15)::INT, 120 + FLOOR(RANDOM() * 180)::INT, NOW()),
+    (gen_random_uuid(), v_store_id, v_org_id, v_zone_ids[LEAST(5, ARRAY_LENGTH(v_zone_ids, 1))], v_zone_ids[3], v_visit_date, 20 + FLOOR(RANDOM() * 15)::INT, 60 + FLOOR(RANDOM() * 60)::INT, NOW()),
+    (gen_random_uuid(), v_store_id, v_org_id, v_zone_ids[3], v_zone_ids[LEAST(6, ARRAY_LENGTH(v_zone_ids, 1))], v_visit_date, 30 + FLOOR(RANDOM() * 15)::INT, 90 + FLOOR(RANDOM() * 60)::INT, NOW()),
+    (gen_random_uuid(), v_store_id, v_org_id, v_zone_ids[4], v_zone_ids[LEAST(6, ARRAY_LENGTH(v_zone_ids, 1))], v_visit_date, 25 + FLOOR(RANDOM() * 15)::INT, 60 + FLOOR(RANDOM() * 60)::INT, NOW()),
+    (gen_random_uuid(), v_store_id, v_org_id, v_zone_ids[2], v_zone_ids[LEAST(7, ARRAY_LENGTH(v_zone_ids, 1))], v_visit_date, 15 + FLOOR(RANDOM() * 10)::INT, 180 + FLOOR(RANDOM() * 120)::INT, NOW()),
+    (gen_random_uuid(), v_store_id, v_org_id, v_zone_ids[LEAST(7, ARRAY_LENGTH(v_zone_ids, 1))], v_zone_ids[2], v_visit_date, 12 + FLOOR(RANDOM() * 8)::INT, 120 + FLOOR(RANDOM() * 60)::INT, NOW()),
+    (gen_random_uuid(), v_store_id, v_org_id, v_zone_ids[LEAST(6, ARRAY_LENGTH(v_zone_ids, 1))], v_zone_ids[1], v_visit_date, 35 + FLOOR(RANDOM() * 20)::INT, 30 + FLOOR(RANDOM() * 30)::INT, NOW()),
     (gen_random_uuid(), v_store_id, v_org_id, v_zone_ids[2], v_zone_ids[1], v_visit_date, 25 + FLOOR(RANDOM() * 15)::INT, 20 + FLOOR(RANDOM() * 20)::INT, NOW()),
     (gen_random_uuid(), v_store_id, v_org_id, v_zone_ids[3], v_zone_ids[4], v_visit_date, 15 + FLOOR(RANDOM() * 10)::INT, 90 + FLOOR(RANDOM() * 60)::INT, NOW()),
     (gen_random_uuid(), v_store_id, v_org_id, v_zone_ids[4], v_zone_ids[3], v_visit_date, 10 + FLOOR(RANDOM() * 8)::INT, 60 + FLOOR(RANDOM() * 60)::INT, NOW()),
-    (gen_random_uuid(), v_store_id, v_org_id, v_zone_ids[5], v_zone_ids[6], v_visit_date, 18 + FLOOR(RANDOM() * 12)::INT, 60 + FLOOR(RANDOM() * 30)::INT, NOW()),
-    (gen_random_uuid(), v_store_id, v_org_id, v_zone_ids[7], v_zone_ids[3], v_visit_date, 8 + FLOOR(RANDOM() * 5)::INT, 120 + FLOOR(RANDOM() * 60)::INT, NOW()),
-    (gen_random_uuid(), v_store_id, v_org_id, v_zone_ids[7], v_zone_ids[4], v_visit_date, 6 + FLOOR(RANDOM() * 4)::INT, 90 + FLOOR(RANDOM() * 60)::INT, NOW()),
-    (gen_random_uuid(), v_store_id, v_org_id, v_zone_ids[4], v_zone_ids[5], v_visit_date, 5 + FLOOR(RANDOM() * 5)::INT, 120 + FLOOR(RANDOM() * 90)::INT, NOW());
+    (gen_random_uuid(), v_store_id, v_org_id, v_zone_ids[LEAST(5, ARRAY_LENGTH(v_zone_ids, 1))], v_zone_ids[LEAST(6, ARRAY_LENGTH(v_zone_ids, 1))], v_visit_date, 18 + FLOOR(RANDOM() * 12)::INT, 60 + FLOOR(RANDOM() * 30)::INT, NOW()),
+    (gen_random_uuid(), v_store_id, v_org_id, v_zone_ids[LEAST(7, ARRAY_LENGTH(v_zone_ids, 1))], v_zone_ids[3], v_visit_date, 8 + FLOOR(RANDOM() * 5)::INT, 120 + FLOOR(RANDOM() * 60)::INT, NOW()),
+    (gen_random_uuid(), v_store_id, v_org_id, v_zone_ids[LEAST(7, ARRAY_LENGTH(v_zone_ids, 1))], v_zone_ids[4], v_visit_date, 6 + FLOOR(RANDOM() * 4)::INT, 90 + FLOOR(RANDOM() * 60)::INT, NOW()),
+    (gen_random_uuid(), v_store_id, v_org_id, v_zone_ids[4], v_zone_ids[LEAST(5, ARRAY_LENGTH(v_zone_ids, 1))], v_visit_date, 5 + FLOOR(RANDOM() * 5)::INT, 120 + FLOOR(RANDOM() * 90)::INT, NOW());
   END LOOP;
 
-  PERFORM 1;
-  RAISE NOTICE '  zone_transitions 시딩 완료';
+  RAISE NOTICE '    ✓ zone_transitions: % 건', 90 * 17;
 
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════════════════';
@@ -334,13 +358,16 @@ END LOOP;
   RAISE NOTICE '  ✓ funnel_events: %', v_total_funnel_events;
   RAISE NOTICE '  ✓ zone_events: %', v_total_zone_events;
   RAISE NOTICE '  ✓ visit_zone_events: %', v_total_visit_zone_events;
+  RAISE NOTICE '  ✓ zone_transitions: %', 90 * 17;
   RAISE NOTICE '  완료 시간: %', NOW();
   RAISE NOTICE '════════════════════════════════════════════════════════════════════';
 END $$;
 
 COMMIT;
 
--- 검증 쿼리 (현 스키마 기준)
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 검증 쿼리
+-- ═══════════════════════════════════════════════════════════════════════════
 SELECT 'store_visits' as table_name, COUNT(*) as row_count FROM public.store_visits
 UNION ALL SELECT 'transactions', COUNT(*) FROM public.transactions
 UNION ALL SELECT 'line_items', COUNT(*) FROM public.line_items
@@ -349,3 +376,58 @@ UNION ALL SELECT 'zone_events', COUNT(*) FROM public.zone_events
 UNION ALL SELECT 'visit_zone_events', COUNT(*) FROM public.visit_zone_events
 UNION ALL SELECT 'zone_transitions', COUNT(*) FROM public.zone_transitions
 ORDER BY table_name;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 데이터 정합성 검증
+-- ═══════════════════════════════════════════════════════════════════════════
+DO $$
+DECLARE
+  v_tx_count INT;
+  v_funnel_purchase INT;
+  v_funnel_entry INT;
+  v_store_visits INT;
+  v_event_hour_null INT;
+BEGIN
+  SELECT COUNT(*) INTO v_tx_count FROM public.transactions;
+  SELECT COUNT(*) INTO v_funnel_purchase FROM public.funnel_events WHERE event_type = 'purchase';
+  SELECT COUNT(*) INTO v_funnel_entry FROM public.funnel_events WHERE event_type = 'entry';
+  SELECT COUNT(*) INTO v_store_visits FROM public.store_visits;
+  SELECT COUNT(*) INTO v_event_hour_null FROM public.funnel_events WHERE event_hour IS NULL;
+  
+  RAISE NOTICE '';
+  RAISE NOTICE '═══════════════════════════════════════════════════════════════';
+  RAISE NOTICE '  데이터 정합성 검증';
+  RAISE NOTICE '═══════════════════════════════════════════════════════════════';
+  
+  -- 검증 1: transactions = funnel_events purchase
+  IF v_tx_count != v_funnel_purchase THEN
+    RAISE WARNING '❌ transactions(%) != funnel_events purchase(%)', v_tx_count, v_funnel_purchase;
+  ELSE
+    RAISE NOTICE '✅ transactions = funnel_events purchase: %', v_tx_count;
+  END IF;
+  
+  -- 검증 2: store_visits = funnel_events entry
+  IF v_store_visits != v_funnel_entry THEN
+    RAISE WARNING '⚠️ store_visits(%) != funnel_events entry(%) - 허용 오차', v_store_visits, v_funnel_entry;
+  ELSE
+    RAISE NOTICE '✅ store_visits = funnel_events entry: %', v_funnel_entry;
+  END IF;
+  
+  -- 검증 3: event_hour NULL 체크
+  IF v_event_hour_null > 0 THEN
+    RAISE WARNING '❌ event_hour NULL 건수: %', v_event_hour_null;
+  ELSE
+    RAISE NOTICE '✅ event_hour 모두 채워짐';
+  END IF;
+  
+  -- 검증 4: 퍼널 분포 확인
+  RAISE NOTICE '';
+  RAISE NOTICE '퍼널 분포:';
+  RAISE NOTICE '  - ENTRY: %', (SELECT COUNT(*) FROM public.funnel_events WHERE event_type = 'entry');
+  RAISE NOTICE '  - BROWSE: %', (SELECT COUNT(*) FROM public.funnel_events WHERE event_type = 'browse');
+  RAISE NOTICE '  - ENGAGE: %', (SELECT COUNT(*) FROM public.funnel_events WHERE event_type = 'engage');
+  RAISE NOTICE '  - FITTING: %', (SELECT COUNT(*) FROM public.funnel_events WHERE event_type = 'fitting');
+  RAISE NOTICE '  - PURCHASE: %', v_funnel_purchase;
+  
+  RAISE NOTICE '═══════════════════════════════════════════════════════════════';
+END $$;
