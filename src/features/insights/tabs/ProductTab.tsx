@@ -543,33 +543,32 @@ export function ProductTab() {
   });
 
   // 🔧 FIX: 하이브리드 정규화 - daily_kpis_agg 총액 기준으로 product_performance_agg 비율 적용
+  // 정규화 비율 계산 (카테고리 차트 + 상품 테이블 공통 사용)
+  const revenueRatio = useMemo(() => {
+    if (!productData?.length) return 1;
+    const productPerfTotal = productData.reduce((s, p) => s + p.revenue, 0);
+    const kpiTotalRevenue = metrics?.revenue || productPerfTotal;
+    return productPerfTotal > 0 ? kpiTotalRevenue / productPerfTotal : 1;
+  }, [productData, metrics?.revenue]);
+
   // 차트 중앙 총액 = daily_kpis_agg.total_revenue, 카테고리 비율 = product_performance_agg 기준
   const categoryData = useMemo(() => {
     if (!productData?.length) return [];
 
-    // 1. product_performance_agg에서 카테고리별 원본 합계 계산
+    // product_performance_agg에서 카테고리별 원본 합계 계산
     const map = new Map<string, { revenue: number; quantity: number }>();
     productData.forEach(p => {
       const e = map.get(p.category) || { revenue: 0, quantity: 0 };
       map.set(p.category, { revenue: e.revenue + p.revenue, quantity: e.quantity + p.quantity });
     });
 
-    // 2. product_performance_agg 매출 총합
-    const productPerfTotal = productData.reduce((s, p) => s + p.revenue, 0);
-
-    // 3. daily_kpis_agg 기준 총 매출 (개요탭과 동일)
-    const kpiTotalRevenue = metrics?.revenue || productPerfTotal;
-
-    // 4. 정규화 비율 계산 (product_performance_agg → daily_kpis_agg 스케일링)
-    const revenueRatio = productPerfTotal > 0 ? kpiTotalRevenue / productPerfTotal : 1;
-
-    // 5. 각 카테고리에 정규화 적용
+    // 각 카테고리에 정규화 적용
     return [...map.entries()].map(([name, d]) => ({
       name,
       revenue: Math.round(d.revenue * revenueRatio), // 정규화된 매출 (합계 = kpiTotalRevenue)
       quantity: d.quantity, // 판매량은 원본 유지 (product_performance_agg 기준)
     })).sort((a, b) => b.revenue - a.revenue);
-  }, [productData, metrics?.revenue]);
+  }, [productData, revenueRatio]);
 
   const summary = useMemo(() => {
     const totalRevenue = productData?.reduce((s, p) => s + p.revenue, 0) || 0;
@@ -612,7 +611,7 @@ export function ProductTab() {
               <div><p style={text3D.label}>BESTSELLER</p><p style={{ fontSize: '12px', ...text3D.body }}>베스트셀러</p></div>
             </div>
             <p style={{ fontSize: '24px', ...text3D.heroNumber }} className="truncate">{summary.topProduct?.name || '-'}</p>
-            <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>{formatCurrency(summary.topProduct?.revenue || 0)}</p>
+            <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>{formatCurrency(Math.round((summary.topProduct?.revenue || 0) * revenueRatio))}</p>
           </div>
         </Glass3DCard>
         <Glass3DCard dark={isDark}>
@@ -696,7 +695,7 @@ export function ProductTab() {
                       <td className="py-3 px-4">
                         <span style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '11px', background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)', color: isDark ? 'rgba(255,255,255,0.8)' : '#6b7280' }}>{p.category}</span>
                       </td>
-                      <td className="text-right py-3 px-4" style={text3D.body}>{formatCurrency(p.revenue)}</td>
+                      <td className="text-right py-3 px-4" style={text3D.body}>{formatCurrency(Math.round(p.revenue * revenueRatio))}</td>
                       <td className="text-right py-3 px-4" style={text3D.body}>{p.quantity.toLocaleString()}개</td>
                       <td className="text-right py-3 px-4">
                         <span style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, background: p.stock < 10 ? 'rgba(239,68,68,0.15)' : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'), color: p.stock < 10 ? '#ef4444' : (isDark ? 'rgba(255,255,255,0.7)' : '#6b7280') }}>{p.stock}개</span>
