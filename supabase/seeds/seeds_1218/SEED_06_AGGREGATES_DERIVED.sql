@@ -465,8 +465,11 @@ BEGIN
 END $$;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- STEP 7: customer_segments_agg - transactions에서 파생
+-- STEP 7: customer_segments_agg - funnel_events entry에서 파생 (v8.7 수정)
 -- 고객 탭 세그먼트 분석
+--
+-- 🔧 v8.7 수정: transactions → funnel_events entry 기준으로 변경
+-- 이유: unique_visitors (daily_kpis_agg)와 segment total 일치 필요
 -- ═══════════════════════════════════════════════════════════════════════════════
 DO $$
 DECLARE
@@ -476,7 +479,8 @@ DECLARE
   v_segment TEXT;
   v_segments TEXT[] := ARRAY['VIP', 'Regular', 'New', 'Dormant'];
   v_count INTEGER := 0;
-  v_seg_data RECORD;
+  v_visitor_data RECORD;
+  v_tx_data RECORD;
 BEGIN
   -- 일관된 Org/Store 선택 (데이터가 있는 store 우선)
   SELECT s.id, s.org_id INTO v_store_id, v_org_id
@@ -485,20 +489,30 @@ BEGIN
   ORDER BY COALESCE(fe.cnt, 0) DESC, s.created_at ASC LIMIT 1;
 
   RAISE NOTICE '[STEP 7] customer_segments_agg 생성 중 (org: %, store: %)...', v_org_id, v_store_id;
+  RAISE NOTICE '  → funnel_events entry 기준 (v8.7)';
 
-  -- 각 날짜에 대해 세그먼트 데이터 생성
+  -- 각 날짜에 대해 세그먼트 데이터 생성 (funnel_events entry 기준)
   FOR v_date IN
-    SELECT DISTINCT transaction_datetime::date
-    FROM transactions
+    SELECT DISTINCT event_date
+    FROM funnel_events
     WHERE store_id = v_store_id
+      AND event_type = 'entry'
     ORDER BY 1
   LOOP
-    -- 해당 날짜의 거래 통계 가져오기
+    -- 해당 날짜의 방문자 통계 가져오기 (funnel_events entry 기준)
     SELECT
-      COUNT(DISTINCT customer_id) as total_customers,
-      SUM(total_amount) as total_revenue,
-      AVG(total_amount) as avg_txn
-    INTO v_seg_data
+      COUNT(DISTINCT customer_id) as unique_visitors
+    INTO v_visitor_data
+    FROM funnel_events
+    WHERE store_id = v_store_id
+      AND event_date = v_date
+      AND event_type = 'entry';
+
+    -- 해당 날짜의 거래 통계 가져오기 (매출/평균값용)
+    SELECT
+      COALESCE(SUM(total_amount), 0) as total_revenue,
+      COALESCE(AVG(total_amount), 100000) as avg_txn
+    INTO v_tx_data
     FROM transactions
     WHERE store_id = v_store_id
       AND transaction_datetime::date = v_date;
@@ -519,26 +533,30 @@ BEGIN
         v_date,
         'customer_tier',
         v_segment,
-        -- 세그먼트별 고객 수 (VIP 15%, Regular 40%, New 30%, Dormant 15%)
+        -- 세그먼트별 고객 수 (unique_visitors 기준으로 분배)
+        -- VIP 15%, Regular 40%, New 30%, Dormant 15% (합계 100%)
         CASE v_segment
-          WHEN 'VIP' THEN FLOOR(COALESCE(v_seg_data.total_customers, 0) * 0.15) + FLOOR(RANDOM() * 5)
-          WHEN 'Regular' THEN FLOOR(COALESCE(v_seg_data.total_customers, 0) * 0.40) + FLOOR(RANDOM() * 10)
-          WHEN 'New' THEN FLOOR(COALESCE(v_seg_data.total_customers, 0) * 0.30) + FLOOR(RANDOM() * 8)
-          WHEN 'Dormant' THEN FLOOR(COALESCE(v_seg_data.total_customers, 0) * 0.15) + FLOOR(RANDOM() * 5)
+          WHEN 'VIP' THEN FLOOR(COALESCE(v_visitor_data.unique_visitors, 0) * 0.15)
+          WHEN 'Regular' THEN FLOOR(COALESCE(v_visitor_data.unique_visitors, 0) * 0.40)
+          WHEN 'New' THEN FLOOR(COALESCE(v_visitor_data.unique_visitors, 0) * 0.30)
+          WHEN 'Dormant' THEN COALESCE(v_visitor_data.unique_visitors, 0)
+                              - FLOOR(COALESCE(v_visitor_data.unique_visitors, 0) * 0.15)
+                              - FLOOR(COALESCE(v_visitor_data.unique_visitors, 0) * 0.40)
+                              - FLOOR(COALESCE(v_visitor_data.unique_visitors, 0) * 0.30)
         END as customer_count,
         -- 세그먼트별 매출 (VIP가 높은 비중)
         CASE v_segment
-          WHEN 'VIP' THEN FLOOR(COALESCE(v_seg_data.total_revenue, 0) * 0.45)
-          WHEN 'Regular' THEN FLOOR(COALESCE(v_seg_data.total_revenue, 0) * 0.35)
-          WHEN 'New' THEN FLOOR(COALESCE(v_seg_data.total_revenue, 0) * 0.15)
-          WHEN 'Dormant' THEN FLOOR(COALESCE(v_seg_data.total_revenue, 0) * 0.05)
+          WHEN 'VIP' THEN FLOOR(v_tx_data.total_revenue * 0.45)
+          WHEN 'Regular' THEN FLOOR(v_tx_data.total_revenue * 0.35)
+          WHEN 'New' THEN FLOOR(v_tx_data.total_revenue * 0.15)
+          WHEN 'Dormant' THEN FLOOR(v_tx_data.total_revenue * 0.05)
         END as total_revenue,
         -- avg_transaction_value
         CASE v_segment
-          WHEN 'VIP' THEN COALESCE(v_seg_data.avg_txn, 100000) * 1.8
-          WHEN 'Regular' THEN COALESCE(v_seg_data.avg_txn, 100000) * 1.0
-          WHEN 'New' THEN COALESCE(v_seg_data.avg_txn, 100000) * 0.7
-          WHEN 'Dormant' THEN COALESCE(v_seg_data.avg_txn, 100000) * 0.5
+          WHEN 'VIP' THEN v_tx_data.avg_txn * 1.8
+          WHEN 'Regular' THEN v_tx_data.avg_txn * 1.0
+          WHEN 'New' THEN v_tx_data.avg_txn * 0.7
+          WHEN 'Dormant' THEN v_tx_data.avg_txn * 0.5
         END as avg_transaction_value,
         -- visit_frequency (월별)
         CASE v_segment
@@ -570,8 +588,8 @@ BEGIN
         END as ltv_estimate,
         jsonb_build_object(
           'source', 'SEED_06_DERIVED',
-          'version', 'v8.6',
-          'derived_from', 'transactions',
+          'version', 'v8.7',
+          'derived_from', 'funnel_events.entry + transactions',
           'segment', v_segment,
           'tier_rank', CASE v_segment
             WHEN 'VIP' THEN 1
