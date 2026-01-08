@@ -889,13 +889,15 @@ export function CustomerTab() {
     queryFn: async () => {
       if (!selectedStore?.id || !orgId) return [];
 
+      // 🔧 FIX: limit(10000) 추가 - Supabase 기본 1000행 제한 해결
       const { data, error } = await supabase
         .from('customer_segments_agg')
         .select('segment_name, customer_count, total_revenue, avg_transaction_value, visit_frequency')
         .eq('org_id', orgId)
         .eq('store_id', selectedStore.id)
         .gte('date', dateRange.startDate)
-        .lte('date', dateRange.endDate);
+        .lte('date', dateRange.endDate)
+        .limit(10000);
 
       if (error) return [];
 
