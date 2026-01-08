@@ -1,13 +1,18 @@
 -- =====================================================
--- SEED_09_DATE_REFRESH.sql (v2 - L2 기반 파생)
+-- SEED_09_DATE_REFRESH.sql (v3 - L2 + L3 날짜 동시 갱신)
 --
 -- 인사이트 허브 데이터 날짜 업데이트 및 보강
 -- 수정일: 2026-01-08
 --
--- 핵심 변경:
+-- 핵심 변경 (v3):
+-- - PART 1: L2 날짜 shift 시 L3 테이블도 함께 shift
+--   (daily_kpis_agg, hourly_metrics, zone_daily_metrics 등)
+-- - 이를 통해 7일/30일/90일 등 모든 기간에서 L2-L3 일관성 보장
+-- - 버그 수정: KPI 카드와 퍼널 차트 간 날짜 불일치 해결
+--
+-- v2 변경:
 -- - L2 데이터 먼저 생성 (funnel_events, transactions, line_items, zone_events)
 -- - L3 집계 데이터는 L2에서 파생 (SEED_06_DERIVED 방식 적용)
--- - 데이터 일관성 보장
 -- =====================================================
 
 -- 대상 store_id (동적으로 조회)
@@ -74,6 +79,38 @@ BEGIN
       UPDATE purchases SET purchase_date = purchase_date + v_shift_days
       WHERE store_id = v_store_id AND purchase_date < CURRENT_DATE - v_shift_days;
       RAISE NOTICE '  - purchases 업데이트 완료';
+
+      -- L3 집계 테이블 날짜도 함께 shift (L2와 일관성 유지)
+      RAISE NOTICE '[PART 1-B] L3 집계 테이블 날짜 shift...';
+
+      UPDATE daily_kpis_agg SET date = date + v_shift_days
+      WHERE store_id = v_store_id AND date < CURRENT_DATE - v_shift_days;
+      RAISE NOTICE '  - daily_kpis_agg 업데이트 완료';
+
+      UPDATE daily_sales SET date = date + v_shift_days
+      WHERE store_id = v_store_id AND date < CURRENT_DATE - v_shift_days;
+      RAISE NOTICE '  - daily_sales 업데이트 완료';
+
+      UPDATE hourly_metrics SET date = date + v_shift_days
+      WHERE store_id = v_store_id AND date < CURRENT_DATE - v_shift_days;
+      RAISE NOTICE '  - hourly_metrics 업데이트 완료';
+
+      UPDATE zone_daily_metrics SET date = date + v_shift_days
+      WHERE store_id = v_store_id AND date < CURRENT_DATE - v_shift_days;
+      RAISE NOTICE '  - zone_daily_metrics 업데이트 완료';
+
+      UPDATE product_performance_agg SET date = date + v_shift_days
+      WHERE store_id = v_store_id AND date < CURRENT_DATE - v_shift_days;
+      RAISE NOTICE '  - product_performance_agg 업데이트 완료';
+
+      UPDATE customer_segments_agg SET date = date + v_shift_days
+      WHERE store_id = v_store_id AND date < CURRENT_DATE - v_shift_days;
+      RAISE NOTICE '  - customer_segments_agg 업데이트 완료';
+
+      UPDATE zone_transitions SET transition_date = transition_date + v_shift_days
+      WHERE store_id = v_store_id AND transition_date < CURRENT_DATE - v_shift_days;
+      RAISE NOTICE '  - zone_transitions 업데이트 완료';
+
     ELSE
       RAISE NOTICE '[PART 1] 데이터가 이미 최신 상태 - shift 스킵';
     END IF;
@@ -718,15 +755,48 @@ DECLARE
   v_kpi_visitors INT;
   v_funnel_purchase INT;
   v_kpi_transactions INT;
+  v_funnel_entry_all INT;
+  v_kpi_visitors_all INT;
+  v_funnel_purchase_all INT;
+  v_kpi_transactions_all INT;
 BEGIN
   SELECT id INTO v_store_id FROM stores LIMIT 1;
 
   RAISE NOTICE '';
   RAISE NOTICE '═══════════════════════════════════════════════════════════════';
-  RAISE NOTICE '[PART 6] 데이터 정합성 검증 (최근 7일)';
+  RAISE NOTICE '[PART 6] 데이터 정합성 검증';
   RAISE NOTICE '═══════════════════════════════════════════════════════════════';
 
-  -- 1. funnel_events entry vs daily_kpis_agg total_visitors
+  -- 1. 전체 기간 검증
+  RAISE NOTICE '[전체 기간]';
+
+  SELECT COUNT(*) INTO v_funnel_entry_all
+  FROM funnel_events WHERE store_id = v_store_id AND event_type = 'entry';
+
+  SELECT COALESCE(SUM(total_visitors), 0) INTO v_kpi_visitors_all
+  FROM daily_kpis_agg WHERE store_id = v_store_id;
+
+  IF v_funnel_entry_all = v_kpi_visitors_all THEN
+    RAISE NOTICE '  ✓ 전체 entry = total_visitors: % = %', v_funnel_entry_all, v_kpi_visitors_all;
+  ELSE
+    RAISE WARNING '  ✗ 전체 entry ≠ total_visitors: % ≠ %', v_funnel_entry_all, v_kpi_visitors_all;
+  END IF;
+
+  SELECT COUNT(*) INTO v_funnel_purchase_all
+  FROM funnel_events WHERE store_id = v_store_id AND event_type = 'purchase';
+
+  SELECT COALESCE(SUM(total_transactions), 0) INTO v_kpi_transactions_all
+  FROM daily_kpis_agg WHERE store_id = v_store_id;
+
+  IF v_funnel_purchase_all = v_kpi_transactions_all THEN
+    RAISE NOTICE '  ✓ 전체 purchase = total_transactions: % = %', v_funnel_purchase_all, v_kpi_transactions_all;
+  ELSE
+    RAISE WARNING '  ✗ 전체 purchase ≠ total_transactions: % ≠ %', v_funnel_purchase_all, v_kpi_transactions_all;
+  END IF;
+
+  -- 2. 최근 7일 검증
+  RAISE NOTICE '[최근 7일]';
+
   SELECT COUNT(*) INTO v_funnel_entry
   FROM funnel_events WHERE store_id = v_store_id
     AND event_type = 'entry' AND event_date >= CURRENT_DATE - INTERVAL '6 days';
@@ -736,12 +806,11 @@ BEGIN
     AND date >= CURRENT_DATE - INTERVAL '6 days';
 
   IF v_funnel_entry = v_kpi_visitors THEN
-    RAISE NOTICE '  ✓ entry = total_visitors: % = %', v_funnel_entry, v_kpi_visitors;
+    RAISE NOTICE '  ✓ 7일 entry = total_visitors: % = %', v_funnel_entry, v_kpi_visitors;
   ELSE
-    RAISE WARNING '  ✗ entry ≠ total_visitors: % ≠ %', v_funnel_entry, v_kpi_visitors;
+    RAISE WARNING '  ✗ 7일 entry ≠ total_visitors: % ≠ %', v_funnel_entry, v_kpi_visitors;
   END IF;
 
-  -- 2. funnel_events purchase vs daily_kpis_agg total_transactions
   SELECT COUNT(*) INTO v_funnel_purchase
   FROM funnel_events WHERE store_id = v_store_id
     AND event_type = 'purchase' AND event_date >= CURRENT_DATE - INTERVAL '6 days';
@@ -751,14 +820,25 @@ BEGIN
     AND date >= CURRENT_DATE - INTERVAL '6 days';
 
   IF v_funnel_purchase = v_kpi_transactions THEN
-    RAISE NOTICE '  ✓ purchase = total_transactions: % = %', v_funnel_purchase, v_kpi_transactions;
+    RAISE NOTICE '  ✓ 7일 purchase = total_transactions: % = %', v_funnel_purchase, v_kpi_transactions;
   ELSE
-    RAISE WARNING '  ✗ purchase ≠ total_transactions: % ≠ %', v_funnel_purchase, v_kpi_transactions;
+    RAISE WARNING '  ✗ 7일 purchase ≠ total_transactions: % ≠ %', v_funnel_purchase, v_kpi_transactions;
   END IF;
+
+  -- 3. 날짜 범위 일치 확인
+  RAISE NOTICE '[날짜 범위 일치]';
+  PERFORM 1 FROM (
+    SELECT 'funnel_events' as tbl, MIN(event_date) as min_dt, MAX(event_date) as max_dt
+    FROM funnel_events WHERE store_id = v_store_id
+    UNION ALL
+    SELECT 'daily_kpis_agg', MIN(date), MAX(date)
+    FROM daily_kpis_agg WHERE store_id = v_store_id
+  ) t;
+  RAISE NOTICE '  (PART 7 쿼리 결과로 확인)';
 
   RAISE NOTICE '';
   RAISE NOTICE '═══════════════════════════════════════════════════════════════';
-  RAISE NOTICE 'SEED_09 v2 완료: L2 기반 날짜 갱신';
+  RAISE NOTICE 'SEED_09 v3 완료: L2 + L3 날짜 동시 갱신';
   RAISE NOTICE '═══════════════════════════════════════════════════════════════';
 END $$;
 
@@ -766,12 +846,15 @@ END $$;
 -- PART 7: 결과 확인 쿼리
 -- =====================================================
 
+-- 테이블별 날짜 범위 및 기간별 레코드 수 확인
 SELECT 'funnel_events' as tbl,
        MIN(event_date) as min_dt,
        MAX(event_date) as max_dt,
        COUNT(*) as cnt,
        SUM(CASE WHEN event_date = CURRENT_DATE THEN 1 ELSE 0 END) as today,
-       SUM(CASE WHEN event_date >= CURRENT_DATE - INTERVAL '6 days' THEN 1 ELSE 0 END) as last_7d
+       SUM(CASE WHEN event_date >= CURRENT_DATE - INTERVAL '6 days' THEN 1 ELSE 0 END) as last_7d,
+       SUM(CASE WHEN event_date >= CURRENT_DATE - INTERVAL '29 days' THEN 1 ELSE 0 END) as last_30d,
+       SUM(CASE WHEN event_date >= CURRENT_DATE - INTERVAL '89 days' THEN 1 ELSE 0 END) as last_90d
 FROM funnel_events
 
 UNION ALL
@@ -779,7 +862,9 @@ UNION ALL
 SELECT 'daily_kpis_agg',
        MIN(date), MAX(date), COUNT(*),
        SUM(CASE WHEN date = CURRENT_DATE THEN 1 ELSE 0 END),
-       SUM(CASE WHEN date >= CURRENT_DATE - INTERVAL '6 days' THEN 1 ELSE 0 END)
+       SUM(CASE WHEN date >= CURRENT_DATE - INTERVAL '6 days' THEN 1 ELSE 0 END),
+       SUM(CASE WHEN date >= CURRENT_DATE - INTERVAL '29 days' THEN 1 ELSE 0 END),
+       SUM(CASE WHEN date >= CURRENT_DATE - INTERVAL '89 days' THEN 1 ELSE 0 END)
 FROM daily_kpis_agg
 
 UNION ALL
@@ -787,7 +872,9 @@ UNION ALL
 SELECT 'transactions',
        MIN(transaction_datetime::date), MAX(transaction_datetime::date), COUNT(*),
        SUM(CASE WHEN transaction_datetime::date = CURRENT_DATE THEN 1 ELSE 0 END),
-       SUM(CASE WHEN transaction_datetime::date >= CURRENT_DATE - INTERVAL '6 days' THEN 1 ELSE 0 END)
+       SUM(CASE WHEN transaction_datetime::date >= CURRENT_DATE - INTERVAL '6 days' THEN 1 ELSE 0 END),
+       SUM(CASE WHEN transaction_datetime::date >= CURRENT_DATE - INTERVAL '29 days' THEN 1 ELSE 0 END),
+       SUM(CASE WHEN transaction_datetime::date >= CURRENT_DATE - INTERVAL '89 days' THEN 1 ELSE 0 END)
 FROM transactions
 
 UNION ALL
@@ -795,7 +882,9 @@ UNION ALL
 SELECT 'hourly_metrics',
        MIN(date), MAX(date), COUNT(*),
        SUM(CASE WHEN date = CURRENT_DATE THEN 1 ELSE 0 END),
-       SUM(CASE WHEN date >= CURRENT_DATE - INTERVAL '6 days' THEN 1 ELSE 0 END)
+       SUM(CASE WHEN date >= CURRENT_DATE - INTERVAL '6 days' THEN 1 ELSE 0 END),
+       SUM(CASE WHEN date >= CURRENT_DATE - INTERVAL '29 days' THEN 1 ELSE 0 END),
+       SUM(CASE WHEN date >= CURRENT_DATE - INTERVAL '89 days' THEN 1 ELSE 0 END)
 FROM hourly_metrics
 
 UNION ALL
@@ -803,11 +892,13 @@ UNION ALL
 SELECT 'zone_daily_metrics',
        MIN(date), MAX(date), COUNT(*),
        SUM(CASE WHEN date = CURRENT_DATE THEN 1 ELSE 0 END),
-       SUM(CASE WHEN date >= CURRENT_DATE - INTERVAL '6 days' THEN 1 ELSE 0 END)
+       SUM(CASE WHEN date >= CURRENT_DATE - INTERVAL '6 days' THEN 1 ELSE 0 END),
+       SUM(CASE WHEN date >= CURRENT_DATE - INTERVAL '29 days' THEN 1 ELSE 0 END),
+       SUM(CASE WHEN date >= CURRENT_DATE - INTERVAL '89 days' THEN 1 ELSE 0 END)
 FROM zone_daily_metrics
 
 ORDER BY tbl;
 
 -- =====================================================
--- End of SEED_09_DATE_REFRESH.sql (v2)
+-- End of SEED_09_DATE_REFRESH.sql (v3)
 -- =====================================================
