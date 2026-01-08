@@ -39,6 +39,14 @@ export const MODULE_CONFIG: Record<SourceModule, ModuleConfig> = {
     bgColor: 'bg-pink-500/20',
     borderColor: 'border-pink-500/30',
   },
+  promotion_optimization: {
+    displayName: '프로모션 최적화',
+    shortName: '프로모 최적화',
+    icon: '🎯',
+    color: 'text-rose-400',
+    bgColor: 'bg-rose-500/20',
+    borderColor: 'border-rose-500/30',
+  },
   demand_forecast: {
     displayName: '수요 예측',
     shortName: '수요',
