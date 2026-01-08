@@ -332,13 +332,15 @@ export function InsightDataProvider({ children, initialTab = 'overview' }: Insig
       if (!storeId || !orgId) return null;
 
       // zone_daily_metrics + zones_dim 조인
+      // 🔧 FIX: limit(10000) 추가 - Supabase 기본 1000행 제한 해결
       const { data: metricsData, error: metricsError } = await supabase
         .from('zone_daily_metrics')
         .select('zone_id, total_visitors, avg_dwell_seconds, revenue_attributed')
         .eq('org_id', orgId)
         .eq('store_id', storeId)
         .gte('date', startDate)
-        .lte('date', endDate);
+        .lte('date', endDate)
+        .limit(10000);
 
       if (metricsError) {
         console.error('[InsightDataProvider] Zone metrics error:', metricsError);
@@ -377,13 +379,15 @@ export function InsightDataProvider({ children, initialTab = 'overview' }: Insig
       })).sort((a, b) => b.visitors - a.visitors);
 
       // 존 이동 경로
+      // 🔧 FIX: limit(10000) 추가
       const { data: transitionsData } = await supabase
         .from('zone_transitions')
         .select('from_zone_id, to_zone_id, transition_count')
         .eq('org_id', orgId)
         .eq('store_id', storeId)
         .gte('transition_date', startDate)
-        .lte('transition_date', endDate);
+        .lte('transition_date', endDate)
+        .limit(10000);
 
       const transitionMap = new Map<string, number>();
       transitionsData?.forEach(t => {

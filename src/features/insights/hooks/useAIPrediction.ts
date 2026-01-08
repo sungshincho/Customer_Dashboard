@@ -279,13 +279,15 @@ export const useAIPrediction = () => {
         // 폴백: transactions 테이블에서 일별 집계
         console.log('[useAIPrediction] Falling back to transactions table', { kpiError });
 
+        // 🔧 FIX: limit(10000) 추가 - Supabase 기본 1000행 제한 해결
         const { data: txData } = await supabase
           .from('transactions')
           .select('transaction_datetime, total_amount, customer_id')
           .eq('store_id', selectedStore.id)
           .eq('org_id', orgId)
           .gte('transaction_datetime', format(startDate, 'yyyy-MM-dd'))
-          .lte('transaction_datetime', format(endDate, "yyyy-MM-dd'T'23:59:59"));
+          .lte('transaction_datetime', format(endDate, "yyyy-MM-dd'T'23:59:59"))
+          .limit(10000);
 
         if (txData && txData.length > 0) {
           // 일별 집계
