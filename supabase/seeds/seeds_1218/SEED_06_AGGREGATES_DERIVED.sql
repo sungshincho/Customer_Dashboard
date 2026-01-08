@@ -411,7 +411,7 @@ BEGIN
     -- transactions: DISTINCT transaction_id 수
     COUNT(DISTINCT li.transaction_id) as transactions,
     -- conversion_rate: 추정 (2~17%)
-    ROUND((RANDOM() * 0.15 + 0.02) * 100, 2) as conversion_rate,
+    ROUND(((RANDOM() * 0.15 + 0.02) * 100)::NUMERIC, 2) as conversion_rate,
     -- avg_selling_price: 평균 단가
     CASE
       WHEN SUM(li.quantity) > 0
