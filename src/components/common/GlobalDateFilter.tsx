@@ -19,7 +19,7 @@ import { useDateFilterStore, PresetPeriod, PRESET_LABELS } from '@/store/dateFil
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { useState } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { DateRange } from 'react-day-picker';
 
 const presets: PresetPeriod[] = ['today', '7d', '30d', '90d'];
@@ -38,7 +38,25 @@ export function GlobalDateFilter({
   const { dateRange, setPreset, setCustomRange } = useDateFilterStore();
   const [isOpen, setIsOpen] = useState(false);
 
-  const handleDateRangeSelect = (range: DateRange | undefined) => {
+  // H-6: 임시 선택 상태 (팝오버 열릴 때 리셋됨)
+  const [tempRange, setTempRange] = useState<DateRange | undefined>(undefined);
+
+  // 팝오버 열릴 때 임시 상태 초기화
+  useEffect(() => {
+    if (isOpen) {
+      // 팝오버가 열리면 임시 선택 상태를 현재 저장된 범위로 설정
+      setTempRange({
+        from: parseISO(dateRange.startDate),
+        to: parseISO(dateRange.endDate),
+      });
+    }
+  }, [isOpen, dateRange.startDate, dateRange.endDate]);
+
+  const handleDateRangeSelect = useCallback((range: DateRange | undefined) => {
+    // 임시 상태 업데이트
+    setTempRange(range);
+
+    // 두 날짜가 모두 선택되면 저장하고 팝오버 닫기
     if (range?.from && range?.to) {
       setCustomRange(
         format(range.from, 'yyyy-MM-dd'),
@@ -46,9 +64,14 @@ export function GlobalDateFilter({
       );
       setIsOpen(false);
     }
-  };
+  }, [setCustomRange]);
 
-  const selectedRange: DateRange = {
+  // 초기화 버튼 핸들러
+  const handleReset = useCallback(() => {
+    setTempRange(undefined);
+  }, []);
+
+  const displayRange: DateRange = tempRange ?? {
     from: parseISO(dateRange.startDate),
     to: parseISO(dateRange.endDate),
   };
@@ -98,11 +121,26 @@ export function GlobalDateFilter({
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="end">
+            <div className="p-3 border-b flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">
+                {tempRange?.from && !tempRange?.to
+                  ? '종료일을 선택하세요'
+                  : '날짜 범위 선택'}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs"
+                onClick={handleReset}
+              >
+                초기화
+              </Button>
+            </div>
             <Calendar
               initialFocus
               mode="range"
-              defaultMonth={selectedRange.from}
-              selected={selectedRange}
+              defaultMonth={displayRange.from}
+              selected={displayRange}
               onSelect={handleDateRangeSelect}
               numberOfMonths={2}
               locale={ko}
