@@ -177,7 +177,7 @@ export const RESULT_CONFIG = {
   },
   failed: {
     label: '미달성',
-    icon: '❌',
+    icon: '📉',
     color: 'text-red-400',
     bgColor: 'bg-red-500/20',
   },

@@ -110,6 +110,7 @@ const CategoryTable: React.FC<{
             <div style={{ height: '14px', width: '50px', borderRadius: '4px', background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' }} />
             <div style={{ height: '14px', width: '50px', borderRadius: '4px', background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' }} />
             <div style={{ height: '14px', width: '60px', borderRadius: '4px', background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)' }} />
+            <div style={{ height: '14px', width: '60px', borderRadius: '4px', background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)' }} />
           </div>
         ))}
       </div>
@@ -127,6 +128,7 @@ const CategoryTable: React.FC<{
               <th style={{ textAlign: 'center', padding: '10px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>적용</th>
               <th style={{ textAlign: 'center', padding: '10px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>성공</th>
               <th style={{ textAlign: 'center', padding: '10px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>평균ROI</th>
+              <th style={{ textAlign: 'center', padding: '10px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>총 효과</th>
             </tr>
           </thead>
           <tbody>
@@ -159,6 +161,9 @@ const CategoryTable: React.FC<{
                   </td>
                   <td style={{ textAlign: 'center', padding: '12px 8px', fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>
                     {formatPercent(item.averageRoi)}
+                  </td>
+                  <td style={{ textAlign: 'center', padding: '12px 8px', color: isDark ? 'rgba(255,255,255,0.5)' : '#9ca3af' }}>
+                    -
                   </td>
                 </tr>
               );
