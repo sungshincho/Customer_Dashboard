@@ -1173,7 +1173,7 @@ export default function DigitalTwinStudioPage() {
                 </div> : <>
                   <div className="flex-1 h-full bg-black/80 backdrop-blur-sm border border-white/10 rounded-xl overflow-hidden flex flex-col">
                     {/* 탭 헤더 - 4패널 구조: 레이어 → AI시뮬레이션 → AI최적화 → 적용하기 */}
-                    <div className="flex border-b border-white/10 items-center">
+                    <div className="flex border-b border-white/10 items-center flex-shrink-0">
                       <TabButton active={activeTab === 'layer'} onClick={() => setActiveTab('layer')}>
                         <Layers className="w-3 h-3 mr-1 inline" />
                         레이어
@@ -1197,7 +1197,7 @@ export default function DigitalTwinStudioPage() {
                     </div>
 
                     {/* 탭 컨텐츠 */}
-                    <div className="flex-1 overflow-y-auto">
+                    <div className="flex-1 overflow-y-auto min-h-0">
                       {activeTab === 'layer' && <LayerPanel />}
                       {activeTab === 'ai-simulation' && <AISimulationTab storeId={selectedStore?.id || ''} sceneData={currentRecipe} onOverlayToggle={toggleOverlay} simulationZones={simulationZones} onResultsUpdate={(type, result) => {
                     // AI 시뮬레이션 결과 저장 및 결과 리포트 패널 표시
