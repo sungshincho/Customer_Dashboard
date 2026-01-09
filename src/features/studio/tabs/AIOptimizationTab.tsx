@@ -1091,54 +1091,6 @@ export function AIOptimizationTab({
                   />
                 )}
 
-                {/* 비교 모드 토글 - 3D 뷰 모드 (이미지 아이콘 제거) */}
-                <div className="p-2 bg-white/5 rounded-lg">
-                  <div className="flex items-center gap-1 text-[10px] text-white/50 mb-2">
-                    <Eye className="h-3 w-3" />
-                    3D 뷰 모드
-                  </div>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => setViewMode('as-is')}
-                      className={cn(
-                        'flex-1 px-2 py-1.5 text-xs rounded transition-all',
-                        viewMode === 'as-is'
-                          ? 'bg-red-600 text-white'
-                          : 'bg-white/10 text-white/60 hover:bg-white/20'
-                      )}
-                    >
-                      As-Is
-                    </button>
-                    <button
-                      onClick={() => setViewMode('all')}
-                      className={cn(
-                        'flex-1 px-2 py-1.5 text-xs rounded transition-all',
-                        viewMode === 'all'
-                          ? 'bg-gradient-to-r from-red-600 to-green-600 text-white'
-                          : 'bg-white/10 text-white/60 hover:bg-white/20'
-                      )}
-                    >
-                      <Layers className="h-3 w-3 mx-auto" />
-                    </button>
-                    <button
-                      onClick={() => setViewMode('to-be')}
-                      className={cn(
-                        'flex-1 px-2 py-1.5 text-xs rounded transition-all',
-                        viewMode === 'to-be'
-                          ? 'bg-green-600 text-white'
-                          : 'bg-white/10 text-white/60 hover:bg-white/20'
-                      )}
-                    >
-                      To-Be
-                    </button>
-                  </div>
-                  <p className="text-[9px] text-white/40 mt-1.5 text-center">
-                    {viewMode === 'as-is' && '원래 배치 상태'}
-                    {viewMode === 'all' && '변경 비교 (화살표 표시)'}
-                    {viewMode === 'to-be' && '최적화 후 배치'}
-                  </p>
-                </div>
-
                 {/* As-Is / To-Be 액션 버튼 */}
                 <div className="flex gap-2 pt-2">
                   <Button
