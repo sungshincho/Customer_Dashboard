@@ -922,10 +922,8 @@
   background-color: rgba(0, 0, 0, var(--tw-bg-opacity, 0.8)) !important;
 }
 
-/* 패널 배경 */
-.digital-twin-studio > div {
-  background-color: #000000 !important;
-}
+/* 패널 배경 - Canvas 컨테이너는 제외 */
+/* 주의: Canvas는 투명해야 3D가 보임 */
 
 /* ===== 보더 강제 ===== */
 .digital-twin-studio .border-white\/10,
