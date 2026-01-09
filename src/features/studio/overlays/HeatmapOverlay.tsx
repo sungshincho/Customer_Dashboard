@@ -2,12 +2,25 @@
  * HeatmapOverlay.tsx
  *
  * 히트맵 오버레이 - 방문자 밀집도 시각화
+ * - storeBounds를 사용하여 매장 범위 내에만 렌더링
  */
 
 import { useMemo, useState } from 'react';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import type { HeatPoint, HeatmapOverlayProps } from '../types';
+
+// 기본 매장 경계 (storeBounds가 없을 때 사용)
+const DEFAULT_BOUNDS = {
+  width: 17.4,
+  depth: 16.6,
+  minX: -8.7,
+  maxX: 8.7,
+  minZ: -8.3,
+  maxZ: 8.3,
+  centerX: 0,
+  centerZ: 0,
+};
 
 // ============================================================================
 // HeatmapOverlay 컴포넌트
@@ -19,6 +32,7 @@ export function HeatmapOverlay({
   opacity = 0.6,
   heightScale = 2,
   onPointClick,
+  storeBounds,  // 🆕 매장 경계
 }: HeatmapOverlayProps) {
   const [selectedPoint, setSelectedPoint] = useState<HeatPoint | null>(null);
 
@@ -27,22 +41,34 @@ export function HeatmapOverlay({
     return null;
   }
 
+  // 매장 경계 사용 (props가 없으면 기본값)
+  const bounds = storeBounds || DEFAULT_BOUNDS;
+
   const { geometry, colors } = useMemo(() => {
-    const gridSize = 20;
-    const geo = new THREE.PlaneGeometry(gridSize, gridSize, 32, 32);
+    // 🆕 매장 크기에 맞게 그리드 생성
+    const gridWidth = bounds.width;
+    const gridDepth = bounds.depth;
+    const segments = 32; // 그리드 세분화
+    
+    const geo = new THREE.PlaneGeometry(gridWidth, gridDepth, segments, segments);
     const positions = geo.attributes.position.array as Float32Array;
     const colorArray = new Float32Array(positions.length);
 
     // Create height map and color based on heat intensity
     for (let i = 0; i < positions.length; i += 3) {
-      const x = positions[i];
-      const z = positions[i + 1];
+      // 🆕 로컬 좌표를 월드 좌표로 변환
+      const localX = positions[i];
+      const localZ = positions[i + 1];
+      const worldX = localX + bounds.centerX;
+      const worldZ = localZ + bounds.centerZ;
 
       // Find closest heat point and calculate intensity
       let totalIntensity = 0;
       heatPoints.forEach((point) => {
-        const distance = Math.sqrt(Math.pow(x - point.x, 2) + Math.pow(z - point.z, 2));
-        const influence = Math.max(0, 1 - distance / 3) * point.intensity;
+        const distance = Math.sqrt(Math.pow(worldX - point.x, 2) + Math.pow(worldZ - point.z, 2));
+        // 🆕 influence 범위를 매장 크기에 비례하게 조정
+        const influenceRadius = Math.max(bounds.width, bounds.depth) * 0.15;
+        const influence = Math.max(0, 1 - distance / influenceRadius) * point.intensity;
         totalIntensity = Math.max(totalIntensity, influence);
       });
 
@@ -63,7 +89,7 @@ export function HeatmapOverlay({
     geo.computeVertexNormals();
 
     return { geometry: geo, colors: colorArray };
-  }, [heatPoints, maxIntensity, heightScale, colorScale]);
+  }, [heatPoints, maxIntensity, heightScale, colorScale, bounds]);
 
   const handlePointClick = (point: HeatPoint) => {
     setSelectedPoint(point);
@@ -72,11 +98,11 @@ export function HeatmapOverlay({
 
   return (
     <group>
-      {/* 히트맵 메시 */}
+      {/* 히트맵 메시 - 🆕 매장 중심에 배치 */}
       <mesh
         geometry={geometry}
         rotation={[-Math.PI / 2, 0, 0]}
-        position={[0, 0.1, 0]}
+        position={[bounds.centerX, 0.1, bounds.centerZ]}
         onClick={(e) => {
           e.stopPropagation();
           const p = e.point;
