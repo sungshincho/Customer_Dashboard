@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { CategoryPerformance } from '../types/roi.types';
-import { getModuleConfig, TREND_ICONS } from '../utils/moduleConfig';
+import { getModuleConfig } from '../utils/moduleConfig';
 
 // ============================================================================
 // 3D 스타일 시스템
@@ -127,8 +127,6 @@ const CategoryTable: React.FC<{
               <th style={{ textAlign: 'center', padding: '10px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>적용</th>
               <th style={{ textAlign: 'center', padding: '10px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>성공</th>
               <th style={{ textAlign: 'center', padding: '10px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>평균ROI</th>
-              <th style={{ textAlign: 'right', padding: '10px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>총 효과</th>
-              <th style={{ textAlign: 'center', padding: '10px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>트렌드</th>
             </tr>
           </thead>
           <tbody>
@@ -161,12 +159,6 @@ const CategoryTable: React.FC<{
                   </td>
                   <td style={{ textAlign: 'center', padding: '12px 8px', fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>
                     {formatPercent(item.averageRoi)}
-                  </td>
-                  <td style={{ textAlign: 'right', padding: '12px 8px', fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>
-                    {formatCurrency(item.totalImpact)}
-                  </td>
-                  <td style={{ textAlign: 'center', padding: '12px 8px', fontSize: '16px' }}>
-                    {hasData ? TREND_ICONS[item.trend] : '-'}
                   </td>
                 </tr>
               );
