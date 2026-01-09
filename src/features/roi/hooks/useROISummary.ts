@@ -33,6 +33,8 @@ export const useROISummary = (dateRange: DateRange) => {
       }
 
       const days = getDaysFromRange(dateRange);
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
 
       // 기본값 정의
       const defaultSummary: ROISummary = {
@@ -47,41 +49,62 @@ export const useROISummary = (dateRange: DateRange) => {
         revenueChangePercent: 0,
       };
 
-      // RPC 함수 호출 (타입이 생성되지 않은 경우 as any 사용)
+      // applied_strategies 테이블에서 직접 집계
       try {
-        const { data, error } = await supabase.rpc('get_roi_summary' as any, {
-          p_store_id: selectedStore.id,
-          p_days: days,
-        });
+        const { data, error } = await supabase
+          .from('applied_strategies')
+          .select('status, result, final_roi, current_roi, expected_roi, actual_revenue, expected_revenue')
+          .eq('store_id', selectedStore.id)
+          .gte('created_at', startDate.toISOString());
 
         if (error) {
-          // 함수가 존재하지 않는 경우 조용히 기본값 반환
-          if (error.message?.includes('function') || error.code === '42883') {
-            return defaultSummary;
-          }
           console.warn('ROI summary fetch warning:', error.message);
           return defaultSummary;
         }
 
-        if (!data) {
+        if (!data || data.length === 0) {
           return defaultSummary;
         }
 
-        // RPC 결과를 타입에 맞게 변환
-        const result = data as any;
+        // 집계
+        const totalApplied = data.length;
+        const activeCount = data.filter((item: any) => item.status === 'active').length;
+        const successCount = data.filter((item: any) => item.result === 'success').length;
+        const failedCount = data.filter((item: any) => item.result === 'failed').length;
+
+        // 성공률 계산
+        const successRate = totalApplied > 0 ? (successCount / totalApplied) * 100 : 0;
+
+        // 평균 ROI 계산 (final_roi → current_roi → expected_roi 순서)
+        const roiValues = data
+          .map((item: any) => item.final_roi ?? item.current_roi ?? item.expected_roi)
+          .filter((v: any) => v != null);
+        const averageRoi = roiValues.length > 0
+          ? roiValues.reduce((a: number, b: number) => a + b, 0) / roiValues.length
+          : 0;
+
+        // 총 추가매출 (actual_revenue 합계)
+        const totalRevenueImpact = data
+          .map((item: any) => item.actual_revenue || 0)
+          .reduce((a: number, b: number) => a + b, 0);
+
+        // 예상 매출 합계
+        const expectedRevenueTotal = data
+          .map((item: any) => item.expected_revenue || 0)
+          .reduce((a: number, b: number) => a + b, 0);
+
         return {
-          totalApplied: result?.total_applied || result?.totalApplied || 0,
-          activeCount: result?.active_count || result?.activeCount || 0,
-          successCount: result?.success_count || result?.successCount || 0,
-          failedCount: result?.failed_count || result?.failedCount || 0,
-          successRate: result?.success_rate || result?.successRate || 0,
-          averageRoi: result?.average_roi || result?.averageRoi || 0,
-          totalRevenueImpact: result?.total_revenue_impact || result?.totalRevenueImpact || 0,
-          expectedRevenueTotal: result?.expected_revenue_total || result?.expectedRevenueTotal || 0,
-          revenueChangePercent: result?.revenue_change_percent || 0,
+          totalApplied,
+          activeCount,
+          successCount,
+          failedCount,
+          successRate,
+          averageRoi,
+          totalRevenueImpact,
+          expectedRevenueTotal,
+          revenueChangePercent: 0, // 전월 대비 계산은 별도 로직 필요
         };
       } catch {
-        // RPC 함수가 없거나 네트워크 오류 시 기본값 반환
         return defaultSummary;
       }
     },

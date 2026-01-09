@@ -153,7 +153,7 @@ export const ROISummaryCards: React.FC<ROISummaryCardsProps> = ({ data, isLoadin
     {
       label: '평균 ROI',
       value: formatPercent(data?.averageRoi || 0),
-      subLabel: '목표 200%',
+      subLabel: data?.averageRoi ? '전략 적용 기준' : '-',
       icon: TrendingUp,
     },
     {
