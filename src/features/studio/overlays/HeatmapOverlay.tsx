@@ -12,8 +12,8 @@ import type { HeatPoint, HeatmapOverlayProps } from '../types';
 
 // 기본 매장 경계 (storeBounds가 없을 때 사용)
 const DEFAULT_BOUNDS = {
-  width: 17.4,
-  depth: 16.6,
+  width: 16.5,
+  depth: 16.5,
   minX: -8.7,
   maxX: 8.7,
   minZ: -8.3,
