@@ -20,7 +20,6 @@ import { StaffOptimizationResultPanel } from '../components/StaffOptimizationRes
 import { useScene } from '../core/SceneProvider';
 import { validateOptimizationResult } from '../utils/optimizationValidator';
 import { OptimizationSettingsPanel } from '../components/optimization';
-import { DiagnosticsSummary } from '../components/DiagnosticsSummary';
 import type { DiagnosticIssue } from '../components/DiagnosticIssueList';
 import type { UseSceneSimulationReturn } from '../hooks/useSceneSimulation';
 import type { SceneRecipe } from '../types';
@@ -732,19 +731,6 @@ export function AIOptimizationTab({
               </p>
             </div>
           </div>
-
-          {/* 기존 DiagnosticsSummary (접힌 상태로 상세 보기) */}
-          <DiagnosticsSummary
-            issues={diagnosticIssues}
-            defaultExpanded={false}
-            onOptimizeClick={() => {
-              // 진단 결과에 따라 최적화 유형 자동 선택
-              setSelectedOptimizations(['layout']);
-              toast.info('진단 결과 기반 최적화 설정 완료', {
-                description: '아래 "최적화 실행" 버튼을 눌러주세요.',
-              });
-            }}
-          />
         </div>
       )}
 
