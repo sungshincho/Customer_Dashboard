@@ -653,7 +653,7 @@ export function AIOptimizationTab({
   }, [sceneSimulation.state, selectedGoal, selectedOptimizations, optimizationSettings]);
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4 space-y-4 min-h-0">
       {/* ========== 🆕 문제점 시나리오 (AI 시뮬레이션에서 전달) ========== */}
       {diagnosticIssues.length > 0 && (
         <div className="space-y-3">
@@ -943,14 +943,16 @@ export function AIOptimizationTab({
           </button>
 
           {isSettingsExpanded && (
-            <OptimizationSettingsPanel
-              settings={optimizationSettings}
-              onChange={setOptimizationSettings}
-              furniture={furnitureItems}
-              products={productItems}
-              disabled={isRunning}
-              compact
-            />
+            <div className="animate-in slide-in-from-top-2 duration-200">
+              <OptimizationSettingsPanel
+                settings={optimizationSettings}
+                onChange={setOptimizationSettings}
+                furniture={furnitureItems}
+                products={productItems}
+                disabled={isRunning}
+                compact
+              />
+            </div>
           )}
         </div>
 
