@@ -127,13 +127,16 @@ const DialogContent = React.forwardRef<
                 border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.06)',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
+                zIndex: 50,
               }}
+              onClick={(e) => e.stopPropagation()}
             >
               <X
                 style={{
                   width: '14px',
                   height: '14px',
                   color: isDark ? 'rgba(255,255,255,0.6)' : '#515158',
+                  pointerEvents: 'none',
                 }}
               />
               <span className="sr-only">Close</span>
