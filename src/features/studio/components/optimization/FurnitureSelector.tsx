@@ -77,7 +77,7 @@ export function FurnitureSelector({
       </button>
 
       {isExpanded && (
-        <div className="space-y-2 pl-1">
+        <div className="space-y-2 pl-1 animate-in slide-in-from-top-2 duration-200">
           {/* 전체 선택/해제 버튼 */}
           <div className="flex gap-2">
             <Button
@@ -102,8 +102,8 @@ export function FurnitureSelector({
             </Button>
           </div>
 
-          {/* 가구 목록 */}
-          <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
+          {/* 가구 목록 - 높이 축소 */}
+          <div className="max-h-32 overflow-y-auto space-y-1 pr-1 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
             {movableFurniture.length === 0 ? (
               <p className="text-xs text-white/40 py-2">이동 가능한 가구가 없습니다</p>
             ) : (
@@ -119,11 +119,16 @@ export function FurnitureSelector({
                         ? 'bg-blue-500/20 border border-blue-500/30'
                         : 'bg-white/5 hover:bg-white/10 border border-transparent'
                     )}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleToggleFurniture(item.id);
+                    }}
                   >
                     <input
                       type="checkbox"
                       checked={isSelected}
-                      onChange={() => handleToggleFurniture(item.id)}
+                      onChange={() => {}}
                       disabled={disabled}
                       className="sr-only"
                     />
