@@ -120,8 +120,8 @@ export function AIOptimizationTab({
   onNavigateToApply,
   simulationEnvConfig,
 }: AIOptimizationTabProps) {
-  // SceneProvider에서 applySimulationResults 가져오기
-  const { applySimulationResults } = useScene();
+  // SceneProvider에서 applySimulationResults, revertSimulationChanges 가져오기
+  const { applySimulationResults, revertSimulationChanges } = useScene();
 
   // 최적화 목표 선택
   const [selectedGoal, setSelectedGoal] = useState<OptimizationGoal>('revenue');
@@ -131,6 +131,9 @@ export function AIOptimizationTab({
 
   // 실행 상태
   const [runningTypes, setRunningTypes] = useState<OptimizationType[]>([]);
+
+  // 🆕 최적화 진행률 (0-100)
+  const [optimizationProgress, setOptimizationProgress] = useState(0);
 
   // 결과 패널 펼침/접힘
   const [isResultExpanded, setIsResultExpanded] = useState(true);
@@ -261,11 +264,22 @@ export function AIOptimizationTab({
     }
 
     setRunningTypes([...selectedOptimizations]);
+    setOptimizationProgress(0);
+
+    // 진행률 업데이트 인터벌
+    const progressInterval = setInterval(() => {
+      setOptimizationProgress((prev) => {
+        if (prev >= 90) return prev;
+        return prev + Math.random() * 8 + 2; // 2-10% 씩 증가
+      });
+    }, 400);
 
     try {
       // Store Context 빌드 (온톨로지 + 데이터소스)
+      setOptimizationProgress(10);
       console.log('[AIOptimizationTab] Building store context...');
       const storeContext = await buildStoreContext(storeId);
+      setOptimizationProgress(25);
       console.log('[AIOptimizationTab] Store context built:', {
         hasZones: storeContext.zones?.length,
         hasFurniture: storeContext.productPlacements?.length,
@@ -518,7 +532,7 @@ export function AIOptimizationTab({
 
       // 인력배치 결과가 있으면 오버레이 활성화 및 오른쪽 패널 업데이트
       if (results.staffing) {
-        onOverlayToggle('staffingOptimization', true);
+        onOverlayToggle('staffing', true);
 
         if (onResultsUpdate) {
           const currentCoverage = results.staffing.zoneCoverage?.[0]?.currentCoverage || 68;
@@ -544,22 +558,33 @@ export function AIOptimizationTab({
       }
 
       toast.success(`${selectedOptimizations.length}개 최적화가 완료되었습니다`);
+      setOptimizationProgress(100);
     } catch (error) {
       console.error('Optimization error:', error);
       toast.error('최적화 실행 중 오류가 발생했습니다');
     } finally {
+      clearInterval(progressInterval);
       setRunningTypes([]);
+      // 1초 후 진행률 리셋
+      setTimeout(() => setOptimizationProgress(0), 1000);
     }
   }, [selectedOptimizations, selectedGoal, storeId, sceneData, sceneSimulation, onOverlayToggle, onResultsUpdate, optimizationSettings, simulationEnvConfig]);
 
   // As-Is 씬으로 복원
   const handleRevertToAsIs = useCallback(() => {
+    // 1. 3D 모델 위치 복원 (SceneProvider의 revertSimulationChanges 호출)
+    revertSimulationChanges();
+    
+    // 2. hook 상태 초기화
     sceneSimulation.clearScenes();
+    
+    // 3. 오버레이 끄기
     onOverlayToggle('layoutOptimization', false);
     onOverlayToggle('flowOptimization', false);
-    onOverlayToggle('staffingOptimization', false);
+    onOverlayToggle('staffing', false);
+    
     toast.info('원래 씬으로 복원되었습니다');
-  }, [sceneSimulation, onOverlayToggle]);
+  }, [sceneSimulation, onOverlayToggle, revertSimulationChanges]);
 
   // To-Be 씬 적용 - 3D 모델 위치 실제 변경 (가구 + 상품)
   const handleApplyToBe = useCallback(async () => {
@@ -571,19 +596,48 @@ export function AIOptimizationTab({
         productPlacements?: any[];
       } = {};
 
-      // 1️⃣ 레이아웃 최적화 결과가 있으면 가구 이동 적용 (layoutChanges 또는 furnitureMoves)
-      const furnitureMoves = results.layout?.layoutChanges || results.layout?.furnitureMoves || [];
-      if (furnitureMoves.length > 0) {
-        payload.furnitureMoves = furnitureMoves;
+      // 1️⃣ 레이아웃 최적화 결과가 있으면 가구 이동 적용
+      // 모든 가능한 필드명 fallback
+      const rawFurnitureMoves = results.layout?.layoutChanges || 
+                                results.layout?.furnitureMoves ||
+                                results.layout?.furniture_changes ||
+                                results.layout?.furniture_moves || [];
+      
+      if (rawFurnitureMoves.length > 0) {
+        // SceneProvider가 기대하는 형식으로 변환
+        payload.furnitureMoves = rawFurnitureMoves.map((move: any) => ({
+          furnitureId: move.furniture_id || move.furnitureId || move.entityId || move.id,
+          furnitureName: move.furniture_name || move.furnitureName || move.entityLabel || move.name,
+          toPosition: move.suggested_position || move.suggestedPosition || move.toPosition || move.new_position || {
+            x: move.new_x ?? move.x ?? 0,
+            y: move.new_y ?? move.y ?? 0,
+            z: move.new_z ?? move.z ?? 0,
+          },
+          rotation: move.rotation ?? move.new_rotation,
+          reason: move.reason || move.expected_effect,
+        }));
       }
 
       // 2️⃣ 상품 배치 결과가 있으면 상품 재배치 적용 (슬롯 기반)
-      if (results.layout?.productPlacements && results.layout.productPlacements.length > 0) {
-        payload.productPlacements = results.layout.productPlacements;
+      const rawProductPlacements = results.layout?.productPlacements ||
+                                   results.layout?.product_placements ||
+                                   results.layout?.product_changes || [];
+      
+      if (rawProductPlacements.length > 0) {
+        payload.productPlacements = rawProductPlacements.map((p: any) => ({
+          productId: p.product_id || p.productId,
+          productSku: p.sku || p.productSku || p.product_sku,
+          toFurnitureId: p.suggested_furniture_id || p.toFurnitureId || p.target_furniture_id,
+          toSlotId: p.suggested_slot_id || p.toSlotId || p.target_slot_id,
+          toPosition: p.suggested_position || p.toPosition,
+          toSlotPosition: p.slot_position || p.toSlotPosition,
+          reason: p.reason,
+        }));
       }
 
       // 변경사항이 있을 때만 적용
-      if (payload.furnitureMoves || payload.productPlacements) {
+      if (payload.furnitureMoves?.length || payload.productPlacements?.length) {
+        console.log('[AIOptimizationTab] Applying To-Be:', payload);
         applySimulationResults(payload);
 
         const moveCount = payload.furnitureMoves?.length || 0;
@@ -592,6 +646,8 @@ export function AIOptimizationTab({
         toast.success(
           `최적화 적용 완료: 가구 ${moveCount}개 이동, 상품 ${placementCount}개 재배치`
         );
+      } else {
+        toast.warning('적용할 변경사항이 없습니다');
       }
 
       // 내부 상태도 업데이트
@@ -951,7 +1007,7 @@ export function AIOptimizationTab({
           {isRunning ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              최적화 실행 중...
+              최적화 실행 중... {Math.round(optimizationProgress)}%
             </>
           ) : (
             <>
@@ -960,6 +1016,24 @@ export function AIOptimizationTab({
             </>
           )}
         </Button>
+
+        {/* 🆕 최적화 진행률 바 */}
+        {isRunning && (
+          <div className="space-y-1">
+            <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-300 ease-out"
+                style={{ width: `${Math.min(optimizationProgress, 100)}%` }}
+              />
+            </div>
+            <p className="text-[10px] text-white/50 text-center">
+              {optimizationProgress < 30 && '매장 데이터 분석 중...'}
+              {optimizationProgress >= 30 && optimizationProgress < 60 && 'AI 최적화 계산 중...'}
+              {optimizationProgress >= 60 && optimizationProgress < 90 && '결과 생성 중...'}
+              {optimizationProgress >= 90 && '완료 처리 중...'}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* 구분선 */}
@@ -993,6 +1067,7 @@ export function AIOptimizationTab({
                     type="layout"
                     title="레이아웃 최적화"
                     result={results.layout}
+                    onToggleOverlay={(visible) => onOverlayToggle('layoutOptimization', visible)}
                   />
                 )}
 
@@ -1012,7 +1087,7 @@ export function AIOptimizationTab({
                     result={results.staffing as unknown as StaffOptimizationResult}
                     onToggleOverlay={(visible) => {
                       setShowStaffOverlay(visible);
-                      onOverlayToggle('staffingOptimization', visible);
+                      onOverlayToggle('staffing', visible);
                     }}
                     isOverlayVisible={showStaffOverlay}
                   />
