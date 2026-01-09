@@ -914,13 +914,8 @@
   color: inherit !important;
 }
 
-/* ===== 배경 강제 ===== */
-.digital-twin-studio .bg-black,
-.digital-twin-studio .bg-black\/80,
-.digital-twin-studio .bg-black\/70,
-.digital-twin-studio .bg-black\/60 {
-  background-color: rgba(0, 0, 0, var(--tw-bg-opacity, 0.8)) !important;
-}
+/* ===== 배경 - Tailwind 원본 유지 ===== */
+/* bg-black/80 등의 원본 opacity는 그대로 유지 */
 
 /* 패널 배경 - Canvas 컨테이너는 제외 */
 /* 주의: Canvas는 투명해야 3D가 보임 */
