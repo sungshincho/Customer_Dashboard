@@ -8,7 +8,7 @@
  * - 가시성 토글
  */
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   ChevronRight,
   ChevronDown,
@@ -256,6 +256,85 @@ export function LayerPanel() {
     setExpandedZones(new Set());
     setExpandedFurniture(new Set());
   }, [filterType]);
+
+  // 🆕 3D에서 가구/제품 선택 시 해당 존과 가구를 자동으로 펼치기
+  useEffect(() => {
+    if (!selectedId) return;
+
+    // 1. 선택된 ID가 가구인지 확인
+    const selectedModel = models.find((m) => m.id === selectedId);
+    if (selectedModel && selectedModel.type === 'furniture') {
+      const zoneId = (selectedModel.metadata as any)?.zoneId;
+      if (zoneId) {
+        // zones 그룹 펼치기
+        setExpandedGroups((prev) => new Set([...prev, 'zones']));
+        // 해당 존 펼치기
+        setExpandedZones((prev) => new Set([...prev, zoneId]));
+      }
+      return;
+    }
+
+    // 2. 선택된 ID가 childProduct(제품)인지 확인
+    const parentFurnitureId = childProductMap.get(selectedId);
+    if (parentFurnitureId) {
+      const parentModel = models.find((m) => m.id === parentFurnitureId);
+      if (parentModel) {
+        const zoneId = (parentModel.metadata as any)?.zoneId;
+        if (zoneId) {
+          // zones 그룹 펼치기
+          setExpandedGroups((prev) => new Set([...prev, 'zones']));
+          // 해당 존 펼치기
+          setExpandedZones((prev) => new Set([...prev, zoneId]));
+          // 해당 가구 펼치기
+          setExpandedFurniture((prev) => new Set([...prev, parentFurnitureId]));
+        }
+      }
+    }
+
+    // 3. 선택된 ID가 zoneGroups 내 가구인지 순회하여 확인 (직접 모델이 아닌 경우)
+    for (const group of zoneGroups) {
+      const foundFurniture = group.furniture.find((f) => f.id === selectedId);
+      if (foundFurniture) {
+        // zones 그룹 펼치기
+        setExpandedGroups((prev) => new Set([...prev, 'zones']));
+        // 해당 존 펼치기
+        setExpandedZones((prev) => new Set([...prev, group.zoneId]));
+        break;
+      }
+
+      // childProducts에서 찾기
+      for (const furniture of group.furniture) {
+        const foundChild = furniture.children.find((c) => c.id === selectedId);
+        if (foundChild) {
+          // zones 그룹 펼치기
+          setExpandedGroups((prev) => new Set([...prev, 'zones']));
+          // 해당 존 펼치기
+          setExpandedZones((prev) => new Set([...prev, group.zoneId]));
+          // 해당 가구 펼치기
+          setExpandedFurniture((prev) => new Set([...prev, furniture.id]));
+          break;
+        }
+      }
+    }
+  }, [selectedId, models, childProductMap, zoneGroups]);
+
+  // 🆕 선택된 항목 ref 맵 (스크롤용)
+  const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  // 🆕 선택된 항목으로 스크롤
+  useEffect(() => {
+    if (!selectedId) return;
+
+    // DOM 업데이트 후 스크롤 (존/가구 펼치기 후 실행되도록 딜레이)
+    const timer = setTimeout(() => {
+      const element = itemRefs.current.get(selectedId);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [selectedId, expandedZones, expandedFurniture]);
 
   // 토글 핸들러
   const toggleGroup = (id: string) => {
@@ -513,6 +592,10 @@ export function LayerPanel() {
                           <div key={furniture.id} className="space-y-0.5">
                             {/* 가구 아이템 */}
                             <div
+                              ref={(el) => {
+                                if (el) itemRefs.current.set(furniture.id, el);
+                                else itemRefs.current.delete(furniture.id);
+                              }}
                               className={cn(
                                 'flex items-center gap-1.5 py-1 px-2 rounded-md cursor-pointer border border-transparent transition-colors group',
                                 isSelected
@@ -588,6 +671,10 @@ export function LayerPanel() {
                                   return (
                                     <div
                                       key={child.id}
+                                      ref={(el) => {
+                                        if (el) itemRefs.current.set(child.id, el);
+                                        else itemRefs.current.delete(child.id);
+                                      }}
                                       className={cn(
                                         'flex items-center gap-1.5 py-0.5 px-2 rounded cursor-pointer border border-transparent transition-colors group',
                                         isChildSelected
