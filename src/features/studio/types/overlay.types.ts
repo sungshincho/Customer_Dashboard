@@ -50,6 +50,17 @@ export interface HeatmapOverlayProps {
   opacity?: number;
   heightScale?: number;
   onPointClick?: (point: HeatPoint) => void;
+  /** 🆕 매장 경계 - 히트맵 범위 제한용 */
+  storeBounds?: {
+    width: number;
+    depth: number;
+    minX: number;
+    maxX: number;
+    minZ: number;
+    maxZ: number;
+    centerX: number;
+    centerZ: number;
+  };
 }
 
 // 경로 포인트
