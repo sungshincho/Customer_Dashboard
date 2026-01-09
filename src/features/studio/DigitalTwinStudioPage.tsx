@@ -980,10 +980,10 @@ export default function DigitalTwinStudioPage() {
                     label: zone.zone_name
                   };
                 });
-                return <HeatmapOverlay heatPoints={zoneHeatPoints} />;
+                return <HeatmapOverlay heatPoints={zoneHeatPoints} storeBounds={storeBounds} />;
               }
               // 폴백: 데모 데이터
-              return <HeatmapOverlay heatPoints={demoHeatPoints} />;
+              return <HeatmapOverlay heatPoints={demoHeatPoints} storeBounds={storeBounds} />;
             })()}
 
                 {/* 🆕 개선된 동선 오버레이 (zone_transitions 기반) - DB 데이터 사용 */}
