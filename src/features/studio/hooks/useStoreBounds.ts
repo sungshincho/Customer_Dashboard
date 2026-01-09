@@ -122,12 +122,12 @@ export function useStoreBounds() {
       maxZ = Math.max(maxZ, zoneMaxZ);
     });
 
-    // 여백 추가 (10%)
-    const padding = Math.max((maxX - minX), (maxZ - minZ)) * 0.1;
-    minX -= padding;
-    maxX += padding;
-    minZ -= padding;
-    maxZ += padding;
+    // 🔧 패딩 제거 - 매장 벽과 정확히 일치하도록
+    // const padding = Math.max((maxX - minX), (maxZ - minZ)) * 0.1;
+    // minX -= padding;
+    // maxX += padding;
+    // minZ -= padding;
+    // maxZ += padding;
 
     const width = maxX - minX;
     const depth = maxZ - minZ;
