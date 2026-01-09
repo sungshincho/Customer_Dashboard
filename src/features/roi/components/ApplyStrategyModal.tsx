@@ -3,7 +3,7 @@
  * - 인사이트 허브와 디지털트윈 스튜디오에서 공통으로 사용
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { AlertCircle, Calendar, Target, TrendingUp, Loader2 } from 'lucide-react';
+import { AlertCircle, Calendar, Target, Loader2 } from 'lucide-react';
 import { useApplyStrategy } from '../hooks/useAppliedStrategies';
 import { useApplyRecommendation, RecommendationType } from '@/hooks/useROITracking';
 import { getModuleConfig, getSourceDisplayName } from '../utils/moduleConfig';
@@ -65,10 +65,29 @@ export const ApplyStrategyModal: React.FC<ApplyStrategyModalProps> = ({
   const [targetRoi, setTargetRoi] = useState(strategyData.expectedRoi.toString());
   const [notes, setNotes] = useState('');
 
+  // 다크 모드 감지
+  const [isDark, setIsDark] = useState(false);
+  useEffect(() => {
+    const check = () => setIsDark(document.documentElement.classList.contains('dark'));
+    check();
+    const obs = new MutationObserver(check);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => obs.disconnect();
+  }, []);
+
   const { mutate: applyStrategy, isPending: isApplyingStrategy } = useApplyStrategy();
   const { mutate: applyRecommendation, isPending: isApplyingRecommendation } = useApplyRecommendation();
   const isPending = isApplyingStrategy || isApplyingRecommendation;
   const config = getModuleConfig(strategyData.sourceModule);
+
+  // 색상 변수
+  const textPrimary = isDark ? '#ffffff' : '#1a1a1f';
+  const textSecondary = isDark ? 'rgba(255,255,255,0.7)' : '#515158';
+  const textMuted = isDark ? 'rgba(255,255,255,0.5)' : '#6b7280';
+  const cardBg = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)';
+  const cardBorder = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)';
+  const inputBg = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,1)';
+  const inputBorder = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.2)';
 
   // sourceModule을 recommendation_type으로 매핑
   const getRecommendationType = (sourceModule: SourceModule): RecommendationType => {
@@ -191,9 +210,9 @@ export const ApplyStrategyModal: React.FC<ApplyStrategyModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-gray-900 border-white/10 max-w-lg">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-white flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2" style={{ color: textPrimary }}>
             <span className={cn('w-8 h-8 rounded-lg flex items-center justify-center', config.bgColor)}>
               {config.icon}
             </span>
@@ -203,48 +222,52 @@ export const ApplyStrategyModal: React.FC<ApplyStrategyModalProps> = ({
 
         <div className="space-y-5 mt-2">
           {/* 전략 요약 */}
-          <div className="p-4 bg-white/5 rounded-lg border border-white/10">
-            <h4 className="font-medium text-white mb-3">{strategyData.name}</h4>
+          <div className="p-4 rounded-lg" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+            <h4 className="font-medium mb-3" style={{ color: textPrimary }}>{strategyData.name}</h4>
             <div className="grid grid-cols-3 gap-4 text-sm">
               <div>
-                <p className="text-white/50">예상 ROI</p>
-                <p className="text-white font-medium text-lg">{strategyData.expectedRoi}%</p>
+                <p style={{ color: textMuted }}>예상 ROI</p>
+                <p className="font-medium text-lg" style={{ color: textPrimary }}>{strategyData.expectedRoi}%</p>
               </div>
               {strategyData.expectedRevenue !== undefined && (
                 <div>
-                  <p className="text-white/50">예상 매출</p>
-                  <p className="text-green-400 font-medium text-lg">
+                  <p style={{ color: textMuted }}>예상 매출</p>
+                  <p className="font-medium text-lg text-green-500">
                     +{formatCurrency(strategyData.expectedRevenue)}
                   </p>
                 </div>
               )}
               {strategyData.confidence !== undefined && (
                 <div>
-                  <p className="text-white/50">신뢰도</p>
-                  <p className="text-white font-medium text-lg">{strategyData.confidence}%</p>
+                  <p style={{ color: textMuted }}>신뢰도</p>
+                  <p className="font-medium text-lg" style={{ color: textPrimary }}>{strategyData.confidence}%</p>
                 </div>
               )}
             </div>
-            <p className="text-xs text-white/40 mt-3">
+            <p className="text-xs mt-3" style={{ color: textMuted }}>
               출처: {getSourceDisplayName(strategyData.source)}
             </p>
           </div>
 
           {/* 전략명 */}
           <div className="space-y-2">
-            <Label className="text-white/70 text-sm">전략명 (수정 가능)</Label>
+            <Label className="text-sm" style={{ color: textSecondary }}>전략명 (수정 가능)</Label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
               placeholder="전략명 입력"
+              style={{
+                background: inputBg,
+                border: `1px solid ${inputBorder}`,
+                color: textPrimary,
+              }}
             />
           </div>
 
           {/* 기간 */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label className="text-white/70 text-sm flex items-center gap-1">
+              <Label className="text-sm flex items-center gap-1" style={{ color: textSecondary }}>
                 <Calendar className="w-3 h-3" />
                 시작일
               </Label>
@@ -252,11 +275,15 @@ export const ApplyStrategyModal: React.FC<ApplyStrategyModalProps> = ({
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="bg-white/5 border-white/10 text-white"
+                style={{
+                  background: inputBg,
+                  border: `1px solid ${inputBorder}`,
+                  color: textPrimary,
+                }}
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-white/70 text-sm flex items-center gap-1">
+              <Label className="text-sm flex items-center gap-1" style={{ color: textSecondary }}>
                 <Calendar className="w-3 h-3" />
                 종료일
               </Label>
@@ -264,14 +291,18 @@ export const ApplyStrategyModal: React.FC<ApplyStrategyModalProps> = ({
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="bg-white/5 border-white/10 text-white"
+                style={{
+                  background: inputBg,
+                  border: `1px solid ${inputBorder}`,
+                  color: textPrimary,
+                }}
               />
             </div>
           </div>
 
           {/* ROI 목표 */}
           <div className="space-y-2">
-            <Label className="text-white/70 text-sm flex items-center gap-1">
+            <Label className="text-sm flex items-center gap-1" style={{ color: textSecondary }}>
               <Target className="w-3 h-3" />
               ROI 목표 (%)
             </Label>
@@ -279,51 +310,88 @@ export const ApplyStrategyModal: React.FC<ApplyStrategyModalProps> = ({
               type="number"
               value={targetRoi}
               onChange={(e) => setTargetRoi(e.target.value)}
-              className="bg-white/5 border-white/10 text-white"
               placeholder="예상 ROI 기준"
+              style={{
+                background: inputBg,
+                border: `1px solid ${inputBorder}`,
+                color: textPrimary,
+              }}
             />
-            <p className="text-xs text-white/40">비워두면 예상 ROI ({strategyData.expectedRoi}%)가 목표가 됩니다</p>
+            <p className="text-xs" style={{ color: textMuted }}>비워두면 예상 ROI ({strategyData.expectedRoi}%)가 목표가 됩니다</p>
           </div>
 
           {/* 메모 */}
           <div className="space-y-2">
-            <Label className="text-white/70 text-sm">메모 (선택)</Label>
+            <Label className="text-sm" style={{ color: textSecondary }}>메모 (선택)</Label>
             <Textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="추가 메모나 특이사항을 입력하세요..."
-              className="bg-white/5 border-white/10 text-white placeholder:text-white/30 resize-none"
+              className="resize-none"
               rows={3}
+              style={{
+                background: inputBg,
+                border: `1px solid ${inputBorder}`,
+                color: textPrimary,
+              }}
             />
           </div>
 
-          {/* 안내 */}
-          <div className="flex items-start gap-2 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-            <AlertCircle className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
-            <p className="text-xs text-yellow-400/80">
+          {/* 안내 - 빨간색으로 변경 */}
+          <div className="flex items-start gap-2 p-3 rounded-lg" style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+            <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: '#ef4444' }} />
+            <p className="text-xs" style={{ color: '#ef4444' }}>
               적용 시 ROI 측정 대시보드에 기록되며, 실시간으로 성과가 추적됩니다.
               적용 기간 동안 전략의 효과를 측정하여 최종 ROI를 산출합니다.
             </p>
           </div>
 
-          {/* 버튼 */}
+          {/* 버튼 - 검정색 + 테두리 */}
           <div className="flex justify-end gap-3 pt-2">
-            <Button variant="ghost" onClick={onClose} disabled={isPending}>
+            <button
+              onClick={onClose}
+              disabled={isPending}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '8px',
+                background: 'transparent',
+                border: `1px solid ${cardBorder}`,
+                color: textPrimary,
+                fontSize: '14px',
+                fontWeight: 500,
+                cursor: isPending ? 'not-allowed' : 'pointer',
+                opacity: isPending ? 0.5 : 1,
+              }}
+            >
               취소
-            </Button>
-            <Button onClick={handleApply} disabled={isPending}>
+            </button>
+            <button
+              onClick={handleApply}
+              disabled={isPending}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '8px',
+                background: 'transparent',
+                border: `1px solid ${cardBorder}`,
+                color: textPrimary,
+                fontSize: '14px',
+                fontWeight: 600,
+                cursor: isPending ? 'not-allowed' : 'pointer',
+                opacity: isPending ? 0.5 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
               {isPending ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                   적용 중...
                 </>
               ) : (
-                <>
-                  <TrendingUp className="w-4 h-4 mr-2" />
-                  적용하기
-                </>
+                '적용하기'
               )}
-            </Button>
+            </button>
           </div>
         </div>
       </DialogContent>
