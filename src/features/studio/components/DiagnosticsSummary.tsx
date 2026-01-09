@@ -195,11 +195,12 @@ export function DiagnosticsSummary({
                         {issue.title}
                       </p>
                       <p className="text-[10px] text-white/50">
-                        {issue.zone} • {issue.metric}
+                        {issue.zone || issue.zone_name || '전체'}
+                        {(issue.metric || issue.category) && ` • ${issue.metric || issue.category}`}
                       </p>
-                      {issue.recommendation && (
+                      {(issue.recommendation || issue.suggested_action) && (
                         <p className="text-[10px] text-white/40 mt-1 italic">
-                          💡 {issue.recommendation}
+                          💡 {issue.recommendation || issue.suggested_action}
                         </p>
                       )}
                     </div>
