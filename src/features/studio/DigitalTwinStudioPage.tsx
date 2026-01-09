@@ -924,7 +924,7 @@ export default function DigitalTwinStudioPage() {
   }
   return <DashboardLayout>
       <SceneProvider mode={mode} initialModels={sceneModels}>
-        <div className="relative w-full h-[calc(100vh-120px)] overflow-hidden bg-black rounded-lg">
+        <div className="digital-twin-studio relative w-full h-[calc(100vh-120px)] overflow-hidden bg-black rounded-lg">
           {/* ========== 3D 캔버스 (배경) ========== */}
           <div className="absolute inset-0 z-0">
             {loading ? <div className="flex items-center justify-center h-full">
