@@ -1127,11 +1127,6 @@ export default function DigitalTwinStudioPage() {
               <QuickToggleBar activeOverlays={activeOverlays as any[]} onToggle={id => toggleOverlay(id as OverlayType)} />
             </div>
 
-            {/* ----- 상단 우측: As-Is / To-Be / Split 토글 ----- */}
-            <div className="absolute top-4 right-4 pointer-events-auto z-20">
-              <ViewModeToggle mode={viewMode} onChange={setViewMode} hasOptimizationResults={!!sceneSimulation.state.results.layout || !!sceneSimulation.state.results.flow} />
-            </div>
-
             {/* ----- 하단 좌측: 현재 상태 정보 + 뷰모드 표시 ----- */}
             <div className="absolute bottom-4 left-4 pointer-events-auto z-20 flex items-center gap-2">
               {/* 뷰 모드 인디케이터 */}
