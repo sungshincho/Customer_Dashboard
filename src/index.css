@@ -828,67 +828,112 @@
 /* 스튜디오 컨테이너 - 항상 다크모드 스타일 강제 */
 .digital-twin-studio {
   /* 다크모드 CSS 변수 강제 적용 */
-  --background: 0 0% 5%;
-  --background-gradient: linear-gradient(180deg, #0a0a0c 0%, #111114 20%, #0d0d10 45%, #0a0a0c 70%, #0f0f12 100%);
-  --foreground: 0 0% 98%;
-  --card: 0 0% 8%;
-  --card-foreground: 0 0% 98%;
-  --popover: 0 0% 8%;
-  --popover-foreground: 0 0% 98%;
-  --primary: 0 0% 98%;
-  --primary-foreground: 0 0% 5%;
-  --secondary: 0 0% 12%;
-  --secondary-foreground: 0 0% 98%;
-  --muted: 0 0% 12%;
-  --muted-foreground: 0 0% 55%;
-  --accent: 0 0% 12%;
-  --accent-foreground: 0 0% 98%;
-  --border: 0 0% 15%;
-  --input: 0 0% 15%;
-  --ring: 0 0% 55%;
+  --background: 0 0% 5% !important;
+  --foreground: 0 0% 98% !important;
+  --card: 0 0% 8% !important;
+  --card-foreground: 0 0% 98% !important;
+  --popover: 0 0% 8% !important;
+  --popover-foreground: 0 0% 98% !important;
+  --primary: 0 0% 98% !important;
+  --primary-foreground: 0 0% 5% !important;
+  --secondary: 0 0% 12% !important;
+  --secondary-foreground: 0 0% 98% !important;
+  --muted: 0 0% 12% !important;
+  --muted-foreground: 0 0% 55% !important;
+  --accent: 0 0% 12% !important;
+  --accent-foreground: 0 0% 98% !important;
+  --border: 0 0% 15% !important;
+  --input: 0 0% 15% !important;
+  --ring: 0 0% 55% !important;
   
   color-scheme: dark !important;
 }
 
-/* 스튜디오 내부 요소들 - 다크모드 스타일 */
+/* 스튜디오 내부 모든 요소 - 다크모드 강제 */
 .digital-twin-studio,
-.digital-twin-studio * {
+.digital-twin-studio *,
+.digital-twin-studio *::before,
+.digital-twin-studio *::after {
   color-scheme: dark !important;
 }
 
-/* 스튜디오 배경 */
-.digital-twin-studio .studio-canvas-container {
-  background: #0a0a0c !important;
-}
-
-/* 스튜디오 패널들 - 다크 테마 고정 */
-.digital-twin-studio .studio-panel,
-.digital-twin-studio [class*="bg-black"],
-.digital-twin-studio [class*="backdrop-blur"] {
-  --tw-bg-opacity: 1 !important;
-}
-
-/* 스튜디오 텍스트 색상 - 다크 테마 고정 */
-.digital-twin-studio .studio-text,
-.digital-twin-studio [class*="text-white"] {
+/* ===== 모든 텍스트 색상 강제 ===== */
+.digital-twin-studio {
   color: rgba(255, 255, 255, 0.9) !important;
 }
 
-.digital-twin-studio [class*="text-white/"] {
+.digital-twin-studio span,
+.digital-twin-studio p,
+.digital-twin-studio div,
+.digital-twin-studio label,
+.digital-twin-studio h1,
+.digital-twin-studio h2,
+.digital-twin-studio h3,
+.digital-twin-studio h4,
+.digital-twin-studio h5,
+.digital-twin-studio h6 {
   color: inherit !important;
 }
 
-/* 스튜디오 버튼들 - 다크 테마 호버 효과 */
-.digital-twin-studio button:not([class*="bg-"]):hover {
-  background-color: rgba(255, 255, 255, 0.1) !important;
+/* 탭 버튼 텍스트 - 항상 흰색 */
+.digital-twin-studio button {
+  color: rgba(255, 255, 255, 0.6) !important;
 }
 
-/* 스튜디오 보더 - 다크 테마 고정 */
-.digital-twin-studio [class*="border-white"] {
+.digital-twin-studio button:hover {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* 활성 탭 */
+.digital-twin-studio button[class*="border-b-2"],
+.digital-twin-studio button[class*="text-blue"] {
+  color: #60a5fa !important;
+}
+
+/* 레이어 패널 내 모든 텍스트 */
+.digital-twin-studio .text-white,
+.digital-twin-studio .text-white\/90,
+.digital-twin-studio .text-white\/80,
+.digital-twin-studio .text-white\/70,
+.digital-twin-studio .text-white\/60,
+.digital-twin-studio .text-white\/50,
+.digital-twin-studio .text-white\/40 {
+  color: rgba(255, 255, 255, var(--tw-text-opacity, 1)) !important;
+}
+
+/* 숫자 표시 (4/4, 11/11 등) */
+.digital-twin-studio .text-xs,
+.digital-twin-studio .text-sm,
+.digital-twin-studio .text-\[10px\],
+.digital-twin-studio .text-\[11px\] {
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+/* 아이콘 색상 */
+.digital-twin-studio svg {
+  color: inherit !important;
+}
+
+/* ===== 배경 강제 ===== */
+.digital-twin-studio .bg-black,
+.digital-twin-studio .bg-black\/80,
+.digital-twin-studio .bg-black\/70,
+.digital-twin-studio .bg-black\/60 {
+  background-color: rgba(0, 0, 0, var(--tw-bg-opacity, 0.8)) !important;
+}
+
+/* 패널 배경 */
+.digital-twin-studio > div {
+  background-color: #000000 !important;
+}
+
+/* ===== 보더 강제 ===== */
+.digital-twin-studio .border-white\/10,
+.digital-twin-studio .border-white\/20 {
   border-color: rgba(255, 255, 255, 0.1) !important;
 }
 
-/* 스튜디오 입력 필드 - 다크 테마 고정 */
+/* ===== 입력 필드 ===== */
 .digital-twin-studio input,
 .digital-twin-studio select,
 .digital-twin-studio textarea {
@@ -902,39 +947,16 @@
   color: rgba(255, 255, 255, 0.4) !important;
 }
 
-/* 스튜디오 체크박스 - 다크 테마 고정 */
+/* ===== 체크박스/슬라이더 ===== */
 .digital-twin-studio input[type="checkbox"] {
   accent-color: #3b82f6 !important;
 }
 
-/* 스튜디오 슬라이더 - 다크 테마 고정 */
 .digital-twin-studio input[type="range"] {
   accent-color: #3b82f6 !important;
 }
 
-/* 스튜디오 탭 버튼 - 다크 테마 고정 */
-.digital-twin-studio .studio-tab-active {
-  background-color: rgba(59, 130, 246, 0.2) !important;
-  color: #60a5fa !important;
-  border-bottom-color: #3b82f6 !important;
-}
-
-.digital-twin-studio .studio-tab-inactive {
-  color: rgba(255, 255, 255, 0.5) !important;
-}
-
-.digital-twin-studio .studio-tab-inactive:hover {
-  color: rgba(255, 255, 255, 0.8) !important;
-  background-color: rgba(255, 255, 255, 0.05) !important;
-}
-
-/* 스튜디오 카드 - 다크 테마 고정 */
-.digital-twin-studio .studio-card {
-  background: rgba(0, 0, 0, 0.6) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-}
-
-/* 스튜디오 스크롤바 - 다크 테마 고정 */
+/* ===== 스크롤바 ===== */
 .digital-twin-studio ::-webkit-scrollbar {
   width: 6px !important;
   height: 6px !important;
@@ -954,43 +976,24 @@
   background: rgba(255, 255, 255, 0.3) !important;
 }
 
-/* 드래그 가능 패널 - 다크 테마 고정 */
-.digital-twin-studio .draggable-panel {
-  background: rgba(0, 0, 0, 0.85) !important;
-  backdrop-filter: blur(16px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+/* ===== 호버 상태 ===== */
+.digital-twin-studio .hover\:bg-white\/5:hover,
+.digital-twin-studio .hover\:bg-white\/10:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
 }
 
-.digital-twin-studio .draggable-panel-header {
-  background: rgba(255, 255, 255, 0.05) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
-}
-
-/* 결과 패널 - 다크 테마 고정 */
-.digital-twin-studio .result-panel {
-  background: linear-gradient(165deg, 
-    rgba(48, 48, 58, 0.95) 0%, 
-    rgba(32, 32, 40, 0.95) 50%, 
-    rgba(42, 42, 52, 0.95) 100%
-  ) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-}
-
-/* 툴팁 - 다크 테마 고정 */
-.digital-twin-studio [role="tooltip"],
-.digital-twin-studio [data-state="delayed-open"],
+/* ===== Radix UI 컴포넌트 ===== */
 .digital-twin-studio [data-radix-popper-content-wrapper] {
   --tw-bg-opacity: 1 !important;
-  background-color: rgba(0, 0, 0, 0.9) !important;
-  color: rgba(255, 255, 255, 0.9) !important;
-  border-color: rgba(255, 255, 255, 0.1) !important;
 }
 
-/* 드롭다운 메뉴 - 다크 테마 고정 */
 .digital-twin-studio [data-radix-menu-content],
-.digital-twin-studio [data-radix-select-content] {
+.digital-twin-studio [data-radix-select-content],
+.digital-twin-studio [role="tooltip"],
+.digital-twin-studio [role="dialog"] {
   background-color: rgba(15, 15, 20, 0.98) !important;
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
 }
 
 .digital-twin-studio [data-radix-menu-item],
@@ -1004,24 +1007,4 @@
 .digital-twin-studio [data-radix-select-item][data-highlighted] {
   background-color: rgba(255, 255, 255, 0.1) !important;
   color: white !important;
-}
-
-/* 모달/다이얼로그 - 다크 테마 고정 */
-.digital-twin-studio [role="dialog"],
-.digital-twin-studio [data-radix-dialog-content] {
-  background-color: rgba(20, 20, 25, 0.98) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  color: rgba(255, 255, 255, 0.9) !important;
-}
-
-/* Alert/Badge - 다크 테마 고정 */
-.digital-twin-studio .studio-alert {
-  background: rgba(0, 0, 0, 0.6) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  color: rgba(255, 255, 255, 0.8) !important;
-}
-
-.digital-twin-studio .studio-badge {
-  background: rgba(59, 130, 246, 0.2) !important;
-  color: #60a5fa !important;
 }
