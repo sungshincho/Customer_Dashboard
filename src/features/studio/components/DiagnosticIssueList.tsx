@@ -199,16 +199,20 @@ export function DiagnosticIssueList({
                     </div>
 
                     {/* 존 위치 */}
-                    <div className="flex items-center gap-1 mt-1 text-xs text-white/60">
-                      <MapPin className="w-3 h-3" />
-                      {issue.zone}
-                    </div>
+                    {(issue.zone || issue.zone_name) && (
+                      <div className="flex items-center gap-1 mt-1 text-xs text-white/60">
+                        <MapPin className="w-3 h-3" />
+                        {issue.zone || issue.zone_name}
+                      </div>
+                    )}
 
                     {/* 메트릭 및 영향 */}
                     <div className="flex items-center gap-3 mt-2 text-xs">
-                      <span className={cn('font-medium', config.color)}>
-                        {issue.metric}
-                      </span>
+                      {(issue.metric || issue.category || issue.description) && (
+                        <span className={cn('font-medium', config.color)}>
+                          {issue.metric || issue.category || issue.description}
+                        </span>
+                      )}
                       {issue.impact && (
                         <span className="flex items-center gap-1 text-white/50">
                           <TrendingDown className="w-3 h-3 text-red-400" />
@@ -218,9 +222,9 @@ export function DiagnosticIssueList({
                     </div>
 
                     {/* 권장사항 */}
-                    {issue.recommendation && (
+                    {(issue.recommendation || issue.suggested_action) && (
                       <p className="mt-2 text-xs text-white/40 italic">
-                        💡 {issue.recommendation}
+                        💡 {issue.recommendation || issue.suggested_action}
                       </p>
                     )}
                   </div>
