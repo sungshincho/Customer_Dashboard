@@ -935,18 +935,6 @@ export function AIRecommendationTab() {
 
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button
-                        onClick={() => navigate('/studio')}
-                        style={{
-                          flex: 1, padding: '10px', borderRadius: '10px',
-                          background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
-                          border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.06)',
-                          fontSize: '11px', fontWeight: 500, color: isDark ? 'rgba(255,255,255,0.8)' : '#515158',
-                          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
-                        }}
-                      >
-                        <FlaskConical className="w-3 h-3" /> 시뮬레이션
-                      </button>
-                      <button
                         onClick={() => handleStrategySettings(strategy)}
                         style={{
                           flex: 1, padding: '10px', borderRadius: '10px',
