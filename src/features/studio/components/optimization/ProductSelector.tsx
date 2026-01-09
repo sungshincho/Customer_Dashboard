@@ -83,7 +83,7 @@ export function ProductSelector({
       </button>
 
       {isExpanded && (
-        <div className="space-y-2 pl-1">
+        <div className="space-y-2 pl-1 animate-in slide-in-from-top-2 duration-200">
           {/* 모드 선택 (라디오) */}
           <div className="space-y-1.5">
             <label
@@ -153,9 +153,9 @@ export function ProductSelector({
             </label>
           </div>
 
-          {/* 제품 목록 (선택 모드일 때만) */}
+          {/* 제품 목록 (선택 모드일 때만) - 높이 축소 */}
           {!settings.relocateAll && (
-            <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+            <div className="max-h-32 overflow-y-auto space-y-2 pr-1 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
               {Object.entries(groupedProducts).map(([category, items]) => (
                 <div key={category}>
                   <div className="text-[10px] text-white/40 uppercase tracking-wide mb-1">
@@ -174,11 +174,16 @@ export function ProductSelector({
                               ? 'bg-green-500/15'
                               : 'hover:bg-white/5'
                           )}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleToggleProduct(product.id);
+                          }}
                         >
                           <input
                             type="checkbox"
                             checked={isSelected}
-                            onChange={() => handleToggleProduct(product.id)}
+                            onChange={() => {}}
                             disabled={disabled}
                             className="sr-only"
                           />
