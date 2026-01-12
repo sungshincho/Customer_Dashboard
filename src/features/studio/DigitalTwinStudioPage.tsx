@@ -915,15 +915,30 @@ export default function DigitalTwinStudioPage() {
 
   // 씬 저장 핸들러 - 수정: 이름이 같으면 업데이트, 다르면 새로 생성
   const handleSaveScene = async (name: string) => {
-    if (!currentRecipe) return;
+    if (!currentRecipe) {
+      toast.error('저장할 씬 데이터가 없습니다');
+      return;
+    }
+    
     try {
-      // 기존 씬과 이름이 같고, 새 씬 모드가 아니면 업데이트
-      const existingScene = scenes.find(s => s.name === name);
-      const shouldUpdate = !isNewSceneMode && existingScene;
+      // 🔧 FIX: 안전한 씬 찾기 (name이 undefined인 경우 처리)
+      const existingScene = scenes.find(s => s.name && s.name === name);
+      
+      // 새 씬 모드이거나 기존 씬이 없으면 새로 생성
+      const shouldUpdate = !isNewSceneMode && existingScene && existingScene.id;
+      
+      console.log('[handleSaveScene]', {
+        name,
+        isNewSceneMode,
+        existingScene: existingScene?.id,
+        shouldUpdate,
+        scenesCount: scenes.length
+      });
       
       await saveScene(currentRecipe, name, shouldUpdate ? existingScene.id : undefined);
       setSceneName(name);
       setIsNewSceneMode(false); // 저장 후 새 씬 모드 해제
+      
       logActivity('feature_use', {
         feature: 'scene_save',
         scene_name: name,
@@ -932,6 +947,7 @@ export default function DigitalTwinStudioPage() {
         is_new: !shouldUpdate
       });
     } catch (err) {
+      console.error('[handleSaveScene] Error:', err);
       // 에러는 useScenePersistence에서 처리
     }
   };
@@ -940,6 +956,7 @@ export default function DigitalTwinStudioPage() {
   const handleNewScene = useCallback(() => {
     setSceneName('');
     setIsNewSceneMode(true);
+    toast.info('새 씬 이름을 입력해주세요');
   }, []);
   if (!selectedStore) {
     return <DashboardLayout>
@@ -1277,7 +1294,7 @@ export default function DigitalTwinStudioPage() {
                     }
                     setActiveTab('ai-optimization');
                   }} onEnvironmentConfigChange={handleEnvironmentConfigChange} />}
-                      {activeTab === 'ai-optimization' && <AIOptimizationTab storeId={selectedStore?.id || ''} sceneData={currentRecipe} sceneSimulation={sceneSimulation} viewMode={viewMode} onViewModeChange={setViewMode} onSceneUpdate={newScene => {
+                      {activeTab === 'ai-optimization' && <AIOptimizationTab storeId={selectedStore?.id || ''} sceneData={currentRecipe} sceneSimulation={sceneSimulation} viewMode={viewMode} onViewModeChange={setViewMode} onSaveScene={handleSaveScene} onSceneUpdate={newScene => {
                     // SceneProvider에 시뮬레이션 결과 적용
                     if (newScene.furnitureMoves) {
                       // applySimulationResults는 useScene에서 가져옴
