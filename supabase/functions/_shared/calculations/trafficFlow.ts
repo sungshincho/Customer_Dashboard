@@ -88,7 +88,7 @@ export interface CalculationStep {
 // ============================================================================
 
 /** 시간대별 트래픽 계수 */
-const TIME_MULTIPLIERS: Record<TimeOfDay, number> = {
+export const TIME_MULTIPLIERS: Record<TimeOfDay, number> = {
   morning: 0.6,    // 오전 (10-12시)
   afternoon: 1.0,  // 오후 피크 (12-18시)
   evening: 0.85,   // 저녁 (18-21시)
@@ -96,7 +96,7 @@ const TIME_MULTIPLIERS: Record<TimeOfDay, number> = {
 };
 
 /** 요일별 트래픽 계수 */
-const DAY_MULTIPLIERS: Record<DayOfWeek, number> = {
+export const DAY_MULTIPLIERS: Record<DayOfWeek, number> = {
   monday: 0.7,
   tuesday: 0.75,
   wednesday: 0.8,
@@ -107,7 +107,7 @@ const DAY_MULTIPLIERS: Record<DayOfWeek, number> = {
 };
 
 /** Zone 타입별 흡인력 계수 */
-const ZONE_ATTRACTION: Record<ZoneType, number> = {
+export const ZONE_ATTRACTION: Record<ZoneType, number> = {
   entrance: 1.5,    // 입구: 모든 방문자 통과
   main: 1.2,        // 메인 통로: 높은 유동성
   display: 1.0,     // 디스플레이: 표준
@@ -119,7 +119,7 @@ const ZONE_ATTRACTION: Record<ZoneType, number> = {
 };
 
 /** Zone 타입별 기본 체류 시간 (분) */
-const ZONE_DWELL_TIME: Record<ZoneType, number> = {
+export const ZONE_DWELL_TIME: Record<ZoneType, number> = {
   entrance: 1,
   main: 3,
   display: 5,
@@ -134,7 +134,7 @@ const ZONE_DWELL_TIME: Record<ZoneType, number> = {
 const CAPACITY_PER_SQM = 0.5;
 
 /** 혼잡도 임계값 */
-const CONGESTION_THRESHOLDS = {
+export const CONGESTION_THRESHOLDS = {
   low: 0.4,
   medium: 0.6,
   high: 0.8,

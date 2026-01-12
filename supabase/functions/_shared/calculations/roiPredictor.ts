@@ -108,7 +108,7 @@ export interface ComparisonMetrics {
 // ============================================================================
 
 /** 업계 평균 ROI (리테일) */
-const INDUSTRY_AVG_ROI = 15; // 15%
+export const INDUSTRY_AVG_ROI = 15; // 15%
 
 /** 전환율 등급 기준 */
 const CONVERSION_GRADE_THRESHOLDS = {
