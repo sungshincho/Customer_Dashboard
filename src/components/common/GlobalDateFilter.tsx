@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/popover';
 import { useDateFilterStore, PresetPeriod, PRESET_LABELS } from '@/store/dateFilterStore';
 import { cn } from '@/lib/utils';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isToday, isSameDay } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { useState, useCallback, useEffect } from 'react';
 import { DateRange } from 'react-day-picker';
@@ -44,32 +44,70 @@ export function GlobalDateFilter({
   // 팝오버 열릴 때 임시 상태 초기화
   useEffect(() => {
     if (isOpen) {
-      // 팝오버가 열리면 임시 선택 상태를 현재 저장된 범위로 설정
+      // "오늘" 프리셋인 경우 시작 날짜만 선택된 상태로 설정
+      if (dateRange.preset === 'today') {
+        setTempRange({
+          from: parseISO(dateRange.startDate),
+          to: undefined,
+        });
+      } else {
+        // 다른 프리셋(7일, 30일, 90일, custom)은 범위로 설정
+        setTempRange({
+          from: parseISO(dateRange.startDate),
+          to: parseISO(dateRange.endDate),
+        });
+      }
+    }
+  }, [isOpen, dateRange.startDate, dateRange.endDate, dateRange.preset]);
+
+  // 날짜 클릭 핸들러 - 시작/종료가 모두 선택된 상태에서 새 날짜 클릭 시 초기화
+  const handleDayClick = useCallback((day: Date) => {
+    if (tempRange?.from && tempRange?.to) {
+      // 기존 범위가 완성된 상태에서 새로 클릭하면 시작 날짜로 초기화
       setTempRange({
-        from: parseISO(dateRange.startDate),
-        to: parseISO(dateRange.endDate),
+        from: day,
+        to: undefined,
       });
     }
-  }, [isOpen, dateRange.startDate, dateRange.endDate]);
+  }, [tempRange]);
 
   const handleDateRangeSelect = useCallback((range: DateRange | undefined) => {
-    // 임시 상태 업데이트
-    setTempRange(range);
+    // 시작/종료 날짜가 모두 선택된 상태에서는 onDayClick에서 처리됨
+    if (tempRange?.from && tempRange?.to) {
+      return;
+    }
 
-    // 두 날짜가 모두 선택되면 저장하고 팝오버 닫기
-    if (range?.from && range?.to) {
+    // 임시 상태 업데이트 (자동 닫힘 제거됨 - 적용 버튼으로 닫음)
+    setTempRange(range);
+  }, [tempRange]);
+
+  // 초기화 버튼 핸들러 - 선택된 날짜 해제
+  const handleReset = useCallback(() => {
+    setTempRange({ from: undefined, to: undefined });
+  }, []);
+
+  // 적용 버튼 핸들러
+  const handleApply = useCallback(() => {
+    if (tempRange?.from && tempRange?.to) {
       setCustomRange(
-        format(range.from, 'yyyy-MM-dd'),
-        format(range.to, 'yyyy-MM-dd')
+        format(tempRange.from, 'yyyy-MM-dd'),
+        format(tempRange.to, 'yyyy-MM-dd')
       );
       setIsOpen(false);
     }
-  }, [setCustomRange]);
+  }, [tempRange, setCustomRange]);
 
-  // 초기화 버튼 핸들러
-  const handleReset = useCallback(() => {
-    setTempRange(undefined);
-  }, []);
+  // 팝오버 외부 클릭 시 (onOpenChange)
+  const handleOpenChange = useCallback((open: boolean) => {
+    if (!open && tempRange?.from && tempRange?.to) {
+      // 닫힐 때 시작/종료 날짜가 모두 선택되어 있으면 적용
+      setCustomRange(
+        format(tempRange.from, 'yyyy-MM-dd'),
+        format(tempRange.to, 'yyyy-MM-dd')
+      );
+    }
+    setIsOpen(open);
+  }, [tempRange, setCustomRange]);
 
   const displayRange: DateRange = tempRange ?? {
     from: parseISO(dateRange.startDate),
@@ -99,7 +137,7 @@ export function GlobalDateFilter({
       </div>
 
       {showCustom && (
-        <Popover open={isOpen} onOpenChange={setIsOpen}>
+        <Popover open={isOpen} onOpenChange={handleOpenChange}>
           <PopoverTrigger asChild>
             <Button
               variant={dateRange.preset === 'custom' ? 'default' : 'outline'}
@@ -122,28 +160,50 @@ export function GlobalDateFilter({
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="end">
             <div className="p-3 border-b flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-black dark:text-white">
                 {tempRange?.from && !tempRange?.to
                   ? '종료일을 선택하세요'
                   : '날짜 범위 선택'}
               </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 px-2 text-xs"
-                onClick={handleReset}
-              >
-                초기화
-              </Button>
+              <div className="flex gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs text-black dark:text-white"
+                  onClick={handleReset}
+                >
+                  초기화
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs text-black dark:text-white"
+                  onClick={handleApply}
+                  disabled={!tempRange?.from || !tempRange?.to}
+                >
+                  적용
+                </Button>
+              </div>
             </div>
             <Calendar
+              key={`${dateRange.startDate}-${dateRange.preset}`}
               initialFocus
               mode="range"
               defaultMonth={displayRange.from}
               selected={displayRange}
               onSelect={handleDateRangeSelect}
+              onDayClick={handleDayClick}
               numberOfMonths={2}
               locale={ko}
+              modifiers={{
+                todayInRange: (day) =>
+                  isToday(day) &&
+                  !isSameDay(day, tempRange?.from ?? new Date(0)) &&
+                  !isSameDay(day, tempRange?.to ?? new Date(0)),
+              }}
+              modifiersClassNames={{
+                todayInRange: "!bg-blue-500/20 !text-blue-600 !ring-1 !ring-blue-500/40 dark:!bg-blue-500/30 dark:!text-blue-300 dark:!ring-blue-400/50 rounded-full",
+              }}
             />
           </PopoverContent>
         </Popover>

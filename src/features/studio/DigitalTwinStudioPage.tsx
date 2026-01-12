@@ -5,7 +5,7 @@
  * 드래그 가능 패널 시스템 + 시뮬레이션 결과 패널
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { useActivityLogger } from '@/hooks/useActivityLogger';
@@ -13,7 +13,7 @@ import { useLocation } from 'react-router-dom';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, Loader2, Sparkles, Layers, Save, Play, GitCompare, Pause, Square, RotateCcw, Users, FlaskConical, CheckCircle } from 'lucide-react';
+import { AlertCircle, Loader2, Sparkles, Layers, Save, Play, GitCompare, Pause, Square, RotateCcw, Users, FlaskConical, CheckCircle, Cloud, CloudRain, CloudSnow, Sun, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 
 // 새 스튜디오 컴포넌트
@@ -27,7 +27,7 @@ import { AIOptimizationTab } from './tabs/AIOptimizationTab';
 import { AISimulationTab } from './tabs/AISimulationTab';
 import { ApplyPanel } from './tabs/ApplyPanel';
 import { LayoutResultPanel, FlowResultPanel, CongestionResultPanel, StaffingResultPanel, type LayoutResult, type FlowResult, type CongestionResult, type StaffingResult } from './panels/results';
-import { useStudioMode, useOverlayVisibility, useScenePersistence, useSceneSimulation, useStoreBounds, useStaffData } from './hooks';
+import { useStudioMode, useOverlayVisibility, useScenePersistence, useSceneSimulation, useStoreBounds, useStaffData, useEnvironmentContext } from './hooks';
 import { loadUserModels } from './utils';
 import type { StudioMode, Model3D, OverlayType, HeatPoint, ZoneBoundary, SceneRecipe, LightingPreset, Vector3, SimulationScenario, TransformMode, RenderingConfig } from './types';
 import type { SimulationEnvironmentConfig } from './types/simulationEnvironment.types';
@@ -144,6 +144,18 @@ export default function DigitalTwinStudioPage() {
 
   // 🆕 로그인된 계정의 스토어 ID
   const storeId = selectedStore?.id;
+
+  // 🆕 환경 컨텍스트 (실시간 날씨, 공휴일, 이벤트)
+  const {
+    context: envContext,
+    isLoading: isEnvLoading,
+    impact: envImpact,
+    currentTime: envCurrentTime
+  } = useEnvironmentContext({
+    storeId: storeId || '',
+    enabled: !!storeId,
+    autoRefresh: true
+  });
 
   // 🆕 실제 히트맵 데이터 (zone_daily_metrics.heatmap_intensity 기반)
   const {
@@ -898,22 +910,37 @@ export default function DigitalTwinStudioPage() {
     });
   }, [dbZones, demoZones]);
 
-  // 씬 저장 핸들러
+  // 🆕 새 씬 생성 모드 상태
+  const [isNewSceneMode, setIsNewSceneMode] = useState(false);
+
+  // 씬 저장 핸들러 - 수정: 이름이 같으면 업데이트, 다르면 새로 생성
   const handleSaveScene = async (name: string) => {
     if (!currentRecipe) return;
     try {
-      await saveScene(currentRecipe, name, activeScene?.id);
+      // 기존 씬과 이름이 같고, 새 씬 모드가 아니면 업데이트
+      const existingScene = scenes.find(s => s.name === name);
+      const shouldUpdate = !isNewSceneMode && existingScene;
+      
+      await saveScene(currentRecipe, name, shouldUpdate ? existingScene.id : undefined);
       setSceneName(name);
+      setIsNewSceneMode(false); // 저장 후 새 씬 모드 해제
       logActivity('feature_use', {
         feature: 'scene_save',
         scene_name: name,
         layer_count: activeLayers.length,
-        store_id: selectedStore?.id
+        store_id: selectedStore?.id,
+        is_new: !shouldUpdate
       });
     } catch (err) {
       // 에러는 useScenePersistence에서 처리
     }
   };
+
+  // 새 씬 버튼 핸들러
+  const handleNewScene = useCallback(() => {
+    setSceneName('');
+    setIsNewSceneMode(true);
+  }, []);
   if (!selectedStore) {
     return <DashboardLayout>
         <Alert>
@@ -1040,14 +1067,16 @@ export default function DigitalTwinStudioPage() {
                 {/* 시뮬레이션 결과 스태프 오버레이 (최적화 결과가 있을 때) */}
                 {isActive('staff') && sceneSimulation.state.results.staffing && <StaffingOverlay result={sceneSimulation.state.results.staffing as any} showStaffMarkers={true} showCurrentPositions={false} showSuggestedPositions={true} showCoverageZones={false} showMovementPaths={true} animateMovement={true} />}
 
-                {/* 시뮬레이션 결과 오버레이 - 🔧 FIX: 토글 조건 추가 */}
-                {isActive('layoutOptimization') && sceneSimulation.state.results.layout && <LayoutOptimizationOverlay result={sceneSimulation.state.results.layout as any} showBefore={false} showAfter={false} showMoves={true} showProductMoves={true} showZoneHighlights={true} storeBounds={storeBounds} zonePositions={zonePositions} zoneSizes={zoneSizes} />}
+                {/* 🔧 레이아웃 오버레이 - compare 모드에서만 표시 (As-Is/To-Be 박스) */}
+                {viewMode === 'compare' && isActive('layoutOptimization') && sceneSimulation.state.results.layout && <LayoutOptimizationOverlay result={sceneSimulation.state.results.layout as any} showBefore={false} showAfter={false} showMoves={true} showProductMoves={true} showZoneHighlights={true} storeBounds={storeBounds} zonePositions={zonePositions} zoneSizes={zoneSizes} />}
+                
+                {/* 🔧 동선/혼잡도/직원배치 오버레이 - compare 조건 제거, 토글로만 제어 */}
                 {isActive('flowOptimization') && sceneSimulation.state.results.flow && <FlowOptimizationOverlay result={sceneSimulation.state.results.flow as any} showPaths={true} showBottlenecks={true} showHeatmap={true} animatePaths={true} storeBounds={storeBounds} entrancePosition={entrancePosition} />}
                 {isActive('congestion') && sceneSimulation.state.results.congestion && <CongestionOverlay result={sceneSimulation.state.results.congestion as any} showHeatmap={true} showZoneMarkers={true} showCrowdAnimation={true} animateTimeProgress={false} />}
                 {isActive('staffing') && sceneSimulation.state.results.staffing && <StaffingOverlay result={sceneSimulation.state.results.staffing as any} showStaffMarkers={true} showCurrentPositions={true} showSuggestedPositions={true} showCoverageZones={true} showMovementPaths={true} animateMovement={true} />}
 
-                {/* 🆕 인력 재배치 오버레이 (As-Is → To-Be 이동 경로 애니메이션) */}
-                {sceneSimulation.state.results.staffing && viewMode === 'to-be' && (() => {
+                {/* 🆕 인력 재배치 오버레이 (staffing 활성화 시 표시) */}
+                {isActive('staffing') && sceneSimulation.state.results.staffing && (() => {
               const staffingResult = sceneSimulation.state.results.staffing as any;
               // staffPositions를 StaffReallocation 형식으로 변환
               const reallocations = (staffingResult.staffPositions || []).map((sp: any, idx: number) => ({
@@ -1080,35 +1109,22 @@ export default function DigitalTwinStudioPage() {
               return <StaffReallocationOverlay visible={true} reallocations={reallocations} />;
             })()}
               </Canvas3D>}
+              
+              {/* 🔧 ViewModeHandler 제거됨 - AI 최적화 탭에서 직접 3D 위치 관리 */}
           </div>
 
           {/* ========== UI 오버레이 ========== */}
           <div className="absolute inset-0 z-10 pointer-events-none">
-            {/* ----- 상단 중앙: 통합 컨트롤 바 (패널 토글 + 퀵 토글) ----- */}
+            {/* ----- 상단 중앙: 퀵 토글 바 ----- */}
             <div className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-auto z-20 flex items-center gap-3">
-              {/* 패널 토글 버튼들 */}
-              <div className="flex items-center gap-1 px-2 py-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 shadow-lg">
-                {/* 임시 비활성화 - 도구 버튼
-                 <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setVisiblePanels(prev => ({ ...prev, tools: !prev.tools }))}
-                  className={`h-8 px-3 rounded-lg transition-all border border-transparent ${
-                    visiblePanels.tools ? 'bg-blue-500/30 border-blue-500 text-blue-400' : 'hover:bg-white/10 text-white/60'
-                  }`}
-                 >
-                  <Layers className="w-4 h-4 mr-1.5" />
-                  <span className="text-xs">도구</span>
-                 </Button>
-                 */}
-                <Button variant="ghost" size="sm" onClick={() => setVisiblePanels(prev => ({
-                ...prev,
-                sceneSave: !prev.sceneSave
-              }))} className={`h-8 px-3 rounded-lg transition-all border border-transparent ${visiblePanels.sceneSave ? 'bg-green-500/30 border-green-500' : 'hover:bg-white/10'}`}
-                  style={{ color: visiblePanels.sceneSave ? '#4ade80' : 'rgba(255,255,255,0.6)' }}>
-                  <Save className="w-4 h-4 mr-1.5" />
-                  <span className="text-xs">씬 저장</span>
-                </Button>
+              {/* 퀵 토글 바 */}
+              <QuickToggleBar activeOverlays={activeOverlays as any[]} onToggle={id => toggleOverlay(id as OverlayType)} />
+            </div>
+
+            {/* ----- 상단 우측: AI 리포트 + 씬 저장 + 뷰 모드 토글 ----- */}
+            <div className="absolute top-4 right-4 pointer-events-auto z-20 flex items-center gap-2">
+              {/* AI 리포트 버튼 */}
+              <div className="flex items-center px-2 py-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 shadow-lg">
                 <Button variant="ghost" size="sm" onClick={() => setVisiblePanels(prev => ({
                 ...prev,
                 resultReport: !prev.resultReport
@@ -1120,11 +1136,19 @@ export default function DigitalTwinStudioPage() {
                 </Button>
               </div>
 
-              {/* 구분선 */}
-              <div className="w-px h-6 bg-white/20" />
+              {/* 씬 저장 버튼 */}
+              <div className="flex items-center px-2 py-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 shadow-lg">
+                <Button variant="ghost" size="sm" onClick={() => setVisiblePanels(prev => ({
+                ...prev,
+                sceneSave: !prev.sceneSave
+              }))} className={`h-8 px-3 rounded-lg transition-all border border-transparent ${visiblePanels.sceneSave ? 'bg-green-500/30 border-green-500' : 'hover:bg-white/10'}`}
+                  style={{ color: visiblePanels.sceneSave ? '#4ade80' : 'rgba(255,255,255,0.6)' }}>
+                  <Save className="w-4 h-4 mr-1.5" />
+                  <span className="text-xs">씬 저장</span>
+                </Button>
+              </div>
 
-              {/* 퀵 토글 바 */}
-              <QuickToggleBar activeOverlays={activeOverlays as any[]} onToggle={id => toggleOverlay(id as OverlayType)} />
+              {/* 🔧 ViewModeToggle 제거됨 - AI 최적화 탭 내부에서 관리 */}
             </div>
 
             {/* ----- 하단 좌측: 현재 상태 정보 + 뷰모드 표시 ----- */}
@@ -1134,18 +1158,60 @@ export default function DigitalTwinStudioPage() {
                   <div className="flex items-center gap-1.5">
                     {viewMode === 'as-is' && '📍 As-Is (현재 배치)'}
                     {viewMode === 'to-be' && '✨ To-Be (최적화 결과)'}
-                    {viewMode === 'split' && '⚡ Split (비교 뷰)'}
+                    {viewMode === 'compare' && '🔄 비교 (변화 보기)'}
                   </div>
-                  {/* Split 뷰 안내 */}
-                  {viewMode === 'split' && <div className="text-[10px] text-white/70">
-                      🔴 As-Is → 🟢 To-Be 화살표로 변경 확인
+                  {/* 비교 뷰 안내 */}
+                  {viewMode === 'compare' && <div className="text-[10px] text-white/70">
+                      🔴 As-Is → 🟢 To-Be 변화 확인
                     </div>}
                 </div>}
               
             </div>
 
-            {/* ----- 하단 우측: 카메라 컨트롤 힌트 ----- */}
-            <div className="absolute bottom-4 right-4 pointer-events-auto z-20">
+            {/* ----- 하단 우측: 현재 환경 + 카메라 컨트롤 힌트 ----- */}
+            <div className="absolute bottom-4 right-4 pointer-events-auto z-20 flex flex-col gap-2 items-end">
+              {/* 현재 환경 표시 */}
+              {envContext && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 shadow-lg">
+                  {/* 날씨 */}
+                  <div className="flex items-center gap-1">
+                    {envContext.weather?.condition === 'rain' && <CloudRain className="w-3.5 h-3.5 text-blue-400" />}
+                    {envContext.weather?.condition === 'snow' && <CloudSnow className="w-3.5 h-3.5 text-blue-200" />}
+                    {envContext.weather?.condition === 'clear' && <Sun className="w-3.5 h-3.5 text-yellow-400" />}
+                    {envContext.weather?.condition === 'clouds' && <Cloud className="w-3.5 h-3.5 text-gray-400" />}
+                    {!envContext.weather && <Cloud className="w-3.5 h-3.5 text-white/30" />}
+                    <span className="text-xs text-white">
+                      {envContext.weather ? `${Math.round(envContext.weather.temperature)}°C` : '-'}
+                    </span>
+                  </div>
+                  
+                  <div className="w-px h-4 bg-white/20" />
+                  
+                  {/* 요일 */}
+                  <div className="flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-purple-400" />
+                    <span className="text-xs text-white">
+                      {envContext.holiday ? envContext.holiday.name : envCurrentTime?.isWeekend ? '주말' : '평일'}
+                    </span>
+                  </div>
+                  
+                  {/* 트래픽 영향도 */}
+                  {envImpact && (
+                    <>
+                      <div className="w-px h-4 bg-white/20" />
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${
+                        envImpact.trafficMultiplier > 1.1 ? 'bg-green-500/20 text-green-400' : 
+                        envImpact.trafficMultiplier < 0.9 ? 'bg-red-500/20 text-red-400' : 
+                        'bg-white/10 text-white/60'
+                      }`}>
+                        트래픽 {(envImpact.trafficMultiplier * 100).toFixed(0)}%
+                      </span>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* 카메라 컨트롤 힌트 */}
               <div className="bg-black/70 backdrop-blur-sm border border-white/10 rounded-lg px-3 py-2 text-xs text-white/50 flex items-center gap-2">
                 <Mouse className="w-3.5 h-3.5" />
                 <span>회전</span>
@@ -1211,7 +1277,7 @@ export default function DigitalTwinStudioPage() {
                     }
                     setActiveTab('ai-optimization');
                   }} onEnvironmentConfigChange={handleEnvironmentConfigChange} />}
-                      {activeTab === 'ai-optimization' && <AIOptimizationTab storeId={selectedStore?.id || ''} sceneData={currentRecipe} sceneSimulation={sceneSimulation} onSceneUpdate={newScene => {
+                      {activeTab === 'ai-optimization' && <AIOptimizationTab storeId={selectedStore?.id || ''} sceneData={currentRecipe} sceneSimulation={sceneSimulation} viewMode={viewMode} onViewModeChange={setViewMode} onSceneUpdate={newScene => {
                     // SceneProvider에 시뮬레이션 결과 적용
                     if (newScene.furnitureMoves) {
                       // applySimulationResults는 useScene에서 가져옴
@@ -1290,7 +1356,7 @@ export default function DigitalTwinStudioPage() {
                   onSave={handleSaveScene}
                   onLoad={(id) => setActiveScene(id)}
                   onDelete={(id) => deleteScene(id)}
-                  onNew={() => setSceneName('')}
+                  onNew={handleNewScene}
                   maxScenes={3}
                 />
               </DraggablePanel>
@@ -1606,3 +1672,5 @@ function SimulationResultPanels({
     }} />}
     </>;
 }
+
+// 🔧 ViewModeHandler 제거됨 - AI 최적화 탭에서 직접 뷰 모드 관리

@@ -548,7 +548,7 @@ function StaffMarker({
               color="#22c55e"
               anchorX="center"
             >
-              +{position.coverageGain.toFixed(0)}%
+              +{(position.coverageGain ?? 0).toFixed(0)}%
             </Text>
           )}
         </group>
@@ -567,21 +567,21 @@ function StaffMarker({
             <div className="space-y-1.5 text-xs">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">현재 구역:</span>
-                <span>{position.currentZone}</span>
+                <span>{position.currentZone || '미지정'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">추천 구역:</span>
-                <span className="text-green-500">{position.suggestedZone}</span>
+                <span className="text-green-500">{position.suggestedZone || '미지정'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">커버리지 증가:</span>
-                <span className="text-green-500 font-medium">+{position.coverageGain.toFixed(1)}%</span>
+                <span className="text-green-500 font-medium">+{(position.coverageGain ?? 0).toFixed(1)}%</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">효율 점수:</span>
-                <span>{position.efficiencyScore.toFixed(0)}/100</span>
+                <span>{(position.efficiencyScore ?? 0).toFixed(0)}/100</span>
               </div>
-              {position.responsibilityZones.length > 0 && (
+              {position.responsibilityZones && position.responsibilityZones.length > 0 && (
                 <div className="pt-1 border-t border-border">
                   <span className="text-muted-foreground text-[10px]">담당 구역:</span>
                   <div className="text-[10px] mt-0.5">
@@ -628,7 +628,11 @@ function ZoneCoverageIndicator({
   const priorityColor = zone.priority === 'high' ? '#ef4444' :
                         zone.priority === 'medium' ? '#f59e0b' : '#22c55e';
 
-  const coverageImprovement = zone.optimizedCoverage - zone.currentCoverage;
+  // 안전한 값 처리
+  const currentCoverage = zone.currentCoverage ?? 0;
+  const optimizedCoverage = zone.optimizedCoverage ?? 0;
+  const avgResponseTime = zone.avgResponseTime ?? 0;
+  const coverageImprovement = optimizedCoverage - currentCoverage;
 
   return (
     <group position={position}>
@@ -657,11 +661,11 @@ function ZoneCoverageIndicator({
             <div className="space-y-0.5 text-[10px]">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">현재 커버리지:</span>
-                <span>{zone.currentCoverage.toFixed(0)}%</span>
+                <span>{currentCoverage.toFixed(0)}%</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">최적화 후:</span>
-                <span className="text-green-500">{zone.optimizedCoverage.toFixed(0)}%</span>
+                <span className="text-green-500">{optimizedCoverage.toFixed(0)}%</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">개선:</span>
@@ -669,11 +673,11 @@ function ZoneCoverageIndicator({
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">응답시간:</span>
-                <span>{zone.avgResponseTime.toFixed(0)}초</span>
+                <span>{avgResponseTime.toFixed(0)}초</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">담당직원:</span>
-                <span>{zone.assignedStaff.length}명</span>
+                <span>{zone.assignedStaff?.length || 0}명</span>
               </div>
             </div>
           </div>
@@ -692,6 +696,15 @@ interface MetricsPanelProps {
 }
 
 function MetricsPanel({ metrics }: MetricsPanelProps) {
+  // 안전한 기본값 적용
+  const safeMetrics = {
+    currentCoverage: metrics?.currentCoverage ?? 0,
+    optimizedCoverage: metrics?.optimizedCoverage ?? 0,
+    customerServiceRateIncrease: metrics?.customerServiceRateIncrease ?? 0,
+    avgResponseTimeReduction: metrics?.avgResponseTimeReduction ?? 0,
+    efficiencyScore: metrics?.efficiencyScore ?? 0,
+  };
+
   return (
     <Html position={[-5, 3, 5]} center>
       <div className="bg-background/90 backdrop-blur-sm border border-border rounded-lg p-3 shadow-lg min-w-[160px]">
@@ -700,22 +713,22 @@ function MetricsPanel({ metrics }: MetricsPanelProps) {
           <div className="flex justify-between items-center">
             <span className="text-muted-foreground">커버리지:</span>
             <div className="text-right">
-              <span className="text-muted-foreground">{metrics.currentCoverage}%</span>
+              <span className="text-muted-foreground">{safeMetrics.currentCoverage}%</span>
               <span className="mx-1">→</span>
-              <span className="text-green-500 font-medium">{metrics.optimizedCoverage.toFixed(0)}%</span>
+              <span className="text-green-500 font-medium">{safeMetrics.optimizedCoverage.toFixed(0)}%</span>
             </div>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">응대율 증가:</span>
-            <span className="text-green-500">+{metrics.customerServiceRateIncrease}%</span>
+            <span className="text-green-500">+{safeMetrics.customerServiceRateIncrease}%</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">응답시간 단축:</span>
-            <span className="text-green-500">-{metrics.avgResponseTimeReduction}%</span>
+            <span className="text-green-500">-{safeMetrics.avgResponseTimeReduction}%</span>
           </div>
           <div className="flex justify-between pt-1 border-t border-border">
             <span className="text-muted-foreground">효율 점수:</span>
-            <span className="font-medium">{metrics.efficiencyScore.toFixed(0)}/100</span>
+            <span className="font-medium">{safeMetrics.efficiencyScore.toFixed(0)}/100</span>
           </div>
         </div>
       </div>

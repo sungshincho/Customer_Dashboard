@@ -139,6 +139,10 @@ export {
 // 환경 모델 훅
 export { useEnvironmentModels } from './useEnvironmentModels';
 
+// 환경 컨텍스트 훅 (날씨, 공휴일, 이벤트)
+export { useEnvironmentContext } from './useEnvironmentContext';
+export type { UseEnvironmentContextOptions, UseEnvironmentContextReturn } from './useEnvironmentContext';
+
 // 공간 텍스처 훅 (낮/밤 텍스처 동적 로드)
 export { useSpaceTextures } from './useSpaceTextures';
 export type { SpaceTextures } from './useSpaceTextures';
