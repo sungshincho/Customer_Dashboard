@@ -569,21 +569,19 @@ export function AIOptimizationTab({
     }
   }, [selectedOptimizations, selectedGoal, storeId, sceneData, sceneSimulation, onOverlayToggle, onResultsUpdate, optimizationSettings, simulationEnvConfig]);
 
-  // As-Is 씬으로 복원
+  // As-Is 씬으로 복원 (3D 위치만 복원, 결과 데이터는 유지)
   const handleRevertToAsIs = useCallback(() => {
-    // 1. 3D 모델 위치 복원 (SceneProvider의 revertSimulationChanges 호출)
+    // 1. 3D 모델 위치만 복원 (SceneProvider의 revertSimulationChanges 호출)
     revertSimulationChanges();
     
-    // 2. hook 상태 초기화
-    sceneSimulation.clearScenes();
+    // 🔧 FIX: clearScenes() 제거 - 결과 데이터를 유지해야 To-Be 다시 적용 가능
+    // sceneSimulation.clearScenes(); // 이 줄 제거
     
-    // 3. 오버레이 끄기
+    // 2. 레이아웃 오버레이만 끄기 (동선/직원배치 오버레이는 유지)
     onOverlayToggle('layoutOptimization', false);
-    onOverlayToggle('flowOptimization', false);
-    onOverlayToggle('staffing', false);
     
-    toast.info('원래 씬으로 복원되었습니다');
-  }, [sceneSimulation, onOverlayToggle, revertSimulationChanges]);
+    toast.info('As-Is 상태로 복원되었습니다 (To-Be 다시 적용 가능)');
+  }, [onOverlayToggle, revertSimulationChanges]);
 
   // To-Be 씬 적용 - 3D 모델 위치 실제 변경 (가구 + 상품)
   const handleApplyToBe = useCallback(async () => {
