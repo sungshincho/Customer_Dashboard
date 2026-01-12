@@ -372,13 +372,26 @@ interface HeatmapMeshProps {
 }
 
 function HeatmapMesh({ points, color, opacity, heightScale, label, storeBounds }: HeatmapMeshProps) {
+  // 🔧 FIX: 유효한 포인트만 필터링 (NaN 방지)
+  const validPoints = useMemo(() => {
+    return (points || []).filter(p => 
+      p &&
+      typeof p.x === 'number' &&
+      typeof p.z === 'number' &&
+      typeof p.intensity === 'number' &&
+      Number.isFinite(p.x) &&
+      Number.isFinite(p.z) &&
+      Number.isFinite(p.intensity)
+    );
+  }, [points]);
+
   // 히트맵 포인트 좌표를 클램핑
   const clampedPoints = useMemo(() => {
-    return points.map(p => {
+    return validPoints.map(p => {
       const clamped = clampToStoreBounds(p.x, p.z, storeBounds);
       return { ...p, x: clamped.x, z: clamped.z };
     });
-  }, [points, storeBounds]);
+  }, [validPoints, storeBounds]);
 
   const geometry = useMemo(() => {
     const gridSize = 12;
