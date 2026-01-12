@@ -56,6 +56,7 @@ type SceneAction =
   | { type: 'LOAD_SCENE'; payload: Partial<SceneState> }
   | { type: 'SET_DIRTY'; payload: boolean }
   | { type: 'APPLY_SIMULATION'; payload: SimulationResultsPayload }
+  | { type: 'REVERT_SIMULATION' }  // 🆕 시뮬레이션 결과 되돌리기
   | { type: 'TOGGLE_PRODUCT_VISIBILITY'; payload: string }  // 🆕 제품 개별 가시성 토글
   | { type: 'RESET' };
 
@@ -464,6 +465,30 @@ const sceneReducer = (state: SceneState, action: SceneAction): SceneState => {
       };
     }
 
+    // 🆕 시뮬레이션 결과 되돌리기 (reducer 기반으로 stale closure 방지)
+    case 'REVERT_SIMULATION': {
+      const revertedModels = state.models.map((model) => {
+        if (model.metadata?.movedBySimulation && model.metadata?.previousPosition) {
+          return {
+            ...model,
+            position: model.metadata.previousPosition as Vector3Tuple,
+            metadata: {
+              ...model.metadata,
+              movedBySimulation: false,
+              previousPosition: undefined,
+            },
+          };
+        }
+        return model;
+      });
+      
+      return {
+        ...state,
+        models: revertedModels,
+        isDirty: true,
+      };
+    }
+
     case 'RESET':
       return initialState;
 
@@ -648,25 +673,10 @@ export function SceneProvider({ mode = 'view', children, initialModels = [] }: S
     dispatch({ type: 'APPLY_SIMULATION', payload: results });
   }, []);
 
-  // 시뮬레이션 변경 되돌리기
+  // 🔧 시뮬레이션 변경 되돌리기 (dispatch 기반으로 stale closure 방지)
   const revertSimulationChanges = useCallback(() => {
-    // 이전 위치로 모델 복원
-    const revertedModels = state.models.map((model) => {
-      if (model.metadata?.movedBySimulation && model.metadata?.previousPosition) {
-        return {
-          ...model,
-          position: model.metadata.previousPosition as Vector3Tuple,
-          metadata: {
-            ...model.metadata,
-            movedBySimulation: false,
-            previousPosition: undefined,
-          },
-        };
-      }
-      return model;
-    });
-    dispatch({ type: 'SET_MODELS', payload: revertedModels });
-  }, [state.models]);
+    dispatch({ type: 'REVERT_SIMULATION' });
+  }, []);
 
   // 🆕 제품 개별 가시성 토글 (가구의 childProducts 내 visible 속성 직접 수정)
   const toggleProductVisibility = useCallback((productId: string) => {
