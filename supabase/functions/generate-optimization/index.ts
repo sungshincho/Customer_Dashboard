@@ -1291,9 +1291,11 @@ async function generateAIOptimization(
           response_format: responseFormat,
           max_tokens: 16000,
           // 🆕 Sprint 1: Tool Use 파라미터 추가
+          // tool_choice: 'required' - AI가 반드시 Tool을 호출하도록 강제
+          // 첫 번째 호출에서는 required, 이후에는 auto로 전환 (무한 루프 방지)
           ...(enableToolUse && toolCallIterations < maxIterations ? {
             tools: OPENROUTER_TOOLS,
-            tool_choice: 'auto',
+            tool_choice: toolCallIterations === 0 ? 'required' : 'auto',
           } : {}),
         }),
       });
@@ -1392,13 +1394,20 @@ async function generateAIOptimization(
       console.log(`[generateAIOptimization] ✅ Schema validation passed`);
     }
 
+    // 🆕 Sprint 1 강화: Tool 결과를 최종 JSON에 강제 반영 (후처리)
+    const toolResultsMap = parseToolResultsToMap(allToolCallResults);
+    const enhancedResult = applyToolResultsToOptimization(result, toolResultsMap);
+    if (Object.keys(toolResultsMap).length > 0) {
+      console.log(`[generateAIOptimization] 🔧 Applied ${Object.keys(toolResultsMap).length} tool results to final output`);
+    }
+
     return {
       optimization_id: '',
       store_id: '',
       created_at: '',
       optimization_type: optimizationType as any,
-      furniture_changes: result.furniture_changes || [],
-      product_changes: result.product_changes || [],
+      furniture_changes: enhancedResult.furniture_changes || [],
+      product_changes: enhancedResult.product_changes || [],
       summary: result.summary ? {
         ...result.summary,
         // 🆕 AI 추론 메타데이터 추가
@@ -2311,4 +2320,155 @@ Return a JSON object with this exact structure:
     ],
     confidence: 0.7,
   };
+}
+
+// ============================================================================
+// 🆕 Sprint 1 강화: Tool 결과 후처리 함수
+// ============================================================================
+
+/**
+ * Tool 결과 타입 정의
+ */
+interface ParsedToolResult {
+  type: 'traffic_flow' | 'roi';
+  zone_id?: string;
+  product_id?: string;
+  data: any;
+}
+
+/**
+ * Tool 호출 결과를 Map으로 파싱
+ * - zone_id 또는 product_id를 키로 사용
+ */
+function parseToolResultsToMap(
+  toolResults: ToolCallResult[]
+): Record<string, ParsedToolResult> {
+  const resultMap: Record<string, ParsedToolResult> = {};
+
+  for (const result of toolResults) {
+    try {
+      const data = JSON.parse(result.content);
+
+      // 에러 결과는 스킵
+      if (data.error) continue;
+
+      // traffic_flow 결과
+      if (data.zone_id && data.expected_visitors !== undefined) {
+        resultMap[`traffic_${data.zone_id}`] = {
+          type: 'traffic_flow',
+          zone_id: data.zone_id,
+          data,
+        };
+      }
+
+      // roi 결과 (product_id가 있는 경우)
+      if (data.roi_percent !== undefined) {
+        // ROI 결과는 호출 순서대로 저장 (인덱스 기반)
+        const key = `roi_${Object.keys(resultMap).filter(k => k.startsWith('roi_')).length}`;
+        resultMap[key] = {
+          type: 'roi',
+          data,
+        };
+      }
+    } catch {
+      // 파싱 실패 시 스킵
+      continue;
+    }
+  }
+
+  return resultMap;
+}
+
+/**
+ * Tool 결과를 최적화 결과에 강제 적용
+ * - AI가 생성한 수치를 계산 함수 결과로 덮어씀
+ */
+function applyToolResultsToOptimization(
+  result: any,
+  toolResultsMap: Record<string, ParsedToolResult>
+): any {
+  // Tool 결과가 없으면 원본 반환
+  if (Object.keys(toolResultsMap).length === 0) {
+    return result;
+  }
+
+  const enhancedResult = { ...result };
+
+  // 1. Traffic Flow 결과를 furniture_changes에 적용
+  const trafficResults = Object.values(toolResultsMap).filter(r => r.type === 'traffic_flow');
+  if (trafficResults.length > 0 && enhancedResult.furniture_changes) {
+    enhancedResult.furniture_changes = enhancedResult.furniture_changes.map((change: any) => {
+      const trafficData = trafficResults.find(t => t.zone_id === change.suggested?.zone_id);
+      if (trafficData) {
+        return {
+          ...change,
+          // 계산된 트래픽 데이터 추가
+          calculated_traffic: {
+            expected_visitors: trafficData.data.expected_visitors,
+            flow_rate: trafficData.data.flow_rate,
+            congestion_risk: trafficData.data.congestion_risk,
+            bottleneck_probability: trafficData.data.bottleneck_probability,
+            confidence: trafficData.data.confidence,
+          },
+          // expected_impact를 계산 결과로 덮어쓰기
+          expected_impact: trafficData.data.expected_visitors > 0
+            ? Math.min(0.5, trafficData.data.expected_visitors / 1000)  // 정규화
+            : change.expected_impact,
+        };
+      }
+      return change;
+    });
+  }
+
+  // 2. ROI 결과를 product_changes에 적용
+  const roiResults = Object.values(toolResultsMap).filter(r => r.type === 'roi');
+  if (roiResults.length > 0 && enhancedResult.product_changes) {
+    enhancedResult.product_changes = enhancedResult.product_changes.map((change: any, index: number) => {
+      // 인덱스 기반 매칭 (순서대로)
+      const roiData = roiResults[index]?.data;
+      if (roiData) {
+        return {
+          ...change,
+          // 계산된 ROI 데이터 추가
+          calculated_roi: {
+            expected_impressions: roiData.expected_impressions,
+            expected_conversions: roiData.expected_conversions,
+            expected_revenue: roiData.expected_revenue,
+            expected_profit: roiData.expected_profit,
+            roi_percent: roiData.roi_percent,
+            confidence: roiData.confidence,
+            recommendation: roiData.recommendation,
+          },
+          // AI가 생성한 수치를 계산 결과로 덮어쓰기
+          expected_revenue_impact: roiData.roi_percent / 100,  // ROI%를 0-1 범위로 변환
+          expected_visibility_impact: roiData.expected_impressions > 0
+            ? Math.min(1, roiData.expected_conversions / roiData.expected_impressions * 10)  // 전환율 기반
+            : change.expected_visibility_impact,
+        };
+      }
+      return change;
+    });
+  }
+
+  // 3. Summary에 계산 기반 집계 추가
+  if (enhancedResult.summary) {
+    const totalRoiResults = roiResults.map(r => r.data);
+    if (totalRoiResults.length > 0) {
+      const avgRoi = totalRoiResults.reduce((sum, r) => sum + (r.roi_percent || 0), 0) / totalRoiResults.length;
+      const totalExpectedProfit = totalRoiResults.reduce((sum, r) => sum + (r.expected_profit || 0), 0);
+
+      enhancedResult.summary = {
+        ...enhancedResult.summary,
+        // 계산 기반 수치 추가
+        calculated_avg_roi_percent: Math.round(avgRoi * 10) / 10,
+        calculated_total_daily_profit: totalExpectedProfit,
+        calculation_source: 'function_calling',
+        calculation_confidence: totalRoiResults.reduce((sum, r) => sum + (r.confidence || 0), 0) / totalRoiResults.length,
+      };
+    }
+  }
+
+  console.log(`[applyToolResultsToOptimization] Enhanced ${enhancedResult.furniture_changes?.length || 0} furniture, ${enhancedResult.product_changes?.length || 0} product changes`);
+
+  return enhancedResult;
 }
