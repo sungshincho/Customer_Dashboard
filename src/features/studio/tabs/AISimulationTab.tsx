@@ -113,7 +113,7 @@ export function AISimulationTab({
   });
 
   // ===== 통합 시뮬레이션 상태 =====
-  const [simulationType, setSimulationType] = useState<SimulationType>('realtime');
+  const [simulationType, setSimulationType] = useState<SimulationType>('prediction');
   const [customerCount, setCustomerCount] = useState(100);
   const [duration, setDuration] = useState(60);
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
@@ -638,31 +638,8 @@ export function AISimulationTab({
           )}
         </div>
 
-        {/* 시뮬레이션 타입 선택 */}
-        <div className="space-y-2">
-          <label className="text-xs font-medium text-white">시뮬레이션 타입</label>
-          <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => setSimulationType('realtime')} disabled={isAnyRunning} className={cn("p-3 rounded-lg border text-left transition", simulationType === 'realtime' ? "bg-blue-500/20 border-blue-500 text-blue-400" : "bg-white/5 border-white/10 hover:bg-white/10 text-white/70", isAnyRunning && "opacity-50 cursor-not-allowed")}>
-              <div className="flex items-center gap-2 font-medium text-sm text-white">
-                <Play className="w-4 h-4" />
-                실시간
-              </div>
-              <p className="text-xs text-white/40 mt-1">
-                3D 고객 아바타 애니메이션
-              </p>
-            </button>
-
-            <button onClick={() => setSimulationType('prediction')} disabled={isAnyRunning} className={cn("p-3 rounded-lg border text-left transition", simulationType === 'prediction' ? "bg-purple-500/20 border-purple-500 text-purple-400" : "bg-white/5 border-white/10 hover:bg-white/10 text-white/70", isAnyRunning && "opacity-50 cursor-not-allowed")}>
-              <div className="flex items-center gap-2 font-medium text-sm">
-                <Zap className="w-4 h-4" />
-                AI 예측
-              </div>
-              <p className="text-xs text-white/40 mt-1">
-                AI 기반 분석 및 인사이트
-              </p>
-            </button>
-          </div>
-        </div>
+        {/* 🆕 시뮬레이션 타입 - AI 예측 고정 (실시간 제거) */}
+        {/* 시뮬레이션 타입 선택 UI 제거됨 - 기본값으로 AI 예측 사용 */}
 
         {/* 🆕 환경 상태 표시 */}
         {envContext && <div className="p-3 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg border border-white/10 space-y-2">
@@ -712,12 +689,12 @@ export function AISimulationTab({
               </div>}
           </div>}
 
-        {/* 🆕 환경 설정 패널 (접기/펼치기) */}
+        {/* 🆕 커스텀 시나리오 패널 (접기/펼치기) */}
         <div className="border border-white/10 rounded-lg">
           <button onClick={() => setShowEnvironmentSettings(!showEnvironmentSettings)} className="w-full flex items-center justify-between p-3 text-sm text-white/80">
             <span className="font-medium flex items-center gap-2 text-white">
-              <Settings className="w-4 h-4" />
-              환경 설정 (시뮬레이션)
+              <Wrench className="w-4 h-4 text-blue-400" />
+              커스텀 시나리오
             </span>
             <div className="flex items-center gap-2">
               <span className={cn("text-xs px-1.5 py-0.5 rounded", simulationEnvConfig.mode === 'realtime' ? "bg-blue-500/20 text-blue-400" : simulationEnvConfig.mode === 'dateSelect' ? "bg-green-500/20 text-green-400" : "bg-purple-500/20 text-purple-400")}>
@@ -728,6 +705,9 @@ export function AISimulationTab({
           </button>
 
           {showEnvironmentSettings && <div className="p-3 pt-0 border-t border-white/10">
+              <p className="text-xs text-white/50 mb-3">
+                날씨, 시간대, 이벤트 등을 직접 설정하여 시나리오를 구성하세요
+              </p>
               <SimulationEnvironmentSettings config={simulationEnvConfig} onChange={config => {
             console.log('[AISimulationTab] SimulationEnvironmentSettings onChange:', config.mode);
             setSimulationEnvConfig(config);
