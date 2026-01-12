@@ -53,6 +53,26 @@ export function useOverlayVisibility(options: UseOverlayVisibilityOptions = {}) 
     [onOverlayChange]
   );
 
+  // 🆕 오버레이 가시성을 직접 설정 (visible: true면 표시, false면 숨김)
+  const setOverlayVisibility = useCallback(
+    (overlayId: OverlayType, visible: boolean) => {
+      setActiveOverlays((prev) => {
+        const isCurrentlyActive = prev.includes(overlayId);
+        
+        // 이미 원하는 상태면 변경 없음
+        if (visible === isCurrentlyActive) return prev;
+        
+        const next = visible
+          ? [...prev, overlayId]  // 표시
+          : prev.filter((o) => o !== overlayId);  // 숨김
+        
+        onOverlayChange?.(next);
+        return next;
+      });
+    },
+    [onOverlayChange]
+  );
+
   const isActive = useCallback(
     (overlayId: OverlayType) => activeOverlays.includes(overlayId),
     [activeOverlays]
@@ -68,6 +88,7 @@ export function useOverlayVisibility(options: UseOverlayVisibilityOptions = {}) 
     toggleOverlay,
     showOverlay,
     hideOverlay,
+    setOverlayVisibility,  // 🆕 추가
     isActive,
     clearAll,
   };
