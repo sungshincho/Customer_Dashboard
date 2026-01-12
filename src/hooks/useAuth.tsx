@@ -200,11 +200,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               await fetchOrganizationContext(session.user.id);
               
               // Only redirect if organization context loaded successfully
+              // 로그인 페이지(/auth)에서만 리다이렉트, 이미 대시보드에 있으면 무시
               if (event === "SIGNED_IN") {
-                redirectTimeout = setTimeout(() => {
-                  const defaultPath = getDefaultDashboard();
-                  navigate(defaultPath);
-                }, 500);
+                const currentPath = window.location.pathname;
+                if (currentPath === "/auth") {
+                  redirectTimeout = setTimeout(() => {
+                    const defaultPath = getDefaultDashboard();
+                    navigate(defaultPath);
+                  }, 500);
+                }
               }
             } catch (error) {
               // Don't redirect if organization context failed (e.g., no subscription)
