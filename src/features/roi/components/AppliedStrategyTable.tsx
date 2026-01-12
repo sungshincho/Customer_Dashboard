@@ -342,26 +342,41 @@ export const AppliedStrategyTable: React.FC<AppliedStrategyTableProps> = ({
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                   <thead>
                     <tr style={{ borderBottom: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)' }}>
-                      <th style={{ textAlign: 'center', padding: '10px 8px', width: '40px' }}>
-                        <input
-                          type="checkbox"
-                          checked={allSelected}
-                          ref={(el) => {
-                            if (el) el.indeterminate = someSelected && !allSelected;
-                          }}
-                          onChange={handleSelectAll}
-                          style={{
-                            width: '16px', height: '16px', cursor: 'pointer',
-                            accentColor: isDark ? '#fff' : '#1a1a1f',
-                          }}
-                        />
+                      <th style={{ textAlign: 'center', padding: '10px 8px', width: '40px', verticalAlign: 'middle' }}>
+                        <label style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', margin: 0 }}>
+                          <input
+                            type="checkbox"
+                            checked={allSelected}
+                            ref={(el) => {
+                              if (el) el.indeterminate = someSelected && !allSelected;
+                            }}
+                            onChange={handleSelectAll}
+                            style={{ display: 'none' }}
+                          />
+                          <span style={{
+                            width: '16px', height: '16px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                            border: isDark ? '1.5px solid rgba(255,255,255,0.4)' : '1.5px solid rgba(0,0,0,0.3)',
+                            borderRadius: '3px',
+                            background: 'transparent',
+                          }}>
+                            {(allSelected || (someSelected && !allSelected)) && (
+                              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ display: 'block' }}>
+                                {someSelected && !allSelected ? (
+                                  <line x1="2" y1="5" x2="8" y2="5" stroke={isDark ? '#fff' : '#1a1a1f'} strokeWidth="2" />
+                                ) : (
+                                  <path d="M2 5L4 7L8 3" stroke={isDark ? '#fff' : '#1a1a1f'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                )}
+                              </svg>
+                            )}
+                          </span>
+                        </label>
                       </th>
-                      <th style={{ textAlign: 'left', padding: '10px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>날짜</th>
-                      <th style={{ textAlign: 'left', padding: '10px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>유형</th>
-                      <th style={{ textAlign: 'left', padding: '10px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>전략명</th>
-                      <th style={{ textAlign: 'center', padding: '10px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>예상</th>
-                      <th style={{ textAlign: 'center', padding: '10px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>실제</th>
-                      <th style={{ textAlign: 'center', padding: '10px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>상태</th>
+                      <th style={{ textAlign: 'left', padding: '10px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280', verticalAlign: 'middle' }}>날짜</th>
+                      <th style={{ textAlign: 'left', padding: '10px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280', verticalAlign: 'middle' }}>유형</th>
+                      <th style={{ textAlign: 'left', padding: '10px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280', verticalAlign: 'middle' }}>전략명</th>
+                      <th style={{ textAlign: 'center', padding: '10px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280', verticalAlign: 'middle' }}>예상</th>
+                      <th style={{ textAlign: 'center', padding: '10px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280', verticalAlign: 'middle' }}>실제</th>
+                      <th style={{ textAlign: 'center', padding: '10px 8px', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280', verticalAlign: 'middle' }}>상태</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -382,39 +397,46 @@ export const AppliedStrategyTable: React.FC<AppliedStrategyTableProps> = ({
                           onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)'; }}
                           onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
                         >
-                          <td style={{ textAlign: 'center', padding: '12px 8px' }}>
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
+                          <td style={{ textAlign: 'center', padding: '12px 8px', verticalAlign: 'middle' }}>
+                            <label
+                              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', margin: 0 }}
                               onClick={(e) => handleSelectOne(item.id, e)}
-                              onChange={() => {}}
-                              style={{
-                                width: '16px', height: '16px', cursor: 'pointer',
-                                accentColor: isDark ? '#fff' : '#1a1a1f',
-                              }}
-                            />
+                            >
+                              <span style={{
+                                width: '16px', height: '16px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                border: isDark ? '1.5px solid rgba(255,255,255,0.4)' : '1.5px solid rgba(0,0,0,0.3)',
+                                borderRadius: '3px',
+                                background: 'transparent',
+                              }}>
+                                {isSelected && (
+                                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ display: 'block' }}>
+                                    <path d="M2 5L4 7L8 3" stroke={isDark ? '#fff' : '#1a1a1f'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                )}
+                              </span>
+                            </label>
                           </td>
-                          <td style={{ padding: '12px 8px', color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280' }}>
+                          <td style={{ padding: '12px 8px', color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280', verticalAlign: 'middle' }}>
                             {formatDate(item.createdAt)}
                           </td>
-                          <td style={{ padding: '12px 8px' }}>
+                          <td style={{ padding: '12px 8px', verticalAlign: 'middle' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <Icon3D size={24} dark={isDark}>{config.icon}</Icon3D>
                               <span style={{ fontSize: '11px', color: isDark ? 'rgba(255,255,255,0.7)' : '#515158' }}>{config.shortName}</span>
                             </div>
                           </td>
-                          <td style={{ padding: '12px 8px' }}>
+                          <td style={{ padding: '12px 8px', verticalAlign: 'middle' }}>
                             <p style={{ fontWeight: 600, margin: 0, maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isDark ? '#fff' : '#1a1a1f' }}>
                               {item.name}
                             </p>
                           </td>
-                          <td style={{ textAlign: 'center', padding: '12px 8px', color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280' }}>
+                          <td style={{ textAlign: 'center', padding: '12px 8px', color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280', verticalAlign: 'middle' }}>
                             {formatPercent(item.expectedRoi)}
                           </td>
-                          <td style={{ textAlign: 'center', padding: '12px 8px', fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>
+                          <td style={{ textAlign: 'center', padding: '12px 8px', fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f', verticalAlign: 'middle' }}>
                             {formatPercent(actualRoi)}
                           </td>
-                          <td style={{ textAlign: 'center', padding: '12px 8px', fontSize: '12px', fontWeight: 500, color: isDark ? '#fff' : '#1a1a1f' }}>
+                          <td style={{ textAlign: 'center', padding: '12px 8px', fontSize: '12px', fontWeight: 500, color: isDark ? '#fff' : '#1a1a1f', verticalAlign: 'middle' }}>
                             {item.status === 'completed' ? getResultLabel(item.result) : getStatusLabel(item.status)}
                           </td>
                         </tr>
