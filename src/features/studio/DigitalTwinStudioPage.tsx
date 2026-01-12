@@ -5,7 +5,7 @@
  * 드래그 가능 패널 시스템 + 시뮬레이션 결과 패널
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { useActivityLogger } from '@/hooks/useActivityLogger';
@@ -1040,14 +1040,16 @@ export default function DigitalTwinStudioPage() {
                 {/* 시뮬레이션 결과 스태프 오버레이 (최적화 결과가 있을 때) */}
                 {isActive('staff') && sceneSimulation.state.results.staffing && <StaffingOverlay result={sceneSimulation.state.results.staffing as any} showStaffMarkers={true} showCurrentPositions={false} showSuggestedPositions={true} showCoverageZones={false} showMovementPaths={true} animateMovement={true} />}
 
-                {/* 시뮬레이션 결과 오버레이 - 🔧 비교(compare) 모드에서만 표시 */}
+                {/* 🔧 레이아웃 오버레이 - compare 모드에서만 표시 (As-Is/To-Be 박스) */}
                 {viewMode === 'compare' && isActive('layoutOptimization') && sceneSimulation.state.results.layout && <LayoutOptimizationOverlay result={sceneSimulation.state.results.layout as any} showBefore={false} showAfter={false} showMoves={true} showProductMoves={true} showZoneHighlights={true} storeBounds={storeBounds} zonePositions={zonePositions} zoneSizes={zoneSizes} />}
-                {viewMode === 'compare' && isActive('flowOptimization') && sceneSimulation.state.results.flow && <FlowOptimizationOverlay result={sceneSimulation.state.results.flow as any} showPaths={true} showBottlenecks={true} showHeatmap={true} animatePaths={true} storeBounds={storeBounds} entrancePosition={entrancePosition} />}
-                {viewMode === 'compare' && isActive('congestion') && sceneSimulation.state.results.congestion && <CongestionOverlay result={sceneSimulation.state.results.congestion as any} showHeatmap={true} showZoneMarkers={true} showCrowdAnimation={true} animateTimeProgress={false} />}
-                {viewMode === 'compare' && isActive('staffing') && sceneSimulation.state.results.staffing && <StaffingOverlay result={sceneSimulation.state.results.staffing as any} showStaffMarkers={true} showCurrentPositions={true} showSuggestedPositions={true} showCoverageZones={true} showMovementPaths={true} animateMovement={true} />}
+                
+                {/* 🔧 동선/혼잡도/직원배치 오버레이 - compare 조건 제거, 토글로만 제어 */}
+                {isActive('flowOptimization') && sceneSimulation.state.results.flow && <FlowOptimizationOverlay result={sceneSimulation.state.results.flow as any} showPaths={true} showBottlenecks={true} showHeatmap={true} animatePaths={true} storeBounds={storeBounds} entrancePosition={entrancePosition} />}
+                {isActive('congestion') && sceneSimulation.state.results.congestion && <CongestionOverlay result={sceneSimulation.state.results.congestion as any} showHeatmap={true} showZoneMarkers={true} showCrowdAnimation={true} animateTimeProgress={false} />}
+                {isActive('staffing') && sceneSimulation.state.results.staffing && <StaffingOverlay result={sceneSimulation.state.results.staffing as any} showStaffMarkers={true} showCurrentPositions={true} showSuggestedPositions={true} showCoverageZones={true} showMovementPaths={true} animateMovement={true} />}
 
-                {/* 🆕 인력 재배치 오버레이 (비교 모드에서 As-Is → To-Be 이동 경로 애니메이션) */}
-                {sceneSimulation.state.results.staffing && viewMode === 'compare' && (() => {
+                {/* 🆕 인력 재배치 오버레이 (staffing 활성화 시 표시) */}
+                {isActive('staffing') && sceneSimulation.state.results.staffing && (() => {
               const staffingResult = sceneSimulation.state.results.staffing as any;
               // staffPositions를 StaffReallocation 형식으로 변환
               const reallocations = (staffingResult.staffPositions || []).map((sp: any, idx: number) => ({
@@ -1080,6 +1082,12 @@ export default function DigitalTwinStudioPage() {
               return <StaffReallocationOverlay visible={true} reallocations={reallocations} />;
             })()}
               </Canvas3D>}
+              
+              {/* 🆕 ViewMode 변경 시 3D 모델 위치 적용 */}
+              <ViewModeHandler 
+                viewMode={viewMode} 
+                layoutResult={sceneSimulation.state.results.layout}
+              />
           </div>
 
           {/* ========== UI 오버레이 ========== */}
@@ -1606,4 +1614,37 @@ function SimulationResultPanels({
       y: 520
     }} />}
     </>;
+}
+
+// 🆕 ViewMode 변경 시 3D 모델 위치 적용 컴포넌트
+interface ViewModeHandlerProps {
+  viewMode: ViewMode;
+  layoutResult: any;
+}
+
+function ViewModeHandler({ viewMode, layoutResult }: ViewModeHandlerProps) {
+  const { applySimulationResults, revertSimulationChanges } = useScene();
+  const prevViewModeRef = useRef<ViewMode>('as-is');
+
+  useEffect(() => {
+    // viewMode가 실제로 변경되었을 때만 처리
+    if (prevViewModeRef.current === viewMode) return;
+    
+    console.log('[ViewModeHandler] Mode changed:', prevViewModeRef.current, '->', viewMode);
+    
+    if (viewMode === 'as-is') {
+      // As-Is: 원래 위치로 복원
+      revertSimulationChanges();
+    } else if ((viewMode === 'to-be' || viewMode === 'compare') && layoutResult?.furnitureMoves) {
+      // To-Be 또는 비교: 최적화 위치로 이동
+      applySimulationResults({
+        furnitureMoves: layoutResult.furnitureMoves,
+        animated: true
+      });
+    }
+    
+    prevViewModeRef.current = viewMode;
+  }, [viewMode, layoutResult, applySimulationResults, revertSimulationChanges]);
+
+  return null; // UI 렌더링 없음
 }
