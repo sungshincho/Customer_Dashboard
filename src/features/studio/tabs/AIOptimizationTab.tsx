@@ -597,17 +597,31 @@ export function AIOptimizationTab({
       const results = sceneSimulation.state.results;
       const previousMode = viewMode;
       
-      // 🔧 FIX: 상태 전환 로직 개선
-      // As-Is → To-Be/비교: 적용
-      // To-Be/비교 → As-Is: 복원
-      // To-Be ↔ 비교: 오버레이만 토글 (3D 위치는 이미 To-Be 상태)
+      // 🔧 FIX: 상태 전환 로직 수정
+      // - As-Is: 원본 위치
+      // - 비교: 원본 위치 + 오버레이 (As-Is 박스 + To-Be 박스)
+      // - To-Be: 최적화 위치
       
       if (newMode === 'as-is') {
         // As-Is: 원래 위치로 복원
-        revertSimulationChanges();
+        if (previousMode === 'to-be') {
+          // To-Be에서 오는 경우만 위치 복원 필요
+          revertSimulationChanges();
+        }
+        // 비교에서 오는 경우는 이미 As-Is 위치이므로 복원 불필요
         onOverlayToggle('layoutOptimization', false);
-      } else if (previousMode === 'as-is' && (newMode === 'to-be' || newMode === 'compare')) {
-        // As-Is에서 To-Be/비교로 전환: 최적화 위치 적용
+        
+      } else if (newMode === 'compare') {
+        // 🔧 비교 모드: As-Is 위치 유지 + 오버레이만 표시
+        if (previousMode === 'to-be') {
+          // To-Be에서 오는 경우: 위치를 As-Is로 복원
+          revertSimulationChanges();
+        }
+        // As-Is에서 오는 경우: 위치 변경 없음 (이미 As-Is)
+        onOverlayToggle('layoutOptimization', true);
+        
+      } else if (newMode === 'to-be') {
+        // To-Be: 최적화 위치 적용
         const rawFurnitureMoves = results.layout?.layoutChanges || 
                                   results.layout?.furnitureMoves ||
                                   results.layout?.furniture_changes ||
@@ -629,12 +643,7 @@ export function AIOptimizationTab({
           };
           applySimulationResults(payload);
         }
-        
-        // 비교 모드일 때만 오버레이 표시
-        onOverlayToggle('layoutOptimization', newMode === 'compare');
-      } else if ((previousMode === 'to-be' || previousMode === 'compare') && (newMode === 'to-be' || newMode === 'compare')) {
-        // 🔧 FIX: To-Be ↔ 비교 간 전환: 오버레이만 토글 (3D 위치 변경 없음)
-        onOverlayToggle('layoutOptimization', newMode === 'compare');
+        onOverlayToggle('layoutOptimization', false);
       }
 
       // 뷰 모드 상태 업데이트
@@ -1158,7 +1167,7 @@ export function AIOptimizationTab({
                 {/* 현재 뷰 모드 설명 */}
                 <div className="text-[10px] text-center text-white/40 py-1">
                   {viewMode === 'as-is' && '📍 현재 배치 상태'}
-                  {viewMode === 'compare' && '🔄 As-Is → To-Be 변화 비교 (오버레이 표시)'}
+                  {viewMode === 'compare' && '🔄 현재 배치 + 이동 위치 표시 (빨강→초록)'}
                   {viewMode === 'to-be' && '✨ 최적화 결과 적용 상태'}
                 </div>
 
