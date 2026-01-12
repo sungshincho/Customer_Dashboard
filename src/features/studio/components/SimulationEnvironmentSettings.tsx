@@ -169,107 +169,17 @@ export const SimulationEnvironmentSettings: React.FC<SimulationEnvironmentSettin
     return config.calculatedImpact || calculateSimulationImpacts(config, realTimeData || undefined);
   }, [config, realTimeData]);
   return <div className={cn('space-y-4', className)}>
-      {/* 3가지 모드 선택 */}
+      {/* 2가지 모드 선택 (날짜 선택 제거) */}
       <div className="flex gap-1 p-1 bg-muted/50 rounded-lg">
         <button onClick={() => handleModeChange('realtime')} className={cn('flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded text-xs font-medium transition', config.mode === 'realtime' ? 'bg-blue-500 text-white' : 'hover:bg-muted')}>
           <Activity className="w-3.5 h-3.5" />
           {!compact && '실시간'}
-        </button>
-        <button onClick={() => handleModeChange('dateSelect')} className={cn('flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded text-xs font-medium transition', config.mode === 'dateSelect' ? 'bg-purple-500 text-white' : 'hover:bg-muted')}>
-          <Calendar className="w-3.5 h-3.5" />
-          {!compact && '날짜 선택'}
         </button>
         <button onClick={() => handleModeChange('manual')} className={cn('flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded text-xs font-medium transition', config.mode === 'manual' ? 'bg-orange-500 text-white' : 'hover:bg-muted')}>
           <Settings2 className="w-3.5 h-3.5" />
           {!compact && '직접 설정'}
         </button>
       </div>
-
-      {/* ===== 날짜 선택 모드 ===== */}
-      {config.mode === 'dateSelect' && <div className="space-y-3">
-          {/* 날짜 선택 */}
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-              <Calendar className="w-3 h-3" />
-              시뮬레이션 날짜
-            </label>
-            <input type="date" value={config.selectedDate.toISOString().split('T')[0]} onChange={e => handleDateChange(new Date(e.target.value))} className="w-full px-3 py-2 rounded-lg border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50" />
-          </div>
-
-          {/* 시간대 선택 (드롭다운) */}
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              시간대
-            </label>
-            <Select value={config.manualSettings.timeOfDay} onValueChange={(value: TimeOfDayOption) => updateManualSettings({
-          timeOfDay: value
-        })}>
-              <SelectTrigger className="w-full h-9 text-sm bg-background border-white/10">
-                <SelectValue placeholder="시간대 선택" />
-              </SelectTrigger>
-              <SelectContent>
-                {TIME_OF_DAY_OPTIONS.map(time => <SelectItem key={time.value} value={time.value}>
-                    <div className="flex items-center gap-2">
-                      <span>{time.emoji}</span>
-                      <span>{time.label}</span>
-                      <span className="text-muted-foreground text-xs">({time.hours})</span>
-                    </div>
-                  </SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* 자동 로드된 정보 표시 */}
-          {isLoadingDateData ? <div className="flex items-center justify-center py-4 text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              <span className="text-sm">날짜 정보 로딩 중...</span>
-            </div> : config.autoLoadedData && <div className="p-3 bg-purple-500/10 rounded-lg space-y-2 border border-purple-500/20">
-              <div className="text-xs font-medium text-purple-400">자동 반영된 정보</div>
-
-              {/* 날씨 */}
-              {config.autoLoadedData.weather && <div className="flex items-center gap-2">
-                  <span className="text-xl">
-                    {getWeatherEmoji(config.autoLoadedData.weather.condition)}
-                  </span>
-                  <div>
-                    <div className="text-sm font-medium">
-                      {config.autoLoadedData.weather.description}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {config.autoLoadedData.weather.temperature}°C
-                    </div>
-                  </div>
-                </div>}
-
-              {/* 이벤트 */}
-              {config.autoLoadedData.events && config.autoLoadedData.events.length > 0 && <div className="flex gap-1 flex-wrap">
-                  {config.autoLoadedData.events.map((event, idx) => <span key={idx} className={cn('px-2 py-0.5 rounded text-xs', event.type === 'holiday' ? 'bg-red-500/20 text-red-400' : event.type === 'commercial' ? 'bg-orange-500/20 text-orange-400' : 'bg-blue-500/20 text-blue-400')}>
-                      {event.type === 'holiday' ? '🎉' : event.type === 'commercial' ? '🛒' : '📅'} {event.name}
-                    </span>)}
-                </div>}
-
-              {!config.autoLoadedData.weather && (!config.autoLoadedData.events || config.autoLoadedData.events.length === 0) && <div className="text-sm text-muted-foreground">
-                  해당 날짜의 특별한 정보가 없습니다
-                </div>}
-            </div>}
-
-          {/* 선택된 설정 요약 */}
-          <div className="p-3 bg-muted/30 rounded-lg">
-            <div className="text-xs text-muted-foreground mb-1">현재 설정</div>
-            <div className="flex flex-wrap gap-2">
-              <span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs">
-                📅 {config.selectedDate.toLocaleDateString('ko-KR')}
-              </span>
-              <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs">
-                {TIME_OF_DAY_OPTIONS.find(t => t.value === config.manualSettings.timeOfDay)?.emoji}{' '}
-                {TIME_OF_DAY_OPTIONS.find(t => t.value === config.manualSettings.timeOfDay)?.label}
-                {' '}
-                ({config.manualSettings.timeOfDay === 'peak' ? '데이터 기반' : isDayTime(config.manualSettings.timeOfDay) ? '낮 씬' : '밤 씬'})
-              </span>
-            </div>
-          </div>
-        </div>}
 
       {/* ===== 직접 설정 모드 ===== */}
       {config.mode === 'manual' && <div className="space-y-4">
