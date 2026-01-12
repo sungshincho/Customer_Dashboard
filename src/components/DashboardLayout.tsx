@@ -6,7 +6,7 @@
  * - Monochrome (Black/White) theme
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -32,6 +32,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const { user, signOut } = useAuth();
   const [isDark, setIsDark] = useState(false);
 
+  // Cookie에서 사이드바 상태 읽기
+  const defaultSidebarOpen = useMemo(() => {
+    const cookie = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith("sidebar:state="));
+    return cookie ? cookie.split("=")[1] === "true" : true;
+  }, []);
+
   // 다크모드 감지
   useEffect(() => {
     const checkDarkMode = () => {
@@ -54,7 +62,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   };
 
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={defaultSidebarOpen}>
       <div className="flex min-h-screen w-full relative">
         {/* ===== Background Layers ===== */}
         
