@@ -649,8 +649,8 @@ export function AISimulationTab({
               커스텀 시나리오
             </span>
             <div className="flex items-center gap-2">
-              <span className={cn("text-xs px-1.5 py-0.5 rounded", simulationEnvConfig.mode === 'realtime' ? "bg-blue-500/20 text-blue-400" : simulationEnvConfig.mode === 'dateSelect' ? "bg-green-500/20 text-green-400" : "bg-purple-500/20 text-purple-400")}>
-                {simulationEnvConfig.mode === 'realtime' ? '실시간' : simulationEnvConfig.mode === 'dateSelect' ? '날짜선택' : '직접설정'}
+              <span className={cn("text-xs px-1.5 py-0.5 rounded", simulationEnvConfig.mode === 'realtime' ? "bg-blue-500/20 text-blue-400" : "bg-purple-500/20 text-purple-400")}>
+                {simulationEnvConfig.mode === 'realtime' ? '실시간' : '직접설정'}
               </span>
               {showEnvironmentSettings ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </div>
