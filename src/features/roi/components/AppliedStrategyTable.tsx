@@ -342,25 +342,21 @@ export const AppliedStrategyTable: React.FC<AppliedStrategyTableProps> = ({
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                   <thead>
                     <tr style={{ borderBottom: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)' }}>
-                      <th style={{ textAlign: 'center', padding: '10px 8px', width: '40px', verticalAlign: 'middle' }}>
-                        <label style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', margin: 0 }}>
-                          <input
-                            type="checkbox"
-                            checked={allSelected}
-                            ref={(el) => {
-                              if (el) el.indeterminate = someSelected && !allSelected;
-                            }}
-                            onChange={handleSelectAll}
-                            style={{ display: 'none' }}
-                          />
+                      <th style={{ textAlign: 'center', padding: '10px 8px', width: '40px', verticalAlign: 'middle', lineHeight: '24px' }}>
+                        <label
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', margin: 0, height: '24px' }}
+                          onClick={(e) => { e.stopPropagation(); handleSelectAll(); }}
+                        >
                           <span style={{
-                            width: '16px', height: '16px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                            width: '16px', height: '16px', minWidth: '16px', minHeight: '16px',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
                             border: isDark ? '1.5px solid rgba(255,255,255,0.4)' : '1.5px solid rgba(0,0,0,0.3)',
                             borderRadius: '3px',
                             background: 'transparent',
+                            boxSizing: 'border-box',
                           }}>
                             {(allSelected || (someSelected && !allSelected)) && (
-                              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ display: 'block' }}>
+                              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                                 {someSelected && !allSelected ? (
                                   <line x1="2" y1="5" x2="8" y2="5" stroke={isDark ? '#fff' : '#1a1a1f'} strokeWidth="2" />
                                 ) : (
@@ -397,19 +393,21 @@ export const AppliedStrategyTable: React.FC<AppliedStrategyTableProps> = ({
                           onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)'; }}
                           onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
                         >
-                          <td style={{ textAlign: 'center', padding: '12px 8px', verticalAlign: 'middle' }}>
+                          <td style={{ textAlign: 'center', padding: '12px 8px', verticalAlign: 'middle', lineHeight: '24px' }}>
                             <label
-                              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', margin: 0 }}
+                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', margin: 0, height: '24px' }}
                               onClick={(e) => handleSelectOne(item.id, e)}
                             >
                               <span style={{
-                                width: '16px', height: '16px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                width: '16px', height: '16px', minWidth: '16px', minHeight: '16px',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 border: isDark ? '1.5px solid rgba(255,255,255,0.4)' : '1.5px solid rgba(0,0,0,0.3)',
                                 borderRadius: '3px',
                                 background: 'transparent',
+                                boxSizing: 'border-box',
                               }}>
                                 {isSelected && (
-                                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ display: 'block' }}>
+                                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                                     <path d="M2 5L4 7L8 3" stroke={isDark ? '#fff' : '#1a1a1f'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                   </svg>
                                 )}
