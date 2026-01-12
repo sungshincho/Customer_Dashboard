@@ -13,6 +13,10 @@ ALTER TABLE weather_data ALTER COLUMN user_id DROP NOT NULL;
 -- holidays_events: user_id NULL 허용 (글로벌 공휴일은 user_id 없음)
 ALTER TABLE holidays_events ALTER COLUMN user_id DROP NOT NULL;
 
+-- graph_entities: user_id NULL 허용
+-- (weather_data 트리거가 graph_entities에 동기화 시 user_id가 NULL일 수 있음)
+ALTER TABLE graph_entities ALTER COLUMN user_id DROP NOT NULL;
+
 -- ============================================================================
 -- 1. layout_optimization_results 테이블에 누락된 컬럼 추가
 -- ============================================================================
