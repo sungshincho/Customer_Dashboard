@@ -147,7 +147,7 @@ export interface RetailROIOutput {
 // ============================================================================
 
 /** 위치별 가시성 승수 */
-const POSITION_VISIBILITY_MULTIPLIER: Record<string, number> = {
+export const POSITION_VISIBILITY_MULTIPLIER: Record<string, number> = {
   eye_level: 1.4,        // 눈높이 - 가장 좋음
   reach_level: 1.2,      // 손 닿는 높이
   endcap: 1.35,          // 엔드캡
@@ -158,7 +158,7 @@ const POSITION_VISIBILITY_MULTIPLIER: Record<string, number> = {
 };
 
 /** 위치별 전환율 보너스 */
-const POSITION_CONVERSION_BONUS: Record<string, number> = {
+export const POSITION_CONVERSION_BONUS: Record<string, number> = {
   eye_level: 0.02,
   endcap: 0.03,
   checkout_adjacent: 0.04,  // 충동구매 효과
@@ -169,7 +169,7 @@ const POSITION_CONVERSION_BONUS: Record<string, number> = {
 };
 
 /** 판정 기준 (월간 증분 이익 기준, 원) */
-const VERDICT_THRESHOLDS = {
+export const VERDICT_THRESHOLDS = {
   strongly_recommend: 500000,   // 월 50만원 이상
   recommend: 200000,            // 월 20만원 이상
   neutral: 50000,               // 월 5만원 이상
