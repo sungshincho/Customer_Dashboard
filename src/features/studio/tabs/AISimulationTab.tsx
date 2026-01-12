@@ -641,7 +641,33 @@ export function AISimulationTab({
         {/* 🆕 시뮬레이션 타입 - AI 예측 고정 (실시간 제거) */}
         {/* 시뮬레이션 타입 선택 UI 제거됨 - 기본값으로 AI 예측 사용 */}
 
-        {/* 🆕 환경 상태 표시 */}
+        {/* 🆕 커스텀 시나리오 패널 (접기/펼치기) - 프리셋 바로 아래 배치 */}
+        <div className="border border-white/10 rounded-lg">
+          <button onClick={() => setShowEnvironmentSettings(!showEnvironmentSettings)} className="w-full flex items-center justify-between p-3 text-sm text-white/80">
+            <span className="font-medium flex items-center gap-2 text-white">
+              <Wrench className="w-4 h-4 text-blue-400" />
+              커스텀 시나리오
+            </span>
+            <div className="flex items-center gap-2">
+              <span className={cn("text-xs px-1.5 py-0.5 rounded", simulationEnvConfig.mode === 'realtime' ? "bg-blue-500/20 text-blue-400" : simulationEnvConfig.mode === 'dateSelect' ? "bg-green-500/20 text-green-400" : "bg-purple-500/20 text-purple-400")}>
+                {simulationEnvConfig.mode === 'realtime' ? '실시간' : simulationEnvConfig.mode === 'dateSelect' ? '날짜선택' : '직접설정'}
+              </span>
+              {showEnvironmentSettings ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </div>
+          </button>
+
+          {showEnvironmentSettings && <div className="p-3 pt-0 border-t border-white/10">
+              <p className="text-xs text-white/50 mb-3">
+                날씨, 시간대, 이벤트 등을 직접 설정하여 시나리오를 구성하세요
+              </p>
+              <SimulationEnvironmentSettings config={simulationEnvConfig} onChange={config => {
+            console.log('[AISimulationTab] SimulationEnvironmentSettings onChange:', config.mode);
+            setSimulationEnvConfig(config);
+          }} storeId={storeId} compact={true} />
+            </div>}
+        </div>
+
+        {/* 🆕 현재 환경 상태 표시 - 커스텀 시나리오 아래 배치 */}
         {envContext && <div className="p-3 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg border border-white/10 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium flex items-center gap-1 text-white">
@@ -688,32 +714,6 @@ export function AISimulationTab({
                 {envImpact.summary}
               </div>}
           </div>}
-
-        {/* 🆕 커스텀 시나리오 패널 (접기/펼치기) */}
-        <div className="border border-white/10 rounded-lg">
-          <button onClick={() => setShowEnvironmentSettings(!showEnvironmentSettings)} className="w-full flex items-center justify-between p-3 text-sm text-white/80">
-            <span className="font-medium flex items-center gap-2 text-white">
-              <Wrench className="w-4 h-4 text-blue-400" />
-              커스텀 시나리오
-            </span>
-            <div className="flex items-center gap-2">
-              <span className={cn("text-xs px-1.5 py-0.5 rounded", simulationEnvConfig.mode === 'realtime' ? "bg-blue-500/20 text-blue-400" : simulationEnvConfig.mode === 'dateSelect' ? "bg-green-500/20 text-green-400" : "bg-purple-500/20 text-purple-400")}>
-                {simulationEnvConfig.mode === 'realtime' ? '실시간' : simulationEnvConfig.mode === 'dateSelect' ? '날짜선택' : '직접설정'}
-              </span>
-              {showEnvironmentSettings ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            </div>
-          </button>
-
-          {showEnvironmentSettings && <div className="p-3 pt-0 border-t border-white/10">
-              <p className="text-xs text-white/50 mb-3">
-                날씨, 시간대, 이벤트 등을 직접 설정하여 시나리오를 구성하세요
-              </p>
-              <SimulationEnvironmentSettings config={simulationEnvConfig} onChange={config => {
-            console.log('[AISimulationTab] SimulationEnvironmentSettings onChange:', config.mode);
-            setSimulationEnvConfig(config);
-          }} storeId={storeId} compact={true} />
-            </div>}
-        </div>
 
         {/* 🔧 숨김 처리: 예상 고객 수, 시뮬레이션 시간, 시각화 옵션 */}
         {/* 
