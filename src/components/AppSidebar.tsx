@@ -114,7 +114,7 @@ export function AppSidebar() {
                 const active = isActive(item.url);
                 return (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild className={collapsed ? "h-[52px] py-0" : "h-auto py-3"}>
+                    <SidebarMenuButton asChild className="h-auto py-3">
                       <NavLink
                         to={item.url}
                         className={`hover:bg-muted/50 dark:hover:bg-white/10 rounded-lg transition-colors ${
@@ -124,8 +124,25 @@ export function AppSidebar() {
                       >
                         <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}>
                           {collapsed ? (
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${active ? 'border-2 border-foreground dark:border-white' : ''}`}>
-                              <item.icon className="h-5 w-5 text-foreground dark:text-white" />
+                            <div
+                              className="w-10 h-10 rounded-xl flex items-center justify-center relative"
+                              style={active ? {
+                                background: 'linear-gradient(145deg, #2f2f38 0%, #1c1c22 35%, #282830 65%, #1e1e26 100%)',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.18), 0 4px 8px rgba(0,0,0,0.16), inset 0 1px 1px rgba(255,255,255,0.12)',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                              } : {
+                                background: 'linear-gradient(145deg, #e8e8ec 0%, #d8d8dc 35%, #e0e0e4 65%, #d4d4d8 100%)',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.08), 0 4px 8px rgba(0,0,0,0.06), inset 0 1px 1px rgba(255,255,255,0.8)',
+                                border: '1px solid rgba(0,0,0,0.08)',
+                              }}
+                            >
+                              <item.icon
+                                className="h-5 w-5"
+                                style={{
+                                  color: active ? '#ffffff' : '#6b6b73',
+                                  filter: active ? 'drop-shadow(0 1px 2px rgba(0,0,0,0.4))' : 'none'
+                                }}
+                              />
                             </div>
                           ) : (
                             <item.icon className={`h-5 w-5 text-foreground dark:text-white ${active ? 'text-primary dark:text-white' : ''}`} />
