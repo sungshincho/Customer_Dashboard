@@ -99,12 +99,16 @@ export function GlobalDateFilter({
 
   // 팝오버 외부 클릭 시 (onOpenChange)
   const handleOpenChange = useCallback((open: boolean) => {
-    if (!open && tempRange?.from && tempRange?.to) {
+    if (!open) {
       // 닫힐 때 시작/종료 날짜가 모두 선택되어 있으면 적용
-      setCustomRange(
-        format(tempRange.from, 'yyyy-MM-dd'),
-        format(tempRange.to, 'yyyy-MM-dd')
-      );
+      if (tempRange?.from && tempRange?.to) {
+        setCustomRange(
+          format(tempRange.from, 'yyyy-MM-dd'),
+          format(tempRange.to, 'yyyy-MM-dd')
+        );
+      }
+      // 닫힐 때 tempRange 초기화 (다음에 열 때 올바른 defaultMonth 적용)
+      setTempRange(undefined);
     }
     setIsOpen(open);
   }, [tempRange, setCustomRange]);
