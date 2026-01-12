@@ -616,34 +616,57 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
                             staffingResult.positions ||
                             [];
             
-            // 🔧 FIX: visualization 데이터가 없으면 기본값 생성
-            results.staffing = {
-              ...staffingResult,
-              staffPositions,
-              visualization: staffingResult.visualization || {
-                heatmap: [],
-                coverageZones: (staffingResult.zoneCoverage || []).map((zone: any) => ({
-                  zoneId: zone.zoneId || zone.zone_id,
-                  zoneName: zone.zoneName || zone.zone_name,
-                  currentCoverage: zone.currentCoverage || zone.current_coverage || 0.5,
-                  suggestedCoverage: zone.suggestedCoverage || zone.suggested_coverage || 0.8,
-                  center: { x: zone.centerX || 0, y: 0, z: zone.centerZ || 0 },
-                  radius: zone.radius || 3,
-                })),
-                movementPaths: staffPositions.map((sp: any) => ({
-                  staffId: sp.staffId || sp.staff_id,
-                  from: sp.currentPosition || { x: 0, y: 0, z: 0 },
-                  to: sp.suggestedPosition || { x: 2, y: 0, z: 2 },
-                })),
-                staffMarkers: staffPositions.map((sp: any) => ({
-                  id: sp.staffId || sp.staff_id,
-                  name: sp.staffName || sp.staff_name || '직원',
-                  role: sp.role || 'sales',
-                  currentPosition: sp.currentPosition || { x: 0, y: 0, z: 0 },
-                  suggestedPosition: sp.suggestedPosition || { x: 2, y: 0, z: 2 },
-                })),
-              },
-            };
+            // 🔧 FIX: staffPositions가 0개면 빈 결과 처리 (임의 데이터 생성 안 함)
+            if (staffPositions.length === 0) {
+              console.log('[useSceneSimulation] No staff positions found - skipping staffing visualization');
+              results.staffing = {
+                ...staffingResult,
+                staffPositions: [],
+                zoneCoverage: staffingResult.zoneCoverage || [],
+                metrics: staffingResult.metrics || {
+                  currentCoverage: 0,
+                  optimizedCoverage: 0,
+                  customerServiceRateIncrease: 0,
+                  avgResponseTimeReduction: 0,
+                  efficiencyScore: 0,
+                },
+                visualization: {
+                  heatmap: [],
+                  coverageZones: [],
+                  movementPaths: [],
+                  staffMarkers: [],
+                },
+              };
+            } else {
+              // 🔧 FIX: visualization 데이터가 없으면 기본값 생성
+              results.staffing = {
+                ...staffingResult,
+                staffPositions,
+                visualization: staffingResult.visualization || {
+                  heatmap: [],
+                  coverageZones: (staffingResult.zoneCoverage || []).map((zone: any) => ({
+                    zoneId: zone.zoneId || zone.zone_id,
+                    zoneName: zone.zoneName || zone.zone_name,
+                    currentCoverage: zone.currentCoverage || zone.current_coverage || 0.5,
+                    suggestedCoverage: zone.suggestedCoverage || zone.suggested_coverage || 0.8,
+                    center: { x: zone.centerX || 0, y: 0, z: zone.centerZ || 0 },
+                    radius: zone.radius || 3,
+                  })),
+                  movementPaths: staffPositions.map((sp: any) => ({
+                    staffId: sp.staffId || sp.staff_id,
+                    from: sp.currentPosition || { x: 0, y: 0, z: 0 },
+                    to: sp.suggestedPosition || { x: 2, y: 0, z: 2 },
+                  })),
+                  staffMarkers: staffPositions.map((sp: any) => ({
+                    id: sp.staffId || sp.staff_id,
+                    name: sp.staffName || sp.staff_name || '직원',
+                    role: sp.role || 'sales',
+                    currentPosition: sp.currentPosition || { x: 0, y: 0, z: 0 },
+                    suggestedPosition: sp.suggestedPosition || { x: 2, y: 0, z: 2 },
+                  })),
+                },
+              };
+            }
             console.log('[useSceneSimulation] Staffing result extracted with visualization:', {
               hasStaffPositions: !!results.staffing.staffPositions?.length,
               positionsCount: results.staffing.staffPositions?.length || 0,
