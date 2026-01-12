@@ -33,6 +33,11 @@ import {
   ISSUE_TYPE_META,
 } from '../types/scenarioPresets.types';
 import { analyzeSimulationIssues, extractIssuesFromAIResult } from '../utils/simulationIssueAnalyzer';
+import {
+  SimulationErrorRecovery,
+  createSimulationError,
+  type SimulationErrorState,
+} from '../components/SimulationErrorRecovery';
 
 // 시뮬레이션 타입
 type SimulationType = 'realtime' | 'prediction';
@@ -123,6 +128,10 @@ export function AISimulationTab({
   const [showOptimizationModal, setShowOptimizationModal] = useState(false);
   const [selectedIssuesForOptimization, setSelectedIssuesForOptimization] = useState<Set<string>>(new Set());
   // isOptimizationLoading state removed - optimization runs in AIOptimizationTab
+
+  // 🆕 S0-4: 에러 복구 상태
+  const [simulationError, setSimulationError] = useState<SimulationErrorState | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
 
   // 🆕 시뮬레이션 환경 설정 상태
   const [showEnvironmentSettings, setShowEnvironmentSettings] = useState(true); // 기본 열림
@@ -215,6 +224,10 @@ export function AISimulationTab({
       toast.error('매장을 선택해주세요');
       return;
     }
+
+    // S0-4: 실행 시 에러 상태 초기화
+    setSimulationError(null);
+
     if (simulationType === 'realtime') {
       // 실시간 시뮬레이션 시작
       onOverlayToggle('avatar', true);
@@ -280,15 +293,34 @@ export function AISimulationTab({
         // AI 결과에서 이슈 추출
         const aiStore = useAISimulationStore.getState();
         if (aiStore.result) {
+          // S0-4: 폴백 데이터 감지
+          const isFallback = !!(aiStore.result as any)?._fallback;
+          if (isFallback) {
+            setSimulationError({
+              message: 'AI 응답을 처리하는 중 문제가 발생하여 기본 데이터로 표시됩니다.',
+              canRetry: true,
+              timestamp: new Date(),
+              type: 'parse',
+              isFallback: true,
+              details: 'AI 분석은 완료되었으나 응답 형식에 문제가 있어 폴백 데이터를 사용합니다.',
+            });
+            toast.warning('AI 응답 처리 오류', {
+              id: 'ai-sim',
+              description: '기본 데이터로 결과를 표시합니다. 다시 시도하면 정확한 결과를 얻을 수 있습니다.',
+            });
+          }
+
           const extractedIssues = extractIssuesFromAIResult(aiStore.result, zoneDataForAnalysis);
           setAnalyzedIssues(extractedIssues);
 
-          // 심각한 이슈가 있으면 알림
-          const criticalIssues = extractedIssues.filter(i => i.severity === 'critical');
-          if (criticalIssues.length > 0) {
-            toast.warning(`${criticalIssues.length}개의 심각한 문제가 감지되었습니다`, {
-              description: 'AI 최적화를 통해 해결 방안을 확인하세요',
-            });
+          // 심각한 이슈가 있으면 알림 (폴백이 아닌 경우에만)
+          if (!isFallback) {
+            const criticalIssues = extractedIssues.filter(i => i.severity === 'critical');
+            if (criticalIssues.length > 0) {
+              toast.warning(`${criticalIssues.length}개의 심각한 문제가 감지되었습니다`, {
+                description: 'AI 최적화를 통해 해결 방안을 확인하세요',
+              });
+            }
           }
         }
 
@@ -297,6 +329,13 @@ export function AISimulationTab({
           onOverlayToggle('congestionHeatmap', true);
         }
       } catch (err: any) {
+        // S0-4: 향상된 에러 처리
+        const errorState = createSimulationError(err, {
+          canRetry: true,
+          isFallback: false,
+        });
+        setSimulationError(errorState);
+
         toast.error(`시뮬레이션 실패: ${err.message}`, {
           id: 'ai-sim'
         });
@@ -312,7 +351,33 @@ export function AISimulationTab({
     }
     resetAIPrediction();
     setDiagnosticIssues([]);
+    setSimulationError(null); // S0-4: 에러 상태도 초기화
   }, [simulationType, stopRealtime, resetAIPrediction, onOverlayToggle]);
+
+  // S0-4: 에러 복구 - 재시도
+  const handleErrorRetry = useCallback(async () => {
+    setIsRetrying(true);
+    setSimulationError(null);
+    try {
+      await handleRunSimulation();
+    } finally {
+      setIsRetrying(false);
+    }
+  }, [handleRunSimulation]);
+
+  // S0-4: 에러 복구 - 초기화
+  const handleErrorReset = useCallback(() => {
+    setSimulationError(null);
+    resetAIPrediction();
+    setAnalyzedIssues([]);
+    toast.info('시뮬레이션이 초기화되었습니다');
+  }, [resetAIPrediction]);
+
+  // S0-4: 에러 무시 (폴백 데이터 사용)
+  const handleErrorDismiss = useCallback(() => {
+    setSimulationError(null);
+    // 폴백 데이터로 계속 진행
+  }, []);
 
   // 일시정지/재개 토글
   const handleTogglePause = useCallback(() => {
@@ -751,8 +816,19 @@ export function AISimulationTab({
         }} />
           </div>}
 
-        {/* 에러 표시 */}
-        {aiError && <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+        {/* S0-4: 향상된 에러 복구 UI */}
+        {simulationError && (
+          <SimulationErrorRecovery
+            error={simulationError}
+            onRetry={handleErrorRetry}
+            onReset={handleErrorReset}
+            onDismiss={simulationError.isFallback ? handleErrorDismiss : undefined}
+            isRetrying={isRetrying}
+          />
+        )}
+
+        {/* 기존 에러 표시 (simulationError가 없을 때만 표시) */}
+        {aiError && !simulationError && <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
             <div className="flex items-center gap-2 text-red-400 text-sm">
               <AlertTriangle className="w-4 h-4" />
               {aiError}

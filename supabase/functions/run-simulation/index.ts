@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.89.0';
-import { logAIResponse, createExecutionTimer } from '../_shared/aiResponseLogger.ts';
+import { logAIResponse, createExecutionTimer, extractParseResultForLogging } from '../_shared/aiResponseLogger.ts';
+import { safeJsonParse, SIMULATION_FALLBACK, logParseResult } from '../_shared/safeJsonParse.ts';
 
 /**
  * run-simulation Edge Function
@@ -294,6 +295,9 @@ Deno.serve(async (req: Request) => {
         summary_text: responseSummary,
       };
 
+      // 🆕 S0-5: 파싱 성공률 추적
+      const isFallback = !!(simulationResult as any)?._fallback;
+
       await logAIResponse(supabaseClient, {
         storeId: store_id,
         userId: userId || undefined, // 🆕 user_id 추가
@@ -345,6 +349,10 @@ Deno.serve(async (req: Request) => {
           hasEnvironmentContext: !!environment_context,
           hasPresetScenario: !!environment_context?.preset_scenario,
         },
+        // 🆕 S0-5: 파싱 성공률 추적
+        parseSuccess: !isFallback,
+        usedFallback: isFallback,
+        rawResponseLength: undefined, // AI 응답 원본이 함수 내부에서만 접근 가능
       });
 
       console.log(`[Simulation] 로깅 완료: ${executionTime}ms`);
@@ -375,6 +383,9 @@ Deno.serve(async (req: Request) => {
         executionTimeMs: timer.getElapsedMs(),
         hadError: true,
         errorMessage: error.message,
+        // 🆕 S0-5: 파싱 성공률 추적 - 에러 시 실패 처리
+        parseSuccess: false,
+        usedFallback: false,
       });
     } catch {
       // 로깅 실패 무시
@@ -735,13 +746,33 @@ function generateRuleBasedSimulation(context: any, zones: any[], options: any): 
 
 // ===== 결과 파싱 및 검증 =====
 function parseAndValidateResult(aiResponse: string, zones: any[], options: any): SimulationResult {
-  let jsonStr = aiResponse;
-  const jsonMatch = aiResponse.match(/```json\n?([\s\S]*?)\n?```/);
-  if (jsonMatch) {
-    jsonStr = jsonMatch[1];
-  }
+  // 🆕 safeJsonParse 사용 (Sprint 0: S0-2)
+  const parseResult = safeJsonParse<Record<string, any>>(aiResponse, {
+    fallback: {
+      kpis: SIMULATION_FALLBACK.kpis,
+      zone_analysis: [],
+      flow_analysis: SIMULATION_FALLBACK.flow_analysis,
+      ai_insights: SIMULATION_FALLBACK.ai_insights,
+      confidence_score: 0,
+    },
+    stripMarkdown: true,
+    enableLogging: true,
+    functionName: 'run-simulation',
+    validator: (obj: unknown) => {
+      const o = obj as Record<string, unknown>;
+      return (
+        o !== null &&
+        typeof o === 'object' &&
+        (typeof o.kpis === 'object' || Array.isArray(o.zone_analysis))
+      );
+    },
+  });
 
-  const parsed = JSON.parse(jsonStr);
+  // 파싱 결과 로깅
+  logParseResult(parseResult, 'run-simulation');
+
+  const parsed = parseResult.data;
+  const isFallback = !parseResult.success;
 
   // 존 ID 매핑
   const zoneAnalysis = (parsed.zone_analysis || []).map((za: any) => {
@@ -753,19 +784,34 @@ function parseAndValidateResult(aiResponse: string, zones: any[], options: any):
     };
   });
 
+  // 폴백인 경우 진단 이슈 추가
+  const fallbackIssue: DiagnosticIssue | null = isFallback ? {
+    id: 'parse-error',
+    severity: 'warning',
+    category: 'conversion',
+    title: 'AI 응답 파싱 부분 실패',
+    description: `AI 응답 처리 중 일부 오류가 발생했습니다. 결과가 불완전할 수 있습니다. (${parseResult.error})`,
+    current_value: 0,
+    threshold_value: 0,
+    impact: '일부 분석 결과가 누락되었을 수 있습니다.',
+    suggested_action: '시뮬레이션을 다시 실행하거나 결과를 주의해서 검토하세요.',
+  } : null;
+
   return {
     simulation_id: `sim-${Date.now()}`,
     timestamp: new Date().toISOString(),
     duration_minutes: options.duration_minutes,
-    kpis: parsed.kpis || {},
+    kpis: parsed.kpis || SIMULATION_FALLBACK.kpis,
     zone_analysis: zoneAnalysis,
-    flow_analysis: parsed.flow_analysis || { primary_paths: [], dead_zones: [], congestion_points: [] },
+    flow_analysis: parsed.flow_analysis || SIMULATION_FALLBACK.flow_analysis,
     hourly_analysis: parsed.hourly_analysis || [],
-    diagnostic_issues: [],
+    diagnostic_issues: fallbackIssue ? [fallbackIssue] : [],
     customer_journeys: [],
     ai_insights: parsed.ai_insights || [],
-    confidence_score: parsed.confidence_score || 70,
-  };
+    confidence_score: isFallback ? 30 : (parsed.confidence_score || 70),
+    // 🆕 폴백 여부 표시
+    ...(isFallback ? { _fallback: true, _parseError: parseResult.error } : {}),
+  } as SimulationResult;
 }
 
 // ===== 진단 이슈 생성 =====

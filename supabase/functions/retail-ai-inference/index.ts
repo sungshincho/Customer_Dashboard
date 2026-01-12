@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.79.0';
+import { safeJsonParse, INFERENCE_FALLBACK, logParseResult } from '../_shared/safeJsonParse.ts';
 
 /**
  * retail-ai-inference Edge Function
@@ -504,14 +505,42 @@ async function callAI(prompt: string, apiKey: string): Promise<AIInferenceResult
     }
 
     const data = await response.json();
-    const result = JSON.parse(data.choices[0].message.content);
+    const content = data.choices?.[0]?.message?.content || '';
+
+    // 🆕 safeJsonParse 사용 (Sprint 0: S0-3)
+    const parseResult = safeJsonParse<AIInferenceResult>(content, {
+      fallback: {
+        insights: ['AI 응답 파싱에 실패했습니다.'],
+        recommendations: [],
+        metrics: {},
+        confidence: 0,
+      },
+      stripMarkdown: true,
+      enableLogging: true,
+      functionName: 'retail-ai-inference',
+      validator: (obj: unknown) => {
+        const o = obj as Record<string, unknown>;
+        return o !== null && typeof o === 'object';
+      },
+    });
+
+    // 파싱 결과 로깅
+    logParseResult(parseResult, 'retail-ai-inference');
+
+    if (!parseResult.success) {
+      console.warn('[retail-ai-inference] Parse failed, using partial data');
+    }
+
+    const result = parseResult.data;
 
     return {
       insights: result.insights || [],
       recommendations: result.recommendations || [],
       metrics: result.metrics || {},
-      confidence: result.confidence || 0.7,
-    };
+      confidence: parseResult.success ? (result.confidence || 0.7) : 0.3,
+      // 🆕 폴백 여부 표시
+      ...(parseResult.success ? {} : { _fallback: true, _parseError: parseResult.error }),
+    } as AIInferenceResult;
   } catch (e) {
     console.error('AI call failed:', e);
     // 폴백
@@ -520,7 +549,8 @@ async function callAI(prompt: string, apiKey: string): Promise<AIInferenceResult
       recommendations: [],
       metrics: {},
       confidence: 0,
-    };
+      _fallback: true,
+    } as AIInferenceResult;
   }
 }
 

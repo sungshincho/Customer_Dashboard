@@ -118,6 +118,16 @@ export interface AIResponseLogInput {
   // 에러 정보
   hadError?: boolean;
   errorMessage?: string;
+
+  // 🆕 S0-5: 파싱 성공률 추적
+  parseSuccess?: boolean;
+  usedFallback?: boolean;
+  parseAttempts?: Array<{
+    method: string;
+    success: boolean;
+    error?: string;
+  }>;
+  rawResponseLength?: number;
 }
 
 /**
@@ -163,6 +173,11 @@ export async function logAIResponse(
       completionTokens,
       hadError = false,
       errorMessage,
+      // 🆕 S0-5: 파싱 성공률 추적
+      parseSuccess,
+      usedFallback,
+      parseAttempts,
+      rawResponseLength,
     } = input;
 
     // 입력 검증
@@ -189,6 +204,11 @@ export async function logAIResponse(
       completion_tokens: completionTokens || null,
       had_error: hadError,
       error_message: errorMessage || null,
+      // 🆕 S0-5: 파싱 성공률 추적
+      parse_success: parseSuccess ?? !hadError,
+      used_fallback: usedFallback ?? false,
+      parse_attempts: parseAttempts ? sanitizeForJsonb(parseAttempts) : null,
+      raw_response_length: rawResponseLength || null,
     };
 
     // 데이터베이스에 삽입
@@ -422,6 +442,195 @@ export function logAIResponseAsync(
 }
 
 // ============================================================================
+// 🆕 S0-5: 파싱 성공률 통계 조회 함수
+// ============================================================================
+
+/**
+ * 파싱 성공률 통계 조회 결과
+ */
+export interface ParseSuccessStats {
+  total: number;
+  success: number;
+  failure: number;
+  fallback: number;
+  successRate: number;
+  fallbackRate: number;
+  avgResponseTime: number;
+}
+
+/**
+ * 함수별 파싱 성공률 통계 조회
+ */
+export async function getParseSuccessStats(
+  supabase: SupabaseClient,
+  options?: {
+    functionName?: FunctionName;
+    storeId?: string;
+    since?: Date;
+    limit?: number;
+  }
+): Promise<ParseSuccessStats> {
+  try {
+    let query = supabase
+      .from('ai_response_logs')
+      .select('parse_success, used_fallback, execution_time_ms');
+
+    if (options?.functionName) {
+      query = query.eq('function_name', options.functionName);
+    }
+    if (options?.storeId) {
+      query = query.eq('store_id', options.storeId);
+    }
+    if (options?.since) {
+      query = query.gte('created_at', options.since.toISOString());
+    }
+    if (options?.limit) {
+      query = query.limit(options.limit);
+    }
+
+    const { data, error } = await query;
+
+    if (error || !data) {
+      console.error('[AIResponseLogger] Stats query failed:', error?.message);
+      return {
+        total: 0,
+        success: 0,
+        failure: 0,
+        fallback: 0,
+        successRate: 0,
+        fallbackRate: 0,
+        avgResponseTime: 0,
+      };
+    }
+
+    const total = data.length;
+    const success = data.filter(d => d.parse_success && !d.used_fallback).length;
+    const failure = data.filter(d => !d.parse_success && !d.used_fallback).length;
+    const fallback = data.filter(d => d.used_fallback).length;
+    const avgResponseTime = total > 0
+      ? data.reduce((sum, d) => sum + (d.execution_time_ms || 0), 0) / total
+      : 0;
+
+    return {
+      total,
+      success,
+      failure,
+      fallback,
+      successRate: total > 0 ? (success / total) * 100 : 0,
+      fallbackRate: total > 0 ? (fallback / total) * 100 : 0,
+      avgResponseTime: Math.round(avgResponseTime),
+    };
+  } catch (err) {
+    console.error('[AIResponseLogger] Stats exception:', err);
+    return {
+      total: 0,
+      success: 0,
+      failure: 0,
+      fallback: 0,
+      successRate: 0,
+      fallbackRate: 0,
+      avgResponseTime: 0,
+    };
+  }
+}
+
+/**
+ * 함수별 성공률 대시보드 데이터 조회
+ */
+export async function getSuccessRateDashboard(
+  supabase: SupabaseClient,
+  since?: Date
+): Promise<Array<{
+  functionName: FunctionName;
+  total: number;
+  successRate: number;
+  fallbackRate: number;
+  avgResponseTime: number;
+  lastError?: string;
+}>> {
+  try {
+    let query = supabase
+      .from('ai_response_logs')
+      .select('function_name, parse_success, used_fallback, execution_time_ms, error_message, created_at')
+      .order('created_at', { ascending: false });
+
+    if (since) {
+      query = query.gte('created_at', since.toISOString());
+    }
+
+    const { data, error } = await query;
+
+    if (error || !data) {
+      console.error('[AIResponseLogger] Dashboard query failed:', error?.message);
+      return [];
+    }
+
+    // 함수별로 그룹화
+    const grouped = data.reduce((acc, row) => {
+      const fn = row.function_name as FunctionName;
+      if (!acc[fn]) {
+        acc[fn] = { total: 0, success: 0, fallback: 0, totalTime: 0, lastError: undefined };
+      }
+      acc[fn].total++;
+      if (row.parse_success && !row.used_fallback) acc[fn].success++;
+      if (row.used_fallback) acc[fn].fallback++;
+      acc[fn].totalTime += row.execution_time_ms || 0;
+      if (row.error_message && !acc[fn].lastError) {
+        acc[fn].lastError = row.error_message;
+      }
+      return acc;
+    }, {} as Record<FunctionName, {
+      total: number;
+      success: number;
+      fallback: number;
+      totalTime: number;
+      lastError?: string;
+    }>);
+
+    return Object.entries(grouped).map(([functionName, stats]) => ({
+      functionName: functionName as FunctionName,
+      total: stats.total,
+      successRate: stats.total > 0 ? Math.round((stats.success / stats.total) * 100) : 0,
+      fallbackRate: stats.total > 0 ? Math.round((stats.fallback / stats.total) * 100) : 0,
+      avgResponseTime: stats.total > 0 ? Math.round(stats.totalTime / stats.total) : 0,
+      lastError: stats.lastError,
+    }));
+  } catch (err) {
+    console.error('[AIResponseLogger] Dashboard exception:', err);
+    return [];
+  }
+}
+
+/**
+ * safeJsonParse 결과에서 로깅 데이터 추출
+ */
+export function extractParseResultForLogging<T>(
+  parseResult: {
+    success: boolean;
+    data: T;
+    error?: string;
+    rawResponse?: string;
+    parseAttempts?: Array<{ method: string; success: boolean; error?: string }>;
+  }
+): {
+  parseSuccess: boolean;
+  usedFallback: boolean;
+  parseAttempts?: Array<{ method: string; success: boolean; error?: string }>;
+  rawResponseLength?: number;
+  errorMessage?: string;
+} {
+  const isFallback = !!(parseResult.data as any)?._fallback;
+
+  return {
+    parseSuccess: parseResult.success && !isFallback,
+    usedFallback: isFallback,
+    parseAttempts: parseResult.parseAttempts,
+    rawResponseLength: parseResult.rawResponse?.length,
+    errorMessage: parseResult.error,
+  };
+}
+
+// ============================================================================
 // Export
 // ============================================================================
 
@@ -433,4 +642,8 @@ export default {
   createInferenceSummary,
   createInferenceContextMetadata,
   createExecutionTimer,
+  // 🆕 S0-5
+  getParseSuccessStats,
+  getSuccessRateDashboard,
+  extractParseResultForLogging,
 };
