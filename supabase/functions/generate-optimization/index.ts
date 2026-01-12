@@ -65,6 +65,16 @@ import {
   type VMDAnalysisResult,
 } from './vmd/vmdEngine.ts';
 
+// 🆕 Sprint 2: VMD 룰셋 동적 로드 (S2-4)
+import {
+  loadVMDRulesets,
+  buildVMDRulesetContext,
+  findMatchingRules,
+  recordRuleApplication,
+  type VMDRule,
+  type VMDRulesetContext,
+} from '../_shared/vmd/vmdRulesetLoader.ts';
+
 // Phase 4.2: 자동 학습 시스템
 import {
   loadStoredParameters,
@@ -1249,6 +1259,21 @@ async function generateAIOptimization(
     enhancedUserPrompt += `\n\n${vmdAnalysis.aiPromptContext}`;
   }
 
+  // 🆕 Sprint 2: VMD 룰셋 동적 로드 및 프롬프트 주입 (S2-4)
+  let vmdRulesetContext: VMDRulesetContext | null = null;
+  try {
+    vmdRulesetContext = await buildVMDRulesetContext({
+      minConfidence: 0.6,
+      maxRules: 8,
+    });
+    if (vmdRulesetContext.promptText) {
+      enhancedUserPrompt += `\n\n${vmdRulesetContext.promptText}`;
+      console.log(`[generateAIOptimization] 📚 VMD Ruleset loaded: ${vmdRulesetContext.metadata.totalRules} rules, avg confidence ${(vmdRulesetContext.metadata.avgConfidence * 100).toFixed(0)}%`);
+    }
+  } catch (rulesetError) {
+    console.warn('[generateAIOptimization] VMD Ruleset load failed, continuing without:', rulesetError);
+  }
+
   console.log(`[generateAIOptimization] Prompt built: tokens~${builtPrompt.totalTokenEstimate}, strategy=${builtPrompt.metadata.strategy}`);
   console.log(`[generateAIOptimization] CoT=${builtPrompt.metadata.cotEnabled}, FewShot=${builtPrompt.metadata.fewShotEnabled}(${builtPrompt.metadata.fewShotCount} examples, ${builtPrompt.metadata.fewShotStrategy})`);
   console.log(`[generateAIOptimization] Data included: env=${builtPrompt.metadata.dataIncluded.environment}, flow=${builtPrompt.metadata.dataIncluded.flowAnalysis}, assoc=${builtPrompt.metadata.dataIncluded.associations}, vmd=${!!vmdAnalysis}`);
@@ -1401,6 +1426,12 @@ async function generateAIOptimization(
       console.log(`[generateAIOptimization] 🔧 Applied ${Object.keys(toolResultsMap).length} tool results to final output`);
     }
 
+    // 🆕 Sprint 2: XAI 근거 생성 - VMD 규칙 추출 (S2-5)
+    const appliedVMDRules = extractAppliedVMDRules(enhancedResult, vmdRulesetContext);
+    if (appliedVMDRules.length > 0) {
+      console.log(`[generateAIOptimization] 📜 VMD Rules applied: ${appliedVMDRules.map(r => r.rule_code).join(', ')}`);
+    }
+
     return {
       optimization_id: '',
       store_id: '',
@@ -1422,6 +1453,14 @@ async function generateAIOptimization(
         tool_use_enabled: enableToolUse,
         tool_call_iterations: toolCallIterations,
         total_tool_calls: allToolCallResults.length,
+        // 🆕 Sprint 2: VMD 규칙 적용 메타데이터 (S2-5)
+        vmd_rules_loaded: vmdRulesetContext?.metadata.totalRules || 0,
+        vmd_rules_applied: appliedVMDRules.map(r => ({
+          rule_code: r.rule_code,
+          rule_name: r.rule_name_ko,
+          confidence: r.confidence_level,
+        })),
+        vmd_rules_applied_count: appliedVMDRules.length,
       } : {
         total_furniture_changes: 0,
         total_product_changes: 0,
@@ -2471,4 +2510,112 @@ function applyToolResultsToOptimization(
   console.log(`[applyToolResultsToOptimization] Enhanced ${enhancedResult.furniture_changes?.length || 0} furniture, ${enhancedResult.product_changes?.length || 0} product changes`);
 
   return enhancedResult;
+}
+
+// ============================================================================
+// 🆕 Sprint 2: XAI 근거 생성 - VMD 규칙 추출 함수 (S2-5)
+// ============================================================================
+
+/**
+ * AI 응답에서 적용된 VMD 규칙 추출
+ * - AI가 vmd_rule_applied 필드에 명시한 규칙 코드 수집
+ * - 변경 항목의 reason/vmd_principle에서 규칙 참조 탐지
+ */
+function extractAppliedVMDRules(
+  result: any,
+  rulesetContext: VMDRulesetContext | null
+): VMDRule[] {
+  if (!rulesetContext || rulesetContext.rules.length === 0) {
+    return [];
+  }
+
+  const appliedRuleCodes = new Set<string>();
+
+  // 1. 명시적 vmd_rule_applied 필드에서 추출
+  const changes = [
+    ...(result.furniture_changes || []),
+    ...(result.product_changes || []),
+  ];
+
+  for (const change of changes) {
+    // vmd_rule_applied 배열
+    if (Array.isArray(change.vmd_rule_applied)) {
+      change.vmd_rule_applied.forEach((code: string) => appliedRuleCodes.add(code));
+    }
+    // 단일 값
+    else if (typeof change.vmd_rule_applied === 'string') {
+      appliedRuleCodes.add(change.vmd_rule_applied);
+    }
+
+    // vmd_principle 필드에서 규칙 코드 탐지
+    if (change.vmd_principle) {
+      const matches = change.vmd_principle.match(/VMD-\d{3}/g);
+      if (matches) {
+        matches.forEach((code: string) => appliedRuleCodes.add(code));
+      }
+    }
+
+    // reason 필드에서 규칙 코드 탐지
+    if (change.reason) {
+      const matches = change.reason.match(/VMD-\d{3}/g);
+      if (matches) {
+        matches.forEach((code: string) => appliedRuleCodes.add(code));
+      }
+    }
+  }
+
+  // 2. summary의 insights에서도 탐지
+  if (result.summary?.insights) {
+    const insightsText = Array.isArray(result.summary.insights)
+      ? result.summary.insights.join(' ')
+      : String(result.summary.insights);
+
+    const matches = insightsText.match(/VMD-\d{3}/g);
+    if (matches) {
+      matches.forEach((code: string) => appliedRuleCodes.add(code));
+    }
+  }
+
+  // 3. 수집된 규칙 코드로 실제 규칙 객체 조회
+  const appliedRules = rulesetContext.rules.filter(
+    rule => appliedRuleCodes.has(rule.rule_code)
+  );
+
+  // 4. 규칙 코드가 명시되지 않았지만 키워드 매칭으로 추론
+  if (appliedRules.length === 0) {
+    // 간단한 키워드 매칭으로 추론
+    const allText = JSON.stringify(result).toLowerCase();
+
+    for (const rule of rulesetContext.rules) {
+      const keywords = extractKeywords(rule.rule_name_ko, rule.description_ko);
+      const matched = keywords.some(kw => allText.includes(kw.toLowerCase()));
+      if (matched && appliedRules.length < 3) {
+        appliedRules.push(rule);
+      }
+    }
+  }
+
+  return appliedRules;
+}
+
+/**
+ * 규칙 이름/설명에서 키워드 추출
+ */
+function extractKeywords(name: string, description: string): string[] {
+  const keywords: string[] = [];
+
+  // 한국어 핵심 단어
+  const koreanKeywords = [
+    '통로', '눈높이', '골든존', '입구', '계산대',
+    '연관', '교차', '시야', '데드존', '충동구매',
+  ];
+
+  const combined = `${name} ${description}`;
+  for (const kw of koreanKeywords) {
+    if (combined.includes(kw)) {
+      keywords.push(kw);
+    }
+  }
+
+  return keywords;
 }
