@@ -13,7 +13,7 @@ import { useLocation } from 'react-router-dom';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, Loader2, Sparkles, Layers, Save, Play, GitCompare, Pause, Square, RotateCcw, Users, FlaskConical, CheckCircle } from 'lucide-react';
+import { AlertCircle, Loader2, Sparkles, Layers, Save, Play, GitCompare, Pause, Square, RotateCcw, Users, FlaskConical, CheckCircle, Cloud, CloudRain, CloudSnow, Sun, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 
 // 새 스튜디오 컴포넌트
@@ -27,7 +27,7 @@ import { AIOptimizationTab } from './tabs/AIOptimizationTab';
 import { AISimulationTab } from './tabs/AISimulationTab';
 import { ApplyPanel } from './tabs/ApplyPanel';
 import { LayoutResultPanel, FlowResultPanel, CongestionResultPanel, StaffingResultPanel, type LayoutResult, type FlowResult, type CongestionResult, type StaffingResult } from './panels/results';
-import { useStudioMode, useOverlayVisibility, useScenePersistence, useSceneSimulation, useStoreBounds, useStaffData } from './hooks';
+import { useStudioMode, useOverlayVisibility, useScenePersistence, useSceneSimulation, useStoreBounds, useStaffData, useEnvironmentContext } from './hooks';
 import { loadUserModels } from './utils';
 import type { StudioMode, Model3D, OverlayType, HeatPoint, ZoneBoundary, SceneRecipe, LightingPreset, Vector3, SimulationScenario, TransformMode, RenderingConfig } from './types';
 import type { SimulationEnvironmentConfig } from './types/simulationEnvironment.types';
@@ -144,6 +144,18 @@ export default function DigitalTwinStudioPage() {
 
   // 🆕 로그인된 계정의 스토어 ID
   const storeId = selectedStore?.id;
+
+  // 🆕 환경 컨텍스트 (실시간 날씨, 공휴일, 이벤트)
+  const {
+    context: envContext,
+    isLoading: isEnvLoading,
+    impact: envImpact,
+    currentTime: envCurrentTime
+  } = useEnvironmentContext({
+    storeId: storeId || '',
+    enabled: !!storeId,
+    autoRefresh: true
+  });
 
   // 🆕 실제 히트맵 데이터 (zone_daily_metrics.heatmap_intensity 기반)
   const {
@@ -1092,16 +1104,57 @@ export default function DigitalTwinStudioPage() {
 
           {/* ========== UI 오버레이 ========== */}
           <div className="absolute inset-0 z-10 pointer-events-none">
-            {/* ----- 상단 중앙: 퀵 토글 바 + AI 리포트 ----- */}
+            {/* ----- 상단 중앙: 퀵 토글 바 ----- */}
             <div className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-auto z-20 flex items-center gap-3">
               {/* 퀵 토글 바 */}
               <QuickToggleBar activeOverlays={activeOverlays as any[]} onToggle={id => toggleOverlay(id as OverlayType)} />
+            </div>
 
-              {/* 구분선 */}
-              <div className="w-px h-6 bg-white/20" />
+            {/* ----- 상단 우측: 현재 환경 + AI 리포트 + 씬 저장 + 뷰 모드 토글 ----- */}
+            <div className="absolute top-4 right-4 pointer-events-auto z-20 flex items-center gap-2">
+              {/* 현재 환경 표시 */}
+              {envContext && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 shadow-lg">
+                  {/* 날씨 */}
+                  <div className="flex items-center gap-1">
+                    {envContext.weather?.condition === 'rain' && <CloudRain className="w-3.5 h-3.5 text-blue-400" />}
+                    {envContext.weather?.condition === 'snow' && <CloudSnow className="w-3.5 h-3.5 text-blue-200" />}
+                    {envContext.weather?.condition === 'clear' && <Sun className="w-3.5 h-3.5 text-yellow-400" />}
+                    {envContext.weather?.condition === 'clouds' && <Cloud className="w-3.5 h-3.5 text-gray-400" />}
+                    {!envContext.weather && <Cloud className="w-3.5 h-3.5 text-white/30" />}
+                    <span className="text-xs text-white">
+                      {envContext.weather ? `${Math.round(envContext.weather.temperature)}°C` : '-'}
+                    </span>
+                  </div>
+                  
+                  <div className="w-px h-4 bg-white/20" />
+                  
+                  {/* 요일 */}
+                  <div className="flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-purple-400" />
+                    <span className="text-xs text-white">
+                      {envContext.holiday ? envContext.holiday.name : envCurrentTime?.isWeekend ? '주말' : '평일'}
+                    </span>
+                  </div>
+                  
+                  {/* 트래픽 영향도 */}
+                  {envImpact && (
+                    <>
+                      <div className="w-px h-4 bg-white/20" />
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${
+                        envImpact.trafficMultiplier > 1.1 ? 'bg-green-500/20 text-green-400' : 
+                        envImpact.trafficMultiplier < 0.9 ? 'bg-red-500/20 text-red-400' : 
+                        'bg-white/10 text-white/60'
+                      }`}>
+                        트래픽 {(envImpact.trafficMultiplier * 100).toFixed(0)}%
+                      </span>
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* AI 리포트 버튼 */}
-              <div className="flex items-center gap-1 px-2 py-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 shadow-lg">
+              <div className="flex items-center px-2 py-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 shadow-lg">
                 <Button variant="ghost" size="sm" onClick={() => setVisiblePanels(prev => ({
                 ...prev,
                 resultReport: !prev.resultReport
@@ -1112,10 +1165,7 @@ export default function DigitalTwinStudioPage() {
                   {(simulationResults.layout || simulationResults.flow || simulationResults.congestion || simulationResults.staffing) && <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full" />}
                 </Button>
               </div>
-            </div>
 
-            {/* ----- 상단 우측: 씬 저장 + 뷰 모드 토글 ----- */}
-            <div className="absolute top-4 right-4 pointer-events-auto z-20 flex items-center gap-2">
               {/* 씬 저장 버튼 */}
               <div className="flex items-center px-2 py-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 shadow-lg">
                 <Button variant="ghost" size="sm" onClick={() => setVisiblePanels(prev => ({
