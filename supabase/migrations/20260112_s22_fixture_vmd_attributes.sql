@@ -1,31 +1,32 @@
 -- ============================================================================
--- Sprint 2: Fixture VMD 속성 확장
+-- Sprint 2: Furniture VMD 속성 확장
 -- Task: S2-2
 -- 작성일: 2026-01-12
+-- 수정: fixtures_dim → furniture (실제 테이블명)
 -- ============================================================================
 
--- Fixture에 height_zone 컬럼 추가 (선반 높이 구역)
-ALTER TABLE fixtures_dim
+-- Furniture에 height_zone 컬럼 추가 (선반 높이 구역)
+ALTER TABLE furniture
 ADD COLUMN IF NOT EXISTS height_zone TEXT DEFAULT 'eye_level'
 CHECK (height_zone IN ('floor', 'bend', 'reach', 'eye_level', 'top'));
 
-COMMENT ON COLUMN fixtures_dim.height_zone IS '선반 높이 구역: floor(바닥), bend(허리), reach(손닿는), eye_level(눈높이), top(최상단)';
+COMMENT ON COLUMN furniture.height_zone IS '선반 높이 구역: floor(바닥), bend(허리), reach(손닿는), eye_level(눈높이), top(최상단)';
 
--- Fixture에 facing 컬럼 추가 (상품 진열 방향)
-ALTER TABLE fixtures_dim
+-- Furniture에 facing 컬럼 추가 (상품 진열 방향)
+ALTER TABLE furniture
 ADD COLUMN IF NOT EXISTS facing TEXT DEFAULT 'front'
 CHECK (facing IN ('front', 'side', 'back', 'island', 'corner'));
 
-COMMENT ON COLUMN fixtures_dim.facing IS '진열 방향: front(전면), side(측면), back(후면), island(섬형), corner(코너)';
+COMMENT ON COLUMN furniture.facing IS '진열 방향: front(전면), side(측면), back(후면), island(섬형), corner(코너)';
 
--- Fixture에 VMD 속성 JSONB 추가
-ALTER TABLE fixtures_dim
+-- Furniture에 VMD 속성 JSONB 추가
+ALTER TABLE furniture
 ADD COLUMN IF NOT EXISTS vmd_properties JSONB DEFAULT '{}'::jsonb;
 
-COMMENT ON COLUMN fixtures_dim.vmd_properties IS 'VMD 관련 확장 속성';
+COMMENT ON COLUMN furniture.vmd_properties IS 'VMD 관련 확장 속성';
 
--- 기존 Fixture에 기본 VMD 속성 추가
-UPDATE fixtures_dim SET vmd_properties = jsonb_build_object(
+-- 기존 Furniture에 기본 VMD 속성 추가
+UPDATE furniture SET vmd_properties = jsonb_build_object(
   'visibility_score',
     CASE height_zone
       WHEN 'eye_level' THEN 1.0
@@ -50,11 +51,14 @@ UPDATE fixtures_dim SET vmd_properties = jsonb_build_object(
   'signage_present', false,
   'recommended_product_category', null,
   'max_products',
-    CASE fixture_type
+    CASE furniture_type
       WHEN 'shelf' THEN 20
       WHEN 'rack' THEN 30
+      WHEN 'clothing_rack' THEN 25
       WHEN 'table' THEN 15
       WHEN 'mannequin' THEN 1
+      WHEN 'mannequin_full' THEN 1
+      WHEN 'mannequin_half' THEN 1
       WHEN 'display' THEN 10
       ELSE 15
     END
@@ -63,7 +67,7 @@ UPDATE fixtures_dim SET vmd_properties = jsonb_build_object(
 -- ============================================================================
 -- Height Zone 참조 테이블
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS fixture_height_zones (
+CREATE TABLE IF NOT EXISTS furniture_height_zones (
   code TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   height_range_cm TEXT NOT NULL,
@@ -73,7 +77,7 @@ CREATE TABLE IF NOT EXISTS fixture_height_zones (
   description TEXT
 );
 
-INSERT INTO fixture_height_zones (code, name, height_range_cm, visibility_multiplier, accessibility_multiplier, recommended_products, description)
+INSERT INTO furniture_height_zones (code, name, height_range_cm, visibility_multiplier, accessibility_multiplier, recommended_products, description)
 VALUES
   ('floor', '바닥', '0-60cm', 0.4, 0.5, '대용량, 무거운 상품', '바닥 근처, 가시성 낮음'),
   ('bend', '허리', '60-90cm', 0.6, 0.7, '중간 가격대, 일반 상품', '허리 높이, 약간 숙여야 함'),
@@ -85,14 +89,14 @@ ON CONFLICT (code) DO NOTHING;
 -- ============================================================================
 -- Facing 참조 테이블
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS fixture_facings (
+CREATE TABLE IF NOT EXISTS furniture_facings (
   code TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   traffic_exposure NUMERIC NOT NULL,
   description TEXT
 );
 
-INSERT INTO fixture_facings (code, name, traffic_exposure, description)
+INSERT INTO furniture_facings (code, name, traffic_exposure, description)
 VALUES
   ('front', '전면', 1.0, '주 동선에서 정면으로 보이는 위치'),
   ('side', '측면', 0.7, '동선 옆에서 측면으로 보이는 위치'),
@@ -104,25 +108,25 @@ ON CONFLICT (code) DO NOTHING;
 -- ============================================================================
 -- 인덱스
 -- ============================================================================
-CREATE INDEX IF NOT EXISTS idx_fixtures_height_zone ON fixtures_dim(height_zone);
-CREATE INDEX IF NOT EXISTS idx_fixtures_facing ON fixtures_dim(facing);
-CREATE INDEX IF NOT EXISTS idx_fixtures_focal_point
-ON fixtures_dim ((vmd_properties->>'is_focal_point'))
+CREATE INDEX IF NOT EXISTS idx_furniture_height_zone ON furniture(height_zone);
+CREATE INDEX IF NOT EXISTS idx_furniture_facing ON furniture(facing);
+CREATE INDEX IF NOT EXISTS idx_furniture_focal_point
+ON furniture ((vmd_properties->>'is_focal_point'))
 WHERE (vmd_properties->>'is_focal_point')::boolean = true;
-CREATE INDEX IF NOT EXISTS idx_fixtures_endcap
-ON fixtures_dim ((vmd_properties->>'is_endcap'))
+CREATE INDEX IF NOT EXISTS idx_furniture_endcap
+ON furniture ((vmd_properties->>'is_endcap'))
 WHERE (vmd_properties->>'is_endcap')::boolean = true;
 
 -- ============================================================================
--- 뷰: Fixture VMD 요약
+-- 뷰: Furniture VMD 요약
 -- ============================================================================
-CREATE OR REPLACE VIEW v_fixture_vmd_summary AS
+CREATE OR REPLACE VIEW v_furniture_vmd_summary AS
 SELECT
   f.id,
   f.store_id,
   f.zone_id,
-  f.fixture_name,
-  f.fixture_type,
+  f.furniture_name,
+  f.furniture_type,
   f.height_zone,
   f.facing,
   hz.height_range_cm,
@@ -135,16 +139,16 @@ SELECT
   (f.vmd_properties->>'is_endcap')::boolean AS is_endcap,
   (f.vmd_properties->>'lighting_enhanced')::boolean AS lighting_enhanced,
   (f.vmd_properties->>'max_products')::integer AS max_products
-FROM fixtures_dim f
-LEFT JOIN fixture_height_zones hz ON hz.code = f.height_zone
-LEFT JOIN fixture_facings ff ON ff.code = f.facing;
+FROM furniture f
+LEFT JOIN furniture_height_zones hz ON hz.code = f.height_zone
+LEFT JOIN furniture_facings ff ON ff.code = f.facing;
 
-COMMENT ON VIEW v_fixture_vmd_summary IS 'Fixture의 VMD 속성 요약 뷰';
+COMMENT ON VIEW v_furniture_vmd_summary IS 'Furniture의 VMD 속성 요약 뷰';
 
 -- ============================================================================
--- 함수: Fixture 가시성 점수 계산
+-- 함수: Furniture 가시성 점수 계산
 -- ============================================================================
-CREATE OR REPLACE FUNCTION calculate_fixture_visibility(
+CREATE OR REPLACE FUNCTION calculate_furniture_visibility(
   p_height_zone TEXT,
   p_facing TEXT,
   p_is_focal_point BOOLEAN DEFAULT false,
@@ -158,7 +162,7 @@ DECLARE
 BEGIN
   -- 높이별 기본 점수
   SELECT visibility_multiplier INTO v_base_score
-  FROM fixture_height_zones
+  FROM furniture_height_zones
   WHERE code = p_height_zone;
 
   IF v_base_score IS NULL THEN
@@ -167,7 +171,7 @@ BEGIN
 
   -- Facing 가중치
   SELECT traffic_exposure INTO v_facing_multiplier
-  FROM fixture_facings
+  FROM furniture_facings
   WHERE code = p_facing;
 
   IF v_facing_multiplier IS NULL THEN
@@ -187,4 +191,4 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
-COMMENT ON FUNCTION calculate_fixture_visibility IS 'Fixture 가시성 점수 계산 (0-1)';
+COMMENT ON FUNCTION calculate_furniture_visibility IS 'Furniture 가시성 점수 계산 (0-1)';
