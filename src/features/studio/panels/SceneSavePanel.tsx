@@ -5,7 +5,7 @@
  */
 
 import { useState } from 'react';
-import { Save, FolderOpen, Trash2, Clock, Loader2, Plus } from 'lucide-react';
+import { Save, FolderOpen, Trash2, Clock, Loader2, Plus, RotateCcw, AlertTriangle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -23,6 +23,8 @@ interface SceneSavePanelProps {
   onLoad?: (sceneId: string) => void;
   onDelete?: (sceneId: string) => void;
   onNew?: () => void;
+  /** 🆕 씬 초기화 (뉴럴트윈 기본값으로 복원) */
+  onReset?: () => void;
   /** 최대 저장 가능한 씬 개수 (기본값: 무제한) */
   maxScenes?: number;
 }
@@ -39,10 +41,12 @@ export function SceneSavePanel({
   onLoad,
   onDelete,
   onNew,
+  onReset,
   maxScenes,
 }: SceneSavePanelProps) {
   const [sceneName, setSceneName] = useState(currentSceneName);
   const [showInputWarning, setShowInputWarning] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   // 최대 개수 제한 (maxScenes가 설정된 경우)
   const displayedScenes = maxScenes ? savedScenes.slice(0, maxScenes) : savedScenes;
@@ -150,6 +154,50 @@ export function SceneSavePanel({
         <Plus className="w-3 h-3 mr-1" />
         새 씬
       </Button>
+
+      {/* 🆕 씬 초기화 버튼 */}
+      {onReset && (
+        <div className="space-y-2">
+          {!showResetConfirm ? (
+            <Button
+              className="w-full bg-white/5 text-white/50 hover:bg-orange-500/20 hover:text-orange-400 h-7 text-xs transition-all border border-white/10 hover:border-orange-500/30"
+              onClick={() => setShowResetConfirm(true)}
+            >
+              <RotateCcw className="w-3 h-3 mr-1" />
+              씬 초기화
+            </Button>
+          ) : (
+            <div className="p-2.5 bg-orange-500/10 border border-orange-500/30 rounded-lg space-y-2">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-orange-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs text-orange-400 font-medium">초기화 확인</p>
+                  <p className="text-[10px] text-white/60 mt-0.5">
+                    뉴럴트윈이 설정한 최초 기본값으로 복원됩니다. 현재 변경사항이 모두 사라집니다.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1 bg-orange-500/20 text-orange-400 hover:bg-orange-500 hover:text-white h-6 text-[10px] transition-all"
+                  onClick={() => {
+                    onReset();
+                    setShowResetConfirm(false);
+                  }}
+                >
+                  초기화 실행
+                </Button>
+                <Button
+                  className="flex-1 bg-white/5 text-white/50 hover:bg-white/10 h-6 text-[10px] transition-all"
+                  onClick={() => setShowResetConfirm(false)}
+                >
+                  취소
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 저장된 씬 목록 */}
       <div>
