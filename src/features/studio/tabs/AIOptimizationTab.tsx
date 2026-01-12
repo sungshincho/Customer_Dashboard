@@ -9,7 +9,7 @@
  */
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { Sparkles, Layout, Route, Users, Loader2, ChevronDown, ChevronUp, Check, RotateCcw, Eye, Layers, Target, TrendingUp, Clock, Footprints, Settings2, Save, ArrowRight, BookmarkPlus, Cloud, Calendar, Thermometer } from 'lucide-react';
+import { Sparkles, Layout, Route, Users, Loader2, ChevronDown, ChevronUp, Check, RotateCcw, Eye, Layers, Target, TrendingUp, Clock, Footprints, Settings2, Save, ArrowRight, BookmarkPlus, Cloud, Calendar, Thermometer, GitCompare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -33,7 +33,7 @@ import type { SimulationEnvironmentConfig } from '../types/simulationEnvironment
 import { WEATHER_OPTIONS, HOLIDAY_OPTIONS, TIME_OF_DAY_OPTIONS, getEffectiveWeather, getEffectiveTimeOfDay, getEffectiveHoliday } from '../types/simulationEnvironment.types';
 
 type OptimizationType = 'layout' | 'flow' | 'staffing';
-type ViewMode = 'all' | 'as-is' | 'to-be';
+type ViewMode = 'as-is' | 'compare' | 'to-be';
 type OptimizationGoal = 'revenue' | 'dwell_time' | 'traffic' | 'conversion';
 
 interface GoalOption {
@@ -106,6 +106,10 @@ interface AIOptimizationTabProps {
   onNavigateToApply?: () => void;
   /** 🆕 시뮬레이션 환경 설정 (날씨, 휴일, 시간대 등) */
   simulationEnvConfig?: SimulationEnvironmentConfig | null;
+  /** 🆕 현재 뷰 모드 (상단 토글과 연동) */
+  viewMode?: ViewMode;
+  /** 🆕 뷰 모드 변경 콜백 (상단 토글과 연동) */
+  onViewModeChange?: (mode: ViewMode) => void;
 }
 
 export function AIOptimizationTab({
@@ -118,6 +122,8 @@ export function AIOptimizationTab({
   diagnosticIssues = [],
   onNavigateToApply,
   simulationEnvConfig,
+  viewMode: externalViewMode,
+  onViewModeChange,
 }: AIOptimizationTabProps) {
   // SceneProvider에서 applySimulationResults, revertSimulationChanges 가져오기
   const { applySimulationResults, revertSimulationChanges } = useScene();
@@ -137,8 +143,19 @@ export function AIOptimizationTab({
   // 결과 패널 펼침/접힘
   const [isResultExpanded, setIsResultExpanded] = useState(true);
 
-  // 비교 모드 (all: 전체, as-is: 변경 전, to-be: 변경 후)
-  const [viewMode, setViewMode] = useState<ViewMode>('all');
+  // 🆕 뷰 모드 - 외부에서 전달받거나 내부 상태 사용
+  const [internalViewMode, setInternalViewMode] = useState<ViewMode>('as-is');
+  const viewMode = externalViewMode ?? internalViewMode;
+  const setViewMode = useCallback((mode: ViewMode) => {
+    if (onViewModeChange) {
+      onViewModeChange(mode);
+    } else {
+      setInternalViewMode(mode);
+    }
+  }, [onViewModeChange]);
+
+  // 🆕 뷰 모드 전환 중인지 추적 (연타 방지)
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   // 최적화 설정 상태
   const [optimizationSettings, setOptimizationSettings] = useState<OptimizationSettings>(DEFAULT_OPTIMIZATION_SETTINGS);
@@ -569,99 +586,123 @@ export function AIOptimizationTab({
     }
   }, [selectedOptimizations, selectedGoal, storeId, sceneData, sceneSimulation, onOverlayToggle, onResultsUpdate, optimizationSettings, simulationEnvConfig]);
 
-  // As-Is 씬으로 복원 (3D 위치만 복원, 결과 데이터는 유지)
-  const handleRevertToAsIs = useCallback(() => {
-    // 1. 3D 모델 위치만 복원 (SceneProvider의 revertSimulationChanges 호출)
-    revertSimulationChanges();
+  // 🆕 뷰 모드 변경 핸들러 (연타 방지 + 3D 위치 적용)
+  const handleViewModeChange = useCallback(async (newMode: ViewMode) => {
+    // 이미 같은 모드면 무시
+    if (viewMode === newMode) return;
     
-    // 🔧 FIX: clearScenes() 제거 - 결과 데이터를 유지해야 To-Be 다시 적용 가능
-    // sceneSimulation.clearScenes(); // 이 줄 제거
-    
-    // 2. 레이아웃 오버레이만 끄기 (동선/직원배치 오버레이는 유지)
-    onOverlayToggle('layoutOptimization', false);
-    
-    toast.info('As-Is 상태로 복원되었습니다 (To-Be 다시 적용 가능)');
-  }, [onOverlayToggle, revertSimulationChanges]);
+    // 전환 중이면 무시 (연타 방지)
+    if (isTransitioning) {
+      console.log('[AIOptimizationTab] View mode transition blocked - already transitioning');
+      return;
+    }
 
-  // To-Be 씬 적용 - 3D 모델 위치 실제 변경 (가구 + 상품)
-  const handleApplyToBe = useCallback(async () => {
+    setIsTransitioning(true);
+    console.log('[AIOptimizationTab] View mode changing:', viewMode, '->', newMode);
+
     try {
       const results = sceneSimulation.state.results;
-
-      const payload: {
-        furnitureMoves?: any[];
-        productPlacements?: any[];
-      } = {};
-
-      // 1️⃣ 레이아웃 최적화 결과가 있으면 가구 이동 적용
-      // 모든 가능한 필드명 fallback
-      const rawFurnitureMoves = results.layout?.layoutChanges || 
-                                results.layout?.furnitureMoves ||
-                                results.layout?.furniture_changes ||
-                                results.layout?.furniture_moves || [];
       
-      if (rawFurnitureMoves.length > 0) {
-        // SceneProvider가 기대하는 형식으로 변환
-        payload.furnitureMoves = rawFurnitureMoves.map((move: any) => ({
-          furnitureId: move.furniture_id || move.furnitureId || move.entityId || move.id,
-          furnitureName: move.furniture_name || move.furnitureName || move.entityLabel || move.name,
-          toPosition: move.suggested_position || move.suggestedPosition || move.toPosition || move.new_position || {
-            x: move.new_x ?? move.x ?? 0,
-            y: move.new_y ?? move.y ?? 0,
-            z: move.new_z ?? move.z ?? 0,
-          },
-          rotation: move.rotation ?? move.new_rotation,
-          reason: move.reason || move.expected_effect,
-        }));
+      if (newMode === 'as-is') {
+        // As-Is: 원래 위치로 복원
+        revertSimulationChanges();
+        onOverlayToggle('layoutOptimization', false);
+      } else if (newMode === 'to-be' || newMode === 'compare') {
+        // To-Be 또는 비교: 최적화 위치로 이동
+        const rawFurnitureMoves = results.layout?.layoutChanges || 
+                                  results.layout?.furnitureMoves ||
+                                  results.layout?.furniture_changes ||
+                                  results.layout?.furniture_moves || [];
+        
+        if (rawFurnitureMoves.length > 0) {
+          const payload = {
+            furnitureMoves: rawFurnitureMoves.map((move: any) => ({
+              furnitureId: move.furniture_id || move.furnitureId || move.entityId || move.id,
+              furnitureName: move.furniture_name || move.furnitureName || move.entityLabel || move.name,
+              toPosition: move.suggested_position || move.suggestedPosition || move.toPosition || move.new_position || {
+                x: move.new_x ?? move.x ?? 0,
+                y: move.new_y ?? move.y ?? 0,
+                z: move.new_z ?? move.z ?? 0,
+              },
+              rotation: move.rotation ?? move.new_rotation,
+              reason: move.reason || move.expected_effect,
+            })),
+          };
+          applySimulationResults(payload);
+        }
+        
+        // 비교 모드일 때만 오버레이 표시
+        onOverlayToggle('layoutOptimization', newMode === 'compare');
       }
 
-      // 2️⃣ 상품 배치 결과가 있으면 상품 재배치 적용 (슬롯 기반)
-      const rawProductPlacements = results.layout?.productPlacements ||
-                                   results.layout?.product_placements ||
-                                   results.layout?.product_changes || [];
-      
-      if (rawProductPlacements.length > 0) {
-        payload.productPlacements = rawProductPlacements.map((p: any) => ({
-          productId: p.product_id || p.productId,
-          productSku: p.sku || p.productSku || p.product_sku,
-          toFurnitureId: p.suggested_furniture_id || p.toFurnitureId || p.target_furniture_id,
-          toSlotId: p.suggested_slot_id || p.toSlotId || p.target_slot_id,
-          toPosition: p.suggested_position || p.toPosition,
-          toSlotPosition: p.slot_position || p.toSlotPosition,
-          reason: p.reason,
-        }));
-      }
-
-      // 변경사항이 있을 때만 적용
-      if (payload.furnitureMoves?.length || payload.productPlacements?.length) {
-        console.log('[AIOptimizationTab] Applying To-Be:', payload);
-        applySimulationResults(payload);
-
-        const moveCount = payload.furnitureMoves?.length || 0;
-        const placementCount = payload.productPlacements?.length || 0;
-
-        toast.success(
-          `최적화 적용 완료: 가구 ${moveCount}개 이동, 상품 ${placementCount}개 재배치`
-        );
-      } else {
-        toast.warning('적용할 변경사항이 없습니다');
-      }
-
-      // 내부 상태도 업데이트
-      await sceneSimulation.applyAllChanges();
+      // 뷰 모드 상태 업데이트
+      setViewMode(newMode);
 
     } catch (error) {
-      console.error('Apply To-Be error:', error);
-      toast.error('적용에 실패했습니다');
+      console.error('[AIOptimizationTab] View mode change error:', error);
+      toast.error('뷰 모드 전환 중 오류가 발생했습니다');
+    } finally {
+      // 300ms 후 전환 잠금 해제 (애니메이션 완료 대기)
+      setTimeout(() => setIsTransitioning(false), 300);
     }
-  }, [sceneSimulation, applySimulationResults]);
+  }, [viewMode, isTransitioning, sceneSimulation.state.results, revertSimulationChanges, applySimulationResults, onOverlayToggle, setViewMode]);
 
-  // To-Be 씬 저장
+  // As-Is 버튼 클릭 핸들러
+  const handleRevertToAsIs = useCallback(() => {
+    handleViewModeChange('as-is');
+  }, [handleViewModeChange]);
+
+  // 비교 버튼 클릭 핸들러
+  const handleCompare = useCallback(() => {
+    handleViewModeChange('compare');
+  }, [handleViewModeChange]);
+
+  // To-Be 버튼 클릭 핸들러
+  const handleApplyToBe = useCallback(() => {
+    handleViewModeChange('to-be');
+  }, [handleViewModeChange]);
+
+  // To-Be 씬 저장 (개선: 결과 데이터 기반으로 저장)
   const handleSaveToBe = useCallback(async () => {
     try {
-      const sceneName = `최적화 씬 ${new Date().toLocaleDateString('ko-KR')}`;
-      await sceneSimulation.saveToBeScene(sceneName);
+      const { results } = sceneSimulation.state;
+      
+      // 저장할 결과가 없으면 에러
+      if (!results.layout && !results.flow && !results.staffing) {
+        toast.error('저장할 최적화 결과가 없습니다');
+        return;
+      }
+
+      const sceneName = `최적화 씬 ${new Date().toLocaleDateString('ko-KR')} ${new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}`;
+      
+      // toBeScene이 있으면 사용, 없으면 현재 sceneData에 결과 반영
+      if (sceneSimulation.state.toBeScene) {
+        await sceneSimulation.saveToBeScene(sceneName);
+      } else {
+        // 직접 저장 시도 - sceneSimulation의 내부 저장 로직 우회
+        toast.info('최적화 결과를 시나리오로 저장합니다');
+        
+        // 시나리오로 저장 (fallback)
+        const scenarioData = {
+          id: `tobe-scene-${Date.now()}`,
+          name: sceneName,
+          createdAt: new Date().toISOString(),
+          type: 'to-be-scene',
+          results: {
+            layout: results.layout,
+            flow: results.flow,
+            staffing: results.staffing,
+          },
+        };
+        
+        const savedScenes = JSON.parse(localStorage.getItem('optimization_tobe_scenes') || '[]');
+        savedScenes.push(scenarioData);
+        localStorage.setItem('optimization_tobe_scenes', JSON.stringify(savedScenes));
+        
+        toast.success('To-Be 씬이 저장되었습니다');
+      }
     } catch (error) {
+      console.error('Save To-Be error:', error);
       toast.error('저장에 실패했습니다');
     }
   }, [sceneSimulation]);
@@ -1056,25 +1097,60 @@ export function AIOptimizationTab({
                   />
                 )}
 
-                {/* As-Is / To-Be 액션 버튼 */}
-                <div className="flex gap-2 pt-2">
+                {/* 🆕 As-Is / 비교 / To-Be 뷰 모드 토글 (3버튼) */}
+                <div className="flex gap-1 p-1 bg-white/5 rounded-lg">
                   <Button
                     onClick={handleRevertToAsIs}
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
-                    className="flex-1 border-white/20 text-white/70 hover:text-white hover:bg-white/10"
+                    disabled={isTransitioning}
+                    className={cn(
+                      "flex-1 h-8 text-xs transition-all",
+                      viewMode === 'as-is' 
+                        ? "bg-blue-600 text-white hover:bg-blue-700" 
+                        : "text-white/60 hover:text-white hover:bg-white/10"
+                    )}
                   >
-                    <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
-                    As-Is 복원
+                    <Eye className="h-3.5 w-3.5 mr-1" />
+                    As-Is
+                  </Button>
+                  <Button
+                    onClick={handleCompare}
+                    variant="ghost"
+                    size="sm"
+                    disabled={isTransitioning}
+                    className={cn(
+                      "flex-1 h-8 text-xs transition-all",
+                      viewMode === 'compare' 
+                        ? "bg-purple-600 text-white hover:bg-purple-700" 
+                        : "text-white/60 hover:text-white hover:bg-white/10"
+                    )}
+                  >
+                    <GitCompare className="h-3.5 w-3.5 mr-1" />
+                    비교
                   </Button>
                   <Button
                     onClick={handleApplyToBe}
+                    variant="ghost"
                     size="sm"
-                    className="flex-1 bg-blue-600 hover:bg-blue-700"
+                    disabled={isTransitioning}
+                    className={cn(
+                      "flex-1 h-8 text-xs transition-all",
+                      viewMode === 'to-be' 
+                        ? "bg-green-600 text-white hover:bg-green-700" 
+                        : "text-white/60 hover:text-white hover:bg-white/10"
+                    )}
                   >
-                    <Check className="h-3.5 w-3.5 mr-1.5" />
-                    To-Be 적용
+                    <Sparkles className="h-3.5 w-3.5 mr-1" />
+                    To-Be
                   </Button>
+                </div>
+
+                {/* 현재 뷰 모드 설명 */}
+                <div className="text-[10px] text-center text-white/40 py-1">
+                  {viewMode === 'as-is' && '📍 현재 배치 상태'}
+                  {viewMode === 'compare' && '🔄 As-Is → To-Be 변화 비교 (오버레이 표시)'}
+                  {viewMode === 'to-be' && '✨ 최적화 결과 적용 상태'}
                 </div>
 
                 {/* 저장 버튼 그룹 */}
