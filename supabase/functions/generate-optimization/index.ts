@@ -756,9 +756,20 @@ Deno.serve(async (req) => {
       console.warn('[generate-optimization] Failed to log response:', logError);
     }
 
+    // 🆕 3D 시각화 데이터 생성 (아키텍처 통합)
+    const visualizationData = generateVisualizationData(
+      result,
+      flowAnalysis,
+      layoutData,
+      layoutData.zones
+    );
+    console.log(`[generate-optimization] Visualization data generated: layout=${visualizationData.layout.furnitureMoves.length}+${visualizationData.layout.productMoves.length}, flow=${visualizationData.flow.zoneFlowArrows.length}, staffing=${visualizationData.staffing.staffMarkers.length}`);
+
     return new Response(JSON.stringify({
       success: true,
       result,
+      // 🆕 3D 시각화 데이터 (useSceneSimulation.ts 호환)
+      visualization: visualizationData,
       data_summary: {
         furniture_analyzed: layoutData.furniture.length,
         products_analyzed: layoutData.products.length,
@@ -2650,4 +2661,234 @@ function extractKeywords(name: string, description: string): string[] {
   }
 
   return keywords;
+}
+
+// ============================================================================
+// 🆕 3D 시각화 데이터 생성 함수 (아키텍처 통합)
+// ============================================================================
+
+interface VisualizationData {
+  layout: {
+    furnitureMoves: Array<{
+      furnitureId: string;
+      furnitureCode?: string;
+      furnitureName?: string;
+      from: Vector3D;
+      to: Vector3D;
+      reason: string;
+      priority: string;
+    }>;
+    productMoves: Array<{
+      productId: string;
+      productSku?: string;
+      productName?: string;
+      from: { zoneId?: string; furnitureId?: string; slotId?: string; position?: Vector3D };
+      to: { zoneId?: string; furnitureId?: string; slotId?: string; position?: Vector3D };
+      reason: string;
+      priority: string;
+    }>;
+  };
+  flow: {
+    zoneFlowArrows: Array<{
+      from: { x: number; z: number };
+      to: { x: number; z: number };
+      intensity: number;
+      label?: string;
+    }>;
+    bottlenecks: Array<{
+      zoneId: string;
+      zoneName: string;
+      position: Vector3D;
+      severity: number;
+      suggestion: string;
+    }>;
+    deadZones: Array<{
+      zoneId: string;
+      zoneName: string;
+      position: Vector3D;
+      severity: number;
+      reason: string;
+    }>;
+    paths: Array<{
+      pathId: string;
+      zoneNames: string[];
+      frequency: number;
+      pathType: string;
+    }>;
+  };
+  staffing: {
+    staffMarkers: Array<{
+      staffId: string;
+      staffName: string;
+      role: string;
+      currentPosition: Vector3D;
+      suggestedPosition: Vector3D;
+    }>;
+    coverageZones: Array<{
+      zoneId: string;
+      zoneName: string;
+      currentCoverage: number;
+      suggestedCoverage: number;
+      center: Vector3D;
+      radius: number;
+    }>;
+    movementPaths: Array<{
+      staffId: string;
+      from: Vector3D;
+      to: Vector3D;
+    }>;
+  };
+}
+
+/**
+ * 최적화 결과와 분석 데이터로부터 3D 시각화 데이터 생성
+ */
+function generateVisualizationData(
+  result: AILayoutOptimizationResult,
+  flowAnalysis: FlowAnalysisResult | null,
+  layoutData: any,
+  zones: any[]
+): VisualizationData {
+  // 1. Layout 시각화 데이터
+  const furnitureMoves = (result.furniture_changes || []).map((fc: FurnitureChange) => {
+    // 현재 위치 찾기
+    const currentFurniture = layoutData?.furniture?.find((f: any) =>
+      f.id === fc.furniture_id || f.furniture_code === fc.furniture_type
+    );
+
+    return {
+      furnitureId: fc.furniture_id,
+      furnitureCode: fc.furniture_type,
+      furnitureName: fc.furniture_label || fc.furniture_type,
+      from: currentFurniture ? {
+        x: currentFurniture.position_x || 0,
+        y: currentFurniture.position_y || 0,
+        z: currentFurniture.position_z || 0,
+      } : { x: 0, y: 0, z: 0 },
+      to: fc.suggested?.position || { x: 0, y: 0, z: 0 },
+      reason: fc.reason,
+      priority: fc.priority,
+    };
+  });
+
+  const productMoves = (result.product_changes || []).map((pc: ProductChange) => ({
+    productId: pc.product_id,
+    productSku: pc.sku,
+    productName: pc.product_name || pc.sku,
+    from: {
+      zoneId: pc.current?.zone_id,
+      furnitureId: pc.current?.furniture_id,
+      slotId: pc.current?.slot_id,
+      position: pc.current?.position,
+    },
+    to: {
+      zoneId: pc.suggested?.zone_id,
+      furnitureId: pc.suggested?.furniture_id,
+      slotId: pc.suggested?.slot_id,
+      position: pc.suggested?.position,
+    },
+    reason: pc.reason,
+    priority: pc.priority,
+  }));
+
+  // 2. Flow 시각화 데이터
+  const zonePositionMap = new Map<string, Vector3D>();
+  zones.forEach((zone: any) => {
+    zonePositionMap.set(zone.zone_name || zone.id, {
+      x: zone.center_x || zone.position_x || 0,
+      y: 0.1,
+      z: zone.center_z || zone.position_z || 0,
+    });
+  });
+
+  // keyPaths에서 flow arrows 생성
+  const zoneFlowArrows = flowAnalysis?.keyPaths?.slice(0, 10).map((path, idx) => {
+    const fromZone = path.zoneNames[0];
+    const toZone = path.zoneNames[path.zoneNames.length - 1];
+    const fromPos = zonePositionMap.get(fromZone) || { x: -5 + idx, y: 0, z: -5 };
+    const toPos = zonePositionMap.get(toZone) || { x: 5 - idx, y: 0, z: 5 };
+
+    return {
+      from: { x: fromPos.x, z: fromPos.z },
+      to: { x: toPos.x, z: toPos.z },
+      intensity: Math.min(1, path.frequency / 100),
+      label: path.zoneNames.join(' → '),
+    };
+  }) || [];
+
+  const bottlenecks = flowAnalysis?.bottlenecks?.map((bn) => {
+    const pos = zonePositionMap.get(bn.zoneName) || { x: 0, y: 0, z: 0 };
+    return {
+      zoneId: bn.zoneId,
+      zoneName: bn.zoneName,
+      position: pos,
+      severity: bn.severity,
+      suggestion: bn.suggestions?.[0] || '혼잡도 개선이 필요합니다.',
+    };
+  }) || [];
+
+  const deadZones = flowAnalysis?.deadZones?.map((dz) => {
+    const pos = zonePositionMap.get(dz.zoneName) || { x: 0, y: 0, z: 0 };
+    return {
+      zoneId: dz.zoneId,
+      zoneName: dz.zoneName,
+      position: pos,
+      severity: dz.severity,
+      reason: dz.reason,
+    };
+  }) || [];
+
+  const paths = flowAnalysis?.keyPaths?.slice(0, 5).map((p, idx) => ({
+    pathId: `path-${idx}`,
+    zoneNames: p.zoneNames,
+    frequency: p.frequency,
+    pathType: p.pathType,
+  })) || [];
+
+  // 3. Staffing 시각화 데이터
+  const staffingResult = result.staffing_result;
+
+  const staffMarkers = staffingResult?.staffPositions?.map((sp: StaffPosition) => ({
+    staffId: sp.staffId,
+    staffName: sp.staffName,
+    role: sp.role,
+    currentPosition: sp.currentPosition,
+    suggestedPosition: sp.suggestedPosition,
+  })) || [];
+
+  const coverageZones = staffingResult?.zoneCoverage?.map((zc: ZoneCoverage) => {
+    const pos = zonePositionMap.get(zc.zoneName) || { x: 0, y: 0, z: 0 };
+    return {
+      zoneId: zc.zoneId,
+      zoneName: zc.zoneName,
+      currentCoverage: zc.currentCoverage,
+      suggestedCoverage: zc.suggestedCoverage,
+      center: pos,
+      radius: 3,
+    };
+  }) || [];
+
+  const movementPaths = staffingResult?.staffPositions?.map((sp: StaffPosition) => ({
+    staffId: sp.staffId,
+    from: sp.currentPosition,
+    to: sp.suggestedPosition,
+  })) || [];
+
+  return {
+    layout: {
+      furnitureMoves,
+      productMoves,
+    },
+    flow: {
+      zoneFlowArrows,
+      bottlenecks,
+      deadZones,
+      paths,
+    },
+    staffing: {
+      staffMarkers,
+      coverageZones,
+      movementPaths,
+    },
+  };
 }
