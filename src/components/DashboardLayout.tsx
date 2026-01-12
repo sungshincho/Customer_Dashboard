@@ -6,7 +6,7 @@
  * - Monochrome (Black/White) theme
  */
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -28,17 +28,18 @@ interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
+// Cookie에서 사이드바 상태 읽기 (컴포넌트 외부에서 초기값 계산)
+const getInitialSidebarState = () => {
+  const cookie = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith("sidebar:state="));
+  return cookie ? cookie.split("=")[1] === "true" : true;
+};
+
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const { user, signOut } = useAuth();
   const [isDark, setIsDark] = useState(false);
-
-  // Cookie에서 사이드바 상태 읽기
-  const defaultSidebarOpen = useMemo(() => {
-    const cookie = document.cookie
-      .split("; ")
-      .find((row) => row.startsWith("sidebar:state="));
-    return cookie ? cookie.split("=")[1] === "true" : true;
-  }, []);
+  const [sidebarOpen, setSidebarOpen] = useState(getInitialSidebarState);
 
   // 다크모드 감지
   useEffect(() => {
@@ -62,7 +63,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   };
 
   return (
-    <SidebarProvider defaultOpen={defaultSidebarOpen}>
+    <SidebarProvider open={sidebarOpen} onOpenChange={setSidebarOpen}>
       <div className="flex min-h-screen w-full relative">
         {/* ===== Background Layers ===== */}
         
