@@ -197,7 +197,7 @@ SET margin_rate = 0.35  -- 기본 마진 35%
 WHERE margin_rate IS NULL;
 
 -- ============================================================================
--- 6. AI 파싱 성공률 집계 뷰
+-- 6. AI 파싱 성공률 집계 뷰 (수정됨)
 -- ============================================================================
 
 CREATE OR REPLACE VIEW ai_parse_success_stats AS
@@ -211,7 +211,7 @@ SELECT
     100.0 * SUM(CASE WHEN parse_success THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0),
     2
   ) as success_rate_percent,
-  AVG(response_time_ms) as avg_response_time_ms
+  AVG(execution_time_ms) as avg_execution_time_ms  -- ✅ 수정: response_time_ms → execution_time_ms
 FROM ai_response_logs
 WHERE created_at >= NOW() - INTERVAL '30 days'
 GROUP BY function_name, DATE(created_at)
