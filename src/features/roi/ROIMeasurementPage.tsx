@@ -108,18 +108,69 @@ export const ROIMeasurementPage: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="p-6 space-y-6 min-h-screen">
-        {/* 헤더 */}
+        {/* 헤더 - InsightHub/Settings 스타일 */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className={`text-2xl font-bold flex items-center gap-3 ${isDark ? 'text-white' : 'text-black'}`}>
-              <div className={`p-2 rounded-lg ${isDark ? 'bg-white/10' : 'bg-black/5'}`}>
-                <TrendingUp className={`w-6 h-6 ${isDark ? 'text-white' : 'text-black'}`} />
-              </div>
-              ROI 측정 대시보드
-            </h1>
-            <p className={`mt-1 ${isDark ? 'text-white/60' : 'text-black/60'}`}>
-              모든 시뮬레이션 적용 결과를 한눈에 추적하고 분석하세요
-            </p>
+          <div className="flex items-center gap-5">
+            {/* Logo - 3D glassmorphism button style */}
+            <div
+              className="w-12 h-12 rounded-2xl flex items-center justify-center relative"
+              style={{
+                background: 'linear-gradient(145deg, #2f2f38 0%, #1c1c22 35%, #282830 65%, #1e1e26 100%)',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.18), 0 4px 8px rgba(0,0,0,0.16), 0 8px 16px rgba(0,0,0,0.12), 0 16px 32px rgba(0,0,0,0.08), inset 0 1px 1px rgba(255,255,255,0.12)',
+                border: '1px solid rgba(255,255,255,0.1)',
+              }}
+            >
+              {/* Chrome highlight */}
+              <div
+                className="absolute"
+                style={{
+                  top: '2px',
+                  left: '18%',
+                  right: '18%',
+                  height: '1px',
+                  background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent)',
+                }}
+              />
+              <TrendingUp
+                className="h-5 w-5"
+                style={{
+                  color: '#ffffff',
+                  filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.4))',
+                }}
+              />
+            </div>
+
+            {/* Title */}
+            <div>
+              <h1
+                className="text-2xl"
+                style={{
+                  fontWeight: 800,
+                  letterSpacing: '-0.03em',
+                  ...(isDark ? {
+                    color: '#ffffff',
+                    textShadow: '0 2px 4px rgba(0,0,0,0.4)',
+                  } : {
+                    background: 'linear-gradient(180deg, #1a1a1f 0%, #0a0a0c 35%, #1a1a1f 70%, #0c0c0e 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.08))',
+                  }),
+                }}
+              >
+                ROI 측정 대시보드
+              </h1>
+              <p
+                className="text-sm mt-0.5"
+                style={{
+                  fontWeight: 500,
+                  color: isDark ? 'rgba(255,255,255,0.6)' : '#515158',
+                  textShadow: isDark ? 'none' : '0 1px 0 rgba(255,255,255,0.5)',
+                }}
+              >
+                모든 시뮬레이션 적용 결과를 한눈에 추적하고 분석하세요
+              </p>
+            </div>
           </div>
 
           <div className="flex items-center gap-3">

@@ -18,6 +18,7 @@ import {
   Package,
   TrendingUp,
   Sparkles,
+  BarChart3,
 } from 'lucide-react';
 
 // Data Provider (통합 데이터소스)
@@ -90,17 +91,13 @@ function InsightHubContent({ activeTab, setActiveTab }: {
                   background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent)',
                 }}
               />
-              <span
-                className="text-xl font-bold"
+              <BarChart3
+                className="h-5 w-5"
                 style={{
-                  background: 'linear-gradient(180deg, #ffffff 0%, #c8c8cc 50%, #ffffff 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
+                  color: '#ffffff',
                   filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.4))',
                 }}
-              >
-                N
-              </span>
+              />
             </div>
 
             {/* Title */}
