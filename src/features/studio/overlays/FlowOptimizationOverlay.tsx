@@ -175,13 +175,24 @@ function FlowHeatmap({ data }: FlowHeatmapProps) {
     const positions = geo.attributes.position.array as Float32Array;
     const colors = new Float32Array(positions.length);
 
+    // 🔧 FIX: 유효한 데이터만 필터링 (NaN 방지)
+    const validData = (data || []).filter(point => 
+      point &&
+      typeof point.x === 'number' && 
+      typeof point.z === 'number' && 
+      typeof point.density === 'number' &&
+      Number.isFinite(point.x) && 
+      Number.isFinite(point.z) &&
+      Number.isFinite(point.density)
+    );
+
     for (let i = 0; i < positions.length; i += 3) {
       const x = positions[i];
       const z = positions[i + 1];
 
       // 가장 가까운 포인트의 밀도 찾기
       let density = 0;
-      data.forEach((point) => {
+      validData.forEach((point) => {
         const dist = Math.sqrt(Math.pow(x - point.x, 2) + Math.pow(z - point.z, 2));
         if (dist < 2) {
           density = Math.max(density, point.density * (1 - dist / 2));
