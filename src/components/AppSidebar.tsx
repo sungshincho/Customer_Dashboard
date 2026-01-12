@@ -114,7 +114,7 @@ export function AppSidebar() {
         {/* 메인 메뉴 (4개) */}
         <SidebarGroup className="mt-4">
           <SidebarGroupContent>
-            <SidebarMenu className={collapsed ? "space-y-9 flex flex-col items-center" : "space-y-2"}>
+            <SidebarMenu className={collapsed ? "space-y-[38px] flex flex-col items-center" : "space-y-2"}>
               {mainMenuItems.map((item) => {
                 const active = isActive(item.url);
                 return (
