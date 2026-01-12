@@ -76,6 +76,7 @@ COMMENT ON COLUMN ai_response_logs.raw_response_length IS 'AI 원본 응답 문�
 DROP POLICY IF EXISTS "learning_sessions_insert_policy" ON learning_sessions;
 DROP POLICY IF EXISTS "learning_sessions_select_policy" ON learning_sessions;
 DROP POLICY IF EXISTS "learning_sessions_update_policy" ON learning_sessions;
+DROP POLICY IF EXISTS "learning_sessions_all_policy" ON learning_sessions;
 
 -- 모든 작업 허용 (Edge Function은 service_role 사용)
 CREATE POLICY "learning_sessions_all_policy" ON learning_sessions
@@ -88,6 +89,7 @@ CREATE POLICY "learning_sessions_all_policy" ON learning_sessions
 DROP POLICY IF EXISTS "learning_adjustments_insert_policy" ON learning_adjustments;
 DROP POLICY IF EXISTS "learning_adjustments_select_policy" ON learning_adjustments;
 DROP POLICY IF EXISTS "learning_adjustments_update_policy" ON learning_adjustments;
+DROP POLICY IF EXISTS "learning_adjustments_all_policy" ON learning_adjustments;
 
 CREATE POLICY "learning_adjustments_all_policy" ON learning_adjustments
   FOR ALL USING (true) WITH CHECK (true);
@@ -99,6 +101,7 @@ CREATE POLICY "learning_adjustments_all_policy" ON learning_adjustments
 DROP POLICY IF EXISTS "stored_model_parameters_insert_policy" ON stored_model_parameters;
 DROP POLICY IF EXISTS "stored_model_parameters_select_policy" ON stored_model_parameters;
 DROP POLICY IF EXISTS "stored_model_parameters_update_policy" ON stored_model_parameters;
+DROP POLICY IF EXISTS "stored_model_parameters_all_policy" ON stored_model_parameters;
 
 CREATE POLICY "stored_model_parameters_all_policy" ON stored_model_parameters
   FOR ALL USING (true) WITH CHECK (true);
@@ -110,6 +113,7 @@ CREATE POLICY "stored_model_parameters_all_policy" ON stored_model_parameters
 DROP POLICY IF EXISTS "prediction_records_insert_policy" ON prediction_records;
 DROP POLICY IF EXISTS "prediction_records_select_policy" ON prediction_records;
 DROP POLICY IF EXISTS "prediction_records_update_policy" ON prediction_records;
+DROP POLICY IF EXISTS "prediction_records_all_policy" ON prediction_records;
 
 CREATE POLICY "prediction_records_all_policy" ON prediction_records
   FOR ALL USING (true) WITH CHECK (true);
