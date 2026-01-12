@@ -115,13 +115,22 @@ const formatPercent = (value: number | null): string => {
   return `${value.toFixed(0)}%`;
 };
 
-const getStatusIcon = (status: StrategyStatus): string => {
-  return STATUS_CONFIG[status]?.icon || '❓';
+const getStatusLabel = (status: StrategyStatus): string => {
+  switch (status) {
+    case 'active': return '진행중';
+    case 'cancelled': return '취소됨';
+    case 'completed': return '완료';
+    default: return '-';
+  }
 };
 
-const getResultIcon = (result: StrategyResult): string => {
-  if (!result) return '🔄';
-  return RESULT_CONFIG[result]?.icon || '❓';
+const getResultLabel = (result: StrategyResult): string => {
+  switch (result) {
+    case 'success': return '목표 달성';
+    case 'partial': return '부분 달성';
+    case 'failed': return '미달성';
+    default: return '-';
+  }
 };
 
 export const AppliedStrategyTable: React.FC<AppliedStrategyTableProps> = ({
@@ -307,8 +316,8 @@ export const AppliedStrategyTable: React.FC<AppliedStrategyTableProps> = ({
                         <td style={{ textAlign: 'center', padding: '12px 8px', fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>
                           {formatPercent(actualRoi)}
                         </td>
-                        <td style={{ textAlign: 'center', padding: '12px 8px', fontSize: '16px' }}>
-                          {item.status === 'completed' ? getResultIcon(item.result) : getStatusIcon(item.status)}
+                        <td style={{ textAlign: 'center', padding: '12px 8px', fontSize: '12px', fontWeight: 500, color: isDark ? '#fff' : '#1a1a1f' }}>
+                          {item.status === 'completed' ? getResultLabel(item.result) : getStatusLabel(item.status)}
                         </td>
                       </tr>
                     );

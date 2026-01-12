@@ -163,8 +163,23 @@ export const StrategyDetailModal: React.FC<StrategyDetailModalProps> = ({
               <DialogTitle style={{ color: textPrimary }} className="text-xl">{strategy.name}</DialogTitle>
               <p className="text-sm mt-1" style={{ color: textMuted }}>
                 적용일: {formatDate(strategy.startDate)} | 상태:{' '}
-                <span className={STATUS_CONFIG[strategy.status].color}>
-                  {STATUS_CONFIG[strategy.status].icon} {STATUS_CONFIG[strategy.status].label}
+                <span style={{
+                  color: strategy.status === 'cancelled'
+                    ? '#ef4444'
+                    : strategy.status === 'active'
+                      ? '#3b82f6'
+                      : textPrimary,
+                  fontWeight: 500
+                }}>
+                  {strategy.status === 'cancelled'
+                    ? '취소됨'
+                    : strategy.status === 'active'
+                      ? '진행중'
+                      : strategy.result === 'success'
+                        ? '완료 (목표 달성)'
+                        : strategy.result === 'partial'
+                          ? '완료 (부분 달성)'
+                          : '완료 (미달성)'}
                 </span>
                 {daysRemaining !== null && ` (D+${daysPassed}/${totalDays})`}
               </p>
