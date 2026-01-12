@@ -52,7 +52,15 @@ export function StaffingOverlay({
   const [hoveredStaff, setHoveredStaff] = useState<string | null>(null);
   const [hoveredZone, setHoveredZone] = useState<string | null>(null);
 
+  // 🔧 FIX: result가 없거나 staffPositions가 비어있으면 렌더링 안 함 (임의 데이터 방지)
   if (!result || !result.visualization) return null;
+  
+  // 🔧 FIX: staffPositions가 0개면 렌더링 안 함
+  const hasValidStaffData = result.staffPositions && result.staffPositions.length > 0;
+  if (!hasValidStaffData) {
+    console.log('[StaffingOverlay] No valid staff data, skipping render');
+    return null;
+  }
 
   const { visualization, staffPositions, zoneCoverage, metrics } = result;
 
