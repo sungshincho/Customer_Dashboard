@@ -44,32 +44,64 @@ export function GlobalDateFilter({
   // 팝오버 열릴 때 임시 상태 초기화
   useEffect(() => {
     if (isOpen) {
-      // 팝오버가 열리면 임시 선택 상태를 현재 저장된 범위로 설정
-      setTempRange({
-        from: parseISO(dateRange.startDate),
-        to: parseISO(dateRange.endDate),
-      });
+      // "오늘" 프리셋인 경우 시작 날짜만 선택된 상태로 설정
+      if (dateRange.preset === 'today') {
+        setTempRange({
+          from: parseISO(dateRange.startDate),
+          to: undefined,
+        });
+      } else {
+        // 다른 프리셋(7일, 30일, 90일, custom)은 범위로 설정
+        setTempRange({
+          from: parseISO(dateRange.startDate),
+          to: parseISO(dateRange.endDate),
+        });
+      }
     }
-  }, [isOpen, dateRange.startDate, dateRange.endDate]);
+  }, [isOpen, dateRange.startDate, dateRange.endDate, dateRange.preset]);
 
   const handleDateRangeSelect = useCallback((range: DateRange | undefined) => {
-    // 임시 상태 업데이트
-    setTempRange(range);
+    // 시작/종료 날짜가 모두 선택된 상태에서 새 날짜 클릭 시 초기화
+    if (tempRange?.from && tempRange?.to && range?.from) {
+      // 기존 범위가 완성된 상태에서 새로 클릭하면 시작 날짜로 초기화
+      setTempRange({
+        from: range.from,
+        to: undefined,
+      });
+      return;
+    }
 
-    // 두 날짜가 모두 선택되면 저장하고 팝오버 닫기
-    if (range?.from && range?.to) {
+    // 임시 상태 업데이트 (자동 닫힘 제거됨 - 적용 버튼으로 닫음)
+    setTempRange(range);
+  }, [tempRange]);
+
+  // 초기화 버튼 핸들러 - 선택된 날짜 해제
+  const handleReset = useCallback(() => {
+    setTempRange({ from: undefined, to: undefined });
+  }, []);
+
+  // 적용 버튼 핸들러
+  const handleApply = useCallback(() => {
+    if (tempRange?.from && tempRange?.to) {
       setCustomRange(
-        format(range.from, 'yyyy-MM-dd'),
-        format(range.to, 'yyyy-MM-dd')
+        format(tempRange.from, 'yyyy-MM-dd'),
+        format(tempRange.to, 'yyyy-MM-dd')
       );
       setIsOpen(false);
     }
-  }, [setCustomRange]);
+  }, [tempRange, setCustomRange]);
 
-  // 초기화 버튼 핸들러
-  const handleReset = useCallback(() => {
-    setTempRange(undefined);
-  }, []);
+  // 팝오버 외부 클릭 시 (onOpenChange)
+  const handleOpenChange = useCallback((open: boolean) => {
+    if (!open && tempRange?.from && tempRange?.to) {
+      // 닫힐 때 시작/종료 날짜가 모두 선택되어 있으면 적용
+      setCustomRange(
+        format(tempRange.from, 'yyyy-MM-dd'),
+        format(tempRange.to, 'yyyy-MM-dd')
+      );
+    }
+    setIsOpen(open);
+  }, [tempRange, setCustomRange]);
 
   const displayRange: DateRange = tempRange ?? {
     from: parseISO(dateRange.startDate),
@@ -99,7 +131,7 @@ export function GlobalDateFilter({
       </div>
 
       {showCustom && (
-        <Popover open={isOpen} onOpenChange={setIsOpen}>
+        <Popover open={isOpen} onOpenChange={handleOpenChange}>
           <PopoverTrigger asChild>
             <Button
               variant={dateRange.preset === 'custom' ? 'default' : 'outline'}
@@ -127,14 +159,24 @@ export function GlobalDateFilter({
                   ? '종료일을 선택하세요'
                   : '날짜 범위 선택'}
               </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 px-2 text-xs"
-                onClick={handleReset}
-              >
-                초기화
-              </Button>
+              <div className="flex gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  onClick={handleReset}
+                >
+                  초기화
+                </Button>
+                <Button
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  onClick={handleApply}
+                  disabled={!tempRange?.from || !tempRange?.to}
+                >
+                  적용
+                </Button>
+              </div>
             </div>
             <Calendar
               initialFocus
