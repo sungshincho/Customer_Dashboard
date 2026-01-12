@@ -186,6 +186,7 @@ export function GlobalDateFilter({
               </div>
             </div>
             <Calendar
+              key={`${dateRange.startDate}-${dateRange.preset}`}
               initialFocus
               mode="range"
               defaultMonth={displayRange.from}
