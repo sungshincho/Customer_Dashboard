@@ -1,18 +1,18 @@
 /**
  * ViewModeToggle.tsx
  *
- * 3D 뷰어 As-Is / To-Be / Split 모드 전환 토글
- * - As-Is: 현재 배치
- * - To-Be: 최적화 결과
- * - Split: 좌우 분할 비교
+ * 3D 뷰어 As-Is / 비교 / To-Be 모드 전환 토글
+ * - As-Is: 현재 배치 (시각 효과 없음)
+ * - compare: As-Is → To-Be 변화 비교 (빨간/초록 박스, 점선 화살표)
+ * - To-Be: 최적화 결과 (시각 효과 없음)
  */
 
 import { useEffect, useCallback } from 'react';
-import { Eye, GitCompare, Columns } from 'lucide-react';
+import { Eye, GitCompare, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 
-export type ViewMode = 'as-is' | 'to-be' | 'split';
+export type ViewMode = 'as-is' | 'compare' | 'to-be';
 
 interface ViewModeToggleProps {
   mode: ViewMode;
@@ -31,20 +31,20 @@ const modeConfig = [
     activeColor: 'bg-blue-600 text-white',
   },
   {
+    id: 'compare' as ViewMode,
+    label: '비교',
+    shortcut: 'C',
+    icon: GitCompare,
+    description: 'As-Is ↔ To-Be 변화 비교',
+    activeColor: 'bg-purple-600 text-white',
+  },
+  {
     id: 'to-be' as ViewMode,
     label: 'To-Be',
     shortcut: 'T',
-    icon: GitCompare,
+    icon: Sparkles,
     description: '최적화 결과',
     activeColor: 'bg-green-600 text-white',
-  },
-  {
-    id: 'split' as ViewMode,
-    label: 'Split',
-    shortcut: 'S',
-    icon: Columns,
-    description: '좌우 비교',
-    activeColor: 'bg-purple-600 text-white',
   },
 ];
 
@@ -73,12 +73,12 @@ export function ViewModeToggle({
     if (key === 'a') {
       e.preventDefault();
       onChange('as-is');
+    } else if (key === 'c' && canUseToBe) {
+      e.preventDefault();
+      onChange('compare');
     } else if (key === 't' && canUseToBe) {
       e.preventDefault();
       onChange('to-be');
-    } else if (key === 's' && canUseToBe) {
-      e.preventDefault();
-      onChange('split');
     }
   }, [onChange, canUseToBe]);
 
