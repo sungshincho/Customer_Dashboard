@@ -114,7 +114,7 @@ export function AppSidebar() {
         {/* 메인 메뉴 (4개) */}
         <SidebarGroup className="mt-4">
           <SidebarGroupContent>
-            <SidebarMenu className="space-y-2">
+            <SidebarMenu className={collapsed ? "space-y-4" : "space-y-2"}>
               {mainMenuItems.map((item) => {
                 const active = isActive(item.url);
                 return (
@@ -124,7 +124,7 @@ export function AppSidebar() {
                         to={item.url}
                         className={`hover:bg-muted/50 dark:hover:bg-white/10 rounded-lg transition-colors ${
                           active && !collapsed ? 'bg-primary/10 dark:bg-white/10 border-l-4 border-primary dark:border-white' : ''
-                        } ${collapsed ? 'flex items-center justify-center !bg-transparent hover:!bg-transparent py-[10px]' : ''}`}
+                        } ${collapsed ? 'flex items-center justify-center !bg-transparent hover:!bg-transparent' : ''}`}
                         activeClassName={!collapsed ? "bg-primary/10 dark:bg-white/10 text-primary dark:text-white font-medium" : ""}
                       >
                         <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}>
