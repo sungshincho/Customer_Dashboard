@@ -114,15 +114,15 @@ export function AppSidebar() {
                 const active = isActive(item.url);
                 return (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild className="h-auto py-3">
+                    <SidebarMenuButton asChild className="h-[60px] py-0">
                       <NavLink
                         to={item.url}
-                        className={`hover:bg-muted/50 dark:hover:bg-white/10 rounded-lg transition-colors ${
+                        className={`hover:bg-muted/50 dark:hover:bg-white/10 rounded-lg transition-colors h-full ${
                           active && !collapsed ? 'bg-primary/10 dark:bg-white/10 border-l-4 border-primary dark:border-white' : ''
                         } ${collapsed ? 'flex items-center justify-center' : ''}`}
                         activeClassName={!collapsed ? "bg-primary/10 dark:bg-white/10 text-primary dark:text-white font-medium" : ""}
                       >
-                        <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}>
+                        <div className={`flex items-center h-full ${collapsed ? 'justify-center' : 'gap-3'}`}>
                           {collapsed ? (
                             <div
                               className="w-10 h-10 rounded-xl flex items-center justify-center relative"
