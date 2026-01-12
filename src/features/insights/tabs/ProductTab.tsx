@@ -206,6 +206,8 @@ interface DonutChartProps {
   isDark: boolean;
 }
 
+const OTHERS_THRESHOLD = 5; // 5% 미만은 "기타"로 표시
+
 const GlowDonutChart = ({ data, isDark }: DonutChartProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -214,6 +216,17 @@ const GlowDonutChart = ({ data, isDark }: DonutChartProps) => {
   const anglesRef = useRef<Array<{ start: number; end: number; data: { name: string; revenue: number } }>>([]);
   const animationRef = useRef<number>(0);
   const [progress, setProgress] = useState(0);
+
+  // 5% 미만 카테고리 계산
+  const total = useMemo(() => data.reduce((s, d) => s + d.revenue, 0), [data]);
+  const othersCategories = useMemo(() =>
+    data.filter(d => (d.revenue / total) * 100 < OTHERS_THRESHOLD),
+    [data, total]
+  );
+  const othersTotal = useMemo(() =>
+    othersCategories.reduce((s, d) => s + d.revenue, 0),
+    [othersCategories]
+  );
 
   useEffect(() => {
     const update = () => {
@@ -259,33 +272,49 @@ const GlowDonutChart = ({ data, isDark }: DonutChartProps) => {
     const angles: typeof anglesRef.current = [];
     const maxA = Math.PI * 2 * progress;
     let acc = 0;
-    
+
+    // "기타" 라벨 위치 계산을 위한 변수
+    let othersStartAngle = 0;
+    let othersEndAngle = 0;
+    let hasOthers = false;
+
     const getColor = (i: number, o: number) => {
       const b = isDark ? [0.85, 0.6, 0.4, 0.25, 0.15, 0.1][i] || 0.3 : [0.9, 0.65, 0.45, 0.3, 0.2, 0.12][i] || 0.3;
       return isDark ? `rgba(255,255,255,${o * b})` : `rgba(0,0,0,${o * b})`;
     };
-    
+
     data.forEach((seg, i) => {
       const full = (seg.revenue / total) * Math.PI * 2;
       const rem = maxA - acc;
       if (rem <= 0) return;
       const slice = Math.min(full, rem);
       const mid = cur + full / 2;
-      
+      const pctValue = (seg.revenue / total) * 100;
+      const isOthers = pctValue < OTHERS_THRESHOLD;
+
       if (progress >= 1) angles.push({ start: cur, end: cur + full, data: seg });
-      
+
+      // "기타" 범위 추적
+      if (isOthers) {
+        if (!hasOthers) {
+          othersStartAngle = cur;
+          hasOthers = true;
+        }
+        othersEndAngle = cur + full;
+      }
+
       const grad = ctx.createRadialGradient(cx, cy, ir, cx, cy, or);
       grad.addColorStop(0, getColor(i, 0.3));
       grad.addColorStop(0.6, getColor(i, 0.55));
       grad.addColorStop(1, getColor(i, 0.85));
-      
+
       ctx.beginPath();
       ctx.arc(cx, cy, or, cur, cur + slice);
       ctx.arc(cx, cy, ir, cur + slice, cur, true);
       ctx.closePath();
       ctx.fillStyle = grad;
       ctx.fill();
-      
+
       if (slice >= full - 0.01) {
         ctx.strokeStyle = isDark ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.9)';
         ctx.lineWidth = 2;
@@ -294,21 +323,34 @@ const GlowDonutChart = ({ data, isDark }: DonutChartProps) => {
         ctx.lineTo(cx + Math.cos(cur + slice) * or, cy + Math.sin(cur + slice) * or);
         ctx.stroke();
       }
-      
-      if (progress >= 1) {
+
+      // 5% 이상인 카테고리만 개별 라벨 표시
+      if (progress >= 1 && !isOthers) {
         const lr = or + 22;
         const lx = cx + Math.cos(mid) * lr, ly = cy + Math.sin(mid) * lr;
-        const pct = ((seg.revenue / total) * 100).toFixed(0);
         ctx.font = '600 10px system-ui';
         ctx.fillStyle = isDark ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.75)';
         ctx.textAlign = mid > Math.PI / 2 && mid < Math.PI * 1.5 ? 'right' : 'left';
-        ctx.fillText(`${seg.name.length > 6 ? seg.name.slice(0, 6) + '..' : seg.name} ${pct}%`, lx, ly);
+        ctx.fillText(`${seg.name.length > 6 ? seg.name.slice(0, 6) + '..' : seg.name} ${pctValue.toFixed(0)}%`, lx, ly);
       }
-      
+
       cur += full;
       acc += full;
     });
     anglesRef.current = angles;
+
+    // "기타" 라벨 렌더링 (5% 미만 카테고리가 있는 경우)
+    if (progress >= 1 && hasOthers) {
+      const othersMid = (othersStartAngle + othersEndAngle) / 2;
+      const lr = or + 22;
+      const lx = cx + Math.cos(othersMid) * lr;
+      const ly = cy + Math.sin(othersMid) * lr;
+      const othersPct = ((othersTotal / total) * 100).toFixed(0);
+      ctx.font = '600 10px system-ui';
+      ctx.fillStyle = isDark ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.75)';
+      ctx.textAlign = othersMid > Math.PI / 2 && othersMid < Math.PI * 1.5 ? 'right' : 'left';
+      ctx.fillText(`기타 ${othersPct}%`, lx, ly);
+    }
     
     ctx.font = 'bold 14px system-ui';
     ctx.fillStyle = isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.85)';
@@ -317,7 +359,7 @@ const GlowDonutChart = ({ data, isDark }: DonutChartProps) => {
     ctx.font = '500 8px system-ui';
     ctx.fillStyle = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)';
     ctx.fillText('TOTAL', cx, cy + 16);
-  }, [data, isDark, dimensions, progress]);
+  }, [data, isDark, dimensions, progress, othersTotal, total]);
 
   const onMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -341,10 +383,49 @@ const GlowDonutChart = ({ data, isDark }: DonutChartProps) => {
     setTooltip(null);
   };
 
+  // 범례용 색상 함수
+  const getLegendColor = (idx: number) => {
+    // 기타 카테고리들의 실제 인덱스 계산 (data 배열에서의 위치)
+    const dataIdx = data.findIndex(d => d.name === othersCategories[idx]?.name);
+    const b = isDark
+      ? [0.85, 0.6, 0.4, 0.25, 0.15, 0.1][dataIdx] || 0.3
+      : [0.9, 0.65, 0.45, 0.3, 0.2, 0.12][dataIdx] || 0.3;
+    return isDark ? `rgba(255,255,255,${b * 0.7})` : `rgba(0,0,0,${b * 0.7})`;
+  };
+
   return (
-    <div ref={containerRef} style={{ width: '100%', display: 'flex', justifyContent: 'center', position: 'relative' }}>
-      <canvas ref={canvasRef} style={{ width: dimensions.width, height: dimensions.height, cursor: tooltip ? 'pointer' : 'default' }} onMouseMove={onMove} onMouseLeave={() => setTooltip(null)} />
-      <ChartTooltip data={tooltip} isDark={isDark} />
+    <div ref={containerRef} style={{ width: '100%', position: 'relative' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', position: 'relative' }}>
+        <canvas ref={canvasRef} style={{ width: dimensions.width, height: dimensions.height, cursor: tooltip ? 'pointer' : 'default' }} onMouseMove={onMove} onMouseLeave={() => setTooltip(null)} />
+        <ChartTooltip data={tooltip} isDark={isDark} />
+      </div>
+      {/* 기타 카테고리 범례 */}
+      {othersCategories.length > 0 && (
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          justifyContent: 'center',
+          gap: '8px 16px',
+          padding: '8px 12px',
+          marginTop: '4px',
+          fontSize: '11px',
+          color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)',
+        }}>
+          <span style={{ fontWeight: 600, marginRight: '4px' }}>기타:</span>
+          {othersCategories.map((cat, idx) => (
+            <span key={cat.name} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '2px',
+                backgroundColor: getLegendColor(idx),
+              }} />
+              <span>{cat.name}</span>
+              <span style={{ opacity: 0.7 }}>{((cat.revenue / total) * 100).toFixed(1)}%</span>
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
