@@ -667,54 +667,6 @@ export function AISimulationTab({
             </div>}
         </div>
 
-        {/* 🆕 현재 환경 상태 표시 - 커스텀 시나리오 아래 배치 */}
-        {envContext && <div className="p-3 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg border border-white/10 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium flex items-center gap-1 text-white">
-                <Cloud className="w-3 h-3" />
-                현재 환경
-              </span>
-              {!isEnvLoading && envImpact && <span className={cn("text-xs px-1.5 py-0.5 rounded", envImpact.trafficMultiplier > 1.1 ? "bg-green-500/20 text-green-400" : envImpact.trafficMultiplier < 0.9 ? "bg-red-500/20 text-red-400" : "bg-white/10 text-white/60")}>
-                  트래픽 {(envImpact.trafficMultiplier * 100).toFixed(0)}%
-                </span>}
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              {/* 날씨 */}
-              <div className="flex items-center gap-1.5">
-                {envContext.weather?.condition === 'rain' && <CloudRain className="w-3.5 h-3.5 text-blue-400" />}
-                {envContext.weather?.condition === 'snow' && <CloudSnow className="w-3.5 h-3.5 text-blue-200" />}
-                {envContext.weather?.condition === 'clear' && <Sun className="w-3.5 h-3.5 text-yellow-400" />}
-                {envContext.weather?.condition === 'clouds' && <Cloud className="w-3.5 h-3.5 text-gray-400" />}
-                {!envContext.weather && <Cloud className="w-3.5 h-3.5 text-white/30" />}
-                <span className="text-xs text-white">
-                  {envContext.weather ? `${Math.round(envContext.weather.temperature)}°C` : '-'}
-                </span>
-              </div>
-
-              {/* 공휴일 */}
-              <div className="flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-purple-400" />
-                <span className="text-xs truncate text-white">
-                  {envContext.holiday ? envContext.holiday.name : currentTime.isWeekend ? '주말' : '평일'}
-                </span>
-              </div>
-
-              {/* 이벤트 */}
-              <div className="flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
-                <span className="text-xs text-white">
-                  {envContext.activeEvents.length > 0 ? `${envContext.activeEvents.length}개 이벤트` : '없음'}
-                </span>
-              </div>
-            </div>
-
-            {/* 영향도 요약 */}
-            {envImpact && <div className="text-[10px] text-white/40 pt-1 border-t border-white/10">
-                {envImpact.summary}
-              </div>}
-          </div>}
-
         {/* 🔧 숨김 처리: 예상 고객 수, 시뮬레이션 시간, 시각화 옵션 */}
         {/* 
         {/* 예상 고객 수 *}
