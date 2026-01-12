@@ -243,4 +243,29 @@ export const useUpdateStrategyStatus = () => {
   });
 };
 
+// 전략 삭제 뮤테이션
+export const useDeleteStrategies = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (strategyIds: string[]) => {
+      const { error } = await supabase
+        .from('applied_strategies')
+        .delete()
+        .in('id', strategyIds);
+
+      if (error) {
+        throw error;
+      }
+
+      return strategyIds;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['applied-strategies'] });
+      queryClient.invalidateQueries({ queryKey: ['roi-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['category-performance'] });
+    },
+  });
+};
+
 export default useAppliedStrategies;
