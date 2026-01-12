@@ -591,18 +591,22 @@ export async function loadEnvironmentDataBundle(
   targetDate?: Date
 ): Promise<EnvironmentDataBundle> {
   const now = targetDate || new Date();
-  const dateStr = now.toISOString().split('T')[0];
-  const hour = now.getHours();
 
-  console.log(`[environmentLoader] Loading environment data for store ${storeId}, date ${dateStr}`);
+  // 🔧 한국 시간대(KST, UTC+9) 적용
+  const kstOffset = 9 * 60 * 60 * 1000; // 9시간 in milliseconds
+  const kstNow = new Date(now.getTime() + kstOffset);
+  const dateStr = kstNow.toISOString().split('T')[0];
+  const hour = kstNow.getUTCHours(); // KST 기준 시간
 
-  // 시간대 정보 구성
-  const dayOfWeek = getDayOfWeek(now);
+  console.log(`[environmentLoader] Loading environment data for store ${storeId}, date ${dateStr}, hour ${hour} (KST)`);
+
+  // 시간대 정보 구성 (KST 기준)
+  const dayOfWeek = getDayOfWeek(kstNow);
   const isWeekend = dayOfWeek === 'saturday' || dayOfWeek === 'sunday';
   const timeOfDay = getTimeOfDay(hour);
 
   const temporal: TemporalContext = {
-    date: now,
+    date: kstNow,
     dayOfWeek,
     isWeekend,
     timeOfDay,
