@@ -70,6 +70,21 @@ export {
   type ConsistencyResult,
 } from './validation.ts';
 
+// 🆕 Sprint 1: 리테일 ROI v2 (증분 기반)
+export {
+  calculateRetailROI,
+  calculateRetailROIBatch,
+  summarizeRetailROIResults,
+  RETAIL_ROI_FUNCTION_DECLARATION,
+  POSITION_VISIBILITY_MULTIPLIER,
+  POSITION_CONVERSION_BONUS,
+  VERDICT_THRESHOLDS,
+  type RetailROIInput,
+  type RetailROIOutput,
+  type RetailROISummary,
+  type PositionInfo,
+} from './roiPredictor_v2.ts';
+
 // ============================================================================
 // Tool Use 통합 정의
 // ============================================================================
@@ -88,6 +103,13 @@ import {
   type ROIOutput,
 } from './roiPredictor.ts';
 
+import {
+  calculateRetailROI,
+  RETAIL_ROI_FUNCTION_DECLARATION,
+  type RetailROIInput,
+  type RetailROIOutput,
+} from './roiPredictor_v2.ts';
+
 /**
  * Gemini Function Calling을 위한 Tool 정의 배열
  * AI 모델에 전달할 수 있는 형식
@@ -100,6 +122,10 @@ export const CALCULATION_TOOLS = [
   {
     type: 'function' as const,
     function: ROI_FUNCTION_DECLARATION,
+  },
+  {
+    type: 'function' as const,
+    function: RETAIL_ROI_FUNCTION_DECLARATION,
   },
 ];
 
@@ -137,6 +163,31 @@ export interface ToolCallResult {
 }
 
 /**
+ * Gemini Function Call 인자를 RetailROIInput으로 변환
+ */
+function convertToRetailROIInput(args: Record<string, unknown>): RetailROIInput {
+  return {
+    product_name: args.product_name as string,
+    product_price: args.product_price as number,
+    product_margin: args.product_margin as number,
+    base_conversion_rate: args.base_conversion_rate as number,
+    current_position: {
+      zone_name: args.current_zone_name as string,
+      daily_traffic: args.current_daily_traffic as number,
+      visibility: args.current_visibility as number,
+      position_type: args.current_position_type as RetailROIInput['current_position']['position_type'],
+    },
+    proposed_position: {
+      zone_name: args.proposed_zone_name as string,
+      daily_traffic: args.proposed_daily_traffic as number,
+      visibility: args.proposed_visibility as number,
+      position_type: args.proposed_position_type as RetailROIInput['proposed_position']['position_type'],
+    },
+    implementation_cost: args.implementation_cost as number | undefined,
+  };
+}
+
+/**
  * 단일 Tool Call 처리
  */
 export function processToolCall(toolCall: ToolCall): ToolCallResult {
@@ -147,7 +198,7 @@ export function processToolCall(toolCall: ToolCall): ToolCallResult {
     // arguments 파싱
     const args = JSON.parse(fn.arguments);
 
-    let result: TrafficFlowOutput | ROIOutput;
+    let result: TrafficFlowOutput | ROIOutput | RetailROIOutput;
 
     // Function 라우팅
     switch (functionName) {
@@ -159,13 +210,18 @@ export function processToolCall(toolCall: ToolCall): ToolCallResult {
         result = calculateROI(args as ROIInput);
         break;
 
+      case 'calculate_retail_roi':
+        // v2: 증분 기반 리테일 ROI
+        result = calculateRetailROI(convertToRetailROIInput(args));
+        break;
+
       default:
         return {
           tool_call_id: id,
           role: 'tool',
           content: JSON.stringify({
             error: `Unknown function: ${functionName}`,
-            available_functions: ['calculate_traffic_flow', 'calculate_roi'],
+            available_functions: ['calculate_traffic_flow', 'calculate_roi', 'calculate_retail_roi'],
           }),
         };
     }
@@ -275,6 +331,10 @@ export function logToolUsage(
       console.log(`      → visitors=${resultObj.expected_visitors}, congestion=${resultObj.congestion_risk}`);
     } else if (tc.function.name === 'calculate_roi') {
       console.log(`      → ROI=${resultObj.roi_percent}%, profit=₩${resultObj.expected_profit?.toLocaleString()}`);
+    } else if (tc.function.name === 'calculate_retail_roi') {
+      const s = resultObj.summary;
+      console.log(`      → ${s.verdict_kr}: ${s.one_liner}`);
+      console.log(`      → 월 증분이익=₩${resultObj.profit?.incremental_monthly?.toLocaleString()}, 회수=${resultObj.roi?.payback_period_text}`);
     }
   });
 }
