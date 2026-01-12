@@ -183,8 +183,14 @@ function FlowHeatmap({ data }: FlowHeatmapProps) {
       typeof point.density === 'number' &&
       Number.isFinite(point.x) && 
       Number.isFinite(point.z) &&
-      Number.isFinite(point.density)
+      Number.isFinite(point.density) &&
+      point.density > 0  // 🔧 FIX: density가 0보다 큰 데이터만
     );
+
+    // 🔧 FIX: 유효한 데이터가 없으면 null geometry 반환
+    if (validData.length === 0) {
+      return null;
+    }
 
     for (let i = 0; i < positions.length; i += 3) {
       const x = positions[i];
@@ -213,6 +219,11 @@ function FlowHeatmap({ data }: FlowHeatmapProps) {
     geo.computeVertexNormals();
     return geo;
   }, [data]);
+
+  // 🔧 FIX: geometry가 null이면 렌더링하지 않음
+  if (!geometry) {
+    return null;
+  }
 
   return (
     <mesh
