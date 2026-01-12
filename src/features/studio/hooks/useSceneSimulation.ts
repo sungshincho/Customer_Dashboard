@@ -581,8 +581,27 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
           console.warn('[useSceneSimulation] No layout result:', layoutRes);
         }
         if (flowRes.status === 'fulfilled' && flowRes.value.data?.result) {
-          results.flow = flowRes.value.data.result;
-          console.log('[useSceneSimulation] Flow result extracted:', results.flow);
+          const flowResult = flowRes.value.data.result;
+          // 🔧 FIX: visualization 데이터가 없으면 기본값 생성
+          results.flow = {
+            ...flowResult,
+            visualization: flowResult.visualization || {
+              flowHeatmap: [],
+              zoneFlowArrows: (flowResult.bottlenecks || []).map((bn: any, idx: number) => ({
+                from: { x: bn.position?.x || 0, z: bn.position?.z || -5 },
+                to: { x: (bn.position?.x || 0) + 2, z: (bn.position?.z || 0) + 2 },
+                intensity: bn.severity || 0.5,
+              })),
+            },
+            paths: flowResult.paths || [],
+            bottlenecks: flowResult.bottlenecks || [],
+          };
+          console.log('[useSceneSimulation] Flow result extracted with visualization:', {
+            hasVisualization: !!results.flow.visualization,
+            hasZoneFlowArrows: !!results.flow.visualization?.zoneFlowArrows?.length,
+            pathsCount: results.flow.paths?.length,
+            bottlenecksCount: results.flow.bottlenecks?.length,
+          });
         } else {
           console.warn('[useSceneSimulation] No flow result:', flowRes);
         }
@@ -592,19 +611,45 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
           const staffingResult = staffingData?.result || staffingData?.staffing || staffingData;
 
           if (staffingResult && (staffingResult.staffPositions || staffingResult.metrics || staffingResult.zoneCoverage)) {
+            const staffPositions = staffingResult.staffPositions ||
+                            staffingResult.staff_positions ||
+                            staffingResult.positions ||
+                            [];
+            
+            // 🔧 FIX: visualization 데이터가 없으면 기본값 생성
             results.staffing = {
               ...staffingResult,
-              // staffPositions가 다른 이름일 수 있음
-              staffPositions: staffingResult.staffPositions ||
-                              staffingResult.staff_positions ||
-                              staffingResult.positions ||
-                              [],
+              staffPositions,
+              visualization: staffingResult.visualization || {
+                heatmap: [],
+                coverageZones: (staffingResult.zoneCoverage || []).map((zone: any) => ({
+                  zoneId: zone.zoneId || zone.zone_id,
+                  zoneName: zone.zoneName || zone.zone_name,
+                  currentCoverage: zone.currentCoverage || zone.current_coverage || 0.5,
+                  suggestedCoverage: zone.suggestedCoverage || zone.suggested_coverage || 0.8,
+                  center: { x: zone.centerX || 0, y: 0, z: zone.centerZ || 0 },
+                  radius: zone.radius || 3,
+                })),
+                movementPaths: staffPositions.map((sp: any) => ({
+                  staffId: sp.staffId || sp.staff_id,
+                  from: sp.currentPosition || { x: 0, y: 0, z: 0 },
+                  to: sp.suggestedPosition || { x: 2, y: 0, z: 2 },
+                })),
+                staffMarkers: staffPositions.map((sp: any) => ({
+                  id: sp.staffId || sp.staff_id,
+                  name: sp.staffName || sp.staff_name || '직원',
+                  role: sp.role || 'sales',
+                  currentPosition: sp.currentPosition || { x: 0, y: 0, z: 0 },
+                  suggestedPosition: sp.suggestedPosition || { x: 2, y: 0, z: 2 },
+                })),
+              },
             };
-            console.log('[useSceneSimulation] Staffing result extracted:', {
+            console.log('[useSceneSimulation] Staffing result extracted with visualization:', {
               hasStaffPositions: !!results.staffing.staffPositions?.length,
               positionsCount: results.staffing.staffPositions?.length || 0,
               hasMetrics: !!staffingResult.metrics,
               hasZoneCoverage: !!staffingResult.zoneCoverage,
+              hasVisualization: !!results.staffing.visualization,
             });
           } else {
             console.warn('[useSceneSimulation] Staffing data structure unknown:', staffingData);
