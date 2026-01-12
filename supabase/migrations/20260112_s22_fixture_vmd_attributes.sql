@@ -5,27 +5,27 @@
 -- ============================================================================
 
 -- Fixture에 height_zone 컬럼 추가 (선반 높이 구역)
-ALTER TABLE fixtures_dim
+ALTER TABLE furniture
 ADD COLUMN IF NOT EXISTS height_zone TEXT DEFAULT 'eye_level'
 CHECK (height_zone IN ('floor', 'bend', 'reach', 'eye_level', 'top'));
 
-COMMENT ON COLUMN fixtures_dim.height_zone IS '선반 높이 구역: floor(바닥), bend(허리), reach(손닿는), eye_level(눈높이), top(최상단)';
+COMMENT ON COLUMN furniture.height_zone IS '선반 높이 구역: floor(바닥), bend(허리), reach(손닿는), eye_level(눈높이), top(최상단)';
 
 -- Fixture에 facing 컬럼 추가 (상품 진열 방향)
-ALTER TABLE fixtures_dim
+ALTER TABLE furniture
 ADD COLUMN IF NOT EXISTS facing TEXT DEFAULT 'front'
 CHECK (facing IN ('front', 'side', 'back', 'island', 'corner'));
 
-COMMENT ON COLUMN fixtures_dim.facing IS '진열 방향: front(전면), side(측면), back(후면), island(섬형), corner(코너)';
+COMMENT ON COLUMN furniture.facing IS '진열 방향: front(전면), side(측면), back(후면), island(섬형), corner(코너)';
 
 -- Fixture에 VMD 속성 JSONB 추가
-ALTER TABLE fixtures_dim
+ALTER TABLE furniture
 ADD COLUMN IF NOT EXISTS vmd_properties JSONB DEFAULT '{}'::jsonb;
 
-COMMENT ON COLUMN fixtures_dim.vmd_properties IS 'VMD 관련 확장 속성';
+COMMENT ON COLUMN furniture.vmd_properties IS 'VMD 관련 확장 속성';
 
 -- 기존 Fixture에 기본 VMD 속성 추가
-UPDATE fixtures_dim SET vmd_properties = jsonb_build_object(
+UPDATE furniture SET vmd_properties = jsonb_build_object(
   'visibility_score',
     CASE height_zone
       WHEN 'eye_level' THEN 1.0
@@ -104,13 +104,13 @@ ON CONFLICT (code) DO NOTHING;
 -- ============================================================================
 -- 인덱스
 -- ============================================================================
-CREATE INDEX IF NOT EXISTS idx_fixtures_height_zone ON fixtures_dim(height_zone);
-CREATE INDEX IF NOT EXISTS idx_fixtures_facing ON fixtures_dim(facing);
+CREATE INDEX IF NOT EXISTS idx_fixtures_height_zone ON furniture(height_zone);
+CREATE INDEX IF NOT EXISTS idx_fixtures_facing ON furniture(facing);
 CREATE INDEX IF NOT EXISTS idx_fixtures_focal_point
-ON fixtures_dim ((vmd_properties->>'is_focal_point'))
+ON furniture ((vmd_properties->>'is_focal_point'))
 WHERE (vmd_properties->>'is_focal_point')::boolean = true;
 CREATE INDEX IF NOT EXISTS idx_fixtures_endcap
-ON fixtures_dim ((vmd_properties->>'is_endcap'))
+ON furniture ((vmd_properties->>'is_endcap'))
 WHERE (vmd_properties->>'is_endcap')::boolean = true;
 
 -- ============================================================================
@@ -135,7 +135,7 @@ SELECT
   (f.vmd_properties->>'is_endcap')::boolean AS is_endcap,
   (f.vmd_properties->>'lighting_enhanced')::boolean AS lighting_enhanced,
   (f.vmd_properties->>'max_products')::integer AS max_products
-FROM fixtures_dim f
+FROM furniture f
 LEFT JOIN fixture_height_zones hz ON hz.code = f.height_zone
 LEFT JOIN fixture_facings ff ON ff.code = f.facing;
 
