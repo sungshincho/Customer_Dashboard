@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 // 새 스튜디오 컴포넌트
 import { Canvas3D, SceneProvider, useScene } from './core';
 import { LayerPanel, SimulationPanel, ToolPanel, SceneSavePanel, OverlayControlPanel, PropertyPanel } from './panels';
-import { HeatmapOverlay, CustomerFlowOverlay, LayoutOptimizationOverlay, FlowOptimizationOverlay, CongestionOverlay, StaffingOverlay, StaffAvatarsOverlay, CustomerFlowOverlayEnhanced, StaffReallocationOverlay } from './overlays';
+import { HeatmapOverlay, CustomerFlowOverlay, LayoutOptimizationOverlay, FlowOptimizationOverlay, CongestionOverlay, StaffingOverlay, StaffAvatarsOverlay, CustomerFlowOverlayEnhanced, StaffReallocationOverlay, ZonesFloorOverlay } from './overlays';
 import { DraggablePanel, QuickToggleBar, ViewModeToggle, ResultReportPanel, type ViewMode } from './components';
 import type { DiagnosticIssue } from './components/DiagnosticIssueList';
 import { PanelLeftClose, PanelLeft, Mouse } from 'lucide-react';
@@ -133,6 +133,14 @@ export default function DigitalTwinStudioPage() {
     zoneSizes,
     zones: dbZones
   } = useStoreBounds();
+
+  // 🔍 DEBUG: zones_dim 데이터 확인
+  useEffect(() => {
+    console.log('[DigitalTwinStudio] zones_dim data:', {
+      count: dbZones?.length || 0,
+      zones: dbZones?.map(z => ({ id: z.id, name: z.zone_name, type: z.zone_type })) || []
+    });
+  }, [dbZones]);
 
   // 실제 DB 스태프 데이터
   const {
@@ -1083,7 +1091,10 @@ export default function DigitalTwinStudioPage() {
             {loading ? <div className="flex items-center justify-center h-full">
                 <Loader2 className="w-8 h-8 animate-spin text-white" />
               </div> : <Canvas3D mode={mode} transformMode={transformMode} enableControls={true} enableSelection={isEditMode} enableTransform={isEditMode} showGrid={isEditMode} zones={simulationZones} userId={user?.id} storeId={selectedStore?.id} renderingConfig={environmentRenderingConfig} isDayMode={isDayMode}>
-                {/* 🔧 ZonesFloorOverlay 제거됨 - 불필요한 파란색 바닥 표시 방지 */}
+                {/* 🔧 zones_dim 기반 구역 바닥 오버레이 - DB 데이터만 사용 */}
+                {isActive('zone') && dbZones && dbZones.length > 0 && (
+                  <ZonesFloorOverlay zones={dbZones} visible={true} showLabels={true} opacity={0.3} />
+                )}
 
                 {/* 🔧 히트맵 오버레이 - zone_daily_metrics.heatmap_intensity 기반 실제 데이터 사용 */}
                 {isActive('heatmap') && (() => {
