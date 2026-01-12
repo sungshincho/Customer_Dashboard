@@ -246,22 +246,31 @@ export function calculateROI(input: ROIInput): ROIOutput {
   // Step 7: ROI 계산
   // ROI = (이익 - 비용) / 비용 × 100 (비용이 있을 경우)
   // ROI = 이익 기준 (비용이 없을 경우)
+  // 🔧 버그 수정: 최소 비용 보장 + ROI 상한선 설정
+  const MIN_COST = 10000; // 최소 1만원 비용 (ROI 폭발 방지)
+  const MAX_ROI = 500; // ROI 상한선 500%
   let roi_percent: number;
 
   if (totalCost > 0) {
     // 월간 이익으로 ROI 계산 (30일 기준)
     const monthly_profit = profit * 30;
-    roi_percent = ((monthly_profit - totalCost) / totalCost) * 100;
+    // 🔧 최소 비용 보장 (0에 가까운 비용으로 인한 ROI 폭발 방지)
+    const safeCost = Math.max(totalCost, MIN_COST);
+    roi_percent = ((monthly_profit - safeCost) / safeCost) * 100;
+    // 🔧 ROI 상한선 적용
+    roi_percent = Math.min(roi_percent, MAX_ROI);
 
     breakdown.push({
       step: 'ROI',
       value: roi_percent,
-      formula: `(₩${monthly_profit.toLocaleString()} - ₩${totalCost.toLocaleString()}) / ₩${totalCost.toLocaleString()} × 100 = ${roi_percent.toFixed(1)}%`,
+      formula: `(₩${monthly_profit.toLocaleString()} - ₩${safeCost.toLocaleString()}) / ₩${safeCost.toLocaleString()} × 100 = ${roi_percent.toFixed(1)}%`,
       unit: '%/월',
     });
   } else {
     // 비용이 없으면 이익률 기반 ROI
     roi_percent = profit > 0 ? input.product_margin * 100 : 0;
+    // 🔧 ROI 상한선 적용
+    roi_percent = Math.min(roi_percent, MAX_ROI);
 
     breakdown.push({
       step: 'ROI (마진 기준)',
