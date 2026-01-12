@@ -910,22 +910,37 @@ export default function DigitalTwinStudioPage() {
     });
   }, [dbZones, demoZones]);
 
-  // 씬 저장 핸들러
+  // 🆕 새 씬 생성 모드 상태
+  const [isNewSceneMode, setIsNewSceneMode] = useState(false);
+
+  // 씬 저장 핸들러 - 수정: 이름이 같으면 업데이트, 다르면 새로 생성
   const handleSaveScene = async (name: string) => {
     if (!currentRecipe) return;
     try {
-      await saveScene(currentRecipe, name, activeScene?.id);
+      // 기존 씬과 이름이 같고, 새 씬 모드가 아니면 업데이트
+      const existingScene = scenes.find(s => s.name === name);
+      const shouldUpdate = !isNewSceneMode && existingScene;
+      
+      await saveScene(currentRecipe, name, shouldUpdate ? existingScene.id : undefined);
       setSceneName(name);
+      setIsNewSceneMode(false); // 저장 후 새 씬 모드 해제
       logActivity('feature_use', {
         feature: 'scene_save',
         scene_name: name,
         layer_count: activeLayers.length,
-        store_id: selectedStore?.id
+        store_id: selectedStore?.id,
+        is_new: !shouldUpdate
       });
     } catch (err) {
       // 에러는 useScenePersistence에서 처리
     }
   };
+
+  // 새 씬 버튼 핸들러
+  const handleNewScene = useCallback(() => {
+    setSceneName('');
+    setIsNewSceneMode(true);
+  }, []);
   if (!selectedStore) {
     return <DashboardLayout>
         <Alert>
@@ -1095,11 +1110,7 @@ export default function DigitalTwinStudioPage() {
             })()}
               </Canvas3D>}
               
-              {/* 🆕 ViewMode 변경 시 3D 모델 위치 적용 */}
-              <ViewModeHandler 
-                viewMode={viewMode} 
-                layoutResult={sceneSimulation.state.results.layout}
-              />
+              {/* 🔧 ViewModeHandler 제거됨 - AI 최적화 탭에서 직접 3D 위치 관리 */}
           </div>
 
           {/* ========== UI 오버레이 ========== */}
@@ -1137,12 +1148,7 @@ export default function DigitalTwinStudioPage() {
                 </Button>
               </div>
 
-              {/* 뷰 모드 토글 (As-Is / 비교 / To-Be) */}
-              <ViewModeToggle
-                mode={viewMode}
-                onChange={setViewMode}
-                hasOptimizationResults={!!(sceneSimulation.state.results.layout || sceneSimulation.state.results.flow || sceneSimulation.state.results.staffing)}
-              />
+              {/* 🔧 ViewModeToggle 제거됨 - AI 최적화 탭 내부에서 관리 */}
             </div>
 
             {/* ----- 하단 좌측: 현재 상태 정보 + 뷰모드 표시 ----- */}
@@ -1271,7 +1277,7 @@ export default function DigitalTwinStudioPage() {
                     }
                     setActiveTab('ai-optimization');
                   }} onEnvironmentConfigChange={handleEnvironmentConfigChange} />}
-                      {activeTab === 'ai-optimization' && <AIOptimizationTab storeId={selectedStore?.id || ''} sceneData={currentRecipe} sceneSimulation={sceneSimulation} onSceneUpdate={newScene => {
+                      {activeTab === 'ai-optimization' && <AIOptimizationTab storeId={selectedStore?.id || ''} sceneData={currentRecipe} sceneSimulation={sceneSimulation} viewMode={viewMode} onViewModeChange={setViewMode} onSceneUpdate={newScene => {
                     // SceneProvider에 시뮬레이션 결과 적용
                     if (newScene.furnitureMoves) {
                       // applySimulationResults는 useScene에서 가져옴
@@ -1350,7 +1356,7 @@ export default function DigitalTwinStudioPage() {
                   onSave={handleSaveScene}
                   onLoad={(id) => setActiveScene(id)}
                   onDelete={(id) => deleteScene(id)}
-                  onNew={() => setSceneName('')}
+                  onNew={handleNewScene}
                   maxScenes={3}
                 />
               </DraggablePanel>
@@ -1667,35 +1673,4 @@ function SimulationResultPanels({
     </>;
 }
 
-// 🆕 ViewMode 변경 시 3D 모델 위치 적용 컴포넌트
-interface ViewModeHandlerProps {
-  viewMode: ViewMode;
-  layoutResult: any;
-}
-
-function ViewModeHandler({ viewMode, layoutResult }: ViewModeHandlerProps) {
-  const { applySimulationResults, revertSimulationChanges } = useScene();
-  const prevViewModeRef = useRef<ViewMode>('as-is');
-
-  useEffect(() => {
-    // viewMode가 실제로 변경되었을 때만 처리
-    if (prevViewModeRef.current === viewMode) return;
-    
-    console.log('[ViewModeHandler] Mode changed:', prevViewModeRef.current, '->', viewMode);
-    
-    if (viewMode === 'as-is') {
-      // As-Is: 원래 위치로 복원
-      revertSimulationChanges();
-    } else if ((viewMode === 'to-be' || viewMode === 'compare') && layoutResult?.furnitureMoves) {
-      // To-Be 또는 비교: 최적화 위치로 이동
-      applySimulationResults({
-        furnitureMoves: layoutResult.furnitureMoves,
-        animated: true
-      });
-    }
-    
-    prevViewModeRef.current = viewMode;
-  }, [viewMode, layoutResult, applySimulationResults, revertSimulationChanges]);
-
-  return null; // UI 렌더링 없음
-}
+// 🔧 ViewModeHandler 제거됨 - AI 최적화 탭에서 직접 뷰 모드 관리
