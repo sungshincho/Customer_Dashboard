@@ -50,10 +50,14 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
     ? "bg-white text-black hover:bg-white hover:text-black focus:bg-white focus:text-black"
     : "bg-black text-white hover:bg-black hover:text-white focus:bg-black focus:text-white";
 
-  // Today style (monochrome - more prominent)
-  const dayTodayClass = isDark
-    ? "bg-white/20 text-white font-bold ring-1 ring-white/30"
-    : "bg-black/10 text-black font-bold ring-1 ring-black/20";
+  // Today style (blue - more prominent)
+  // [&:not([aria-selected])] 조건으로 선택된 날짜(시작/종료)가 우선되도록 함
+  const dayTodayClass = cn(
+    "font-bold",
+    isDark
+      ? "[&:not([aria-selected])]:bg-blue-500/30 [&:not([aria-selected])]:text-blue-300 [&:not([aria-selected])]:ring-1 [&:not([aria-selected])]:ring-blue-400/50"
+      : "[&:not([aria-selected])]:bg-blue-500/20 [&:not([aria-selected])]:text-blue-600 [&:not([aria-selected])]:ring-1 [&:not([aria-selected])]:ring-blue-500/40"
+  );
 
   return (
     <DayPicker
