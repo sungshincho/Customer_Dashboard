@@ -50,13 +50,13 @@ ADD COLUMN IF NOT EXISTS summary JSONB DEFAULT '{}'::jsonb;
 
 COMMENT ON COLUMN layout_optimization_results.summary IS 'AI 최적화 응답 요약 (vmd_rules, store_persona 등)';
 
--- status 값 확장 (partial 추가)
+-- status 값 확장 (pending, partial 추가)
 ALTER TABLE layout_optimization_results
 DROP CONSTRAINT IF EXISTS layout_optimization_results_status_check;
 
 ALTER TABLE layout_optimization_results
 ADD CONSTRAINT layout_optimization_results_status_check
-CHECK (status IN ('generated', 'reviewing', 'approved', 'applied', 'rejected', 'partial'));
+CHECK (status IN ('pending', 'generated', 'reviewing', 'approved', 'applied', 'rejected', 'partial'));
 
 -- ============================================================================
 -- 2. ai_response_logs 테이블에 누락된 컬럼 추가
