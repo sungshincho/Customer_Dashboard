@@ -500,210 +500,142 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
         });
         console.log('[useSceneSimulation] Supabase URL:', (supabase as any).supabaseUrl || 'not accessible');
 
-        // 🔍 DEBUG: 실제 Edge Function 호출 직전 로그
-        console.log('[useSceneSimulation] 🚀 Starting Edge Function calls NOW...');
+        // 🔧 아키텍처 통합: generate-optimization 단일 호출로 변경
+        // (기존 advanced-ai-inference 3개 호출 제거 - 비용 75% 절감)
+        console.log('[useSceneSimulation] 🚀 Starting generate-optimization call...');
 
-        const [layoutRes, flowRes, staffingRes, ultimateRes] = await Promise.allSettled([
-          supabase.functions.invoke('advanced-ai-inference', {
-            body: {
-              type: 'layout_optimization',
-              storeId: selectedStore.id,
-              orgId,
-              params: { ...params?.layout, sceneData },
+        const { data: optimizationData, error: optimizationError } = await supabase.functions.invoke('generate-optimization', {
+          body: {
+            store_id: selectedStore.id,
+            optimization_type: 'both',
+            parameters: {
+              prioritize_revenue: params?.layout?.goal === 'revenue',
+              max_changes: (params?.layout?.settings?.products?.maxRelocations || 30) +
+                           (params?.layout?.settings?.furniture?.maxMoves || 12),
+              max_product_changes: params?.layout?.settings?.products?.maxRelocations || 30,
+              max_furniture_changes: params?.layout?.settings?.furniture?.maxMoves || 12,
+              intensity: params?.layout?.settings?.intensity || 'medium',
+              environment_context: params?.layout?.environment_context || null,
+              diagnostic_issues: params?.layout?.diagnostic_issues || null,
+              goal: params?.layout?.settings?.objective || params?.layout?.goal || 'balanced',
             },
-          }),
-          supabase.functions.invoke('advanced-ai-inference', {
-            body: {
-              type: 'flow_simulation',
-              storeId: selectedStore.id,
-              orgId,
-              params: { ...params?.flow, sceneData },
-            },
-          }),
-          supabase.functions.invoke('advanced-ai-inference', {
-            body: {
-              type: 'staffing_optimization',
-              storeId: selectedStore.id,
-              orgId,
-              params: { ...params?.staffing, sceneData },
-            },
-          }),
-          // 🆕 Ultimate AI 최적화 호출 (동선/환경/연관/VMD 분석 포함)
-          supabase.functions.invoke('generate-optimization', {
-            body: {
-              store_id: selectedStore.id,
-              optimization_type: 'both',
-              parameters: {
-                prioritize_revenue: params?.layout?.goal === 'revenue',
-                // 🔧 P0 FIX: Frontend intensity 설정 연동
-                max_changes: (params?.layout?.settings?.products?.maxRelocations || 30) +
-                             (params?.layout?.settings?.furniture?.maxMoves || 12),
-                max_product_changes: params?.layout?.settings?.products?.maxRelocations || 30,
-                max_furniture_changes: params?.layout?.settings?.furniture?.maxMoves || 12,
-                intensity: params?.layout?.settings?.intensity || 'medium',
-                // 🔧 P1 FIX: 환경 컨텍스트 전달
-                environment_context: params?.layout?.environment_context || null,
-                // 🔧 P1 FIX: 진단 이슈 전달
-                diagnostic_issues: params?.layout?.diagnostic_issues || null,
-                // 최적화 목표 전달
-                goal: params?.layout?.settings?.objective || params?.layout?.goal || 'balanced',
-              },
-            },
-          }),
-        ]);
+          },
+        });
 
-        console.log('[useSceneSimulation] Edge Function responses:', {
-          layout: layoutRes.status === 'fulfilled' ? { data: layoutRes.value.data, error: layoutRes.value.error } : { reason: layoutRes.reason },
-          flow: flowRes.status === 'fulfilled' ? { data: flowRes.value.data, error: flowRes.value.error } : { reason: flowRes.reason },
-          staffing: staffingRes.status === 'fulfilled' ? { data: staffingRes.value.data, error: staffingRes.value.error } : { reason: staffingRes.reason },
-          ultimate: ultimateRes.status === 'fulfilled' ? { success: ultimateRes.value.data?.success } : { reason: ultimateRes.reason },
+        if (optimizationError) {
+          throw new Error(optimizationError.message || 'Optimization failed');
+        }
+
+        console.log('[useSceneSimulation] generate-optimization response:', {
+          success: optimizationData?.success,
+          hasResult: !!optimizationData?.result,
+          hasVisualization: !!optimizationData?.visualization,
+          hasFlowAnalysis: !!optimizationData?.flow_analysis_summary,
         });
 
         const results: SimulationResults = {};
-        if (layoutRes.status === 'fulfilled' && layoutRes.value.data?.result) {
-          // 🔧 FIX: productPlacements가 result 외부에 있을 수 있으므로 병합
-          const layoutData = layoutRes.value.data;
+
+        // 🆕 통합된 visualization 데이터에서 layout, flow, staffing 추출
+        if (optimizationData?.success) {
+          const vizData = optimizationData.visualization;
+          const mainResult = optimizationData.result;
+
+          // 1. Layout 결과 (visualization.layout + result에서 추출)
           results.layout = {
-            ...layoutData.result,
-            // productPlacements는 result 내부 또는 외부에 있을 수 있음
-            productPlacements: layoutData.result?.productPlacements ||
-                               layoutData.productPlacements ||
-                               layoutData.result?.productMoves ||
-                               layoutData.productMoves ||
-                               [],
+            furnitureMoves: vizData?.layout?.furnitureMoves || [],
+            productPlacements: vizData?.layout?.productMoves || mainResult?.product_changes?.map((pc: any) => ({
+              productId: pc.product_id,
+              productSku: pc.sku,
+              from: pc.current,
+              to: pc.suggested,
+              reason: pc.reason,
+            })) || [],
+            summary: mainResult?.summary || {},
+            confidence: mainResult?.summary?.expected_revenue_improvement || 0,
           };
-          console.log('[useSceneSimulation] Layout result with productPlacements:', {
-            resultHasProductPlacements: !!layoutData.result?.productPlacements,
-            dataHasProductPlacements: !!layoutData.productPlacements,
+          console.log('[useSceneSimulation] Layout extracted:', {
+            furnitureMovesCount: results.layout.furnitureMoves?.length || 0,
             productPlacementsCount: results.layout.productPlacements?.length || 0,
           });
-        } else {
-          console.warn('[useSceneSimulation] No layout result:', layoutRes);
-        }
-        if (flowRes.status === 'fulfilled' && flowRes.value.data?.result) {
-          const flowResult = flowRes.value.data.result;
-          // 🔧 FIX: visualization 데이터가 없으면 기본값 생성
+
+          // 2. Flow 결과 (visualization.flow + flow_analysis_summary에서 추출)
+          const flowSummary = optimizationData.flow_analysis_summary;
           results.flow = {
-            ...flowResult,
-            visualization: flowResult.visualization || {
+            visualization: {
               flowHeatmap: [],
-              zoneFlowArrows: (flowResult.bottlenecks || []).map((bn: any, idx: number) => ({
-                from: { x: bn.position?.x || 0, z: bn.position?.z || -5 },
-                to: { x: (bn.position?.x || 0) + 2, z: (bn.position?.z || 0) + 2 },
-                intensity: bn.severity || 0.5,
-              })),
+              zoneFlowArrows: vizData?.flow?.zoneFlowArrows || [],
             },
-            paths: flowResult.paths || [],
-            bottlenecks: flowResult.bottlenecks || [],
+            paths: vizData?.flow?.paths || flowSummary?.key_paths || [],
+            bottlenecks: vizData?.flow?.bottlenecks || flowSummary?.bottlenecks?.map((b: any) => ({
+              zoneId: b.zone,
+              zoneName: b.zone,
+              severity: b.severity,
+              congestionScore: b.congestion,
+            })) || [],
+            deadZones: vizData?.flow?.deadZones || flowSummary?.dead_zones || [],
+            summary: {
+              flowHealthScore: flowSummary?.flow_health_score || 0,
+              bottleneckCount: flowSummary?.bottleneck_count || 0,
+              deadZoneCount: flowSummary?.dead_zone_count || 0,
+              conversionRate: flowSummary?.overall_conversion_rate || 0,
+            },
           };
-          console.log('[useSceneSimulation] Flow result extracted with visualization:', {
-            hasVisualization: !!results.flow.visualization,
-            hasZoneFlowArrows: !!results.flow.visualization?.zoneFlowArrows?.length,
-            pathsCount: results.flow.paths?.length,
-            bottlenecksCount: results.flow.bottlenecks?.length,
-          });
-        } else {
-          console.warn('[useSceneSimulation] No flow result:', flowRes);
-        }
-        if (staffingRes.status === 'fulfilled') {
-          const staffingData = staffingRes.value.data;
-          // 🔧 FIX: staffing result가 다양한 위치에 있을 수 있음
-          const staffingResult = staffingData?.result || staffingData?.staffing || staffingData;
-
-          if (staffingResult && (staffingResult.staffPositions || staffingResult.metrics || staffingResult.zoneCoverage)) {
-            const staffPositions = staffingResult.staffPositions ||
-                            staffingResult.staff_positions ||
-                            staffingResult.positions ||
-                            [];
-            
-            // 🔧 FIX: staffPositions가 0개면 빈 결과 처리 (임의 데이터 생성 안 함)
-            if (staffPositions.length === 0) {
-              console.log('[useSceneSimulation] No staff positions found - skipping staffing visualization');
-              results.staffing = {
-                ...staffingResult,
-                staffPositions: [],
-                zoneCoverage: staffingResult.zoneCoverage || [],
-                metrics: staffingResult.metrics || {
-                  currentCoverage: 0,
-                  optimizedCoverage: 0,
-                  customerServiceRateIncrease: 0,
-                  avgResponseTimeReduction: 0,
-                  efficiencyScore: 0,
-                },
-                visualization: {
-                  heatmap: [],
-                  coverageZones: [],
-                  movementPaths: [],
-                  staffMarkers: [],
-                },
-              };
-            } else {
-              // 🔧 FIX: visualization 데이터가 없으면 기본값 생성
-              results.staffing = {
-                ...staffingResult,
-                staffPositions,
-                visualization: staffingResult.visualization || {
-                  heatmap: [],
-                  coverageZones: (staffingResult.zoneCoverage || []).map((zone: any) => ({
-                    zoneId: zone.zoneId || zone.zone_id,
-                    zoneName: zone.zoneName || zone.zone_name,
-                    currentCoverage: zone.currentCoverage || zone.current_coverage || 0.5,
-                    suggestedCoverage: zone.suggestedCoverage || zone.suggested_coverage || 0.8,
-                    center: { x: zone.centerX || 0, y: 0, z: zone.centerZ || 0 },
-                    radius: zone.radius || 3,
-                  })),
-                  movementPaths: staffPositions.map((sp: any) => ({
-                    staffId: sp.staffId || sp.staff_id,
-                    from: sp.currentPosition || { x: 0, y: 0, z: 0 },
-                    to: sp.suggestedPosition || { x: 2, y: 0, z: 2 },
-                  })),
-                  staffMarkers: staffPositions.map((sp: any) => ({
-                    id: sp.staffId || sp.staff_id,
-                    name: sp.staffName || sp.staff_name || '직원',
-                    role: sp.role || 'sales',
-                    currentPosition: sp.currentPosition || { x: 0, y: 0, z: 0 },
-                    suggestedPosition: sp.suggestedPosition || { x: 2, y: 0, z: 2 },
-                  })),
-                },
-              };
-            }
-            console.log('[useSceneSimulation] Staffing result extracted with visualization:', {
-              hasStaffPositions: !!results.staffing.staffPositions?.length,
-              positionsCount: results.staffing.staffPositions?.length || 0,
-              hasMetrics: !!staffingResult.metrics,
-              hasZoneCoverage: !!staffingResult.zoneCoverage,
-              hasVisualization: !!results.staffing.visualization,
-            });
-          } else {
-            console.warn('[useSceneSimulation] Staffing data structure unknown:', staffingData);
-          }
-        } else {
-          console.warn('[useSceneSimulation] No staffing result:', staffingRes);
-        }
-
-        // 🆕 Ultimate 분석 결과 처리
-        if (ultimateRes.status === 'fulfilled' && ultimateRes.value.data?.success) {
-          const ultimateData = ultimateRes.value.data as UltimateOptimizationResponse;
-          console.log('[useSceneSimulation] 🎯 Ultimate analysis received:', {
-            hasFlowAnalysis: !!ultimateData.flow_analysis_summary,
-            hasVMD: !!ultimateData.vmd_analysis,
-            hasEnvironment: !!ultimateData.environment_summary,
-            hasAssociation: !!ultimateData.association_summary,
-            hasPrediction: !!ultimateData.prediction_summary,
+          console.log('[useSceneSimulation] Flow extracted:', {
+            zoneFlowArrowsCount: results.flow.visualization?.zoneFlowArrows?.length || 0,
+            bottlenecksCount: results.flow.bottlenecks?.length || 0,
+            flowHealthScore: results.flow.summary?.flowHealthScore,
           });
 
+          // 3. Staffing 결과 (visualization.staffing + result.staffing_result에서 추출)
+          const staffingResult = mainResult?.staffing_result;
+          results.staffing = {
+            staffPositions: vizData?.staffing?.staffMarkers?.map((sm: any) => ({
+              staffId: sm.staffId,
+              staffName: sm.staffName,
+              role: sm.role,
+              currentPosition: sm.currentPosition,
+              suggestedPosition: sm.suggestedPosition,
+            })) || staffingResult?.staffPositions || [],
+            zoneCoverage: vizData?.staffing?.coverageZones || staffingResult?.zoneCoverage || [],
+            metrics: staffingResult?.metrics || {
+              currentCoverage: 0,
+              optimizedCoverage: 0,
+              customerServiceRateIncrease: 0,
+              avgResponseTimeReduction: 0,
+              efficiencyScore: 0,
+            },
+            visualization: {
+              heatmap: [],
+              coverageZones: vizData?.staffing?.coverageZones || [],
+              movementPaths: vizData?.staffing?.movementPaths || [],
+              staffMarkers: vizData?.staffing?.staffMarkers || [],
+            },
+            insights: staffingResult?.insights || [],
+          };
+          console.log('[useSceneSimulation] Staffing extracted:', {
+            staffPositionsCount: results.staffing.staffPositions?.length || 0,
+            coverageZonesCount: results.staffing.zoneCoverage?.length || 0,
+          });
+
+          // 4. Ultimate 분석 결과 (기존과 동일)
           results.ultimateAnalysis = {
-            flowAnalysis: ultimateData.flow_analysis_summary,
-            environment: ultimateData.environment_summary,
-            association: ultimateData.association_summary,
-            prediction: ultimateData.prediction_summary,
-            conversionPrediction: ultimateData.conversion_prediction_summary,
-            vmd: ultimateData.vmd_analysis,
-            learningSession: ultimateData.learning_session,
-            overallConfidence: ultimateData.prediction_summary?.overall_confidence ?? 75,
+            flowAnalysis: optimizationData.flow_analysis_summary,
+            environment: optimizationData.environment_summary,
+            association: optimizationData.association_summary,
+            prediction: optimizationData.prediction_summary,
+            conversionPrediction: optimizationData.conversion_prediction_summary,
+            vmd: optimizationData.vmd_analysis,
+            learningSession: optimizationData.learning_session,
+            overallConfidence: optimizationData.prediction_summary?.overall_confidence ?? 75,
           };
+          console.log('[useSceneSimulation] 🎯 Ultimate analysis:', {
+            hasFlowAnalysis: !!results.ultimateAnalysis.flowAnalysis,
+            hasVMD: !!results.ultimateAnalysis.vmd,
+            hasEnvironment: !!results.ultimateAnalysis.environment,
+            overallConfidence: results.ultimateAnalysis.overallConfidence,
+          });
         } else {
-          console.warn('[useSceneSimulation] No Ultimate analysis result:', ultimateRes);
+          console.warn('[useSceneSimulation] Optimization failed or no data:', optimizationData);
         }
 
         // 통합 To-be 씬 생성
