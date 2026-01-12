@@ -93,6 +93,7 @@ export function GlobalDateFilter({
         format(tempRange.from, 'yyyy-MM-dd'),
         format(tempRange.to, 'yyyy-MM-dd')
       );
+      setTempRange(undefined);
       setIsOpen(false);
     }
   }, [tempRange, setCustomRange]);
