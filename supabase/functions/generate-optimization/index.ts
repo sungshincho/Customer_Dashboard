@@ -83,6 +83,20 @@ import {
   PLACEMENT_STRATEGIES,
 } from './schemas/retailOptimizationSchema.ts';
 
+// 🆕 Sprint 1: Function Calling 기반 계산 모듈
+import {
+  OPENROUTER_TOOLS,
+  processToolCalls,
+  hasToolCalls,
+  extractToolCalls,
+  formatToolResultsForAI,
+  shouldEnableToolUse,
+  logToolUsage,
+  TOOL_USE_CONFIG,
+  type ToolCall,
+  type ToolCallResult,
+} from '../_shared/calculations/index.ts';
+
 /**
  * generate-optimization Edge Function
  *
@@ -1247,29 +1261,91 @@ async function generateAIOptimization(
 
   console.log(`[generateAIOptimization] 📋 Response format: ${JSON.stringify(responseFormat).substring(0, 100)}...`);
 
-  try {
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: builtPrompt.systemPrompt },
-          { role: 'user', content: enhancedUserPrompt }  // 🆕 VMD 컨텍스트 포함
-        ],
-        response_format: responseFormat,
-        max_tokens: 16000, // 🔧 토큰 한도 증가 (6000 → 16000)
-      }),
-    });
+  // 🆕 Sprint 1: Tool Use 활성화 여부 결정
+  const enableToolUse = shouldEnableToolUse(optimizationType, parameters);
+  console.log(`[generateAIOptimization] 🔧 Tool Use: ${enableToolUse ? 'ENABLED' : 'DISABLED'}`);
 
-    if (!response.ok) {
-      throw new Error(`AI API error: ${await response.text()}`);
+  try {
+    // 메시지 히스토리 (Tool Call 반복을 위해)
+    let messages: Array<{ role: string; content?: string | null; tool_calls?: ToolCall[] }> = [
+      { role: 'system', content: builtPrompt.systemPrompt },
+      { role: 'user', content: enhancedUserPrompt }
+    ];
+
+    let data: any;
+    let toolCallIterations = 0;
+    const maxIterations = TOOL_USE_CONFIG.maxIterations;
+    let allToolCallResults: ToolCallResult[] = [];
+
+    // 🆕 Sprint 1: Tool Call 반복 처리 루프
+    while (true) {
+      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages,
+          response_format: responseFormat,
+          max_tokens: 16000,
+          // 🆕 Sprint 1: Tool Use 파라미터 추가
+          ...(enableToolUse && toolCallIterations < maxIterations ? {
+            tools: OPENROUTER_TOOLS,
+            tool_choice: 'auto',
+          } : {}),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`AI API error: ${await response.text()}`);
+      }
+
+      data = await response.json();
+
+      // 🆕 Sprint 1: Tool Call 처리
+      if (enableToolUse && hasToolCalls(data) && toolCallIterations < maxIterations) {
+        toolCallIterations++;
+        const toolCalls = extractToolCalls(data);
+        const toolResults = processToolCalls(toolCalls);
+        allToolCallResults.push(...toolResults);
+
+        // 로깅
+        logToolUsage(toolCalls, toolResults, 'generateAIOptimization');
+        console.log(`[generateAIOptimization] 🔄 Tool Call iteration ${toolCallIterations}/${maxIterations}`);
+
+        // 메시지 히스토리에 추가
+        const assistantMessage = data.choices[0].message;
+        messages.push({
+          role: 'assistant',
+          content: assistantMessage.content,
+          tool_calls: assistantMessage.tool_calls,
+        });
+
+        // Tool 결과 메시지 추가
+        for (const result of toolResults) {
+          messages.push({
+            role: 'tool',
+            content: result.content,
+            // @ts-ignore - tool_call_id는 OpenRouter에서 필요
+            tool_call_id: result.tool_call_id,
+          });
+        }
+
+        // 다음 반복으로 계속
+        continue;
+      }
+
+      // Tool Call이 없거나 최대 반복 도달 시 루프 종료
+      break;
     }
 
-    const data = await response.json();
+    // 🆕 Sprint 1: Tool Use 메타데이터 로깅
+    if (toolCallIterations > 0) {
+      console.log(`[generateAIOptimization] ✅ Tool Use completed: ${toolCallIterations} iteration(s), ${allToolCallResults.length} total call(s)`);
+    }
+
     const rawContent = data.choices[0].message.content;
 
     // 🆕 Phase 1.1: <thinking> 블록 추출 및 로깅
@@ -1333,6 +1409,10 @@ async function generateAIOptimization(
         structured_output_enabled: true,
         schema_validation_passed: validation.valid,
         schema_validation_errors: validation.errors.length > 0 ? validation.errors : undefined,
+        // 🆕 Sprint 1: Tool Use 메타데이터
+        tool_use_enabled: enableToolUse,
+        tool_call_iterations: toolCallIterations,
+        total_tool_calls: allToolCallResults.length,
       } : {
         total_furniture_changes: 0,
         total_product_changes: 0,
