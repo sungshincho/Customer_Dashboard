@@ -1110,49 +1110,8 @@ export default function DigitalTwinStudioPage() {
               <QuickToggleBar activeOverlays={activeOverlays as any[]} onToggle={id => toggleOverlay(id as OverlayType)} />
             </div>
 
-            {/* ----- 상단 우측: 현재 환경 + AI 리포트 + 씬 저장 + 뷰 모드 토글 ----- */}
+            {/* ----- 상단 우측: AI 리포트 + 씬 저장 + 뷰 모드 토글 ----- */}
             <div className="absolute top-4 right-4 pointer-events-auto z-20 flex items-center gap-2">
-              {/* 현재 환경 표시 */}
-              {envContext && (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 shadow-lg">
-                  {/* 날씨 */}
-                  <div className="flex items-center gap-1">
-                    {envContext.weather?.condition === 'rain' && <CloudRain className="w-3.5 h-3.5 text-blue-400" />}
-                    {envContext.weather?.condition === 'snow' && <CloudSnow className="w-3.5 h-3.5 text-blue-200" />}
-                    {envContext.weather?.condition === 'clear' && <Sun className="w-3.5 h-3.5 text-yellow-400" />}
-                    {envContext.weather?.condition === 'clouds' && <Cloud className="w-3.5 h-3.5 text-gray-400" />}
-                    {!envContext.weather && <Cloud className="w-3.5 h-3.5 text-white/30" />}
-                    <span className="text-xs text-white">
-                      {envContext.weather ? `${Math.round(envContext.weather.temperature)}°C` : '-'}
-                    </span>
-                  </div>
-                  
-                  <div className="w-px h-4 bg-white/20" />
-                  
-                  {/* 요일 */}
-                  <div className="flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5 text-purple-400" />
-                    <span className="text-xs text-white">
-                      {envContext.holiday ? envContext.holiday.name : envCurrentTime?.isWeekend ? '주말' : '평일'}
-                    </span>
-                  </div>
-                  
-                  {/* 트래픽 영향도 */}
-                  {envImpact && (
-                    <>
-                      <div className="w-px h-4 bg-white/20" />
-                      <span className={`text-xs px-1.5 py-0.5 rounded ${
-                        envImpact.trafficMultiplier > 1.1 ? 'bg-green-500/20 text-green-400' : 
-                        envImpact.trafficMultiplier < 0.9 ? 'bg-red-500/20 text-red-400' : 
-                        'bg-white/10 text-white/60'
-                      }`}>
-                        트래픽 {(envImpact.trafficMultiplier * 100).toFixed(0)}%
-                      </span>
-                    </>
-                  )}
-                </div>
-              )}
-
               {/* AI 리포트 버튼 */}
               <div className="flex items-center px-2 py-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 shadow-lg">
                 <Button variant="ghost" size="sm" onClick={() => setVisiblePanels(prev => ({
@@ -1203,8 +1162,50 @@ export default function DigitalTwinStudioPage() {
               
             </div>
 
-            {/* ----- 하단 우측: 카메라 컨트롤 힌트 ----- */}
-            <div className="absolute bottom-4 right-4 pointer-events-auto z-20">
+            {/* ----- 하단 우측: 현재 환경 + 카메라 컨트롤 힌트 ----- */}
+            <div className="absolute bottom-4 right-4 pointer-events-auto z-20 flex flex-col gap-2 items-end">
+              {/* 현재 환경 표시 */}
+              {envContext && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 shadow-lg">
+                  {/* 날씨 */}
+                  <div className="flex items-center gap-1">
+                    {envContext.weather?.condition === 'rain' && <CloudRain className="w-3.5 h-3.5 text-blue-400" />}
+                    {envContext.weather?.condition === 'snow' && <CloudSnow className="w-3.5 h-3.5 text-blue-200" />}
+                    {envContext.weather?.condition === 'clear' && <Sun className="w-3.5 h-3.5 text-yellow-400" />}
+                    {envContext.weather?.condition === 'clouds' && <Cloud className="w-3.5 h-3.5 text-gray-400" />}
+                    {!envContext.weather && <Cloud className="w-3.5 h-3.5 text-white/30" />}
+                    <span className="text-xs text-white">
+                      {envContext.weather ? `${Math.round(envContext.weather.temperature)}°C` : '-'}
+                    </span>
+                  </div>
+                  
+                  <div className="w-px h-4 bg-white/20" />
+                  
+                  {/* 요일 */}
+                  <div className="flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-purple-400" />
+                    <span className="text-xs text-white">
+                      {envContext.holiday ? envContext.holiday.name : envCurrentTime?.isWeekend ? '주말' : '평일'}
+                    </span>
+                  </div>
+                  
+                  {/* 트래픽 영향도 */}
+                  {envImpact && (
+                    <>
+                      <div className="w-px h-4 bg-white/20" />
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${
+                        envImpact.trafficMultiplier > 1.1 ? 'bg-green-500/20 text-green-400' : 
+                        envImpact.trafficMultiplier < 0.9 ? 'bg-red-500/20 text-red-400' : 
+                        'bg-white/10 text-white/60'
+                      }`}>
+                        트래픽 {(envImpact.trafficMultiplier * 100).toFixed(0)}%
+                      </span>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* 카메라 컨트롤 힌트 */}
               <div className="bg-black/70 backdrop-blur-sm border border-white/10 rounded-lg px-3 py-2 text-xs text-white/50 flex items-center gap-2">
                 <Mouse className="w-3.5 h-3.5" />
                 <span>회전</span>
