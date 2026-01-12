@@ -1115,7 +1115,8 @@ export default function DigitalTwinStudioPage() {
             })()}
 
                 {/* 시뮬레이션 결과 스태프 오버레이 (최적화 결과가 있을 때) */}
-                {isActive('staff') && sceneSimulation.state.results.staffing && <StaffingOverlay result={sceneSimulation.state.results.staffing as any} showStaffMarkers={true} showCurrentPositions={false} showSuggestedPositions={true} showCoverageZones={false} showMovementPaths={true} animateMovement={true} />}
+                {/* 🔧 FIX: dbStaff가 있을 때만 표시 (임의 데이터 방지) */}
+                {isActive('staff') && dbStaff && dbStaff.length > 0 && sceneSimulation.state.results.staffing && <StaffingOverlay result={sceneSimulation.state.results.staffing as any} showStaffMarkers={true} showCurrentPositions={false} showSuggestedPositions={true} showCoverageZones={false} showMovementPaths={true} animateMovement={true} />}
 
                 {/* 🔧 레이아웃 오버레이 - compare 모드에서만 표시 (As-Is/To-Be 박스) */}
                 {viewMode === 'compare' && isActive('layoutOptimization') && sceneSimulation.state.results.layout && <LayoutOptimizationOverlay result={sceneSimulation.state.results.layout as any} showBefore={false} showAfter={false} showMoves={true} showProductMoves={true} showZoneHighlights={true} storeBounds={storeBounds} zonePositions={zonePositions} zoneSizes={zoneSizes} />}
@@ -1123,10 +1124,11 @@ export default function DigitalTwinStudioPage() {
                 {/* 🔧 동선/혼잡도/직원배치 오버레이 - compare 조건 제거, 토글로만 제어 */}
                 {isActive('flowOptimization') && sceneSimulation.state.results.flow && <FlowOptimizationOverlay result={sceneSimulation.state.results.flow as any} showPaths={true} showBottlenecks={true} showHeatmap={true} animatePaths={true} storeBounds={storeBounds} entrancePosition={entrancePosition} />}
                 {isActive('congestion') && sceneSimulation.state.results.congestion && <CongestionOverlay result={sceneSimulation.state.results.congestion as any} showHeatmap={true} showZoneMarkers={true} showCrowdAnimation={true} animateTimeProgress={false} />}
-                {isActive('staffing') && sceneSimulation.state.results.staffing && <StaffingOverlay result={sceneSimulation.state.results.staffing as any} showStaffMarkers={true} showCurrentPositions={true} showSuggestedPositions={true} showCoverageZones={true} showMovementPaths={true} animateMovement={true} />}
+                {/* 🔧 FIX: dbStaff가 있을 때만 표시 (임의 데이터 방지) */}
+                {isActive('staffing') && dbStaff && dbStaff.length > 0 && sceneSimulation.state.results.staffing && <StaffingOverlay result={sceneSimulation.state.results.staffing as any} showStaffMarkers={true} showCurrentPositions={true} showSuggestedPositions={true} showCoverageZones={true} showMovementPaths={true} animateMovement={true} />}
 
-                {/* 🔧 FIX: 인력 재배치 오버레이 - compare 모드에서만 표시 + 유효한 데이터 있을 때만 */}
-                {viewMode === 'compare' && isActive('staffing') && sceneSimulation.state.results.staffing && (() => {
+                {/* 🔧 FIX: 인력 재배치 오버레이 - compare 모드 + dbStaff 있을 때만 표시 */}
+                {viewMode === 'compare' && isActive('staffing') && dbStaff && dbStaff.length > 0 && sceneSimulation.state.results.staffing && (() => {
               const staffingResult = sceneSimulation.state.results.staffing as any;
               const staffPositions = staffingResult.staffPositions || [];
               
