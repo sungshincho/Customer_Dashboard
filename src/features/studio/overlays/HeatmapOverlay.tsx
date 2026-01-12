@@ -54,6 +54,17 @@ export function HeatmapOverlay({
     const positions = geo.attributes.position.array as Float32Array;
     const colorArray = new Float32Array(positions.length);
 
+    // 🔧 FIX: 유효한 히트 포인트만 필터링 (NaN 방지)
+    const validHeatPoints = (heatPoints || []).filter(point => 
+      point &&
+      typeof point.x === 'number' && 
+      typeof point.z === 'number' && 
+      typeof point.intensity === 'number' &&
+      Number.isFinite(point.x) && 
+      Number.isFinite(point.z) &&
+      Number.isFinite(point.intensity)
+    );
+
     // Create height map and color based on heat intensity
     for (let i = 0; i < positions.length; i += 3) {
       // 🆕 로컬 좌표를 월드 좌표로 변환
@@ -64,7 +75,7 @@ export function HeatmapOverlay({
 
       // Find closest heat point and calculate intensity
       let totalIntensity = 0;
-      heatPoints.forEach((point) => {
+      validHeatPoints.forEach((point) => {
         const distance = Math.sqrt(Math.pow(worldX - point.x, 2) + Math.pow(worldZ - point.z, 2));
         // 🆕 influence 범위를 매장 크기에 비례하게 조정
         const influenceRadius = Math.max(bounds.width, bounds.depth) * 0.15;
