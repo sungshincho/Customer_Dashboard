@@ -1334,14 +1334,16 @@ async function generateAIOptimization(
         body: JSON.stringify({
           model: 'google/gemini-2.5-flash',
           messages,
-          response_format: responseFormat,
+          // 🔧 Gemini는 tool_choice + response_format을 동시에 지원하지 않음
+          // Tool Use 진행 중에는 response_format 생략, 최종 응답에만 사용
+          ...(enableToolUse && toolCallIterations < maxIterations ? {} : { response_format: responseFormat }),
           max_tokens: 16000,
           // 🆕 Sprint 1: Tool Use 파라미터 추가
-          // tool_choice: 'required' - AI가 반드시 Tool을 호출하도록 강제
-          // 첫 번째 호출에서는 required, 이후에는 auto로 전환 (무한 루프 방지)
+          // tool_choice: 'auto' - AI가 필요 시 Tool을 호출
+          // 'required'는 response_format과 충돌하므로 'auto' 사용
           ...(enableToolUse && toolCallIterations < maxIterations ? {
             tools: OPENROUTER_TOOLS,
-            tool_choice: toolCallIterations === 0 ? 'required' : 'auto',
+            tool_choice: 'auto',
           } : {}),
         }),
       });

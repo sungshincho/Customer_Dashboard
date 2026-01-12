@@ -62,6 +62,12 @@ ADD COLUMN IF NOT EXISTS error_message TEXT;
 
 COMMENT ON COLUMN ai_response_logs.error_message IS '에러 발생 시 메시지';
 
+-- raw_response_length 컬럼 추가 (원본 응답 길이)
+ALTER TABLE ai_response_logs
+ADD COLUMN IF NOT EXISTS raw_response_length INTEGER;
+
+COMMENT ON COLUMN ai_response_logs.raw_response_length IS 'AI 원본 응답 문자열 길이';
+
 -- ============================================================================
 -- 3. learning_sessions RLS 정책 수정 (service_role 허용)
 -- ============================================================================
