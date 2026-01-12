@@ -670,7 +670,9 @@ export function AISimulationTab({
             </div>}
         </div>
 
-        {/* 예상 고객 수 */}
+        {/* 🔧 숨김 처리: 예상 고객 수, 시뮬레이션 시간, 시각화 옵션 */}
+        {/* 
+        {/* 예상 고객 수 *}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <label className="text-xs font-medium bg-inherit text-white">예상 고객 수</label>
@@ -683,7 +685,7 @@ export function AISimulationTab({
           </div>
         </div>
 
-        {/* 시뮬레이션 시간 */}
+        {/* 시뮬레이션 시간 *}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <label className="text-xs font-medium text-white">시뮬레이션 시간</label>
@@ -696,7 +698,7 @@ export function AISimulationTab({
           </div>
         </div>
 
-        {/* 고급 옵션 (접기/펼치기) */}
+        {/* 고급 옵션 (접기/펼치기) *}
         <div className="border border-white/10 rounded-lg">
           <button onClick={() => setShowAdvancedOptions(!showAdvancedOptions)} className="w-full flex items-center justify-between p-3 text-sm text-white/80">
             <span className="font-medium text-white">시각화 옵션</span>
@@ -704,7 +706,7 @@ export function AISimulationTab({
           </button>
 
           {showAdvancedOptions && <div className="p-3 pt-0 space-y-3 border-t border-white/10">
-              {/* 고객 상태 범례 */}
+              {/* 고객 상태 범례 *}
               <label className="flex items-center gap-3 cursor-pointer">
                 <input type="checkbox" checked={showCustomerLabels} onChange={e => setShowCustomerLabels(e.target.checked)} disabled={isAnyRunning} className="w-4 h-4 rounded bg-white/10" />
                 <div>
@@ -715,7 +717,7 @@ export function AISimulationTab({
                 </div>
               </label>
 
-              {/* 혼잡도 히트맵 */}
+              {/* 혼잡도 히트맵 *}
               <label className="flex items-center gap-3 cursor-pointer">
                 <input type="checkbox" checked={showCongestionHeatmap} onChange={e => setShowCongestionHeatmap(e.target.checked)} disabled={isAnyRunning} className="w-4 h-4 rounded bg-white/10" />
                 <div>
@@ -726,7 +728,7 @@ export function AISimulationTab({
                 </div>
               </label>
 
-              {/* 고객 상태 범례 표시 */}
+              {/* 고객 상태 범례 표시 *}
               {showCustomerLabels && <div className="pt-2 border-t border-white/10">
                   <div className="text-xs text-white/50 mb-2">상태 범례</div>
                   <div className="grid grid-cols-3 gap-1">
@@ -740,6 +742,7 @@ export function AISimulationTab({
                 </div>}
             </div>}
         </div>
+        */}
 
         {/* AI 예측 로딩 프로그레스 */}
         {isAIPredictionLoading && <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
