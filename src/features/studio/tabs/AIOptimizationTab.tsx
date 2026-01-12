@@ -866,39 +866,6 @@ export function AIOptimizationTab({
         </div>
       )}
 
-      {/* ========== 최적화 목표 선택 ========== */}
-      <div className="space-y-2">
-        <div className="text-xs font-medium text-white/60 flex items-center gap-1.5">
-          <Target className="h-3 w-3" />
-          최적화 목표
-        </div>
-        <div className="grid grid-cols-4 gap-1.5">
-          {goalOptions.map((goal) => {
-            const Icon = goal.icon;
-            const isSelected = selectedGoal === goal.id;
-            return (
-              <button
-                key={goal.id}
-                onClick={() => setSelectedGoal(goal.id)}
-                disabled={isRunning}
-                className={cn(
-                  'flex flex-col items-center p-2 rounded-lg transition-all text-center',
-                  isSelected
-                    ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-lg'
-                    : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white/80'
-                )}
-              >
-                <Icon className={cn('h-4 w-4 mb-1', isSelected ? 'text-white' : 'text-white/40')} />
-                <span className="text-[10px] font-medium">{goal.label}</span>
-              </button>
-            );
-          })}
-        </div>
-        <p className="text-[10px] text-white/40 text-center">
-          {goalOptions.find(g => g.id === selectedGoal)?.description}
-        </p>
-      </div>
-
       {/* 구분선 */}
       <div className="border-t border-white/10" />
 
