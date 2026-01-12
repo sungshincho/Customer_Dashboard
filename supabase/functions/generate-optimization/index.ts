@@ -75,6 +75,13 @@ import {
   type VMDRulesetContext,
 } from '../_shared/vmd/vmdRulesetLoader.ts';
 
+// 🆕 Sprint 3: Store Persona 로드 (S3-4)
+import {
+  buildPersonaPromptContext,
+  learnFromFeedback,
+  type PersonaPromptContext,
+} from '../_shared/persona/storePersonaLoader.ts';
+
 // Phase 4.2: 자동 학습 시스템
 import {
   loadStoredParameters,
@@ -1274,6 +1281,18 @@ async function generateAIOptimization(
     console.warn('[generateAIOptimization] VMD Ruleset load failed, continuing without:', rulesetError);
   }
 
+  // 🆕 Sprint 3: Store Persona 로드 및 프롬프트 주입 (S3-4)
+  let personaContext: PersonaPromptContext | null = null;
+  try {
+    personaContext = await buildPersonaPromptContext(storeId);
+    if (personaContext.hasPersona && personaContext.promptText) {
+      enhancedUserPrompt += `\n\n${personaContext.promptText}`;
+      console.log(`[generateAIOptimization] 👤 Store Persona loaded: style=${personaContext.metadata.storeStyle}, demographic=${personaContext.metadata.targetDemographic}, acceptance=${personaContext.metadata.feedbackStats.acceptance_rate}%`);
+    }
+  } catch (personaError) {
+    console.warn('[generateAIOptimization] Store Persona load failed, continuing without:', personaError);
+  }
+
   console.log(`[generateAIOptimization] Prompt built: tokens~${builtPrompt.totalTokenEstimate}, strategy=${builtPrompt.metadata.strategy}`);
   console.log(`[generateAIOptimization] CoT=${builtPrompt.metadata.cotEnabled}, FewShot=${builtPrompt.metadata.fewShotEnabled}(${builtPrompt.metadata.fewShotCount} examples, ${builtPrompt.metadata.fewShotStrategy})`);
   console.log(`[generateAIOptimization] Data included: env=${builtPrompt.metadata.dataIncluded.environment}, flow=${builtPrompt.metadata.dataIncluded.flowAnalysis}, assoc=${builtPrompt.metadata.dataIncluded.associations}, vmd=${!!vmdAnalysis}`);
@@ -1461,6 +1480,15 @@ async function generateAIOptimization(
           confidence: r.confidence_level,
         })),
         vmd_rules_applied_count: appliedVMDRules.length,
+        // 🆕 Sprint 3: Store Persona 메타데이터 (S3-4)
+        store_persona: personaContext ? {
+          has_persona: personaContext.hasPersona,
+          store_style: personaContext.metadata.storeStyle,
+          target_demographic: personaContext.metadata.targetDemographic,
+          acceptance_rate: personaContext.metadata.feedbackStats.acceptance_rate,
+          adjusted_confidence: personaContext.adjustedConfidence,
+          learning_version: personaContext.metadata.learningVersion,
+        } : null,
       } : {
         total_furniture_changes: 0,
         total_product_changes: 0,
