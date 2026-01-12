@@ -678,8 +678,8 @@ export function AISimulationTab({
               </p>
               <SimulationEnvironmentSettings config={simulationEnvConfig} onChange={config => {
             console.log('[AISimulationTab] SimulationEnvironmentSettings onChange:', config.mode);
-            // 커스텀 설정 변경 시 프리셋 선택 해제
-            if (config.mode === 'manual') {
+            // 커스텀 설정 변경 시 프리셋 선택 해제 (실시간 또는 직접설정 모두)
+            if (config.mode === 'manual' || config.mode === 'realtime') {
               setSelectedPreset(null);
             }
             setSimulationEnvConfig(config);
