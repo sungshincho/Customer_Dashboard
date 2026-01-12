@@ -712,9 +712,11 @@ async function saveWeatherToDb(
         humidity: weather.humidity,
         precipitation: weather.precipitation,
         wind_speed: weather.windSpeed,
+        is_global: false,
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'store_id,date',
+        ignoreDuplicates: false,
       });
 
     if (error) {
