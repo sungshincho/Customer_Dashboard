@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.89.0';
-import { logAIResponse, createExecutionTimer } from '../_shared/aiResponseLogger.ts';
+import { logAIResponse, createExecutionTimer, extractParseResultForLogging } from '../_shared/aiResponseLogger.ts';
 import { safeJsonParse, SIMULATION_FALLBACK, logParseResult } from '../_shared/safeJsonParse.ts';
 
 /**
@@ -295,6 +295,9 @@ Deno.serve(async (req: Request) => {
         summary_text: responseSummary,
       };
 
+      // 🆕 S0-5: 파싱 성공률 추적
+      const isFallback = !!(simulationResult as any)?._fallback;
+
       await logAIResponse(supabaseClient, {
         storeId: store_id,
         userId: userId || undefined, // 🆕 user_id 추가
@@ -346,6 +349,10 @@ Deno.serve(async (req: Request) => {
           hasEnvironmentContext: !!environment_context,
           hasPresetScenario: !!environment_context?.preset_scenario,
         },
+        // 🆕 S0-5: 파싱 성공률 추적
+        parseSuccess: !isFallback,
+        usedFallback: isFallback,
+        rawResponseLength: undefined, // AI 응답 원본이 함수 내부에서만 접근 가능
       });
 
       console.log(`[Simulation] 로깅 완료: ${executionTime}ms`);
@@ -376,6 +383,9 @@ Deno.serve(async (req: Request) => {
         executionTimeMs: timer.getElapsedMs(),
         hadError: true,
         errorMessage: error.message,
+        // 🆕 S0-5: 파싱 성공률 추적 - 에러 시 실패 처리
+        parseSuccess: false,
+        usedFallback: false,
       });
     } catch {
       // 로깅 실패 무시
