@@ -68,6 +68,12 @@ ADD COLUMN IF NOT EXISTS raw_response_length INTEGER;
 
 COMMENT ON COLUMN ai_response_logs.raw_response_length IS 'AI 원본 응답 문자열 길이';
 
+-- used_fallback 컬럼 추가 (폴백 사용 여부)
+ALTER TABLE ai_response_logs
+ADD COLUMN IF NOT EXISTS used_fallback BOOLEAN DEFAULT false;
+
+COMMENT ON COLUMN ai_response_logs.used_fallback IS 'AI 응답 실패 시 폴백 사용 여부';
+
 -- ============================================================================
 -- 3. learning_sessions RLS 정책 수정 (service_role 허용)
 -- ============================================================================
