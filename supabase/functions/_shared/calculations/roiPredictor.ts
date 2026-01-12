@@ -244,33 +244,29 @@ export function calculateROI(input: ROIInput): ROIOutput {
   }
 
   // Step 7: ROI 계산
-  // ROI = (이익 - 비용) / 비용 × 100 (비용이 있을 경우)
-  // ROI = 이익 기준 (비용이 없을 경우)
-  // 🔧 버그 수정: 최소 비용 보장 + ROI 상한선 설정
-  const MIN_COST = 10000; // 최소 1만원 비용 (ROI 폭발 방지)
-  const MAX_ROI = 500; // ROI 상한선 500%
+  // 🔧 합리적인 ROI 계산 로직:
+  // - 의미 있는 비용(≥10,000원)이 있으면: 비용 기반 ROI = (월간이익 - 비용) / 비용 × 100
+  // - 비용이 없거나 무의미하면: 마진 기반 ROI = 마진율 × 100
+  const MEANINGFUL_COST_THRESHOLD = 10000; // 의미 있는 비용 기준 (1만원)
   let roi_percent: number;
 
-  if (totalCost > 0) {
+  if (totalCost >= MEANINGFUL_COST_THRESHOLD) {
+    // 의미 있는 비용이 있을 때: 비용 대비 수익률 계산
     // 월간 이익으로 ROI 계산 (30일 기준)
     const monthly_profit = profit * 30;
-    // 🔧 최소 비용 보장 (0에 가까운 비용으로 인한 ROI 폭발 방지)
-    const safeCost = Math.max(totalCost, MIN_COST);
-    roi_percent = ((monthly_profit - safeCost) / safeCost) * 100;
-    // 🔧 ROI 상한선 적용
-    roi_percent = Math.min(roi_percent, MAX_ROI);
+    roi_percent = ((monthly_profit - totalCost) / totalCost) * 100;
 
     breakdown.push({
-      step: 'ROI',
+      step: 'ROI (비용 기반)',
       value: roi_percent,
-      formula: `(₩${monthly_profit.toLocaleString()} - ₩${safeCost.toLocaleString()}) / ₩${safeCost.toLocaleString()} × 100 = ${roi_percent.toFixed(1)}%`,
+      formula: `(₩${monthly_profit.toLocaleString()} - ₩${totalCost.toLocaleString()}) / ₩${totalCost.toLocaleString()} × 100 = ${roi_percent.toFixed(1)}%`,
       unit: '%/월',
     });
   } else {
-    // 비용이 없으면 이익률 기반 ROI
+    // 비용이 없거나 무의미할 때: 마진율 기반 ROI
+    // 상품 배치 변경은 대부분 추가 비용 없이 기존 상품을 이동하므로
+    // 마진율을 ROI의 proxy로 사용
     roi_percent = profit > 0 ? input.product_margin * 100 : 0;
-    // 🔧 ROI 상한선 적용
-    roi_percent = Math.min(roi_percent, MAX_ROI);
 
     breakdown.push({
       step: 'ROI (마진 기준)',
