@@ -262,7 +262,7 @@ export const AppliedStrategyTable: React.FC<AppliedStrategyTableProps> = ({
         <div style={{ padding: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <h3 style={{ fontSize: '16px', margin: 0, ...text3D.number }}>📋 적용 이력</h3>
+              <h3 style={{ fontSize: '16px', margin: 0, ...text3D.number }}>적용 이력</h3>
               <Badge3D dark={isDark}>
                 <span style={{ color: isDark ? 'rgba(255,255,255,0.7)' : '#515158' }}>{filteredData.length}건</span>
               </Badge3D>

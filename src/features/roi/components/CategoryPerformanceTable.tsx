@@ -202,7 +202,7 @@ export const CategoryPerformanceTable: React.FC<CategoryPerformanceTableProps> =
     <GlassCard dark={isDark}>
       <div style={{ padding: '24px' }}>
         <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px', ...text3D.number }}>
-          📊 카테고리별 성과
+          카테고리별 성과
         </h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <CategoryTable
