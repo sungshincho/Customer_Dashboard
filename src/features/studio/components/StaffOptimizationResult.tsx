@@ -170,7 +170,7 @@ export const StaffOptimizationResultPanel: React.FC<StaffOptimizationResultPanel
           <div className="flex gap-2 pt-2">
             <button
               onClick={() => onToggleOverlay?.(!isOverlayVisible)}
-              className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-xs bg-muted hover:bg-muted/80 rounded transition"
+              className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-xs bg-white/10 hover:bg-white/20 text-white rounded transition"
             >
               {isOverlayVisible ? (
                 <EyeOff className="w-3 h-3" />
@@ -181,7 +181,7 @@ export const StaffOptimizationResultPanel: React.FC<StaffOptimizationResultPanel
             </button>
             <button
               onClick={onApply}
-              className="flex-1 px-3 py-1.5 text-xs bg-primary text-primary-foreground hover:bg-primary/90 rounded transition"
+              className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-xs bg-white/10 hover:bg-white/20 text-white rounded transition"
             >
               적용
             </button>
