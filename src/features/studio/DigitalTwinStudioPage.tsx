@@ -1299,12 +1299,12 @@ export default function DigitalTwinStudioPage() {
               {(sceneSimulation.state.results.layout || sceneSimulation.state.results.flow) && <div className={`px-3 py-2 rounded-lg text-xs font-medium flex flex-col gap-1 ${viewMode === 'as-is' ? 'bg-blue-600/80 text-white' : viewMode === 'to-be' ? 'bg-green-600/80 text-white' : 'bg-purple-600/80 text-white'}`}>
                   <div className="flex items-center gap-1.5">
                     {viewMode === 'as-is' && '📍 As-Is (현재 배치)'}
-                    {viewMode === 'to-be' && '✨ To-Be (최적화 결과)'}
-                    {viewMode === 'compare' && '🔄 비교 (변화 보기)'}
+                    {viewMode === 'to-be' && '✨ To-Be (최적화 결과 적용됨)'}
+                    {viewMode === 'compare' && '🔄 비교 (현재 배치 + 이동 위치)'}
                   </div>
                   {/* 비교 뷰 안내 */}
                   {viewMode === 'compare' && <div className="text-[10px] text-white/70">
-                      🔴 As-Is → 🟢 To-Be 변화 확인
+                      🔴 현재 위치 → 🟢 이동할 위치
                     </div>}
                 </div>}
               
