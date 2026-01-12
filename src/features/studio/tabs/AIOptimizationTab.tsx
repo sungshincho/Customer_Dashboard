@@ -225,19 +225,9 @@ export function AIOptimizationTab({
     return products;
   }, [sceneData?.products, sceneData?.furniture]);
 
-  // 비교 모드 변경 시 오버레이 업데이트
-  useEffect(() => {
-    const { results } = sceneSimulation.state;
-    const hasLayoutResult = !!results.layout;
-
-    if (hasLayoutResult) {
-      // viewMode에 따라 오버레이 설정
-      // 'all' - 모든 변경 표시 (As-Is, To-Be, 화살표 모두)
-      // 'as-is' - 원래 상태만
-      // 'to-be' - 최적화 결과만
-      onOverlayToggle('layoutOptimization', viewMode !== 'as-is');
-    }
-  }, [viewMode, sceneSimulation.state.results, onOverlayToggle]);
+  // 🔧 FIX: 이 useEffect 제거 - handleViewModeChange에서 오버레이 설정을 직접 처리함
+  // viewMode 변경 시 useEffect가 중복으로 오버레이 토글을 호출하여 버그 발생
+  // (비교 버튼 클릭 → handleViewModeChange에서 오버레이 켜짐 → useEffect에서 다시 토글되어 꺼짐)
 
   // 체크박스 토글
   const toggleOptimization = (type: OptimizationType) => {
