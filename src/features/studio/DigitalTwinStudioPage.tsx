@@ -1125,6 +1125,16 @@ export default function DigitalTwinStudioPage() {
 
               {/* 퀵 토글 바 */}
               <QuickToggleBar activeOverlays={activeOverlays as any[]} onToggle={id => toggleOverlay(id as OverlayType)} />
+
+              {/* 구분선 */}
+              <div className="w-px h-6 bg-white/20" />
+
+              {/* 뷰 모드 토글 (As-Is / 비교 / To-Be) */}
+              <ViewModeToggle
+                mode={viewMode}
+                onChange={setViewMode}
+                hasOptimizationResults={!!(sceneSimulation.state.results.layout || sceneSimulation.state.results.flow || sceneSimulation.state.results.staffing)}
+              />
             </div>
 
             {/* ----- 하단 좌측: 현재 상태 정보 + 뷰모드 표시 ----- */}
