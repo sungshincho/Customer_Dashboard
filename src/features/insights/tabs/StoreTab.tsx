@@ -692,7 +692,7 @@ export function StoreTab() {
       </div>
 
       {/* 센서 커버율 안내 배너 - 데이터 있을 때만 표시 */}
-      {metrics?.trackedVisitors && metrics.trackedVisitors > 0 && metrics.uniqueVisitors > 0 && (
+      {(metrics?.trackedVisitors ?? 0) > 0 && (metrics?.uniqueVisitors ?? 0) > 0 && (
         <div className={`p-3 rounded-lg flex items-start gap-2 ${isDark ? 'bg-white/5 border border-white/10' : 'bg-black/5 border border-black/10'}`}>
           <Info className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }} />
           <p style={{ fontSize: '13px', ...text3D.body }}>

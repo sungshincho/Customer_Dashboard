@@ -400,7 +400,7 @@ export function OverviewTab() {
       </div>
 
       {/* 방문 빈도 안내 */}
-      {metrics?.visitFrequency && metrics.visitFrequency > 1 && (
+      {(metrics?.visitFrequency ?? 0) > 1 && (
         <div className={cn("p-3 rounded-lg flex items-start gap-2",
           isDark ? "bg-white/5 border border-white/10" : "bg-black/[0.02] border border-black/5"
         )}>
