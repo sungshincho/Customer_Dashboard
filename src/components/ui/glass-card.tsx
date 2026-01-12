@@ -126,6 +126,7 @@ export const Icon3D: React.FC<Icon3DProps> = ({
       style={{
         width: size,
         height: size,
+        flexShrink: 0,
         background: dark
           ? 'linear-gradient(145deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.04) 50%, rgba(255,255,255,0.09) 100%)'
           : 'linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(230,230,238,0.95) 40%, rgba(245,245,250,0.98) 100%)',
