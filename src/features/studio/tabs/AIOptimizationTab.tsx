@@ -110,6 +110,8 @@ interface AIOptimizationTabProps {
   viewMode?: ViewMode;
   /** 🆕 뷰 모드 변경 콜백 (상단 토글과 연동) */
   onViewModeChange?: (mode: ViewMode) => void;
+  /** 🆕 씬 저장 함수 (DigitalTwinStudioPage에서 전달) */
+  onSaveScene?: (name: string) => Promise<void>;
 }
 
 export function AIOptimizationTab({
@@ -124,6 +126,7 @@ export function AIOptimizationTab({
   simulationEnvConfig,
   viewMode: externalViewMode,
   onViewModeChange,
+  onSaveScene,
 }: AIOptimizationTabProps) {
   // SceneProvider에서 applySimulationResults, revertSimulationChanges 가져오기
   const { applySimulationResults, revertSimulationChanges } = useScene();
@@ -602,13 +605,19 @@ export function AIOptimizationTab({
 
     try {
       const results = sceneSimulation.state.results;
+      const previousMode = viewMode;
+      
+      // 🔧 FIX: 상태 전환 로직 개선
+      // As-Is → To-Be/비교: 적용
+      // To-Be/비교 → As-Is: 복원
+      // To-Be ↔ 비교: 오버레이만 토글 (3D 위치는 이미 To-Be 상태)
       
       if (newMode === 'as-is') {
         // As-Is: 원래 위치로 복원
         revertSimulationChanges();
         onOverlayToggle('layoutOptimization', false);
-      } else if (newMode === 'to-be' || newMode === 'compare') {
-        // To-Be 또는 비교: 최적화 위치로 이동
+      } else if (previousMode === 'as-is' && (newMode === 'to-be' || newMode === 'compare')) {
+        // As-Is에서 To-Be/비교로 전환: 최적화 위치 적용
         const rawFurnitureMoves = results.layout?.layoutChanges || 
                                   results.layout?.furnitureMoves ||
                                   results.layout?.furniture_changes ||
@@ -632,6 +641,9 @@ export function AIOptimizationTab({
         }
         
         // 비교 모드일 때만 오버레이 표시
+        onOverlayToggle('layoutOptimization', newMode === 'compare');
+      } else if ((previousMode === 'to-be' || previousMode === 'compare') && (newMode === 'to-be' || newMode === 'compare')) {
+        // 🔧 FIX: To-Be ↔ 비교 간 전환: 오버레이만 토글 (3D 위치 변경 없음)
         onOverlayToggle('layoutOptimization', newMode === 'compare');
       }
 
@@ -662,7 +674,7 @@ export function AIOptimizationTab({
     handleViewModeChange('to-be');
   }, [handleViewModeChange]);
 
-  // To-Be 씬 저장 (개선: 결과 데이터 기반으로 저장)
+  // To-Be 씬 저장 (개선: 상위 컴포넌트의 씬 저장 기능 사용)
   const handleSaveToBe = useCallback(async () => {
     try {
       const { results } = sceneSimulation.state;
@@ -675,37 +687,44 @@ export function AIOptimizationTab({
 
       const sceneName = `최적화 씬 ${new Date().toLocaleDateString('ko-KR')} ${new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}`;
       
-      // toBeScene이 있으면 사용, 없으면 현재 sceneData에 결과 반영
+      // 🔧 FIX: onSaveScene이 있으면 사용 (DB 저장)
+      if (onSaveScene) {
+        await onSaveScene(sceneName);
+        toast.success('To-Be 씬이 저장되었습니다');
+        return;
+      }
+      
+      // toBeScene이 있으면 사용
       if (sceneSimulation.state.toBeScene) {
         await sceneSimulation.saveToBeScene(sceneName);
-      } else {
-        // 직접 저장 시도 - sceneSimulation의 내부 저장 로직 우회
-        toast.info('최적화 결과를 시나리오로 저장합니다');
-        
-        // 시나리오로 저장 (fallback)
-        const scenarioData = {
-          id: `tobe-scene-${Date.now()}`,
-          name: sceneName,
-          createdAt: new Date().toISOString(),
-          type: 'to-be-scene',
-          results: {
-            layout: results.layout,
-            flow: results.flow,
-            staffing: results.staffing,
-          },
-        };
-        
-        const savedScenes = JSON.parse(localStorage.getItem('optimization_tobe_scenes') || '[]');
-        savedScenes.push(scenarioData);
-        localStorage.setItem('optimization_tobe_scenes', JSON.stringify(savedScenes));
-        
-        toast.success('To-Be 씬이 저장되었습니다');
+        return;
       }
+      
+      // 최후 수단: 로컬 스토리지에 저장
+      toast.info('최적화 결과를 시나리오로 저장합니다');
+      
+      const scenarioData = {
+        id: `tobe-scene-${Date.now()}`,
+        name: sceneName,
+        createdAt: new Date().toISOString(),
+        type: 'to-be-scene',
+        results: {
+          layout: results.layout,
+          flow: results.flow,
+          staffing: results.staffing,
+        },
+      };
+      
+      const savedScenes = JSON.parse(localStorage.getItem('optimization_tobe_scenes') || '[]');
+      savedScenes.push(scenarioData);
+      localStorage.setItem('optimization_tobe_scenes', JSON.stringify(savedScenes));
+      
+      toast.success('To-Be 씬이 저장되었습니다 (로컬)');
     } catch (error) {
       console.error('Save To-Be error:', error);
       toast.error('저장에 실패했습니다');
     }
-  }, [sceneSimulation]);
+  }, [sceneSimulation, onSaveScene]);
 
   const { results } = sceneSimulation.state;
   const hasResults = results.layout || results.flow || results.staffing;
