@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/popover';
 import { useDateFilterStore, PresetPeriod, PRESET_LABELS } from '@/store/dateFilterStore';
 import { cn } from '@/lib/utils';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isToday, isSameDay } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { useState, useCallback, useEffect } from 'react';
 import { DateRange } from 'react-day-picker';
@@ -60,14 +60,20 @@ export function GlobalDateFilter({
     }
   }, [isOpen, dateRange.startDate, dateRange.endDate, dateRange.preset]);
 
-  const handleDateRangeSelect = useCallback((range: DateRange | undefined) => {
-    // 시작/종료 날짜가 모두 선택된 상태에서 새 날짜 클릭 시 초기화
-    if (tempRange?.from && tempRange?.to && range?.from) {
+  // 날짜 클릭 핸들러 - 시작/종료가 모두 선택된 상태에서 새 날짜 클릭 시 초기화
+  const handleDayClick = useCallback((day: Date) => {
+    if (tempRange?.from && tempRange?.to) {
       // 기존 범위가 완성된 상태에서 새로 클릭하면 시작 날짜로 초기화
       setTempRange({
-        from: range.from,
+        from: day,
         to: undefined,
       });
+    }
+  }, [tempRange]);
+
+  const handleDateRangeSelect = useCallback((range: DateRange | undefined) => {
+    // 시작/종료 날짜가 모두 선택된 상태에서는 onDayClick에서 처리됨
+    if (tempRange?.from && tempRange?.to) {
       return;
     }
 
@@ -184,8 +190,18 @@ export function GlobalDateFilter({
               defaultMonth={displayRange.from}
               selected={displayRange}
               onSelect={handleDateRangeSelect}
+              onDayClick={handleDayClick}
               numberOfMonths={2}
               locale={ko}
+              modifiers={{
+                todayInRange: (day) =>
+                  isToday(day) &&
+                  !isSameDay(day, tempRange?.from ?? new Date(0)) &&
+                  !isSameDay(day, tempRange?.to ?? new Date(0)),
+              }}
+              modifiersClassNames={{
+                todayInRange: "!bg-blue-500/20 !text-blue-600 !ring-1 !ring-blue-500/40 dark:!bg-blue-500/30 dark:!text-blue-300 dark:!ring-blue-400/50 rounded-full",
+              }}
             />
           </PopoverContent>
         </Popover>
