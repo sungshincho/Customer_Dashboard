@@ -137,12 +137,23 @@ function ServiceHeatmap({ data }: ServiceHeatmapProps) {
     const positions = geo.attributes.position.array as Float32Array;
     const colors = new Float32Array(positions.length);
 
+    // 🔧 FIX: 유효한 데이터만 필터링 (NaN 방지)
+    const validData = (data || []).filter(point => 
+      point &&
+      typeof point.x === 'number' && 
+      typeof point.z === 'number' && 
+      typeof point.serviceLevel === 'number' &&
+      Number.isFinite(point.x) && 
+      Number.isFinite(point.z) &&
+      Number.isFinite(point.serviceLevel)
+    );
+
     for (let i = 0; i < positions.length; i += 3) {
       const x = positions[i];
       const z = positions[i + 1];
 
       let serviceLevel = 0;
-      data.forEach((point) => {
+      validData.forEach((point) => {
         const dist = Math.sqrt(Math.pow(x - point.x, 2) + Math.pow(z - point.z, 2));
         if (dist < 2.5) {
           serviceLevel = Math.max(serviceLevel, point.serviceLevel * (1 - dist / 2.5));
@@ -215,7 +226,14 @@ function CoverageZone({ zone, showCurrent, showSuggested }: CoverageZoneProps) {
   const shouldShow = (zone.type === 'current' && showCurrent) ||
                      (zone.type === 'optimized' && showSuggested);
 
-  if (!shouldShow) return null;
+  // 🔧 FIX: position이 유효한지 체크 (NaN 방지)
+  const hasValidPosition = zone.position &&
+    typeof zone.position.x === 'number' &&
+    typeof zone.position.z === 'number' &&
+    Number.isFinite(zone.position.x) &&
+    Number.isFinite(zone.position.z);
+
+  if (!shouldShow || !hasValidPosition) return null;
 
   const color = zone.type === 'current' ? '#60a5fa' : '#22c55e';
   const opacity = zone.type === 'current' ? 0.15 : 0.25;
