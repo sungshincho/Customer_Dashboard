@@ -282,9 +282,10 @@ export const ResultReportPanel = memo(function ResultReportPanel({
                         3D 보기
                       </Button>
                       <Button
+                        variant="ghost"
                         size="sm"
                         onClick={() => onApply(type.id)}
-                        className="flex-1 h-7 text-xs"
+                        className="flex-1 h-7 text-xs bg-white/10 hover:bg-white/20 text-white"
                       >
                         적용
                       </Button>
@@ -575,7 +576,7 @@ const StaffingResultContent = memo(function StaffingResultContent({
       {result.improvements.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {result.improvements.map((imp, i) => (
-            <span key={i} className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400">
+            <span key={i} className="text-xs px-1.5 py-0.5 rounded bg-white/10 text-white/80">
               {imp.metric}: {imp.value}
             </span>
           ))}
