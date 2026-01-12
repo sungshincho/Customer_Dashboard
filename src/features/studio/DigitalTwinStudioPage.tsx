@@ -1084,31 +1084,16 @@ export default function DigitalTwinStudioPage() {
 
           {/* ========== UI 오버레이 ========== */}
           <div className="absolute inset-0 z-10 pointer-events-none">
-            {/* ----- 상단 중앙: 통합 컨트롤 바 (패널 토글 + 퀵 토글) ----- */}
+            {/* ----- 상단 중앙: 퀵 토글 바 + AI 리포트 ----- */}
             <div className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-auto z-20 flex items-center gap-3">
-              {/* 패널 토글 버튼들 */}
+              {/* 퀵 토글 바 */}
+              <QuickToggleBar activeOverlays={activeOverlays as any[]} onToggle={id => toggleOverlay(id as OverlayType)} />
+
+              {/* 구분선 */}
+              <div className="w-px h-6 bg-white/20" />
+
+              {/* AI 리포트 버튼 */}
               <div className="flex items-center gap-1 px-2 py-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 shadow-lg">
-                {/* 임시 비활성화 - 도구 버튼
-                 <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setVisiblePanels(prev => ({ ...prev, tools: !prev.tools }))}
-                  className={`h-8 px-3 rounded-lg transition-all border border-transparent ${
-                    visiblePanels.tools ? 'bg-blue-500/30 border-blue-500 text-blue-400' : 'hover:bg-white/10 text-white/60'
-                  }`}
-                 >
-                  <Layers className="w-4 h-4 mr-1.5" />
-                  <span className="text-xs">도구</span>
-                 </Button>
-                 */}
-                <Button variant="ghost" size="sm" onClick={() => setVisiblePanels(prev => ({
-                ...prev,
-                sceneSave: !prev.sceneSave
-              }))} className={`h-8 px-3 rounded-lg transition-all border border-transparent ${visiblePanels.sceneSave ? 'bg-green-500/30 border-green-500' : 'hover:bg-white/10'}`}
-                  style={{ color: visiblePanels.sceneSave ? '#4ade80' : 'rgba(255,255,255,0.6)' }}>
-                  <Save className="w-4 h-4 mr-1.5" />
-                  <span className="text-xs">씬 저장</span>
-                </Button>
                 <Button variant="ghost" size="sm" onClick={() => setVisiblePanels(prev => ({
                 ...prev,
                 resultReport: !prev.resultReport
@@ -1119,15 +1104,21 @@ export default function DigitalTwinStudioPage() {
                   {(simulationResults.layout || simulationResults.flow || simulationResults.congestion || simulationResults.staffing) && <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full" />}
                 </Button>
               </div>
+            </div>
 
-              {/* 구분선 */}
-              <div className="w-px h-6 bg-white/20" />
-
-              {/* 퀵 토글 바 */}
-              <QuickToggleBar activeOverlays={activeOverlays as any[]} onToggle={id => toggleOverlay(id as OverlayType)} />
-
-              {/* 구분선 */}
-              <div className="w-px h-6 bg-white/20" />
+            {/* ----- 상단 우측: 씬 저장 + 뷰 모드 토글 ----- */}
+            <div className="absolute top-4 right-4 pointer-events-auto z-20 flex items-center gap-2">
+              {/* 씬 저장 버튼 */}
+              <div className="flex items-center px-2 py-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 shadow-lg">
+                <Button variant="ghost" size="sm" onClick={() => setVisiblePanels(prev => ({
+                ...prev,
+                sceneSave: !prev.sceneSave
+              }))} className={`h-8 px-3 rounded-lg transition-all border border-transparent ${visiblePanels.sceneSave ? 'bg-green-500/30 border-green-500' : 'hover:bg-white/10'}`}
+                  style={{ color: visiblePanels.sceneSave ? '#4ade80' : 'rgba(255,255,255,0.6)' }}>
+                  <Save className="w-4 h-4 mr-1.5" />
+                  <span className="text-xs">씬 저장</span>
+                </Button>
+              </div>
 
               {/* 뷰 모드 토글 (As-Is / 비교 / To-Be) */}
               <ViewModeToggle
