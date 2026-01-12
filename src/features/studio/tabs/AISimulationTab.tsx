@@ -12,7 +12,7 @@ import { Play, Pause, Square, RotateCcw, Users, Activity, Thermometer, Monitor, 
 import { useEnvironmentContext } from '../hooks/useEnvironmentContext';
 import { SimulationEnvironmentSettings } from '../components/SimulationEnvironmentSettings';
 import type { SimulationEnvironmentConfig } from '../types/simulationEnvironment.types';
-import { createDefaultSimulationConfig, calculateSimulationImpacts } from '../types/simulationEnvironment.types';
+import { createDefaultSimulationConfig, calculateSimulationImpacts, WEATHER_OPTIONS, TIME_OF_DAY_OPTIONS, HOLIDAY_OPTIONS } from '../types/simulationEnvironment.types';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
@@ -642,14 +642,30 @@ export function AISimulationTab({
         {/* 시뮬레이션 타입 선택 UI 제거됨 - 기본값으로 AI 예측 사용 */}
 
         {/* 🆕 커스텀 시나리오 패널 (접기/펼치기) - 프리셋 바로 아래 배치 */}
-        <div className="border border-white/10 rounded-lg">
+        <div className={cn(
+          "border rounded-lg transition-all duration-300",
+          // 커스텀 시나리오가 적용되었을 때 (직접설정 모드이고 프리셋 미선택)
+          simulationEnvConfig.mode === 'manual' && !selectedPreset
+            ? "border-orange-500/50 bg-orange-500/5 shadow-[0_0_15px_rgba(249,115,22,0.15)]"
+            : "border-white/10"
+        )}>
           <button onClick={() => setShowEnvironmentSettings(!showEnvironmentSettings)} className="w-full flex items-center justify-between p-3 text-sm text-white/80">
             <span className="font-medium flex items-center gap-2 text-white">
-              <Wrench className="w-4 h-4 text-blue-400" />
+              <Wrench className={cn(
+                "w-4 h-4 transition-colors",
+                simulationEnvConfig.mode === 'manual' && !selectedPreset ? "text-orange-400" : "text-blue-400"
+              )} />
               커스텀 시나리오
+              {/* 적용됨 표시 */}
+              {simulationEnvConfig.mode === 'manual' && !selectedPreset && (
+                <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 animate-pulse">
+                  <CheckCircle className="w-3 h-3" />
+                  적용됨
+                </span>
+              )}
             </span>
             <div className="flex items-center gap-2">
-              <span className={cn("text-xs px-1.5 py-0.5 rounded", simulationEnvConfig.mode === 'realtime' ? "bg-blue-500/20 text-blue-400" : "bg-purple-500/20 text-purple-400")}>
+              <span className={cn("text-xs px-1.5 py-0.5 rounded", simulationEnvConfig.mode === 'realtime' ? "bg-blue-500/20 text-blue-400" : "bg-orange-500/20 text-orange-400")}>
                 {simulationEnvConfig.mode === 'realtime' ? '실시간' : '직접설정'}
               </span>
               {showEnvironmentSettings ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -662,9 +678,120 @@ export function AISimulationTab({
               </p>
               <SimulationEnvironmentSettings config={simulationEnvConfig} onChange={config => {
             console.log('[AISimulationTab] SimulationEnvironmentSettings onChange:', config.mode);
+            // 커스텀 설정 변경 시 프리셋 선택 해제
+            if (config.mode === 'manual') {
+              setSelectedPreset(null);
+            }
             setSimulationEnvConfig(config);
           }} storeId={storeId} compact={true} />
             </div>}
+        </div>
+
+        {/* 🆕 최종 적용 시나리오 확인 패널 */}
+        <div className="border border-white/10 rounded-lg p-3 bg-gradient-to-br from-white/5 to-transparent">
+          <div className="flex items-center gap-2 mb-2">
+            <CheckCircle className="w-4 h-4 text-green-400" />
+            <span className="text-xs font-medium text-white">최종 적용 시나리오</span>
+          </div>
+          
+          {/* 적용된 시나리오 타입 표시 */}
+          <div className={cn(
+            "p-2.5 rounded-lg border transition-all",
+            selectedPreset 
+              ? "bg-purple-500/10 border-purple-500/30" 
+              : simulationEnvConfig.mode === 'manual'
+              ? "bg-orange-500/10 border-orange-500/30"
+              : "bg-blue-500/10 border-blue-500/30"
+          )}>
+            {selectedPreset ? (
+              // 프리셋 시나리오 적용됨
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <Target className="w-4 h-4 text-purple-400" />
+                  <span className="text-sm font-medium text-purple-400">프리셋 시나리오</span>
+                </div>
+                <div className="flex items-center gap-2 text-white">
+                  <span className="text-lg">{PRESET_SCENARIOS.find(p => p.id === selectedPreset)?.emoji}</span>
+                  <span className="font-medium">{PRESET_SCENARIOS.find(p => p.id === selectedPreset)?.name}</span>
+                </div>
+                <p className="text-[10px] text-white/50">
+                  {PRESET_SCENARIOS.find(p => p.id === selectedPreset)?.description}
+                </p>
+              </div>
+            ) : simulationEnvConfig.mode === 'manual' ? (
+              // 커스텀 시나리오 적용됨
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <Wrench className="w-4 h-4 text-orange-400" />
+                  <span className="text-sm font-medium text-orange-400">커스텀 시나리오</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {simulationEnvConfig.manualSettings?.weather && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/80">
+                      🌤️ {WEATHER_OPTIONS.find(w => w.id === simulationEnvConfig.manualSettings?.weather)?.label || simulationEnvConfig.manualSettings?.weather}
+                    </span>
+                  )}
+                  {simulationEnvConfig.manualSettings?.timeOfDay && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/80">
+                      🕐 {TIME_OF_DAY_OPTIONS.find(t => t.id === simulationEnvConfig.manualSettings?.timeOfDay)?.label || simulationEnvConfig.manualSettings?.timeOfDay}
+                    </span>
+                  )}
+                  {simulationEnvConfig.manualSettings?.holidayType && simulationEnvConfig.manualSettings?.holidayType !== 'none' && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/80">
+                      🎉 {HOLIDAY_OPTIONS.find(h => h.id === simulationEnvConfig.manualSettings?.holidayType)?.label || simulationEnvConfig.manualSettings?.holidayType}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ) : (
+              // 실시간 환경 적용됨
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-blue-400" />
+                  <span className="text-sm font-medium text-blue-400">실시간 환경</span>
+                </div>
+                <p className="text-[10px] text-white/50">
+                  현재 실제 날씨, 시간대, 이벤트를 기반으로 시뮬레이션합니다
+                </p>
+              </div>
+            )}
+          </div>
+          
+          {/* 예상 영향도 요약 */}
+          {simulationEnvConfig.calculatedImpact && (
+            <div className="grid grid-cols-3 gap-2 mt-2 text-center">
+              <div className="p-1.5 bg-white/5 rounded">
+                <div className="text-[9px] text-white/40">트래픽</div>
+                <div className={cn(
+                  "text-xs font-bold",
+                  (simulationEnvConfig.calculatedImpact.trafficMultiplier || 1) >= 1 ? "text-green-400" : "text-red-400"
+                )}>
+                  {(simulationEnvConfig.calculatedImpact.trafficMultiplier || 1) >= 1 ? '+' : ''}
+                  {Math.round(((simulationEnvConfig.calculatedImpact.trafficMultiplier || 1) - 1) * 100)}%
+                </div>
+              </div>
+              <div className="p-1.5 bg-white/5 rounded">
+                <div className="text-[9px] text-white/40">체류시간</div>
+                <div className={cn(
+                  "text-xs font-bold",
+                  (simulationEnvConfig.calculatedImpact.dwellTimeMultiplier || 1) >= 1 ? "text-blue-400" : "text-orange-400"
+                )}>
+                  {(simulationEnvConfig.calculatedImpact.dwellTimeMultiplier || 1) >= 1 ? '+' : ''}
+                  {Math.round(((simulationEnvConfig.calculatedImpact.dwellTimeMultiplier || 1) - 1) * 100)}%
+                </div>
+              </div>
+              <div className="p-1.5 bg-white/5 rounded">
+                <div className="text-[9px] text-white/40">전환율</div>
+                <div className={cn(
+                  "text-xs font-bold",
+                  (simulationEnvConfig.calculatedImpact.conversionMultiplier || 1) >= 1 ? "text-purple-400" : "text-red-400"
+                )}>
+                  {(simulationEnvConfig.calculatedImpact.conversionMultiplier || 1) >= 1 ? '+' : ''}
+                  {Math.round(((simulationEnvConfig.calculatedImpact.conversionMultiplier || 1) - 1) * 100)}%
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 🔧 숨김 처리: 예상 고객 수, 시뮬레이션 시간, 시각화 옵션 */}
