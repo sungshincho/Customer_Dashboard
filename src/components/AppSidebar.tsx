@@ -83,27 +83,32 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarContent className="bg-background dark:bg-sidebar">
         {/* Store Selector */}
-        {!collapsed && stores.length > 0 && (
-          <div className="p-4 border-b border-border">
-            <Select
-              value={selectedStore?.id || ""}
-              onValueChange={(value) => {
-                const store = stores.find(s => s.id === value);
-                setSelectedStore(store || null);
-              }}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="매장 선택" />
-              </SelectTrigger>
-              <SelectContent>
-                {stores.map((store) => (
-                  <SelectItem key={store.id} value={store.id}>
-                    {store.store_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        {stores.length > 0 && (
+          collapsed ? (
+            /* 접힌 상태: 펼친 상태의 Store Selector와 동일한 높이 유지 */
+            <div className="h-[73px] border-b border-border" />
+          ) : (
+            <div className="p-4 border-b border-border">
+              <Select
+                value={selectedStore?.id || ""}
+                onValueChange={(value) => {
+                  const store = stores.find(s => s.id === value);
+                  setSelectedStore(store || null);
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="매장 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {stores.map((store) => (
+                    <SelectItem key={store.id} value={store.id}>
+                      {store.store_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )
         )}
 
         {/* 메인 메뉴 (4개) */}
@@ -119,7 +124,7 @@ export function AppSidebar() {
                         to={item.url}
                         className={`hover:bg-muted/50 dark:hover:bg-white/10 rounded-lg transition-colors ${
                           active && !collapsed ? 'bg-primary/10 dark:bg-white/10 border-l-4 border-primary dark:border-white' : ''
-                        } ${collapsed ? 'flex items-center justify-center !bg-transparent hover:!bg-transparent' : ''}`}
+                        } ${collapsed ? 'flex items-center justify-center !bg-transparent hover:!bg-transparent py-[10px]' : ''}`}
                         activeClassName={!collapsed ? "bg-primary/10 dark:bg-white/10 text-primary dark:text-white font-medium" : ""}
                       >
                         <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}>
