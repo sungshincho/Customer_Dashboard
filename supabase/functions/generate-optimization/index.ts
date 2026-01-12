@@ -1339,11 +1339,11 @@ async function generateAIOptimization(
           ...(enableToolUse && toolCallIterations < maxIterations ? {} : { response_format: responseFormat }),
           max_tokens: 16000,
           // 🆕 Sprint 1: Tool Use 파라미터 추가
-          // tool_choice: 'auto' - AI가 필요 시 Tool을 호출
-          // 'required'는 response_format과 충돌하므로 'auto' 사용
+          // tool_choice: 'required' - AI가 반드시 Tool을 호출하도록 강제 (첫 호출)
+          // response_format을 생략했으므로 'required' 사용 가능
           ...(enableToolUse && toolCallIterations < maxIterations ? {
             tools: OPENROUTER_TOOLS,
-            tool_choice: 'auto',
+            tool_choice: toolCallIterations === 0 ? 'required' : 'auto',
           } : {}),
         }),
       });
