@@ -105,6 +105,7 @@ export default function DigitalTwinStudioPage() {
   const {
     activeOverlays,
     toggleOverlay,
+    setOverlayVisibility,
     isActive
   } = useOverlayVisibility();
 
@@ -1277,7 +1278,7 @@ export default function DigitalTwinStudioPage() {
                     {/* 탭 컨텐츠 - 독립적인 스크롤 영역 */}
                     <div className="absolute top-[41px] left-0 right-0 bottom-0 overflow-y-auto overflow-x-hidden">
                       {activeTab === 'layer' && <LayerPanel />}
-                      {activeTab === 'ai-simulation' && <AISimulationTab storeId={selectedStore?.id || ''} sceneData={currentRecipe} onOverlayToggle={toggleOverlay} simulationZones={simulationZones} onResultsUpdate={(type, result) => {
+                      {activeTab === 'ai-simulation' && <AISimulationTab storeId={selectedStore?.id || ''} sceneData={currentRecipe} onOverlayToggle={setOverlayVisibility} simulationZones={simulationZones} onResultsUpdate={(type, result) => {
                     // AI 시뮬레이션 결과 저장 및 결과 리포트 패널 표시
                     setSimulationResults(prev => ({
                       ...prev,
@@ -1299,7 +1300,7 @@ export default function DigitalTwinStudioPage() {
                     if (newScene.furnitureMoves) {
                       // applySimulationResults는 useScene에서 가져옴
                     }
-                  }} onOverlayToggle={toggleOverlay} onResultsUpdate={(type, result) => {
+                  }} onOverlayToggle={setOverlayVisibility} onResultsUpdate={(type, result) => {
                     // AI 최적화 결과 저장 및 결과 리포트 패널 표시
                     setSimulationResults(prev => ({
                       ...prev,
