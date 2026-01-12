@@ -1284,10 +1284,13 @@ async function generateAIOptimization(
   // 🆕 Sprint 3: Store Persona 로드 및 프롬프트 주입 (S3-4)
   let personaContext: PersonaPromptContext | null = null;
   try {
-    personaContext = await buildPersonaPromptContext(storeId);
-    if (personaContext.hasPersona && personaContext.promptText) {
-      enhancedUserPrompt += `\n\n${personaContext.promptText}`;
-      console.log(`[generateAIOptimization] 👤 Store Persona loaded: style=${personaContext.metadata.storeStyle}, demographic=${personaContext.metadata.targetDemographic}, acceptance=${personaContext.metadata.feedbackStats.acceptance_rate}%`);
+    const storeIdForPersona = layoutData?.store_id || layoutData?.storeId;
+    if (storeIdForPersona) {
+      personaContext = await buildPersonaPromptContext(storeIdForPersona);
+      if (personaContext.hasPersona && personaContext.promptText) {
+        enhancedUserPrompt += `\n\n${personaContext.promptText}`;
+        console.log(`[generateAIOptimization] 👤 Store Persona loaded: style=${personaContext.metadata.storeStyle}, demographic=${personaContext.metadata.targetDemographic}, acceptance=${personaContext.metadata.feedbackStats.acceptance_rate}%`);
+      }
     }
   } catch (personaError) {
     console.warn('[generateAIOptimization] Store Persona load failed, continuing without:', personaError);
@@ -1298,12 +1301,11 @@ async function generateAIOptimization(
   console.log(`[generateAIOptimization] Data included: env=${builtPrompt.metadata.dataIncluded.environment}, flow=${builtPrompt.metadata.dataIncluded.flowAnalysis}, assoc=${builtPrompt.metadata.dataIncluded.associations}, vmd=${!!vmdAnalysis}`);
 
   // 🆕 Phase 5: Structured Output 포맷 결정
-  // staffing 타입이 아닌 경우에만 retail optimization 스키마 사용
-  const responseFormat = optimizationType === 'staffing'
-    ? { type: 'json_object' as const }  // staffing은 별도 함수에서 처리
-    : createResponseFormat(optimizationType);
+  // NOTE: Gemini API는 복잡한 json_schema를 지원하지 않음 (nesting depth 제한)
+  // json_object 타입으로 폴백하여 프롬프트 기반 JSON 생성 유도
+  const responseFormat = { type: 'json_object' as const };
 
-  console.log(`[generateAIOptimization] 📋 Response format: ${JSON.stringify(responseFormat).substring(0, 100)}...`);
+  console.log(`[generateAIOptimization] 📋 Response format: json_object (Gemini schema depth limit workaround)`);
 
   // 🆕 Sprint 1: Tool Use 활성화 여부 결정
   const enableToolUse = shouldEnableToolUse(optimizationType, parameters);
