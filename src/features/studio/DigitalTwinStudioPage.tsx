@@ -959,6 +959,38 @@ export default function DigitalTwinStudioPage() {
     setIsNewSceneMode(true);
     toast.info('새 씬 이름을 입력해주세요');
   }, []);
+
+  // 🆕 씬 초기화 (뉴럴트윈 기본값으로 복원)
+  const handleResetScene = useCallback(async () => {
+    if (!user) return;
+    
+    setLoading(true);
+    try {
+      console.log('[DigitalTwinStudio] Resetting scene to original data...');
+      const loadedModels = await loadUserModels(user.id, selectedStore?.id);
+      
+      setModels(loadedModels);
+      if (loadedModels.length > 0) {
+        setActiveLayers(loadedModels.map(m => m.id));
+      }
+      
+      // 시뮬레이션 상태 초기화
+      sceneSimulation.reset();
+      
+      // 씬 이름 초기화
+      setSceneName('');
+      setIsNewSceneMode(false);
+      
+      toast.success('씬이 초기화되었습니다', {
+        description: '뉴럴트윈이 설정한 기본값으로 복원되었습니다'
+      });
+    } catch (error) {
+      console.error('[DigitalTwinStudio] Error resetting scene:', error);
+      toast.error('씬 초기화 실패');
+    } finally {
+      setLoading(false);
+    }
+  }, [user, selectedStore, sceneSimulation]);
   if (!selectedStore) {
     return <DashboardLayout>
         <Alert>
@@ -1375,6 +1407,7 @@ export default function DigitalTwinStudioPage() {
                   onLoad={(id) => setActiveScene(id)}
                   onDelete={(id) => deleteScene(id)}
                   onNew={handleNewScene}
+                  onReset={handleResetScene}
                   maxScenes={3}
                 />
               </DraggablePanel>
