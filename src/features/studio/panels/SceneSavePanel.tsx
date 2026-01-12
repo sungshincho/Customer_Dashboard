@@ -46,7 +46,11 @@ export function SceneSavePanel({
 
   // 최대 개수 제한 (maxScenes가 설정된 경우)
   const displayedScenes = maxScenes ? savedScenes.slice(0, maxScenes) : savedScenes;
-  const canSaveNew = maxScenes ? savedScenes.length < maxScenes : true;
+  
+  // 🔧 FIX: 기존 씬과 같은 이름이면 업데이트이므로 저장 가능
+  const existingScene = savedScenes.find(s => s.name === sceneName.trim());
+  const isUpdate = !!existingScene;
+  const canSaveNew = maxScenes ? (savedScenes.length < maxScenes || isUpdate) : true;
 
   const isDisabled = !sceneName.trim() || isSaving || !canSaveNew;
 
@@ -111,9 +115,12 @@ export function SceneSavePanel({
             "w-full h-7 text-xs transition-all",
             isDisabled
               ? "bg-white/5 text-white/70"
+              : isUpdate
+              ? "bg-blue-500/20 text-blue-400 hover:bg-blue-600 hover:text-white"
               : "bg-white/10 text-white/70 hover:bg-gradient-to-r hover:from-purple-700 hover:to-pink-700 hover:text-white"
           )}
           onClick={handleSave}
+          disabled={isDisabled}
         >
           {isSaving ? (
             <>
@@ -123,10 +130,16 @@ export function SceneSavePanel({
           ) : (
             <>
               <Save className="w-3 h-3 mr-1" />
-              저장
+              {isUpdate ? '업데이트' : '저장'}
             </>
           )}
         </Button>
+        {/* 상태 표시 */}
+        {sceneName.trim() && !canSaveNew && !isUpdate && (
+          <p className="text-[10px] text-orange-400 mt-1">
+            최대 {maxScenes}개까지 저장 가능합니다
+          </p>
+        )}
       </div>
 
       {/* 새 씬 버튼 */}
