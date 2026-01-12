@@ -17,6 +17,10 @@ ALTER TABLE holidays_events ALTER COLUMN user_id DROP NOT NULL;
 -- (weather_data 트리거가 graph_entities에 동기화 시 user_id가 NULL일 수 있음)
 ALTER TABLE graph_entities ALTER COLUMN user_id DROP NOT NULL;
 
+-- ontology_relation_inference_queue: user_id NULL 허용
+-- (graph_entities INSERT 시 queue_relation_inference 트리거가 실행됨)
+ALTER TABLE ontology_relation_inference_queue ALTER COLUMN user_id DROP NOT NULL;
+
 -- ============================================================================
 -- 1. layout_optimization_results 테이블에 누락된 컬럼 추가
 -- ============================================================================
