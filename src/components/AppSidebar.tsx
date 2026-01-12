@@ -114,26 +114,32 @@ export function AppSidebar() {
                 const active = isActive(item.url);
                 return (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild className={collapsed ? "h-auto py-2" : "h-auto py-3"}>
+                    <SidebarMenuButton asChild className={collapsed ? "!w-auto !h-auto !p-0 !overflow-visible !rounded-none bg-transparent hover:bg-transparent" : "h-auto py-3"}>
                       <NavLink
                         to={item.url}
                         className={`hover:bg-muted/50 dark:hover:bg-white/10 rounded-lg transition-colors ${
                           active && !collapsed ? 'bg-primary/10 dark:bg-white/10 border-l-4 border-primary dark:border-white' : ''
-                        } ${collapsed ? 'flex items-center justify-center' : ''}`}
+                        } ${collapsed ? 'flex items-center justify-center !bg-transparent hover:!bg-transparent' : ''}`}
                         activeClassName={!collapsed ? "bg-primary/10 dark:bg-white/10 text-primary dark:text-white font-medium" : ""}
                       >
                         <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}>
                           {collapsed ? (
                             <div
-                              className="w-10 h-10 rounded-2xl flex items-center justify-center relative"
-                              style={active ? {
-                                background: 'linear-gradient(145deg, #2f2f38 0%, #1c1c22 35%, #282830 65%, #1e1e26 100%)',
-                                boxShadow: '0 2px 4px rgba(0,0,0,0.18), 0 4px 8px rgba(0,0,0,0.16), 0 8px 16px rgba(0,0,0,0.12), 0 16px 32px rgba(0,0,0,0.08), inset 0 1px 1px rgba(255,255,255,0.12)',
-                                border: '1px solid rgba(255,255,255,0.1)',
-                              } : {
-                                background: 'linear-gradient(145deg, #e8e8ec 0%, #d8d8dc 35%, #e0e0e4 65%, #d4d4d8 100%)',
-                                boxShadow: '0 2px 4px rgba(0,0,0,0.08), 0 4px 8px rgba(0,0,0,0.06), 0 8px 16px rgba(0,0,0,0.04), inset 0 1px 1px rgba(255,255,255,0.8)',
-                                border: '1px solid rgba(0,0,0,0.08)',
+                              className="flex items-center justify-center relative"
+                              style={{
+                                width: '40px',
+                                height: '40px',
+                                borderRadius: '16px',
+                                overflow: 'visible',
+                                ...(active ? {
+                                  background: 'linear-gradient(145deg, #2f2f38 0%, #1c1c22 35%, #282830 65%, #1e1e26 100%)',
+                                  boxShadow: '0 2px 4px rgba(0,0,0,0.18), 0 4px 8px rgba(0,0,0,0.16), 0 8px 16px rgba(0,0,0,0.12), 0 16px 32px rgba(0,0,0,0.08), inset 0 1px 1px rgba(255,255,255,0.12)',
+                                  border: '1px solid rgba(255,255,255,0.1)',
+                                } : {
+                                  background: 'linear-gradient(145deg, #e8e8ec 0%, #d8d8dc 35%, #e0e0e4 65%, #d4d4d8 100%)',
+                                  boxShadow: '0 2px 4px rgba(0,0,0,0.08), 0 4px 8px rgba(0,0,0,0.06), 0 8px 16px rgba(0,0,0,0.04), inset 0 1px 1px rgba(255,255,255,0.8)',
+                                  border: '1px solid rgba(0,0,0,0.08)',
+                                })
                               }}
                             >
                               {/* Chrome highlight */}
