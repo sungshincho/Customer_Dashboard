@@ -1,1148 +1,1190 @@
 /**
- * AIOptimizationTab.tsx
+ * AISimulationTab.tsx
  *
- * AI 최적화 탭 - 레이아웃/동선/인력배치 최적화
- * - 다중 선택 가능
- * - As-Is / To-Be 결과 비교
- * - 3D 씬에 결과 자동 반영
- * - 최적화 설정 패널 (가구/제품/강도)
+ * AI 시뮬레이션 탭 - 통합 시뮬레이션 컨트롤
+ * - 실시간/AI 예측 시뮬레이션 타입 선택
+ * - 하나의 통합 실행 버튼
+ * - 시뮬레이션 옵션 설정
  */
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { Sparkles, Layout, Route, Users, Loader2, ChevronDown, ChevronUp, Check, RotateCcw, Eye, Layers, Target, TrendingUp, Clock, Footprints, Settings2, Save, ArrowRight, BookmarkPlus, Cloud, Calendar, Thermometer } from 'lucide-react';
+import { Play, Pause, Square, RotateCcw, Users, Activity, Thermometer, Monitor, Eye, Lightbulb, Lock, Loader2, TrendingUp, Clock, DollarSign, AlertTriangle, Zap, Sparkles, Sun, ChevronDown, ChevronUp, Cloud, CloudRain, CloudSnow, Calendar, Settings, Target, ArrowRight, X, CheckCircle, MapPin, Wrench } from 'lucide-react';
+import { useEnvironmentContext } from '../hooks/useEnvironmentContext';
+import { SimulationEnvironmentSettings } from '../components/SimulationEnvironmentSettings';
+import type { SimulationEnvironmentConfig } from '../types/simulationEnvironment.types';
+import { createDefaultSimulationConfig, calculateSimulationImpacts } from '../types/simulationEnvironment.types';
 import { Button } from '@/components/ui/button';
+import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useSimulationStore, STATE_COLORS, STATE_LABELS } from '@/stores/simulationStore';
+import { useSimulationStore as useAISimulationStore } from '../stores/simulationStore';
 import { buildStoreContext } from '../utils/store-context-builder';
-import { OptimizationResultPanel } from '../panels/OptimizationResultPanel';
-import { StaffOptimizationResultPanel } from '../components/StaffOptimizationResult';
-import { useScene } from '../core/SceneProvider';
-import { validateOptimizationResult } from '../utils/optimizationValidator';
-import { OptimizationSettingsPanel } from '../components/optimization';
-import type { DiagnosticIssue } from '../components/DiagnosticIssueList';
-import type { UseSceneSimulationReturn } from '../hooks/useSceneSimulation';
+import { DiagnosticIssueList, type DiagnosticIssue } from '../components/DiagnosticIssueList';
 import type { SceneRecipe } from '../types';
-import type {
-  OptimizationSettings,
-  FurnitureItem,
-  ProductItem,
-} from '../types/optimization.types';
-import { DEFAULT_OPTIMIZATION_SETTINGS, INTENSITY_LIMITS } from '../types/optimization.types';
-import type { StaffOptimizationResult } from '../types/staffOptimization.types';
-import type { SimulationEnvironmentConfig } from '../types/simulationEnvironment.types';
-import { WEATHER_OPTIONS, HOLIDAY_OPTIONS, TIME_OF_DAY_OPTIONS, getEffectiveWeather, getEffectiveTimeOfDay, getEffectiveHoliday } from '../types/simulationEnvironment.types';
+// 프리셋 시나리오
+import {
+  PRESET_SCENARIOS,
+  type PresetScenario,
+  type PresetScenarioId,
+  presetToEnvironmentConfig,
+  type SimulationIssue,
+  ISSUE_TYPE_META,
+} from '../types/scenarioPresets.types';
+import { analyzeSimulationIssues, extractIssuesFromAIResult } from '../utils/simulationIssueAnalyzer';
 
-type OptimizationType = 'layout' | 'flow' | 'staffing';
-type ViewMode = 'all' | 'as-is' | 'to-be';
-type OptimizationGoal = 'revenue' | 'dwell_time' | 'traffic' | 'conversion';
-
-interface GoalOption {
-  id: OptimizationGoal;
-  label: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
+// 시뮬레이션 타입
+type SimulationType = 'realtime' | 'prediction';
+interface SimulationZone {
+  id: string;
+  zone_name: string;
+  zone_type: string;
+  x: number;
+  z: number;
+  width: number;
+  depth: number;
 }
-
-const goalOptions: GoalOption[] = [
-  {
-    id: 'revenue',
-    label: '매출',
-    description: '매출 극대화',
-    icon: TrendingUp,
-  },
-  {
-    id: 'dwell_time',
-    label: '체류',
-    description: '체류시간 증가',
-    icon: Clock,
-  },
-  {
-    id: 'traffic',
-    label: '동선',
-    description: '유동인구 분산',
-    icon: Footprints,
-  },
-  {
-    id: 'conversion',
-    label: '전환',
-    description: '전환율 개선',
-    icon: Target,
-  },
-];
-
-interface OptimizationOption {
-  id: OptimizationType;
-  label: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-}
-
-const optimizationOptions: OptimizationOption[] = [
-  {
-    id: 'layout',
-    label: '레이아웃 최적화',
-    description: 'AI가 가구/제품/장치 배치를 최적화합니다',
-    icon: Layout,
-  },
-  {
-    id: 'staffing',
-    label: '인력 배치 최적화',
-    description: 'AI가 최적의 직원 배치를 제안합니다',
-    icon: Users,
-  },
-  // 동선 최적화는 오버레이_고객 시뮬레이션으로 통합됨
-];
-
-interface AIOptimizationTabProps {
+interface AISimulationTabProps {
   storeId: string;
   sceneData: SceneRecipe | null;
-  sceneSimulation: UseSceneSimulationReturn;
-  onSceneUpdate?: (newScene: any) => void;
   onOverlayToggle: (overlayType: string, visible: boolean) => void;
-  onResultsUpdate?: (type: 'layout' | 'flow' | 'congestion' | 'staffing', result: any) => void;
-  /** AI 시뮬레이션에서 전달받은 진단 결과 */
-  diagnosticIssues?: DiagnosticIssue[];
-  /** 적용하기 탭으로 이동 */
-  onNavigateToApply?: () => void;
-  /** 🆕 시뮬레이션 환경 설정 (날씨, 휴일, 시간대 등) */
-  simulationEnvConfig?: SimulationEnvironmentConfig | null;
+  simulationZones: SimulationZone[];
+  onResultsUpdate?: (type: 'congestion' | 'flow' | 'layout' | 'staffing', result: any) => void;
+  onNavigateToOptimization?: (diagnosticIssues?: DiagnosticIssue[]) => void;
+  /** 환경 설정 변경 시 콜백 */
+  onEnvironmentConfigChange?: (config: SimulationEnvironmentConfig) => void;
 }
-
-export function AIOptimizationTab({
+export function AISimulationTab({
   storeId,
   sceneData,
-  sceneSimulation,
-  onSceneUpdate,
   onOverlayToggle,
+  simulationZones,
   onResultsUpdate,
-  diagnosticIssues = [],
-  onNavigateToApply,
-  simulationEnvConfig,
-}: AIOptimizationTabProps) {
-  // SceneProvider에서 applySimulationResults, revertSimulationChanges 가져오기
-  const { applySimulationResults, revertSimulationChanges } = useScene();
+  onNavigateToOptimization,
+  onEnvironmentConfigChange
+}: AISimulationTabProps) {
+  // 실시간 시뮬레이션 스토어
+  const {
+    isRunning: isRealtimeRunning,
+    isPaused,
+    simulationTime,
+    kpi,
+    config,
+    start: startRealtime,
+    pause,
+    resume,
+    stop: stopRealtime,
+    reset: resetRealtime,
+    setSpeed
+  } = useSimulationStore();
 
-  // 최적화 목표 선택
-  const [selectedGoal, setSelectedGoal] = useState<OptimizationGoal>('revenue');
+  // AI 예측 시뮬레이션 스토어
+  const {
+    isLoading: isAIPredictionLoading,
+    progress: aiProgress,
+    error: aiError,
+    result: aiResult,
+    diagnosticIssues: aiDiagnosticIssues,
+    realtimeKpis,
+    options: aiOptions,
+    setOptions: setAIOptions,
+    runSimulation: runAIPrediction,
+    reset: resetAIPrediction,
+    getIssuesForOptimization
+  } = useAISimulationStore();
 
-  // 선택된 최적화 유형들
-  const [selectedOptimizations, setSelectedOptimizations] = useState<OptimizationType[]>(['layout']);
+  // 🆕 환경 컨텍스트 (날씨, 공휴일, 이벤트)
+  const {
+    context: envContext,
+    impact: envImpact,
+    aiContext: envAiContext,
+    isLoading: isEnvLoading,
+    currentTime
+  } = useEnvironmentContext({
+    storeId,
+    enabled: !!storeId,
+    autoRefresh: true
+  });
 
-  // 실행 상태
-  const [runningTypes, setRunningTypes] = useState<OptimizationType[]>([]);
+  // ===== 통합 시뮬레이션 상태 =====
+  const [simulationType, setSimulationType] = useState<SimulationType>('realtime');
+  const [customerCount, setCustomerCount] = useState(100);
+  const [duration, setDuration] = useState(60);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
 
-  // 🆕 최적화 진행률 (0-100)
-  const [optimizationProgress, setOptimizationProgress] = useState(0);
+  // 🆕 프리셋 시나리오 상태
+  const [selectedPreset, setSelectedPreset] = useState<PresetScenarioId | null>(null);
+  const [trafficMultiplier, setTrafficMultiplier] = useState(1.0);
+  const [showPresets, setShowPresets] = useState(true);
+  const [analyzedIssues, setAnalyzedIssues] = useState<SimulationIssue[]>([]);
 
-  // 결과 패널 펼침/접힘
-  const [isResultExpanded, setIsResultExpanded] = useState(true);
+  // 🆕 AI 최적화 연결 모달 상태
+  const [showOptimizationModal, setShowOptimizationModal] = useState(false);
+  const [selectedIssuesForOptimization, setSelectedIssuesForOptimization] = useState<Set<string>>(new Set());
+  // isOptimizationLoading state removed - optimization runs in AIOptimizationTab
 
-  // 비교 모드 (all: 전체, as-is: 변경 전, to-be: 변경 후)
-  const [viewMode, setViewMode] = useState<ViewMode>('all');
+  // 🆕 시뮬레이션 환경 설정 상태
+  const [showEnvironmentSettings, setShowEnvironmentSettings] = useState(true); // 기본 열림
+  const [simulationEnvConfig, setSimulationEnvConfig] = useState<SimulationEnvironmentConfig>(() => {
+    const config = createDefaultSimulationConfig();
+    config.calculatedImpact = calculateSimulationImpacts(config);
+    return config;
+  });
 
-  // 최적화 설정 상태
-  const [optimizationSettings, setOptimizationSettings] = useState<OptimizationSettings>(DEFAULT_OPTIMIZATION_SETTINGS);
-  const [isSettingsExpanded, setIsSettingsExpanded] = useState(false);
-
-  // 🆕 Staff overlay 표시 상태
-  const [showStaffOverlay, setShowStaffOverlay] = useState(false);
-
-  // sceneData에서 가구/제품 목록 추출
-  const furnitureItems: FurnitureItem[] = useMemo(() => {
-    if (!sceneData?.furniture) return [];
-    return sceneData.furniture.map((f) => ({
-      id: f.id,
-      name: f.metadata?.name || f.furniture_type || '가구',
-      furniture_type: f.furniture_type || 'unknown',
-      movable: f.movable !== false, // 기본적으로 이동 가능
-      position: f.position || { x: 0, y: 0, z: 0 },
-      zone_id: f.metadata?.zone_id,
-    }));
-  }, [sceneData?.furniture]);
-
-  const productItems: ProductItem[] = useMemo(() => {
-    const products: ProductItem[] = [];
-
-    // 1️⃣ sceneData.products에서 추출 (기존 방식)
-    if (sceneData?.products) {
-      sceneData.products.forEach((p) => {
-        products.push({
-          id: p.id,
-          sku: p.sku || '',
-          product_name: p.metadata?.product_name || p.metadata?.name || '상품',
-          category: p.metadata?.category,
-          furniture_id: p.metadata?.furniture_id,
-          slot_id: p.metadata?.slot_id,
-        });
-      });
-    }
-
-    // 2️⃣ 가구의 childProducts에서 추출 (SEED 로더 방식)
-    if (sceneData?.furniture) {
-      sceneData.furniture.forEach((f) => {
-        const childProducts = (f as any).childProducts || [];
-        childProducts.forEach((cp: any) => {
-          products.push({
-            id: cp.id,
-            sku: cp.sku || cp.metadata?.sku || '',
-            product_name: cp.metadata?.product_name || cp.metadata?.name || cp.sku || '상품',
-            category: cp.metadata?.category,
-            furniture_id: f.id,
-            slot_id: cp.metadata?.slot_id,
-          });
-        });
-      });
-    }
-
-    // 🔍 DEBUG: 제품 추출 결과 로깅
-    console.log('[AIOptimizationTab] productItems extracted:', {
-      fromProducts: sceneData?.products?.length || 0,
-      fromChildProducts: products.length - (sceneData?.products?.length || 0),
-      total: products.length,
-      furnitureCount: sceneData?.furniture?.length || 0,
-    });
-
-    return products;
-  }, [sceneData?.products, sceneData?.furniture]);
-
-  // 비교 모드 변경 시 오버레이 업데이트
+  // 🔧 FIX: 환경 설정 변경 시 부모에게 알림 (디버그 로그 추가)
   useEffect(() => {
-    const { results } = sceneSimulation.state;
-    const hasLayoutResult = !!results.layout;
-
-    if (hasLayoutResult) {
-      // viewMode에 따라 오버레이 설정
-      // 'all' - 모든 변경 표시 (As-Is, To-Be, 화살표 모두)
-      // 'as-is' - 원래 상태만
-      // 'to-be' - 최적화 결과만
-      onOverlayToggle('layoutOptimization', viewMode !== 'as-is');
-    }
-  }, [viewMode, sceneSimulation.state.results, onOverlayToggle]);
-
-  // 체크박스 토글
-  const toggleOptimization = (type: OptimizationType) => {
-    setSelectedOptimizations((prev) =>
-      prev.includes(type)
-        ? prev.filter((t) => t !== type)
-        : [...prev, type]
-    );
-  };
-
-  // 전체 선택/해제
-  const toggleAll = () => {
-    if (selectedOptimizations.length === optimizationOptions.length) {
-      setSelectedOptimizations([]);
-    } else {
-      setSelectedOptimizations(optimizationOptions.map((o) => o.id));
-    }
-  };
-
-  // 최적화 실행
-  const runOptimizations = useCallback(async () => {
-    console.log('[AIOptimizationTab] runOptimizations clicked', {
-      selectedOptimizations,
-      selectedGoal,
-      storeId,
-      hasSceneData: !!sceneData,
-      optimizationSettings,
+    console.log('[AISimulationTab] Environment config useEffect triggered:', {
+      hasCallback: !!onEnvironmentConfigChange,
+      mode: simulationEnvConfig.mode,
+      weather: simulationEnvConfig.manualSettings?.weather
     });
-
-    if (selectedOptimizations.length === 0) {
-      toast.error('최적화를 선택하세요');
-      return;
+    if (onEnvironmentConfigChange) {
+      onEnvironmentConfigChange(simulationEnvConfig);
     }
+  }, [simulationEnvConfig, onEnvironmentConfigChange]);
 
+  // 시각화 옵션
+  const [showCustomerLabels, setShowCustomerLabels] = useState(false);
+  const [showCongestionHeatmap, setShowCongestionHeatmap] = useState(false);
+
+  // 진단 결과
+  const [diagnosticIssues, setDiagnosticIssues] = useState<DiagnosticIssue[]>([]);
+
+  // 현재 실행 중 여부 통합 체크
+  const isAnyRunning = isRealtimeRunning || isAIPredictionLoading;
+
+  // 🆕 프리셋 시나리오 선택 핸들러
+  const handlePresetSelect = useCallback((preset: PresetScenario) => {
+    setSelectedPreset(preset.id);
+    setSimulationType('prediction'); // 프리셋 선택 시 AI 예측 모드로 전환
+
+    // 환경 설정 업데이트
+    const envConfig = presetToEnvironmentConfig(preset);
+    setSimulationEnvConfig(prev => ({
+      ...prev,
+      ...envConfig,
+      calculatedImpact: {
+        trafficMultiplier: preset.expectedImpact.visitorsMultiplier,
+        dwellTimeMultiplier: preset.expectedImpact.dwellTimeMultiplier,
+        conversionMultiplier: preset.expectedImpact.conversionMultiplier,
+      },
+    }));
+
+    // 트래픽 배수 업데이트
+    setTrafficMultiplier(preset.settings.trafficMultiplier);
+
+    // 고객 수 자동 조정 (기본 100명 기준)
+    const baseCustomers = 100;
+    setCustomerCount(Math.round(baseCustomers * preset.settings.trafficMultiplier));
+
+    toast.success(`"${preset.name}" 시나리오가 적용되었습니다`, {
+      description: preset.description,
+    });
+  }, []);
+
+  // 🆕 프리셋 초기화
+  const handleClearPreset = useCallback(() => {
+    setSelectedPreset(null);
+    setTrafficMultiplier(1.0);
+    setCustomerCount(100);
+    const defaultConfig = createDefaultSimulationConfig();
+    defaultConfig.calculatedImpact = calculateSimulationImpacts(defaultConfig);
+    setSimulationEnvConfig(defaultConfig);
+  }, []);
+
+  // 시간 포맷팅
+  const formatTime = (seconds: number): string => {
+    const absSeconds = Math.max(0, Math.abs(seconds));
+    const m = Math.floor(absSeconds / 60);
+    const s = Math.floor(absSeconds % 60);
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  // 금액 포맷팅
+  const formatCurrency = (amount: number): string => {
+    if (amount >= 1000000) {
+      return `₩${(amount / 1000000).toFixed(1)}M`;
+    }
+    return `₩${(amount / 10000).toFixed(0)}만`;
+  };
+
+  // ===== 🔧 통합 시뮬레이션 실행 =====
+  const handleRunSimulation = useCallback(async () => {
     if (!storeId) {
       toast.error('매장을 선택해주세요');
       return;
     }
-
-    if (!sceneData) {
-      toast.error('씬 데이터가 없습니다');
-      return;
-    }
-
-    setRunningTypes([...selectedOptimizations]);
-    setOptimizationProgress(0);
-
-    // 진행률 업데이트 인터벌
-    const progressInterval = setInterval(() => {
-      setOptimizationProgress((prev) => {
-        if (prev >= 90) return prev;
-        return prev + Math.random() * 8 + 2; // 2-10% 씩 증가
-      });
-    }, 400);
-
-    try {
-      // Store Context 빌드 (온톨로지 + 데이터소스)
-      setOptimizationProgress(10);
-      console.log('[AIOptimizationTab] Building store context...');
-      const storeContext = await buildStoreContext(storeId);
-      setOptimizationProgress(25);
-      console.log('[AIOptimizationTab] Store context built:', {
-        hasZones: storeContext.zones?.length,
-        hasFurniture: storeContext.productPlacements?.length,
-        hasVisits: storeContext.visits?.length,
-      });
-
-      // 강도에 따른 제한 설정
-      const intensityLimits = INTENSITY_LIMITS[optimizationSettings.intensity];
-
-      // 선택된 최적화만 실행하도록 파라미터 구성
-      const params: Record<string, Record<string, any>> = {};
-
-      // 🔧 FIX: 환경 컨텍스트 구성 (날짜선택/직접설정 모드일 때 사용)
-      const environmentContext = simulationEnvConfig && (simulationEnvConfig.mode === 'dateSelect' || simulationEnvConfig.mode === 'manual')
-        ? {
-            weather: getEffectiveWeather(simulationEnvConfig),
-            temperature: simulationEnvConfig.autoLoadedData?.weather?.temperature ?? 20,
-            humidity: simulationEnvConfig.autoLoadedData?.weather?.humidity ?? 50,
-            holiday_type: getEffectiveHoliday(simulationEnvConfig),
-            time_of_day: getEffectiveTimeOfDay(simulationEnvConfig),
-            impact: simulationEnvConfig.calculatedImpact,
-          }
-        : null;
-
-      // 🆕 진단 이슈 컨텍스트 구성 (시뮬레이션에서 전달받은 문제점들)
-      const diagnosticIssuesContext = diagnosticIssues.length > 0
-        ? {
-            priority_issues: diagnosticIssues.map(issue => ({
-              id: issue.id,
-              type: (issue as any).type || 'unknown',
-              severity: issue.severity,
-              title: issue.title,
-              zone_id: (issue as any).zone_id || issue.zone,
-              zone_name: (issue as any).zone_name || issue.zone,
-              description: issue.message || (issue as any).details?.description,
-              impact: (issue as any).impact,
-              recommendations: issue.recommendation ? [issue.recommendation] : (issue as any).recommendations || [],
-            })),
-            scenario_context: (diagnosticIssues[0] as any)?.scenario_context || null,
-            environment_context: (diagnosticIssues[0] as any)?.environment_context || null,
-            simulation_kpis: (diagnosticIssues[0] as any)?.simulation_kpis || null,
-          }
-        : null;
-
-      console.log('[AIOptimizationTab] Diagnostic issues context:', diagnosticIssuesContext);
-
-      if (selectedOptimizations.includes('layout')) {
-        // 목표를 설정 패널의 objective로 매핑
-        const goalMapping: Record<string, OptimizationGoal> = {
-          revenue: 'revenue',
-          dwell_time: 'dwell_time',
-          conversion: 'conversion',
-          balanced: 'revenue', // balanced는 revenue로 기본 설정
-        };
-
-        params.layout = {
-          goal: goalMapping[optimizationSettings.objective] || selectedGoal,
-          storeContext,
-          // 🆕 환경 컨텍스트 추가 (비 오는 날 → 실내 체류 증가 가정 등)
-          environment_context: environmentContext,
-          // 🆕 진단 이슈 컨텍스트 추가 (시뮬레이션에서 발견한 문제점 우선 해결)
-          diagnostic_issues: diagnosticIssuesContext,
-          // 설정 패널의 상세 설정 전달
-          settings: {
-            objective: optimizationSettings.objective,
-            furniture: {
-              movableIds: optimizationSettings.furniture.movableIds,
-              keepWallAttached: optimizationSettings.furniture.keepWallAttached,
-              keepZoneBoundaries: optimizationSettings.furniture.keepZoneBoundaries,
-              maxMoves: intensityLimits.maxFurnitureMoves,
-            },
-            products: {
-              relocatableIds: optimizationSettings.products.relocateAll
-                ? [] // 빈 배열 = 전체 제품
-                : optimizationSettings.products.relocatableIds,
-              relocateAll: optimizationSettings.products.relocateAll,
-              respectDisplayType: optimizationSettings.products.respectDisplayType,
-              keepCategory: optimizationSettings.products.keepCategory,
-              maxRelocations: intensityLimits.maxProductRelocations,
-            },
-            intensity: optimizationSettings.intensity,
-          },
-        };
+    if (simulationType === 'realtime') {
+      // 실시간 시뮬레이션 시작
+      onOverlayToggle('avatar', true);
+      if (showCongestionHeatmap) {
+        onOverlayToggle('heatmap', true);
       }
-      if (selectedOptimizations.includes('flow')) {
-        params.flow = {
-          duration: '1hour',
-          customerCount: 100,
-          storeContext,
-          // 🆕 환경 컨텍스트 추가 (날씨에 따른 동선 패턴 변화 등)
-          environment_context: environmentContext,
-        };
-      }
-      if (selectedOptimizations.includes('staffing')) {
-        // 선택된 목표에 따라 직원 배치 전략 결정
-        const staffingGoalMap: Record<OptimizationGoal, string> = {
-          revenue: 'sales_support',
-          dwell_time: 'customer_engagement',
-          traffic: 'flow_guidance',
-          conversion: 'customer_service',
-        };
-        params.staffing = {
-          staffCount: 3,
-          goal: staffingGoalMap[selectedGoal],
-          storeContext,
-          // 🆕 환경 컨텍스트 추가 (블랙프라이데이 → 고트래픽 가정 등)
-          environment_context: environmentContext,
-        };
-      }
+      startRealtime();
+      toast.success('실시간 시뮬레이션이 시작되었습니다');
+    } else {
+      // AI 예측 시뮬레이션 실행
+      try {
+        // 🆕 프리셋 시나리오 컨텍스트 구성
+        const currentPreset = selectedPreset ? PRESET_SCENARIOS.find(p => p.id === selectedPreset) : null;
 
-      console.log('[AIOptimizationTab] Calling runAllSimulations with params:', Object.keys(params));
-
-      // useSceneSimulation의 runAllSimulations 호출 - 결과를 직접 반환받음
-      const results = await sceneSimulation.runAllSimulations(params, sceneData);
-
-      console.log('[AIOptimizationTab] runAllSimulations returned:', {
-        hasLayout: !!results.layout,
-        hasFlow: !!results.flow,
-        hasStaffing: !!results.staffing,
-        results,
-      });
-
-      // 🆕 레이아웃 결과 유효성 검증
-      if (results.layout) {
-        const storeDataForValidation = {
-          zones: storeContext.zones || [],
-          furniture: sceneData.furniture?.map((f) => ({
-            id: f.id,
-            furniture_code: f.furniture_type || f.metadata?.furniture_code,
-            metadata: f.metadata,
-            position: f.position,
-          })) || [],
+        // 🆕 환경 설정에 따른 옵션 구성
+        const envConfigForAI = {
+          weather: simulationEnvConfig.manualSettings?.weather || simulationEnvConfig.weather,
+          temperature: simulationEnvConfig.temperature,
+          humidity: simulationEnvConfig.humidity,
+          holiday_type: simulationEnvConfig.manualSettings?.holidayType || simulationEnvConfig.holidayType,
+          day_of_week: simulationEnvConfig.dayOfWeek,
+          time_of_day: simulationEnvConfig.manualSettings?.timeOfDay || simulationEnvConfig.timeOfDay,
+          impact: simulationEnvConfig.calculatedImpact,
+          // 🆕 프리셋 시나리오 정보 추가
+          preset_scenario: currentPreset ? {
+            id: currentPreset.id,
+            name: currentPreset.name,
+            traffic_multiplier: currentPreset.settings.trafficMultiplier,
+            discount_percent: currentPreset.settings.discountPercent,
+            event_type: currentPreset.settings.eventType,
+            expected_impact: currentPreset.expectedImpact,
+            risk_tags: currentPreset.riskTags,
+          } : null,
         };
 
-        const validation = validateOptimizationResult(
-          {
-            furniture_moves: results.layout.furnitureMoves || results.layout.layoutChanges || [],
-            product_placements: results.layout.productPlacements || [],
-          },
-          storeDataForValidation
-        );
-
-        console.log('[AIOptimizationTab] Validation result:', {
-          isValid: validation.isValid,
-          removedFurniture: validation.removedItems.furniture.length,
-          removedProducts: validation.removedItems.products.length,
-          warnings: validation.warnings,
+        // 옵션 설정 - 시간대는 환경 설정에서 가져옴
+        const timeOfDayFromConfig = simulationEnvConfig.mode === 'manual' ? simulationEnvConfig.manualSettings?.timeOfDay : simulationEnvConfig.timeOfDay || 'afternoon';
+        setAIOptions({
+          customer_count: customerCount,
+          duration_minutes: duration,
+          time_of_day: timeOfDayFromConfig,
+          environment_context: envConfigForAI, // 환경 컨텍스트 추가
+          traffic_multiplier: trafficMultiplier, // 🆕 트래픽 배수
+        });
+        toast.loading('AI 예측 시뮬레이션 실행 중...', {
+          id: 'ai-sim'
+        });
+        await runAIPrediction(storeId);
+        toast.success('AI 시뮬레이션 완료!', {
+          id: 'ai-sim'
         });
 
-        // 유효하지 않은 항목이 있으면 경고 표시
-        if (!validation.isValid) {
-          const removedCount = validation.removedItems.furniture.length + validation.removedItems.products.length;
-          toast.warning(`${removedCount}개 항목이 유효성 검증에서 필터링됨`, {
-            description: validation.warnings.slice(0, 3).join('\n'),
-          });
+        // 🆕 시뮬레이션 결과에서 문제점 분석
+        // simulationZones를 ZoneData 형식으로 변환
+        const zoneDataForAnalysis = simulationZones.map(z => ({
+          id: z.id,
+          name: z.zone_name,
+          type: z.zone_type,
+          capacity: 50, // 기본값 (실제로는 store 설정에서 가져와야 함)
+          visitRate: Math.random() * 0.3 + 0.1, // 시뮬레이션 결과에서 추출
+        }));
 
-          // 검증된 결과로 교체
-          if (results.layout.furnitureMoves) {
-            results.layout.furnitureMoves = validation.filteredResult.furniture_moves as any[];
+        // AI 결과에서 이슈 추출
+        const aiStore = useAISimulationStore.getState();
+        if (aiStore.result) {
+          const extractedIssues = extractIssuesFromAIResult(aiStore.result, zoneDataForAnalysis);
+          setAnalyzedIssues(extractedIssues);
+
+          // 심각한 이슈가 있으면 알림
+          const criticalIssues = extractedIssues.filter(i => i.severity === 'critical');
+          if (criticalIssues.length > 0) {
+            toast.warning(`${criticalIssues.length}개의 심각한 문제가 감지되었습니다`, {
+              description: 'AI 최적화를 통해 해결 방안을 확인하세요',
+            });
           }
-          if ((results.layout as any).layoutChanges) {
-            (results.layout as any).layoutChanges = validation.filteredResult.furniture_moves as any[];
-          }
-          if (results.layout.productPlacements) {
-            results.layout.productPlacements = validation.filteredResult.product_placements as any[];
-          }
         }
-      }
 
-      // 레이아웃 결과가 있으면 오버레이 활성화 및 오른쪽 패널 업데이트
-      if (results.layout) {
-        onOverlayToggle('layoutOptimization', true);
-
-        // 오른쪽 패널용 결과 변환
-        if (onResultsUpdate) {
-          const layoutPanelResult = {
-            currentEfficiency: results.layout.currentEfficiency || 1,
-            optimizedEfficiency: results.layout.optimizedEfficiency || 75,
-            revenueIncrease: results.layout.improvements?.revenueIncrease ||
-                            results.layout.optimizationSummary?.expectedRevenueIncrease || 0,
-            dwellTimeIncrease: results.layout.improvements?.dwellTimeIncrease || 0,
-            conversionIncrease: results.layout.improvements?.conversionIncrease ||
-                               results.layout.optimizationSummary?.expectedConversionIncrease || 0,
-            // 가구 변경 사항 (layoutChanges 또는 furnitureMoves 지원)
-            changes: (results.layout.layoutChanges || results.layout.furnitureMoves || []).map((move: any) => ({
-              item: move.entityLabel || move.furnitureName || move.furnitureId || move.name || '가구',
-              from: (move.currentPosition || move.fromPosition)
-                ? `(${(move.currentPosition?.x || move.fromPosition?.x || 0).toFixed(1)}, ${(move.currentPosition?.z || move.fromPosition?.z || 0).toFixed(1)})`
-                : 'As-Is',
-              to: (move.suggestedPosition || move.toPosition)
-                ? `(${(move.suggestedPosition?.x || move.toPosition?.x || 0).toFixed(1)}, ${(move.suggestedPosition?.z || move.toPosition?.z || 0).toFixed(1)})`
-                : 'To-Be',
-              effect: move.reason || '+효율성',
-            })),
-            // 🆕 제품 재배치 변경 사항 (슬롯 바인딩 기반)
-            productChanges: (results.layout.productPlacements || []).map((placement: any) => ({
-              productId: placement.productId || placement.product_id || '',
-              productSku: placement.productSku || placement.sku || '',
-              productName: placement.productName || placement.productLabel || placement.sku || '상품',
-              // As-Is (현재 위치)
-              fromFurniture: placement.fromFurnitureCode || placement.fromFurnitureName || placement.currentFurnitureLabel || '현재 가구',
-              fromSlot: placement.fromSlotId || '-',
-              // To-Be (제안 위치)
-              toFurniture: placement.toFurnitureCode || placement.toFurnitureName || placement.suggestedFurnitureLabel || '추천 가구',
-              toSlot: placement.toSlotId || '-',
-              // 사유 및 예상 효과
-              reason: placement.reason || '슬롯 최적화',
-              expectedImpact: placement.expectedImpact ? {
-                revenueChangePct: placement.expectedImpact.revenueChangePct || placement.expectedImpact.revenue_change_pct || 0,
-                visibilityScore: placement.expectedImpact.visibilityScore || placement.expectedImpact.visibility_score || 0,
-              } : undefined,
-            })),
-          };
-
-          console.log('[AIOptimizationTab] layoutPanelResult:', {
-            changesCount: layoutPanelResult.changes.length,
-            productChangesCount: layoutPanelResult.productChanges.length,
-            rawLayoutChanges: results.layout.layoutChanges?.length,
-            rawFurnitureMoves: results.layout.furnitureMoves?.length,
-            rawProductPlacements: results.layout.productPlacements?.length,
-          });
-
-          onResultsUpdate('layout', layoutPanelResult);
+        // 혼잡도 히트맵 표시 (옵션에 따라)
+        if (showCongestionHeatmap) {
+          onOverlayToggle('congestionHeatmap', true);
         }
+      } catch (err: any) {
+        toast.error(`시뮬레이션 실패: ${err.message}`, {
+          id: 'ai-sim'
+        });
       }
-
-      // 동선 결과가 있으면 오버레이 활성화 및 오른쪽 패널 업데이트
-      if (results.flow) {
-        onOverlayToggle('flowOptimization', true);
-
-        if (onResultsUpdate) {
-          const flowPanelResult = {
-            currentPathLength: results.flow.comparison?.currentPathLength || 45,
-            optimizedPathLength: results.flow.comparison?.optimizedPathLength || 38,
-            bottlenecks: results.flow.bottlenecks?.map((b: any) => ({
-              location: b.location || b.zoneName || '구간',
-              congestion: Math.round((b.severity || b.congestionLevel || 0.7) * 100),
-              cause: b.cause || '통로 혼잡',
-              suggestion: b.suggestions?.[0] || '통로 확장 권장',
-            })) || [],
-            improvements: [
-              { metric: '동선 길이 감소', value: `${results.flow.comparison?.pathLengthReduction?.toFixed(1) || -15}%` },
-              { metric: '이동 시간 감소', value: `${results.flow.comparison?.timeReduction?.toFixed(1) || -18}%` },
-              { metric: '병목 해소율', value: `${Math.round((results.flow.comparison?.congestionReduction || 0.8) * 100)}%` },
-            ],
-          };
-          onResultsUpdate('flow', flowPanelResult);
-        }
-      }
-
-      // 인력배치 결과가 있으면 오버레이 활성화 및 오른쪽 패널 업데이트
-      if (results.staffing) {
-        onOverlayToggle('staffing', true);
-
-        if (onResultsUpdate) {
-          const currentCoverage = results.staffing.zoneCoverage?.[0]?.currentCoverage || 68;
-          const optimizedCoverage = results.staffing.zoneCoverage?.[0]?.suggestedCoverage || 92;
-          const staffingPanelResult = {
-            currentCoverage,
-            optimizedCoverage,
-            staffCount: results.staffing.staffPositions?.length || 3,
-            staffPositions: results.staffing.staffPositions?.map((p: any) => ({
-              name: p.staffName || p.staffId || `직원`,
-              current: p.currentPosition ? `(${p.currentPosition.x?.toFixed(1)}, ${p.currentPosition.z?.toFixed(1)})` : '현재 위치',
-              suggested: p.suggestedPosition ? `(${p.suggestedPosition.x?.toFixed(1)}, ${p.suggestedPosition.z?.toFixed(1)})` : '제안 위치',
-              coverageGain: `+${p.coverageGain || 10}%`,
-            })) || [],
-            improvements: [
-              { metric: '고객 응대율', value: `+${Math.round((results.staffing.metrics?.customerServiceRateIncrease || 0.35) * 100)}%` },
-              { metric: '대기 시간', value: `-${Math.round((1 / (results.staffing.metrics?.avgResponseTime || 1)) * 10)}%` },
-              { metric: '커버리지 증가', value: `+${results.staffing.metrics?.coverageGain || 24}%` },
-            ],
-          };
-          onResultsUpdate('staffing', staffingPanelResult);
-        }
-      }
-
-      toast.success(`${selectedOptimizations.length}개 최적화가 완료되었습니다`);
-      setOptimizationProgress(100);
-    } catch (error) {
-      console.error('Optimization error:', error);
-      toast.error('최적화 실행 중 오류가 발생했습니다');
-    } finally {
-      clearInterval(progressInterval);
-      setRunningTypes([]);
-      // 1초 후 진행률 리셋
-      setTimeout(() => setOptimizationProgress(0), 1000);
     }
-  }, [selectedOptimizations, selectedGoal, storeId, sceneData, sceneSimulation, onOverlayToggle, onResultsUpdate, optimizationSettings, simulationEnvConfig]);
+  }, [storeId, simulationType, customerCount, duration, showCongestionHeatmap, startRealtime, runAIPrediction, setAIOptions, onOverlayToggle, simulationEnvConfig, envAiContext, selectedPreset, trafficMultiplier, simulationZones]);
 
-  // As-Is 씬으로 복원
-  const handleRevertToAsIs = useCallback(() => {
-    // 1. 3D 모델 위치 복원 (SceneProvider의 revertSimulationChanges 호출)
-    revertSimulationChanges();
-    
-    // 2. hook 상태 초기화
-    sceneSimulation.clearScenes();
-    
-    // 3. 오버레이 끄기
-    onOverlayToggle('layoutOptimization', false);
-    onOverlayToggle('flowOptimization', false);
-    onOverlayToggle('staffing', false);
-    
-    toast.info('원래 씬으로 복원되었습니다');
-  }, [sceneSimulation, onOverlayToggle, revertSimulationChanges]);
+  // 시뮬레이션 중지
+  const handleStopSimulation = useCallback(() => {
+    if (simulationType === 'realtime') {
+      stopRealtime();
+      onOverlayToggle('avatar', false);
+    }
+    resetAIPrediction();
+    setDiagnosticIssues([]);
+  }, [simulationType, stopRealtime, resetAIPrediction, onOverlayToggle]);
 
-  // To-Be 씬 적용 - 3D 모델 위치 실제 변경 (가구 + 상품)
-  const handleApplyToBe = useCallback(async () => {
-    try {
-      const results = sceneSimulation.state.results;
+  // 일시정지/재개 토글
+  const handleTogglePause = useCallback(() => {
+    if (isPaused) {
+      resume();
+    } else {
+      pause();
+    }
+  }, [isPaused, resume, pause]);
 
-      const payload: {
-        furnitureMoves?: any[];
-        productPlacements?: any[];
-      } = {};
+  // 최적화 탭으로 이동
+  const handleNavigateToOptimization = useCallback(() => {
+    const issues = getIssuesForOptimization();
+    if (onNavigateToOptimization) {
+      onNavigateToOptimization(issues);
+      toast.info(`${issues.length}개 이슈를 AI 최적화로 전달합니다`);
+    }
+  }, [getIssuesForOptimization, onNavigateToOptimization]);
 
-      // 1️⃣ 레이아웃 최적화 결과가 있으면 가구 이동 적용
-      // 모든 가능한 필드명 fallback
-      const rawFurnitureMoves = results.layout?.layoutChanges || 
-                                results.layout?.furnitureMoves ||
-                                results.layout?.furniture_changes ||
-                                results.layout?.furniture_moves || [];
-      
-      if (rawFurnitureMoves.length > 0) {
-        // SceneProvider가 기대하는 형식으로 변환
-        payload.furnitureMoves = rawFurnitureMoves.map((move: any) => ({
-          furnitureId: move.furniture_id || move.furnitureId || move.entityId || move.id,
-          furnitureName: move.furniture_name || move.furnitureName || move.entityLabel || move.name,
-          toPosition: move.suggested_position || move.suggestedPosition || move.toPosition || move.new_position || {
-            x: move.new_x ?? move.x ?? 0,
-            y: move.new_y ?? move.y ?? 0,
-            z: move.new_z ?? move.z ?? 0,
-          },
-          rotation: move.rotation ?? move.new_rotation,
-          reason: move.reason || move.expected_effect,
-        }));
-      }
+  // 🆕 AI 최적화 모달 열기
+  const handleOpenOptimizationModal = useCallback(() => {
+    // 분석된 이슈 중 critical/warning만 기본 선택
+    const criticalWarningIds = analyzedIssues
+      .filter(i => i.severity === 'critical' || i.severity === 'warning')
+      .map(i => i.id);
+    setSelectedIssuesForOptimization(new Set(criticalWarningIds));
+    setShowOptimizationModal(true);
+  }, [analyzedIssues]);
 
-      // 2️⃣ 상품 배치 결과가 있으면 상품 재배치 적용 (슬롯 기반)
-      const rawProductPlacements = results.layout?.productPlacements ||
-                                   results.layout?.product_placements ||
-                                   results.layout?.product_changes || [];
-      
-      if (rawProductPlacements.length > 0) {
-        payload.productPlacements = rawProductPlacements.map((p: any) => ({
-          productId: p.product_id || p.productId,
-          productSku: p.sku || p.productSku || p.product_sku,
-          toFurnitureId: p.suggested_furniture_id || p.toFurnitureId || p.target_furniture_id,
-          toSlotId: p.suggested_slot_id || p.toSlotId || p.target_slot_id,
-          toPosition: p.suggested_position || p.toPosition,
-          toSlotPosition: p.slot_position || p.toSlotPosition,
-          reason: p.reason,
-        }));
-      }
-
-      // 변경사항이 있을 때만 적용
-      if (payload.furnitureMoves?.length || payload.productPlacements?.length) {
-        console.log('[AIOptimizationTab] Applying To-Be:', payload);
-        applySimulationResults(payload);
-
-        const moveCount = payload.furnitureMoves?.length || 0;
-        const placementCount = payload.productPlacements?.length || 0;
-
-        toast.success(
-          `최적화 적용 완료: 가구 ${moveCount}개 이동, 상품 ${placementCount}개 재배치`
-        );
+  // 🆕 이슈 선택 토글
+  const handleToggleIssueSelection = useCallback((issueId: string) => {
+    setSelectedIssuesForOptimization(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(issueId)) {
+        newSet.delete(issueId);
       } else {
-        toast.warning('적용할 변경사항이 없습니다');
+        newSet.add(issueId);
       }
+      return newSet;
+    });
+  }, []);
 
-      // 내부 상태도 업데이트
-      await sceneSimulation.applyAllChanges();
-
-    } catch (error) {
-      console.error('Apply To-Be error:', error);
-      toast.error('적용에 실패했습니다');
-    }
-  }, [sceneSimulation, applySimulationResults]);
-
-  // To-Be 씬 저장
-  const handleSaveToBe = useCallback(async () => {
-    try {
-      const sceneName = `최적화 씬 ${new Date().toLocaleDateString('ko-KR')}`;
-      await sceneSimulation.saveToBeScene(sceneName);
-    } catch (error) {
-      toast.error('저장에 실패했습니다');
-    }
-  }, [sceneSimulation]);
-
-  const { results } = sceneSimulation.state;
-  const hasResults = results.layout || results.flow || results.staffing;
-  const isRunning = sceneSimulation.isSimulating || runningTypes.length > 0;
-
-  // 시나리오 저장 (ApplyPanel로 전달)
-  const handleSaveScenario = useCallback(() => {
-    const { results } = sceneSimulation.state;
-    if (!results.layout && !results.flow && !results.staffing) {
-      toast.error('저장할 최적화 결과가 없습니다');
+  // 🆕 AI 최적화 탭으로 이동 (이슈 전달)
+  const handleNavigateToOptimizationTab = useCallback(() => {
+    if (selectedIssuesForOptimization.size === 0) {
+      toast.error('해결할 문제를 선택해주세요');
       return;
     }
 
-    // 시나리오 데이터 구성
-    const scenarioData = {
-      id: `scenario-${Date.now()}`,
-      name: `최적화 시나리오 ${new Date().toLocaleDateString('ko-KR')}`,
-      createdAt: new Date().toISOString(),
-      goal: selectedGoal,
-      optimizations: selectedOptimizations,
-      results: {
-        layout: results.layout,
-        flow: results.flow,
-        staffing: results.staffing,
-      },
-      settings: optimizationSettings,
+    // 선택된 이슈들
+    const selectedIssues = analyzedIssues.filter(i => selectedIssuesForOptimization.has(i.id));
+
+    // 현재 프리셋 시나리오 정보
+    const currentPreset = selectedPreset ? PRESET_SCENARIOS.find(p => p.id === selectedPreset) : null;
+
+    // 최적화 탭으로 이동 (이슈와 시나리오 컨텍스트 전달)
+    if (onNavigateToOptimization) {
+      const diagnosticIssues = selectedIssues.map(i => ({
+        id: i.id,
+        type: i.type,
+        severity: i.severity,
+        title: i.title,
+        zone_id: i.location.zoneId,
+        zone_name: i.location.zoneName,
+        message: i.details.description,
+        recommendations: i.recommendations,
+        impact: i.impact,
+        details: i.details,
+        // 🆕 시나리오 및 환경 컨텍스트
+        scenario_context: currentPreset ? {
+          id: currentPreset.id,
+          name: currentPreset.name,
+          description: currentPreset.description,
+          expected_impact: currentPreset.expectedImpact,
+          risk_tags: currentPreset.riskTags,
+        } : null,
+        environment_context: {
+          weather: simulationEnvConfig.manualSettings?.weather || simulationEnvConfig.weather,
+          holiday_type: simulationEnvConfig.manualSettings?.holidayType || simulationEnvConfig.holidayType,
+          time_of_day: simulationEnvConfig.manualSettings?.timeOfDay || simulationEnvConfig.timeOfDay,
+          traffic_multiplier: trafficMultiplier,
+        },
+        simulation_kpis: {
+          visitors: realtimeKpis.visitors,
+          revenue: realtimeKpis.revenue,
+          conversion: realtimeKpis.conversion,
+          avg_dwell: realtimeKpis.avgDwell,
+        },
+      }));
+
+      onNavigateToOptimization(diagnosticIssues as any);
+
+      toast.success('AI 최적화 탭으로 이동합니다', {
+        description: `${selectedIssues.length}개 문제점을 우선 해결하도록 설정됩니다`,
+      });
+    }
+
+    setShowOptimizationModal(false);
+  }, [selectedIssuesForOptimization, analyzedIssues, selectedPreset, simulationEnvConfig, trafficMultiplier, realtimeKpis, onNavigateToOptimization]);
+
+  // 🆕 분석된 이슈 카운트 (memoized)
+  const { analyzedCriticalCount, analyzedWarningCount, analyzedInfoCount, totalRevenueImpact } = useMemo(() => {
+    return {
+      analyzedCriticalCount: analyzedIssues.filter(i => i.severity === 'critical').length,
+      analyzedWarningCount: analyzedIssues.filter(i => i.severity === 'warning').length,
+      analyzedInfoCount: analyzedIssues.filter(i => i.severity === 'info').length,
+      totalRevenueImpact: analyzedIssues.reduce((sum, i) => sum + i.impact.revenueImpact, 0),
     };
+  }, [analyzedIssues]);
 
-    // 로컬 스토리지에 저장
-    const savedScenarios = JSON.parse(localStorage.getItem('optimization_scenarios') || '[]');
-    savedScenarios.push(scenarioData);
-    localStorage.setItem('optimization_scenarios', JSON.stringify(savedScenarios));
+  // 기존 이슈 카운트 (호환성)
+  const criticalCount = aiDiagnosticIssues.filter(i => i.severity === 'critical').length;
+  const warningCount = aiDiagnosticIssues.filter(i => i.severity === 'warning').length;
+  return <div className="flex flex-col h-full overflow-hidden">
+      {/* ===== 헤더 ===== */}
+      <div className="p-4 border-b border-white/10">
+        <h3 className="font-semibold text-sm text-white flex items-center gap-2">
+          <Activity className="w-4 h-4 text-green-400" />
+          AI 시뮬레이션
+        </h3>
+        <p className="text-xs text-white/50 mt-1">
+          매장 고객 흐름을 시뮬레이션하고 AI 예측 분석을 실행합니다.
+        </p>
+      </div>
 
-    toast.success('시나리오가 저장되었습니다', {
-      description: '적용하기 탭에서 저장된 시나리오를 확인할 수 있습니다.',
-    });
-  }, [sceneSimulation.state, selectedGoal, selectedOptimizations, optimizationSettings]);
+      {/* ===== 설정 영역 ===== */}
+      <div className="flex-1 overflow-auto p-4 space-y-4">
 
-  return (
-    <div className="p-4 space-y-4 min-h-0">
-      {/* ========== 🆕 문제점 시나리오 (AI 시뮬레이션에서 전달) ========== */}
-      {diagnosticIssues.length > 0 && (
-        <div className="space-y-3">
-          {/* 시나리오 컨텍스트 헤더 */}
-          <div className="p-3 bg-gradient-to-r from-red-500/10 via-orange-500/10 to-yellow-500/10 rounded-lg border border-red-500/30">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-semibold text-white flex items-center gap-2">
-                <Target className="w-4 h-4 text-red-400" />
-                해결할 문제점 시나리오
+        {/* 🆕 프리셋 시나리오 섹션 */}
+        <div className="border border-white/10 rounded-lg">
+          <button
+            onClick={() => setShowPresets(!showPresets)}
+            className="w-full flex items-center justify-between p-3 text-sm text-white/80"
+          >
+            <span className="font-medium flex items-center gap-2 text-white">
+              <Target className="w-4 h-4 text-purple-400" />
+              프리셋 시나리오
+              {selectedPreset && (
+                <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400">
+                  {PRESET_SCENARIOS.find(p => p.id === selectedPreset)?.emoji}{' '}
+                  {PRESET_SCENARIOS.find(p => p.id === selectedPreset)?.name}
+                </span>
+              )}
+            </span>
+            {showPresets ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+
+          {showPresets && (
+            <div className="p-3 pt-0 border-t border-white/10 space-y-3">
+              <p className="text-xs text-white/50">
+                "만약 ~라면?" 시나리오를 선택하고 매장 상태를 예측하세요
+              </p>
+
+              {/* 프리셋 카드 그리드 */}
+              <div className="grid grid-cols-2 gap-2">
+                {PRESET_SCENARIOS.slice(0, 6).map((preset) => (
+                  <button
+                    key={preset.id}
+                    onClick={() => handlePresetSelect(preset)}
+                    disabled={isAnyRunning}
+                    className={cn(
+                      'p-2.5 rounded-lg border text-left transition-all',
+                      selectedPreset === preset.id
+                        ? `${preset.colorTheme.bg} ${preset.colorTheme.border} ${preset.colorTheme.text}`
+                        : 'bg-white/5 border-white/10 hover:bg-white/10 text-white/70',
+                      isAnyRunning && 'opacity-50 cursor-not-allowed'
+                    )}
+                  >
+                    <div className="flex items-center gap-1.5 font-medium text-xs">
+                      <span className="text-base">{preset.emoji}</span>
+                      <span className="truncate">{preset.name}</span>
+                    </div>
+                    <div className="text-[10px] text-white/40 mt-1 truncate">
+                      {preset.description}
+                    </div>
+                    {/* 리스크 태그 */}
+                    {preset.riskTags.length > 0 && (
+                      <div className="flex gap-1 mt-1.5 flex-wrap">
+                        {preset.riskTags.slice(0, 2).map((tag) => (
+                          <span
+                            key={tag}
+                            className="text-[9px] px-1 py-0.5 rounded bg-red-500/20 text-red-400"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {/* 선택된 프리셋 정보 */}
+              {selectedPreset && (
+                <div className="p-2.5 bg-white/5 rounded-lg space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-white">예상 영향</span>
+                    <button
+                      onClick={handleClearPreset}
+                      className="text-[10px] text-white/40 hover:text-white/60"
+                    >
+                      초기화
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2 text-center">
+                    {(() => {
+                      const preset = PRESET_SCENARIOS.find(p => p.id === selectedPreset);
+                      if (!preset) return null;
+                      return (
+                        <>
+                          <div>
+                            <div className="text-[10px] text-white/40">방문객</div>
+                            <div className={cn(
+                              'text-xs font-bold',
+                              preset.expectedImpact.visitorsMultiplier > 1 ? 'text-green-400' : 'text-red-400'
+                            )}>
+                              {preset.expectedImpact.visitorsMultiplier > 1 ? '+' : ''}
+                              {Math.round((preset.expectedImpact.visitorsMultiplier - 1) * 100)}%
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-white/40">전환율</div>
+                            <div className={cn(
+                              'text-xs font-bold',
+                              preset.expectedImpact.conversionMultiplier > 1 ? 'text-green-400' : 'text-red-400'
+                            )}>
+                              {preset.expectedImpact.conversionMultiplier > 1 ? '+' : ''}
+                              {Math.round((preset.expectedImpact.conversionMultiplier - 1) * 100)}%
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-white/40">객단가</div>
+                            <div className={cn(
+                              'text-xs font-bold',
+                              preset.expectedImpact.basketMultiplier > 1 ? 'text-green-400' : 'text-red-400'
+                            )}>
+                              {preset.expectedImpact.basketMultiplier > 1 ? '+' : ''}
+                              {Math.round((preset.expectedImpact.basketMultiplier - 1) * 100)}%
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-white/40">체류</div>
+                            <div className={cn(
+                              'text-xs font-bold',
+                              preset.expectedImpact.dwellTimeMultiplier > 1 ? 'text-blue-400' : 'text-orange-400'
+                            )}>
+                              {preset.expectedImpact.dwellTimeMultiplier > 1 ? '+' : ''}
+                              {Math.round((preset.expectedImpact.dwellTimeMultiplier - 1) * 100)}%
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* 시뮬레이션 타입 선택 */}
+        <div className="space-y-2">
+          <label className="text-xs font-medium text-white">시뮬레이션 타입</label>
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => setSimulationType('realtime')} disabled={isAnyRunning} className={cn("p-3 rounded-lg border text-left transition", simulationType === 'realtime' ? "bg-blue-500/20 border-blue-500 text-blue-400" : "bg-white/5 border-white/10 hover:bg-white/10 text-white/70", isAnyRunning && "opacity-50 cursor-not-allowed")}>
+              <div className="flex items-center gap-2 font-medium text-sm text-white">
+                <Play className="w-4 h-4" />
+                실시간
+              </div>
+              <p className="text-xs text-white/40 mt-1">
+                3D 고객 아바타 애니메이션
+              </p>
+            </button>
+
+            <button onClick={() => setSimulationType('prediction')} disabled={isAnyRunning} className={cn("p-3 rounded-lg border text-left transition", simulationType === 'prediction' ? "bg-purple-500/20 border-purple-500 text-purple-400" : "bg-white/5 border-white/10 hover:bg-white/10 text-white/70", isAnyRunning && "opacity-50 cursor-not-allowed")}>
+              <div className="flex items-center gap-2 font-medium text-sm">
+                <Zap className="w-4 h-4" />
+                AI 예측
+              </div>
+              <p className="text-xs text-white/40 mt-1">
+                AI 기반 분석 및 인사이트
+              </p>
+            </button>
+          </div>
+        </div>
+
+        {/* 🆕 환경 상태 표시 */}
+        {envContext && <div className="p-3 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg border border-white/10 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium flex items-center gap-1 text-white">
+                <Cloud className="w-3 h-3" />
+                현재 환경
               </span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30">
-                {diagnosticIssues.length}건 발견
-              </span>
+              {!isEnvLoading && envImpact && <span className={cn("text-xs px-1.5 py-0.5 rounded", envImpact.trafficMultiplier > 1.1 ? "bg-green-500/20 text-green-400" : envImpact.trafficMultiplier < 0.9 ? "bg-red-500/20 text-red-400" : "bg-white/10 text-white/60")}>
+                  트래픽 {(envImpact.trafficMultiplier * 100).toFixed(0)}%
+                </span>}
             </div>
 
-            {/* 시나리오/환경 컨텍스트 (있는 경우) */}
-            {diagnosticIssues[0]?.scenario_context && (
-              <div className="mb-2 p-2 bg-purple-500/10 rounded border border-purple-500/20">
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="text-purple-300 font-medium">📊 시뮬레이션 시나리오:</span>
-                  <span className="text-white">{(diagnosticIssues[0] as any).scenario_context.name}</span>
+            <div className="grid grid-cols-3 gap-2">
+              {/* 날씨 */}
+              <div className="flex items-center gap-1.5">
+                {envContext.weather?.condition === 'rain' && <CloudRain className="w-3.5 h-3.5 text-blue-400" />}
+                {envContext.weather?.condition === 'snow' && <CloudSnow className="w-3.5 h-3.5 text-blue-200" />}
+                {envContext.weather?.condition === 'clear' && <Sun className="w-3.5 h-3.5 text-yellow-400" />}
+                {envContext.weather?.condition === 'clouds' && <Cloud className="w-3.5 h-3.5 text-gray-400" />}
+                {!envContext.weather && <Cloud className="w-3.5 h-3.5 text-white/30" />}
+                <span className="text-xs text-white">
+                  {envContext.weather ? `${Math.round(envContext.weather.temperature)}°C` : '-'}
+                </span>
+              </div>
+
+              {/* 공휴일 */}
+              <div className="flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-purple-400" />
+                <span className="text-xs truncate text-white">
+                  {envContext.holiday ? envContext.holiday.name : currentTime.isWeekend ? '주말' : '평일'}
+                </span>
+              </div>
+
+              {/* 이벤트 */}
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
+                <span className="text-xs text-white">
+                  {envContext.activeEvents.length > 0 ? `${envContext.activeEvents.length}개 이벤트` : '없음'}
+                </span>
+              </div>
+            </div>
+
+            {/* 영향도 요약 */}
+            {envImpact && <div className="text-[10px] text-white/40 pt-1 border-t border-white/10">
+                {envImpact.summary}
+              </div>}
+          </div>}
+
+        {/* 🆕 환경 설정 패널 (접기/펼치기) */}
+        <div className="border border-white/10 rounded-lg">
+          <button onClick={() => setShowEnvironmentSettings(!showEnvironmentSettings)} className="w-full flex items-center justify-between p-3 text-sm text-white/80">
+            <span className="font-medium flex items-center gap-2 text-white">
+              <Settings className="w-4 h-4" />
+              환경 설정 (시뮬레이션)
+            </span>
+            <div className="flex items-center gap-2">
+              <span className={cn("text-xs px-1.5 py-0.5 rounded", simulationEnvConfig.mode === 'realtime' ? "bg-blue-500/20 text-blue-400" : simulationEnvConfig.mode === 'dateSelect' ? "bg-green-500/20 text-green-400" : "bg-purple-500/20 text-purple-400")}>
+                {simulationEnvConfig.mode === 'realtime' ? '실시간' : simulationEnvConfig.mode === 'dateSelect' ? '날짜선택' : '직접설정'}
+              </span>
+              {showEnvironmentSettings ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </div>
+          </button>
+
+          {showEnvironmentSettings && <div className="p-3 pt-0 border-t border-white/10">
+              <SimulationEnvironmentSettings config={simulationEnvConfig} onChange={config => {
+            console.log('[AISimulationTab] SimulationEnvironmentSettings onChange:', config.mode);
+            setSimulationEnvConfig(config);
+          }} storeId={storeId} compact={true} />
+            </div>}
+        </div>
+
+        {/* 🔧 숨김 처리: 예상 고객 수, 시뮬레이션 시간, 시각화 옵션 */}
+        {/* 
+        {/* 예상 고객 수 *}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-medium bg-inherit text-white">예상 고객 수</label>
+            <span className="text-sm font-bold text-white">{customerCount}명</span>
+          </div>
+          <Slider value={[customerCount]} onValueChange={([v]) => setCustomerCount(v)} min={10} max={300} step={10} disabled={isAnyRunning} className="w-full" />
+          <div className="flex justify-between text-xs text-white/40">
+            <span>10명</span>
+            <span>300명</span>
+          </div>
+        </div>
+
+        {/* 시뮬레이션 시간 *}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-medium text-white">시뮬레이션 시간</label>
+            <span className="text-sm font-bold text-white">{duration}분</span>
+          </div>
+          <Slider value={[duration]} onValueChange={([v]) => setDuration(v)} min={15} max={180} step={15} disabled={isAnyRunning} className="w-full" />
+          <div className="flex justify-between text-xs text-white/40">
+            <span>15분</span>
+            <span>180분</span>
+          </div>
+        </div>
+
+        {/* 고급 옵션 (접기/펼치기) *}
+        <div className="border border-white/10 rounded-lg">
+          <button onClick={() => setShowAdvancedOptions(!showAdvancedOptions)} className="w-full flex items-center justify-between p-3 text-sm text-white/80">
+            <span className="font-medium text-white">시각화 옵션</span>
+            {showAdvancedOptions ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+
+          {showAdvancedOptions && <div className="p-3 pt-0 space-y-3 border-t border-white/10">
+              {/* 고객 상태 범례 *}
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" checked={showCustomerLabels} onChange={e => setShowCustomerLabels(e.target.checked)} disabled={isAnyRunning} className="w-4 h-4 rounded bg-white/10" />
+                <div>
+                  <div className="text-sm text-white/80">고객 상태 범례</div>
+                  <div className="text-xs text-white/40">
+                    고객 상태별 색상을 표시합니다
+                  </div>
                 </div>
-                {(diagnosticIssues[0] as any).scenario_context.description && (
-                  <p className="text-[10px] text-white/50 mt-1">
-                    {(diagnosticIssues[0] as any).scenario_context.description}
-                  </p>
+              </label>
+
+              {/* 혼잡도 히트맵 *}
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" checked={showCongestionHeatmap} onChange={e => setShowCongestionHeatmap(e.target.checked)} disabled={isAnyRunning} className="w-4 h-4 rounded bg-white/10" />
+                <div>
+                  <div className="text-sm text-white/80">혼잡도 시뮬레이션</div>
+                  <div className="text-xs text-white/40">
+                    AI가 시간대별 혼잡도 히트맵을 생성합니다
+                  </div>
+                </div>
+              </label>
+
+              {/* 고객 상태 범례 표시 *}
+              {showCustomerLabels && <div className="pt-2 border-t border-white/10">
+                  <div className="text-xs text-white/50 mb-2">상태 범례</div>
+                  <div className="grid grid-cols-3 gap-1">
+                    {Object.entries(STATE_LABELS).map(([state, label]) => <div key={state} className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full" style={{
+                  backgroundColor: STATE_COLORS[state as keyof typeof STATE_COLORS]
+                }} />
+                        <span className="text-[10px] text-white/50">{label}</span>
+                      </div>)}
+                  </div>
+                </div>}
+            </div>}
+        </div>
+        */}
+
+        {/* AI 예측 로딩 프로그레스 */}
+        {isAIPredictionLoading && <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-purple-500 to-blue-500 transition-all duration-300" style={{
+          width: `${aiProgress}%`
+        }} />
+          </div>}
+
+        {/* 에러 표시 */}
+        {aiError && <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+            <div className="flex items-center gap-2 text-red-400 text-sm">
+              <AlertTriangle className="w-4 h-4" />
+              {aiError}
+            </div>
+          </div>}
+
+        {/* 실시간 시뮬레이션 KPI (실행 중일 때) */}
+        {isRealtimeRunning && simulationType === 'realtime' && <div className="space-y-3 p-3 bg-white/5 rounded-lg border border-white/10">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-white/50">경과 시간</span>
+              <span className="text-lg font-mono text-white">{formatTime(simulationTime)}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="p-2 bg-white/5 rounded">
+                <div className="flex items-center gap-1 text-xs text-white/40">
+                  <Users className="h-3 w-3" />
+                  현재 고객
+                </div>
+                <div className="text-lg font-bold text-white">{kpi.currentCustomers}</div>
+              </div>
+              <div className="p-2 bg-white/5 rounded">
+                <div className="text-xs text-white/40">매출</div>
+                <div className="text-lg font-bold text-green-400">{formatCurrency(kpi.totalRevenue)}</div>
+              </div>
+              <div className="p-2 bg-white/5 rounded">
+                <div className="text-xs text-white/40">전환율</div>
+                <div className="text-lg font-bold text-blue-400">{kpi.conversionRate.toFixed(1)}%</div>
+              </div>
+              <div className="p-2 bg-white/5 rounded">
+                <div className="text-xs text-white/40">평균 체류</div>
+                <div className="text-lg font-bold text-purple-400">{kpi.avgDwellTime.toFixed(0)}분</div>
+              </div>
+            </div>
+
+            {/* 속도 조절 */}
+            <div className="flex gap-1">
+              {[1, 2, 4, 10].map(speed => <Button key={speed} onClick={() => setSpeed(speed)} size="sm" variant={config.speed === speed ? 'default' : 'outline'} className={cn('flex-1 text-xs h-7', config.speed === speed ? 'bg-blue-600' : 'border-white/20 text-white/60')}>
+                  {speed}x
+                </Button>)}
+            </div>
+          </div>}
+
+        {/* AI 예측 결과 표시 */}
+        {aiResult && simulationType === 'prediction' && <div className="space-y-3">
+            {/* KPI 요약 */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="p-2 bg-white/5 rounded-lg">
+                <div className="flex items-center gap-1 text-xs text-white/40 mb-0.5">
+                  <Users className="h-3 w-3" />
+                  예상 방문객
+                </div>
+                <div className="text-lg font-bold text-white">
+                  {realtimeKpis.visitors.toLocaleString()}
+                  <span className="text-xs text-white/40 font-normal ml-0.5">명</span>
+                </div>
+              </div>
+              <div className="p-2 bg-white/5 rounded-lg">
+                <div className="flex items-center gap-1 text-xs text-white/40 mb-0.5">
+                  <TrendingUp className="h-3 w-3" />
+                  전환율
+                </div>
+                <div className="text-lg font-bold text-blue-400">
+                  {(realtimeKpis.conversion * 100).toFixed(1)}%
+                </div>
+              </div>
+              <div className="p-2 bg-white/5 rounded-lg">
+                <div className="flex items-center gap-1 text-xs text-white/40 mb-0.5">
+                  <Clock className="h-3 w-3" />
+                  평균 체류
+                </div>
+                <div className="text-lg font-bold text-purple-400">
+                  {Math.round(realtimeKpis.avgDwell / 60)}분
+                </div>
+              </div>
+              <div className="p-2 bg-white/5 rounded-lg">
+                <div className="flex items-center gap-1 text-xs text-white/40 mb-0.5">
+                  <DollarSign className="h-3 w-3" />
+                  예상 매출
+                </div>
+                <div className="text-lg font-bold text-green-400">
+                  {formatCurrency(realtimeKpis.revenue)}
+                </div>
+              </div>
+            </div>
+
+            {/* 🆕 분석된 문제점 섹션 (새로운 형식) */}
+            {analyzedIssues.length > 0 && (
+              <div className="p-3 bg-gradient-to-br from-red-500/5 to-orange-500/5 rounded-lg border border-red-500/20 space-y-3">
+                {/* 헤더 */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm font-medium text-white">
+                    <AlertTriangle className="h-4 w-4 text-red-400" />
+                    감지된 문제점
+                  </div>
+                  <div className="flex gap-1.5">
+                    {analyzedCriticalCount > 0 && (
+                      <span className="px-2 py-0.5 bg-red-500 text-white text-xs rounded-full font-medium">
+                        위험 {analyzedCriticalCount}
+                      </span>
+                    )}
+                    {analyzedWarningCount > 0 && (
+                      <span className="px-2 py-0.5 bg-yellow-500 text-white text-xs rounded-full font-medium">
+                        주의 {analyzedWarningCount}
+                      </span>
+                    )}
+                    {analyzedInfoCount > 0 && (
+                      <span className="px-2 py-0.5 bg-blue-500 text-white text-xs rounded-full font-medium">
+                        정보 {analyzedInfoCount}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 예상 영향 요약 */}
+                {totalRevenueImpact > 0 && (
+                  <div className="p-2 bg-red-500/10 rounded text-xs text-red-300 flex items-center gap-2">
+                    <DollarSign className="h-3.5 w-3.5" />
+                    예상 매출 손실: <span className="font-bold">{(totalRevenueImpact / 10000).toLocaleString()}만원</span>
+                  </div>
+                )}
+
+                {/* 이슈 목록 */}
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {analyzedIssues.slice(0, 5).map((issue) => (
+                    <div
+                      key={issue.id}
+                      className={cn(
+                        'p-2.5 rounded-lg text-xs border transition-all',
+                        issue.severity === 'critical'
+                          ? 'bg-red-500/10 border-red-500/30 text-red-300'
+                          : issue.severity === 'warning'
+                          ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300'
+                          : 'bg-blue-500/10 border-blue-500/30 text-blue-300'
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm">{ISSUE_TYPE_META[issue.type]?.icon || '⚠️'}</span>
+                          <span className="font-medium">{issue.title}</span>
+                        </div>
+                        {issue.severity === 'critical' && (
+                          <span className="px-1 py-0.5 bg-red-500/30 text-red-300 text-[10px] rounded">
+                            위험
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-1.5 text-white/50">
+                        <MapPin className="h-3 w-3" />
+                        {issue.location.zoneName}
+                        {issue.details.description && (
+                          <>
+                            <span>•</span>
+                            <span className="truncate">{issue.details.description}</span>
+                          </>
+                        )}
+                      </div>
+                      {/* 권장사항 미리보기 */}
+                      {issue.recommendations.length > 0 && (
+                        <div className="mt-1.5 pt-1.5 border-t border-white/10 text-[10px] text-white/40">
+                          💡 {issue.recommendations[0]}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {analyzedIssues.length > 5 && (
+                    <div className="text-xs text-white/40 text-center py-1">
+                      +{analyzedIssues.length - 5}개 더 있음
+                    </div>
+                  )}
+                </div>
+
+                {/* AI 최적화 연결 버튼 */}
+                {(analyzedCriticalCount > 0 || analyzedWarningCount > 0) && (
+                  <div className="space-y-2">
+                    <div className="p-2.5 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-lg border border-purple-500/30">
+                      <p className="text-xs text-white/80 text-center">
+                        <Sparkles className="h-3.5 w-3.5 inline mr-1 text-purple-400" />
+                        <strong>AI 최적화</strong>로 위 문제점들을 해결할 수 있습니다
+                      </p>
+                    </div>
+                    <Button
+                      onClick={handleOpenOptimizationModal}
+                      className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-sm py-3"
+                      size="sm"
+                    >
+                      <Wrench className="h-4 w-4 mr-2" />
+                      AI 최적화로 실행하시겠습니까?
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  </div>
                 )}
               </div>
             )}
 
-            {/* 문제점 목록 */}
-            <div className="space-y-1.5">
-              {diagnosticIssues.slice(0, 5).map((issue, idx) => (
-                <div
-                  key={issue.id || idx}
-                  className={cn(
-                    'p-2 rounded flex items-start gap-2',
-                    issue.severity === 'critical'
-                      ? 'bg-red-500/20 border border-red-500/30'
-                      : issue.severity === 'warning'
-                      ? 'bg-yellow-500/20 border border-yellow-500/30'
-                      : 'bg-blue-500/20 border border-blue-500/30'
-                  )}
-                >
-                  <span className="text-sm">
-                    {issue.severity === 'critical' ? '🔴' : issue.severity === 'warning' ? '🟠' : '🔵'}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-white truncate">{issue.title}</p>
-                    <p className="text-[10px] text-white/50">
-                      {issue.zone || issue.zone_name} • {issue.message || (issue as any).details?.description}
-                    </p>
-                    {(issue as any).impact?.revenueImpact > 0 && (
-                      <p className="text-[10px] text-red-400 mt-0.5">
-                        예상 손실: {((issue as any).impact.revenueImpact / 10000).toLocaleString()}만원
-                      </p>
-                    )}
+            {/* 기존 진단 이슈 (호환성 유지) */}
+            {aiDiagnosticIssues.length > 0 && analyzedIssues.length === 0 && <div className="p-3 bg-white/5 rounded-lg space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm text-white/80">
+                    <AlertTriangle className="h-4 w-4" />
+                    발견된 이슈
+                  </div>
+                  <div className="flex gap-1">
+                    {criticalCount > 0 && <span className="px-1.5 py-0.5 bg-red-500 text-white text-xs rounded-full">
+                        {criticalCount}
+                      </span>}
+                    {warningCount > 0 && <span className="px-1.5 py-0.5 bg-yellow-500 text-white text-xs rounded-full">
+                        {warningCount}
+                      </span>}
                   </div>
                 </div>
-              ))}
-              {diagnosticIssues.length > 5 && (
-                <p className="text-[10px] text-white/40 text-center pt-1">
-                  +{diagnosticIssues.length - 5}건 더 있음
-                </p>
+
+                {/* 이슈 목록 (최대 3개) */}
+                <div className="space-y-1.5">
+                  {aiDiagnosticIssues.slice(0, 3).map(issue => <div key={issue.id} className={cn('p-2 rounded text-xs', issue.severity === 'critical' ? 'bg-red-500/20 text-red-300' : issue.severity === 'warning' ? 'bg-yellow-500/20 text-yellow-300' : 'bg-blue-500/20 text-blue-300')}>
+                      <div className="font-medium">{issue.title}</div>
+                      <div className="text-white/50 mt-0.5">{issue.zone_name}</div>
+                    </div>)}
+                  {aiDiagnosticIssues.length > 3 && <div className="text-xs text-white/40 text-center">
+                      +{aiDiagnosticIssues.length - 3}개 더
+                    </div>}
+                </div>
+
+                {/* AI 최적화로 이동 버튼 */}
+                {(criticalCount > 0 || warningCount > 0) && onNavigateToOptimization && <Button onClick={handleNavigateToOptimization} className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-sm" size="sm">
+                    <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                    AI 최적화로 해결하기 ({criticalCount + warningCount}개 이슈)
+                  </Button>}
+              </div>}
+
+            {/* AI 인사이트 */}
+            {aiResult.ai_insights && aiResult.ai_insights.length > 0 && <div className="p-3 bg-white/5 rounded-lg">
+                <div className="text-sm text-white/80 mb-2 flex items-center gap-2">
+                  <Lightbulb className="h-4 w-4 text-yellow-400" />
+                  AI 인사이트
+                </div>
+                <ul className="space-y-1.5">
+                  {aiResult.ai_insights.slice(0, 3).map((insight, idx) => <li key={idx} className="text-xs text-white/60 flex items-start gap-1.5">
+                      <span className="text-yellow-400 mt-0.5">•</span>
+                      {insight}
+                    </li>)}
+                </ul>
+              </div>}
+          </div>}
+      </div>
+
+      {/* ===== 🔧 통합 실행 버튼 영역 ===== */}
+      <div className="p-4 border-t border-white/10 space-y-2">
+        {!isAnyRunning ? <Button onClick={handleRunSimulation} disabled={!storeId} className={cn("w-full py-3 font-medium text-white transition flex items-center justify-center gap-2", simulationType === 'realtime' ? "bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700" : "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700")}>
+            {simulationType === 'realtime' ? <>
+                <Play className="w-4 h-4" />
+                실시간 시뮬레이션 시작
+              </> : <>
+                <Zap className="w-4 h-4" />
+                AI 예측 시뮬레이션 실행
+              </>}
+          </Button> : <div className="flex gap-2">
+            {/* 일시정지/재개 (실시간만) */}
+            {simulationType === 'realtime' && isRealtimeRunning && <Button onClick={handleTogglePause} className="flex-1 py-3 font-medium bg-yellow-600 hover:bg-yellow-700 text-white transition flex items-center justify-center gap-2">
+                {isPaused ? <>
+                    <Play className="w-4 h-4" />
+                    재개
+                  </> : <>
+                    <Pause className="w-4 h-4" />
+                    일시정지
+                  </>}
+              </Button>}
+
+            {/* 중지 */}
+            <Button onClick={handleStopSimulation} className={cn("py-3 font-medium bg-red-600 hover:bg-red-700 text-white transition flex items-center justify-center gap-2", simulationType === 'realtime' && isRealtimeRunning ? "flex-1" : "w-full")}>
+              <Square className="w-4 h-4" />
+              중지
+            </Button>
+          </div>}
+
+        {/* 실시간 시뮬레이션 상태 표시 */}
+        {isRealtimeRunning && simulationType === 'realtime' && <div className="text-center text-xs text-white/50">
+            <Clock className="w-3 h-3 inline mr-1" />
+            경과 시간: {formatTime(simulationTime)}
+            {' | '}
+            <Users className="w-3 h-3 inline mx-1" />
+            활동중: {kpi.currentCustomers}명
+          </div>}
+
+        {/* AI 예측 로딩 상태 */}
+        {isAIPredictionLoading && <div className="text-center text-xs text-white/50">
+            <Loader2 className="w-3 h-3 inline mr-1 animate-spin" />
+            AI 분석 중... {aiProgress}%
+          </div>}
+      </div>
+
+      {/* 🆕 AI 최적화 연결 모달 */}
+      {showOptimizationModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-[#1a1a2e] border border-white/10 rounded-xl w-full max-w-lg mx-4 max-h-[80vh] overflow-hidden shadow-2xl">
+            {/* 모달 헤더 */}
+            <div className="p-4 border-b border-white/10 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Wrench className="h-5 w-5 text-purple-400" />
+                <h3 className="font-semibold text-white">AI 최적화 연결</h3>
+              </div>
+              <button
+                onClick={() => setShowOptimizationModal(false)}
+                className="p-1 rounded hover:bg-white/10 text-white/60 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* 모달 내용 */}
+            <div className="p-4 space-y-4 overflow-y-auto max-h-[50vh]">
+              {/* 현재 시나리오 정보 */}
+              {selectedPreset && (
+                <div className="p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                  <div className="text-xs text-purple-300 mb-1">적용된 시나리오</div>
+                  <div className="flex items-center gap-2 text-white">
+                    <span className="text-lg">
+                      {PRESET_SCENARIOS.find(p => p.id === selectedPreset)?.emoji}
+                    </span>
+                    <span className="font-medium">
+                      {PRESET_SCENARIOS.find(p => p.id === selectedPreset)?.name}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* 해결할 문제 선택 */}
+              <div>
+                <div className="text-sm font-medium text-white mb-2 flex items-center justify-between">
+                  <span>해결할 문제 선택</span>
+                  <span className="text-xs text-white/40">
+                    {selectedIssuesForOptimization.size}개 선택됨
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {analyzedIssues.map((issue) => (
+                    <label
+                      key={issue.id}
+                      className={cn(
+                        'flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all',
+                        selectedIssuesForOptimization.has(issue.id)
+                          ? 'bg-purple-500/10 border-purple-500/30'
+                          : 'bg-white/5 border-white/10 hover:bg-white/10'
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedIssuesForOptimization.has(issue.id)}
+                        onChange={() => handleToggleIssueSelection(issue.id)}
+                        className="mt-0.5 w-4 h-4 rounded bg-white/10 border-white/20"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span>{ISSUE_TYPE_META[issue.type]?.icon || '⚠️'}</span>
+                          <span className="text-sm font-medium text-white truncate">
+                            {issue.title}
+                          </span>
+                          <span
+                            className={cn(
+                              'text-[10px] px-1.5 py-0.5 rounded',
+                              issue.severity === 'critical'
+                                ? 'bg-red-500/30 text-red-300'
+                                : issue.severity === 'warning'
+                                ? 'bg-yellow-500/30 text-yellow-300'
+                                : 'bg-blue-500/30 text-blue-300'
+                            )}
+                          >
+                            {issue.severity === 'critical' ? '위험' : issue.severity === 'warning' ? '주의' : '정보'}
+                          </span>
+                        </div>
+                        <div className="text-xs text-white/50 mt-1">
+                          {issue.location.zoneName} • {issue.details.description}
+                        </div>
+                        {issue.impact.revenueImpact > 0 && (
+                          <div className="text-xs text-red-400 mt-1">
+                            예상 손실: {(issue.impact.revenueImpact / 10000).toLocaleString()}만원
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* 최적화 예상 효과 */}
+              {selectedIssuesForOptimization.size > 0 && (
+                <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/20">
+                  <div className="text-xs text-green-300 mb-2">최적화 예상 효과</div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle className="h-3.5 w-3.5 text-green-400" />
+                      <span className="text-white/70">문제 해결:</span>
+                      <span className="text-green-400 font-medium">
+                        {selectedIssuesForOptimization.size}개
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <DollarSign className="h-3.5 w-3.5 text-green-400" />
+                      <span className="text-white/70">예상 회복:</span>
+                      <span className="text-green-400 font-medium">
+                        {(
+                          analyzedIssues
+                            .filter(i => selectedIssuesForOptimization.has(i.id))
+                            .reduce((sum, i) => sum + i.impact.revenueImpact, 0) / 10000
+                        ).toLocaleString()}만원
+                      </span>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
 
-            {/* 안내 메시지 */}
-            <div className="mt-3 p-2 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded border border-purple-500/20">
-              <p className="text-xs text-purple-300 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5" />
-                <strong>AI 최적화</strong>가 위 문제점들을 최우선으로 해결합니다
-              </p>
-              <p className="text-[10px] text-white/50 mt-1">
-                아래에서 최적화 목표와 옵션을 설정하고 실행하세요
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========== 🔧 FIX: 환경 설정 컨텍스트 (날짜선택/직접설정 모드일 때 표시) ========== */}
-      {simulationEnvConfig && (simulationEnvConfig.mode === 'dateSelect' || simulationEnvConfig.mode === 'manual') && (
-        <div className="p-3 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg border border-blue-500/30 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-white/80 flex items-center gap-1.5">
-              <Cloud className="w-3.5 h-3.5 text-blue-400" />
-              환경 컨텍스트 적용됨
-            </span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">
-              {simulationEnvConfig.mode === 'dateSelect' ? '날짜 선택' : '직접 설정'}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2 text-xs">
-            {/* 날씨 */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-sm">
-                {WEATHER_OPTIONS.find((w) => w.value === getEffectiveWeather(simulationEnvConfig))?.emoji}
-              </span>
-              <span className="text-white/70">
-                {WEATHER_OPTIONS.find((w) => w.value === getEffectiveWeather(simulationEnvConfig))?.label}
-              </span>
-            </div>
-
-            {/* 휴일 */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-sm">
-                {HOLIDAY_OPTIONS.find((h) => h.value === getEffectiveHoliday(simulationEnvConfig))?.emoji}
-              </span>
-              <span className="text-white/70">
-                {HOLIDAY_OPTIONS.find((h) => h.value === getEffectiveHoliday(simulationEnvConfig))?.label}
-              </span>
-            </div>
-
-            {/* 시간대 */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-sm">
-                {TIME_OF_DAY_OPTIONS.find((t) => t.value === getEffectiveTimeOfDay(simulationEnvConfig))?.emoji}
-              </span>
-              <span className="text-white/70">
-                {TIME_OF_DAY_OPTIONS.find((t) => t.value === getEffectiveTimeOfDay(simulationEnvConfig))?.label}
-              </span>
-            </div>
-          </div>
-
-          {/* 영향도 요약 */}
-          {simulationEnvConfig.calculatedImpact && (
-            <div className="text-[10px] text-white/50 pt-1 border-t border-white/10 flex gap-3">
-              <span>
-                트래픽: <span className={cn(
-                  simulationEnvConfig.calculatedImpact.trafficMultiplier > 1 ? 'text-green-400' : 'text-red-400'
-                )}>
-                  {(simulationEnvConfig.calculatedImpact.trafficMultiplier * 100).toFixed(0)}%
-                </span>
-              </span>
-              <span>
-                체류: <span className={cn(
-                  simulationEnvConfig.calculatedImpact.dwellTimeMultiplier > 1 ? 'text-green-400' : 'text-red-400'
-                )}>
-                  {(simulationEnvConfig.calculatedImpact.dwellTimeMultiplier * 100).toFixed(0)}%
-                </span>
-              </span>
-              <span>
-                전환: <span className={cn(
-                  simulationEnvConfig.calculatedImpact.conversionMultiplier > 1 ? 'text-green-400' : 'text-red-400'
-                )}>
-                  {(simulationEnvConfig.calculatedImpact.conversionMultiplier * 100).toFixed(0)}%
-                </span>
-              </span>
-            </div>
-          )}
-
-          <p className="text-[10px] text-white/40">
-            ⚡ AI 최적화 시 위 환경 조건을 고려하여 추천합니다
-          </p>
-        </div>
-      )}
-
-      {/* 구분선 */}
-      <div className="border-t border-white/10" />
-
-      {/* ========== 최적화 선택 섹션 ========== */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="text-sm font-medium text-white/80 flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-yellow-400" />
-            AI 최적화
-          </div>
-          <button
-            onClick={toggleAll}
-            className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
-          >
-            {selectedOptimizations.length === optimizationOptions.length ? '전체 해제' : '전체 선택'}
-          </button>
-        </div>
-
-        {/* 최적화 옵션 체크박스 */}
-        <div className="space-y-2">
-          {optimizationOptions.map((option) => {
-            const Icon = option.icon;
-            const isSelected = selectedOptimizations.includes(option.id);
-            const isRunningThis = runningTypes.includes(option.id);
-            const hasResult = !!results[option.id];
-
-            return (
-              <label
-                key={option.id}
-                className={cn(
-                  'flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-all',
-                  'border border-transparent',
-                  isSelected
-                    ? 'bg-blue-500/20 border-blue-500/50'
-                    : 'bg-white/5 hover:bg-white/10',
-                  isRunningThis && 'opacity-70 cursor-wait'
-                )}
+            {/* 모달 푸터 */}
+            <div className="p-4 border-t border-white/10 flex gap-2">
+              <Button
+                onClick={() => setShowOptimizationModal(false)}
+                variant="outline"
+                className="flex-1 border-white/20 text-white/70 hover:bg-white/10"
               >
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={() => toggleOptimization(option.id)}
-                  disabled={isRunning}
-                  className="mt-1 w-4 h-4 rounded border-white/40 text-blue-600 focus:ring-blue-500 bg-white/10"
-                />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <Icon className={cn('h-4 w-4', isSelected ? 'text-blue-400' : 'text-white/40')} />
-                    <span className={cn('text-sm font-medium', isSelected ? 'text-white' : 'text-white/70')}>
-                      {option.label}
-                    </span>
-                    {isRunningThis && <Loader2 className="h-3 w-3 animate-spin text-blue-400" />}
-                    {hasResult && !isRunningThis && (
-                      <span className="px-1.5 py-0.5 text-xs bg-green-600 text-white rounded">완료</span>
-                    )}
-                  </div>
-                  <p className="text-xs text-white/50 mt-1">{option.description}</p>
-                </div>
-              </label>
-            );
-          })}
-        </div>
-
-        {/* ========== 상세 설정 섹션 ========== */}
-        <div className="space-y-2">
-          <button
-            onClick={() => setIsSettingsExpanded(!isSettingsExpanded)}
-            className="w-full flex items-center justify-between text-xs font-medium text-white/70 hover:text-white/90 transition-colors p-2 bg-white/5 rounded-lg"
-          >
-            <div className="flex items-center gap-2">
-              <Settings2 className="h-4 w-4 text-purple-400" />
-              상세 설정
-              <span className="text-white/40">
-                ({optimizationSettings.intensity === 'low' ? '보수적' : optimizationSettings.intensity === 'medium' ? '균형' : '적극적'})
-              </span>
-            </div>
-            {isSettingsExpanded ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
-          </button>
-
-          {isSettingsExpanded && (
-            <div className="animate-in slide-in-from-top-2 duration-200">
-              <OptimizationSettingsPanel
-                settings={optimizationSettings}
-                onChange={setOptimizationSettings}
-                furniture={furnitureItems}
-                products={productItems}
-                disabled={isRunning}
-                compact
-              />
-            </div>
-          )}
-        </div>
-
-        {/* 실행 버튼 */}
-        <Button
-          onClick={runOptimizations}
-          disabled={isRunning || selectedOptimizations.length === 0}
-          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-        >
-          {isRunning ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              최적화 실행 중... {Math.round(optimizationProgress)}%
-            </>
-          ) : (
-            <>
-              <Sparkles className="h-4 w-4 mr-2" />
-              선택된 {selectedOptimizations.length}개 최적화 실행
-            </>
-          )}
-        </Button>
-
-        {/* 🆕 최적화 진행률 바 */}
-        {isRunning && (
-          <div className="space-y-1">
-            <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
-              <div 
-                className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-300 ease-out"
-                style={{ width: `${Math.min(optimizationProgress, 100)}%` }}
-              />
-            </div>
-            <p className="text-[10px] text-white/50 text-center">
-              {optimizationProgress < 30 && '매장 데이터 분석 중...'}
-              {optimizationProgress >= 30 && optimizationProgress < 60 && 'AI 최적화 계산 중...'}
-              {optimizationProgress >= 60 && optimizationProgress < 90 && '결과 생성 중...'}
-              {optimizationProgress >= 90 && '완료 처리 중...'}
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* 구분선 */}
-      <div className="border-t border-white/10" />
-
-      {/* ========== 결과 섹션 ========== */}
-      <div className="space-y-3">
-        <button
-          onClick={() => setIsResultExpanded(!isResultExpanded)}
-          className="w-full flex items-center justify-between text-sm font-medium text-white/80"
-        >
-          <span>최적화 결과</span>
-          {isResultExpanded ? (
-            <ChevronUp className="h-4 w-4 text-white/40" />
-          ) : (
-            <ChevronDown className="h-4 w-4 text-white/40" />
-          )}
-        </button>
-
-        {isResultExpanded && (
-          <div className="space-y-3">
-            {!hasResults ? (
-              <div className="text-center py-6 text-white/40 text-sm">
-                최적화를 실행하면 결과가 여기에 표시됩니다.
-              </div>
-            ) : (
-              <>
-                {/* 레이아웃 최적화 결과 */}
-                {results.layout && (
-                  <OptimizationResultPanel
-                    type="layout"
-                    title="레이아웃 최적화"
-                    result={results.layout}
-                    onToggleOverlay={(visible) => onOverlayToggle('layoutOptimization', visible)}
-                  />
-                )}
-
-                {/* 동선 최적화 결과 */}
-                {results.flow && (
-                  <OptimizationResultPanel
-                    type="flow"
-                    title="동선 최적화"
-                    result={results.flow}
-                    onToggleOverlay={(visible) => onOverlayToggle('flowOptimization', visible)}
-                  />
-                )}
-
-                {/* 인력 배치 최적화 결과 - 새로운 상세 패널 사용 */}
-                {results.staffing && (
-                  <StaffOptimizationResultPanel
-                    result={results.staffing as unknown as StaffOptimizationResult}
-                    onToggleOverlay={(visible) => {
-                      setShowStaffOverlay(visible);
-                      onOverlayToggle('staffing', visible);
-                    }}
-                    isOverlayVisible={showStaffOverlay}
-                  />
-                )}
-
-                {/* As-Is / To-Be 액션 버튼 */}
-                <div className="flex gap-2 pt-2">
-                  <Button
-                    onClick={handleRevertToAsIs}
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 border-white/20 text-white/70 hover:text-white hover:bg-white/10"
-                  >
-                    <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
-                    As-Is 복원
-                  </Button>
-                  <Button
-                    onClick={handleApplyToBe}
-                    size="sm"
-                    className="flex-1 bg-blue-600 hover:bg-blue-700"
-                  >
-                    <Check className="h-3.5 w-3.5 mr-1.5" />
-                    To-Be 적용
-                  </Button>
-                </div>
-
-                {/* 저장 버튼 그룹 */}
-                <div className="flex gap-2 pt-2 border-t border-white/10">
-                  <Button
-                    onClick={handleSaveToBe}
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 border-white/20 text-white/70 hover:text-white hover:bg-white/10"
-                  >
-                    <Save className="h-3.5 w-3.5 mr-1.5" />
-                    씬 저장
-                  </Button>
-                  <Button
-                    onClick={handleSaveScenario}
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 border-purple-500/50 text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
-                  >
-                    <BookmarkPlus className="h-3.5 w-3.5 mr-1.5" />
-                    시나리오 저장
-                  </Button>
-                </div>
-
-                {/* 적용하기 탭으로 이동 버튼 */}
-                {onNavigateToApply && (
-                  <Button
-                    onClick={onNavigateToApply}
-                    className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
-                  >
-                    <ArrowRight className="h-4 w-4 mr-2" />
-                    적용하기 탭에서 검토 및 실행
-                  </Button>
-                )}
-              </>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* 비교 요약 */}
-      {sceneSimulation.state.comparison && (
-        <div className="p-3 bg-white/5 rounded-lg border border-white/10">
-          <h4 className="text-xs font-medium text-white/60 mb-2">변경 요약</h4>
-          <div className="space-y-1 text-xs">
-            <div className="flex justify-between">
-              <span className="text-white/50">총 변경 수</span>
-              <span className="text-white">{sceneSimulation.state.comparison.summary.totalChanges}개</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-white/50">예상 매출 증가</span>
-              <span className="text-green-400">
-                +{sceneSimulation.state.comparison.summary.expectedImpact?.revenue?.toFixed(1) || 0}%
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-white/50">예상 체류시간 증가</span>
-              <span className="text-blue-400">
-                +{sceneSimulation.state.comparison.summary.expectedImpact?.traffic?.toFixed(1) || 0}%
-              </span>
+                취소
+              </Button>
+              <Button
+                onClick={handleNavigateToOptimizationTab}
+                disabled={selectedIssuesForOptimization.size === 0}
+                className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+              >
+                <ArrowRight className="h-4 w-4 mr-2" />
+                AI 최적화 탭으로 이동
+              </Button>
             </div>
           </div>
         </div>
       )}
-    </div>
-  );
+    </div>;
 }
-
-export default AIOptimizationTab;
+export default AISimulationTab;
