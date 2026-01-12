@@ -118,13 +118,13 @@ export function AppSidebar() {
                       <NavLink
                         to={item.url}
                         className={`hover:bg-muted/50 dark:hover:bg-white/10 rounded-lg transition-colors ${
-                          active ? 'bg-primary/10 dark:bg-white/10 border-l-4 border-primary dark:border-white' : ''
-                        }`}
-                        activeClassName="bg-primary/10 dark:bg-white/10 text-primary dark:text-white font-medium"
+                          active && !collapsed ? 'bg-primary/10 dark:bg-white/10 border-l-4 border-primary dark:border-white' : ''
+                        } ${collapsed ? 'flex justify-center' : ''}`}
+                        activeClassName={!collapsed ? "bg-primary/10 dark:bg-white/10 text-primary dark:text-white font-medium" : ""}
                       >
-                        <div className="flex items-center gap-3">
+                        <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}>
                           {collapsed ? (
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${active ? 'border-2 border-foreground dark:border-white' : ''}`}>
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${active ? 'border-2 border-foreground dark:border-white' : ''}`}>
                               <item.icon className="h-5 w-5 text-foreground dark:text-white" />
                             </div>
                           ) : (
