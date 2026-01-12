@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 // 새 스튜디오 컴포넌트
 import { Canvas3D, SceneProvider, useScene } from './core';
 import { LayerPanel, SimulationPanel, ToolPanel, SceneSavePanel, OverlayControlPanel, PropertyPanel } from './panels';
-import { HeatmapOverlay, CustomerFlowOverlay, ZoneBoundaryOverlay, LayoutOptimizationOverlay, FlowOptimizationOverlay, CongestionOverlay, StaffingOverlay, ZonesFloorOverlay, StaffAvatarsOverlay, CustomerFlowOverlayEnhanced, StaffReallocationOverlay } from './overlays';
+import { HeatmapOverlay, CustomerFlowOverlay, LayoutOptimizationOverlay, FlowOptimizationOverlay, CongestionOverlay, StaffingOverlay, StaffAvatarsOverlay, CustomerFlowOverlayEnhanced, StaffReallocationOverlay } from './overlays';
 import { DraggablePanel, QuickToggleBar, ViewModeToggle, ResultReportPanel, type ViewMode } from './components';
 import type { DiagnosticIssue } from './components/DiagnosticIssueList';
 import { PanelLeftClose, PanelLeft, Mouse } from 'lucide-react';
@@ -1007,10 +1007,7 @@ export default function DigitalTwinStudioPage() {
             {loading ? <div className="flex items-center justify-center h-full">
                 <Loader2 className="w-8 h-8 animate-spin text-white" />
               </div> : <Canvas3D mode={mode} transformMode={transformMode} enableControls={true} enableSelection={isEditMode} enableTransform={isEditMode} showGrid={isEditMode} zones={simulationZones} userId={user?.id} storeId={selectedStore?.id} renderingConfig={environmentRenderingConfig} isDayMode={isDayMode}>
-                {/* zones_dim 기반 구역 바닥 오버레이 (DB 데이터 우선) */}
-                {isActive('zone') && dbZones && dbZones.length > 0 && <ZonesFloorOverlay zones={dbZones} visible={true} showLabels={true} opacity={0.3} />}
-                {/* 폴백: DB 데이터 없으면 demoZones 사용 */}
-                {isActive('zone') && (!dbZones || dbZones.length === 0) && <ZoneBoundaryOverlay zones={demoZones} />}
+                {/* 🔧 ZonesFloorOverlay 제거됨 - 불필요한 파란색 바닥 표시 방지 */}
 
                 {/* 🔧 히트맵 오버레이 - zone_daily_metrics.heatmap_intensity 기반 실제 데이터 사용 */}
                 {isActive('heatmap') && (() => {
@@ -1687,13 +1684,13 @@ function SimulationResultPanels({
         furnitureMoves: layoutResult.furnitureMoves,
         animated: true
       });
-      toggleOverlay('zone');
+      // 🔧 FIX: zone 토글 제거 (파란색 바닥 방지)
       toast.success('3D 씬에 레이아웃 변경이 적용되었습니다');
     } else {
-      toggleOverlay('zone');
+      // 🔧 FIX: zone 토글 제거 (파란색 바닥 방지)
       toast.info('3D 뷰에서 변경사항 표시');
     }
-  }, [sceneSimulationResults.layout, applySimulationResults, toggleOverlay]);
+  }, [sceneSimulationResults.layout, applySimulationResults]);
   return <>
       {visiblePanels.layoutResult && <LayoutResultPanel result={simulationResults.layout} onClose={() => onClose('layoutResult')} onApply={() => {
       // ROI 측정 모달 완료 후 호출됨 - 별도 동작 없음
