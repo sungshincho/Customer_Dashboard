@@ -1125,38 +1125,44 @@ export default function DigitalTwinStudioPage() {
                 {isActive('congestion') && sceneSimulation.state.results.congestion && <CongestionOverlay result={sceneSimulation.state.results.congestion as any} showHeatmap={true} showZoneMarkers={true} showCrowdAnimation={true} animateTimeProgress={false} />}
                 {isActive('staffing') && sceneSimulation.state.results.staffing && <StaffingOverlay result={sceneSimulation.state.results.staffing as any} showStaffMarkers={true} showCurrentPositions={true} showSuggestedPositions={true} showCoverageZones={true} showMovementPaths={true} animateMovement={true} />}
 
-                {/* 🆕 인력 재배치 오버레이 (staffing 활성화 시 표시) */}
-                {isActive('staffing') && sceneSimulation.state.results.staffing && (() => {
+                {/* 🔧 FIX: 인력 재배치 오버레이 - compare 모드에서만 표시 + 유효한 데이터 있을 때만 */}
+                {viewMode === 'compare' && isActive('staffing') && sceneSimulation.state.results.staffing && (() => {
               const staffingResult = sceneSimulation.state.results.staffing as any;
-              // staffPositions를 StaffReallocation 형식으로 변환
-              const reallocations = (staffingResult.staffPositions || []).map((sp: any, idx: number) => ({
-                staff_id: sp.staffId || `staff-${idx}`,
-                staff_code: `S${String(idx + 1).padStart(3, '0')}`,
-                staff_name: sp.staffName || `직원 ${idx + 1}`,
-                role: 'sales' as const,
-                from_zone_id: sp.fromZoneId || `zone-${idx}`,
-                from_zone_name: sp.fromZoneName || '이전 구역',
-                from_position: sp.currentPosition || {
-                  x: 0,
-                  y: 0,
-                  z: 0
-                },
-                to_zone_id: sp.toZoneId || `zone-opt-${idx}`,
-                to_zone_name: sp.toZoneName || '최적 구역',
-                to_position: sp.suggestedPosition || {
-                  x: 0,
-                  y: 0,
-                  z: 0
-                },
-                reason: sp.reason || '커버리지 최적화',
-                priority: (sp.coverageGain > 15 ? 'high' : sp.coverageGain > 8 ? 'medium' : 'low') as 'high' | 'medium' | 'low',
-                expected_impact: {
-                  coverage_change_pct: sp.coverageGain || 0,
-                  response_time_change_sec: -5,
-                  customers_served_change: Math.floor((sp.coverageGain || 0) / 3)
-                }
-              }));
-              return <StaffReallocationOverlay visible={true} reallocations={reallocations} />;
+              const staffPositions = staffingResult.staffPositions || [];
+              
+              // 유효한 재배치 데이터만 필터링 (from/to 위치가 모두 있어야 함)
+              const validReallocations = staffPositions
+                .filter((sp: any) => {
+                  const hasCurrentPos = sp.currentPosition && 
+                    (sp.currentPosition.x !== 0 || sp.currentPosition.z !== 0);
+                  const hasSuggestedPos = sp.suggestedPosition && 
+                    (sp.suggestedPosition.x !== 0 || sp.suggestedPosition.z !== 0);
+                  return hasCurrentPos && hasSuggestedPos;
+                })
+                .map((sp: any, idx: number) => ({
+                  staff_id: sp.staffId || `staff-${idx}`,
+                  staff_code: `S${String(idx + 1).padStart(3, '0')}`,
+                  staff_name: sp.staffName || `직원 ${idx + 1}`,
+                  role: 'sales' as const,
+                  from_zone_id: sp.fromZoneId || `zone-${idx}`,
+                  from_zone_name: sp.fromZoneName || sp.currentPosition?.zoneName || '현재 위치',
+                  from_position: sp.currentPosition,
+                  to_zone_id: sp.toZoneId || `zone-opt-${idx}`,
+                  to_zone_name: sp.toZoneName || sp.suggestedPosition?.zoneName || '최적 위치',
+                  to_position: sp.suggestedPosition,
+                  reason: sp.reason || '커버리지 최적화',
+                  priority: (sp.coverageGain > 15 ? 'high' : sp.coverageGain > 8 ? 'medium' : 'low') as 'high' | 'medium' | 'low',
+                  expected_impact: {
+                    coverage_change_pct: sp.coverageGain || 0,
+                    response_time_change_sec: -5,
+                    customers_served_change: Math.floor((sp.coverageGain || 0) / 3)
+                  }
+                }));
+              
+              // 유효한 재배치 데이터가 없으면 렌더링 안 함
+              if (validReallocations.length === 0) return null;
+              
+              return <StaffReallocationOverlay visible={true} reallocations={validReallocations} />;
             })()}
               </Canvas3D>}
               
