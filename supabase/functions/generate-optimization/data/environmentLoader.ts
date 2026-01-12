@@ -6,9 +6,29 @@
  * 날씨, 휴일/이벤트, 시간대 데이터를 통합 로드하고
  * 정량적 영향도 계산을 수행합니다.
  *
- * @version 2.0.0
+ * 🆕 v2.1.0: 실시간 API 폴백 기능 추가
+ * - DB에 데이터 없을 시 OpenWeatherMap / data.go.kr 직접 호출
+ * - 자동 DB 저장으로 캐싱
+ *
+ * @version 2.1.0
  * @author NEURALTWIN AI Team
  */
+
+// ============================================================================
+// 🆕 실시간 API 설정
+// ============================================================================
+
+const WEATHER_API_CONFIG = {
+  enabled: true,
+  cacheMinutes: 30, // 30분 이내 데이터는 캐시 사용
+  defaultLat: 37.5665, // 서울 기본 좌표
+  defaultLon: 126.9780,
+};
+
+const HOLIDAYS_API_CONFIG = {
+  enabled: true,
+  cacheDays: 30, // 한 달 단위 캐시
+};
 
 // ============================================================================
 // 타입 정의
@@ -574,11 +594,246 @@ export function analyzeEventImpact(
 }
 
 // ============================================================================
+// 🆕 실시간 API 호출 함수
+// ============================================================================
+
+// OpenWeatherMap condition → DB weather_condition 매핑
+const WEATHER_CONDITION_MAP: Record<string, WeatherCondition> = {
+  'Clear': 'clear',
+  'Clouds': 'cloudy',
+  'Rain': 'rain',
+  'Drizzle': 'drizzle',
+  'Snow': 'snow',
+  'Thunderstorm': 'thunderstorm',
+  'Mist': 'mist',
+  'Fog': 'fog',
+  'Haze': 'haze',
+  'Smoke': 'haze',
+  'Dust': 'haze',
+};
+
+/**
+ * 매장 좌표 조회
+ */
+async function getStoreCoordinates(
+  supabase: any,
+  storeId: string
+): Promise<{ lat: number; lon: number } | null> {
+  try {
+    const { data, error } = await supabase
+      .from('stores')
+      .select('latitude, longitude, address')
+      .eq('id', storeId)
+      .single();
+
+    if (error || !data) {
+      console.log(`[environmentLoader] Store coordinates not found for ${storeId}`);
+      return null;
+    }
+
+    // 좌표가 있으면 사용
+    if (data.latitude && data.longitude) {
+      return { lat: data.latitude, lon: data.longitude };
+    }
+
+    return null;
+  } catch (e) {
+    console.error('[environmentLoader] Error fetching store coordinates:', e);
+    return null;
+  }
+}
+
+/**
+ * OpenWeatherMap API 직접 호출
+ */
+async function fetchWeatherFromAPI(
+  lat: number,
+  lon: number
+): Promise<WeatherData | null> {
+  try {
+    const apiKey = Deno.env.get('OPENWEATHERMAP_API_KEY');
+    if (!apiKey) {
+      console.log('[environmentLoader] OPENWEATHERMAP_API_KEY not set, skipping weather fetch');
+      return null;
+    }
+
+    const url = new URL('https://api.openweathermap.org/data/2.5/weather');
+    url.searchParams.set('lat', String(lat));
+    url.searchParams.set('lon', String(lon));
+    url.searchParams.set('appid', apiKey);
+    url.searchParams.set('units', 'metric');
+    url.searchParams.set('lang', 'kr');
+
+    console.log(`[environmentLoader] 🌤️ Fetching weather from API for (${lat}, ${lon})`);
+
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      console.error(`[environmentLoader] Weather API error: ${response.status}`);
+      return null;
+    }
+
+    const data = await response.json();
+    const rawCondition = data.weather?.[0]?.main || 'Clouds';
+    const condition = WEATHER_CONDITION_MAP[rawCondition] || 'unknown';
+
+    const weather: WeatherData = {
+      date: new Date().toISOString().split('T')[0],
+      condition,
+      temperature: data.main?.temp ?? 20,
+      humidity: data.main?.humidity ?? 50,
+      precipitation: data.rain?.['1h'] || data.rain?.['3h'] || 0,
+      windSpeed: data.wind?.speed ?? 0,
+    };
+
+    console.log(`[environmentLoader] ✅ Weather fetched: ${condition}, ${weather.temperature}°C`);
+    return weather;
+  } catch (e) {
+    console.error('[environmentLoader] Weather API exception:', e);
+    return null;
+  }
+}
+
+/**
+ * 날씨 데이터 DB 저장
+ */
+async function saveWeatherToDb(
+  supabase: any,
+  storeId: string,
+  weather: WeatherData
+): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('weather_data')
+      .upsert({
+        store_id: storeId,
+        date: weather.date,
+        weather_condition: weather.condition,
+        temperature: weather.temperature,
+        humidity: weather.humidity,
+        precipitation: weather.precipitation,
+        wind_speed: weather.windSpeed,
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'store_id,date',
+      });
+
+    if (error) {
+      console.error('[environmentLoader] Weather DB save error:', error.message);
+    } else {
+      console.log('[environmentLoader] 💾 Weather saved to DB');
+    }
+  } catch (e) {
+    console.error('[environmentLoader] Weather DB save exception:', e);
+  }
+}
+
+/**
+ * 공휴일 API 직접 호출 (data.go.kr)
+ */
+async function fetchHolidaysFromAPI(
+  year: number,
+  month: number
+): Promise<HolidayEvent[]> {
+  try {
+    const apiKey = Deno.env.get('DATA_GO_KR_API_KEY');
+    if (!apiKey) {
+      console.log('[environmentLoader] DATA_GO_KR_API_KEY not set, skipping holidays fetch');
+      return [];
+    }
+
+    const url = new URL('https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo');
+    url.searchParams.set('serviceKey', apiKey);
+    url.searchParams.set('solYear', String(year));
+    url.searchParams.set('solMonth', String(month).padStart(2, '0'));
+    url.searchParams.set('_type', 'json');
+
+    console.log(`[environmentLoader] 📅 Fetching holidays from API for ${year}-${month}`);
+
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      console.error(`[environmentLoader] Holidays API error: ${response.status}`);
+      return [];
+    }
+
+    const data = await response.json();
+    const items = data.response?.body?.items?.item;
+    const holidaysList = Array.isArray(items) ? items : items ? [items] : [];
+
+    const shoppingHolidays = ['설날', '추석', '크리스마스', '어린이날', '어버이날'];
+
+    const holidays: HolidayEvent[] = holidaysList.map((item: any) => {
+      const dateStr = String(item.locdate);
+      const formattedDate = `${dateStr.slice(0, 4)}-${dateStr.slice(4, 6)}-${dateStr.slice(6, 8)}`;
+      const isShoppingHoliday = shoppingHolidays.some(h => item.dateName?.includes(h));
+
+      return {
+        id: `holiday-${formattedDate}`,
+        date: formattedDate,
+        eventName: item.dateName,
+        eventType: 'holiday' as EventType,
+        impactLevel: isShoppingHoliday ? 'high' as ImpactLevel : 'medium' as ImpactLevel,
+        description: `공휴일: ${item.dateName}`,
+        multipliers: {
+          traffic: isShoppingHoliday ? 0.4 : 1.3,
+          dwell: 1.0,
+          conversion: isShoppingHoliday ? 0.9 : 1.05,
+          revenue: isShoppingHoliday ? 0.5 : 1.15,
+        },
+      };
+    });
+
+    console.log(`[environmentLoader] ✅ Holidays fetched: ${holidays.length} items`);
+    return holidays;
+  } catch (e) {
+    console.error('[environmentLoader] Holidays API exception:', e);
+    return [];
+  }
+}
+
+/**
+ * 공휴일 데이터 DB 저장
+ */
+async function saveHolidaysToDb(
+  supabase: any,
+  holidays: HolidayEvent[]
+): Promise<void> {
+  if (holidays.length === 0) return;
+
+  try {
+    const records = holidays.map(h => ({
+      date: h.date,
+      event_name: h.eventName,
+      event_type: h.eventType,
+      impact_level: h.impactLevel,
+      is_global: true,
+      description: h.description,
+      updated_at: new Date().toISOString(),
+    }));
+
+    const { error } = await supabase
+      .from('holidays_events')
+      .upsert(records, {
+        onConflict: 'date,event_name',
+      });
+
+    if (error) {
+      console.error('[environmentLoader] Holidays DB save error:', error.message);
+    } else {
+      console.log(`[environmentLoader] 💾 ${holidays.length} holidays saved to DB`);
+    }
+  } catch (e) {
+    console.error('[environmentLoader] Holidays DB save exception:', e);
+  }
+}
+
+// ============================================================================
 // 핵심 함수: 환경 데이터 통합 로딩
 // ============================================================================
 
 /**
  * 환경 데이터 통합 로딩 및 영향도 분석
+ *
+ * 🆕 v2.1: DB에 데이터 없으면 실시간 API 호출
  *
  * @param supabase - Supabase 클라이언트
  * @param storeId - 매장 ID
@@ -638,6 +893,7 @@ export async function loadEnvironmentDataBundle(
   // 날씨 데이터 파싱
   let weather: WeatherData | null = null;
   let weatherDataAge = 0;
+  let weatherFromApi = false;
 
   if (weatherResult.data && weatherResult.data.length > 0) {
     const w = weatherResult.data[0];
@@ -655,10 +911,45 @@ export async function loadEnvironmentDataBundle(
     weatherDataAge = Math.floor((now.getTime() - dataDate.getTime()) / (24 * 60 * 60 * 1000));
   }
 
-  // 이벤트 데이터 파싱
-  const events: HolidayEvent[] = (eventsResult.data || [])
-    .filter((e: any) => e.date === dateStr) // 정확히 오늘 날짜만
-    .map((e: any) => {
+  // 🆕 날씨 데이터 없으면 실시간 API 호출
+  if (!weather && WEATHER_API_CONFIG.enabled) {
+    console.log('[environmentLoader] No weather data in DB, fetching from API...');
+
+    // 매장 좌표 조회 또는 기본값 사용
+    const coords = await getStoreCoordinates(supabase, storeId);
+    const lat = coords?.lat ?? WEATHER_API_CONFIG.defaultLat;
+    const lon = coords?.lon ?? WEATHER_API_CONFIG.defaultLon;
+
+    weather = await fetchWeatherFromAPI(lat, lon);
+
+    if (weather) {
+      weatherFromApi = true;
+      // DB에 저장 (캐싱)
+      await saveWeatherToDb(supabase, storeId, weather);
+    }
+  }
+
+  // 🆕 공휴일 데이터 없으면 실시간 API 호출
+  let events: HolidayEvent[] = [];
+  let eventsFromApi = false;
+
+  const dbEvents = (eventsResult.data || [])
+    .filter((e: any) => e.date === dateStr);
+
+  if (dbEvents.length === 0 && HOLIDAYS_API_CONFIG.enabled) {
+    console.log('[environmentLoader] No holidays in DB, fetching from API...');
+
+    const apiHolidays = await fetchHolidaysFromAPI(kstNow.getFullYear(), kstNow.getMonth() + 1);
+
+    if (apiHolidays.length > 0) {
+      eventsFromApi = true;
+      // DB에 저장
+      await saveHolidaysToDb(supabase, apiHolidays);
+      // 오늘 날짜 필터
+      events = apiHolidays.filter(h => h.date === dateStr);
+    }
+  } else {
+    events = dbEvents.map((e: any) => {
       const eventKey = normalizeEventKey(e.event_name);
       const baseImpact = EVENT_IMPACT_MAP[eventKey] || EVENT_IMPACT_MAP.default;
       const impactLevel = (e.impact_level as ImpactLevel) || 'medium';
@@ -679,8 +970,9 @@ export async function loadEnvironmentDataBundle(
         },
       };
     });
+  }
 
-  console.log(`[environmentLoader] Loaded: weather=${!!weather}, events=${events.length}`);
+  console.log(`[environmentLoader] Loaded: weather=${!!weather}${weatherFromApi ? ' (API)' : ''}, events=${events.length}${eventsFromApi ? ' (API)' : ''}`);
 
   // 영향도 계산
   const weatherImpact = calculateWeatherImpact(weather);
