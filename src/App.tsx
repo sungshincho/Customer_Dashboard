@@ -22,7 +22,14 @@ import SettingsPage from "@/features/settings/SettingsPage";
 import { OnboardingWizard } from "@/features/onboarding/components/OnboardingWizard";
 import { useIsOnboardingComplete } from "@/hooks/useOnboarding";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // 탭 전환 시 자동 refetch 비활성화 - 세션 초기화 방지
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 // 온보딩 래퍼 컴포넌트 (Hook 사용을 위해 분리)
 function OnboardingWrapper({ children }: { children: React.ReactNode }) {
