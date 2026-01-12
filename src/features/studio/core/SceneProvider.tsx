@@ -268,6 +268,7 @@ const sceneReducer = (state: SceneState, action: SceneAction): SceneState => {
                   ...updatedModel.metadata,
                   movedBySimulation: true,
                   previousPosition: model.position,
+                  previousRotation: model.rotation, // 🔧 FIX: 회전값도 저장
                   simulationType: 'furniture_move',
                 },
               };
@@ -472,10 +473,13 @@ const sceneReducer = (state: SceneState, action: SceneAction): SceneState => {
           return {
             ...model,
             position: model.metadata.previousPosition as Vector3Tuple,
+            // 🔧 FIX: 회전값도 복원 (저장되어 있는 경우)
+            rotation: (model.metadata.previousRotation as Vector3Tuple) || model.rotation,
             metadata: {
               ...model.metadata,
               movedBySimulation: false,
               previousPosition: undefined,
+              previousRotation: undefined,
             },
           };
         }
