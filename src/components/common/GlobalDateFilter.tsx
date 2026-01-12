@@ -160,7 +160,7 @@ export function GlobalDateFilter({
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="end">
             <div className="p-3 border-b flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-black dark:text-white">
                 {tempRange?.from && !tempRange?.to
                   ? '종료일을 선택하세요'
                   : '날짜 범위 선택'}
@@ -169,14 +169,15 @@ export function GlobalDateFilter({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-6 px-2 text-xs"
+                  className="h-6 px-2 text-xs text-black dark:text-white"
                   onClick={handleReset}
                 >
                   초기화
                 </Button>
                 <Button
+                  variant="ghost"
                   size="sm"
-                  className="h-6 px-2 text-xs"
+                  className="h-6 px-2 text-xs text-black dark:text-white"
                   onClick={handleApply}
                   disabled={!tempRange?.from || !tempRange?.to}
                 >
