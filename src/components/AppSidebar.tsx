@@ -114,33 +114,48 @@ export function AppSidebar() {
                 const active = isActive(item.url);
                 return (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild className="h-[60px] py-0">
+                    <SidebarMenuButton asChild className={collapsed ? "h-auto py-2" : "h-auto py-3"}>
                       <NavLink
                         to={item.url}
-                        className={`hover:bg-muted/50 dark:hover:bg-white/10 rounded-lg transition-colors h-full ${
+                        className={`hover:bg-muted/50 dark:hover:bg-white/10 rounded-lg transition-colors ${
                           active && !collapsed ? 'bg-primary/10 dark:bg-white/10 border-l-4 border-primary dark:border-white' : ''
                         } ${collapsed ? 'flex items-center justify-center' : ''}`}
                         activeClassName={!collapsed ? "bg-primary/10 dark:bg-white/10 text-primary dark:text-white font-medium" : ""}
                       >
-                        <div className={`flex items-center h-full ${collapsed ? 'justify-center' : 'gap-3'}`}>
+                        <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}>
                           {collapsed ? (
                             <div
-                              className="w-10 h-10 rounded-xl flex items-center justify-center relative"
+                              className="w-10 h-10 rounded-2xl flex items-center justify-center relative"
                               style={active ? {
                                 background: 'linear-gradient(145deg, #2f2f38 0%, #1c1c22 35%, #282830 65%, #1e1e26 100%)',
-                                boxShadow: '0 2px 4px rgba(0,0,0,0.18), 0 4px 8px rgba(0,0,0,0.16), inset 0 1px 1px rgba(255,255,255,0.12)',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.18), 0 4px 8px rgba(0,0,0,0.16), 0 8px 16px rgba(0,0,0,0.12), 0 16px 32px rgba(0,0,0,0.08), inset 0 1px 1px rgba(255,255,255,0.12)',
                                 border: '1px solid rgba(255,255,255,0.1)',
                               } : {
                                 background: 'linear-gradient(145deg, #e8e8ec 0%, #d8d8dc 35%, #e0e0e4 65%, #d4d4d8 100%)',
-                                boxShadow: '0 2px 4px rgba(0,0,0,0.08), 0 4px 8px rgba(0,0,0,0.06), inset 0 1px 1px rgba(255,255,255,0.8)',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.08), 0 4px 8px rgba(0,0,0,0.06), 0 8px 16px rgba(0,0,0,0.04), inset 0 1px 1px rgba(255,255,255,0.8)',
                                 border: '1px solid rgba(0,0,0,0.08)',
                               }}
                             >
+                              {/* Chrome highlight */}
+                              <div
+                                className="absolute"
+                                style={{
+                                  top: '2px',
+                                  left: '18%',
+                                  right: '18%',
+                                  height: '1px',
+                                  background: active
+                                    ? 'linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent)'
+                                    : 'linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent)',
+                                }}
+                              />
                               <item.icon
                                 className="h-5 w-5"
-                                style={{
-                                  color: active ? '#ffffff' : '#6b6b73',
-                                  filter: active ? 'drop-shadow(0 1px 2px rgba(0,0,0,0.4))' : 'none'
+                                style={active ? {
+                                  color: '#ffffff',
+                                  filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.4))',
+                                } : {
+                                  color: '#6b6b73',
                                 }}
                               />
                             </div>
