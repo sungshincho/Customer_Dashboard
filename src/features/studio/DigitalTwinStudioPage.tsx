@@ -117,7 +117,8 @@ export default function DigitalTwinStudioPage() {
     saveScene,
     deleteScene,
     setActiveScene,
-    clearActiveScene  // 🆕 추가
+    clearActiveScene,
+    renameScene  // 🆕 추가
   } = useScenePersistence({
     userId: user?.id,
     storeId: selectedStore?.id
@@ -1514,6 +1515,7 @@ export default function DigitalTwinStudioPage() {
                   saveScene={saveScene}
                   setActiveScene={setActiveScene}
                   deleteScene={deleteScene}
+                  renameScene={renameScene}
                   onNew={handleNewScene}
                   onReset={handleResetScene}
                   maxScenes={3}
@@ -1848,6 +1850,7 @@ interface SceneSavePanelWrapperProps {
   saveScene: (recipe: SceneRecipe, name: string, sceneId?: string) => Promise<void>;
   setActiveScene: (id: string) => void;
   deleteScene: (id: string) => Promise<void>;
+  renameScene: (id: string, newName: string) => Promise<void>;  // 🆕 추가
   onNew: () => void;
   onReset: () => void;
   maxScenes: number;
@@ -1866,6 +1869,7 @@ function SceneSavePanelWrapper({
   saveScene,
   setActiveScene,
   deleteScene,
+  renameScene,  // 🆕 추가
   onNew,
   onReset,
   maxScenes,
@@ -2018,6 +2022,7 @@ function SceneSavePanelWrapper({
       onSave={handleSave}
       onLoad={(id) => setActiveScene(id)}
       onDelete={(id) => deleteScene(id)}
+      onRename={(id, newName) => renameScene(id, newName)}  // 🆕 추가
       onNew={onNew}
       onReset={onReset}
       maxScenes={maxScenes}
