@@ -148,13 +148,39 @@ export function useScenePersistence(options: UseScenePersistenceOptions = {}) {
 
         if (error) throw error;
 
-        await loadScenes();
+        // 🔧 FIX: 목록 다시 로드 후 활성 씬 즉시 설정
+        const { data } = await supabase
+          .from('store_scenes')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('store_id', storeId)
+          .order('updated_at', { ascending: false });
+
+        if (data) {
+          const mappedScenes: SavedScene[] = data.map((scene: any) => ({
+            id: scene.id,
+            name: scene.scene_name,
+            recipe_data: scene.recipe_data,
+            thumbnail: undefined,
+            is_active: scene.is_active,
+            created_at: scene.created_at,
+            updated_at: scene.updated_at,
+          }));
+          
+          setScenes(mappedScenes);
+          
+          // 선택한 씬을 activeScene으로 설정 (새 객체 참조 생성)
+          const selectedScene = mappedScenes.find(s => s.id === sceneId);
+          if (selectedScene) {
+            setActiveSceneState({ ...selectedScene });
+          }
+        }
       } catch (error) {
         console.error('Failed to set active scene:', error);
         toast.error('씬 활성화에 실패했습니다');
       }
     },
-    [userId, storeId, loadScenes]
+    [userId, storeId]
   );
 
   // 초기 로드
