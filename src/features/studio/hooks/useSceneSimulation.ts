@@ -558,6 +558,16 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
             })) || [],
             summary: mainResult?.summary || {},
             confidence: mainResult?.summary?.expected_revenue_improvement || 0,
+            // 🔧 FIX: ToBeSceneGenerator가 필요로 하는 필드 추가
+            currentEfficiency: 0,
+            optimizedEfficiency: mainResult?.summary?.expected_revenue_improvement || 0,
+            improvements: {
+              revenueIncrease: mainResult?.summary?.expected_revenue_improvement || 0,
+              revenueIncreasePercent: (mainResult?.summary?.expected_revenue_improvement || 0) * 100,
+              dwellTimeIncrease: 0,
+              conversionIncrease: mainResult?.summary?.expected_conversion_improvement || 0,
+              trafficIncrease: mainResult?.summary?.expected_traffic_improvement || 0,
+            },
           };
           console.log('[useSceneSimulation] Layout extracted:', {
             furnitureMovesCount: results.layout.furnitureMoves?.length || 0,
@@ -585,6 +595,12 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
               deadZoneCount: flowSummary?.dead_zone_count || 0,
               conversionRate: flowSummary?.overall_conversion_rate || 0,
             },
+            // 🔧 FIX: ToBeSceneGenerator가 필요로 하는 필드 추가
+            comparison: {
+              congestionReduction: flowSummary?.congestion_reduction || 0,
+              pathLengthReduction: flowSummary?.path_length_reduction || 0,
+            },
+            optimizations: flowSummary?.optimizations || [],
           };
           console.log('[useSceneSimulation] Flow extracted:', {
             zoneFlowArrowsCount: results.flow.visualization?.zoneFlowArrows?.length || 0,
