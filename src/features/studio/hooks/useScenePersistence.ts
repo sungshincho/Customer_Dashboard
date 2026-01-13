@@ -205,6 +205,26 @@ export function useScenePersistence(options: UseScenePersistenceOptions = {}) {
     }
   }, [userId, storeId, loadScenes]);
 
+  // 🆕 씬 이름 변경
+  const renameScene = useCallback(
+    async (sceneId: string, newName: string) => {
+      try {
+        const { error } = await supabase
+          .from('store_scenes')
+          .update({ scene_name: newName })
+          .eq('id', sceneId);
+
+        if (error) throw error;
+        toast.success('씬 이름이 변경되었습니다');
+        await loadScenes(true);  // 목록만 갱신
+      } catch (error) {
+        console.error('Failed to rename scene:', error);
+        toast.error('씬 이름 변경에 실패했습니다');
+      }
+    },
+    [loadScenes]
+  );
+
   // 초기 로드
   useEffect(() => {
     loadScenes();
@@ -219,7 +239,8 @@ export function useScenePersistence(options: UseScenePersistenceOptions = {}) {
     saveScene,
     deleteScene,
     setActiveScene,
-    clearActiveScene,  // 🆕 추가
+    clearActiveScene,
+    renameScene,  // 🆕 추가
   };
 }
 
