@@ -79,7 +79,7 @@ export function generateLayoutOptimizedScene(
   const toBe: SceneRecipe = deepClone(asIsScene);
 
   // 1️⃣ 가구 이동 적용
-  layoutResult.furnitureMoves.forEach((move) => {
+  (layoutResult.furnitureMoves || []).forEach((move) => {
     const furnitureIdx = toBe.furniture.findIndex(
       (f) => f.id === move.furnitureId || f.furniture_type === move.furnitureName
     );
@@ -255,7 +255,7 @@ export function generateFlowOptimizedScene(
   const toBe: SceneRecipe = deepClone(asIsScene);
 
   // 병목 지점 기반 가구 재배치
-  flowResult.bottlenecks.forEach((bottleneck, idx) => {
+  (flowResult.bottlenecks || []).forEach((bottleneck, idx) => {
     // bottleneck.position이 없으면 스킵
     if (!bottleneck?.position) return;
     
@@ -289,24 +289,24 @@ export function generateFlowOptimizedScene(
         assetName: furniture.furniture_type,
         before: { position: beforePosition },
         after: { position: furniture.position },
-        reason: `병목 해소: ${bottleneck.zoneName}`,
-        impact: `-${(bottleneck.avgWaitTime * 0.5).toFixed(0)}초 대기시간`,
+        reason: `병목 해소: ${bottleneck.zoneName || '알 수 없음'}`,
+        impact: `-${((bottleneck.avgWaitTime || 0) * 0.5).toFixed(0)}초 대기시간`,
       });
     });
   });
 
   // 최적화 제안 기반 변경
-  flowResult.optimizations.forEach((opt) => {
+  (flowResult.optimizations || []).forEach((opt) => {
     if (opt.type === 'layout_change') {
       changes.push({
         id: `opt-${opt.id}`,
         type: 'modify',
         assetType: 'zone',
         assetId: opt.id,
-        assetName: opt.description,
+        assetName: opt.description || '',
         after: { position: opt.location },
-        reason: opt.description,
-        impact: `+${opt.expectedImprovement.toFixed(0)}% 개선`,
+        reason: opt.description || '',
+        impact: `+${(opt.expectedImprovement || 0).toFixed(0)}% 개선`,
       });
     }
   });
@@ -316,9 +316,9 @@ export function generateFlowOptimizedScene(
     furnitureMoves: changes.filter((c) => c.type === 'move').length,
     productChanges: 0,
     expectedImpact: {
-      efficiency: flowResult.comparison.congestionReduction,
+      efficiency: flowResult.comparison?.congestionReduction || 0,
       revenue: 0,
-      traffic: flowResult.comparison.pathLengthReduction,
+      traffic: flowResult.comparison?.pathLengthReduction || 0,
     },
   };
 
@@ -343,17 +343,17 @@ export function generateStaffingOptimizedScene(
 
   // 인력 배치는 가구/상품 이동이 아니라 마커 위치이므로
   // 씬 자체는 변경하지 않고 변경 사항만 기록
-  staffingResult.staffPositions.forEach((staff) => {
+  (staffingResult.staffPositions || []).forEach((staff) => {
     changes.push({
       id: `staff-${staff.staffId}`,
       type: 'move',
       assetType: 'zone', // 특수 타입으로 처리
       assetId: staff.staffId,
-      assetName: staff.staffName,
+      assetName: staff.staffName || '',
       before: { position: staff.currentPosition },
       after: { position: staff.suggestedPosition },
       reason: `커버리지 최적화`,
-      impact: `+${staff.coverageGain.toFixed(1)}% 커버리지`,
+      impact: `+${(staff.coverageGain || 0).toFixed(1)}% 커버리지`,
     });
   });
 
@@ -362,9 +362,9 @@ export function generateStaffingOptimizedScene(
     furnitureMoves: 0,
     productChanges: 0,
     expectedImpact: {
-      efficiency: staffingResult.metrics.coverageGain,
+      efficiency: staffingResult.metrics?.coverageGain || 0,
       revenue: 0,
-      traffic: staffingResult.metrics.customerServiceRateIncrease,
+      traffic: staffingResult.metrics?.customerServiceRateIncrease || 0,
     },
   };
 
