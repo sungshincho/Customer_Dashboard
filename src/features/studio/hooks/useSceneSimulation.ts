@@ -161,10 +161,24 @@ async function extractAvailableSlots(
 }
 
 // 타입 별칭 (기존 코드와 호환성 유지)
-type LayoutSimulationResult = LayoutSimulationResultType;
+type LayoutSimulationResult = LayoutSimulationResultType & {
+  // 서버/Edge 응답에서 snake_case/camelCase 변형이 올 수 있어 선택적으로 허용
+  furniture_changes?: any[];
+  furniture_moves?: any[];
+  furnitureMoves?: any[];
+  layoutChanges?: any[];
+  product_changes?: any[];
+  product_moves?: any[];
+};
+
 type FlowSimulationResult = FlowSimulationResultType;
+
 type CongestionSimulationResult = CongestionSimulationResultType;
-type StaffingSimulationResult = StaffingSimulationResultType;
+
+type StaffingSimulationResult = StaffingSimulationResultType & {
+  staffPositions?: any[];
+  visualization?: any;
+};
 
 // ============================================================================
 // 타입 정의

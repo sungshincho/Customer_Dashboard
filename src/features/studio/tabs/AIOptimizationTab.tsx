@@ -625,10 +625,11 @@ export function AIOptimizationTab({
         
       } else if (newMode === 'to-be') {
         // To-Be: 최적화 위치 적용
-        const rawFurnitureMoves = results.layout?.layoutChanges || 
-                                  results.layout?.furnitureMoves ||
-                                  results.layout?.furniture_changes ||
-                                  results.layout?.furniture_moves || [];
+        const layoutAny = results.layout as any;
+        const rawFurnitureMoves = layoutAny?.layoutChanges ||
+                                  layoutAny?.furnitureMoves ||
+                                  layoutAny?.furniture_changes ||
+                                  layoutAny?.furniture_moves || [];
         
         if (rawFurnitureMoves.length > 0) {
           const payload = {

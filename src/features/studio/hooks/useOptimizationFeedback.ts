@@ -85,10 +85,13 @@ export function useOptimizationFeedback({
   const [reasonCodes, setReasonCodes] = useState<FeedbackReasonCode[]>([]);
   const [feedbackStats, setFeedbackStats] = useState<FeedbackStats | null>(null);
 
+  // Supabase 타입 정의가 일부 테이블을 포함하지 않을 수 있어, 이 훅에서는 런타임 동작을 유지하며 타입만 완화
+  const sb = supabase as any;
+
   // 사유 코드 로드
   const loadReasonCodes = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await sb
         .from('feedback_reason_codes')
         .select('*')
         .eq('is_active', true)
@@ -96,7 +99,7 @@ export function useOptimizationFeedback({
 
       if (error) throw error;
 
-      setReasonCodes(data || []);
+      setReasonCodes((data || []) as FeedbackReasonCode[]);
     } catch (err) {
       console.error('[useOptimizationFeedback] Failed to load reason codes:', err);
     }
@@ -106,7 +109,7 @@ export function useOptimizationFeedback({
   const loadFeedbackStats = useCallback(async () => {
     try {
       // store_personas 테이블에서 통계 조회
-      const { data, error } = await supabase
+      const { data, error } = await sb
         .from('store_personas')
         .select('feedback_stats')
         .eq('store_id', storeId)
@@ -146,7 +149,7 @@ export function useOptimizationFeedback({
 
     try {
       // 1. optimization_feedback 테이블에 저장
-      const { error: feedbackError } = await supabase
+      const { error: feedbackError } = await sb
         .from('optimization_feedback')
         .insert({
           store_id: storeId,
@@ -170,7 +173,7 @@ export function useOptimizationFeedback({
 
       // 2. strategy_feedback 테이블에도 저장 (레거시 호환 + 학습 시스템 연동)
       if (feedback.targetType === 'overall') {
-        const { error: strategyError } = await supabase
+        const { error: strategyError } = await sb
           .from('strategy_feedback')
           .insert({
             org_id: await getOrgIdForStore(storeId),
@@ -202,16 +205,16 @@ export function useOptimizationFeedback({
           modify: 'partial',
         };
 
-        const { error: updateError } = await supabase
-          .from('layout_optimization_results')
-          .update({
-            status: statusMap[feedback.action],
-            feedback_action: feedback.action,
-            feedback_reason: feedback.reasonCode,
-            feedback_note: feedback.reasonText,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', feedback.optimizationId);
+         const { error: updateError } = await sb
+           .from('layout_optimization_results')
+           .update({
+             status: statusMap[feedback.action],
+             feedback_action: feedback.action,
+             feedback_reason: feedback.reasonCode,
+             feedback_note: feedback.reasonText,
+             updated_at: new Date().toISOString(),
+           })
+           .eq('id', feedback.optimizationId);
 
         if (updateError) {
           console.warn('[submitFeedback] layout_optimization_results update failed:', updateError);
@@ -252,7 +255,7 @@ export function useOptimizationFeedback({
         feedback_by: userId || 'anonymous',
       }));
 
-      const { error } = await supabase
+      const { error } = await sb
         .from('optimization_feedback')
         .insert(feedbackRecords);
 
@@ -298,7 +301,7 @@ export function useOptimizationFeedback({
 // ============================================================================
 
 async function getOrgIdForStore(storeId: string): Promise<string> {
-  const { data } = await supabase
+  const { data } = await (supabase as any)
     .from('stores')
     .select('org_id')
     .eq('id', storeId)

@@ -1072,10 +1072,8 @@ export default function DigitalTwinStudioPage() {
         setActiveLayers(loadedModels.map(m => m.id));
       }
       
-      // 시뮬레이션 상태 초기화
-      if (sceneSimulation?.reset) {
-        sceneSimulation.reset();
-      }
+      // 시뮬레이션 상태 초기화 (존재하는 경우에만)
+      (sceneSimulation as any)?.reset?.();
       
       // 씬 이름 초기화
       setSceneName('');
@@ -1975,7 +1973,7 @@ function SceneSavePanelWrapper({
       furniture: furnitureList,
       products: productsList,
       lighting: lightingPreset,
-      camera: { position: { x: 10, y: 10, z: 15 }, target: { x: 0, y: 0, z: 0 } }
+      camera: { position: { x: 10, y: 10, z: 15 }, target: { x: 0, y: 0, z: 0 }, fov: 50 }
     };
   }, [sceneModels, activeLayers]);
 
