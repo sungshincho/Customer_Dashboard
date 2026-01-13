@@ -18,6 +18,48 @@ const corsHeaders = {
 
 // ===== 타입 정의 =====
 
+// 🆕 Graph Layer 연동 타입 (Phase 3: Simulation-Graph 연결)
+interface GraphEntity {
+  id: string;
+  entity_type_id: string;
+  label: string;
+  properties: Record<string, any>;
+  entity_type?: {
+    name: string;
+    category: string;
+  };
+}
+
+interface GraphRelation {
+  id: string;
+  relation_type_id: string;
+  source_entity_id: string;
+  target_entity_id: string;
+  weight: number;
+  properties?: Record<string, any>;
+  relation_type?: {
+    name: string;
+  };
+}
+
+interface GraphContext {
+  entities: GraphEntity[];
+  relations: GraphRelation[];
+  zone_entities: GraphEntity[];      // Zone 엔티티만 필터링
+  product_entities: GraphEntity[];   // Product 엔티티만 필터링
+  customer_entities: GraphEntity[];  // Customer 엔티티만 필터링
+  zone_relations: {                   // Zone 간 관계 요약
+    from_zone: string;
+    to_zone: string;
+    relation_type: string;
+    weight: number;
+  }[];
+  entity_summary: {
+    total_entities: number;
+    by_type: Record<string, number>;
+  };
+}
+
 // 🆕 환경/시나리오 컨텍스트 타입 (파인튜닝 데이터셋용)
 interface EnvironmentContext {
   weather?: string;
@@ -84,6 +126,21 @@ interface ZoneAnalysis {
   bottleneck_score: number;
 }
 
+// Graph 기반 최적화 추천 (Phase 3)
+interface GraphRecommendation {
+  id: string;
+  type: 'layout' | 'product_placement' | 'staffing' | 'flow_optimization' | 'zone_connection';
+  priority: 'high' | 'medium' | 'low';
+  title: string;
+  description: string;
+  affected_zones: string[];
+  expected_impact: {
+    metric: string;
+    improvement_percent: number;
+  };
+  implementation_steps: string[];
+}
+
 interface SimulationResult {
   simulation_id: string;
   timestamp: string;
@@ -123,6 +180,8 @@ interface SimulationResult {
   }[];
   ai_insights: string[];
   confidence_score: number;
+  // Phase 3: Graph 기반 추천
+  graph_recommendations?: GraphRecommendation[];
 }
 
 // ===== 메인 핸들러 =====
@@ -196,7 +255,40 @@ Deno.serve(async (req: Request) => {
       .eq('store_id', store_id)
       .gte('kpi_date', dateStr);
 
-    console.log(`[Simulation] 데이터 로드: zones=${zones?.length || 0}, transitions=${transitions?.length || 0}`);
+    // ===== 1-B. Graph Layer 데이터 로드 (Phase 3: Simulation-Graph 연결) =====
+    const { data: graphEntities } = await supabaseClient
+      .from('graph_entities')
+      .select(`
+        id,
+        entity_type_id,
+        label,
+        properties,
+        ontology_entity_types (
+          name,
+          category
+        )
+      `)
+      .eq('store_id', store_id);
+
+    const { data: graphRelations } = await supabaseClient
+      .from('graph_relations')
+      .select(`
+        id,
+        relation_type_id,
+        source_entity_id,
+        target_entity_id,
+        weight,
+        properties,
+        ontology_relation_types (
+          name
+        )
+      `)
+      .eq('store_id', store_id);
+
+    // Graph 컨텍스트 구성
+    const graphContext = buildGraphContext(graphEntities || [], graphRelations || []);
+
+    console.log(`[Simulation] 데이터 로드: zones=${zones?.length || 0}, transitions=${transitions?.length || 0}, graph_entities=${graphEntities?.length || 0}, graph_relations=${graphRelations?.length || 0}`);
 
     // ===== 2. 분석 컨텍스트 구성 =====
     const analysisContext = buildAnalysisContext({
@@ -206,6 +298,7 @@ Deno.serve(async (req: Request) => {
       zoneMetrics: zoneMetrics || [],
       dailyKpis: dailyKpis || [],
       options,
+      graphContext,  // Phase 3: Graph 컨텍스트 추가
     });
 
     // ===== 3. AI 추론 또는 규칙 기반 시뮬레이션 =====
@@ -230,6 +323,16 @@ Deno.serve(async (req: Request) => {
       simulationResult.kpis
     );
 
+    // ===== 4-B. Graph 기반 최적화 추천 생성 (Phase 3) =====
+    if (graphContext.entity_summary.total_entities > 0) {
+      simulationResult.graph_recommendations = generateGraphRecommendations(
+        graphContext,
+        simulationResult.zone_analysis,
+        simulationResult.flow_analysis
+      );
+      console.log(`[Simulation] Graph 추천 ${simulationResult.graph_recommendations.length}개 생성`);
+    }
+
     // ===== 5. 결과 저장 (선택적) =====
     try {
       await supabaseClient
@@ -244,6 +347,20 @@ Deno.serve(async (req: Request) => {
         });
     } catch (saveError) {
       console.warn('[Simulation] 결과 저장 실패 (테이블 없음?):', saveError);
+    }
+
+    // ===== 5-B. 시뮬레이션 결과를 Graph에 반영 (Phase 3) =====
+    try {
+      await saveSimulationToGraph(
+        supabaseClient,
+        store_id,
+        userId,
+        simulationResult,
+        graphContext
+      );
+      console.log('[Simulation] Graph 반영 완료');
+    } catch (graphSaveError) {
+      console.warn('[Simulation] Graph 반영 실패 (무시):', graphSaveError);
     }
 
     console.log(`[Simulation] 완료: ${simulationResult.diagnostic_issues.length}개 이슈 발견`);
@@ -398,9 +515,474 @@ Deno.serve(async (req: Request) => {
   }
 });
 
+// ===== Graph 컨텍스트 구성 (Phase 3: Simulation-Graph 연결) =====
+function buildGraphContext(entities: any[], relations: any[]): GraphContext {
+  // 엔티티 타입별 분류
+  const entityMap = new Map<string, GraphEntity>();
+  const byType: Record<string, number> = {};
+
+  const processedEntities: GraphEntity[] = entities.map((e: any) => {
+    const typeName = e.ontology_entity_types?.name || 'unknown';
+    byType[typeName] = (byType[typeName] || 0) + 1;
+
+    const entity: GraphEntity = {
+      id: e.id,
+      entity_type_id: e.entity_type_id,
+      label: e.label,
+      properties: e.properties || {},
+      entity_type: e.ontology_entity_types ? {
+        name: e.ontology_entity_types.name,
+        category: e.ontology_entity_types.category,
+      } : undefined,
+    };
+    entityMap.set(e.id, entity);
+    return entity;
+  });
+
+  // Zone/Product/Customer 엔티티 필터링
+  const zone_entities = processedEntities.filter(
+    (e) => e.entity_type?.name?.toLowerCase().includes('zone') ||
+           e.entity_type?.category?.toLowerCase() === 'space'
+  );
+
+  const product_entities = processedEntities.filter(
+    (e) => e.entity_type?.name?.toLowerCase().includes('product') ||
+           e.entity_type?.category?.toLowerCase() === 'product'
+  );
+
+  const customer_entities = processedEntities.filter(
+    (e) => e.entity_type?.name?.toLowerCase().includes('customer') ||
+           e.entity_type?.category?.toLowerCase() === 'customer'
+  );
+
+  // 관계 처리
+  const processedRelations: GraphRelation[] = relations.map((r: any) => ({
+    id: r.id,
+    relation_type_id: r.relation_type_id,
+    source_entity_id: r.source_entity_id,
+    target_entity_id: r.target_entity_id,
+    weight: r.weight || 1.0,
+    properties: r.properties || {},
+    relation_type: r.ontology_relation_types ? {
+      name: r.ontology_relation_types.name,
+    } : undefined,
+  }));
+
+  // Zone 간 관계 추출
+  const zoneEntityIds = new Set(zone_entities.map((z) => z.id));
+  const zone_relations = processedRelations
+    .filter((r) => zoneEntityIds.has(r.source_entity_id) && zoneEntityIds.has(r.target_entity_id))
+    .map((r) => {
+      const fromZone = entityMap.get(r.source_entity_id);
+      const toZone = entityMap.get(r.target_entity_id);
+      return {
+        from_zone: fromZone?.label || r.source_entity_id,
+        to_zone: toZone?.label || r.target_entity_id,
+        relation_type: r.relation_type?.name || 'connected_to',
+        weight: r.weight,
+      };
+    });
+
+  return {
+    entities: processedEntities,
+    relations: processedRelations,
+    zone_entities,
+    product_entities,
+    customer_entities,
+    zone_relations,
+    entity_summary: {
+      total_entities: processedEntities.length,
+      by_type: byType,
+    },
+  };
+}
+
+// ===== Graph 기반 최적화 추천 생성 (Phase 3) =====
+function generateGraphRecommendations(
+  graphContext: GraphContext,
+  zoneAnalysis: ZoneAnalysis[],
+  flowAnalysis: any
+): GraphRecommendation[] {
+  const recommendations: GraphRecommendation[] = [];
+  let recId = 0;
+
+  // 1. Zone 연결성 분석 - 고립된 Zone 개선
+  const connectedZones = new Set([
+    ...graphContext.zone_relations.map((r) => r.from_zone),
+    ...graphContext.zone_relations.map((r) => r.to_zone),
+  ]);
+  const isolatedZones = graphContext.zone_entities.filter(
+    (z) => !connectedZones.has(z.label)
+  );
+
+  if (isolatedZones.length > 0) {
+    recommendations.push({
+      id: `rec-${++recId}`,
+      type: 'zone_connection',
+      priority: 'high',
+      title: '고립된 Zone 연결 개선',
+      description: `${isolatedZones.map((z) => z.label).join(', ')} Zone이 그래프에서 연결되지 않았습니다. 동선 분석 정확도를 위해 연결 관계를 추가하세요.`,
+      affected_zones: isolatedZones.map((z) => z.label),
+      expected_impact: {
+        metric: '동선 분석 정확도',
+        improvement_percent: 15,
+      },
+      implementation_steps: [
+        '고립된 Zone의 인접 Zone 파악',
+        'connected_to 또는 leads_to 관계 추가',
+        '동선 데이터 재수집 후 검증',
+      ],
+    });
+  }
+
+  // 2. 혼잡 구간 기반 레이아웃 최적화
+  const congestionPoints = zoneAnalysis.filter((za) => za.congestion_level > 70);
+  if (congestionPoints.length > 0) {
+    // Graph에서 해당 Zone의 연결 관계 분석
+    const highTrafficRelations = graphContext.zone_relations.filter(
+      (r) => congestionPoints.some((cp) => cp.zone_name === r.to_zone) && r.weight > 0.5
+    );
+
+    if (highTrafficRelations.length > 0) {
+      recommendations.push({
+        id: `rec-${++recId}`,
+        type: 'layout',
+        priority: 'high',
+        title: '혼잡 구간 레이아웃 최적화',
+        description: `${congestionPoints.map((cp) => cp.zone_name).join(', ')}에 트래픽이 집중됩니다. 인접 Zone으로 트래픽을 분산시키세요.`,
+        affected_zones: congestionPoints.map((cp) => cp.zone_name),
+        expected_impact: {
+          metric: '피크 혼잡도',
+          improvement_percent: 20,
+        },
+        implementation_steps: [
+          '혼잡 Zone의 가구/집기 배치 재검토',
+          '대체 동선 유도 사이니지 설치',
+          '인기 상품을 인접 Zone으로 분산 배치',
+        ],
+      });
+    }
+  }
+
+  // 3. Dead Zone 활성화 추천
+  if (flowAnalysis.dead_zones && flowAnalysis.dead_zones.length > 0) {
+    // Graph에서 dead zone과 연결된 Zone 분석
+    const deadZoneConnections = graphContext.zone_relations.filter(
+      (r) => flowAnalysis.dead_zones.includes(r.to_zone) || flowAnalysis.dead_zones.includes(r.from_zone)
+    );
+
+    recommendations.push({
+      id: `rec-${++recId}`,
+      type: 'flow_optimization',
+      priority: 'medium',
+      title: 'Dead Zone 활성화',
+      description: `${flowAnalysis.dead_zones.join(', ')} Zone의 방문율이 낮습니다. 동선 유도를 통해 방문율을 높이세요.`,
+      affected_zones: flowAnalysis.dead_zones,
+      expected_impact: {
+        metric: 'Zone 방문율',
+        improvement_percent: 30,
+      },
+      implementation_steps: [
+        '주요 동선에서 Dead Zone으로의 시각적 연결 강화',
+        '프로모션 상품 또는 체험 요소 배치',
+        deadZoneConnections.length > 0
+          ? `연결된 Zone(${[...new Set(deadZoneConnections.map((r) => r.from_zone))].join(', ')})에서 유도 배치`
+          : '인접 Zone과의 연결 동선 생성',
+      ],
+    });
+  }
+
+  // 4. Product-Zone 관계 기반 상품 배치 추천
+  if (graphContext.product_entities.length > 0 && graphContext.zone_entities.length > 0) {
+    // 상품이 없는 고트래픽 Zone 찾기
+    const highTrafficZones = zoneAnalysis
+      .filter((za) => za.visitor_count > 50 && za.conversion_contribution < 10)
+      .map((za) => za.zone_name);
+
+    if (highTrafficZones.length > 0) {
+      recommendations.push({
+        id: `rec-${++recId}`,
+        type: 'product_placement',
+        priority: 'medium',
+        title: '고트래픽 Zone 상품 배치 최적화',
+        description: `${highTrafficZones.join(', ')}은 방문자가 많지만 전환 기여도가 낮습니다. 전략 상품 배치를 고려하세요.`,
+        affected_zones: highTrafficZones,
+        expected_impact: {
+          metric: '전환율',
+          improvement_percent: 10,
+        },
+        implementation_steps: [
+          '고트래픽 Zone에 베스트셀러 상품 배치',
+          '충동구매 유발 상품 디스플레이 추가',
+          '시선 유도형 POP 설치',
+        ],
+      });
+    }
+  }
+
+  // 5. 직원 배치 추천 (혼잡도 + 체류시간 기반)
+  const staffingNeededZones = zoneAnalysis.filter(
+    (za) => za.congestion_level > 60 && za.avg_dwell_seconds > 120
+  );
+
+  if (staffingNeededZones.length > 0) {
+    recommendations.push({
+      id: `rec-${++recId}`,
+      type: 'staffing',
+      priority: 'high',
+      title: '피크 시간대 직원 배치 최적화',
+      description: `${staffingNeededZones.map((z) => z.zone_name).join(', ')}에서 혼잡도와 체류시간이 높습니다. 추가 직원 배치를 고려하세요.`,
+      affected_zones: staffingNeededZones.map((z) => z.zone_name),
+      expected_impact: {
+        metric: '고객 만족도',
+        improvement_percent: 15,
+      },
+      implementation_steps: [
+        '피크 시간대(오후 2-6시) 해당 Zone 직원 증원',
+        '빠른 응대를 위한 모바일 POS 도입 고려',
+        '고객 대기열 관리 시스템 도입',
+      ],
+    });
+  }
+
+  // 우선순위별 정렬
+  const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+  recommendations.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+
+  return recommendations;
+}
+
+// ===== 시뮬레이션 결과를 Graph에 반영 (Phase 3) =====
+async function saveSimulationToGraph(
+  supabase: any,
+  storeId: string,
+  userId: string | null,
+  result: SimulationResult,
+  graphContext: GraphContext
+): Promise<void> {
+  if (!userId) {
+    console.log('[Graph] userId 없음, Graph 반영 스킵');
+    return;
+  }
+
+  // 1. SimulationEvent 엔티티 타입 조회 (또는 생성)
+  let simulationEventTypeId: string | null = null;
+
+  const { data: existingType } = await supabase
+    .from('ontology_entity_types')
+    .select('id')
+    .eq('name', 'SimulationEvent')
+    .or(`and(org_id.is.null,user_id.is.null),user_id.eq.${userId}`)
+    .limit(1)
+    .single();
+
+  if (existingType) {
+    simulationEventTypeId = existingType.id;
+  } else {
+    // SimulationEvent 타입이 없으면 생성
+    const { data: newType, error: typeError } = await supabase
+      .from('ontology_entity_types')
+      .insert({
+        name: 'SimulationEvent',
+        category: 'event',
+        description: '시뮬레이션 실행 이벤트',
+        user_id: userId,
+        properties_schema: {
+          simulation_id: { type: 'string' },
+          simulation_type: { type: 'string' },
+          predicted_visitors: { type: 'number' },
+          predicted_revenue: { type: 'number' },
+          confidence_score: { type: 'number' },
+          issue_count: { type: 'number' },
+        },
+      })
+      .select('id')
+      .single();
+
+    if (typeError) {
+      console.warn('[Graph] SimulationEvent 타입 생성 실패:', typeError.message);
+      return;
+    }
+    simulationEventTypeId = newType.id;
+  }
+
+  // 2. 시뮬레이션 이벤트 엔티티 생성
+  const simulationEntity = {
+    user_id: userId,
+    store_id: storeId,
+    entity_type_id: simulationEventTypeId,
+    label: `Simulation_${result.simulation_id}`,
+    properties: {
+      simulation_id: result.simulation_id,
+      timestamp: result.timestamp,
+      duration_minutes: result.duration_minutes,
+      predicted_visitors: result.kpis.predicted_visitors,
+      predicted_conversion_rate: result.kpis.predicted_conversion_rate,
+      predicted_revenue: result.kpis.predicted_revenue,
+      peak_congestion_percent: result.kpis.peak_congestion_percent,
+      confidence_score: result.confidence_score,
+      issue_count: result.diagnostic_issues.length,
+      critical_issues: result.diagnostic_issues.filter((i) => i.severity === 'critical').length,
+      ai_insights: result.ai_insights,
+    },
+  };
+
+  const { data: createdEntity, error: entityError } = await supabase
+    .from('graph_entities')
+    .insert(simulationEntity)
+    .select('id')
+    .single();
+
+  if (entityError) {
+    console.warn('[Graph] SimulationEvent 엔티티 생성 실패:', entityError.message);
+    return;
+  }
+
+  console.log(`[Graph] SimulationEvent 엔티티 생성: ${createdEntity.id}`);
+
+  // 3. Zone 엔티티와 관계 생성 (시뮬레이션이 분석한 Zone들)
+  if (graphContext.zone_entities.length > 0) {
+    // 'analyzed_by' 관계 타입 조회
+    let analyzedByTypeId: string | null = null;
+
+    const { data: relType } = await supabase
+      .from('ontology_relation_types')
+      .select('id')
+      .eq('name', 'analyzed_by')
+      .or(`and(org_id.is.null,user_id.is.null),user_id.eq.${userId}`)
+      .limit(1)
+      .single();
+
+    if (relType) {
+      analyzedByTypeId = relType.id;
+    } else {
+      // 관계 타입 생성
+      const { data: newRelType } = await supabase
+        .from('ontology_relation_types')
+        .insert({
+          name: 'analyzed_by',
+          description: '시뮬레이션에 의해 분석됨',
+          user_id: userId,
+        })
+        .select('id')
+        .single();
+
+      if (newRelType) {
+        analyzedByTypeId = newRelType.id;
+      }
+    }
+
+    if (analyzedByTypeId) {
+      // Zone 분석 결과와 연결
+      const relations = result.zone_analysis.map((za) => {
+        // 해당 zone_id를 가진 Graph 엔티티 찾기
+        const zoneEntity = graphContext.zone_entities.find(
+          (ze) => ze.label === za.zone_name || ze.properties?.zone_id === za.zone_id
+        );
+
+        if (!zoneEntity) return null;
+
+        return {
+          user_id: userId,
+          store_id: storeId,
+          relation_type_id: analyzedByTypeId,
+          source_entity_id: zoneEntity.id,
+          target_entity_id: createdEntity.id,
+          weight: za.congestion_level / 100, // 혼잡도를 weight로 사용
+          properties: {
+            visitor_count: za.visitor_count,
+            avg_dwell_seconds: za.avg_dwell_seconds,
+            congestion_level: za.congestion_level,
+            bottleneck_score: za.bottleneck_score,
+            conversion_contribution: za.conversion_contribution,
+          },
+        };
+      }).filter(Boolean);
+
+      if (relations.length > 0) {
+        const { error: relError } = await supabase
+          .from('graph_relations')
+          .insert(relations);
+
+        if (relError) {
+          console.warn('[Graph] Zone-Simulation 관계 생성 실패:', relError.message);
+        } else {
+          console.log(`[Graph] Zone-Simulation 관계 ${relations.length}개 생성`);
+        }
+      }
+    }
+  }
+
+  // 4. 진단 이슈를 별도 엔티티로 저장 (critical 이슈만)
+  const criticalIssues = result.diagnostic_issues.filter((i) => i.severity === 'critical');
+  if (criticalIssues.length > 0) {
+    // DiagnosticIssue 타입 조회/생성
+    let issueTypeId: string | null = null;
+
+    const { data: issueType } = await supabase
+      .from('ontology_entity_types')
+      .select('id')
+      .eq('name', 'DiagnosticIssue')
+      .or(`and(org_id.is.null,user_id.is.null),user_id.eq.${userId}`)
+      .limit(1)
+      .single();
+
+    if (issueType) {
+      issueTypeId = issueType.id;
+    } else {
+      const { data: newIssueType } = await supabase
+        .from('ontology_entity_types')
+        .insert({
+          name: 'DiagnosticIssue',
+          category: 'event',
+          description: '시뮬레이션 진단 이슈',
+          user_id: userId,
+        })
+        .select('id')
+        .single();
+
+      if (newIssueType) {
+        issueTypeId = newIssueType.id;
+      }
+    }
+
+    if (issueTypeId) {
+      const issueEntities = criticalIssues.map((issue) => ({
+        user_id: userId,
+        store_id: storeId,
+        entity_type_id: issueTypeId,
+        label: `Issue_${issue.id}_${result.simulation_id}`,
+        properties: {
+          issue_id: issue.id,
+          severity: issue.severity,
+          category: issue.category,
+          title: issue.title,
+          description: issue.description,
+          zone_name: issue.zone_name,
+          current_value: issue.current_value,
+          threshold_value: issue.threshold_value,
+          impact: issue.impact,
+          suggested_action: issue.suggested_action,
+          simulation_id: result.simulation_id,
+        },
+      }));
+
+      const { error: issueError } = await supabase
+        .from('graph_entities')
+        .insert(issueEntities);
+
+      if (issueError) {
+        console.warn('[Graph] DiagnosticIssue 엔티티 생성 실패:', issueError.message);
+      } else {
+        console.log(`[Graph] DiagnosticIssue 엔티티 ${issueEntities.length}개 생성`);
+      }
+    }
+  }
+}
+
 // ===== 분석 컨텍스트 구성 =====
 function buildAnalysisContext(data: any) {
-  const { zones, furniture, transitions, zoneMetrics, dailyKpis, options } = data;
+  const { zones, furniture, transitions, zoneMetrics, dailyKpis, options, graphContext } = data;
 
   // 존별 평균 지표 계산
   const zoneStats = zones.map((zone: any) => {
@@ -471,16 +1053,64 @@ function buildAnalysisContext(data: any) {
       : 500000,
   };
 
+  // Graph 기반 인사이트 생성 (Phase 3)
+  const graphInsights: string[] = [];
+  if (graphContext && graphContext.entity_summary.total_entities > 0) {
+    // Zone 엔티티와 zones_dim 비교
+    if (graphContext.zone_entities.length !== zones.length) {
+      graphInsights.push(
+        `Graph Zone 엔티티(${graphContext.zone_entities.length}개)와 zones_dim(${zones.length}개) 불일치 - 동기화 필요`
+      );
+    }
+
+    // Graph 관계 밀도 분석
+    const relationDensity = graphContext.relations.length / Math.max(graphContext.entities.length, 1);
+    if (relationDensity < 1) {
+      graphInsights.push(
+        `Graph 관계 밀도(${relationDensity.toFixed(2)})가 낮음 - 엔티티 간 연결 강화 권장`
+      );
+    }
+
+    // 고립된 Zone 탐지
+    const connectedZones = new Set([
+      ...graphContext.zone_relations.map((r) => r.from_zone),
+      ...graphContext.zone_relations.map((r) => r.to_zone),
+    ]);
+    const isolatedZones = graphContext.zone_entities.filter(
+      (z) => !connectedZones.has(z.label)
+    );
+    if (isolatedZones.length > 0) {
+      graphInsights.push(
+        `고립된 Zone 엔티티 발견: ${isolatedZones.map((z) => z.label).join(', ')}`
+      );
+    }
+  }
+
   return {
     store_summary: {
       zone_count: zones.length,
       furniture_count: furniture.length,
       data_days: dailyKpis.length || 30,
+      // Phase 3: Graph 요약 추가
+      graph_entity_count: graphContext?.entity_summary.total_entities || 0,
+      graph_relation_count: graphContext?.relations.length || 0,
     },
     zone_stats: zoneStats,
     transition_probabilities: transitionProbs.sort((a: any, b: any) => b.avg_count_per_day - a.avg_count_per_day),
     historical_kpis: avgKpis,
     simulation_options: options,
+    // Phase 3: Graph 컨텍스트 추가
+    graph_context: graphContext ? {
+      zone_entities: graphContext.zone_entities.map((e) => ({
+        label: e.label,
+        properties: e.properties,
+      })),
+      zone_relations: graphContext.zone_relations,
+      entity_summary: graphContext.entity_summary,
+      product_count: graphContext.product_entities.length,
+      customer_count: graphContext.customer_entities.length,
+    } : null,
+    graph_insights: graphInsights,
   };
 }
 
