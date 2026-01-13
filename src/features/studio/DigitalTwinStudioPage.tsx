@@ -228,6 +228,12 @@ export default function DigitalTwinStudioPage() {
   // As-Is / To-Be / Split 뷰 모드
   const [viewMode, setViewMode] = useState<ViewMode>('as-is');
 
+  // 🆕 SceneProvider 내부의 실제 모델 상태 (저장용)
+  const [sceneProviderModels, setSceneProviderModels] = useState<any[]>([]);
+
+  // 🆕 명시적 불러오기 요청 플래그 (저장 후 자동 불러오기 방지)
+  const [pendingLoadSceneId, setPendingLoadSceneId] = useState<string | null>(null);
+
   // 드래그 패널 표시 상태
   const [visiblePanels, setVisiblePanels] = useState<VisiblePanels>({
     tools: false,
@@ -426,9 +432,13 @@ export default function DigitalTwinStudioPage() {
     loadModelsAsync();
   }, [user, selectedStore]);
 
-  // 🔧 FIX: 저장된 씬 불러오기 - activeScene이 변경되면 씬 복원
+  // 🔧 FIX: 저장된 씬 불러오기 - 명시적 불러오기 요청 시에만 실행
   useEffect(() => {
+    // pendingLoadSceneId가 없으면 (저장 후 자동 호출) 무시
+    if (!pendingLoadSceneId) return;
     if (!activeScene?.recipe_data) return;
+    // 요청한 씬이 아니면 무시
+    if (activeScene.id !== pendingLoadSceneId) return;
     
     const recipe = activeScene.recipe_data as SceneRecipe;
     console.log('[DigitalTwinStudio] Loading saved scene:', activeScene.name, recipe);
@@ -446,9 +456,10 @@ export default function DigitalTwinStudioPage() {
           url: recipe.space.model_url,
           model_url: recipe.space.model_url,
           visible: true,
-          position: [recipe.space.position.x, recipe.space.position.y, recipe.space.position.z],
-          rotation: [recipe.space.rotation.x, recipe.space.rotation.y, recipe.space.rotation.z],
-          scale: [recipe.space.scale.x, recipe.space.scale.y, recipe.space.scale.z],
+          // 🔧 FIX: position을 객체로 저장 (sceneModels 변환과 호환)
+          position: { x: recipe.space.position.x, y: recipe.space.position.y, z: recipe.space.position.z },
+          rotation: { x: recipe.space.rotation.x, y: recipe.space.rotation.y, z: recipe.space.rotation.z },
+          scale: { x: recipe.space.scale.x, y: recipe.space.scale.y, z: recipe.space.scale.z },
           dimensions: recipe.space.dimensions,
           metadata: recipe.space.metadata,
         });
@@ -464,9 +475,9 @@ export default function DigitalTwinStudioPage() {
             url: f.model_url,
             model_url: f.model_url,
             visible: true,
-            position: [f.position.x, f.position.y, f.position.z],
-            rotation: [f.rotation.x, f.rotation.y, f.rotation.z],
-            scale: [f.scale.x, f.scale.y, f.scale.z],
+            position: { x: f.position.x, y: f.position.y, z: f.position.z },
+            rotation: { x: f.rotation.x, y: f.rotation.y, z: f.rotation.z },
+            scale: { x: f.scale.x, y: f.scale.y, z: f.scale.z },
             dimensions: f.dimensions,
             metadata: f.metadata,
           });
@@ -483,9 +494,9 @@ export default function DigitalTwinStudioPage() {
             url: p.model_url,
             model_url: p.model_url,
             visible: true,
-            position: [p.position.x, p.position.y, p.position.z],
-            rotation: [p.rotation.x, p.rotation.y, p.rotation.z],
-            scale: [p.scale.x, p.scale.y, p.scale.z],
+            position: { x: p.position.x, y: p.position.y, z: p.position.z },
+            rotation: { x: p.rotation.x, y: p.rotation.y, z: p.rotation.z },
+            scale: { x: p.scale.x, y: p.scale.y, z: p.scale.z },
             metadata: { sku: p.sku, display_type: p.display_type },
           });
         });
@@ -499,8 +510,11 @@ export default function DigitalTwinStudioPage() {
     } catch (error) {
       console.error('[DigitalTwinStudio] Failed to restore scene:', error);
       toast.error('씬 불러오기 실패');
+    } finally {
+      // 불러오기 완료 후 플래그 초기화
+      setPendingLoadSceneId(null);
     }
-  }, [activeScene]);
+  }, [activeScene, pendingLoadSceneId]);
 
   // 패널 닫기 핸들러
   const closePanel = useCallback((panelId: keyof VisiblePanels) => {
@@ -658,12 +672,24 @@ export default function DigitalTwinStudioPage() {
   }, [handleSimulationComplete]);
 
   // SceneRecipe 생성 (handleRunAllSimulations보다 먼저 정의되어야 함)
-  // SceneRecipe 생성 (handleRunAllSimulations에서 사용하므로 먼저 정의)
+  // 🔧 FIX: sceneProviderModels 사용 - 3D에서 실제 보이는 위치 기반으로 저장
   const currentRecipe = useMemo<SceneRecipe | null>(() => {
-    const activeModels = models.filter(m => activeLayers.includes(m.id));
+    // sceneProviderModels가 있으면 사용 (실제 3D 위치), 없으면 models 사용 (초기 로드)
+    const sourceModels = sceneProviderModels.length > 0 ? sceneProviderModels : models;
+    const activeModels = sourceModels.filter((m: any) => activeLayers.includes(m.id));
     if (activeModels.length === 0) return null;
-    const spaceModel = activeModels.find(m => m.type === 'space');
+    const spaceModel = activeModels.find((m: any) => m.type === 'space');
     if (!spaceModel) return null;
+    
+    // 🔧 Helper: position 변환 (배열 또는 객체 → 객체)
+    const toVector3 = (pos: any, defaultVal = { x: 0, y: 0, z: 0 }) => {
+      if (!pos) return defaultVal;
+      if (Array.isArray(pos)) {
+        return { x: pos[0] || 0, y: pos[1] || 0, z: pos[2] || 0 };
+      }
+      return { x: pos.x || 0, y: pos.y || 0, z: pos.z || 0 };
+    };
+    
     const lightingPreset: LightingPreset = {
       name: 'warm-retail',
       description: 'Default',
@@ -682,28 +708,16 @@ export default function DigitalTwinStudioPage() {
         }
       }]
     };
-    const furnitureList = activeModels.filter(m => m.type === 'furniture').map(m => {
-      const metaChildProducts = (m.metadata as any)?.childProducts;
+    const furnitureList = activeModels.filter((m: any) => m.type === 'furniture').map((m: any) => {
+      const metaChildProducts = m.metadata?.childProducts;
       return {
         id: m.id,
-        model_url: m.model_url,
+        model_url: m.model_url || m.url,
         type: 'furniture' as const,
         furniture_type: m.name,
-        position: m.position || {
-          x: 0,
-          y: 0,
-          z: 0
-        },
-        rotation: m.rotation || {
-          x: 0,
-          y: 0,
-          z: 0
-        },
-        scale: m.scale || {
-          x: 1,
-          y: 1,
-          z: 1
-        },
+        position: toVector3(m.position),
+        rotation: toVector3(m.rotation),
+        scale: toVector3(m.scale, { x: 1, y: 1, z: 1 }),
         dimensions: m.dimensions,
         movable: true,
         metadata: m.metadata,
@@ -712,21 +726,9 @@ export default function DigitalTwinStudioPage() {
           id: cp.id,
           type: 'product' as const,
           model_url: cp.model_url,
-          position: cp.position || {
-            x: 0,
-            y: 0,
-            z: 0
-          },
-          rotation: cp.rotation || {
-            x: 0,
-            y: 0,
-            z: 0
-          },
-          scale: cp.scale || {
-            x: 1,
-            y: 1,
-            z: 1
-          },
+          position: toVector3(cp.position),
+          rotation: toVector3(cp.rotation),
+          scale: toVector3(cp.scale, { x: 1, y: 1, z: 1 }),
           sku: cp.name,
           display_type: cp.metadata?.displayType,
           dimensions: cp.dimensions,
@@ -735,27 +737,15 @@ export default function DigitalTwinStudioPage() {
         })) || []
       };
     });
-    const productsList = activeModels.filter(m => m.type === 'product').map(m => ({
+    const productsList = activeModels.filter((m: any) => m.type === 'product').map((m: any) => ({
       id: m.id,
-      model_url: m.model_url,
+      model_url: m.model_url || m.url,
       type: 'product' as const,
       product_id: m.metadata?.entityId,
       sku: m.name,
-      position: m.position || {
-        x: 0,
-        y: 0,
-        z: 0
-      },
-      rotation: m.rotation || {
-        x: 0,
-        y: 0,
-        z: 0
-      },
-      scale: m.scale || {
-        x: 1,
-        y: 1,
-        z: 1
-      },
+      position: toVector3(m.position),
+      rotation: toVector3(m.rotation),
+      scale: toVector3(m.scale, { x: 1, y: 1, z: 1 }),
       dimensions: m.dimensions,
       movable: true,
       metadata: m.metadata
@@ -764,6 +754,7 @@ export default function DigitalTwinStudioPage() {
     // 🔍 DEBUG: currentRecipe의 childProducts 확인
     const totalChildProducts = furnitureList.reduce((sum, f) => sum + ((f as any).childProducts?.length || 0), 0);
     console.log('[DigitalTwinStudio] currentRecipe built:', {
+      source: sceneProviderModels.length > 0 ? 'sceneProviderModels' : 'models',
       furnitureCount: furnitureList.length,
       productsCount: productsList.length,
       childProductsTotal: totalChildProducts,
@@ -772,23 +763,11 @@ export default function DigitalTwinStudioPage() {
     return {
       space: {
         id: spaceModel.id,
-        model_url: spaceModel.model_url,
+        model_url: spaceModel.model_url || spaceModel.url,
         type: 'space',
-        position: spaceModel.position || {
-          x: 0,
-          y: 0,
-          z: 0
-        },
-        rotation: spaceModel.rotation || {
-          x: 0,
-          y: 0,
-          z: 0
-        },
-        scale: spaceModel.scale || {
-          x: 1,
-          y: 1,
-          z: 1
-        },
+        position: toVector3(spaceModel.position),
+        rotation: toVector3(spaceModel.rotation),
+        scale: toVector3(spaceModel.scale, { x: 1, y: 1, z: 1 }),
         dimensions: spaceModel.dimensions,
         metadata: spaceModel.metadata
       },
@@ -809,7 +788,7 @@ export default function DigitalTwinStudioPage() {
         fov: 50
       }
     };
-  }, [models, activeLayers]);
+  }, [models, activeLayers, sceneProviderModels]);
 
   // 전체 시뮬레이션 실행 (씬 기반 + 레거시 UI 결과)
   const handleRunAllSimulations = useCallback(async () => {
@@ -1084,7 +1063,7 @@ export default function DigitalTwinStudioPage() {
       </DashboardLayout>;
   }
   return <DashboardLayout>
-      <SceneProvider mode={mode} initialModels={sceneModels}>
+      <SceneProvider mode={mode} initialModels={sceneModels} onModelsChange={setSceneProviderModels}>
         <div className="digital-twin-studio relative w-full h-[calc(100vh-120px)] overflow-hidden bg-black rounded-lg">
           {/* ========== 3D 캔버스 (배경) ========== */}
           <div className="absolute inset-0 z-0">
@@ -1496,7 +1475,11 @@ export default function DigitalTwinStudioPage() {
                   isSaving={isSaving}
                   isDirty={false}
                   onSave={handleSaveScene}
-                  onLoad={(id) => setActiveScene(id)}
+                  onLoad={(id) => {
+                    // 🔧 FIX: 명시적 불러오기 요청 플래그 설정
+                    setPendingLoadSceneId(id);
+                    setActiveScene(id);
+                  }}
                   onDelete={(id) => deleteScene(id)}
                   onNew={handleNewScene}
                   onReset={handleResetScene}
