@@ -86,31 +86,35 @@ export function DataQualityScoreCard({ score }: DataQualityScoreProps) {
             데이터 소스 커버리지
           </h4>
           {Object.entries(score.coverage)
-            .filter(([key]) => key !== 'raw_imports')
-            .map(([key, data]: [string, any]) => (
-              <div key={key} className="flex items-center gap-3">
-                <div className="w-24 text-sm text-gray-600 dark:text-gray-400">
-                  {data.label}
+            .filter(([key]) => key !== 'raw_imports' && key !== 'zone')
+            .map(([key, data]: [string, any]) => {
+              // Handle missing completeness - derive from available status
+              const completeness = data.completeness ?? (data.available ? 1 : 0);
+              return (
+                <div key={key} className="flex items-center gap-3">
+                  <div className="w-24 text-sm text-gray-600 dark:text-gray-400">
+                    {data.label}
+                  </div>
+                  <div className="flex-1">
+                    <Progress
+                      value={completeness * 100}
+                      className="h-2"
+                    />
+                  </div>
+                  <div className="w-16 text-right">
+                    {data.available ? (
+                      <Badge variant="default" className="text-xs bg-green-600">
+                        {(data.record_count || 0).toLocaleString()}
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="text-xs">
+                        없음
+                      </Badge>
+                    )}
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <Progress
-                    value={data.completeness * 100}
-                    className="h-2"
-                  />
-                </div>
-                <div className="w-16 text-right">
-                  {data.available ? (
-                    <Badge variant="default" className="text-xs bg-green-600">
-                      {data.record_count.toLocaleString()}
-                    </Badge>
-                  ) : (
-                    <Badge variant="secondary" className="text-xs">
-                      없음
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
         </div>
 
         {/* Warnings */}

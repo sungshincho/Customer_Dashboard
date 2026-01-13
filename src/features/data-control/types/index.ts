@@ -10,44 +10,26 @@ export interface DataSourceStatus {
   record_count?: number;
 }
 
+export interface DataSourceCoverage {
+  available: boolean;
+  record_count: number;
+  completeness?: number;
+  label: string;
+}
+
 export interface DataQualityScore {
   success: boolean;
   store_id: string;
-  store_name: string;
-  date: string;
+  store_name?: string;
+  date?: string;
   overall_score: number;
   confidence_level: 'high' | 'medium' | 'low';
   coverage: {
-    pos: {
-      available: boolean;
-      record_count: number;
-      completeness: number;
-      label: string;
-    };
-    sensor: {
-      available: boolean;
-      record_count: number;
-      completeness: number;
-      label: string;
-    };
-    crm: {
-      available: boolean;
-      record_count: number;
-      completeness: number;
-      label: string;
-    };
-    product: {
-      available: boolean;
-      record_count: number;
-      completeness: number;
-      label: string;
-    };
-    zone: {
-      available: boolean;
-      record_count: number;
-      completeness: number;
-      label: string;
-    };
+    pos: DataSourceCoverage;
+    sensor: DataSourceCoverage;
+    crm: DataSourceCoverage;
+    product: DataSourceCoverage;
+    zone?: DataSourceCoverage;
     raw_imports?: {
       total_count: number;
       completed_count: number;
@@ -56,9 +38,9 @@ export interface DataQualityScore {
       latest_import: string | null;
     };
   };
-  warnings: DataWarning[];
+  warnings: DataWarning[] | Array<{ type: string; source: string; severity: string; message: string }>;
   warning_count: number;
-  calculated_at: string;
+  calculated_at?: string;
 }
 
 export interface DataWarning {
@@ -99,7 +81,7 @@ export interface PipelineStats {
     failed: number;
     pending: number;
   };
-  etl_runs: {
+  etl_runs?: {
     total: number;
     completed: number;
     failed: number;
