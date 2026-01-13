@@ -446,9 +446,10 @@ export default function DigitalTwinStudioPage() {
           url: recipe.space.model_url,
           model_url: recipe.space.model_url,
           visible: true,
-          position: [recipe.space.position.x, recipe.space.position.y, recipe.space.position.z],
-          rotation: [recipe.space.rotation.x, recipe.space.rotation.y, recipe.space.rotation.z],
-          scale: [recipe.space.scale.x, recipe.space.scale.y, recipe.space.scale.z],
+          // 🔧 FIX: 객체 형태로 유지 (배열로 변환하면 다음 저장 시 .x, .y, .z 접근 실패)
+          position: { x: recipe.space.position.x, y: recipe.space.position.y, z: recipe.space.position.z },
+          rotation: { x: recipe.space.rotation.x, y: recipe.space.rotation.y, z: recipe.space.rotation.z },
+          scale: { x: recipe.space.scale.x, y: recipe.space.scale.y, z: recipe.space.scale.z },
           dimensions: recipe.space.dimensions,
           metadata: recipe.space.metadata,
         });
@@ -464,9 +465,10 @@ export default function DigitalTwinStudioPage() {
             url: f.model_url,
             model_url: f.model_url,
             visible: true,
-            position: [f.position.x, f.position.y, f.position.z],
-            rotation: [f.rotation.x, f.rotation.y, f.rotation.z],
-            scale: [f.scale.x, f.scale.y, f.scale.z],
+            // 🔧 FIX: 객체 형태로 유지 (배열로 변환하면 다음 저장 시 .x, .y, .z 접근 실패)
+            position: { x: f.position.x, y: f.position.y, z: f.position.z },
+            rotation: { x: f.rotation.x, y: f.rotation.y, z: f.rotation.z },
+            scale: { x: f.scale.x, y: f.scale.y, z: f.scale.z },
             dimensions: f.dimensions,
             metadata: f.metadata,
           });
@@ -483,9 +485,10 @@ export default function DigitalTwinStudioPage() {
             url: p.model_url,
             model_url: p.model_url,
             visible: true,
-            position: [p.position.x, p.position.y, p.position.z],
-            rotation: [p.rotation.x, p.rotation.y, p.rotation.z],
-            scale: [p.scale.x, p.scale.y, p.scale.z],
+            // 🔧 FIX: 객체 형태로 유지 (배열로 변환하면 다음 저장 시 .x, .y, .z 접근 실패)
+            position: { x: p.position.x, y: p.position.y, z: p.position.z },
+            rotation: { x: p.rotation.x, y: p.rotation.y, z: p.rotation.z },
+            scale: { x: p.scale.x, y: p.scale.y, z: p.scale.z },
             metadata: { sku: p.sku, display_type: p.display_type },
           });
         });
