@@ -122,7 +122,7 @@ DECLARE
   v_weights CONSTANT JSONB := '{"pos": 0.25, "sensor": 0.30, "crm": 0.15, "product": 0.15, "zone": 0.15}';
 BEGIN
   -- 스토어 이름 조회
-  SELECT name INTO v_store_name FROM stores WHERE id = p_store_id;
+  SELECT store_name INTO v_store_name FROM stores WHERE id = p_store_id;
 
   IF v_store_name IS NULL THEN
     RETURN jsonb_build_object('success', false, 'error', 'Store not found');
