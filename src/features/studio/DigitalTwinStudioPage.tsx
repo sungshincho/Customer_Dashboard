@@ -116,7 +116,8 @@ export default function DigitalTwinStudioPage() {
     isSaving,
     saveScene,
     deleteScene,
-    setActiveScene
+    setActiveScene,
+    clearActiveScene  // 🆕 추가
   } = useScenePersistence({
     userId: user?.id,
     storeId: selectedStore?.id
@@ -1051,7 +1052,19 @@ export default function DigitalTwinStudioPage() {
     setLoading(true);
     try {
       console.log('[DigitalTwinStudio] Resetting scene to original data...');
+      
+      // 🔧 FIX: 활성 씬 해제 (DB에서 is_active = false로 설정)
+      try {
+        await clearActiveScene();
+        console.log('[DigitalTwinStudio] Active scene cleared');
+      } catch (clearError) {
+        console.warn('[DigitalTwinStudio] clearActiveScene failed (non-critical):', clearError);
+        // 활성 씬 해제 실패해도 계속 진행
+      }
+      
+      // furniture 테이블의 원본 데이터 로드
       const loadedModels = await loadUserModels(user.id, selectedStore?.id);
+      console.log('[DigitalTwinStudio] Loaded original models:', loadedModels.length);
       
       setModels(loadedModels);
       if (loadedModels.length > 0) {
@@ -1059,22 +1072,26 @@ export default function DigitalTwinStudioPage() {
       }
       
       // 시뮬레이션 상태 초기화
-      sceneSimulation.reset();
+      if (sceneSimulation?.reset) {
+        sceneSimulation.reset();
+      }
       
       // 씬 이름 초기화
       setSceneName('');
       setIsNewSceneMode(false);
       
       toast.success('씬이 초기화되었습니다', {
-        description: '뉴럴트윈이 설정한 기본값으로 복원되었습니다'
+        description: 'DB 원본 데이터(기본 위치)로 복원되었습니다'
       });
     } catch (error) {
       console.error('[DigitalTwinStudio] Error resetting scene:', error);
-      toast.error('씬 초기화 실패');
+      toast.error('씬 초기화 실패', {
+        description: error instanceof Error ? error.message : '알 수 없는 오류'
+      });
     } finally {
       setLoading(false);
     }
-  }, [user, selectedStore, sceneSimulation]);
+  }, [user, selectedStore, sceneSimulation, clearActiveScene]);
   if (!selectedStore) {
     return <DashboardLayout>
         <Alert>
