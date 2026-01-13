@@ -134,20 +134,20 @@ DECLARE
   v_store_name TEXT;
   v_weights CONSTANT JSONB := '{"pos": 0.25, "sensor": 0.30, "crm": 0.15, "product": 0.15, "zone": 0.15}';
 BEGIN
-  -- 스토어 이름 조회 (store_name → name fallback)
-  SELECT COALESCE(store_name, name) INTO v_store_name
-  FROM stores WHERE id = p_store_id;
+  -- 스토어 이름 조회 (store_name 컬럼만 사용)
+  SELECT store_name INTO v_store_name FROM stores WHERE id = p_store_id;
 
   IF v_store_name IS NULL THEN
-    -- store_name도 name도 없으면 id 사용
-    SELECT id::TEXT INTO v_store_name FROM stores WHERE id = p_store_id;
-    IF v_store_name IS NULL THEN
+    -- store_name이 없으면 store가 존재하는지 확인
+    IF NOT EXISTS (SELECT 1 FROM stores WHERE id = p_store_id) THEN
       RETURN jsonb_build_object('success', false, 'error', 'Store not found');
     END IF;
+    v_store_name := p_store_id::TEXT;
   END IF;
 
-  -- 1. POS/Transaction 커버리지 (전체 데이터 조회 - 시드 호환)
-  SELECT COUNT(*) INTO v_count FROM purchases WHERE store_id = p_store_id;
+  -- 1. POS/Transaction 커버리지 (transactions 또는 line_items 참조 - 시드 호환)
+  -- purchases 테이블 대신 transactions 테이블 사용 (시드 데이터가 transactions에 있음)
+  SELECT COUNT(*) INTO v_count FROM transactions WHERE store_id = p_store_id;
 
   v_coverage := v_coverage || jsonb_build_object(
     'pos', jsonb_build_object(
