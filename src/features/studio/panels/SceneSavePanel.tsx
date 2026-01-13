@@ -240,7 +240,6 @@ export function SceneSavePanel({
                   size="icon"
                   className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
                   onClick={() => onLoad?.(scene.id)}
-                  disabled={scene.is_active}
                 >
                   <FolderOpen className="w-3 h-3 text-white/60" />
                 </Button>
