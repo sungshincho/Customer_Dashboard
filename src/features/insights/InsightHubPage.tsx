@@ -32,6 +32,9 @@ import { ProductTab } from '@/features/insights/tabs/ProductTab';
 import { PredictionTab } from '@/features/insights/tabs/PredictionTab';
 import { AIRecommendationTab } from '@/features/insights/tabs/AIRecommendationTab';
 
+// Data Quality Banner (데이터 컨트롤타워 연동)
+import { DataQualityBanner } from '@/features/insights/components/DataQualityBanner';
+
 const tabs = [
   { value: 'overview', label: '개요', icon: LayoutDashboard },
   { value: 'store', label: '매장', icon: Store },
@@ -135,6 +138,9 @@ function InsightHubContent({ activeTab, setActiveTab }: {
 
           <GlobalDateFilter />
         </div>
+
+      {/* Data Quality Banner */}
+      <DataQualityBanner className="mb-2" />
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as InsightTabType)} className="space-y-6">

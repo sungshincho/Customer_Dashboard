@@ -5,6 +5,7 @@ import {
   Box,
   BarChart3,
   TrendingUp,
+  Database,
   LucideIcon
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
@@ -36,8 +37,15 @@ interface MenuItem {
   description: string;
 }
 
-// 4개 메인 메뉴
+// 5개 메인 메뉴 (데이터 컨트롤타워 추가)
 const mainMenuItems: MenuItem[] = [
+  {
+    title: "데이터 컨트롤타워",
+    url: "/data/control-tower",
+    icon: Database,
+    emoji: "🗄️",
+    description: "데이터 수집, Lineage, ETL 모니터링"
+  },
   {
     title: "인사이트 허브",
     url: "/insights",
@@ -76,6 +84,7 @@ export function AppSidebar() {
 
   const isActive = (path: string) => {
     if (path === "/insights") return location.pathname === "/" || location.pathname.startsWith("/insights");
+    if (path === "/data/control-tower") return location.pathname.startsWith("/data");
     return location.pathname.startsWith(path);
   };
 
