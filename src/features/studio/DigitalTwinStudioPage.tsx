@@ -1880,6 +1880,9 @@ function SceneSavePanelWrapper({
     };
 
     // SceneProvider의 models는 position이 [x,y,z] 배열 형태, url 필드 사용
+    // 🔧 FIX: rotation은 라디안으로 저장되어 있으므로 도(degree)로 변환하여 저장
+    const radToDeg = (rad: number) => rad * 180 / Math.PI;
+    
     const furnitureList = activeModels.filter(m => m.type === 'furniture').map(m => {
       const pos = m.position || [0, 0, 0];
       const rot = m.rotation || [0, 0, 0];
@@ -1892,7 +1895,7 @@ function SceneSavePanelWrapper({
         type: 'furniture' as const,
         furniture_type: m.name,
         position: { x: pos[0], y: pos[1], z: pos[2] },
-        rotation: { x: rot[0], y: rot[1], z: rot[2] },
+        rotation: { x: radToDeg(rot[0]), y: radToDeg(rot[1]), z: radToDeg(rot[2]) },  // 라디안 → 도
         scale: { x: scl[0], y: scl[1], z: scl[2] },
         dimensions: m.dimensions,
         movable: true,
@@ -1925,7 +1928,7 @@ function SceneSavePanelWrapper({
         product_id: (m.metadata as any)?.entityId,
         sku: m.name,
         position: { x: pos[0], y: pos[1], z: pos[2] },
-        rotation: { x: rot[0], y: rot[1], z: rot[2] },
+        rotation: { x: radToDeg(rot[0]), y: radToDeg(rot[1]), z: radToDeg(rot[2]) },  // 라디안 → 도
         scale: { x: scl[0], y: scl[1], z: scl[2] },
         dimensions: m.dimensions,
         movable: true,
@@ -1943,7 +1946,7 @@ function SceneSavePanelWrapper({
         model_url: spaceModel.url,  // 🔧 FIX: SceneProvider의 Model3D는 url 필드 사용
         type: 'space',
         position: { x: spacePos[0], y: spacePos[1], z: spacePos[2] },
-        rotation: { x: spaceRot[0], y: spaceRot[1], z: spaceRot[2] },
+        rotation: { x: radToDeg(spaceRot[0]), y: radToDeg(spaceRot[1]), z: radToDeg(spaceRot[2]) },  // 라디안 → 도
         scale: { x: spaceScl[0], y: spaceScl[1], z: spaceScl[2] },
         dimensions: spaceModel.dimensions,
         metadata: spaceModel.metadata
