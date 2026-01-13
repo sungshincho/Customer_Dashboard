@@ -428,82 +428,79 @@ export default function DigitalTwinStudioPage() {
 
   // 🔧 FIX: 저장된 씬 불러오기 - activeScene이 변경되면 씬 복원
   useEffect(() => {
-    if (!activeScene?.recipe_data) return;
+    if (!activeScene?.recipe_data || !user) return;
     
     const recipe = activeScene.recipe_data as SceneRecipe;
     console.log('[DigitalTwinStudio] Loading saved scene:', activeScene.name, recipe);
     
-    try {
-      // recipe_data를 ModelLayer[]로 변환
-      const restoredModels: ModelLayer[] = [];
-      
-      // Space 모델 복원
-      if (recipe.space) {
-        restoredModels.push({
-          id: recipe.space.id,
-          name: 'Space',
-          type: 'space',
-          url: recipe.space.model_url,
-          model_url: recipe.space.model_url,
-          visible: true,
-          // 🔧 FIX: 객체 형태로 유지 (배열로 변환하면 다음 저장 시 .x, .y, .z 접근 실패)
-          position: { x: recipe.space.position.x, y: recipe.space.position.y, z: recipe.space.position.z },
-          rotation: { x: recipe.space.rotation.x, y: recipe.space.rotation.y, z: recipe.space.rotation.z },
-          scale: { x: recipe.space.scale.x, y: recipe.space.scale.y, z: recipe.space.scale.z },
-          dimensions: recipe.space.dimensions,
-          metadata: recipe.space.metadata,
-        });
-      }
-      
-      // Furniture 모델 복원
-      if (recipe.furniture) {
-        recipe.furniture.forEach(f => {
-          restoredModels.push({
-            id: f.id,
-            name: f.furniture_type || 'Furniture',
-            type: 'furniture',
-            url: f.model_url,
-            model_url: f.model_url,
-            visible: true,
-            // 🔧 FIX: 객체 형태로 유지 (배열로 변환하면 다음 저장 시 .x, .y, .z 접근 실패)
-            position: { x: f.position.x, y: f.position.y, z: f.position.z },
-            rotation: { x: f.rotation.x, y: f.rotation.y, z: f.rotation.z },
-            scale: { x: f.scale.x, y: f.scale.y, z: f.scale.z },
-            dimensions: f.dimensions,
-            metadata: f.metadata,
+    // 원본 데이터를 기반으로 위치만 덮어쓰는 방식으로 복원
+    const restoreScene = async () => {
+      try {
+        // 1. 먼저 원본 모델 데이터 로드 (metadata, childProducts 등 포함)
+        const originalModels = await loadUserModels(user.id, selectedStore?.id);
+        
+        // 2. 저장된 recipe에서 위치 정보만 추출하여 매핑
+        const positionMap = new Map<string, { position: any; rotation: any; scale: any }>();
+        
+        if (recipe.space) {
+          positionMap.set(recipe.space.id, {
+            position: recipe.space.position,
+            rotation: recipe.space.rotation,
+            scale: recipe.space.scale,
           });
-        });
-      }
-      
-      // Product 모델 복원
-      if (recipe.products) {
-        recipe.products.forEach(p => {
-          restoredModels.push({
-            id: p.id,
-            name: p.sku || 'Product',
-            type: 'product',
-            url: p.model_url,
-            model_url: p.model_url,
-            visible: true,
-            // 🔧 FIX: 객체 형태로 유지 (배열로 변환하면 다음 저장 시 .x, .y, .z 접근 실패)
-            position: { x: p.position.x, y: p.position.y, z: p.position.z },
-            rotation: { x: p.rotation.x, y: p.rotation.y, z: p.rotation.z },
-            scale: { x: p.scale.x, y: p.scale.y, z: p.scale.z },
-            metadata: { sku: p.sku, display_type: p.display_type },
+        }
+        
+        if (recipe.furniture) {
+          recipe.furniture.forEach(f => {
+            positionMap.set(f.id, {
+              position: f.position,
+              rotation: f.rotation,
+              scale: f.scale,
+            });
           });
+        }
+        
+        if (recipe.products) {
+          recipe.products.forEach(p => {
+            positionMap.set(p.id, {
+              position: p.position,
+              rotation: p.rotation,
+              scale: p.scale,
+            });
+          });
+        }
+        
+        // 3. 원본 모델에 저장된 위치 적용
+        const restoredModels = originalModels.map(m => {
+          const savedPos = positionMap.get(m.id);
+          if (savedPos) {
+            return {
+              ...m,
+              position: savedPos.position,
+              rotation: savedPos.rotation,
+              scale: savedPos.scale,
+            };
+          }
+          return m;
         });
+        
+        console.log('[DigitalTwinStudio] Restored models with saved positions:', {
+          total: restoredModels.length,
+          positionsApplied: positionMap.size
+        });
+        
+        setModels(restoredModels);
+        setActiveLayers(restoredModels.map(m => m.id));
+        setSceneName(activeScene.name);
+        toast.success(`씬 "${activeScene.name}" 불러오기 완료`);
+      } catch (error) {
+        console.error('[DigitalTwinStudio] Failed to restore scene:', error);
+        toast.error('씬 불러오기 실패');
       }
-      
-      console.log('[DigitalTwinStudio] Restored models from saved scene:', restoredModels.length);
-      setModels(restoredModels);
-      setActiveLayers(restoredModels.map(m => m.id));
-      setSceneName(activeScene.name);
-      toast.success(`씬 "${activeScene.name}" 불러오기 완료`);
-    } catch (error) {
-      console.error('[DigitalTwinStudio] Failed to restore scene:', error);
-      toast.error('씬 불러오기 실패');
-    }
-  }, [activeScene]);
+    };
+    
+    restoreScene();
+  }, [activeScene, user, selectedStore]);
 
   // 패널 닫기 핸들러
   const closePanel = useCallback((panelId: keyof VisiblePanels) => {
@@ -1882,7 +1879,7 @@ function SceneSavePanelWrapper({
       ]
     };
 
-    // SceneProvider의 models는 position이 [x,y,z] 배열 형태
+    // SceneProvider의 models는 position이 [x,y,z] 배열 형태, url 필드 사용
     const furnitureList = activeModels.filter(m => m.type === 'furniture').map(m => {
       const pos = m.position || [0, 0, 0];
       const rot = m.rotation || [0, 0, 0];
@@ -1891,7 +1888,7 @@ function SceneSavePanelWrapper({
       
       return {
         id: m.id,
-        model_url: m.model_url,
+        model_url: m.url,  // 🔧 FIX: SceneProvider의 Model3D는 url 필드 사용
         type: 'furniture' as const,
         furniture_type: m.name,
         position: { x: pos[0], y: pos[1], z: pos[2] },
@@ -1903,7 +1900,7 @@ function SceneSavePanelWrapper({
         childProducts: metaChildProducts?.map((cp: any) => ({
           id: cp.id,
           type: 'product' as const,
-          model_url: cp.model_url,
+          model_url: cp.model_url || cp.url,  // 🔧 FIX
           position: cp.position || { x: 0, y: 0, z: 0 },
           rotation: cp.rotation || { x: 0, y: 0, z: 0 },
           scale: cp.scale || { x: 1, y: 1, z: 1 },
@@ -1923,7 +1920,7 @@ function SceneSavePanelWrapper({
       
       return {
         id: m.id,
-        model_url: m.model_url,
+        model_url: m.url,  // 🔧 FIX: SceneProvider의 Model3D는 url 필드 사용
         type: 'product' as const,
         product_id: (m.metadata as any)?.entityId,
         sku: m.name,
@@ -1943,7 +1940,7 @@ function SceneSavePanelWrapper({
     return {
       space: {
         id: spaceModel.id,
-        model_url: spaceModel.model_url,
+        model_url: spaceModel.url,  // 🔧 FIX: SceneProvider의 Model3D는 url 필드 사용
         type: 'space',
         position: { x: spacePos[0], y: spacePos[1], z: spacePos[2] },
         rotation: { x: spaceRot[0], y: spaceRot[1], z: spaceRot[2] },
