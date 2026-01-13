@@ -114,6 +114,18 @@ export interface StoreContext {
     hasProductData: boolean;
     overallScore: number;
   };
+  /** 🆕 직원 데이터 (AI 인력 최적화용) */
+  staff: Array<{
+    id: string;
+    staffCode: string;
+    staffName: string;
+    role: string;
+    zoneId?: string;
+    zoneName?: string;
+    isActive: boolean;
+    /** 현재 3D 위치 */
+    position?: { x: number; y: number; z: number };
+  }>;
 }
 
 export async function buildStoreContext(storeId: string): Promise<StoreContext> {
@@ -135,6 +147,7 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
     furnitureResult,
     hourlyMetricsResult,
     zoneTransitionsResult,
+    staffResult,  // 🆕 직원 데이터
   ] = await Promise.all([
     // 매장 정보
     supabase.from('stores').select('*').eq('id', storeId).single(),
@@ -209,6 +222,12 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
       .eq('store_id', storeId)
       .gte('transition_date', thirtyDaysAgoStr)
       .order('transition_count', { ascending: false }),
+
+    // 🆕 직원 데이터 (AI 인력 최적화용)
+    supabase.from('staff')
+      .select('id, staff_code, staff_name, role, assigned_zone_id, is_active, avatar_position')
+      .eq('store_id', storeId)
+      .eq('is_active', true),
   ]);
 
   const store = storeResult.data;
@@ -223,6 +242,7 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
   const furniture = furnitureResult.data || [];
   const hourlyMetrics = hourlyMetricsResult.data || [];
   const zoneTransitions = zoneTransitionsResult.data || [];
+  const staffData = staffResult.data || [];  // 🆕 직원 데이터
 
   // 가구 ID -> 가구 데이터 맵 생성 (빠른 조회용)
   const furnitureMap = new Map<string, any>();
@@ -243,6 +263,7 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
     hourlyMetrics: hourlyMetrics.length,
     visits: visits.length,
     zoneTransitions: zoneTransitions.length,
+    staff: staffData.length,  // 🆕 직원 수 로깅
   });
 
   // 데이터 품질 점수 계산
@@ -489,6 +510,17 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
       hasProductData,
       overallScore,
     },
+    // 🆕 직원 데이터 (AI 인력 최적화용)
+    staff: staffData.map((s: any) => ({
+      id: s.id,
+      staffCode: s.staff_code || '',
+      staffName: s.staff_name || '직원',
+      role: s.role || 'staff',
+      zoneId: s.assigned_zone_id,
+      zoneName: s.assigned_zone_id ? zoneIdToNameMap.get(s.assigned_zone_id) : undefined,
+      isActive: s.is_active ?? true,
+      position: parsePosition(s.avatar_position),
+    })),
   };
 }
 
@@ -567,6 +599,36 @@ function aggregateProductPerformance(rawData: any[]): StoreContext['productPerfo
   });
 
   return products;
+}
+
+/**
+ * JSONB position 데이터 파싱
+ */
+function parsePosition(position: any): { x: number; y: number; z: number } | undefined {
+  if (!position) return undefined;
+
+  if (typeof position === 'object') {
+    return {
+      x: Number(position.x) || 0,
+      y: Number(position.y) || 0,
+      z: Number(position.z) || 0,
+    };
+  }
+
+  if (typeof position === 'string') {
+    try {
+      const parsed = JSON.parse(position);
+      return {
+        x: Number(parsed.x) || 0,
+        y: Number(parsed.y) || 0,
+        z: Number(parsed.z) || 0,
+      };
+    } catch {
+      return undefined;
+    }
+  }
+
+  return undefined;
 }
 
 export default buildStoreContext;

@@ -262,10 +262,14 @@ export function formatToolResultsForAI(
   assistantMessage: { role: string; content: string | null; tool_calls: ToolCall[] },
   toolResults: ToolCallResult[]
 ): Array<{ role: string; content?: string; tool_calls?: ToolCall[] } | ToolCallResult> {
-  return [
-    assistantMessage,
-    ...toolResults,
-  ];
+  // Deno/TS strict mode: content는 null이 아닌 string/undefined 여야 함
+  const safeAssistantMessage: { role: string; content?: string; tool_calls?: ToolCall[] } = {
+    role: assistantMessage.role,
+    ...(assistantMessage.content != null ? { content: assistantMessage.content } : {}),
+    ...(assistantMessage.tool_calls?.length ? { tool_calls: assistantMessage.tool_calls } : {}),
+  };
+
+  return [safeAssistantMessage, ...toolResults];
 }
 
 // ============================================================================

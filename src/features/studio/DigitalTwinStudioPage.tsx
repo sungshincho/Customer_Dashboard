@@ -116,7 +116,9 @@ export default function DigitalTwinStudioPage() {
     isSaving,
     saveScene,
     deleteScene,
-    setActiveScene
+    setActiveScene,
+    clearActiveScene,
+    renameScene  // 🆕 추가
   } = useScenePersistence({
     userId: user?.id,
     storeId: selectedStore?.id
@@ -428,79 +430,79 @@ export default function DigitalTwinStudioPage() {
 
   // 🔧 FIX: 저장된 씬 불러오기 - activeScene이 변경되면 씬 복원
   useEffect(() => {
-    if (!activeScene?.recipe_data) return;
+    if (!activeScene?.recipe_data || !user) return;
     
     const recipe = activeScene.recipe_data as SceneRecipe;
     console.log('[DigitalTwinStudio] Loading saved scene:', activeScene.name, recipe);
     
-    try {
-      // recipe_data를 ModelLayer[]로 변환
-      const restoredModels: ModelLayer[] = [];
-      
-      // Space 모델 복원
-      if (recipe.space) {
-        restoredModels.push({
-          id: recipe.space.id,
-          name: 'Space',
-          type: 'space',
-          url: recipe.space.model_url,
-          model_url: recipe.space.model_url,
-          visible: true,
-          position: [recipe.space.position.x, recipe.space.position.y, recipe.space.position.z],
-          rotation: [recipe.space.rotation.x, recipe.space.rotation.y, recipe.space.rotation.z],
-          scale: [recipe.space.scale.x, recipe.space.scale.y, recipe.space.scale.z],
-          dimensions: recipe.space.dimensions,
-          metadata: recipe.space.metadata,
-        });
-      }
-      
-      // Furniture 모델 복원
-      if (recipe.furniture) {
-        recipe.furniture.forEach(f => {
-          restoredModels.push({
-            id: f.id,
-            name: f.furniture_type || 'Furniture',
-            type: 'furniture',
-            url: f.model_url,
-            model_url: f.model_url,
-            visible: true,
-            position: [f.position.x, f.position.y, f.position.z],
-            rotation: [f.rotation.x, f.rotation.y, f.rotation.z],
-            scale: [f.scale.x, f.scale.y, f.scale.z],
-            dimensions: f.dimensions,
-            metadata: f.metadata,
+    // 원본 데이터를 기반으로 위치만 덮어쓰는 방식으로 복원
+    const restoreScene = async () => {
+      try {
+        // 1. 먼저 원본 모델 데이터 로드 (metadata, childProducts 등 포함)
+        const originalModels = await loadUserModels(user.id, selectedStore?.id);
+        
+        // 2. 저장된 recipe에서 위치 정보만 추출하여 매핑
+        const positionMap = new Map<string, { position: any; rotation: any; scale: any }>();
+        
+        if (recipe.space) {
+          positionMap.set(recipe.space.id, {
+            position: recipe.space.position,
+            rotation: recipe.space.rotation,
+            scale: recipe.space.scale,
           });
-        });
-      }
-      
-      // Product 모델 복원
-      if (recipe.products) {
-        recipe.products.forEach(p => {
-          restoredModels.push({
-            id: p.id,
-            name: p.sku || 'Product',
-            type: 'product',
-            url: p.model_url,
-            model_url: p.model_url,
-            visible: true,
-            position: [p.position.x, p.position.y, p.position.z],
-            rotation: [p.rotation.x, p.rotation.y, p.rotation.z],
-            scale: [p.scale.x, p.scale.y, p.scale.z],
-            metadata: { sku: p.sku, display_type: p.display_type },
+        }
+        
+        if (recipe.furniture) {
+          recipe.furniture.forEach(f => {
+            positionMap.set(f.id, {
+              position: f.position,
+              rotation: f.rotation,
+              scale: f.scale,
+            });
           });
+        }
+        
+        if (recipe.products) {
+          recipe.products.forEach(p => {
+            positionMap.set(p.id, {
+              position: p.position,
+              rotation: p.rotation,
+              scale: p.scale,
+            });
+          });
+        }
+        
+        // 3. 원본 모델에 저장된 위치 적용
+        const restoredModels = originalModels.map(m => {
+          const savedPos = positionMap.get(m.id);
+          if (savedPos) {
+            return {
+              ...m,
+              position: savedPos.position,
+              rotation: savedPos.rotation,
+              scale: savedPos.scale,
+            };
+          }
+          return m;
         });
+        
+        console.log('[DigitalTwinStudio] Restored models with saved positions:', {
+          total: restoredModels.length,
+          positionsApplied: positionMap.size
+        });
+        
+        setModels(restoredModels);
+        setActiveLayers(restoredModels.map(m => m.id));
+        setSceneName(activeScene.name);
+        toast.success(`씬 "${activeScene.name}" 불러오기 완료`);
+      } catch (error) {
+        console.error('[DigitalTwinStudio] Failed to restore scene:', error);
+        toast.error('씬 불러오기 실패');
       }
-      
-      console.log('[DigitalTwinStudio] Restored models from saved scene:', restoredModels.length);
-      setModels(restoredModels);
-      setActiveLayers(restoredModels.map(m => m.id));
-      setSceneName(activeScene.name);
-      toast.success(`씬 "${activeScene.name}" 불러오기 완료`);
-    } catch (error) {
-      console.error('[DigitalTwinStudio] Failed to restore scene:', error);
-      toast.error('씬 불러오기 실패');
-    }
-  }, [activeScene]);
+    };
+    
+    restoreScene();
+  }, [activeScene, user, selectedStore]);
 
   // 패널 닫기 핸들러
   const closePanel = useCallback((panelId: keyof VisiblePanels) => {
@@ -1051,30 +1053,44 @@ export default function DigitalTwinStudioPage() {
     setLoading(true);
     try {
       console.log('[DigitalTwinStudio] Resetting scene to original data...');
+      
+      // 🔧 FIX: 활성 씬 해제 (DB에서 is_active = false로 설정)
+      try {
+        await clearActiveScene();
+        console.log('[DigitalTwinStudio] Active scene cleared');
+      } catch (clearError) {
+        console.warn('[DigitalTwinStudio] clearActiveScene failed (non-critical):', clearError);
+        // 활성 씬 해제 실패해도 계속 진행
+      }
+      
+      // furniture 테이블의 원본 데이터 로드
       const loadedModels = await loadUserModels(user.id, selectedStore?.id);
+      console.log('[DigitalTwinStudio] Loaded original models:', loadedModels.length);
       
       setModels(loadedModels);
       if (loadedModels.length > 0) {
         setActiveLayers(loadedModels.map(m => m.id));
       }
       
-      // 시뮬레이션 상태 초기화
-      sceneSimulation.reset();
+      // 시뮬레이션 상태 초기화 (존재하는 경우에만)
+      (sceneSimulation as any)?.reset?.();
       
       // 씬 이름 초기화
       setSceneName('');
       setIsNewSceneMode(false);
       
       toast.success('씬이 초기화되었습니다', {
-        description: '뉴럴트윈이 설정한 기본값으로 복원되었습니다'
+        description: 'DB 원본 데이터(기본 위치)로 복원되었습니다'
       });
     } catch (error) {
       console.error('[DigitalTwinStudio] Error resetting scene:', error);
-      toast.error('씬 초기화 실패');
+      toast.error('씬 초기화 실패', {
+        description: error instanceof Error ? error.message : '알 수 없는 오류'
+      });
     } finally {
       setLoading(false);
     }
-  }, [user, selectedStore, sceneSimulation]);
+  }, [user, selectedStore, sceneSimulation, clearActiveScene]);
   if (!selectedStore) {
     return <DashboardLayout>
         <Alert>
@@ -1490,17 +1506,23 @@ export default function DigitalTwinStudioPage() {
                 onHeightChange={setSceneSavePanelHeight}
                 width="w-52"
               >
-                <SceneSavePanel
+                <SceneSavePanelWrapper
                   currentSceneName={sceneName}
                   savedScenes={scenes.slice(0, 3)}
                   isSaving={isSaving}
-                  isDirty={false}
-                  onSave={handleSaveScene}
-                  onLoad={(id) => setActiveScene(id)}
-                  onDelete={(id) => deleteScene(id)}
+                  saveScene={saveScene}
+                  setActiveScene={setActiveScene}
+                  deleteScene={deleteScene}
+                  renameScene={renameScene}
                   onNew={handleNewScene}
                   onReset={handleResetScene}
                   maxScenes={3}
+                  setSceneName={setSceneName}
+                  isNewSceneMode={isNewSceneMode}
+                  setIsNewSceneMode={setIsNewSceneMode}
+                  activeLayers={activeLayers}
+                  logActivity={logActivity}
+                  storeId={selectedStore?.id}
                 />
               </DraggablePanel>
             )}
@@ -1814,6 +1836,196 @@ function SimulationResultPanels({
       y: 520
     }} />}
     </>;
+}
+
+// ============================================================================
+// 🔧 FIX: SceneProvider 내부에서 실제 3D models를 가져와 저장하는 래퍼
+// ============================================================================
+interface SceneSavePanelWrapperProps {
+  currentSceneName: string;
+  savedScenes: any[];
+  isSaving: boolean;
+  saveScene: (recipe: SceneRecipe, name: string, sceneId?: string) => Promise<void>;
+  setActiveScene: (id: string) => void;
+  deleteScene: (id: string) => Promise<void>;
+  renameScene: (id: string, newName: string) => Promise<void>;  // 🆕 추가
+  onNew: () => void;
+  onReset: () => void;
+  maxScenes: number;
+  setSceneName: (name: string) => void;
+  isNewSceneMode: boolean;
+  setIsNewSceneMode: (v: boolean) => void;
+  activeLayers: string[];
+  logActivity: (type: string, data: any) => void;
+  storeId?: string;
+}
+
+function SceneSavePanelWrapper({
+  currentSceneName,
+  savedScenes,
+  isSaving,
+  saveScene,
+  setActiveScene,
+  deleteScene,
+  renameScene,  // 🆕 추가
+  onNew,
+  onReset,
+  maxScenes,
+  setSceneName,
+  isNewSceneMode,
+  setIsNewSceneMode,
+  activeLayers,
+  logActivity,
+  storeId,
+}: SceneSavePanelWrapperProps) {
+  // 🔧 핵심: SceneProvider 내부에서 실제 3D에 보이는 models를 가져옴
+  const { models: sceneModels } = useScene();
+
+  // 현재 화면에 보이는 3D 상태로 SceneRecipe 생성
+  const buildCurrentRecipe = useCallback((): SceneRecipe | null => {
+    const activeModels = sceneModels.filter(m => activeLayers.includes(m.id));
+    if (activeModels.length === 0) return null;
+    
+    const spaceModel = activeModels.find(m => m.type === 'space');
+    if (!spaceModel) return null;
+
+    const lightingPreset: LightingPreset = {
+      name: 'warm-retail',
+      description: 'Default',
+      lights: [
+        { type: 'ambient', color: '#ffffff', intensity: 0.5 },
+        { type: 'directional', color: '#ffffff', intensity: 1, position: { x: 10, y: 10, z: 5 } }
+      ]
+    };
+
+    // SceneProvider의 models는 position이 [x,y,z] 배열 형태, url 필드 사용
+    // 🔧 FIX: rotation은 라디안으로 저장되어 있으므로 도(degree)로 변환하여 저장
+    const radToDeg = (rad: number) => rad * 180 / Math.PI;
+    
+    const furnitureList = activeModels.filter(m => m.type === 'furniture').map(m => {
+      const pos = m.position || [0, 0, 0];
+      const rot = m.rotation || [0, 0, 0];
+      const scl = m.scale || [1, 1, 1];
+      const metaChildProducts = (m.metadata as any)?.childProducts;
+      
+      return {
+        id: m.id,
+        model_url: m.url,  // 🔧 FIX: SceneProvider의 Model3D는 url 필드 사용
+        type: 'furniture' as const,
+        furniture_type: m.name,
+        position: { x: pos[0], y: pos[1], z: pos[2] },
+        rotation: { x: radToDeg(rot[0]), y: radToDeg(rot[1]), z: radToDeg(rot[2]) },  // 라디안 → 도
+        scale: { x: scl[0], y: scl[1], z: scl[2] },
+        dimensions: m.dimensions,
+        movable: true,
+        metadata: m.metadata,
+        childProducts: metaChildProducts?.map((cp: any) => ({
+          id: cp.id,
+          type: 'product' as const,
+          model_url: cp.model_url || cp.url,  // 🔧 FIX
+          position: cp.position || { x: 0, y: 0, z: 0 },
+          rotation: cp.rotation || { x: 0, y: 0, z: 0 },
+          scale: cp.scale || { x: 1, y: 1, z: 1 },
+          sku: cp.name,
+          display_type: cp.metadata?.displayType,
+          dimensions: cp.dimensions,
+          isRelativePosition: true,
+          metadata: cp.metadata
+        })) || []
+      };
+    });
+
+    const productsList = activeModels.filter(m => m.type === 'product').map(m => {
+      const pos = m.position || [0, 0, 0];
+      const rot = m.rotation || [0, 0, 0];
+      const scl = m.scale || [1, 1, 1];
+      
+      return {
+        id: m.id,
+        model_url: m.url,  // 🔧 FIX: SceneProvider의 Model3D는 url 필드 사용
+        type: 'product' as const,
+        product_id: (m.metadata as any)?.entityId,
+        sku: m.name,
+        position: { x: pos[0], y: pos[1], z: pos[2] },
+        rotation: { x: radToDeg(rot[0]), y: radToDeg(rot[1]), z: radToDeg(rot[2]) },  // 라디안 → 도
+        scale: { x: scl[0], y: scl[1], z: scl[2] },
+        dimensions: m.dimensions,
+        movable: true,
+        metadata: m.metadata
+      };
+    });
+
+    const spacePos = spaceModel.position || [0, 0, 0];
+    const spaceRot = spaceModel.rotation || [0, 0, 0];
+    const spaceScl = spaceModel.scale || [1, 1, 1];
+
+    return {
+      space: {
+        id: spaceModel.id,
+        model_url: spaceModel.url,  // 🔧 FIX: SceneProvider의 Model3D는 url 필드 사용
+        type: 'space',
+        position: { x: spacePos[0], y: spacePos[1], z: spacePos[2] },
+        rotation: { x: radToDeg(spaceRot[0]), y: radToDeg(spaceRot[1]), z: radToDeg(spaceRot[2]) },  // 라디안 → 도
+        scale: { x: spaceScl[0], y: spaceScl[1], z: spaceScl[2] },
+        dimensions: spaceModel.dimensions,
+        metadata: spaceModel.metadata
+      },
+      furniture: furnitureList,
+      products: productsList,
+      lighting: lightingPreset,
+      camera: { position: { x: 10, y: 10, z: 15 }, target: { x: 0, y: 0, z: 0 }, fov: 50 }
+    };
+  }, [sceneModels, activeLayers]);
+
+  // 저장 핸들러 - 실제 3D 화면 상태를 저장
+  const handleSave = useCallback(async (name: string) => {
+    const recipe = buildCurrentRecipe();
+    if (!recipe) {
+      toast.error('저장할 씬 데이터가 없습니다');
+      return;
+    }
+
+    try {
+      const existingScene = savedScenes.find(s => s.name && s.name === name);
+      const shouldUpdate = !isNewSceneMode && existingScene && existingScene.id;
+
+      console.log('[SceneSavePanelWrapper] Saving scene with actual 3D positions', {
+        name,
+        furnitureCount: recipe.furniture.length,
+        firstFurniturePos: recipe.furniture[0]?.position
+      });
+
+      await saveScene(recipe, name, shouldUpdate ? existingScene.id : undefined);
+      setSceneName(name);
+      setIsNewSceneMode(false);
+
+      logActivity('feature_use', {
+        feature: 'scene_save',
+        scene_name: name,
+        layer_count: activeLayers.length,
+        store_id: storeId,
+        is_new: !shouldUpdate
+      });
+    } catch (err) {
+      console.error('[SceneSavePanelWrapper] Error:', err);
+    }
+  }, [buildCurrentRecipe, savedScenes, isNewSceneMode, saveScene, setSceneName, setIsNewSceneMode, activeLayers, logActivity, storeId]);
+
+  return (
+    <SceneSavePanel
+      currentSceneName={currentSceneName}
+      savedScenes={savedScenes}
+      isSaving={isSaving}
+      isDirty={false}
+      onSave={handleSave}
+      onLoad={(id) => setActiveScene(id)}
+      onDelete={(id) => deleteScene(id)}
+      onRename={(id, newName) => renameScene(id, newName)}  // 🆕 추가
+      onNew={onNew}
+      onReset={onReset}
+      maxScenes={maxScenes}
+    />
+  );
 }
 
 // 🔧 ViewModeHandler 제거됨 - AI 최적화 탭에서 직접 뷰 모드 관리

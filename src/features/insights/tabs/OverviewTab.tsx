@@ -150,28 +150,28 @@ const MetricCard = ({
   const text3D = getText3D(isDark);
   return (
     <GlassCard dark={isDark}>
-      <div style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', height: '100%' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ padding: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+          <Icon3D size={40} dark={isDark}>{icon}</Icon3D>
           <div>
             <p style={text3D.label}>{labelEn}</p>
-            <p style={{ fontSize: '13px', margin: '4px 0 0 0', ...text3D.body }}>{label}</p>
+            <p style={{ fontSize: '12px', ...text3D.body }}>{label}</p>
           </div>
-          <p style={{ fontSize: '32px', margin: '12px 0 0 0', flex: 1, ...text3D.heroNumber }}>{value}</p>
-          {subLabel && <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>{subLabel}</p>}
-          {change !== undefined && (
-            <div style={{ marginTop: '12px' }}>
-              <Badge3D dark={isDark}>
-                {change > 0 ? <TrendingUp className="h-3.5 w-3.5" style={{ color: '#22c55e' }} />
-                  : change < 0 ? <TrendingDown className="h-3.5 w-3.5" style={{ color: '#ef4444' }} />
-                  : <Minus className="h-3.5 w-3.5" style={{ color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280' }} />}
-                <span style={{ fontSize: '11px', fontWeight: 600,
-                  color: change > 0 ? '#22c55e' : change < 0 ? '#ef4444' : (isDark ? 'rgba(255,255,255,0.6)' : '#6b7280')
-                }}>{change > 0 ? '+' : ''}{change.toFixed(1)}{changeUnit}</span>
-              </Badge3D>
-            </div>
-          )}
         </div>
-        <Icon3D size={44} dark={isDark}>{icon}</Icon3D>
+        <p style={{ fontSize: '28px', ...text3D.heroNumber }}>{value}</p>
+        {subLabel && <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>{subLabel}</p>}
+        {change !== undefined && (
+          <div style={{ marginTop: '12px' }}>
+            <Badge3D dark={isDark}>
+              {change > 0 ? <TrendingUp className="h-3.5 w-3.5" style={{ color: '#22c55e' }} />
+                : change < 0 ? <TrendingDown className="h-3.5 w-3.5" style={{ color: '#ef4444' }} />
+                : <Minus className="h-3.5 w-3.5" style={{ color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280' }} />}
+              <span style={{ fontSize: '11px', fontWeight: 600,
+                color: change > 0 ? '#22c55e' : change < 0 ? '#ef4444' : (isDark ? 'rgba(255,255,255,0.6)' : '#6b7280')
+              }}>{change > 0 ? '+' : ''}{change.toFixed(1)}{changeUnit}</span>
+            </Badge3D>
+          </div>
+        )}
       </div>
     </GlassCard>
   );

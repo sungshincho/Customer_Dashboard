@@ -161,10 +161,24 @@ async function extractAvailableSlots(
 }
 
 // 타입 별칭 (기존 코드와 호환성 유지)
-type LayoutSimulationResult = LayoutSimulationResultType;
+type LayoutSimulationResult = LayoutSimulationResultType & {
+  // 서버/Edge 응답에서 snake_case/camelCase 변형이 올 수 있어 선택적으로 허용
+  furniture_changes?: any[];
+  furniture_moves?: any[];
+  furnitureMoves?: any[];
+  layoutChanges?: any[];
+  product_changes?: any[];
+  product_moves?: any[];
+};
+
 type FlowSimulationResult = FlowSimulationResultType;
+
 type CongestionSimulationResult = CongestionSimulationResultType;
-type StaffingSimulationResult = StaffingSimulationResultType;
+
+type StaffingSimulationResult = StaffingSimulationResultType & {
+  staffPositions?: any[];
+  visualization?: any;
+};
 
 // ============================================================================
 // 타입 정의
@@ -520,12 +534,21 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
               params: { ...params?.flow, sceneData },
             },
           }),
-          supabase.functions.invoke('advanced-ai-inference', {
+          // 🔧 FIX: advanced-ai-inference 대신 generate-optimization 사용 (503 에러 방지)
+          supabase.functions.invoke('generate-optimization', {
             body: {
-              type: 'staffing_optimization',
-              storeId: selectedStore.id,
-              orgId,
-              params: { ...params?.staffing, sceneData },
+              store_id: selectedStore.id,
+              optimization_type: 'staffing',
+              parameters: {
+                staffing_goal: params?.staffing?.goal || 'customer_service',
+                staff_count: params?.staffing?.staffCount || 8,
+                // storeContext를 layoutData로 전달
+                ...(params?.staffing?.storeContext && {
+                  store_info: params.staffing.storeContext.storeInfo,
+                  zones: params.staffing.storeContext.zones,
+                  staff: params.staffing.storeContext.staff,
+                }),
+              },
             },
           }),
           // 🆕 Ultimate AI 최적화 호출 (동선/환경/연관/VMD 분석 포함)
@@ -607,8 +630,12 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
         }
         if (staffingRes.status === 'fulfilled') {
           const staffingData = staffingRes.value.data;
-          // 🔧 FIX: staffing result가 다양한 위치에 있을 수 있음
-          const staffingResult = staffingData?.result || staffingData?.staffing || staffingData;
+          // 🔧 FIX: generate-optimization 응답 구조에 맞게 수정
+          // generate-optimization은 staffing_result 안에 결과가 있음
+          const staffingResult = staffingData?.staffing_result || 
+                                 staffingData?.result || 
+                                 staffingData?.staffing || 
+                                 staffingData;
 
           if (staffingResult && (staffingResult.staffPositions || staffingResult.metrics || staffingResult.zoneCoverage)) {
             const staffPositions = staffingResult.staffPositions ||

@@ -4,8 +4,8 @@
 
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
-import { useStore } from '@/hooks/useStore';
+import { supabase } from '@/integrations/supabase/client';
+import { useSelectedStore } from '@/hooks/useSelectedStore';
 import type {
   DataControlTowerStatus,
   DataQualityScore,
@@ -18,7 +18,7 @@ import type {
 // useDataControlTowerStatus - Control Tower 전체 상태 조회
 // ============================================================================
 export function useDataControlTowerStatus() {
-  const { selectedStore } = useStore();
+  const { selectedStore } = useSelectedStore();
   const storeId = selectedStore?.id;
 
   return useQuery<DataControlTowerStatus>({
@@ -165,7 +165,7 @@ async function buildControlTowerStatusFallback(storeId: string): Promise<DataCon
 // useDataQualityScore - 데이터 품질 점수 조회
 // ============================================================================
 export function useDataQualityScore(date?: string) {
-  const { selectedStore } = useStore();
+  const { selectedStore } = useSelectedStore();
   const storeId = selectedStore?.id;
 
   return useQuery<DataQualityScore>({
@@ -255,7 +255,7 @@ async function buildQualityScoreFallback(storeId: string): Promise<DataQualitySc
 // useRecentImports - 최근 Import 목록 조회
 // ============================================================================
 export function useRecentImports(limit: number = 20) {
-  const { selectedStore } = useStore();
+  const { selectedStore } = useSelectedStore();
   const storeId = selectedStore?.id;
 
   return useQuery<RawImport[]>({
@@ -263,7 +263,7 @@ export function useRecentImports(limit: number = 20) {
     queryFn: async () => {
       if (!storeId) return [];
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('raw_imports')
         .select('id, source_type, source_name, data_type, row_count, status, error_message, created_at, completed_at')
         .eq('store_id', storeId)
@@ -281,7 +281,7 @@ export function useRecentImports(limit: number = 20) {
 // useETLHistory - ETL 실행 이력 조회
 // ============================================================================
 export function useETLHistory(limit: number = 20) {
-  const { selectedStore } = useStore();
+  const { selectedStore } = useSelectedStore();
   const storeId = selectedStore?.id;
 
   return useQuery<ETLRun[]>({
@@ -289,7 +289,7 @@ export function useETLHistory(limit: number = 20) {
     queryFn: async () => {
       if (!storeId) return [];
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('etl_runs')
         .select('id, etl_function, status, input_record_count, output_record_count, duration_ms, started_at, completed_at')
         .eq('store_id', storeId)
@@ -350,7 +350,7 @@ export function useReplayImport() {
 // useETLHealth - ETL 파이프라인 헬스체크
 // ============================================================================
 export function useETLHealth() {
-  const { selectedStore } = useStore();
+  const { selectedStore } = useSelectedStore();
   const storeId = selectedStore?.id;
 
   return useQuery({
@@ -387,7 +387,7 @@ export function useETLHealth() {
 // useKPILineage - KPI Lineage 조회
 // ============================================================================
 export function useKPILineage(kpiTable: string, kpiId?: string, date?: string) {
-  const { selectedStore } = useStore();
+  const { selectedStore } = useSelectedStore();
   const storeId = selectedStore?.id;
 
   return useQuery<KPILineage | null>({

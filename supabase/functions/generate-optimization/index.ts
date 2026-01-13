@@ -177,6 +177,8 @@ interface GenerateOptimizationRequest {
 interface FurnitureChange {
   furniture_id: string;
   furniture_type: string;
+  // 결과 생성 과정에서 라벨이 포함될 수 있음(옵션)
+  furniture_label?: string;
   movable: boolean;
   current: {
     zone_id: string;
@@ -196,6 +198,8 @@ interface FurnitureChange {
 interface ProductChange {
   product_id: string;
   sku: string;
+  // 결과 생성 과정에서 제품명이 포함될 수 있음(옵션)
+  product_name?: string;
   current: {
     zone_id: string;
     furniture_id: string;
@@ -2740,6 +2744,22 @@ interface VisualizationData {
   };
 }
 
+function severityToNumber(severity: unknown): number {
+  if (typeof severity === 'number') return severity;
+  switch (severity) {
+    case 'low':
+      return 1;
+    case 'medium':
+      return 2;
+    case 'high':
+      return 3;
+    case 'critical':
+      return 4;
+    default:
+      return 0;
+  }
+}
+
 /**
  * 최적화 결과와 분석 데이터로부터 3D 시각화 데이터 생성
  */
@@ -2759,7 +2779,7 @@ function generateVisualizationData(
     return {
       furnitureId: fc.furniture_id,
       furnitureCode: fc.furniture_type,
-      furnitureName: fc.furniture_label || fc.furniture_type,
+      furnitureName: fc.furniture_label ?? fc.furniture_type,
       from: currentFurniture ? {
         x: currentFurniture.position_x || 0,
         y: currentFurniture.position_y || 0,
@@ -2774,7 +2794,7 @@ function generateVisualizationData(
   const productMoves = (result.product_changes || []).map((pc: ProductChange) => ({
     productId: pc.product_id,
     productSku: pc.sku,
-    productName: pc.product_name || pc.sku,
+    productName: pc.product_name ?? pc.sku,
     from: {
       zoneId: pc.current?.zone_id,
       furnitureId: pc.current?.furniture_id,
@@ -2822,8 +2842,8 @@ function generateVisualizationData(
       zoneId: bn.zoneId,
       zoneName: bn.zoneName,
       position: pos,
-      severity: bn.severity,
-      suggestion: bn.suggestions?.[0] || '혼잡도 개선이 필요합니다.',
+      severity: severityToNumber(bn.severity),
+      suggestion: bn.recommendation || '혼잡도 개선이 필요합니다.',
     };
   }) || [];
 
@@ -2833,8 +2853,8 @@ function generateVisualizationData(
       zoneId: dz.zoneId,
       zoneName: dz.zoneName,
       position: pos,
-      severity: dz.severity,
-      reason: dz.reason,
+      severity: severityToNumber(dz.severity),
+      reason: dz.recommendation || '동선 유입 개선이 필요합니다.',
     };
   }) || [];
 

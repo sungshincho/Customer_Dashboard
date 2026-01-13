@@ -390,13 +390,16 @@ export function AIOptimizationTab({
           traffic: 'flow_guidance',
           conversion: 'customer_service',
         };
+        // 🔧 FIX: 실제 DB 직원 수 사용 (하드코딩 제거)
+        const actualStaffCount = storeContext.staff?.length || 8;
         params.staffing = {
-          staffCount: 3,
+          staffCount: actualStaffCount,
           goal: staffingGoalMap[selectedGoal],
           storeContext,
           // 🆕 환경 컨텍스트 추가 (블랙프라이데이 → 고트래픽 가정 등)
           environment_context: environmentContext,
         };
+        console.log('[AIOptimizationTab] Using actual staff count:', actualStaffCount);
       }
 
       console.log('[AIOptimizationTab] Calling runAllSimulations with params:', Object.keys(params));
@@ -622,10 +625,11 @@ export function AIOptimizationTab({
         
       } else if (newMode === 'to-be') {
         // To-Be: 최적화 위치 적용
-        const rawFurnitureMoves = results.layout?.layoutChanges || 
-                                  results.layout?.furnitureMoves ||
-                                  results.layout?.furniture_changes ||
-                                  results.layout?.furniture_moves || [];
+        const layoutAny = results.layout as any;
+        const rawFurnitureMoves = layoutAny?.layoutChanges ||
+                                  layoutAny?.furnitureMoves ||
+                                  layoutAny?.furniture_changes ||
+                                  layoutAny?.furniture_moves || [];
         
         if (rawFurnitureMoves.length > 0) {
           const payload = {

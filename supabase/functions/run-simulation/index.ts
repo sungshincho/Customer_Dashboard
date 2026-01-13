@@ -1073,15 +1073,15 @@ function buildAnalysisContext(data: any) {
 
     // 고립된 Zone 탐지
     const connectedZones = new Set([
-      ...graphContext.zone_relations.map((r) => r.from_zone),
-      ...graphContext.zone_relations.map((r) => r.to_zone),
+      ...graphContext.zone_relations.map((r: any) => r.from_zone),
+      ...graphContext.zone_relations.map((r: any) => r.to_zone),
     ]);
     const isolatedZones = graphContext.zone_entities.filter(
-      (z) => !connectedZones.has(z.label)
+      (z: any) => !connectedZones.has(z.label)
     );
     if (isolatedZones.length > 0) {
       graphInsights.push(
-        `고립된 Zone 엔티티 발견: ${isolatedZones.map((z) => z.label).join(', ')}`
+        `고립된 Zone 엔티티 발견: ${isolatedZones.map((z: any) => z.label).join(', ')}`
       );
     }
   }
@@ -1101,7 +1101,7 @@ function buildAnalysisContext(data: any) {
     simulation_options: options,
     // Phase 3: Graph 컨텍스트 추가
     graph_context: graphContext ? {
-      zone_entities: graphContext.zone_entities.map((e) => ({
+      zone_entities: graphContext.zone_entities.map((e: any) => ({
         label: e.label,
         properties: e.properties,
       })),

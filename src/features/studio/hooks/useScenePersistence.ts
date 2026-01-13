@@ -22,7 +22,8 @@ export function useScenePersistence(options: UseScenePersistenceOptions = {}) {
   const [isSaving, setIsSaving] = useState(false);
 
   // 씬 목록 로드
-  const loadScenes = useCallback(async () => {
+  // skipActiveScene: true면 목록만 갱신하고 activeScene은 건드리지 않음 (저장 후 사용)
+  const loadScenes = useCallback(async (skipActiveScene = false) => {
     if (!userId || !storeId) return;
 
     setIsLoading(true);
@@ -48,10 +49,12 @@ export function useScenePersistence(options: UseScenePersistenceOptions = {}) {
 
       setScenes(mappedScenes);
 
-      // 활성 씬 찾기
-      const active = mappedScenes.find((s) => s.is_active);
-      if (active) {
-        setActiveSceneState(active);
+      // 🔧 FIX: skipActiveScene이 true면 activeScene 설정 스킵 (저장 후 화면 깨짐 방지)
+      if (!skipActiveScene) {
+        const active = mappedScenes.find((s) => s.is_active);
+        if (active) {
+          setActiveSceneState(active);
+        }
       }
     } catch (error) {
       console.error('Failed to load scenes:', error);
@@ -98,7 +101,7 @@ export function useScenePersistence(options: UseScenePersistenceOptions = {}) {
           toast.success('씬이 저장되었습니다');
         }
 
-        await loadScenes();
+        await loadScenes(true);  // 🔧 FIX: 목록만 갱신, activeScene은 건드리지 않음 (저장 후 화면 깨짐 방지)
       } catch (error) {
         console.error('Failed to save scene:', error);
         toast.error('씬 저장에 실패했습니다');
@@ -118,7 +121,7 @@ export function useScenePersistence(options: UseScenePersistenceOptions = {}) {
 
         if (error) throw error;
         toast.success('씬이 삭제되었습니다');
-        await loadScenes();
+        await loadScenes(true);  // 🔧 FIX: 목록만 갱신
       } catch (error) {
         console.error('Failed to delete scene:', error);
         toast.error('씬 삭제에 실패했습니다');
@@ -148,13 +151,78 @@ export function useScenePersistence(options: UseScenePersistenceOptions = {}) {
 
         if (error) throw error;
 
-        await loadScenes();
+        // 🔧 FIX: 목록 다시 로드 후 활성 씬 즉시 설정
+        const { data } = await supabase
+          .from('store_scenes')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('store_id', storeId)
+          .order('updated_at', { ascending: false });
+
+        if (data) {
+          const mappedScenes: SavedScene[] = data.map((scene: any) => ({
+            id: scene.id,
+            name: scene.scene_name,
+            recipe_data: scene.recipe_data,
+            thumbnail: undefined,
+            is_active: scene.is_active,
+            created_at: scene.created_at,
+            updated_at: scene.updated_at,
+          }));
+          
+          setScenes(mappedScenes);
+          
+          // 선택한 씬을 activeScene으로 설정 (새 객체 참조 생성)
+          const selectedScene = mappedScenes.find(s => s.id === sceneId);
+          if (selectedScene) {
+            setActiveSceneState({ ...selectedScene });
+          }
+        }
       } catch (error) {
         console.error('Failed to set active scene:', error);
         toast.error('씬 활성화에 실패했습니다');
       }
     },
-    [userId, storeId, loadScenes]
+    [userId, storeId]
+  );
+
+  // 🆕 활성 씬 해제 (씬 초기화 시 사용)
+  const clearActiveScene = useCallback(async () => {
+    if (!userId || !storeId) return;
+    
+    try {
+      // 모든 씬의 is_active를 false로 설정
+      await supabase
+        .from('store_scenes')
+        .update({ is_active: false })
+        .eq('user_id', userId)
+        .eq('store_id', storeId);
+      
+      setActiveSceneState(null);
+      await loadScenes(true);  // 목록만 갱신
+    } catch (error) {
+      console.error('Failed to clear active scene:', error);
+    }
+  }, [userId, storeId, loadScenes]);
+
+  // 🆕 씬 이름 변경
+  const renameScene = useCallback(
+    async (sceneId: string, newName: string) => {
+      try {
+        const { error } = await supabase
+          .from('store_scenes')
+          .update({ scene_name: newName })
+          .eq('id', sceneId);
+
+        if (error) throw error;
+        toast.success('씬 이름이 변경되었습니다');
+        await loadScenes(true);  // 목록만 갱신
+      } catch (error) {
+        console.error('Failed to rename scene:', error);
+        toast.error('씬 이름 변경에 실패했습니다');
+      }
+    },
+    [loadScenes]
   );
 
   // 초기 로드
@@ -171,6 +239,8 @@ export function useScenePersistence(options: UseScenePersistenceOptions = {}) {
     saveScene,
     deleteScene,
     setActiveScene,
+    clearActiveScene,
+    renameScene,  // 🆕 추가
   };
 }
 

@@ -728,17 +728,17 @@ export function AISimulationTab({
                 <div className="flex flex-wrap gap-1.5 mt-1">
                   {simulationEnvConfig.manualSettings?.weather && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/80">
-                      🌤️ {WEATHER_OPTIONS.find(w => w.id === simulationEnvConfig.manualSettings?.weather)?.label || simulationEnvConfig.manualSettings?.weather}
+                      🌤️ {WEATHER_OPTIONS.find(w => w.value === simulationEnvConfig.manualSettings?.weather)?.label || simulationEnvConfig.manualSettings?.weather}
                     </span>
                   )}
                   {simulationEnvConfig.manualSettings?.timeOfDay && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/80">
-                      🕐 {TIME_OF_DAY_OPTIONS.find(t => t.id === simulationEnvConfig.manualSettings?.timeOfDay)?.label || simulationEnvConfig.manualSettings?.timeOfDay}
+                      🕐 {TIME_OF_DAY_OPTIONS.find(t => t.value === simulationEnvConfig.manualSettings?.timeOfDay)?.label || simulationEnvConfig.manualSettings?.timeOfDay}
                     </span>
                   )}
                   {simulationEnvConfig.manualSettings?.holidayType && simulationEnvConfig.manualSettings?.holidayType !== 'none' && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/80">
-                      🎉 {HOLIDAY_OPTIONS.find(h => h.id === simulationEnvConfig.manualSettings?.holidayType)?.label || simulationEnvConfig.manualSettings?.holidayType}
+                      🎉 {HOLIDAY_OPTIONS.find(h => h.value === simulationEnvConfig.manualSettings?.holidayType)?.label || simulationEnvConfig.manualSettings?.holidayType}
                     </span>
                   )}
                 </div>
