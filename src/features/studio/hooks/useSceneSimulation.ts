@@ -560,13 +560,13 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
             confidence: mainResult?.summary?.expected_revenue_improvement || 0,
             // 🔧 FIX: ToBeSceneGenerator가 필요로 하는 필드 추가
             currentEfficiency: 0,
-            optimizedEfficiency: mainResult?.summary?.expected_revenue_improvement || 0,
+            optimizedEfficiency: (mainResult?.summary?.expected_revenue_improvement || 0) * 100,
             improvements: {
               revenueIncrease: mainResult?.summary?.expected_revenue_improvement || 0,
               revenueIncreasePercent: (mainResult?.summary?.expected_revenue_improvement || 0) * 100,
               dwellTimeIncrease: 0,
-              conversionIncrease: mainResult?.summary?.expected_conversion_improvement || 0,
-              trafficIncrease: mainResult?.summary?.expected_traffic_improvement || 0,
+              conversionIncrease: (mainResult?.summary?.expected_conversion_improvement || 0) * 100,
+              trafficIncrease: (mainResult?.summary?.expected_traffic_improvement || 0) * 100,
             },
           };
           console.log('[useSceneSimulation] Layout extracted:', {
@@ -587,6 +587,7 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
               zoneName: b.zone,
               severity: b.severity,
               congestionScore: b.congestion,
+              avgWaitTime: b.avg_wait_time || 0,
             })) || [],
             deadZones: vizData?.flow?.deadZones || flowSummary?.dead_zones || [],
             summary: {
