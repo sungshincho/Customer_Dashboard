@@ -523,6 +523,12 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
         });
 
         if (optimizationError) {
+          console.error('[useSceneSimulation] ❌ Edge Function error:', {
+            message: optimizationError.message,
+            context: optimizationError.context,
+            name: optimizationError.name,
+            details: JSON.stringify(optimizationError),
+          });
           throw new Error(optimizationError.message || 'Optimization failed');
         }
 
@@ -655,9 +661,11 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
 
         return results;
       } catch (err) {
+        console.error('[useSceneSimulation] ❌ Simulation failed:', err);
         setError(err as Error);
         toast({
           title: '시뮬레이션 실패',
+          description: err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다',
           variant: 'destructive',
         });
         return {};
