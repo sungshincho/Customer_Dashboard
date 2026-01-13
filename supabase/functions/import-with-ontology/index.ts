@@ -9,6 +9,115 @@ interface ImportRequest {
   importId: string; // user_data_imports의 ID
   createEntities?: boolean; // 엔티티 자동 생성 여부
   entityTypeMapping?: Record<string, string>; // 데이터 타입 -> entity_type_id 매핑
+  sourceType?: 'csv' | 'api' | 'webhook' | 'manual'; // 데이터 소스 유형
+}
+
+// ============================================================================
+// raw_imports 테이블 연동 (CTO 요구사항: 원본 데이터 보존)
+// ============================================================================
+
+interface RawImportRecord {
+  org_id?: string;
+  store_id?: string;
+  user_id: string;
+  source_type: 'csv' | 'api' | 'webhook' | 'manual';
+  source_name?: string;
+  row_count: number;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  data_type?: string;
+  metadata: {
+    columns?: string[];
+    sample_rows?: Record<string, any>[];
+    etl_version?: string;
+    ontology_mapping?: any;
+    [key: string]: any;
+  };
+  raw_data?: any[];
+}
+
+async function createRawImport(
+  supabase: any,
+  record: RawImportRecord
+): Promise<{ id: string | null; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from('raw_imports')
+      .insert({
+        org_id: record.org_id || null,
+        store_id: record.store_id || null,
+        user_id: record.user_id,
+        source_type: record.source_type,
+        source_name: record.source_name || null,
+        row_count: record.row_count,
+        status: record.status,
+        data_type: record.data_type || null,
+        metadata: record.metadata,
+        raw_data: record.raw_data || null,
+        etl_version: '2.0',
+        created_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error('[raw_imports] INSERT failed:', error.message);
+      return { id: null, error: error.message };
+    }
+
+    console.log(`[raw_imports] Created: ${data.id}`);
+    return { id: data.id };
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[raw_imports] Exception:', errorMsg);
+    return { id: null, error: errorMsg };
+  }
+}
+
+async function updateRawImportStatus(
+  supabase: any,
+  id: string,
+  status: 'processing' | 'completed' | 'failed',
+  additionalData?: {
+    row_count?: number;
+    error_message?: string;
+    error_details?: any;
+  }
+): Promise<void> {
+  try {
+    const updateData: any = {
+      status,
+      processed_at: new Date().toISOString(),
+    };
+
+    if (status === 'processing') {
+      updateData.started_at = new Date().toISOString();
+    }
+
+    if (status === 'completed' || status === 'failed') {
+      updateData.completed_at = new Date().toISOString();
+    }
+
+    if (additionalData?.row_count !== undefined) {
+      updateData.row_count = additionalData.row_count;
+    }
+
+    if (additionalData?.error_message) {
+      updateData.error_message = additionalData.error_message;
+    }
+
+    if (additionalData?.error_details) {
+      updateData.error_details = additionalData.error_details;
+    }
+
+    await supabase
+      .from('raw_imports')
+      .update(updateData)
+      .eq('id', id);
+
+    console.log(`[raw_imports] Updated status: ${id} -> ${status}`);
+  } catch (err) {
+    console.error('[raw_imports] Status update failed:', err);
+  }
 }
 
 interface Link3DModelRequest {
@@ -103,8 +212,8 @@ async function processCSVImport(
   request: ImportRequest,
   result: ImportResult
 ) {
-  const { importId, createEntities = true, entityTypeMapping = {} } = request;
-  
+  const { importId, createEntities = true, entityTypeMapping = {}, sourceType } = request;
+
   console.log('📊 Processing CSV import:', importId);
 
   // 1. user_data_imports에서 데이터 조회
@@ -122,14 +231,53 @@ async function processCSVImport(
 
   result.importId = importId;
 
-  if (!createEntities) {
-    console.log('⏭️ Skipping entity creation');
-    return;
-  }
-
   const rawData = importData.raw_data as any[];
   const dataType = importData.data_type;
   const storeId = importData.store_id;
+  const orgId = importData.org_id;
+  const fileName = importData.file_name;
+
+  // ============================================================================
+  // raw_imports 기록 시작 (CTO 요구사항: 원본 데이터 보존)
+  // ============================================================================
+  let rawImportId: string | null = null;
+
+  const rawImportResult = await createRawImport(supabase, {
+    org_id: orgId,
+    store_id: storeId,
+    user_id: userId,
+    source_type: sourceType || 'csv',
+    source_name: fileName,
+    row_count: rawData?.length || 0,
+    status: 'pending',
+    data_type: dataType,
+    metadata: {
+      columns: Object.keys(rawData?.[0] || {}),
+      sample_rows: rawData?.slice(0, 3),
+      etl_version: '2.0',
+      import_id: importId,
+      create_entities: createEntities,
+      entity_type_mapping: entityTypeMapping,
+    },
+    raw_data: rawData,
+  });
+
+  rawImportId = rawImportResult.id;
+  (result as any).rawImportId = rawImportId;
+
+  if (rawImportId) {
+    await updateRawImportStatus(supabase, rawImportId, 'processing');
+  }
+
+  if (!createEntities) {
+    console.log('⏭️ Skipping entity creation');
+    if (rawImportId) {
+      await updateRawImportStatus(supabase, rawImportId, 'completed', {
+        row_count: rawData?.length || 0,
+      });
+    }
+    return;
+  }
 
   console.log(`Processing ${rawData.length} rows of type: ${dataType}`);
 
@@ -223,6 +371,24 @@ async function processCSVImport(
   if (dataType === 'purchases' && result.entitiesCreated > 0) {
     const relationsCreated = await createPurchaseRelations(supabase, userId, importId, storeId);
     result.relationsCreated = relationsCreated;
+  }
+
+  // ============================================================================
+  // raw_imports 상태 업데이트 (완료 또는 실패)
+  // ============================================================================
+  if (rawImportId) {
+    const hasErrors = result.errors.length > 0;
+    const status = hasErrors && result.entitiesCreated === 0 ? 'failed' : 'completed';
+
+    await updateRawImportStatus(supabase, rawImportId, status, {
+      row_count: result.entitiesCreated,
+      error_message: hasErrors ? result.errors.join('; ') : undefined,
+      error_details: hasErrors ? {
+        errors: result.errors,
+        entities_created: result.entitiesCreated,
+        relations_created: result.relationsCreated,
+      } : undefined,
+    });
   }
 }
 

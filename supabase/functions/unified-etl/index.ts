@@ -29,6 +29,8 @@ interface UnifiedETLRequest {
   import_id?: string;
   data_type?: string;
   raw_data?: any[];
+  source_name?: string;  // 파일명 또는 소스 식별자
+  source_type?: 'csv' | 'api' | 'webhook' | 'manual';  // 데이터 소스 유형
   // l1_to_l2 / l2_to_l3 specific
   target_tables?: string[];
   // schema ETL specific
@@ -46,6 +48,120 @@ interface UnifiedETLRequest {
     properties?: Record<string, string>;
   }>;
   options?: Record<string, any>;
+}
+
+// ============================================================================
+// raw_imports 테이블 연동 (CTO 요구사항: 원본 데이터 보존)
+// ============================================================================
+
+interface RawImportRecord {
+  org_id?: string;
+  store_id?: string;
+  user_id: string;
+  source_type: 'csv' | 'api' | 'webhook' | 'manual';
+  source_name?: string;
+  file_path?: string;
+  row_count: number;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  data_type?: string;
+  metadata: {
+    columns?: string[];
+    sample_rows?: Record<string, any>[];
+    etl_version?: string;
+    [key: string]: any;
+  };
+  raw_data?: any[];
+}
+
+async function createRawImport(
+  supabase: any,
+  record: RawImportRecord
+): Promise<{ id: string | null; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from('raw_imports')
+      .insert({
+        org_id: record.org_id || null,
+        store_id: record.store_id || null,
+        user_id: record.user_id,
+        source_type: record.source_type,
+        source_name: record.source_name || null,
+        file_path: record.file_path || null,
+        row_count: record.row_count,
+        status: record.status,
+        data_type: record.data_type || null,
+        metadata: record.metadata,
+        raw_data: record.raw_data || null,
+        etl_version: '2.0',
+        created_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error('[raw_imports] INSERT failed:', error.message);
+      return { id: null, error: error.message };
+    }
+
+    console.log(`[raw_imports] Created: ${data.id}`);
+    return { id: data.id };
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[raw_imports] Exception:', errorMsg);
+    return { id: null, error: errorMsg };
+  }
+}
+
+async function updateRawImportStatus(
+  supabase: any,
+  id: string,
+  status: 'processing' | 'completed' | 'failed',
+  additionalData?: {
+    row_count?: number;
+    error_message?: string;
+    error_details?: any;
+    progress?: { current: number; total: number; percentage: number };
+  }
+): Promise<void> {
+  try {
+    const updateData: any = {
+      status,
+      processed_at: new Date().toISOString(),
+    };
+
+    if (status === 'processing') {
+      updateData.started_at = new Date().toISOString();
+    }
+
+    if (status === 'completed' || status === 'failed') {
+      updateData.completed_at = new Date().toISOString();
+    }
+
+    if (additionalData?.row_count !== undefined) {
+      updateData.row_count = additionalData.row_count;
+    }
+
+    if (additionalData?.error_message) {
+      updateData.error_message = additionalData.error_message;
+    }
+
+    if (additionalData?.error_details) {
+      updateData.error_details = additionalData.error_details;
+    }
+
+    if (additionalData?.progress) {
+      updateData.progress = additionalData.progress;
+    }
+
+    await supabase
+      .from('raw_imports')
+      .update(updateData)
+      .eq('id', id);
+
+    console.log(`[raw_imports] Updated status: ${id} -> ${status}`);
+  } catch (err) {
+    console.error('[raw_imports] Status update failed:', err);
+  }
 }
 
 Deno.serve(async (req) => {
@@ -189,8 +305,9 @@ function ensureUUID(value: any): string {
 }
 
 async function processRawToL2(supabase: any, userId: string | null, request: UnifiedETLRequest) {
-  const { import_id, store_id, org_id, data_type } = request;
+  const { import_id, store_id, org_id, data_type, source_name, source_type } = request;
   let { raw_data } = request;
+  let sourceName = source_name;
 
   console.log(`[raw_to_l2] Processing import: ${import_id}, type: ${data_type}`);
 
@@ -206,10 +323,45 @@ async function processRawToL2(supabase: any, userId: string | null, request: Uni
       throw new Error(`Import data not found: ${import_id}`);
     }
     raw_data = importData.raw_data;
+    sourceName = sourceName || importData.file_name;
   }
 
   if (!Array.isArray(raw_data) || raw_data.length === 0) {
     throw new Error('No data to process');
+  }
+
+  // ============================================================================
+  // raw_imports 기록 시작 (CTO 요구사항: 원본 데이터 보존)
+  // ============================================================================
+  let rawImportId: string | null = null;
+
+  if (userId) {
+    const rawImportResult = await createRawImport(supabase, {
+      org_id: org_id,
+      store_id: store_id,
+      user_id: userId,
+      source_type: source_type || 'csv',
+      source_name: sourceName,
+      row_count: raw_data.length,
+      status: 'pending',
+      data_type: data_type,
+      metadata: {
+        columns: Object.keys(raw_data[0] || {}),
+        sample_rows: raw_data.slice(0, 3),  // 첫 3행만 샘플로 저장
+        etl_version: '2.0',
+        import_id: import_id || null,
+      },
+      raw_data: raw_data,  // 전체 원본 데이터 저장
+    });
+
+    rawImportId = rawImportResult.id;
+
+    if (rawImportId) {
+      // 처리 시작 상태로 변경
+      await updateRawImportStatus(supabase, rawImportId, 'processing', {
+        progress: { current: 0, total: raw_data.length, percentage: 0 },
+      });
+    }
   }
 
   const result: any = {
@@ -219,6 +371,7 @@ async function processRawToL2(supabase: any, userId: string | null, request: Uni
     records_inserted: 0,
     errors: [],
     tables_affected: [],
+    raw_import_id: rawImportId,  // lineage 추적용
   };
 
   // Process based on data type
@@ -279,6 +432,24 @@ async function processRawToL2(supabase: any, userId: string | null, request: Uni
   // Add more data types as needed...
 
   result.success = result.errors.length === 0 || result.records_inserted > 0;
+
+  // ============================================================================
+  // raw_imports 상태 업데이트 (완료 또는 실패)
+  // ============================================================================
+  if (rawImportId) {
+    if (result.success) {
+      await updateRawImportStatus(supabase, rawImportId, 'completed', {
+        row_count: result.records_inserted,
+        progress: { current: result.records_inserted, total: raw_data.length, percentage: 100 },
+      });
+    } else {
+      await updateRawImportStatus(supabase, rawImportId, 'failed', {
+        error_message: result.errors.join('; '),
+        error_details: { errors: result.errors, records_attempted: raw_data.length },
+      });
+    }
+  }
+
   return result;
 }
 
