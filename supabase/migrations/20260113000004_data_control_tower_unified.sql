@@ -129,7 +129,11 @@ BEGIN
   END IF;
 
   -- 1. POS/Transaction 커버리지
-  SELECT COUNT(*) INTO v_count FROM purchases WHERE store_id = p_store_id AND DATE(created_at) = p_date;
+  -- 수정: created_at → purchase_date, 최근 30일 데이터도 확인
+  SELECT COUNT(*) INTO v_count FROM purchases
+  WHERE store_id = p_store_id
+    AND purchase_date::DATE >= (p_date - INTERVAL '30 days')
+    AND purchase_date::DATE <= p_date;
 
   v_coverage := v_coverage || jsonb_build_object(
     'pos', jsonb_build_object(
@@ -152,7 +156,11 @@ BEGIN
   v_weight_sum := v_weight_sum + (v_weights->>'pos')::NUMERIC;
 
   -- 2. Sensor (zone_events) 커버리지
-  SELECT COUNT(*) INTO v_count FROM zone_events WHERE store_id = p_store_id AND event_date = p_date;
+  -- 수정: 최근 30일 데이터 확인
+  SELECT COUNT(*) INTO v_count FROM zone_events
+  WHERE store_id = p_store_id
+    AND event_date >= (p_date - INTERVAL '30 days')::DATE
+    AND event_date <= p_date;
 
   v_coverage := v_coverage || jsonb_build_object(
     'sensor', jsonb_build_object(
