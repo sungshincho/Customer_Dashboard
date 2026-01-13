@@ -22,7 +22,8 @@ export function useScenePersistence(options: UseScenePersistenceOptions = {}) {
   const [isSaving, setIsSaving] = useState(false);
 
   // 씬 목록 로드
-  const loadScenes = useCallback(async () => {
+  // skipActiveScene: true면 목록만 갱신하고 activeScene은 건드리지 않음 (저장 후 사용)
+  const loadScenes = useCallback(async (skipActiveScene = false) => {
     if (!userId || !storeId) return;
 
     setIsLoading(true);
@@ -48,10 +49,12 @@ export function useScenePersistence(options: UseScenePersistenceOptions = {}) {
 
       setScenes(mappedScenes);
 
-      // 활성 씬 찾기
-      const active = mappedScenes.find((s) => s.is_active);
-      if (active) {
-        setActiveSceneState(active);
+      // 🔧 FIX: skipActiveScene이 true면 activeScene 설정 스킵 (저장 후 화면 깨짐 방지)
+      if (!skipActiveScene) {
+        const active = mappedScenes.find((s) => s.is_active);
+        if (active) {
+          setActiveSceneState(active);
+        }
       }
     } catch (error) {
       console.error('Failed to load scenes:', error);
@@ -98,7 +101,7 @@ export function useScenePersistence(options: UseScenePersistenceOptions = {}) {
           toast.success('씬이 저장되었습니다');
         }
 
-        await loadScenes();
+        await loadScenes(true);  // 🔧 FIX: 목록만 갱신, activeScene은 건드리지 않음 (저장 후 화면 깨짐 방지)
       } catch (error) {
         console.error('Failed to save scene:', error);
         toast.error('씬 저장에 실패했습니다');
@@ -118,7 +121,7 @@ export function useScenePersistence(options: UseScenePersistenceOptions = {}) {
 
         if (error) throw error;
         toast.success('씬이 삭제되었습니다');
-        await loadScenes();
+        await loadScenes(true);  // 🔧 FIX: 목록만 갱신
       } catch (error) {
         console.error('Failed to delete scene:', error);
         toast.error('씬 삭제에 실패했습니다');
