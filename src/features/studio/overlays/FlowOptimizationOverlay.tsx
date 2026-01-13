@@ -123,7 +123,7 @@ export function FlowOptimizationOverlay({
       ))}
 
       {/* 애니메이션 경로 */}
-      {showPaths && hasPaths && paths.filter(p => p?.points?.length > 0).slice(0, 15).map((path) => (
+      {showPaths && hasPaths && paths.slice(0, 15).map((path) => (
         <AnimatedPath
           key={path.id}
           path={path}
@@ -289,12 +289,11 @@ function AnimatedPath({
 
   // 좌표를 클램핑하여 경로 포인트 계산
   const clampedPoints = useMemo(() => {
-    if (!path?.points || !Array.isArray(path.points)) return [];
     return path.points.map(p => {
       const clamped = clampToStoreBounds(p.x, p.z, storeBounds);
       return { x: clamped.x, y: p.y, z: clamped.z };
     });
-  }, [path?.points, storeBounds]);
+  }, [path.points, storeBounds]);
 
   // 경로 애니메이션
   useFrame((_, delta) => {
