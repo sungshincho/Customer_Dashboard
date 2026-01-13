@@ -105,27 +105,29 @@ export function PipelineTimeline({ stats }: PipelineTimelineProps) {
         </div>
 
         {/* ETL Runs Summary */}
-        <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-700">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600 dark:text-gray-400">ETL 실행</span>
-            <div className="flex gap-3">
-              <span className="text-gray-900 dark:text-white">
-                총 {stats.etl_runs.total}회
-              </span>
-              {stats.etl_runs.running > 0 && (
-                <Badge variant="secondary" className="text-xs">
-                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                  {stats.etl_runs.running} 실행 중
-                </Badge>
-              )}
-              {stats.etl_runs.failed > 0 && (
-                <Badge variant="destructive" className="text-xs">
-                  {stats.etl_runs.failed} 실패
-                </Badge>
-              )}
+        {stats.etl_runs && (
+          <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-700">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-600 dark:text-gray-400">ETL 실행</span>
+              <div className="flex gap-3">
+                <span className="text-gray-900 dark:text-white">
+                  총 {stats.etl_runs.total}회
+                </span>
+                {stats.etl_runs.running > 0 && (
+                  <Badge variant="secondary" className="text-xs">
+                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    {stats.etl_runs.running} 실행 중
+                  </Badge>
+                )}
+                {stats.etl_runs.failed > 0 && (
+                  <Badge variant="destructive" className="text-xs">
+                    {stats.etl_runs.failed} 실패
+                  </Badge>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );
