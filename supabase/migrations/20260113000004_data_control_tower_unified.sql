@@ -2,7 +2,19 @@
 -- MIGRATION: Data Control Tower 통합 마이그레이션
 -- 목적: source_trace 컬럼 추가 + RPC 함수 생성 (안전한 단일 실행)
 -- 작성일: 2026-01-13
+-- 수정: 함수 중복 제거, store 컬럼 fallback, 전체 데이터 조회, completeness 기준 조정
 -- ============================================================================
+
+-- ============================================================================
+-- Part 0: 기존 함수 DROP (중복 시그니처 제거)
+-- ============================================================================
+DROP FUNCTION IF EXISTS public.calculate_data_quality_score(UUID, DATE);
+DROP FUNCTION IF EXISTS public.calculate_data_quality_score(UUID);
+DROP FUNCTION IF EXISTS public.get_data_control_tower_status(UUID, INTEGER);
+DROP FUNCTION IF EXISTS public.get_data_control_tower_status(UUID);
+DROP FUNCTION IF EXISTS public.get_kpi_lineage(TEXT, UUID, UUID, DATE);
+DROP FUNCTION IF EXISTS public.get_kpi_lineage(TEXT, UUID);
+DROP FUNCTION IF EXISTS public.get_kpi_lineage(TEXT);
 
 -- ============================================================================
 -- Part 1: etl_runs 테이블 생성 (먼저 생성해야 함)
@@ -101,6 +113,7 @@ END $$;
 
 -- ============================================================================
 -- Part 3: calculate_data_quality_score RPC 함수
+-- 수정: store_name/name fallback, 전체 데이터 조회, completeness 기준 조정
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.calculate_data_quality_score(
@@ -121,25 +134,26 @@ DECLARE
   v_store_name TEXT;
   v_weights CONSTANT JSONB := '{"pos": 0.25, "sensor": 0.30, "crm": 0.15, "product": 0.15, "zone": 0.15}';
 BEGIN
-  -- 스토어 이름 조회
-  SELECT store_name INTO v_store_name FROM stores WHERE id = p_store_id;
+  -- 스토어 이름 조회 (store_name → name fallback)
+  SELECT COALESCE(store_name, name) INTO v_store_name
+  FROM stores WHERE id = p_store_id;
 
   IF v_store_name IS NULL THEN
-    RETURN jsonb_build_object('success', false, 'error', 'Store not found');
+    -- store_name도 name도 없으면 id 사용
+    SELECT id::TEXT INTO v_store_name FROM stores WHERE id = p_store_id;
+    IF v_store_name IS NULL THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Store not found');
+    END IF;
   END IF;
 
-  -- 1. POS/Transaction 커버리지
-  -- 수정: created_at → purchase_date, 최근 30일 데이터도 확인
-  SELECT COUNT(*) INTO v_count FROM purchases
-  WHERE store_id = p_store_id
-    AND purchase_date::DATE >= (p_date - INTERVAL '30 days')
-    AND purchase_date::DATE <= p_date;
+  -- 1. POS/Transaction 커버리지 (전체 데이터 조회 - 시드 호환)
+  SELECT COUNT(*) INTO v_count FROM purchases WHERE store_id = p_store_id;
 
   v_coverage := v_coverage || jsonb_build_object(
     'pos', jsonb_build_object(
       'available', v_count > 0,
       'record_count', v_count,
-      'completeness', LEAST(v_count::NUMERIC / 100, 1),
+      'completeness', LEAST(v_count::NUMERIC / 1000, 1),
       'label', 'POS/매출 데이터'
     )
   );
@@ -152,21 +166,17 @@ BEGIN
     );
   END IF;
 
-  v_total_score := v_total_score + LEAST(v_count::NUMERIC / 100, 1) * (v_weights->>'pos')::NUMERIC;
+  v_total_score := v_total_score + LEAST(v_count::NUMERIC / 1000, 1) * (v_weights->>'pos')::NUMERIC;
   v_weight_sum := v_weight_sum + (v_weights->>'pos')::NUMERIC;
 
-  -- 2. Sensor (zone_events) 커버리지
-  -- 수정: 최근 30일 데이터 확인
-  SELECT COUNT(*) INTO v_count FROM zone_events
-  WHERE store_id = p_store_id
-    AND event_date >= (p_date - INTERVAL '30 days')::DATE
-    AND event_date <= p_date;
+  -- 2. Sensor (zone_events) 커버리지 (전체 데이터 조회)
+  SELECT COUNT(*) INTO v_count FROM zone_events WHERE store_id = p_store_id;
 
   v_coverage := v_coverage || jsonb_build_object(
     'sensor', jsonb_build_object(
       'available', v_count > 0,
       'record_count', v_count,
-      'completeness', LEAST(v_count::NUMERIC / 500, 1),
+      'completeness', LEAST(v_count::NUMERIC / 5000, 1),
       'label', 'NEURALSENSE 센서'
     )
   );
@@ -179,7 +189,7 @@ BEGIN
     );
   END IF;
 
-  v_total_score := v_total_score + LEAST(v_count::NUMERIC / 500, 1) * (v_weights->>'sensor')::NUMERIC;
+  v_total_score := v_total_score + LEAST(v_count::NUMERIC / 5000, 1) * (v_weights->>'sensor')::NUMERIC;
   v_weight_sum := v_weight_sum + (v_weights->>'sensor')::NUMERIC;
 
   -- 3. CRM/Customer 커버리지
@@ -264,8 +274,8 @@ BEGIN
       ELSE 'low'
     END,
     'coverage', v_coverage,
-    'warnings', v_issues,
-    'warning_count', jsonb_array_length(v_issues),
+    'warnings', COALESCE(v_issues, '[]'::jsonb),
+    'warning_count', jsonb_array_length(COALESCE(v_issues, '[]'::jsonb)),
     'calculated_at', NOW()
   );
 
@@ -278,6 +288,7 @@ GRANT EXECUTE ON FUNCTION public.calculate_data_quality_score TO service_role;
 
 -- ============================================================================
 -- Part 4: get_data_control_tower_status RPC 함수
+-- 수정: COALESCE 전체 적용
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.get_data_control_tower_status(
@@ -301,57 +312,57 @@ BEGIN
   -- 1. 데이터 품질 점수
   v_quality_score := calculate_data_quality_score(p_store_id, CURRENT_DATE);
 
-  -- 2. 최근 Imports
-  SELECT jsonb_agg(
+  -- 2. 최근 Imports (COALESCE 적용)
+  SELECT COALESCE(jsonb_agg(
     jsonb_build_object(
       'id', id, 'source_type', source_type, 'source_name', source_name,
       'data_type', data_type, 'row_count', row_count, 'status', status,
       'error_message', error_message, 'created_at', created_at, 'completed_at', completed_at
     ) ORDER BY created_at DESC
-  )
+  ), '[]'::jsonb)
   INTO v_recent_imports
   FROM (SELECT * FROM raw_imports WHERE store_id = p_store_id ORDER BY created_at DESC LIMIT p_limit) sub;
 
-  -- 3. 최근 ETL Runs
-  SELECT jsonb_agg(
+  -- 3. 최근 ETL Runs (COALESCE 적용)
+  SELECT COALESCE(jsonb_agg(
     jsonb_build_object(
       'id', id, 'etl_function', etl_function, 'status', status,
       'input_record_count', input_record_count, 'output_record_count', output_record_count,
       'duration_ms', duration_ms, 'started_at', started_at, 'completed_at', completed_at
     ) ORDER BY started_at DESC
-  )
+  ), '[]'::jsonb)
   INTO v_etl_runs_data
   FROM (SELECT * FROM etl_runs WHERE store_id = p_store_id ORDER BY started_at DESC LIMIT p_limit) sub;
 
   -- 4. 파이프라인 통계
   SELECT jsonb_build_object(
     'raw_imports', jsonb_build_object(
-      'total', COUNT(*),
-      'completed', COUNT(*) FILTER (WHERE status = 'completed'),
-      'failed', COUNT(*) FILTER (WHERE status = 'failed'),
-      'pending', COUNT(*) FILTER (WHERE status = 'pending')
+      'total', COALESCE(COUNT(*), 0),
+      'completed', COALESCE(COUNT(*) FILTER (WHERE status = 'completed'), 0),
+      'failed', COALESCE(COUNT(*) FILTER (WHERE status = 'failed'), 0),
+      'pending', COALESCE(COUNT(*) FILTER (WHERE status = 'pending'), 0)
     )
   )
   INTO v_pipeline_stats
   FROM raw_imports WHERE store_id = p_store_id;
 
   -- ETL 통계 추가
-  SELECT v_pipeline_stats || jsonb_build_object(
+  SELECT COALESCE(v_pipeline_stats, '{}'::jsonb) || jsonb_build_object(
     'etl_runs', jsonb_build_object(
-      'total', COUNT(*),
-      'completed', COUNT(*) FILTER (WHERE status = 'completed'),
-      'failed', COUNT(*) FILTER (WHERE status = 'failed'),
-      'running', COUNT(*) FILTER (WHERE status = 'running')
+      'total', COALESCE(COUNT(*), 0),
+      'completed', COALESCE(COUNT(*) FILTER (WHERE status = 'completed'), 0),
+      'failed', COALESCE(COUNT(*) FILTER (WHERE status = 'failed'), 0),
+      'running', COALESCE(COUNT(*) FILTER (WHERE status = 'running'), 0)
     )
   )
   INTO v_pipeline_stats
   FROM etl_runs WHERE store_id = p_store_id;
 
   -- L2/L3 카운트
-  SELECT COUNT(*) INTO v_l2_count FROM zone_events WHERE store_id = p_store_id;
-  SELECT COUNT(*) INTO v_l3_count FROM daily_kpis_agg WHERE store_id = p_store_id;
+  SELECT COALESCE(COUNT(*), 0) INTO v_l2_count FROM zone_events WHERE store_id = p_store_id;
+  SELECT COALESCE(COUNT(*), 0) INTO v_l3_count FROM daily_kpis_agg WHERE store_id = p_store_id;
 
-  v_pipeline_stats := v_pipeline_stats || jsonb_build_object('l2_records', v_l2_count, 'l3_records', v_l3_count);
+  v_pipeline_stats := COALESCE(v_pipeline_stats, '{}'::jsonb) || jsonb_build_object('l2_records', v_l2_count, 'l3_records', v_l3_count);
 
   -- 5. 데이터 소스 상태
   v_data_sources := jsonb_build_object(
@@ -381,11 +392,11 @@ BEGIN
   v_result := jsonb_build_object(
     'success', true,
     'store_id', p_store_id,
-    'quality_score', v_quality_score,
-    'data_sources', v_data_sources,
+    'quality_score', COALESCE(v_quality_score, '{}'::jsonb),
+    'data_sources', COALESCE(v_data_sources, '{}'::jsonb),
     'recent_imports', COALESCE(v_recent_imports, '[]'::jsonb),
     'recent_etl_runs', COALESCE(v_etl_runs_data, '[]'::jsonb),
-    'pipeline_stats', v_pipeline_stats,
+    'pipeline_stats', COALESCE(v_pipeline_stats, '{}'::jsonb),
     'queried_at', NOW()
   );
 
@@ -435,14 +446,14 @@ BEGIN
 
   v_source_trace := COALESCE(v_kpi_record -> 'source_trace', '{}'::jsonb);
 
-  -- Raw Imports 조회
-  SELECT jsonb_agg(
+  -- Raw Imports 조회 (COALESCE 적용)
+  SELECT COALESCE(jsonb_agg(
     jsonb_build_object(
       'id', id, 'source_type', source_type, 'source_name', source_name,
       'data_type', data_type, 'row_count', row_count, 'status', status,
       'created_at', created_at
     )
-  )
+  ), '[]'::jsonb)
   INTO v_raw_imports
   FROM raw_imports
   WHERE store_id = COALESCE(p_store_id, (v_kpi_record->>'store_id')::UUID)
@@ -451,9 +462,9 @@ BEGIN
 
   v_result := jsonb_build_object(
     'success', true,
-    'kpi_record', v_kpi_record,
+    'kpi_record', COALESCE(v_kpi_record, '{}'::jsonb),
     'lineage', jsonb_build_object(
-      'source_trace', v_source_trace,
+      'source_trace', COALESCE(v_source_trace, '{}'::jsonb),
       'etl_run', NULL,
       'raw_imports', COALESCE(v_raw_imports, '[]'::jsonb),
       'lineage_path', jsonb_build_array(
@@ -480,6 +491,10 @@ BEGIN
   RAISE NOTICE '======================================';
   RAISE NOTICE 'Data Control Tower migration completed';
   RAISE NOTICE '- etl_runs table created';
-  RAISE NOTICE '- RPC functions created';
+  RAISE NOTICE '- RPC functions created (with fixes)';
+  RAISE NOTICE '  * store_name/name fallback';
+  RAISE NOTICE '  * Full data query (no date filter)';
+  RAISE NOTICE '  * Adjusted completeness (/1000, /5000)';
+  RAISE NOTICE '  * COALESCE applied to all jsonb_agg';
   RAISE NOTICE '======================================';
 END $$;
