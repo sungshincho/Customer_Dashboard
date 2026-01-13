@@ -390,13 +390,16 @@ export function AIOptimizationTab({
           traffic: 'flow_guidance',
           conversion: 'customer_service',
         };
+        // 🔧 FIX: 실제 DB 직원 수 사용 (하드코딩 제거)
+        const actualStaffCount = storeContext.staff?.length || 8;
         params.staffing = {
-          staffCount: 3,
+          staffCount: actualStaffCount,
           goal: staffingGoalMap[selectedGoal],
           storeContext,
           // 🆕 환경 컨텍스트 추가 (블랙프라이데이 → 고트래픽 가정 등)
           environment_context: environmentContext,
         };
+        console.log('[AIOptimizationTab] Using actual staff count:', actualStaffCount);
       }
 
       console.log('[AIOptimizationTab] Calling runAllSimulations with params:', Object.keys(params));
