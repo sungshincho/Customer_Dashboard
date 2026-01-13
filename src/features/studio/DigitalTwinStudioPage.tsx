@@ -1493,17 +1493,22 @@ export default function DigitalTwinStudioPage() {
                 onHeightChange={setSceneSavePanelHeight}
                 width="w-52"
               >
-                <SceneSavePanel
+                <SceneSavePanelWrapper
                   currentSceneName={sceneName}
                   savedScenes={scenes.slice(0, 3)}
                   isSaving={isSaving}
-                  isDirty={false}
-                  onSave={handleSaveScene}
-                  onLoad={(id) => setActiveScene(id)}
-                  onDelete={(id) => deleteScene(id)}
+                  saveScene={saveScene}
+                  setActiveScene={setActiveScene}
+                  deleteScene={deleteScene}
                   onNew={handleNewScene}
                   onReset={handleResetScene}
                   maxScenes={3}
+                  setSceneName={setSceneName}
+                  isNewSceneMode={isNewSceneMode}
+                  setIsNewSceneMode={setIsNewSceneMode}
+                  activeLayers={activeLayers}
+                  logActivity={logActivity}
+                  storeId={selectedStore?.id}
                 />
               </DraggablePanel>
             )}
@@ -1817,6 +1822,190 @@ function SimulationResultPanels({
       y: 520
     }} />}
     </>;
+}
+
+// ============================================================================
+// 🔧 FIX: SceneProvider 내부에서 실제 3D models를 가져와 저장하는 래퍼
+// ============================================================================
+interface SceneSavePanelWrapperProps {
+  currentSceneName: string;
+  savedScenes: any[];
+  isSaving: boolean;
+  saveScene: (recipe: SceneRecipe, name: string, sceneId?: string) => Promise<void>;
+  setActiveScene: (id: string) => void;
+  deleteScene: (id: string) => Promise<void>;
+  onNew: () => void;
+  onReset: () => void;
+  maxScenes: number;
+  setSceneName: (name: string) => void;
+  isNewSceneMode: boolean;
+  setIsNewSceneMode: (v: boolean) => void;
+  activeLayers: string[];
+  logActivity: (type: string, data: any) => void;
+  storeId?: string;
+}
+
+function SceneSavePanelWrapper({
+  currentSceneName,
+  savedScenes,
+  isSaving,
+  saveScene,
+  setActiveScene,
+  deleteScene,
+  onNew,
+  onReset,
+  maxScenes,
+  setSceneName,
+  isNewSceneMode,
+  setIsNewSceneMode,
+  activeLayers,
+  logActivity,
+  storeId,
+}: SceneSavePanelWrapperProps) {
+  // 🔧 핵심: SceneProvider 내부에서 실제 3D에 보이는 models를 가져옴
+  const { models: sceneModels } = useScene();
+
+  // 현재 화면에 보이는 3D 상태로 SceneRecipe 생성
+  const buildCurrentRecipe = useCallback((): SceneRecipe | null => {
+    const activeModels = sceneModels.filter(m => activeLayers.includes(m.id));
+    if (activeModels.length === 0) return null;
+    
+    const spaceModel = activeModels.find(m => m.type === 'space');
+    if (!spaceModel) return null;
+
+    const lightingPreset: LightingPreset = {
+      name: 'warm-retail',
+      description: 'Default',
+      lights: [
+        { type: 'ambient', color: '#ffffff', intensity: 0.5 },
+        { type: 'directional', color: '#ffffff', intensity: 1, position: { x: 10, y: 10, z: 5 } }
+      ]
+    };
+
+    // SceneProvider의 models는 position이 [x,y,z] 배열 형태
+    const furnitureList = activeModels.filter(m => m.type === 'furniture').map(m => {
+      const pos = m.position || [0, 0, 0];
+      const rot = m.rotation || [0, 0, 0];
+      const scl = m.scale || [1, 1, 1];
+      const metaChildProducts = (m.metadata as any)?.childProducts;
+      
+      return {
+        id: m.id,
+        model_url: m.model_url,
+        type: 'furniture' as const,
+        furniture_type: m.name,
+        position: { x: pos[0], y: pos[1], z: pos[2] },
+        rotation: { x: rot[0], y: rot[1], z: rot[2] },
+        scale: { x: scl[0], y: scl[1], z: scl[2] },
+        dimensions: m.dimensions,
+        movable: true,
+        metadata: m.metadata,
+        childProducts: metaChildProducts?.map((cp: any) => ({
+          id: cp.id,
+          type: 'product' as const,
+          model_url: cp.model_url,
+          position: cp.position || { x: 0, y: 0, z: 0 },
+          rotation: cp.rotation || { x: 0, y: 0, z: 0 },
+          scale: cp.scale || { x: 1, y: 1, z: 1 },
+          sku: cp.name,
+          display_type: cp.metadata?.displayType,
+          dimensions: cp.dimensions,
+          isRelativePosition: true,
+          metadata: cp.metadata
+        })) || []
+      };
+    });
+
+    const productsList = activeModels.filter(m => m.type === 'product').map(m => {
+      const pos = m.position || [0, 0, 0];
+      const rot = m.rotation || [0, 0, 0];
+      const scl = m.scale || [1, 1, 1];
+      
+      return {
+        id: m.id,
+        model_url: m.model_url,
+        type: 'product' as const,
+        product_id: (m.metadata as any)?.entityId,
+        sku: m.name,
+        position: { x: pos[0], y: pos[1], z: pos[2] },
+        rotation: { x: rot[0], y: rot[1], z: rot[2] },
+        scale: { x: scl[0], y: scl[1], z: scl[2] },
+        dimensions: m.dimensions,
+        movable: true,
+        metadata: m.metadata
+      };
+    });
+
+    const spacePos = spaceModel.position || [0, 0, 0];
+    const spaceRot = spaceModel.rotation || [0, 0, 0];
+    const spaceScl = spaceModel.scale || [1, 1, 1];
+
+    return {
+      space: {
+        id: spaceModel.id,
+        model_url: spaceModel.model_url,
+        type: 'space',
+        position: { x: spacePos[0], y: spacePos[1], z: spacePos[2] },
+        rotation: { x: spaceRot[0], y: spaceRot[1], z: spaceRot[2] },
+        scale: { x: spaceScl[0], y: spaceScl[1], z: spaceScl[2] },
+        dimensions: spaceModel.dimensions,
+        metadata: spaceModel.metadata
+      },
+      furniture: furnitureList,
+      products: productsList,
+      lighting: lightingPreset,
+      camera: { position: { x: 10, y: 10, z: 15 }, target: { x: 0, y: 0, z: 0 } }
+    };
+  }, [sceneModels, activeLayers]);
+
+  // 저장 핸들러 - 실제 3D 화면 상태를 저장
+  const handleSave = useCallback(async (name: string) => {
+    const recipe = buildCurrentRecipe();
+    if (!recipe) {
+      toast.error('저장할 씬 데이터가 없습니다');
+      return;
+    }
+
+    try {
+      const existingScene = savedScenes.find(s => s.name && s.name === name);
+      const shouldUpdate = !isNewSceneMode && existingScene && existingScene.id;
+
+      console.log('[SceneSavePanelWrapper] Saving scene with actual 3D positions', {
+        name,
+        furnitureCount: recipe.furniture.length,
+        firstFurniturePos: recipe.furniture[0]?.position
+      });
+
+      await saveScene(recipe, name, shouldUpdate ? existingScene.id : undefined);
+      setSceneName(name);
+      setIsNewSceneMode(false);
+
+      logActivity('feature_use', {
+        feature: 'scene_save',
+        scene_name: name,
+        layer_count: activeLayers.length,
+        store_id: storeId,
+        is_new: !shouldUpdate
+      });
+    } catch (err) {
+      console.error('[SceneSavePanelWrapper] Error:', err);
+    }
+  }, [buildCurrentRecipe, savedScenes, isNewSceneMode, saveScene, setSceneName, setIsNewSceneMode, activeLayers, logActivity, storeId]);
+
+  return (
+    <SceneSavePanel
+      currentSceneName={currentSceneName}
+      savedScenes={savedScenes}
+      isSaving={isSaving}
+      isDirty={false}
+      onSave={handleSave}
+      onLoad={(id) => setActiveScene(id)}
+      onDelete={(id) => deleteScene(id)}
+      onNew={onNew}
+      onReset={onReset}
+      maxScenes={maxScenes}
+    />
+  );
 }
 
 // 🔧 ViewModeHandler 제거됨 - AI 최적화 탭에서 직접 뷰 모드 관리
