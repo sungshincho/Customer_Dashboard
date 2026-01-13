@@ -186,6 +186,25 @@ export function useScenePersistence(options: UseScenePersistenceOptions = {}) {
     [userId, storeId]
   );
 
+  // 🆕 활성 씬 해제 (씬 초기화 시 사용)
+  const clearActiveScene = useCallback(async () => {
+    if (!userId || !storeId) return;
+    
+    try {
+      // 모든 씬의 is_active를 false로 설정
+      await supabase
+        .from('store_scenes')
+        .update({ is_active: false })
+        .eq('user_id', userId)
+        .eq('store_id', storeId);
+      
+      setActiveSceneState(null);
+      await loadScenes(true);  // 목록만 갱신
+    } catch (error) {
+      console.error('Failed to clear active scene:', error);
+    }
+  }, [userId, storeId, loadScenes]);
+
   // 초기 로드
   useEffect(() => {
     loadScenes();
@@ -200,6 +219,7 @@ export function useScenePersistence(options: UseScenePersistenceOptions = {}) {
     saveScene,
     deleteScene,
     setActiveScene,
+    clearActiveScene,  // 🆕 추가
   };
 }
 
