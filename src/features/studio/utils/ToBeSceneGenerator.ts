@@ -230,9 +230,9 @@ export function generateLayoutOptimizedScene(
     furnitureMoves: changes.filter((c) => c.assetType === 'furniture').length,
     productChanges: changes.filter((c) => c.assetType === 'product').length,
     expectedImpact: {
-      efficiency: layoutResult.optimizedEfficiency - layoutResult.currentEfficiency,
-      revenue: layoutResult.improvements.revenueIncreasePercent,
-      traffic: layoutResult.improvements.trafficIncrease,
+      efficiency: (layoutResult.optimizedEfficiency || 0) - (layoutResult.currentEfficiency || 0),
+      revenue: layoutResult.improvements?.revenueIncreasePercent || 0,
+      traffic: layoutResult.improvements?.trafficIncrease || 0,
     },
   };
 
@@ -414,10 +414,10 @@ export function generateCombinedOptimizedScene(
     productChanges: uniqueChanges.filter((c) => c.assetType === 'product').length,
     expectedImpact: {
       efficiency: (results.layout?.optimizedEfficiency || 0) - (results.layout?.currentEfficiency || 0) +
-                  (results.flow?.comparison.congestionReduction || 0),
-      revenue: results.layout?.improvements.revenueIncreasePercent || 0,
-      traffic: (results.layout?.improvements.trafficIncrease || 0) +
-               (results.flow?.comparison.pathLengthReduction || 0),
+                  (results.flow?.comparison?.congestionReduction || 0),
+      revenue: results.layout?.improvements?.revenueIncreasePercent || 0,
+      traffic: (results.layout?.improvements?.trafficIncrease || 0) +
+               (results.flow?.comparison?.pathLengthReduction || 0),
     },
   };
 
