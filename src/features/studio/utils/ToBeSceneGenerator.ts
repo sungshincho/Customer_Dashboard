@@ -167,11 +167,11 @@ export function generateLayoutOptimizedScene(
           const targetFurniture = toBe.furniture.find(
             (f) => f.id === placement.toFurnitureId
           );
-          if (targetFurniture) {
+          if (targetFurniture?.position) {
             product.position = {
-              x: targetFurniture.position.x + (placement.toSlotPosition.x || 0),
-              y: targetFurniture.position.y + (placement.toSlotPosition.y || 0),
-              z: targetFurniture.position.z + (placement.toSlotPosition.z || 0),
+              x: (targetFurniture.position.x || 0) + (placement.toSlotPosition.x || 0),
+              y: (targetFurniture.position.y || 0) + (placement.toSlotPosition.y || 0),
+              z: (targetFurniture.position.z || 0) + (placement.toSlotPosition.z || 0),
             };
             console.log(`[ToBeSceneGenerator] Product ${placement.productSku} using furniture + slotOffset:`, product.position);
           }
@@ -182,7 +182,7 @@ export function generateLayoutOptimizedScene(
             (f) => f.id === placement.toFurnitureId
           );
 
-          if (targetFurniture) {
+          if (targetFurniture?.position) {
             const slotOffsets: Record<string, Vector3> = {
               hanger: { x: 0, y: 1.5, z: 0 },
               mannequin: { x: 0, y: 1.0, z: 0 },
@@ -196,9 +196,9 @@ export function generateLayoutOptimizedScene(
             const offset = slotOffsets[placement.slotType || 'shelf'] || { x: 0, y: 0.8, z: 0 };
 
             product.position = {
-              x: targetFurniture.position.x + offset.x,
-              y: targetFurniture.position.y + offset.y,
-              z: targetFurniture.position.z + offset.z,
+              x: (targetFurniture.position.x || 0) + offset.x,
+              y: (targetFurniture.position.y || 0) + offset.y,
+              z: (targetFurniture.position.z || 0) + offset.z,
             };
             console.warn(`[ToBeSceneGenerator] Product ${placement.productSku} using fallback offset:`, product.position);
           }
@@ -256,25 +256,30 @@ export function generateFlowOptimizedScene(
 
   // 병목 지점 기반 가구 재배치
   flowResult.bottlenecks.forEach((bottleneck, idx) => {
+    // bottleneck.position이 없으면 스킵
+    if (!bottleneck?.position) return;
+    
     // 병목 지점 근처 가구 찾기
     const nearbyFurniture = toBe.furniture.filter((f) => {
+      if (!f?.position) return false;
       const dist = Math.sqrt(
-        Math.pow(f.position.x - bottleneck.position.x, 2) +
-        Math.pow(f.position.z - bottleneck.position.z, 2)
+        Math.pow((f.position.x || 0) - (bottleneck.position.x || 0), 2) +
+        Math.pow((f.position.z || 0) - (bottleneck.position.z || 0), 2)
       );
       return dist < 3; // 3m 이내
     });
 
     nearbyFurniture.forEach((furniture) => {
+      if (!furniture?.position) return;
       const beforePosition = { ...furniture.position };
 
       // 병목 해소를 위해 가구 이동 (병목 지점에서 멀어지게)
-      const dx = furniture.position.x - bottleneck.position.x;
-      const dz = furniture.position.z - bottleneck.position.z;
+      const dx = (furniture.position.x || 0) - (bottleneck.position.x || 0);
+      const dz = (furniture.position.z || 0) - (bottleneck.position.z || 0);
       const dist = Math.sqrt(dx * dx + dz * dz) || 1;
 
-      furniture.position.x += (dx / dist) * 1.5; // 1.5m 이동
-      furniture.position.z += (dz / dist) * 1.5;
+      furniture.position.x = (furniture.position.x || 0) + (dx / dist) * 1.5; // 1.5m 이동
+      furniture.position.z = (furniture.position.z || 0) + (dz / dist) * 1.5;
 
       changes.push({
         id: `flow-change-${furniture.id}-${idx}`,
