@@ -5,7 +5,7 @@
  */
 
 import { useState } from 'react';
-import { Save, FolderOpen, Trash2, Clock, Loader2, Plus, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Save, FolderOpen, Trash2, Clock, Loader2, Plus, RotateCcw, AlertTriangle, Check, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -25,6 +25,8 @@ interface SceneSavePanelProps {
   onNew?: () => void;
   /** 🆕 씬 초기화 (뉴럴트윈 기본값으로 복원) */
   onReset?: () => void;
+  /** 🆕 씬 이름 변경 */
+  onRename?: (sceneId: string, newName: string) => void;
   /** 최대 저장 가능한 씬 개수 (기본값: 무제한) */
   maxScenes?: number;
 }
@@ -42,11 +44,16 @@ export function SceneSavePanel({
   onDelete,
   onNew,
   onReset,
+  onRename,
   maxScenes,
 }: SceneSavePanelProps) {
   const [sceneName, setSceneName] = useState(currentSceneName);
   const [showInputWarning, setShowInputWarning] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  
+  // 🆕 인라인 편집 상태
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
 
   // 최대 개수 제한 (maxScenes가 설정된 경우)
   const displayedScenes = maxScenes ? savedScenes.slice(0, maxScenes) : savedScenes;
@@ -77,6 +84,28 @@ export function SceneSavePanel({
     }
   };
 
+  // 🆕 인라인 편집 시작
+  const startEditing = (scene: SavedScene) => {
+    setEditingId(scene.id);
+    setEditingName(scene.name);
+  };
+
+  // 🆕 인라인 편집 저장
+  const saveEditing = () => {
+    if (editingId && editingName.trim() && onRename) {
+      onRename(editingId, editingName.trim());
+    }
+    setEditingId(null);
+    setEditingName('');
+  };
+
+  // 🆕 인라인 편집 취소
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditingName('');
+  };
+
+  // 🔧 FIX: created_at 사용 (저장 시간)
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString('ko-KR', {
@@ -221,37 +250,81 @@ export function SceneSavePanel({
                 )}
               >
                 <div className="flex-1 min-w-0">
-                  <p className="text-[11px] text-white truncate flex items-center gap-1">
-                    {scene.name}
-                    {scene.is_active && (
-                      <span className="text-[8px] px-1 py-0.5 rounded bg-primary/30 text-primary-foreground">
-                        활성
-                      </span>
-                    )}
-                  </p>
-                  <p className="text-[9px] text-white/40 flex items-center gap-0.5">
-                    <Clock className="w-2.5 h-2.5" />
-                    {formatDate(scene.updated_at || scene.created_at)}
-                  </p>
+                  {/* 🆕 인라인 편집 모드 */}
+                  {editingId === scene.id ? (
+                    <div className="flex items-center gap-1">
+                      <Input
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        className="h-5 text-[11px] bg-white/10 border-white/20 text-white px-1.5 py-0"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') saveEditing();
+                          if (e.key === 'Escape') cancelEditing();
+                        }}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-4 w-4 text-green-400 hover:text-green-300"
+                        onClick={saveEditing}
+                      >
+                        <Check className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-4 w-4 text-red-400 hover:text-red-300"
+                        onClick={cancelEditing}
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <p 
+                        className="text-[11px] text-white truncate flex items-center gap-1 cursor-pointer hover:text-blue-300"
+                        onClick={() => startEditing(scene)}
+                        title="클릭하여 이름 변경"
+                      >
+                        {scene.name}
+                        {scene.is_active && (
+                          <span className="text-[8px] px-1 py-0.5 rounded bg-primary/30 text-primary-foreground">
+                            활성
+                          </span>
+                        )}
+                      </p>
+                      {/* 🔧 FIX: created_at 사용 (저장 시간) */}
+                      <p className="text-[9px] text-white/40 flex items-center gap-0.5">
+                        <Clock className="w-2.5 h-2.5" />
+                        {formatDate(scene.created_at)}
+                      </p>
+                    </>
+                  )}
                 </div>
 
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={() => onLoad?.(scene.id)}
-                >
-                  <FolderOpen className="w-3 h-3 text-white/60" />
-                </Button>
+                {/* 편집 모드가 아닐 때만 버튼 표시 */}
+                {editingId !== scene.id && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => onLoad?.(scene.id)}
+                    >
+                      <FolderOpen className="w-3 h-3 text-white/60" />
+                    </Button>
 
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={() => onDelete?.(scene.id)}
-                >
-                  <Trash2 className="w-3 h-3 text-red-400/60" />
-                </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => onDelete?.(scene.id)}
+                    >
+                      <Trash2 className="w-3 h-3 text-red-400/60" />
+                    </Button>
+                  </>
+                )}
               </div>
             ))}
           </div>
