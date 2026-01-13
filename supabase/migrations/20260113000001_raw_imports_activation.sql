@@ -90,7 +90,7 @@ BEGIN
       udi.row_count,
       udi.status,
       udi.error_message,
-      COALESCE(udi.metadata, '{}'::jsonb) as metadata,
+      '{}'::jsonb as metadata,  -- user_data_imports에 metadata 컬럼 없음
       udi.raw_data,
       udi.progress,
       udi.error_details,
