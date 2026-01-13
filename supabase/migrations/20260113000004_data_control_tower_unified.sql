@@ -146,8 +146,9 @@ BEGIN
     END IF;
   END IF;
 
-  -- 1. POS/Transaction 커버리지 (전체 데이터 조회 - 시드 호환)
-  SELECT COUNT(*) INTO v_count FROM purchases WHERE store_id = p_store_id;
+  -- 1. POS/Transaction 커버리지 (transactions 또는 line_items 참조 - 시드 호환)
+  -- purchases 테이블 대신 transactions 테이블 사용 (시드 데이터가 transactions에 있음)
+  SELECT COUNT(*) INTO v_count FROM transactions WHERE store_id = p_store_id;
 
   v_coverage := v_coverage || jsonb_build_object(
     'pos', jsonb_build_object(
