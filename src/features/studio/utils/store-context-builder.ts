@@ -114,6 +114,16 @@ export interface StoreContext {
     hasProductData: boolean;
     overallScore: number;
   };
+  /** 🆕 직원 데이터 (AI 인력 최적화용) */
+  staff: Array<{
+    id: string;
+    staffCode: string;
+    staffName: string;
+    role: string;
+    zoneId?: string;
+    zoneName?: string;
+    isActive: boolean;
+  }>;
 }
 
 export async function buildStoreContext(storeId: string): Promise<StoreContext> {
@@ -135,6 +145,7 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
     furnitureResult,
     hourlyMetricsResult,
     zoneTransitionsResult,
+    staffResult,  // 🆕 직원 데이터
   ] = await Promise.all([
     // 매장 정보
     supabase.from('stores').select('*').eq('id', storeId).single(),
@@ -209,6 +220,12 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
       .eq('store_id', storeId)
       .gte('transition_date', thirtyDaysAgoStr)
       .order('transition_count', { ascending: false }),
+
+    // 🆕 직원 데이터 (AI 인력 최적화용)
+    supabase.from('staff')
+      .select('id, staff_code, staff_name, role, assigned_zone_id, is_active')
+      .eq('store_id', storeId)
+      .eq('is_active', true),
   ]);
 
   const store = storeResult.data;
@@ -223,6 +240,7 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
   const furniture = furnitureResult.data || [];
   const hourlyMetrics = hourlyMetricsResult.data || [];
   const zoneTransitions = zoneTransitionsResult.data || [];
+  const staffData = staffResult.data || [];  // 🆕 직원 데이터
 
   // 가구 ID -> 가구 데이터 맵 생성 (빠른 조회용)
   const furnitureMap = new Map<string, any>();
@@ -243,6 +261,7 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
     hourlyMetrics: hourlyMetrics.length,
     visits: visits.length,
     zoneTransitions: zoneTransitions.length,
+    staff: staffData.length,  // 🆕 직원 수 로깅
   });
 
   // 데이터 품질 점수 계산
@@ -489,6 +508,16 @@ export async function buildStoreContext(storeId: string): Promise<StoreContext> 
       hasProductData,
       overallScore,
     },
+    // 🆕 직원 데이터 (AI 인력 최적화용)
+    staff: staffData.map((s: any) => ({
+      id: s.id,
+      staffCode: s.staff_code || '',
+      staffName: s.staff_name || '직원',
+      role: s.role || 'staff',
+      zoneId: s.assigned_zone_id,
+      zoneName: s.assigned_zone_id ? zoneIdToNameMap.get(s.assigned_zone_id) : undefined,
+      isActive: s.is_active ?? true,
+    })),
   };
 }
 
