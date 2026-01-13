@@ -574,11 +574,9 @@ interface SceneProviderProps {
   mode?: StudioMode;
   children: ReactNode;
   initialModels?: Model3D[];
-  /** 🆕 모델 상태가 변경될 때 호출되는 콜백 (저장 기능용) */
-  onModelsChange?: (models: Model3D[]) => void;
 }
 
-export function SceneProvider({ mode = 'view', children, initialModels = [], onModelsChange }: SceneProviderProps) {
+export function SceneProvider({ mode = 'view', children, initialModels = [] }: SceneProviderProps) {
   const [state, dispatch] = useReducer(sceneReducer, {
     ...initialState,
     mode,
@@ -591,13 +589,6 @@ export function SceneProvider({ mode = 'view', children, initialModels = [], onM
       dispatch({ type: 'SET_MODELS', payload: initialModels });
     }
   }, [initialModels]);
-
-  // 🆕 models 상태가 변경될 때 상위 컴포넌트에 알림
-  useEffect(() => {
-    if (onModelsChange && state.models.length > 0) {
-      onModelsChange(state.models);
-    }
-  }, [state.models, onModelsChange]);
 
   // 모드
   const setMode = useCallback((mode: StudioMode) => {
