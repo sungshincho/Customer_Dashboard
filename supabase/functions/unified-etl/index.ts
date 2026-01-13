@@ -547,6 +547,97 @@ async function processL1ToL2(supabase: any, request: UnifiedETLRequest) {
 // ETL Type: l2_to_l3 - Aggregate L2 data into L3 summary tables
 // ============================================================================
 
+// source_trace 구조 정의
+interface SourceTrace {
+  raw_import_ids?: string[];
+  source_tables: string[];
+  date_range: { start: string; end: string };
+  source_record_counts?: Record<string, number>;
+  etl_run_id: string;
+  etl_function: string;
+  calculated_at: string;
+}
+
+// ETL 실행 기록 생성
+async function createETLRun(
+  supabase: any,
+  params: {
+    org_id?: string;
+    store_id?: string;
+    etl_function: string;
+    date_range_start?: string;
+    date_range_end?: string;
+    raw_import_ids?: string[];
+  }
+): Promise<string | null> {
+  try {
+    const { data, error } = await supabase
+      .from('etl_runs')
+      .insert({
+        org_id: params.org_id || null,
+        store_id: params.store_id || null,
+        etl_function: params.etl_function,
+        etl_version: '2.0',
+        date_range_start: params.date_range_start || null,
+        date_range_end: params.date_range_end || null,
+        raw_import_ids: params.raw_import_ids || [],
+        status: 'running',
+        started_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error('[etl_runs] CREATE failed:', error.message);
+      return null;
+    }
+
+    console.log(`[etl_runs] Created: ${data.id}`);
+    return data.id;
+  } catch (err) {
+    console.error('[etl_runs] Exception:', err);
+    return null;
+  }
+}
+
+// ETL 실행 상태 업데이트
+async function updateETLRunStatus(
+  supabase: any,
+  id: string,
+  status: 'completed' | 'failed' | 'partial',
+  stats?: {
+    input_record_count?: number;
+    output_record_count?: number;
+    error_message?: string;
+    error_details?: any;
+    metadata?: Record<string, any>;
+  }
+): Promise<void> {
+  try {
+    const startedAt = new Date();
+    const completedAt = new Date();
+    const duration_ms = completedAt.getTime() - startedAt.getTime();
+
+    await supabase
+      .from('etl_runs')
+      .update({
+        status,
+        completed_at: completedAt.toISOString(),
+        duration_ms,
+        input_record_count: stats?.input_record_count || 0,
+        output_record_count: stats?.output_record_count || 0,
+        error_message: stats?.error_message || null,
+        error_details: stats?.error_details || null,
+        metadata: stats?.metadata || {},
+      })
+      .eq('id', id);
+
+    console.log(`[etl_runs] Updated: ${id} -> ${status}`);
+  } catch (err) {
+    console.error('[etl_runs] Status update failed:', err);
+  }
+}
+
 async function processL2ToL3(supabase: any, request: UnifiedETLRequest) {
   const { org_id, store_id, date, date_from, date_to, target_tables } = request;
   const targetDate = date || new Date().toISOString().split('T')[0];
@@ -567,6 +658,31 @@ async function processL2ToL3(supabase: any, request: UnifiedETLRequest) {
   }
 
   const dates = getDateRange(targetDate, date_from, date_to);
+  const dateRangeStart = dates[0];
+  const dateRangeEnd = dates[dates.length - 1];
+
+  // ============================================================================
+  // ETL Run 기록 시작 (Data Lineage 추적)
+  // ============================================================================
+  const etlRunId = await createETLRun(supabase, {
+    org_id,
+    store_id,
+    etl_function: 'unified-etl:l2_to_l3',
+    date_range_start: dateRangeStart,
+    date_range_end: dateRangeEnd,
+  });
+
+  // source_trace 기본 구조
+  const baseSourceTrace: Omit<SourceTrace, 'source_record_counts'> = {
+    source_tables: ['line_items', 'funnel_events'],
+    date_range: { start: dateRangeStart, end: dateRangeEnd },
+    etl_run_id: etlRunId || crypto.randomUUID(),
+    etl_function: 'unified-etl:l2_to_l3',
+    calculated_at: new Date().toISOString(),
+  };
+
+  let totalInputRecords = 0;
+  let totalOutputRecords = 0;
 
   // Aggregate daily_kpis_agg
   if (targetSet.has('daily_kpis_agg')) {
@@ -586,10 +702,23 @@ async function processL2ToL3(supabase: any, request: UnifiedETLRequest) {
           .eq('store_id', store.id)
           .eq('event_date', date);
 
+        const lineItemCount = (lineItems || []).length;
+        const funnelEventCount = (funnelEvents || []).length;
+        totalInputRecords += lineItemCount + funnelEventCount;
+
         const totalRevenue = (lineItems || []).reduce((sum: number, li: any) => sum + (li.line_total || 0), 0);
         const totalTransactions = new Set((lineItems || []).map((li: any) => li.transaction_id)).size;
         const entryEvents = (funnelEvents || []).filter((e: any) => e.event_type === 'entry');
         const totalVisitors = entryEvents.length;
+
+        // source_trace 포함한 집계 레코드
+        const sourceTrace: SourceTrace = {
+          ...baseSourceTrace,
+          source_record_counts: {
+            line_items: lineItemCount,
+            funnel_events: funnelEventCount,
+          },
+        };
 
         aggregations.push({
           date,
@@ -601,6 +730,7 @@ async function processL2ToL3(supabase: any, request: UnifiedETLRequest) {
           conversion_rate: totalVisitors > 0 ? (totalTransactions / totalVisitors) * 100 : 0,
           avg_transaction_value: totalTransactions > 0 ? totalRevenue / totalTransactions : 0,
           calculated_at: new Date().toISOString(),
+          source_trace: sourceTrace,  // Data Lineage 정보 추가
         });
       }
     }
@@ -610,15 +740,103 @@ async function processL2ToL3(supabase: any, request: UnifiedETLRequest) {
         .from('daily_kpis_agg')
         .upsert(aggregations, { onConflict: 'date,store_id', ignoreDuplicates: false });
       results.daily_kpis_agg = { processed: aggregations.length, errors: error ? 1 : 0 };
+      totalOutputRecords += aggregations.length;
     } else {
       results.daily_kpis_agg = { processed: 0, errors: 0 };
     }
+  }
+
+  // Aggregate zone_daily_metrics (with source_trace)
+  if (targetSet.has('zone_daily_metrics')) {
+    const zoneAggregations: any[] = [];
+
+    for (const date of dates) {
+      for (const store of stores) {
+        // Get zone transitions for this store and date
+        const { data: zoneTransitions } = await supabase
+          .from('zone_transitions')
+          .select('*')
+          .eq('store_id', store.id)
+          .gte('transition_time', `${date}T00:00:00`)
+          .lt('transition_time', `${date}T23:59:59`);
+
+        const { data: zones } = await supabase
+          .from('zones_dim')
+          .select('id, zone_name')
+          .eq('store_id', store.id);
+
+        if (!zones || zones.length === 0) continue;
+
+        const transitionCount = (zoneTransitions || []).length;
+        totalInputRecords += transitionCount;
+
+        // Aggregate metrics per zone
+        for (const zone of zones) {
+          const zoneVisits = (zoneTransitions || []).filter(
+            (zt: any) => zt.to_zone_id === zone.id || zt.from_zone_id === zone.id
+          );
+
+          const avgDwellTime = zoneVisits.length > 0
+            ? zoneVisits.reduce((sum: number, zt: any) => sum + (zt.duration_seconds || 0), 0) / zoneVisits.length
+            : 0;
+
+          const sourceTrace: SourceTrace = {
+            ...baseSourceTrace,
+            source_tables: ['zone_transitions', 'zones_dim'],
+            source_record_counts: {
+              zone_transitions: zoneVisits.length,
+              zones_dim: 1,
+            },
+          };
+
+          zoneAggregations.push({
+            date,
+            store_id: store.id,
+            org_id: store.org_id,
+            zone_id: zone.id,
+            zone_name: zone.zone_name,
+            visit_count: zoneVisits.length,
+            avg_dwell_time: avgDwellTime,
+            calculated_at: new Date().toISOString(),
+            source_trace: sourceTrace,
+          });
+        }
+      }
+    }
+
+    if (zoneAggregations.length > 0) {
+      const { error } = await supabase
+        .from('zone_daily_metrics')
+        .upsert(zoneAggregations, { onConflict: 'date,zone_id', ignoreDuplicates: false });
+      results.zone_daily_metrics = { processed: zoneAggregations.length, errors: error ? 1 : 0 };
+      totalOutputRecords += zoneAggregations.length;
+    } else {
+      results.zone_daily_metrics = { processed: 0, errors: 0 };
+    }
+  }
+
+  // ============================================================================
+  // ETL Run 완료 기록
+  // ============================================================================
+  if (etlRunId) {
+    const hasErrors = Object.values(results).some(r => r.errors > 0);
+    await updateETLRunStatus(supabase, etlRunId, hasErrors ? 'partial' : 'completed', {
+      input_record_count: totalInputRecords,
+      output_record_count: totalOutputRecords,
+      metadata: {
+        target_tables: Array.from(targetSet),
+        results,
+        dates_processed: dates.length,
+        stores_processed: stores.length,
+      },
+    });
   }
 
   return {
     success: true,
     etl_type: 'l2_to_l3',
     results,
+    etl_run_id: etlRunId,  // lineage 추적용
     aggregated_at: new Date().toISOString(),
   };
 }
