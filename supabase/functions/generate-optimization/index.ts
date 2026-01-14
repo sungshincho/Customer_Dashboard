@@ -2119,7 +2119,7 @@ async function performStaffingOptimization(
   try {
     const { data: staffRows, error: staffError } = await supabase
       .from('staff')
-      .select('id, staff_code, staff_name, role, department, is_active')
+      .select('id, staff_code, staff_name, role, department, is_active, avatar_position, assigned_zone_id')
       .eq('store_id', storeId)
       .eq('is_active', true)
       .limit(20);
