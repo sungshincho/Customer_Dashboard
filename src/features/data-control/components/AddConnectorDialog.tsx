@@ -54,6 +54,7 @@ import {
 } from '../types';
 import { AuthConfigForm } from './AuthConfigForm';
 import { FieldMappingEditor } from './FieldMappingEditor';
+import { useToast } from '@/components/ui/use-toast';
 
 // ============================================================================
 // Props & State Types
@@ -109,6 +110,8 @@ export function AddConnectorDialog({
   const [step, setStep] = useState<Step>('provider');
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [testResult, setTestResult] = useState<any>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const createMutation = useCreateConnection();
   const testMutation = useTestConnection();
@@ -124,6 +127,7 @@ export function AddConnectorDialog({
       setStep('provider');
       setFormData(initialFormData);
       setTestResult(null);
+      setCreateError(null);
     }
   }, [open]);
 
@@ -176,8 +180,9 @@ export function AddConnectorDialog({
 
   // 연결 생성
   const handleCreate = async () => {
+    setCreateError(null);
     try {
-      await createMutation.mutateAsync({
+      console.log('Creating connection with data:', {
         orgId,
         storeId,
         name: formData.name,
@@ -190,9 +195,48 @@ export function AddConnectorDialog({
         targetTable: formData.targetTable,
         responseDataPath: formData.responseDataPath,
       });
+
+      const result = await createMutation.mutateAsync({
+        orgId,
+        storeId,
+        name: formData.name,
+        provider: formData.provider,
+        dataCategory: formData.dataCategory,
+        url: formData.url,
+        authType: formData.authType,
+        authConfig: formData.authConfig,
+        fieldMappings: formData.fieldMappings,
+        targetTable: formData.targetTable,
+        responseDataPath: formData.responseDataPath,
+      });
+
+      console.log('Connection created:', result);
+
+      // RPC 함수가 success: false를 반환할 수 있음
+      if (result && !result.success) {
+        setCreateError(result.error || '연결 생성에 실패했습니다.');
+        toast({
+          variant: 'destructive',
+          title: '연결 생성 실패',
+          description: result.error || '알 수 없는 오류가 발생했습니다.',
+        });
+        return;
+      }
+
+      toast({
+        title: '연결 생성 완료',
+        description: `${formData.name} 연결이 성공적으로 생성되었습니다.`,
+      });
       onOpenChange(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('연결 생성 실패:', error);
+      const errorMessage = error?.message || '연결 생성 중 오류가 발생했습니다.';
+      setCreateError(errorMessage);
+      toast({
+        variant: 'destructive',
+        title: '연결 생성 실패',
+        description: errorMessage,
+      });
     }
   };
 
@@ -506,6 +550,17 @@ export function AddConnectorDialog({
                   <p><strong>필드 매핑:</strong> {formData.fieldMappings.length}개</p>
                 </CardContent>
               </Card>
+
+              {/* 생성 에러 표시 */}
+              {createError && (
+                <div className="p-4 bg-red-100 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <XCircle className="h-5 w-5 text-red-600" />
+                    <span className="font-medium text-red-800">연결 생성 실패</span>
+                  </div>
+                  <p className="text-sm text-red-700">{createError}</p>
+                </div>
+              )}
             </div>
           )}
         </ScrollArea>
