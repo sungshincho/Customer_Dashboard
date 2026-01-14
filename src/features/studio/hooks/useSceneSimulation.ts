@@ -621,8 +621,17 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
         }
         if (staffingRes.status === 'fulfilled') {
           const staffingData = staffingRes.value.data;
+          
+          // 🔍 DEBUG: 실제 응답 구조 확인
+          console.log('[useSceneSimulation] 🔍 staffingData:', staffingData);
+          console.log('[useSceneSimulation] 🔍 staffingData keys:', Object.keys(staffingData || {}));
+          console.log('[useSceneSimulation] 🔍 staffingData.result:', staffingData?.result);
+          console.log('[useSceneSimulation] 🔍 staffingData.result keys:', Object.keys(staffingData?.result || {}));
+          
           // 🔧 FIX: staffing result가 다양한 위치에 있을 수 있음
           const staffingResult = staffingData?.result || staffingData?.staffing || staffingData;
+          
+          console.log('[useSceneSimulation] 🔍 staffingResult keys:', Object.keys(staffingResult || {}));
 
           if (staffingResult && (staffingResult.staffPositions || staffingResult.metrics || staffingResult.zoneCoverage)) {
             const staffPositions = staffingResult.staffPositions ||
