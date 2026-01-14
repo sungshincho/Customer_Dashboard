@@ -88,7 +88,16 @@ export function RecentImportsList({
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-sm font-semibold">최근 데이터 Import</CardTitle>
         {onRefresh && (
-          <Button variant="ghost" size="sm" onClick={onRefresh} disabled={isLoading}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              console.log('최근 Import 새로고침 버튼 클릭됨');
+              onRefresh();
+            }}
+            disabled={isLoading}
+          >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
           </Button>
         )}
