@@ -37,7 +37,7 @@ export function useDataControlTowerStatus() {
           });
 
         if (error) throw error;
-        return data as DataControlTowerStatus;
+        return data as unknown as DataControlTowerStatus;
       } catch (rpcError) {
         // Fallback: build status from direct queries
         console.warn('RPC not available, using fallback queries:', rpcError);
@@ -154,8 +154,8 @@ async function buildControlTowerStatusFallback(storeId: string): Promise<DataCon
       crm: { name: 'CRM', description: '고객/CDP 데이터', status: (customerCount || 0) > 0 ? 'active' : 'inactive' },
       product: { name: 'ERP', description: '재고/상품 데이터', status: (productCount || 0) > 0 ? 'active' : 'inactive' },
     },
-    recent_imports: recentImports || [],
-    recent_etl_runs: etlRuns || [],
+    recent_imports: (recentImports || []) as unknown as RawImport[],
+    recent_etl_runs: (etlRuns || []) as unknown as ETLRun[],
     pipeline_stats: {
       raw_imports: {
         total: totalImports || 0,
@@ -193,7 +193,7 @@ export function useDataQualityScore(date?: string) {
           });
 
         if (error) throw error;
-        return data as DataQualityScore;
+        return data as unknown as DataQualityScore;
       } catch (rpcError) {
         console.warn('Quality score RPC not available, using fallback:', rpcError);
         return await buildQualityScoreFallback(storeId);
@@ -424,7 +424,7 @@ export function useKPILineage(kpiTable: string, kpiId?: string, date?: string) {
           });
 
         if (error) throw error;
-        return data as KPILineage;
+        return data as unknown as KPILineage;
       } catch (rpcError) {
         console.warn('KPI lineage RPC not available, using fallback:', rpcError);
         return buildKPILineageFallback(storeId, kpiTable, kpiId, date);
@@ -483,7 +483,7 @@ async function buildKPILineageFallback(
     lineage: {
       source_trace: kpiRecord.source_trace || {},
       etl_run: null,
-      raw_imports: rawImports || [],
+      raw_imports: (rawImports || []) as unknown as RawImport[],
       lineage_path: [
         { layer: 'L3', table: kpiTable, description: '집계 KPI 테이블' },
         { layer: 'L2', tables: ['zone_events', 'line_items'], description: 'Fact 테이블' },

@@ -2142,12 +2142,16 @@ async function performStaffingOptimization(
   const storeWidth = storeInfo.width || 17;
   const storeDepth = storeInfo.depth || 16;
 
-  // 3. 직원 정보 섹션 생성
+// 3. 직원 정보 섹션 생성 (🔧 FIX: 현재 위치 포함)
   const staffInfoSection = realStaffData.length > 0
-    ? `ACTUAL STAFF MEMBERS (use these exact IDs and names):
-${realStaffData.map((s: any, idx: number) => `- ${s.staff_code || `STAFF-${idx+1}`}: ${s.staff_name} (${s.role || 'sales'})`).join('\n')}`
+    ? `ACTUAL STAFF MEMBERS WITH CURRENT POSITIONS:
+${realStaffData.map((s: any, idx: number) => {
+  const pos = s.avatar_position;
+  const posStr = pos ? `at (${pos.x?.toFixed(1) || 0}, ${pos.z?.toFixed(1) || 0})` : 'unknown position';
+  return `- ${s.staff_code || `STAFF-${idx+1}`}: ${s.staff_name} (${s.role || 'sales'}) - ${posStr}`;
+}).join('\n')}`
     : `- Available Staff Count: ${staffCount}`;
-
+  
   // 4. AI 프롬프트 생성 (🆕 assignment_strategy 필드 추가)
   const prompt = `You are an expert retail operations AI specializing in staff placement optimization.
 

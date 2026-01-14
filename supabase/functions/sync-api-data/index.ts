@@ -509,7 +509,7 @@ serve(async (req) => {
           status: 'error',
           last_error: syncError.message,
         })
-        .eq('id', connection.id);
+        .eq('id', schedule.data_source_id);
 
       throw syncError;
     }
