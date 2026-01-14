@@ -2,6 +2,7 @@
 // Phase 9: Connector Settings Page
 // ============================================================================
 // API 연결 상세 설정 및 관리 페이지
+// Updated: 2026-01-14 - Fixed duplicate export
 // ============================================================================
 
 import React, { useState, useEffect } from 'react';
@@ -707,5 +708,3 @@ export default function ConnectorSettingsPage() {
     </div>
   );
 }
-
-export default ConnectorSettingsPage;
