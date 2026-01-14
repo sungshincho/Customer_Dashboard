@@ -624,17 +624,25 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
           
           // 🔍 DEBUG: 실제 응답 구조 확인
           console.log('[useSceneSimulation] 🔍 staffingData:', staffingData);
-          console.log('[useSceneSimulation] 🔍 staffingData keys:', Object.keys(staffingData || {}));
-          console.log('[useSceneSimulation] 🔍 staffingData.result:', staffingData?.result);
-          console.log('[useSceneSimulation] 🔍 staffingData.result keys:', Object.keys(staffingData?.result || {}));
+          console.log('[useSceneSimulation] 🔍 staffingData.result?.staffing_result:', staffingData?.result?.staffing_result);
+          console.log('[useSceneSimulation] 🔍 staffingData.visualization?.staffing:', staffingData?.visualization?.staffing);
           
-          // 🔧 FIX: staffing result가 다양한 위치에 있을 수 있음
-          const staffingResult = staffingData?.result || staffingData?.staffing || staffingData;
+          // 🔧 FIX: generate-optimization 응답 구조 지원
+          // 1. result.staffing_result (generate-optimization staffing 전용)
+          // 2. visualization.staffing (generate-optimization both 모드)
+          // 3. result (advanced-ai-inference)
+          const staffingResult = staffingData?.result?.staffing_result ||
+                                 staffingData?.visualization?.staffing ||
+                                 staffingData?.result || 
+                                 staffingData?.staffing || 
+                                 staffingData;
           
-          console.log('[useSceneSimulation] 🔍 staffingResult keys:', Object.keys(staffingResult || {}));
+          console.log('[useSceneSimulation] 🔍 resolved staffingResult:', staffingResult);
 
-          if (staffingResult && (staffingResult.staffPositions || staffingResult.metrics || staffingResult.zoneCoverage)) {
+          if (staffingResult && (staffingResult.staffPositions || staffingResult.staffMarkers || staffingResult.metrics || staffingResult.zoneCoverage || staffingResult.coverageZones)) {
+            // staffMarkers를 staffPositions로 변환
             const staffPositions = staffingResult.staffPositions ||
+                            staffingResult.staffMarkers ||
                             staffingResult.staff_positions ||
                             staffingResult.positions ||
                             [];
