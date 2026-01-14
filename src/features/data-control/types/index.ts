@@ -128,24 +128,33 @@ export interface ApiMappingTemplate {
   updated_at?: string;
 }
 
+export type SyncType = 'scheduled' | 'manual' | 'retry';
+
 export interface ApiSyncLog {
   id: string;
   sync_endpoint_id?: string;
   api_connection_id: string;
+  sync_type: SyncType;
   started_at: string;
   completed_at?: string;
+  fetch_completed_at?: string;
+  processing_completed_at?: string;
   duration_ms?: number;
   status: 'running' | 'success' | 'partial' | 'failed';
   records_fetched: number;
   records_created: number;
   records_updated: number;
   records_failed: number;
+  error_type?: string;
   error_message?: string;
   error_details?: any;
   request_url?: string;
   request_headers?: Record<string, string>;
   response_status?: number;
   response_headers?: Record<string, string>;
+  response_size_bytes?: number;
+  raw_import_id?: string;
+  etl_run_id?: string;
   org_id?: string;
   created_at: string;
 }
@@ -158,8 +167,10 @@ export interface ConnectionTestResult {
   headers?: Record<string, string>;
   sample_data?: any[];
   record_count?: number;
+  detected_fields?: string[];
   message?: string;
   error?: string;
+  error_details?: any;
 }
 
 export interface SyncResult {
