@@ -82,7 +82,7 @@ export async function encrypt(plaintext: string): Promise<string> {
   const ciphertext = await crypto.subtle.encrypt(
     {
       name: ALGORITHM,
-      iv: iv,
+      iv: iv as unknown as BufferSource,
       tagLength: TAG_LENGTH,
     },
     key,
@@ -116,11 +116,11 @@ export async function decrypt(encryptedData: string): Promise<string> {
   const decrypted = await crypto.subtle.decrypt(
     {
       name: ALGORITHM,
-      iv: iv,
+      iv: iv as unknown as BufferSource,
       tagLength: TAG_LENGTH,
     },
     key,
-    ciphertext
+    ciphertext as unknown as BufferSource
   );
 
   const decoder = new TextDecoder();
