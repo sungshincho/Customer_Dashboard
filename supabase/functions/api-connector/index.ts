@@ -114,8 +114,10 @@ function buildAuthHeaders(authType: string, authConfig: any): Record<string, str
       }
       break;
     case 'basic':
-      if (authConfig.username && authConfig.password) {
-        const credentials = btoa(`${authConfig.username}:${authConfig.password}`);
+      // 토스페이먼츠 등 비밀번호가 빈 값인 경우도 지원
+      if (authConfig.username) {
+        const password = authConfig.password || '';
+        const credentials = btoa(`${authConfig.username}:${password}`);
         headers['Authorization'] = `Basic ${credentials}`;
       }
       break;
