@@ -15,3 +15,10 @@ export { ApiConnectionsList } from './ApiConnectionsList';
 export { AddConnectorDialog } from './AddConnectorDialog';
 export { AuthConfigForm } from './AuthConfigForm';
 export { FieldMappingEditor } from './FieldMappingEditor';
+
+// ============================================================================
+// Phase 9: Connector Settings Components
+// ============================================================================
+
+export { default as ConnectionTestResult } from './connectors/ConnectionTestResult';
+export { default as SyncHistoryTable } from './connectors/SyncHistoryTable';
