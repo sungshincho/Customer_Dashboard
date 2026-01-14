@@ -110,6 +110,18 @@ async function buildControlTowerStatusFallback(storeId: string): Promise<DataCon
     .select('*', { count: 'exact', head: true })
     .eq('store_id', storeId);
 
+  // 4-1. ERP/재고 데이터 카운트 (inventory_levels + inventory_movements)
+  const { count: inventoryLevelCount } = await supabase
+    .from('inventory_levels')
+    .select('*', { count: 'exact', head: true });
+
+  const { count: inventoryMovementCount } = await supabase
+    .from('inventory_movements')
+    .select('*', { count: 'exact', head: true })
+    .eq('store_id', storeId);
+
+  const totalInventoryCount = (inventoryLevelCount || 0) + (inventoryMovementCount || 0);
+
   // 5. L2/L3 counts
   const { count: l2Count } = await supabase
     .from('zone_events')
@@ -121,10 +133,10 @@ async function buildControlTowerStatusFallback(storeId: string): Promise<DataCon
     .select('*', { count: 'exact', head: true })
     .eq('store_id', storeId);
 
-  // Calculate quality score
-  const sources = [totalPosCount, sensorCount, customerCount, productCount];
+  // Calculate quality score (now includes ERP/inventory)
+  const sources = [totalPosCount, sensorCount, customerCount, productCount, totalInventoryCount];
   const availableSources = sources.filter(c => (c || 0) > 0).length;
-  const overallScore = Math.round((availableSources / 4) * 100);
+  const overallScore = Math.round((availableSources / 5) * 100);
 
   return {
     success: true,
@@ -139,6 +151,7 @@ async function buildControlTowerStatusFallback(storeId: string): Promise<DataCon
         sensor: { available: (sensorCount || 0) > 0, record_count: sensorCount || 0, label: 'NEURALSENSE 센서' },
         crm: { available: (customerCount || 0) > 0, record_count: customerCount || 0, label: 'CRM/고객 데이터' },
         product: { available: (productCount || 0) > 0, record_count: productCount || 0, label: '상품 마스터' },
+        erp: { available: totalInventoryCount > 0, record_count: totalInventoryCount, label: 'ERP/재고 데이터' },
       },
       warnings: [],
       warning_count: 0,
@@ -147,7 +160,8 @@ async function buildControlTowerStatusFallback(storeId: string): Promise<DataCon
       pos: { name: 'POS', description: '매출/거래 데이터', status: totalPosCount > 0 ? 'active' : 'inactive' },
       sensor: { name: 'NEURALSENSE', description: 'WiFi/BLE 센서', status: (sensorCount || 0) > 0 ? 'active' : 'inactive' },
       crm: { name: 'CRM', description: '고객/CDP 데이터', status: (customerCount || 0) > 0 ? 'active' : 'inactive' },
-      product: { name: 'ERP', description: '재고/상품 데이터', status: (productCount || 0) > 0 ? 'active' : 'inactive' },
+      product: { name: '상품', description: '상품 마스터', status: (productCount || 0) > 0 ? 'active' : 'inactive' },
+      erp: { name: 'ERP', description: '재고/입출고 데이터', status: totalInventoryCount > 0 ? 'active' : 'inactive' },
     },
     recent_imports: (recentImports || []) as unknown as RawImport[],
     recent_etl_runs: (etlRuns || []) as unknown as ETLRun[],
@@ -224,9 +238,21 @@ async function buildQualityScoreFallback(storeId: string): Promise<DataQualitySc
     .select('*', { count: 'exact', head: true })
     .eq('store_id', storeId);
 
-  const sources = [totalPosCount, sensorCount, customerCount, productCount];
+  // ERP/재고 데이터 카운트
+  const { count: inventoryLevelCount } = await supabase
+    .from('inventory_levels')
+    .select('*', { count: 'exact', head: true });
+
+  const { count: inventoryMovementCount } = await supabase
+    .from('inventory_movements')
+    .select('*', { count: 'exact', head: true })
+    .eq('store_id', storeId);
+
+  const totalInventoryCount = (inventoryLevelCount || 0) + (inventoryMovementCount || 0);
+
+  const sources = [totalPosCount, sensorCount, customerCount, productCount, totalInventoryCount];
   const availableSources = sources.filter(c => (c || 0) > 0).length;
-  const overallScore = Math.round((availableSources / 4) * 100);
+  const overallScore = Math.round((availableSources / 5) * 100);
 
   const warnings: Array<{ type: string; source: string; severity: string; message: string }> = [];
 
@@ -242,6 +268,9 @@ async function buildQualityScoreFallback(storeId: string): Promise<DataQualitySc
   if (!productCount || productCount === 0) {
     warnings.push({ type: 'missing', source: 'product', severity: 'medium', message: '상품 데이터가 없습니다.' });
   }
+  if (totalInventoryCount === 0) {
+    warnings.push({ type: 'missing', source: 'erp', severity: 'medium', message: 'ERP/재고 데이터가 없습니다.' });
+  }
 
   return {
     success: true,
@@ -253,6 +282,7 @@ async function buildQualityScoreFallback(storeId: string): Promise<DataQualitySc
       sensor: { available: (sensorCount || 0) > 0, record_count: sensorCount || 0, label: 'NEURALSENSE 센서' },
       crm: { available: (customerCount || 0) > 0, record_count: customerCount || 0, label: 'CRM/고객 데이터' },
       product: { available: (productCount || 0) > 0, record_count: productCount || 0, label: '상품 마스터' },
+      erp: { available: totalInventoryCount > 0, record_count: totalInventoryCount, label: 'ERP/재고 데이터' },
     },
     warnings,
     warning_count: warnings.length,

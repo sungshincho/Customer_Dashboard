@@ -257,6 +257,202 @@ export const TARGET_TABLES = [
   { value: 'zone_events', label: '구역 이벤트', category: 'sensor' },
 ] as const;
 
+// ============================================================================
+// ERP API Provider 옵션
+// ============================================================================
+export const ERP_PROVIDERS = [
+  { value: 'sap', label: 'SAP S/4HANA' },
+  { value: 'sap_b1', label: 'SAP Business One' },
+  { value: 'netsuite', label: 'Oracle NetSuite' },
+  { value: 'dynamics', label: 'Microsoft Dynamics 365' },
+  { value: 'odoo', label: 'Odoo ERP' },
+  { value: 'quickbooks', label: 'QuickBooks' },
+  { value: 'zoho', label: 'Zoho Inventory' },
+  { value: 'shopify', label: 'Shopify Inventory' },
+  { value: 'generic', label: 'Generic Inventory API' },
+  { value: 'custom', label: 'Custom ERP' },
+] as const;
+
+// ============================================================================
+// ERP API Mapping Templates
+// ============================================================================
+export const ERP_API_TEMPLATES: Record<string, {
+  provider: string;
+  data_category: DataCategory;
+  target_table: string;
+  name: string;
+  description: string;
+  default_endpoint: string;
+  default_method: string;
+  response_data_path: string;
+  field_mappings: FieldMapping[];
+  pagination_type: PaginationType;
+  pagination_config: PaginationConfig;
+  suggested_auth_type: AuthType;
+}> = {
+  // SAP S/4HANA 재고 레벨
+  sap_inventory_levels: {
+    provider: 'sap',
+    data_category: 'erp',
+    target_table: 'inventory_levels',
+    name: 'SAP S/4HANA 재고 수준',
+    description: 'SAP S/4HANA OData API에서 재고 수준 데이터 연동',
+    default_endpoint: '/sap/opu/odata/sap/API_PRODUCT_STOCK_SRV/A_ProductStock',
+    default_method: 'GET',
+    response_data_path: 'd.results',
+    field_mappings: [
+      { source: 'Material', target: 'product_id', transform: 'to_string', required: true },
+      { source: 'MatlWrhsStkQtyInMatlBaseUnit', target: 'current_stock', transform: 'to_integer', required: true },
+      { source: 'ReorderPoint', target: 'optimal_stock', transform: 'to_integer' },
+      { source: 'SafetyStock', target: 'minimum_stock', transform: 'to_integer' },
+      { source: 'LastChangeDateTime', target: 'last_updated', transform: 'to_timestamp' },
+    ],
+    pagination_type: 'offset',
+    pagination_config: { page_param: '$skip', limit_param: '$top', default_limit: 1000 },
+    suggested_auth_type: 'basic',
+  },
+
+  // SAP 재고 이동
+  sap_inventory_movements: {
+    provider: 'sap',
+    data_category: 'erp',
+    target_table: 'inventory_movements',
+    name: 'SAP S/4HANA 재고 이동',
+    description: 'SAP S/4HANA에서 입출고 내역 연동',
+    default_endpoint: '/sap/opu/odata/sap/API_MATERIAL_DOCUMENT_SRV/A_MaterialDocumentItem',
+    default_method: 'GET',
+    response_data_path: 'd.results',
+    field_mappings: [
+      { source: 'Material', target: 'product_id', transform: 'to_string', required: true },
+      { source: 'Plant', target: 'store_id', transform: 'to_string' },
+      { source: 'GoodsMovementType', target: 'movement_type', transform: 'to_string', required: true },
+      { source: 'QuantityInBaseUnit', target: 'quantity', transform: 'to_integer', required: true },
+      { source: 'PostingDate', target: 'moved_at', transform: 'to_timestamp', required: true },
+      { source: 'MaterialDocumentHeaderText', target: 'reason', transform: 'to_string' },
+      { source: 'MaterialDocument', target: 'reference_id', transform: 'to_string' },
+    ],
+    pagination_type: 'offset',
+    pagination_config: { page_param: '$skip', limit_param: '$top', default_limit: 500 },
+    suggested_auth_type: 'basic',
+  },
+
+  // NetSuite 재고 레벨
+  netsuite_inventory_levels: {
+    provider: 'netsuite',
+    data_category: 'erp',
+    target_table: 'inventory_levels',
+    name: 'NetSuite 재고 수준',
+    description: 'Oracle NetSuite REST API에서 재고 수준 데이터 연동',
+    default_endpoint: '/services/rest/record/v1/inventoryItem',
+    default_method: 'GET',
+    response_data_path: 'items',
+    field_mappings: [
+      { source: 'id', target: 'product_id', transform: 'to_string', required: true },
+      { source: 'quantityOnHand', target: 'current_stock', transform: 'to_integer', required: true },
+      { source: 'reorderPoint', target: 'optimal_stock', transform: 'to_integer' },
+      { source: 'safetyStockLevel', target: 'minimum_stock', transform: 'to_integer' },
+      { source: 'averageWeeklyDemand', target: 'weekly_demand', transform: 'to_decimal' },
+      { source: 'lastModifiedDate', target: 'last_updated', transform: 'to_timestamp' },
+    ],
+    pagination_type: 'offset',
+    pagination_config: { page_param: 'offset', limit_param: 'limit', default_limit: 1000 },
+    suggested_auth_type: 'oauth2',
+  },
+
+  // NetSuite 재고 이동
+  netsuite_inventory_movements: {
+    provider: 'netsuite',
+    data_category: 'erp',
+    target_table: 'inventory_movements',
+    name: 'NetSuite 재고 이동',
+    description: 'NetSuite에서 입출고 및 재고 조정 내역 연동',
+    default_endpoint: '/services/rest/record/v1/inventoryadjustment',
+    default_method: 'GET',
+    response_data_path: 'items',
+    field_mappings: [
+      { source: 'item.id', target: 'product_id', transform: 'to_string', required: true },
+      { source: 'location.id', target: 'store_id', transform: 'to_string' },
+      { source: 'adjustmentType', target: 'movement_type', transform: 'to_string', required: true },
+      { source: 'adjustQtyBy', target: 'quantity', transform: 'to_integer', required: true },
+      { source: 'tranDate', target: 'moved_at', transform: 'to_timestamp', required: true },
+      { source: 'memo', target: 'reason', transform: 'to_string' },
+      { source: 'tranId', target: 'reference_id', transform: 'to_string' },
+    ],
+    pagination_type: 'offset',
+    pagination_config: { page_param: 'offset', limit_param: 'limit', default_limit: 500 },
+    suggested_auth_type: 'oauth2',
+  },
+
+  // Shopify 재고 레벨
+  shopify_inventory_levels: {
+    provider: 'shopify',
+    data_category: 'erp',
+    target_table: 'inventory_levels',
+    name: 'Shopify 재고 수준',
+    description: 'Shopify Admin API에서 재고 수준 데이터 연동',
+    default_endpoint: '/admin/api/2024-01/inventory_levels.json',
+    default_method: 'GET',
+    response_data_path: 'inventory_levels',
+    field_mappings: [
+      { source: 'inventory_item_id', target: 'product_id', transform: 'to_string', required: true },
+      { source: 'available', target: 'current_stock', transform: 'to_integer', required: true },
+      { source: 'updated_at', target: 'last_updated', transform: 'to_timestamp' },
+    ],
+    pagination_type: 'cursor',
+    pagination_config: { cursor_param: 'page_info', cursor_field: 'page_info', default_limit: 250 },
+    suggested_auth_type: 'bearer',
+  },
+
+  // Generic Inventory API
+  generic_inventory_levels: {
+    provider: 'generic',
+    data_category: 'erp',
+    target_table: 'inventory_levels',
+    name: 'Generic 재고 API',
+    description: '범용 REST API에서 재고 수준 데이터 연동 (필드 매핑 커스터마이징 필요)',
+    default_endpoint: '/api/v1/inventory',
+    default_method: 'GET',
+    response_data_path: 'data',
+    field_mappings: [
+      { source: 'product_id', target: 'product_id', transform: 'to_string', required: true },
+      { source: 'quantity', target: 'current_stock', transform: 'to_integer', required: true },
+      { source: 'reorder_level', target: 'optimal_stock', transform: 'to_integer' },
+      { source: 'min_stock', target: 'minimum_stock', transform: 'to_integer' },
+      { source: 'weekly_sales', target: 'weekly_demand', transform: 'to_decimal' },
+      { source: 'updated_at', target: 'last_updated', transform: 'to_timestamp' },
+    ],
+    pagination_type: 'offset',
+    pagination_config: { page_param: 'page', limit_param: 'per_page', default_limit: 100 },
+    suggested_auth_type: 'bearer',
+  },
+
+  // Generic 재고 이동
+  generic_inventory_movements: {
+    provider: 'generic',
+    data_category: 'erp',
+    target_table: 'inventory_movements',
+    name: 'Generic 재고 이동 API',
+    description: '범용 REST API에서 입출고 내역 연동',
+    default_endpoint: '/api/v1/inventory/movements',
+    default_method: 'GET',
+    response_data_path: 'data',
+    field_mappings: [
+      { source: 'product_id', target: 'product_id', transform: 'to_string', required: true },
+      { source: 'store_id', target: 'store_id', transform: 'to_string' },
+      { source: 'type', target: 'movement_type', transform: 'to_string', required: true },
+      { source: 'quantity', target: 'quantity', transform: 'to_integer', required: true },
+      { source: 'timestamp', target: 'moved_at', transform: 'to_timestamp', required: true },
+      { source: 'previous_qty', target: 'previous_stock', transform: 'to_integer' },
+      { source: 'new_qty', target: 'new_stock', transform: 'to_integer' },
+      { source: 'reason', target: 'reason', transform: 'to_string' },
+      { source: 'reference', target: 'reference_id', transform: 'to_string' },
+    ],
+    pagination_type: 'offset',
+    pagination_config: { page_param: 'page', limit_param: 'per_page', default_limit: 100 },
+    suggested_auth_type: 'bearer',
+  },
+};
+
 export const TRANSFORM_TYPES = [
   { value: 'direct', label: '그대로' },
   { value: 'to_string', label: '문자열' },
@@ -300,6 +496,7 @@ export interface DataQualityScore {
     sensor: DataSourceCoverage;
     crm: DataSourceCoverage;
     product: DataSourceCoverage;
+    erp?: DataSourceCoverage;
     zone?: DataSourceCoverage;
     raw_imports?: {
       total_count: number;
