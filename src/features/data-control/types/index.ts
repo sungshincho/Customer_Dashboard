@@ -251,9 +251,10 @@ export const TARGET_TABLES = [
   { value: 'line_items', label: '거래 상세', category: 'pos' },
   { value: 'customers', label: '고객', category: 'crm' },
   { value: 'products', label: '상품', category: 'pos' },
-  { value: 'inventory', label: '재고', category: 'erp' },
+  { value: 'inventory_levels', label: '재고 수준', category: 'erp' },
+  { value: 'inventory_movements', label: '재고 이동', category: 'erp' },
   { value: 'visits', label: '방문', category: 'sensor' },
-  { value: 'zone_transitions', label: '구역 이동', category: 'sensor' },
+  { value: 'zone_events', label: '구역 이벤트', category: 'sensor' },
 ] as const;
 
 export const TRANSFORM_TYPES = [
