@@ -630,14 +630,31 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
         }
         if (staffingRes.status === 'fulfilled') {
           const staffingData = staffingRes.value.data;
+          
           // 🔧 FIX: generate-optimization 응답 구조에 맞게 수정
-          // generate-optimization은 result.staffing_result 안에 결과가 있음
+          // 다양한 응답 구조 지원:
+          // 1. { result: { staffing_result: {...} } }
+          // 2. { staffing_result: {...} }
+          // 3. { result: { staffPositions, ... } }
+          // 4. { staffPositions, ... }
           const staffingResult = staffingData?.result?.staffing_result ||
                                  staffingData?.staffing_result || 
                                  staffingData?.result?.staffing ||
+                                 // result 자체가 staffPositions를 가지고 있으면 그것 사용
+                                 (staffingData?.result?.staffPositions ? staffingData.result : null) ||
                                  staffingData?.result || 
-                                 staffingData?.staffing || 
+                                 staffingData?.staffing ||
+                                 // data 자체가 staffPositions를 가지고 있으면 그것 사용
+                                 (staffingData?.staffPositions ? staffingData : null) ||
                                  staffingData;
+          
+          console.log('[useSceneSimulation] Staffing parsing:', {
+            hasData: !!staffingData,
+            hasResult: !!staffingData?.result,
+            hasStaffingResult: !!staffingData?.result?.staffing_result,
+            resolvedKeys: Object.keys(staffingResult || {}),
+            hasStaffPositions: !!staffingResult?.staffPositions,
+          });
 
           if (staffingResult && (staffingResult.staffPositions || staffingResult.metrics || staffingResult.zoneCoverage)) {
             const staffPositions = staffingResult.staffPositions ||
