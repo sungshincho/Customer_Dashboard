@@ -534,21 +534,12 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
               params: { ...params?.flow, sceneData },
             },
           }),
-          // 🔧 FIX: advanced-ai-inference 대신 generate-optimization 사용 (503 에러 방지)
-          supabase.functions.invoke('generate-optimization', {
+          supabase.functions.invoke('advanced-ai-inference', {
             body: {
-              store_id: selectedStore.id,
-              optimization_type: 'staffing',
-              parameters: {
-                staffing_goal: params?.staffing?.goal || 'customer_service',
-                staff_count: params?.staffing?.staffCount || 8,
-                // storeContext를 layoutData로 전달
-                ...(params?.staffing?.storeContext && {
-                  store_info: params.staffing.storeContext.storeInfo,
-                  zones: params.staffing.storeContext.zones,
-                  staff: params.staffing.storeContext.staff,
-                }),
-              },
+              type: 'staffing_optimization',
+              storeId: selectedStore.id,
+              orgId,
+              params: { ...params?.staffing, sceneData },
             },
           }),
           // 🆕 Ultimate AI 최적화 호출 (동선/환경/연관/VMD 분석 포함)
@@ -630,31 +621,8 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
         }
         if (staffingRes.status === 'fulfilled') {
           const staffingData = staffingRes.value.data;
-          
-          // 🔧 FIX: generate-optimization 응답 구조에 맞게 수정
-          // 다양한 응답 구조 지원:
-          // 1. { result: { staffing_result: {...} } }
-          // 2. { staffing_result: {...} }
-          // 3. { result: { staffPositions, ... } }
-          // 4. { staffPositions, ... }
-          const staffingResult = staffingData?.result?.staffing_result ||
-                                 staffingData?.staffing_result || 
-                                 staffingData?.result?.staffing ||
-                                 // result 자체가 staffPositions를 가지고 있으면 그것 사용
-                                 (staffingData?.result?.staffPositions ? staffingData.result : null) ||
-                                 staffingData?.result || 
-                                 staffingData?.staffing ||
-                                 // data 자체가 staffPositions를 가지고 있으면 그것 사용
-                                 (staffingData?.staffPositions ? staffingData : null) ||
-                                 staffingData;
-          
-          console.log('[useSceneSimulation] Staffing parsing:', {
-            hasData: !!staffingData,
-            hasResult: !!staffingData?.result,
-            hasStaffingResult: !!staffingData?.result?.staffing_result,
-            resolvedKeys: Object.keys(staffingResult || {}),
-            hasStaffPositions: !!staffingResult?.staffPositions,
-          });
+          // 🔧 FIX: staffing result가 다양한 위치에 있을 수 있음
+          const staffingResult = staffingData?.result || staffingData?.staffing || staffingData;
 
           if (staffingResult && (staffingResult.staffPositions || staffingResult.metrics || staffingResult.zoneCoverage)) {
             const staffPositions = staffingResult.staffPositions ||
