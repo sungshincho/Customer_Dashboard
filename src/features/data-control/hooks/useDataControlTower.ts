@@ -86,19 +86,14 @@ async function buildControlTowerStatusFallback(storeId: string): Promise<DataCon
     .eq('status', 'failed');
 
   // 4. Data source checks
+  // POS 데이터는 transactions 테이블만 카운트 (RPC 함수와 동일하게)
+  // purchases 테이블은 API 매핑 대상이 아니므로 제외
   const { count: posCount } = await supabase
-    .from('purchases')
-    .select('*', { count: 'exact', head: true })
-    .eq('store_id', storeId);
-
-  // transactions 테이블도 카운트 (API 연동 데이터)
-  const { count: transactionsCount } = await supabase
     .from('transactions')
     .select('*', { count: 'exact', head: true })
     .eq('store_id', storeId);
 
-  // POS 데이터 = purchases + transactions
-  const totalPosCount = (posCount || 0) + (transactionsCount || 0);
+  const totalPosCount = posCount || 0;
 
   const { count: sensorCount } = await supabase
     .from('zone_events')
@@ -205,18 +200,14 @@ export function useDataQualityScore(date?: string) {
 
 // Fallback quality score calculation
 async function buildQualityScoreFallback(storeId: string): Promise<DataQualityScore> {
+  // POS 데이터는 transactions 테이블만 카운트 (RPC 함수와 동일하게)
+  // purchases 테이블은 API 매핑 대상이 아니므로 제외
   const { count: posCount } = await supabase
-    .from('purchases')
-    .select('*', { count: 'exact', head: true })
-    .eq('store_id', storeId);
-
-  // transactions 테이블도 카운트 (API 연동 데이터)
-  const { count: transactionsCount } = await supabase
     .from('transactions')
     .select('*', { count: 'exact', head: true })
     .eq('store_id', storeId);
 
-  const totalPosCount = (posCount || 0) + (transactionsCount || 0);
+  const totalPosCount = posCount || 0;
 
   const { count: sensorCount } = await supabase
     .from('zone_events')
