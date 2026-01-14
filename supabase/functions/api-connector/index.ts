@@ -180,10 +180,10 @@ serve(async (req) => {
         // 테스트 시작 시간
         const startTime = Date.now();
 
-        // 인증 헤더 구성
+        // 인증 헤더 구성 (camelCase와 snake_case 둘 다 지원)
         const authHeaders = buildAuthHeaders(
-          config.auth_type || 'none',
-          config.auth_config || {}
+          config.auth_type || config.authType || 'none',
+          config.auth_config || config.authConfig || {}
         );
 
         // 요청 헤더 구성
