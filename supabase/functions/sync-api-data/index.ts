@@ -125,19 +125,21 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const body = await req.json();
-    const { scheduleId, connection_id, manualRun = false } = body;
+    const { scheduleId, connection_id, manualRun = false, sync_type } = body;
 
     // =========================================================================
     // Phase 7: 직접 connection_id로 동기화 (스케줄 없이)
+    // Phase 8: sync_type 지원 (manual, scheduled, retry)
     // =========================================================================
     if (connection_id && !scheduleId) {
-      console.log(`Direct sync for connection: ${connection_id}`);
+      console.log(`Direct sync for connection: ${connection_id}, type: ${sync_type || 'manual'}`);
 
       // api-connector Edge Function으로 위임
       const { data: syncResult, error: syncError } = await supabase.functions.invoke('api-connector', {
         body: {
           action: 'sync',
           connection_id,
+          sync_type: sync_type || 'manual',
         },
       });
 

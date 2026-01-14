@@ -301,24 +301,36 @@ export function useTestConnection() {
 
 // ============================================================================
 // useSyncConnection - 동기화 실행
+// Phase 8: sync_type 지원 (manual, scheduled, retry)
 // ============================================================================
+
+interface SyncConnectionParams {
+  connectionId: string;
+  syncType?: 'manual' | 'scheduled' | 'retry';
+}
 
 export function useSyncConnection() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (connectionId: string) => {
+    mutationFn: async (params: string | SyncConnectionParams) => {
+      // 하위 호환성: string인 경우 connectionId로 처리
+      const connectionId = typeof params === 'string' ? params : params.connectionId;
+      const syncType = typeof params === 'string' ? 'manual' : (params.syncType || 'manual');
+
       const { data, error } = await supabase.functions.invoke('api-connector', {
         body: {
           action: 'sync',
           connection_id: connectionId,
+          sync_type: syncType,
         },
       });
 
       if (error) throw error;
       return data as SyncResult;
     },
-    onSuccess: (_, connectionId) => {
+    onSuccess: (_, params) => {
+      const connectionId = typeof params === 'string' ? params : params.connectionId;
       queryClient.invalidateQueries({ queryKey: apiConnectorKeys.all });
       queryClient.invalidateQueries({
         queryKey: apiConnectorKeys.syncLogs(connectionId),

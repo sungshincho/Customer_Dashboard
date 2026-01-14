@@ -289,6 +289,9 @@ serve(async (req) => {
           );
         }
 
+        // sync_type 파라미터 (manual, scheduled, retry)
+        const syncType = body.sync_type || 'manual';
+
         // 연결 정보 로드
         const { data: conn, error: connError } = await supabase
           .from('api_connections')
@@ -317,6 +320,7 @@ serve(async (req) => {
           .from('api_sync_logs')
           .insert({
             api_connection_id: connection_id,
+            sync_type: syncType,
             status: 'running',
             org_id: conn.org_id,
             request_url: conn.url,
