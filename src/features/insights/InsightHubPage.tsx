@@ -16,6 +16,7 @@ import {
   Store,
   Users,
   Package,
+  Boxes,
   TrendingUp,
   Sparkles,
   BarChart3,
@@ -29,6 +30,7 @@ import { OverviewTab } from '@/features/insights/tabs/OverviewTab';
 import { StoreTab } from '@/features/insights/tabs/StoreTab';
 import { CustomerTab } from '@/features/insights/tabs/CustomerTab';
 import { ProductTab } from '@/features/insights/tabs/ProductTab';
+import { InventoryTab } from '@/features/insights/tabs/InventoryTab';
 import { PredictionTab } from '@/features/insights/tabs/PredictionTab';
 import { AIRecommendationTab } from '@/features/insights/tabs/AIRecommendationTab';
 
@@ -40,6 +42,7 @@ const tabs = [
   { value: 'store', label: '매장', icon: Store },
   { value: 'customer', label: '고객', icon: Users },
   { value: 'product', label: '상품', icon: Package },
+  { value: 'inventory', label: '재고', icon: Boxes },
   { value: 'prediction', label: '예측', icon: TrendingUp },
   { value: 'ai', label: 'AI추천', icon: Sparkles },
 ];
@@ -225,6 +228,10 @@ function InsightHubContent({ activeTab, setActiveTab }: {
 
           <TabsContent value="product" className="space-y-6 mt-0">
             <ProductTab />
+          </TabsContent>
+
+          <TabsContent value="inventory" className="space-y-6 mt-0">
+            <InventoryTab />
           </TabsContent>
 
           <TabsContent value="prediction" className="space-y-6 mt-0">

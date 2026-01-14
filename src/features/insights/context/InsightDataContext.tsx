@@ -24,7 +24,7 @@ import { useAuth } from '@/hooks/useAuth';
 // 타입 정의
 // ============================================================================
 
-export type InsightTabType = 'overview' | 'store' | 'customer' | 'product' | 'prediction' | 'ai';
+export type InsightTabType = 'overview' | 'store' | 'customer' | 'product' | 'inventory' | 'prediction' | 'ai';
 
 // 기본 KPI (daily_kpis_agg 단일 소스)
 export interface BaseKPIs {
@@ -105,6 +105,61 @@ export interface ProductPerformance {
   avgPrice: number;
 }
 
+// 재고 메트릭 (Inventory 탭)
+export interface InventoryMetricsData {
+  totalProducts: number;
+  totalStockValue: number;
+  lowStockCount: number;
+  overstockCount: number;
+  criticalStockCount: number;
+  healthyStockCount: number;
+  stockDistribution: {
+    critical: number;
+    low: number;
+    normal: number;
+    overstock: number;
+  };
+  categoryBreakdown: Array<{
+    category: string;
+    totalStock: number;
+    lowStockItems: number;
+    overstockItems: number;
+  }>;
+  inventoryLevels: Array<{
+    id: string;
+    product_id: string;
+    product_name: string;
+    sku: string;
+    category: string | null;
+    current_stock: number;
+    optimal_stock: number;
+    minimum_stock: number;
+    weekly_demand: number;
+    days_until_stockout: number | null;
+    stock_status: 'critical' | 'low' | 'normal' | 'overstock';
+    last_updated: string | null;
+  }>;
+  recentMovements: Array<{
+    id: string;
+    product_id: string;
+    product_name: string;
+    movement_type: string;
+    quantity: number;
+    previous_stock: number | null;
+    new_stock: number | null;
+    reason: string | null;
+    moved_at: string;
+  }>;
+  riskProducts: Array<{
+    product_id: string;
+    product_name: string;
+    current_stock: number;
+    optimal_stock: number;
+    days_until_stockout: number;
+    urgency: 'critical' | 'high' | 'medium' | 'low';
+  }>;
+}
+
 // Context 타입
 interface InsightDataContextType {
   // 현재 활성 탭
@@ -121,6 +176,7 @@ interface InsightDataContextType {
   zoneMetrics: UseQueryResult<ZoneMetrics | null>;
   customerSegments: UseQueryResult<CustomerSegments | null>;
   productPerformance: UseQueryResult<ProductPerformance | null>;
+  inventoryMetrics: UseQueryResult<InventoryMetricsData | null>;
 
   // 데이터 새로고침
   refreshAll: () => void;
@@ -551,6 +607,196 @@ export function InsightDataProvider({ children, initialTab = 'overview' }: Insig
   });
 
   // ========================================================================
+  // 6. 재고 메트릭 - Inventory 탭 진입 시 Lazy Loading
+  // ========================================================================
+  const inventoryMetrics = useQuery({
+    queryKey: ['insight-inventory', storeId, startDate, endDate, orgId],
+    queryFn: async (): Promise<InventoryMetricsData | null> => {
+      if (!orgId) return null;
+
+      // 1. 재고 수준 조회 (products 조인)
+      const { data: levelsData, error: levelsError } = await supabase
+        .from('inventory_levels')
+        .select(`
+          id,
+          product_id,
+          current_stock,
+          optimal_stock,
+          minimum_stock,
+          weekly_demand,
+          last_updated,
+          products:product_id (
+            product_name,
+            sku,
+            category,
+            price
+          )
+        `)
+        .eq('org_id', orgId)
+        .limit(1000);
+
+      if (levelsError) {
+        console.error('[InsightDataProvider] Inventory levels error:', levelsError);
+      }
+
+      // 2. 최근 입출고 내역 조회
+      const { data: movementsData, error: movementsError } = await supabase
+        .from('inventory_movements')
+        .select(`
+          id,
+          product_id,
+          movement_type,
+          quantity,
+          previous_stock,
+          new_stock,
+          reason,
+          reference_id,
+          moved_at,
+          products:product_id (
+            product_name
+          )
+        `)
+        .eq('org_id', orgId)
+        .gte('moved_at', startDate)
+        .lte('moved_at', endDate)
+        .order('moved_at', { ascending: false })
+        .limit(100);
+
+      if (movementsError) {
+        console.error('[InsightDataProvider] Inventory movements error:', movementsError);
+      }
+
+      // 3. 데이터 가공 - 재고 상태 계산
+      const calculateStockStatus = (
+        current: number,
+        optimal: number,
+        minimum: number
+      ): 'critical' | 'low' | 'normal' | 'overstock' => {
+        if (current <= minimum) return 'critical';
+        if (current < optimal * 0.5) return 'low';
+        if (current > optimal * 1.5) return 'overstock';
+        return 'normal';
+      };
+
+      const calculateDaysUntilStockout = (
+        current: number,
+        weeklyDemand: number
+      ): number | null => {
+        if (!weeklyDemand || weeklyDemand <= 0) return null;
+        const dailyDemand = weeklyDemand / 7;
+        return Math.floor(current / dailyDemand);
+      };
+
+      const getUrgencyLevel = (
+        daysUntilStockout: number | null
+      ): 'critical' | 'high' | 'medium' | 'low' => {
+        if (daysUntilStockout === null) return 'low';
+        if (daysUntilStockout <= 3) return 'critical';
+        if (daysUntilStockout <= 7) return 'high';
+        if (daysUntilStockout <= 14) return 'medium';
+        return 'low';
+      };
+
+      const inventoryLevels = (levelsData || []).map((level: any) => {
+        const product = level.products || {};
+        const daysUntilStockout = calculateDaysUntilStockout(
+          level.current_stock,
+          level.weekly_demand
+        );
+
+        return {
+          id: level.id,
+          product_id: level.product_id,
+          product_name: product.product_name || 'Unknown',
+          sku: product.sku || '',
+          category: product.category,
+          current_stock: level.current_stock || 0,
+          optimal_stock: level.optimal_stock || 0,
+          minimum_stock: level.minimum_stock || 0,
+          weekly_demand: level.weekly_demand || 0,
+          days_until_stockout: daysUntilStockout,
+          stock_status: calculateStockStatus(
+            level.current_stock || 0,
+            level.optimal_stock || 0,
+            level.minimum_stock || 0
+          ),
+          last_updated: level.last_updated,
+        };
+      });
+
+      const recentMovements = (movementsData || []).map((mov: any) => ({
+        id: mov.id,
+        product_id: mov.product_id,
+        product_name: mov.products?.product_name || 'Unknown',
+        movement_type: mov.movement_type,
+        quantity: mov.quantity,
+        previous_stock: mov.previous_stock,
+        new_stock: mov.new_stock,
+        reason: mov.reason,
+        moved_at: mov.moved_at,
+      }));
+
+      // 4. KPI 계산
+      const stockDistribution = {
+        critical: inventoryLevels.filter((l: any) => l.stock_status === 'critical').length,
+        low: inventoryLevels.filter((l: any) => l.stock_status === 'low').length,
+        normal: inventoryLevels.filter((l: any) => l.stock_status === 'normal').length,
+        overstock: inventoryLevels.filter((l: any) => l.stock_status === 'overstock').length,
+      };
+
+      // 카테고리별 집계
+      const categoryMap = new Map<string, { totalStock: number; lowStockItems: number; overstockItems: number }>();
+      inventoryLevels.forEach((level: any) => {
+        const cat = level.category || '기타';
+        const current = categoryMap.get(cat) || { totalStock: 0, lowStockItems: 0, overstockItems: 0 };
+        categoryMap.set(cat, {
+          totalStock: current.totalStock + level.current_stock,
+          lowStockItems: current.lowStockItems + (level.stock_status === 'low' || level.stock_status === 'critical' ? 1 : 0),
+          overstockItems: current.overstockItems + (level.stock_status === 'overstock' ? 1 : 0),
+        });
+      });
+
+      const categoryBreakdown = Array.from(categoryMap.entries())
+        .map(([category, data]) => ({ category, ...data }))
+        .sort((a, b) => b.totalStock - a.totalStock);
+
+      // 위험 상품 목록
+      const riskProducts = inventoryLevels
+        .filter((l: any) => l.stock_status === 'critical' || l.stock_status === 'low')
+        .map((l: any) => ({
+          product_id: l.product_id,
+          product_name: l.product_name,
+          current_stock: l.current_stock,
+          optimal_stock: l.optimal_stock,
+          days_until_stockout: l.days_until_stockout || 0,
+          urgency: getUrgencyLevel(l.days_until_stockout),
+        }))
+        .sort((a: any, b: any) => a.days_until_stockout - b.days_until_stockout)
+        .slice(0, 10);
+
+      const totalStockValue = inventoryLevels.reduce((sum: number, l: any) => sum + l.current_stock, 0);
+
+      return {
+        totalProducts: inventoryLevels.length,
+        totalStockValue,
+        lowStockCount: stockDistribution.critical + stockDistribution.low,
+        overstockCount: stockDistribution.overstock,
+        criticalStockCount: stockDistribution.critical,
+        healthyStockCount: stockDistribution.normal,
+        stockDistribution,
+        categoryBreakdown,
+        inventoryLevels,
+        recentMovements,
+        riskProducts,
+      };
+    },
+    enabled: !!orgId && activeTab === 'inventory',
+    staleTime: STALE_TIME,
+    gcTime: CACHE_TIME,
+    refetchOnMount: false,
+  });
+
+  // ========================================================================
   // 데이터 새로고침
   // ========================================================================
   const refreshAll = useCallback(() => {
@@ -559,7 +805,8 @@ export function InsightDataProvider({ children, initialTab = 'overview' }: Insig
     if (activeTab === 'store') zoneMetrics.refetch();
     if (activeTab === 'customer') customerSegments.refetch();
     if (activeTab === 'product') productPerformance.refetch();
-  }, [activeTab, baseKPIs, funnelData, zoneMetrics, customerSegments, productPerformance]);
+    if (activeTab === 'inventory') inventoryMetrics.refetch();
+  }, [activeTab, baseKPIs, funnelData, zoneMetrics, customerSegments, productPerformance, inventoryMetrics]);
 
   // ========================================================================
   // Context Value
@@ -572,8 +819,9 @@ export function InsightDataProvider({ children, initialTab = 'overview' }: Insig
     zoneMetrics,
     customerSegments,
     productPerformance,
+    inventoryMetrics,
     refreshAll,
-  }), [activeTab, baseKPIs, funnelData, zoneMetrics, customerSegments, productPerformance, refreshAll]);
+  }), [activeTab, baseKPIs, funnelData, zoneMetrics, customerSegments, productPerformance, inventoryMetrics, refreshAll]);
 
   return (
     <InsightDataContext.Provider value={value}>
@@ -619,6 +867,11 @@ export function useCustomerSegmentsData() {
 export function useProductPerformanceData() {
   const { productPerformance, setActiveTab } = useInsightData();
   return { ...productPerformance, enableLoading: () => setActiveTab('product') };
+}
+
+export function useInventoryMetricsData() {
+  const { inventoryMetrics, setActiveTab } = useInsightData();
+  return { ...inventoryMetrics, enableLoading: () => setActiveTab('inventory') };
 }
 
 // ============================================================================
