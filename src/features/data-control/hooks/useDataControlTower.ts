@@ -91,6 +91,15 @@ async function buildControlTowerStatusFallback(storeId: string): Promise<DataCon
     .select('*', { count: 'exact', head: true })
     .eq('store_id', storeId);
 
+  // transactions 테이블도 카운트 (API 연동 데이터)
+  const { count: transactionsCount } = await supabase
+    .from('transactions')
+    .select('*', { count: 'exact', head: true })
+    .eq('store_id', storeId);
+
+  // POS 데이터 = purchases + transactions
+  const totalPosCount = (posCount || 0) + (transactionsCount || 0);
+
   const { count: sensorCount } = await supabase
     .from('zone_events')
     .select('*', { count: 'exact', head: true })
@@ -118,7 +127,7 @@ async function buildControlTowerStatusFallback(storeId: string): Promise<DataCon
     .eq('store_id', storeId);
 
   // Calculate quality score
-  const sources = [posCount, sensorCount, customerCount, productCount];
+  const sources = [totalPosCount, sensorCount, customerCount, productCount];
   const availableSources = sources.filter(c => (c || 0) > 0).length;
   const overallScore = Math.round((availableSources / 4) * 100);
 
@@ -131,7 +140,7 @@ async function buildControlTowerStatusFallback(storeId: string): Promise<DataCon
       overall_score: overallScore,
       confidence_level: overallScore >= 75 ? 'high' : overallScore >= 50 ? 'medium' : 'low',
       coverage: {
-        pos: { available: (posCount || 0) > 0, record_count: posCount || 0, label: 'POS/매출 데이터' },
+        pos: { available: totalPosCount > 0, record_count: totalPosCount, label: 'POS/매출 데이터' },
         sensor: { available: (sensorCount || 0) > 0, record_count: sensorCount || 0, label: 'NEURALSENSE 센서' },
         crm: { available: (customerCount || 0) > 0, record_count: customerCount || 0, label: 'CRM/고객 데이터' },
         product: { available: (productCount || 0) > 0, record_count: productCount || 0, label: '상품 마스터' },
@@ -140,7 +149,7 @@ async function buildControlTowerStatusFallback(storeId: string): Promise<DataCon
       warning_count: 0,
     },
     data_sources: {
-      pos: { name: 'POS', description: '매출/거래 데이터', status: (posCount || 0) > 0 ? 'active' : 'inactive' },
+      pos: { name: 'POS', description: '매출/거래 데이터', status: totalPosCount > 0 ? 'active' : 'inactive' },
       sensor: { name: 'NEURALSENSE', description: 'WiFi/BLE 센서', status: (sensorCount || 0) > 0 ? 'active' : 'inactive' },
       crm: { name: 'CRM', description: '고객/CDP 데이터', status: (customerCount || 0) > 0 ? 'active' : 'inactive' },
       product: { name: 'ERP', description: '재고/상품 데이터', status: (productCount || 0) > 0 ? 'active' : 'inactive' },
@@ -201,6 +210,14 @@ async function buildQualityScoreFallback(storeId: string): Promise<DataQualitySc
     .select('*', { count: 'exact', head: true })
     .eq('store_id', storeId);
 
+  // transactions 테이블도 카운트 (API 연동 데이터)
+  const { count: transactionsCount } = await supabase
+    .from('transactions')
+    .select('*', { count: 'exact', head: true })
+    .eq('store_id', storeId);
+
+  const totalPosCount = (posCount || 0) + (transactionsCount || 0);
+
   const { count: sensorCount } = await supabase
     .from('zone_events')
     .select('*', { count: 'exact', head: true })
@@ -216,13 +233,13 @@ async function buildQualityScoreFallback(storeId: string): Promise<DataQualitySc
     .select('*', { count: 'exact', head: true })
     .eq('store_id', storeId);
 
-  const sources = [posCount, sensorCount, customerCount, productCount];
+  const sources = [totalPosCount, sensorCount, customerCount, productCount];
   const availableSources = sources.filter(c => (c || 0) > 0).length;
   const overallScore = Math.round((availableSources / 4) * 100);
 
   const warnings: Array<{ type: string; source: string; severity: string; message: string }> = [];
 
-  if (!posCount || posCount === 0) {
+  if (totalPosCount === 0) {
     warnings.push({ type: 'missing', source: 'pos', severity: 'high', message: 'POS 데이터가 없습니다.' });
   }
   if (!sensorCount || sensorCount === 0) {
@@ -241,7 +258,7 @@ async function buildQualityScoreFallback(storeId: string): Promise<DataQualitySc
     overall_score: overallScore,
     confidence_level: overallScore >= 75 ? 'high' : overallScore >= 50 ? 'medium' : 'low',
     coverage: {
-      pos: { available: (posCount || 0) > 0, record_count: posCount || 0, label: 'POS/매출 데이터' },
+      pos: { available: totalPosCount > 0, record_count: totalPosCount, label: 'POS/매출 데이터' },
       sensor: { available: (sensorCount || 0) > 0, record_count: sensorCount || 0, label: 'NEURALSENSE 센서' },
       crm: { available: (customerCount || 0) > 0, record_count: customerCount || 0, label: 'CRM/고객 데이터' },
       product: { available: (productCount || 0) > 0, record_count: productCount || 0, label: '상품 마스터' },
