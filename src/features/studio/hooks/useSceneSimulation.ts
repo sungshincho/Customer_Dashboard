@@ -631,8 +631,10 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
         if (staffingRes.status === 'fulfilled') {
           const staffingData = staffingRes.value.data;
           // 🔧 FIX: generate-optimization 응답 구조에 맞게 수정
-          // generate-optimization은 staffing_result 안에 결과가 있음
-          const staffingResult = staffingData?.staffing_result || 
+          // generate-optimization은 result.staffing_result 안에 결과가 있음
+          const staffingResult = staffingData?.result?.staffing_result ||
+                                 staffingData?.staffing_result || 
+                                 staffingData?.result?.staffing ||
                                  staffingData?.result || 
                                  staffingData?.staffing || 
                                  staffingData;
