@@ -707,3 +707,5 @@ export function ConnectorSettingsPage() {
     </div>
   );
 }
+
+export default ConnectorSettingsPage;
