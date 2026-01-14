@@ -147,9 +147,13 @@ export default function DataControlTowerPage() {
 
             {/* Refresh Button */}
             <Button
+              type="button"
               variant="outline"
               size="sm"
-              onClick={() => refetch()}
+              onClick={() => {
+                console.log('새로고침 버튼 클릭됨');
+                refetch();
+              }}
               disabled={isFetching}
             >
               <RefreshCw

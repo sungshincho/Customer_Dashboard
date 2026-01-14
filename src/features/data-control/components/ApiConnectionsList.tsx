@@ -334,7 +334,16 @@ export function ApiConnectionsList({ orgId, storeId, onEdit, onAdd }: ApiConnect
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => {
+                    console.log('API 연결 새로고침 버튼 클릭됨');
+                    refetch();
+                  }}
+                  disabled={isFetching}
+                >
                   <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
                 </Button>
               </TooltipTrigger>
