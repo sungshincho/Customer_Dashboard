@@ -16,9 +16,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { Store, Database, Users, Settings, CreditCard, Plus, Mail, Building2, Upload, Link, Eye, Edit, MapPin, Network, Boxes } from 'lucide-react';
+import { Store, Database, Users, Settings, CreditCard, Plus, Mail, Building2, Upload, Link, Eye, Edit, MapPin, Network, Boxes, Plug } from 'lucide-react';
+import { ApiConnectionsList, AddConnectorDialog } from '@/features/data-control/components';
 import { useActivityLogger } from '@/hooks/useActivityLogger';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { OntologyGraph3D } from '@/features/data-management/ontology/components/OntologyGraph3D';
 import { MasterSchemaSync } from '@/features/data-management/ontology/components/MasterSchemaSync';
@@ -75,6 +76,7 @@ export default function SettingsPage() {
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, orgId, orgName, role, isOrgHQ, isOrgStore } = useAuth();
   const { stores, loading: storesLoading, refreshStores } = useSelectedStore();
   const [loading, setLoading] = useState(false);
@@ -97,6 +99,7 @@ export default function SettingsPage() {
   const [storeDialogOpen, setStoreDialogOpen] = useState(false);
   const [newStore, setNewStore] = useState({ store_name: '', store_code: '', address: '', manager_name: '', manager_email: '' });
   const [importStatus, setImportStatus] = useState({ lastSync: null as any, pendingRows: 0, totalEntities: 0, totalRelations: 0 });
+  const [showAddConnector, setShowAddConnector] = useState(false);
 
   useEffect(() => { fetchSettings(); }, []);
 
@@ -284,7 +287,37 @@ export default function SettingsPage() {
             </div>
             <MasterSchemaSync />
             <GlassCard dark={isDark}><div style={{ padding: '24px' }}><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}><div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><Icon3D size={32} dark={isDark}><Network className="w-4 h-4" style={{ color: iconColor }} /></Icon3D><div><h3 style={{ fontSize: '16px', margin: 0, ...text3D.number }}>온톨로지 스키마 뷰어</h3><p style={{ fontSize: '12px', margin: '2px 0 0 0', ...text3D.body }}>리테일 비즈니스 도메인의 엔티티와 관계를 3D 그래프로 시각화</p></div></div><Badge3D variant="outline" dark={isDark}>리테일 전문</Badge3D></div><div style={{ width: '100%', height: '70vh', minHeight: '600px', background: isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.02)', borderRadius: '12px', border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.05)' }}><OntologyGraph3D /></div></div></GlassCard>
-            <GlassCard dark={isDark}><div style={{ padding: '24px' }}><h3 style={{ fontSize: '16px', margin: '0 0 4px 0', ...text3D.number }}>API 연동</h3><p style={{ fontSize: '12px', margin: '0 0 16px 0', ...text3D.body }}>외부 시스템과의 데이터 연동</p><div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>{[{ name: 'POS 시스템', desc: '실시간 판매 데이터 연동' }, { name: 'ERP 시스템', desc: '재고 및 주문 데이터' }].map((item) => (<div key={item.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)', borderRadius: '12px' }}><div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><Icon3D size={40} dark={isDark}><Link className="w-5 h-5" style={{ color: iconColor }} /></Icon3D><div><p style={{ fontWeight: 600, margin: 0, color: isDark ? '#fff' : '#1a1a1f' }}>{item.name}</p><p style={{ fontSize: '12px', margin: '2px 0 0 0', ...text3D.body }}>{item.desc}</p></div></div><Badge3D variant="secondary" dark={isDark}>미연결</Badge3D></div>))}<Button3D variant="outline" dark={isDark} style={{ width: '100%' }}><Plus className="w-4 h-4" /> 새 연동 추가</Button3D></div></div></GlassCard>
+            {/* API 연동 - 실제 ApiConnectionsList 컴포넌트 연결 */}
+            <GlassCard dark={isDark}>
+              <div style={{ padding: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <Icon3D size={32} dark={isDark}><Plug className="w-4 h-4" style={{ color: iconColor }} /></Icon3D>
+                    <div>
+                      <h3 style={{ fontSize: '16px', margin: 0, ...text3D.number }}>API 연동</h3>
+                      <p style={{ fontSize: '12px', margin: '2px 0 0 0', ...text3D.body }}>외부 시스템 API를 연결하여 데이터를 자동으로 동기화합니다</p>
+                    </div>
+                  </div>
+                  <Button3D size="sm" dark={isDark} onClick={() => setShowAddConnector(true)}>
+                    <Plus className="w-4 h-4" /> 커넥터 추가
+                  </Button3D>
+                </div>
+                <ApiConnectionsList
+                  orgId={orgId}
+                  storeId={stores?.[0]?.id}
+                  onAdd={() => setShowAddConnector(true)}
+                  onEdit={(id) => navigate(`/data/connectors/${id}`)}
+                />
+              </div>
+            </GlassCard>
+
+            {/* Add Connector Dialog */}
+            <AddConnectorDialog
+              open={showAddConnector}
+              onOpenChange={setShowAddConnector}
+              orgId={orgId}
+              storeId={stores?.[0]?.id}
+            />
           </TabsContent>
 
           <TabsContent value="users" className="space-y-4 mt-0">

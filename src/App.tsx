@@ -21,6 +21,7 @@ import SettingsPage from "@/features/settings/SettingsPage";
 // 데이터 컨트롤타워 (Foundation Layer)
 import DataControlTowerPage from "@/features/data-control/DataControlTowerPage";
 import LineageExplorerPage from "@/features/data-control/LineageExplorerPage";
+import ConnectorSettingsPage from "@/features/data-control/ConnectorSettingsPage";
 
 // Onboarding
 import { OnboardingWizard } from "@/features/onboarding/components/OnboardingWizard";
@@ -81,6 +82,7 @@ const App = () => (
                 {/* 데이터 컨트롤타워 라우트 */}
                 <Route path="/data/control-tower" element={<ProtectedRoute><DataControlTowerPage /></ProtectedRoute>} />
                 <Route path="/data/lineage" element={<ProtectedRoute><LineageExplorerPage /></ProtectedRoute>} />
+                <Route path="/data/connectors/:id" element={<ProtectedRoute><ConnectorSettingsPage /></ProtectedRoute>} />
 
                 {/* 레거시 라우트 리다이렉트 (하위 호환성) */}
                 <Route path="/overview/dashboard" element={<Navigate to="/insights" replace />} />

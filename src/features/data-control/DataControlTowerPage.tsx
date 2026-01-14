@@ -14,20 +14,29 @@ import {
   ExternalLink,
   Activity,
   AlertCircle,
+  Plus,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { useDataControlTowerStatus } from './hooks/useDataControlTower';
+import { useAuth } from '@/hooks/useAuth';
+import { useSelectedStore } from '@/hooks/useSelectedStore';
 import {
   DataSourceCards,
   PipelineTimeline,
   RecentImportsList,
   DataQualityScoreCard,
+  AddConnectorDialog,
+  ApiConnectionsList,
 } from './components';
 
 export default function DataControlTowerPage() {
   const [isDark, setIsDark] = useState(false);
+  const [showAddConnector, setShowAddConnector] = useState(false);
   const { data: status, isLoading, error, refetch } = useDataControlTowerStatus();
+  const { orgId } = useAuth();
+  const { selectedStore } = useSelectedStore();
+  const navigate = useNavigate();
 
   // Dark mode detection
   useEffect(() => {
@@ -149,6 +158,15 @@ export default function DataControlTowerPage() {
               새로고침
             </Button>
 
+            {/* Add Connector Button */}
+            <Button
+              size="sm"
+              onClick={() => setShowAddConnector(true)}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              커넥터 추가
+            </Button>
+
             {/* Lineage Link */}
             <Button variant="outline" size="sm" asChild>
               <Link to="/data/lineage">
@@ -158,6 +176,14 @@ export default function DataControlTowerPage() {
             </Button>
           </div>
         </div>
+
+        {/* Add Connector Dialog */}
+        <AddConnectorDialog
+          open={showAddConnector}
+          onOpenChange={setShowAddConnector}
+          orgId={orgId}
+          storeId={selectedStore?.id}
+        />
 
         {/* Error State */}
         {error && (
@@ -187,7 +213,15 @@ export default function DataControlTowerPage() {
               </div>
             </div>
 
-            {/* Row 2: Pipeline Timeline */}
+            {/* Row 2: API Connections */}
+            <ApiConnectionsList
+              orgId={orgId}
+              storeId={selectedStore?.id}
+              onAdd={() => setShowAddConnector(true)}
+              onEdit={(id) => navigate(`/data/connectors/${id}`)}
+            />
+
+            {/* Row 3: Pipeline Timeline */}
             <PipelineTimeline stats={status.pipeline_stats} />
 
             {/* Row 3: Recent Imports */}
