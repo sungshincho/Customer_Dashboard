@@ -20,12 +20,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import {
   Plug,
   MoreVertical,
   PlayCircle,
@@ -331,25 +325,19 @@ export function ApiConnectionsList({ orgId, storeId, onEdit, onAdd }: ApiConnect
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-medium">API 연결 ({connections.length})</h3>
         <div className="flex items-center gap-2">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={() => {
-                    console.log('API 연결 새로고침 버튼 클릭됨');
-                    refetch();
-                  }}
-                  disabled={isFetching}
-                >
-                  <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>새로고침</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => {
+              console.log('API 연결 새로고침 버튼 클릭됨');
+              refetch();
+            }}
+            disabled={isFetching}
+            title="새로고침"
+          >
+            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+          </Button>
           {onAdd && (
             <Button onClick={onAdd}>
               <Plug className="h-4 w-4 mr-2" />
