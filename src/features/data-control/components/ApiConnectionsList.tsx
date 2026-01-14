@@ -278,7 +278,7 @@ interface ApiConnectionsListProps {
 }
 
 export function ApiConnectionsList({ orgId, storeId, onEdit, onAdd }: ApiConnectionsListProps) {
-  const { data: connections, isLoading, error, refetch } = useApiConnections({ orgId, storeId });
+  const { data: connections, isLoading, isFetching, error, refetch } = useApiConnections({ orgId, storeId });
 
   if (isLoading) {
     return (
@@ -334,8 +334,8 @@ export function ApiConnectionsList({ orgId, storeId, onEdit, onAdd }: ApiConnect
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="icon" onClick={() => refetch()}>
-                  <RefreshCw className="h-4 w-4" />
+                <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
+                  <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>새로고침</TooltipContent>

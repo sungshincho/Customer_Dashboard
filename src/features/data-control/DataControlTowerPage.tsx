@@ -33,7 +33,7 @@ import {
 export default function DataControlTowerPage() {
   const [isDark, setIsDark] = useState(false);
   const [showAddConnector, setShowAddConnector] = useState(false);
-  const { data: status, isLoading, error, refetch } = useDataControlTowerStatus();
+  const { data: status, isLoading, isFetching, error, refetch } = useDataControlTowerStatus();
   const { orgId } = useAuth();
   const { selectedStore } = useSelectedStore();
   const navigate = useNavigate();
@@ -150,10 +150,10 @@ export default function DataControlTowerPage() {
               variant="outline"
               size="sm"
               onClick={() => refetch()}
-              disabled={isLoading}
+              disabled={isFetching}
             >
               <RefreshCw
-                className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`}
+                className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`}
               />
               새로고침
             </Button>
@@ -227,7 +227,7 @@ export default function DataControlTowerPage() {
             {/* Row 3: Recent Imports */}
             <RecentImportsList
               imports={status.recent_imports}
-              isLoading={isLoading}
+              isLoading={isFetching}
               onRefresh={() => refetch()}
             />
           </div>
