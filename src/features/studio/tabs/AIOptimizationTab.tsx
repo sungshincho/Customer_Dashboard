@@ -135,7 +135,7 @@ export function AIOptimizationTab({
   const [selectedGoal, setSelectedGoal] = useState<OptimizationGoal>('revenue');
 
   // 선택된 최적화 유형들
-  const [selectedOptimizations, setSelectedOptimizations] = useState<OptimizationType[]>(['layout']);
+  const [selectedOptimizations, setSelectedOptimizations] = useState<OptimizationType[]>(['layout', 'staffing']);
 
   // 실행 상태
   const [runningTypes, setRunningTypes] = useState<OptimizationType[]>([]);
