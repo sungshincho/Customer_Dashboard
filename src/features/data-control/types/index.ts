@@ -12,7 +12,7 @@ export type DataCategory = 'pos' | 'crm' | 'erp' | 'ecommerce' | 'analytics' | '
 
 export type ConnectionStatus = 'active' | 'inactive' | 'error' | 'testing';
 
-export type SyncFrequency = 'realtime' | 'hourly' | 'daily' | 'weekly' | 'manual';
+export type SyncFrequency = 'realtime' | 'every_5_min' | 'every_15_min' | 'every_30_min' | 'hourly' | 'every_6_hours' | 'daily' | 'weekly' | 'manual' | 'custom';
 
 export type PaginationType = 'none' | 'offset' | 'cursor' | 'page' | 'link';
 
@@ -93,6 +93,7 @@ export interface ApiConnection {
   pagination_type?: PaginationType;
   pagination_config?: PaginationConfig;
   sync_frequency?: SyncFrequency;
+  sync_cron?: string;
   sync_config?: SyncConfig;
   status: ConnectionStatus;
   is_active: boolean;
@@ -101,6 +102,10 @@ export interface ApiConnection {
   last_error?: string;
   total_records_synced?: number;
   last_sync_duration_ms?: number;
+  next_scheduled_sync?: string;
+  is_credentials_encrypted?: boolean;
+  retry_count?: number;
+  max_retries?: number;
   created_at: string;
   updated_at?: string;
 }
