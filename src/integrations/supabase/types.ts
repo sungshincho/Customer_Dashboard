@@ -654,72 +654,129 @@ export type Database = {
       }
       api_connections: {
         Row: {
+          api_body_template: Json | null
           auth_config: Json | null
           auth_type: string | null
           auth_value: string | null
           created_at: string
+          data_category: string | null
+          error_count: number | null
+          field_mappings: Json | null
           headers: Json | null
           id: string
           is_active: boolean | null
+          is_credentials_encrypted: boolean | null
           last_error: string | null
           last_sync: string | null
+          last_sync_duration_ms: number | null
           last_tested_at: string | null
+          max_retries: number | null
           method: string | null
           name: string
+          next_scheduled_sync: string | null
+          next_sync_at: string | null
           org_id: string | null
+          pagination_config: Json | null
+          pagination_type: string | null
           provider: string | null
           rate_limit_config: Json | null
           request_config: Json | null
+          response_data_path: string | null
+          retry_count: number | null
           status: string | null
           store_id: string | null
+          successful_syncs: number | null
+          sync_config: Json | null
+          sync_cron: string | null
+          sync_frequency: string | null
+          target_table: string | null
+          total_records_synced: number | null
           type: string
           updated_at: string
           url: string
           user_id: string
         }
         Insert: {
+          api_body_template?: Json | null
           auth_config?: Json | null
           auth_type?: string | null
           auth_value?: string | null
           created_at?: string
+          data_category?: string | null
+          error_count?: number | null
+          field_mappings?: Json | null
           headers?: Json | null
           id?: string
           is_active?: boolean | null
+          is_credentials_encrypted?: boolean | null
           last_error?: string | null
           last_sync?: string | null
+          last_sync_duration_ms?: number | null
           last_tested_at?: string | null
+          max_retries?: number | null
           method?: string | null
           name: string
+          next_scheduled_sync?: string | null
+          next_sync_at?: string | null
           org_id?: string | null
+          pagination_config?: Json | null
+          pagination_type?: string | null
           provider?: string | null
           rate_limit_config?: Json | null
           request_config?: Json | null
+          response_data_path?: string | null
+          retry_count?: number | null
           status?: string | null
           store_id?: string | null
+          successful_syncs?: number | null
+          sync_config?: Json | null
+          sync_cron?: string | null
+          sync_frequency?: string | null
+          target_table?: string | null
+          total_records_synced?: number | null
           type: string
           updated_at?: string
           url: string
           user_id: string
         }
         Update: {
+          api_body_template?: Json | null
           auth_config?: Json | null
           auth_type?: string | null
           auth_value?: string | null
           created_at?: string
+          data_category?: string | null
+          error_count?: number | null
+          field_mappings?: Json | null
           headers?: Json | null
           id?: string
           is_active?: boolean | null
+          is_credentials_encrypted?: boolean | null
           last_error?: string | null
           last_sync?: string | null
+          last_sync_duration_ms?: number | null
           last_tested_at?: string | null
+          max_retries?: number | null
           method?: string | null
           name?: string
+          next_scheduled_sync?: string | null
+          next_sync_at?: string | null
           org_id?: string | null
+          pagination_config?: Json | null
+          pagination_type?: string | null
           provider?: string | null
           rate_limit_config?: Json | null
           request_config?: Json | null
+          response_data_path?: string | null
+          retry_count?: number | null
           status?: string | null
           store_id?: string | null
+          successful_syncs?: number | null
+          sync_config?: Json | null
+          sync_cron?: string | null
+          sync_frequency?: string | null
+          target_table?: string | null
+          total_records_synced?: number | null
           type?: string
           updated_at?: string
           url?: string
@@ -735,6 +792,75 @@ export type Database = {
           },
         ]
       }
+      api_mapping_templates: {
+        Row: {
+          auth_config_hints: Json | null
+          created_at: string | null
+          data_category: string
+          default_endpoint: string | null
+          default_headers: Json | null
+          default_method: string | null
+          description: string | null
+          field_mappings: Json
+          id: string
+          is_active: boolean | null
+          is_official: boolean | null
+          name: string
+          pagination_config: Json | null
+          pagination_type: string | null
+          provider: string
+          response_data_path: string | null
+          suggested_auth_type: string | null
+          target_table: string
+          updated_at: string | null
+          version: string | null
+        }
+        Insert: {
+          auth_config_hints?: Json | null
+          created_at?: string | null
+          data_category: string
+          default_endpoint?: string | null
+          default_headers?: Json | null
+          default_method?: string | null
+          description?: string | null
+          field_mappings: Json
+          id?: string
+          is_active?: boolean | null
+          is_official?: boolean | null
+          name: string
+          pagination_config?: Json | null
+          pagination_type?: string | null
+          provider: string
+          response_data_path?: string | null
+          suggested_auth_type?: string | null
+          target_table: string
+          updated_at?: string | null
+          version?: string | null
+        }
+        Update: {
+          auth_config_hints?: Json | null
+          created_at?: string | null
+          data_category?: string
+          default_endpoint?: string | null
+          default_headers?: Json | null
+          default_method?: string | null
+          description?: string | null
+          field_mappings?: Json
+          id?: string
+          is_active?: boolean | null
+          is_official?: boolean | null
+          name?: string
+          pagination_config?: Json | null
+          pagination_type?: string | null
+          provider?: string
+          response_data_path?: string | null
+          suggested_auth_type?: string | null
+          target_table?: string
+          updated_at?: string | null
+          version?: string | null
+        }
+        Relationships: []
+      }
       api_sync_logs: {
         Row: {
           api_connection_id: string | null
@@ -743,8 +869,13 @@ export type Database = {
           duration_ms: number | null
           error_details: Json | null
           error_message: string | null
+          error_type: string | null
+          etl_run_id: string | null
+          fetch_completed_at: string | null
           id: string
           org_id: string | null
+          processing_completed_at: string | null
+          raw_import_id: string | null
           records_created: number | null
           records_failed: number | null
           records_fetched: number | null
@@ -752,10 +883,12 @@ export type Database = {
           request_headers: Json | null
           request_url: string | null
           response_headers: Json | null
+          response_size_bytes: number | null
           response_status: number | null
           started_at: string | null
           status: string
           sync_endpoint_id: string
+          sync_type: string | null
         }
         Insert: {
           api_connection_id?: string | null
@@ -764,8 +897,13 @@ export type Database = {
           duration_ms?: number | null
           error_details?: Json | null
           error_message?: string | null
+          error_type?: string | null
+          etl_run_id?: string | null
+          fetch_completed_at?: string | null
           id?: string
           org_id?: string | null
+          processing_completed_at?: string | null
+          raw_import_id?: string | null
           records_created?: number | null
           records_failed?: number | null
           records_fetched?: number | null
@@ -773,10 +911,12 @@ export type Database = {
           request_headers?: Json | null
           request_url?: string | null
           response_headers?: Json | null
+          response_size_bytes?: number | null
           response_status?: number | null
           started_at?: string | null
           status: string
           sync_endpoint_id: string
+          sync_type?: string | null
         }
         Update: {
           api_connection_id?: string | null
@@ -785,8 +925,13 @@ export type Database = {
           duration_ms?: number | null
           error_details?: Json | null
           error_message?: string | null
+          error_type?: string | null
+          etl_run_id?: string | null
+          fetch_completed_at?: string | null
           id?: string
           org_id?: string | null
+          processing_completed_at?: string | null
+          raw_import_id?: string | null
           records_created?: number | null
           records_failed?: number | null
           records_fetched?: number | null
@@ -794,10 +939,12 @@ export type Database = {
           request_headers?: Json | null
           request_url?: string | null
           response_headers?: Json | null
+          response_size_bytes?: number | null
           response_status?: number | null
           started_at?: string | null
           status?: string
           sync_endpoint_id?: string
+          sync_type?: string | null
         }
         Relationships: [
           {
@@ -808,10 +955,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "api_sync_logs_etl_run_id_fkey"
+            columns: ["etl_run_id"]
+            isOneToOne: false
+            referencedRelation: "etl_runs"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "api_sync_logs_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "api_sync_logs_raw_import_id_fkey"
+            columns: ["raw_import_id"]
+            isOneToOne: false
+            referencedRelation: "raw_imports"
             referencedColumns: ["id"]
           },
           {
@@ -5691,6 +5852,8 @@ export type Database = {
       }
       raw_imports: {
         Row: {
+          api_connection_id: string | null
+          api_response_meta: Json | null
           completed_at: string | null
           created_at: string | null
           data_type: string | null
@@ -5710,9 +5873,12 @@ export type Database = {
           started_at: string | null
           status: string | null
           store_id: string | null
+          sync_batch_id: string | null
           user_id: string
         }
         Insert: {
+          api_connection_id?: string | null
+          api_response_meta?: Json | null
           completed_at?: string | null
           created_at?: string | null
           data_type?: string | null
@@ -5732,9 +5898,12 @@ export type Database = {
           started_at?: string | null
           status?: string | null
           store_id?: string | null
+          sync_batch_id?: string | null
           user_id: string
         }
         Update: {
+          api_connection_id?: string | null
+          api_response_meta?: Json | null
           completed_at?: string | null
           created_at?: string | null
           data_type?: string | null
@@ -5754,9 +5923,17 @@ export type Database = {
           started_at?: string | null
           status?: string | null
           store_id?: string | null
+          sync_batch_id?: string | null
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "raw_imports_api_connection_id_fkey"
+            columns: ["api_connection_id"]
+            isOneToOne: false
+            referencedRelation: "api_connections"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "raw_imports_org_id_fkey"
             columns: ["org_id"]
@@ -10008,6 +10185,14 @@ export type Database = {
         }
         Returns: number
       }
+      calculate_next_sync_time: {
+        Args: {
+          p_last_sync?: string
+          p_sync_cron?: string
+          p_sync_frequency: string
+        }
+        Returns: string
+      }
       can_access_membership: {
         Args: { membership_org_id: string; membership_user_id: string }
         Returns: boolean
@@ -10070,7 +10255,33 @@ export type Database = {
           zone_name: string
         }[]
       }
+      create_api_connection: {
+        Args: {
+          p_auth_config?: Json
+          p_auth_type: string
+          p_data_category: string
+          p_field_mappings?: Json
+          p_name: string
+          p_org_id: string
+          p_provider: string
+          p_response_data_path?: string
+          p_store_id: string
+          p_target_table?: string
+          p_url: string
+        }
+        Returns: Json
+      }
+      create_sync_log: {
+        Args: {
+          p_connection_id: string
+          p_request_headers?: Json
+          p_request_url?: string
+          p_sync_type?: string
+        }
+        Returns: Json
+      }
       ensure_store_persona: { Args: { p_store_id: string }; Returns: string }
+      execute_api_sync: { Args: { p_connection_id: string }; Returns: Json }
       export_public_schema: { Args: never; Returns: Json }
       generate_sample_sales_data: {
         Args: { p_days?: number; p_org_id: string; p_store_id: string }
@@ -10084,6 +10295,14 @@ export type Database = {
           p_visits_per_day?: number
         }
         Returns: undefined
+      }
+      get_api_connections_dashboard: {
+        Args: { p_org_id?: string; p_store_id?: string }
+        Returns: Json
+      }
+      get_api_mapping_template: {
+        Args: { p_data_category?: string; p_provider: string }
+        Returns: Json
       }
       get_applicable_vmd_rules: {
         Args: {
@@ -10134,6 +10353,29 @@ export type Database = {
           slot_position: Json
           slot_type: string
           slot_uuid: string
+        }[]
+      }
+      get_connection_settings: {
+        Args: { p_connection_id: string }
+        Returns: Json
+      }
+      get_connections_due_for_sync: {
+        Args: { p_limit?: number }
+        Returns: {
+          auth_config: Json
+          auth_type: string
+          field_mappings: Json
+          id: string
+          last_sync: string
+          max_retries: number
+          name: string
+          next_scheduled_sync: string
+          response_data_path: string
+          retry_count: number
+          sync_cron: string
+          sync_frequency: string
+          target_table: string
+          url: string
         }[]
       }
       get_daily_kpis_summary: {
@@ -10243,6 +10485,19 @@ export type Database = {
         Args: { p_limit?: number; p_store_id: string; p_strategy_type: string }
         Returns: Json
       }
+      get_sync_history: {
+        Args: {
+          p_connection_id?: string
+          p_limit?: number
+          p_offset?: number
+          p_org_id?: string
+        }
+        Returns: Json
+      }
+      get_sync_statistics: {
+        Args: { p_connection_id?: string; p_days?: number; p_org_id?: string }
+        Returns: Json
+      }
       get_sync_status: {
         Args: { p_org_id?: string; p_store_id?: string }
         Returns: Json
@@ -10311,6 +10566,21 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: string
       }
+      record_sync_result: {
+        Args: {
+          p_batch_id: string
+          p_connection_id: string
+          p_duration_ms?: number
+          p_error_details?: Json
+          p_error_message?: string
+          p_records_created?: number
+          p_records_failed?: number
+          p_records_fetched?: number
+          p_records_updated?: number
+          p_status: string
+        }
+        Returns: Json
+      }
       save_concept_value: {
         Args: {
           p_concept_name: string
@@ -10322,6 +10592,56 @@ export type Database = {
         Returns: string
       }
       test_api_connection: { Args: { p_connection_id: string }; Returns: Json }
+      update_connection_after_sync: {
+        Args: {
+          p_connection_id: string
+          p_duration_ms?: number
+          p_error_message?: string
+          p_records_synced?: number
+          p_success: boolean
+        }
+        Returns: Json
+      }
+      update_connection_settings: {
+        Args: {
+          p_auth_config?: Json
+          p_auth_type?: string
+          p_connection_id: string
+          p_description?: string
+          p_field_mappings?: Json
+          p_headers?: Json
+          p_is_active?: boolean
+          p_max_retries?: number
+          p_method?: string
+          p_name?: string
+          p_response_data_path?: string
+          p_sync_config?: Json
+          p_sync_cron?: string
+          p_sync_frequency?: string
+          p_target_table?: string
+          p_url?: string
+        }
+        Returns: Json
+      }
+      update_sync_log: {
+        Args: {
+          p_duration_ms?: number
+          p_error_details?: Json
+          p_error_message?: string
+          p_error_type?: string
+          p_etl_run_id?: string
+          p_log_id: string
+          p_raw_import_id?: string
+          p_records_created?: number
+          p_records_failed?: number
+          p_records_fetched?: number
+          p_records_updated?: number
+          p_response_size_bytes?: number
+          p_response_status?: number
+          p_status: string
+        }
+        Returns: Json
+      }
       user_can_access_store: { Args: { p_store_id: string }; Returns: boolean }
     }
     Enums: {

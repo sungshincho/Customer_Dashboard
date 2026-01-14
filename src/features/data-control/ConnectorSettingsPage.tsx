@@ -124,7 +124,7 @@ function StatusBadge({ status }: { status: ConnectionStatus }) {
 // Main Component
 // ============================================================================
 
-export function ConnectorSettingsPage() {
+export default function ConnectorSettingsPage() {
   const { connectionId } = useParams<{ connectionId: string }>();
   const navigate = useNavigate();
 
@@ -324,7 +324,7 @@ export function ConnectorSettingsPage() {
 
       {/* Test Result */}
       {testMutation.data && (
-        <ConnectionTestResult result={testMutation.data} onClose={() => testMutation.reset()} />
+        <ConnectionTestResult result={testMutation.data} />
       )}
 
       {/* Settings Tabs */}
@@ -551,9 +551,9 @@ export function ConnectorSettingsPage() {
               </div>
 
               <FieldMappingEditor
-                mappings={formData.field_mappings || []}
+                fieldMappings={formData.field_mappings || []}
                 onChange={(mappings) => updateFormField('field_mappings', mappings)}
-                detectedFields={testMutation.data?.detected_fields}
+                sampleData={testMutation.data?.sample_data}
               />
             </CardContent>
           </Card>

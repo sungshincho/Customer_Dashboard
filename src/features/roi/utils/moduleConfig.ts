@@ -119,12 +119,18 @@ const DEFAULT_MODULE_CONFIG: ModuleConfig = {
   borderColor: 'border-gray-500/30',
 };
 
-export const getModuleConfig = (module: SourceModule): ModuleConfig => {
-  return MODULE_CONFIG[module] || DEFAULT_MODULE_CONFIG;
+export const getModuleConfig = (module: SourceModule | string | undefined | null): ModuleConfig => {
+  if (!module || !(module in MODULE_CONFIG)) {
+    return DEFAULT_MODULE_CONFIG;
+  }
+  return MODULE_CONFIG[module as SourceModule];
 };
 
-export const getModuleIcon = (module: SourceModule): string => {
-  return MODULE_CONFIG[module]?.icon || '📊';
+export const getModuleIcon = (module: SourceModule | string | undefined | null): string => {
+  if (!module || !(module in MODULE_CONFIG)) {
+    return '📊';
+  }
+  return MODULE_CONFIG[module as SourceModule].icon;
 };
 
 export const getModuleDisplayName = (module: SourceModule): string => {

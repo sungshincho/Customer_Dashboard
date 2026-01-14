@@ -60,7 +60,7 @@ export function useApiConnections(params?: { orgId?: string; storeId?: string })
       const { data, error } = await query;
 
       if (error) throw error;
-      return data as ApiConnection[];
+      return (data || []) as unknown as ApiConnection[];
     },
   });
 }
@@ -80,7 +80,7 @@ export function useApiConnection(connectionId: string) {
         .single();
 
       if (error) throw error;
-      return data as ApiConnection;
+      return data as unknown as ApiConnection;
     },
     enabled: !!connectionId,
   });
@@ -100,7 +100,7 @@ export function useApiConnectionsDashboard(params?: { orgId?: string; storeId?: 
       });
 
       if (error) throw error;
-      return data as ApiConnectionsDashboard;
+      return data as unknown as ApiConnectionsDashboard;
     },
   });
 }
@@ -130,7 +130,7 @@ export function useApiMappingTemplates(params?: { provider?: string; dataCategor
       const { data, error } = await query;
 
       if (error) throw error;
-      return data as ApiMappingTemplate[];
+      return (data || []) as unknown as ApiMappingTemplate[];
     },
   });
 }
@@ -188,8 +188,8 @@ export function useCreateConnection() {
         p_data_category: params.dataCategory,
         p_url: params.url,
         p_auth_type: params.authType,
-        p_auth_config: params.authConfig || {},
-        p_field_mappings: params.fieldMappings || [],
+        p_auth_config: (params.authConfig || {}) as any,
+        p_field_mappings: (params.fieldMappings || []) as any,
         p_target_table: params.targetTable || null,
         p_response_data_path: params.responseDataPath || 'data',
       });
@@ -219,13 +219,13 @@ export function useUpdateConnection() {
     mutationFn: async ({ id, updates }: UpdateConnectionParams) => {
       const { data, error } = await supabase
         .from('api_connections')
-        .update(updates)
+        .update(updates as any)
         .eq('id', id)
         .select()
         .single();
 
       if (error) throw error;
-      return data as ApiConnection;
+      return data as unknown as ApiConnection;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: apiConnectorKeys.all });
@@ -421,7 +421,7 @@ export function useToggleConnectionStatus() {
         .single();
 
       if (error) throw error;
-      return data as ApiConnection;
+      return data as unknown as ApiConnection;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: apiConnectorKeys.all });

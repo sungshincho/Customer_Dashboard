@@ -299,7 +299,7 @@ function useSyncHistory(params: {
       });
 
       if (error) throw error;
-      return data as {
+      return data as unknown as {
         success: boolean;
         logs: SyncLog[];
         total: number;
