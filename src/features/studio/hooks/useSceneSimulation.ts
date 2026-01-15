@@ -680,10 +680,46 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
                 rotation: move.rotation,
               }));
 
-          // 🆕 productPlacements도 visualization fallback 적용
-          const finalProductPlacements = productPlacements.length > 0
-            ? productPlacements
-            : vizProductMoves;
+          // 🆕 productPlacements 형식으로 변환 (LayoutOptimizationOverlay 호환)
+          // Edge Function은 snake_case 반환, 프론트엔드는 camelCase 기대
+          const mappedProductPlacements = productPlacements.length > 0
+            ? productPlacements.map((change: any) => ({
+                productId: change.product_id || change.productId || change.id,
+                productSku: change.sku || change.productSku || change.product_sku,
+                productName: change.product_name || change.productName,
+                // from 정보
+                fromZoneId: change.current?.zone_id || change.currentZoneId || change.from_zone_id,
+                fromFurnitureId: change.current?.furniture_id || change.currentFurnitureId || change.from_furniture_id,
+                fromSlotId: change.current?.slot_id || change.currentSlotId || change.from_slot_id,
+                fromPosition: change.current?.position || change.currentPosition || change.from_position,
+                // to 정보
+                toZoneId: change.suggested?.zone_id || change.suggestedZoneId || change.to_zone_id,
+                toFurnitureId: change.suggested?.furniture_id || change.suggestedFurnitureId || change.to_furniture_id,
+                toSlotId: change.suggested?.slot_id || change.suggestedSlotId || change.to_slot_id,
+                toPosition: change.suggested?.position || change.suggestedPosition || change.to_position,
+                // 기타 정보
+                reason: change.reason || change.optimization_reason,
+                priority: change.priority || 'medium',
+                expectedRevenueImpact: change.expected_revenue_impact || change.expectedRevenueImpact || 0,
+                expectedVisibilityImpact: change.expected_visibility_impact || change.expectedVisibilityImpact || 0,
+              }))
+            : vizProductMoves.map((move: any) => ({
+                productId: move.productId || move.product_id,
+                productSku: move.productSku || move.product_sku,
+                productName: move.productName || move.product_name,
+                fromPosition: move.from?.position || move.fromPosition || move.from,
+                toPosition: move.to?.position || move.toPosition || move.to,
+                fromFurnitureId: move.from?.furnitureId || move.fromFurnitureId,
+                toFurnitureId: move.to?.furnitureId || move.toFurnitureId,
+                reason: move.reason,
+                priority: move.priority || 'medium',
+              }));
+
+          console.log('[useSceneSimulation] 📦 Product placements mapped:', {
+            originalCount: productPlacements.length,
+            mappedCount: mappedProductPlacements.length,
+            firstMapped: mappedProductPlacements[0],
+          });
 
           // 🔧 FIX: summary 필드 올바른 매핑 (소수점 → 퍼센트 변환)
           // Edge Function 응답: { result: { summary: {...} } }
@@ -698,13 +734,13 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
           results.layout = {
             furnitureMoves,
             layoutChanges: furnitureChanges.length > 0 ? furnitureChanges : vizFurnitureMoves,
-            productPlacements: finalProductPlacements,
+            productPlacements: mappedProductPlacements,
             summary: summaryData,
             insights: layoutData.insights || layoutData.result?.insights || summaryData.insights || [],
             // 효율성 점수 계산 (변경 수 기반)
             currentEfficiency: summaryData.current_efficiency || 70,
             optimizedEfficiency: summaryData.optimized_efficiency ||
-              Math.min(95, 70 + (furnitureMoves.length * 2) + (finalProductPlacements.length * 0.5)),
+              Math.min(95, 70 + (furnitureMoves.length * 2) + (mappedProductPlacements.length * 0.5)),
             improvements: {
               revenueIncrease: toPercent(revenueImprovement),
               revenueIncreasePercent: toPercent(revenueImprovement),
@@ -715,7 +751,7 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
           };
           console.log('[useSceneSimulation] ✅ Layout result (generate-optimization):', {
             furnitureMovesCount: furnitureMoves.length,
-            productPlacementsCount: finalProductPlacements.length,
+            productPlacementsCount: mappedProductPlacements.length,
             usedVisualizationFallback: furnitureChanges.length === 0 && vizFurnitureMoves.length > 0,
             summaryData: {
               revenue: toPercent(revenueImprovement),
@@ -723,6 +759,7 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
               conversion: toPercent(conversionImprovement),
             },
             firstFurnitureMove: furnitureMoves[0],
+            firstProductPlacement: mappedProductPlacements[0],
           });
         } else {
           console.warn('[useSceneSimulation] No layout result:', layoutRes);
