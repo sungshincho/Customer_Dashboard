@@ -28,12 +28,13 @@ END $$;
 -- 날씨 API 연결 (OpenWeatherMap)
 INSERT INTO api_connections (
   id,
+  user_id,
   org_id,
   store_id,
   name,
   provider,
-  api_type,
-  base_url,
+  type,
+  url,
   status,
   is_active,
   data_category,
@@ -47,6 +48,7 @@ INSERT INTO api_connections (
 )
 SELECT
   gen_random_uuid(),
+  (SELECT id FROM auth.users LIMIT 1),
   s.org_id,
   s.id,
   '날씨 데이터 (OpenWeatherMap)',
@@ -74,12 +76,13 @@ WHERE NOT EXISTS (
 -- 공휴일/이벤트 API 연결 (공공데이터포털)
 INSERT INTO api_connections (
   id,
+  user_id,
   org_id,
   store_id,
   name,
   provider,
-  api_type,
-  base_url,
+  type,
+  url,
   status,
   is_active,
   data_category,
@@ -93,6 +96,7 @@ INSERT INTO api_connections (
 )
 SELECT
   gen_random_uuid(),
+  (SELECT id FROM auth.users LIMIT 1),
   s.org_id,
   s.id,
   '공휴일/이벤트 (공공데이터포털)',
@@ -129,7 +133,7 @@ BEGIN
   RAISE NOTICE '컨텍스트 데이터 소스 레코드 삽입 완료: 날씨=%건, 공휴일=%건', weather_count, holidays_count;
 END $$;
 
--- 4. ensure_system_context_connections RPC 함수도 수정 (data_category 사용)
+-- 4. ensure_system_context_connections RPC 함수도 수정 (올바른 컬럼명 사용)
 CREATE OR REPLACE FUNCTION ensure_system_context_connections(
   p_org_id uuid,
   p_store_id uuid DEFAULT NULL,
@@ -142,8 +146,16 @@ AS $$
 DECLARE
   v_weather_id uuid;
   v_holidays_id uuid;
+  v_user_id uuid;
   v_result jsonb;
 BEGIN
+  -- user_id 결정: 파라미터 없으면 첫 번째 사용자 사용
+  v_user_id := COALESCE(p_user_id, (SELECT id FROM auth.users LIMIT 1));
+
+  IF v_user_id IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'error', 'No valid user_id found');
+  END IF;
+
   -- 날씨 연결 확인/생성
   SELECT id INTO v_weather_id
   FROM api_connections
@@ -155,12 +167,13 @@ BEGIN
 
   IF v_weather_id IS NULL THEN
     INSERT INTO api_connections (
-      id, org_id, store_id, name, provider, api_type, base_url,
+      id, user_id, org_id, store_id, name, provider, type, url,
       status, is_active, data_category, connection_category,
       is_system_managed, display_order, icon_name, description,
       created_at, updated_at
     ) VALUES (
       gen_random_uuid(),
+      v_user_id,
       p_org_id,
       p_store_id,
       '날씨 데이터 (OpenWeatherMap)',
@@ -192,12 +205,13 @@ BEGIN
 
   IF v_holidays_id IS NULL THEN
     INSERT INTO api_connections (
-      id, org_id, store_id, name, provider, api_type, base_url,
+      id, user_id, org_id, store_id, name, provider, type, url,
       status, is_active, data_category, connection_category,
       is_system_managed, display_order, icon_name, description,
       created_at, updated_at
     ) VALUES (
       gen_random_uuid(),
+      v_user_id,
       p_org_id,
       p_store_id,
       '공휴일/이벤트 (공공데이터포털)',
