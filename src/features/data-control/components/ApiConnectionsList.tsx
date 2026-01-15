@@ -209,11 +209,6 @@ function ConnectionCard({ connection, onEdit }: ConnectionCardProps) {
             </div>
           ) : (
             <>
-              {/* URL - 비즈니스 연결만 표시 */}
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <span className="truncate max-w-[200px]">{connection.url}</span>
-              </div>
-
               {/* 마지막 동기화 */}
               {connection.last_sync && (
                 <div className="flex items-center gap-2 text-muted-foreground">
@@ -233,7 +228,7 @@ function ConnectionCard({ connection, onEdit }: ConnectionCardProps) {
                 </div>
               )}
 
-              {/* 오류 메시지 - 비즈니스 연결만 표시 */}
+              {/* 오류 메시지 */}
               {connection.status === 'error' && connection.last_error && (
                 <div className="flex items-start gap-2 text-destructive bg-destructive/10 p-2 rounded">
                   <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
