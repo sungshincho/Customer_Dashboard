@@ -200,7 +200,7 @@ export function useInventoryMetrics() {
 
       // 3. 데이터 가공
       const inventoryLevels: InventoryLevel[] = (levelsData || []).map((level: any) => {
-        const product = productsMap[level.product_id] || {};
+        const product = (productsMap[level.product_id] || {}) as { product_name?: string; sku?: string; category?: string | null; price?: number | null };
         const daysUntilStockout = calculateDaysUntilStockout(
           level.current_stock,
           level.weekly_demand

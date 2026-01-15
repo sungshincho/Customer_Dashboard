@@ -793,14 +793,14 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
               positionsCount: results.staffing.staffPositions?.length || 0,
               hasVisualization: !!results.staffing.visualization,
               // ResultReportPanel용
-              currentCoverage: results.staffing.currentCoverage,
-              optimizedCoverage: results.staffing.optimizedCoverage,
-              staffCount: results.staffing.staffCount,
-              improvementsCount: results.staffing.improvements?.length || 0,
+              currentCoverage: (results.staffing as any).currentCoverage,
+              optimizedCoverage: (results.staffing as any).optimizedCoverage,
+              staffCount: (results.staffing as any).staffCount,
+              improvementsCount: (results.staffing as any).improvements?.length || 0,
               // StaffOptimizationResultPanel용
-              hasSummary: !!results.staffing.summary,
-              reallocationsCount: results.staffing.reallocations?.length || 0,
-              hasOverallImpact: !!results.staffing.overall_impact,
+              hasSummary: !!(results.staffing as any).summary,
+              reallocationsCount: (results.staffing as any).reallocations?.length || 0,
+              hasOverallImpact: !!(results.staffing as any).overall_impact,
               insightsCount: results.staffing.insights?.length || 0,
               confidence: results.staffing.confidence,
             });

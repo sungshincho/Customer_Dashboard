@@ -658,7 +658,7 @@ export type Database = {
           auth_config: Json | null
           auth_type: string | null
           auth_value: string | null
-          connection_category: 'business' | 'context' | 'analytics' | null
+          connection_category: string | null
           created_at: string
           data_category: string | null
           description: string | null
@@ -706,7 +706,7 @@ export type Database = {
           auth_config?: Json | null
           auth_type?: string | null
           auth_value?: string | null
-          connection_category?: 'business' | 'context' | 'analytics' | null
+          connection_category?: string | null
           created_at?: string
           data_category?: string | null
           description?: string | null
@@ -754,7 +754,7 @@ export type Database = {
           auth_config?: Json | null
           auth_type?: string | null
           auth_value?: string | null
-          connection_category?: 'business' | 'context' | 'analytics' | null
+          connection_category?: string | null
           created_at?: string
           data_category?: string | null
           description?: string | null
@@ -10296,6 +10296,10 @@ export type Database = {
         Returns: Json
       }
       ensure_store_persona: { Args: { p_store_id: string }; Returns: string }
+      ensure_system_context_connections: {
+        Args: { p_org_id: string; p_store_id?: string; p_user_id?: string }
+        Returns: Json
+      }
       execute_api_sync: { Args: { p_connection_id: string }; Returns: Json }
       export_public_schema: { Args: never; Returns: Json }
       generate_sample_sales_data: {
@@ -10310,6 +10314,10 @@ export type Database = {
           p_visits_per_day?: number
         }
         Returns: undefined
+      }
+      get_all_data_sources: {
+        Args: { p_org_id: string; p_store_id?: string }
+        Returns: Json
       }
       get_api_connections_dashboard: {
         Args: { p_org_id?: string; p_store_id?: string }
@@ -10392,6 +10400,10 @@ export type Database = {
           target_table: string
           url: string
         }[]
+      }
+      get_context_data_sources: {
+        Args: { p_org_id: string; p_store_id?: string }
+        Returns: Json
       }
       get_daily_kpis_summary: {
         Args: { p_days?: number; p_store_id: string }
