@@ -614,24 +614,10 @@ export function InsightDataProvider({ children, initialTab = 'overview' }: Insig
     queryFn: async (): Promise<InventoryMetricsData | null> => {
       if (!orgId) return null;
 
-      // 1. 재고 수준 조회 (products 조인)
+      // 1. 재고 수준 조회 (별도 쿼리 후 병합)
       const { data: levelsData, error: levelsError } = await supabase
         .from('inventory_levels')
-        .select(`
-          id,
-          product_id,
-          current_stock,
-          optimal_stock,
-          minimum_stock,
-          weekly_demand,
-          last_updated,
-          products:product_id (
-            product_name,
-            sku,
-            category,
-            price
-          )
-        `)
+        .select('id, product_id, current_stock, optimal_stock, minimum_stock, weekly_demand, last_updated')
         .eq('org_id', orgId)
         .limit(1000);
 
@@ -639,23 +625,30 @@ export function InsightDataProvider({ children, initialTab = 'overview' }: Insig
         console.error('[InsightDataProvider] Inventory levels error:', levelsError);
       }
 
-      // 2. 최근 입출고 내역 조회
+      // 1-1. 상품 정보 별도 조회 (product_id 기준)
+      const productIds = [...new Set((levelsData || []).map((l: any) => l.product_id).filter(Boolean))];
+      let productsMap: Record<string, { product_name: string; sku: string; category: string | null; price: number | null }> = {};
+
+      if (productIds.length > 0) {
+        const { data: productsData, error: productsError } = await supabase
+          .from('products')
+          .select('id, product_name, sku, category, price')
+          .in('id', productIds);
+
+        if (productsError) {
+          console.error('[InsightDataProvider] Products error:', productsError);
+        }
+
+        productsMap = (productsData || []).reduce((acc: any, p: any) => {
+          acc[p.id] = { product_name: p.product_name, sku: p.sku, category: p.category, price: p.price };
+          return acc;
+        }, {});
+      }
+
+      // 2. 최근 입출고 내역 조회 (별도 쿼리)
       const { data: movementsData, error: movementsError } = await supabase
         .from('inventory_movements')
-        .select(`
-          id,
-          product_id,
-          movement_type,
-          quantity,
-          previous_stock,
-          new_stock,
-          reason,
-          reference_id,
-          moved_at,
-          products:product_id (
-            product_name
-          )
-        `)
+        .select('id, product_id, movement_type, quantity, previous_stock, new_stock, reason, reference_id, moved_at')
         .eq('org_id', orgId)
         .gte('moved_at', startDate)
         .lte('moved_at', endDate)
@@ -664,6 +657,21 @@ export function InsightDataProvider({ children, initialTab = 'overview' }: Insig
 
       if (movementsError) {
         console.error('[InsightDataProvider] Inventory movements error:', movementsError);
+      }
+
+      // 2-1. 입출고 내역의 상품 정보 조회
+      const movementProductIds = [...new Set((movementsData || []).map((m: any) => m.product_id).filter(Boolean))];
+      const missingProductIds = movementProductIds.filter(id => !productsMap[id]);
+
+      if (missingProductIds.length > 0) {
+        const { data: moreProductsData } = await supabase
+          .from('products')
+          .select('id, product_name, sku, category, price')
+          .in('id', missingProductIds);
+
+        (moreProductsData || []).forEach((p: any) => {
+          productsMap[p.id] = { product_name: p.product_name, sku: p.sku, category: p.category, price: p.price };
+        });
       }
 
       // 3. 데이터 가공 - 재고 상태 계산
@@ -698,7 +706,7 @@ export function InsightDataProvider({ children, initialTab = 'overview' }: Insig
       };
 
       const inventoryLevels = (levelsData || []).map((level: any) => {
-        const product = level.products || {};
+        const product = productsMap[level.product_id] || {};
         const daysUntilStockout = calculateDaysUntilStockout(
           level.current_stock,
           level.weekly_demand
@@ -709,7 +717,7 @@ export function InsightDataProvider({ children, initialTab = 'overview' }: Insig
           product_id: level.product_id,
           product_name: product.product_name || 'Unknown',
           sku: product.sku || '',
-          category: product.category,
+          category: product.category || null,
           current_stock: level.current_stock || 0,
           optimal_stock: level.optimal_stock || 0,
           minimum_stock: level.minimum_stock || 0,
@@ -727,7 +735,7 @@ export function InsightDataProvider({ children, initialTab = 'overview' }: Insig
       const recentMovements = (movementsData || []).map((mov: any) => ({
         id: mov.id,
         product_id: mov.product_id,
-        product_name: mov.products?.product_name || 'Unknown',
+        product_name: productsMap[mov.product_id]?.product_name || 'Unknown',
         movement_type: mov.movement_type,
         quantity: mov.quantity,
         previous_stock: mov.previous_stock,
