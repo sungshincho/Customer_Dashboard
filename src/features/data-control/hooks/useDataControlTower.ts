@@ -37,7 +37,10 @@ export function useDataControlTowerStatus() {
           });
 
         if (error) throw error;
-        return data as unknown as DataControlTowerStatus;
+
+        // RPC 결과에 ERP 데이터가 없으면 병합
+        const result = data as unknown as DataControlTowerStatus;
+        return await ensureERPCoverage(result, storeId);
       } catch (rpcError) {
         // Fallback: build status from direct queries
         console.warn('RPC not available, using fallback queries:', rpcError);
@@ -47,6 +50,127 @@ export function useDataControlTowerStatus() {
     enabled: !!storeId,
     refetchInterval: 30000, // 30초마다 새로고침
   });
+}
+
+// ERP 데이터가 없으면 병합하는 함수
+async function ensureERPCoverage(result: DataControlTowerStatus, storeId: string): Promise<DataControlTowerStatus> {
+  // ERP 데이터가 이미 있으면 그대로 반환
+  if (result.quality_score?.coverage?.erp) {
+    return result;
+  }
+
+  // ERP/재고 데이터 카운트
+  // inventory_levels: 상품별 현재 재고 수준 (상태 데이터) - 상품 수 기준
+  // inventory_movements: 입출고 트랜잭션 이력 (이벤트 데이터) - 활동 여부 확인용
+  const { count: inventoryLevelCount } = await supabase
+    .from('inventory_levels')
+    .select('*', { count: 'exact', head: true });
+
+  const { count: inventoryMovementCount } = await supabase
+    .from('inventory_movements')
+    .select('*', { count: 'exact', head: true })
+    .eq('store_id', storeId);
+
+  // ERP 데이터 존재 여부: levels가 있거나 movements 활동이 있으면 true
+  const hasERPData = (inventoryLevelCount || 0) > 0 || (inventoryMovementCount || 0) > 0;
+  // 표시할 레코드 수: 관리 중인 상품 수 (levels 기준)
+  const erpRecordCount = inventoryLevelCount || 0;
+
+  // Coverage에 ERP 추가
+  if (result.quality_score?.coverage) {
+    result.quality_score.coverage.erp = {
+      available: hasERPData,
+      record_count: erpRecordCount,
+      label: 'ERP/재고 데이터',
+    };
+  }
+
+  // Data sources에 ERP 추가
+  if (result.data_sources && !result.data_sources.erp) {
+    result.data_sources.erp = {
+      name: 'ERP',
+      description: '재고/입출고 데이터',
+      status: hasERPData ? 'active' : 'inactive',
+      last_sync: null,
+    };
+  }
+
+  // ERP를 포함하여 전체 점수 재계산 (5개 데이터 소스 기준)
+  const coverage = result.quality_score?.coverage;
+  if (coverage) {
+    const sources = [
+      coverage.pos?.record_count || 0,
+      coverage.sensor?.record_count || 0,
+      coverage.crm?.record_count || 0,
+      coverage.product?.record_count || 0,
+      erpRecordCount,
+    ];
+    const availableSources = sources.filter(c => c > 0).length;
+    result.quality_score.overall_score = Math.round((availableSources / 5) * 100);
+    result.quality_score.confidence_level = result.quality_score.overall_score >= 75 ? 'high' : result.quality_score.overall_score >= 50 ? 'medium' : 'low';
+  }
+
+  return result;
+}
+
+// DataQualityScore용 ERP 데이터 병합 함수
+async function ensureERPCoverageForQualityScore(result: DataQualityScore, storeId: string): Promise<DataQualityScore> {
+  // ERP 데이터가 이미 있으면 그대로 반환
+  if (result.coverage?.erp) {
+    return result;
+  }
+
+  // ERP/재고 데이터 카운트
+  // inventory_levels: 상품별 현재 재고 수준 (상태 데이터) - 상품 수 기준
+  // inventory_movements: 입출고 트랜잭션 이력 (이벤트 데이터) - 활동 여부 확인용
+  const { count: inventoryLevelCount } = await supabase
+    .from('inventory_levels')
+    .select('*', { count: 'exact', head: true });
+
+  const { count: inventoryMovementCount } = await supabase
+    .from('inventory_movements')
+    .select('*', { count: 'exact', head: true })
+    .eq('store_id', storeId);
+
+  // ERP 데이터 존재 여부: levels가 있거나 movements 활동이 있으면 true
+  const hasERPData = (inventoryLevelCount || 0) > 0 || (inventoryMovementCount || 0) > 0;
+  // 표시할 레코드 수: 관리 중인 상품 수 (levels 기준)
+  const erpRecordCount = inventoryLevelCount || 0;
+
+  // Coverage에 ERP 추가
+  if (result.coverage) {
+    result.coverage.erp = {
+      available: hasERPData,
+      record_count: erpRecordCount,
+      label: 'ERP/재고 데이터',
+    };
+  }
+
+  // ERP를 포함하여 전체 점수 재계산 (5개 데이터 소스 기준)
+  const coverage = result.coverage;
+  if (coverage) {
+    const sources = [
+      coverage.pos?.record_count || 0,
+      coverage.sensor?.record_count || 0,
+      coverage.crm?.record_count || 0,
+      coverage.product?.record_count || 0,
+      erpRecordCount,
+    ];
+    const availableSources = sources.filter(c => c > 0).length;
+    result.overall_score = Math.round((availableSources / 5) * 100);
+    result.confidence_level = result.overall_score >= 75 ? 'high' : result.overall_score >= 50 ? 'medium' : 'low';
+
+    // ERP가 없으면 경고 추가
+    if (!hasERPData && Array.isArray(result.warnings)) {
+      const hasERPWarning = result.warnings.some((w: any) => w.source === 'erp');
+      if (!hasERPWarning) {
+        result.warnings.push({ type: 'missing', source: 'erp', severity: 'medium', message: 'ERP/재고 데이터가 없습니다.' });
+        result.warning_count = result.warnings.length;
+      }
+    }
+  }
+
+  return result;
 }
 
 // Fallback function when RPC is not available
@@ -110,7 +234,9 @@ async function buildControlTowerStatusFallback(storeId: string): Promise<DataCon
     .select('*', { count: 'exact', head: true })
     .eq('store_id', storeId);
 
-  // 4-1. ERP/재고 데이터 카운트 (inventory_levels + inventory_movements)
+  // 4-1. ERP/재고 데이터 카운트
+  // inventory_levels: 상품별 현재 재고 수준 (상태 데이터) - 상품 수 기준
+  // inventory_movements: 입출고 트랜잭션 이력 (이벤트 데이터) - 활동 여부 확인용
   const { count: inventoryLevelCount } = await supabase
     .from('inventory_levels')
     .select('*', { count: 'exact', head: true });
@@ -120,7 +246,10 @@ async function buildControlTowerStatusFallback(storeId: string): Promise<DataCon
     .select('*', { count: 'exact', head: true })
     .eq('store_id', storeId);
 
-  const totalInventoryCount = (inventoryLevelCount || 0) + (inventoryMovementCount || 0);
+  // ERP 데이터 존재 여부: levels가 있거나 movements 활동이 있으면 true
+  const hasERPData = (inventoryLevelCount || 0) > 0 || (inventoryMovementCount || 0) > 0;
+  // 표시할 레코드 수: 관리 중인 상품 수 (levels 기준)
+  const erpRecordCount = inventoryLevelCount || 0;
 
   // 5. L2/L3 counts
   const { count: l2Count } = await supabase
@@ -134,7 +263,7 @@ async function buildControlTowerStatusFallback(storeId: string): Promise<DataCon
     .eq('store_id', storeId);
 
   // Calculate quality score (now includes ERP/inventory)
-  const sources = [totalPosCount, sensorCount, customerCount, productCount, totalInventoryCount];
+  const sources = [totalPosCount, sensorCount, customerCount, productCount, erpRecordCount];
   const availableSources = sources.filter(c => (c || 0) > 0).length;
   const overallScore = Math.round((availableSources / 5) * 100);
 
@@ -151,7 +280,7 @@ async function buildControlTowerStatusFallback(storeId: string): Promise<DataCon
         sensor: { available: (sensorCount || 0) > 0, record_count: sensorCount || 0, label: 'NEURALSENSE 센서' },
         crm: { available: (customerCount || 0) > 0, record_count: customerCount || 0, label: 'CRM/고객 데이터' },
         product: { available: (productCount || 0) > 0, record_count: productCount || 0, label: '상품 마스터' },
-        erp: { available: totalInventoryCount > 0, record_count: totalInventoryCount, label: 'ERP/재고 데이터' },
+        erp: { available: hasERPData, record_count: erpRecordCount, label: 'ERP/재고 데이터' },
       },
       warnings: [],
       warning_count: 0,
@@ -161,7 +290,7 @@ async function buildControlTowerStatusFallback(storeId: string): Promise<DataCon
       sensor: { name: 'NEURALSENSE', description: 'WiFi/BLE 센서', status: (sensorCount || 0) > 0 ? 'active' : 'inactive' },
       crm: { name: 'CRM', description: '고객/CDP 데이터', status: (customerCount || 0) > 0 ? 'active' : 'inactive' },
       product: { name: '상품', description: '상품 마스터', status: (productCount || 0) > 0 ? 'active' : 'inactive' },
-      erp: { name: 'ERP', description: '재고/입출고 데이터', status: totalInventoryCount > 0 ? 'active' : 'inactive' },
+      erp: { name: 'ERP', description: '재고/입출고 데이터', status: hasERPData ? 'active' : 'inactive' },
     },
     recent_imports: (recentImports || []) as unknown as RawImport[],
     recent_etl_runs: (etlRuns || []) as unknown as ETLRun[],
@@ -202,7 +331,10 @@ export function useDataQualityScore(date?: string) {
           });
 
         if (error) throw error;
-        return data as unknown as DataQualityScore;
+
+        // RPC 결과에 ERP 데이터가 없으면 병합
+        const result = data as unknown as DataQualityScore;
+        return await ensureERPCoverageForQualityScore(result, storeId);
       } catch (rpcError) {
         console.warn('Quality score RPC not available, using fallback:', rpcError);
         return await buildQualityScoreFallback(storeId);
@@ -239,6 +371,8 @@ async function buildQualityScoreFallback(storeId: string): Promise<DataQualitySc
     .eq('store_id', storeId);
 
   // ERP/재고 데이터 카운트
+  // inventory_levels: 상품별 현재 재고 수준 (상태 데이터) - 상품 수 기준
+  // inventory_movements: 입출고 트랜잭션 이력 (이벤트 데이터) - 활동 여부 확인용
   const { count: inventoryLevelCount } = await supabase
     .from('inventory_levels')
     .select('*', { count: 'exact', head: true });
@@ -248,9 +382,12 @@ async function buildQualityScoreFallback(storeId: string): Promise<DataQualitySc
     .select('*', { count: 'exact', head: true })
     .eq('store_id', storeId);
 
-  const totalInventoryCount = (inventoryLevelCount || 0) + (inventoryMovementCount || 0);
+  // ERP 데이터 존재 여부: levels가 있거나 movements 활동이 있으면 true
+  const hasERPData = (inventoryLevelCount || 0) > 0 || (inventoryMovementCount || 0) > 0;
+  // 표시할 레코드 수: 관리 중인 상품 수 (levels 기준)
+  const erpRecordCount = inventoryLevelCount || 0;
 
-  const sources = [totalPosCount, sensorCount, customerCount, productCount, totalInventoryCount];
+  const sources = [totalPosCount, sensorCount, customerCount, productCount, erpRecordCount];
   const availableSources = sources.filter(c => (c || 0) > 0).length;
   const overallScore = Math.round((availableSources / 5) * 100);
 
@@ -268,7 +405,7 @@ async function buildQualityScoreFallback(storeId: string): Promise<DataQualitySc
   if (!productCount || productCount === 0) {
     warnings.push({ type: 'missing', source: 'product', severity: 'medium', message: '상품 데이터가 없습니다.' });
   }
-  if (totalInventoryCount === 0) {
+  if (!hasERPData) {
     warnings.push({ type: 'missing', source: 'erp', severity: 'medium', message: 'ERP/재고 데이터가 없습니다.' });
   }
 
@@ -282,7 +419,7 @@ async function buildQualityScoreFallback(storeId: string): Promise<DataQualitySc
       sensor: { available: (sensorCount || 0) > 0, record_count: sensorCount || 0, label: 'NEURALSENSE 센서' },
       crm: { available: (customerCount || 0) > 0, record_count: customerCount || 0, label: 'CRM/고객 데이터' },
       product: { available: (productCount || 0) > 0, record_count: productCount || 0, label: '상품 마스터' },
-      erp: { available: totalInventoryCount > 0, record_count: totalInventoryCount, label: 'ERP/재고 데이터' },
+      erp: { available: hasERPData, record_count: erpRecordCount, label: 'ERP/재고 데이터' },
     },
     warnings,
     warning_count: warnings.length,
