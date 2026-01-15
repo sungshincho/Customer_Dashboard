@@ -8,11 +8,23 @@
  * - 결과 적용/롤백
  * - 부분 적용 (선택한 변경사항만)
  * - 히스토리 관리
+ *
+ * B안 확장:
+ * - 레이아웃 최적화 → 직원 위치 제안 (부가 결과)
+ * - 인력배치 최적화 → 가구 미세 조정 (부가 결과)
+ * - 전체/부분 적용 옵션
  */
 
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import type { AILayoutOptimizationResult, ProductAsset, Vector3D } from '@/types/scene3d';
+import type {
+  AILayoutOptimizationResult,
+  ProductAsset,
+  Vector3D,
+  StaffSuggestions,
+  FurnitureAdjustments,
+  StaffChange,
+} from '@/types/scene3d';
 
 // ============================================================================
 // 타입 정의
@@ -46,11 +58,19 @@ export interface UseOptimizationReturn {
 
   // 액션
   generateOptimization: (params: GenerateOptimizationParams) => Promise<AILayoutOptimizationResult | null>;
-  applyChange: (changeId: string, type: 'furniture' | 'product') => Promise<boolean>;
+  applyChange: (changeId: string, type: 'furniture' | 'product' | 'staff') => Promise<boolean>;
   applyAllChanges: () => Promise<boolean>;
-  rejectChange: (changeId: string, type: 'furniture' | 'product') => void;
+  rejectChange: (changeId: string, type: 'furniture' | 'product' | 'staff') => void;
   rejectAllChanges: () => void;
   clearResult: () => void;
+
+  // B안: 통합 적용 액션
+  /** 선택적 적용 (가구만, 직원만, 전체 등) */
+  applyChangesWithOption: (option: ApplyChangesOption) => Promise<boolean>;
+  /** 직원 제안만 적용 */
+  applyStaffSuggestions: () => Promise<boolean>;
+  /** 가구 미세 조정만 적용 */
+  applyFurnitureAdjustments: () => Promise<boolean>;
 
   // 히스토리
   history: OptimizationHistoryItem[];
@@ -59,10 +79,26 @@ export interface UseOptimizationReturn {
   // 유틸리티
   getAppliedProducts: () => ProductAsset[];
   getPendingChangesCount: () => number;
+
+  // B안: 유틸리티 확장
+  /** 직원 제안 수 반환 */
+  getStaffSuggestionsCount: () => number;
+  /** 가구 조정 수 반환 */
+  getFurnitureAdjustmentsCount: () => number;
+  /** 변경사항 유형별 카운트 */
+  getChangesSummary: () => {
+    furniture: number;
+    product: number;
+    staff: number;
+    furnitureAdjustments: number;
+  };
 }
 
+// B안: 적용 옵션 타입
+export type ApplyChangesOption = 'furniture' | 'product' | 'staff' | 'all' | 'furniture_only' | 'staff_only';
+
 export interface GenerateOptimizationParams {
-  optimizationType: 'furniture' | 'product' | 'both';
+  optimizationType: 'furniture' | 'product' | 'both' | 'staff';
   zoneIds?: string[];
   productIds?: string[];
   furnitureIds?: string[];
@@ -70,6 +106,16 @@ export interface GenerateOptimizationParams {
   prioritizeVisibility?: boolean;
   prioritizeAccessibility?: boolean;
   maxChanges?: number;
+  // B안: 통합 최적화 옵션
+  /** 레이아웃 최적화 시 직원 위치도 함께 제안 */
+  includeStaffOptimization?: boolean;
+  /** 인력배치 최적화 시 가구 미세 조정 허용 */
+  allowFurnitureAdjustment?: boolean;
+  /** 가구 미세 조정 최대 거리 (cm) */
+  maxAdjustmentDistance?: number;
+  // Staffing 전용 파라미터
+  staffingGoal?: 'customer_service' | 'sales' | 'efficiency';
+  staffCount?: number;
 }
 
 // ============================================================================
@@ -90,7 +136,7 @@ export function useOptimization({
   const [appliedChangeIds, setAppliedChangeIds] = useState<Set<string>>(new Set());
   const [rejectedChangeIds, setRejectedChangeIds] = useState<Set<string>>(new Set());
 
-  // 최적화 생성
+  // 최적화 생성 (B안: 통합 파라미터 포함)
   const generateOptimization = useCallback(async (params: GenerateOptimizationParams) => {
     try {
       setStatus('generating');
@@ -108,6 +154,13 @@ export function useOptimization({
             prioritize_visibility: params.prioritizeVisibility,
             prioritize_accessibility: params.prioritizeAccessibility,
             max_changes: params.maxChanges,
+            // B안: 통합 최적화 파라미터
+            include_staff_optimization: params.includeStaffOptimization,
+            allow_furniture_adjustment: params.allowFurnitureAdjustment,
+            max_adjustment_distance: params.maxAdjustmentDistance,
+            // Staffing 전용 파라미터
+            staffing_goal: params.staffingGoal,
+            staff_count: params.staffCount,
           },
         },
       });
@@ -300,6 +353,132 @@ export function useOptimization({
     setRejectedChangeIds(new Set());
   }, []);
 
+  // ============================================================================
+  // B안: 통합 적용 함수
+  // ============================================================================
+
+  // B안: 선택적 적용 (가구만, 직원만, 전체 등)
+  const applyChangesWithOption = useCallback(async (option: ApplyChangesOption): Promise<boolean> => {
+    if (!result) return false;
+
+    try {
+      setStatus('applying');
+      const appliedIds: string[] = [];
+
+      // 가구 변경 적용
+      if (option === 'all' || option === 'furniture' || option === 'furniture_only') {
+        for (const change of result.furniture_changes) {
+          if (!rejectedChangeIds.has(change.furniture_id)) {
+            appliedIds.push(change.furniture_id);
+          }
+        }
+      }
+
+      // 상품 변경 적용
+      if (option === 'all' || option === 'product') {
+        const productPlacements = result.product_changes
+          .filter(c => !rejectedChangeIds.has(c.product_id))
+          .map(c => ({
+            product_id: c.product_id,
+            store_id: storeId,
+            user_id: userId,
+            slot_id: c.suggested.slot_id,
+            display_type: 'shelf',
+            position_offset: c.suggested.position ? JSON.parse(JSON.stringify(c.suggested.position)) : null,
+            updated_at: new Date().toISOString(),
+          }));
+
+        if (productPlacements.length > 0) {
+          await supabase
+            .from('product_placements')
+            .upsert(productPlacements as any, { onConflict: 'product_id,store_id' });
+
+          productPlacements.forEach(p => appliedIds.push(p.product_id));
+        }
+      }
+
+      // 직원 제안 적용 (B안)
+      if ((option === 'all' || option === 'staff' || option === 'staff_only') && result.staff_suggestions) {
+        for (const suggestion of result.staff_suggestions.items) {
+          if (!rejectedChangeIds.has(suggestion.staff_id)) {
+            appliedIds.push(`staff_${suggestion.staff_id}`);
+            // 직원 위치는 씬 저장 시 반영되므로 여기서는 ID만 추적
+          }
+        }
+      }
+
+      // 직원 변경 적용 (staff 타입 최적화)
+      if ((option === 'all' || option === 'staff' || option === 'staff_only') && result.staff_changes) {
+        for (const change of result.staff_changes) {
+          if (!rejectedChangeIds.has(change.staff_id)) {
+            appliedIds.push(`staff_${change.staff_id}`);
+          }
+        }
+      }
+
+      // 가구 미세 조정 적용 (B안)
+      if (option === 'all' && result.furniture_adjustments) {
+        for (const adjustment of result.furniture_adjustments.items) {
+          if (!rejectedChangeIds.has(`adj_${adjustment.furniture_id}`)) {
+            appliedIds.push(`adj_${adjustment.furniture_id}`);
+          }
+        }
+      }
+
+      // DB 상태 업데이트
+      await supabase
+        .from('layout_optimization_results')
+        .update({
+          status: appliedIds.length > 0 ? 'applied' : 'rejected',
+          applied_at: new Date().toISOString(),
+          applied_changes: appliedIds,
+        })
+        .eq('id', result.optimization_id);
+
+      setAppliedChangeIds(new Set(appliedIds));
+      setStatus('applied');
+      onOptimizationApplied?.(appliedIds);
+      return true;
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Failed to apply changes');
+      setError(error);
+      setStatus('error');
+      onError?.(error);
+      return false;
+    }
+  }, [result, storeId, userId, rejectedChangeIds, onOptimizationApplied, onError]);
+
+  // B안: 직원 제안만 적용
+  const applyStaffSuggestions = useCallback(async (): Promise<boolean> => {
+    return applyChangesWithOption('staff_only');
+  }, [applyChangesWithOption]);
+
+  // B안: 가구 미세 조정만 적용
+  const applyFurnitureAdjustments = useCallback(async (): Promise<boolean> => {
+    if (!result?.furniture_adjustments) return false;
+
+    try {
+      setStatus('applying');
+      const appliedIds: string[] = [];
+
+      for (const adjustment of result.furniture_adjustments.items) {
+        if (!rejectedChangeIds.has(`adj_${adjustment.furniture_id}`)) {
+          appliedIds.push(`adj_${adjustment.furniture_id}`);
+        }
+      }
+
+      setAppliedChangeIds(prev => new Set([...prev, ...appliedIds]));
+      setStatus('ready');
+      return true;
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Failed to apply furniture adjustments');
+      setError(error);
+      setStatus('error');
+      onError?.(error);
+      return false;
+    }
+  }, [result, rejectedChangeIds, onError]);
+
   // 히스토리 로드
   const loadHistory = useCallback(async () => {
     try {
@@ -361,6 +540,36 @@ export function useOptimization({
     return totalChanges - appliedChangeIds.size - rejectedChangeIds.size;
   }, [result, appliedChangeIds, rejectedChangeIds]);
 
+  // ============================================================================
+  // B안: 유틸리티 함수
+  // ============================================================================
+
+  // B안: 직원 제안 수 반환
+  const getStaffSuggestionsCount = useCallback(() => {
+    if (!result) return 0;
+    return result.staff_suggestions?.items?.length || 0;
+  }, [result]);
+
+  // B안: 가구 조정 수 반환
+  const getFurnitureAdjustmentsCount = useCallback(() => {
+    if (!result) return 0;
+    return result.furniture_adjustments?.items?.length || 0;
+  }, [result]);
+
+  // B안: 변경사항 유형별 카운트
+  const getChangesSummary = useCallback(() => {
+    if (!result) {
+      return { furniture: 0, product: 0, staff: 0, furnitureAdjustments: 0 };
+    }
+
+    return {
+      furniture: result.furniture_changes.length,
+      product: result.product_changes.length,
+      staff: (result.staff_suggestions?.items?.length || 0) + (result.staff_changes?.length || 0),
+      furnitureAdjustments: result.furniture_adjustments?.items?.length || 0,
+    };
+  }, [result]);
+
   return {
     status,
     result,
@@ -374,11 +583,21 @@ export function useOptimization({
     rejectAllChanges,
     clearResult,
 
+    // B안: 통합 적용 액션
+    applyChangesWithOption,
+    applyStaffSuggestions,
+    applyFurnitureAdjustments,
+
     history,
     loadHistory,
 
     getAppliedProducts,
     getPendingChangesCount,
+
+    // B안: 유틸리티 확장
+    getStaffSuggestionsCount,
+    getFurnitureAdjustmentsCount,
+    getChangesSummary,
   };
 }
 

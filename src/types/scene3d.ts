@@ -63,14 +63,25 @@ export interface ProductAsset extends SceneAsset {
   isRelativePosition?: boolean;
 }
 
+// Staff Role Types
+export type StaffRole = 'sales' | 'manager' | 'cashier' | 'support' | 'fitting_room' | 'stock';
+
 export interface StaffAsset extends SceneAsset {
   type: 'staff';
   staff_id: string;
   staff_name: string;
-  role: string;
+  role: StaffRole | string;
   assigned_zone_id?: string;
   shift_start?: string;
   shift_end?: string;
+  avatar_url?: string;
+  /** B안: 최적화 제안 위치 */
+  suggested_position?: Vector3D;
+  suggested_rotation?: Vector3D;
+  /** B안: 최적화 사유 */
+  optimization_reason?: string;
+  /** B안: 선택적 적용 여부 (레이아웃 최적화에서 직원 제안 시) */
+  is_optional?: boolean;
 }
 
 export interface CustomerAsset extends SceneAsset {
@@ -160,12 +171,119 @@ export interface ProductPlacement {
   movable: boolean;
 }
 
-// Layout Optimization Types
+// ============================================================================
+// B안: 통합 최적화 타입 정의
+// ============================================================================
+
+// 직원 위치 변경 (인력배치 최적화 결과)
+export interface StaffChange {
+  staff_id: string;
+  staff_name: string;
+  role: StaffRole | string;
+
+  current: {
+    zone_id: string;
+    position: Vector3D;
+    rotation?: Vector3D;
+  };
+
+  suggested: {
+    zone_id: string;
+    position: Vector3D;
+    rotation?: Vector3D;
+  };
+
+  reason: string;
+  priority: 'high' | 'medium' | 'low';
+  expected_coverage_gain: number;
+  expected_service_impact: number;
+}
+
+// 직원 위치 제안 (레이아웃 최적화 → 직원 연동)
+export interface StaffSuggestion {
+  staff_id: string;
+  staff_name: string;
+  role: StaffRole | string;
+
+  current_position: Vector3D;
+  suggested_position: Vector3D;
+  suggested_rotation?: Vector3D;
+
+  reason: string;
+  /** 선택적 적용 여부 - 레이아웃 최적화 시 직원 제안은 optional */
+  is_optional: boolean;
+  /** 연동된 가구 변경 ID */
+  related_furniture_change_id?: string;
+}
+
+// 가구 미세 조정 (인력배치 최적화 → 가구 연동)
+export interface FurnitureAdjustment {
+  furniture_id: string;
+  furniture_type: string;
+  furniture_name?: string;
+
+  adjustment_type: 'position' | 'rotation' | 'both';
+
+  current_position: Vector3D;
+  current_rotation: Vector3D;
+
+  adjusted_position: Vector3D;
+  adjusted_rotation: Vector3D;
+
+  /** 이동 거리 (cm) */
+  adjustment_distance: number;
+  reason: string;
+  /** 선택적 적용 여부 - 인력배치 최적화 시 가구 조정은 optional */
+  is_optional: boolean;
+  /** 연동된 직원 변경 ID */
+  related_staff_change_id?: string;
+}
+
+// 직원 위치 제안 그룹 (레이아웃 최적화 결과에 포함)
+export interface StaffSuggestions {
+  summary: {
+    repositioned: number;
+    note: string;  // e.g., "가구 배치 변경에 따른 권장 위치"
+  };
+  items: StaffSuggestion[];
+}
+
+// 가구 미세 조정 그룹 (인력배치 최적화 결과에 포함)
+export interface FurnitureAdjustments {
+  summary: {
+    adjusted: number;
+    note: string;  // e.g., "직원 동선 확보를 위한 미세 조정"
+  };
+  items: FurnitureAdjustment[];
+}
+
+// 인력배치 최적화 결과
+export interface StaffOptimizationResult {
+  optimization_id: string;
+  store_id: string;
+  created_at: string;
+  optimization_type: 'staff';
+
+  staff_changes: StaffChange[];
+
+  /** B안: 가구 미세 조정 (부가 결과 20%) */
+  furniture_adjustments?: FurnitureAdjustments;
+
+  summary: {
+    total_staff_changes: number;
+    total_furniture_adjustments: number;
+    expected_coverage_improvement: number;
+    expected_service_improvement: number;
+    expected_efficiency_improvement: number;
+  };
+}
+
+// Layout Optimization Types (B안 확장)
 export interface AILayoutOptimizationResult {
   optimization_id: string;
   store_id: string;
   created_at: string;
-  optimization_type: 'furniture' | 'product' | 'both';
+  optimization_type: 'furniture' | 'product' | 'both' | 'staff';
 
   furniture_changes: Array<{
     furniture_id: string;
@@ -213,12 +331,27 @@ export interface AILayoutOptimizationResult {
     expected_visibility_impact: number;
   }>;
 
+  /** B안: 직원 위치 제안 (부가 결과 20%) */
+  staff_suggestions?: StaffSuggestions;
+
+  /** B안: 인력배치 최적화 결과 (staff 타입일 때) */
+  staff_changes?: StaffChange[];
+
+  /** B안: 가구 미세 조정 (인력배치 → 가구 연동) */
+  furniture_adjustments?: FurnitureAdjustments;
+
   summary: {
     total_furniture_changes: number;
     total_product_changes: number;
     expected_revenue_improvement: number;
     expected_traffic_improvement: number;
     expected_conversion_improvement: number;
+    /** B안: 직원 제안 수 */
+    total_staff_suggestions?: number;
+    /** B안: 가구 조정 수 */
+    total_furniture_adjustments?: number;
+    /** B안: 커버리지 개선 예상 */
+    expected_coverage_improvement?: number;
   };
 }
 

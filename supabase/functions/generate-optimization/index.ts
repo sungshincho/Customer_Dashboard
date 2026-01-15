@@ -92,6 +92,14 @@ import {
   type LearningSessionSummary,
 } from './feedback/autoLearning.ts';
 
+// 🆕 B안: 통합 최적화 유틸리티
+import {
+  enhanceLayoutResultWithStaff,
+  enhanceStaffingResultWithFurniture,
+  type StaffSuggestions,
+  type FurnitureAdjustments,
+} from '../_shared/optimization/integratedOptimization.ts';
+
 // 🆕 Phase 5: Structured Output 스키마 (리테일 도메인 지식 기반)
 import {
   createResponseFormat,
@@ -449,6 +457,46 @@ Deno.serve(async (req) => {
     result.store_id = store_id;
     result.created_at = new Date().toISOString();
     result.optimization_type = optimization_type;
+
+    // 🆕 B안: 직원 데이터 로드 (레이아웃 최적화 시 직원 제안용)
+    let staffData: any[] = [];
+    if (parameters?.include_staff_optimization && optimization_type !== 'staffing') {
+      try {
+        const { data: staffRows } = await supabase
+          .from('staff')
+          .select('id, staff_code, staff_name, role, avatar_position, assigned_zone_id')
+          .eq('store_id', store_id)
+          .eq('is_active', true);
+        staffData = staffRows || [];
+        console.log(`[generate-optimization] 🆕 B안: Loaded ${staffData.length} staff for integrated optimization`);
+      } catch (err) {
+        console.warn('[generate-optimization] B안: Staff data load failed:', err);
+      }
+    }
+
+    // 🆕 B안: 레이아웃 최적화 결과에 직원 제안 추가
+    if (parameters?.include_staff_optimization && optimization_type !== 'staffing') {
+      result = enhanceLayoutResultWithStaff(
+        result,
+        staffData,
+        layoutData.zones,
+        true
+      );
+      console.log(`[generate-optimization] 🆕 B안: Added ${result.staff_suggestions?.items?.length || 0} staff suggestions`);
+    }
+
+    // 🆕 B안: 인력배치 최적화 결과에 가구 미세 조정 추가
+    if (parameters?.allow_furniture_adjustment && staffingResult) {
+      const enhancedStaffingResult = enhanceStaffingResultWithFurniture(
+        staffingResult,
+        layoutData.furniture,
+        true,
+        parameters?.max_adjustment_distance || 50
+      );
+      result.staffing_result = enhancedStaffingResult;
+      result.furniture_adjustments = enhancedStaffingResult.furniture_adjustments;
+      console.log(`[generate-optimization] 🆕 B안: Added ${result.furniture_adjustments?.items?.length || 0} furniture adjustments`);
+    }
 
     // 🆕 Phase 2.1: 매출 예측 적용
     const predictions: RevenuePredictionOutput[] = [];
