@@ -192,9 +192,13 @@ export function ContextDataSourceCards({
             // 아이콘 결정 (icon_name > data_category > 기본)
             const iconKey = source.icon_name || source.data_category || 'Cloud';
             const Icon = contextIcons[iconKey] || Cloud;
-            // 시스템 관리 컨텍스트 소스는 항상 활성으로 표시
-            const displayStatus = source.is_system_managed ? 'active' : source.status;
-            const StatusIcon = CheckCircle; // 항상 체크 아이콘 표시
+            // 컨텍스트 소스는 data_category로 판별 (weather, holidays)
+            const isSystemManaged =
+              source.is_system_managed ||
+              source.data_category === 'weather' ||
+              source.data_category === 'holidays';
+            // 항상 활성으로 표시
+            const StatusIcon = CheckCircle;
 
             return (
               <div
@@ -205,12 +209,10 @@ export function ContextDataSourceCards({
                   <div className="w-12 h-12 rounded-xl bg-white dark:bg-gray-700 flex items-center justify-center shadow-sm">
                     <Icon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                   </div>
-                  <div
-                    className={`absolute -top-1 -right-1 w-4 h-4 rounded-full ${statusColors[displayStatus] || 'bg-green-500'} flex items-center justify-center`}
-                  >
+                  <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
                     <StatusIcon className="w-3 h-3 text-white" />
                   </div>
-                  {source.is_system_managed && (
+                  {isSystemManaged && (
                     <div className="absolute -bottom-1 -left-1 w-4 h-4 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
                       <Lock className="w-2.5 h-2.5 text-gray-500 dark:text-gray-400" />
                     </div>
