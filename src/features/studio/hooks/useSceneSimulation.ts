@@ -334,23 +334,49 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
         },
       };
 
-      // Edge Function 호출
-      const { data, error } = await supabase.functions.invoke('advanced-ai-inference', {
-        body: {
-          type: `${request.type}_optimization`,
-          storeId: selectedStore.id,
-          orgId,
-          params: {
-            ...request.params,
-            sceneData, // As-is 씬 데이터 전달
+      // 🔧 마이그레이션: 타입별 Edge Function 분기
+      let data: any;
+      let error: any;
+
+      if (request.type === 'layout' || request.type === 'staffing') {
+        // generate-optimization 사용
+        const response = await supabase.functions.invoke('generate-optimization', {
+          body: {
+            store_id: selectedStore.id,
+            optimization_type: request.type,
+            parameters: request.params,
           },
-        },
-      });
+        });
+        data = response.data;
+        error = response.error;
+      } else {
+        // flow, congestion은 advanced-ai-inference 유지
+        const response = await supabase.functions.invoke('advanced-ai-inference', {
+          body: {
+            type: `${request.type}_simulation`,
+            storeId: selectedStore.id,
+            orgId,
+            params: {
+              ...request.params,
+              sceneData,
+            },
+          },
+        });
+        data = response.data;
+        error = response.error;
+      }
 
       if (error) throw error;
-      if (!data?.result) throw new Error('시뮬레이션 결과를 받지 못했습니다.');
+      if (!data) throw new Error('시뮬레이션 결과를 받지 못했습니다.');
 
-      return { [request.type]: data.result };
+      // generate-optimization 응답 구조 변환
+      const result = request.type === 'layout'
+        ? { layoutChanges: data.furniture_changes || [], productPlacements: data.product_changes || [], summary: data.summary }
+        : request.type === 'staffing'
+          ? data.staffing_result || data
+          : data.result;
+
+      return { [request.type]: result };
     },
     onSuccess: (newResults) => {
       setState((prev) => {
@@ -517,15 +543,25 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
         // 🔍 DEBUG: 실제 Edge Function 호출 직전 로그
         console.log('[useSceneSimulation] 🚀 Starting Edge Function calls NOW...');
 
+        // 🔧 마이그레이션: advanced-ai-inference → generate-optimization
+        // - layout_optimization: generate-optimization (layout)
+        // - staffing_optimization: generate-optimization (staffing)
+        // - flow_simulation: advanced-ai-inference 유지 (generate-optimization 미지원)
         const [layoutRes, flowRes, staffingRes, ultimateRes] = await Promise.allSettled([
-          supabase.functions.invoke('advanced-ai-inference', {
+          // 레이아웃 최적화 - generate-optimization 사용
+          supabase.functions.invoke('generate-optimization', {
             body: {
-              type: 'layout_optimization',
-              storeId: selectedStore.id,
-              orgId,
-              params: { ...params?.layout, sceneData },
+              store_id: selectedStore.id,
+              optimization_type: 'layout',
+              parameters: {
+                prioritize_revenue: params?.layout?.goal === 'revenue',
+                max_furniture_changes: params?.layout?.settings?.furniture?.maxMoves || 12,
+                intensity: params?.layout?.settings?.intensity || 'medium',
+                goal: params?.layout?.settings?.objective || params?.layout?.goal || 'balanced',
+              },
             },
           }),
+          // 동선 시뮬레이션 - advanced-ai-inference 유지
           supabase.functions.invoke('advanced-ai-inference', {
             body: {
               type: 'flow_simulation',
@@ -534,12 +570,15 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
               params: { ...params?.flow, sceneData },
             },
           }),
-          supabase.functions.invoke('advanced-ai-inference', {
+          // 인력배치 최적화 - generate-optimization 사용
+          supabase.functions.invoke('generate-optimization', {
             body: {
-              type: 'staffing_optimization',
-              storeId: selectedStore.id,
-              orgId,
-              params: { ...params?.staffing, sceneData },
+              store_id: selectedStore.id,
+              optimization_type: 'staffing',
+              parameters: {
+                shift_type: params?.staffing?.shiftType || 'weekday_morning',
+                visitor_count: params?.staffing?.visitorCount || 100,
+              },
             },
           }),
           // 🆕 Ultimate AI 최적화 호출 (동선/환경/연관/VMD 분석 포함)
@@ -574,22 +613,22 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
         });
 
         const results: SimulationResults = {};
-        if (layoutRes.status === 'fulfilled' && layoutRes.value.data?.result) {
-          // 🔧 FIX: productPlacements가 result 외부에 있을 수 있으므로 병합
+        // 🔧 마이그레이션: generate-optimization 응답 구조 처리
+        if (layoutRes.status === 'fulfilled' && layoutRes.value.data) {
           const layoutData = layoutRes.value.data;
+          // generate-optimization 응답: furniture_changes, product_changes 또는 result
+          const layoutChanges = layoutData.furniture_changes || layoutData.result?.layoutChanges || [];
+          const productPlacements = layoutData.product_changes || layoutData.result?.productPlacements || [];
+
           results.layout = {
-            ...layoutData.result,
-            // productPlacements는 result 내부 또는 외부에 있을 수 있음
-            productPlacements: layoutData.result?.productPlacements ||
-                               layoutData.productPlacements ||
-                               layoutData.result?.productMoves ||
-                               layoutData.productMoves ||
-                               [],
+            layoutChanges,
+            productPlacements,
+            summary: layoutData.summary || layoutData.result?.summary || {},
+            insights: layoutData.insights || layoutData.result?.insights || [],
           };
-          console.log('[useSceneSimulation] Layout result with productPlacements:', {
-            resultHasProductPlacements: !!layoutData.result?.productPlacements,
-            dataHasProductPlacements: !!layoutData.productPlacements,
-            productPlacementsCount: results.layout.productPlacements?.length || 0,
+          console.log('[useSceneSimulation] Layout result (generate-optimization):', {
+            layoutChangesCount: layoutChanges.length,
+            productPlacementsCount: productPlacements.length,
           });
         } else {
           console.warn('[useSceneSimulation] No layout result:', layoutRes);
@@ -619,22 +658,19 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
         } else {
           console.warn('[useSceneSimulation] No flow result:', flowRes);
         }
-        if (staffingRes.status === 'fulfilled') {
+        if (staffingRes.status === 'fulfilled' && staffingRes.value.data) {
           const staffingData = staffingRes.value.data;
-          
+
           // 🔍 DEBUG: 실제 응답 구조 확인
           console.log('[useSceneSimulation] 🔍 staffingData:', staffingData);
-          console.log('[useSceneSimulation] 🔍 staffingData.result?.staffing_result:', staffingData?.result?.staffing_result);
-          console.log('[useSceneSimulation] 🔍 staffingData.visualization?.staffing:', staffingData?.visualization?.staffing);
-          
-          // 🔧 FIX: generate-optimization 응답 구조 지원
-          // 1. result.staffing_result (generate-optimization staffing 전용)
-          // 2. visualization.staffing (generate-optimization both 모드)
-          // 3. result (advanced-ai-inference)
-          const staffingResult = staffingData?.result?.staffing_result ||
+          console.log('[useSceneSimulation] 🔍 staffingData.staffing_result:', staffingData?.staffing_result);
+
+          // 🔧 마이그레이션: generate-optimization 응답 구조 처리
+          // generate-optimization staffing 타입: { staffing_result: {...} }
+          const staffingResult = staffingData?.staffing_result ||
+                                 staffingData?.result?.staffing_result ||
                                  staffingData?.visualization?.staffing ||
-                                 staffingData?.result || 
-                                 staffingData?.staffing || 
+                                 staffingData?.result ||
                                  staffingData;
           
           console.log('[useSceneSimulation] 🔍 resolved staffingResult:', staffingResult);
