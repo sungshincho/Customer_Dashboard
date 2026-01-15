@@ -73,13 +73,25 @@ export function generateLayoutOptimizedScene(
   asIsScene: SceneRecipe,
   layoutResult: LayoutSimulationResult
 ): SceneComparison {
+  console.log('[ToBeSceneGenerator] generateLayoutOptimizedScene called:', {
+    furnitureMovesCount: layoutResult.furnitureMoves?.length || 0,
+    productPlacementsCount: layoutResult.productPlacements?.length || 0,
+    asIsFurnitureCount: asIsScene.furniture?.length || 0,
+  });
+
   const changes: SceneChange[] = [];
 
   // 씬 복사
   const toBe: SceneRecipe = deepClone(asIsScene);
 
   // 1️⃣ 가구 이동 적용
-  layoutResult.furnitureMoves.forEach((move) => {
+  (layoutResult.furnitureMoves || []).forEach((move) => {
+    // 🔧 FIX: toPosition이 없으면 스킵
+    if (!move.toPosition) {
+      console.warn('[ToBeSceneGenerator] Skipping move without toPosition:', move);
+      return;
+    }
+
     const furnitureIdx = toBe.furniture.findIndex(
       (f) => f.id === move.furnitureId || f.furniture_type === move.furnitureName
     );
@@ -90,9 +102,9 @@ export function generateLayoutOptimizedScene(
 
       // 위치 업데이트
       furniture.position = {
-        x: move.toPosition.x,
-        y: move.toPosition.y,
-        z: move.toPosition.z,
+        x: move.toPosition.x ?? furniture.position.x,
+        y: move.toPosition.y ?? furniture.position.y,
+        z: move.toPosition.z ?? furniture.position.z,
       };
 
       // 회전 업데이트 (있는 경우)

@@ -633,34 +633,52 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
           const productPlacements = layoutData.product_changes || layoutData.result?.productPlacements || [];
 
           // furnitureMoves 형식으로 변환 (generateLayoutOptimizedScene 호환)
+          // 🔧 FIX: Edge Function 실제 필드명에 맞게 매핑 수정
           const furnitureMoves = furnitureChanges.map((change: any) => ({
-            furnitureId: change.entity_id || change.entityId || change.id,
-            furnitureName: change.entity_label || change.entityLabel || change.furniture_name,
-            fromPosition: change.current_position || change.currentPosition,
-            toPosition: change.suggested_position || change.suggestedPosition || change.new_position,
-            reason: change.reason,
+            furnitureId: change.furniture_id || change.entity_id || change.id,
+            furnitureName: change.furniture_label || change.furniture_type || change.entity_label || change.name,
+            fromPosition: change.current?.position || change.current_position || change.currentPosition,
+            toPosition: change.suggested?.position || change.suggested_position || change.suggestedPosition || change.new_position,
+            reason: change.reason || change.optimization_reason,
+            rotation: change.suggested?.rotation?.y || change.rotation,
           }));
+
+          // 🔧 FIX: summary 필드 올바른 매핑 (소수점 → 퍼센트 변환)
+          const summaryData = layoutData.summary || layoutData.result?.summary || {};
+          const revenueImprovement = summaryData.expected_revenue_improvement || 0;
+          const trafficImprovement = summaryData.expected_traffic_improvement || 0;
+          const conversionImprovement = summaryData.expected_conversion_improvement || 0;
+
+          // 소수점이면 100을 곱해 퍼센트로 변환 (0.08 → 8)
+          const toPercent = (val: number) => val < 1 ? val * 100 : val;
 
           results.layout = {
             furnitureMoves,
             layoutChanges: furnitureChanges,
             productPlacements,
-            summary: layoutData.summary || layoutData.result?.summary || {},
-            insights: layoutData.insights || layoutData.result?.insights || [],
-            // 기본값 설정
-            currentEfficiency: layoutData.summary?.current_efficiency || 70,
-            optimizedEfficiency: layoutData.summary?.optimized_efficiency || 85,
+            summary: summaryData,
+            insights: layoutData.insights || layoutData.result?.insights || summaryData.insights || [],
+            // 효율성 점수 계산 (변경 수 기반)
+            currentEfficiency: summaryData.current_efficiency || 70,
+            optimizedEfficiency: summaryData.optimized_efficiency ||
+              Math.min(95, 70 + (furnitureChanges.length * 2) + (productPlacements.length * 0.5)),
             improvements: {
-              revenueIncrease: layoutData.summary?.expected_revenue_improvement || 0,
-              revenueIncreasePercent: layoutData.summary?.expected_revenue_improvement || 0,
-              dwellTimeIncrease: 0,
-              conversionIncrease: layoutData.summary?.expected_conversion_improvement || 0,
-              trafficIncrease: layoutData.summary?.expected_traffic_improvement || 0,
+              revenueIncrease: toPercent(revenueImprovement),
+              revenueIncreasePercent: toPercent(revenueImprovement),
+              dwellTimeIncrease: toPercent(summaryData.expected_dwell_time_improvement || 0),
+              conversionIncrease: toPercent(conversionImprovement),
+              trafficIncrease: toPercent(trafficImprovement),
             },
           };
-          console.log('[useSceneSimulation] Layout result (generate-optimization):', {
+          console.log('[useSceneSimulation] ✅ Layout result (generate-optimization):', {
             furnitureMovesCount: furnitureMoves.length,
             productPlacementsCount: productPlacements.length,
+            summaryData: {
+              revenue: toPercent(revenueImprovement),
+              traffic: toPercent(trafficImprovement),
+              conversion: toPercent(conversionImprovement),
+            },
+            firstFurnitureMove: furnitureMoves[0],
           });
         } else {
           console.warn('[useSceneSimulation] No layout result:', layoutRes);
@@ -741,14 +759,26 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
               // 🆕 모든 컴포넌트 호환을 위한 통합 구조 생성
 
               // ========== 1. 기본 메트릭 추출 ==========
-              const currentCoverage = staffingResult.metrics?.currentCoverage ||
-                                      staffingResult.metrics?.current_coverage || 68;
-              const optimizedCoverage = staffingResult.metrics?.optimizedCoverage ||
-                                        staffingResult.metrics?.optimized_coverage || 85;
-              const customerServiceRateIncrease = staffingResult.metrics?.customerServiceRateIncrease ||
-                                                   staffingResult.metrics?.customer_service_rate_increase || 0.35;
-              const avgResponseTimeReduction = staffingResult.metrics?.avgResponseTimeReduction ||
-                                               staffingResult.metrics?.avg_response_time_reduction || 0.2;
+              // 🔧 FIX: Edge Function 실제 필드명에 맞게 매핑
+              // Edge Function: { totalCoverage, coverageGain, customerServiceRateIncrease }
+              const metrics = staffingResult.metrics || {};
+              const totalCoverage = metrics.totalCoverage || metrics.total_coverage || 70;
+              const coverageGain = metrics.coverageGain || metrics.coverage_gain || 15;
+
+              const currentCoverage = metrics.currentCoverage || metrics.current_coverage || totalCoverage;
+              const optimizedCoverage = metrics.optimizedCoverage || metrics.optimized_coverage ||
+                                        Math.min(100, totalCoverage + coverageGain);
+              const customerServiceRateIncrease = metrics.customerServiceRateIncrease ||
+                                                   metrics.customer_service_rate_increase || 12;
+              const avgResponseTimeReduction = metrics.avgResponseTimeReduction ||
+                                               metrics.avg_response_time_reduction ||
+                                               (metrics.avgResponseTime ? metrics.avgResponseTime * 0.2 : 8);
+
+              console.log('[useSceneSimulation] 📊 Staffing metrics extracted:', {
+                rawMetrics: metrics,
+                mapped: { currentCoverage, optimizedCoverage, coverageGain, customerServiceRateIncrease },
+                staffPositionsCount: staffPositions.length,
+              });
 
               // ========== 2. 재배치 직원 수 계산 ==========
               const reallocatedCount = staffPositions.filter((sp: any) => {
