@@ -4,10 +4,8 @@
 -- ============================================================================
 
 -- 1. 기존 CHECK 제약조건 삭제 및 새 제약조건 추가
--- api_connections 테이블의 data_category에 'weather', 'holidays' 추가
 DO $$
 BEGIN
-  -- 기존 CHECK 제약조건 삭제 (있으면)
   IF EXISTS (
     SELECT 1 FROM information_schema.table_constraints
     WHERE constraint_name = 'api_connections_data_category_check'
@@ -16,7 +14,6 @@ BEGIN
     ALTER TABLE api_connections DROP CONSTRAINT api_connections_data_category_check;
   END IF;
 
-  -- 새 CHECK 제약조건 추가 (weather, holidays 포함)
   ALTER TABLE api_connections
     ADD CONSTRAINT api_connections_data_category_check
     CHECK (data_category IN ('pos', 'crm', 'erp', 'ecommerce', 'analytics', 'sensor', 'custom', 'weather', 'holidays'));
@@ -24,27 +21,12 @@ BEGIN
   RAISE NOTICE 'api_connections data_category CHECK 제약조건 업데이트 완료';
 END $$;
 
--- 2. 컨텍스트 데이터 소스 연결 레코드 삽입
--- 날씨 API 연결 (OpenWeatherMap)
+-- 2. 날씨 API 연결 (OpenWeatherMap)
 INSERT INTO api_connections (
-  id,
-  user_id,
-  org_id,
-  store_id,
-  name,
-  provider,
-  type,
-  url,
-  status,
-  is_active,
-  data_category,
-  connection_category,
-  is_system_managed,
-  display_order,
-  icon_name,
-  description,
-  created_at,
-  updated_at
+  id, user_id, org_id, store_id, name, provider, type, url,
+  status, is_active, data_category, connection_category,
+  is_system_managed, display_order, icon_name, description,
+  created_at, updated_at
 )
 SELECT
   gen_random_uuid(),
@@ -73,26 +55,12 @@ WHERE NOT EXISTS (
   AND ac.connection_category = 'context'
 );
 
--- 공휴일/이벤트 API 연결 (공공데이터포털)
+-- 3. 공휴일/이벤트 API 연결 (공공데이터포털)
 INSERT INTO api_connections (
-  id,
-  user_id,
-  org_id,
-  store_id,
-  name,
-  provider,
-  type,
-  url,
-  status,
-  is_active,
-  data_category,
-  connection_category,
-  is_system_managed,
-  display_order,
-  icon_name,
-  description,
-  created_at,
-  updated_at
+  id, user_id, org_id, store_id, name, provider, type, url,
+  status, is_active, data_category, connection_category,
+  is_system_managed, display_order, icon_name, description,
+  created_at, updated_at
 )
 SELECT
   gen_random_uuid(),
@@ -121,19 +89,22 @@ WHERE NOT EXISTS (
   AND ac.connection_category = 'context'
 );
 
--- 3. 삽입된 레코드 수 확인
-DO $$
-DECLARE
-  weather_count integer;
-  holidays_count integer;
-BEGIN
-  SELECT COUNT(*) INTO weather_count FROM api_connections WHERE data_category = 'weather';
-  SELECT COUNT(*) INTO holidays_count FROM api_connections WHERE data_category = 'holidays';
+-- 4. 삽입된 레코드 확인
+SELECT 
+  name, 
+  data_category, 
+  connection_category, 
+  is_system_managed,
+  status
+FROM api_connections
+WHERE connection_category = 'context';
 
-  RAISE NOTICE '컨텍스트 데이터 소스 레코드 삽입 완료: 날씨=%건, 공휴일=%건', weather_count, holidays_count;
-END $$;
+-- 5. 기존 함수 모두 삭제 (오버로드된 버전 포함)
+DROP FUNCTION IF EXISTS ensure_system_context_connections(uuid);
+DROP FUNCTION IF EXISTS ensure_system_context_connections(uuid, uuid);
+DROP FUNCTION IF EXISTS ensure_system_context_connections(uuid, uuid, uuid);
 
--- 4. ensure_system_context_connections RPC 함수도 수정 (올바른 컬럼명 사용)
+-- 6. 새 함수 생성
 CREATE OR REPLACE FUNCTION ensure_system_context_connections(
   p_org_id uuid,
   p_store_id uuid DEFAULT NULL,
@@ -149,7 +120,6 @@ DECLARE
   v_user_id uuid;
   v_result jsonb;
 BEGIN
-  -- user_id 결정: 파라미터 없으면 첫 번째 사용자 사용
   v_user_id := COALESCE(p_user_id, (SELECT id FROM auth.users LIMIT 1));
 
   IF v_user_id IS NULL THEN
@@ -242,4 +212,5 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION ensure_system_context_connections IS '시스템 컨텍스트 데이터 소스 연결 보장 (날씨, 공휴일)';
+COMMENT ON FUNCTION ensure_system_context_connections(uuid, uuid, uuid) 
+IS '시스템 컨텍스트 데이터 소스 연결 보장 (날씨, 공휴일)';
