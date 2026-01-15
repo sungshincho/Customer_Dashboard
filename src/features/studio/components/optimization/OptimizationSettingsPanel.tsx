@@ -18,12 +18,14 @@ import type {
   OptimizationIntensity,
   FurnitureSettings,
   ProductSettings,
+  IntegratedOptimizationSettings as IntegratedSettingsType,
 } from '../../types/optimization.types';
-import { DEFAULT_OPTIMIZATION_SETTINGS } from '../../types/optimization.types';
+import { DEFAULT_OPTIMIZATION_SETTINGS, DEFAULT_INTEGRATED_SETTINGS } from '../../types/optimization.types';
 import { ObjectiveSelector } from './ObjectiveSelector';
 import { FurnitureSelector } from './FurnitureSelector';
 import { ProductSelector } from './ProductSelector';
 import { IntensitySlider } from './IntensitySlider';
+import { IntegratedOptimizationSettings } from './IntegratedOptimizationSettings';
 
 interface OptimizationSettingsPanelProps {
   /** 현재 설정 값 */
@@ -40,6 +42,10 @@ interface OptimizationSettingsPanelProps {
   compact?: boolean;
   /** 추가 클래스 */
   className?: string;
+  /** B안: 최적화 타입 (통합 설정 표시용) */
+  optimizationType?: 'layout' | 'staffing' | 'both';
+  /** B안: 통합 최적화 설정 표시 여부 */
+  showIntegratedSettings?: boolean;
 }
 
 export function OptimizationSettingsPanel({
@@ -50,6 +56,8 @@ export function OptimizationSettingsPanel({
   disabled = false,
   compact = false,
   className,
+  optimizationType = 'both',
+  showIntegratedSettings = true,
 }: OptimizationSettingsPanelProps) {
   // 목표 변경 핸들러
   const handleObjectiveChange = (objective: OptimizationObjective) => {
@@ -69,6 +77,11 @@ export function OptimizationSettingsPanel({
   // 강도 변경 핸들러
   const handleIntensityChange = (intensity: OptimizationIntensity) => {
     onChange({ ...settings, intensity });
+  };
+
+  // B안: 통합 설정 변경 핸들러
+  const handleIntegratedChange = (integratedSettings: IntegratedSettingsType) => {
+    onChange({ ...settings, integrated: integratedSettings });
   };
 
   return (
@@ -120,6 +133,19 @@ export function OptimizationSettingsPanel({
         onChange={handleIntensityChange}
         disabled={disabled}
       />
+
+      {/* B안: 통합 최적화 설정 */}
+      {showIntegratedSettings && (
+        <>
+          <div className="border-t border-white/10" />
+          <IntegratedOptimizationSettings
+            settings={settings.integrated || DEFAULT_INTEGRATED_SETTINGS}
+            onChange={handleIntegratedChange}
+            optimizationType={optimizationType}
+            disabled={disabled}
+          />
+        </>
+      )}
     </div>
   );
 }

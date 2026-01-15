@@ -182,7 +182,7 @@ async function ensureERPCoverageForQualityScore(result: DataQualityScore, storeI
     if (!hasERPData && Array.isArray(result.warnings)) {
       const hasERPWarning = result.warnings.some((w: any) => w.source === 'erp');
       if (!hasERPWarning) {
-        result.warnings.push({ type: 'missing', source: 'erp', severity: 'medium', message: 'ERP/재고 데이터가 없습니다.' });
+        result.warnings.push({ type: 'missing', source: 'erp', severity: 'medium', message: 'ERP/재고 데이터가 없습니다.', affected_metrics: ['inventory'] });
         result.warning_count = result.warnings.length;
       }
     }
@@ -311,11 +311,11 @@ async function buildControlTowerStatusFallback(storeId: string, orgId?: string):
       warning_count: 0,
     },
     data_sources: {
-      pos: { name: 'POS', description: '매출/거래 데이터', status: totalPosCount > 0 ? 'active' : 'inactive' },
-      sensor: { name: 'NEURALSENSE', description: 'WiFi/BLE 센서', status: (sensorCount || 0) > 0 ? 'active' : 'inactive' },
-      crm: { name: 'CRM', description: '고객/CDP 데이터', status: (customerCount || 0) > 0 ? 'active' : 'inactive' },
-      product: { name: '상품', description: '상품 마스터', status: (productCount || 0) > 0 ? 'active' : 'inactive' },
-      erp: { name: 'ERP', description: '재고/입출고 데이터', status: hasERPData ? 'active' : 'inactive' },
+      pos: { name: 'POS', description: '매출/거래 데이터', status: totalPosCount > 0 ? 'active' : 'inactive', last_sync: null },
+      sensor: { name: 'NEURALSENSE', description: 'WiFi/BLE 센서', status: (sensorCount || 0) > 0 ? 'active' : 'inactive', last_sync: null },
+      crm: { name: 'CRM', description: '고객/CDP 데이터', status: (customerCount || 0) > 0 ? 'active' : 'inactive', last_sync: null },
+      product: { name: '상품', description: '상품 마스터', status: (productCount || 0) > 0 ? 'active' : 'inactive', last_sync: null },
+      erp: { name: 'ERP', description: '재고/입출고 데이터', status: hasERPData ? 'active' : 'inactive', last_sync: null },
     },
     recent_imports: (recentImports || []) as unknown as RawImport[],
     recent_etl_runs: (etlRuns || []) as unknown as ETLRun[],
@@ -705,7 +705,7 @@ export function useContextDataSources() {
 
       // RPC 함수 호출 시도
       try {
-        const { data, error } = await supabase.rpc('get_context_data_sources', {
+        const { data, error } = await (supabase.rpc as any)('get_context_data_sources', {
           p_org_id: orgId,
           p_store_id: storeId || null,
         });
@@ -729,7 +729,7 @@ export function useContextDataSources() {
       if (!orgId) throw new Error('No organization');
 
       // RPC 함수 호출
-      const { data, error } = await supabase.rpc('ensure_system_context_connections', {
+      const { data, error } = await (supabase.rpc as any)('ensure_system_context_connections', {
         p_org_id: orgId,
         p_store_id: storeId || null,
       });
@@ -819,7 +819,7 @@ export function useAllDataSources() {
 
       // RPC 함수 호출 시도
       try {
-        const { data, error } = await supabase.rpc('get_all_data_sources', {
+        const { data, error } = await (supabase.rpc as any)('get_all_data_sources', {
           p_org_id: orgId,
           p_store_id: storeId || null,
         });

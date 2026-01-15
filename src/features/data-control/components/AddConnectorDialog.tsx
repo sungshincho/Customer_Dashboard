@@ -214,11 +214,12 @@ export function AddConnectorDialog({
 
       // RPC 함수가 success: false를 반환할 수 있음
       if (result && !result.success) {
-        setCreateError(result.error || '연결 생성에 실패했습니다.');
+        const errorMsg = (result as any).error || '연결 생성에 실패했습니다.';
+        setCreateError(errorMsg);
         toast({
           variant: 'destructive',
           title: '연결 생성 실패',
-          description: result.error || '알 수 없는 오류가 발생했습니다.',
+          description: errorMsg,
         });
         return;
       }

@@ -1,17 +1,9 @@
 // ============================================================================
-// Phase 7: API Connections List Component
+// ApiConnectionsList.tsx - API 연결 목록 (3D Glassmorphism Design)
 // ============================================================================
 
-import React from 'react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,6 +24,7 @@ import {
   AlertTriangle,
   Loader2,
   RefreshCw,
+  Link2,
 } from 'lucide-react';
 import {
   useApiConnections,
@@ -49,24 +42,136 @@ import { formatDistanceToNow } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
 // ============================================================================
+// 3D 스타일 시스템
+// ============================================================================
+
+const getText3D = (isDark: boolean) => ({
+  title: isDark ? {
+    fontWeight: 600, fontSize: '15px', color: '#ffffff',
+    textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+  } as React.CSSProperties : {
+    fontWeight: 600, fontSize: '15px',
+    background: 'linear-gradient(180deg, #1a1a1f 0%, #2a2a2f 100%)',
+    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+  } as React.CSSProperties,
+  subtitle: isDark ? {
+    fontWeight: 500, fontSize: '13px', color: 'rgba(255,255,255,0.6)',
+  } as React.CSSProperties : {
+    fontWeight: 500, fontSize: '13px', color: '#6b7280',
+  } as React.CSSProperties,
+  label: isDark ? {
+    fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const,
+    fontSize: '10px', color: 'rgba(255,255,255,0.5)',
+  } as React.CSSProperties : {
+    fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const,
+    fontSize: '10px',
+    background: 'linear-gradient(180deg, #6b7280 0%, #9ca3af 100%)',
+    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+  } as React.CSSProperties,
+  body: isDark ? {
+    fontWeight: 500, fontSize: '13px', color: 'rgba(255,255,255,0.6)',
+  } as React.CSSProperties : {
+    fontWeight: 500, fontSize: '13px', color: '#6b7280',
+  } as React.CSSProperties,
+  small: isDark ? {
+    fontWeight: 500, fontSize: '12px', color: 'rgba(255,255,255,0.5)',
+  } as React.CSSProperties : {
+    fontWeight: 500, fontSize: '12px', color: '#9ca3af',
+  } as React.CSSProperties,
+});
+
+const GlassCard = ({ children, dark = false }: { children: React.ReactNode; dark?: boolean }) => (
+  <div style={{ perspective: '1200px', height: '100%' }}>
+    <div style={{
+      borderRadius: '20px', padding: '1.5px',
+      background: dark
+        ? 'linear-gradient(145deg, rgba(75,75,85,0.9) 0%, rgba(50,50,60,0.8) 50%, rgba(65,65,75,0.9) 100%)'
+        : 'linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(220,220,230,0.6) 50%, rgba(255,255,255,0.93) 100%)',
+      boxShadow: dark
+        ? '0 2px 4px rgba(0,0,0,0.2), 0 8px 16px rgba(0,0,0,0.25)'
+        : '0 1px 1px rgba(0,0,0,0.02), 0 2px 2px rgba(0,0,0,0.02), 0 4px 4px rgba(0,0,0,0.02), 0 8px 8px rgba(0,0,0,0.02)',
+      height: '100%',
+    }}>
+      <div style={{
+        background: dark
+          ? 'linear-gradient(165deg, rgba(48,48,58,0.98) 0%, rgba(32,32,40,0.97) 30%, rgba(42,42,52,0.98) 60%, rgba(35,35,45,0.97) 100%)'
+          : 'linear-gradient(165deg, rgba(255,255,255,0.95) 0%, rgba(253,253,255,0.88) 25%, rgba(255,255,255,0.92) 50%, rgba(251,251,254,0.85) 75%, rgba(255,255,255,0.94) 100%)',
+        backdropFilter: 'blur(80px) saturate(200%)', borderRadius: '19px', height: '100%', position: 'relative', overflow: 'hidden',
+      }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '1px',
+          background: dark
+            ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.18) 20%, rgba(255,255,255,0.28) 50%, rgba(255,255,255,0.18) 80%, transparent 100%)'
+            : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.9) 10%, rgba(255,255,255,1) 50%, rgba(255,255,255,0.9) 90%, transparent 100%)',
+          pointerEvents: 'none',
+        }} />
+        <div style={{ position: 'relative', zIndex: 10, height: '100%' }}>{children}</div>
+      </div>
+    </div>
+  </div>
+);
+
+const Icon3D = ({ children, size = 40, dark = false }: { children: React.ReactNode; size?: number; dark?: boolean }) => (
+  <div style={{
+    width: size, height: size,
+    background: dark
+      ? 'linear-gradient(145deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.04) 50%, rgba(255,255,255,0.09) 100%)'
+      : 'linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(230,230,238,0.95) 40%, rgba(245,245,250,0.98) 100%)',
+    borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
+    border: dark ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(255,255,255,0.95)',
+    boxShadow: dark
+      ? 'inset 0 1px 2px rgba(255,255,255,0.12), 0 4px 12px rgba(0,0,0,0.3)'
+      : '0 2px 4px rgba(0,0,0,0.05), 0 4px 8px rgba(0,0,0,0.06), inset 0 2px 4px rgba(255,255,255,1)',
+    flexShrink: 0,
+  }}>
+    {!dark && <div style={{ position: 'absolute', top: '2px', left: '15%', right: '15%', height: '35%',
+      background: 'linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(255,255,255,0) 100%)',
+      borderRadius: '40% 40% 50% 50%', pointerEvents: 'none',
+    }} />}
+    <span style={{ position: 'relative', zIndex: 10 }}>{children}</span>
+  </div>
+);
+
+const Badge3D = ({ children, dark = false, variant = 'default' }: { children: React.ReactNode; dark?: boolean; variant?: 'default' | 'success' | 'warning' | 'error' }) => {
+  const colors = {
+    default: { bg: dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)', text: dark ? 'rgba(255,255,255,0.8)' : '#6b7280' },
+    success: { bg: dark ? 'rgba(34,197,94,0.2)' : 'rgba(34,197,94,0.1)', text: '#22c55e' },
+    warning: { bg: dark ? 'rgba(234,179,8,0.2)' : 'rgba(234,179,8,0.1)', text: '#eab308' },
+    error: { bg: dark ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.1)', text: '#ef4444' },
+  };
+  const color = colors[variant];
+
+  return (
+    <div style={{
+      display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px',
+      background: color.bg,
+      borderRadius: '8px',
+      border: dark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.05)',
+      fontSize: '11px', fontWeight: 600, color: color.text,
+    }}>
+      {children}
+    </div>
+  );
+};
+
+// ============================================================================
 // 상태 배지 컴포넌트
 // ============================================================================
 
-function StatusBadge({ status }: { status: ConnectionStatus }) {
-  const variants: Record<ConnectionStatus, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: React.ReactNode; label: string }> = {
-    active: { variant: 'default', icon: <CheckCircle2 className="h-3 w-3" />, label: '활성' },
-    inactive: { variant: 'secondary', icon: <Clock className="h-3 w-3" />, label: '비활성' },
-    error: { variant: 'destructive', icon: <XCircle className="h-3 w-3" />, label: '오류' },
-    testing: { variant: 'outline', icon: <Loader2 className="h-3 w-3 animate-spin" />, label: '테스트 중' },
+function StatusBadge({ status, isDark }: { status: ConnectionStatus; isDark: boolean }) {
+  const variants: Record<ConnectionStatus, { variant: 'success' | 'default' | 'error' | 'warning'; icon: React.ReactNode; label: string }> = {
+    active: { variant: 'success', icon: <CheckCircle2 className="h-3 w-3" />, label: '활성' },
+    inactive: { variant: 'default', icon: <Clock className="h-3 w-3" />, label: '비활성' },
+    error: { variant: 'error', icon: <XCircle className="h-3 w-3" />, label: '오류' },
+    testing: { variant: 'warning', icon: <Loader2 className="h-3 w-3 animate-spin" />, label: '테스트 중' },
   };
 
   const config = variants[status] || variants.inactive;
 
   return (
-    <Badge variant={config.variant} className="flex items-center gap-1">
+    <Badge3D variant={config.variant} dark={isDark}>
       {config.icon}
       {config.label}
-    </Badge>
+    </Badge3D>
   );
 }
 
@@ -86,9 +191,13 @@ function getCategoryIcon(category?: string) {
 interface ConnectionCardProps {
   connection: ApiConnection;
   onEdit?: (id: string) => void;
+  isDark: boolean;
 }
 
-function ConnectionCard({ connection, onEdit }: ConnectionCardProps) {
+function ConnectionCard({ connection, onEdit, isDark }: ConnectionCardProps) {
+  const text3D = getText3D(isDark);
+  const iconColor = isDark ? 'rgba(255,255,255,0.7)' : '#374151';
+
   const testMutation = useTestConnection();
   const syncMutation = useSyncConnection();
   const deleteMutation = useDeleteConnection();
@@ -123,31 +232,36 @@ function ConnectionCard({ connection, onEdit }: ConnectionCardProps) {
   const isLoading = testMutation.isPending || syncMutation.isPending;
 
   return (
-    <Card className="relative">
-      <CardHeader className="pb-2">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-2">
-            <Plug className="h-5 w-5 text-muted-foreground" />
+    <GlassCard dark={isDark}>
+      <div style={{ padding: '16px', position: 'relative' }}>
+        {/* 헤더 */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Icon3D size={36} dark={isDark}>
+              <Plug className="w-4 h-4" style={{ color: iconColor }} />
+            </Icon3D>
             <div>
-              <CardTitle className="text-base">{connection.name}</CardTitle>
-              <CardDescription className="text-xs">
+              <h4 style={{ margin: 0, ...text3D.title }}>{connection.name}</h4>
+              <p style={{ margin: '2px 0 0 0', ...text3D.small }}>
                 {connection.provider && `${connection.provider} / `}
                 {getCategoryIcon(connection.data_category)}
-              </CardDescription>
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {/* 시스템 컨텍스트는 항상 활성으로 표시 */}
-            <StatusBadge status={isSystemContext ? 'active' : connection.status} />
-            {isSystemContext && (
-              <Badge variant="outline" className="text-xs">
-                시스템
-              </Badge>
-            )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <StatusBadge status={connection.status} isDark={isDark} />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <MoreVertical className="h-4 w-4" />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  style={{
+                    background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                    borderRadius: '8px',
+                  }}
+                >
+                  <MoreVertical className="h-4 w-4" style={{ color: isDark ? 'rgba(255,255,255,0.7)' : '#6b7280' }} />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -203,92 +317,121 @@ function ConnectionCard({ connection, onEdit }: ConnectionCardProps) {
             </DropdownMenu>
           </div>
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-2 text-sm">
-          {/* 시스템 컨텍스트는 자동 연결 메시지만 표시 */}
-          {isSystemContext ? (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <CheckCircle2 className="h-3 w-3 text-green-500" />
-              <span>자동 연결됨 (Edge Function 경유)</span>
+
+        {/* 콘텐츠 */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {/* URL */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', ...text3D.small }}>
+            <span style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {connection.url}
+            </span>
+          </div>
+
+          {/* 마지막 동기화 */}
+          {connection.last_sync ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', ...text3D.small }}>
+              <Clock className="h-3 w-3" />
+              <span>
+                마지막 동기화:{' '}
+                {formatDistanceToNow(new Date(connection.last_sync), { addSuffix: true, locale: ko })}
+              </span>
             </div>
-          ) : (
-            <>
-              {/* 마지막 동기화 */}
-              {connection.last_sync && (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Clock className="h-3 w-3" />
-                  <span>
-                    마지막 동기화:{' '}
-                    {formatDistanceToNow(new Date(connection.last_sync), { addSuffix: true, locale: ko })}
-                  </span>
-                </div>
-              )}
+          ) : null}
 
-              {/* 총 동기화 레코드 */}
-              {connection.total_records_synced !== undefined && connection.total_records_synced > 0 && (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <RefreshCw className="h-3 w-3" />
-                  <span>{connection.total_records_synced.toLocaleString()}개 레코드 동기화됨</span>
-                </div>
-              )}
+          {/* 총 동기화 레코드 */}
+          {connection.total_records_synced !== undefined && connection.total_records_synced > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', ...text3D.small }}>
+              <RefreshCw className="h-3 w-3" />
+              <span>{connection.total_records_synced.toLocaleString()}개 레코드 동기화됨</span>
+            </div>
+          )}
 
-              {/* 오류 메시지 */}
-              {connection.status === 'error' && connection.last_error && (
-                <div className="flex items-start gap-2 text-destructive bg-destructive/10 p-2 rounded">
-                  <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                  <span className="text-xs">{connection.last_error}</span>
-                </div>
-              )}
-            </>
+          {/* 오류 메시지 */}
+          {connection.status === 'error' && connection.last_error && (
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '10px',
+              borderRadius: '10px',
+              background: isDark ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.08)',
+              border: isDark ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(239,68,68,0.2)',
+            }}>
+              <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: '#ef4444' }} />
+              <span style={{ fontSize: '12px', color: '#ef4444' }}>{connection.last_error}</span>
+            </div>
           )}
 
           {/* 테스트/동기화 결과 */}
           {testMutation.isSuccess && (
-            <div className={`flex items-center gap-2 p-2 rounded text-xs ${
-              testMutation.data.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-            }`}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '8px', padding: '10px',
+              borderRadius: '10px',
+              background: testMutation.data.success
+                ? (isDark ? 'rgba(34,197,94,0.15)' : 'rgba(34,197,94,0.08)')
+                : (isDark ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.08)'),
+              border: testMutation.data.success
+                ? (isDark ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(34,197,94,0.2)')
+                : (isDark ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(239,68,68,0.2)'),
+            }}>
               {testMutation.data.success ? (
                 <>
-                  <CheckCircle2 className="h-3 w-3" />
-                  테스트 성공 ({testMutation.data.response_time_ms}ms)
+                  <CheckCircle2 className="h-3 w-3" style={{ color: '#22c55e' }} />
+                  <span style={{ fontSize: '12px', color: '#22c55e' }}>
+                    테스트 성공 ({testMutation.data.response_time_ms}ms)
+                  </span>
                 </>
               ) : (
                 <>
-                  <XCircle className="h-3 w-3" />
-                  테스트 실패: {testMutation.data.error || testMutation.data.message}
+                  <XCircle className="h-3 w-3" style={{ color: '#ef4444' }} />
+                  <span style={{ fontSize: '12px', color: '#ef4444' }}>
+                    테스트 실패: {testMutation.data.error || testMutation.data.message}
+                  </span>
                 </>
               )}
             </div>
           )}
 
           {syncMutation.isSuccess && (
-            <div className={`flex items-center gap-2 p-2 rounded text-xs ${
-              syncMutation.data.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-            }`}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '8px', padding: '10px',
+              borderRadius: '10px',
+              background: syncMutation.data.success
+                ? (isDark ? 'rgba(34,197,94,0.15)' : 'rgba(34,197,94,0.08)')
+                : (isDark ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.08)'),
+              border: syncMutation.data.success
+                ? (isDark ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(34,197,94,0.2)')
+                : (isDark ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(239,68,68,0.2)'),
+            }}>
               {syncMutation.data.success ? (
                 <>
-                  <CheckCircle2 className="h-3 w-3" />
-                  동기화 완료: {syncMutation.data.records_created}개 생성
+                  <CheckCircle2 className="h-3 w-3" style={{ color: '#22c55e' }} />
+                  <span style={{ fontSize: '12px', color: '#22c55e' }}>
+                    동기화 완료: {syncMutation.data.records_created}개 생성
+                  </span>
                 </>
               ) : (
                 <>
-                  <XCircle className="h-3 w-3" />
-                  동기화 실패: {syncMutation.data.error}
+                  <XCircle className="h-3 w-3" style={{ color: '#ef4444' }} />
+                  <span style={{ fontSize: '12px', color: '#ef4444' }}>
+                    동기화 실패: {syncMutation.data.error}
+                  </span>
                 </>
               )}
             </div>
           )}
         </div>
-      </CardContent>
 
-      {/* 로딩 오버레이 */}
-      {isLoading && (
-        <div className="absolute inset-0 bg-background/50 flex items-center justify-center rounded-lg">
-          <Loader2 className="h-6 w-6 animate-spin" />
-        </div>
-      )}
-    </Card>
+        {/* 로딩 오버레이 */}
+        {isLoading && (
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: isDark ? 'rgba(32,32,40,0.8)' : 'rgba(255,255,255,0.8)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            borderRadius: '19px',
+          }}>
+            <Loader2 className="h-6 w-6 animate-spin" style={{ color: isDark ? 'rgba(255,255,255,0.7)' : '#6b7280' }} />
+          </div>
+        )}
+      </div>
+    </GlassCard>
   );
 }
 
@@ -304,40 +447,74 @@ interface ApiConnectionsListProps {
 }
 
 export function ApiConnectionsList({ orgId, storeId, onEdit, onAdd }: ApiConnectionsListProps) {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsDark(document.documentElement.classList.contains('dark'));
+    check();
+    const obs = new MutationObserver(check);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => obs.disconnect();
+  }, []);
+
+  const text3D = getText3D(isDark);
+  const iconColor = isDark ? 'rgba(255,255,255,0.7)' : '#374151';
+
   const { data: connections, isLoading, isFetching, error, refetch } = useApiConnections({ orgId, storeId });
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 0',
+      }}>
+        <Loader2 className="h-8 w-8 animate-spin" style={{ color: isDark ? 'rgba(255,255,255,0.5)' : '#9ca3af' }} />
       </div>
     );
   }
 
   if (error) {
     return (
-      <Card className="border-destructive">
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-2 text-destructive">
-            <AlertTriangle className="h-5 w-5" />
-            <span>연결 목록을 불러오는 중 오류가 발생했습니다.</span>
+      <GlassCard dark={isDark}>
+        <div style={{ padding: '24px' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '10px', padding: '16px',
+            borderRadius: '12px',
+            background: isDark ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.08)',
+            border: isDark ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(239,68,68,0.2)',
+          }}>
+            <AlertTriangle className="h-5 w-5" style={{ color: '#ef4444' }} />
+            <span style={{ color: '#ef4444' }}>연결 목록을 불러오는 중 오류가 발생했습니다.</span>
           </div>
-          <Button variant="outline" onClick={() => refetch()} className="mt-4">
+          <Button
+            variant="outline"
+            onClick={() => refetch()}
+            style={{
+              marginTop: '16px',
+              background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+              border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)',
+            }}
+          >
             다시 시도
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </GlassCard>
     );
   }
 
   if (!connections || connections.length === 0) {
     return (
-      <Card>
-        <CardContent className="pt-6">
-          <div className="text-center py-8">
-            <Plug className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">API 연결 없음</h3>
-            <p className="text-muted-foreground mb-4">
+      <GlassCard dark={isDark}>
+        <div style={{ padding: '24px' }}>
+          <div style={{ textAlign: 'center', padding: '32px 0' }}>
+            <div style={{
+              width: '64px', height: '64px', borderRadius: '50%', margin: '0 auto 16px',
+              background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Plug className="h-7 w-7" style={{ color: isDark ? 'rgba(255,255,255,0.4)' : '#9ca3af' }} />
+            </div>
+            <h3 style={{ margin: '0 0 8px 0', ...text3D.title }}>API 연결 없음</h3>
+            <p style={{ margin: '0 0 16px 0', ...text3D.body }}>
               외부 시스템에서 데이터를 자동으로 가져오려면 API 연결을 추가하세요.
             </p>
             {onAdd && (
@@ -347,48 +524,65 @@ export function ApiConnectionsList({ orgId, storeId, onEdit, onAdd }: ApiConnect
               </Button>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </GlassCard>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-medium">API 연결 ({connections.length})</h3>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={() => {
-              console.log('API 연결 새로고침 버튼 클릭됨');
-              refetch();
-            }}
-            disabled={isFetching}
-            title="새로고침"
-          >
-            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
-          </Button>
-          {onAdd && (
-            <Button onClick={onAdd}>
-              <Plug className="h-4 w-4 mr-2" />
-              새 연결 추가
+    <GlassCard dark={isDark}>
+      <div style={{ padding: '20px' }}>
+        {/* 헤더 */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <Icon3D size={40} dark={isDark}>
+              <Link2 className="w-5 h-5" style={{ color: iconColor }} />
+            </Icon3D>
+            <div>
+              <span style={text3D.label}>API Connections</span>
+              <h3 style={{ margin: '4px 0 0 0', ...text3D.title }}>API 연결 ({connections.length})</h3>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => {
+                console.log('API 연결 새로고침 버튼 클릭됨');
+                refetch();
+              }}
+              disabled={isFetching}
+              title="새로고침"
+              style={{
+                background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)',
+              }}
+            >
+              <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} style={{ color: isDark ? 'rgba(255,255,255,0.7)' : '#6b7280' }} />
             </Button>
-          )}
+            {onAdd && (
+              <Button onClick={onAdd}>
+                <Plug className="h-4 w-4 mr-2" />
+                새 연결 추가
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* 연결 카드 그리드 */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {connections.map((connection) => (
+            <ConnectionCard
+              key={connection.id}
+              connection={connection}
+              onEdit={onEdit}
+              isDark={isDark}
+            />
+          ))}
         </div>
       </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {connections.map((connection) => (
-          <ConnectionCard
-            key={connection.id}
-            connection={connection}
-            onEdit={onEdit}
-          />
-        ))}
-      </div>
-    </div>
+    </GlassCard>
   );
 }
 

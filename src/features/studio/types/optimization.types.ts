@@ -32,6 +32,16 @@ export interface ProductSettings {
   keepCategory: boolean;
 }
 
+// B안: 통합 최적화 설정 인터페이스
+export interface IntegratedOptimizationSettings {
+  /** 레이아웃 최적화 시 직원 위치도 함께 제안 */
+  includeStaffOptimization: boolean;
+  /** 인력배치 최적화 시 가구 미세 조정 허용 */
+  allowFurnitureAdjustment: boolean;
+  /** 가구 미세 조정 최대 거리 (cm) */
+  maxAdjustmentDistance: number;
+}
+
 // 통합 최적화 설정 인터페이스
 export interface OptimizationSettings {
   /** 최적화 목표 */
@@ -42,6 +52,8 @@ export interface OptimizationSettings {
   products: ProductSettings;
   /** 최적화 강도 */
   intensity: OptimizationIntensity;
+  /** B안: 통합 최적화 설정 */
+  integrated?: IntegratedOptimizationSettings;
 }
 
 // 강도별 최대 변경 수
@@ -54,6 +66,13 @@ export const INTENSITY_LIMITS: Record<OptimizationIntensity, IntensityLimits> = 
   low: { maxFurnitureMoves: 5, maxProductRelocations: 15 },
   medium: { maxFurnitureMoves: 12, maxProductRelocations: 35 },
   high: { maxFurnitureMoves: 25, maxProductRelocations: 60 },
+};
+
+// B안: 기본 통합 최적화 설정
+export const DEFAULT_INTEGRATED_SETTINGS: IntegratedOptimizationSettings = {
+  includeStaffOptimization: true,
+  allowFurnitureAdjustment: true,
+  maxAdjustmentDistance: 50,
 };
 
 // 기본 최적화 설정
@@ -71,6 +90,8 @@ export const DEFAULT_OPTIMIZATION_SETTINGS: OptimizationSettings = {
     keepCategory: false,
   },
   intensity: 'medium',
+  // B안: 통합 최적화 기본값
+  integrated: DEFAULT_INTEGRATED_SETTINGS,
 };
 
 // 가구 아이템 (선택 UI용)

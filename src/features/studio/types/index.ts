@@ -25,6 +25,10 @@ export {
   type TransformMode,
   type EnvironmentPreset,
   type SavedScene,
+  // B안: 새 타입 추가
+  type SceneType,
+  type StaffPosition,
+  type SceneMetadata,
 } from './scene.types';
 
 // model.types에서 TransformMode 제외하고 export
