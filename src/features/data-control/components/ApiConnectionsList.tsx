@@ -94,6 +94,9 @@ function ConnectionCard({ connection, onEdit }: ConnectionCardProps) {
   const deleteMutation = useDeleteConnection();
   const toggleMutation = useToggleConnectionStatus();
 
+  // 시스템 관리 컨텍스트 데이터 소스 여부 (날씨, 공휴일 등)
+  const isSystemContext = connection.is_system_managed || connection.connection_category === 'context';
+
   const handleTest = () => {
     testMutation.mutate({ connectionId: connection.id });
   };
@@ -130,6 +133,11 @@ function ConnectionCard({ connection, onEdit }: ConnectionCardProps) {
           </div>
           <div className="flex items-center gap-2">
             <StatusBadge status={connection.status} />
+            {isSystemContext && (
+              <Badge variant="outline" className="text-xs">
+                시스템
+              </Badge>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -137,14 +145,23 @@ function ConnectionCard({ connection, onEdit }: ConnectionCardProps) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleTest} disabled={isLoading}>
-                  <TestTube className="h-4 w-4 mr-2" />
-                  연결 테스트
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleSync} disabled={isLoading || connection.status === 'error'}>
-                  <PlayCircle className="h-4 w-4 mr-2" />
-                  지금 동기화
-                </DropdownMenuItem>
+                {isSystemContext ? (
+                  <DropdownMenuItem disabled className="text-muted-foreground">
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    자동 동기화 (Edge Function)
+                  </DropdownMenuItem>
+                ) : (
+                  <>
+                    <DropdownMenuItem onClick={handleTest} disabled={isLoading}>
+                      <TestTube className="h-4 w-4 mr-2" />
+                      연결 테스트
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleSync} disabled={isLoading || connection.status === 'error'}>
+                      <PlayCircle className="h-4 w-4 mr-2" />
+                      지금 동기화
+                    </DropdownMenuItem>
+                  </>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => onEdit?.(connection.id)}>
                   <Settings className="h-4 w-4 mr-2" />
@@ -163,15 +180,19 @@ function ConnectionCard({ connection, onEdit }: ConnectionCardProps) {
                     </>
                   )}
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={handleDelete}
-                  className="text-destructive focus:text-destructive"
-                  disabled={deleteMutation.isPending}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  삭제
-                </DropdownMenuItem>
+                {!isSystemContext && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={handleDelete}
+                      className="text-destructive focus:text-destructive"
+                      disabled={deleteMutation.isPending}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      삭제
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

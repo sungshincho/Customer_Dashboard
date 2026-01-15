@@ -8,7 +8,7 @@
 
 export type AuthType = 'none' | 'api_key' | 'bearer' | 'basic' | 'oauth2';
 
-export type DataCategory = 'pos' | 'crm' | 'erp' | 'ecommerce' | 'analytics' | 'sensor' | 'custom';
+export type DataCategory = 'pos' | 'crm' | 'erp' | 'ecommerce' | 'analytics' | 'sensor' | 'custom' | 'weather' | 'holidays';
 
 export type ConnectionStatus = 'active' | 'inactive' | 'error' | 'testing';
 
@@ -87,6 +87,10 @@ export interface ApiConnection {
   auth_config?: AuthConfig;
   provider?: string;
   data_category?: DataCategory;
+  connection_category?: 'business' | 'context' | 'analytics';
+  is_system_managed?: boolean;
+  display_order?: number;
+  icon_name?: string;
   field_mappings?: FieldMapping[];
   target_table?: string;
   response_data_path?: string;
@@ -228,6 +232,8 @@ export const DATA_CATEGORIES = [
   { value: 'analytics', label: '분석', icon: 'BarChart3' },
   { value: 'sensor', label: '센서 / IoT', icon: 'Activity' },
   { value: 'custom', label: '커스텀', icon: 'Settings' },
+  { value: 'weather', label: '날씨', icon: 'CloudSun' },
+  { value: 'holidays', label: '공휴일/이벤트', icon: 'Calendar' },
 ] as const;
 
 export const AUTH_TYPES = [
