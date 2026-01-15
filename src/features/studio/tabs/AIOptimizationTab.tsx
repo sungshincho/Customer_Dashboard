@@ -180,6 +180,26 @@ export function AIOptimizationTab({
     }));
   }, [sceneData?.furniture]);
 
+  // 🔧 FIX: 가구 목록이 로드되면 이동 가능한 가구 전체 선택으로 초기화
+  useEffect(() => {
+    if (furnitureItems.length > 0 && optimizationSettings.furniture.movableIds.length === 0) {
+      const movableFurnitureIds = furnitureItems
+        .filter((f) => f.movable)
+        .map((f) => f.id);
+
+      if (movableFurnitureIds.length > 0) {
+        setOptimizationSettings((prev) => ({
+          ...prev,
+          furniture: {
+            ...prev.furniture,
+            movableIds: movableFurnitureIds,
+          },
+        }));
+        console.log('[AIOptimizationTab] Initialized movableIds with all furniture:', movableFurnitureIds.length);
+      }
+    }
+  }, [furnitureItems]);
+
   const productItems: ProductItem[] = useMemo(() => {
     const products: ProductItem[] = [];
 

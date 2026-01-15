@@ -300,6 +300,34 @@ export const DEFAULT_OPTIMIZATION_SETTINGS: OptimizationSettings = {
   parameters: {},
 };
 
+/**
+ * 🔧 FIX: 최적화 목표에 따른 가중치 반환
+ * - revenue: 매출 최대화 우선
+ * - dwell_time: 체류시간 증가 우선
+ * - conversion: 전환율 향상 우선
+ * - balanced: 균형 최적화
+ */
+export function getWeightsForGoal(goal: string): {
+  revenue: number;
+  conversion: number;
+  traffic: number;
+  experience: number;
+} {
+  switch (goal) {
+    case 'revenue':
+      return { revenue: 0.50, conversion: 0.20, traffic: 0.15, experience: 0.15 };
+    case 'dwell_time':
+      return { revenue: 0.15, conversion: 0.20, traffic: 0.20, experience: 0.45 };
+    case 'conversion':
+      return { revenue: 0.20, conversion: 0.50, traffic: 0.15, experience: 0.15 };
+    case 'traffic':
+      return { revenue: 0.15, conversion: 0.15, traffic: 0.50, experience: 0.20 };
+    case 'balanced':
+    default:
+      return { revenue: 0.30, conversion: 0.25, traffic: 0.20, experience: 0.25 };
+  }
+}
+
 // ============================================================================
 // System Prompt Builder
 // ============================================================================
@@ -1179,12 +1207,8 @@ export function createPromptContext(
       optimizationGoal: parameters.goal || 'balanced',
       intensity: parameters.intensity || 'medium',
       maxChanges: parameters.max_changes || 30,
-      weights: {
-        revenue: parameters.prioritize_revenue ? 0.5 : 0.25,
-        conversion: 0.25,
-        traffic: 0.25,
-        experience: parameters.prioritize_accessibility ? 0.4 : 0.25,
-      },
+      // 🔧 FIX: goal에 따라 가중치 자동 결정
+      weights: getWeightsForGoal(parameters.goal || 'balanced'),
       parameters,
     },
     // 🆕 시뮬레이션에서 전달받은 진단 이슈
