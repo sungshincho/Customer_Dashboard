@@ -885,7 +885,19 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
         }
 
         // 통합 To-be 씬 생성
+        console.log('[useSceneSimulation] 📊 Results before comparison:', {
+          hasLayout: !!results.layout,
+          hasFlow: !!results.flow,
+          hasStaffing: !!results.staffing,
+          hasUltimate: !!results.ultimateAnalysis,
+          targetSceneExists: !!targetScene,
+        });
+
         const comparison = generateCombinedOptimizedScene(targetScene, results);
+        console.log('[useSceneSimulation] ✅ Comparison generated:', {
+          totalChanges: comparison?.summary?.totalChanges,
+          hasToBeScene: !!comparison?.toBe,
+        });
 
         setState((prev) => ({
           ...prev,
@@ -901,9 +913,11 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
 
         return results;
       } catch (err) {
+        console.error('[useSceneSimulation] ❌ Error in runAllSimulations:', err);
         setError(err as Error);
         toast({
           title: '시뮬레이션 실패',
+          description: err instanceof Error ? err.message : '알 수 없는 오류',
           variant: 'destructive',
         });
         return {};
