@@ -495,8 +495,13 @@ const MovementTypeIcon = ({ type, isDark }: { type: string; isDark: boolean }) =
 };
 
 export function InventoryTab() {
-  const { data, isLoading, refetch } = useInventoryMetricsData();
+  const { data, isLoading, refetch, enableLoading } = useInventoryMetricsData();
   const [isDark, setIsDark] = useState(false);
+
+  // 컴포넌트 마운트 시 데이터 로딩 활성화
+  useEffect(() => {
+    enableLoading();
+  }, [enableLoading]);
 
   useEffect(() => {
     const check = () => setIsDark(document.documentElement.classList.contains('dark'));
