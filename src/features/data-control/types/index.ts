@@ -599,3 +599,66 @@ export interface KPILineage {
     kpi_table: string;
   };
 }
+
+// ============================================================================
+// Context Data Sources Types (날씨, 이벤트, 환율, 트렌드 등)
+// ============================================================================
+
+export type ConnectionCategory = 'business' | 'context' | 'analytics';
+
+export interface ContextDataSource {
+  id: string;
+  name: string;
+  type: string;
+  provider: string | null;
+  data_category: string | null;
+  connection_category: ConnectionCategory;
+  is_system_managed: boolean;
+  is_active: boolean;
+  status: ConnectionStatus;
+  icon_name: string | null;
+  description: string | null;
+  last_sync: string | null;
+  total_records_synced: number;
+  display_order: number;
+}
+
+export interface ContextDataSummary {
+  latest_date: string | null;
+  record_count: number;
+  avg_temperature?: number;
+  upcoming_events?: number;
+}
+
+export interface AllDataSources {
+  success: boolean;
+  business: ContextDataSource[];
+  context: ContextDataSource[];
+  business_count: number;
+  context_count: number;
+}
+
+export interface ContextDataSourcesResult {
+  success: boolean;
+  connections: ContextDataSource[];
+  weather_summary: ContextDataSummary;
+  events_summary: ContextDataSummary;
+}
+
+// Context Data Category 상수
+export const CONTEXT_DATA_CATEGORIES = [
+  { value: 'weather', label: '날씨', icon: 'CloudSun' },
+  { value: 'holidays', label: '공휴일/이벤트', icon: 'Calendar' },
+  { value: 'exchange', label: '환율', icon: 'TrendingUp' },
+  { value: 'trends', label: '트렌드', icon: 'BarChart3' },
+] as const;
+
+// Context Provider 상수
+export const CONTEXT_PROVIDERS = [
+  { value: 'openweathermap', label: 'OpenWeatherMap', category: 'weather' },
+  { value: 'kma', label: '기상청', category: 'weather' },
+  { value: 'korean_holidays', label: '공공데이터포털 공휴일', category: 'holidays' },
+  { value: 'google_calendar', label: 'Google Calendar', category: 'holidays' },
+  { value: 'exchange_rate_api', label: 'Exchange Rate API', category: 'exchange' },
+  { value: 'google_trends', label: 'Google Trends', category: 'trends' },
+] as const;

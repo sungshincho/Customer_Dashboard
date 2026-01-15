@@ -2,7 +2,7 @@
 // Data Control Tower Hooks
 // ============================================================================
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
@@ -13,6 +13,8 @@ import type {
   RawImport,
   ETLRun,
   KPILineage,
+  ContextDataSource,
+  AllDataSources,
 } from '../types';
 
 // ============================================================================
@@ -684,4 +686,322 @@ async function buildKPILineageFallback(
       kpi_table: kpiTable,
     },
   };
+}
+
+// ============================================================================
+// useContextDataSources - 컨텍스트 데이터 소스 조회 (날씨, 이벤트 등)
+// ============================================================================
+export function useContextDataSources() {
+  const { selectedStore } = useSelectedStore();
+  const { orgId } = useAuth();
+  const storeId = selectedStore?.id;
+  const queryClient = useQueryClient();
+
+  // 컨텍스트 데이터 소스 조회
+  const query = useQuery<ContextDataSource[]>({
+    queryKey: ['context-data-sources', orgId, storeId],
+    queryFn: async () => {
+      if (!orgId) return [];
+
+      // RPC 함수 호출 시도
+      try {
+        const { data, error } = await supabase.rpc('get_context_data_sources', {
+          p_org_id: orgId,
+          p_store_id: storeId || null,
+        });
+
+        if (error) throw error;
+
+        const result = data as unknown as { success: boolean; connections: ContextDataSource[] };
+        return result.connections || [];
+      } catch (rpcError) {
+        // RPC 실패 시 직접 쿼리
+        console.warn('Context data sources RPC not available, using fallback:', rpcError);
+        return await fetchContextDataSourcesFallback(orgId, storeId);
+      }
+    },
+    enabled: !!orgId,
+  });
+
+  // 시스템 컨텍스트 연결 초기화 (날씨, 공휴일)
+  const initMutation = useMutation({
+    mutationFn: async () => {
+      if (!orgId) throw new Error('No organization');
+
+      // RPC 함수 호출
+      const { data, error } = await supabase.rpc('ensure_system_context_connections', {
+        p_org_id: orgId,
+        p_store_id: storeId || null,
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['context-data-sources'] });
+      queryClient.invalidateQueries({ queryKey: ['all-data-sources'] });
+    },
+  });
+
+  // 컴포넌트 마운트 시 시스템 연결 자동 초기화 (조건부)
+  useEffect(() => {
+    if (orgId && query.data && query.data.length === 0) {
+      // 컨텍스트 연결이 없으면 자동 초기화 시도
+      initMutation.mutate();
+    }
+  }, [orgId, query.data?.length]);
+
+  return {
+    data: query.data || [],
+    isLoading: query.isLoading,
+    error: query.error,
+    refetch: query.refetch,
+    initializeSystemConnections: () => initMutation.mutateAsync(),
+    isInitializing: initMutation.isPending,
+  };
+}
+
+// 컨텍스트 데이터 소스 fallback 조회
+async function fetchContextDataSourcesFallback(
+  orgId: string,
+  storeId?: string
+): Promise<ContextDataSource[]> {
+  let query = supabase
+    .from('api_connections')
+    .select('*')
+    .eq('org_id', orgId)
+    .eq('connection_category', 'context')
+    .order('display_order', { ascending: true });
+
+  if (storeId) {
+    query = query.or(`store_id.eq.${storeId},store_id.is.null`);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('Failed to fetch context data sources:', error);
+    return [];
+  }
+
+  return (data || []).map((conn: any) => ({
+    id: conn.id,
+    name: conn.name,
+    type: conn.type,
+    provider: conn.provider,
+    data_category: conn.data_category,
+    connection_category: conn.connection_category || 'context',
+    is_system_managed: conn.is_system_managed || false,
+    is_active: conn.is_active || false,
+    status: conn.status || 'inactive',
+    icon_name: conn.icon_name,
+    description: conn.description,
+    last_sync: conn.last_sync,
+    total_records_synced: conn.total_records_synced || 0,
+    display_order: conn.display_order || 100,
+  }));
+}
+
+// ============================================================================
+// useAllDataSources - 모든 데이터 소스 조회 (비즈니스 + 컨텍스트)
+// ============================================================================
+export function useAllDataSources() {
+  const { selectedStore } = useSelectedStore();
+  const { orgId } = useAuth();
+  const storeId = selectedStore?.id;
+
+  return useQuery<AllDataSources>({
+    queryKey: ['all-data-sources', orgId, storeId],
+    queryFn: async () => {
+      if (!orgId) {
+        return { success: true, business: [], context: [], business_count: 0, context_count: 0 };
+      }
+
+      // RPC 함수 호출 시도
+      try {
+        const { data, error } = await supabase.rpc('get_all_data_sources', {
+          p_org_id: orgId,
+          p_store_id: storeId || null,
+        });
+
+        if (error) throw error;
+        return data as unknown as AllDataSources;
+      } catch (rpcError) {
+        // RPC 실패 시 직접 쿼리
+        console.warn('All data sources RPC not available, using fallback:', rpcError);
+        return await fetchAllDataSourcesFallback(orgId, storeId);
+      }
+    },
+    enabled: !!orgId,
+  });
+}
+
+// 모든 데이터 소스 fallback 조회
+async function fetchAllDataSourcesFallback(
+  orgId: string,
+  storeId?: string
+): Promise<AllDataSources> {
+  let query = supabase
+    .from('api_connections')
+    .select('*')
+    .eq('org_id', orgId)
+    .order('display_order', { ascending: true })
+    .order('name', { ascending: true });
+
+  if (storeId) {
+    query = query.or(`store_id.eq.${storeId},store_id.is.null`);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('Failed to fetch all data sources:', error);
+    return { success: false, business: [], context: [], business_count: 0, context_count: 0 };
+  }
+
+  const mapConnection = (conn: any): ContextDataSource => ({
+    id: conn.id,
+    name: conn.name,
+    type: conn.type,
+    provider: conn.provider,
+    data_category: conn.data_category,
+    connection_category: conn.connection_category || 'business',
+    is_system_managed: conn.is_system_managed || false,
+    is_active: conn.is_active || false,
+    status: conn.status || 'inactive',
+    icon_name: conn.icon_name,
+    description: conn.description,
+    last_sync: conn.last_sync,
+    total_records_synced: conn.total_records_synced || 0,
+    display_order: conn.display_order || 100,
+  });
+
+  const business = (data || [])
+    .filter((c: any) => !c.connection_category || c.connection_category === 'business')
+    .map(mapConnection);
+
+  const context = (data || [])
+    .filter((c: any) => c.connection_category === 'context')
+    .map(mapConnection);
+
+  return {
+    success: true,
+    business,
+    context,
+    business_count: business.length,
+    context_count: context.length,
+  };
+}
+
+// ============================================================================
+// useWeatherDataStatus - 날씨 데이터 상태 조회
+// ============================================================================
+export function useWeatherDataStatus() {
+  const { selectedStore } = useSelectedStore();
+  const { orgId } = useAuth();
+  const storeId = selectedStore?.id;
+
+  return useQuery({
+    queryKey: ['weather-data-status', orgId, storeId],
+    queryFn: async () => {
+      if (!orgId) return null;
+
+      // 최근 7일 날씨 데이터 조회
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+      let query = supabase
+        .from('weather_data')
+        .select('*', { count: 'exact' })
+        .eq('org_id', orgId)
+        .gte('date', sevenDaysAgo.toISOString().split('T')[0])
+        .order('date', { ascending: false })
+        .limit(10);
+
+      if (storeId) {
+        query = query.eq('store_id', storeId);
+      }
+
+      const { data, count, error } = await query;
+
+      if (error) {
+        console.error('Failed to fetch weather data status:', error);
+        return null;
+      }
+
+      const latestDate = data?.[0]?.date || null;
+      const avgTemp = data?.length
+        ? data.reduce((sum, d) => sum + (Number(d.temperature) || 0), 0) / data.length
+        : null;
+
+      return {
+        record_count: count || 0,
+        latest_date: latestDate,
+        avg_temperature: avgTemp ? Math.round(avgTemp * 10) / 10 : null,
+        recent_data: data || [],
+      };
+    },
+    enabled: !!orgId,
+  });
+}
+
+// ============================================================================
+// useEventsDataStatus - 이벤트/공휴일 데이터 상태 조회
+// ============================================================================
+export function useEventsDataStatus() {
+  const { selectedStore } = useSelectedStore();
+  const { orgId } = useAuth();
+  const storeId = selectedStore?.id;
+
+  return useQuery({
+    queryKey: ['events-data-status', orgId, storeId],
+    queryFn: async () => {
+      if (!orgId) return null;
+
+      const today = new Date().toISOString().split('T')[0];
+      const thirtyDaysLater = new Date();
+      thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
+
+      // 전체 이벤트 수
+      let countQuery = supabase
+        .from('holidays_events')
+        .select('*', { count: 'exact', head: true })
+        .eq('org_id', orgId);
+
+      if (storeId) {
+        countQuery = countQuery.or(`store_id.eq.${storeId},store_id.is.null`);
+      }
+
+      const { count: totalCount } = await countQuery;
+
+      // 다가오는 이벤트 (30일 이내)
+      let upcomingQuery = supabase
+        .from('holidays_events')
+        .select('*')
+        .eq('org_id', orgId)
+        .gte('date', today)
+        .lte('date', thirtyDaysLater.toISOString().split('T')[0])
+        .order('date', { ascending: true })
+        .limit(10);
+
+      if (storeId) {
+        upcomingQuery = upcomingQuery.or(`store_id.eq.${storeId},store_id.is.null`);
+      }
+
+      const { data: upcomingEvents, error } = await upcomingQuery;
+
+      if (error) {
+        console.error('Failed to fetch events data status:', error);
+        return null;
+      }
+
+      return {
+        record_count: totalCount || 0,
+        upcoming_count: upcomingEvents?.length || 0,
+        upcoming_events: upcomingEvents || [],
+        next_event: upcomingEvents?.[0] || null,
+      };
+    },
+    enabled: !!orgId,
+  });
 }
