@@ -1,9 +1,8 @@
 // ============================================================================
-// DataSourceCards.tsx - 데이터 소스 상태 카드 (비즈니스 + 컨텍스트)
+// DataSourceCards.tsx - 데이터 소스 상태 카드 (3D Glassmorphism Design)
 // ============================================================================
 
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { useState, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   ShoppingCart,
@@ -25,7 +24,120 @@ import {
 import type { DataSourceStatus, ContextDataSource } from '../types';
 
 // ============================================================================
-// 비즈니스 데이터 소스 카드 (기존)
+// 3D 스타일 시스템
+// ============================================================================
+
+const getText3D = (isDark: boolean) => ({
+  title: isDark ? {
+    fontWeight: 600, fontSize: '14px', color: '#ffffff',
+    textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+  } as React.CSSProperties : {
+    fontWeight: 600, fontSize: '14px',
+    background: 'linear-gradient(180deg, #1a1a1f 0%, #2a2a2f 100%)',
+    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+  } as React.CSSProperties,
+  label: isDark ? {
+    fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const,
+    fontSize: '10px', color: 'rgba(255,255,255,0.5)',
+  } as React.CSSProperties : {
+    fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const,
+    fontSize: '10px',
+    background: 'linear-gradient(180deg, #6b7280 0%, #9ca3af 100%)',
+    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+  } as React.CSSProperties,
+  body: isDark ? {
+    fontWeight: 500, fontSize: '12px', color: 'rgba(255,255,255,0.6)',
+  } as React.CSSProperties : {
+    fontWeight: 500, fontSize: '12px', color: '#6b7280',
+  } as React.CSSProperties,
+  small: isDark ? {
+    fontWeight: 500, fontSize: '11px', color: 'rgba(255,255,255,0.5)',
+  } as React.CSSProperties : {
+    fontWeight: 500, fontSize: '11px', color: '#9ca3af',
+  } as React.CSSProperties,
+});
+
+const GlassCard = ({ children, dark = false, className = '' }: { children: React.ReactNode; dark?: boolean; className?: string }) => (
+  <div style={{ perspective: '1200px', height: '100%' }} className={className}>
+    <div style={{
+      borderRadius: '20px', padding: '1.5px',
+      background: dark
+        ? 'linear-gradient(145deg, rgba(75,75,85,0.9) 0%, rgba(50,50,60,0.8) 50%, rgba(65,65,75,0.9) 100%)'
+        : 'linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(220,220,230,0.6) 50%, rgba(255,255,255,0.93) 100%)',
+      boxShadow: dark
+        ? '0 2px 4px rgba(0,0,0,0.2), 0 8px 16px rgba(0,0,0,0.25), 0 16px 32px rgba(0,0,0,0.2)'
+        : '0 1px 1px rgba(0,0,0,0.02), 0 2px 2px rgba(0,0,0,0.02), 0 4px 4px rgba(0,0,0,0.02), 0 8px 8px rgba(0,0,0,0.02), 0 16px 16px rgba(0,0,0,0.02)',
+      height: '100%',
+    }}>
+      <div style={{
+        background: dark
+          ? 'linear-gradient(165deg, rgba(48,48,58,0.98) 0%, rgba(32,32,40,0.97) 30%, rgba(42,42,52,0.98) 60%, rgba(35,35,45,0.97) 100%)'
+          : 'linear-gradient(165deg, rgba(255,255,255,0.95) 0%, rgba(253,253,255,0.88) 25%, rgba(255,255,255,0.92) 50%, rgba(251,251,254,0.85) 75%, rgba(255,255,255,0.94) 100%)',
+        backdropFilter: 'blur(80px) saturate(200%)', borderRadius: '19px', height: '100%', position: 'relative', overflow: 'hidden',
+      }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '1px',
+          background: dark
+            ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.18) 20%, rgba(255,255,255,0.28) 50%, rgba(255,255,255,0.18) 80%, transparent 100%)'
+            : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.9) 10%, rgba(255,255,255,1) 50%, rgba(255,255,255,0.9) 90%, transparent 100%)',
+          pointerEvents: 'none',
+        }} />
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '50%',
+          background: dark
+            ? 'linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 30%, transparent 100%)'
+            : 'linear-gradient(180deg, rgba(255,255,255,0.75) 0%, rgba(255,255,255,0.35) 25%, rgba(255,255,255,0.08) 55%, transparent 100%)',
+          borderRadius: '19px 19px 50% 50%', pointerEvents: 'none',
+        }} />
+        <div style={{ position: 'relative', zIndex: 10, height: '100%' }}>{children}</div>
+      </div>
+    </div>
+  </div>
+);
+
+const Icon3D = ({ children, size = 48, dark = false }: { children: React.ReactNode; size?: number; dark?: boolean }) => (
+  <div style={{
+    width: size, height: size,
+    background: dark
+      ? 'linear-gradient(145deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.04) 50%, rgba(255,255,255,0.09) 100%)'
+      : 'linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(230,230,238,0.95) 40%, rgba(245,245,250,0.98) 100%)',
+    borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
+    border: dark ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(255,255,255,0.95)',
+    boxShadow: dark
+      ? 'inset 0 1px 2px rgba(255,255,255,0.12), inset 0 -2px 4px rgba(0,0,0,0.25), 0 4px 12px rgba(0,0,0,0.3)'
+      : '0 2px 4px rgba(0,0,0,0.05), 0 4px 8px rgba(0,0,0,0.06), 0 8px 16px rgba(0,0,0,0.05), inset 0 2px 4px rgba(255,255,255,1), inset 0 -2px 4px rgba(0,0,0,0.04)',
+    flexShrink: 0,
+  }}>
+    {!dark && <div style={{ position: 'absolute', top: '3px', left: '15%', right: '15%', height: '35%',
+      background: 'linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(255,255,255,0) 100%)',
+      borderRadius: '40% 40% 50% 50%', pointerEvents: 'none',
+    }} />}
+    <span style={{ position: 'relative', zIndex: 10 }}>{children}</span>
+  </div>
+);
+
+const Badge3D = ({ children, dark = false, variant = 'default' }: { children: React.ReactNode; dark?: boolean; variant?: 'default' | 'success' | 'warning' | 'error' }) => {
+  const colors = {
+    default: { bg: dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)', text: dark ? 'rgba(255,255,255,0.8)' : '#6b7280' },
+    success: { bg: dark ? 'rgba(34,197,94,0.2)' : 'rgba(34,197,94,0.1)', text: '#22c55e' },
+    warning: { bg: dark ? 'rgba(234,179,8,0.2)' : 'rgba(234,179,8,0.1)', text: '#eab308' },
+    error: { bg: dark ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.1)', text: '#ef4444' },
+  };
+  const color = colors[variant];
+
+  return (
+    <div style={{
+      display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px',
+      background: color.bg,
+      borderRadius: '8px',
+      border: dark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.05)',
+      fontSize: '11px', fontWeight: 600, color: color.text,
+    }}>
+      {children}
+    </div>
+  );
+};
+
+// ============================================================================
+// 비즈니스 데이터 소스 카드
 // ============================================================================
 
 interface DataSourceCardsProps {
@@ -41,79 +153,81 @@ const sourceIcons: Record<string, any> = {
   external: Cloud,
 };
 
-const statusColors: Record<string, string> = {
-  active: 'bg-green-500',
-  inactive: 'bg-gray-400',
-  error: 'bg-red-500',
-  testing: 'bg-yellow-500',
-};
-
-const statusLabels: Record<string, string> = {
-  active: '연결됨',
-  inactive: '비활성',
-  error: '오류',
-  testing: '테스트중',
+const statusConfig: Record<string, { label: string; variant: 'success' | 'warning' | 'error' | 'default' }> = {
+  active: { label: '연결됨', variant: 'success' },
+  inactive: { label: '비활성', variant: 'default' },
+  error: { label: '오류', variant: 'error' },
+  testing: { label: '테스트중', variant: 'warning' },
 };
 
 export function DataSourceCards({ dataSources }: DataSourceCardsProps) {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsDark(document.documentElement.classList.contains('dark'));
+    check();
+    const obs = new MutationObserver(check);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => obs.disconnect();
+  }, []);
+
+  const text3D = getText3D(isDark);
+  const iconColor = isDark ? 'rgba(255,255,255,0.7)' : '#374151';
   const sources = Object.entries(dataSources);
 
   return (
-    <Card>
-      <CardContent className="p-6">
-        <h3 className="text-sm font-semibold mb-4 text-gray-700 dark:text-gray-300">
-          비즈니스 데이터 소스
-        </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4">
+    <GlassCard dark={isDark}>
+      <div style={{ padding: '20px' }}>
+        <div style={{ marginBottom: '16px' }}>
+          <span style={text3D.label}>Business Data Sources</span>
+          <h3 style={{ margin: '4px 0 0 0', ...text3D.title }}>비즈니스 데이터 소스</h3>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {sources.map(([key, source]) => {
             const Icon = sourceIcons[key] || Cloud;
-            const StatusIcon =
-              source.status === 'active'
-                ? CheckCircle
-                : source.status === 'error'
-                ? XCircle
-                : AlertCircle;
+            const status = statusConfig[source.status] || statusConfig.inactive;
+            const StatusIcon = source.status === 'active' ? CheckCircle : source.status === 'error' ? XCircle : AlertCircle;
 
             return (
               <div
                 key={key}
-                className="flex flex-col items-center p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700"
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '16px',
+                  borderRadius: '16px',
+                  background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+                  border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.04)',
+                }}
               >
-                <div className="relative">
-                  <div className="w-12 h-12 rounded-xl bg-white dark:bg-gray-700 flex items-center justify-center shadow-sm">
-                    <Icon className="w-6 h-6 text-gray-600 dark:text-gray-300" />
-                  </div>
-                  <div
-                    className={`absolute -top-1 -right-1 w-4 h-4 rounded-full ${statusColors[source.status]} flex items-center justify-center`}
-                  >
-                    <StatusIcon className="w-3 h-3 text-white" />
+                <div style={{ position: 'relative' }}>
+                  <Icon3D size={48} dark={isDark}>
+                    <Icon className="w-5 h-5" style={{ color: iconColor }} />
+                  </Icon3D>
+                  <div style={{
+                    position: 'absolute', top: '-4px', right: '-4px',
+                    width: '18px', height: '18px', borderRadius: '50%',
+                    background: status.variant === 'success' ? '#22c55e' : status.variant === 'error' ? '#ef4444' : status.variant === 'warning' ? '#eab308' : (isDark ? 'rgba(255,255,255,0.3)' : '#9ca3af'),
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    border: isDark ? '2px solid rgba(48,48,58,0.98)' : '2px solid rgba(255,255,255,0.95)',
+                  }}>
+                    <StatusIcon className="w-2.5 h-2.5 text-white" />
                   </div>
                 </div>
-                <span className="mt-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {source.name}
-                </span>
-                <Badge
-                  variant={source.status === 'active' ? 'default' : 'secondary'}
-                  className="mt-1 text-xs"
-                >
-                  {statusLabels[source.status]}
-                </Badge>
+                <span style={{ marginTop: '10px', textAlign: 'center', ...text3D.title }}>{source.name}</span>
+                <Badge3D dark={isDark} variant={status.variant}>{status.label}</Badge3D>
                 {source.last_sync && (
-                  <span className="mt-1 text-xs text-gray-500">
-                    {formatRelativeTime(source.last_sync)}
-                  </span>
+                  <span style={{ marginTop: '6px', ...text3D.small }}>{formatRelativeTime(source.last_sync)}</span>
                 )}
               </div>
             );
           })}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </GlassCard>
   );
 }
 
 // ============================================================================
-// 컨텍스트 데이터 소스 카드 (날씨, 이벤트, 환율 등)
+// 컨텍스트 데이터 소스 카드 (날씨, 이벤트 등)
 // ============================================================================
 
 interface ContextDataSourceCardsProps {
@@ -135,99 +249,128 @@ const contextIcons: Record<string, any> = {
   trends: BarChart3,
 };
 
-export function ContextDataSourceCards({
-  sources,
-  isLoading,
-  onRefresh,
-}: ContextDataSourceCardsProps) {
+export function ContextDataSourceCards({ sources, isLoading }: ContextDataSourceCardsProps) {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsDark(document.documentElement.classList.contains('dark'));
+    check();
+    const obs = new MutationObserver(check);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => obs.disconnect();
+  }, []);
+
+  const text3D = getText3D(isDark);
+  const iconColor = isDark ? 'rgba(100,149,237,0.9)' : '#3b82f6';
+
   if (isLoading) {
     return (
-      <Card>
-        <CardContent className="p-6">
-          <h3 className="text-sm font-semibold mb-4 text-gray-700 dark:text-gray-300">
-            컨텍스트 데이터 소스
-          </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <GlassCard dark={isDark}>
+        <div style={{ padding: '20px' }}>
+          <div style={{ marginBottom: '16px' }}>
+            <span style={text3D.label}>Context Data Sources</span>
+            <h3 style={{ margin: '4px 0 0 0', ...text3D.title }}>컨텍스트 데이터 소스</h3>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-32 rounded-xl" />
+              <Skeleton key={i} className="h-32 rounded-2xl" style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }} />
             ))}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </GlassCard>
     );
   }
 
   if (!sources || sources.length === 0) {
     return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-              컨텍스트 데이터 소스
-            </h3>
+      <GlassCard dark={isDark}>
+        <div style={{ padding: '20px' }}>
+          <div style={{ marginBottom: '16px' }}>
+            <span style={text3D.label}>Context Data Sources</span>
+            <h3 style={{ margin: '4px 0 0 0', ...text3D.title }}>컨텍스트 데이터 소스</h3>
           </div>
-          <div className="text-center py-8 text-gray-500">
-            <CloudSun className="w-12 h-12 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">컨텍스트 데이터 소스가 없습니다.</p>
-            <p className="text-xs mt-1">시스템이 자동으로 기본 연결을 생성합니다.</p>
+          <div style={{ textAlign: 'center', padding: '32px 0' }}>
+            <div style={{
+              width: '64px', height: '64px', borderRadius: '50%', margin: '0 auto 16px',
+              background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <CloudSun className="h-7 w-7" style={{ color: isDark ? 'rgba(255,255,255,0.4)' : '#9ca3af' }} />
+            </div>
+            <p style={text3D.body}>컨텍스트 데이터 소스가 없습니다.</p>
+            <p style={{ marginTop: '4px', ...text3D.small }}>시스템이 자동으로 기본 연결을 생성합니다.</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </GlassCard>
     );
   }
 
   return (
-    <Card>
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-            컨텍스트 데이터 소스
-          </h3>
-          <span className="text-xs text-gray-500">
-            날씨, 공휴일, 이벤트 등 외부 환경 데이터
-          </span>
+    <GlassCard dark={isDark}>
+      <div style={{ padding: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <div>
+            <span style={text3D.label}>Context Data Sources</span>
+            <h3 style={{ margin: '4px 0 0 0', ...text3D.title }}>컨텍스트 데이터 소스</h3>
+          </div>
+          <span style={text3D.small}>날씨, 공휴일, 이벤트 등</span>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {sources.map((source) => {
-            // 아이콘 결정 (icon_name > data_category > 기본)
             const iconKey = source.icon_name || source.data_category || 'Cloud';
             const Icon = contextIcons[iconKey] || Cloud;
-            // 시스템 관리 컨텍스트 소스는 항상 활성으로 표시
-            const displayStatus = source.is_system_managed ? 'active' : source.status;
-            const StatusIcon = CheckCircle; // 항상 체크 아이콘 표시
+            const status = statusConfig[source.status] || statusConfig.inactive;
+            const StatusIcon = source.status === 'active' ? CheckCircle : source.status === 'error' ? XCircle : AlertCircle;
 
             return (
               <div
                 key={source.id}
-                className="flex flex-col items-center p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/30"
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '16px',
+                  borderRadius: '16px',
+                  background: isDark ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)',
+                  border: isDark ? '1px solid rgba(59,130,246,0.2)' : '1px solid rgba(59,130,246,0.1)',
+                }}
               >
-                <div className="relative">
-                  <div className="w-12 h-12 rounded-xl bg-white dark:bg-gray-700 flex items-center justify-center shadow-sm">
-                    <Icon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div
-                    className={`absolute -top-1 -right-1 w-4 h-4 rounded-full ${statusColors[displayStatus] || 'bg-green-500'} flex items-center justify-center`}
-                  >
-                    <StatusIcon className="w-3 h-3 text-white" />
+                <div style={{ position: 'relative' }}>
+                  <Icon3D size={48} dark={isDark}>
+                    <Icon className="w-5 h-5" style={{ color: iconColor }} />
+                  </Icon3D>
+                  <div style={{
+                    position: 'absolute', top: '-4px', right: '-4px',
+                    width: '18px', height: '18px', borderRadius: '50%',
+                    background: status.variant === 'success' ? '#22c55e' : status.variant === 'error' ? '#ef4444' : status.variant === 'warning' ? '#eab308' : (isDark ? 'rgba(255,255,255,0.3)' : '#9ca3af'),
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    border: isDark ? '2px solid rgba(48,48,58,0.98)' : '2px solid rgba(255,255,255,0.95)',
+                  }}>
+                    <StatusIcon className="w-2.5 h-2.5 text-white" />
                   </div>
                   {source.is_system_managed && (
-                    <div className="absolute -bottom-1 -left-1 w-4 h-4 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
-                      <Lock className="w-2.5 h-2.5 text-gray-500 dark:text-gray-400" />
+                    <div style={{
+                      position: 'absolute', bottom: '-4px', left: '-4px',
+                      width: '18px', height: '18px', borderRadius: '50%',
+                      background: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      border: isDark ? '2px solid rgba(48,48,58,0.98)' : '2px solid rgba(255,255,255,0.95)',
+                    }}>
+                      <Lock className="w-2 h-2" style={{ color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280' }} />
                     </div>
                   )}
                 </div>
-                <span className="mt-2 text-sm font-medium text-gray-700 dark:text-gray-300 text-center">
-                  {source.name}
-                </span>
-                <Badge variant="default" className="mt-1 text-xs">
-                  자동 연결
-                </Badge>
+                <span style={{ marginTop: '10px', textAlign: 'center', ...text3D.title }}>{source.name}</span>
+                <Badge3D dark={isDark} variant={status.variant}>{status.label}</Badge3D>
+                {source.total_records_synced > 0 && (
+                  <span style={{ marginTop: '6px', ...text3D.body }}>{source.total_records_synced.toLocaleString()}건</span>
+                )}
+                {source.last_sync && (
+                  <span style={{ marginTop: '2px', ...text3D.small }}>{formatRelativeTime(source.last_sync)}</span>
+                )}
               </div>
             );
           })}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </GlassCard>
   );
 }
 
@@ -248,10 +391,7 @@ export function UnifiedDataSourceCards({
 }: UnifiedDataSourceCardsProps) {
   return (
     <div className="space-y-4">
-      {/* 비즈니스 데이터 소스 */}
       <DataSourceCards dataSources={businessSources} />
-
-      {/* 컨텍스트 데이터 소스 */}
       <ContextDataSourceCards sources={contextSources} isLoading={isContextLoading} />
     </div>
   );
