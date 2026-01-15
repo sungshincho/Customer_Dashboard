@@ -153,6 +153,16 @@ const sourceIcons: Record<string, any> = {
   external: Cloud,
 };
 
+// 데이터 소스 키에 따른 고정 표시 이름 (RPC 응답과 관계없이 일관된 이름 표시)
+const sourceDisplayNames: Record<string, string> = {
+  pos: 'POS',
+  sensor: 'NEURALSENSE',
+  crm: 'CRM',
+  product: '상품',
+  erp: 'ERP',
+  external: 'External',
+};
+
 const statusConfig: Record<string, { label: string; variant: 'success' | 'warning' | 'error' | 'default' }> = {
   active: { label: '연결됨', variant: 'success' },
   inactive: { label: '비활성', variant: 'default' },
@@ -212,7 +222,7 @@ export function DataSourceCards({ dataSources }: DataSourceCardsProps) {
                     <StatusIcon className="w-2.5 h-2.5 text-white" />
                   </div>
                 </div>
-                <span style={{ marginTop: '10px', textAlign: 'center', ...text3D.title }}>{source.name}</span>
+                <span style={{ marginTop: '10px', textAlign: 'center', ...text3D.title }}>{sourceDisplayNames[key] || source.name}</span>
                 <Badge3D dark={isDark} variant={status.variant}>{status.label}</Badge3D>
                 {source.last_sync && (
                   <span style={{ marginTop: '6px', ...text3D.small }}>{formatRelativeTime(source.last_sync)}</span>
@@ -435,7 +445,7 @@ export function UnifiedDataSourceCards({
                       <StatusIcon className="w-2.5 h-2.5 text-white" />
                     </div>
                   </div>
-                  <span style={{ marginTop: '10px', textAlign: 'center', ...text3D.title }}>{source.name}</span>
+                  <span style={{ marginTop: '10px', textAlign: 'center', ...text3D.title }}>{sourceDisplayNames[key] || source.name}</span>
                   <Badge3D dark={isDark} variant={status.variant}>{status.label}</Badge3D>
                   {source.last_sync && (
                     <span style={{ marginTop: '6px', ...text3D.small }}>{formatRelativeTime(source.last_sync)}</span>
