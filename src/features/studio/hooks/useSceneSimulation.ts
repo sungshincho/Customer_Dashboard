@@ -628,35 +628,66 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
         // 🔧 마이그레이션: generate-optimization 응답 구조 처리
         if (layoutRes.status === 'fulfilled' && layoutRes.value.data) {
           const layoutData = layoutRes.value.data;
-          // 🔧 FIX: generate-optimization 응답 구조: { success, result: { furniture_changes, ... } }
-          const furnitureChanges = layoutData.furniture_changes ||
-                                   layoutData.result?.furniture_changes ||
+
+          // 🔍 DEBUG: 응답 구조 상세 로깅
+          console.log('[useSceneSimulation] 📦 layoutData FULL structure:', JSON.stringify({
+            keys: Object.keys(layoutData),
+            success: layoutData.success,
+            hasResult: !!layoutData.result,
+            resultKeys: layoutData.result ? Object.keys(layoutData.result) : [],
+            hasVisualization: !!layoutData.visualization,
+            visualizationKeys: layoutData.visualization ? Object.keys(layoutData.visualization) : [],
+          }));
+
+          // 🔧 FIX: generate-optimization 응답 구조: { success, result: { furniture_changes, ... }, visualization: { layout: { furnitureMoves, ... } } }
+          // 여러 경로에서 데이터 추출 시도
+          const furnitureChanges = layoutData.result?.furniture_changes ||
+                                   layoutData.furniture_changes ||
                                    layoutData.result?.layoutChanges || [];
-          const productPlacements = layoutData.product_changes ||
-                                    layoutData.result?.product_changes ||
+          const productPlacements = layoutData.result?.product_changes ||
+                                    layoutData.product_changes ||
                                     layoutData.result?.productPlacements || [];
+
+          // 🆕 visualization.layout에서 직접 가져오기 (fallback)
+          const vizFurnitureMoves = layoutData.visualization?.layout?.furnitureMoves || [];
+          const vizProductMoves = layoutData.visualization?.layout?.productMoves || [];
+
+          console.log('[useSceneSimulation] 📊 Extracted counts:', {
+            furnitureChanges: furnitureChanges.length,
+            productPlacements: productPlacements.length,
+            vizFurnitureMoves: vizFurnitureMoves.length,
+            vizProductMoves: vizProductMoves.length,
+          });
 
           // furnitureMoves 형식으로 변환 (generateLayoutOptimizedScene 호환)
           // 🔧 FIX: Edge Function 실제 필드명에 맞게 매핑 수정
-          const furnitureMoves = furnitureChanges.map((change: any) => ({
-            furnitureId: change.furniture_id || change.entity_id || change.id,
-            furnitureName: change.furniture_label || change.furniture_type || change.entity_label || change.name,
-            fromPosition: change.current?.position || change.current_position || change.currentPosition,
-            toPosition: change.suggested?.position || change.suggested_position || change.suggestedPosition || change.new_position,
-            reason: change.reason || change.optimization_reason,
-            rotation: change.suggested?.rotation?.y || change.rotation,
-          }));
+          // 우선순위: result.furniture_changes > visualization.layout.furnitureMoves
+          const furnitureMoves = furnitureChanges.length > 0
+            ? furnitureChanges.map((change: any) => ({
+                furnitureId: change.furniture_id || change.entity_id || change.id,
+                furnitureName: change.furniture_label || change.furniture_type || change.entity_label || change.name,
+                fromPosition: change.current?.position || change.current_position || change.currentPosition,
+                toPosition: change.suggested?.position || change.suggested_position || change.suggestedPosition || change.new_position,
+                reason: change.reason || change.optimization_reason,
+                rotation: change.suggested?.rotation?.y || change.rotation,
+              }))
+            : vizFurnitureMoves.map((move: any) => ({
+                furnitureId: move.furnitureId || move.furniture_id,
+                furnitureName: move.furnitureName || move.furnitureCode || move.furniture_name,
+                fromPosition: move.from || move.fromPosition,
+                toPosition: move.to || move.toPosition,
+                reason: move.reason,
+                rotation: move.rotation,
+              }));
+
+          // 🆕 productPlacements도 visualization fallback 적용
+          const finalProductPlacements = productPlacements.length > 0
+            ? productPlacements
+            : vizProductMoves;
 
           // 🔧 FIX: summary 필드 올바른 매핑 (소수점 → 퍼센트 변환)
           // Edge Function 응답: { result: { summary: {...} } }
           const summaryData = layoutData.summary || layoutData.result?.summary || {};
-          console.log('[useSceneSimulation] 📦 Raw layoutData structure:', {
-            hasFurnitureChanges: !!layoutData.furniture_changes,
-            hasResultFurnitureChanges: !!layoutData.result?.furniture_changes,
-            furnitureCount: furnitureChanges.length,
-            productCount: productPlacements.length,
-            summaryKeys: Object.keys(summaryData),
-          });
           const revenueImprovement = summaryData.expected_revenue_improvement || 0;
           const trafficImprovement = summaryData.expected_traffic_improvement || 0;
           const conversionImprovement = summaryData.expected_conversion_improvement || 0;
@@ -666,14 +697,14 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
 
           results.layout = {
             furnitureMoves,
-            layoutChanges: furnitureChanges,
-            productPlacements,
+            layoutChanges: furnitureChanges.length > 0 ? furnitureChanges : vizFurnitureMoves,
+            productPlacements: finalProductPlacements,
             summary: summaryData,
             insights: layoutData.insights || layoutData.result?.insights || summaryData.insights || [],
             // 효율성 점수 계산 (변경 수 기반)
             currentEfficiency: summaryData.current_efficiency || 70,
             optimizedEfficiency: summaryData.optimized_efficiency ||
-              Math.min(95, 70 + (furnitureChanges.length * 2) + (productPlacements.length * 0.5)),
+              Math.min(95, 70 + (furnitureMoves.length * 2) + (finalProductPlacements.length * 0.5)),
             improvements: {
               revenueIncrease: toPercent(revenueImprovement),
               revenueIncreasePercent: toPercent(revenueImprovement),
@@ -684,7 +715,8 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
           };
           console.log('[useSceneSimulation] ✅ Layout result (generate-optimization):', {
             furnitureMovesCount: furnitureMoves.length,
-            productPlacementsCount: productPlacements.length,
+            productPlacementsCount: finalProductPlacements.length,
+            usedVisualizationFallback: furnitureChanges.length === 0 && vizFurnitureMoves.length > 0,
             summaryData: {
               revenue: toPercent(revenueImprovement),
               traffic: toPercent(trafficImprovement),
@@ -792,14 +824,27 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
                 staffPositionsCount: staffPositions.length,
               });
 
-              // ========== 2. 재배치 직원 수 계산 ==========
-              const reallocatedCount = staffPositions.filter((sp: any) => {
+              // ========== 2. 재배치가 필요한 직원 필터링 ==========
+              // 🔧 FIX: 실제 위치 변경이 필요한 직원만 필터링
+              const isStaffReallocated = (sp: any) => {
                 const curr = sp.currentPosition || sp.current_position;
                 const sugg = sp.suggestedPosition || sp.suggested_position;
-                if (!curr || !sugg) return true; // 위치 정보 없으면 재배치로 간주
-                return Math.abs((curr.x || 0) - (sugg.x || 0)) > 0.5 ||
-                       Math.abs((curr.z || 0) - (sugg.z || 0)) > 0.5;
-              }).length;
+                // 위치 정보가 없거나, 제안된 위치가 현재 위치와 유의미하게 다른 경우 재배치 필요
+                if (!curr || !sugg) return false; // 위치 정보 없으면 재배치 불필요로 처리
+                const distanceX = Math.abs((curr.x || 0) - (sugg.x || 0));
+                const distanceZ = Math.abs((curr.z || 0) - (sugg.z || 0));
+                // 최소 1m 이상 이동하는 경우만 재배치로 간주
+                return distanceX > 1 || distanceZ > 1;
+              };
+
+              const reallocatedStaff = staffPositions.filter(isStaffReallocated);
+              const reallocatedCount = reallocatedStaff.length;
+
+              console.log('[useSceneSimulation] 🚶 Staff reallocation filter:', {
+                totalStaff: staffPositions.length,
+                reallocatedCount,
+                filteredOut: staffPositions.length - reallocatedCount,
+              });
 
               // ========== 3. visualization 구성 ==========
               const visualization = staffingResult.visualization || {
@@ -812,17 +857,21 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
                   center: { x: zone.centerX || 0, y: 0, z: zone.centerZ || 0 },
                   radius: zone.radius || 3,
                 })),
-                movementPaths: staffPositions.map((sp: any) => ({
+                // 🔧 FIX: 재배치가 필요한 직원만 이동 경로 표시
+                movementPaths: reallocatedStaff.map((sp: any) => ({
                   staffId: sp.staffId || sp.staff_id,
                   from: sp.currentPosition || sp.current_position || { x: 0, y: 0, z: 0 },
                   to: sp.suggestedPosition || sp.suggested_position || { x: 2, y: 0, z: 2 },
                 })),
+                // 전체 직원 마커는 유지 (현재 위치 표시용)
                 staffMarkers: staffPositions.map((sp: any) => ({
                   id: sp.staffId || sp.staff_id,
                   name: sp.staffName || sp.staff_name || '직원',
                   role: sp.role || 'sales',
                   currentPosition: sp.currentPosition || sp.current_position || { x: 0, y: 0, z: 0 },
                   suggestedPosition: sp.suggestedPosition || sp.suggested_position || { x: 2, y: 0, z: 2 },
+                  // 🆕 재배치 필요 여부 플래그 추가
+                  needsReallocation: isStaffReallocated(sp),
                 })),
               };
 
@@ -863,7 +912,8 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
                   efficiency_after: optimizedCoverage,
                   efficiency_change: optimizedCoverage - currentCoverage,
                 },
-                reallocations: staffPositions.map((sp: any, idx: number) => ({
+                // 🔧 FIX: 재배치가 필요한 직원만 reallocations에 포함
+                reallocations: reallocatedStaff.map((sp: any, idx: number) => ({
                   staff_id: sp.staffId || sp.staff_id || `staff-${idx}`,
                   staff_code: sp.staffCode || sp.staff_code || `STAFF-${String(idx + 1).padStart(3, '0')}`,
                   staff_name: sp.staffName || sp.staff_name || sp.name || `직원 ${idx + 1}`,
