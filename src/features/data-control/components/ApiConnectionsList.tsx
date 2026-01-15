@@ -204,7 +204,12 @@ function ConnectionCard({ connection, onEdit, isDark }: ConnectionCardProps) {
   const toggleMutation = useToggleConnectionStatus();
 
   // 시스템 관리 컨텍스트 데이터 소스 여부 (날씨, 공휴일 등)
-  const isSystemContext = connection.is_system_managed || connection.connection_category === 'context';
+  // data_category가 weather/holidays이면 시스템 컨텍스트로 판별
+  const isSystemContext =
+    connection.is_system_managed ||
+    connection.connection_category === 'context' ||
+    connection.data_category === 'weather' ||
+    connection.data_category === 'holidays';
 
   const handleTest = () => {
     testMutation.mutate({ connectionId: connection.id });

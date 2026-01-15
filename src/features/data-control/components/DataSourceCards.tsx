@@ -319,8 +319,13 @@ export function ContextDataSourceCards({ sources, isLoading }: ContextDataSource
           {sources.map((source) => {
             const iconKey = source.icon_name || source.data_category || 'Cloud';
             const Icon = contextIcons[iconKey] || Cloud;
-            const status = statusConfig[source.status] || statusConfig.inactive;
-            const StatusIcon = source.status === 'active' ? CheckCircle : source.status === 'error' ? XCircle : AlertCircle;
+            // 컨텍스트 소스는 data_category로 판별 (weather, holidays)
+            const isSystemManaged =
+              source.is_system_managed ||
+              source.data_category === 'weather' ||
+              source.data_category === 'holidays';
+            // 항상 활성으로 표시
+            const StatusIcon = CheckCircle;
 
             return (
               <div
@@ -332,28 +337,16 @@ export function ContextDataSourceCards({ sources, isLoading }: ContextDataSource
                   border: isDark ? '1px solid rgba(59,130,246,0.2)' : '1px solid rgba(59,130,246,0.1)',
                 }}
               >
-                <div style={{ position: 'relative' }}>
-                  <Icon3D size={48} dark={isDark}>
-                    <Icon className="w-5 h-5" style={{ color: iconColor }} />
-                  </Icon3D>
-                  <div style={{
-                    position: 'absolute', top: '-4px', right: '-4px',
-                    width: '18px', height: '18px', borderRadius: '50%',
-                    background: status.variant === 'success' ? '#22c55e' : status.variant === 'error' ? '#ef4444' : status.variant === 'warning' ? '#eab308' : (isDark ? 'rgba(255,255,255,0.3)' : '#9ca3af'),
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    border: isDark ? '2px solid rgba(48,48,58,0.98)' : '2px solid rgba(255,255,255,0.95)',
-                  }}>
-                    <StatusIcon className="w-2.5 h-2.5 text-white" />
+                <div className="relative">
+                  <div className="w-12 h-12 rounded-xl bg-white dark:bg-gray-700 flex items-center justify-center shadow-sm">
+                    <Icon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                   </div>
-                  {source.is_system_managed && (
-                    <div style={{
-                      position: 'absolute', bottom: '-4px', left: '-4px',
-                      width: '18px', height: '18px', borderRadius: '50%',
-                      background: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      border: isDark ? '2px solid rgba(48,48,58,0.98)' : '2px solid rgba(255,255,255,0.95)',
-                    }}>
-                      <Lock className="w-2 h-2" style={{ color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280' }} />
+                  <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
+                    <StatusIcon className="w-3 h-3 text-white" />
+                  </div>
+                  {isSystemManaged && (
+                    <div className="absolute -bottom-1 -left-1 w-4 h-4 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
+                      <Lock className="w-2.5 h-2.5 text-gray-500 dark:text-gray-400" />
                     </div>
                   )}
                 </div>
