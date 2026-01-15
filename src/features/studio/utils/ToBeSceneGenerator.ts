@@ -230,9 +230,9 @@ export function generateLayoutOptimizedScene(
     furnitureMoves: changes.filter((c) => c.assetType === 'furniture').length,
     productChanges: changes.filter((c) => c.assetType === 'product').length,
     expectedImpact: {
-      efficiency: layoutResult.optimizedEfficiency - layoutResult.currentEfficiency,
-      revenue: layoutResult.improvements.revenueIncreasePercent,
-      traffic: layoutResult.improvements.trafficIncrease,
+      efficiency: (layoutResult.optimizedEfficiency || 0) - (layoutResult.currentEfficiency || 0),
+      revenue: layoutResult.improvements?.revenueIncreasePercent || 0,
+      traffic: layoutResult.improvements?.trafficIncrease || 0,
     },
   };
 
@@ -255,7 +255,9 @@ export function generateFlowOptimizedScene(
   const toBe: SceneRecipe = deepClone(asIsScene);
 
   // 병목 지점 기반 가구 재배치
-  flowResult.bottlenecks.forEach((bottleneck, idx) => {
+  (flowResult.bottlenecks || []).forEach((bottleneck, idx) => {
+    // position이 없으면 스킵
+    if (!bottleneck?.position) return;
     // 병목 지점 근처 가구 찾기
     const nearbyFurniture = toBe.furniture.filter((f) => {
       const dist = Math.sqrt(
@@ -291,7 +293,7 @@ export function generateFlowOptimizedScene(
   });
 
   // 최적화 제안 기반 변경
-  flowResult.optimizations.forEach((opt) => {
+  (flowResult.optimizations || []).forEach((opt) => {
     if (opt.type === 'layout_change') {
       changes.push({
         id: `opt-${opt.id}`,
@@ -311,9 +313,9 @@ export function generateFlowOptimizedScene(
     furnitureMoves: changes.filter((c) => c.type === 'move').length,
     productChanges: 0,
     expectedImpact: {
-      efficiency: flowResult.comparison.congestionReduction,
+      efficiency: flowResult.comparison?.congestionReduction || 0,
       revenue: 0,
-      traffic: flowResult.comparison.pathLengthReduction,
+      traffic: flowResult.comparison?.pathLengthReduction || 0,
     },
   };
 
@@ -338,7 +340,7 @@ export function generateStaffingOptimizedScene(
 
   // 인력 배치는 가구/상품 이동이 아니라 마커 위치이므로
   // 씬 자체는 변경하지 않고 변경 사항만 기록
-  staffingResult.staffPositions.forEach((staff) => {
+  (staffingResult.staffPositions || []).forEach((staff) => {
     changes.push({
       id: `staff-${staff.staffId}`,
       type: 'move',
@@ -348,7 +350,7 @@ export function generateStaffingOptimizedScene(
       before: { position: staff.currentPosition },
       after: { position: staff.suggestedPosition },
       reason: `커버리지 최적화`,
-      impact: `+${staff.coverageGain.toFixed(1)}% 커버리지`,
+      impact: `+${(staff.coverageGain || 0).toFixed(1)}% 커버리지`,
     });
   });
 
@@ -357,9 +359,9 @@ export function generateStaffingOptimizedScene(
     furnitureMoves: 0,
     productChanges: 0,
     expectedImpact: {
-      efficiency: staffingResult.metrics.coverageGain,
+      efficiency: staffingResult.metrics?.coverageGain || 0,
       revenue: 0,
-      traffic: staffingResult.metrics.customerServiceRateIncrease,
+      traffic: staffingResult.metrics?.customerServiceRateIncrease || 0,
     },
   };
 
@@ -414,10 +416,10 @@ export function generateCombinedOptimizedScene(
     productChanges: uniqueChanges.filter((c) => c.assetType === 'product').length,
     expectedImpact: {
       efficiency: (results.layout?.optimizedEfficiency || 0) - (results.layout?.currentEfficiency || 0) +
-                  (results.flow?.comparison.congestionReduction || 0),
-      revenue: results.layout?.improvements.revenueIncreasePercent || 0,
-      traffic: (results.layout?.improvements.trafficIncrease || 0) +
-               (results.flow?.comparison.pathLengthReduction || 0),
+                  (results.flow?.comparison?.congestionReduction || 0),
+      revenue: results.layout?.improvements?.revenueIncreasePercent || 0,
+      traffic: (results.layout?.improvements?.trafficIncrease || 0) +
+               (results.flow?.comparison?.pathLengthReduction || 0),
     },
   };
 
