@@ -6,6 +6,7 @@ import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
+import { useAuth } from '@/hooks/useAuth';
 import type {
   DataControlTowerStatus,
   DataQualityScore,
@@ -19,6 +20,7 @@ import type {
 // ============================================================================
 export function useDataControlTowerStatus() {
   const { selectedStore } = useSelectedStore();
+  const { orgId } = useAuth();
   const storeId = selectedStore?.id;
 
   return useQuery<DataControlTowerStatus>({
@@ -40,11 +42,11 @@ export function useDataControlTowerStatus() {
 
         // RPC 결과에 ERP 데이터가 없으면 병합
         const result = data as unknown as DataControlTowerStatus;
-        return await ensureERPCoverage(result, storeId);
+        return await ensureERPCoverage(result, storeId, orgId);
       } catch (rpcError) {
         // Fallback: build status from direct queries
         console.warn('RPC not available, using fallback queries:', rpcError);
-        return await buildControlTowerStatusFallback(storeId);
+        return await buildControlTowerStatusFallback(storeId, orgId);
       }
     },
     enabled: !!storeId,
@@ -53,23 +55,30 @@ export function useDataControlTowerStatus() {
 }
 
 // ERP 데이터가 없으면 병합하는 함수
-async function ensureERPCoverage(result: DataControlTowerStatus, storeId: string): Promise<DataControlTowerStatus> {
+async function ensureERPCoverage(result: DataControlTowerStatus, storeId: string, orgId?: string): Promise<DataControlTowerStatus> {
   // ERP 데이터가 이미 있으면 그대로 반환
   if (result.quality_score?.coverage?.erp) {
     return result;
   }
 
   // ERP/재고 데이터 카운트
-  // inventory_levels: 상품별 현재 재고 수준 (상태 데이터) - 상품 수 기준
-  // inventory_movements: 입출고 트랜잭션 이력 (이벤트 데이터) - 활동 여부 확인용
-  const { count: inventoryLevelCount } = await supabase
+  // inventory_levels: 상품별 현재 재고 수준 (상태 데이터) - org_id로 필터 (store_id 없음)
+  // inventory_movements: 입출고 트랜잭션 이력 (이벤트 데이터) - org_id 또는 store_id로 필터
+  let inventoryLevelQuery = supabase
     .from('inventory_levels')
     .select('*', { count: 'exact', head: true });
+  if (orgId) {
+    inventoryLevelQuery = inventoryLevelQuery.eq('org_id', orgId);
+  }
+  const { count: inventoryLevelCount } = await inventoryLevelQuery;
 
-  const { count: inventoryMovementCount } = await supabase
+  let inventoryMovementQuery = supabase
     .from('inventory_movements')
-    .select('*', { count: 'exact', head: true })
-    .eq('store_id', storeId);
+    .select('*', { count: 'exact', head: true });
+  if (orgId) {
+    inventoryMovementQuery = inventoryMovementQuery.eq('org_id', orgId);
+  }
+  const { count: inventoryMovementCount } = await inventoryMovementQuery;
 
   // ERP 데이터 존재 여부: levels가 있거나 movements 활동이 있으면 true
   const hasERPData = (inventoryLevelCount || 0) > 0 || (inventoryMovementCount || 0) > 0;
@@ -114,23 +123,30 @@ async function ensureERPCoverage(result: DataControlTowerStatus, storeId: string
 }
 
 // DataQualityScore용 ERP 데이터 병합 함수
-async function ensureERPCoverageForQualityScore(result: DataQualityScore, storeId: string): Promise<DataQualityScore> {
+async function ensureERPCoverageForQualityScore(result: DataQualityScore, storeId: string, orgId?: string): Promise<DataQualityScore> {
   // ERP 데이터가 이미 있으면 그대로 반환
   if (result.coverage?.erp) {
     return result;
   }
 
   // ERP/재고 데이터 카운트
-  // inventory_levels: 상품별 현재 재고 수준 (상태 데이터) - 상품 수 기준
-  // inventory_movements: 입출고 트랜잭션 이력 (이벤트 데이터) - 활동 여부 확인용
-  const { count: inventoryLevelCount } = await supabase
+  // inventory_levels: 상품별 현재 재고 수준 (상태 데이터) - org_id로 필터 (store_id 없음)
+  // inventory_movements: 입출고 트랜잭션 이력 (이벤트 데이터) - org_id로 필터
+  let inventoryLevelQuery = supabase
     .from('inventory_levels')
     .select('*', { count: 'exact', head: true });
+  if (orgId) {
+    inventoryLevelQuery = inventoryLevelQuery.eq('org_id', orgId);
+  }
+  const { count: inventoryLevelCount } = await inventoryLevelQuery;
 
-  const { count: inventoryMovementCount } = await supabase
+  let inventoryMovementQuery = supabase
     .from('inventory_movements')
-    .select('*', { count: 'exact', head: true })
-    .eq('store_id', storeId);
+    .select('*', { count: 'exact', head: true });
+  if (orgId) {
+    inventoryMovementQuery = inventoryMovementQuery.eq('org_id', orgId);
+  }
+  const { count: inventoryMovementCount } = await inventoryMovementQuery;
 
   // ERP 데이터 존재 여부: levels가 있거나 movements 활동이 있으면 true
   const hasERPData = (inventoryLevelCount || 0) > 0 || (inventoryMovementCount || 0) > 0;
@@ -174,7 +190,7 @@ async function ensureERPCoverageForQualityScore(result: DataQualityScore, storeI
 }
 
 // Fallback function when RPC is not available
-async function buildControlTowerStatusFallback(storeId: string): Promise<DataControlTowerStatus> {
+async function buildControlTowerStatusFallback(storeId: string, orgId?: string): Promise<DataControlTowerStatus> {
   // 1. Recent imports
   const { data: recentImports } = await supabase
     .from('raw_imports')
@@ -235,16 +251,23 @@ async function buildControlTowerStatusFallback(storeId: string): Promise<DataCon
     .eq('store_id', storeId);
 
   // 4-1. ERP/재고 데이터 카운트
-  // inventory_levels: 상품별 현재 재고 수준 (상태 데이터) - 상품 수 기준
-  // inventory_movements: 입출고 트랜잭션 이력 (이벤트 데이터) - 활동 여부 확인용
-  const { count: inventoryLevelCount } = await supabase
+  // inventory_levels: 상품별 현재 재고 수준 (상태 데이터) - org_id로 필터 (store_id 없음)
+  // inventory_movements: 입출고 트랜잭션 이력 (이벤트 데이터) - org_id로 필터
+  let inventoryLevelQuery = supabase
     .from('inventory_levels')
     .select('*', { count: 'exact', head: true });
+  if (orgId) {
+    inventoryLevelQuery = inventoryLevelQuery.eq('org_id', orgId);
+  }
+  const { count: inventoryLevelCount } = await inventoryLevelQuery;
 
-  const { count: inventoryMovementCount } = await supabase
+  let inventoryMovementQuery = supabase
     .from('inventory_movements')
-    .select('*', { count: 'exact', head: true })
-    .eq('store_id', storeId);
+    .select('*', { count: 'exact', head: true });
+  if (orgId) {
+    inventoryMovementQuery = inventoryMovementQuery.eq('org_id', orgId);
+  }
+  const { count: inventoryMovementCount } = await inventoryMovementQuery;
 
   // ERP 데이터 존재 여부: levels가 있거나 movements 활동이 있으면 true
   const hasERPData = (inventoryLevelCount || 0) > 0 || (inventoryMovementCount || 0) > 0;
@@ -313,10 +336,11 @@ async function buildControlTowerStatusFallback(storeId: string): Promise<DataCon
 // ============================================================================
 export function useDataQualityScore(date?: string) {
   const { selectedStore } = useSelectedStore();
+  const { orgId } = useAuth();
   const storeId = selectedStore?.id;
 
   return useQuery<DataQualityScore>({
-    queryKey: ['data-quality-score', storeId, date],
+    queryKey: ['data-quality-score', storeId, orgId, date],
     queryFn: async () => {
       if (!storeId) {
         throw new Error('No store selected');
@@ -334,10 +358,10 @@ export function useDataQualityScore(date?: string) {
 
         // RPC 결과에 ERP 데이터가 없으면 병합
         const result = data as unknown as DataQualityScore;
-        return await ensureERPCoverageForQualityScore(result, storeId);
+        return await ensureERPCoverageForQualityScore(result, storeId, orgId);
       } catch (rpcError) {
         console.warn('Quality score RPC not available, using fallback:', rpcError);
-        return await buildQualityScoreFallback(storeId);
+        return await buildQualityScoreFallback(storeId, orgId);
       }
     },
     enabled: !!storeId,
@@ -345,7 +369,7 @@ export function useDataQualityScore(date?: string) {
 }
 
 // Fallback quality score calculation
-async function buildQualityScoreFallback(storeId: string): Promise<DataQualityScore> {
+async function buildQualityScoreFallback(storeId: string, orgId?: string): Promise<DataQualityScore> {
   // POS 데이터는 transactions 테이블만 카운트 (RPC 함수와 동일하게)
   // purchases 테이블은 API 매핑 대상이 아니므로 제외
   const { count: posCount } = await supabase
@@ -371,16 +395,23 @@ async function buildQualityScoreFallback(storeId: string): Promise<DataQualitySc
     .eq('store_id', storeId);
 
   // ERP/재고 데이터 카운트
-  // inventory_levels: 상품별 현재 재고 수준 (상태 데이터) - 상품 수 기준
-  // inventory_movements: 입출고 트랜잭션 이력 (이벤트 데이터) - 활동 여부 확인용
-  const { count: inventoryLevelCount } = await supabase
+  // inventory_levels: 상품별 현재 재고 수준 (상태 데이터) - org_id로 필터 (store_id 없음)
+  // inventory_movements: 입출고 트랜잭션 이력 (이벤트 데이터) - org_id로 필터
+  let inventoryLevelQuery = supabase
     .from('inventory_levels')
     .select('*', { count: 'exact', head: true });
+  if (orgId) {
+    inventoryLevelQuery = inventoryLevelQuery.eq('org_id', orgId);
+  }
+  const { count: inventoryLevelCount } = await inventoryLevelQuery;
 
-  const { count: inventoryMovementCount } = await supabase
+  let inventoryMovementQuery = supabase
     .from('inventory_movements')
-    .select('*', { count: 'exact', head: true })
-    .eq('store_id', storeId);
+    .select('*', { count: 'exact', head: true });
+  if (orgId) {
+    inventoryMovementQuery = inventoryMovementQuery.eq('org_id', orgId);
+  }
+  const { count: inventoryMovementCount } = await inventoryMovementQuery;
 
   // ERP 데이터 존재 여부: levels가 있거나 movements 활동이 있으면 true
   const hasERPData = (inventoryLevelCount || 0) > 0 || (inventoryMovementCount || 0) > 0;
