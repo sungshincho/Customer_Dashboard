@@ -629,17 +629,37 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
         if (layoutRes.status === 'fulfilled' && layoutRes.value.data) {
           const layoutData = layoutRes.value.data;
           // generate-optimization 응답: furniture_changes, product_changes 또는 result
-          const layoutChanges = layoutData.furniture_changes || layoutData.result?.layoutChanges || [];
+          const furnitureChanges = layoutData.furniture_changes || layoutData.result?.layoutChanges || [];
           const productPlacements = layoutData.product_changes || layoutData.result?.productPlacements || [];
 
+          // furnitureMoves 형식으로 변환 (generateLayoutOptimizedScene 호환)
+          const furnitureMoves = furnitureChanges.map((change: any) => ({
+            furnitureId: change.entity_id || change.entityId || change.id,
+            furnitureName: change.entity_label || change.entityLabel || change.furniture_name,
+            fromPosition: change.current_position || change.currentPosition,
+            toPosition: change.suggested_position || change.suggestedPosition || change.new_position,
+            reason: change.reason,
+          }));
+
           results.layout = {
-            layoutChanges,
+            furnitureMoves,
+            layoutChanges: furnitureChanges,
             productPlacements,
             summary: layoutData.summary || layoutData.result?.summary || {},
             insights: layoutData.insights || layoutData.result?.insights || [],
+            // 기본값 설정
+            currentEfficiency: layoutData.summary?.current_efficiency || 70,
+            optimizedEfficiency: layoutData.summary?.optimized_efficiency || 85,
+            improvements: {
+              revenueIncrease: layoutData.summary?.expected_revenue_improvement || 0,
+              revenueIncreasePercent: layoutData.summary?.expected_revenue_improvement || 0,
+              dwellTimeIncrease: 0,
+              conversionIncrease: layoutData.summary?.expected_conversion_improvement || 0,
+              trafficIncrease: layoutData.summary?.expected_traffic_improvement || 0,
+            },
           };
           console.log('[useSceneSimulation] Layout result (generate-optimization):', {
-            layoutChangesCount: layoutChanges.length,
+            furnitureMovesCount: furnitureMoves.length,
             productPlacementsCount: productPlacements.length,
           });
         } else {
