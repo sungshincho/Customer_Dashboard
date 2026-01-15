@@ -245,8 +245,13 @@ const sceneReducer = (state: SceneState, action: SceneAction): SceneState => {
 
           // 가구 위치 이동 처리
           if (hasFurnitureMoves) {
+            // 🔧 FIX: Edge Function은 raw UUID 반환, 3D 모델은 "furniture-{uuid}" 형식 사용
+            // metadata.furnitureId에 raw UUID가 저장되어 있으므로 이것도 매칭 대상에 추가
+            const modelFurnitureId = (model.metadata as any)?.furnitureId;
             const move = furnitureMoves!.find(
-              (m) => m.furnitureId === model.id || m.furnitureName === model.name
+              (m) => m.furnitureId === model.id ||
+                     m.furnitureId === modelFurnitureId ||
+                     m.furnitureName === model.name
             );
 
             if (move) {
@@ -281,9 +286,10 @@ const sceneReducer = (state: SceneState, action: SceneAction): SceneState => {
             const currentChildProducts = ((updatedModel.metadata as any)?.childProducts as any[]) || [];
 
             // 이 가구에서 제거할 제품들 (다른 가구로 이동)
+            // 🔧 FIX: modelFurnitureId (raw UUID)도 매칭 대상에 추가
             const productsToRemove = new Set<string>();
             childProductMoves.forEach((move, productId) => {
-              if (move.fromFurnitureId === model.id) {
+              if (move.fromFurnitureId === model.id || move.fromFurnitureId === modelFurnitureId) {
                 productsToRemove.add(productId);
               }
             });
@@ -291,7 +297,7 @@ const sceneReducer = (state: SceneState, action: SceneAction): SceneState => {
             // 이 가구로 추가할 제품들 (다른 가구에서 이동)
             const productsToAdd: any[] = [];
             childProductMoves.forEach((move) => {
-              if (move.toFurnitureId === model.id) {
+              if (move.toFurnitureId === model.id || move.toFurnitureId === modelFurnitureId) {
                 productsToAdd.push({
                   ...move.productData,
                   position: move.newPosition,
@@ -332,8 +338,12 @@ const sceneReducer = (state: SceneState, action: SceneAction): SceneState => {
 
         // 2️⃣ 상품 재배치 처리 (슬롯 기반)
         if (hasProductPlacements && model.type === 'product') {
+          // 🔧 FIX: Edge Function은 raw UUID 반환, 3D 모델은 "product-{uuid}" 형식 사용
+          const modelProductId = (model.metadata as any)?.productId;
           const placement = productPlacements!.find(
-            (p) => p.productId === model.id || p.productSku === model.metadata?.sku
+            (p) => p.productId === model.id ||
+                   p.productId === modelProductId ||
+                   p.productSku === model.metadata?.sku
           );
 
           if (placement) {
