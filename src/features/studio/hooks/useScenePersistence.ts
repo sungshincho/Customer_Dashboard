@@ -2,16 +2,51 @@
  * useScenePersistence.ts
  *
  * 씬 저장/불러오기 훅
+ *
+ * B안 확장:
+ * - staff_positions: 직원 위치 저장
+ * - scene_type: 씬 타입 (manual, ai_optimized, staffing_optimized)
+ * - metadata: 최적화 메타데이터
  */
 
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import type { SceneRecipe, SavedScene } from '../types';
+import type { SceneRecipe, SavedScene, StaffPosition, SceneType, SceneMetadata } from '../types';
 
 interface UseScenePersistenceOptions {
   userId?: string;
   storeId?: string;
+}
+
+// B안: 씬 저장 옵션
+export interface SaveSceneOptions {
+  recipe: SceneRecipe;
+  name: string;
+  sceneId?: string;
+  /** B안: 직원 위치 */
+  staffPositions?: StaffPosition[];
+  /** B안: 씬 타입 */
+  sceneType?: SceneType;
+  /** B안: 메타데이터 */
+  metadata?: SceneMetadata;
+}
+
+// B안: DB에서 씬 매핑
+function mapDbSceneToSavedScene(scene: any): SavedScene {
+  return {
+    id: scene.id,
+    name: scene.scene_name,
+    recipe_data: scene.recipe_data,
+    thumbnail: undefined,
+    is_active: scene.is_active,
+    created_at: scene.created_at,
+    updated_at: scene.updated_at,
+    // B안 확장 필드
+    staff_positions: scene.staff_positions || [],
+    scene_type: scene.scene_type || 'manual',
+    metadata: scene.metadata || {},
+  };
 }
 
 export function useScenePersistence(options: UseScenePersistenceOptions = {}) {
@@ -37,15 +72,8 @@ export function useScenePersistence(options: UseScenePersistenceOptions = {}) {
 
       if (error) throw error;
 
-      const mappedScenes: SavedScene[] = (data || []).map((scene: any) => ({
-        id: scene.id,
-        name: scene.scene_name,
-        recipe_data: scene.recipe_data,
-        thumbnail: undefined,
-        is_active: scene.is_active,
-        created_at: scene.created_at,
-        updated_at: scene.updated_at,
-      }));
+      // B안: 확장 필드 포함하여 매핑
+      const mappedScenes: SavedScene[] = (data || []).map(mapDbSceneToSavedScene);
 
       setScenes(mappedScenes);
 
@@ -64,9 +92,23 @@ export function useScenePersistence(options: UseScenePersistenceOptions = {}) {
     }
   }, [userId, storeId]);
 
-  // 씬 저장
+  // 씬 저장 (기존 API 호환)
   const saveScene = useCallback(
     async (recipe: SceneRecipe, name: string, sceneId?: string) => {
+      return saveSceneWithOptions({
+        recipe,
+        name,
+        sceneId,
+      });
+    },
+    [userId, storeId]
+  );
+
+  // B안: 확장 씬 저장 (직원 위치, 메타데이터 포함)
+  const saveSceneWithOptions = useCallback(
+    async (options: SaveSceneOptions) => {
+      const { recipe, name, sceneId, staffPositions, sceneType, metadata } = options;
+
       if (!userId || !storeId) {
         toast.error('사용자 또는 매장 정보가 없습니다');
         return;
@@ -74,15 +116,33 @@ export function useScenePersistence(options: UseScenePersistenceOptions = {}) {
 
       setIsSaving(true);
       try {
+        // B안: 확장 데이터 구성
+        const sceneData: any = {
+          scene_name: name,
+          recipe_data: recipe as any,
+          updated_at: new Date().toISOString(),
+        };
+
+        // B안: 직원 위치 추가
+        if (staffPositions !== undefined) {
+          sceneData.staff_positions = staffPositions;
+        }
+
+        // B안: 씬 타입 추가
+        if (sceneType !== undefined) {
+          sceneData.scene_type = sceneType;
+        }
+
+        // B안: 메타데이터 추가
+        if (metadata !== undefined) {
+          sceneData.metadata = metadata;
+        }
+
         if (sceneId) {
           // 업데이트
           const { error } = await supabase
             .from('store_scenes')
-            .update({
-              scene_name: name,
-              recipe_data: recipe as any,
-              updated_at: new Date().toISOString(),
-            })
+            .update(sceneData)
             .eq('id', sceneId);
 
           if (error) throw error;
@@ -92,16 +152,15 @@ export function useScenePersistence(options: UseScenePersistenceOptions = {}) {
           const { error } = await supabase.from('store_scenes').insert({
             user_id: userId,
             store_id: storeId,
-            scene_name: name,
-            recipe_data: recipe as any,
             is_active: true,
+            ...sceneData,
           });
 
           if (error) throw error;
           toast.success('씬이 저장되었습니다');
         }
 
-        await loadScenes(true);  // 🔧 FIX: 목록만 갱신, activeScene은 건드리지 않음 (저장 후 화면 깨짐 방지)
+        await loadScenes(true);  // 목록만 갱신, activeScene은 건드리지 않음
       } catch (error) {
         console.error('Failed to save scene:', error);
         toast.error('씬 저장에 실패했습니다');
@@ -160,18 +219,11 @@ export function useScenePersistence(options: UseScenePersistenceOptions = {}) {
           .order('updated_at', { ascending: false });
 
         if (data) {
-          const mappedScenes: SavedScene[] = data.map((scene: any) => ({
-            id: scene.id,
-            name: scene.scene_name,
-            recipe_data: scene.recipe_data,
-            thumbnail: undefined,
-            is_active: scene.is_active,
-            created_at: scene.created_at,
-            updated_at: scene.updated_at,
-          }));
-          
+          // B안: 확장 필드 포함하여 매핑
+          const mappedScenes: SavedScene[] = data.map(mapDbSceneToSavedScene);
+
           setScenes(mappedScenes);
-          
+
           // 선택한 씬을 activeScene으로 설정 (새 객체 참조 생성)
           const selectedScene = mappedScenes.find(s => s.id === sceneId);
           if (selectedScene) {
@@ -237,10 +289,11 @@ export function useScenePersistence(options: UseScenePersistenceOptions = {}) {
     isSaving,
     loadScenes,
     saveScene,
+    saveSceneWithOptions,  // B안: 확장 저장
     deleteScene,
     setActiveScene,
     clearActiveScene,
-    renameScene,  // 🆕 추가
+    renameScene,
   };
 }
 

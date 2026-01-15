@@ -8,8 +8,9 @@
  */
 
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Eye, EyeOff, TrendingUp, Clock, Users, Percent, Package, ArrowRight, Armchair } from 'lucide-react';
+import { ChevronDown, ChevronUp, Eye, EyeOff, TrendingUp, Clock, Users, Percent, Package, ArrowRight, Armchair, UserCircle2, Move } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 type OptimizationType = 'layout' | 'flow' | 'staffing';
@@ -31,6 +32,9 @@ export function OptimizationResultPanel({
   const [isOverlayVisible, setIsOverlayVisible] = useState(true);
   const [showFurnitureDetails, setShowFurnitureDetails] = useState(false);
   const [showProductDetails, setShowProductDetails] = useState(false);
+  // B안: 직원 제안 및 가구 조정 표시 상태
+  const [showStaffSuggestions, setShowStaffSuggestions] = useState(false);
+  const [showFurnitureAdjustments, setShowFurnitureAdjustments] = useState(false);
 
   const toggleOverlay = () => {
     const newValue = !isOverlayVisible;
@@ -51,6 +55,8 @@ export function OptimizationResultPanel({
           productChangesCount: result.productPlacements?.length || 0,
           currentEfficiency: result.currentEfficiency || 0,
           optimizedEfficiency: result.optimizedEfficiency || 0,
+          // B안: 직원 제안 수
+          staffSuggestionsCount: result.staff_suggestions?.items?.length || 0,
         };
       case 'flow':
         return {
@@ -68,6 +74,8 @@ export function OptimizationResultPanel({
           staffMoves: result.staffPositions?.length || result.suggestions?.length || 0,
           currentCoverage: result.currentCoverage || 68,
           optimizedCoverage: result.optimizedCoverage || 92,
+          // B안: 가구 미세 조정 수
+          furnitureAdjustmentsCount: result.furniture_adjustments?.items?.length || 0,
         };
       default:
         return {};
@@ -245,6 +253,57 @@ export function OptimizationResultPanel({
                 </div>
               )}
 
+              {/* B안: 직원 위치 제안 (레이아웃 최적화 → 직원 연동) */}
+              {summary.staffSuggestionsCount > 0 && (
+                <div className="space-y-1 border-t border-cyan-500/20 pt-2 mt-2">
+                  <button
+                    onClick={() => setShowStaffSuggestions(!showStaffSuggestions)}
+                    className="flex items-center gap-1 text-xs text-cyan-300 hover:text-cyan-200 transition-colors w-full"
+                  >
+                    <UserCircle2 className="h-3 w-3 text-cyan-400" />
+                    <span>👥 직원 위치 제안: {summary.staffSuggestionsCount}건</span>
+                    <Badge variant="outline" className="ml-1 text-[9px] px-1 py-0 border-cyan-500/30 text-cyan-400">
+                      선택 사항
+                    </Badge>
+                    {showStaffSuggestions ? (
+                      <ChevronUp className="h-3 w-3 ml-auto" />
+                    ) : (
+                      <ChevronDown className="h-3 w-3 ml-auto" />
+                    )}
+                  </button>
+
+                  {showStaffSuggestions && result.staff_suggestions?.items?.length > 0 && (
+                    <div className="space-y-1.5 mt-1 max-h-32 overflow-y-auto">
+                      {result.staff_suggestions.items.slice(0, 5).map((suggestion: any, i: number) => (
+                        <div key={i} className="text-[10px] bg-cyan-500/10 border border-cyan-500/20 rounded p-1.5">
+                          <div className="flex items-center gap-1 mb-1">
+                            <span className="text-white font-medium truncate flex-1">
+                              {suggestion.staff_name}
+                            </span>
+                            <span className="text-cyan-300 text-[9px] bg-cyan-500/20 px-1 rounded">
+                              {suggestion.role}
+                            </span>
+                          </div>
+                          {suggestion.reason && (
+                            <div className="text-cyan-200/60 truncate">
+                              💡 {suggestion.reason}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {result.staff_suggestions.items.length > 5 && (
+                        <div className="text-[9px] text-cyan-300/50 text-center">
+                          +{result.staff_suggestions.items.length - 5}건 더보기
+                        </div>
+                      )}
+                      <div className="text-[9px] text-cyan-400/70 mt-1 italic">
+                        {result.staff_suggestions.summary?.note || '가구 배치 변경에 따른 권장 직원 위치'}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* 변경 사항 없음 */}
               {summary.furnitureChangesCount === 0 && summary.productChangesCount === 0 && (
                 <div className="text-xs text-white/40">변경 사항 없음</div>
@@ -330,6 +389,57 @@ export function OptimizationResultPanel({
               <div className="text-xs text-white/50">
                 직원 재배치 제안: {summary.staffMoves}건
               </div>
+
+              {/* B안: 가구 미세 조정 (인력배치 최적화 → 가구 연동) */}
+              {summary.furnitureAdjustmentsCount > 0 && (
+                <div className="space-y-1 border-t border-orange-500/20 pt-2 mt-2">
+                  <button
+                    onClick={() => setShowFurnitureAdjustments(!showFurnitureAdjustments)}
+                    className="flex items-center gap-1 text-xs text-orange-300 hover:text-orange-200 transition-colors w-full"
+                  >
+                    <Move className="h-3 w-3 text-orange-400" />
+                    <span>🪑 가구 미세 조정: {summary.furnitureAdjustmentsCount}건</span>
+                    <Badge variant="outline" className="ml-1 text-[9px] px-1 py-0 border-orange-500/30 text-orange-400">
+                      선택 사항
+                    </Badge>
+                    {showFurnitureAdjustments ? (
+                      <ChevronUp className="h-3 w-3 ml-auto" />
+                    ) : (
+                      <ChevronDown className="h-3 w-3 ml-auto" />
+                    )}
+                  </button>
+
+                  {showFurnitureAdjustments && result.furniture_adjustments?.items?.length > 0 && (
+                    <div className="space-y-1.5 mt-1 max-h-32 overflow-y-auto">
+                      {result.furniture_adjustments.items.slice(0, 5).map((adjustment: any, i: number) => (
+                        <div key={i} className="text-[10px] bg-orange-500/10 border border-orange-500/20 rounded p-1.5">
+                          <div className="flex items-center gap-1 mb-1">
+                            <span className="text-white font-medium truncate flex-1">
+                              {adjustment.furniture_name || adjustment.furniture_type}
+                            </span>
+                            <span className="text-orange-300 text-[9px] bg-orange-500/20 px-1 rounded">
+                              {adjustment.adjustment_distance}cm
+                            </span>
+                          </div>
+                          {adjustment.reason && (
+                            <div className="text-orange-200/60 truncate">
+                              💡 {adjustment.reason}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {result.furniture_adjustments.items.length > 5 && (
+                        <div className="text-[9px] text-orange-300/50 text-center">
+                          +{result.furniture_adjustments.items.length - 5}건 더보기
+                        </div>
+                      )}
+                      <div className="text-[9px] text-orange-400/70 mt-1 italic">
+                        {result.furniture_adjustments.summary?.note || '직원 동선 확보를 위한 미세 조정'}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* 오버레이 토글 */}
               {onToggleOverlay && (
