@@ -34,6 +34,7 @@ import {
 export default function DataControlTowerPage() {
   const [isDark, setIsDark] = useState(false);
   const [showAddConnector, setShowAddConnector] = useState(false);
+  const [holidayCount, setHolidayCount] = useState<number>(0);
   const { data: status, isLoading, isFetching, error, refetch } = useDataControlTowerStatus();
   const { data: contextSources, isLoading: isContextLoading } = useContextDataSources();
   const { data: weatherStatus } = useWeatherDataStatus();
@@ -42,8 +43,8 @@ export default function DataControlTowerPage() {
   const { selectedStore } = useSelectedStore();
   const navigate = useNavigate();
 
-  // 컨텍스트 데이터 상태 구성
-  const contextDataStatus = weatherStatus || eventsStatus
+  // 컨텍스트 데이터 상태 구성 (holidayCount는 API에서 직접 가져온 실제 건수 사용)
+  const contextDataStatus = weatherStatus || holidayCount > 0
     ? {
         weather: weatherStatus
           ? {
@@ -53,10 +54,10 @@ export default function DataControlTowerPage() {
                 : false,
             }
           : undefined,
-        events: eventsStatus
+        events: holidayCount > 0
           ? {
-              record_count: eventsStatus.record_count,
-              upcoming_count: eventsStatus.upcoming_count,
+              record_count: holidayCount,
+              upcoming_count: eventsStatus?.upcoming_count || 0,
             }
           : undefined,
       }
@@ -83,6 +84,7 @@ export default function DataControlTowerPage() {
       const result = await fetchHolidayData();
       if (result.data.length > 0) {
         console.log(`[DataControlTower] 공휴일 데이터 동기화 완료: ${result.data.length}건`);
+        setHolidayCount(result.data.length);
       }
     };
     syncHolidays();
