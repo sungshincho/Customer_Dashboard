@@ -132,7 +132,8 @@ function ConnectionCard({ connection, onEdit }: ConnectionCardProps) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <StatusBadge status={connection.status} />
+            {/* 시스템 컨텍스트는 항상 활성으로 표시 */}
+            <StatusBadge status={isSystemContext ? 'active' : connection.status} />
             {isSystemContext && (
               <Badge variant="outline" className="text-xs">
                 시스템
@@ -200,36 +201,46 @@ function ConnectionCard({ connection, onEdit }: ConnectionCardProps) {
       </CardHeader>
       <CardContent>
         <div className="space-y-2 text-sm">
-          {/* URL */}
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <span className="truncate max-w-[200px]">{connection.url}</span>
-          </div>
-
-          {/* 마지막 동기화 */}
-          {connection.last_sync && (
+          {/* 시스템 컨텍스트는 자동 연결 메시지만 표시 */}
+          {isSystemContext ? (
             <div className="flex items-center gap-2 text-muted-foreground">
-              <Clock className="h-3 w-3" />
-              <span>
-                마지막 동기화:{' '}
-                {formatDistanceToNow(new Date(connection.last_sync), { addSuffix: true, locale: ko })}
-              </span>
+              <CheckCircle2 className="h-3 w-3 text-green-500" />
+              <span>자동 연결됨 (Edge Function 경유)</span>
             </div>
-          )}
+          ) : (
+            <>
+              {/* URL - 비즈니스 연결만 표시 */}
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <span className="truncate max-w-[200px]">{connection.url}</span>
+              </div>
 
-          {/* 총 동기화 레코드 */}
-          {connection.total_records_synced !== undefined && connection.total_records_synced > 0 && (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <RefreshCw className="h-3 w-3" />
-              <span>{connection.total_records_synced.toLocaleString()}개 레코드 동기화됨</span>
-            </div>
-          )}
+              {/* 마지막 동기화 */}
+              {connection.last_sync && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Clock className="h-3 w-3" />
+                  <span>
+                    마지막 동기화:{' '}
+                    {formatDistanceToNow(new Date(connection.last_sync), { addSuffix: true, locale: ko })}
+                  </span>
+                </div>
+              )}
 
-          {/* 오류 메시지 */}
-          {connection.status === 'error' && connection.last_error && (
-            <div className="flex items-start gap-2 text-destructive bg-destructive/10 p-2 rounded">
-              <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-              <span className="text-xs">{connection.last_error}</span>
-            </div>
+              {/* 총 동기화 레코드 */}
+              {connection.total_records_synced !== undefined && connection.total_records_synced > 0 && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <RefreshCw className="h-3 w-3" />
+                  <span>{connection.total_records_synced.toLocaleString()}개 레코드 동기화됨</span>
+                </div>
+              )}
+
+              {/* 오류 메시지 - 비즈니스 연결만 표시 */}
+              {connection.status === 'error' && connection.last_error && (
+                <div className="flex items-start gap-2 text-destructive bg-destructive/10 p-2 rounded">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <span className="text-xs">{connection.last_error}</span>
+                </div>
+              )}
+            </>
           )}
 
           {/* 테스트/동기화 결과 */}
