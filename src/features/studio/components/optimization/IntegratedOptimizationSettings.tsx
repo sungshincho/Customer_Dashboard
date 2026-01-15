@@ -10,7 +10,6 @@ import { Users, Move, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { IntegratedOptimizationSettings } from '../../types/optimization.types';
@@ -29,12 +28,6 @@ interface IntegratedOptimizationSettingsProps {
   className?: string;
 }
 
-const ADJUSTMENT_DISTANCE_OPTIONS = [
-  { value: 30, label: '30cm', description: '최소 조정' },
-  { value: 50, label: '50cm', description: '보통' },
-  { value: 100, label: '100cm', description: '적극적 조정' },
-];
-
 export function IntegratedOptimizationSettings({
   settings = DEFAULT_INTEGRATED_SETTINGS,
   onChange,
@@ -50,10 +43,6 @@ export function IntegratedOptimizationSettings({
 
   const handleFurnitureAdjustmentChange = (checked: boolean) => {
     onChange({ ...settings, allowFurnitureAdjustment: checked });
-  };
-
-  const handleMaxDistanceChange = (value: number[]) => {
-    onChange({ ...settings, maxAdjustmentDistance: value[0] });
   };
 
   const showStaffOption = optimizationType === 'layout' || optimizationType === 'both';
@@ -133,67 +122,32 @@ export function IntegratedOptimizationSettings({
 
           {/* 인력배치 최적화 → 가구 미세 조정 */}
           {showFurnitureOption && (
-            <div className="space-y-2">
-              <div className="flex items-start gap-2">
-                <Checkbox
-                  id="allowFurniture"
-                  checked={settings.allowFurnitureAdjustment}
-                  onCheckedChange={handleFurnitureAdjustmentChange}
-                  disabled={disabled}
-                  className="mt-0.5"
-                />
-                <div className="flex-1">
-                  <Label
-                    htmlFor="allowFurniture"
-                    className="text-sm text-white/80 cursor-pointer flex items-center gap-1"
-                  >
-                    <Move className="h-3.5 w-3.5 text-orange-400" />
-                    가구 미세 조정 허용
-                  </Label>
-                  <p className="text-[10px] text-white/40 mt-0.5">
-                    직원 동선 확보를 위한 가구 위치 미세 조정을 허용합니다
-                  </p>
-                </div>
-                <Badge
-                  variant="outline"
-                  className="text-[9px] px-1 py-0 border-orange-500/30 text-orange-400 shrink-0"
+            <div className="flex items-start gap-2">
+              <Checkbox
+                id="allowFurniture"
+                checked={settings.allowFurnitureAdjustment}
+                onCheckedChange={handleFurnitureAdjustmentChange}
+                disabled={disabled}
+                className="mt-0.5"
+              />
+              <div className="flex-1">
+                <Label
+                  htmlFor="allowFurniture"
+                  className="text-sm text-white/80 cursor-pointer flex items-center gap-1"
                 >
-                  권장
-                </Badge>
+                  <Move className="h-3.5 w-3.5 text-orange-400" />
+                  가구 미세 조정 허용
+                </Label>
+                <p className="text-[10px] text-white/40 mt-0.5">
+                  직원 동선 확보를 위한 가구 위치 미세 조정을 허용합니다
+                </p>
               </div>
-
-              {/* 최대 이동 거리 슬라이더 */}
-              {settings.allowFurnitureAdjustment && (
-                <div className="ml-6 space-y-2 bg-white/5 rounded p-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-white/60">최대 이동 거리</span>
-                    <span className="text-xs font-medium text-orange-400">
-                      {settings.maxAdjustmentDistance}cm
-                    </span>
-                  </div>
-                  <Slider
-                    value={[settings.maxAdjustmentDistance]}
-                    onValueChange={handleMaxDistanceChange}
-                    min={30}
-                    max={100}
-                    step={10}
-                    disabled={disabled}
-                    className="w-full"
-                  />
-                  <div className="flex justify-between text-[9px] text-white/40">
-                    {ADJUSTMENT_DISTANCE_OPTIONS.map((opt) => (
-                      <span
-                        key={opt.value}
-                        className={cn(
-                          settings.maxAdjustmentDistance === opt.value && 'text-orange-400'
-                        )}
-                      >
-                        {opt.label}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <Badge
+                variant="outline"
+                className="text-[9px] px-1 py-0 border-orange-500/30 text-orange-400 shrink-0"
+              >
+                권장
+              </Badge>
             </div>
           )}
 
