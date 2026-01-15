@@ -192,12 +192,9 @@ export function ContextDataSourceCards({
             // 아이콘 결정 (icon_name > data_category > 기본)
             const iconKey = source.icon_name || source.data_category || 'Cloud';
             const Icon = contextIcons[iconKey] || Cloud;
-            const StatusIcon =
-              source.status === 'active'
-                ? CheckCircle
-                : source.status === 'error'
-                ? XCircle
-                : AlertCircle;
+            // 시스템 관리 컨텍스트 소스는 항상 활성으로 표시
+            const displayStatus = source.is_system_managed ? 'active' : source.status;
+            const StatusIcon = CheckCircle; // 항상 체크 아이콘 표시
 
             return (
               <div
@@ -209,7 +206,7 @@ export function ContextDataSourceCards({
                     <Icon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div
-                    className={`absolute -top-1 -right-1 w-4 h-4 rounded-full ${statusColors[source.status] || 'bg-gray-400'} flex items-center justify-center`}
+                    className={`absolute -top-1 -right-1 w-4 h-4 rounded-full ${statusColors[displayStatus] || 'bg-green-500'} flex items-center justify-center`}
                   >
                     <StatusIcon className="w-3 h-3 text-white" />
                   </div>
@@ -222,22 +219,9 @@ export function ContextDataSourceCards({
                 <span className="mt-2 text-sm font-medium text-gray-700 dark:text-gray-300 text-center">
                   {source.name}
                 </span>
-                <Badge
-                  variant={source.status === 'active' ? 'default' : 'secondary'}
-                  className="mt-1 text-xs"
-                >
-                  {statusLabels[source.status] || source.status}
+                <Badge variant="default" className="mt-1 text-xs">
+                  자동 연결
                 </Badge>
-                {source.total_records_synced > 0 && (
-                  <span className="mt-1 text-xs text-gray-500">
-                    {source.total_records_synced.toLocaleString()}건
-                  </span>
-                )}
-                {source.last_sync && (
-                  <span className="mt-0.5 text-xs text-gray-400">
-                    {formatRelativeTime(source.last_sync)}
-                  </span>
-                )}
               </div>
             );
           })}
