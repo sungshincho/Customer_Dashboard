@@ -7272,12 +7272,10 @@ export type Database = {
           created_at: string | null
           id: string
           is_active: boolean | null
-          metadata: Json | null
           org_id: string | null
           recipe_data: Json | null
           scene_name: string
           scene_type: string | null
-          staff_positions: Json | null
           store_id: string | null
           updated_at: string | null
           user_id: string
@@ -7286,12 +7284,10 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_active?: boolean | null
-          metadata?: Json | null
           org_id?: string | null
           recipe_data?: Json | null
           scene_name: string
           scene_type?: string | null
-          staff_positions?: Json | null
           store_id?: string | null
           updated_at?: string | null
           user_id: string
@@ -7300,12 +7296,10 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_active?: boolean | null
-          metadata?: Json | null
           org_id?: string | null
           recipe_data?: Json | null
           scene_name?: string
           scene_type?: string | null
-          staff_positions?: Json | null
           store_id?: string | null
           updated_at?: string | null
           user_id?: string

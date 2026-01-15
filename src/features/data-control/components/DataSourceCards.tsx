@@ -324,8 +324,7 @@ export function ContextDataSourceCards({ sources, isLoading }: ContextDataSource
               source.is_system_managed ||
               source.data_category === 'weather' ||
               source.data_category === 'holidays';
-
-            const status = statusConfig[(source.status as unknown as string) || 'active'] || statusConfig.active;
+            // 항상 활성으로 표시
             const StatusIcon = CheckCircle;
 
             return (

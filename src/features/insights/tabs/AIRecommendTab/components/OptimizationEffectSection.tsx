@@ -474,7 +474,7 @@ export function OptimizationEffectSection({
                     background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.5)',
                     cursor: 'pointer',
                   }}
-                  onClick={() => onStartOptimization?.(rec.type === 'product' ? 'layout' : rec.type)}
+                  onClick={() => onStartOptimization?.(rec.type)}
                 >
                   <div
                     style={{
