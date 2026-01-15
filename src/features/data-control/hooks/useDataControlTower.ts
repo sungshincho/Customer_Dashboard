@@ -766,11 +766,12 @@ async function fetchContextDataSourcesFallback(
   orgId: string,
   storeId?: string
 ): Promise<ContextDataSource[]> {
+  // connection_category = 'context' 또는 data_category IN ('weather', 'holidays')
   let query = supabase
     .from('api_connections')
     .select('*')
     .eq('org_id', orgId)
-    .eq('connection_category', 'context')
+    .or('connection_category.eq.context,data_category.in.(weather,holidays)')
     .order('display_order', { ascending: true });
 
   if (storeId) {
@@ -791,9 +792,9 @@ async function fetchContextDataSourcesFallback(
     provider: conn.provider,
     data_category: conn.data_category,
     connection_category: conn.connection_category || 'context',
-    is_system_managed: conn.is_system_managed || false,
+    is_system_managed: conn.is_system_managed || true, // 컨텍스트는 기본 시스템 관리
     is_active: conn.is_active || false,
-    status: conn.status || 'inactive',
+    status: 'active', // 컨텍스트 소스는 항상 활성으로 표시
     icon_name: conn.icon_name,
     description: conn.description,
     last_sync: conn.last_sync,
