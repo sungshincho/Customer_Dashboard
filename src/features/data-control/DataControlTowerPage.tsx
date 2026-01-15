@@ -21,6 +21,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useDataControlTowerStatus, useContextDataSources, useWeatherDataStatus, useEventsDataStatus } from './hooks/useDataControlTower';
 import { useAuth } from '@/hooks/useAuth';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
+import { fetchHolidayData } from '@/features/studio/services/environmentDataService';
 import {
   DataSourceCards,
   ContextDataSourceCards,
@@ -74,6 +75,18 @@ export default function DataControlTowerPage() {
       attributeFilter: ['class'],
     });
     return () => observer.disconnect();
+  }, []);
+
+  // 컨텍스트 데이터(공휴일) 자동 동기화 - 페이지 로드 시 1회
+  useEffect(() => {
+    const syncHolidays = async () => {
+      console.log('[DataControlTower] 공휴일 데이터 자동 동기화 시작...');
+      const result = await fetchHolidayData();
+      if (result.data.length > 0) {
+        console.log(`[DataControlTower] 공휴일 데이터 동기화 완료: ${result.data.length}건`);
+      }
+    };
+    syncHolidays();
   }, []);
 
   const getHealthStatus = () => {
