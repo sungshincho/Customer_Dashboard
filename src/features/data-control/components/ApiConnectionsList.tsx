@@ -249,7 +249,8 @@ function ConnectionCard({ connection, onEdit, isDark }: ConnectionCardProps) {
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <StatusBadge status={connection.status} isDark={isDark} />
+            {/* 시스템 컨텍스트는 항상 '활성' 배지 표시 */}
+            <StatusBadge status={isSystemContext ? 'active' : connection.status} isDark={isDark} />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -540,59 +541,63 @@ export function ApiConnectionsList({ orgId, storeId, onEdit, onAdd }: ApiConnect
   }
 
   return (
-    <GlassCard dark={isDark}>
-      <div style={{ padding: '20px' }}>
-        {/* 헤더 */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Icon3D size={40} dark={isDark}>
-              <Link2 className="w-5 h-5" style={{ color: iconColor }} />
-            </Icon3D>
-            <div>
-              <span style={text3D.label}>API Connections</span>
-              <h3 style={{ margin: '4px 0 0 0', ...text3D.title }}>API 연결 ({connections.length})</h3>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={() => {
-                console.log('API 연결 새로고침 버튼 클릭됨');
-                refetch();
-              }}
-              disabled={isFetching}
-              title="새로고침"
-              style={{
-                background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-                border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)',
-              }}
-            >
-              <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} style={{ color: isDark ? 'rgba(255,255,255,0.7)' : '#6b7280' }} />
-            </Button>
-            {onAdd && (
-              <Button onClick={onAdd}>
-                <Plug className="h-4 w-4 mr-2" />
-                새 연결 추가
-              </Button>
-            )}
+    <div>
+      {/* 헤더 */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: '16px',
+        padding: '0 4px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <Icon3D size={40} dark={isDark}>
+            <Link2 className="w-5 h-5" style={{ color: iconColor }} />
+          </Icon3D>
+          <div>
+            <span style={text3D.label}>API Connections</span>
+            <h3 style={{ margin: '4px 0 0 0', ...text3D.title }}>API 연결 ({connections.length})</h3>
           </div>
         </div>
-
-        {/* 연결 카드 그리드 */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {connections.map((connection) => (
-            <ConnectionCard
-              key={connection.id}
-              connection={connection}
-              onEdit={onEdit}
-              isDark={isDark}
-            />
-          ))}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => {
+              console.log('API 연결 새로고침 버튼 클릭됨');
+              refetch();
+            }}
+            disabled={isFetching}
+            title="새로고침"
+            style={{
+              background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+              border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)',
+            }}
+          >
+            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} style={{ color: isDark ? 'rgba(255,255,255,0.7)' : '#6b7280' }} />
+          </Button>
+          {onAdd && (
+            <Button onClick={onAdd}>
+              <Plug className="h-4 w-4 mr-2" />
+              새 연결 추가
+            </Button>
+          )}
         </div>
       </div>
-    </GlassCard>
+
+      {/* 연결 카드 그리드 */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {connections.map((connection) => (
+          <ConnectionCard
+            key={connection.id}
+            connection={connection}
+            onEdit={onEdit}
+            isDark={isDark}
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 

@@ -767,18 +767,17 @@ async function fetchContextDataSourcesFallback(
   storeId?: string
 ): Promise<ContextDataSource[]> {
   // connection_category = 'context' 또는 data_category IN ('weather', 'holidays')
-  let query = supabase
+  // store_id 조건도 함께 적용
+  const storeCondition = storeId
+    ? `and(or(store_id.eq.${storeId},store_id.is.null))`
+    : '';
+
+  const { data, error } = await supabase
     .from('api_connections')
     .select('*')
     .eq('org_id', orgId)
     .or('connection_category.eq.context,data_category.in.(weather,holidays)')
     .order('display_order', { ascending: true });
-
-  if (storeId) {
-    query = query.or(`store_id.eq.${storeId},store_id.is.null`);
-  }
-
-  const { data, error } = await query;
 
   if (error) {
     console.error('Failed to fetch context data sources:', error);

@@ -210,11 +210,11 @@ export function DataQualityScoreCard({ score, contextData }: DataQualityScorePro
   const scoreColor = getScoreColor(score.overall_score);
   const scoreTextColor = scoreColor === 'success' ? '#22c55e' : scoreColor === 'warning' ? '#eab308' : '#ef4444';
 
-  // 컨텍스트 데이터 점수 계산
+  // 컨텍스트 데이터 점수 계산 (날씨 최신 데이터 OR 이벤트/공휴일 데이터 존재)
   const contextScore = contextData
     ? Math.round(
-        ((contextData.weather?.has_recent ? 50 : 0) +
-          (contextData.events?.upcoming_count ? 50 : 0))
+        ((contextData.weather?.has_recent ? 50 : (contextData.weather?.record_count ? 25 : 0)) +
+          ((contextData.events?.record_count && contextData.events.record_count > 0) ? 50 : 0))
       )
     : 0;
 
