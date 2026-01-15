@@ -1812,7 +1812,16 @@ Deno.serve(async (req) => {
       });
     }
 
-    const body: InferenceRequest = await req.json();
+    let body: InferenceRequest;
+    try {
+      body = await req.json();
+    } catch (parseError) {
+      console.error('Request JSON parse error:', parseError);
+      return new Response(JSON.stringify({ error: 'Invalid JSON in request body' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     const inferenceType = body.inference_type || body.type;
     console.log('Advanced AI inference request:', inferenceType);
 
@@ -2000,9 +2009,9 @@ Return a JSON object with causal_relationships, causal_chains, and insights.`;
   }
 
   const result = await response.json();
-  const cleanedContent = cleanJsonResponse(result.choices[0].message.content);
-  const analysis = JSON.parse(cleanedContent);
-  
+  const aiContent = result.choices?.[0]?.message?.content || '';
+  const analysis = safeParseAIResponse(aiContent, { relationships: [], chains: [], summary: {} });
+
   return {
     type: 'causal_inference',
     timestamp: new Date().toISOString(),
@@ -2053,9 +2062,9 @@ Return a JSON object with anomalies, patterns, and summary.`;
   }
 
   const result = await response.json();
-  const cleanedContent = cleanJsonResponse(result.choices[0].message.content);
-  const analysis = JSON.parse(cleanedContent);
-  
+  const aiContent = result.choices?.[0]?.message?.content || '';
+  const analysis = safeParseAIResponse(aiContent, { anomalies: [], patterns: [], summary: {} });
+
   return {
     type: 'anomaly_detection',
     timestamp: new Date().toISOString(),
@@ -2115,9 +2124,9 @@ Return a JSON object with predictions, feature_importance, drivers, risks, and m
   }
 
   const result = await response.json();
-  const cleanedContent = cleanJsonResponse(result.choices[0].message.content);
-  const analysis = JSON.parse(cleanedContent);
-  
+  const aiContent = result.choices?.[0]?.message?.content || '';
+  const analysis = safeParseAIResponse(aiContent, { predictions: [], trends: [], summary: {} });
+
   return {
     type: 'predictive_modeling',
     timestamp: new Date().toISOString(),
@@ -2393,10 +2402,9 @@ Base ALL recommendations on the provided real data.`
       console.log('AI response length:', aiContent.length);
       
       if (aiContent.trim()) {
-        const cleaned = cleanJsonResponse(aiContent);
-        
-        if (cleaned.startsWith('{')) {
-          aiResponse = JSON.parse(cleaned);
+        const parsed = safeParseAIResponse(aiContent, {});
+        if (parsed && Object.keys(parsed).length > 0) {
+          aiResponse = parsed;
           console.log('Parsed layoutChanges count:', aiResponse.layoutChanges?.length || 0);
           console.log('Parsed productPlacements count:', aiResponse.productPlacements?.length || 0);
         }
@@ -3025,9 +3033,9 @@ Return a JSON object with recommendations array.`;
   }
 
   const result = await response.json();
-  const cleanedContent = cleanJsonResponse(result.choices[0].message.content);
-  const analysis = JSON.parse(cleanedContent);
-  
+  const aiContent = result.choices?.[0]?.message?.content || '';
+  const analysis = safeParseAIResponse(aiContent, { patterns: [], insights: [], summary: {} });
+
   return analysis;
 }
 
@@ -3367,9 +3375,9 @@ Return a JSON object with patterns, segments, trends, insights, and summary.`;
   }
 
   const result = await response.json();
-  const cleanedContent = cleanJsonResponse(result.choices[0].message.content);
-  const analysis = JSON.parse(cleanedContent);
-  
+  const aiContent = result.choices?.[0]?.message?.content || '';
+  const analysis = safeParseAIResponse(aiContent, { patterns: [], clusters: [], summary: {} });
+
   return {
     type: 'pattern_discovery',
     timestamp: new Date().toISOString(),
