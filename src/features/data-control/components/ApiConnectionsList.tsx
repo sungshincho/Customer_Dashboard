@@ -323,7 +323,7 @@ function ConnectionCard({ connection, onEdit, isDark }: ConnectionCardProps) {
           </div>
 
           {/* 마지막 동기화 */}
-          {connection.last_sync && (
+          {connection.last_sync ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', ...text3D.small }}>
               <Clock className="h-3 w-3" />
               <span>
@@ -331,18 +331,7 @@ function ConnectionCard({ connection, onEdit, isDark }: ConnectionCardProps) {
                 {formatDistanceToNow(new Date(connection.last_sync), { addSuffix: true, locale: ko })}
               </span>
             </div>
-          ) : (
-            <>
-              {/* 마지막 동기화 */}
-              {connection.last_sync && (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Clock className="h-3 w-3" />
-                  <span>
-                    마지막 동기화:{' '}
-                    {formatDistanceToNow(new Date(connection.last_sync), { addSuffix: true, locale: ko })}
-                  </span>
-                </div>
-              )}
+          ) : null}
 
           {/* 총 동기화 레코드 */}
           {connection.total_records_synced !== undefined && connection.total_records_synced > 0 && (
