@@ -706,7 +706,7 @@ export function InsightDataProvider({ children, initialTab = 'overview' }: Insig
       };
 
       const inventoryLevels = (levelsData || []).map((level: any) => {
-        const product = productsMap[level.product_id] || {};
+        const product = (productsMap[level.product_id] || {}) as { product_name?: string; sku?: string; category?: string | null };
         const daysUntilStockout = calculateDaysUntilStockout(
           level.current_stock,
           level.weekly_demand
