@@ -85,36 +85,45 @@ export function DataQualityScoreCard({ score }: DataQualityScoreProps) {
           <h4 className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
             데이터 소스 커버리지
           </h4>
-          {Object.entries(score.coverage)
-            .filter(([key]) => key !== 'raw_imports' && key !== 'zone')
-            .map(([key, data]: [string, any]) => {
-              // Handle missing completeness - derive from available status
-              const completeness = data.completeness ?? (data.available ? 1 : 0);
-              return (
-                <div key={key} className="flex items-center gap-3">
-                  <div className="w-24 text-sm text-gray-600 dark:text-gray-400">
-                    {data.label}
-                  </div>
-                  <div className="flex-1">
-                    <Progress
-                      value={completeness * 100}
-                      className="h-2"
-                    />
-                  </div>
-                  <div className="w-16 text-right">
-                    {data.available ? (
-                      <Badge variant="default" className="text-xs bg-green-600">
-                        {(data.record_count || 0).toLocaleString()}
-                      </Badge>
-                    ) : (
-                      <Badge variant="secondary" className="text-xs">
-                        없음
-                      </Badge>
-                    )}
-                  </div>
+          {/* 명시적으로 5개 데이터 소스를 고정 순서로 표시 */}
+          {[
+            { key: 'pos', fallbackLabel: 'POS/매출 데이터' },
+            { key: 'sensor', fallbackLabel: 'NEURALSENSE 센서' },
+            { key: 'crm', fallbackLabel: 'CRM/고객 데이터' },
+            { key: 'product', fallbackLabel: '상품 마스터' },
+            { key: 'erp', fallbackLabel: 'ERP/재고 데이터' },
+          ].map(({ key, fallbackLabel }) => {
+            const data = (score.coverage as Record<string, any>)[key] || {
+              available: false,
+              record_count: 0,
+              label: fallbackLabel,
+            };
+            const completeness = data.completeness ?? (data.available ? 1 : 0);
+            return (
+              <div key={key} className="flex items-center gap-3">
+                <div className="w-24 text-sm text-gray-600 dark:text-gray-400">
+                  {data.label || fallbackLabel}
                 </div>
-              );
-            })}
+                <div className="flex-1">
+                  <Progress
+                    value={completeness * 100}
+                    className="h-2"
+                  />
+                </div>
+                <div className="w-16 text-right">
+                  {data.available ? (
+                    <Badge variant="default" className="text-xs bg-green-600">
+                      {(data.record_count || 0).toLocaleString()}
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary" className="text-xs">
+                      없음
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         {/* Warnings */}
