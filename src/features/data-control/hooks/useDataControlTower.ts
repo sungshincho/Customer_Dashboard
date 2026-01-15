@@ -959,14 +959,19 @@ export function useEventsDataStatus() {
       if (!orgId) return null;
 
       const today = new Date().toISOString().split('T')[0];
+      const currentYear = new Date().getFullYear();
+      const yearStart = `${currentYear}-01-01`;
+      const yearEnd = `${currentYear}-12-31`;
       const thirtyDaysLater = new Date();
       thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
 
-      // 전체 이벤트 수
+      // 현재 연도 이벤트 수 (2026년 공휴일만 카운트)
       let countQuery = supabase
         .from('holidays_events')
         .select('*', { count: 'exact', head: true })
-        .eq('org_id', orgId);
+        .eq('org_id', orgId)
+        .gte('date', yearStart)
+        .lte('date', yearEnd);
 
       if (storeId) {
         countQuery = countQuery.or(`store_id.eq.${storeId},store_id.is.null`);

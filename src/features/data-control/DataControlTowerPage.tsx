@@ -23,8 +23,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { fetchHolidayData } from '@/features/studio/services/environmentDataService';
 import {
-  DataSourceCards,
-  ContextDataSourceCards,
+  UnifiedDataSourceCards,
   PipelineTimeline,
   RecentImportsList,
   DataQualityScoreCard,
@@ -249,13 +248,12 @@ export default function DataControlTowerPage() {
             {/* Row 1: Data Quality Score + Data Sources */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <DataQualityScoreCard score={status.quality_score} contextData={contextDataStatus} />
-              <div className="lg:col-span-2 space-y-4">
-                {/* 비즈니스 데이터 소스 */}
-                <DataSourceCards dataSources={status.data_sources} />
-                {/* 컨텍스트 데이터 소스 (날씨, 공휴일 등) */}
-                <ContextDataSourceCards
-                  sources={contextSources || []}
-                  isLoading={isContextLoading}
+              <div className="lg:col-span-2">
+                {/* 통합 데이터 소스 (비즈니스 + 컨텍스트) */}
+                <UnifiedDataSourceCards
+                  businessSources={status.data_sources}
+                  contextSources={contextSources || []}
+                  isContextLoading={isContextLoading}
                 />
               </div>
             </div>

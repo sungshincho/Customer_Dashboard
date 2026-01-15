@@ -369,7 +369,7 @@ export function ContextDataSourceCards({ sources, isLoading }: ContextDataSource
 }
 
 // ============================================================================
-// 통합 데이터 소스 카드 (비즈니스 + 컨텍스트)
+// 통합 데이터 소스 카드 (비즈니스 + 컨텍스트를 하나의 박스에)
 // ============================================================================
 
 interface UnifiedDataSourceCardsProps {
@@ -383,11 +383,155 @@ export function UnifiedDataSourceCards({
   contextSources,
   isContextLoading,
 }: UnifiedDataSourceCardsProps) {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsDark(document.documentElement.classList.contains('dark'));
+    check();
+    const obs = new MutationObserver(check);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => obs.disconnect();
+  }, []);
+
+  const text3D = getText3D(isDark);
+  const iconColor = isDark ? 'rgba(255,255,255,0.7)' : '#374151';
+  const sources = Object.entries(businessSources);
+
   return (
-    <div className="space-y-4">
-      <DataSourceCards dataSources={businessSources} />
-      <ContextDataSourceCards sources={contextSources} isLoading={isContextLoading} />
-    </div>
+    <GlassCard dark={isDark}>
+      <div style={{ padding: '20px' }}>
+        {/* 비즈니스 데이터 소스 섹션 */}
+        <div style={{ marginBottom: '24px' }}>
+          <div style={{ marginBottom: '16px' }}>
+            <span style={text3D.label}>Business Data Sources</span>
+            <h3 style={{ margin: '4px 0 0 0', ...text3D.title }}>비즈니스 데이터 소스</h3>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {sources.map(([key, source]) => {
+              const Icon = sourceIcons[key] || Cloud;
+              const status = statusConfig[source.status] || statusConfig.inactive;
+              const StatusIcon = source.status === 'active' ? CheckCircle : source.status === 'error' ? XCircle : AlertCircle;
+
+              return (
+                <div
+                  key={key}
+                  style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '16px',
+                    borderRadius: '16px',
+                    background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+                    border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.04)',
+                  }}
+                >
+                  <div style={{ position: 'relative' }}>
+                    <Icon3D size={48} dark={isDark}>
+                      <Icon className="w-5 h-5" style={{ color: iconColor }} />
+                    </Icon3D>
+                    <div style={{
+                      position: 'absolute', top: '-4px', right: '-4px',
+                      width: '18px', height: '18px', borderRadius: '50%',
+                      background: status.variant === 'success' ? '#22c55e' : status.variant === 'error' ? '#ef4444' : status.variant === 'warning' ? '#eab308' : (isDark ? 'rgba(255,255,255,0.3)' : '#9ca3af'),
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      border: isDark ? '2px solid rgba(48,48,58,0.98)' : '2px solid rgba(255,255,255,0.95)',
+                    }}>
+                      <StatusIcon className="w-2.5 h-2.5 text-white" />
+                    </div>
+                  </div>
+                  <span style={{ marginTop: '10px', textAlign: 'center', ...text3D.title }}>{source.name}</span>
+                  <Badge3D dark={isDark} variant={status.variant}>{status.label}</Badge3D>
+                  {source.last_sync && (
+                    <span style={{ marginTop: '6px', ...text3D.small }}>{formatRelativeTime(source.last_sync)}</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 구분선 */}
+        <div style={{
+          height: '1px',
+          background: isDark
+            ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.15) 20%, rgba(255,255,255,0.15) 80%, transparent 100%)'
+            : 'linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.08) 20%, rgba(0,0,0,0.08) 80%, transparent 100%)',
+          marginBottom: '24px',
+        }} />
+
+        {/* 컨텍스트 데이터 소스 섹션 */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <div>
+              <span style={text3D.label}>Context Data Sources</span>
+              <h3 style={{ margin: '4px 0 0 0', ...text3D.title }}>컨텍스트 데이터 소스</h3>
+            </div>
+            <span style={text3D.small}>날씨, 공휴일, 이벤트 등</span>
+          </div>
+
+          {isContextLoading ? (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[1, 2].map((i) => (
+                <Skeleton key={i} className="h-32 rounded-2xl" style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }} />
+              ))}
+            </div>
+          ) : !contextSources || contextSources.length === 0 ? (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '12px', padding: '16px',
+              borderRadius: '12px',
+              background: isDark ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)',
+              border: isDark ? '1px solid rgba(59,130,246,0.2)' : '1px solid rgba(59,130,246,0.1)',
+            }}>
+              <CloudSun className="w-5 h-5" style={{ color: '#3b82f6' }} />
+              <span style={text3D.body}>시스템이 자동으로 컨텍스트 연결을 생성합니다.</span>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {contextSources.map((source) => {
+                const iconKey = source.icon_name || source.data_category || 'Cloud';
+                const Icon = contextIcons[iconKey] || Cloud;
+                const isSystemManaged =
+                  source.is_system_managed ||
+                  source.data_category === 'weather' ||
+                  source.data_category === 'holidays';
+                const StatusIcon = CheckCircle;
+
+                return (
+                  <div
+                    key={source.id}
+                    style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '16px',
+                      borderRadius: '16px',
+                      background: isDark ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)',
+                      border: isDark ? '1px solid rgba(59,130,246,0.2)' : '1px solid rgba(59,130,246,0.1)',
+                    }}
+                  >
+                    <div className="relative">
+                      <Icon3D size={48} dark={isDark}>
+                        <Icon className="w-5 h-5" style={{ color: '#3b82f6' }} />
+                      </Icon3D>
+                      <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
+                        <StatusIcon className="w-3 h-3 text-white" />
+                      </div>
+                      {isSystemManaged && (
+                        <div className="absolute -bottom-1 -left-1 w-4 h-4 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
+                          <Lock className="w-2.5 h-2.5 text-gray-500 dark:text-gray-400" />
+                        </div>
+                      )}
+                    </div>
+                    <span style={{ marginTop: '10px', textAlign: 'center', ...text3D.title }}>{source.name}</span>
+                    <Badge3D dark={isDark} variant="success">자동 연결</Badge3D>
+                    {source.total_records_synced > 0 && (
+                      <span style={{ marginTop: '6px', ...text3D.body }}>{source.total_records_synced.toLocaleString()}건</span>
+                    )}
+                    {source.last_sync && (
+                      <span style={{ marginTop: '2px', ...text3D.small }}>{formatRelativeTime(source.last_sync)}</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </GlassCard>
   );
 }
 
