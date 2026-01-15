@@ -555,17 +555,34 @@ export interface EnvironmentDataBundle {
 
 /**
  * 모든 환경 데이터 통합 조회
+ * 📌 DB 저장 옵션 추가 - 데이터 컨트롤타워 연동용
  */
-export async function fetchAllEnvironmentData(storeId: string): Promise<EnvironmentDataBundle> {
+export async function fetchAllEnvironmentData(
+  storeId: string,
+  options?: {
+    save_to_db?: boolean;
+    org_id?: string;
+    user_id?: string;
+  }
+): Promise<EnvironmentDataBundle> {
   const errors: EnvironmentDataError[] = [];
+  const shouldSaveToDb = options?.save_to_db ?? true; // 기본값: true로 변경
 
-  // 매장 위치 조회
+  // 매장 위치 및 org_id 조회
   const location = await getStoreLocation(storeId);
+  const storeInfo = await getStoreInfo(storeId);
+  const orgId = options?.org_id || storeInfo?.org_id;
+  const userId = options?.user_id || storeInfo?.user_id;
 
-  // 병렬 데이터 조회
+  // 병렬 데이터 조회 (날씨는 DB 저장 옵션 전달)
   const [weatherResult, holidaysResult, activeEventsResult, upcomingEventsResult] =
     await Promise.all([
-      fetchWeatherData(location?.lat, location?.lon),
+      fetchWeatherData(location?.lat, location?.lon, {
+        store_id: storeId,
+        org_id: orgId,
+        user_id: userId,
+        save_to_db: shouldSaveToDb,
+      }),
       fetchHolidayData(),
       fetchStoreEvents(storeId, { status: 'active' }),
       fetchStoreEvents(storeId, { status: 'scheduled' }),
@@ -576,6 +593,11 @@ export async function fetchAllEnvironmentData(storeId: string): Promise<Environm
   if (holidaysResult.error) errors.push(holidaysResult.error);
   if (activeEventsResult.error) errors.push(activeEventsResult.error);
   if (upcomingEventsResult.error) errors.push(upcomingEventsResult.error);
+
+  // 공휴일 데이터 DB 저장 (holidays_events 테이블)
+  if (shouldSaveToDb && holidaysResult.data.length > 0 && orgId) {
+    await saveHolidaysToDb(holidaysResult.data, storeId, orgId);
+  }
 
   // 오늘 공휴일 확인
   const today = new Date().toISOString().split('T')[0];
@@ -598,6 +620,66 @@ export async function fetchAllEnvironmentData(storeId: string): Promise<Environm
     errors,
     fetchedAt: new Date().toISOString(),
   };
+}
+
+/**
+ * 매장 정보 조회 (org_id, user_id 포함)
+ */
+async function getStoreInfo(storeId: string): Promise<{ org_id?: string; user_id?: string } | null> {
+  try {
+    const { data, error } = await supabase
+      .from('stores')
+      .select('org_id, user_id')
+      .eq('id', storeId)
+      .single();
+
+    if (error || !data) return null;
+    return { org_id: data.org_id, user_id: data.user_id };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 공휴일 데이터 DB 저장 (holidays_events 테이블)
+ */
+async function saveHolidaysToDb(
+  holidays: HolidayData[],
+  storeId: string,
+  orgId: string
+): Promise<void> {
+  try {
+    // 중복 방지를 위해 upsert 사용
+    const records = holidays.map((h) => ({
+      store_id: storeId,
+      org_id: orgId,
+      date: h.date,
+      event_name: h.name,
+      event_type: h.isHoliday ? 'public_holiday' : 'observance',
+      impact_level: h.isShoppingHoliday ? 'high' : h.isHoliday ? 'medium' : 'low',
+      is_recurring: true,
+      metadata: {
+        source: h.source,
+        countryCode: h.countryCode,
+        expectedTrafficMultiplier: h.expectedTrafficMultiplier,
+      },
+    }));
+
+    const { error } = await supabase
+      .from('holidays_events')
+      .upsert(records, {
+        onConflict: 'store_id,date,event_name',
+        ignoreDuplicates: true,
+      });
+
+    if (error) {
+      console.warn('[EnvironmentData] 공휴일 DB 저장 실패:', error.message);
+    } else {
+      console.log('[EnvironmentData] 공휴일 데이터 DB 저장:', records.length, '건');
+    }
+  } catch (err) {
+    console.warn('[EnvironmentData] 공휴일 DB 저장 중 오류:', err);
+  }
 }
 
 // ============================================================================
