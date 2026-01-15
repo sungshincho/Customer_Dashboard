@@ -287,7 +287,7 @@ export function LayoutOptimizationOverlay({
   return (
     <group name="layout-optimization-overlay">
       {/* 변경 전 히트맵 (비교 모드에서만 표시) */}
-      {showBefore && visualization.beforeHeatmap.length > 0 && (
+      {showBefore && visualization?.beforeHeatmap && visualization.beforeHeatmap.length > 0 && (
         <HeatmapMesh
           points={visualization.beforeHeatmap}
           color="#ef4444"
@@ -304,7 +304,7 @@ export function LayoutOptimizationOverlay({
        */}
 
       {/* 가구 이동 경로 */}
-      {showMoves && furnitureMoves.map((move, idx) => (
+      {showMoves && furnitureMoves?.map((move, idx) => (
         <FurnitureMoveIndicator
           key={move.furnitureId}
           move={move}
@@ -335,7 +335,7 @@ export function LayoutOptimizationOverlay({
       ))}
 
       {/* 존 하이라이트 */}
-      {showZoneHighlights && visualization.highlightZones
+      {showZoneHighlights && visualization?.highlightZones && visualization.highlightZones
         .filter((zone) => zone.zoneId) // zoneId가 있는 것만 렌더링
         .map((zone) => (
         <ZoneHighlight
@@ -347,7 +347,7 @@ export function LayoutOptimizationOverlay({
       ))}
 
       {/* 선택된 이동 정보 패널 */}
-      {selectedMove && (
+      {selectedMove && furnitureMoves?.find(m => m.furnitureId === selectedMove) && (
         <MovementInfoPanel
           move={furnitureMoves.find(m => m.furnitureId === selectedMove)!}
           storeBounds={storeBounds}
