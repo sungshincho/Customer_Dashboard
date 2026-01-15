@@ -628,9 +628,13 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
         // 🔧 마이그레이션: generate-optimization 응답 구조 처리
         if (layoutRes.status === 'fulfilled' && layoutRes.value.data) {
           const layoutData = layoutRes.value.data;
-          // generate-optimization 응답: furniture_changes, product_changes 또는 result
-          const furnitureChanges = layoutData.furniture_changes || layoutData.result?.layoutChanges || [];
-          const productPlacements = layoutData.product_changes || layoutData.result?.productPlacements || [];
+          // 🔧 FIX: generate-optimization 응답 구조: { success, result: { furniture_changes, ... } }
+          const furnitureChanges = layoutData.furniture_changes ||
+                                   layoutData.result?.furniture_changes ||
+                                   layoutData.result?.layoutChanges || [];
+          const productPlacements = layoutData.product_changes ||
+                                    layoutData.result?.product_changes ||
+                                    layoutData.result?.productPlacements || [];
 
           // furnitureMoves 형식으로 변환 (generateLayoutOptimizedScene 호환)
           // 🔧 FIX: Edge Function 실제 필드명에 맞게 매핑 수정
@@ -644,7 +648,15 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
           }));
 
           // 🔧 FIX: summary 필드 올바른 매핑 (소수점 → 퍼센트 변환)
+          // Edge Function 응답: { result: { summary: {...} } }
           const summaryData = layoutData.summary || layoutData.result?.summary || {};
+          console.log('[useSceneSimulation] 📦 Raw layoutData structure:', {
+            hasFurnitureChanges: !!layoutData.furniture_changes,
+            hasResultFurnitureChanges: !!layoutData.result?.furniture_changes,
+            furnitureCount: furnitureChanges.length,
+            productCount: productPlacements.length,
+            summaryKeys: Object.keys(summaryData),
+          });
           const revenueImprovement = summaryData.expected_revenue_improvement || 0;
           const trafficImprovement = summaryData.expected_traffic_improvement || 0;
           const conversionImprovement = summaryData.expected_conversion_improvement || 0;
