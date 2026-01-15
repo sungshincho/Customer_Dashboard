@@ -13,6 +13,7 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
+  Boxes,
 } from 'lucide-react';
 import type { DataSourceStatus } from '../types';
 
@@ -25,6 +26,7 @@ const sourceIcons: Record<string, any> = {
   sensor: Wifi,
   crm: Users,
   product: Package,
+  erp: Boxes,
   external: Cloud,
 };
 
