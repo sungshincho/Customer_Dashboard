@@ -338,12 +338,23 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
       let data: any;
       let error: any;
 
-      if (request.type === 'layout' || request.type === 'staffing') {
-        // generate-optimization 사용
+      if (request.type === 'layout') {
+        // layout → generate-optimization 'both' 타입
         const response = await supabase.functions.invoke('generate-optimization', {
           body: {
             store_id: selectedStore.id,
-            optimization_type: request.type,
+            optimization_type: 'both', // furniture + product
+            parameters: request.params,
+          },
+        });
+        data = response.data;
+        error = response.error;
+      } else if (request.type === 'staffing') {
+        // staffing → generate-optimization 'staffing' 타입
+        const response = await supabase.functions.invoke('generate-optimization', {
+          body: {
+            store_id: selectedStore.id,
+            optimization_type: 'staffing',
             parameters: request.params,
           },
         });
@@ -544,18 +555,19 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
         console.log('[useSceneSimulation] 🚀 Starting Edge Function calls NOW...');
 
         // 🔧 마이그레이션: advanced-ai-inference → generate-optimization
-        // - layout_optimization: generate-optimization (layout)
+        // - layout_optimization: generate-optimization (both = furniture + product)
         // - staffing_optimization: generate-optimization (staffing)
         // - flow_simulation: advanced-ai-inference 유지 (generate-optimization 미지원)
         const [layoutRes, flowRes, staffingRes, ultimateRes] = await Promise.allSettled([
-          // 레이아웃 최적화 - generate-optimization 사용
+          // 레이아웃 최적화 - generate-optimization 'both' 타입 사용
           supabase.functions.invoke('generate-optimization', {
             body: {
               store_id: selectedStore.id,
-              optimization_type: 'layout',
+              optimization_type: 'both', // furniture + product 통합
               parameters: {
                 prioritize_revenue: params?.layout?.goal === 'revenue',
                 max_furniture_changes: params?.layout?.settings?.furniture?.maxMoves || 12,
+                max_product_changes: params?.layout?.settings?.products?.maxRelocations || 30,
                 intensity: params?.layout?.settings?.intensity || 'medium',
                 goal: params?.layout?.settings?.objective || params?.layout?.goal || 'balanced',
               },
