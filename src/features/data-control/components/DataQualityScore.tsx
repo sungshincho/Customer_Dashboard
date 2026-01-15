@@ -11,11 +11,19 @@ import {
   XCircle,
   TrendingUp,
   Info,
+  CloudSun,
+  Calendar,
 } from 'lucide-react';
-import type { DataQualityScore as DataQualityScoreType } from '../types';
+import type { DataQualityScore as DataQualityScoreType, ContextDataSource } from '../types';
+
+interface ContextDataStatus {
+  weather?: { record_count: number; has_recent: boolean };
+  events?: { record_count: number; upcoming_count: number };
+}
 
 interface DataQualityScoreProps {
   score: DataQualityScoreType;
+  contextData?: ContextDataStatus;
 }
 
 const confidenceConfig: Record<string, { label: string; color: string; icon: any }> = {
@@ -36,7 +44,7 @@ const confidenceConfig: Record<string, { label: string; color: string; icon: any
   },
 };
 
-export function DataQualityScoreCard({ score }: DataQualityScoreProps) {
+export function DataQualityScoreCard({ score, contextData }: DataQualityScoreProps) {
   const confidence = confidenceConfig[score.confidence_level];
   const ConfidenceIcon = confidence.icon;
 
@@ -51,6 +59,14 @@ export function DataQualityScoreCard({ score }: DataQualityScoreProps) {
     if (value >= 50) return 'bg-yellow-500';
     return 'bg-red-500';
   };
+
+  // 컨텍스트 데이터 점수 계산 (보조 지표)
+  const contextScore = contextData
+    ? Math.round(
+        ((contextData.weather?.has_recent ? 50 : 0) +
+          (contextData.events?.upcoming_count ? 50 : 0))
+      )
+    : 0;
 
   return (
     <Card className="overflow-hidden">
@@ -168,6 +184,57 @@ export function DataQualityScoreCard({ score }: DataQualityScoreProps) {
               <span className="text-sm font-medium">
                 모든 데이터 소스가 정상입니다
               </span>
+            </div>
+          </div>
+        )}
+
+        {/* Context Data Section (Optional) */}
+        {contextData && (
+          <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-700">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                컨텍스트 데이터
+              </h4>
+              {contextScore > 0 && (
+                <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-200">
+                  보조 점수: {contextScore}%
+                </Badge>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {/* 날씨 데이터 */}
+              <div className="flex items-center gap-2 p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20">
+                <CloudSun className="w-4 h-4 text-blue-500" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    날씨
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {contextData.weather?.record_count || 0}건
+                    {contextData.weather?.has_recent && (
+                      <span className="ml-1 text-green-600">• 최신</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* 이벤트 데이터 */}
+              <div className="flex items-center gap-2 p-2 rounded-lg bg-purple-50 dark:bg-purple-900/20">
+                <Calendar className="w-4 h-4 text-purple-500" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    공휴일/이벤트
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {contextData.events?.record_count || 0}건
+                    {(contextData.events?.upcoming_count || 0) > 0 && (
+                      <span className="ml-1 text-purple-600">
+                        • 예정 {contextData.events?.upcoming_count}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}

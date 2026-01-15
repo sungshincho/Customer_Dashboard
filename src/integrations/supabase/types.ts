@@ -658,14 +658,19 @@ export type Database = {
           auth_config: Json | null
           auth_type: string | null
           auth_value: string | null
+          connection_category: 'business' | 'context' | 'analytics' | null
           created_at: string
           data_category: string | null
+          description: string | null
+          display_order: number | null
           error_count: number | null
           field_mappings: Json | null
           headers: Json | null
+          icon_name: string | null
           id: string
           is_active: boolean | null
           is_credentials_encrypted: boolean | null
+          is_system_managed: boolean | null
           last_error: string | null
           last_sync: string | null
           last_sync_duration_ms: number | null
@@ -701,14 +706,19 @@ export type Database = {
           auth_config?: Json | null
           auth_type?: string | null
           auth_value?: string | null
+          connection_category?: 'business' | 'context' | 'analytics' | null
           created_at?: string
           data_category?: string | null
+          description?: string | null
+          display_order?: number | null
           error_count?: number | null
           field_mappings?: Json | null
           headers?: Json | null
+          icon_name?: string | null
           id?: string
           is_active?: boolean | null
           is_credentials_encrypted?: boolean | null
+          is_system_managed?: boolean | null
           last_error?: string | null
           last_sync?: string | null
           last_sync_duration_ms?: number | null
@@ -744,14 +754,19 @@ export type Database = {
           auth_config?: Json | null
           auth_type?: string | null
           auth_value?: string | null
+          connection_category?: 'business' | 'context' | 'analytics' | null
           created_at?: string
           data_category?: string | null
+          description?: string | null
+          display_order?: number | null
           error_count?: number | null
           field_mappings?: Json | null
           headers?: Json | null
+          icon_name?: string | null
           id?: string
           is_active?: boolean | null
           is_credentials_encrypted?: boolean | null
+          is_system_managed?: boolean | null
           last_error?: string | null
           last_sync?: string | null
           last_sync_duration_ms?: number | null

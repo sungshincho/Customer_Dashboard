@@ -18,11 +18,12 @@ import {
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
-import { useDataControlTowerStatus } from './hooks/useDataControlTower';
+import { useDataControlTowerStatus, useContextDataSources, useWeatherDataStatus, useEventsDataStatus } from './hooks/useDataControlTower';
 import { useAuth } from '@/hooks/useAuth';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import {
   DataSourceCards,
+  ContextDataSourceCards,
   PipelineTimeline,
   RecentImportsList,
   DataQualityScoreCard,
@@ -34,9 +35,32 @@ export default function DataControlTowerPage() {
   const [isDark, setIsDark] = useState(false);
   const [showAddConnector, setShowAddConnector] = useState(false);
   const { data: status, isLoading, isFetching, error, refetch } = useDataControlTowerStatus();
+  const { data: contextSources, isLoading: isContextLoading } = useContextDataSources();
+  const { data: weatherStatus } = useWeatherDataStatus();
+  const { data: eventsStatus } = useEventsDataStatus();
   const { orgId } = useAuth();
   const { selectedStore } = useSelectedStore();
   const navigate = useNavigate();
+
+  // 컨텍스트 데이터 상태 구성
+  const contextDataStatus = weatherStatus || eventsStatus
+    ? {
+        weather: weatherStatus
+          ? {
+              record_count: weatherStatus.record_count,
+              has_recent: weatherStatus.latest_date
+                ? new Date(weatherStatus.latest_date) >= new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+                : false,
+            }
+          : undefined,
+        events: eventsStatus
+          ? {
+              record_count: eventsStatus.record_count,
+              upcoming_count: eventsStatus.upcoming_count,
+            }
+          : undefined,
+      }
+    : undefined;
 
   // Dark mode detection
   useEffect(() => {
@@ -211,9 +235,15 @@ export default function DataControlTowerPage() {
           <div className="space-y-6">
             {/* Row 1: Data Quality Score + Data Sources */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <DataQualityScoreCard score={status.quality_score} />
-              <div className="lg:col-span-2">
+              <DataQualityScoreCard score={status.quality_score} contextData={contextDataStatus} />
+              <div className="lg:col-span-2 space-y-4">
+                {/* 비즈니스 데이터 소스 */}
                 <DataSourceCards dataSources={status.data_sources} />
+                {/* 컨텍스트 데이터 소스 (날씨, 공휴일 등) */}
+                <ContextDataSourceCards
+                  sources={contextSources || []}
+                  isLoading={isContextLoading}
+                />
               </div>
             </div>
 
