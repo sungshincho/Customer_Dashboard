@@ -300,7 +300,6 @@ export async function fetchHolidayData(
 ): Promise<{ data: HolidayData[]; error: EnvironmentDataError | null }> {
   const config = getConfig();
   const targetYear = year ?? new Date().getFullYear();
-  const targetMonth = month ?? new Date().getMonth() + 1;
 
   // 캐시 확인
   if (isCacheValid(cache.holidays)) {
@@ -314,37 +313,54 @@ export async function fetchHolidayData(
   }
 
   try {
-    // Edge Function을 통해 공휴일 API 호출 (API 키는 서버에서 처리)
-    const { data, error } = await supabase.functions.invoke('environment-proxy', {
-      body: { type: 'holidays', year: targetYear, month: targetMonth, countryCode },
-    });
+    // 특정 월이 지정된 경우 해당 월만, 아니면 전체 연도(12개월) 조회
+    const monthsToFetch = month ? [month] : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
-    if (error) {
-      // API 키 미설정 등의 에러 - 조용히 처리
-      console.info('[EnvironmentData] 공휴일 API 호출 실패:', error.message);
-      return { data: [], error: null };
-    }
+    console.log(`[EnvironmentData] ${targetYear}년 공휴일 데이터 조회 시작 (${monthsToFetch.length}개월)`);
 
-    // 에러 응답 확인
-    if (data?.error) {
-      console.info('[EnvironmentData] 공휴일 API 에러:', data.error);
-      return { data: [], error: null };
-    }
+    // 모든 월을 병렬로 조회
+    const results = await Promise.all(
+      monthsToFetch.map(async (m) => {
+        try {
+          const { data, error } = await supabase.functions.invoke('environment-proxy', {
+            body: { type: 'holidays', year: targetYear, month: m, countryCode, save_to_db: true },
+          });
 
-    const rawData = data as DataGoKrHolidayResponse;
-    const holidays = transformDataGoKrResponse(rawData);
+          if (error || data?.error) {
+            return [];
+          }
+
+          const rawData = data as DataGoKrHolidayResponse;
+          return transformDataGoKrResponse(rawData);
+        } catch {
+          return [];
+        }
+      })
+    );
+
+    // 결과 합치기 및 중복 제거 (날짜 기준)
+    const allHolidays = results.flat();
+    const uniqueHolidays = allHolidays.reduce((acc, holiday) => {
+      if (!acc.find((h) => h.date === holiday.date && h.name === holiday.name)) {
+        acc.push(holiday);
+      }
+      return acc;
+    }, [] as HolidayData[]);
+
+    // 날짜순 정렬
+    uniqueHolidays.sort((a, b) => a.date.localeCompare(b.date));
 
     // 캐시 업데이트
-    if (holidays.length > 0) {
+    if (uniqueHolidays.length > 0) {
       cache.holidays = {
-        data: holidays,
+        data: uniqueHolidays,
         timestamp: Date.now(),
         expiresAt: Date.now() + config.holidayCacheHours * 60 * 60 * 1000,
       };
     }
 
-    console.log('[EnvironmentData] 공휴일 데이터 조회 성공:', holidays.length, '건');
-    return { data: holidays, error: null };
+    console.log('[EnvironmentData] 공휴일 데이터 조회 성공:', uniqueHolidays.length, '건');
+    return { data: uniqueHolidays, error: null };
   } catch (error) {
     // 네트워크 에러 등 - 조용히 처리
     console.info('[EnvironmentData] 공휴일 데이터 조회 불가:', error instanceof Error ? error.message : 'Unknown');
