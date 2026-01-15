@@ -37,7 +37,10 @@ export function useDataControlTowerStatus() {
           });
 
         if (error) throw error;
-        return data as unknown as DataControlTowerStatus;
+
+        // RPC 결과에 ERP 데이터가 없으면 병합
+        const result = data as unknown as DataControlTowerStatus;
+        return await ensureERPCoverage(result, storeId);
       } catch (rpcError) {
         // Fallback: build status from direct queries
         console.warn('RPC not available, using fallback queries:', rpcError);
@@ -47,6 +50,117 @@ export function useDataControlTowerStatus() {
     enabled: !!storeId,
     refetchInterval: 30000, // 30초마다 새로고침
   });
+}
+
+// ERP 데이터가 없으면 병합하는 함수
+async function ensureERPCoverage(result: DataControlTowerStatus, storeId: string): Promise<DataControlTowerStatus> {
+  // ERP 데이터가 이미 있으면 그대로 반환
+  if (result.quality_score?.coverage?.erp) {
+    return result;
+  }
+
+  // ERP/재고 데이터 카운트
+  const { count: inventoryLevelCount } = await supabase
+    .from('inventory_levels')
+    .select('*', { count: 'exact', head: true });
+
+  const { count: inventoryMovementCount } = await supabase
+    .from('inventory_movements')
+    .select('*', { count: 'exact', head: true })
+    .eq('store_id', storeId);
+
+  const totalInventoryCount = (inventoryLevelCount || 0) + (inventoryMovementCount || 0);
+
+  // Coverage에 ERP 추가
+  if (result.quality_score?.coverage) {
+    result.quality_score.coverage.erp = {
+      available: totalInventoryCount > 0,
+      record_count: totalInventoryCount,
+      label: 'ERP/재고 데이터',
+    };
+  }
+
+  // Data sources에 ERP 추가
+  if (result.data_sources && !result.data_sources.erp) {
+    result.data_sources.erp = {
+      name: 'ERP',
+      description: '재고/입출고 데이터',
+      status: totalInventoryCount > 0 ? 'active' : 'inactive',
+      last_sync: null,
+    };
+  }
+
+  // ERP를 포함하여 전체 점수 재계산 (5개 데이터 소스 기준)
+  const coverage = result.quality_score?.coverage;
+  if (coverage) {
+    const sources = [
+      coverage.pos?.record_count || 0,
+      coverage.sensor?.record_count || 0,
+      coverage.crm?.record_count || 0,
+      coverage.product?.record_count || 0,
+      totalInventoryCount,
+    ];
+    const availableSources = sources.filter(c => c > 0).length;
+    result.quality_score.overall_score = Math.round((availableSources / 5) * 100);
+    result.quality_score.confidence_level = result.quality_score.overall_score >= 75 ? 'high' : result.quality_score.overall_score >= 50 ? 'medium' : 'low';
+  }
+
+  return result;
+}
+
+// DataQualityScore용 ERP 데이터 병합 함수
+async function ensureERPCoverageForQualityScore(result: DataQualityScore, storeId: string): Promise<DataQualityScore> {
+  // ERP 데이터가 이미 있으면 그대로 반환
+  if (result.coverage?.erp) {
+    return result;
+  }
+
+  // ERP/재고 데이터 카운트
+  const { count: inventoryLevelCount } = await supabase
+    .from('inventory_levels')
+    .select('*', { count: 'exact', head: true });
+
+  const { count: inventoryMovementCount } = await supabase
+    .from('inventory_movements')
+    .select('*', { count: 'exact', head: true })
+    .eq('store_id', storeId);
+
+  const totalInventoryCount = (inventoryLevelCount || 0) + (inventoryMovementCount || 0);
+
+  // Coverage에 ERP 추가
+  if (result.coverage) {
+    result.coverage.erp = {
+      available: totalInventoryCount > 0,
+      record_count: totalInventoryCount,
+      label: 'ERP/재고 데이터',
+    };
+  }
+
+  // ERP를 포함하여 전체 점수 재계산 (5개 데이터 소스 기준)
+  const coverage = result.coverage;
+  if (coverage) {
+    const sources = [
+      coverage.pos?.record_count || 0,
+      coverage.sensor?.record_count || 0,
+      coverage.crm?.record_count || 0,
+      coverage.product?.record_count || 0,
+      totalInventoryCount,
+    ];
+    const availableSources = sources.filter(c => c > 0).length;
+    result.overall_score = Math.round((availableSources / 5) * 100);
+    result.confidence_level = result.overall_score >= 75 ? 'high' : result.overall_score >= 50 ? 'medium' : 'low';
+
+    // ERP가 없으면 경고 추가
+    if (totalInventoryCount === 0 && Array.isArray(result.warnings)) {
+      const hasERPWarning = result.warnings.some((w: any) => w.source === 'erp');
+      if (!hasERPWarning) {
+        result.warnings.push({ type: 'missing', source: 'erp', severity: 'medium', message: 'ERP/재고 데이터가 없습니다.' });
+        result.warning_count = result.warnings.length;
+      }
+    }
+  }
+
+  return result;
 }
 
 // Fallback function when RPC is not available
@@ -202,7 +316,10 @@ export function useDataQualityScore(date?: string) {
           });
 
         if (error) throw error;
-        return data as unknown as DataQualityScore;
+
+        // RPC 결과에 ERP 데이터가 없으면 병합
+        const result = data as unknown as DataQualityScore;
+        return await ensureERPCoverageForQualityScore(result, storeId);
       } catch (rpcError) {
         console.warn('Quality score RPC not available, using fallback:', rpcError);
         return await buildQualityScoreFallback(storeId);
