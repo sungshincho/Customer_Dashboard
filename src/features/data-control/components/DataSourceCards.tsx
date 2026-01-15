@@ -351,7 +351,7 @@ export function ContextDataSourceCards({ sources, isLoading }: ContextDataSource
                   )}
                 </div>
                 <span style={{ marginTop: '10px', textAlign: 'center', ...text3D.title }}>{source.name}</span>
-                <Badge3D dark={isDark} variant={status.variant}>{status.label}</Badge3D>
+                <Badge3D dark={isDark} variant="success">자동 연결</Badge3D>
                 {source.total_records_synced > 0 && (
                   <span style={{ marginTop: '6px', ...text3D.body }}>{source.total_records_synced.toLocaleString()}건</span>
                 )}

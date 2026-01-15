@@ -320,12 +320,22 @@ function ConnectionCard({ connection, onEdit, isDark }: ConnectionCardProps) {
 
         {/* 콘텐츠 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {/* URL */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', ...text3D.small }}>
-            <span style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {connection.url}
-            </span>
-          </div>
+          {/* 시스템 컨텍스트: 자동 연결 메시지 표시, URL/에러 숨김 */}
+          {isSystemContext ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', ...text3D.small }}>
+              <CheckCircle2 className="h-3 w-3" style={{ color: '#22c55e' }} />
+              <span style={{ color: isDark ? 'rgba(34,197,94,0.9)' : '#16a34a' }}>
+                자동 연결됨 (Edge Function 경유)
+              </span>
+            </div>
+          ) : (
+            /* 일반 연결: URL 표시 */
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', ...text3D.small }}>
+              <span style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                ••••••••
+              </span>
+            </div>
+          )}
 
           {/* 마지막 동기화 */}
           {connection.last_sync ? (
@@ -346,8 +356,8 @@ function ConnectionCard({ connection, onEdit, isDark }: ConnectionCardProps) {
             </div>
           )}
 
-          {/* 오류 메시지 */}
-          {connection.status === 'error' && connection.last_error && (
+          {/* 오류 메시지 - 시스템 컨텍스트에서는 숨김 */}
+          {!isSystemContext && connection.status === 'error' && connection.last_error && (
             <div style={{
               display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '10px',
               borderRadius: '10px',
