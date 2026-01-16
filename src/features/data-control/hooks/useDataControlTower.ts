@@ -328,6 +328,86 @@ async function buildControlTowerStatusFallback(storeId: string, orgId?: string):
       },
       l2_records: l2Count || 0,
       l3_records: l3Count || 0,
+      // 새로운 데이터 흐름 정보
+      data_flows: [
+        {
+          source: 'pos' as const,
+          label: 'POS',
+          icon: 'shopping-cart',
+          inputCount: totalPosCount,
+          outputTable: 'transactions',
+          outputCount: totalPosCount,
+          kpiConnected: (l3Count || 0) > 0 && totalPosCount > 0,
+          status: totalPosCount > 0 ? 'active' as const : 'inactive' as const,
+          lastSync: null,
+          trend: 'stable' as const,
+        },
+        {
+          source: 'sensor' as const,
+          label: '센서',
+          icon: 'wifi',
+          inputCount: sensorCount || 0,
+          outputTable: 'zone_events',
+          outputCount: l2Count || 0,
+          kpiConnected: (l3Count || 0) > 0 && (sensorCount || 0) > 0,
+          status: (sensorCount || 0) > 0 ? 'active' as const : 'inactive' as const,
+          lastSync: null,
+          trend: 'stable' as const,
+        },
+        {
+          source: 'customer' as const,
+          label: '고객',
+          icon: 'users',
+          inputCount: customerCount || 0,
+          outputTable: 'customers',
+          outputCount: customerCount || 0,
+          kpiConnected: false,
+          status: (customerCount || 0) > 0 ? 'active' as const : 'inactive' as const,
+          lastSync: null,
+        },
+        {
+          source: 'inventory' as const,
+          label: '재고',
+          icon: 'package',
+          inputCount: erpRecordCount,
+          outputTable: 'inventory_levels',
+          outputCount: erpRecordCount,
+          kpiConnected: false,
+          status: erpRecordCount > 0 ? 'active' as const : 'inactive' as const,
+          lastSync: null,
+        },
+        {
+          source: 'import' as const,
+          label: '파일',
+          icon: 'file-up',
+          inputCount: totalImports || 0,
+          outputTable: 'user_data_imports',
+          outputCount: completedImports || 0,
+          kpiConnected: false,
+          status: (totalImports || 0) > 0 ? 'active' as const : 'inactive' as const,
+          lastSync: null,
+        },
+      ],
+      pipeline_health: {
+        status: availableSources >= 3 ? 'healthy' as const :
+                availableSources >= 1 ? 'warning' as const : 'unknown' as const,
+        message: availableSources >= 3
+          ? '데이터 파이프라인이 정상 작동 중입니다.'
+          : availableSources >= 1
+            ? '일부 데이터 소스가 미연동 상태입니다.'
+            : '데이터 소스를 연결해주세요.',
+        warnings: [
+          ...(totalPosCount === 0 ? ['POS 데이터가 없습니다.'] : []),
+          ...((sensorCount || 0) === 0 ? ['센서 데이터가 없습니다.'] : []),
+          ...(erpRecordCount === 0 ? ['재고 데이터가 없습니다.'] : []),
+        ],
+      },
+      today_processed: {
+        input: totalImports || 0,
+        transformed: l2Count || 0,
+        aggregated: l3Count || 0,
+        failed: failedImports || 0,
+      },
     },
     queried_at: new Date().toISOString(),
   };

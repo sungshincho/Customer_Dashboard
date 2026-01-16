@@ -1,18 +1,25 @@
 // ============================================================================
-// PipelineTimeline.tsx - 데이터 파이프라인 타임라인 (3D Glassmorphism Design)
+// PipelineTimeline.tsx - 데이터 파이프라인 현황 (비즈니스 관점 + 실시간 모니터링)
 // ============================================================================
 
 import { useState, useEffect } from 'react';
 import {
-  Database,
+  ShoppingCart,
+  Wifi,
+  Users,
+  Package,
+  FileUp,
   ArrowRight,
-  Layers,
-  BarChart3,
   CheckCircle,
-  Loader2,
-  GitBranch,
+  AlertTriangle,
+  XCircle,
+  Activity,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  RefreshCw,
 } from 'lucide-react';
-import type { PipelineStats } from '../types';
+import type { PipelineStats, DataSourceFlow, PipelineHealth } from '../types';
 
 // ============================================================================
 // 3D 스타일 시스템
@@ -113,49 +120,144 @@ const Icon3D = ({ children, size = 44, dark = false }: { children: React.ReactNo
   </div>
 );
 
-const Badge3D = ({ children, dark = false, variant = 'default' }: { children: React.ReactNode; dark?: boolean; variant?: 'default' | 'success' | 'warning' | 'error' }) => {
-  const colors = {
-    default: { bg: dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)', text: dark ? 'rgba(255,255,255,0.8)' : '#6b7280' },
-    success: { bg: dark ? 'rgba(34,197,94,0.2)' : 'rgba(34,197,94,0.1)', text: '#22c55e' },
-    warning: { bg: dark ? 'rgba(234,179,8,0.2)' : 'rgba(234,179,8,0.1)', text: '#eab308' },
-    error: { bg: dark ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.1)', text: '#ef4444' },
+// ============================================================================
+// 상태 배지 컴포넌트
+// ============================================================================
+
+const StatusBadge = ({ status, dark }: { status: 'healthy' | 'warning' | 'error' | 'unknown'; dark: boolean }) => {
+  const config = {
+    healthy: { bg: 'rgba(34,197,94,0.15)', border: 'rgba(34,197,94,0.3)', color: '#22c55e', label: '정상 운영 중' },
+    warning: { bg: 'rgba(234,179,8,0.15)', border: 'rgba(234,179,8,0.3)', color: '#eab308', label: '주의 필요' },
+    error: { bg: 'rgba(239,68,68,0.15)', border: 'rgba(239,68,68,0.3)', color: '#ef4444', label: '오류 발생' },
+    unknown: { bg: 'rgba(107,114,128,0.15)', border: 'rgba(107,114,128,0.3)', color: '#6b7280', label: '확인 중' },
   };
-  const color = colors[variant];
+  const c = config[status];
 
   return (
     <div style={{
-      display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 8px',
-      background: color.bg,
-      borderRadius: '6px',
-      border: dark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.05)',
-      fontSize: '10px', fontWeight: 600, color: color.text,
+      display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px',
+      background: c.bg, border: `1px solid ${c.border}`, borderRadius: '20px',
     }}>
-      {children}
+      <div style={{ width: 8, height: 8, borderRadius: '50%', background: c.color,
+        boxShadow: `0 0 8px ${c.color}`, animation: status === 'healthy' ? 'pulse 2s infinite' : 'none' }} />
+      <span style={{ fontSize: '12px', fontWeight: 600, color: c.color }}>{c.label}</span>
     </div>
   );
 };
 
 // ============================================================================
-// 스테이지 아이콘 컴포넌트
+// 데이터 흐름 행 컴포넌트
 // ============================================================================
 
-const StageIcon3D = ({ icon: Icon, color, dark }: { icon: any; color: string; dark: boolean }) => (
+const DataFlowRow = ({ flow, dark, text3D }: { flow: DataSourceFlow; dark: boolean; text3D: ReturnType<typeof getText3D> }) => {
+  const icons: Record<string, any> = {
+    pos: ShoppingCart,
+    sensor: Wifi,
+    customer: Users,
+    inventory: Package,
+    import: FileUp,
+  };
+  const Icon = icons[flow.source] || Activity;
+
+  const statusColors = {
+    active: '#22c55e',
+    inactive: '#6b7280',
+    warning: '#eab308',
+    error: '#ef4444',
+  };
+
+  const TrendIcon = flow.trend === 'up' ? TrendingUp : flow.trend === 'down' ? TrendingDown : Minus;
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px',
+      background: dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+      borderRadius: '12px', marginBottom: '8px',
+      border: dark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.04)',
+    }}>
+      {/* 소스 아이콘 */}
+      <div style={{
+        width: 36, height: 36, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: dark ? `${statusColors[flow.status]}20` : `${statusColors[flow.status]}15`,
+        border: `1px solid ${statusColors[flow.status]}40`,
+      }}>
+        <Icon className="w-4 h-4" style={{ color: statusColors[flow.status] }} />
+      </div>
+
+      {/* 소스 라벨 */}
+      <div style={{ flex: '0 0 80px' }}>
+        <div style={{ ...text3D.body, fontWeight: 600 }}>{flow.label}</div>
+        <div style={{ ...text3D.small, fontSize: '10px' }}>
+          {flow.inputCount.toLocaleString()} 건
+        </div>
+      </div>
+
+      {/* 화살표 */}
+      <ArrowRight className="w-4 h-4" style={{ color: dark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)', flexShrink: 0 }} />
+
+      {/* 출력 테이블 */}
+      <div style={{ flex: 1 }}>
+        <div style={{ ...text3D.small, fontSize: '10px' }}>{flow.outputTable}</div>
+        <div style={{ ...text3D.body, fontWeight: 600 }}>{flow.outputCount.toLocaleString()} 건</div>
+      </div>
+
+      {/* 화살표 */}
+      <ArrowRight className="w-4 h-4" style={{ color: dark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)', flexShrink: 0 }} />
+
+      {/* KPI 연결 상태 */}
+      <div style={{ flex: '0 0 70px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+        {flow.kpiConnected ? (
+          <>
+            <CheckCircle className="w-4 h-4" style={{ color: '#22c55e' }} />
+            <span style={{ ...text3D.small, color: '#22c55e' }}>연결됨</span>
+          </>
+        ) : (
+          <>
+            <AlertTriangle className="w-4 h-4" style={{ color: '#eab308' }} />
+            <span style={{ ...text3D.small, color: '#eab308' }}>미연동</span>
+          </>
+        )}
+      </div>
+
+      {/* 트렌드 */}
+      {flow.trend && (
+        <TrendIcon className="w-4 h-4" style={{
+          color: flow.trend === 'up' ? '#22c55e' : flow.trend === 'down' ? '#ef4444' : '#6b7280',
+        }} />
+      )}
+    </div>
+  );
+};
+
+// ============================================================================
+// 처리량 요약 컴포넌트
+// ============================================================================
+
+const ProcessingSummary = ({ stats, dark, text3D }: {
+  stats: { input: number; transformed: number; aggregated: number; failed: number };
+  dark: boolean;
+  text3D: ReturnType<typeof getText3D>;
+}) => (
   <div style={{
-    width: '64px', height: '64px',
-    background: dark
-      ? `linear-gradient(145deg, ${color}30 0%, ${color}15 50%, ${color}20 100%)`
-      : `linear-gradient(145deg, ${color}15 0%, ${color}08 50%, ${color}12 100%)`,
-    borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
-    border: dark ? `1px solid ${color}40` : `1px solid ${color}25`,
-    boxShadow: dark
-      ? `inset 0 1px 2px ${color}30, 0 4px 12px rgba(0,0,0,0.3)`
-      : `0 2px 4px ${color}15, 0 4px 8px ${color}10, inset 0 2px 4px rgba(255,255,255,0.8)`,
+    display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px',
+    padding: '16px',
+    background: dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+    borderRadius: '12px',
+    border: dark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.04)',
   }}>
-    {!dark && <div style={{ position: 'absolute', top: '4px', left: '20%', right: '20%', height: '30%',
-      background: 'linear-gradient(180deg, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 100%)',
-      borderRadius: '40% 40% 50% 50%', pointerEvents: 'none',
-    }} />}
-    <Icon className="w-7 h-7" style={{ color, position: 'relative', zIndex: 10 }} />
+    {[
+      { label: '입력', value: stats.input, color: '#3b82f6' },
+      { label: '변환', value: stats.transformed, color: '#8b5cf6' },
+      { label: '집계', value: stats.aggregated, color: '#22c55e' },
+      { label: '실패', value: stats.failed, color: stats.failed > 0 ? '#ef4444' : '#6b7280' },
+    ].map((item) => (
+      <div key={item.label} style={{ textAlign: 'center' }}>
+        <div style={{ ...text3D.small }}>{item.label}</div>
+        <div style={{ fontSize: '18px', fontWeight: 700, color: item.color }}>
+          {item.value.toLocaleString()}
+        </div>
+      </div>
+    ))}
   </div>
 );
 
@@ -165,9 +267,10 @@ const StageIcon3D = ({ icon: Icon, color, dark }: { icon: any; color: string; da
 
 interface PipelineTimelineProps {
   stats: PipelineStats;
+  onRefresh?: () => void;
 }
 
-export function PipelineTimeline({ stats }: PipelineTimelineProps) {
+export function PipelineTimeline({ stats, onRefresh }: PipelineTimelineProps) {
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
@@ -181,113 +284,170 @@ export function PipelineTimeline({ stats }: PipelineTimelineProps) {
   const text3D = getText3D(isDark);
   const iconColor = isDark ? 'rgba(255,255,255,0.7)' : '#374151';
 
-  const stages = [
+  // 기본 데이터 흐름 (stats.data_flows가 없을 경우 fallback)
+  const dataFlows: DataSourceFlow[] = stats.data_flows || [
     {
-      name: 'Raw Import',
-      layer: 'L1',
-      icon: Database,
-      count: stats.raw_imports.total,
-      completed: stats.raw_imports.completed,
-      pending: stats.raw_imports.pending,
-      failed: stats.raw_imports.failed,
-      color: '#3b82f6',
+      source: 'pos',
+      label: 'POS',
+      icon: 'shopping-cart',
+      inputCount: 0,
+      outputTable: 'transactions',
+      outputCount: 0,
+      kpiConnected: false,
+      status: 'inactive',
+      lastSync: null,
     },
     {
-      name: 'L2 Transform',
-      layer: 'L2',
-      icon: Layers,
-      count: stats.l2_records,
-      completed: stats.l2_records,
-      pending: 0,
-      failed: 0,
-      color: '#8b5cf6',
+      source: 'sensor',
+      label: '센서',
+      icon: 'wifi',
+      inputCount: stats.l2_records,
+      outputTable: 'zone_events',
+      outputCount: stats.l2_records,
+      kpiConnected: stats.l3_records > 0,
+      status: stats.l2_records > 0 ? 'active' : 'inactive',
+      lastSync: null,
     },
     {
-      name: 'L3 Aggregate',
-      layer: 'L3',
-      icon: BarChart3,
-      count: stats.l3_records,
-      completed: stats.l3_records,
-      pending: 0,
-      failed: 0,
-      color: '#22c55e',
+      source: 'customer',
+      label: '고객',
+      icon: 'users',
+      inputCount: 0,
+      outputTable: 'customers',
+      outputCount: 0,
+      kpiConnected: false,
+      status: 'inactive',
+      lastSync: null,
+    },
+    {
+      source: 'inventory',
+      label: '재고',
+      icon: 'package',
+      inputCount: 0,
+      outputTable: 'inventory_levels',
+      outputCount: 0,
+      kpiConnected: false,
+      status: 'inactive',
+      lastSync: null,
+    },
+    {
+      source: 'import',
+      label: '파일',
+      icon: 'file-up',
+      inputCount: stats.raw_imports.total,
+      outputTable: 'user_data_imports',
+      outputCount: stats.raw_imports.completed,
+      kpiConnected: false,
+      status: stats.raw_imports.total > 0 ? 'active' : 'inactive',
+      lastSync: null,
     },
   ];
+
+  // 파이프라인 건강 상태
+  const pipelineHealth: PipelineHealth = stats.pipeline_health || {
+    status: stats.l2_records > 0 && stats.l3_records > 0 ? 'healthy' :
+            stats.l2_records > 0 ? 'warning' : 'unknown',
+    message: stats.l2_records > 0 && stats.l3_records > 0
+      ? '모든 데이터 파이프라인이 정상 작동 중입니다.'
+      : stats.l2_records > 0
+        ? '일부 데이터 소스가 미연동 상태입니다.'
+        : '데이터 파이프라인을 확인해주세요.',
+    warnings: [],
+  };
+
+  // 오늘 처리량
+  const todayProcessed = stats.today_processed || {
+    input: stats.raw_imports.total,
+    transformed: stats.l2_records,
+    aggregated: stats.l3_records,
+    failed: stats.raw_imports.failed,
+  };
+
+  // 활성 데이터 소스 수
+  const activeFlows = dataFlows.filter(f => f.status === 'active').length;
+  const connectedFlows = dataFlows.filter(f => f.kpiConnected).length;
 
   return (
     <GlassCard dark={isDark}>
       <div style={{ padding: '24px' }}>
         {/* 헤더 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-          <Icon3D size={44} dark={isDark}>
-            <GitBranch className="w-5 h-5" style={{ color: iconColor }} />
-          </Icon3D>
-          <div>
-            <span style={text3D.label}>Data Pipeline</span>
-            <h3 style={{ margin: '4px 0 0 0', ...text3D.title }}>데이터 파이프라인</h3>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <Icon3D size={44} dark={isDark}>
+              <Activity className="w-5 h-5" style={{ color: iconColor }} />
+            </Icon3D>
+            <div>
+              <span style={text3D.label}>Data Pipeline</span>
+              <h3 style={{ margin: '4px 0 0 0', ...text3D.title }}>데이터 흐름 현황</h3>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <StatusBadge status={pipelineHealth.status} dark={isDark} />
+            {onRefresh && (
+              <button
+                onClick={onRefresh}
+                style={{
+                  background: 'transparent', border: 'none', cursor: 'pointer', padding: '8px',
+                  borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <RefreshCw className="w-4 h-4" style={{ color: iconColor }} />
+              </button>
+            )}
           </div>
         </div>
 
-        {/* 파이프라인 스테이지 */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          {stages.map((stage, index) => (
-            <div key={stage.layer} style={{ display: 'flex', alignItems: 'center' }}>
-              {/* Stage Card */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <StageIcon3D icon={stage.icon} color={stage.color} dark={isDark} />
-                <span style={{ marginTop: '12px', ...text3D.body }}>{stage.name}</span>
-                <span style={{ fontSize: '22px', marginTop: '4px', ...text3D.heroNumber }}>
-                  {stage.count.toLocaleString()}
-                </span>
-                <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-                  {stage.pending > 0 && (
-                    <Badge3D dark={isDark} variant="warning">
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                      {stage.pending}
-                    </Badge3D>
-                  )}
-                  {stage.completed > 0 && (
-                    <Badge3D dark={isDark} variant="success">
-                      <CheckCircle className="w-3 h-3" />
-                      {stage.completed}
-                    </Badge3D>
-                  )}
-                </div>
-              </div>
-
-              {/* Arrow */}
-              {index < stages.length - 1 && (
-                <div style={{ margin: '0 24px', marginBottom: '60px' }}>
-                  <ArrowRight className="w-6 h-6" style={{ color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)' }} />
-                </div>
-              )}
+        {/* 요약 통계 */}
+        <div style={{
+          display: 'flex', gap: '24px', marginBottom: '20px', padding: '12px 0',
+          borderBottom: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.06)',
+        }}>
+          <div>
+            <span style={text3D.small}>활성 소스</span>
+            <div style={{ fontSize: '20px', fontWeight: 700, color: '#3b82f6' }}>
+              {activeFlows}/{dataFlows.length}
             </div>
+          </div>
+          <div>
+            <span style={text3D.small}>KPI 연결</span>
+            <div style={{ fontSize: '20px', fontWeight: 700, color: '#22c55e' }}>
+              {connectedFlows}/{dataFlows.length}
+            </div>
+          </div>
+          <div>
+            <span style={text3D.small}>L3 집계</span>
+            <div style={{ fontSize: '20px', fontWeight: 700, color: '#8b5cf6' }}>
+              {stats.l3_records.toLocaleString()}
+            </div>
+          </div>
+        </div>
+
+        {/* 데이터 흐름 목록 */}
+        <div style={{ marginBottom: '20px' }}>
+          {dataFlows.map((flow) => (
+            <DataFlowRow key={flow.source} flow={flow} dark={isDark} text3D={text3D} />
           ))}
         </div>
 
-        {/* ETL Runs Summary */}
-        {stats.etl_runs && (
+        {/* 오늘 처리량 */}
+        <div>
+          <div style={{ ...text3D.small, marginBottom: '12px' }}>오늘 처리량</div>
+          <ProcessingSummary stats={todayProcessed} dark={isDark} text3D={text3D} />
+        </div>
+
+        {/* 경고 메시지 */}
+        {pipelineHealth.warnings.length > 0 && (
           <div style={{
-            marginTop: '24px', paddingTop: '20px',
-            borderTop: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.06)',
+            marginTop: '16px', padding: '12px', borderRadius: '8px',
+            background: isDark ? 'rgba(234,179,8,0.1)' : 'rgba(234,179,8,0.08)',
+            border: '1px solid rgba(234,179,8,0.3)',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={text3D.body}>ETL 실행</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={text3D.title}>총 {stats.etl_runs.total}회</span>
-                {stats.etl_runs.running > 0 && (
-                  <Badge3D dark={isDark} variant="warning">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    {stats.etl_runs.running} 실행 중
-                  </Badge3D>
-                )}
-                {stats.etl_runs.failed > 0 && (
-                  <Badge3D dark={isDark} variant="error">
-                    {stats.etl_runs.failed} 실패
-                  </Badge3D>
-                )}
+            {pipelineHealth.warnings.map((warning, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', ...text3D.small, color: '#eab308' }}>
+                <AlertTriangle className="w-4 h-4" />
+                {warning}
               </div>
-            </div>
+            ))}
           </div>
         )}
       </div>

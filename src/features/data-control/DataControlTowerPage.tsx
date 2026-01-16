@@ -296,8 +296,8 @@ export default function DataControlTowerPage() {
               />
             </div>
 
-            {/* Row 4: Pipeline Timeline */}
-            <PipelineTimeline stats={status.pipeline_stats} />
+            {/* Row 4: Pipeline Timeline - 데이터 흐름 현황 */}
+            <PipelineTimeline stats={status.pipeline_stats} onRefresh={() => refetch()} />
           </div>
         )}
       </div>

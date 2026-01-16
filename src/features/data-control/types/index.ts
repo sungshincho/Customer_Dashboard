@@ -548,6 +548,25 @@ export interface ETLRun {
   completed_at: string | null;
 }
 
+export interface DataSourceFlow {
+  source: 'pos' | 'sensor' | 'customer' | 'inventory' | 'import';
+  label: string;
+  icon: string;
+  inputCount: number;
+  outputTable: string;
+  outputCount: number;
+  kpiConnected: boolean;
+  status: 'active' | 'inactive' | 'warning' | 'error';
+  lastSync: string | null;
+  trend?: 'up' | 'down' | 'stable';
+}
+
+export interface PipelineHealth {
+  status: 'healthy' | 'warning' | 'error' | 'unknown';
+  message: string;
+  warnings: string[];
+}
+
 export interface PipelineStats {
   raw_imports: {
     total: number;
@@ -563,6 +582,15 @@ export interface PipelineStats {
   };
   l2_records: number;
   l3_records: number;
+  // 새로운 필드
+  data_flows?: DataSourceFlow[];
+  pipeline_health?: PipelineHealth;
+  today_processed?: {
+    input: number;
+    transformed: number;
+    aggregated: number;
+    failed: number;
+  };
 }
 
 export interface DataControlTowerStatus {
