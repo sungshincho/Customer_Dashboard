@@ -25,7 +25,6 @@ import { fetchHolidayData } from '@/features/studio/services/environmentDataServ
 import {
   UnifiedDataSourceCards,
   PipelineTimeline,
-  RecentImportsList,
   DataQualityScoreCard,
   AddConnectorDialog,
   ApiConnectionsList,
@@ -299,13 +298,6 @@ export default function DataControlTowerPage() {
 
             {/* Row 4: Pipeline Timeline */}
             <PipelineTimeline stats={status.pipeline_stats} />
-
-            {/* Row 3: Recent Imports */}
-            <RecentImportsList
-              imports={status.recent_imports}
-              isLoading={isFetching}
-              onRefresh={() => refetch()}
-            />
           </div>
         )}
       </div>
