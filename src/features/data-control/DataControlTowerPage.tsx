@@ -29,6 +29,7 @@ import {
   DataQualityScoreCard,
   AddConnectorDialog,
   ApiConnectionsList,
+  DataImportWidget,
 } from './components';
 
 export default function DataControlTowerPage() {
@@ -260,13 +261,24 @@ export default function DataControlTowerPage() {
               </div>
             </div>
 
-            {/* Row 2: API Connections */}
-            <ApiConnectionsList
-              orgId={orgId}
-              storeId={selectedStore?.id}
-              onAdd={() => setShowAddConnector(true)}
-              onEdit={(id) => navigate(`/data/connectors/${id}`)}
-            />
+            {/* Row 2: Data Import Widget + API Connections */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Data Import Widget - 파일 임포트 */}
+              <DataImportWidget
+                onImportComplete={(result) => {
+                  console.log('Import completed:', result);
+                  refetch();
+                }}
+              />
+
+              {/* API Connections */}
+              <ApiConnectionsList
+                orgId={orgId}
+                storeId={selectedStore?.id}
+                onAdd={() => setShowAddConnector(true)}
+                onEdit={(id) => navigate(`/data/connectors/${id}`)}
+              />
+            </div>
 
             {/* Row 3: Pipeline Timeline */}
             <PipelineTimeline stats={status.pipeline_stats} />

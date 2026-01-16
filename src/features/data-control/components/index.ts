@@ -22,3 +22,9 @@ export { FieldMappingEditor } from './FieldMappingEditor';
 
 export { default as ConnectionTestResult } from './connectors/ConnectionTestResult';
 export { default as SyncHistoryTable } from './connectors/SyncHistoryTable';
+
+// ============================================================================
+// User Import ETL Components (Phase 1)
+// ============================================================================
+
+export { DataImportWidget } from './DataImportWidget';
