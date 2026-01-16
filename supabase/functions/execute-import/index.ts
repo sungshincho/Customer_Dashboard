@@ -2,6 +2,7 @@
 // execute-import Edge Function
 // ETL 실행 - 데이터 변환 및 타겟 테이블 저장
 // Phase 2: customers, transactions + line_items 지원
+// Phase 3: staff, inventory 임포트 강화
 // ============================================================================
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -208,6 +209,142 @@ async function importTransactionsWithLineItems(
   return { importedRows, failedRows, lineItemsImported, errorDetails };
 }
 
+// Inventory 임포트 함수 (SKU → product_id 조회)
+async function importInventoryLevels(
+  supabase: SupabaseClient,
+  rawData: Record<string, unknown>[],
+  mapping: Record<string, string>,
+  storeId: string | null,
+  userId: string,
+  orgId: string | null,
+  batchSize: number,
+  skipErrors: boolean,
+  importRecordId?: string
+): Promise<{
+  importedRows: number;
+  failedRows: number;
+  errorDetails: Array<{ batch_start: number; batch_end: number; error: string }>;
+}> {
+  let importedRows = 0;
+  let failedRows = 0;
+  const errorDetails: Array<{ batch_start: number; batch_end: number; error: string }> = [];
+
+  // SKU 캐시 구축
+  const skuCache = new Map<string, string>();
+  const allSkus: string[] = [];
+
+  // 모든 SKU 수집
+  for (const row of rawData) {
+    const transformed = transformRow(row, mapping, "inventory", storeId, userId);
+    const sku = transformed._product_sku as string;
+    if (sku && !allSkus.includes(sku)) {
+      allSkus.push(sku);
+    }
+  }
+
+  // 대량 SKU 조회
+  if (allSkus.length > 0) {
+    const { data: products } = await supabase
+      .from("products")
+      .select("id, sku")
+      .in("sku", allSkus);
+
+    if (products) {
+      for (const p of products) {
+        skuCache.set(p.sku, p.id);
+      }
+    }
+    console.log(`📦 SKU cache built: ${skuCache.size} products found`);
+  }
+
+  // 배치로 처리
+  for (let i = 0; i < rawData.length; i += batchSize) {
+    const batch = rawData.slice(i, i + batchSize);
+    const inventoryRecords: Record<string, unknown>[] = [];
+
+    for (const row of batch) {
+      const transformed = transformRow(row, mapping, "inventory", storeId, userId);
+      const sku = transformed._product_sku as string;
+
+      // SKU로 product_id 찾기
+      const productId = sku ? skuCache.get(sku) : null;
+
+      if (!productId && sku) {
+        console.warn(`⚠️ Product not found for SKU: ${sku}`);
+        if (!skipErrors) {
+          failedRows++;
+          continue;
+        }
+      }
+
+      delete transformed._product_sku;
+
+      if (productId) {
+        transformed.product_id = productId;
+        inventoryRecords.push({
+          ...transformed,
+          org_id: orgId,
+          last_updated: new Date().toISOString(),
+        });
+      }
+    }
+
+    if (inventoryRecords.length > 0) {
+      try {
+        const { error: upsertError } = await supabase
+          .from("inventory_levels")
+          .upsert(inventoryRecords, {
+            onConflict: "product_id",
+            ignoreDuplicates: false,
+          });
+
+        if (upsertError) {
+          throw upsertError;
+        }
+
+        importedRows += inventoryRecords.length;
+        console.log(
+          `✅ Inventory batch ${Math.floor(i / batchSize) + 1}: ${inventoryRecords.length} records`
+        );
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        console.error(`❌ Inventory batch error at ${i}:`, errorMessage);
+
+        if (skipErrors) {
+          failedRows += inventoryRecords.length;
+          errorDetails.push({
+            batch_start: i,
+            batch_end: i + batch.length,
+            error: errorMessage,
+          });
+        } else {
+          throw err;
+        }
+      }
+    } else {
+      failedRows += batch.length;
+    }
+
+    // 진행 상황 업데이트
+    if (importRecordId) {
+      await supabase
+        .from("user_data_imports")
+        .update({
+          imported_rows: importedRows,
+          failed_rows: failedRows,
+          progress: {
+            current: i + batch.length,
+            total: rawData.length,
+            percentage: Math.round(((i + batch.length) / rawData.length) * 100),
+          },
+        })
+        .eq("id", importRecordId);
+    }
+  }
+
+  return { importedRows, failedRows, errorDetails };
+}
+
 // 데이터 변환 함수
 function transformRow(
   row: Record<string, unknown>,
@@ -271,10 +408,20 @@ function transformRow(
     case "staff":
       transformed.id = transformed.id || crypto.randomUUID();
       transformed.user_id = userId;
-      // staff_name -> name
-      if (transformed.staff_name && !transformed.name) {
-        transformed.name = transformed.staff_name;
+      // staff_name 필드 유지 (테이블에 staff_name 컬럼 있음)
+      if (!transformed.staff_name && transformed.name) {
+        transformed.staff_name = transformed.name;
       }
+      // 숫자 필드 변환
+      if (transformed.hourly_rate !== undefined) {
+        transformed.hourly_rate = Number(transformed.hourly_rate) || 0;
+      }
+      // 날짜 필드 변환
+      if (transformed.hire_date) {
+        transformed.hire_date = new Date(transformed.hire_date as string).toISOString().split('T')[0];
+      }
+      // 기본값 설정
+      transformed.is_active = transformed.is_active !== false;
       break;
 
     case "transactions":
@@ -308,14 +455,35 @@ function transformRow(
     case "inventory":
       transformed.id = transformed.id || crypto.randomUUID();
       transformed.user_id = userId;
+      // 숫자 필드 변환
       if (transformed.quantity !== undefined) {
-        transformed.quantity = Number(transformed.quantity) || 0;
+        transformed.current_stock = Number(transformed.quantity) || 0;
+        delete transformed.quantity;
+      }
+      if (transformed.current_stock !== undefined) {
+        transformed.current_stock = Number(transformed.current_stock) || 0;
       }
       if (transformed.min_stock !== undefined) {
-        transformed.min_stock = Number(transformed.min_stock) || 0;
+        transformed.minimum_stock = Number(transformed.min_stock) || 0;
+        delete transformed.min_stock;
+      }
+      if (transformed.minimum_stock !== undefined) {
+        transformed.minimum_stock = Number(transformed.minimum_stock) || 0;
       }
       if (transformed.max_stock !== undefined) {
-        transformed.max_stock = Number(transformed.max_stock) || 0;
+        transformed.optimal_stock = Number(transformed.max_stock) || 0;
+        delete transformed.max_stock;
+      }
+      if (transformed.optimal_stock !== undefined) {
+        transformed.optimal_stock = Number(transformed.optimal_stock) || 0;
+      }
+      if (transformed.weekly_demand !== undefined) {
+        transformed.weekly_demand = Number(transformed.weekly_demand) || 0;
+      }
+      // product_sku -> _product_sku (SKU 조회용)
+      if (transformed.product_sku) {
+        transformed._product_sku = transformed.product_sku;
+        delete transformed.product_sku;
       }
       break;
   }
@@ -468,6 +636,22 @@ serve(async (req) => {
       importedRows = result.importedRows;
       failedRows = result.failedRows;
       lineItemsImported = result.lineItemsImported;
+      errorDetails.push(...result.errorDetails);
+    } else if (importType === "inventory") {
+      // inventory 임포트의 경우 SKU → product_id 조회
+      const result = await importInventoryLevels(
+        supabase,
+        rawData,
+        finalMapping,
+        session.store_id,
+        user.id,
+        session.org_id,
+        batchSize,
+        skipErrors,
+        importRecord?.id
+      );
+      importedRows = result.importedRows;
+      failedRows = result.failedRows;
       errorDetails.push(...result.errorDetails);
     } else {
       // 일반 임포트 처리

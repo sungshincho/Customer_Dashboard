@@ -24,7 +24,9 @@ export { default as ConnectionTestResult } from './connectors/ConnectionTestResu
 export { default as SyncHistoryTable } from './connectors/SyncHistoryTable';
 
 // ============================================================================
-// User Import ETL Components (Phase 1)
+// User Import ETL Components (Phase 1-3)
 // ============================================================================
 
 export { DataImportWidget } from './DataImportWidget';
+export { ImportHistoryWidget } from './ImportHistoryWidget';
+export { Model3DUploadWidget } from './Model3DUploadWidget';
