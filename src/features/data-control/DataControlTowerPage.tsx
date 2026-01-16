@@ -31,6 +31,7 @@ import {
   ApiConnectionsList,
   DataImportWidget,
   ImportHistoryWidget,
+  Model3DUploadWidget,
 } from './components';
 
 export default function DataControlTowerPage() {
@@ -281,15 +282,22 @@ export default function DataControlTowerPage() {
               />
             </div>
 
-            {/* Row 3: Import History */}
-            <ImportHistoryWidget
-              onRollback={() => {
-                console.log('Rollback completed');
-                refetch();
-              }}
-            />
+            {/* Row 3: Import History + 3D Model Upload */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <ImportHistoryWidget
+                onRollback={() => {
+                  console.log('Rollback completed');
+                  refetch();
+                }}
+              />
+              <Model3DUploadWidget
+                onUploadComplete={(model) => {
+                  console.log('3D Model uploaded:', model);
+                }}
+              />
+            </div>
 
-            {/* Row 3: Pipeline Timeline */}
+            {/* Row 4: Pipeline Timeline */}
             <PipelineTimeline stats={status.pipeline_stats} />
 
             {/* Row 3: Recent Imports */}
