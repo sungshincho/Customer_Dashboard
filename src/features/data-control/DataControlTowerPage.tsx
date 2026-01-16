@@ -30,6 +30,7 @@ import {
   AddConnectorDialog,
   ApiConnectionsList,
   DataImportWidget,
+  ImportHistoryWidget,
 } from './components';
 
 export default function DataControlTowerPage() {
@@ -279,6 +280,14 @@ export default function DataControlTowerPage() {
                 onEdit={(id) => navigate(`/data/connectors/${id}`)}
               />
             </div>
+
+            {/* Row 3: Import History */}
+            <ImportHistoryWidget
+              onRollback={() => {
+                console.log('Rollback completed');
+                refetch();
+              }}
+            />
 
             {/* Row 3: Pipeline Timeline */}
             <PipelineTimeline stats={status.pipeline_stats} />
