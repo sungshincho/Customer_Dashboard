@@ -2,6 +2,7 @@
 // DataImportWidget.tsx
 // 데이터 임포트 위젯 - 5단계 워크플로우
 // Phase 1: MVP Implementation
+// Phase 2: AI 매핑 통합, 검증 강화
 // ============================================================================
 
 import { useState, useCallback, useRef } from 'react';
@@ -25,6 +26,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   Upload,
   FileSpreadsheet,
   CheckCircle,
@@ -39,6 +46,9 @@ import {
   CreditCard,
   UserCog,
   Boxes,
+  Sparkles,
+  RefreshCw,
+  Info,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -148,6 +158,44 @@ const REQUIRED_FIELDS: Record<ImportType, string[]> = {
   inventory: ['product_sku', 'quantity'],
 };
 
+// 필드 설명 (툴팁용)
+const FIELD_DESCRIPTIONS: Record<string, string> = {
+  // Products
+  product_name: '상품명 (필수)',
+  sku: 'SKU 코드 - 고유 상품 식별자 (필수)',
+  category: '상품 카테고리 (필수)',
+  price: '판매가격 (필수)',
+  cost_price: '원가/입고가',
+  stock: '현재 재고 수량',
+  display_type: '진열 방식 (hanging, standing, folded 등)',
+  // Customers
+  customer_name: '고객명 (필수)',
+  email: '이메일 주소',
+  phone: '연락처',
+  segment: '고객 세그먼트 (VIP, Regular, New, Dormant)',
+  total_purchases: '총 구매 금액',
+  last_visit_date: '마지막 방문일',
+  // Transactions
+  transaction_date: '거래일시 (필수)',
+  total_amount: '거래 총액 (필수)',
+  payment_method: '결제 수단',
+  customer_email: '고객 이메일',
+  item_sku: '상품 SKU',
+  quantity: '수량',
+  unit_price: '단가',
+  // Staff
+  staff_name: '직원명 (필수)',
+  staff_code: '직원 코드 (필수)',
+  role: '직무 역할 (필수)',
+  department: '부서',
+  // Inventory
+  product_sku: '상품 SKU (필수)',
+  min_stock: '최소 재고 수준',
+  max_stock: '최대 재고 수준',
+  reorder_point: '재주문점',
+  location: '위치/구역',
+};
+
 // ============================================================================
 // Component
 // ============================================================================
@@ -169,6 +217,7 @@ export function DataImportWidget({ onImportComplete, className }: DataImportWidg
   const [isLoading, setIsLoading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isAiMapping, setIsAiMapping] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user, orgId } = useAuth();
@@ -312,32 +361,40 @@ export function DataImportWidget({ onImportComplete, className }: DataImportWidg
         throw new Error(`필수 필드가 매핑되지 않았습니다: ${missingFields.join(', ')}`);
       }
 
-      // 로컬 검증 (서버 검증 전 기본 검증)
-      const errors: ValidationResult['errors'] = [];
-      const rawData = parseResult.preview; // 실제로는 전체 데이터 사용
+      // 토큰 가져오기
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      if (!authSession?.access_token) {
+        throw new Error('인증이 필요합니다.');
+      }
 
-      rawData.forEach((row, index) => {
-        requiredFields.forEach((field) => {
-          const sourceField = mapping[field];
-          if (sourceField) {
-            const value = row[sourceField];
-            if (value === null || value === undefined || value === '') {
-              errors.push({
-                row: index + 1,
-                field,
-                message: `필수 필드 '${field}'가 비어있습니다.`,
-              });
-            }
-          }
-        });
-      });
+      // validate-data Edge Function 호출
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/validate-data`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${authSession.access_token}`,
+          },
+          body: JSON.stringify({
+            session_id: session.id,
+            column_mapping: mapping,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || '검증에 실패했습니다.');
+      }
 
       const validationResult: ValidationResult = {
-        total_rows: parseResult.total_rows,
-        valid_rows: parseResult.total_rows - errors.length,
-        error_rows: errors.length,
-        errors,
-        can_import: errors.length < parseResult.total_rows * 0.1, // 10% 미만 에러면 진행 가능
+        total_rows: data.total_rows,
+        valid_rows: data.valid_rows,
+        error_rows: data.error_rows,
+        errors: data.errors || [],
+        can_import: data.can_import,
       };
 
       setValidation(validationResult);
@@ -477,6 +534,104 @@ export function DataImportWidget({ onImportComplete, className }: DataImportWidg
     a.download = `sample_${importType}.${format}`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  // ============================================================================
+  // AI Mapping Handler
+  // ============================================================================
+
+  const handleAiMapping = async () => {
+    if (!session || !parseResult) return;
+
+    setIsAiMapping(true);
+    setError(null);
+
+    try {
+      // 토큰 가져오기
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      if (!authSession?.access_token) {
+        throw new Error('인증이 필요합니다.');
+      }
+
+      // 샘플 데이터로 AI 매핑 요청
+      const sampleData = parseResult.preview.slice(0, 3);
+
+      // auto-map-etl Edge Function 호출
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auto-map-etl`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${authSession.access_token}`,
+          },
+          body: JSON.stringify({
+            source_columns: parseResult.columns,
+            sample_data: sampleData,
+            target_schema: importType,
+            required_fields: REQUIRED_FIELDS[importType],
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        // AI 매핑 서비스가 없는 경우 fallback
+        throw new Error('AI 매핑 서비스 연결 실패');
+      }
+
+      const data = await response.json();
+
+      if (!data.success || !data.mapping) {
+        throw new Error(data.error || 'AI 매핑 결과를 가져올 수 없습니다.');
+      }
+
+      // AI 매핑 결과 적용
+      const aiMapping: Record<string, string> = {};
+      for (const [targetField, sourceField] of Object.entries(data.mapping)) {
+        if (sourceField && parseResult.columns.includes(sourceField as string)) {
+          aiMapping[targetField] = sourceField as string;
+        } else if (mapping[targetField]) {
+          // 기존 매핑 유지
+          aiMapping[targetField] = mapping[targetField];
+        }
+      }
+
+      // 기존 매핑에 없는 필드도 포함
+      for (const [targetField, sourceField] of Object.entries(mapping)) {
+        if (!aiMapping[targetField]) {
+          aiMapping[targetField] = sourceField;
+        }
+      }
+
+      setMapping(aiMapping);
+
+      toast({
+        title: 'AI 매핑 완료',
+        description: 'AI가 컬럼 매핑을 제안했습니다. 확인 후 필요시 수정하세요.',
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'AI 매핑 실패';
+      console.warn('AI mapping failed, using rule-based mapping:', message);
+
+      toast({
+        title: 'AI 매핑 사용 불가',
+        description: '규칙 기반 매핑을 사용합니다.',
+        variant: 'default',
+      });
+    } finally {
+      setIsAiMapping(false);
+    }
+  };
+
+  // 매핑 초기화 핸들러
+  const handleResetMapping = () => {
+    if (parseResult?.suggested_mapping) {
+      setMapping(parseResult.suggested_mapping as Record<string, string>);
+      toast({
+        title: '매핑 초기화',
+        description: '자동 감지된 매핑으로 초기화되었습니다.',
+      });
+    }
   };
 
   // ============================================================================
@@ -637,7 +792,51 @@ export function DataImportWidget({ onImportComplete, className }: DataImportWidg
               <span className="text-muted-foreground">
                 파일: {session?.file_name}
               </span>
-              <Badge variant="secondary">{parseResult.total_rows}행</Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary">{parseResult.total_rows}행</Badge>
+                {/* AI 매핑 버튼 */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleAiMapping}
+                        disabled={isAiMapping}
+                        className="gap-1"
+                      >
+                        {isAiMapping ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                        )}
+                        AI 매핑
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>AI가 컬럼을 자동으로 매핑합니다</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                {/* 매핑 초기화 버튼 */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleResetMapping}
+                        className="gap-1"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>초기 매핑으로 되돌리기</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
             </div>
 
             {/* Mapping Table */}
@@ -654,10 +853,26 @@ export function DataImportWidget({ onImportComplete, className }: DataImportWidg
                   {Object.entries(mapping).map(([targetField, sourceField]) => (
                     <TableRow key={targetField}>
                       <TableCell className="font-medium">
-                        {targetField}
-                        {isRequiredField(targetField) && (
-                          <span className="text-destructive ml-1">*</span>
-                        )}
+                        <div className="flex items-center gap-1.5">
+                          <span>
+                            {targetField}
+                            {isRequiredField(targetField) && (
+                              <span className="text-destructive ml-0.5">*</span>
+                            )}
+                          </span>
+                          {FIELD_DESCRIPTIONS[targetField] && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="max-w-xs">{FIELD_DESCRIPTIONS[targetField]}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Select

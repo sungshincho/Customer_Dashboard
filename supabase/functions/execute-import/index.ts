@@ -1,10 +1,11 @@
 // ============================================================================
 // execute-import Edge Function
 // ETL 실행 - 데이터 변환 및 타겟 테이블 저장
+// Phase 2: customers, transactions + line_items 지원
 // ============================================================================
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -27,6 +28,7 @@ interface ExecuteResponse {
   status?: string;
   imported_rows?: number;
   failed_rows?: number;
+  line_items_imported?: number;
   error_details?: Array<{
     batch_start: number;
     batch_end: number;
@@ -42,7 +44,169 @@ const CONFLICT_COLUMNS: Record<string, string> = {
   staff: "staff_code",
   inventory: "product_id",
   transactions: "id",
+  line_items: "id",
 };
+
+// Transactions + Line Items 동시 임포트 함수
+async function importTransactionsWithLineItems(
+  supabase: SupabaseClient,
+  rawData: Record<string, unknown>[],
+  mapping: Record<string, string>,
+  storeId: string | null,
+  userId: string,
+  batchSize: number,
+  skipErrors: boolean,
+  importRecordId?: string
+): Promise<{
+  importedRows: number;
+  failedRows: number;
+  lineItemsImported: number;
+  errorDetails: Array<{ batch_start: number; batch_end: number; error: string }>;
+}> {
+  let importedRows = 0;
+  let failedRows = 0;
+  let lineItemsImported = 0;
+  const errorDetails: Array<{ batch_start: number; batch_end: number; error: string }> = [];
+
+  // 거래를 그룹화 (같은 날짜 + 고객이면 같은 거래)
+  const transactionGroups = new Map<string, {
+    transaction: Record<string, unknown>;
+    lineItems: Array<{ sku: string; quantity: number; unit_price: number }>;
+  }>();
+
+  for (let i = 0; i < rawData.length; i++) {
+    const row = rawData[i];
+    const transformed = transformRow(row, mapping, "transactions", storeId, userId);
+
+    // 그룹 키 생성 (날짜 + 고객 이메일 또는 ID)
+    const dateStr = transformed.transaction_date?.toString().split("T")[0] || "";
+    const customerKey = (transformed._customer_email || transformed.id)?.toString() || "";
+    const groupKey = `${dateStr}_${customerKey}_${i}`; // 각 행을 개별 거래로 처리
+
+    if (!transactionGroups.has(groupKey)) {
+      const lineItem = transformed._line_item as { sku: string; quantity: number; unit_price: number } | undefined;
+      delete transformed._line_item;
+      delete transformed._customer_email;
+
+      transactionGroups.set(groupKey, {
+        transaction: transformed,
+        lineItems: lineItem ? [lineItem] : [],
+      });
+    } else {
+      const group = transactionGroups.get(groupKey)!;
+      const lineItem = transformed._line_item as { sku: string; quantity: number; unit_price: number } | undefined;
+      if (lineItem) {
+        group.lineItems.push(lineItem);
+        // 총액 업데이트
+        const currentAmount = Number(group.transaction.total_amount) || 0;
+        group.transaction.total_amount = currentAmount + (lineItem.quantity * lineItem.unit_price);
+      }
+    }
+  }
+
+  console.log(`📦 Grouped into ${transactionGroups.size} transactions`);
+
+  // 배치로 처리
+  const groups = Array.from(transactionGroups.values());
+
+  for (let i = 0; i < groups.length; i += batchSize) {
+    const batch = groups.slice(i, i + batchSize);
+
+    try {
+      // 1. Transactions 삽입
+      const transactions = batch.map((g) => g.transaction);
+      const { error: txError } = await supabase
+        .from("transactions")
+        .upsert(transactions, { onConflict: "id", ignoreDuplicates: false });
+
+      if (txError) {
+        throw txError;
+      }
+
+      importedRows += transactions.length;
+
+      // 2. Line Items 삽입 (있는 경우)
+      const lineItems: Record<string, unknown>[] = [];
+
+      for (const group of batch) {
+        const transactionId = group.transaction.id;
+
+        for (const item of group.lineItems) {
+          if (item.sku) {
+            // SKU로 product_id 조회
+            const { data: product } = await supabase
+              .from("products")
+              .select("id")
+              .eq("sku", item.sku)
+              .single();
+
+            lineItems.push({
+              id: crypto.randomUUID(),
+              transaction_id: transactionId,
+              product_id: product?.id || null,
+              sku: item.sku,
+              quantity: item.quantity,
+              unit_price: item.unit_price,
+              subtotal: item.quantity * item.unit_price,
+              user_id: userId,
+              store_id: storeId,
+              created_at: new Date().toISOString(),
+            });
+          }
+        }
+      }
+
+      if (lineItems.length > 0) {
+        const { error: liError } = await supabase
+          .from("line_items")
+          .upsert(lineItems, { onConflict: "id", ignoreDuplicates: false });
+
+        if (liError) {
+          console.error("Line items error:", liError);
+          // line_items 에러는 경고로 처리, 트랜잭션은 성공으로 유지
+        } else {
+          lineItemsImported += lineItems.length;
+        }
+      }
+
+      console.log(
+        `✅ Batch ${Math.floor(i / batchSize) + 1}: ${transactions.length} transactions, ${lineItems.length} line items`
+      );
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error(`❌ Batch error at ${i}:`, errorMessage);
+
+      if (skipErrors) {
+        failedRows += batch.length;
+        errorDetails.push({
+          batch_start: i,
+          batch_end: i + batch.length,
+          error: errorMessage,
+        });
+      } else {
+        throw err;
+      }
+    }
+
+    // 진행 상황 업데이트
+    if (importRecordId) {
+      await supabase
+        .from("user_data_imports")
+        .update({
+          imported_rows: importedRows,
+          failed_rows: failedRows,
+          progress: {
+            current: i + batch.length,
+            total: groups.length,
+            percentage: Math.round(((i + batch.length) / groups.length) * 100),
+          },
+        })
+        .eq("id", importRecordId);
+    }
+  }
+
+  return { importedRows, failedRows, lineItemsImported, errorDetails };
+}
 
 // 데이터 변환 함수
 function transformRow(
@@ -123,6 +287,21 @@ function transformRow(
         transformed.transaction_date = new Date(
           transformed.transaction_date as string
         ).toISOString();
+      }
+      // customer_email로 customer_id 조회용 저장
+      if (transformed.customer_email) {
+        transformed._customer_email = transformed.customer_email;
+      }
+      // line_items 데이터 임시 저장
+      if (transformed.item_sku || transformed.quantity || transformed.unit_price) {
+        transformed._line_item = {
+          sku: transformed.item_sku,
+          quantity: Number(transformed.quantity) || 1,
+          unit_price: Number(transformed.unit_price) || 0,
+        };
+        delete transformed.item_sku;
+        delete transformed.quantity;
+        delete transformed.unit_price;
       }
       break;
 
@@ -272,59 +451,80 @@ serve(async (req) => {
       `📊 Processing ${rawData.length} rows in batches of ${batchSize}`
     );
 
-    for (let i = 0; i < rawData.length; i += batchSize) {
-      const batch = rawData.slice(i, i + batchSize);
-      const transformedBatch = batch.map((row) =>
-        transformRow(row, finalMapping, importType, session.store_id, user.id)
+    let lineItemsImported = 0;
+
+    // transactions 임포트의 경우 특별 처리
+    if (importType === "transactions") {
+      const result = await importTransactionsWithLineItems(
+        supabase,
+        rawData,
+        finalMapping,
+        session.store_id,
+        user.id,
+        batchSize,
+        skipErrors,
+        importRecord?.id
       );
-
-      try {
-        // 타겟 테이블에 upsert
-        const { error: upsertError } = await supabase
-          .from(targetTable)
-          .upsert(transformedBatch, {
-            onConflict: conflictColumn,
-            ignoreDuplicates: false,
-          });
-
-        if (upsertError) {
-          throw upsertError;
-        }
-
-        importedRows += transformedBatch.length;
-        console.log(
-          `✅ Batch ${Math.floor(i / batchSize) + 1}: ${transformedBatch.length} rows imported`
+      importedRows = result.importedRows;
+      failedRows = result.failedRows;
+      lineItemsImported = result.lineItemsImported;
+      errorDetails.push(...result.errorDetails);
+    } else {
+      // 일반 임포트 처리
+      for (let i = 0; i < rawData.length; i += batchSize) {
+        const batch = rawData.slice(i, i + batchSize);
+        const transformedBatch = batch.map((row) =>
+          transformRow(row, finalMapping, importType, session.store_id, user.id)
         );
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : String(err);
-        console.error(`❌ Batch error at ${i}:`, errorMessage);
 
-        if (skipErrors) {
-          failedRows += batch.length;
-          errorDetails.push({
-            batch_start: i,
-            batch_end: i + batch.length,
-            error: errorMessage,
-          });
-        } else {
-          throw err;
+        try {
+          // 타겟 테이블에 upsert
+          const { error: upsertError } = await supabase
+            .from(targetTable)
+            .upsert(transformedBatch, {
+              onConflict: conflictColumn,
+              ignoreDuplicates: false,
+            });
+
+          if (upsertError) {
+            throw upsertError;
+          }
+
+          importedRows += transformedBatch.length;
+          console.log(
+            `✅ Batch ${Math.floor(i / batchSize) + 1}: ${transformedBatch.length} rows imported`
+          );
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          console.error(`❌ Batch error at ${i}:`, errorMessage);
+
+          if (skipErrors) {
+            failedRows += batch.length;
+            errorDetails.push({
+              batch_start: i,
+              batch_end: i + batch.length,
+              error: errorMessage,
+            });
+          } else {
+            throw err;
+          }
         }
-      }
 
-      // 진행 상황 업데이트
-      if (importRecord) {
-        await supabase
-          .from("user_data_imports")
-          .update({
-            imported_rows: importedRows,
-            failed_rows: failedRows,
-            progress: {
-              current: i + batch.length,
-              total: rawData.length,
-              percentage: Math.round(((i + batch.length) / rawData.length) * 100),
-            },
-          })
-          .eq("id", importRecord.id);
+        // 진행 상황 업데이트
+        if (importRecord) {
+          await supabase
+            .from("user_data_imports")
+            .update({
+              imported_rows: importedRows,
+              failed_rows: failedRows,
+              progress: {
+                current: i + batch.length,
+                total: rawData.length,
+                percentage: Math.round(((i + batch.length) / rawData.length) * 100),
+              },
+            })
+            .eq("id", importRecord.id);
+        }
       }
     }
 
@@ -372,7 +572,7 @@ serve(async (req) => {
       .eq("id", rawImport.id);
 
     console.log(
-      `✅ Import complete: ${importedRows} imported, ${failedRows} failed`
+      `✅ Import complete: ${importedRows} imported, ${failedRows} failed, ${lineItemsImported} line items`
     );
 
     const response: ExecuteResponse = {
@@ -380,6 +580,7 @@ serve(async (req) => {
       status: finalStatus,
       imported_rows: importedRows,
       failed_rows: failedRows,
+      line_items_imported: lineItemsImported > 0 ? lineItemsImported : undefined,
       error_details: errorDetails.length > 0 ? errorDetails : undefined,
     };
 
