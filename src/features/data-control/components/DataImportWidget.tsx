@@ -5,7 +5,7 @@
 // Phase 2: AI 매핑 통합, 검증 강화
 // ============================================================================
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -218,11 +218,90 @@ export function DataImportWidget({ onImportComplete, className }: DataImportWidg
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAiMapping, setIsAiMapping] = useState(false);
+  const [importRecordId, setImportRecordId] = useState<string | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const { user, orgId } = useAuth();
   const { selectedStore } = useSelectedStore();
   const { toast } = useToast();
+
+  // ============================================================================
+  // Real-time Progress Polling
+  // ============================================================================
+
+  useEffect(() => {
+    if (!isPolling || !importRecordId) return;
+
+    const pollProgress = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('user_data_imports')
+          .select('status, imported_rows, failed_rows, progress, error_details')
+          .eq('id', importRecordId)
+          .single();
+
+        if (error) {
+          console.error('Polling error:', error);
+          return;
+        }
+
+        if (data) {
+          const progress = data.progress as { current: number; total: number; percentage: number } | null;
+
+          setImportResult({
+            status: data.status,
+            imported_rows: data.imported_rows || 0,
+            failed_rows: data.failed_rows || 0,
+            progress: progress || {
+              current: (data.imported_rows || 0) + (data.failed_rows || 0),
+              total: validation?.total_rows || 0,
+              percentage: 0,
+            },
+          });
+
+          // 완료/실패 상태면 polling 중지
+          if (['completed', 'partial', 'failed'].includes(data.status)) {
+            setIsPolling(false);
+            setIsLoading(false);
+            setCurrentStep('complete');
+
+            toast({
+              title: data.status === 'failed' ? '임포트 실패' : '임포트 완료',
+              description: data.status === 'failed'
+                ? '임포트 중 오류가 발생했습니다.'
+                : `${data.imported_rows}행이 성공적으로 임포트되었습니다.`,
+              variant: data.status === 'failed' ? 'destructive' : 'default',
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Polling error:', err);
+      }
+    };
+
+    // 1초마다 polling
+    pollingRef.current = setInterval(pollProgress, 1000);
+
+    // 초기 1회 실행
+    pollProgress();
+
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
+    };
+  }, [isPolling, importRecordId, validation?.total_rows, toast]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
+    };
+  }, []);
 
   // ============================================================================
   // File Upload Handlers
@@ -418,7 +497,7 @@ export function DataImportWidget({ onImportComplete, className }: DataImportWidg
   };
 
   // ============================================================================
-  // Import Handler
+  // Import Handler (with real-time progress polling)
   // ============================================================================
 
   const handleImport = async () => {
@@ -427,6 +506,12 @@ export function DataImportWidget({ onImportComplete, className }: DataImportWidg
     setIsLoading(true);
     setError(null);
     setCurrentStep('import');
+    setImportResult({
+      status: 'processing',
+      imported_rows: 0,
+      failed_rows: 0,
+      progress: { current: 0, total: validation.total_rows, percentage: 0 },
+    });
 
     try {
       // 토큰 가져오기
@@ -435,8 +520,8 @@ export function DataImportWidget({ onImportComplete, className }: DataImportWidg
         throw new Error('인증이 필요합니다.');
       }
 
-      // execute-import Edge Function 호출
-      const response = await fetch(
+      // execute-import Edge Function 호출 (비동기 - 응답을 기다리지 않음)
+      const importPromise = fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/execute-import`,
         {
           method: 'POST',
@@ -456,42 +541,65 @@ export function DataImportWidget({ onImportComplete, className }: DataImportWidg
         }
       );
 
+      // 약간 대기 후 import record 조회 (Edge Function이 record를 생성할 시간)
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // session_id로 import record 조회
+      const { data: importRecord } = await supabase
+        .from('user_data_imports')
+        .select('id')
+        .eq('session_id', session.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (importRecord?.id) {
+        setImportRecordId(importRecord.id);
+        setIsPolling(true);
+      }
+
+      // Edge Function 응답 처리 (polling이 완료 처리를 담당하지만, 에러 처리용)
+      const response = await importPromise;
       const data = await response.json();
 
-      if (!data.success) {
+      if (!data.success && !isPolling) {
         throw new Error(data.error || '임포트에 실패했습니다.');
       }
 
-      const result: ImportResult = {
-        status: data.status,
-        imported_rows: data.imported_rows,
-        failed_rows: data.failed_rows,
-        progress: {
-          current: data.imported_rows + data.failed_rows,
-          total: validation.total_rows,
-          percentage: 100,
-        },
-      };
+      // polling이 아닌 경우 직접 결과 처리
+      if (!isPolling) {
+        const result: ImportResult = {
+          status: data.status,
+          imported_rows: data.imported_rows,
+          failed_rows: data.failed_rows,
+          progress: {
+            current: data.imported_rows + data.failed_rows,
+            total: validation.total_rows,
+            percentage: 100,
+          },
+        };
 
-      setImportResult(result);
-      setCurrentStep('complete');
+        setImportResult(result);
+        setCurrentStep('complete');
 
-      toast({
-        title: '임포트 완료',
-        description: `${result.imported_rows}행이 성공적으로 임포트되었습니다.`,
-      });
+        toast({
+          title: '임포트 완료',
+          description: `${result.imported_rows}행이 성공적으로 임포트되었습니다.`,
+        });
 
-      onImportComplete?.(result);
+        onImportComplete?.(result);
+        setIsLoading(false);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : '임포트 실패';
       setError(message);
       setCurrentStep('validate');
+      setIsPolling(false);
       toast({
         title: '임포트 실패',
         description: message,
         variant: 'destructive',
       });
-    } finally {
       setIsLoading(false);
     }
   };
@@ -508,32 +616,81 @@ export function DataImportWidget({ onImportComplete, className }: DataImportWidg
     setValidation(null);
     setImportResult(null);
     setError(null);
+    setImportRecordId(null);
+    setIsPolling(false);
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+    }
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
   // ============================================================================
-  // Sample Download Handler
+  // Sample Download Handler (generate-template Edge Function 사용)
   // ============================================================================
 
-  const handleDownloadSample = (format: 'csv' | 'xlsx') => {
-    // TODO: 실제 샘플 파일 다운로드 구현
-    const sampleCSV = {
-      products: 'product_name,sku,category,price,stock,display_type\n프리미엄 캐시미어 코트,SKU-OUT-001,아우터,450000,15,hanging',
-      customers: 'customer_name,email,phone,segment,total_purchases\n김철수,kim@example.com,010-1234-5678,VIP,2500000',
-      transactions: 'transaction_date,total_amount,payment_method,customer_email\n2025-01-10,450000,card,kim@example.com',
-      staff: 'staff_code,staff_name,role,department\nEMP001,매니저,manager,관리',
-      inventory: 'product_sku,quantity,min_stock,max_stock\nSKU-OUT-001,15,5,30',
-    };
+  const handleDownloadSample = async (format: 'csv' | 'json') => {
+    try {
+      const { data: { session: authSession } } = await supabase.auth.getSession();
 
-    const blob = new Blob([sampleCSV[importType]], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `sample_${importType}.${format}`;
-    a.click();
-    URL.revokeObjectURL(url);
+      // Edge Function 호출
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-template`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(authSession?.access_token
+              ? { Authorization: `Bearer ${authSession.access_token}` }
+              : {}),
+          },
+          body: JSON.stringify({
+            import_type: importType,
+            format,
+            include_samples: true,
+            language: 'ko',
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!data.success || !data.content) {
+        throw new Error(data.error || '템플릿 생성 실패');
+      }
+
+      // 파일 다운로드
+      const blob = new Blob([data.content], { type: data.mime_type });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = data.filename;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: '템플릿 다운로드',
+        description: `${data.filename} 파일이 다운로드되었습니다.`,
+      });
+    } catch (err) {
+      // Edge Function 실패 시 fallback
+      const fallbackCSV: Record<string, string> = {
+        products: '상품명,SKU,카테고리,가격,재고,진열방식\n프리미엄 캐시미어 코트,SKU-OUT-001,아우터,450000,15,hanging',
+        customers: '고객명,이메일,전화번호,고객등급,총구매액\n김철수,kim@example.com,010-1234-5678,VIP,2500000',
+        transactions: '거래일,거래금액,결제수단,고객이메일\n2025-01-10,450000,card,kim@example.com',
+        staff: '직원코드,직원명,역할,부서\nEMP001,매니저,manager,영업팀',
+        inventory: '상품SKU,재고수량,최소재고,최대재고\nSKU-OUT-001,15,5,30',
+      };
+
+      const blob = new Blob([fallbackCSV[importType]], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${importType}_template_ko.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
   };
 
   // ============================================================================
@@ -775,11 +932,11 @@ export function DataImportWidget({ onImportComplete, className }: DataImportWidg
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => handleDownloadSample('xlsx')}
+                onClick={() => handleDownloadSample('json')}
                 className="text-primary"
               >
                 <Download className="w-4 h-4 mr-1" />
-                샘플 Excel
+                샘플 JSON
               </Button>
             </div>
           </div>

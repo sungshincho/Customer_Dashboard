@@ -25,6 +25,12 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -42,6 +48,8 @@ import {
   Download,
   Eye,
   Trash2,
+  FileJson,
+  FileText,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -225,8 +233,8 @@ export function ImportHistoryWidget({ onRollback, className }: ImportHistoryWidg
     }
   };
 
-  // 에러 리포트 다운로드
-  const handleDownloadErrors = (importRecord: ImportRecord) => {
+  // 에러 리포트 다운로드 (CSV/JSON 포맷 지원)
+  const handleDownloadErrors = (importRecord: ImportRecord, format: 'csv' | 'json' | 'txt' = 'csv') => {
     if (!importRecord.error_details || importRecord.error_details.length === 0) {
       toast({
         title: '에러 없음',
@@ -235,17 +243,73 @@ export function ImportHistoryWidget({ onRollback, className }: ImportHistoryWidg
       return;
     }
 
-    const content = importRecord.error_details
-      .map((err, i) => `${i + 1}. 행 ${err.batch_start}-${err.batch_end}: ${err.error}`)
-      .join('\n');
+    let content: string;
+    let mimeType: string;
+    let extension: string;
 
-    const blob = new Blob([content], { type: 'text/plain' });
+    switch (format) {
+      case 'json':
+        content = JSON.stringify({
+          import_id: importRecord.id,
+          file_name: importRecord.file_name,
+          import_type: importRecord.import_type,
+          total_rows: importRecord.total_rows,
+          imported_rows: importRecord.imported_rows,
+          failed_rows: importRecord.failed_rows,
+          status: importRecord.status,
+          created_at: importRecord.created_at,
+          errors: importRecord.error_details.map((err, i) => ({
+            index: i + 1,
+            batch_start: err.batch_start,
+            batch_end: err.batch_end,
+            error: err.error,
+          })),
+        }, null, 2);
+        mimeType = 'application/json';
+        extension = 'json';
+        break;
+
+      case 'csv':
+        const csvHeaders = ['번호', '시작행', '종료행', '에러 메시지'];
+        const csvRows = importRecord.error_details.map((err, i) =>
+          [i + 1, err.batch_start, err.batch_end, `"${err.error.replace(/"/g, '""')}"`].join(',')
+        );
+        content = [csvHeaders.join(','), ...csvRows].join('\n');
+        mimeType = 'text/csv';
+        extension = 'csv';
+        break;
+
+      default: // txt
+        content = `임포트 에러 리포트
+========================================
+파일: ${importRecord.file_name}
+타입: ${importRecord.import_type}
+일시: ${importRecord.created_at}
+총 행: ${importRecord.total_rows}
+성공: ${importRecord.imported_rows}
+실패: ${importRecord.failed_rows}
+========================================
+
+에러 목록:
+${importRecord.error_details.map((err, i) =>
+  `${i + 1}. 행 ${err.batch_start}-${err.batch_end}: ${err.error}`
+).join('\n')}`;
+        mimeType = 'text/plain';
+        extension = 'txt';
+    }
+
+    const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `import_errors_${importRecord.id.slice(0, 8)}.txt`;
+    a.download = `import_errors_${importRecord.id.slice(0, 8)}.${extension}`;
     a.click();
     URL.revokeObjectURL(url);
+
+    toast({
+      title: '다운로드 완료',
+      description: `에러 리포트가 ${extension.toUpperCase()} 형식으로 저장되었습니다.`,
+    });
   };
 
   // ============================================================================
@@ -341,25 +405,33 @@ export function ImportHistoryWidget({ onRollback, className }: ImportHistoryWidg
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
-                          {/* 에러 다운로드 */}
+                          {/* 에러 다운로드 (포맷 선택) */}
                           {record.error_details && record.error_details.length > 0 && (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7 w-7 p-0"
-                                    onClick={() => handleDownloadErrors(record)}
-                                  >
-                                    <Download className="w-3.5 h-3.5" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>에러 리포트 다운로드</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleDownloadErrors(record, 'csv')}>
+                                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                                  CSV 형식
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDownloadErrors(record, 'json')}>
+                                  <FileJson className="w-4 h-4 mr-2" />
+                                  JSON 형식
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDownloadErrors(record, 'txt')}>
+                                  <FileText className="w-4 h-4 mr-2" />
+                                  텍스트 형식
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           )}
 
                           {/* 롤백 버튼 */}
