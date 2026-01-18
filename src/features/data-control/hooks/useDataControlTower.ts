@@ -119,6 +119,98 @@ async function ensureERPCoverage(result: DataControlTowerStatus, storeId: string
     const availableSources = sources.filter(c => c > 0).length;
     result.quality_score.overall_score = Math.round((availableSources / 5) * 100);
     result.quality_score.confidence_level = result.quality_score.overall_score >= 75 ? 'high' : result.quality_score.overall_score >= 50 ? 'medium' : 'low';
+
+    // pipeline_stats.data_flows가 없으면 coverage 기반으로 생성
+    if (!result.pipeline_stats?.data_flows) {
+      const posCount = coverage.pos?.record_count || 0;
+      const sensorCount = coverage.sensor?.record_count || 0;
+      const customerCount = coverage.crm?.record_count || 0;
+      const productCount = coverage.product?.record_count || 0;
+      const l3Count = result.pipeline_stats?.l3_records || 0;
+
+      result.pipeline_stats = {
+        ...result.pipeline_stats,
+        data_flows: [
+          {
+            source: 'pos' as const,
+            label: 'POS',
+            icon: 'shopping-cart',
+            inputCount: posCount,
+            outputTable: 'transactions',
+            outputCount: posCount,
+            kpiConnected: l3Count > 0 && posCount > 0,
+            status: posCount > 0 ? 'active' as const : 'inactive' as const,
+            lastSync: null,
+            trend: 'stable' as const,
+          },
+          {
+            source: 'sensor' as const,
+            label: '센서',
+            icon: 'wifi',
+            inputCount: sensorCount,
+            outputTable: 'zone_events',
+            outputCount: result.pipeline_stats?.l2_records || sensorCount,
+            kpiConnected: l3Count > 0 && sensorCount > 0,
+            status: sensorCount > 0 ? 'active' as const : 'inactive' as const,
+            lastSync: null,
+            trend: 'stable' as const,
+          },
+          {
+            source: 'customer' as const,
+            label: '고객',
+            icon: 'users',
+            inputCount: customerCount,
+            outputTable: 'customers',
+            outputCount: customerCount,
+            kpiConnected: false,
+            status: customerCount > 0 ? 'active' as const : 'inactive' as const,
+            lastSync: null,
+          },
+          {
+            source: 'inventory' as const,
+            label: '재고',
+            icon: 'package',
+            inputCount: erpRecordCount,
+            outputTable: 'inventory_levels',
+            outputCount: erpRecordCount,
+            kpiConnected: false,
+            status: erpRecordCount > 0 ? 'active' as const : 'inactive' as const,
+            lastSync: null,
+          },
+          {
+            source: 'import' as const,
+            label: '파일',
+            icon: 'file-up',
+            inputCount: result.pipeline_stats?.raw_imports?.total || 0,
+            outputTable: 'user_data_imports',
+            outputCount: result.pipeline_stats?.raw_imports?.completed || 0,
+            kpiConnected: false,
+            status: (result.pipeline_stats?.raw_imports?.total || 0) > 0 ? 'active' as const : 'inactive' as const,
+            lastSync: null,
+          },
+        ],
+        pipeline_health: {
+          status: availableSources >= 3 ? 'healthy' as const :
+                  availableSources >= 1 ? 'warning' as const : 'unknown' as const,
+          message: availableSources >= 3
+            ? '데이터 파이프라인이 정상 작동 중입니다.'
+            : availableSources >= 1
+              ? '일부 데이터 소스가 미연동 상태입니다.'
+              : '데이터 소스를 연결해주세요.',
+          warnings: [
+            ...(posCount === 0 ? ['POS 데이터가 없습니다.'] : []),
+            ...(sensorCount === 0 ? ['센서 데이터가 없습니다.'] : []),
+            ...(erpRecordCount === 0 ? ['재고 데이터가 없습니다.'] : []),
+          ],
+        },
+        today_processed: {
+          input: result.pipeline_stats?.raw_imports?.total || 0,
+          transformed: result.pipeline_stats?.l2_records || 0,
+          aggregated: l3Count,
+          failed: result.pipeline_stats?.raw_imports?.failed || 0,
+        },
+      };
+    }
   }
 
   return result;
