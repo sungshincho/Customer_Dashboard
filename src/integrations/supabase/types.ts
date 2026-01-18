@@ -3356,6 +3356,42 @@ export type Database = {
           },
         ]
       }
+      import_type_schemas: {
+        Row: {
+          created_at: string | null
+          id: string
+          import_type: string
+          optional_fields: Json | null
+          required_fields: Json
+          sample_data: Json | null
+          target_table: string
+          updated_at: string | null
+          validation_rules: Json | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          import_type: string
+          optional_fields?: Json | null
+          required_fields: Json
+          sample_data?: Json | null
+          target_table: string
+          updated_at?: string | null
+          validation_rules?: Json | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          import_type?: string
+          optional_fields?: Json | null
+          required_fields?: Json
+          sample_data?: Json | null
+          target_table?: string
+          updated_at?: string | null
+          validation_rules?: Json | null
+        }
+        Relationships: []
+      }
       inventory: {
         Row: {
           id: string
@@ -4281,6 +4317,75 @@ export type Database = {
           },
           {
             foreignKeyName: "line_items_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      model_3d_files: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          display_name: string
+          file_name: string
+          file_path: string
+          file_size: number
+          file_type: string
+          id: string
+          metadata: Json | null
+          org_id: string | null
+          status: string | null
+          store_id: string | null
+          thumbnail_url: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          display_name: string
+          file_name: string
+          file_path: string
+          file_size: number
+          file_type: string
+          id?: string
+          metadata?: Json | null
+          org_id?: string | null
+          status?: string | null
+          store_id?: string | null
+          thumbnail_url?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          display_name?: string
+          file_name?: string
+          file_path?: string
+          file_size?: number
+          file_type?: string
+          id?: string
+          metadata?: Json | null
+          org_id?: string | null
+          status?: string | null
+          store_id?: string | null
+          thumbnail_url?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "model_3d_files_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "model_3d_files_store_id_fkey"
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
@@ -5883,6 +5988,7 @@ export type Database = {
           progress: Json | null
           raw_data: Json | null
           row_count: number | null
+          session_id: string | null
           source_name: string | null
           source_type: string
           started_at: string | null
@@ -5908,6 +6014,7 @@ export type Database = {
           progress?: Json | null
           raw_data?: Json | null
           row_count?: number | null
+          session_id?: string | null
           source_name?: string | null
           source_type: string
           started_at?: string | null
@@ -5933,6 +6040,7 @@ export type Database = {
           progress?: Json | null
           raw_data?: Json | null
           row_count?: number | null
+          session_id?: string | null
           source_name?: string | null
           source_type?: string
           started_at?: string | null
@@ -5954,6 +6062,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "raw_imports_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "upload_sessions"
             referencedColumns: ["id"]
           },
           {
@@ -7272,10 +7387,12 @@ export type Database = {
           created_at: string | null
           id: string
           is_active: boolean | null
+          metadata: Json | null
           org_id: string | null
           recipe_data: Json | null
           scene_name: string
           scene_type: string | null
+          staff_positions: Json | null
           store_id: string | null
           updated_at: string | null
           user_id: string
@@ -7284,10 +7401,12 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_active?: boolean | null
+          metadata?: Json | null
           org_id?: string | null
           recipe_data?: Json | null
           scene_name: string
           scene_type?: string | null
+          staff_positions?: Json | null
           store_id?: string | null
           updated_at?: string | null
           user_id: string
@@ -7296,10 +7415,12 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_active?: boolean | null
+          metadata?: Json | null
           org_id?: string | null
           recipe_data?: Json | null
           scene_name?: string
           scene_type?: string | null
+          staff_positions?: Json | null
           store_id?: string | null
           updated_at?: string | null
           user_id?: string
@@ -8218,40 +8339,70 @@ export type Database = {
       }
       upload_sessions: {
         Row: {
+          column_mapping: Json | null
           created_at: string
+          file_name: string | null
+          file_path: string | null
+          file_size: number | null
+          file_type: string | null
           id: string
+          import_type: string | null
           org_id: string | null
+          parsed_preview: Json | null
           processed_files: number | null
+          row_count: number | null
           session_name: string | null
           status: string
           store_id: string | null
+          target_table: string | null
           total_files: number | null
           updated_at: string
           user_id: string
+          validation_errors: Json | null
         }
         Insert: {
+          column_mapping?: Json | null
           created_at?: string
+          file_name?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          file_type?: string | null
           id?: string
+          import_type?: string | null
           org_id?: string | null
+          parsed_preview?: Json | null
           processed_files?: number | null
+          row_count?: number | null
           session_name?: string | null
           status?: string
           store_id?: string | null
+          target_table?: string | null
           total_files?: number | null
           updated_at?: string
           user_id: string
+          validation_errors?: Json | null
         }
         Update: {
+          column_mapping?: Json | null
           created_at?: string
+          file_name?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          file_type?: string | null
           id?: string
+          import_type?: string | null
           org_id?: string | null
+          parsed_preview?: Json | null
           processed_files?: number | null
+          row_count?: number | null
           session_name?: string | null
           status?: string
           store_id?: string | null
+          target_table?: string | null
           total_files?: number | null
           updated_at?: string
           user_id?: string
+          validation_errors?: Json | null
         }
         Relationships: [
           {
@@ -8377,16 +8528,23 @@ export type Database = {
           data_type: string
           error_details: Json | null
           error_message: string | null
+          failed_rows: number | null
           file_name: string
           id: string
+          import_type: string | null
+          imported_rows: number | null
           is_paused: boolean | null
           org_id: string | null
           progress: Json | null
           raw_data: Json | null
+          rolled_back_at: string | null
+          rolled_back_rows: number | null
           row_count: number | null
           started_at: string | null
           status: string
           store_id: string | null
+          target_table: string | null
+          total_rows: number | null
           updated_at: string
           user_id: string
         }
@@ -8398,16 +8556,23 @@ export type Database = {
           data_type: string
           error_details?: Json | null
           error_message?: string | null
+          failed_rows?: number | null
           file_name: string
           id?: string
+          import_type?: string | null
+          imported_rows?: number | null
           is_paused?: boolean | null
           org_id?: string | null
           progress?: Json | null
           raw_data?: Json | null
+          rolled_back_at?: string | null
+          rolled_back_rows?: number | null
           row_count?: number | null
           started_at?: string | null
           status?: string
           store_id?: string | null
+          target_table?: string | null
+          total_rows?: number | null
           updated_at?: string
           user_id: string
         }
@@ -8419,16 +8584,23 @@ export type Database = {
           data_type?: string
           error_details?: Json | null
           error_message?: string | null
+          failed_rows?: number | null
           file_name?: string
           id?: string
+          import_type?: string | null
+          imported_rows?: number | null
           is_paused?: boolean | null
           org_id?: string | null
           progress?: Json | null
           raw_data?: Json | null
+          rolled_back_at?: string | null
+          rolled_back_rows?: number | null
           row_count?: number | null
           started_at?: string | null
           status?: string
           store_id?: string | null
+          target_table?: string | null
+          total_rows?: number | null
           updated_at?: string
           user_id?: string
         }
@@ -10286,6 +10458,19 @@ export type Database = {
         }
         Returns: Json
       }
+      create_import_session: {
+        Args: {
+          p_file_name: string
+          p_file_path: string
+          p_file_size: number
+          p_file_type: string
+          p_import_type: string
+          p_org_id: string
+          p_store_id: string
+          p_user_id: string
+        }
+        Returns: string
+      }
       create_sync_log: {
         Args: {
           p_connection_id: string
@@ -10314,6 +10499,19 @@ export type Database = {
           p_visits_per_day?: number
         }
         Returns: undefined
+      }
+      get_active_import_sessions: {
+        Args: { p_store_id?: string; p_user_id: string }
+        Returns: {
+          created_at: string
+          file_name: string
+          id: string
+          import_type: string
+          row_count: number
+          status: string
+          target_table: string
+          updated_at: string
+        }[]
       }
       get_all_data_sources: {
         Args: { p_org_id: string; p_store_id?: string }
@@ -10453,6 +10651,21 @@ export type Database = {
           transaction_count: number
           visitor_count: number
         }[]
+      }
+      get_import_schema: {
+        Args: { p_import_type: string }
+        Returns: {
+          import_type: string
+          optional_fields: Json
+          required_fields: Json
+          sample_data: Json
+          target_table: string
+          validation_rules: Json
+        }[]
+      }
+      get_import_target_table: {
+        Args: { p_import_type: string }
+        Returns: string
       }
       get_kpi_lineage: {
         Args: {
@@ -10649,6 +10862,17 @@ export type Database = {
           p_url?: string
         }
         Returns: Json
+      }
+      update_import_session_status: {
+        Args: {
+          p_column_mapping?: Json
+          p_parsed_preview?: Json
+          p_row_count?: number
+          p_session_id: string
+          p_status: string
+          p_validation_errors?: Json
+        }
+        Returns: boolean
       }
       update_sync_log: {
         Args: {
