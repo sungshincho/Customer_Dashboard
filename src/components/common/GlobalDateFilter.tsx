@@ -145,64 +145,55 @@ export function GlobalDateFilter({
 
   return (
     <div className={cn('flex items-center gap-3', className)}>
-      {/* 달력 아이콘 + 프리셋 버튼 - 탭 스타일 래퍼 */}
+      {/* 달력 아이콘 + 프리셋 버튼 - SelectTrigger 스타일 */}
       <div
-        className="inline-flex rounded-xl p-[1px]"
+        className="flex items-center gap-1 h-10 px-2 rounded-xl transition-all duration-200"
         style={{
           background: isDark
-            ? 'linear-gradient(145deg, rgba(75,75,85,0.8) 0%, rgba(50,50,60,0.6) 50%, rgba(65,65,75,0.8) 100%)'
-            : 'linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(220,220,230,0.6) 50%, rgba(255,255,255,0.93) 100%)',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.04), 0 4px 8px rgba(0,0,0,0.05), 0 8px 16px rgba(0,0,0,0.04)',
+            ? 'linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)'
+            : 'linear-gradient(145deg, rgba(255,255,255,0.9) 0%, rgba(250,250,255,0.8) 100%)',
+          border: isDark ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(0,0,0,0.08)',
+          boxShadow: isDark
+            ? 'inset 0 1px 1px rgba(255,255,255,0.06), 0 2px 4px rgba(0,0,0,0.2)'
+            : '0 1px 2px rgba(0,0,0,0.04), inset 0 1px 1px rgba(255,255,255,0.8)',
         }}
       >
-        <div
-          className="flex items-center gap-1 h-10 px-1 rounded-[11px]"
-          style={{
-            background: isDark
-              ? 'linear-gradient(165deg, rgba(40,40,50,0.95) 0%, rgba(30,30,40,0.9) 100%)'
-              : 'linear-gradient(165deg, rgba(255,255,255,0.92) 0%, rgba(250,250,254,0.85) 50%, rgba(255,255,255,0.9) 100%)',
-            backdropFilter: 'blur(40px)',
-          }}
-        >
-          {!compact && (
-            <div className="flex items-center justify-center w-8 h-8">
-              <CalendarIcon
-                className="h-4 w-4"
-                style={{
-                  color: isDark ? 'rgba(255,255,255,0.5)' : '#515158',
-                }}
-              />
-            </div>
-          )}
-          {presets.map((preset) => {
-            const isActive = dateRange.preset === preset;
-            return (
-              <button
-                key={preset}
-                type="button"
-                onClick={() => setPreset(preset)}
-                className="px-3 h-8 rounded-lg text-xs font-medium transition-all duration-200"
-                style={
-                  isActive
-                    ? {
-                        background: 'linear-gradient(145deg, #222228 0%, #2c2c34 45%, #1c1c24 100%)',
-                        border: '1px solid rgba(255,255,255,0.08)',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.16), 0 4px 8px rgba(0,0,0,0.14), inset 0 1px 1px rgba(255,255,255,0.1)',
-                        color: '#ffffff',
-                        textShadow: '0 1px 2px rgba(0,0,0,0.3)',
-                      }
-                    : {
-                        background: 'transparent',
-                        border: '1px solid transparent',
-                        color: isDark ? 'rgba(255,255,255,0.5)' : '#515158',
-                      }
-                }
-              >
-                {PRESET_LABELS[preset]}
-              </button>
-            );
-          })}
-        </div>
+        {!compact && (
+          <CalendarIcon
+            className="h-4 w-4 mr-1"
+            style={{
+              color: isDark ? 'rgba(255,255,255,0.5)' : '#515158',
+            }}
+          />
+        )}
+        {presets.map((preset) => {
+          const isActive = dateRange.preset === preset;
+          return (
+            <button
+              key={preset}
+              type="button"
+              onClick={() => setPreset(preset)}
+              className="px-2 h-6 rounded-md text-xs font-medium transition-all duration-200"
+              style={
+                isActive
+                  ? {
+                      background: 'linear-gradient(145deg, #222228 0%, #2c2c34 45%, #1c1c24 100%)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.12), inset 0 1px 1px rgba(255,255,255,0.08)',
+                      color: '#ffffff',
+                      textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                    }
+                  : {
+                      background: 'transparent',
+                      border: '1px solid transparent',
+                      color: isDark ? 'rgba(255,255,255,0.5)' : '#515158',
+                    }
+              }
+            >
+              {PRESET_LABELS[preset]}
+            </button>
+          );
+        })}
       </div>
 
       {/* 직접 설정 버튼 - SelectTrigger 스타일 */}
