@@ -318,12 +318,9 @@ export function ContextDataSourceCards({ sources, isLoading }: ContextDataSource
   return (
     <GlassCard dark={isDark}>
       <div style={{ padding: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-          <div>
-            <span style={text3D.label}>Context Data Sources</span>
-            <h3 style={{ margin: '4px 0 0 0', ...text3D.title }}>컨텍스트 데이터 소스</h3>
-          </div>
-          <span style={text3D.small}>날씨, 공휴일, 이벤트 등</span>
+        <div style={{ marginBottom: '16px' }}>
+          <span style={text3D.label}>Context Data Sources</span>
+          <h3 style={{ margin: '4px 0 0 0', ...text3D.title }}>컨텍스트 데이터 소스</h3>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {sources.map((source) => {
@@ -467,12 +464,9 @@ export function UnifiedDataSourceCards({
 
         {/* 컨텍스트 데이터 소스 섹션 */}
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <div>
-              <span style={text3D.label}>Context Data Sources</span>
-              <h3 style={{ margin: '4px 0 0 0', ...text3D.title }}>컨텍스트 데이터 소스</h3>
-            </div>
-            <span style={text3D.small}>날씨, 공휴일, 이벤트 등</span>
+          <div style={{ marginBottom: '16px' }}>
+            <span style={text3D.label}>Context Data Sources</span>
+            <h3 style={{ margin: '4px 0 0 0', ...text3D.title }}>컨텍스트 데이터 소스</h3>
           </div>
 
           {isContextLoading ? (
