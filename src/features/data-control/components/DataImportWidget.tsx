@@ -196,6 +196,85 @@ const FIELD_DESCRIPTIONS: Record<string, string> = {
   location: '위치/구역',
 };
 
+// 규칙 기반 매핑용 컬럼 별칭 (parse-file Edge Function과 동기화)
+const MAPPING_RULES: Record<ImportType, Record<string, string[]>> = {
+  products: {
+    product_name: ['product_name', '상품명', 'name', '제품명', 'item_name', 'title', '품명', '제품', '상품'],
+    sku: ['sku', 'SKU', '상품코드', 'product_code', 'item_code', 'code', '코드', '품번'],
+    category: ['category', '카테고리', '분류', 'type', '품목', '종류', '대분류'],
+    price: ['price', '가격', '판매가', 'selling_price', '정가', '단가', '금액', 'unit_price'],
+    stock: ['stock', '재고', 'quantity', '수량', 'inventory', '재고수량', 'qty'],
+    cost_price: ['cost_price', '원가', 'cost', '매입가', '입고가', '도매가', '공급가'],
+    display_type: ['display_type', '진열타입', '진열방식', 'display', '디스플레이'],
+    description: ['description', '설명', '상세설명', '메모', '비고', 'note', '상세', '특이사항'],
+    brand: ['brand', '브랜드', '제조사', 'manufacturer'],
+  },
+  customers: {
+    customer_name: ['customer_name', '고객명', 'name', '이름', '성명', '고객', '회원명'],
+    email: ['email', '이메일', 'e-mail', 'mail'],
+    phone: ['phone', '전화번호', 'tel', '휴대폰', 'mobile', '연락처', '핸드폰', 'phone_number'],
+    segment: ['segment', '등급', 'tier', '회원등급', 'grade', '고객등급', 'membership'],
+    total_purchases: ['total_purchases', '총구매액', '구매액', '누적구매', 'total_amount'],
+    last_visit_date: ['last_visit_date', '마지막방문일', '최근방문', 'last_visit'],
+  },
+  transactions: {
+    transaction_date: ['transaction_date', '거래일', 'date', '날짜', '결제일', '주문일', 'order_date'],
+    total_amount: ['total_amount', '총금액', 'amount', '금액', '결제금액', '합계', 'total'],
+    payment_method: ['payment_method', '결제수단', 'payment', '결제방법', '지불방법'],
+    customer_email: ['customer_email', '고객이메일', 'email', 'customer_id', '고객번호'],
+    item_sku: ['item_sku', '상품코드', 'sku', 'product_code', '품번'],
+    quantity: ['quantity', '수량', 'qty', '개수'],
+    unit_price: ['unit_price', '단가', 'price', '가격'],
+  },
+  staff: {
+    staff_name: ['staff_name', '직원명', 'name', '이름', '성명'],
+    staff_code: ['staff_code', '직원코드', 'code', '사번', 'employee_id', 'emp_code'],
+    role: ['role', '역할', '직책', 'position', '직위'],
+    department: ['department', '부서', 'dept', '팀'],
+    email: ['email', '이메일'],
+    phone: ['phone', '전화번호', '연락처'],
+  },
+  inventory: {
+    product_sku: ['product_sku', 'sku', '상품코드', 'product_code', '품번'],
+    quantity: ['quantity', '수량', '재고', 'stock', 'qty'],
+    min_stock: ['min_stock', '최소재고', 'min', '안전재고'],
+    max_stock: ['max_stock', '최대재고', 'max'],
+    reorder_point: ['reorder_point', '재주문점', '발주점'],
+    location: ['location', '위치', '보관위치', '창고'],
+  },
+};
+
+// 규칙 기반 매핑 함수
+function applyRuleBasedMapping(
+  columns: string[],
+  importType: ImportType,
+  currentMapping: Record<string, string>
+): Record<string, string> {
+  const rules = MAPPING_RULES[importType] || {};
+  const newMapping: Record<string, string> = { ...currentMapping };
+
+  for (const [targetField, sourceOptions] of Object.entries(rules)) {
+    // 이미 매핑된 필드는 건너뜀
+    if (newMapping[targetField]) continue;
+
+    // 컬럼명과 규칙 매칭
+    const matchedColumn = columns.find((col) =>
+      sourceOptions.some(
+        (opt) =>
+          col.toLowerCase().replace(/[_\s-]/g, '') ===
+            opt.toLowerCase().replace(/[_\s-]/g, '') ||
+          col.toLowerCase().includes(opt.toLowerCase())
+      )
+    );
+
+    if (matchedColumn) {
+      newMapping[targetField] = matchedColumn;
+    }
+  }
+
+  return newMapping;
+}
+
 // ============================================================================
 // Component
 // ============================================================================
@@ -770,11 +849,34 @@ export function DataImportWidget({ onImportComplete, className }: DataImportWidg
       const message = err instanceof Error ? err.message : 'AI 매핑 실패';
       console.warn('AI mapping failed, using rule-based mapping:', message);
 
-      toast({
-        title: 'AI 매핑 사용 불가',
-        description: '규칙 기반 매핑을 사용합니다.',
-        variant: 'default',
-      });
+      // AI 매핑 실패 시 규칙 기반 매핑 적용
+      if (parseResult?.columns) {
+        const ruleBasedMapping = applyRuleBasedMapping(
+          parseResult.columns,
+          importType,
+          mapping
+        );
+        setMapping(ruleBasedMapping);
+
+        // 새로 매핑된 필드 수 계산
+        const newMappedCount = Object.values(ruleBasedMapping).filter(v => v).length;
+        const previousMappedCount = Object.values(mapping).filter(v => v).length;
+        const improved = newMappedCount > previousMappedCount;
+
+        toast({
+          title: 'AI 매핑 사용 불가',
+          description: improved
+            ? `규칙 기반 매핑 적용 완료 (${newMappedCount}개 필드 매핑됨)`
+            : '규칙 기반 매핑을 적용했습니다. 매핑을 확인해주세요.',
+          variant: 'default',
+        });
+      } else {
+        toast({
+          title: 'AI 매핑 사용 불가',
+          description: '파일을 다시 업로드해주세요.',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setIsAiMapping(false);
     }
