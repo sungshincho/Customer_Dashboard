@@ -22,6 +22,29 @@ import { ko } from 'date-fns/locale';
 import { useState, useCallback, useEffect } from 'react';
 import { DateRange } from 'react-day-picker';
 
+// 다크 모드 감지 hook
+function useDarkMode() {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+
+    checkDarkMode();
+
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  return isDark;
+}
+
 const presets: PresetPeriod[] = ['today', '7d', '30d', '90d'];
 
 interface GlobalDateFilterProps {
@@ -37,6 +60,7 @@ export function GlobalDateFilter({
 }: GlobalDateFilterProps) {
   const { dateRange, setPreset, setCustomRange } = useDateFilterStore();
   const [isOpen, setIsOpen] = useState(false);
+  const isDark = useDarkMode();
 
   // H-6: 임시 선택 상태 (팝오버 열릴 때 리셋됨)
   const [tempRange, setTempRange] = useState<DateRange | undefined>(undefined);
@@ -120,48 +144,95 @@ export function GlobalDateFilter({
   };
 
   return (
-    <div className={cn('flex items-center gap-2', className)}>
-      {!compact && (
-        <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-      )}
-      <div className="flex gap-1">
-        {presets.map((preset) => (
-          <Button
-            key={preset}
-            variant={dateRange.preset === preset ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => setPreset(preset)}
-            className={cn(
-              'h-7 px-2 text-xs',
-              dateRange.preset === preset && 'shadow-sm'
-            )}
-          >
-            {PRESET_LABELS[preset]}
-          </Button>
-        ))}
+    <div className={cn('flex items-center gap-3', className)}>
+      {/* 달력 아이콘 + 프리셋 버튼 - 탭 스타일 래퍼 */}
+      <div
+        className="inline-flex rounded-2xl p-[1.5px]"
+        style={{
+          background: isDark
+            ? 'linear-gradient(145deg, rgba(75,75,85,0.8) 0%, rgba(50,50,60,0.6) 50%, rgba(65,65,75,0.8) 100%)'
+            : 'linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(220,220,230,0.6) 50%, rgba(255,255,255,0.93) 100%)',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.04), 0 4px 8px rgba(0,0,0,0.05), 0 8px 16px rgba(0,0,0,0.04)',
+        }}
+      >
+        <div
+          className="flex items-center gap-1 p-1.5 rounded-[15px]"
+          style={{
+            background: isDark
+              ? 'linear-gradient(165deg, rgba(40,40,50,0.95) 0%, rgba(30,30,40,0.9) 100%)'
+              : 'linear-gradient(165deg, rgba(255,255,255,0.92) 0%, rgba(250,250,254,0.85) 50%, rgba(255,255,255,0.9) 100%)',
+            backdropFilter: 'blur(40px)',
+          }}
+        >
+          {!compact && (
+            <div className="flex items-center justify-center w-8 h-8">
+              <CalendarIcon
+                className="h-4 w-4"
+                style={{
+                  color: isDark ? 'rgba(255,255,255,0.5)' : '#515158',
+                }}
+              />
+            </div>
+          )}
+          {presets.map((preset) => {
+            const isActive = dateRange.preset === preset;
+            return (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => setPreset(preset)}
+                className="px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200"
+                style={
+                  isActive
+                    ? {
+                        background: 'linear-gradient(145deg, #222228 0%, #2c2c34 45%, #1c1c24 100%)',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.16), 0 4px 8px rgba(0,0,0,0.14), inset 0 1px 1px rgba(255,255,255,0.1)',
+                        color: '#ffffff',
+                        textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                      }
+                    : {
+                        background: 'transparent',
+                        border: '1px solid transparent',
+                        color: isDark ? 'rgba(255,255,255,0.5)' : '#515158',
+                      }
+                }
+              >
+                {PRESET_LABELS[preset]}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
+      {/* 직접 설정 버튼 - SelectTrigger 스타일 */}
       {showCustom && (
         <Popover open={isOpen} onOpenChange={handleOpenChange}>
           <PopoverTrigger asChild>
-            <Button
-              variant={dateRange.preset === 'custom' ? 'default' : 'outline'}
-              size="sm"
-              className={cn(
-                'h-7 gap-1 text-xs',
-                dateRange.preset === 'custom' && 'shadow-sm'
-              )}
+            <button
+              type="button"
+              className="flex h-10 items-center justify-center gap-2 rounded-xl px-3 text-sm transition-all duration-200"
+              style={{
+                background: isDark
+                  ? 'linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)'
+                  : 'linear-gradient(145deg, rgba(255,255,255,0.9) 0%, rgba(250,250,255,0.8) 100%)',
+                border: isDark ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(0,0,0,0.08)',
+                boxShadow: isDark
+                  ? 'inset 0 1px 1px rgba(255,255,255,0.06), 0 2px 4px rgba(0,0,0,0.2)'
+                  : '0 1px 2px rgba(0,0,0,0.04), inset 0 1px 1px rgba(255,255,255,0.8)',
+                color: isDark ? '#ffffff' : '#1a1a1f',
+              }}
             >
-              <CalendarIcon className="h-3 w-3" />
+              <CalendarIcon className="h-4 w-4" />
               {dateRange.preset === 'custom' ? (
-                <>
+                <span className="text-xs">
                   {format(parseISO(dateRange.startDate), 'M/d', { locale: ko })} -{' '}
                   {format(parseISO(dateRange.endDate), 'M/d', { locale: ko })}
-                </>
+                </span>
               ) : (
-                '직접 설정'
+                <span className="text-xs">직접 설정</span>
               )}
-            </Button>
+            </button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="end">
             <div className="p-3 border-b flex items-center justify-between">
