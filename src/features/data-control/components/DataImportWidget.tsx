@@ -1133,16 +1133,16 @@ export function DataImportWidget({ onImportComplete, className }: DataImportWidg
                       </TableCell>
                       <TableCell>
                         <Select
-                          value={sourceField || ''}
+                          value={sourceField || '__none__'}
                           onValueChange={(value) =>
-                            setMapping({ ...mapping, [targetField]: value })
+                            setMapping({ ...mapping, [targetField]: value === '__none__' ? '' : value })
                           }
                         >
                           <SelectTrigger className="h-8">
                             <SelectValue placeholder="선택 안함" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">-- 선택 안함 --</SelectItem>
+                            <SelectItem value="__none__">-- 선택 안함 --</SelectItem>
                             {parseResult.columns.map((col) => (
                               <SelectItem key={col} value={col}>
                                 {col}
