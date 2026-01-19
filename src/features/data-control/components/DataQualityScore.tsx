@@ -144,8 +144,11 @@ const Badge3D = ({ children, dark = false, variant = 'default' }: { children: Re
 
 const GlowProgressBar = ({ value, isDark }: { value: number; isDark: boolean }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [animatedProgress, setAnimatedProgress] = useState(0);
+  const [canvasWidth, setCanvasWidth] = useState(0);
 
+  // 애니메이션
   useEffect(() => {
     const start = performance.now();
     const duration = 800;
@@ -157,28 +160,46 @@ const GlowProgressBar = ({ value, isDark }: { value: number; isDark: boolean }) 
     requestAnimationFrame(animate);
   }, [value]);
 
+  // ResizeObserver로 컨테이너 크기 감지
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setCanvasWidth(entry.contentRect.width);
+      }
+    });
+
+    observer.observe(container);
+    // 초기 크기 설정
+    setCanvasWidth(container.offsetWidth);
+
+    return () => observer.disconnect();
+  }, []);
+
+  // 캔버스 그리기
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || canvasWidth === 0) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const width = canvas.offsetWidth;
     const height = 10;
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = width * dpr;
+    canvas.width = canvasWidth * dpr;
     canvas.height = height * dpr;
     ctx.scale(dpr, dpr);
-    ctx.clearRect(0, 0, width, height);
+    ctx.clearRect(0, 0, canvasWidth, height);
 
     // 배경
     ctx.fillStyle = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)';
     ctx.beginPath();
-    ctx.roundRect(0, 0, width, height, 5);
+    ctx.roundRect(0, 0, canvasWidth, height, 5);
     ctx.fill();
 
     // 채움 바
-    const fillWidth = (Math.min(animatedProgress, 100) / 100) * width;
+    const fillWidth = (Math.min(animatedProgress, 100) / 100) * canvasWidth;
     if (fillWidth > 0) {
       const grad = ctx.createLinearGradient(0, 0, fillWidth, 0);
       if (isDark) {
@@ -213,9 +234,13 @@ const GlowProgressBar = ({ value, isDark }: { value: number; isDark: boolean }) 
       ctx.fillStyle = isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.7)';
       ctx.fill();
     }
-  }, [animatedProgress, isDark]);
+  }, [animatedProgress, isDark, canvasWidth]);
 
-  return <canvas ref={canvasRef} style={{ width: '100%', height: 10, display: 'block' }} />;
+  return (
+    <div ref={containerRef} style={{ width: '100%', height: 10 }}>
+      <canvas ref={canvasRef} style={{ width: '100%', height: 10, display: 'block' }} />
+    </div>
+  );
 };
 
 // ============================================================================
