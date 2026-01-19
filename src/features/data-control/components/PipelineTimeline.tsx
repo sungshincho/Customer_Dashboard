@@ -153,26 +153,26 @@ const DataFlowHeader = ({ dark, text3D }: { dark: boolean; text3D: ReturnType<ty
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 16px',
+      display: 'flex', alignItems: 'center', padding: '8px 16px',
       marginBottom: '8px',
     }}>
       {/* 변환 전 소스 */}
-      <div style={{ flex: '0 0 140px', fontSize: '11px', fontWeight: 600, color: grayColor }}>
+      <div style={{ flex: 1, fontSize: '11px', fontWeight: 600, color: grayColor, textAlign: 'center' }}>
         변환 전 소스
       </div>
 
       {/* 변환 결과 */}
-      <div style={{ flex: 1, fontSize: '11px', fontWeight: 600, color: grayColor }}>
+      <div style={{ flex: 1, fontSize: '11px', fontWeight: 600, color: grayColor, textAlign: 'center' }}>
         변환 결과
       </div>
 
       {/* 대시보드 연결 */}
-      <div style={{ flex: '0 0 80px', fontSize: '11px', fontWeight: 600, color: grayColor }}>
+      <div style={{ flex: 1, fontSize: '11px', fontWeight: 600, color: grayColor, textAlign: 'center' }}>
         대시보드 연결
       </div>
 
       {/* 추세 */}
-      <div style={{ flex: '0 0 40px', fontSize: '11px', fontWeight: 600, color: grayColor, textAlign: 'center' }}>
+      <div style={{ flex: 1, fontSize: '11px', fontWeight: 600, color: grayColor, textAlign: 'center' }}>
         추세
       </div>
     </div>
@@ -200,13 +200,13 @@ const DataFlowRow = ({ flow, dark, text3D }: { flow: DataSourceFlow; dark: boole
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px',
+      display: 'flex', alignItems: 'center', padding: '12px 16px',
       background: dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
       borderRadius: '12px', marginBottom: '8px',
       border: dark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.04)',
     }}>
       {/* 변환 전 소스: 아이콘 + 라벨 + 건수 (한 줄) */}
-      <div style={{ flex: '0 0 140px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
         <div style={{
           width: 32, height: 32, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
           background: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
@@ -218,12 +218,12 @@ const DataFlowRow = ({ flow, dark, text3D }: { flow: DataSourceFlow; dark: boole
       </div>
 
       {/* 변환 결과: 테이블명 + 건수 (한 줄) */}
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
         <span style={textStyle}>{flow.outputTable} {flow.outputCount.toLocaleString()}건</span>
       </div>
 
       {/* 대시보드 연결 상태 */}
-      <div style={{ flex: '0 0 80px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
         {flow.kpiConnected ? (
           <>
             <CheckCircle className="w-4 h-4" style={{ color: '#22c55e' }} />
@@ -238,10 +238,10 @@ const DataFlowRow = ({ flow, dark, text3D }: { flow: DataSourceFlow; dark: boole
       </div>
 
       {/* 추세 (미연결 시 빈 공간 유지) */}
-      <div style={{ flex: '0 0 40px', display: 'flex', justifyContent: 'center' }}>
+      <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
         {flow.kpiConnected && flow.trend && (
           <TrendIcon className="w-4 h-4" style={{
-            color: flow.trend === 'up' ? '#22c55e' : flow.trend === 'down' ? '#ef4444' : '#6b7280',
+            color: flow.trend === 'up' ? '#22c55e' : flow.trend === 'down' : '#ef4444' : '#6b7280',
           }} />
         )}
       </div>
