@@ -2,7 +2,7 @@
 // DataQualityScore.tsx - 데이터 품질 점수 (3D Glassmorphism Design)
 // ============================================================================
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   CheckCircle,
   AlertTriangle,
@@ -139,30 +139,83 @@ const Badge3D = ({ children, dark = false, variant = 'default' }: { children: Re
 };
 
 // ============================================================================
-// 3D 프로그레스 바
+// 글로우 프로그레스 바 (목표 달성률 스타일)
 // ============================================================================
 
-const Progress3D = ({ value, dark = false, color = 'default' }: { value: number; dark?: boolean; color?: 'success' | 'warning' | 'error' | 'default' }) => {
-  const colors = {
-    default: isDark => isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)',
-    success: () => '#22c55e',
-    warning: () => '#eab308',
-    error: () => '#ef4444',
-  };
+const GlowProgressBar = ({ value, isDark }: { value: number; isDark: boolean }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [animatedProgress, setAnimatedProgress] = useState(0);
 
-  return (
-    <div style={{
-      width: '100%', height: '6px', borderRadius: '3px',
-      background: dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
-      overflow: 'hidden',
-    }}>
-      <div style={{
-        width: `${Math.min(100, Math.max(0, value))}%`, height: '100%', borderRadius: '3px',
-        background: colors[color](dark),
-        transition: 'width 0.5s ease-out',
-      }} />
-    </div>
-  );
+  useEffect(() => {
+    const start = performance.now();
+    const duration = 800;
+    const animate = (t: number) => {
+      const p = Math.min((t - start) / duration, 1);
+      setAnimatedProgress(value * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(animate);
+    };
+    requestAnimationFrame(animate);
+  }, [value]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const width = canvas.offsetWidth;
+    const height = 10;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, width, height);
+
+    // 배경
+    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)';
+    ctx.beginPath();
+    ctx.roundRect(0, 0, width, height, 5);
+    ctx.fill();
+
+    // 채움 바
+    const fillWidth = (Math.min(animatedProgress, 100) / 100) * width;
+    if (fillWidth > 0) {
+      const grad = ctx.createLinearGradient(0, 0, fillWidth, 0);
+      if (isDark) {
+        grad.addColorStop(0, 'rgba(255,255,255,0.15)');
+        grad.addColorStop(0.5, 'rgba(255,255,255,0.4)');
+        grad.addColorStop(1, 'rgba(255,255,255,0.7)');
+      } else {
+        grad.addColorStop(0, 'rgba(0,0,0,0.1)');
+        grad.addColorStop(0.5, 'rgba(0,0,0,0.35)');
+        grad.addColorStop(1, 'rgba(0,0,0,0.6)');
+      }
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.roundRect(0, 0, fillWidth, height, 5);
+      ctx.fill();
+
+      // 끝 글로우
+      const gx = fillWidth;
+      const gy = height / 2;
+      const gc = isDark ? '255,255,255' : '0,0,0';
+      const glow = ctx.createRadialGradient(gx, gy, 0, gx, gy, 6);
+      glow.addColorStop(0, `rgba(${gc},0.4)`);
+      glow.addColorStop(0.5, `rgba(${gc},0.1)`);
+      glow.addColorStop(1, `rgba(${gc},0)`);
+      ctx.beginPath();
+      ctx.arc(gx, gy, 6, 0, Math.PI * 2);
+      ctx.fillStyle = glow;
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(gx, gy, 2, 0, Math.PI * 2);
+      ctx.fillStyle = isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.7)';
+      ctx.fill();
+    }
+  }, [animatedProgress, isDark]);
+
+  return <canvas ref={canvasRef} style={{ width: '100%', height: 10, display: 'block' }} />;
 };
 
 // ============================================================================
@@ -245,7 +298,7 @@ export function DataQualityScoreCard({ score, contextData }: DataQualityScorePro
             <span style={{ fontSize: '20px', ...text3D.body }}>/ 100</span>
           </div>
           <div style={{ marginTop: '8px' }}>
-            <Progress3D value={score.overall_score} dark={isDark} color={scoreColor} />
+            <GlowProgressBar value={score.overall_score} isDark={isDark} />
           </div>
         </div>
 
@@ -272,17 +325,13 @@ export function DataQualityScoreCard({ score, contextData }: DataQualityScorePro
                 <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <div style={{ width: '120px', whiteSpace: 'nowrap', ...text3D.small }}>{data.label || fallbackLabel}</div>
                   <div style={{ flex: 1 }}>
-                    <Progress3D value={completeness * 100} dark={isDark} color={progressColor} />
+                    <GlowProgressBar value={completeness * 100} isDark={isDark} />
                   </div>
-                  <div style={{ width: '80px', display: 'flex', justifyContent: 'flex-end' }}>
+                  <div style={{ width: '80px', display: 'flex', justifyContent: 'flex-start' }}>
                     {data.available ? (
-                      <div style={{ minWidth: '70px', textAlign: 'center' }}>
-                        <Badge3D dark={isDark} variant="success">{(data.record_count || 0).toLocaleString()}</Badge3D>
-                      </div>
+                      <Badge3D dark={isDark} variant="default">{(data.record_count || 0).toLocaleString()}건</Badge3D>
                     ) : (
-                      <div style={{ minWidth: '70px', textAlign: 'center' }}>
-                        <Badge3D dark={isDark} variant="default">없음</Badge3D>
-                      </div>
+                      <Badge3D dark={isDark} variant="default">없음</Badge3D>
                     )}
                   </div>
                 </div>

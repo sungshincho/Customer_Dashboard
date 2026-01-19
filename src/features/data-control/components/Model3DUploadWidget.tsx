@@ -406,11 +406,10 @@ export function Model3DUploadWidget({ onUploadComplete, className }: Model3DUplo
               <Box className="w-5 h-5" style={{ color: iconColor }} />
             </Icon3D>
             <div>
-              <span style={text3D.label}>3D Model Upload</span>
-              <h3 style={{ margin: '4px 0 0 0', ...text3D.title }}>3D 모델 업로드</h3>
+              <span style={text3D.label}>DIGITALTWIN 3D MODEL UPLOAD</span>
+              <h3 style={{ margin: '4px 0 0 0', ...text3D.title }}>디지털 트윈 3D 모델 업로드</h3>
             </div>
           </div>
-          <Badge variant="secondary">Digital Twin</Badge>
         </div>
 
         <div className="space-y-4">
