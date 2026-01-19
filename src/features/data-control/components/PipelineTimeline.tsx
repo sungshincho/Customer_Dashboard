@@ -9,7 +9,6 @@ import {
   Users,
   Package,
   FileUp,
-  ArrowRight,
   CheckCircle,
   AlertTriangle,
   XCircle,
@@ -146,6 +145,41 @@ const StatusBadge = ({ status, dark }: { status: 'healthy' | 'warning' | 'error'
 };
 
 // ============================================================================
+// 데이터 흐름 컬럼 헤더 컴포넌트
+// ============================================================================
+
+const DataFlowHeader = ({ dark, text3D }: { dark: boolean; text3D: ReturnType<typeof getText3D> }) => {
+  const grayColor = dark ? 'rgba(255,255,255,0.4)' : '#9ca3af';
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 16px',
+      marginBottom: '8px',
+    }}>
+      {/* 변환 전 소스 */}
+      <div style={{ flex: '0 0 140px', fontSize: '11px', fontWeight: 600, color: grayColor }}>
+        변환 전 소스
+      </div>
+
+      {/* 변환 결과 */}
+      <div style={{ flex: 1, fontSize: '11px', fontWeight: 600, color: grayColor }}>
+        변환 결과
+      </div>
+
+      {/* 대시보드 연결 */}
+      <div style={{ flex: '0 0 80px', fontSize: '11px', fontWeight: 600, color: grayColor }}>
+        대시보드 연결
+      </div>
+
+      {/* 추세 */}
+      <div style={{ flex: '0 0 40px', fontSize: '11px', fontWeight: 600, color: grayColor, textAlign: 'center' }}>
+        추세
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
 // 데이터 흐름 행 컴포넌트
 // ============================================================================
 
@@ -159,12 +193,8 @@ const DataFlowRow = ({ flow, dark, text3D }: { flow: DataSourceFlow; dark: boole
   };
   const Icon = icons[flow.source] || Activity;
 
-  const statusColors = {
-    active: '#22c55e',
-    inactive: '#6b7280',
-    warning: '#eab308',
-    error: '#ef4444',
-  };
+  const grayColor = dark ? 'rgba(255,255,255,0.5)' : '#6b7280';
+  const textStyle = { fontSize: '13px', fontWeight: 500, color: dark ? 'rgba(255,255,255,0.8)' : '#374151' };
 
   const TrendIcon = flow.trend === 'up' ? TrendingUp : flow.trend === 'down' ? TrendingDown : Minus;
 
@@ -175,56 +205,46 @@ const DataFlowRow = ({ flow, dark, text3D }: { flow: DataSourceFlow; dark: boole
       borderRadius: '12px', marginBottom: '8px',
       border: dark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.04)',
     }}>
-      {/* 소스 아이콘 */}
-      <div style={{
-        width: 36, height: 36, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: dark ? `${statusColors[flow.status]}20` : `${statusColors[flow.status]}15`,
-        border: `1px solid ${statusColors[flow.status]}40`,
-      }}>
-        <Icon className="w-4 h-4" style={{ color: statusColors[flow.status] }} />
-      </div>
-
-      {/* 소스 라벨 */}
-      <div style={{ flex: '0 0 80px' }}>
-        <div style={{ ...text3D.body, fontWeight: 600 }}>{flow.label}</div>
-        <div style={{ ...text3D.small, fontSize: '10px' }}>
-          {flow.inputCount.toLocaleString()} 건
+      {/* 변환 전 소스: 아이콘 + 라벨 + 건수 (한 줄) */}
+      <div style={{ flex: '0 0 140px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{
+          width: 32, height: 32, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+          border: dark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)',
+        }}>
+          <Icon className="w-4 h-4" style={{ color: grayColor }} />
         </div>
+        <span style={textStyle}>{flow.label} {flow.inputCount.toLocaleString()}건</span>
       </div>
 
-      {/* 화살표 */}
-      <ArrowRight className="w-4 h-4" style={{ color: dark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)', flexShrink: 0 }} />
-
-      {/* 출력 테이블 */}
+      {/* 변환 결과: 테이블명 + 건수 (한 줄) */}
       <div style={{ flex: 1 }}>
-        <div style={{ ...text3D.small, fontSize: '10px' }}>{flow.outputTable}</div>
-        <div style={{ ...text3D.body, fontWeight: 600 }}>{flow.outputCount.toLocaleString()} 건</div>
+        <span style={textStyle}>{flow.outputTable} {flow.outputCount.toLocaleString()}건</span>
       </div>
 
-      {/* 화살표 */}
-      <ArrowRight className="w-4 h-4" style={{ color: dark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)', flexShrink: 0 }} />
-
-      {/* KPI 연결 상태 */}
-      <div style={{ flex: '0 0 70px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+      {/* 대시보드 연결 상태 */}
+      <div style={{ flex: '0 0 80px', display: 'flex', alignItems: 'center', gap: '4px' }}>
         {flow.kpiConnected ? (
           <>
             <CheckCircle className="w-4 h-4" style={{ color: '#22c55e' }} />
-            <span style={{ ...text3D.small, color: '#22c55e' }}>연결됨</span>
+            <span style={{ fontSize: '12px', fontWeight: 500, color: '#22c55e' }}>연결됨</span>
           </>
         ) : (
           <>
             <AlertTriangle className="w-4 h-4" style={{ color: '#eab308' }} />
-            <span style={{ ...text3D.small, color: '#eab308' }}>미연동</span>
+            <span style={{ fontSize: '12px', fontWeight: 500, color: '#eab308' }}>미연결</span>
           </>
         )}
       </div>
 
-      {/* 트렌드 */}
-      {flow.trend && (
-        <TrendIcon className="w-4 h-4" style={{
-          color: flow.trend === 'up' ? '#22c55e' : flow.trend === 'down' ? '#ef4444' : '#6b7280',
-        }} />
-      )}
+      {/* 추세 (미연결 시 빈 공간 유지) */}
+      <div style={{ flex: '0 0 40px', display: 'flex', justifyContent: 'center' }}>
+        {flow.kpiConnected && flow.trend && (
+          <TrendIcon className="w-4 h-4" style={{
+            color: flow.trend === 'up' ? '#22c55e' : flow.trend === 'down' ? '#ef4444' : '#6b7280',
+          }} />
+        )}
+      </div>
     </div>
   );
 };
@@ -381,20 +401,23 @@ export function PipelineTimeline({ stats, onRefresh }: PipelineTimelineProps) {
               <h3 style={{ margin: '4px 0 0 0', ...text3D.title }}>데이터 흐름 현황</h3>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <StatusBadge status={pipelineHealth.status} dark={isDark} />
-            {onRefresh && (
-              <button
-                onClick={onRefresh}
-                style={{
-                  background: 'transparent', border: 'none', cursor: 'pointer', padding: '8px',
-                  borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}
-              >
-                <RefreshCw className="w-4 h-4" style={{ color: iconColor }} />
-              </button>
-            )}
-          </div>
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              className="flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200"
+              style={{
+                background: isDark
+                  ? 'linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)'
+                  : 'linear-gradient(145deg, rgba(255,255,255,0.9) 0%, rgba(250,250,255,0.8) 100%)',
+                border: isDark ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(0,0,0,0.08)',
+                boxShadow: isDark
+                  ? 'inset 0 1px 1px rgba(255,255,255,0.06), 0 2px 4px rgba(0,0,0,0.2)'
+                  : '0 1px 2px rgba(0,0,0,0.04), inset 0 1px 1px rgba(255,255,255,0.8)',
+              }}
+            >
+              <RefreshCw className="w-4 h-4" style={{ color: isDark ? '#ffffff' : '#1a1a1f' }} />
+            </button>
+          )}
         </div>
 
         {/* 요약 통계 */}
@@ -424,6 +447,7 @@ export function PipelineTimeline({ stats, onRefresh }: PipelineTimelineProps) {
 
         {/* 데이터 흐름 목록 */}
         <div style={{ marginBottom: '20px' }}>
+          <DataFlowHeader dark={isDark} text3D={text3D} />
           {dataFlows.map((flow) => (
             <DataFlowRow key={flow.source} flow={flow} dark={isDark} text3D={text3D} />
           ))}
