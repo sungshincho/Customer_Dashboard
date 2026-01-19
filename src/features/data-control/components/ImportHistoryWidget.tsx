@@ -5,7 +5,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -22,7 +21,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   DropdownMenu,
@@ -46,8 +44,6 @@ import {
   Loader2,
   FileSpreadsheet,
   Download,
-  Eye,
-  Trash2,
   FileJson,
   FileText,
 } from 'lucide-react';
@@ -56,6 +52,87 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
+
+// ============================================================================
+// 3D 스타일 시스템
+// ============================================================================
+
+const getText3D = (isDark: boolean) => ({
+  title: isDark ? {
+    fontWeight: 600, fontSize: '14px', color: '#ffffff',
+    textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+  } as React.CSSProperties : {
+    fontWeight: 600, fontSize: '14px',
+    background: 'linear-gradient(180deg, #1a1a1f 0%, #2a2a2f 100%)',
+    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+  } as React.CSSProperties,
+  label: isDark ? {
+    fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const,
+    fontSize: '10px', color: 'rgba(255,255,255,0.5)',
+  } as React.CSSProperties : {
+    fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const,
+    fontSize: '10px',
+    background: 'linear-gradient(180deg, #6b7280 0%, #9ca3af 100%)',
+    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+  } as React.CSSProperties,
+});
+
+const GlassCard = ({ children, dark = false }: { children: React.ReactNode; dark?: boolean }) => (
+  <div style={{ perspective: '1200px', height: '100%' }}>
+    <div style={{
+      borderRadius: '24px', padding: '1.5px',
+      background: dark
+        ? 'linear-gradient(145deg, rgba(75,75,85,0.9) 0%, rgba(50,50,60,0.8) 50%, rgba(65,65,75,0.9) 100%)'
+        : 'linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(220,220,230,0.6) 50%, rgba(255,255,255,0.93) 100%)',
+      boxShadow: dark
+        ? '0 2px 4px rgba(0,0,0,0.2), 0 8px 16px rgba(0,0,0,0.25), 0 16px 32px rgba(0,0,0,0.2)'
+        : '0 1px 1px rgba(0,0,0,0.02), 0 2px 2px rgba(0,0,0,0.02), 0 4px 4px rgba(0,0,0,0.02), 0 8px 8px rgba(0,0,0,0.02), 0 16px 16px rgba(0,0,0,0.02)',
+      height: '100%',
+    }}>
+      <div style={{
+        background: dark
+          ? 'linear-gradient(165deg, rgba(48,48,58,0.98) 0%, rgba(32,32,40,0.97) 30%, rgba(42,42,52,0.98) 60%, rgba(35,35,45,0.97) 100%)'
+          : 'linear-gradient(165deg, rgba(255,255,255,0.95) 0%, rgba(253,253,255,0.88) 25%, rgba(255,255,255,0.92) 50%, rgba(251,251,254,0.85) 75%, rgba(255,255,255,0.94) 100%)',
+        backdropFilter: 'blur(80px) saturate(200%)', borderRadius: '23px', height: '100%', position: 'relative', overflow: 'hidden',
+      }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '1px',
+          background: dark
+            ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.18) 20%, rgba(255,255,255,0.28) 50%, rgba(255,255,255,0.18) 80%, transparent 100%)'
+            : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.9) 10%, rgba(255,255,255,1) 50%, rgba(255,255,255,0.9) 90%, transparent 100%)',
+          pointerEvents: 'none',
+        }} />
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '50%',
+          background: dark
+            ? 'linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 30%, transparent 100%)'
+            : 'linear-gradient(180deg, rgba(255,255,255,0.75) 0%, rgba(255,255,255,0.35) 25%, rgba(255,255,255,0.08) 55%, transparent 100%)',
+          borderRadius: '23px 23px 50% 50%', pointerEvents: 'none',
+        }} />
+        <div style={{ position: 'relative', zIndex: 10, height: '100%' }}>{children}</div>
+      </div>
+    </div>
+  </div>
+);
+
+const Icon3D = ({ children, size = 44, dark = false }: { children: React.ReactNode; size?: number; dark?: boolean }) => (
+  <div style={{
+    width: size, height: size,
+    background: dark
+      ? 'linear-gradient(145deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.04) 50%, rgba(255,255,255,0.09) 100%)'
+      : 'linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(230,230,238,0.95) 40%, rgba(245,245,250,0.98) 100%)',
+    borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
+    border: dark ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(255,255,255,0.95)',
+    boxShadow: dark
+      ? 'inset 0 1px 2px rgba(255,255,255,0.12), inset 0 -2px 4px rgba(0,0,0,0.25), 0 4px 12px rgba(0,0,0,0.3)'
+      : '0 2px 4px rgba(0,0,0,0.05), 0 4px 8px rgba(0,0,0,0.06), 0 8px 16px rgba(0,0,0,0.05), inset 0 2px 4px rgba(255,255,255,1), inset 0 -2px 4px rgba(0,0,0,0.04)',
+    flexShrink: 0,
+  }}>
+    {!dark && <div style={{ position: 'absolute', top: '3px', left: '15%', right: '15%', height: '35%',
+      background: 'linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(255,255,255,0) 100%)',
+      borderRadius: '40% 40% 50% 50%', pointerEvents: 'none',
+    }} />}
+    <span style={{ position: 'relative', zIndex: 10 }}>{children}</span>
+  </div>
+);
 
 // ============================================================================
 // Types
@@ -143,9 +220,22 @@ export function ImportHistoryWidget({ onRollback, className }: ImportHistoryWidg
   const [isRollingBack, setIsRollingBack] = useState<string | null>(null);
   const [selectedImport, setSelectedImport] = useState<ImportRecord | null>(null);
   const [showRollbackDialog, setShowRollbackDialog] = useState(false);
+  const [isDark, setIsDark] = useState(false);
 
   const { user } = useAuth();
   const { toast } = useToast();
+
+  // 다크 모드 감지
+  useEffect(() => {
+    const check = () => setIsDark(document.documentElement.classList.contains('dark'));
+    check();
+    const obs = new MutationObserver(check);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => obs.disconnect();
+  }, []);
+
+  const text3D = getText3D(isDark);
+  const iconColor = isDark ? 'rgba(255,255,255,0.7)' : '#374151';
 
   // 히스토리 로드
   const loadHistory = useCallback(async () => {
@@ -317,18 +407,28 @@ ${importRecord.error_details.map((err, i) =>
   // ============================================================================
 
   return (
-    <Card className={className}>
-      <CardHeader className="pb-4">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <History className="w-5 h-5" />
-            임포트 히스토리
-          </CardTitle>
+    <GlassCard dark={isDark}>
+      <div style={{ padding: '24px' }}>
+        {/* 헤더 */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <Icon3D size={44} dark={isDark}>
+              <History className="w-5 h-5" style={{ color: iconColor }} />
+            </Icon3D>
+            <div>
+              <span style={text3D.label}>Import History</span>
+              <h3 style={{ margin: '4px 0 0 0', ...text3D.title }}>임포트 히스토리</h3>
+            </div>
+          </div>
           <Button
             variant="ghost"
             size="sm"
             onClick={loadHistory}
             disabled={isLoading}
+            style={{
+              background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+              borderRadius: '8px',
+            }}
           >
             {isLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -337,9 +437,8 @@ ${importRecord.error_details.map((err, i) =>
             )}
           </Button>
         </div>
-      </CardHeader>
 
-      <CardContent>
+        <div>
         {isLoading && imports.length === 0 ? (
           <div className="flex justify-center py-8">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
@@ -471,7 +570,8 @@ ${importRecord.error_details.map((err, i) =>
             </Table>
           </div>
         )}
-      </CardContent>
+        </div>
+      </div>
 
       {/* 롤백 확인 다이얼로그 */}
       <Dialog open={showRollbackDialog} onOpenChange={setShowRollbackDialog}>
@@ -530,7 +630,7 @@ ${importRecord.error_details.map((err, i) =>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Card>
+    </GlassCard>
   );
 }
 
