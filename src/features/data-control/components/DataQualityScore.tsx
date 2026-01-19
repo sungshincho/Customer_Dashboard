@@ -271,14 +271,18 @@ export function DataQualityScoreCard({ score, contextData }: DataQualityScorePro
               return (
                 <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <div style={{ width: '120px', whiteSpace: 'nowrap', ...text3D.small }}>{data.label || fallbackLabel}</div>
-                  <div style={{ flex: 1, maxWidth: '120px' }}>
+                  <div style={{ flex: 1 }}>
                     <Progress3D value={completeness * 100} dark={isDark} color={progressColor} />
                   </div>
-                  <div style={{ minWidth: '70px', display: 'flex', justifyContent: 'center' }}>
+                  <div style={{ width: '80px', display: 'flex', justifyContent: 'flex-end' }}>
                     {data.available ? (
-                      <Badge3D dark={isDark} variant="success">{(data.record_count || 0).toLocaleString()}</Badge3D>
+                      <div style={{ minWidth: '70px', textAlign: 'center' }}>
+                        <Badge3D dark={isDark} variant="success">{(data.record_count || 0).toLocaleString()}</Badge3D>
+                      </div>
                     ) : (
-                      <Badge3D dark={isDark} variant="default">없음</Badge3D>
+                      <div style={{ minWidth: '70px', textAlign: 'center' }}>
+                        <Badge3D dark={isDark} variant="default">없음</Badge3D>
+                      </div>
                     )}
                   </div>
                 </div>
