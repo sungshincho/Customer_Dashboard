@@ -55,7 +55,7 @@ interface OptimizationEffectSectionProps {
   /** 상세 보기 클릭 */
   onViewHistory?: () => void;
   /** 최적화 시작 클릭 */
-  onStartOptimization?: (type: 'layout' | 'staff' | 'both') => void;
+  onStartOptimization?: (type: 'layout' | 'staff' | 'both' | 'product') => void;
 }
 
 // ============================================================================

@@ -638,13 +638,15 @@ export function DataImportWidget({ onImportComplete, className }: DataImportWidg
       await new Promise((resolve) => setTimeout(resolve, 500));
 
       // session_id로 import record 조회
-      const { data: importRecord } = await supabase
+      // @ts-expect-error - Deep type instantiation workaround for Supabase query builder
+      const importRecordQuery = supabase
         .from('user_data_imports')
         .select('id')
         .eq('session_id', session.id)
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
+      const { data: importRecord } = await importRecordQuery;
 
       if (importRecord?.id) {
         setImportRecordId(importRecord.id);

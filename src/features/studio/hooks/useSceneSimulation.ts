@@ -735,7 +735,12 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
             furnitureMoves,
             layoutChanges: furnitureChanges.length > 0 ? furnitureChanges : vizFurnitureMoves,
             productPlacements: mappedProductPlacements,
-            summary: summaryData,
+            optimizationSummary: {
+              totalChanges: furnitureMoves.length + mappedProductPlacements.length,
+              expectedRevenueIncrease: toPercent(revenueImprovement),
+              expectedConversionIncrease: toPercent(conversionImprovement),
+              confidence: summaryData.confidence || 0.8,
+            },
             insights: layoutData.insights || layoutData.result?.insights || summaryData.insights || [],
             // 효율성 점수 계산 (변경 수 기반)
             currentEfficiency: summaryData.current_efficiency || 70,
@@ -748,7 +753,7 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
               conversionIncrease: toPercent(conversionImprovement),
               trafficIncrease: toPercent(trafficImprovement),
             },
-          };
+          } as LayoutSimulationResult;
           console.log('[useSceneSimulation] ✅ Layout result (generate-optimization):', {
             furnitureMovesCount: furnitureMoves.length,
             productPlacementsCount: mappedProductPlacements.length,
