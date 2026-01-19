@@ -420,22 +420,26 @@ ${importRecord.error_details.map((err, i) =>
               <h3 style={{ margin: '4px 0 0 0', ...text3D.title }}>임포트 히스토리</h3>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
+          <button
             onClick={loadHistory}
             disabled={isLoading}
+            className="flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200 disabled:opacity-50"
             style={{
-              background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-              borderRadius: '8px',
+              background: isDark
+                ? 'linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)'
+                : 'linear-gradient(145deg, rgba(255,255,255,0.9) 0%, rgba(250,250,255,0.8) 100%)',
+              border: isDark ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(0,0,0,0.08)',
+              boxShadow: isDark
+                ? 'inset 0 1px 1px rgba(255,255,255,0.06), 0 2px 4px rgba(0,0,0,0.2)'
+                : '0 1px 2px rgba(0,0,0,0.04), inset 0 1px 1px rgba(255,255,255,0.8)',
             }}
           >
             {isLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin" style={{ color: isDark ? '#ffffff' : '#1a1a1f' }} />
             ) : (
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className="w-4 h-4" style={{ color: isDark ? '#ffffff' : '#1a1a1f' }} />
             )}
-          </Button>
+          </button>
         </div>
 
         <div>
