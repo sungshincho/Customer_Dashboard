@@ -286,10 +286,11 @@ const sceneReducer = (state: SceneState, action: SceneAction): SceneState => {
             const currentChildProducts = ((updatedModel.metadata as any)?.childProducts as any[]) || [];
 
             // 이 가구에서 제거할 제품들 (다른 가구로 이동)
-            // 🔧 FIX: modelFurnitureId (raw UUID)도 매칭 대상에 추가
+            // 🔧 FIX: modelRawFurnitureId (raw UUID)도 매칭 대상에 추가
+            const modelRawFurnitureId = (model.metadata as any)?.furnitureId;
             const productsToRemove = new Set<string>();
             childProductMoves.forEach((move, productId) => {
-              if (move.fromFurnitureId === model.id || move.fromFurnitureId === modelFurnitureId) {
+              if (move.fromFurnitureId === model.id || move.fromFurnitureId === modelRawFurnitureId) {
                 productsToRemove.add(productId);
               }
             });
@@ -297,7 +298,7 @@ const sceneReducer = (state: SceneState, action: SceneAction): SceneState => {
             // 이 가구로 추가할 제품들 (다른 가구에서 이동)
             const productsToAdd: any[] = [];
             childProductMoves.forEach((move) => {
-              if (move.toFurnitureId === model.id || move.toFurnitureId === modelFurnitureId) {
+              if (move.toFurnitureId === model.id || move.toFurnitureId === modelRawFurnitureId) {
                 productsToAdd.push({
                   ...move.productData,
                   position: move.newPosition,
