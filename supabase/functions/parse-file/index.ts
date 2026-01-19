@@ -78,7 +78,7 @@ const MAPPING_RULES: Record<string, Record<string, string[]>> = {
       "재고수량",
       "qty",
     ],
-    cost_price: ["cost_price", "원가", "cost", "매입가", "입고가"],
+    cost_price: ["cost_price", "원가", "cost", "매입가", "입고가", "도매가", "공급가", "cost_amount"],
     display_type: [
       "display_type",
       "진열타입",
@@ -86,8 +86,8 @@ const MAPPING_RULES: Record<string, Record<string, string[]>> = {
       "display",
       "디스플레이",
     ],
-    description: ["description", "설명", "상세설명", "메모", "비고", "note"],
-    brand: ["brand", "브랜드", "제조사", "manufacturer"],
+    description: ["description", "설명", "상세설명", "메모", "비고", "note", "상세", "특이사항", "상품설명", "상품상세"],
+    brand: ["brand", "브랜드", "제조사", "manufacturer", "브랜드명"],
   },
   customers: {
     customer_name: [
