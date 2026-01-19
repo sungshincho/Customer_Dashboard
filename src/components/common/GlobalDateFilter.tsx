@@ -147,7 +147,7 @@ export function GlobalDateFilter({
     <div className={cn('flex items-center gap-3', className)}>
       {/* 달력 아이콘 + 프리셋 버튼 - 탭 스타일 래퍼 */}
       <div
-        className="inline-flex rounded-2xl p-[1.5px]"
+        className="inline-flex rounded-xl p-[1px]"
         style={{
           background: isDark
             ? 'linear-gradient(145deg, rgba(75,75,85,0.8) 0%, rgba(50,50,60,0.6) 50%, rgba(65,65,75,0.8) 100%)'
@@ -156,7 +156,7 @@ export function GlobalDateFilter({
         }}
       >
         <div
-          className="flex items-center gap-1 p-1.5 rounded-[15px]"
+          className="flex items-center gap-1 h-10 px-1 rounded-[11px]"
           style={{
             background: isDark
               ? 'linear-gradient(165deg, rgba(40,40,50,0.95) 0%, rgba(30,30,40,0.9) 100%)'
@@ -181,7 +181,7 @@ export function GlobalDateFilter({
                 key={preset}
                 type="button"
                 onClick={() => setPreset(preset)}
-                className="px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200"
+                className="px-3 h-8 rounded-lg text-xs font-medium transition-all duration-200"
                 style={
                   isActive
                     ? {
