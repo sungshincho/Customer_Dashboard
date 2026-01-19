@@ -369,10 +369,10 @@ export function DataQualityScoreCard({ score, contextData }: DataQualityScorePro
               <div style={{
                 display: 'flex', alignItems: 'center', gap: '10px', padding: '12px',
                 borderRadius: '12px',
-                background: isDark ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)',
-                border: isDark ? '1px solid rgba(59,130,246,0.2)' : '1px solid rgba(59,130,246,0.1)',
+                background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+                border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.04)',
               }}>
-                <CloudSun className="w-5 h-5" style={{ color: '#3b82f6' }} />
+                <CloudSun className="w-5 h-5" style={{ color: iconColor }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={text3D.title}>날씨</div>
                   <div style={text3D.small}>
@@ -388,16 +388,16 @@ export function DataQualityScoreCard({ score, contextData }: DataQualityScorePro
               <div style={{
                 display: 'flex', alignItems: 'center', gap: '10px', padding: '12px',
                 borderRadius: '12px',
-                background: isDark ? 'rgba(168,85,247,0.1)' : 'rgba(168,85,247,0.05)',
-                border: isDark ? '1px solid rgba(168,85,247,0.2)' : '1px solid rgba(168,85,247,0.1)',
+                background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+                border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.04)',
               }}>
-                <Calendar className="w-5 h-5" style={{ color: '#a855f7' }} />
+                <Calendar className="w-5 h-5" style={{ color: iconColor }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={text3D.title}>공휴일/이벤트</div>
                   <div style={text3D.small}>
                     {contextData.events?.record_count || 0}건
                     {(contextData.events?.upcoming_count || 0) > 0 && (
-                      <span style={{ marginLeft: '6px', color: '#a855f7' }}>
+                      <span style={{ marginLeft: '6px', color: '#22c55e' }}>
                         • 예정 {contextData.events?.upcoming_count}
                       </span>
                     )}
