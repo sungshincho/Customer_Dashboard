@@ -241,7 +241,7 @@ const DataFlowRow = ({ flow, dark, text3D }: { flow: DataSourceFlow; dark: boole
       <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
         {flow.kpiConnected && flow.trend && (
           <TrendIcon className="w-4 h-4" style={{
-            color: flow.trend === 'up' ? '#22c55e' : flow.trend === 'down' : '#ef4444' : '#6b7280',
+            color: flow.trend === 'up' ? '#22c55e' : flow.trend === 'down' ? '#ef4444' : '#6b7280',
           }} />
         )}
       </div>
