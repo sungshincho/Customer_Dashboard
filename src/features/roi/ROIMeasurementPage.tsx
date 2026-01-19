@@ -7,7 +7,6 @@
 import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -186,23 +185,42 @@ export const ROIMeasurementPage: React.FC = () => {
               </SelectContent>
             </Select>
 
-            <Button
-              variant="outline"
-              size="icon"
+            <button
+              type="button"
               onClick={handleRefresh}
-              className={isDark ? 'border-white/10 hover:bg-white/5' : 'border-black/10 hover:bg-black/5'}
+              className="flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200"
+              style={{
+                background: isDark
+                  ? 'linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)'
+                  : 'linear-gradient(145deg, rgba(255,255,255,0.9) 0%, rgba(250,250,255,0.8) 100%)',
+                border: isDark ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(0,0,0,0.08)',
+                boxShadow: isDark
+                  ? 'inset 0 1px 1px rgba(255,255,255,0.06), 0 2px 4px rgba(0,0,0,0.2)'
+                  : '0 1px 2px rgba(0,0,0,0.04), inset 0 1px 1px rgba(255,255,255,0.8)',
+                color: isDark ? '#ffffff' : '#1a1a1f',
+              }}
             >
               <RefreshCw className="w-4 h-4" />
-            </Button>
+            </button>
 
-            <Button 
-              variant="outline" 
-              onClick={handleExportAll} 
-              className={isDark ? 'border-white/10 hover:bg-white/5' : 'border-black/10 hover:bg-black/5'}
+            <button
+              type="button"
+              onClick={handleExportAll}
+              className="flex h-10 items-center justify-center gap-2 rounded-xl px-3 text-sm transition-all duration-200"
+              style={{
+                background: isDark
+                  ? 'linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)'
+                  : 'linear-gradient(145deg, rgba(255,255,255,0.9) 0%, rgba(250,250,255,0.8) 100%)',
+                border: isDark ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(0,0,0,0.08)',
+                boxShadow: isDark
+                  ? 'inset 0 1px 1px rgba(255,255,255,0.06), 0 2px 4px rgba(0,0,0,0.2)'
+                  : '0 1px 2px rgba(0,0,0,0.04), inset 0 1px 1px rgba(255,255,255,0.8)',
+                color: isDark ? '#ffffff' : '#1a1a1f',
+              }}
             >
-              <Download className="w-4 h-4 mr-2" />
+              <Download className="w-4 h-4" />
               내보내기
-            </Button>
+            </button>
           </div>
         </div>
 
