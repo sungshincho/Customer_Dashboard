@@ -179,6 +179,10 @@ interface GenerateOptimizationRequest {
     // 🆕 Staffing 최적화 파라미터
     staffing_goal?: 'customer_service' | 'sales' | 'efficiency';
     staff_count?: number;
+    // 🆕 B안: 통합 최적화 파라미터
+    include_staff_optimization?: boolean;
+    allow_furniture_adjustment?: boolean;
+    max_adjustment_distance?: number;
   };
 }
 
@@ -271,6 +275,9 @@ interface AILayoutOptimizationResult {
   product_changes: ProductChange[];
   // 🆕 Staffing 결과 (staffing 타입일 때만 포함)
   staffing_result?: StaffingResult;
+  // 🆕 B안: 통합 최적화 결과
+  staff_suggestions?: StaffSuggestions;
+  furniture_adjustments?: FurnitureAdjustments;
   summary: {
     total_furniture_changes: number;
     total_product_changes: number;

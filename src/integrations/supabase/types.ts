@@ -8340,7 +8340,10 @@ export type Database = {
       upload_sessions: {
         Row: {
           column_mapping: Json | null
+          completed_at: string | null
+          completed_files: number | null
           created_at: string
+          failed_files: number | null
           file_name: string | null
           file_path: string | null
           file_size: number | null
@@ -8352,6 +8355,7 @@ export type Database = {
           processed_files: number | null
           row_count: number | null
           session_name: string | null
+          started_at: string | null
           status: string
           store_id: string | null
           target_table: string | null
@@ -8362,7 +8366,10 @@ export type Database = {
         }
         Insert: {
           column_mapping?: Json | null
+          completed_at?: string | null
+          completed_files?: number | null
           created_at?: string
+          failed_files?: number | null
           file_name?: string | null
           file_path?: string | null
           file_size?: number | null
@@ -8374,6 +8381,7 @@ export type Database = {
           processed_files?: number | null
           row_count?: number | null
           session_name?: string | null
+          started_at?: string | null
           status?: string
           store_id?: string | null
           target_table?: string | null
@@ -8384,7 +8392,10 @@ export type Database = {
         }
         Update: {
           column_mapping?: Json | null
+          completed_at?: string | null
+          completed_files?: number | null
           created_at?: string
+          failed_files?: number | null
           file_name?: string | null
           file_path?: string | null
           file_size?: number | null
@@ -8396,6 +8407,7 @@ export type Database = {
           processed_files?: number | null
           row_count?: number | null
           session_name?: string | null
+          started_at?: string | null
           status?: string
           store_id?: string | null
           target_table?: string | null
