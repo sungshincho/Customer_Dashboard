@@ -285,7 +285,7 @@ const MAPPING_RULES: Record<ImportType, Record<string, string[]>> = {
     price: ['price', '가격', '판매가', 'selling_price', '정가', '단가', '금액', 'unit_price'],
     stock: ['stock', '재고', 'quantity', '수량', 'inventory', '재고수량', 'qty'],
     cost_price: ['cost_price', '원가', 'cost', '매입가', '입고가', '도매가', '공급가'],
-    display_type: ['display_type', '진열타입', '진열방식', 'display', '디스플레이'],
+    display_type: ['display_type', '진열타입', '진열방식', 'display', '디스플레이', '진열', '전시방식', '전시', '배치', '배치방식', 'display_method'],
     description: ['description', '설명', '상세설명', '메모', '비고', 'note', '상세', '특이사항'],
     brand: ['brand', '브랜드', '제조사', 'manufacturer'],
   },
