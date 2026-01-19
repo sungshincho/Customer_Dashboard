@@ -5,14 +5,11 @@
 
 import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Database,
   RefreshCw,
   ExternalLink,
-  Activity,
   AlertCircle,
   Plus,
 } from 'lucide-react';
@@ -92,16 +89,6 @@ export default function DataControlTowerPage() {
     syncHolidays();
   }, []);
 
-  const getHealthStatus = () => {
-    if (!status?.quality_score) return { label: 'Unknown', color: 'bg-gray-500' };
-    const score = status.quality_score.overall_score;
-    if (score >= 80) return { label: 'Healthy', color: 'bg-green-500' };
-    if (score >= 50) return { label: 'Warning', color: 'bg-yellow-500' };
-    return { label: 'Critical', color: 'bg-red-500' };
-  };
-
-  const healthStatus = getHealthStatus();
-
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -176,48 +163,70 @@ export default function DataControlTowerPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Health Badge */}
-            <Badge
-              className={`${healthStatus.color} text-white border-0 gap-1`}
-            >
-              <Activity className="w-3 h-3" />
-              Health: {healthStatus.label}
-              {status?.quality_score && ` (${status.quality_score.overall_score}%)`}
-            </Badge>
-
             {/* Refresh Button */}
-            <Button
+            <button
               type="button"
-              variant="outline"
-              size="sm"
               onClick={() => {
                 console.log('새로고침 버튼 클릭됨');
                 refetch();
               }}
               disabled={isFetching}
+              className="flex h-10 items-center justify-center gap-2 rounded-xl px-3 text-sm transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50"
+              style={{
+                background: isDark
+                  ? 'linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)'
+                  : 'linear-gradient(145deg, rgba(255,255,255,0.9) 0%, rgba(250,250,255,0.8) 100%)',
+                border: isDark ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(0,0,0,0.08)',
+                boxShadow: isDark
+                  ? 'inset 0 1px 1px rgba(255,255,255,0.06), 0 2px 4px rgba(0,0,0,0.2)'
+                  : '0 1px 2px rgba(0,0,0,0.04), inset 0 1px 1px rgba(255,255,255,0.8)',
+                color: isDark ? '#ffffff' : '#1a1a1f',
+              }}
             >
               <RefreshCw
-                className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`}
+                className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`}
               />
               새로고침
-            </Button>
+            </button>
 
             {/* Add Connector Button */}
-            <Button
-              size="sm"
+            <button
+              type="button"
               onClick={() => setShowAddConnector(true)}
+              className="flex h-10 items-center justify-center gap-2 rounded-xl px-3 text-sm transition-all duration-200"
+              style={{
+                background: isDark
+                  ? 'linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)'
+                  : 'linear-gradient(145deg, rgba(255,255,255,0.9) 0%, rgba(250,250,255,0.8) 100%)',
+                border: isDark ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(0,0,0,0.08)',
+                boxShadow: isDark
+                  ? 'inset 0 1px 1px rgba(255,255,255,0.06), 0 2px 4px rgba(0,0,0,0.2)'
+                  : '0 1px 2px rgba(0,0,0,0.04), inset 0 1px 1px rgba(255,255,255,0.8)',
+                color: isDark ? '#ffffff' : '#1a1a1f',
+              }}
             >
-              <Plus className="w-4 h-4 mr-2" />
+              <Plus className="w-4 h-4" />
               커넥터 추가
-            </Button>
+            </button>
 
             {/* Lineage Link */}
-            <Button variant="outline" size="sm" asChild>
-              <Link to="/data/lineage">
-                <ExternalLink className="w-4 h-4 mr-2" />
-                Lineage 탐색
-              </Link>
-            </Button>
+            <Link
+              to="/data/lineage"
+              className="flex h-10 items-center justify-center gap-2 rounded-xl px-3 text-sm transition-all duration-200"
+              style={{
+                background: isDark
+                  ? 'linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)'
+                  : 'linear-gradient(145deg, rgba(255,255,255,0.9) 0%, rgba(250,250,255,0.8) 100%)',
+                border: isDark ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(0,0,0,0.08)',
+                boxShadow: isDark
+                  ? 'inset 0 1px 1px rgba(255,255,255,0.06), 0 2px 4px rgba(0,0,0,0.2)'
+                  : '0 1px 2px rgba(0,0,0,0.04), inset 0 1px 1px rgba(255,255,255,0.8)',
+                color: isDark ? '#ffffff' : '#1a1a1f',
+              }}
+            >
+              <ExternalLink className="w-4 h-4" />
+              Lineage 탐색
+            </Link>
           </div>
         </div>
 
