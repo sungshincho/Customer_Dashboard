@@ -231,24 +231,29 @@ function ConnectionCard({ connection, onEdit, isDark }: ConnectionCardProps) {
   const isLoading = testMutation.isPending || syncMutation.isPending;
 
   return (
-    <GlassCard dark={isDark}>
-      <div style={{ padding: '16px', position: 'relative' }}>
-        {/* Line 1: 아이콘 + 제목 + More 버튼 */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
-            <Icon3D size={36} dark={isDark}>
-              <Plug className="w-4 h-4" style={{ color: iconColor }} />
-            </Icon3D>
-            <h4 style={{
-              margin: 0,
-              ...text3D.title,
-              maxWidth: '160px',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}>{connection.name}</h4>
-          </div>
-          <DropdownMenu>
+    <div style={{
+      padding: '16px',
+      borderRadius: '16px',
+      background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+      border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.04)',
+      position: 'relative',
+    }}>
+      {/* Line 1: 아이콘 + 제목 + More 버튼 */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+          <Icon3D size={36} dark={isDark}>
+            <Plug className="w-4 h-4" style={{ color: iconColor }} />
+          </Icon3D>
+          <h4 style={{
+            margin: 0,
+            ...text3D.title,
+            maxWidth: '160px',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}>{connection.name}</h4>
+        </div>
+        <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
@@ -313,48 +318,47 @@ function ConnectionCard({ connection, onEdit, isDark }: ConnectionCardProps) {
             </DropdownMenu>
         </div>
 
-        {/* Line 2: 카테고리 + 활성 배지 */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', paddingLeft: '46px' }}>
-          <span style={text3D.small}>{getCategoryIcon(connection.data_category)}</span>
-          <StatusBadge status={isSystemContext ? 'active' : connection.status} isDark={isDark} />
-        </div>
+      {/* Line 2: 카테고리 + 활성 배지 */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+        <span style={text3D.small}>{getCategoryIcon(connection.data_category)}</span>
+        <StatusBadge status={isSystemContext ? 'active' : connection.status} isDark={isDark} />
+      </div>
 
-        {/* Line 3: 연결 상태 텍스트 */}
-        <div style={{ paddingLeft: '46px' }}>
-          {isSystemContext ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', ...text3D.small }}>
-              <CheckCircle2 className="h-3 w-3" />
-              <span>자동 연결됨 (Edge Function 경유)</span>
-            </div>
-          ) : connection.last_sync ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', ...text3D.small }}>
-              <Clock className="h-3 w-3" />
-              <span>
-                마지막 동기화:{' '}
-                {formatDistanceToNow(new Date(connection.last_sync), { addSuffix: true, locale: ko })}
-              </span>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', ...text3D.small }}>
-              <Clock className="h-3 w-3" />
-              <span>동기화 대기 중</span>
-            </div>
-          )}
-        </div>
-
-        {/* 로딩 오버레이 */}
-        {isLoading && (
-          <div style={{
-            position: 'absolute', inset: 0,
-            background: isDark ? 'rgba(32,32,40,0.8)' : 'rgba(255,255,255,0.8)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            borderRadius: '19px',
-          }}>
-            <Loader2 className="h-6 w-6 animate-spin" style={{ color: isDark ? 'rgba(255,255,255,0.7)' : '#6b7280' }} />
+      {/* Line 3: 연결 상태 텍스트 */}
+      <div>
+        {isSystemContext ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', ...text3D.small }}>
+            <CheckCircle2 className="h-3 w-3" />
+            <span>자동 연결됨 (Edge Function 경유)</span>
+          </div>
+        ) : connection.last_sync ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', ...text3D.small }}>
+            <Clock className="h-3 w-3" />
+            <span>
+              마지막 동기화:{' '}
+              {formatDistanceToNow(new Date(connection.last_sync), { addSuffix: true, locale: ko })}
+            </span>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', ...text3D.small }}>
+            <Clock className="h-3 w-3" />
+            <span>동기화 대기 중</span>
           </div>
         )}
       </div>
-    </GlassCard>
+
+      {/* 로딩 오버레이 */}
+      {isLoading && (
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: isDark ? 'rgba(32,32,40,0.8)' : 'rgba(255,255,255,0.8)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          borderRadius: '16px',
+        }}>
+          <Loader2 className="h-6 w-6 animate-spin" style={{ color: isDark ? 'rgba(255,255,255,0.7)' : '#6b7280' }} />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -515,7 +519,7 @@ export function ApiConnectionsList({ orgId, storeId, onEdit, onAdd }: ApiConnect
                   : '0 1px 2px rgba(0,0,0,0.04), inset 0 1px 1px rgba(255,255,255,0.8)',
               }}
             >
-              <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} style={{ color: isDark ? 'rgba(255,255,255,0.7)' : '#6b7280' }} />
+              <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} style={{ color: isDark ? '#ffffff' : '#1a1a1f' }} />
             </button>
             {onAdd && (
               <button
@@ -535,7 +539,7 @@ export function ApiConnectionsList({ orgId, storeId, onEdit, onAdd }: ApiConnect
                   fontWeight: 500,
                 }}
               >
-                <Plug className="h-4 w-4" />
+                <Plug className="h-4 w-4" style={{ color: isDark ? '#ffffff' : '#1a1a1f' }} />
                 새 연결 추가
               </button>
             )}

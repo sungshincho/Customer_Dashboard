@@ -206,7 +206,7 @@ export default function DataControlTowerPage() {
               }}
             >
               <Plus className="w-4 h-4" />
-              커넥터 추가
+              새 연결 추가
             </button>
 
             {/* Lineage Link */}
