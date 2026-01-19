@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import {
   Plug,
+  Plus,
   MoreVertical,
   PlayCircle,
   TestTube,
@@ -469,7 +470,7 @@ export function ApiConnectionsList({ orgId, storeId, onEdit, onAdd }: ApiConnect
                   color: isDark ? '#ffffff' : '#1a1a1f',
                 }}
               >
-                <Plug className="w-4 h-4" />
+                <Plus className="w-4 h-4" />
                 새 연결 추가
               </button>
             )}
@@ -536,7 +537,7 @@ export function ApiConnectionsList({ orgId, storeId, onEdit, onAdd }: ApiConnect
                   color: isDark ? '#ffffff' : '#1a1a1f',
                 }}
               >
-                <Plug className="w-4 h-4" />
+                <Plus className="w-4 h-4" />
                 새 연결 추가
               </button>
             )}
