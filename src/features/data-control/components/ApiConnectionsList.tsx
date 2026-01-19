@@ -3,6 +3,7 @@
 // ============================================================================
 
 import React, { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -254,17 +255,19 @@ function ConnectionCard({ connection, onEdit, isDark }: ConnectionCardProps) {
           }}>{connection.name}</h4>
         </div>
         <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200"
-                  style={{
-                    background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-                  }}
-                >
-                  <MoreVertical className="h-4 w-4" style={{ color: isDark ? 'rgba(255,255,255,0.7)' : '#6b7280' }} />
-                </button>
-              </DropdownMenuTrigger>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              style={{
+                background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                borderRadius: '8px',
+              }}
+            >
+              <MoreVertical className="h-4 w-4" style={{ color: isDark ? 'rgba(255,255,255,0.7)' : '#6b7280' }} />
+            </Button>
+          </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 {isSystemContext ? (
                   <DropdownMenuItem disabled className="text-muted-foreground">
@@ -415,7 +418,7 @@ export function ApiConnectionsList({ orgId, storeId, onEdit, onAdd }: ApiConnect
           <button
             type="button"
             onClick={() => refetch()}
-            className="flex h-10 items-center gap-2 px-4 rounded-xl transition-all duration-200 mt-4"
+            className="flex h-10 items-center justify-center gap-2 px-3 text-sm rounded-xl transition-all duration-200 mt-4"
             style={{
               background: isDark
                 ? 'linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)'
@@ -425,8 +428,6 @@ export function ApiConnectionsList({ orgId, storeId, onEdit, onAdd }: ApiConnect
                 ? 'inset 0 1px 1px rgba(255,255,255,0.06), 0 2px 4px rgba(0,0,0,0.2)'
                 : '0 1px 2px rgba(0,0,0,0.04), inset 0 1px 1px rgba(255,255,255,0.8)',
               color: isDark ? '#ffffff' : '#1a1a1f',
-              fontSize: '14px',
-              fontWeight: 500,
             }}
           >
             다시 시도
@@ -456,7 +457,7 @@ export function ApiConnectionsList({ orgId, storeId, onEdit, onAdd }: ApiConnect
               <button
                 type="button"
                 onClick={onAdd}
-                className="flex h-10 items-center gap-2 px-4 rounded-xl transition-all duration-200 mx-auto"
+                className="flex h-10 items-center justify-center gap-2 px-3 text-sm rounded-xl transition-all duration-200 mx-auto"
                 style={{
                   background: isDark
                     ? 'linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)'
@@ -466,11 +467,9 @@ export function ApiConnectionsList({ orgId, storeId, onEdit, onAdd }: ApiConnect
                     ? 'inset 0 1px 1px rgba(255,255,255,0.06), 0 2px 4px rgba(0,0,0,0.2)'
                     : '0 1px 2px rgba(0,0,0,0.04), inset 0 1px 1px rgba(255,255,255,0.8)',
                   color: isDark ? '#ffffff' : '#1a1a1f',
-                  fontSize: '14px',
-                  fontWeight: 500,
                 }}
               >
-                <Plug className="h-4 w-4" />
+                <Plug className="w-4 h-4" />
                 새 연결 추가
               </button>
             )}
@@ -525,7 +524,7 @@ export function ApiConnectionsList({ orgId, storeId, onEdit, onAdd }: ApiConnect
               <button
                 type="button"
                 onClick={onAdd}
-                className="flex h-10 items-center gap-2 px-4 rounded-xl transition-all duration-200"
+                className="flex h-10 items-center justify-center gap-2 px-3 text-sm rounded-xl transition-all duration-200"
                 style={{
                   background: isDark
                     ? 'linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)'
@@ -535,11 +534,9 @@ export function ApiConnectionsList({ orgId, storeId, onEdit, onAdd }: ApiConnect
                     ? 'inset 0 1px 1px rgba(255,255,255,0.06), 0 2px 4px rgba(0,0,0,0.2)'
                     : '0 1px 2px rgba(0,0,0,0.04), inset 0 1px 1px rgba(255,255,255,0.8)',
                   color: isDark ? '#ffffff' : '#1a1a1f',
-                  fontSize: '14px',
-                  fontWeight: 500,
                 }}
               >
-                <Plug className="h-4 w-4" style={{ color: isDark ? '#ffffff' : '#1a1a1f' }} />
+                <Plug className="w-4 h-4" />
                 새 연결 추가
               </button>
             )}
