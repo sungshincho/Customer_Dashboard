@@ -57,7 +57,7 @@ export const SCENE_CONFIG = {
     position: [8, 20, 8] as [number, number, number],
     castShadow: true,
     shadow: {
-      mapSize: 2048,
+      mapSize: 1024,  // 성능 최적화
       bias: -0.0001,
       normalBias: 0.02,
       camera: {
@@ -132,7 +132,7 @@ export const NIGHT_SCENE_CONFIG = {
     position: [8, 20, 8] as [number, number, number],
     castShadow: true,
     shadow: {
-      mapSize: 2048,
+      mapSize: 1024,  // 성능 최적화
       bias: -0.0001,
       normalBias: 0.02,
       camera: {
