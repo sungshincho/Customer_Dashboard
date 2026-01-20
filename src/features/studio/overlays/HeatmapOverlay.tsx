@@ -3,12 +3,130 @@
  *
  * 히트맵 오버레이 - 방문자 밀집도 시각화
  * - storeBounds를 사용하여 매장 범위 내에만 렌더링
+ * - Quadtree를 사용한 공간 인덱싱으로 성능 최적화
  */
 
 import { useMemo, useState } from 'react';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import type { HeatPoint, HeatmapOverlayProps } from '../types';
+
+// ============================================================================
+// Quadtree 구현 (공간 인덱싱으로 O(n×m) → O(n×log m) 최적화)
+// ============================================================================
+interface QuadBounds {
+  x: number;      // 중심 x
+  z: number;      // 중심 z
+  halfW: number;  // 너비의 절반
+  halfH: number;  // 높이의 절반
+}
+
+interface QuadPoint {
+  x: number;
+  z: number;
+  data: HeatPoint;
+}
+
+class Quadtree {
+  private bounds: QuadBounds;
+  private capacity: number;
+  private points: QuadPoint[] = [];
+  private divided = false;
+  private northeast?: Quadtree;
+  private northwest?: Quadtree;
+  private southeast?: Quadtree;
+  private southwest?: Quadtree;
+
+  constructor(bounds: QuadBounds, capacity = 4) {
+    this.bounds = bounds;
+    this.capacity = capacity;
+  }
+
+  // 점이 영역 안에 있는지 확인
+  private contains(point: QuadPoint): boolean {
+    const { x, z, halfW, halfH } = this.bounds;
+    return (
+      point.x >= x - halfW &&
+      point.x < x + halfW &&
+      point.z >= z - halfH &&
+      point.z < z + halfH
+    );
+  }
+
+  // 영역이 범위와 겹치는지 확인
+  private intersects(range: QuadBounds): boolean {
+    const { x, z, halfW, halfH } = this.bounds;
+    return !(
+      range.x - range.halfW > x + halfW ||
+      range.x + range.halfW < x - halfW ||
+      range.z - range.halfH > z + halfH ||
+      range.z + range.halfH < z - halfH
+    );
+  }
+
+  // 4등분
+  private subdivide(): void {
+    const { x, z, halfW, halfH } = this.bounds;
+    const qW = halfW / 2;
+    const qH = halfH / 2;
+
+    this.northeast = new Quadtree({ x: x + qW, z: z - qH, halfW: qW, halfH: qH }, this.capacity);
+    this.northwest = new Quadtree({ x: x - qW, z: z - qH, halfW: qW, halfH: qH }, this.capacity);
+    this.southeast = new Quadtree({ x: x + qW, z: z + qH, halfW: qW, halfH: qH }, this.capacity);
+    this.southwest = new Quadtree({ x: x - qW, z: z + qH, halfW: qW, halfH: qH }, this.capacity);
+    this.divided = true;
+  }
+
+  // 점 삽입
+  insert(point: QuadPoint): boolean {
+    if (!this.contains(point)) return false;
+
+    if (this.points.length < this.capacity) {
+      this.points.push(point);
+      return true;
+    }
+
+    if (!this.divided) {
+      this.subdivide();
+    }
+
+    return (
+      this.northeast!.insert(point) ||
+      this.northwest!.insert(point) ||
+      this.southeast!.insert(point) ||
+      this.southwest!.insert(point)
+    );
+  }
+
+  // 범위 내 점 검색
+  query(range: QuadBounds, found: QuadPoint[] = []): QuadPoint[] {
+    if (!this.intersects(range)) return found;
+
+    for (const p of this.points) {
+      if (
+        p.x >= range.x - range.halfW &&
+        p.x < range.x + range.halfW &&
+        p.z >= range.z - range.halfH &&
+        p.z < range.z + range.halfH
+      ) {
+        found.push(p);
+      }
+    }
+
+    if (this.divided) {
+      this.northeast!.query(range, found);
+      this.northwest!.query(range, found);
+      this.southeast!.query(range, found);
+      this.southwest!.query(range, found);
+    }
+
+    return found;
+  }
+}
+
+// ============================================================================
+// 기본 설정
+// ============================================================================
 
 // 기본 매장 경계 (storeBounds가 없을 때 사용)
 const DEFAULT_BOUNDS = {
@@ -55,15 +173,28 @@ export function HeatmapOverlay({
     const colorArray = new Float32Array(positions.length);
 
     // 🔧 FIX: 유효한 히트 포인트만 필터링 (NaN 방지)
-    const validHeatPoints = (heatPoints || []).filter(point => 
+    const validHeatPoints = (heatPoints || []).filter(point =>
       point &&
-      typeof point.x === 'number' && 
-      typeof point.z === 'number' && 
+      typeof point.x === 'number' &&
+      typeof point.z === 'number' &&
       typeof point.intensity === 'number' &&
-      Number.isFinite(point.x) && 
+      Number.isFinite(point.x) &&
       Number.isFinite(point.z) &&
       Number.isFinite(point.intensity)
     );
+
+    // 🚀 Quadtree 생성 및 히트포인트 삽입 (성능 최적화)
+    const influenceRadius = Math.max(bounds.width, bounds.depth) * 0.15;
+    const quadtree = new Quadtree({
+      x: bounds.centerX,
+      z: bounds.centerZ,
+      halfW: bounds.width / 2 + influenceRadius,
+      halfH: bounds.depth / 2 + influenceRadius,
+    });
+
+    validHeatPoints.forEach((point) => {
+      quadtree.insert({ x: point.x, z: point.z, data: point });
+    });
 
     // Create height map and color based on heat intensity
     for (let i = 0; i < positions.length; i += 3) {
@@ -73,12 +204,19 @@ export function HeatmapOverlay({
       const worldX = localX + bounds.centerX;
       const worldZ = localZ + bounds.centerZ;
 
+      // 🚀 Quadtree로 근처 히트포인트만 검색 (O(log n))
+      const nearbyPoints = quadtree.query({
+        x: worldX,
+        z: worldZ,
+        halfW: influenceRadius,
+        halfH: influenceRadius,
+      });
+
       // Find closest heat point and calculate intensity
       let totalIntensity = 0;
-      validHeatPoints.forEach((point) => {
+      nearbyPoints.forEach((qp) => {
+        const point = qp.data;
         const distance = Math.sqrt(Math.pow(worldX - point.x, 2) + Math.pow(worldZ - point.z, 2));
-        // 🆕 influence 범위를 매장 크기에 비례하게 조정
-        const influenceRadius = Math.max(bounds.width, bounds.depth) * 0.15;
         const influence = Math.max(0, 1 - distance / influenceRadius) * point.intensity;
         totalIntensity = Math.max(totalIntensity, influence);
       });
