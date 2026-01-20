@@ -139,24 +139,28 @@ export const ROISummaryCards: React.FC<ROISummaryCardsProps> = ({ data, isLoadin
 
   const cards = [
     {
+      labelEn: 'TOTAL APPLIED',
       label: '총 적용',
       value: `${data?.totalApplied || 0}건`,
       subLabel: `진행 중 ${data?.activeCount || 0}건`,
       icon: BarChart3,
     },
     {
+      labelEn: 'SUCCESS RATE',
       label: '성공률',
       value: formatPercent(data?.successRate || 0),
       subLabel: `(${data?.successCount || 0}/${data?.totalApplied || 0})`,
       icon: CheckCircle,
     },
     {
+      labelEn: 'AVG ROI',
       label: '평균 ROI',
       value: formatPercent(data?.averageRoi || 0),
       subLabel: data?.averageRoi ? '전략 적용 기준' : '-',
       icon: TrendingUp,
     },
     {
+      labelEn: 'REVENUE IMPACT',
       label: '총 추가매출',
       value: formatCurrency(data?.totalRevenueImpact || 0),
       subLabel:
@@ -172,13 +176,16 @@ export const ROISummaryCards: React.FC<ROISummaryCardsProps> = ({ data, isLoadin
       {cards.map((card) => (
         <GlassCard key={card.label} dark={isDark}>
           <div style={{ padding: '20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-              <span style={text3D.label}>{card.label}</span>
-              <Icon3D size={36} dark={isDark}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <Icon3D size={40} dark={isDark}>
                 <card.icon className="w-4 h-4" style={{ color: iconColor }} />
               </Icon3D>
+              <div>
+                <p style={{ margin: 0, ...text3D.label }}>{card.labelEn}</p>
+                <p style={{ fontSize: '12px', margin: 0, ...text3D.body }}>{card.label}</p>
+              </div>
             </div>
-            <p style={{ fontSize: '26px', margin: '0 0 4px 0', ...text3D.heroNumber }}>{card.value}</p>
+            <p style={{ fontSize: '28px', margin: '0 0 4px 0', ...text3D.heroNumber }}>{card.value}</p>
             <p style={{ fontSize: '11px', margin: 0, ...text3D.body }}>{card.subLabel}</p>
           </div>
         </GlassCard>
