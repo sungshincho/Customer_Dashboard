@@ -164,10 +164,13 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
 
   setModels: (models) =>
     set((state) => {
+      // 새 models에서 기존 selectedId로 모델 찾기
       const selectedModel = state.selectedId
         ? models.find((m) => m.id === state.selectedId) || null
         : null;
-      return { models, selectedModel, isDirty: true };
+      // 못 찾으면 selectedId도 null로 초기화
+      const selectedId = selectedModel ? state.selectedId : null;
+      return { models, selectedModel, selectedId, isDirty: true };
     }),
 
   // =========================================================================
