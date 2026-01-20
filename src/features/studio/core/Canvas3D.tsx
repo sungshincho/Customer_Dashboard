@@ -267,7 +267,7 @@ function SceneContent({
         {children}
 
         {/* 후처리 효과 (뷰/시뮬레이션 모드) */}
-        <PostProcessing enabled={mode !== 'edit'} />
+        <PostProcessing enabled={mode !== 'edit'} ssao={false} />
 
         {/* 🆕 환경 효과 오버레이 (날씨, 시간대 등) */}
         {renderingConfig && (
