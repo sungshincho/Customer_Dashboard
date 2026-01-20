@@ -17,6 +17,43 @@ import {
   prepareClonedSceneForBaked,
 } from '@/features/simulation/utils/bakedMaterialUtils';
 
+// ============================================================================
+// 전역 텍스처 캐시 (메모리 누수 방지 및 성능 최적화)
+// ============================================================================
+const textureCache = new Map<string, THREE.Texture>();
+
+function loadTextureWithCache(
+  url: string,
+  onLoad: (texture: THREE.Texture) => void,
+  onError?: (err: unknown) => void
+): void {
+  // 캐시에 있으면 재사용
+  if (textureCache.has(url)) {
+    const cached = textureCache.get(url)!;
+    onLoad(cached);
+    return;
+  }
+
+  // 새로 로드
+  const loader = new THREE.TextureLoader();
+  loader.load(
+    url,
+    (texture) => {
+      texture.flipY = false;
+      texture.colorSpace = THREE.SRGBColorSpace;
+      textureCache.set(url, texture);
+      onLoad(texture);
+    },
+    undefined,
+    onError
+  );
+}
+
+// 캐시 클리어 함수 (필요시 외부에서 호출)
+export function clearTextureCache(): void {
+  textureCache.forEach((texture) => texture.dispose());
+  textureCache.clear();
+}
 
 // ============================================================================
 // Props
@@ -151,42 +188,31 @@ function GLTFModel({
   const [dayTexture, setDayTexture] = useState<THREE.Texture | null>(null);
   const [nightTexture, setNightTexture] = useState<THREE.Texture | null>(null);
 
-  // 🆕 텍스처 로드
+  // 🆕 텍스처 로드 (캐시 시스템 사용)
   useEffect(() => {
-    const textureLoader = new THREE.TextureLoader();
-
     if (dayTextureUrl) {
-      textureLoader.load(
+      loadTextureWithCache(
         dayTextureUrl,
         (texture) => {
-          texture.flipY = false;
-          texture.colorSpace = THREE.SRGBColorSpace;
           setDayTexture(texture);
-          console.log('[GLTFModel] Day texture loaded:', dayTextureUrl);
+          console.log('[GLTFModel] Day texture loaded (cached):', dayTextureUrl);
         },
-        undefined,
         (err) => console.warn('[GLTFModel] Failed to load day texture:', err)
       );
     }
 
     if (nightTextureUrl) {
-      textureLoader.load(
+      loadTextureWithCache(
         nightTextureUrl,
         (texture) => {
-          texture.flipY = false;
-          texture.colorSpace = THREE.SRGBColorSpace;
           setNightTexture(texture);
-          console.log('[GLTFModel] Night texture loaded:', nightTextureUrl);
+          console.log('[GLTFModel] Night texture loaded (cached):', nightTextureUrl);
         },
-        undefined,
         (err) => console.warn('[GLTFModel] Failed to load night texture:', err)
       );
     }
 
-    return () => {
-      dayTexture?.dispose();
-      nightTexture?.dispose();
-    };
+    // 캐시된 텍스처는 dispose하지 않음 (전역 캐시에서 관리)
   }, [dayTextureUrl, nightTextureUrl]);
 
   // GLTF 로드

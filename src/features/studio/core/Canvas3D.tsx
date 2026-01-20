@@ -97,7 +97,7 @@ export function Canvas3D({
     <div className={cn('w-full h-full', className)}>
       <Canvas
         shadows
-        dpr={[1, 2]}
+        dpr={1}  // 성능 최적화
         gl={{
           antialias: true,
           alpha: false,
@@ -436,7 +436,7 @@ export function StandaloneCanvas3D({
     <div className={cn('w-full h-full', className)}>
       <Canvas
         shadows
-        dpr={[1, 2]}
+        dpr={1}  // 성능 최적화
         gl={{
           antialias: true,
           alpha: false,
@@ -509,16 +509,17 @@ function SelectionBox({ scale, url }: SelectionBoxProps) {
   // GLB 로드해서 BoundingBox 계산
   const { scene } = useGLTF(url);
   
+  // 씬 복제 없이 직접 바운딩 박스 계산 (성능 최적화)
   const boundingBox = useMemo(() => {
     if (!scene) return null;
-    
-    const cloned = scene.clone(true);
-    const box = new THREE.Box3().setFromObject(cloned);
+
+    // clone(true) 제거 - scene 자체에서 바로 계산
+    const box = new THREE.Box3().setFromObject(scene);
     const sizeVec = new THREE.Vector3();
     box.getSize(sizeVec);
     const center = new THREE.Vector3();
     box.getCenter(center);
-    
+
     return {
       width: sizeVec.x,
       height: sizeVec.y,
