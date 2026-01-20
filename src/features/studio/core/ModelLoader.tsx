@@ -182,7 +182,6 @@ function GLTFModel({
 }: GLTFModelProps) {
   const groupRef = useRef<THREE.Group>(null);
   const [boundingBox, setBoundingBox] = useState<{ width: number; height: number; depth: number; centerY: number } | null>(null);
-  const boundingBoxCalculated = useRef(false);
 
   // 🆕 텍스처 로딩 (낮/밤)
   const [dayTexture, setDayTexture] = useState<THREE.Texture | null>(null);
@@ -243,9 +242,6 @@ function GLTFModel({
       }
     });
 
-    // 클론 변경 시 BoundingBox 재계산 필요
-    boundingBoxCalculated.current = false;
-
     return cloned;
   }, [scene, castShadow, receiveShadow, shouldUseBaked]);
 
@@ -269,41 +265,46 @@ function GLTFModel({
     });
   }, [isDayMode, dayTexture, nightTexture, clonedScene]);
 
-  // 실제 렌더링 후 BoundingBox 계산 (useFrame으로 한 번만 실행)
-  useFrame(() => {
-    if (!boundingBoxCalculated.current && groupRef.current) {
+  // 실제 렌더링 후 BoundingBox 계산 (씬 클론 변경 시 1회만 실행)
+  useEffect(() => {
+    if (!clonedScene) return;
+
+    // 다음 프레임에서 실행하여 씬이 렌더링된 후 계산
+    const frameId = requestAnimationFrame(() => {
+      if (!groupRef.current) return;
+
       // 스케일, 로테이션 적용 전 원본 크기 계산을 위해 임시로 리셋
       const originalScale = groupRef.current.scale.clone();
       const originalRotation = groupRef.current.rotation.clone();
-      
+
       groupRef.current.scale.set(1, 1, 1);
       groupRef.current.rotation.set(0, 0, 0);
       groupRef.current.updateMatrixWorld(true);
-      
+
       const box = new THREE.Box3().setFromObject(groupRef.current);
       const size = new THREE.Vector3();
       box.getSize(size);
       const center = new THREE.Vector3();
       box.getCenter(center);
-      
+
       // 스케일, 로테이션 복원
       groupRef.current.scale.copy(originalScale);
       groupRef.current.rotation.copy(originalRotation);
       groupRef.current.updateMatrixWorld(true);
-      
+
       // position을 빼서 로컬 좌표로 변환
       const localCenterY = center.y - (position[1] || 0);
-      
+
       setBoundingBox({
         width: size.x,
         height: size.y,
         depth: size.z,
         centerY: localCenterY,
       });
-      
-      boundingBoxCalculated.current = true;
-    }
-  });
+    });
+
+    return () => cancelAnimationFrame(frameId);
+  }, [clonedScene, position]);
 
   return (
     <group
