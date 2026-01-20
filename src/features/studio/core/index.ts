@@ -8,7 +8,7 @@
 export { Canvas3D, StandaloneCanvas3D } from './Canvas3D';
 export type { default as Canvas3DDefault } from './Canvas3D';
 
-// SceneProvider
+// SceneProvider & Hooks
 export {
   SceneProvider,
   useScene,
@@ -17,7 +17,15 @@ export {
   useSceneModels,
   useSceneOverlays,
   useSceneLayers,
+  useSceneCamera,
+  useSceneSimulationActions,
 } from './SceneProvider';
+
+// SceneProvider 타입 re-export
+export type { FurnitureMove, SimulationResultsPayload } from './SceneProvider';
+
+// Zustand Store (직접 선택적 구독용)
+export { useSceneStore } from '../stores/sceneStore';
 
 // SceneEnvironment
 export { SceneEnvironment, SCENE_CONFIG, LIGHTING_PRESETS } from './SceneEnvironment';
