@@ -8,8 +8,8 @@
  * - 실시간 고객 시뮬레이션 지원
  */
 
-import { Suspense, ReactNode, useRef, useState, useMemo } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Suspense, ReactNode, useMemo } from 'react';
+import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Preload, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { cn } from '@/lib/utils';
@@ -223,8 +223,7 @@ function SceneContent({
           <OrbitControls
             makeDefault
             target={[camera.target.x, camera.target.y, camera.target.z]}
-            enableDamping
-            dampingFactor={0.05}
+            enableDamping={false}  // 성능 최적화: 관성 계산 제거
             minDistance={8}
             maxDistance={40}
             maxPolarAngle={Math.PI / 2.5}
@@ -464,8 +463,7 @@ export function StandaloneCanvas3D({
             <OrbitControls
               makeDefault
               target={cameraTarget}
-              enableDamping
-              dampingFactor={0.05}
+              enableDamping={false}  // 성능 최적화: 관성 계산 제거
               minDistance={8}
               maxDistance={40}
               maxPolarAngle={Math.PI / 2.5}
@@ -504,11 +502,9 @@ interface SelectionBoxProps {
 }
 
 function SelectionBox({ scale, url }: SelectionBoxProps) {
-  const meshRef = useRef<THREE.Mesh>(null);
-
   // GLB 로드해서 BoundingBox 계산
   const { scene } = useGLTF(url);
-  
+
   // 씬 복제 없이 직접 바운딩 박스 계산 (성능 최적화)
   const boundingBox = useMemo(() => {
     if (!scene) return null;
@@ -528,17 +524,7 @@ function SelectionBox({ scale, url }: SelectionBoxProps) {
     };
   }, [scene]);
 
-  // 펄스 애니메이션
-  useFrame((state) => {
-    if (meshRef.current) {
-      const pulse = 1 + Math.sin(state.clock.elapsedTime * 3) * 0.02;
-      meshRef.current.scale.set(
-        scale[0] * pulse, 
-        scale[1] * pulse, 
-        scale[2] * pulse
-      );
-    }
-  });
+  // 펄스 애니메이션 제거 - 성능 최적화
 
   if (!boundingBox) return null;
 
@@ -548,8 +534,7 @@ function SelectionBox({ scale, url }: SelectionBoxProps) {
   const d = boundingBox.depth * 1.1;
 
   return (
-    <mesh 
-      ref={meshRef} 
+    <mesh
       position={[0, boundingBox.centerY, 0]}
       scale={scale}
     >
