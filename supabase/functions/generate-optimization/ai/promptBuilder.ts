@@ -980,6 +980,7 @@ Respond with valid JSON in this exact structure:
     "expected_revenue_improvement": 0.18,
     "expected_traffic_improvement": 0.10,
     "expected_conversion_improvement": 0.12,
+    "expected_dwell_time_improvement": 0.08,
     "confidence_score": 0.85,
     "key_strategies": ["전략 1", "전략 2", "전략 3"],
     "ai_insights": [

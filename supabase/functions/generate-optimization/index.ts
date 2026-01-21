@@ -1535,6 +1535,9 @@ async function generateAIOptimization(
       product_changes: enhancedResult.product_changes || [],
       summary: result.summary ? {
         ...result.summary,
+        // 🔧 FIX: AI 응답에서 체류시간 필드가 누락된 경우 기본값 설정
+        expected_dwell_time_improvement: result.summary.expected_dwell_time_improvement ??
+          (result.summary.expected_conversion_improvement ? result.summary.expected_conversion_improvement * 0.5 : 0),
         // 🆕 AI 추론 메타데이터 추가
         ai_reasoning_included: !!thinking,
         ai_reasoning_length: thinking?.length || 0,
