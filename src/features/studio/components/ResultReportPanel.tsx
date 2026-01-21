@@ -134,9 +134,9 @@ export const ResultReportPanel = memo(function ResultReportPanel({
             <div className="grid grid-cols-3 gap-2">
               <div className="text-center">
                 <div className="text-lg font-semibold text-green-400">
-                  +₩{(totalImprovements.revenue / 10000).toFixed(0)}만
+                  +{totalImprovements.revenue.toFixed(1)}%
                 </div>
-                <div className="text-[10px] text-white/50">예상 매출/월</div>
+                <div className="text-[10px] text-white/50">예상 매출</div>
               </div>
               <div className="text-center">
                 <div className="text-lg font-semibold text-blue-400">
@@ -151,7 +151,7 @@ export const ResultReportPanel = memo(function ResultReportPanel({
             </div>
           </div>
 
-          {/* 🆕 ROI 분석 */}
+          {/* 🆕 ROI 분석 - 예상 개선 효과 기반 */}
           {totalImprovements.revenue > 0 && (
             <div className="p-2.5 rounded-lg bg-green-500/10 border border-green-500/20">
               <div className="flex items-center gap-1.5 mb-2">
@@ -160,24 +160,22 @@ export const ResultReportPanel = memo(function ResultReportPanel({
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="p-2 rounded bg-black/30">
-                  <div className="text-white/50 text-[10px]">예상 투자 비용</div>
-                  <div className="text-white font-medium">₩{(totalImprovements.revenue * 0.3 / 10000).toFixed(0)}만</div>
+                  <div className="text-white/50 text-[10px]">예상 매출 증가</div>
+                  <div className="text-green-400 font-medium">+{totalImprovements.revenue.toFixed(1)}%</div>
                 </div>
                 <div className="p-2 rounded bg-black/30">
-                  <div className="text-white/50 text-[10px]">ROI</div>
-                  <div className="text-green-400 font-medium">
-                    {Math.round((totalImprovements.revenue / (totalImprovements.revenue * 0.3)) * 100)}%
+                  <div className="text-white/50 text-[10px]">예상 효율성 증가</div>
+                  <div className="text-blue-400 font-medium">+{totalImprovements.efficiency.toFixed(1)}%</div>
+                </div>
+                <div className="p-2 rounded bg-black/30">
+                  <div className="text-white/50 text-[10px]">변경 사항 수</div>
+                  <div className="text-white font-medium">{totalImprovements.changes}건</div>
+                </div>
+                <div className="p-2 rounded bg-black/30">
+                  <div className="text-white/50 text-[10px]">적용 권장</div>
+                  <div className="text-amber-400 font-medium">
+                    {totalImprovements.revenue >= 5 ? '강력 권장' : totalImprovements.revenue >= 2 ? '권장' : '선택적'}
                   </div>
-                </div>
-                <div className="p-2 rounded bg-black/30">
-                  <div className="text-white/50 text-[10px]">투자 회수 기간</div>
-                  <div className="text-white font-medium">
-                    {Math.ceil((totalImprovements.revenue * 0.3) / totalImprovements.revenue)}개월
-                  </div>
-                </div>
-                <div className="p-2 rounded bg-black/30">
-                  <div className="text-white/50 text-[10px]">연간 추가 매출</div>
-                  <div className="text-green-400 font-medium">₩{(totalImprovements.revenue * 12 / 10000).toFixed(0)}만</div>
                 </div>
               </div>
             </div>
@@ -328,15 +326,15 @@ const LayoutResultContent = memo(function LayoutResultContent({ result }: { resu
       {/* 예상 효과 */}
       <div className="grid grid-cols-3 gap-1.5 text-xs">
         <div className="p-1.5 rounded bg-black/20 text-center">
-          <div className="text-green-400 font-medium">+₩{(result.revenueIncrease / 10000).toFixed(0)}만</div>
+          <div className="text-green-400 font-medium">+{result.revenueIncrease.toFixed(1)}%</div>
           <div className="text-white/40 text-[10px]">매출</div>
         </div>
         <div className="p-1.5 rounded bg-black/20 text-center">
-          <div className="text-blue-400 font-medium">+{result.dwellTimeIncrease}분</div>
+          <div className="text-blue-400 font-medium">+{result.dwellTimeIncrease.toFixed(1)}%</div>
           <div className="text-white/40 text-[10px]">체류</div>
         </div>
         <div className="p-1.5 rounded bg-black/20 text-center">
-          <div className="text-purple-400 font-medium">+{result.conversionIncrease}%</div>
+          <div className="text-purple-400 font-medium">+{result.conversionIncrease.toFixed(1)}%</div>
           <div className="text-white/40 text-[10px]">전환</div>
         </div>
       </div>
