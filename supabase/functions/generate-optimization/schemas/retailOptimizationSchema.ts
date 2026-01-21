@@ -565,6 +565,10 @@ export const RETAIL_OPTIMIZATION_SCHEMA = {
           type: 'number',
           description: '예상 전환율 개선율'
         },
+        expected_dwell_time_improvement: {
+          type: 'number',
+          description: '예상 체류시간 증가율 (0.05 = 5%)'
+        },
 
         confidence_score: {
           type: 'number',
