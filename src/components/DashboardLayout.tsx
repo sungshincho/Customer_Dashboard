@@ -36,18 +36,22 @@ const getInitialSidebarState = () => {
   return cookie ? cookie.split("=")[1] === "true" : true;
 };
 
+// 🔧 FIX: 다크모드 초기값 동기 설정 (깜빡임 방지)
+const getInitialDarkMode = () => 
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const { user, signOut } = useAuth();
-  const [isDark, setIsDark] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(getInitialSidebarState);
+  
+  // 🔧 FIX: 초기값을 동기적으로 설정하여 깜빡임 방지
+  const [isDark, setIsDark] = useState(getInitialDarkMode);
 
-  // 다크모드 감지
+  // 다크모드 감지 (런타임 변경 대응)
   useEffect(() => {
     const checkDarkMode = () => {
       setIsDark(document.documentElement.classList.contains('dark'));
     };
-    
-    checkDarkMode();
     
     const observer = new MutationObserver(checkDarkMode);
     observer.observe(document.documentElement, { 
