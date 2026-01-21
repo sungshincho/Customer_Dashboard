@@ -1198,6 +1198,7 @@ function extractPartialData(jsonStr: string): any {
       expected_revenue_improvement: 0,
       expected_traffic_improvement: 0,
       expected_conversion_improvement: 0,
+      expected_dwell_time_improvement: 0, // 🔧 FIX: 체류시간 필드 추가
       partial_extraction: true, // 부분 추출 플래그
     },
   };
@@ -1562,6 +1563,7 @@ async function generateAIOptimization(
         expected_revenue_improvement: 0,
         expected_traffic_improvement: 0,
         expected_conversion_improvement: 0,
+        expected_dwell_time_improvement: 0, // 🔧 FIX: 체류시간 필드 추가
       },
     };
   } catch (e) {
@@ -2089,12 +2091,23 @@ function generateRuleBasedOptimization(
     }
   }
 
+  // 🔧 FIX: 체류시간 개선 예상치 계산 (환경 영향도 반영)
+  // 가구 재배치 = 동선 최적화 = 체류시간 증가
+  const baseDwellTimeImprovement = furnitureChanges.length > 0
+    ? 0.03 + furnitureChanges.length * 0.01  // 가구 1개당 +1% 체류시간
+    : productChanges.length > 0
+      ? 0.02 + productChanges.length * 0.005  // 제품 재배치도 체류시간에 영향
+      : 0;
+  const dwellMultiplier = envImpact?.dwell || 1.0;
+
   const summary = {
     total_furniture_changes: furnitureChanges.length,
     total_product_changes: productChanges.length,
     expected_revenue_improvement: Math.round(baseRevenueImprovement * trafficMultiplier * conversionMultiplier * 100) / 100,
     expected_traffic_improvement: Math.round(baseTrafficImprovement * trafficMultiplier * 100) / 100,
     expected_conversion_improvement: Math.round(baseConversionImprovement * conversionMultiplier * 100) / 100,
+    // 🔧 FIX: 체류시간 개선 예상치 추가 (프론트엔드에서 사용)
+    expected_dwell_time_improvement: Math.round(baseDwellTimeImprovement * dwellMultiplier * 100) / 100,
     // 🆕 AI 인사이트 추가 (룰 기반)
     ai_insights: aiInsights,
     // 🆕 Structured Output 메타데이터 (룰 기반임을 표시)
