@@ -731,6 +731,11 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
           // 소수점이면 100을 곱해 퍼센트로 변환 (0.08 → 8)
           const toPercent = (val: number) => val < 1 ? val * 100 : val;
 
+          // 🔧 FIX: LayoutResult 인터페이스에 맞게 최상위 레벨에도 값 추가
+          const revenueIncreaseValue = toPercent(revenueImprovement);
+          const dwellTimeIncreaseValue = toPercent(summaryData.expected_dwell_time_improvement || 0);
+          const conversionIncreaseValue = toPercent(conversionImprovement);
+
           results.layout = {
             furnitureMoves,
             layoutChanges: furnitureChanges.length > 0 ? furnitureChanges : vizFurnitureMoves,
@@ -746,11 +751,16 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
             currentEfficiency: summaryData.current_efficiency || 70,
             optimizedEfficiency: summaryData.optimized_efficiency ||
               Math.min(95, 70 + (furnitureMoves.length * 2) + (mappedProductPlacements.length * 0.5)),
+            // 🔧 FIX: LayoutResult 인터페이스 호환을 위해 최상위 레벨에 추가
+            revenueIncrease: revenueIncreaseValue,
+            dwellTimeIncrease: dwellTimeIncreaseValue,
+            conversionIncrease: conversionIncreaseValue,
+            // 기존 improvements 객체도 유지 (하위 호환)
             improvements: {
-              revenueIncrease: toPercent(revenueImprovement),
-              revenueIncreasePercent: toPercent(revenueImprovement),
-              dwellTimeIncrease: toPercent(summaryData.expected_dwell_time_improvement || 0),
-              conversionIncrease: toPercent(conversionImprovement),
+              revenueIncrease: revenueIncreaseValue,
+              revenueIncreasePercent: revenueIncreaseValue,
+              dwellTimeIncrease: dwellTimeIncreaseValue,
+              conversionIncrease: conversionIncreaseValue,
               trafficIncrease: toPercent(trafficImprovement),
             },
           } as LayoutSimulationResult;
