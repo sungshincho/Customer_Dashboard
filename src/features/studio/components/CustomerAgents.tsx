@@ -18,7 +18,7 @@ import React, { useRef, useMemo, Suspense } from 'react';
 import * as THREE from 'three';
 import { Line, Html, useGLTF } from '@react-three/drei';
 import { useSimulationStore, STATE_COLORS } from '@/stores/simulationStore';
-import type { SimulatedCustomer } from '@/stores/simulationStore';
+import type { CustomerAgent as CustomerAgentType } from '@/stores/simulationStore';
 
 // ============================================================================
 // 공유 Geometry 인스턴스 (성능 최적화 C)
@@ -42,7 +42,7 @@ interface CustomerAgentsProps {
 }
 
 interface CustomerAgentProps {
-  customer: SimulatedCustomer;
+  customer: CustomerAgentType;
   showPath: boolean;
   showLabel: boolean;
 }
