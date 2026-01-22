@@ -747,8 +747,10 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
               overall: summaryData.confidence || 0.8,
               factors: {
                 dataQuality: 0.8,
-                historicalAccuracy: 0.75,
-                modelConfidence: summaryData.confidence || 0.8,
+                modelAccuracy: summaryData.confidence || 0.8,
+                sampleSize: 0.7,
+                variability: 0.75,
+                slotDataAvailable: 0.6,
               },
             },
             // 기존 속성
@@ -777,6 +779,20 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
               dwellTimeIncrease: dwellTimeIncreaseValue,
               conversionIncrease: conversionIncreaseValue,
               trafficIncrease: toPercent(trafficImprovement),
+            },
+            // 🔧 FIX: visualization 필수 속성 추가
+            visualization: {
+              beforeHeatmap: [],
+              afterHeatmap: [],
+              flowPaths: [],
+              highlightZones: furnitureMoves.map((move: any, idx: number) => ({
+                zoneId: move.furnitureId || `zone-${idx}`,
+                position: move.toPosition || move.suggestedPosition,
+                color: '#4ade80',
+                opacity: 0.6,
+                type: 'furniture',
+                changeType: 'suggested' as const,
+              })),
             },
           } as LayoutSimulationResult;
           console.log('[useSceneSimulation] ✅ Layout result (generate-optimization):', {
