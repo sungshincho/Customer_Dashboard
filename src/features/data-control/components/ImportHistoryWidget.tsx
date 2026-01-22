@@ -53,6 +53,10 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
+// 🔧 FIX: 다크모드 초기값 동기 설정 (깜빡임 방지)
+const getInitialDarkMode = () =>
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+
 // ============================================================================
 // 3D 스타일 시스템
 // ============================================================================
@@ -220,7 +224,7 @@ export function ImportHistoryWidget({ onRollback, className }: ImportHistoryWidg
   const [isRollingBack, setIsRollingBack] = useState<string | null>(null);
   const [selectedImport, setSelectedImport] = useState<ImportRecord | null>(null);
   const [showRollbackDialog, setShowRollbackDialog] = useState(false);
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(getInitialDarkMode);
 
   const { user } = useAuth();
   const { toast } = useToast();
@@ -228,7 +232,6 @@ export function ImportHistoryWidget({ onRollback, className }: ImportHistoryWidg
   // 다크 모드 감지
   useEffect(() => {
     const check = () => setIsDark(document.documentElement.classList.contains('dark'));
-    check();
     const obs = new MutationObserver(check);
     obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => obs.disconnect();

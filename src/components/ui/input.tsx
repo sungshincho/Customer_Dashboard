@@ -7,13 +7,16 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+// 🔧 FIX: 다크모드 초기값 동기 설정 (깜빡임 방지)
+const getInitialDarkMode = () =>
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
   ({ className, type, style, ...props }, ref) => {
-    const [isDark, setIsDark] = React.useState(false);
+    const [isDark, setIsDark] = React.useState(getInitialDarkMode);
 
     React.useEffect(() => {
       const check = () => setIsDark(document.documentElement.classList.contains('dark'));
-      check();
       const obs = new MutationObserver(check);
       obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
       return () => obs.disconnect();

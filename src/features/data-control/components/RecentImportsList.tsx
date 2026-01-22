@@ -17,6 +17,10 @@ import {
 import { useReplayImport } from '../hooks/useDataControlTower';
 import type { RawImport } from '../types';
 
+// 🔧 FIX: 다크모드 초기값 동기 설정 (깜빡임 방지)
+const getInitialDarkMode = () =>
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+
 // ============================================================================
 // 3D 스타일 시스템
 // ============================================================================
@@ -168,13 +172,12 @@ interface RecentImportsListProps {
 }
 
 export function RecentImportsList({ imports, isLoading, onRefresh }: RecentImportsListProps) {
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(getInitialDarkMode);
   const { replay, isReplaying } = useReplayImport();
   const [replayingId, setReplayingId] = useState<string | null>(null);
 
   useEffect(() => {
     const check = () => setIsDark(document.documentElement.classList.contains('dark'));
-    check();
     const obs = new MutationObserver(check);
     obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => obs.disconnect();

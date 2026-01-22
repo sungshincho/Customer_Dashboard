@@ -8,6 +8,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { BarChart3, CheckCircle, TrendingUp, Banknote } from 'lucide-react';
 import type { ROISummary } from '../types/roi.types';
 
+// 🔧 FIX: 다크모드 초기값 동기 설정 (깜빡임 방지)
+const getInitialDarkMode = () =>
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+
 // ============================================================================
 // 3D 스타일 시스템
 // ============================================================================
@@ -103,11 +107,10 @@ const formatPercent = (value: number): string => {
 };
 
 export const ROISummaryCards: React.FC<ROISummaryCardsProps> = ({ data, isLoading }) => {
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(getInitialDarkMode);
 
   useEffect(() => {
     const check = () => setIsDark(document.documentElement.classList.contains('dark'));
-    check();
     const obs = new MutationObserver(check);
     obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => obs.disconnect();

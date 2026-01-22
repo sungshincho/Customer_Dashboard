@@ -22,6 +22,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { useIntegratedMetrics, useHourlyVisitors } from '../context/InsightDataContext';
 import { formatDuration } from '../components';
 
+// 🔧 FIX: 다크모드 초기값 동기 설정 (깜빡임 방지)
+const getInitialDarkMode = () =>
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+
 // 3D Text 스타일 (다크모드 지원)
 const getText3D = (isDark: boolean) => ({
   heroNumber: isDark ? {
@@ -591,13 +595,12 @@ export function StoreTab() {
   const { orgId } = useAuth();
   const { data: metrics } = useIntegratedMetrics();
   const { data: hourlyRawData } = useHourlyVisitors();
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(getInitialDarkMode);
 
   useEffect(() => {
     const checkDarkMode = () => {
       setIsDark(document.documentElement.classList.contains('dark'));
     };
-    checkDarkMode();
     const observer = new MutationObserver(checkDarkMode);
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => observer.disconnect();

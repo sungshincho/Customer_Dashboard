@@ -54,6 +54,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { useToast } from '@/hooks/use-toast';
 
+// 🔧 FIX: 다크모드 초기값 동기 설정 (깜빡임 방지)
+const getInitialDarkMode = () =>
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+
 // ============================================================================
 // 3D 스타일 시스템
 // ============================================================================
@@ -379,7 +383,7 @@ export function DataImportWidget({ onImportComplete, className }: DataImportWidg
   const [isAiMapping, setIsAiMapping] = useState(false);
   const [importRecordId, setImportRecordId] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(getInitialDarkMode);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
@@ -390,7 +394,6 @@ export function DataImportWidget({ onImportComplete, className }: DataImportWidg
   // 다크 모드 감지
   useEffect(() => {
     const check = () => setIsDark(document.documentElement.classList.contains('dark'));
-    check();
     const obs = new MutationObserver(check);
     obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => obs.disconnect();

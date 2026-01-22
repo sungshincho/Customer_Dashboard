@@ -29,6 +29,10 @@ import {
 } from 'lucide-react';
 import { useInventoryMetricsData } from '../context/InsightDataContext';
 
+// 🔧 FIX: 다크모드 초기값 동기 설정 (깜빡임 방지)
+const getInitialDarkMode = () =>
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+
 const getText3D = (isDark: boolean) => ({
   heroNumber: isDark ? {
     fontWeight: 800, letterSpacing: '-0.04em', color: '#ffffff',
@@ -496,7 +500,7 @@ const MovementTypeIcon = ({ type, isDark }: { type: string; isDark: boolean }) =
 
 export function InventoryTab() {
   const { data, isLoading, refetch, enableLoading } = useInventoryMetricsData();
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(getInitialDarkMode);
 
   // 컴포넌트 마운트 시 데이터 로딩 활성화
   useEffect(() => {
@@ -505,7 +509,6 @@ export function InventoryTab() {
 
   useEffect(() => {
     const check = () => setIsDark(document.documentElement.classList.contains('dark'));
-    check();
     const obs = new MutationObserver(check);
     obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => obs.disconnect();

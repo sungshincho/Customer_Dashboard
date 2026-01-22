@@ -18,6 +18,10 @@ import { getModuleConfig, STATUS_CONFIG, RESULT_CONFIG, getSourceDisplayName } f
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
+// 🔧 FIX: 다크모드 초기값 동기 설정 (깜빡임 방지)
+const getInitialDarkMode = () =>
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+
 interface StrategyDetailModalProps {
   strategyId: string;
   onClose: () => void;
@@ -50,11 +54,10 @@ export const StrategyDetailModal: React.FC<StrategyDetailModalProps> = ({
 }) => {
   const { data: strategy, isLoading } = useStrategyDetail(strategyId);
   const { mutate: updateStatus, isPending: isUpdating } = useUpdateStrategyStatus();
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(getInitialDarkMode);
 
   useEffect(() => {
     const check = () => setIsDark(document.documentElement.classList.contains('dark'));
-    check();
     const obs = new MutationObserver(check);
     obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => obs.disconnect();

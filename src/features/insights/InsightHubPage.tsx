@@ -25,6 +25,10 @@ import {
 // Data Provider (통합 데이터소스)
 import { InsightDataProvider, InsightTabType, useInsightData } from '@/features/insights/context/InsightDataContext';
 
+// 🔧 FIX: 다크모드 초기값 동기 설정 (깜빡임 방지)
+const getInitialDarkMode = () =>
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+
 // Tab Components
 import { OverviewTab } from '@/features/insights/tabs/OverviewTab';
 import { StoreTab } from '@/features/insights/tabs/StoreTab';
@@ -52,15 +56,13 @@ function InsightHubContent({ activeTab, setActiveTab }: {
   activeTab: InsightTabType;
   setActiveTab: (tab: InsightTabType) => void;
 }) {
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(getInitialDarkMode);
 
   // 다크모드 감지
   useEffect(() => {
     const checkDarkMode = () => {
       setIsDark(document.documentElement.classList.contains('dark'));
     };
-
-    checkDarkMode();
 
     // MutationObserver로 class 변경 감지
     const observer = new MutationObserver(checkDarkMode);
