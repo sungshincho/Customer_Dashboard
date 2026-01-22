@@ -24,6 +24,10 @@ import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { OntologyGraph3D } from '@/features/data-management/ontology/components/OntologyGraph3D';
 import { MasterSchemaSync } from '@/features/data-management/ontology/components/MasterSchemaSync';
 
+// 🔧 FIX: 다크모드 초기값 동기 설정 (깜빡임 방지)
+const getInitialDarkMode = () =>
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+
 const getText3D = (isDark: boolean) => ({
   heroNumber: isDark ? { fontWeight: 800, letterSpacing: '-0.04em', color: '#ffffff', textShadow: '0 2px 4px rgba(0,0,0,0.4)' } as React.CSSProperties : { fontWeight: 800, letterSpacing: '-0.04em', background: 'linear-gradient(180deg, #1a1a1f 0%, #0a0a0c 35%, #1a1a1f 70%, #0c0c0e 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' } as React.CSSProperties,
   number: isDark ? { fontWeight: 800, letterSpacing: '-0.03em', color: '#ffffff', textShadow: '0 2px 4px rgba(0,0,0,0.3)' } as React.CSSProperties : { fontWeight: 800, letterSpacing: '-0.03em', color: '#0a0a0c' } as React.CSSProperties,
@@ -81,9 +85,9 @@ export default function SettingsPage() {
   const { stores, loading: storesLoading, refreshStores } = useSelectedStore();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('stores');
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(getInitialDarkMode);
 
-  useEffect(() => { const check = () => setIsDark(document.documentElement.classList.contains('dark')); check(); const obs = new MutationObserver(check); obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] }); return () => obs.disconnect(); }, []);
+  useEffect(() => { const check = () => setIsDark(document.documentElement.classList.contains('dark')); const obs = new MutationObserver(check); obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] }); return () => obs.disconnect(); }, []);
   const text3D = getText3D(isDark);
   const iconColor = isDark ? 'rgba(255,255,255,0.7)' : '#374151';
 

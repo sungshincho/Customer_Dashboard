@@ -20,6 +20,10 @@ import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { format, differenceInDays, parseISO } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
+// 🔧 FIX: 다크모드 초기값 동기 설정 (깜빡임 방지)
+const getInitialDarkMode = () =>
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+
 const getText3D = (isDark: boolean) => ({
   number: isDark ? {
     fontWeight: 800, letterSpacing: '-0.03em', color: '#ffffff',
@@ -141,11 +145,10 @@ export function AIRecommendationEffectWidget() {
   const { data: applications = [] } = useRecommendationApplications(selectedStore?.id);
   const pendingMeasurements = usePendingMeasurements(selectedStore?.id);
   const completeROI = useCompleteROIMeasurement();
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(getInitialDarkMode);
 
   useEffect(() => {
     const check = () => setIsDark(document.documentElement.classList.contains('dark'));
-    check();
     const obs = new MutationObserver(check);
     obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => obs.disconnect();

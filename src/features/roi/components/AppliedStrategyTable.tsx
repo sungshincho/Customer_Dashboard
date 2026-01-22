@@ -19,6 +19,10 @@ import { getModuleConfig, STATUS_CONFIG, RESULT_CONFIG } from '../utils/moduleCo
 import { useDeleteStrategies } from '../hooks/useAppliedStrategies';
 import { toast } from 'sonner';
 
+// 🔧 FIX: 다크모드 초기값 동기 설정 (깜빡임 방지)
+const getInitialDarkMode = () =>
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+
 // ============================================================================
 // 3D 스타일 시스템
 // ============================================================================
@@ -143,7 +147,7 @@ export const AppliedStrategyTable: React.FC<AppliedStrategyTableProps> = ({
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(getInitialDarkMode);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
@@ -151,7 +155,6 @@ export const AppliedStrategyTable: React.FC<AppliedStrategyTableProps> = ({
 
   useEffect(() => {
     const check = () => setIsDark(document.documentElement.classList.contains('dark'));
-    check();
     const obs = new MutationObserver(check);
     obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => obs.disconnect();

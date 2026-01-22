@@ -33,13 +33,17 @@ import {
 import { Link } from 'react-router-dom';
 import { useKPILineage } from './hooks/useDataControlTower';
 
+// 🔧 FIX: 다크모드 초기값 동기 설정 (깜빡임 방지)
+const getInitialDarkMode = () =>
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+
 const kpiTables = [
   { value: 'daily_kpis_agg', label: '일별 KPI 집계' },
   { value: 'zone_daily_metrics', label: '존별 일간 메트릭' },
 ];
 
 export default function LineageExplorerPage() {
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(getInitialDarkMode);
   const [selectedTable, setSelectedTable] = useState('daily_kpis_agg');
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split('T')[0]

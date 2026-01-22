@@ -20,6 +20,10 @@ import {
 } from 'lucide-react';
 import type { PipelineStats, DataSourceFlow, PipelineHealth } from '../types';
 
+// 🔧 FIX: 다크모드 초기값 동기 설정 (깜빡임 방지)
+const getInitialDarkMode = () =>
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+
 // ============================================================================
 // 3D 스타일 시스템
 // ============================================================================
@@ -291,11 +295,10 @@ interface PipelineTimelineProps {
 }
 
 export function PipelineTimeline({ stats, onRefresh }: PipelineTimelineProps) {
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(getInitialDarkMode);
 
   useEffect(() => {
     const check = () => setIsDark(document.documentElement.classList.contains('dark'));
-    check();
     const obs = new MutationObserver(check);
     obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => obs.disconnect();

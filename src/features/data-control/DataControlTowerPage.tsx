@@ -30,8 +30,12 @@ import {
   Model3DUploadWidget,
 } from './components';
 
+// 🔧 FIX: 다크모드 초기값 동기 설정 (깜빡임 방지)
+const getInitialDarkMode = () =>
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+
 export default function DataControlTowerPage() {
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(getInitialDarkMode);
   const [showAddConnector, setShowAddConnector] = useState(false);
   const [holidayCount, setHolidayCount] = useState<number>(0);
   const { data: status, isLoading, isFetching, error, refetch } = useDataControlTowerStatus();

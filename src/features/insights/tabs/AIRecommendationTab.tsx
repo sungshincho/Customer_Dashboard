@@ -36,6 +36,10 @@ import { useNavigate } from 'react-router-dom';
 import { ApplyStrategyModal } from '@/features/roi/components/ApplyStrategyModal';
 import type { SourceModule } from '@/features/roi/types/roi.types';
 
+// 🔧 FIX: 다크모드 초기값 동기 설정 (깜빡임 방지)
+const getInitialDarkMode = () =>
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+
 // ============================================================================
 // 3D 스타일 시스템
 // ============================================================================
@@ -218,10 +222,9 @@ export function AIRecommendationTab() {
   const { data: recommendations = [], isLoading } = useAIRecommendations(selectedStore?.id);
 
   // 다크모드 감지
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(getInitialDarkMode);
   useEffect(() => {
     const check = () => setIsDark(document.documentElement.classList.contains('dark'));
-    check();
     const obs = new MutationObserver(check);
     obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => obs.disconnect();

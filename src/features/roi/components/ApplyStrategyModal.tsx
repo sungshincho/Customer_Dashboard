@@ -24,6 +24,10 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 
+// 🔧 FIX: 다크모드 초기값 동기 설정 (깜빡임 방지)
+const getInitialDarkMode = () =>
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+
 interface ApplyStrategyModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -66,10 +70,9 @@ export const ApplyStrategyModal: React.FC<ApplyStrategyModalProps> = ({
   const [notes, setNotes] = useState('');
 
   // 다크 모드 감지
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(getInitialDarkMode);
   useEffect(() => {
     const check = () => setIsDark(document.documentElement.classList.contains('dark'));
-    check();
     const obs = new MutationObserver(check);
     obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => obs.disconnect();

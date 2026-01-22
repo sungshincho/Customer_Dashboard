@@ -12,6 +12,10 @@ import { useGoalProgress, useDeleteGoal, formatGoalValue, GOAL_TYPES, GoalType, 
 import { GoalSettingDialog } from './GoalSettingDialog';
 import React from 'react';
 
+// 🔧 FIX: 다크모드 초기값 동기 설정 (깜빡임 방지)
+const getInitialDarkMode = () =>
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+
 // 기간 유형 라벨
 const PERIOD_LABELS: Record<PeriodType, string> = {
   daily: '일간',
@@ -208,11 +212,10 @@ const iconMap = {
 export function GoalProgressWidget() {
   const { data: progressList = [], isLoading } = useGoalProgress();
   const deleteGoal = useDeleteGoal();
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(getInitialDarkMode);
 
   useEffect(() => {
     const check = () => setIsDark(document.documentElement.classList.contains('dark'));
-    check();
     const obs = new MutationObserver(check);
     obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => obs.disconnect();

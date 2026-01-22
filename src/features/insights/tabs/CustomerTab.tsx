@@ -23,6 +23,10 @@ import { useDateFilterStore } from '@/store/dateFilterStore';
 import { useAuth } from '@/hooks/useAuth';
 import { useIntegratedMetrics } from '../context/InsightDataContext';
 
+// 🔧 FIX: 다크모드 초기값 동기 설정 (깜빡임 방지)
+const getInitialDarkMode = () =>
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+
 // 3D Text 스타일 (다크모드 지원)
 const getText3D = (isDark: boolean) => ({
   heroNumber: isDark ? {
@@ -867,14 +871,13 @@ export function CustomerTab() {
   const { dateRange } = useDateFilterStore();
   const { user, orgId } = useAuth();
   const { data: metrics, isLoading: metricsLoading } = useIntegratedMetrics();
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(getInitialDarkMode);
 
   // 다크모드 감지
   useEffect(() => {
     const checkDarkMode = () => {
       setIsDark(document.documentElement.classList.contains('dark'));
     };
-    checkDarkMode();
     const observer = new MutationObserver(checkDarkMode);
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => observer.disconnect();
