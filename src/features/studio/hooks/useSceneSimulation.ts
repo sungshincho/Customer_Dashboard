@@ -737,6 +737,21 @@ export function useSceneSimulation(): UseSceneSimulationReturn {
           const conversionIncreaseValue = toPercent(conversionImprovement);
 
           results.layout = {
+            // 필수 속성
+            id: `layout-${Date.now()}`,
+            status: 'completed',
+            timestamp: new Date().toISOString(),
+            expectedROI: revenueIncreaseValue,
+            zoneChanges: [],
+            confidence: {
+              overall: summaryData.confidence || 0.8,
+              factors: {
+                dataQuality: 0.8,
+                historicalAccuracy: 0.75,
+                modelConfidence: summaryData.confidence || 0.8,
+              },
+            },
+            // 기존 속성
             furnitureMoves,
             layoutChanges: furnitureChanges.length > 0 ? furnitureChanges : vizFurnitureMoves,
             productPlacements: mappedProductPlacements,
