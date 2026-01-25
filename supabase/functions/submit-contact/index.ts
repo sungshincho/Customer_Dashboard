@@ -33,6 +33,10 @@ interface ContactSubmissionResponse {
   success: boolean;
   id?: string;
   error?: string;
+  // 디버깅용 필드
+  details?: string;
+  hint?: string;
+  code?: string;
 }
 
 // 이메일 유효성 검사
@@ -130,25 +134,49 @@ serve(async (req) => {
       );
     }
 
+    // INSERT할 데이터 준비
+    const submissionData = {
+      name: formData.name.trim(),
+      company: formData.company.trim(),
+      email: formData.email.trim().toLowerCase(),
+      phone: formData.phone?.trim() || null,
+      stores: formData.stores || null,
+      features: formData.features || null,
+      timeline: formData.timeline || null,
+      message: formData.message.trim(),
+    };
+
+    console.log("📝 Attempting to insert data:", JSON.stringify(submissionData));
+
     // contact_submissions 테이블에 저장
     const { data: insertedData, error: insertError } = await supabase
       .from("contact_submissions")
-      .insert({
-        name: formData.name.trim(),
-        company: formData.company.trim(),
-        email: formData.email.trim().toLowerCase(),
-        phone: formData.phone?.trim() || null,
-        stores: formData.stores || null,
-        features: formData.features || null,
-        timeline: formData.timeline || null,
-        message: formData.message.trim(),
-      })
+      .insert(submissionData)
       .select()
       .single();
 
     if (insertError) {
-      console.error("❌ Database insert error:", insertError.message);
-      throw new Error("데이터 저장 중 오류가 발생했습니다.");
+      console.error("❌ Supabase INSERT error:", insertError);
+      console.error("❌ Error message:", insertError.message);
+      console.error("❌ Error details:", insertError.details);
+      console.error("❌ Error hint:", insertError.hint);
+      console.error("❌ Error code:", insertError.code);
+      console.error("❌ Attempted data:", JSON.stringify(submissionData));
+
+      // 상세 에러 정보 반환
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: insertError.message || "데이터 저장 중 오류가 발생했습니다.",
+          details: insertError.details,
+          hint: insertError.hint,
+          code: insertError.code,
+        } as ContactSubmissionResponse),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
     console.log(`✅ Contact submission saved with ID: ${insertedData.id}`);
