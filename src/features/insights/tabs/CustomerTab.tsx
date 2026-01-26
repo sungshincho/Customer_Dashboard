@@ -22,6 +22,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useDateFilterStore } from '@/store/dateFilterStore';
 import { useAuth } from '@/hooks/useAuth';
 import { useIntegratedMetrics } from '../context/InsightDataContext';
+import { useCountUp } from '@/hooks/useCountUp';
 
 // 🔧 FIX: 다크모드 초기값 동기 설정 (깜빡임 방지)
 const getInitialDarkMode = () =>
@@ -966,6 +967,12 @@ export function CustomerTab() {
     return { totalVisitors, totalCustomers, avgReturnRate, topSegment, loyalCustomers };
   }, [segmentData, returnData]);
 
+  // KPI 카운트업 애니메이션
+  const animatedUniqueVisitors = useCountUp(metrics?.uniqueVisitors || 0, { duration: 1500, enabled: !metricsLoading });
+  const animatedRepeatRate = useCountUp(metrics?.repeatRate ?? summary.avgReturnRate, { duration: 1500, decimals: 1, enabled: !metricsLoading });
+  const animatedTopSegmentCount = useCountUp(summary.topSegment?.count || 0, { duration: 1500 });
+  const animatedLoyalCustomers = useCountUp(summary.loyalCustomers, { duration: 1500 });
+
   return (
     <div className="space-y-6">
       {/* 요약 카드 */}
@@ -982,7 +989,7 @@ export function CustomerTab() {
               </div>
             </div>
             <p style={{ fontSize: '28px', ...text3D.heroNumber }}>
-              {metricsLoading ? '-' : (metrics?.uniqueVisitors ?? 0).toLocaleString()}명
+              {metricsLoading ? '-' : animatedUniqueVisitors.toLocaleString()}명
             </p>
             <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>기간 내 고유 방문자</p>
           </div>
@@ -1000,7 +1007,7 @@ export function CustomerTab() {
               </div>
             </div>
             <p style={{ fontSize: '28px', ...text3D.heroNumber }}>
-              {metricsLoading ? '-' : (metrics?.repeatRate ?? summary.avgReturnRate).toFixed(1)}%
+              {metricsLoading ? '-' : animatedRepeatRate.toFixed(1)}%
             </p>
             <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>기간 평균</p>
           </div>
@@ -1018,7 +1025,7 @@ export function CustomerTab() {
               </div>
             </div>
             <p style={{ fontSize: '28px', ...text3D.heroNumber }}>{summary.topSegment?.name || '-'}</p>
-            <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>{summary.topSegment?.count.toLocaleString() || 0}명</p>
+            <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>{animatedTopSegmentCount.toLocaleString()}명</p>
           </div>
         </Glass3DCard>
 
@@ -1033,7 +1040,7 @@ export function CustomerTab() {
                 <p style={{ fontSize: '12px', ...text3D.body }}>충성 고객</p>
               </div>
             </div>
-            <p style={{ fontSize: '28px', ...text3D.heroNumber }}>{summary.loyalCustomers.toLocaleString()}명</p>
+            <p style={{ fontSize: '28px', ...text3D.heroNumber }}>{animatedLoyalCustomers.toLocaleString()}명</p>
             <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>VIP/충성 세그먼트</p>
           </div>
         </Glass3DCard>

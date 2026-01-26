@@ -22,6 +22,7 @@ import { useAIPrediction, DailyPrediction } from '../hooks/useAIPrediction';
 import { formatCurrency } from '../components';
 import { format, isSameDay, addDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import { useCountUp } from '@/hooks/useCountUp';
 
 // 🔧 FIX: 다크모드 초기값 동기 설정 (깜빡임 방지)
 const getInitialDarkMode = () =>
@@ -614,6 +615,11 @@ export function PredictionTab() {
     return formatChartData(data.historicalData, data.dailyPredictions);
   }, [data]);
 
+  // KPI 카운트업 애니메이션
+  const animatedRevenue = useCountUp(data?.summary?.total_predicted_revenue || 0, { duration: 1500, enabled: !isLoading });
+  const animatedVisitors = useCountUp(data?.summary?.total_predicted_visitors || 0, { duration: 1500, enabled: !isLoading });
+  const animatedConversion = useCountUp(data?.summary?.avg_predicted_conversion || 0, { duration: 1500, decimals: 1, enabled: !isLoading });
+
   if (isLoading) return <PredictionTabSkeleton isDark={isDark} />;
 
   if (error) {
@@ -689,7 +695,7 @@ export function PredictionTab() {
               <Calendar className="h-4 w-4" style={{ color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }} />
               <span style={{ fontSize: '12px', ...text3D.body }}>향후 7일 예상 매출</span>
             </div>
-            <p style={{ fontSize: '24px', margin: 0, ...text3D.heroNumber }}>{formatCurrency(summary.total_predicted_revenue)}</p>
+            <p style={{ fontSize: '24px', margin: 0, ...text3D.heroNumber }}>{formatCurrency(animatedRevenue)}</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px' }}>
               {summary.revenue_change_percent > 0 ? <TrendingUp className="h-3 w-3" style={{ color: '#22c55e' }} /> : summary.revenue_change_percent < 0 ? <TrendingDown className="h-3 w-3" style={{ color: '#ef4444' }} /> : <TrendingUp className="h-3 w-3" style={{ color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280' }} />}
               <span style={{ fontSize: '12px', fontWeight: 500, color: summary.revenue_change_percent > 0 ? '#22c55e' : summary.revenue_change_percent < 0 ? '#ef4444' : (isDark ? 'rgba(255,255,255,0.6)' : '#6b7280') }}>
@@ -705,7 +711,7 @@ export function PredictionTab() {
               <Users className="h-4 w-4" style={{ color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }} />
               <span style={{ fontSize: '12px', ...text3D.body }}>예상 방문자</span>
             </div>
-            <p style={{ fontSize: '24px', margin: 0, ...text3D.heroNumber }}>{summary.total_predicted_visitors.toLocaleString()}명</p>
+            <p style={{ fontSize: '24px', margin: 0, ...text3D.heroNumber }}>{animatedVisitors.toLocaleString()}명</p>
             <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>향후 7일 누적</p>
           </div>
         </GlassCard>
@@ -716,7 +722,7 @@ export function PredictionTab() {
               <Percent className="h-4 w-4" style={{ color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }} />
               <span style={{ fontSize: '12px', ...text3D.body }}>예상 전환율</span>
             </div>
-            <p style={{ fontSize: '24px', margin: 0, ...text3D.heroNumber }}>{summary.avg_predicted_conversion.toFixed(1)}%</p>
+            <p style={{ fontSize: '24px', margin: 0, ...text3D.heroNumber }}>{animatedConversion.toFixed(1)}%</p>
             <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>7일 평균 예측</p>
           </div>
         </GlassCard>

@@ -125,6 +125,7 @@ export * from './useOnboarding';
 // ============================================================================
 export { useClearCache } from './useClearCache';
 export { useToast, toast } from './use-toast';
+export { useCountUp, useFormattedCountUp } from './useCountUp';
 
 // ============================================================================
 // 시뮬레이션 훅
