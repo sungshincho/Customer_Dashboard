@@ -19,6 +19,7 @@ import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { useDateFilterStore } from '@/store/dateFilterStore';
 import { useZoneMetricsByDateRange, useZonesDim } from '@/hooks/useZoneMetrics';
 import { useAuth } from '@/hooks/useAuth';
+import { useCountUp } from '@/hooks/useCountUp';
 import { useIntegratedMetrics, useHourlyVisitors } from '../context/InsightDataContext';
 import { formatDuration } from '../components';
 
@@ -647,6 +648,20 @@ export function StoreTab() {
     return hourlyData.reduce((max, item) => (item.visitors > (max?.visitors || 0) ? item : max), hourlyData[0]);
   }, [hourlyData]);
 
+  // 평균 체류시간 계산 (분 단위)
+  const avgDwellMinutes = useMemo(() => {
+    if (metrics?.avgDwellTime) return Math.round(metrics.avgDwellTime / 60);
+    if (zoneData?.length) return Math.round(zoneData.reduce((s, z) => s + z.avgDwell, 0) / zoneData.length);
+    return 0;
+  }, [metrics?.avgDwellTime, zoneData]);
+
+  // KPI 카운트업 애니메이션
+  const animatedPeakVisitors = useCountUp(peakHour?.visitors || 0, { duration: 1500 });
+  const animatedZoneVisitors = useCountUp(zoneData?.[0]?.visitors || 0, { duration: 1500 });
+  const animatedAvgDwell = useCountUp(avgDwellMinutes, { duration: 1500 });
+  const animatedCoverage = useCountUp(metrics?.trackingCoverage || 0, { duration: 1500, decimals: 1 });
+  const animatedTrackedVisitors = useCountUp(metrics?.trackedVisitors || 0, { duration: 1500 });
+
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -657,7 +672,7 @@ export function StoreTab() {
               <div><p style={text3D.label}>PEAK TIME</p><p style={{ fontSize: '12px', ...text3D.body }}>피크타임</p></div>
             </div>
             <p style={{ fontSize: '28px', ...text3D.heroNumber }}>{peakHour?.hour || '0시'}</p>
-            <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>{peakHour?.visitors || 0}명 방문</p>
+            <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>{animatedPeakVisitors.toLocaleString()}명 방문</p>
           </div>
         </Glass3DCard>
         <Glass3DCard dark={isDark}>
@@ -667,7 +682,7 @@ export function StoreTab() {
               <div><p style={text3D.label}>POPULAR ZONE</p><p style={{ fontSize: '12px', ...text3D.body }}>인기 존</p></div>
             </div>
             <p style={{ fontSize: '28px', ...text3D.heroNumber }}>{zoneData?.[0]?.name || '-'}</p>
-            <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>{zoneData?.[0]?.visitors?.toLocaleString() || 0}회 방문</p>
+            <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>{animatedZoneVisitors.toLocaleString()}회 방문</p>
           </div>
         </Glass3DCard>
         <Glass3DCard dark={isDark}>
@@ -676,9 +691,7 @@ export function StoreTab() {
               <Icon3D size={40} dark={isDark}><Users className="h-5 w-5" style={{ color: iconColor }} /></Icon3D>
               <div><p style={text3D.label}>AVG DWELL TIME</p><p style={{ fontSize: '12px', ...text3D.body }}>평균 체류시간</p></div>
             </div>
-            <p style={{ fontSize: '28px', ...text3D.heroNumber }}>
-              {metrics?.avgDwellTime ? formatDuration(metrics.avgDwellTime) : (zoneData?.length ? `${Math.round(zoneData.reduce((s, z) => s + z.avgDwell, 0) / zoneData.length)}분` : '0분')}
-            </p>
+            <p style={{ fontSize: '28px', ...text3D.heroNumber }}>{animatedAvgDwell}분</p>
             <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>전체 존 평균</p>
           </div>
         </Glass3DCard>
@@ -688,8 +701,8 @@ export function StoreTab() {
               <Icon3D size={40} dark={isDark}><Radio className="h-5 w-5" style={{ color: iconColor }} /></Icon3D>
               <div><p style={text3D.label}>TRACKING COVERAGE</p><p style={{ fontSize: '12px', ...text3D.body }}>센서 커버율</p></div>
             </div>
-            <p style={{ fontSize: '28px', ...text3D.heroNumber }}>{metrics?.trackingCoverage?.toFixed(1) || '0'}%</p>
-            <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>{metrics?.trackedVisitors?.toLocaleString() || 0}명 추적</p>
+            <p style={{ fontSize: '28px', ...text3D.heroNumber }}>{animatedCoverage.toFixed(1)}%</p>
+            <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>{animatedTrackedVisitors.toLocaleString()}명 추적</p>
           </div>
         </Glass3DCard>
       </div>

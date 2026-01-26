@@ -15,6 +15,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useDateFilterStore } from '@/store/dateFilterStore';
 import { useAuth } from '@/hooks/useAuth';
+import { useCountUp } from '@/hooks/useCountUp';
 
 // 🔧 FIX: 다크모드 초기값 동기 설정 (깜빡임 방지)
 const getInitialDarkMode = () =>
@@ -664,6 +665,12 @@ export function ProductTab() {
     return { totalRevenue, totalQuantity, topProduct, lowStockCount };
   }, [productData]);
 
+  // KPI 카운트업 애니메이션
+  const animatedRevenue = useCountUp(metrics?.revenue || 0, { duration: 1500, enabled: !metricsLoading });
+  const animatedTotalQuantity = useCountUp(summary.totalQuantity, { duration: 1500 });
+  const animatedLowStock = useCountUp(summary.lowStockCount, { duration: 1500 });
+  const animatedTopProductRevenue = useCountUp(Math.round((summary.topProduct?.revenue || 0) * revenueRatio), { duration: 1500 });
+
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -674,7 +681,7 @@ export function ProductTab() {
               <div><p style={text3D.label}>REVENUE</p><p style={{ fontSize: '12px', ...text3D.body }}>총 매출</p></div>
             </div>
             {/* 🔧 FIX: 개요탭과 동일 소스(daily_kpis_agg) 사용으로 데이터 일관성 확보 */}
-            <p style={{ fontSize: '28px', ...text3D.heroNumber }}>{formatCurrency(metrics?.revenue || 0)}</p>
+            <p style={{ fontSize: '28px', ...text3D.heroNumber }}>{formatCurrency(animatedRevenue)}</p>
             <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>분석 기간 총 매출</p>
           </div>
         </Glass3DCard>
@@ -684,7 +691,7 @@ export function ProductTab() {
               <Icon3D size={40} dark={isDark}><Package className="h-5 w-5" style={{ color: iconColor }} /></Icon3D>
               <div><p style={text3D.label}>UNITS SOLD</p><p style={{ fontSize: '12px', ...text3D.body }}>총 판매량</p></div>
             </div>
-            <p style={{ fontSize: '28px', ...text3D.heroNumber }}>{summary.totalQuantity.toLocaleString()}개</p>
+            <p style={{ fontSize: '28px', ...text3D.heroNumber }}>{animatedTotalQuantity.toLocaleString()}개</p>
             <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>분석 기간 총 판매</p>
           </div>
         </Glass3DCard>
@@ -695,7 +702,7 @@ export function ProductTab() {
               <div><p style={text3D.label}>BESTSELLER</p><p style={{ fontSize: '12px', ...text3D.body }}>베스트셀러</p></div>
             </div>
             <p style={{ fontSize: '24px', ...text3D.heroNumber }} className="truncate">{summary.topProduct?.name || '-'}</p>
-            <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>{formatCurrency(Math.round((summary.topProduct?.revenue || 0) * revenueRatio))}</p>
+            <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>{formatCurrency(animatedTopProductRevenue)}</p>
           </div>
         </Glass3DCard>
         <Glass3DCard dark={isDark}>
@@ -704,7 +711,7 @@ export function ProductTab() {
               <Icon3D size={40} dark={isDark}><AlertTriangle className="h-5 w-5" style={{ color: summary.lowStockCount > 0 ? '#ef4444' : iconColor }} /></Icon3D>
               <div><p style={text3D.label}>LOW STOCK</p><p style={{ fontSize: '12px', ...text3D.body }}>재고 부족</p></div>
             </div>
-            <p style={{ fontSize: '28px', color: summary.lowStockCount > 0 ? '#ef4444' : (isDark ? '#fff' : '#1a1a1f'), ...text3D.heroNumber }}>{summary.lowStockCount}개</p>
+            <p style={{ fontSize: '28px', color: summary.lowStockCount > 0 ? '#ef4444' : (isDark ? '#fff' : '#1a1a1f'), ...text3D.heroNumber }}>{animatedLowStock}개</p>
             <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>재고 10개 미만 상품</p>
           </div>
         </Glass3DCard>

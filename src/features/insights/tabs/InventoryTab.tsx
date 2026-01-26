@@ -28,6 +28,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { useInventoryMetricsData } from '../context/InsightDataContext';
+import { useCountUp } from '@/hooks/useCountUp';
 
 // 🔧 FIX: 다크모드 초기값 동기 설정 (깜빡임 방지)
 const getInitialDarkMode = () =>
@@ -517,6 +518,15 @@ export function InventoryTab() {
   const text3D = getText3D(isDark);
   const iconColor = isDark ? 'rgba(255,255,255,0.8)' : '#1a1a1f';
 
+  // KPI 카운트업 애니메이션
+  const animatedTotalProducts = useCountUp(data?.totalProducts || 0, { duration: 1500, enabled: !isLoading });
+  const animatedLowStock = useCountUp(data?.lowStockCount || 0, { duration: 1500, enabled: !isLoading });
+  const animatedCriticalStock = useCountUp(data?.criticalStockCount || 0, { duration: 1500, enabled: !isLoading });
+  const animatedOverstock = useCountUp(data?.overstockCount || 0, { duration: 1500, enabled: !isLoading });
+  const animatedHealthyStock = useCountUp(data?.healthyStockCount || 0, { duration: 1500, enabled: !isLoading });
+  const healthyRatio = data?.totalProducts ? (data.healthyStockCount / data.totalProducts) * 100 : 0;
+  const animatedHealthyRatio = useCountUp(healthyRatio, { duration: 1500, decimals: 1, enabled: !isLoading });
+
   // 데이터가 없는 경우
   if (!data && !isLoading) {
     return (
@@ -544,7 +554,7 @@ export function InventoryTab() {
               <Icon3D size={40} dark={isDark}><Package className="h-5 w-5" style={{ color: iconColor }} /></Icon3D>
               <div><p style={text3D.label}>TOTAL ITEMS</p><p style={{ fontSize: '12px', ...text3D.body }}>총 상품 수</p></div>
             </div>
-            <p style={{ fontSize: '28px', ...text3D.heroNumber }}>{(data?.totalProducts || 0).toLocaleString()}개</p>
+            <p style={{ fontSize: '28px', ...text3D.heroNumber }}>{animatedTotalProducts.toLocaleString()}개</p>
             <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>관리 중인 SKU</p>
           </div>
         </Glass3DCard>
@@ -562,10 +572,10 @@ export function InventoryTab() {
               color: (data?.lowStockCount || 0) > 0 ? '#ef4444' : (isDark ? '#fff' : '#1a1a1f'),
               ...text3D.heroNumber
             }}>
-              {(data?.lowStockCount || 0).toLocaleString()}개
+              {animatedLowStock.toLocaleString()}개
             </p>
             <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>
-              위험 {data?.criticalStockCount || 0} / 부족 {(data?.lowStockCount || 0) - (data?.criticalStockCount || 0)}
+              위험 {animatedCriticalStock} / 부족 {animatedLowStock - animatedCriticalStock}
             </p>
           </div>
         </Glass3DCard>
@@ -583,7 +593,7 @@ export function InventoryTab() {
               color: (data?.overstockCount || 0) > 0 ? '#3b82f6' : (isDark ? '#fff' : '#1a1a1f'),
               ...text3D.heroNumber
             }}>
-              {(data?.overstockCount || 0).toLocaleString()}개
+              {animatedOverstock.toLocaleString()}개
             </p>
             <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>적정 재고 대비 150% 초과</p>
           </div>
@@ -598,10 +608,10 @@ export function InventoryTab() {
               <div><p style={text3D.label}>HEALTHY</p><p style={{ fontSize: '12px', ...text3D.body }}>정상 재고</p></div>
             </div>
             <p style={{ fontSize: '28px', color: '#22c55e', ...text3D.heroNumber }}>
-              {(data?.healthyStockCount || 0).toLocaleString()}개
+              {animatedHealthyStock.toLocaleString()}개
             </p>
             <p style={{ fontSize: '12px', marginTop: '8px', ...text3D.body }}>
-              {data?.totalProducts ? ((data.healthyStockCount / data.totalProducts) * 100).toFixed(1) : 0}% 정상 비율
+              {animatedHealthyRatio.toFixed(1)}% 정상 비율
             </p>
           </div>
         </Glass3DCard>

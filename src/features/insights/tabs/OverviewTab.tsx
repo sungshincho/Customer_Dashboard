@@ -23,6 +23,7 @@ import {
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { useAIRecommendations } from '@/hooks/useAIRecommendations';
 import { useDateFilterStore } from '@/store/dateFilterStore';
+import { useCountUp } from '@/hooks/useCountUp';
 import { cn } from '@/lib/utils';
 import { useIntegratedMetrics } from '../context/InsightDataContext';
 
@@ -354,6 +355,14 @@ export function OverviewTab() {
 
   const topRecommendations = recommendations?.slice(0, 2) || [];
 
+  // KPI 카운트업 애니메이션
+  const animatedFootfall = useCountUp(metrics?.footfall || 0, { duration: 1500, enabled: !isLoading });
+  const animatedUniqueVisitors = useCountUp(metrics?.uniqueVisitors || 0, { duration: 1500, enabled: !isLoading });
+  const animatedRevenue = useCountUp(metrics?.revenue || 0, { duration: 1500, enabled: !isLoading });
+  const animatedConversionRate = useCountUp(metrics?.conversionRate || 0, { duration: 1500, decimals: 1, enabled: !isLoading });
+  const animatedTransactions = useCountUp(metrics?.transactions || 0, { duration: 1500, enabled: !isLoading });
+  const animatedAtv = useCountUp(metrics?.atv || 0, { duration: 1500, enabled: !isLoading });
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -375,29 +384,29 @@ export function OverviewTab() {
         <MetricCard
           icon={<Users className="h-5 w-5" style={{ color: iconColor }} />}
           labelEn="FOOTFALL" label="총 입장"
-          value={metrics?.footfall.toLocaleString() || '0'}
+          value={animatedFootfall.toLocaleString()}
           subLabel="기간 내 총 입장 횟수"
           change={metrics?.changes.footfall} isDark={isDark}
         />
         <MetricCard
           icon={<UserCheck className="h-5 w-5" style={{ color: iconColor }} />}
           labelEn="UNIQUE VISITORS" label="순 방문객"
-          value={metrics?.uniqueVisitors.toLocaleString() || '0'}
+          value={animatedUniqueVisitors.toLocaleString()}
           subLabel={metrics?.visitFrequency ? `평균 ${metrics.visitFrequency.toFixed(1)}회 방문` : undefined}
           change={metrics?.changes.uniqueVisitors} isDark={isDark}
         />
         <MetricCard
           icon={<DollarSign className="h-5 w-5" style={{ color: iconColor }} />}
           labelEn="REVENUE" label="총 매출"
-          value={formatCurrency(metrics?.revenue || 0)}
-          subLabel={metrics?.atv ? `객단가 ${formatCurrency(metrics.atv)}` : undefined}
+          value={formatCurrency(animatedRevenue)}
+          subLabel={metrics?.atv ? `객단가 ${formatCurrency(animatedAtv)}` : undefined}
           change={metrics?.changes.revenue} isDark={isDark}
         />
         <MetricCard
           icon={<TrendingUp className="h-5 w-5" style={{ color: iconColor }} />}
           labelEn="CONVERSION" label="구매 전환율"
-          value={formatPercent(metrics?.conversionRate || 0)}
-          subLabel={`${metrics?.transactions.toLocaleString() || 0}건 거래`}
+          value={formatPercent(animatedConversionRate)}
+          subLabel={`${animatedTransactions.toLocaleString()}건 거래`}
           change={metrics?.changes.conversionRate} changeUnit="%p" isDark={isDark}
         />
       </div>
