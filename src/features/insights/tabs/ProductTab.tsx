@@ -82,6 +82,8 @@ const GlowHorizontalBarChart = ({ data, isDark }: HorizontalBarChartProps) => {
   const barsRef = useRef<Array<{ x: number; y: number; width: number; height: number; data: { name: string; revenue: number } }>>([]);
   const animationRef = useRef<number>(0);
   const [progress, setProgress] = useState(0);
+  // 🔧 FIX: 이전 데이터 키를 저장하여 실제 데이터 변경 시에만 애니메이션 실행
+  const prevDataKeyRef = useRef<string>('');
 
   useEffect(() => {
     const update = () => {
@@ -94,6 +96,12 @@ const GlowHorizontalBarChart = ({ data, isDark }: HorizontalBarChartProps) => {
 
   useEffect(() => {
     if (!data || data.length === 0) return;
+
+    // 🔧 FIX: 데이터 내용이 실제로 변경되었는지 확인 (탭 전환 시 불필요한 애니메이션 방지)
+    const dataKey = data.map(d => `${d.name}:${d.revenue}`).join('|');
+    if (prevDataKeyRef.current === dataKey) return; // 동일 데이터면 애니메이션 스킵
+    prevDataKeyRef.current = dataKey;
+
     setProgress(0);
     const start = performance.now();
     const animate = (t: number) => {
@@ -665,6 +673,9 @@ export function ProductTab() {
     return { totalRevenue, totalQuantity, topProduct, lowStockCount };
   }, [productData]);
 
+  // 🔧 FIX: 상품별 매출 TOP10 배열 메모이제이션 - 리렌더링 시 새 배열 생성 방지
+  const top10Products = useMemo(() => productData?.slice(0, 10) || [], [productData]);
+
   // KPI 카운트업 애니메이션
   const animatedRevenue = useCountUp(metrics?.revenue || 0, { duration: 1500, enabled: !metricsLoading });
   const animatedTotalQuantity = useCountUp(summary.totalQuantity, { duration: 1500 });
@@ -731,8 +742,8 @@ export function ProductTab() {
         <div className="p-6">
           <h3 style={{ fontSize: '16px', marginBottom: '4px', ...text3D.number }}>상품별 매출 TOP 10</h3>
           <p style={{ fontSize: '12px', marginBottom: '20px', ...text3D.body }}>매출 기준 상위 10개 상품</p>
-          {productData && productData.length > 0 ? (
-            <GlowHorizontalBarChart data={productData.slice(0, 10)} isDark={isDark} />
+          {top10Products.length > 0 ? (
+            <GlowHorizontalBarChart data={top10Products} isDark={isDark} />
           ) : (
             <div className="h-[300px] flex items-center justify-center" style={text3D.body}>상품 데이터가 없습니다</div>
           )}
