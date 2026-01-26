@@ -81,7 +81,7 @@ const ChartTooltip = ({ data, isDark }: { data: TooltipData | null; isDark: bool
   );
 };
 
-// 재고 상태 분포 도넛 차트
+// 재고 상태 분포 글로우 도넛 차트 (고객 세그먼트 분포 스타일)
 interface StockDistributionChartProps {
   data: { critical: number; low: number; normal: number; overstock: number };
   isDark: boolean;
@@ -90,32 +90,52 @@ interface StockDistributionChartProps {
 const StockDistributionChart = ({ data, isDark }: StockDistributionChartProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [dimensions, setDimensions] = useState({ width: 280, height: 240 });
+  const [dimensions, setDimensions] = useState({ width: 300, height: 280 });
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
-  const anglesRef = useRef<Array<{ start: number; end: number; label: string; count: number; color: string }>>([]);
+  const segmentAnglesRef = useRef<Array<{ startAngle: number; endAngle: number; data: { label: string; count: number } }>>([]);
   const animationRef = useRef<number>(0);
-  const [progress, setProgress] = useState(0);
+  const [animationProgress, setAnimationProgress] = useState(0);
 
+  const segments = [
+    { label: '위험', count: data.critical },
+    { label: '부족', count: data.low },
+    { label: '정상', count: data.normal },
+    { label: '과잉', count: data.overstock },
+  ];
   const total = data.critical + data.low + data.normal + data.overstock;
 
   useEffect(() => {
-    const update = () => {
-      if (containerRef.current) setDimensions({ width: Math.min(containerRef.current.offsetWidth, 300), height: 240 });
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        const width = containerRef.current.offsetWidth;
+        setDimensions({ width: Math.min(width, 400), height: 280 });
+      }
     };
-    update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
+    updateDimensions();
+    window.addEventListener('resize', updateDimensions);
+    return () => window.removeEventListener('resize', updateDimensions);
   }, []);
 
+  // 애니메이션 시작
   useEffect(() => {
     if (total === 0) return;
-    setProgress(0);
-    const start = performance.now();
-    const animate = (t: number) => {
-      const p = Math.min((t - start) / 800, 1);
-      setProgress(1 - Math.pow(1 - p, 3));
-      if (p < 1) animationRef.current = requestAnimationFrame(animate);
+
+    setAnimationProgress(0);
+    const startTime = performance.now();
+    const duration = 800; // 0.8초
+
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // easeOutCubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setAnimationProgress(eased);
+
+      if (progress < 1) {
+        animationRef.current = requestAnimationFrame(animate);
+      }
     };
+
     animationRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(animationRef.current);
   }, [data, total]);
@@ -123,93 +143,149 @@ const StockDistributionChart = ({ data, isDark }: StockDistributionChartProps) =
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || total === 0) return;
+
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     const { width, height } = dimensions;
     const dpr = window.devicePixelRatio || 1;
+
     canvas.width = width * dpr;
     canvas.height = height * dpr;
     ctx.scale(dpr, dpr);
+
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const outerRadius = Math.min(width, height) / 2 - 50;
+    const innerRadius = outerRadius * 0.52;
+
     ctx.clearRect(0, 0, width, height);
 
-    const cx = width / 2, cy = height / 2;
-    const or = Math.min(width, height) / 2 - 40;
-    const ir = or * 0.55;
+    let currentAngle = -Math.PI / 2;
+    const angles: Array<{ startAngle: number; endAngle: number; data: { label: string; count: number } }> = [];
 
-    const segments = [
-      { label: '위험', count: data.critical, color: '#ef4444' },
-      { label: '부족', count: data.low, color: '#f97316' },
-      { label: '정상', count: data.normal, color: '#22c55e' },
-      { label: '과잉', count: data.overstock, color: '#3b82f6' },
-    ];
+    // 모노크롬 색상 함수 (밝기로 세그먼트 구분)
+    const getColor = (idx: number, opacity: number) => {
+      if (isDark) {
+        const brightness = [0.8, 0.55, 0.35, 0.18][idx] || 0.4;
+        return `rgba(255, 255, 255, ${opacity * brightness})`;
+      } else {
+        const darkness = [0.85, 0.6, 0.4, 0.2][idx] || 0.4;
+        return `rgba(0, 0, 0, ${opacity * darkness})`;
+      }
+    };
 
-    let cur = -Math.PI / 2;
-    const angles: typeof anglesRef.current = [];
-    const maxA = Math.PI * 2 * progress;
-    let acc = 0;
+    // 애니메이션: 전체 각도를 progress에 따라 제한
+    const maxAngle = Math.PI * 2 * animationProgress;
+    let accumulatedAngle = 0;
 
-    segments.forEach((seg, i) => {
-      if (seg.count === 0) return;
-      const full = (seg.count / total) * Math.PI * 2;
-      const rem = maxA - acc;
-      if (rem <= 0) return;
-      const slice = Math.min(full, rem);
+    segments.forEach((segment, idx) => {
+      if (segment.count === 0) return;
 
-      if (progress >= 1) angles.push({ start: cur, end: cur + full, ...seg });
+      const fullSliceAngle = (segment.count / total) * Math.PI * 2;
+      const remainingAngle = maxAngle - accumulatedAngle;
+      if (remainingAngle <= 0) return;
 
-      // Draw segment
+      const sliceAngle = Math.min(fullSliceAngle, remainingAngle);
+      const startAngle = currentAngle;
+      const midAngle = currentAngle + fullSliceAngle / 2;
+
+      if (animationProgress >= 1) {
+        angles.push({ startAngle, endAngle: currentAngle + fullSliceAngle, data: segment });
+      }
+
+      // 세그먼트 라디얼 그라데이션 (글로우 효과)
+      const gradient = ctx.createRadialGradient(centerX, centerY, innerRadius, centerX, centerY, outerRadius);
+      gradient.addColorStop(0, getColor(idx, 0.3));
+      gradient.addColorStop(0.6, getColor(idx, 0.55));
+      gradient.addColorStop(1, getColor(idx, 0.8));
+
       ctx.beginPath();
-      ctx.arc(cx, cy, or, cur, cur + slice);
-      ctx.arc(cx, cy, ir, cur + slice, cur, true);
+      ctx.arc(centerX, centerY, outerRadius, currentAngle, currentAngle + sliceAngle);
+      ctx.arc(centerX, centerY, innerRadius, currentAngle + sliceAngle, currentAngle, true);
       ctx.closePath();
-      ctx.fillStyle = seg.color + (isDark ? 'cc' : 'bb');
+      ctx.fillStyle = gradient;
       ctx.fill();
 
-      // Separator line
-      if (slice >= full - 0.01) {
-        ctx.strokeStyle = isDark ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.8)';
+      // 구분선 (완료된 세그먼트만)
+      if (sliceAngle >= fullSliceAngle - 0.01) {
+        ctx.strokeStyle = isDark ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.9)';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(cx + Math.cos(cur + slice) * ir, cy + Math.sin(cur + slice) * ir);
-        ctx.lineTo(cx + Math.cos(cur + slice) * or, cy + Math.sin(cur + slice) * or);
+        ctx.moveTo(
+          centerX + Math.cos(currentAngle + sliceAngle) * innerRadius,
+          centerY + Math.sin(currentAngle + sliceAngle) * innerRadius
+        );
+        ctx.lineTo(
+          centerX + Math.cos(currentAngle + sliceAngle) * outerRadius,
+          centerY + Math.sin(currentAngle + sliceAngle) * outerRadius
+        );
         ctx.stroke();
       }
 
-      cur += full;
-      acc += full;
+      // 라벨 (애니메이션 완료 후, 도넛 바깥쪽에 표시)
+      if (animationProgress >= 1) {
+        const labelRadius = outerRadius + 28;
+        const labelX = centerX + Math.cos(midAngle) * labelRadius;
+        const labelY = centerY + Math.sin(midAngle) * labelRadius;
+        const percent = ((segment.count / total) * 100).toFixed(0);
+
+        ctx.font = '600 11px system-ui, -apple-system, sans-serif';
+        ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.8)';
+        ctx.textAlign = midAngle > Math.PI / 2 && midAngle < Math.PI * 1.5 ? 'right' : 'left';
+        ctx.fillText(`${segment.label} ${percent}%`, labelX, labelY);
+      }
+
+      currentAngle += fullSliceAngle;
+      accumulatedAngle += fullSliceAngle;
     });
-    anglesRef.current = angles;
 
-    // Center text
-    ctx.font = 'bold 20px system-ui';
-    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.85)';
+    segmentAnglesRef.current = angles;
+
+    // 중심 텍스트 (애니메이션 중에도 표시, 숫자는 카운트업)
+    const displayTotal = Math.round(total * animationProgress);
+    ctx.font = 'bold 22px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.85)';
     ctx.textAlign = 'center';
-    ctx.fillText(Math.round(total * progress).toLocaleString(), cx, cy + 4);
-    ctx.font = '500 10px system-ui';
-    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)';
-    ctx.fillText('TOTAL ITEMS', cx, cy + 20);
-  }, [data, isDark, dimensions, progress, total]);
+    ctx.fillText(displayTotal.toLocaleString(), centerX, centerY + 2);
+    ctx.font = '500 9px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.35)' : 'rgba(0, 0, 0, 0.35)';
+    ctx.fillText('TOTAL', centerX, centerY + 18);
 
-  const onMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect || total === 0) return;
-    const x = e.clientX - rect.left, y = e.clientY - rect.top;
+  }, [data, isDark, dimensions, animationProgress, total, segments]);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas || total === 0) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
     const { width, height } = dimensions;
-    const cx = width / 2, cy = height / 2;
-    const or = Math.min(width, height) / 2 - 40, ir = or * 0.55;
-    const dx = x - cx, dy = y - cy, dist = Math.sqrt(dx * dx + dy * dy);
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const outerRadius = Math.min(width, height) / 2 - 50;
+    const innerRadius = outerRadius * 0.52;
 
-    if (dist >= ir && dist <= or) {
+    const dx = x - centerX;
+    const dy = y - centerY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    if (distance >= innerRadius && distance <= outerRadius) {
       let angle = Math.atan2(dy, dx);
       if (angle < -Math.PI / 2) angle += Math.PI * 2;
-      const seg = anglesRef.current.find(a => angle >= a.start && angle < a.end);
-      if (seg) {
+
+      const segment = segmentAnglesRef.current.find(s => angle >= s.startAngle && angle < s.endAngle);
+
+      if (segment) {
+        const percent = ((segment.data.count / total) * 100).toFixed(1);
         setTooltip({
-          x, y,
-          title: seg.label,
-          value: `${seg.count.toLocaleString()}개`,
-          subValue: `전체의 ${((seg.count / total) * 100).toFixed(1)}%`,
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top,
+          title: segment.data.label,
+          value: `${segment.data.count.toLocaleString()}개`,
+          subValue: `전체의 ${percent}%`,
         });
         return;
       }
@@ -217,47 +293,25 @@ const StockDistributionChart = ({ data, isDark }: StockDistributionChartProps) =
     setTooltip(null);
   };
 
+  const handleMouseLeave = () => setTooltip(null);
+
   if (total === 0) {
     return (
-      <div className="h-[240px] flex items-center justify-center" style={{ color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>
+      <div className="h-[280px] flex items-center justify-center" style={{ color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>
         재고 데이터가 없습니다
       </div>
     );
   }
 
   return (
-    <div ref={containerRef} style={{ width: '100%', position: 'relative' }}>
-      <div style={{ display: 'flex', justifyContent: 'center', position: 'relative' }}>
-        <canvas
-          ref={canvasRef}
-          style={{ width: dimensions.width, height: dimensions.height, cursor: tooltip ? 'pointer' : 'default' }}
-          onMouseMove={onMove}
-          onMouseLeave={() => setTooltip(null)}
-        />
-        <ChartTooltip data={tooltip} isDark={isDark} />
-      </div>
-      {/* Legend */}
-      <div style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        justifyContent: 'center',
-        gap: '12px 20px',
-        marginTop: '12px',
-        fontSize: '12px',
-      }}>
-        {[
-          { label: '위험', count: data.critical, color: '#ef4444' },
-          { label: '부족', count: data.low, color: '#f97316' },
-          { label: '정상', count: data.normal, color: '#22c55e' },
-          { label: '과잉', count: data.overstock, color: '#3b82f6' },
-        ].map(seg => (
-          <span key={seg.label} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: isDark ? 'rgba(255,255,255,0.7)' : '#374151' }}>
-            <span style={{ width: '10px', height: '10px', borderRadius: '3px', backgroundColor: seg.color }} />
-            <span>{seg.label}</span>
-            <span style={{ fontWeight: 600 }}>{seg.count}</span>
-          </span>
-        ))}
-      </div>
+    <div ref={containerRef} style={{ width: '100%', display: 'flex', justifyContent: 'center', position: 'relative' }}>
+      <canvas
+        ref={canvasRef}
+        style={{ width: dimensions.width, height: dimensions.height, cursor: tooltip ? 'pointer' : 'default' }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+      />
+      <ChartTooltip data={tooltip} isDark={isDark} />
     </div>
   );
 };
