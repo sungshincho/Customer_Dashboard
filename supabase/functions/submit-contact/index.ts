@@ -14,7 +14,7 @@ const corsHeaders = {
 
 // Zapier Webhook URL
 const ZAPIER_WEBHOOK_URL =
-  "https://hooks.zapier.com/hooks/catch/26160974/uqwc9mv/";
+  "https://hooks.zapier.com/hooks/catch/26235556/ul2ehrb/";
 
 interface ContactFormData {
   name: string;
