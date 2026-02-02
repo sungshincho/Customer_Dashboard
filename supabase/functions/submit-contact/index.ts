@@ -20,11 +20,11 @@ interface ContactFormData {
   name: string;
   company: string;
   email: string;
-  phone?: string;
+  phone: string;
   stores?: number;
   features?: string[];
   timeline?: string;
-  message: string;
+  message?: string;
   privacy_consent?: boolean;
   marketing_consent?: boolean;
 }
@@ -56,8 +56,8 @@ function validateInput(data: ContactFormData): string | null {
   if (!data.email || !isValidEmail(data.email)) {
     return "유효한 이메일 주소가 필요합니다.";
   }
-  if (!data.message || data.message.trim().length === 0) {
-    return "메시지는 필수입니다.";
+  if (!data.phone || data.phone.trim().length === 0) {
+    return "전화번호는 필수입니다.";
   }
   return null;
 }
@@ -139,11 +139,11 @@ serve(async (req) => {
       name: formData.name.trim(),
       company: formData.company.trim(),
       email: formData.email.trim().toLowerCase(),
-      phone: formData.phone?.trim() || null,
+      phone: formData.phone.trim(),
       stores: formData.stores || null,
       features: formData.features || null,
       timeline: formData.timeline || null,
-      message: formData.message.trim(),
+      message: formData.message?.trim() || null,
     };
 
     console.log("📝 Attempting to insert data:", JSON.stringify(submissionData));
@@ -187,7 +187,7 @@ serve(async (req) => {
       name: insertedData.name,
       company: insertedData.company,
       email: insertedData.email,
-      phone: insertedData.phone || "미입력",
+      phone: insertedData.phone,
       stores: insertedData.stores,
       features: insertedData.features,
       timeline: insertedData.timeline,
