@@ -46,13 +46,15 @@ function isValidEmail(email: string): boolean {
 }
 
 // 입력값 검증
+// TEMPORARILY MODIFIED: name, company validation removed (fields are hidden)
 function validateInput(data: ContactFormData): string | null {
-  if (!data.name || data.name.trim().length === 0) {
-    return "이름은 필수입니다.";
-  }
-  if (!data.company || data.company.trim().length === 0) {
-    return "회사명은 필수입니다.";
-  }
+  // name, company validation temporarily disabled
+  // if (!data.name || data.name.trim().length === 0) {
+  //   return "이름은 필수입니다.";
+  // }
+  // if (!data.company || data.company.trim().length === 0) {
+  //   return "회사명은 필수입니다.";
+  // }
   if (!data.email || !isValidEmail(data.email)) {
     return "유효한 이메일 주소가 필요합니다.";
   }
@@ -135,9 +137,10 @@ serve(async (req) => {
     }
 
     // INSERT할 데이터 준비
+    // TEMPORARILY MODIFIED: name, company use default values if empty (fields are hidden)
     const submissionData = {
-      name: formData.name.trim(),
-      company: formData.company.trim(),
+      name: formData.name?.trim() || "미제공",
+      company: formData.company?.trim() || "미제공",
       email: formData.email.trim().toLowerCase(),
       phone: formData.phone.trim(),
       stores: formData.stores || null,
