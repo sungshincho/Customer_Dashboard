@@ -1,9 +1,10 @@
 # NEURALTWIN OS 챗봇 — Phase 2-C 기능 개발 결과 문서
 
-> **버전**: v1.0
+> **버전**: v1.1
 > **작성일**: 2026-02-05
+> **수정일**: 2026-02-05 (제약조건 완화 반영 - ChatPanel disabled 구현)
 > **작성자**: Claude AI Assistant
-> **커밋**: `b4a4915` - feat: Phase 2-C 프론트엔드 통합 구현
+> **커밋**: 최종 커밋 참조
 
 ---
 
@@ -14,6 +15,7 @@
 - 채팅창에서 메시지 입력 시 실제 `neuraltwin-assistant` Edge Function 호출
 - 응답의 `actions` 배열을 실행하여 실제 페이지 이동/탭 전환/날짜 변경
 - "인사이트 허브 고객탭 보여줘" 명령 시 실제로 해당 페이지/탭으로 이동
+- **로딩 중 입력창 비활성화** (v1.1 추가)
 
 ---
 
@@ -29,11 +31,12 @@
 | `src/features/assistant/utils/actionDispatcher.ts` | 액션 검증 유틸리티 (순수 함수) |
 | `src/features/assistant/context/AssistantProvider.tsx` | Assistant Context Provider |
 
-### 2.2 수정 파일 (3개)
+### 2.2 수정 파일 (4개)
 
 | 파일 경로 | 수정 내용 |
 |-----------|-----------|
-| `src/components/DashboardLayout.tsx` | `useChatPanel` → `useAssistantChat` 교체 |
+| `src/components/chat/ChatPanel.tsx` | `disabled` prop 추가 + ChatInput에 전달 |
+| `src/components/DashboardLayout.tsx` | `useChatPanel` → `useAssistantChat` 교체 + disabled 전달 |
 | `src/features/insights/InsightHubPage.tsx` | URL 쿼리 파라미터(`?tab=`)로 탭 전환 지원 |
 | `src/features/studio/DigitalTwinStudioPage.tsx` | URL 쿼리 파라미터(`?tab=`)로 탭 전환 지원 |
 
@@ -41,7 +44,26 @@
 
 ## 3. 주요 구현 내용
 
-### 3.1 useAssistantChat.ts
+### 3.1 ChatPanel.tsx — disabled prop 추가 (v1.1 신규)
+
+```typescript
+interface ChatPanelProps {
+  // ... 기존 props
+  disabled?: boolean;  // 추가
+}
+
+export function ChatPanel({
+  // ... 기존 params
+  disabled = false,  // 추가
+}: ChatPanelProps) {
+  // ...
+
+  // ChatInput에 disabled 전달
+  <ChatInput onSend={onSendMessage} isDark={isDark} disabled={disabled} />
+}
+```
+
+### 3.2 useAssistantChat.ts
 
 ```typescript
 // 핵심 기능
@@ -67,7 +89,7 @@ interface UseAssistantChatReturn {
 }
 ```
 
-### 3.2 useActionDispatcher.ts
+### 3.3 useActionDispatcher.ts
 
 ```typescript
 // 지원 액션 타입
@@ -84,7 +106,23 @@ type UIAction = {
 - run_optimization: 🔜 Phase 3-C 예정
 ```
 
-### 3.3 URL 쿼리 파라미터 탭 전환
+### 3.4 DashboardLayout.tsx — disabled 전달
+
+```typescript
+<ChatPanel
+  isOpen={isChatOpen}
+  width={chatWidth}
+  messages={messages}
+  isDark={isDark}
+  onClose={closePanel}
+  onWidthChange={setWidth}
+  onSendMessage={sendMessage}
+  onClearMessages={clearMessages}
+  disabled={isLoading || isStreaming}  // 로딩 중 입력 비활성화
+/>
+```
+
+### 3.5 URL 쿼리 파라미터 탭 전환
 
 ```typescript
 // InsightHubPage.tsx
@@ -107,23 +145,7 @@ useEffect(() => {
 
 ---
 
-## 4. 제약조건 준수
-
-| 제약조건 | 준수 여부 |
-|----------|-----------|
-| ❌ 기존 Edge Function 코드 수정 | ✅ 미수정 |
-| ❌ ChatPanel.tsx 수정 | ✅ 미수정 |
-| ❌ ChatInput.tsx 수정 | ✅ 미수정 |
-| ❌ ChatMessage.tsx 수정 | ✅ 미수정 |
-| ❌ useChatPanel.ts 수정 | ✅ 미수정 |
-| ✅ 새로운 훅/컨텍스트 파일 추가 | ✅ 5개 생성 |
-| ✅ DashboardLayout.tsx 최소 수정 | ✅ import + 훅 호출만 변경 |
-| ✅ InsightHubPage.tsx URL 쿼리 추가 | ✅ 완료 |
-| ✅ DigitalTwinStudioPage.tsx URL 쿼리 추가 | ✅ 완료 |
-
----
-
-## 5. 완료 체크리스트
+## 4. 완료 체크리스트
 
 ### 파일 생성
 - [x] `src/hooks/useAssistantChat.ts` 생성
@@ -133,7 +155,8 @@ useEffect(() => {
 - [x] `src/features/assistant/context/AssistantProvider.tsx` 생성
 
 ### 기존 파일 수정
-- [x] `DashboardLayout.tsx` — import 변경 + 훅 호출 변경
+- [x] `ChatPanel.tsx` — disabled prop 추가 + ChatInput에 전달
+- [x] `DashboardLayout.tsx` — import 변경 + 훅 호출 변경 + disabled 전달
 - [x] `InsightHubPage.tsx` — useSearchParams + useEffect 추가
 - [x] `DigitalTwinStudioPage.tsx` — useSearchParams + useEffect 추가
 
@@ -143,28 +166,47 @@ useEffect(() => {
 - [ ] "고객탭 보여줘" → 실제 탭 전환 확인
 - [ ] "최근 7일로 변경해줘" → 날짜 필터 변경 확인
 - [ ] "인사이트 허브 고객탭에서 7일 데이터 보여줘" → 복합 동작 확인
+- [ ] **isLoading 동안 입력창 비활성화 확인** (v1.1 추가)
+- [ ] 에러 발생 시 에러 메시지 표시 확인
 
 ---
 
-## 6. 파일 구조
+## 5. 파일 구조
 
 ```
 src/
 ├── hooks/
 │   ├── useChatPanel.ts          # 기존 (미수정, 레거시)
 │   └── useAssistantChat.ts      # 신규 (AI 연동)
-├── features/
-│   └── assistant/
-│       ├── context/
-│       │   └── AssistantProvider.tsx
-│       ├── hooks/
-│       │   ├── useAssistantContext.ts
-│       │   └── useActionDispatcher.ts
-│       └── utils/
-│           └── actionDispatcher.ts
 ├── components/
-│   └── DashboardLayout.tsx      # 수정 (useAssistantChat 사용)
+│   ├── DashboardLayout.tsx      # 수정 (useAssistantChat + disabled)
+│   └── chat/
+│       ├── ChatPanel.tsx        # 수정 (disabled prop 추가)
+│       ├── ChatInput.tsx        # 기존 (이미 disabled 구현됨)
+│       └── ChatMessage.tsx      # 미수정
+├── features/
+│   ├── assistant/
+│   │   ├── context/
+│   │   │   └── AssistantProvider.tsx
+│   │   ├── hooks/
+│   │   │   ├── useAssistantContext.ts
+│   │   │   └── useActionDispatcher.ts
+│   │   └── utils/
+│   │       └── actionDispatcher.ts
+│   ├── insights/
+│   │   └── InsightHubPage.tsx   # 수정 (URL 탭 파라미터)
+│   └── studio/
+│       └── DigitalTwinStudioPage.tsx  # 수정 (URL 탭 파라미터)
 ```
+
+---
+
+## 6. 변경 이력
+
+| 버전 | 날짜 | 변경 내용 |
+|------|------|-----------|
+| v1.0 | 2026-02-05 | 초기 구현 (제약조건으로 ChatPanel 미수정) |
+| v1.1 | 2026-02-05 | 제약조건 완화 - ChatPanel disabled prop 구현 |
 
 ---
 
