@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.89.0';
 import { checkRateLimit, cleanupExpiredEntries } from '../_shared/rateLimiter.ts';
 import { saveMessage } from '../_shared/chatLogger.ts';
+import { logSessionStart } from '../_shared/chatEventLogger.ts';
 import { getOrCreateSession } from './utils/session.ts';
 import { createErrorResponse } from './utils/errorTypes.ts';
 
@@ -98,6 +99,14 @@ Deno.serve(async (req) => {
 
     if (!session) {
       return createErrorResponse('SESSION_ERROR', corsHeaders);
+    }
+
+    // 5-1. 새 세션이면 session_start 이벤트 기록
+    if (session.isNew) {
+      await logSessionStart(supabase, session.conversationId, {
+        page: context.page,
+        store_id: context.store.id,
+      });
     }
 
     // 6. 사용자 메시지 저장
