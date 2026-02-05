@@ -13,7 +13,9 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
+import { ChatPanel, ChatToggleButton } from "@/components/chat/ChatPanel";
 import { useAuth } from "@/hooks/useAuth";
+import { useChatPanel } from "@/hooks/useChatPanel";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,9 +45,21 @@ const getInitialDarkMode = () =>
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const { user, signOut } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(getInitialSidebarState);
-  
+
   // 🔧 FIX: 초기값을 동기적으로 설정하여 깜빡임 방지
   const [isDark, setIsDark] = useState(getInitialDarkMode);
+
+  // 채팅 패널 상태
+  const {
+    isOpen: isChatOpen,
+    width: chatWidth,
+    messages,
+    togglePanel,
+    closePanel,
+    setWidth,
+    sendMessage,
+    clearMessages,
+  } = useChatPanel();
 
   // 다크모드 감지 (런타임 변경 대응)
   useEffect(() => {
@@ -145,13 +159,20 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             <div className="flex-1" />
             
             {/* Theme Toggle */}
-            <ThemeToggle 
-              className={isDark 
-                ? "text-white/80 hover:text-white hover:bg-white/10" 
+            <ThemeToggle
+              className={isDark
+                ? "text-white/80 hover:text-white hover:bg-white/10"
                 : "text-black/70 hover:text-black hover:bg-black/5"
-              } 
+              }
             />
-            
+
+            {/* Chat Toggle */}
+            <ChatToggleButton
+              onClick={togglePanel}
+              isOpen={isChatOpen}
+              isDark={isDark}
+            />
+
             {/* Notification Center */}
             <NotificationCenter 
               className={isDark 
@@ -238,6 +259,18 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           {/* Main Content */}
           <main className="flex-1 p-4 lg:p-6">{children}</main>
         </div>
+
+        {/* Chat Panel */}
+        <ChatPanel
+          isOpen={isChatOpen}
+          width={chatWidth}
+          messages={messages}
+          isDark={isDark}
+          onClose={closePanel}
+          onWidthChange={setWidth}
+          onSendMessage={sendMessage}
+          onClearMessages={clearMessages}
+        />
       </div>
     </SidebarProvider>
   );
