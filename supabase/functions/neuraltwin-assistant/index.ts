@@ -5,7 +5,7 @@ import { logSessionStart } from '../_shared/chatEventLogger.ts';
 import { getOrCreateSession } from './utils/session.ts';
 import { createErrorResponse } from './utils/errorTypes.ts';
 import { classifyIntent } from './intent/classifier.ts';
-import { dispatchNavigationAction } from './actions/navigationActions.ts';
+import { dispatchNavigationAction, UIAction } from './actions/navigationActions.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -36,7 +36,7 @@ interface OSAssistantRequest {
 // 응답 인터페이스
 interface OSAssistantResponse {
   message: string;
-  actions?: any[];
+  actions?: UIAction[];
   suggestions?: string[];
   meta: {
     conversationId: string;
@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
     const classification = await classifyIntent(message, context);
 
     // 8. 액션 실행
-    let actionResult = { actions: [] as any[], message: '', suggestions: [] as string[] };
+    let actionResult = { actions: [] as UIAction[], message: '', suggestions: [] as string[] };
 
     if (classification.intent === 'navigate') {
       actionResult = dispatchNavigationAction(classification);

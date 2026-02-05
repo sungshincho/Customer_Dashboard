@@ -1,4 +1,6 @@
 /**
+ * chatEventLogger.ts
+ *
  * 챗봇 이벤트 로깅 유틸리티
  * - chat_events 테이블에 이벤트 기록
  * - handover, context_bridge, session_start 등 추적
@@ -6,6 +8,13 @@
 
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.89.0';
 
+// ============================================================================
+// 타입 정의
+// ============================================================================
+
+/**
+ * 이벤트 유형
+ */
 export type ChatEventType =
   | 'session_start'
   | 'session_end'
@@ -16,11 +25,29 @@ export type ChatEventType =
   | 'lead_captured'
   | 'error_occurred';
 
+/**
+ * 이벤트 레코드 (chat_events 테이블)
+ */
+export interface ChatEvent {
+  id: string;
+  conversation_id: string;
+  event_type: ChatEventType;
+  event_data: Record<string, unknown>;
+  created_at: string;
+}
+
+/**
+ * 이벤트 생성 입력
+ */
 export interface EventCreateInput {
   conversation_id: string;
   event_type: ChatEventType;
-  event_data?: Record<string, any>;
+  event_data?: Record<string, unknown>;
 }
+
+// ============================================================================
+// 이벤트 CRUD 함수
+// ============================================================================
 
 /**
  * 이벤트 기록
@@ -53,7 +80,7 @@ export async function getConversationEvents(
   supabase: SupabaseClient,
   conversationId: string,
   eventType?: ChatEventType
-): Promise<any[]> {
+): Promise<ChatEvent[]> {
   let query = supabase
     .from('chat_events')
     .select('*')
@@ -70,8 +97,12 @@ export async function getConversationEvents(
     console.error('[chatEventLogger] getConversationEvents error:', error);
     return [];
   }
-  return data || [];
+  return (data as ChatEvent[]) || [];
 }
+
+// ============================================================================
+// 헬퍼 함수
+// ============================================================================
 
 /**
  * 세션 시작 이벤트 기록 헬퍼
@@ -79,7 +110,7 @@ export async function getConversationEvents(
 export async function logSessionStart(
   supabase: SupabaseClient,
   conversationId: string,
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
 ): Promise<void> {
   await createEvent(supabase, {
     conversation_id: conversationId,
@@ -106,3 +137,35 @@ export async function logContextBridgeLoad(
     },
   });
 }
+
+/**
+ * 에러 이벤트 기록 헬퍼
+ */
+export async function logError(
+  supabase: SupabaseClient,
+  conversationId: string,
+  errorCode: string,
+  errorMessage: string
+): Promise<void> {
+  await createEvent(supabase, {
+    conversation_id: conversationId,
+    event_type: 'error_occurred',
+    event_data: {
+      error_code: errorCode,
+      error_message: errorMessage,
+      timestamp: new Date().toISOString(),
+    },
+  });
+}
+
+// ============================================================================
+// Export
+// ============================================================================
+
+export default {
+  createEvent,
+  getConversationEvents,
+  logSessionStart,
+  logContextBridgeLoad,
+  logError,
+};
