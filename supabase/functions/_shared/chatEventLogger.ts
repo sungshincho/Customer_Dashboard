@@ -43,6 +43,7 @@ export interface EventCreateInput {
   conversation_id: string;
   event_type: ChatEventType;
   event_data?: Record<string, unknown>;
+  channel?: string;
 }
 
 // ============================================================================
@@ -60,6 +61,7 @@ export async function createEvent(
     .from('chat_events')
     .insert({
       conversation_id: input.conversation_id,
+      channel: input.channel || 'os_assistant',
       event_type: input.event_type,
       event_data: input.event_data || {},
     })

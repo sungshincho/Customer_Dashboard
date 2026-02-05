@@ -3,7 +3,7 @@
  * Lovable API Gateway 경유
  */
 
-const LOVABLE_API_URL = 'https://api.lovable.dev/v1/chat/completions';
+const LOVABLE_API_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
 const DEFAULT_MODEL = 'gemini-2.5-flash';
 const DEFAULT_TEMPERATURE = 0.3;
 const DEFAULT_MAX_TOKENS = 1024;
