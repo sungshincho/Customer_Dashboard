@@ -24,6 +24,8 @@ const QUERY_TYPE_TO_TAB: Record<string, { page: string; tab: string }> = {
   visitors: { page: '/insights', tab: 'customer' },
   conversion: { page: '/insights', tab: 'overview' },
   avgTransaction: { page: '/insights', tab: 'overview' },
+  product: { page: '/insights', tab: 'product' },
+  inventory: { page: '/insights', tab: 'inventory' },
   summary: { page: '/insights', tab: 'overview' },
 };
 
@@ -88,6 +90,12 @@ export async function handleQueryKpi(
 
       case 'avgTransaction':
         return await queryAvgTransaction(supabase, storeId, dateRange);
+
+      case 'product':
+        return await queryProduct(supabase, storeId, dateRange);
+
+      case 'inventory':
+        return await queryInventory(supabase, storeId, dateRange);
 
       case 'summary':
       default:
@@ -366,6 +374,89 @@ async function querySummary(
     message,
     suggestions: ['고객탭 보여줘', '시뮬레이션 돌려줘'],
     data: { totalRevenue, totalVisitors, totalTransactions, conversionRate },
+  };
+}
+
+/**
+ * 상품 판매량 조회
+ */
+async function queryProduct(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string }
+): Promise<QueryActionResult> {
+  // product_performance_agg 테이블에서 조회
+  const { data, error } = await supabase
+    .from('product_performance_agg')
+    .select('product_id, product_name, sales_count, revenue')
+    .eq('store_id', storeId)
+    .gte('date', dateRange.startDate)
+    .lte('date', dateRange.endDate);
+
+  if (error) {
+    console.error('[queryProduct] Error:', error);
+    // 테이블이 없거나 에러 시 daily_kpis_agg에서 거래 수로 대체
+    const { data: kpiData } = await supabase
+      .from('daily_kpis_agg')
+      .select('total_transactions, total_revenue')
+      .eq('store_id', storeId)
+      .gte('date', dateRange.startDate)
+      .lte('date', dateRange.endDate);
+
+    const totalSales = kpiData?.reduce((sum, row) => sum + (row.total_transactions || 0), 0) || 0;
+    const totalRevenue = kpiData?.reduce((sum, row) => sum + (row.total_revenue || 0), 0) || 0;
+
+    return {
+      actions: createNavigationActions('product', dateRange),
+      message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 총 판매 건수는 ${totalSales.toLocaleString()}건, 매출은 ${formatNumber(totalRevenue)}원입니다.\n\n인사이트 허브 상품탭에서 상세 내역을 확인해보세요.`,
+      suggestions: ['매출 알려줘', '재고 현황 알려줘'],
+      data: { totalSales, totalRevenue },
+    };
+  }
+
+  const totalSalesCount = data?.reduce((sum, row) => sum + (row.sales_count || 0), 0) || 0;
+  const totalRevenue = data?.reduce((sum, row) => sum + (row.revenue || 0), 0) || 0;
+
+  return {
+    actions: createNavigationActions('product', dateRange),
+    message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 총 판매량은 ${totalSalesCount.toLocaleString()}개, 매출은 ${formatNumber(totalRevenue)}원입니다.\n\n인사이트 허브 상품탭에서 상세 내역을 확인해보세요.`,
+    suggestions: ['매출 알려줘', '재고 현황 알려줘'],
+    data: { totalSalesCount, totalRevenue },
+  };
+}
+
+/**
+ * 재고 현황 조회
+ */
+async function queryInventory(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string }
+): Promise<QueryActionResult> {
+  // 재고 관련 테이블에서 조회 시도
+  const { data, error } = await supabase
+    .from('inventory_status')
+    .select('product_id, product_name, current_stock, reorder_point')
+    .eq('store_id', storeId);
+
+  if (error) {
+    console.error('[queryInventory] Error:', error);
+    return {
+      actions: createNavigationActions('inventory', dateRange),
+      message: `재고 데이터를 조회할 수 없습니다.\n\n인사이트 허브 재고탭에서 직접 확인해보세요.`,
+      suggestions: ['상품 판매량 알려줘', '매출 알려줘'],
+      data: null,
+    };
+  }
+
+  const totalItems = data?.length || 0;
+  const lowStockItems = data?.filter(item => item.current_stock <= item.reorder_point).length || 0;
+
+  return {
+    actions: createNavigationActions('inventory', dateRange),
+    message: `현재 ${totalItems}개 상품 중 ${lowStockItems}개 상품이 재주문 필요 상태입니다.\n\n인사이트 허브 재고탭에서 상세 내역을 확인해보세요.`,
+    suggestions: ['상품 판매량 알려줘', '매출 알려줘'],
+    data: { totalItems, lowStockItems },
   };
 }
 
