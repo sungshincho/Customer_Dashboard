@@ -4,6 +4,8 @@ import { saveMessage } from '../_shared/chatLogger.ts';
 import { logSessionStart } from '../_shared/chatEventLogger.ts';
 import { getOrCreateSession } from './utils/session.ts';
 import { createErrorResponse } from './utils/errorTypes.ts';
+import { classifyIntent } from './intent/classifier.ts';
+import { dispatchNavigationAction } from './actions/navigationActions.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -120,16 +122,23 @@ Deno.serve(async (req) => {
       },
     });
 
-    // 7. TODO: 인텐트 분류 (Phase 2에서 구현)
-    const intent = 'general_chat';  // 임시
-    const confidence = 0.5;
+    // 7. 인텐트 분류 (Phase 2-A에서 구현)
+    const classification = await classifyIntent(message, context);
 
-    // 8. TODO: 액션 실행 (Phase 2, 3에서 구현)
-    const actions: any[] = [];
+    // 8. 액션 실행
+    let actionResult = { actions: [] as any[], message: '', suggestions: [] as string[] };
 
-    // 9. TODO: 응답 생성 (Phase 3에서 구현)
-    const assistantMessage = `[Phase 1 테스트] 메시지를 받았습니다: "${message}"`;
-    const suggestions = ['인사이트 허브로 이동', '오늘 매출 조회', '시뮬레이션 실행'];
+    if (classification.intent === 'navigate') {
+      actionResult = dispatchNavigationAction(classification);
+    }
+
+    // 9. 응답 생성
+    const assistantMessage = actionResult.message ||
+      `[인텐트: ${classification.intent}] 메시지를 받았습니다: "${message}"`;
+    const suggestions = actionResult.suggestions.length > 0
+      ? actionResult.suggestions
+      : ['인사이트 허브로 이동', '오늘 매출 조회', '시뮬레이션 실행'];
+    const actions = actionResult.actions;
 
     // 10. 어시스턴트 메시지 저장
     await saveMessage(supabase, {
@@ -137,8 +146,8 @@ Deno.serve(async (req) => {
       role: 'assistant',
       content: assistantMessage,
       channel_data: {
-        intent,
-        confidence,
+        intent: classification.intent,
+        confidence: classification.confidence,
         actions,
         suggestions,
       },
@@ -153,8 +162,8 @@ Deno.serve(async (req) => {
       suggestions,
       meta: {
         conversationId: session.conversationId,
-        intent,
-        confidence,
+        intent: classification.intent,
+        confidence: classification.confidence,
         executionTimeMs,
       },
     };
