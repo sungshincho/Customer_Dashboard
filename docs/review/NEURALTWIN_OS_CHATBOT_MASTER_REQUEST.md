@@ -1,9 +1,10 @@
 # NEURALTWIN OS 챗봇 — 기능 개발 요청서 (마스터)
 
-> **버전**: v1.1
+> **버전**: v1.2 (DB 스키마 v2.0 반영)
 > **작성일**: 2026-02-05
 > **상태**: 검토 완료, 8단계 분할 확정
 > **대상**: Claude Code (개발 실행 에이전트)
+> **DB 상태**: 웹사이트 챗봇 팀에서 마이그레이션 완료 (6개 테이블 이미 존재)
 
 ---
 
@@ -23,7 +24,7 @@ NEURALTWIN 대시보드에 이미 존재하는 채팅 패널(더미 에코 응�
 |:---|:---|
 | AI 모델 | Gemini 2.5 Flash (Lovable API Gateway 경유) |
 | Backend | Supabase Edge Function (`neuraltwin-assistant`) — **신규 생성** |
-| DB | Supabase PostgreSQL — **통합 스키마 5개 테이블 신규 생성** |
+| DB | Supabase PostgreSQL — **통합 스키마 6개 테이블 (웹사이트 팀에서 마이그레이션 완료)** |
 | Frontend | 기존 ChatPanel 활용 + 신규 훅/컨텍스트 추가 |
 | 스트리밍 | SSE (Server-Sent Events) |
 
@@ -45,7 +46,7 @@ NEURALTWIN 대시보드에 이미 존재하는 채팅 패널(더미 에코 응�
 
 ```
 ✅ neuraltwin-assistant Edge Function 1개 신규 생성
-✅ 통합 DB 스키마 5개 테이블 신규 생성 (챗봇 전용 인프라)
+✅ 통합 DB 스키마 6개 테이블 활용 (웹사이트 팀에서 이미 마이그레이션 완료)
 ✅ 새로운 훅/컨텍스트/컴포넌트 파일 추가 (기존 파일은 수정하지 않되, 새 파일에서 기존 것을 import하여 사용)
 ✅ 기존 EF를 neuraltwin-assistant에서 호출 (오케스트레이션)
 ✅ 기존 DB 테이블을 직접 쿼리 (읽기 전용)
@@ -118,7 +119,7 @@ navigate('/studio?tab=ai-simulation');
 
 | Phase | 명칭 | 핵심 산출물 |
 |:---|:---|:---|
-| **Phase 1** | 기반 인프라 | DB 5개 테이블 + EF 기본 구조 + 공유 유틸 3개 |
+| **Phase 1** | 기반 인프라 | DB 6개 테이블 존재 확인 + EF 기본 구조 + 공유 유틸 4개 |
 | **Phase 2-A** | 인텐트 분류 + 페이지 네비게이션 | patterns.ts + classifier.ts + navigate 액션 |
 | **Phase 2-B** | 엔티티 추출 + 탭/날짜 액션 | entityExtractor.ts + set_tab, set_date_range 액션 |
 | **Phase 2-C** | 프론트엔드 통합 | useAssistantChat.ts + ActionDispatcher + DashboardLayout 연결 |
@@ -155,11 +156,21 @@ Phase 1 (기반 인프라)
 
 ## 6. 신규 생성 파일 전체 목록
 
-### 6.1 DB 마이그레이션
+### 6.1 DB (웹사이트 팀에서 마이그레이션 완료)
 
 ```
-supabase/migrations/
-└── 20260205000001_create_chat_tables.sql
+⚠️ 마이그레이션 파일 생성 불필요 — 웹사이트 챗봇 팀에서 이미 완료
+
+이미 존재하는 테이블 (6개):
+├── chat_conversations    (대화 세션)
+├── chat_messages         (개별 메시지)
+├── chat_events           (이벤트 로그 — handover, context_bridge 등)
+├── chat_leads            (웹사이트 전용 리드)
+├── chat_daily_analytics  (일별 분석 집계)
+└── assistant_command_cache (OS 전용 명령어 캐시)
+
+이미 존재하는 함수:
+└── handover_chat_session() (웹사이트 → OS 세션 인계)
 ```
 
 ### 6.2 Edge Function
@@ -189,9 +200,10 @@ supabase/functions/neuraltwin-assistant/
 
 ```
 supabase/functions/_shared/
-├── chatLogger.ts              # 신규
-├── streamingResponse.ts       # 신규
-└── rateLimiter.ts             # 신규
+├── chatLogger.ts              # 신규 (대화/메시지 CRUD)
+├── chatEventLogger.ts         # 신규 (chat_events 테이블 CRUD)
+├── streamingResponse.ts       # 신규 (SSE 스트리밍)
+└── rateLimiter.ts             # 신규 (분당 요청 제한)
 ```
 
 ### 6.4 프론트엔드
@@ -217,7 +229,7 @@ src/
 
 | 문서 | 경로 | 설명 |
 |:---|:---|:---|
-| DB 스키마 | `docs/review/NEURALTWIN_CHATBOT_DB_SCHEMA.md` | 5개 테이블 상세 정의 |
+| DB 스키마 | `docs/review/NEURALTWIN_CHATBOT_DB_SCHEMA.md` | 6개 테이블 + handover 함수 (v2.0) |
 | Phase 1 요청서 | `docs/review/NEURALTWIN_OS_CHATBOT_PHASE1_REQUEST.md` | 기반 인프라 구현 |
 | Phase 2-A 요청서 | `docs/review/NEURALTWIN_OS_CHATBOT_PHASE2A_REQUEST.md` | 인텐트 분류 |
 | Phase 2-B 요청서 | `docs/review/NEURALTWIN_OS_CHATBOT_PHASE2B_REQUEST.md` | 엔티티 추출 |
