@@ -7,6 +7,7 @@ import { createErrorResponse } from './utils/errorTypes.ts';
 import { classifyIntent } from './intent/classifier.ts';
 import { dispatchNavigationAction, UIAction } from './actions/navigationActions.ts';
 import { handleGeneralChat } from './actions/chatActions.ts';
+import { handleQueryKpi } from './actions/queryActions.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -126,13 +127,21 @@ Deno.serve(async (req) => {
     // 7. 인텐트 분류 (Phase 2-A에서 구현)
     const classification = await classifyIntent(message, context);
 
-    // 8. 액션 실행 (Phase 3-A: general_chat 추가)
+    // 8. 액션 실행 (Phase 3-A: general_chat, Phase 3-B: query_kpi)
     let actionResult = { actions: [] as UIAction[], message: '', suggestions: [] as string[] };
     const currentPage = context.page.current;
 
     if (['navigate', 'set_tab', 'set_date_range', 'composite_navigate'].includes(classification.intent)) {
       // 네비게이션 관련 인텐트
       actionResult = dispatchNavigationAction(classification, currentPage);
+    } else if (classification.intent === 'query_kpi') {
+      // KPI 데이터 조회 (Phase 3-B)
+      const queryResult = await handleQueryKpi(supabase, classification, context.store.id);
+      actionResult = {
+        actions: queryResult.actions,
+        message: queryResult.message,
+        suggestions: queryResult.suggestions,
+      };
     } else if (classification.intent === 'general_chat') {
       // 일반 대화 (AI 응답)
       const chatResult = await handleGeneralChat(message, [], context);
