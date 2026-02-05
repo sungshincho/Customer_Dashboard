@@ -1098,6 +1098,50 @@ export type Database = {
           },
         ]
       }
+      assistant_command_cache: {
+        Row: {
+          expires_at: string | null
+          id: string
+          input_hash: string | null
+          input_pattern: string | null
+          intent: string | null
+          last_used_at: string | null
+          parameters: Json | null
+          store_id: string | null
+          usage_count: number | null
+        }
+        Insert: {
+          expires_at?: string | null
+          id?: string
+          input_hash?: string | null
+          input_pattern?: string | null
+          intent?: string | null
+          last_used_at?: string | null
+          parameters?: Json | null
+          store_id?: string | null
+          usage_count?: number | null
+        }
+        Update: {
+          expires_at?: string | null
+          id?: string
+          input_hash?: string | null
+          input_pattern?: string | null
+          intent?: string | null
+          last_used_at?: string | null
+          parameters?: Json | null
+          store_id?: string | null
+          usage_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assistant_command_cache_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       auto_order_suggestions: {
         Row: {
           created_at: string | null
@@ -1314,6 +1358,230 @@ export type Database = {
           },
         ]
       }
+      chat_conversations: {
+        Row: {
+          channel: Database["public"]["Enums"]["chat_channel"]
+          channel_metadata: Json | null
+          created_at: string | null
+          id: string
+          is_archived: boolean | null
+          message_count: number | null
+          satisfaction_rating: number | null
+          session_id: string | null
+          store_id: string | null
+          title: string | null
+          total_tokens_used: number | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          channel: Database["public"]["Enums"]["chat_channel"]
+          channel_metadata?: Json | null
+          created_at?: string | null
+          id?: string
+          is_archived?: boolean | null
+          message_count?: number | null
+          satisfaction_rating?: number | null
+          session_id?: string | null
+          store_id?: string | null
+          title?: string | null
+          total_tokens_used?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          channel?: Database["public"]["Enums"]["chat_channel"]
+          channel_metadata?: Json | null
+          created_at?: string | null
+          id?: string
+          is_archived?: boolean | null
+          message_count?: number | null
+          satisfaction_rating?: number | null
+          session_id?: string | null
+          store_id?: string | null
+          title?: string | null
+          total_tokens_used?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_conversations_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_daily_analytics: {
+        Row: {
+          avg_turns_per_session: number | null
+          channel: Database["public"]["Enums"]["chat_channel"]
+          date: string
+          id: string
+          lead_conversion_rate: number | null
+          satisfaction_avg: number | null
+          top_intents: Json | null
+          top_pain_points: Json | null
+          top_topics: Json | null
+          total_sessions: number | null
+          unique_users: number | null
+        }
+        Insert: {
+          avg_turns_per_session?: number | null
+          channel: Database["public"]["Enums"]["chat_channel"]
+          date: string
+          id?: string
+          lead_conversion_rate?: number | null
+          satisfaction_avg?: number | null
+          top_intents?: Json | null
+          top_pain_points?: Json | null
+          top_topics?: Json | null
+          total_sessions?: number | null
+          unique_users?: number | null
+        }
+        Update: {
+          avg_turns_per_session?: number | null
+          channel?: Database["public"]["Enums"]["chat_channel"]
+          date?: string
+          id?: string
+          lead_conversion_rate?: number | null
+          satisfaction_avg?: number | null
+          top_intents?: Json | null
+          top_pain_points?: Json | null
+          top_topics?: Json | null
+          total_sessions?: number | null
+          unique_users?: number | null
+        }
+        Relationships: []
+      }
+      chat_events: {
+        Row: {
+          channel: Database["public"]["Enums"]["chat_channel"]
+          conversation_id: string | null
+          created_at: string | null
+          event_data: Json | null
+          event_type: string
+          id: string
+        }
+        Insert: {
+          channel: Database["public"]["Enums"]["chat_channel"]
+          conversation_id?: string | null
+          created_at?: string | null
+          event_data?: Json | null
+          event_type: string
+          id?: string
+        }
+        Update: {
+          channel?: Database["public"]["Enums"]["chat_channel"]
+          conversation_id?: string | null
+          created_at?: string | null
+          event_data?: Json | null
+          event_type?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_events_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "chat_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_leads: {
+        Row: {
+          company: string | null
+          conversation_id: string | null
+          created_at: string | null
+          email: string
+          id: string
+          pain_points: Json | null
+          role: string | null
+          source_page: string | null
+        }
+        Insert: {
+          company?: string | null
+          conversation_id?: string | null
+          created_at?: string | null
+          email: string
+          id?: string
+          pain_points?: Json | null
+          role?: string | null
+          source_page?: string | null
+        }
+        Update: {
+          company?: string | null
+          conversation_id?: string | null
+          created_at?: string | null
+          email?: string
+          id?: string
+          pain_points?: Json | null
+          role?: string | null
+          source_page?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_leads_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "chat_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_messages: {
+        Row: {
+          channel_data: Json | null
+          content: string
+          conversation_id: string
+          created_at: string | null
+          execution_time_ms: number | null
+          feedback_comment: string | null
+          id: string
+          model_used: string | null
+          role: string
+          tokens_used: number | null
+          user_feedback: string | null
+        }
+        Insert: {
+          channel_data?: Json | null
+          content: string
+          conversation_id: string
+          created_at?: string | null
+          execution_time_ms?: number | null
+          feedback_comment?: string | null
+          id?: string
+          model_used?: string | null
+          role: string
+          tokens_used?: number | null
+          user_feedback?: string | null
+        }
+        Update: {
+          channel_data?: Json | null
+          content?: string
+          conversation_id?: string
+          created_at?: string | null
+          execution_time_ms?: number | null
+          feedback_comment?: string | null
+          id?: string
+          model_used?: string | null
+          role?: string
+          tokens_used?: number | null
+          user_feedback?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "chat_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       column_mappings: {
         Row: {
           created_at: string
@@ -1362,9 +1630,11 @@ export type Database = {
           email: string
           features: string[] | null
           id: string
-          message: string
+          marketing_consent: boolean | null
+          message: string | null
           name: string
           phone: string | null
+          privacy_consent: boolean
           stores: number | null
           timeline: string | null
         }
@@ -1374,9 +1644,11 @@ export type Database = {
           email: string
           features?: string[] | null
           id?: string
-          message: string
+          marketing_consent?: boolean | null
+          message?: string | null
           name: string
           phone?: string | null
+          privacy_consent?: boolean
           stores?: number | null
           timeline?: string | null
         }
@@ -1386,9 +1658,11 @@ export type Database = {
           email?: string
           features?: string[] | null
           id?: string
-          message?: string
+          marketing_consent?: boolean | null
+          message?: string | null
           name?: string
           phone?: string | null
+          privacy_consent?: boolean
           stores?: number | null
           timeline?: string | null
         }
@@ -10788,6 +11062,10 @@ export type Database = {
         Args: { p_end_id: string; p_start_id: string; p_user_id: string }
         Returns: Json
       }
+      handover_chat_session: {
+        Args: { p_session_id: string; p_user_id: string }
+        Returns: number
+      }
       has_valid_license: {
         Args: { _license_type: string; _user_id: string }
         Returns: boolean
@@ -10917,6 +11195,7 @@ export type Database = {
         | "ORG_HQ"
         | "ORG_STORE"
         | "ORG_VIEWER"
+      chat_channel: "website" | "os_app"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -11054,6 +11333,7 @@ export const Constants = {
         "ORG_STORE",
         "ORG_VIEWER",
       ],
+      chat_channel: ["website", "os_app"],
     },
   },
 } as const
