@@ -1,6 +1,6 @@
 # NEURALTWIN OS 챗봇 — Phase 3-A 기능 개발 결과 문서
 
-> **버전**: v1.1
+> **버전**: v1.2
 > **작성일**: 2026-02-05
 > **작성자**: Claude AI Assistant
 > **커밋**: 최종 커밋 참조
@@ -56,7 +56,7 @@
 ```typescript
 // Lovable API Gateway 경유 Gemini 2.5 Flash 호출
 const LOVABLE_API_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
-const DEFAULT_MODEL = 'gemini-2.5-flash';
+const DEFAULT_MODEL = 'google/gemini-2.5-flash';
 const TIMEOUT_MS = 15000;
 
 // 주요 함수
@@ -172,6 +172,7 @@ Edge Function에 필요한 환경 변수:
 |------|------|----------|
 | v1.0 | 2026-02-05 | 최초 작성 |
 | v1.1 | 2026-02-05 | Lovable API URL 수정 (`api.lovable.dev` → `ai.gateway.lovable.dev`) |
+| v1.2 | 2026-02-05 | 모델명 수정 (`gemini-2.5-flash` → `google/gemini-2.5-flash`), channel enum 수정 (`os_assistant` → `os_app`) |
 
 ---
 

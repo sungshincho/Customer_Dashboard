@@ -61,7 +61,7 @@ export async function createEvent(
     .from('chat_events')
     .insert({
       conversation_id: input.conversation_id,
-      channel: input.channel || 'os_assistant',
+      channel: input.channel || 'os_app',
       event_type: input.event_type,
       event_data: input.event_data || {},
     })

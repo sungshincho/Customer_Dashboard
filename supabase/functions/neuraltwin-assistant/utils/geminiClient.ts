@@ -4,7 +4,7 @@
  */
 
 const LOVABLE_API_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
-const DEFAULT_MODEL = 'gemini-2.5-flash';
+const DEFAULT_MODEL = 'google/gemini-2.5-flash';
 const DEFAULT_TEMPERATURE = 0.3;
 const DEFAULT_MAX_TOKENS = 1024;
 const TIMEOUT_MS = 15000;
