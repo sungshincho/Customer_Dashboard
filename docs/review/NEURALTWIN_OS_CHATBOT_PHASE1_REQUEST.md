@@ -1,9 +1,36 @@
 # NEURALTWIN OS 챗봇 — Phase 1 기능 개발 요청서
 
-> **버전**: v1.0
+> **버전**: v1.1 (패치 반영)
 > **작성일**: 2026-02-05
 > **원본 문서**: `NEURALTWIN_OS_CHATBOT_FEATURE_REQUEST.md`
 > **분할 근거**: 검토 결과 보고서 `NEURALTWIN_OS_CHATBOT_REVIEW_RESULT.md`
+> **패치 반영**: `OS_CHATBOT_PATCH_DECISIONS.md` (탭 설정 방식, 에러 핸들링, isLoading 상태)
+
+---
+
+## 0. 사전 결정 사항 (패치 반영)
+
+### 0.1 탭 설정 방식 — URL 쿼리 파라미터 채택
+
+```typescript
+// ActionDispatcher에서 탭 전환 시
+navigate('/insights?tab=customer');
+navigate('/studio?tab=ai-simulation');
+```
+
+- Settings 페이지에서 이미 사용 중인 패턴과 일관성 유지
+- Phase 2-C에서 InsightHubPage, DigitalTwinStudioPage에 `useSearchParams` 코드 4줄 추가 예정
+
+### 0.2 에러 핸들링 — Phase 1에서 errorTypes.ts 선행 생성
+
+- 7개 에러 코드 + 재시도 정책 사전 정의
+- Phase 2~3에서 각 모듈에서 이 정의 참조
+
+### 0.3 isLoading 상태 — isLoading + isStreaming 분리
+
+- `isLoading`: EF 호출 시작 ~ 첫 응답 도착 전
+- `isStreaming`: 첫 응답 도착 ~ 스트리밍 완료
+- 둘 중 하나라도 true이면 입력창 비활성화
 
 ---
 
@@ -347,7 +374,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.89.0';
 import { checkRateLimit, cleanupExpiredEntries } from '../_shared/rateLimiter.ts';
 import { createConversation, getConversation, saveMessage, getConversationMessages } from '../_shared/chatLogger.ts';
 import { getOrCreateSession } from './utils/session.ts';
-import { ERROR_MESSAGES, createErrorResponse } from './utils/errorTypes.ts';
+import { createErrorResponse } from './utils/errorTypes.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -405,7 +432,7 @@ Deno.serve(async (req) => {
     // 2. 인증 확인
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return createErrorResponse('AUTH_REQUIRED', 401, corsHeaders);
+      return createErrorResponse('AUTH_EXPIRED', corsHeaders);
     }
 
     const { data: { user }, error: authError } = await supabase.auth.getUser(
@@ -413,13 +440,13 @@ Deno.serve(async (req) => {
     );
 
     if (authError || !user) {
-      return createErrorResponse('AUTH_REQUIRED', 401, corsHeaders);
+      return createErrorResponse('AUTH_EXPIRED', corsHeaders);
     }
 
     // 3. Rate Limiting
     const rateLimitResult = checkRateLimit(user.id);
     if (!rateLimitResult.allowed) {
-      return createErrorResponse('RATE_LIMIT_EXCEEDED', 429, corsHeaders);
+      return createErrorResponse('RATE_LIMITED', corsHeaders);
     }
 
     // 4. 요청 파싱
@@ -442,7 +469,7 @@ Deno.serve(async (req) => {
     });
 
     if (!session) {
-      return createErrorResponse('SESSION_ERROR', 500, corsHeaders);
+      return createErrorResponse('SESSION_ERROR', corsHeaders);
     }
 
     // 6. 사용자 메시지 저장
@@ -510,7 +537,7 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('[neuraltwin-assistant] Error:', error);
-    return createErrorResponse('INTERNAL_ERROR', 500, corsHeaders);
+    return createErrorResponse('INTERNAL_ERROR', corsHeaders);
   }
 });
 ```
@@ -573,34 +600,120 @@ export async function getOrCreateSession(
 #### 3.3.3 utils/errorTypes.ts
 
 ```typescript
-export const ERROR_MESSAGES = {
-  AUTH_REQUIRED: '로그인이 필요합니다.',
-  RATE_LIMIT_EXCEEDED: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.',
-  AI_TIMEOUT: 'AI 응답이 지연되고 있습니다. 다시 시도해주세요.',
-  INTENT_UNKNOWN: '죄송해요, 무슨 말씀인지 이해하지 못했어요. 다시 말씀해주시겠어요?',
-  EF_CALL_FAILED: '기능 실행 중 오류가 발생했습니다.',
-  NETWORK_ERROR: '네트워크 오류가 발생했습니다.',
-  SESSION_ERROR: '대화 세션을 생성할 수 없습니다.',
-  INTERNAL_ERROR: '내부 오류가 발생했습니다.',
-} as const;
+/**
+ * 챗봇 에러 타입 정의 (패치 문서 반영)
+ * - 7개 에러 코드 + 재시도 정책
+ * - Phase 2~3에서 각 모듈에서 참조
+ */
 
-export type ErrorCode = keyof typeof ERROR_MESSAGES;
+export type AssistantErrorCode =
+  | 'AI_TIMEOUT'
+  | 'RATE_LIMITED'
+  | 'AUTH_EXPIRED'
+  | 'NETWORK_ERROR'
+  | 'INTENT_UNCLEAR'
+  | 'EF_FAILED'
+  | 'DB_QUERY_FAILED'
+  | 'SESSION_ERROR'
+  | 'INTERNAL_ERROR';
 
+export interface AssistantError {
+  code: AssistantErrorCode;
+  userMessage: string;
+  retryable: boolean;
+  retryAfterMs?: number;
+  httpStatus: number;
+}
+
+export const ERROR_DEFINITIONS: Record<AssistantErrorCode, AssistantError> = {
+  AI_TIMEOUT: {
+    code: 'AI_TIMEOUT',
+    userMessage: 'AI 응답이 지연되고 있어요. 잠시 후 다시 시도해주세요.',
+    retryable: true,
+    retryAfterMs: 2000,
+    httpStatus: 504,
+  },
+  RATE_LIMITED: {
+    code: 'RATE_LIMITED',
+    userMessage: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.',
+    retryable: false,
+    httpStatus: 429,
+  },
+  AUTH_EXPIRED: {
+    code: 'AUTH_EXPIRED',
+    userMessage: '세션이 만료되었습니다. 새로고침 후 다시 시도해주세요.',
+    retryable: false,
+    httpStatus: 401,
+  },
+  NETWORK_ERROR: {
+    code: 'NETWORK_ERROR',
+    userMessage: '네트워크 연결을 확인해주세요.',
+    retryable: true,
+    retryAfterMs: 1000,
+    httpStatus: 503,
+  },
+  INTENT_UNCLEAR: {
+    code: 'INTENT_UNCLEAR',
+    userMessage: '', // 에러 아님, general_chat 폴백
+    retryable: false,
+    httpStatus: 200,
+  },
+  EF_FAILED: {
+    code: 'EF_FAILED',
+    userMessage: '기능 실행 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.',
+    retryable: true,
+    retryAfterMs: 2000,
+    httpStatus: 502,
+  },
+  DB_QUERY_FAILED: {
+    code: 'DB_QUERY_FAILED',
+    userMessage: '데이터 조회 중 문제가 발생했어요.',
+    retryable: true,
+    retryAfterMs: 1000,
+    httpStatus: 500,
+  },
+  SESSION_ERROR: {
+    code: 'SESSION_ERROR',
+    userMessage: '대화 세션을 생성할 수 없습니다.',
+    retryable: true,
+    retryAfterMs: 1000,
+    httpStatus: 500,
+  },
+  INTERNAL_ERROR: {
+    code: 'INTERNAL_ERROR',
+    userMessage: '내부 오류가 발생했습니다.',
+    retryable: false,
+    httpStatus: 500,
+  },
+};
+
+/**
+ * 에러 응답 생성 헬퍼
+ */
 export function createErrorResponse(
-  code: ErrorCode,
-  status: number,
+  code: AssistantErrorCode,
   corsHeaders: Record<string, string>
 ): Response {
+  const errorDef = ERROR_DEFINITIONS[code];
   return new Response(
     JSON.stringify({
-      error: ERROR_MESSAGES[code],
-      code,
+      error: errorDef.userMessage,
+      code: errorDef.code,
+      retryable: errorDef.retryable,
+      retryAfterMs: errorDef.retryAfterMs,
     }),
     {
-      status,
+      status: errorDef.httpStatus,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     }
   );
+}
+
+/**
+ * 에러 응답을 어시스턴트 메시지 형태로 변환 (채팅창에 표시용)
+ */
+export function getErrorAsAssistantMessage(code: AssistantErrorCode): string {
+  return ERROR_DEFINITIONS[code].userMessage;
 }
 ```
 
