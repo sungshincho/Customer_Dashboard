@@ -2,6 +2,7 @@
  * 인텐트별 패턴 매칭 정의
  * Phase 2-A: navigate 인텐트
  * Phase 2-B: set_tab, set_date_range, composite_navigate 추가
+ * Phase 3-B: query_kpi 인텐트 추가
  */
 
 import { extractTab, extractDateRange, extractEntities, inferPageFromTab } from './entityExtractor.ts';
@@ -14,6 +15,8 @@ export interface IntentPattern {
     page?: (match: RegExpMatchArray, text: string) => string | null;
     tab?: (match: RegExpMatchArray, text: string) => string | null;
     dateRange?: (match: RegExpMatchArray, text: string) => { preset?: string; startDate?: string; endDate?: string } | null;
+    queryType?: (match: RegExpMatchArray, text: string) => string;
+    period?: (match: RegExpMatchArray, text: string) => { type: string; date?: string };
     all?: (match: RegExpMatchArray, text: string) => Record<string, any>;
   };
 }
@@ -119,7 +122,59 @@ export const INTENT_PATTERNS: IntentPattern[] = [
       all: (_match, text) => extractEntities(text),
     },
   },
+
+  // query_kpi — KPI 데이터 조회 (Phase 3-B)
+  {
+    intent: 'query_kpi',
+    patterns: [
+      /(?:오늘|어제|이번\s*주|이번\s*달|최근)?\s*(?:매출|revenue)\s*(?:얼마|어때|어떻게|알려|보여)/i,
+      /(?:오늘|어제)?\s*(?:방문객|visitor|고객|트래픽)\s*(?:수|몇|얼마|어때|명)/i,
+      /(?:전환율|conversion)\s*(?:어때|어떻게|알려|몇|%)/i,
+      /(?:평균\s*객단가|객단가|거래\s*금액)\s*(?:얼마|어때)/i,
+      /(?:오늘|어제|최근)?\s*(?:성과|실적|현황)\s*(?:어때|알려|보여)/i,
+      /(?:매출|방문객|전환율).*(?:알려|보여|어때|얼마)/i,
+    ],
+    confidence: 0.85,
+    extractors: {
+      queryType: (_match, text) => extractQueryType(text),
+      period: (_match, text) => extractPeriod(text),
+    },
+  },
 ];
+
+// 쿼리 타입 추출 함수 (Phase 3-B)
+function extractQueryType(text: string): string {
+  const normalizedText = text.toLowerCase();
+
+  if (/매출|revenue|수익|매상/.test(normalizedText)) return 'revenue';
+  if (/방문객|visitor|고객\s*수|트래픽/.test(normalizedText)) return 'visitors';
+  if (/전환율|conversion|전환/.test(normalizedText)) return 'conversion';
+  if (/객단가|거래\s*금액|평균\s*금액/.test(normalizedText)) return 'avgTransaction';
+  if (/성과|실적|현황|요약/.test(normalizedText)) return 'summary';
+
+  return 'summary'; // 기본값
+}
+
+// 기간 추출 함수 (Phase 3-B)
+function extractPeriod(text: string): { type: string; date?: string } {
+  const normalizedText = text.toLowerCase();
+
+  if (/오늘|today/.test(normalizedText)) {
+    return { type: 'today' };
+  }
+  if (/어제|yesterday/.test(normalizedText)) {
+    return { type: 'yesterday' };
+  }
+  if (/이번\s*주|this\s*week/.test(normalizedText)) {
+    return { type: 'thisWeek' };
+  }
+  if (/이번\s*달|this\s*month/.test(normalizedText)) {
+    return { type: 'thisMonth' };
+  }
+
+  // 기본값: 오늘
+  return { type: 'today' };
+}
 
 /**
  * 텍스트에서 패턴 매칭으로 인텐트 분류
@@ -171,6 +226,22 @@ export function matchIntent(text: string, currentPage?: string): {
             if (dateRange.endDate) {
               entities.dateEnd = dateRange.endDate;
             }
+          }
+        }
+
+        // 쿼리 타입 추출 (Phase 3-B)
+        if (pattern.extractors?.queryType) {
+          const queryType = pattern.extractors.queryType(match, normalizedText);
+          if (queryType) {
+            entities.queryType = queryType;
+          }
+        }
+
+        // 기간 추출 (Phase 3-B)
+        if (pattern.extractors?.period) {
+          const period = pattern.extractors.period(match, normalizedText);
+          if (period) {
+            entities.period = period;
           }
         }
 
