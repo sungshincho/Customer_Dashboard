@@ -1,6 +1,6 @@
 # NEURALTWIN OS 챗봇 — Phase 3-A 기능 개발 요청서
 
-> **버전**: v1.0
+> **버전**: v1.2
 > **작성일**: 2026-02-05
 > **선행 Phase**: Phase 1 (기반 인프라) 완료 필수, Phase 2 완료 권장
 > **마스터 문서**: `NEURALTWIN_OS_CHATBOT_MASTER_REQUEST.md`
@@ -54,8 +54,8 @@ supabase/functions/neuraltwin-assistant/
  * Lovable API Gateway 경유
  */
 
-const LOVABLE_API_URL = 'https://api.lovable.dev/v1/chat/completions';
-const DEFAULT_MODEL = 'gemini-2.5-flash';
+const LOVABLE_API_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
+const DEFAULT_MODEL = 'google/gemini-2.5-flash';
 const DEFAULT_TEMPERATURE = 0.3;
 const DEFAULT_MAX_TOKENS = 1024;
 const TIMEOUT_MS = 15000;
