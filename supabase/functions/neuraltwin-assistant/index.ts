@@ -135,8 +135,12 @@ Deno.serve(async (req) => {
       // 네비게이션 관련 인텐트 (Phase 3-B+: scroll_to_section, open_modal 추가)
       actionResult = dispatchNavigationAction(classification, currentPage);
     } else if (classification.intent === 'query_kpi') {
-      // KPI 데이터 조회 (Phase 3-B)
-      const queryResult = await handleQueryKpi(supabase, classification, context.store.id);
+      // KPI 데이터 조회 (Phase 3-B) - 컨텍스트 전달
+      const pageContext = {
+        current: context.page.current,
+        tab: context.page.tab,
+      };
+      const queryResult = await handleQueryKpi(supabase, classification, context.store.id, pageContext);
       actionResult = {
         actions: queryResult.actions,
         message: queryResult.message,

@@ -3,19 +3,26 @@
  * Phase 3-B: 기존 DB 테이블 직접 쿼리 (읽기 전용)
  * Phase 3-B+: 인텐트 강화 - 새로운 쿼리 타입 및 기간 타입 추가
  * 데이터 응답 + 관련 탭 자동 이동
+ * Phase 3-B++: TERM_LOCATION_MAP 활용 - 컨텍스트 기반 탭 전환
  */
 
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.89.0';
 import { ClassificationResult } from '../intent/classifier.ts';
 import { formatDataResponse } from '../response/generator.ts';
 import { UIAction } from './navigationActions.ts';
-import { TERM_LOCATION_MAP } from '../config/dashboardStructure.ts';
+import { TERM_LOCATION_MAP, findTermLocation, resolveTargetLocation, TermLocationEntry } from '../config/dashboardStructure.ts';
 
 export interface QueryActionResult {
   actions: UIAction[];
   message: string;
   suggestions: string[];
   data?: any;
+}
+
+// 현재 페이지 컨텍스트 인터페이스
+export interface PageContext {
+  current: string;
+  tab?: string;
 }
 
 /**
@@ -35,27 +42,60 @@ const QUERY_TYPE_TO_TAB: Record<string, { page: string; tab: string; section?: s
 };
 
 /**
- * 날짜 범위를 기반으로 네비게이션 액션 생성
+ * 쿼리 타입에서 용어 키워드 추출
+ */
+function getTermKeyword(queryType: string): string {
+  const termMap: Record<string, string> = {
+    visitors: '방문객',
+    revenue: '매출',
+    conversion: '전환율',
+    avgTransaction: '객단가',
+    product: '상품',
+    inventory: '재고',
+    goal: '목표 달성률',
+    dwellTime: '체류 시간',
+    newVsReturning: '방문객',
+    summary: '매출',
+  };
+  return termMap[queryType] || '매출';
+}
+
+/**
+ * 날짜 범위를 기반으로 네비게이션 액션 생성 (컨텍스트 인식)
  */
 function createNavigationActions(
   queryType: string,
-  dateRange: { startDate: string; endDate: string }
-): UIAction[] {
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
+): { actions: UIAction[]; tabChanged: boolean; targetTab: string } {
   const mapping = QUERY_TYPE_TO_TAB[queryType] || QUERY_TYPE_TO_TAB.summary;
-
   const actions: UIAction[] = [];
 
-  // 1. 페이지 이동
-  actions.push({
-    type: 'navigate',
-    target: mapping.page,
-  });
+  // 현재 탭과 목적 탭이 다른지 확인
+  const currentPage = pageContext?.current || '';
+  const currentTab = pageContext?.tab || '';
+  const targetPage = mapping.page;
+  const targetTab = mapping.tab;
 
-  // 2. 탭 전환
-  actions.push({
-    type: 'set_tab',
-    target: mapping.tab,
-  });
+  const pageNeedsChange = !currentPage.includes('/insights') || (currentPage !== targetPage);
+  const tabNeedsChange = currentTab !== targetTab;
+  const tabChanged = pageNeedsChange || tabNeedsChange;
+
+  // 1. 페이지 이동 (필요시)
+  if (pageNeedsChange) {
+    actions.push({
+      type: 'navigate',
+      target: targetPage,
+    });
+  }
+
+  // 2. 탭 전환 (필요시)
+  if (tabNeedsChange) {
+    actions.push({
+      type: 'set_tab',
+      target: targetTab,
+    });
+  }
 
   // 3. 날짜 범위 설정
   actions.push({
@@ -66,16 +106,43 @@ function createNavigationActions(
     },
   });
 
-  return actions;
+  // 4. 섹션으로 스크롤 (있으면)
+  if (mapping.section) {
+    actions.push({
+      type: 'scroll_to_section',
+      sectionId: mapping.section,
+      highlight: true,
+      highlightDuration: 2000,
+    });
+  }
+
+  return { actions, tabChanged, targetTab };
 }
 
 /**
- * query_kpi 인텐트 처리
+ * 탭 이름을 한글로 변환
+ */
+function getTabDisplayName(tabId: string): string {
+  const tabNames: Record<string, string> = {
+    overview: '개요',
+    customer: '고객',
+    store: '매장',
+    product: '상품',
+    inventory: '재고',
+    prediction: '예측',
+    'ai-recommendation': 'AI추천',
+  };
+  return tabNames[tabId] || tabId;
+}
+
+/**
+ * query_kpi 인텐트 처리 (컨텍스트 인식 버전)
  */
 export async function handleQueryKpi(
   supabase: SupabaseClient,
   classification: ClassificationResult,
-  storeId: string
+  storeId: string,
+  pageContext?: PageContext
 ): Promise<QueryActionResult> {
   const queryType = classification.entities.queryType || 'summary';
   const period = classification.entities.period || { type: 'today' };
@@ -85,35 +152,35 @@ export async function handleQueryKpi(
 
     switch (queryType) {
       case 'revenue':
-        return await queryRevenue(supabase, storeId, dateRange);
+        return await queryRevenue(supabase, storeId, dateRange, pageContext);
 
       case 'visitors':
-        return await queryVisitors(supabase, storeId, dateRange);
+        return await queryVisitors(supabase, storeId, dateRange, pageContext);
 
       case 'conversion':
-        return await queryConversion(supabase, storeId, dateRange);
+        return await queryConversion(supabase, storeId, dateRange, pageContext);
 
       case 'avgTransaction':
-        return await queryAvgTransaction(supabase, storeId, dateRange);
+        return await queryAvgTransaction(supabase, storeId, dateRange, pageContext);
 
       case 'product':
-        return await queryProduct(supabase, storeId, dateRange);
+        return await queryProduct(supabase, storeId, dateRange, pageContext);
 
       case 'inventory':
-        return await queryInventory(supabase, storeId, dateRange);
+        return await queryInventory(supabase, storeId, dateRange, pageContext);
 
       case 'goal':
-        return await queryGoal(supabase, storeId, dateRange);
+        return await queryGoal(supabase, storeId, dateRange, pageContext);
 
       case 'dwellTime':
-        return await queryDwellTime(supabase, storeId, dateRange);
+        return await queryDwellTime(supabase, storeId, dateRange, pageContext);
 
       case 'newVsReturning':
-        return await queryNewVsReturning(supabase, storeId, dateRange);
+        return await queryNewVsReturning(supabase, storeId, dateRange, pageContext);
 
       case 'summary':
       default:
-        return await querySummary(supabase, storeId, dateRange);
+        return await querySummary(supabase, storeId, dateRange, pageContext);
     }
 
   } catch (error) {
@@ -267,12 +334,13 @@ function getDateRange(period: { type: string; startDate?: string; endDate?: stri
 }
 
 /**
- * 매출 조회
+ * 매출 조회 (컨텍스트 인식)
  */
 async function queryRevenue(
   supabase: SupabaseClient,
   storeId: string,
-  dateRange: { startDate: string; endDate: string; compareStartDate?: string; compareEndDate?: string }
+  dateRange: { startDate: string; endDate: string; compareStartDate?: string; compareEndDate?: string },
+  pageContext?: PageContext
 ): Promise<QueryActionResult> {
   const { data, error } = await supabase
     .from('daily_kpis_agg')
@@ -303,21 +371,35 @@ async function queryRevenue(
 
   const responseData = { totalRevenue, totalTransactions, change };
 
+  // 컨텍스트 기반 네비게이션 액션 생성
+  const { actions, tabChanged, targetTab } = createNavigationActions('revenue', dateRange, pageContext);
+
+  // 응답 메시지 구성
+  let message = formatDataResponse('revenue', responseData);
+
+  if (tabChanged) {
+    const targetTabName = getTabDisplayName(targetTab);
+    message += `\n\n${targetTabName}탭으로 이동하여 상세 데이터를 확인합니다.`;
+  } else {
+    message += '\n\n현재 탭에서 데이터를 확인할 수 있습니다.';
+  }
+
   return {
-    actions: createNavigationActions('revenue', dateRange),
-    message: formatDataResponse('revenue', responseData) + '\n\n인사이트 허브 개요탭에서 확인해보세요.',
+    actions,
+    message,
     suggestions: ['방문객 수 알려줘', '전환율 어때?'],
     data: responseData,
   };
 }
 
 /**
- * 방문객 조회
+ * 방문객 조회 (컨텍스트 인식)
  */
 async function queryVisitors(
   supabase: SupabaseClient,
   storeId: string,
-  dateRange: { startDate: string; endDate: string; compareStartDate?: string; compareEndDate?: string }
+  dateRange: { startDate: string; endDate: string; compareStartDate?: string; compareEndDate?: string },
+  pageContext?: PageContext
 ): Promise<QueryActionResult> {
   const { data, error } = await supabase
     .from('daily_kpis_agg')
@@ -348,21 +430,46 @@ async function queryVisitors(
 
   const responseData = { totalVisitors, uniqueVisitors, change };
 
+  // 컨텍스트 기반 네비게이션 액션 생성
+  const { actions, tabChanged, targetTab } = createNavigationActions('visitors', dateRange, pageContext);
+
+  // 응답 메시지 구성
+  let message = formatDataResponse('visitors', responseData);
+
+  // 탭 전환 안내 추가
+  if (tabChanged) {
+    const targetTabName = getTabDisplayName(targetTab);
+    message += `\n\n${targetTabName}탭으로 이동하여 상세 데이터를 확인합니다.`;
+
+    // 복수 위치가 있는 용어인 경우 안내 추가
+    const termEntry = findTermLocation('방문객');
+    if (termEntry?.secondary && termEntry.secondary.length > 0) {
+      const secondaryTab = termEntry.secondary[0].tab;
+      if (secondaryTab) {
+        const secondaryTabName = getTabDisplayName(secondaryTab);
+        message += ` (${secondaryTabName}탭에서도 요약 정보 확인 가능)`;
+      }
+    }
+  } else {
+    message += '\n\n현재 탭에서 데이터를 확인할 수 있습니다.';
+  }
+
   return {
-    actions: createNavigationActions('visitors', dateRange),
-    message: formatDataResponse('visitors', responseData) + '\n\n인사이트 허브 고객탭에서 확인해보세요.',
-    suggestions: ['매출 알려줘', '전환율 어때?'],
+    actions,
+    message,
+    suggestions: ['매출 알려줘', '전환율 어때?', '체류 시간 알려줘'],
     data: responseData,
   };
 }
 
 /**
- * 전환율 조회
+ * 전환율 조회 (컨텍스트 인식)
  */
 async function queryConversion(
   supabase: SupabaseClient,
   storeId: string,
-  dateRange: { startDate: string; endDate: string }
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
 ): Promise<QueryActionResult> {
   const { data, error } = await supabase
     .from('daily_kpis_agg')
@@ -378,22 +485,29 @@ async function queryConversion(
   const conversionRate = totalVisitors > 0 ? (totalTransactions / totalVisitors) * 100 : 0;
 
   const responseData = { conversionRate, totalVisitors, totalTransactions };
+  const { actions, tabChanged, targetTab } = createNavigationActions('conversion', dateRange, pageContext);
+
+  let message = formatDataResponse('conversion', responseData);
+  if (tabChanged) {
+    message += `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 데이터를 확인합니다.`;
+  }
 
   return {
-    actions: createNavigationActions('conversion', dateRange),
-    message: formatDataResponse('conversion', responseData) + '\n\n인사이트 허브 개요탭에서 확인해보세요.',
+    actions,
+    message,
     suggestions: ['매출 알려줘', '방문객 수 알려줘'],
     data: responseData,
   };
 }
 
 /**
- * 평균 객단가 조회
+ * 평균 객단가 조회 (컨텍스트 인식)
  */
 async function queryAvgTransaction(
   supabase: SupabaseClient,
   storeId: string,
-  dateRange: { startDate: string; endDate: string }
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
 ): Promise<QueryActionResult> {
   const { data, error } = await supabase
     .from('daily_kpis_agg')
@@ -409,22 +523,29 @@ async function queryAvgTransaction(
   const avgTransaction = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
 
   const responseData = { avgTransaction, totalRevenue, totalTransactions };
+  const { actions, tabChanged, targetTab } = createNavigationActions('avgTransaction', dateRange, pageContext);
+
+  let message = `평균 객단가는 ${Math.round(avgTransaction).toLocaleString()}원입니다.`;
+  if (tabChanged) {
+    message += `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 데이터를 확인합니다.`;
+  }
 
   return {
-    actions: createNavigationActions('avgTransaction', dateRange),
-    message: `평균 객단가는 ${Math.round(avgTransaction).toLocaleString()}원입니다.\n\n인사이트 허브 개요탭에서 확인해보세요.`,
+    actions,
+    message,
     suggestions: ['매출 알려줘', '전환율 어때?'],
     data: responseData,
   };
 }
 
 /**
- * 전체 요약 조회
+ * 전체 요약 조회 (컨텍스트 인식)
  */
 async function querySummary(
   supabase: SupabaseClient,
   storeId: string,
-  dateRange: { startDate: string; endDate: string }
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
 ): Promise<QueryActionResult> {
   const { data, error } = await supabase
     .from('daily_kpis_agg')
@@ -440,14 +561,19 @@ async function querySummary(
   const totalTransactions = data?.reduce((sum, row) => sum + (row.total_transactions || 0), 0) || 0;
   const conversionRate = totalVisitors > 0 ? (totalTransactions / totalVisitors) * 100 : 0;
 
-  const message = `오늘의 주요 지표입니다:\n` +
+  const { actions, tabChanged, targetTab } = createNavigationActions('summary', dateRange, pageContext);
+
+  let message = `${dateRange.startDate} ~ ${dateRange.endDate} 주요 지표입니다:\n` +
     `• 매출: ${formatNumber(totalRevenue)}원\n` +
     `• 방문객: ${totalVisitors.toLocaleString()}명\n` +
-    `• 전환율: ${conversionRate.toFixed(1)}%\n\n` +
-    `인사이트 허브 개요탭에서 확인해보세요.`;
+    `• 전환율: ${conversionRate.toFixed(1)}%`;
+
+  if (tabChanged) {
+    message += `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 데이터를 확인합니다.`;
+  }
 
   return {
-    actions: createNavigationActions('summary', dateRange),
+    actions,
     message,
     suggestions: ['고객탭 보여줘', '시뮬레이션 돌려줘'],
     data: { totalRevenue, totalVisitors, totalTransactions, conversionRate },
@@ -455,13 +581,17 @@ async function querySummary(
 }
 
 /**
- * 상품 판매량 조회
+ * 상품 판매량 조회 (컨텍스트 인식)
  */
 async function queryProduct(
   supabase: SupabaseClient,
   storeId: string,
-  dateRange: { startDate: string; endDate: string }
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
 ): Promise<QueryActionResult> {
+  const { actions, tabChanged, targetTab } = createNavigationActions('product', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 내역을 확인합니다.` : '';
+
   // product_performance_agg 테이블에서 조회
   const { data, error } = await supabase
     .from('product_performance_agg')
@@ -484,8 +614,8 @@ async function queryProduct(
     const totalRevenue = kpiData?.reduce((sum, row) => sum + (row.total_revenue || 0), 0) || 0;
 
     return {
-      actions: createNavigationActions('product', dateRange),
-      message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 총 판매 건수는 ${totalSales.toLocaleString()}건, 매출은 ${formatNumber(totalRevenue)}원입니다.\n\n인사이트 허브 상품탭에서 상세 내역을 확인해보세요.`,
+      actions,
+      message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 총 판매 건수는 ${totalSales.toLocaleString()}건, 매출은 ${formatNumber(totalRevenue)}원입니다.${tabMessage}`,
       suggestions: ['매출 알려줘', '재고 현황 알려줘'],
       data: { totalSales, totalRevenue },
     };
@@ -495,21 +625,25 @@ async function queryProduct(
   const totalRevenue = data?.reduce((sum, row) => sum + (row.revenue || 0), 0) || 0;
 
   return {
-    actions: createNavigationActions('product', dateRange),
-    message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 총 판매량은 ${totalSalesCount.toLocaleString()}개, 매출은 ${formatNumber(totalRevenue)}원입니다.\n\n인사이트 허브 상품탭에서 상세 내역을 확인해보세요.`,
+    actions,
+    message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 총 판매량은 ${totalSalesCount.toLocaleString()}개, 매출은 ${formatNumber(totalRevenue)}원입니다.${tabMessage}`,
     suggestions: ['매출 알려줘', '재고 현황 알려줘'],
     data: { totalSalesCount, totalRevenue },
   };
 }
 
 /**
- * 재고 현황 조회
+ * 재고 현황 조회 (컨텍스트 인식)
  */
 async function queryInventory(
   supabase: SupabaseClient,
   storeId: string,
-  dateRange: { startDate: string; endDate: string }
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
 ): Promise<QueryActionResult> {
+  const { actions, tabChanged, targetTab } = createNavigationActions('inventory', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 내역을 확인합니다.` : '';
+
   // 재고 관련 테이블에서 조회 시도
   const { data, error } = await supabase
     .from('inventory_status')
@@ -519,8 +653,8 @@ async function queryInventory(
   if (error) {
     console.error('[queryInventory] Error:', error);
     return {
-      actions: createNavigationActions('inventory', dateRange),
-      message: `재고 데이터를 조회할 수 없습니다.\n\n인사이트 허브 재고탭에서 직접 확인해보세요.`,
+      actions,
+      message: `재고 데이터를 조회할 수 없습니다.${tabMessage}`,
       suggestions: ['상품 판매량 알려줘', '매출 알려줘'],
       data: null,
     };
@@ -530,20 +664,21 @@ async function queryInventory(
   const lowStockItems = data?.filter(item => item.current_stock <= item.reorder_point).length || 0;
 
   return {
-    actions: createNavigationActions('inventory', dateRange),
-    message: `현재 ${totalItems}개 상품 중 ${lowStockItems}개 상품이 재주문 필요 상태입니다.\n\n인사이트 허브 재고탭에서 상세 내역을 확인해보세요.`,
+    actions,
+    message: `현재 ${totalItems}개 상품 중 ${lowStockItems}개 상품이 재주문 필요 상태입니다.${tabMessage}`,
     suggestions: ['상품 판매량 알려줘', '매출 알려줘'],
     data: { totalItems, lowStockItems },
   };
 }
 
 /**
- * 목표 달성률 조회 (조건부 응답)
+ * 목표 달성률 조회 (조건부 응답, 컨텍스트 인식)
  */
 async function queryGoal(
   supabase: SupabaseClient,
   storeId: string,
-  dateRange: { startDate: string; endDate: string }
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
 ): Promise<QueryActionResult> {
   // user_goals 테이블에서 목표 조회 시도
   const { data: goalData, error: goalError } = await supabase
@@ -560,7 +695,7 @@ async function queryGoal(
         { type: 'navigate', target: '/insights?tab=overview' },
         { type: 'scroll_to_section', sectionId: 'goal-achievement', highlight: true, highlightDuration: 2000 },
       ],
-      message: '현재 설정된 목표가 없습니다. 목표를 설정하시면 달성률을 확인할 수 있어요.',
+      message: '현재 설정된 목표가 없습니다. 목표를 설정하시면 달성률을 확인할 수 있어요.\n\n개요탭으로 이동하여 목표 설정 섹션을 안내합니다.',
       suggestions: ['목표 설정하기', '매출 알려줘', '방문객 수 확인'],
       data: { hasGoal: false },
     };
@@ -582,22 +717,32 @@ async function queryGoal(
                achievementRate >= 80 ? '목표 달성에 근접해 있어요.' :
                achievementRate >= 50 ? '중간 정도 진행 중이에요.' : '목표까지 더 노력이 필요해요.';
 
+  const { actions, tabChanged, targetTab } = createNavigationActions('goal', dateRange, pageContext);
+  let message = `현재 목표 달성률은 ${achievementRate}%입니다. ${trend}`;
+  if (tabChanged) {
+    message += `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 데이터를 확인합니다.`;
+  }
+
   return {
-    actions: createNavigationActions('goal', dateRange),
-    message: `현재 목표 달성률은 ${achievementRate}%입니다. ${trend}\n\n인사이트 허브 개요탭에서 확인해보세요.`,
+    actions,
+    message,
     suggestions: ['목표 수정하기', '매출 알려줘', '상세 분석 보기'],
     data: { achievementRate, totalRevenue, goalRevenue, hasGoal: true },
   };
 }
 
 /**
- * 체류 시간 조회
+ * 체류 시간 조회 (컨텍스트 인식)
  */
 async function queryDwellTime(
   supabase: SupabaseClient,
   storeId: string,
-  dateRange: { startDate: string; endDate: string }
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
 ): Promise<QueryActionResult> {
+  const { actions, tabChanged, targetTab } = createNavigationActions('dwellTime', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 분석을 확인합니다.` : '';
+
   // 체류 시간 데이터 조회 시도
   const { data, error } = await supabase
     .from('customer_behavior_agg')
@@ -618,8 +763,8 @@ async function queryDwellTime(
 
     if (!kpiData || kpiData.length === 0) {
       return {
-        actions: createNavigationActions('dwellTime', dateRange),
-        message: '체류 시간 데이터를 조회할 수 없습니다.\n\n인사이트 허브 고객탭에서 확인해보세요.',
+        actions,
+        message: `체류 시간 데이터를 조회할 수 없습니다.${tabMessage}`,
         suggestions: ['방문객 수 알려줘', '고객탭 보여줘'],
         data: null,
       };
@@ -627,8 +772,8 @@ async function queryDwellTime(
 
     const avgDwell = kpiData.reduce((sum, row) => sum + (row.avg_dwell_time || 0), 0) / kpiData.length;
     return {
-      actions: createNavigationActions('dwellTime', dateRange),
-      message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 평균 체류 시간은 ${Math.round(avgDwell)}분입니다.\n\n인사이트 허브 고객탭에서 상세 분석을 확인해보세요.`,
+      actions,
+      message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 평균 체류 시간은 ${Math.round(avgDwell)}분입니다.${tabMessage}`,
       suggestions: ['방문객 수 알려줘', '신규/재방문 비율'],
       data: { avgDwellTime: avgDwell },
     };
@@ -639,21 +784,25 @@ async function queryDwellTime(
   const avgDwellTime = totalVisitors > 0 ? weightedDwellSum / totalVisitors : 0;
 
   return {
-    actions: createNavigationActions('dwellTime', dateRange),
-    message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 평균 체류 시간은 ${Math.round(avgDwellTime)}분입니다.\n\n인사이트 허브 고객탭에서 상세 분석을 확인해보세요.`,
+    actions,
+    message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 평균 체류 시간은 ${Math.round(avgDwellTime)}분입니다.${tabMessage}`,
     suggestions: ['방문객 수 알려줘', '신규/재방문 비율'],
     data: { avgDwellTime },
   };
 }
 
 /**
- * 신규/재방문 고객 조회
+ * 신규/재방문 고객 조회 (컨텍스트 인식)
  */
 async function queryNewVsReturning(
   supabase: SupabaseClient,
   storeId: string,
-  dateRange: { startDate: string; endDate: string }
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
 ): Promise<QueryActionResult> {
+  const { actions, tabChanged, targetTab } = createNavigationActions('newVsReturning', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 분석을 확인합니다.` : '';
+
   // 고객 세그먼트 데이터 조회 시도
   const { data, error } = await supabase
     .from('customer_segments_agg')
@@ -674,8 +823,8 @@ async function queryNewVsReturning(
 
     if (!kpiData || kpiData.length === 0) {
       return {
-        actions: createNavigationActions('newVsReturning', dateRange),
-        message: '신규/재방문 데이터를 조회할 수 없습니다.\n\n인사이트 허브 고객탭에서 확인해보세요.',
+        actions,
+        message: `신규/재방문 데이터를 조회할 수 없습니다.${tabMessage}`,
         suggestions: ['방문객 수 알려줘', '고객탭 보여줘'],
         data: null,
       };
@@ -688,8 +837,8 @@ async function queryNewVsReturning(
     const returnRate = total > 0 ? Math.round((totalReturning / total) * 100) : 0;
 
     return {
-      actions: createNavigationActions('newVsReturning', dateRange),
-      message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 고객 구성:\n• 신규 고객: ${totalNew.toLocaleString()}명 (${newRate}%)\n• 재방문 고객: ${totalReturning.toLocaleString()}명 (${returnRate}%)\n\n인사이트 허브 고객탭에서 상세 분석을 확인해보세요.`,
+      actions,
+      message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 고객 구성:\n• 신규 고객: ${totalNew.toLocaleString()}명 (${newRate}%)\n• 재방문 고객: ${totalReturning.toLocaleString()}명 (${returnRate}%)${tabMessage}`,
       suggestions: ['방문객 수 알려줘', '체류 시간 알려줘'],
       data: { newVisitors: totalNew, returningVisitors: totalReturning, newRate, returnRate },
     };
@@ -702,8 +851,8 @@ async function queryNewVsReturning(
   const returnRate = total > 0 ? Math.round((totalReturning / total) * 100) : 0;
 
   return {
-    actions: createNavigationActions('newVsReturning', dateRange),
-    message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 고객 구성:\n• 신규 고객: ${totalNew.toLocaleString()}명 (${newRate}%)\n• 재방문 고객: ${totalReturning.toLocaleString()}명 (${returnRate}%)\n\n인사이트 허브 고객탭에서 상세 분석을 확인해보세요.`,
+    actions,
+    message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 고객 구성:\n• 신규 고객: ${totalNew.toLocaleString()}명 (${newRate}%)\n• 재방문 고객: ${totalReturning.toLocaleString()}명 (${returnRate}%)${tabMessage}`,
     suggestions: ['방문객 수 알려줘', '체류 시간 알려줘'],
     data: { newVisitors: totalNew, returningVisitors: totalReturning, newRate, returnRate },
   };
