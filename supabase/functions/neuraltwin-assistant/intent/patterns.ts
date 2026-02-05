@@ -1,7 +1,10 @@
 /**
  * 인텐트별 패턴 매칭 정의
- * Phase 2-A: navigate 인텐트만 구현
+ * Phase 2-A: navigate 인텐트
+ * Phase 2-B: set_tab, set_date_range, composite_navigate 추가
  */
+
+import { extractTab, extractDateRange, extractEntities, inferPageFromTab } from './entityExtractor.ts';
 
 export interface IntentPattern {
   intent: string;
@@ -9,6 +12,9 @@ export interface IntentPattern {
   confidence: number;
   extractors?: {
     page?: (match: RegExpMatchArray, text: string) => string | null;
+    tab?: (match: RegExpMatchArray, text: string) => string | null;
+    dateRange?: (match: RegExpMatchArray, text: string) => { preset?: string; startDate?: string; endDate?: string } | null;
+    all?: (match: RegExpMatchArray, text: string) => Record<string, any>;
   };
 }
 
@@ -65,7 +71,52 @@ export const INTENT_PATTERNS: IntentPattern[] = [
     ],
     confidence: 0.95,
     extractors: {
-      page: (match, text) => extractPage(text),
+      page: (_match, text) => extractPage(text),
+    },
+  },
+
+  // set_tab — 탭 전환
+  {
+    intent: 'set_tab',
+    patterns: [
+      /(?:고객|customer|매장|store|상품|product|재고|inventory|예측|prediction|AI\s*추천|개요|overview)\s*(?:탭|tab)?(?:을|를)?\s*(?:보여|열|선택|클릭|눌러)/i,
+      /(?:보여|열어|선택|클릭)\s*(?:줘|해)?\s*(?:고객|customer|매장|store|상품|product|재고|inventory|예측|prediction|AI\s*추천|개요)\s*(?:탭|tab)?/i,
+      /(?:고객|매장|상품|재고|예측|AI추천|개요|시뮬레이션|최적화|레이어)\s*(?:탭|tab)\s*(?:으로|로)?\s*(?:이동|가|열어|보여)/i,
+    ],
+    confidence: 0.90,
+    extractors: {
+      tab: (_match, text) => extractTab(text),
+    },
+  },
+
+  // set_date_range — 날짜 필터 변경
+  {
+    intent: 'set_date_range',
+    patterns: [
+      /(\d{1,2})[\/\-.](\d{1,2})\s*[~\-]\s*(\d{1,2})[\/\-.](\d{1,2})/,  // 11/4~11/15
+      /(?:오늘|today)\s*(?:데이터|기간|날짜)?(?:로|으로)?/i,
+      /(?:7일|일주일|1주일)\s*(?:데이터|기간)?(?:로|으로)?/i,
+      /(?:30일|한달|1개월)\s*(?:데이터|기간)?(?:로|으로)?/i,
+      /(?:90일|3개월)\s*(?:데이터|기간)?(?:로|으로)?/i,
+      /기간\s*(?:을|를)?\s*(?:변경|설정|바꿔)/i,
+      /(?:최근|지난)\s*(?:7일|일주일|30일|한달|90일|3개월)/i,
+    ],
+    confidence: 0.90,
+    extractors: {
+      dateRange: (_match, text) => extractDateRange(text),
+    },
+  },
+
+  // composite_navigate — 복합 네비게이션 (페이지 + 탭 + 날짜)
+  {
+    intent: 'composite_navigate',
+    patterns: [
+      /(?:인사이트|스튜디오|설정).*(?:에서|에|의)?\s*(?:\d{1,2}[\/\-]\d{1,2}.*)?(?:고객|매장|상품|재고|예측|AI|개요|시뮬레이션|최적화)?\s*(?:탭|tab)?/i,
+      /(?:고객|매장|상품|재고|예측|AI|개요).*(?:탭|tab)?.*(?:에서|에)?\s*(?:\d{1,2}[\/\-]\d{1,2}|\d{1,2}일|오늘|7일|30일|90일)/i,
+    ],
+    confidence: 0.85,
+    extractors: {
+      all: (_match, text) => extractEntities(text),
     },
   },
 ];
@@ -73,7 +124,7 @@ export const INTENT_PATTERNS: IntentPattern[] = [
 /**
  * 텍스트에서 패턴 매칭으로 인텐트 분류
  */
-export function matchIntent(text: string): {
+export function matchIntent(text: string, currentPage?: string): {
   intent: string;
   confidence: number;
   entities: Record<string, any>;
@@ -86,12 +137,47 @@ export function matchIntent(text: string): {
       if (match) {
         const entities: Record<string, any> = {};
 
-        // 엔티티 추출
+        // 페이지 추출
         if (pattern.extractors?.page) {
           const page = pattern.extractors.page(match, normalizedText);
           if (page) {
             entities.page = page;
           }
+        }
+
+        // 탭 추출
+        if (pattern.extractors?.tab) {
+          const tab = pattern.extractors.tab(match, normalizedText);
+          if (tab) {
+            entities.tab = tab;
+            // 탭에서 페이지 추론
+            const inferredPage = inferPageFromTab(tab);
+            if (inferredPage) {
+              entities.inferredPage = inferredPage;
+            }
+          }
+        }
+
+        // 날짜 범위 추출
+        if (pattern.extractors?.dateRange) {
+          const dateRange = pattern.extractors.dateRange(match, normalizedText);
+          if (dateRange) {
+            if (dateRange.preset) {
+              entities.datePreset = dateRange.preset;
+            }
+            if (dateRange.startDate) {
+              entities.dateStart = dateRange.startDate;
+            }
+            if (dateRange.endDate) {
+              entities.dateEnd = dateRange.endDate;
+            }
+          }
+        }
+
+        // 전체 엔티티 추출 (composite)
+        if (pattern.extractors?.all) {
+          const allEntities = pattern.extractors.all(match, normalizedText);
+          Object.assign(entities, allEntities);
         }
 
         return {

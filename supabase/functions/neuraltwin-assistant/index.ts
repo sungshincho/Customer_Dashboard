@@ -125,11 +125,12 @@ Deno.serve(async (req) => {
     // 7. 인텐트 분류 (Phase 2-A에서 구현)
     const classification = await classifyIntent(message, context);
 
-    // 8. 액션 실행
+    // 8. 액션 실행 (Phase 2-B: set_tab, set_date_range, composite_navigate 추가)
     let actionResult = { actions: [] as UIAction[], message: '', suggestions: [] as string[] };
+    const currentPage = context.page.current;
 
-    if (classification.intent === 'navigate') {
-      actionResult = dispatchNavigationAction(classification);
+    if (['navigate', 'set_tab', 'set_date_range', 'composite_navigate'].includes(classification.intent)) {
+      actionResult = dispatchNavigationAction(classification, currentPage);
     }
 
     // 9. 응답 생성

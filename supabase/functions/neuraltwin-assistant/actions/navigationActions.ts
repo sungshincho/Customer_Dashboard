@@ -1,7 +1,7 @@
 /**
  * 네비게이션 관련 액션 처리
- * Phase 2-A: navigate 액션만 구현
- * Phase 2-B: set_tab, set_date_range 추가 예정
+ * Phase 2-A: navigate 액션
+ * Phase 2-B: set_tab, set_date_range, composite_navigate 추가
  */
 
 import { ClassificationResult } from '../intent/classifier.ts';
@@ -24,6 +24,26 @@ const PAGE_NAMES: Record<string, string> = {
   '/roi': 'ROI 측정',
   '/settings': '설정',
   '/data/control-tower': '데이터 컨트롤타워',
+};
+
+// 탭 한글명 매핑
+const TAB_NAMES: Record<string, string> = {
+  'overview': '개요',
+  'store': '매장',
+  'customer': '고객',
+  'product': '상품',
+  'inventory': '재고',
+  'prediction': '예측',
+  'ai': 'AI추천',
+  'stores': '매장 관리',
+  'data': '데이터',
+  'users': '사용자',
+  'system': '시스템',
+  'license': '플랜',
+  'layer': '레이어',
+  'ai-simulation': 'AI 시뮬레이션',
+  'ai-optimization': 'AI 최적화',
+  'apply': '적용',
 };
 
 /**
@@ -57,6 +77,164 @@ export function handleNavigate(
     ],
     message: `${pageName} 페이지로 이동합니다.`,
     suggestions: getSuggestionsForPage(targetPage),
+  };
+}
+
+/**
+ * set_tab 인텐트 처리
+ */
+export function handleSetTab(
+  classification: ClassificationResult,
+  currentPage?: string
+): ActionResult {
+  const tab = classification.entities.tab;
+  const inferredPage = classification.entities.inferredPage;
+
+  if (!tab) {
+    return {
+      actions: [],
+      message: '어느 탭을 열까요? 고객, 매장, 상품, 재고, 예측, AI추천 중에서 선택해주세요.',
+      suggestions: ['고객탭 보여줘', '매장탭 열어줘', '예측탭 보여줘'],
+    };
+  }
+
+  const tabName = TAB_NAMES[tab] || tab;
+  const targetPage = inferredPage || currentPage || '/insights';
+
+  // URL 쿼리 파라미터 방식으로 탭 전환
+  const targetUrl = `${targetPage}?tab=${tab}`;
+
+  return {
+    actions: [
+      {
+        type: 'navigate',
+        target: targetUrl,
+      },
+    ],
+    message: `${tabName} 탭으로 이동합니다.`,
+    suggestions: getSuggestionsForTab(tab),
+  };
+}
+
+/**
+ * set_date_range 인텐트 처리
+ */
+export function handleSetDateRange(
+  classification: ClassificationResult
+): ActionResult {
+  const { datePreset, dateStart, dateEnd } = classification.entities;
+
+  if (!datePreset && !dateStart) {
+    return {
+      actions: [],
+      message: '어떤 기간으로 설정할까요? 오늘, 7일, 30일, 90일 또는 직접 날짜를 입력해주세요.',
+      suggestions: ['오늘 데이터로 변경', '최근 7일로 설정', '11/4~11/15 기간으로'],
+    };
+  }
+
+  const actions: UIAction[] = [];
+  let message = '';
+
+  if (datePreset) {
+    actions.push({
+      type: 'set_date_range',
+      preset: datePreset,
+    });
+
+    const presetName: Record<string, string> = {
+      'today': '오늘',
+      '7d': '최근 7일',
+      '30d': '최근 30일',
+      '90d': '최근 90일',
+    };
+
+    message = `기간을 ${presetName[datePreset] || datePreset}로 설정합니다.`;
+  } else if (dateStart && dateEnd) {
+    actions.push({
+      type: 'set_date_range',
+      startDate: dateStart,
+      endDate: dateEnd,
+    });
+    message = `기간을 ${dateStart} ~ ${dateEnd}로 설정합니다.`;
+  }
+
+  return {
+    actions,
+    message,
+    suggestions: ['매출 확인해줘', '고객 분석 보여줘', '인사이트 허브로 이동'],
+  };
+}
+
+/**
+ * composite_navigate 인텐트 처리 (복합)
+ */
+export function handleCompositeNavigate(
+  classification: ClassificationResult,
+  currentPage?: string
+): ActionResult {
+  const actions: UIAction[] = [];
+  const messages: string[] = [];
+
+  const { page, tab, inferredPage, datePreset, dateStart, dateEnd } = classification.entities;
+
+  // 1. 페이지 이동
+  const targetPage = page || inferredPage || currentPage;
+  if (targetPage && targetPage !== currentPage) {
+    let targetUrl = targetPage;
+
+    // 2. 탭 설정 (URL 쿼리 파라미터)
+    if (tab) {
+      targetUrl = `${targetPage}?tab=${tab}`;
+      const tabName = TAB_NAMES[tab] || tab;
+      messages.push(`${PAGE_NAMES[targetPage] || targetPage}의 ${tabName} 탭`);
+    } else {
+      messages.push(`${PAGE_NAMES[targetPage] || targetPage} 페이지`);
+    }
+
+    actions.push({
+      type: 'navigate',
+      target: targetUrl,
+    });
+  } else if (tab) {
+    // 페이지 이동 없이 탭만 변경
+    const targetUrl = `${currentPage || '/insights'}?tab=${tab}`;
+    const tabName = TAB_NAMES[tab] || tab;
+    messages.push(`${tabName} 탭`);
+
+    actions.push({
+      type: 'navigate',
+      target: targetUrl,
+    });
+  }
+
+  // 3. 날짜 범위 설정
+  if (datePreset) {
+    actions.push({
+      type: 'set_date_range',
+      preset: datePreset,
+    });
+    const presetName: Record<string, string> = {
+      'today': '오늘',
+      '7d': '최근 7일',
+      '30d': '최근 30일',
+      '90d': '최근 90일',
+    };
+    messages.push(`기간: ${presetName[datePreset] || datePreset}`);
+  } else if (dateStart && dateEnd) {
+    actions.push({
+      type: 'set_date_range',
+      startDate: dateStart,
+      endDate: dateEnd,
+    });
+    messages.push(`기간: ${dateStart}~${dateEnd}`);
+  }
+
+  return {
+    actions,
+    message: messages.length > 0
+      ? `${messages.join(', ')}(으)로 이동합니다.`
+      : '이동할 위치를 파악하지 못했어요. 다시 말씀해주세요.',
+    suggestions: ['오늘 매출 얼마야?', '시뮬레이션 돌려줘'],
   };
 }
 
@@ -98,18 +276,50 @@ function getSuggestionsForPage(page: string): string[] {
 }
 
 /**
- * 액션 디스패처 (Phase 2-B에서 확장)
+ * 탭별 후속 제안
+ */
+function getSuggestionsForTab(tab: string): string[] {
+  switch (tab) {
+    case 'customer':
+      return ['고객 세그먼트 분석해줘', '방문객 수 알려줘'];
+    case 'store':
+      return ['존별 성과 보여줘', '히트맵 분석해줘'];
+    case 'product':
+      return ['베스트셀러 보여줘', '상품별 매출 알려줘'];
+    case 'inventory':
+      return ['재고 현황 보여줘', '부족 재고 알려줘'];
+    case 'prediction':
+      return ['내일 예측 보여줘', '주간 예측 알려줘'];
+    case 'ai':
+      return ['AI 추천 전략 보여줘', '적용 가능한 전략 알려줘'];
+    case 'ai-simulation':
+      return ['시뮬레이션 돌려줘', '시나리오 추가해줘'];
+    case 'ai-optimization':
+      return ['최적화 실행해줘', '최적화 결과 보여줘'];
+    default:
+      return ['매출 알려줘', '데이터 분석해줘'];
+  }
+}
+
+/**
+ * 액션 디스패처 (Phase 2-B 확장)
  */
 export function dispatchNavigationAction(
-  classification: ClassificationResult
+  classification: ClassificationResult,
+  currentPage?: string
 ): ActionResult {
   switch (classification.intent) {
     case 'navigate':
       return handleNavigate(classification);
 
-    // Phase 2-B에서 추가
-    // case 'set_tab':
-    // case 'set_date_range':
+    case 'set_tab':
+      return handleSetTab(classification, currentPage);
+
+    case 'set_date_range':
+      return handleSetDateRange(classification);
+
+    case 'composite_navigate':
+      return handleCompositeNavigate(classification, currentPage);
 
     default:
       return {

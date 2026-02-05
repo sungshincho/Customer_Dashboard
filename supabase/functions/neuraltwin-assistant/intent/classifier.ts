@@ -1,6 +1,7 @@
 /**
  * 하이브리드 인텐트 분류기
  * Phase 2-A: 패턴 매칭만 구현, AI 폴백은 Phase 3-A에서 추가
+ * Phase 2-B: currentPage 컨텍스트 전달 추가
  */
 
 import { matchIntent } from './patterns.ts';
@@ -19,10 +20,13 @@ const CONFIDENCE_THRESHOLD = 0.7;
  */
 export async function classifyIntent(
   message: string,
-  _context?: any  // Phase 3-A에서 AI 분류 시 사용
+  context?: { page?: { current?: string } }
 ): Promise<ClassificationResult> {
+  // 현재 페이지 추출
+  const currentPage = context?.page?.current;
+
   // 1. 패턴 매칭 시도
-  const patternResult = matchIntent(message);
+  const patternResult = matchIntent(message, currentPage);
 
   if (patternResult && patternResult.confidence >= CONFIDENCE_THRESHOLD) {
     return {
