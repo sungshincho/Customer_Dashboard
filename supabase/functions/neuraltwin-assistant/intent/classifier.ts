@@ -1,10 +1,12 @@
 /**
  * 하이브리드 인텐트 분류기
- * Phase 2-A: 패턴 매칭만 구현, AI 폴백은 Phase 3-A에서 추가
- * Phase 2-B: currentPage 컨텍스트 전달 추가
+ * 1차: 패턴 매칭
+ * 2차: Gemini AI 폴백 (패턴 매칭 실패 또는 낮은 신뢰도)
  */
 
 import { matchIntent } from './patterns.ts';
+import { callGemini, parseJsonResponse } from '../utils/geminiClient.ts';
+import { INTENT_CLASSIFICATION_PROMPT } from '../constants/systemPrompt.ts';
 
 export interface ClassificationResult {
   intent: string;
@@ -13,7 +15,8 @@ export interface ClassificationResult {
   method: 'pattern' | 'ai';
 }
 
-const CONFIDENCE_THRESHOLD = 0.7;
+const PATTERN_CONFIDENCE_THRESHOLD = 0.7;
+const AI_CONFIDENCE_THRESHOLD = 0.4;
 
 /**
  * 사용자 메시지에서 인텐트 분류
@@ -28,7 +31,8 @@ export async function classifyIntent(
   // 1. 패턴 매칭 시도
   const patternResult = matchIntent(message, currentPage);
 
-  if (patternResult && patternResult.confidence >= CONFIDENCE_THRESHOLD) {
+  if (patternResult && patternResult.confidence >= PATTERN_CONFIDENCE_THRESHOLD) {
+    console.log('[classifier] Pattern match success:', patternResult.intent);
     return {
       intent: patternResult.intent,
       confidence: patternResult.confidence,
@@ -37,8 +41,40 @@ export async function classifyIntent(
     };
   }
 
-  // 2. 패턴 매칭 실패 → 현재는 general_chat 폴백
-  // Phase 3-A에서 AI 분류 추가 예정
+  // 2. AI 분류 폴백
+  console.log('[classifier] Pattern match failed, trying AI classification');
+
+  try {
+    const prompt = INTENT_CLASSIFICATION_PROMPT.replace('{userMessage}', message);
+
+    const response = await callGemini(
+      [{ role: 'user', content: prompt }],
+      { jsonMode: true, temperature: 0.1 }
+    );
+
+    const parsed = parseJsonResponse<{
+      intent: string;
+      confidence: number;
+      entities: Record<string, any>;
+    }>(response.content);
+
+    if (parsed && parsed.intent && parsed.confidence >= AI_CONFIDENCE_THRESHOLD) {
+      console.log('[classifier] AI classification success:', parsed.intent);
+      return {
+        intent: parsed.intent,
+        confidence: parsed.confidence,
+        entities: parsed.entities || {},
+        method: 'ai',
+      };
+    }
+
+  } catch (error) {
+    console.error('[classifier] AI classification error:', error);
+    // AI 실패 시 general_chat 폴백
+  }
+
+  // 3. 최종 폴백: general_chat
+  console.log('[classifier] Falling back to general_chat');
   return {
     intent: 'general_chat',
     confidence: 0.5,
