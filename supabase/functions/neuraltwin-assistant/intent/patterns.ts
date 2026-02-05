@@ -16,7 +16,7 @@ export interface IntentPattern {
     tab?: (match: RegExpMatchArray, text: string) => string | null;
     dateRange?: (match: RegExpMatchArray, text: string) => { preset?: string; startDate?: string; endDate?: string } | null;
     queryType?: (match: RegExpMatchArray, text: string) => string;
-    period?: (match: RegExpMatchArray, text: string) => { type: string; date?: string };
+    period?: (match: RegExpMatchArray, text: string) => { type: string; startDate?: string; endDate?: string };
     all?: (match: RegExpMatchArray, text: string) => Record<string, any>;
   };
 }
@@ -133,6 +133,9 @@ export const INTENT_PATTERNS: IntentPattern[] = [
       /(?:평균\s*객단가|객단가|거래\s*금액)\s*(?:얼마|어때)/i,
       /(?:오늘|어제|최근)?\s*(?:성과|실적|현황)\s*(?:어때|알려|보여)/i,
       /(?:매출|방문객|전환율).*(?:알려|보여|어때|얼마)/i,
+      // 커스텀 날짜 범위 + KPI (예: "12월 1-15일 방문객 보여줘")
+      /(\d{1,2})월\s*(\d{1,2})[-~](\d{1,2})일?.*(?:매출|방문객|전환율|현황|데이터)/i,
+      /(\d{1,2})[\/\-.](\d{1,2})\s*[-~]\s*(\d{1,2})[\/\-.]?(\d{1,2})?.*(?:매출|방문객|전환율|현황|데이터)/i,
     ],
     confidence: 0.85,
     extractors: {
@@ -156,8 +159,45 @@ function extractQueryType(text: string): string {
 }
 
 // 기간 추출 함수 (Phase 3-B)
-function extractPeriod(text: string): { type: string; date?: string } {
+function extractPeriod(text: string): { type: string; startDate?: string; endDate?: string } {
   const normalizedText = text.toLowerCase();
+  const currentYear = new Date().getFullYear();
+
+  // 커스텀 날짜 범위: "12월 1-15일" 또는 "12월 1일-15일"
+  const koreanDateMatch = text.match(/(\d{1,2})월\s*(\d{1,2})일?\s*[-~]\s*(\d{1,2})일?/);
+  if (koreanDateMatch) {
+    const month = parseInt(koreanDateMatch[1], 10);
+    const startDay = parseInt(koreanDateMatch[2], 10);
+    const endDay = parseInt(koreanDateMatch[3], 10);
+
+    const startDate = `${currentYear}-${String(month).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
+    const endDate = `${currentYear}-${String(month).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
+
+    return { type: 'custom', startDate, endDate };
+  }
+
+  // 커스텀 날짜 범위: "12/1-12/15" 또는 "12/1~15"
+  const slashDateMatch = text.match(/(\d{1,2})[\/\-.](\d{1,2})\s*[-~]\s*(\d{1,2})?[\/\-.]?(\d{1,2})?/);
+  if (slashDateMatch) {
+    const startMonth = parseInt(slashDateMatch[1], 10);
+    const startDay = parseInt(slashDateMatch[2], 10);
+    let endMonth = startMonth;
+    let endDay = startDay;
+
+    if (slashDateMatch[3] && slashDateMatch[4]) {
+      // "12/1-12/15" 형식
+      endMonth = parseInt(slashDateMatch[3], 10);
+      endDay = parseInt(slashDateMatch[4], 10);
+    } else if (slashDateMatch[3]) {
+      // "12/1-15" 형식 (같은 월)
+      endDay = parseInt(slashDateMatch[3], 10);
+    }
+
+    const startDate = `${currentYear}-${String(startMonth).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
+    const endDate = `${currentYear}-${String(endMonth).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
+
+    return { type: 'custom', startDate, endDate };
+  }
 
   if (/오늘|today/.test(normalizedText)) {
     return { type: 'today' };

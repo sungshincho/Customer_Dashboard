@@ -1,17 +1,65 @@
 /**
  * KPI 조회(query_kpi) 처리
  * Phase 3-B: 기존 DB 테이블 직접 쿼리 (읽기 전용)
+ * 데이터 응답 + 관련 탭 자동 이동
  */
 
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.89.0';
 import { ClassificationResult } from '../intent/classifier.ts';
 import { formatDataResponse } from '../response/generator.ts';
+import { UIAction } from './navigationActions.ts';
 
 export interface QueryActionResult {
-  actions: any[];
+  actions: UIAction[];
   message: string;
   suggestions: string[];
   data?: any;
+}
+
+/**
+ * 쿼리 타입별 관련 탭 매핑
+ */
+const QUERY_TYPE_TO_TAB: Record<string, { page: string; tab: string }> = {
+  revenue: { page: '/insights', tab: 'overview' },
+  visitors: { page: '/insights', tab: 'customer' },
+  conversion: { page: '/insights', tab: 'overview' },
+  avgTransaction: { page: '/insights', tab: 'overview' },
+  summary: { page: '/insights', tab: 'overview' },
+};
+
+/**
+ * 날짜 범위를 기반으로 네비게이션 액션 생성
+ */
+function createNavigationActions(
+  queryType: string,
+  dateRange: { startDate: string; endDate: string }
+): UIAction[] {
+  const mapping = QUERY_TYPE_TO_TAB[queryType] || QUERY_TYPE_TO_TAB.summary;
+
+  const actions: UIAction[] = [];
+
+  // 1. 페이지 이동
+  actions.push({
+    type: 'navigate',
+    target: mapping.page,
+  });
+
+  // 2. 탭 전환
+  actions.push({
+    type: 'set_tab',
+    target: mapping.tab,
+  });
+
+  // 3. 날짜 범위 설정
+  actions.push({
+    type: 'set_date_range',
+    target: {
+      startDate: dateRange.startDate,
+      endDate: dateRange.endDate,
+    },
+  });
+
+  return actions;
 }
 
 /**
@@ -59,7 +107,7 @@ export async function handleQueryKpi(
 /**
  * 기간 계산
  */
-function getDateRange(period: { type: string; date?: string }): {
+function getDateRange(period: { type: string; startDate?: string; endDate?: string }): {
   startDate: string;
   endDate: string;
   compareStartDate?: string;
@@ -69,6 +117,21 @@ function getDateRange(period: { type: string; date?: string }): {
   const formatDate = (d: Date) => d.toISOString().split('T')[0];
 
   switch (period.type) {
+    case 'custom': {
+      // 커스텀 날짜 범위가 지정된 경우
+      if (period.startDate && period.endDate) {
+        return {
+          startDate: period.startDate,
+          endDate: period.endDate,
+        };
+      }
+      // 폴백: 오늘
+      return {
+        startDate: formatDate(today),
+        endDate: formatDate(today),
+      };
+    }
+
     case 'today': {
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
@@ -156,9 +219,9 @@ async function queryRevenue(
   const responseData = { totalRevenue, totalTransactions, change };
 
   return {
-    actions: [],
-    message: formatDataResponse('revenue', responseData),
-    suggestions: ['방문객 수 알려줘', '전환율 어때?', '인사이트 허브에서 자세히 보기'],
+    actions: createNavigationActions('revenue', dateRange),
+    message: formatDataResponse('revenue', responseData) + '\n\n인사이트 허브 개요탭에서 확인해보세요.',
+    suggestions: ['방문객 수 알려줘', '전환율 어때?'],
     data: responseData,
   };
 }
@@ -201,9 +264,9 @@ async function queryVisitors(
   const responseData = { totalVisitors, uniqueVisitors, change };
 
   return {
-    actions: [],
-    message: formatDataResponse('visitors', responseData),
-    suggestions: ['매출 알려줘', '전환율 어때?', '고객탭에서 자세히 보기'],
+    actions: createNavigationActions('visitors', dateRange),
+    message: formatDataResponse('visitors', responseData) + '\n\n인사이트 허브 고객탭에서 확인해보세요.',
+    suggestions: ['매출 알려줘', '전환율 어때?'],
     data: responseData,
   };
 }
@@ -232,9 +295,9 @@ async function queryConversion(
   const responseData = { conversionRate, totalVisitors, totalTransactions };
 
   return {
-    actions: [],
-    message: formatDataResponse('conversion', responseData),
-    suggestions: ['매출 알려줘', '방문객 수 알려줘', '인사이트 허브에서 자세히 보기'],
+    actions: createNavigationActions('conversion', dateRange),
+    message: formatDataResponse('conversion', responseData) + '\n\n인사이트 허브 개요탭에서 확인해보세요.',
+    suggestions: ['매출 알려줘', '방문객 수 알려줘'],
     data: responseData,
   };
 }
@@ -263,8 +326,8 @@ async function queryAvgTransaction(
   const responseData = { avgTransaction, totalRevenue, totalTransactions };
 
   return {
-    actions: [],
-    message: `평균 객단가는 ${Math.round(avgTransaction).toLocaleString()}원입니다.`,
+    actions: createNavigationActions('avgTransaction', dateRange),
+    message: `평균 객단가는 ${Math.round(avgTransaction).toLocaleString()}원입니다.\n\n인사이트 허브 개요탭에서 확인해보세요.`,
     suggestions: ['매출 알려줘', '전환율 어때?'],
     data: responseData,
   };
@@ -295,12 +358,13 @@ async function querySummary(
   const message = `오늘의 주요 지표입니다:\n` +
     `• 매출: ${formatNumber(totalRevenue)}원\n` +
     `• 방문객: ${totalVisitors.toLocaleString()}명\n` +
-    `• 전환율: ${conversionRate.toFixed(1)}%`;
+    `• 전환율: ${conversionRate.toFixed(1)}%\n\n` +
+    `인사이트 허브 개요탭에서 확인해보세요.`;
 
   return {
-    actions: [],
+    actions: createNavigationActions('summary', dateRange),
     message,
-    suggestions: ['인사이트 허브에서 자세히 보기', '시뮬레이션 돌려줘'],
+    suggestions: ['고객탭 보여줘', '시뮬레이션 돌려줘'],
     data: { totalRevenue, totalVisitors, totalTransactions, conversionRate },
   };
 }
