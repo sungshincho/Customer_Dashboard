@@ -1,10 +1,11 @@
 # NEURALTWIN OS 챗봇 — Phase 1 기능 개발 요청서
 
-> **버전**: v1.1 (패치 반영)
+> **버전**: v1.2 (DB 스키마 v2.0 반영)
 > **작성일**: 2026-02-05
 > **원본 문서**: `NEURALTWIN_OS_CHATBOT_FEATURE_REQUEST.md`
 > **분할 근거**: 검토 결과 보고서 `NEURALTWIN_OS_CHATBOT_REVIEW_RESULT.md`
 > **패치 반영**: `OS_CHATBOT_PATCH_DECISIONS.md` (탭 설정 방식, 에러 핸들링, isLoading 상태)
+> **DB 상태**: ⚠️ 웹사이트 챗봇 팀에서 마이그레이션 완료 — 테이블 존재 확인만 필요
 
 ---
 
@@ -36,12 +37,12 @@ navigate('/studio?tab=ai-simulation');
 
 ## 1. Phase 1 목표
 
-**DB 스키마 + Edge Function 기본 구조 + 공유 유틸리티** 구축
+**DB 존재 확인 + Edge Function 기본 구조 + 공유 유틸리티** 구축
 
 이 Phase가 완료되면:
-- 챗봇 전용 DB 테이블 5개가 생성됨
+- 챗봇 전용 DB 테이블 6개 존재 확인됨 (웹사이트 팀에서 이미 마이그레이션 완료)
 - `neuraltwin-assistant` Edge Function이 인증 + CORS + 세션 관리까지 동작함
-- 후속 Phase에서 사용할 공유 유틸리티가 준비됨
+- 후속 Phase에서 사용할 공유 유틸리티가 준비됨 (chatLogger, chatEventLogger, streamingResponse, rateLimiter)
 
 ---
 
@@ -60,7 +61,7 @@ navigate('/studio?tab=ai-simulation');
 
 ```
 ✅ neuraltwin-assistant Edge Function 1개 신규 생성
-✅ 통합 DB 스키마 5개 테이블 신규 생성
+✅ 통합 DB 스키마 6개 테이블 활용 (웹사이트 팀에서 이미 생성 완료)
 ✅ supabase/functions/_shared/ 에 챗봇 전용 공유 유틸 추가
 ```
 
@@ -68,35 +69,43 @@ navigate('/studio?tab=ai-simulation');
 
 ## 3. 구현 범위
 
-### 3.1 DB 마이그레이션
+### 3.1 DB 존재 확인 (마이그레이션 불필요)
 
-**파일 생성 위치:**
 ```
-supabase/migrations/20260205000001_create_chat_tables.sql
+⚠️ 중요: 웹사이트 챗봇 팀에서 이미 마이그레이션을 완료했습니다.
+⚠️ 마이그레이션 파일 생성/실행 불필요 — 테이블 존재 확인만 수행하세요.
 ```
 
-**생성할 테이블 (5개):**
+**확인할 테이블 (6개):**
 
-| 테이블 | Phase 1 역할 |
-|:---|:---|
-| `chat_conversations` | 대화 세션 저장 |
-| `chat_messages` | 개별 메시지 저장 |
-| `chat_leads` | 테이블 구조만 생성 (미사용) |
-| `chat_daily_analytics` | 테이블 구조만 생성 (미사용) |
-| `assistant_command_cache` | 테이블 구조만 생성 (미사용) |
+| 테이블 | 상태 | Phase 1 역할 |
+|:---|:---|:---|
+| `chat_conversations` | ✅ 이미 존재 | 대화 세션 저장 |
+| `chat_messages` | ✅ 이미 존재 | 개별 메시지 저장 |
+| `chat_events` | ✅ 이미 존재 | 이벤트 로그 (handover, context_bridge 등) |
+| `chat_leads` | ✅ 이미 존재 | OS에서 미사용 (웹사이트 전용) |
+| `chat_daily_analytics` | ✅ 이미 존재 | OS 초기 버전 미사용 |
+| `assistant_command_cache` | ✅ 이미 존재 | OS 초기 버전 미사용 |
 
-**SQL 내용:**
-- `NEURALTWIN_CHATBOT_DB_SCHEMA.md` 섹션 7의 전체 마이그레이션 SQL 그대로 사용
-- ENUM, 테이블, 인덱스, RLS 정책 모두 포함
+**확인할 함수:**
 
-### 3.2 공유 유틸리티 (3개 파일)
+| 함수 | 상태 | 용도 |
+|:---|:---|:---|
+| `handover_chat_session(p_session_id, p_new_user_id)` | ✅ 이미 존재 | 웹사이트 → OS 세션 인계 |
+
+**스키마 상세:**
+- `NEURALTWIN_CHATBOT_DB_SCHEMA.md` (v2.0) 참조
+- ENUM, 테이블, 인덱스, RLS 정책, handover 함수 모두 포함됨
+
+### 3.2 공유 유틸리티 (4개 파일)
 
 **파일 생성 위치:**
 ```
 supabase/functions/_shared/
-├── chatLogger.ts           # 신규
-├── streamingResponse.ts    # 신규
-└── rateLimiter.ts          # 신규
+├── chatLogger.ts           # 신규 (대화/메시지 CRUD)
+├── chatEventLogger.ts      # 신규 (chat_events 테이블 CRUD)
+├── streamingResponse.ts    # 신규 (SSE 스트리밍)
+└── rateLimiter.ts          # 신규 (분당 요청 제한)
 ```
 
 #### 3.2.1 chatLogger.ts
@@ -223,7 +232,120 @@ export async function getConversationMessages(
 }
 ```
 
-#### 3.2.2 streamingResponse.ts
+#### 3.2.2 chatEventLogger.ts (신규 — chat_events 테이블 활용)
+
+```typescript
+/**
+ * 챗봇 이벤트 로깅 유틸리티
+ * - chat_events 테이블에 이벤트 기록
+ * - handover, context_bridge, session_start 등 추적
+ */
+
+import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.89.0';
+
+export type ChatEventType =
+  | 'session_start'
+  | 'session_end'
+  | 'handover_initiated'
+  | 'handover_completed'
+  | 'context_bridge_load'
+  | 'context_bridge_ref'
+  | 'lead_captured'
+  | 'error_occurred';
+
+export interface EventCreateInput {
+  conversation_id: string;
+  event_type: ChatEventType;
+  event_data?: Record<string, any>;
+}
+
+/**
+ * 이벤트 기록
+ */
+export async function createEvent(
+  supabase: SupabaseClient,
+  input: EventCreateInput
+): Promise<{ id: string } | null> {
+  const { data, error } = await supabase
+    .from('chat_events')
+    .insert({
+      conversation_id: input.conversation_id,
+      event_type: input.event_type,
+      event_data: input.event_data || {},
+    })
+    .select('id')
+    .single();
+
+  if (error) {
+    console.error('[chatEventLogger] createEvent error:', error);
+    return null;
+  }
+  return data;
+}
+
+/**
+ * 대화의 이벤트 이력 조회
+ */
+export async function getConversationEvents(
+  supabase: SupabaseClient,
+  conversationId: string,
+  eventType?: ChatEventType
+): Promise<any[]> {
+  let query = supabase
+    .from('chat_events')
+    .select('*')
+    .eq('conversation_id', conversationId)
+    .order('created_at', { ascending: true });
+
+  if (eventType) {
+    query = query.eq('event_type', eventType);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('[chatEventLogger] getConversationEvents error:', error);
+    return [];
+  }
+  return data || [];
+}
+
+/**
+ * 세션 시작 이벤트 기록 헬퍼
+ */
+export async function logSessionStart(
+  supabase: SupabaseClient,
+  conversationId: string,
+  metadata?: Record<string, any>
+): Promise<void> {
+  await createEvent(supabase, {
+    conversation_id: conversationId,
+    event_type: 'session_start',
+    event_data: metadata,
+  });
+}
+
+/**
+ * Context Bridge 로드 이벤트 기록 헬퍼
+ */
+export async function logContextBridgeLoad(
+  supabase: SupabaseClient,
+  conversationId: string,
+  sourceChannel: string,
+  loadedCount: number
+): Promise<void> {
+  await createEvent(supabase, {
+    conversation_id: conversationId,
+    event_type: 'context_bridge_load',
+    event_data: {
+      source_channel: sourceChannel,
+      loaded_conversations: loadedCount,
+    },
+  });
+}
+```
+
+#### 3.2.4 streamingResponse.ts
 
 ```typescript
 /**
@@ -277,7 +399,7 @@ export async function closeSSE(
 }
 ```
 
-#### 3.2.3 rateLimiter.ts
+#### 3.2.5 rateLimiter.ts
 
 ```typescript
 /**
@@ -373,6 +495,7 @@ supabase/functions/neuraltwin-assistant/
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.89.0';
 import { checkRateLimit, cleanupExpiredEntries } from '../_shared/rateLimiter.ts';
 import { createConversation, getConversation, saveMessage, getConversationMessages } from '../_shared/chatLogger.ts';
+import { logSessionStart } from '../_shared/chatEventLogger.ts';
 import { getOrCreateSession } from './utils/session.ts';
 import { createErrorResponse } from './utils/errorTypes.ts';
 
@@ -470,6 +593,14 @@ Deno.serve(async (req) => {
 
     if (!session) {
       return createErrorResponse('SESSION_ERROR', corsHeaders);
+    }
+
+    // 5-1. 새 세션이면 session_start 이벤트 기록
+    if (session.isNew) {
+      await logSessionStart(supabase, session.conversationId, {
+        page: context.page,
+        store_id: context.store.id,
+      });
     }
 
     // 6. 사용자 메시지 저장
@@ -721,20 +852,21 @@ export function getErrorAsAssistantMessage(code: AssistantErrorCode): string {
 
 ## 4. 완료 체크리스트
 
-### DB 마이그레이션
-- [ ] 마이그레이션 파일 생성 (`20260205000001_create_chat_tables.sql`)
-- [ ] `chat_channel` ENUM 타입 생성
-- [ ] `chat_conversations` 테이블 생성
-- [ ] `chat_messages` 테이블 생성
-- [ ] `chat_leads` 테이블 생성
-- [ ] `chat_daily_analytics` 테이블 생성
-- [ ] `assistant_command_cache` 테이블 생성
-- [ ] 인덱스 6개 생성
-- [ ] RLS 정책 4개 적용
-- [ ] 로컬 DB에서 마이그레이션 실행 확인
+### DB 존재 확인 (마이그레이션 불필요)
+- [ ] `chat_channel` ENUM 타입 존재 확인
+- [ ] `chat_conversations` 테이블 존재 확인
+- [ ] `chat_messages` 테이블 존재 확인
+- [ ] `chat_events` 테이블 존재 확인
+- [ ] `chat_leads` 테이블 존재 확인
+- [ ] `chat_daily_analytics` 테이블 존재 확인
+- [ ] `assistant_command_cache` 테이블 존재 확인
+- [ ] `handover_chat_session()` 함수 존재 확인
+- [ ] 인덱스 10개 존재 확인
+- [ ] RLS 정책 10개 존재 확인
 
 ### 공유 유틸리티
 - [ ] `_shared/chatLogger.ts` 생성
+- [ ] `_shared/chatEventLogger.ts` 생성 (chat_events 테이블 활용)
 - [ ] `_shared/streamingResponse.ts` 생성
 - [ ] `_shared/rateLimiter.ts` 생성
 
@@ -752,17 +884,25 @@ export function getErrorAsAssistantMessage(code: AssistantErrorCode): string {
 
 ## 5. 테스트 시나리오
 
-### 5.1 마이그레이션 테스트
+### 5.1 DB 존재 확인 테스트
 
 ```bash
-# 로컬 Supabase 시작
+# 로컬 Supabase 시작 (이미 마이그레이션 완료된 상태)
 supabase start
 
-# 마이그레이션 실행
-supabase db push
+# 테이블 존재 확인 (6개 테이블)
+supabase db execute "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'chat_%' ORDER BY table_name;"
 
-# 테이블 생성 확인
-supabase db execute "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'chat_%';"
+# 예상 결과:
+# assistant_command_cache
+# chat_conversations
+# chat_daily_analytics
+# chat_events
+# chat_leads
+# chat_messages
+
+# handover 함수 존재 확인
+supabase db execute "SELECT routine_name FROM information_schema.routines WHERE routine_name = 'handover_chat_session';"
 ```
 
 ### 5.2 Edge Function 테스트

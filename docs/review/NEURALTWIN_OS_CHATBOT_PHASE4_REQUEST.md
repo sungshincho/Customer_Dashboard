@@ -1,6 +1,6 @@
 # NEURALTWIN OS 챗봇 — Phase 4 기능 개발 요청서
 
-> **버전**: v1.0
+> **버전**: v1.1 (DB 스키마 v2.0 반영)
 > **작성일**: 2026-02-05
 > **선행 Phase**: Phase 3-A, 3-B, 3-C 완료 필수
 > **마스터 문서**: `NEURALTWIN_OS_CHATBOT_MASTER_REQUEST.md`
@@ -577,8 +577,9 @@ test.describe('NEURALTWIN OS 챗봇', () => {
 │                              └──────────────────────────────────┘  │
 │                                                                     │
 │  ┌─────────────────────────────────────────────────────────────┐   │
-│  │                    챗봇 전용 DB (신규 생성)                   │   │
-│  │  chat_conversations │ chat_messages │ chat_leads (추후)     │   │
+│  │          챗봇 전용 DB (웹사이트 팀에서 마이그레이션 완료)       │   │
+│  │  chat_conversations │ chat_messages │ chat_events           │   │
+│  │  chat_leads (웹사이트) │ chat_daily_analytics │ command_cache │   │
 │  └─────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────┘
 ```
