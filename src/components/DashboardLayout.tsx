@@ -272,6 +272,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           onWidthChange={setWidth}
           onSendMessage={sendMessage}
           onClearMessages={clearMessages}
+          disabled={isLoading || isStreaming}
         />
       </div>
     </SidebarProvider>

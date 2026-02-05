@@ -15,6 +15,7 @@ interface ChatPanelProps {
   onWidthChange: (width: number) => void;
   onSendMessage: (content: string) => void;
   onClearMessages: () => void;
+  disabled?: boolean;
 }
 
 export function ChatPanel({
@@ -26,6 +27,7 @@ export function ChatPanel({
   onWidthChange,
   onSendMessage,
   onClearMessages,
+  disabled = false,
 }: ChatPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -169,7 +171,7 @@ export function ChatPanel({
       </div>
 
       {/* 입력 영역 */}
-      <ChatInput onSend={onSendMessage} isDark={isDark} />
+      <ChatInput onSend={onSendMessage} isDark={isDark} disabled={disabled} />
     </div>
   );
 }
