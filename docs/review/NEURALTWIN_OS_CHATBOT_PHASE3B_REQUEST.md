@@ -1,9 +1,10 @@
 # NEURALTWIN OS 챗봇 — Phase 3-B 기능 개발 요청서
 
-> **버전**: v1.1
+> **버전**: v1.2 (인텐트 강화 반영)
 > **작성일**: 2026-02-05
 > **선행 Phase**: Phase 3-A (일반 대화 + AI 연동) 완료 필수
 > **마스터 문서**: `NEURALTWIN_OS_CHATBOT_MASTER_REQUEST.md`
+> **관련 문서**: `NEURALTWIN_OS_CHATBOT_INTENT_ENHANCEMENT_DESIGN.md`
 
 ---
 
@@ -16,7 +17,9 @@
 - 기존 daily_kpis_agg 테이블에서 데이터 조회
 - 조회 결과를 자연어로 변환하여 응답
 - **관련 탭으로 자동 이동** (예: 방문객 조회 → 인사이트 허브 고객탭)
-- **커스텀 날짜 범위 지원** (예: "12월 1-15일 매출 보여줘")
+- **커스텀 날짜 범위 지원** (예: "12월 1-15일 매출 보여줘", "25년 12월 첫째주 방문객")
+- **확장 KPI 조회** (목표 달성률, 체류 시간, 신규/재방문 비율)
+- **자연어 날짜 표현 지원** (12월 첫째주, 12월 초/중순/말, 연말/연초)
 
 ---
 
@@ -52,15 +55,20 @@ supabase/functions/neuraltwin-assistant/
 |:---|:---|:---|
 | `daily_kpis_agg` | 일별 KPI 집계 | store_id, date, total_revenue, total_visitors, conversion_rate 등 |
 
-### 3.3 쿼리 타입별 탭 매핑
+### 3.3 쿼리 타입별 탭 매핑 (확장됨)
 
-| 쿼리 타입 | 이동 페이지 | 이동 탭 |
-|:---|:---|:---|
-| `revenue` | /insights | overview |
-| `visitors` | /insights | customer |
-| `conversion` | /insights | overview |
-| `avgTransaction` | /insights | overview |
-| `summary` | /insights | overview |
+| 쿼리 타입 | 이동 페이지 | 이동 탭 | 섹션 (선택) |
+|:---|:---|:---|:---|
+| `revenue` | /insights | overview | kpi-cards |
+| `visitors` | /insights | customer | customer-kpi |
+| `conversion` | /insights | overview | kpi-cards |
+| `avgTransaction` | /insights | overview | kpi-cards |
+| `product` | /insights | product | product-performance |
+| `inventory` | /insights | inventory | inventory-status |
+| `goal` | /insights | overview | goal-achievement |
+| `dwellTime` | /insights | customer | customer-kpi |
+| `newVsReturning` | /insights | customer | customer-kpi |
+| `summary` | /insights | overview | kpi-cards |
 
 ### 3.4 patterns.ts — query_kpi 패턴 + 커스텀 날짜
 
@@ -186,6 +194,7 @@ return {
 |------|------|----------|
 | v1.0 | 2026-02-05 | 최초 작성 |
 | v1.1 | 2026-02-05 | 관련 탭 자동 이동 + 커스텀 날짜 범위 지원 추가 |
+| v1.2 | 2026-02-05 | 인텐트 강화 반영 - 자연어 날짜, 확장 쿼리 타입 (goal, dwellTime, newVsReturning) |
 
 ---
 
