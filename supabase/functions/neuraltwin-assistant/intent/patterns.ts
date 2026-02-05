@@ -153,6 +153,8 @@ function extractQueryType(text: string): string {
   if (/방문객|visitor|고객\s*수|트래픽/.test(normalizedText)) return 'visitors';
   if (/전환율|conversion|전환/.test(normalizedText)) return 'conversion';
   if (/객단가|거래\s*금액|평균\s*금액/.test(normalizedText)) return 'avgTransaction';
+  if (/상품|판매량|판매\s*수|product|sales/.test(normalizedText)) return 'product';
+  if (/재고|inventory|stock/.test(normalizedText)) return 'inventory';
   if (/성과|실적|현황|요약/.test(normalizedText)) return 'summary';
 
   return 'summary'; // 기본값
@@ -163,6 +165,15 @@ function extractPeriod(text: string): { type: string; startDate?: string; endDat
   const normalizedText = text.toLowerCase();
   const currentYear = new Date().getFullYear();
 
+  // 연도 추출: "25년", "2025년" 형식
+  let year = currentYear;
+  const yearMatch = text.match(/(\d{2,4})년/);
+  if (yearMatch) {
+    const parsedYear = parseInt(yearMatch[1], 10);
+    // 2자리 연도는 2000년대로 변환 (예: 25 → 2025)
+    year = parsedYear < 100 ? 2000 + parsedYear : parsedYear;
+  }
+
   // 커스텀 날짜 범위: "12월 1-15일" 또는 "12월 1일-15일"
   const koreanDateMatch = text.match(/(\d{1,2})월\s*(\d{1,2})일?\s*[-~]\s*(\d{1,2})일?/);
   if (koreanDateMatch) {
@@ -170,8 +181,8 @@ function extractPeriod(text: string): { type: string; startDate?: string; endDat
     const startDay = parseInt(koreanDateMatch[2], 10);
     const endDay = parseInt(koreanDateMatch[3], 10);
 
-    const startDate = `${currentYear}-${String(month).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
-    const endDate = `${currentYear}-${String(month).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
+    const startDate = `${year}-${String(month).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
+    const endDate = `${year}-${String(month).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
 
     return { type: 'custom', startDate, endDate };
   }
@@ -193,8 +204,8 @@ function extractPeriod(text: string): { type: string; startDate?: string; endDat
       endDay = parseInt(slashDateMatch[3], 10);
     }
 
-    const startDate = `${currentYear}-${String(startMonth).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
-    const endDate = `${currentYear}-${String(endMonth).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
+    const startDate = `${year}-${String(startMonth).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
+    const endDate = `${year}-${String(endMonth).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
 
     return { type: 'custom', startDate, endDate };
   }
