@@ -131,8 +131,8 @@ export function useActionDispatcher() {
       case 'set_date_range':
         // 날짜 필터 변경 - 여러 형식 지원
         if (action.preset) {
-          // 프리셋 형식
-          setPreset(action.preset);
+          // 프리셋 형식 - preset이 PresetPeriod 타입임을 명시
+          setPreset(action.preset as PresetPeriod);
         } else if (action.startDate && action.endDate) {
           // 직접 날짜 형식
           setCustomRange(action.startDate, action.endDate);
