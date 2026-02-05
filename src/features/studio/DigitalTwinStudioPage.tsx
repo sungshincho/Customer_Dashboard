@@ -9,7 +9,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { useActivityLogger } from '@/hooks/useActivityLogger';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -195,6 +195,16 @@ export default function DigitalTwinStudioPage() {
 
   // UI 상태
   const [activeTab, setActiveTab] = useState<TabType>('layer');
+  const [searchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get('tab') as TabType | null;
+
+  // URL 쿼리 파라미터로 탭 전환 (AI 어시스턴트 연동)
+  useEffect(() => {
+    if (tabFromUrl && ['layer', 'ai-simulation', 'ai-optimization', 'apply'].includes(tabFromUrl)) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [tabFromUrl]);
+
   const [models, setModels] = useState<ModelLayer[]>([]);
   const [activeLayers, setActiveLayers] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);

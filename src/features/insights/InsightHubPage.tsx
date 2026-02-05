@@ -8,6 +8,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { GlobalDateFilter } from '@/components/common/GlobalDateFilter';
@@ -251,6 +252,15 @@ function InsightHubContent({ activeTab, setActiveTab }: {
 // 메인 컴포넌트 - Provider로 감싸기
 export default function InsightHubPage() {
   const [activeTab, setActiveTab] = useState<InsightTabType>('overview');
+  const [searchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get('tab') as InsightTabType | null;
+
+  // URL 쿼리 파라미터로 탭 전환 (AI 어시스턴트 연동)
+  useEffect(() => {
+    if (tabFromUrl && ['overview', 'store', 'customer', 'product', 'inventory', 'prediction', 'ai'].includes(tabFromUrl)) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [tabFromUrl]);
 
   return (
     <DashboardLayout>

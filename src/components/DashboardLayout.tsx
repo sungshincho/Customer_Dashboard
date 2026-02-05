@@ -15,7 +15,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { ChatPanel, ChatToggleButton } from "@/components/chat/ChatPanel";
 import { useAuth } from "@/hooks/useAuth";
-import { useChatPanel } from "@/hooks/useChatPanel";
+import { useAssistantChat } from "@/hooks/useAssistantChat";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,7 +49,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   // 🔧 FIX: 초기값을 동기적으로 설정하여 깜빡임 방지
   const [isDark, setIsDark] = useState(getInitialDarkMode);
 
-  // 채팅 패널 상태
+  // 채팅 패널 상태 (AI 연동)
   const {
     isOpen: isChatOpen,
     width: chatWidth,
@@ -59,7 +59,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     setWidth,
     sendMessage,
     clearMessages,
-  } = useChatPanel();
+    isLoading,
+    isStreaming,
+  } = useAssistantChat();
 
   // 다크모드 감지 (런타임 변경 대응)
   useEffect(() => {
