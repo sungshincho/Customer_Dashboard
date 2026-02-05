@@ -6,6 +6,7 @@ import { getOrCreateSession } from './utils/session.ts';
 import { createErrorResponse } from './utils/errorTypes.ts';
 import { classifyIntent } from './intent/classifier.ts';
 import { dispatchNavigationAction, UIAction } from './actions/navigationActions.ts';
+import { handleGeneralChat } from './actions/chatActions.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -125,17 +126,26 @@ Deno.serve(async (req) => {
     // 7. 인텐트 분류 (Phase 2-A에서 구현)
     const classification = await classifyIntent(message, context);
 
-    // 8. 액션 실행 (Phase 2-B: set_tab, set_date_range, composite_navigate 추가)
+    // 8. 액션 실행 (Phase 3-A: general_chat 추가)
     let actionResult = { actions: [] as UIAction[], message: '', suggestions: [] as string[] };
     const currentPage = context.page.current;
 
     if (['navigate', 'set_tab', 'set_date_range', 'composite_navigate'].includes(classification.intent)) {
+      // 네비게이션 관련 인텐트
       actionResult = dispatchNavigationAction(classification, currentPage);
+    } else if (classification.intent === 'general_chat') {
+      // 일반 대화 (AI 응답)
+      const chatResult = await handleGeneralChat(message, [], context);
+      actionResult = {
+        actions: [],
+        message: chatResult.message,
+        suggestions: chatResult.suggestions,
+      };
     }
 
     // 9. 응답 생성
     const assistantMessage = actionResult.message ||
-      `[인텐트: ${classification.intent}] 메시지를 받았습니다: "${message}"`;
+      `메시지를 받았습니다. 아직 "${classification.intent}" 기능은 준비 중이에요.`;
     const suggestions = actionResult.suggestions.length > 0
       ? actionResult.suggestions
       : ['인사이트 허브로 이동', '오늘 매출 조회', '시뮬레이션 실행'];
