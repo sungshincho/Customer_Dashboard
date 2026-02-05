@@ -5,7 +5,7 @@
 
 import { useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useDateFilterStore } from '@/store/dateFilterStore';
+import { useDateFilterStore, type PresetPeriod } from '@/store/dateFilterStore';
 
 // 확장된 UIAction 타입 정의
 export interface UIAction {
@@ -21,7 +21,7 @@ export interface UIAction {
     | 'run_simulation'
     | 'run_optimization';
   target?: string | { startDate: string; endDate: string };
-  preset?: string;
+  preset?: PresetPeriod;
   startDate?: string;
   endDate?: string;
   sectionId?: string;
