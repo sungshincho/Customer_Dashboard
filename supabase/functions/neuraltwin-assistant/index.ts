@@ -131,8 +131,8 @@ Deno.serve(async (req) => {
     let actionResult = { actions: [] as UIAction[], message: '', suggestions: [] as string[] };
     const currentPage = context.page.current;
 
-    if (['navigate', 'set_tab', 'set_date_range', 'composite_navigate'].includes(classification.intent)) {
-      // 네비게이션 관련 인텐트
+    if (['navigate', 'set_tab', 'set_date_range', 'composite_navigate', 'scroll_to_section', 'open_modal'].includes(classification.intent)) {
+      // 네비게이션 관련 인텐트 (Phase 3-B+: scroll_to_section, open_modal 추가)
       actionResult = dispatchNavigationAction(classification, currentPage);
     } else if (classification.intent === 'query_kpi') {
       // KPI 데이터 조회 (Phase 3-B)

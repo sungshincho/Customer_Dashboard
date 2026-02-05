@@ -1,20 +1,27 @@
 # NEURALTWIN OS 챗봇 — Phase 3-B 개발 결과서
 
-> **버전**: v1.1
+> **버전**: v1.2 (인텐트 강화 반영)
 > **작성일**: 2026-02-05
 > **개발자**: Claude AI Assistant
 > **선행 Phase**: Phase 3-A 완료
+> **관련 문서**: `NEURALTWIN_OS_CHATBOT_INTENT_ENHANCEMENT_DESIGN.md`
 
 ---
 
 ## 1. 개발 완료 요약
 
-Phase 3-B **KPI 조회(query_kpi)** 기능 구현 완료:
+Phase 3-B **KPI 조회(query_kpi) + 인텐트 강화** 기능 구현 완료:
 - "오늘 매출 얼마야?", "방문객 몇 명이야?" 질문에 실제 DB 데이터로 응답
 - daily_kpis_agg 테이블에서 데이터 조회
 - 전일 대비 변화율 계산 및 자연어 응답 생성
 - **관련 탭으로 자동 이동** (방문객 → 고객탭, 매출 → 개요탭)
 - **커스텀 날짜 범위 지원** ("12월 1-15일", "12/1~15" 형식)
+- **인텐트 강화 적용**:
+  - 자연어 날짜 표현 (12월 첫째주, 12월 초/중순/말, 연말/연초)
+  - 연도 파싱 ("25년 12월" → 2025년)
+  - 확장 쿼리 타입 (goal, dwellTime, newVsReturning)
+  - 대시보드 구조 정의 및 용어-위치 매핑
+  - scroll_to_section, open_modal 인텐트 추가
 
 ---
 

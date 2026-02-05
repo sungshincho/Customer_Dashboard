@@ -1,8 +1,8 @@
 # NEURALTWIN OS 챗봇 — 기능 개발 요청서 (마스터)
 
-> **버전**: v1.2 (DB 스키마 v2.0 반영)
+> **버전**: v1.3 (인텐트 강화 반영)
 > **작성일**: 2026-02-05
-> **상태**: 검토 완료, 8단계 분할 확정
+> **상태**: 검토 완료, 8단계 분할 확정 + 인텐트 강화 적용
 > **대상**: Claude Code (개발 실행 에이전트)
 > **DB 상태**: 웹사이트 챗봇 팀에서 마이그레이션 완료 (6개 테이블 이미 존재)
 
@@ -97,13 +97,53 @@ navigate('/studio?tab=ai-simulation');
 | `set_tab` | "고객탭 보여줘", "AI추천 탭 열어줘" | 특정 탭 활성화 | P0 |
 | `set_date_range` | "11/4~11/15 기간으로 설정해줘" | 날짜 필터 변경 (Zustand store) | P0 |
 | `composite_navigate` | "인사이트 허브에서 11/4~11/15 개요탭 보여줘" | 페이지 이동 + 날짜 설정 + 탭 전환 복합 | P0 |
-| `open_dialog` | "새 연결 추가해줘", "API 연동하고 싶어" | 특정 다이얼로그/모달 팝업 | P1 |
+| `scroll_to_section` | "KPI 카드 보여줘", "트렌드 차트 확인" | 특정 섹션으로 스크롤 + 하이라이트 | P1 |
+| `open_modal` | "목표 설정하기", "사용자 초대" | 특정 모달/다이얼로그 열기 | P1 |
 | `run_simulation` | "크리스마스 시뮬레이션 돌려줘" | 기존 `run-simulation` EF 호출 | P1 |
 | `run_optimization` | "가구 배치 최적화 해줘" | 기존 `generate-optimization` EF 호출 | P1 |
-| `query_kpi` | "오늘 매출 얼마야?" | 기존 DB 테이블 직접 쿼리 → 결과 반환 | P1 |
+| `query_kpi` | "오늘 매출 얼마야?", "목표 달성률 어때?" | 기존 DB 테이블 직접 쿼리 → 결과 반환 | P1 |
 | `general_chat` | "안녕", "뭐 할 수 있어?" | 일반 대화 응답 | P0 |
 
-### 4.2 초기 버전에서 구현하지 않는 것
+### 4.2 인텐트 강화 (Phase 3-B+)
+
+인텐트 분류 및 엔티티 추출 정확도 향상을 위해 다음 기능들이 추가되었습니다:
+
+#### 4.2.1 날짜 표현 Variation 확대
+
+| 카테고리 | 지원 표현 예시 |
+|:---|:---|
+| 절대 날짜 | "12월 1일", "12월 1-10일", "12월 1일부터 10일까지", "12/1~15", "25년 12월" |
+| 상대 날짜 | "오늘", "어제", "그제", "이번 주", "지난 주", "이번 달", "지난 달" |
+| 상대 기간 | "최근 7일", "지난 일주일", "최근 30일", "지난 3개월" |
+| 자연어 기간 | "12월 첫째주", "12월 초", "12월 중순", "12월 말", "연말", "연초" |
+
+#### 4.2.2 대시보드 용어 인식
+
+| 용어 | Primary 위치 | Secondary 위치 |
+|:---|:---|:---|
+| 순 방문객 | 고객탭 (customer-kpi) | 개요탭 (kpi-cards) |
+| 매출 | 개요탭 (kpi-cards) | 상품탭, ROI |
+| 전환율 | 개요탭 (kpi-cards) | 고객탭 |
+| 목표 달성률 | 개요탭 (goal-achievement) | - |
+| 체류 시간 | 고객탭 (customer-kpi) | 매장탭 |
+
+#### 4.2.3 확장된 UIAction 타입
+
+| 액션 타입 | 설명 |
+|:---|:---|
+| `scroll_to_section` | 특정 섹션으로 스크롤 + 하이라이트 |
+| `open_modal` | 특정 모달/다이얼로그 열기 |
+| `highlight_element` | 특정 요소 하이라이트 |
+| `show_tooltip` | 툴팁 표시 |
+
+#### 4.2.4 조건부 응답
+
+- `goal` 쿼리: 목표 설정 여부에 따라 다른 응답
+- `inventory_alerts` 쿼리: 알림 데이터 유무에 따라 다른 응답
+
+관련 설계 문서: `docs/review/NEURALTWIN_OS_CHATBOT_INTENT_ENHANCEMENT_DESIGN.md`
+
+### 4.3 초기 버전에서 구현하지 않는 것
 
 - Context Bridge (웹사이트 챗봇 연동)
 - 인라인 미니차트/시각화 렌더링
@@ -180,13 +220,15 @@ supabase/functions/neuraltwin-assistant/
 ├── index.ts
 ├── intent/
 │   ├── classifier.ts
-│   ├── patterns.ts
-│   └── entityExtractor.ts
+│   ├── patterns.ts              # 인텐트 강화: 날짜 variation, 용어 인식
+│   └── entityExtractor.ts       # 인텐트 강화: 날짜 추출 로직 확장
 ├── actions/
-│   ├── navigationActions.ts
+│   ├── navigationActions.ts     # 인텐트 강화: scroll_to_section, open_modal 추가
 │   ├── executionActions.ts
-│   ├── queryActions.ts
+│   ├── queryActions.ts          # 인텐트 강화: goal, dwellTime, newVsReturning 추가
 │   └── chatActions.ts
+├── config/
+│   └── dashboardStructure.ts    # 인텐트 강화: 대시보드 구조, 용어-위치 매핑
 ├── response/
 │   └── generator.ts
 └── utils/
