@@ -380,7 +380,7 @@ export function OverviewTab() {
   return (
     <div className="space-y-6">
       {/* KPI 카드 */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div id="overview-kpi-cards" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           icon={<Users className="h-5 w-5" style={{ color: iconColor }} />}
           labelEn="FOOTFALL" label="총 입장"
@@ -428,6 +428,7 @@ export function OverviewTab() {
 
       {/* 고객 여정 퍼널 */}
       {metrics?.funnel && (
+        <div id="overview-funnel">
         <GlassCard dark={isDark}>
           <div style={{ padding: '24px' }}>
             <div style={{ marginBottom: '16px' }}>
@@ -483,15 +484,17 @@ export function OverviewTab() {
             </div>
           </div>
         </GlassCard>
+        </div>
       )}
 
       {/* 목표 달성률 & AI 추천 효과 */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div id="overview-goals" className="grid gap-6 lg:grid-cols-2">
         <GoalProgressWidget />
         <AIRecommendationEffectWidget />
       </div>
 
       {/* 오늘의 AI 인사이트 */}
+      <div id="overview-insights">
       <GlassCard dark={isDark}>
         <div style={{ padding: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
@@ -589,6 +592,7 @@ export function OverviewTab() {
           </div>
         </div>
       </GlassCard>
+      </div>
     </div>
   );
 }

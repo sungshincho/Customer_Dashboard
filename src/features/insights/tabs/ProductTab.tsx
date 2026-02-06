@@ -684,7 +684,7 @@ export function ProductTab() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div id="product-kpi-cards" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Glass3DCard dark={isDark}>
           <div className="p-6">
             <div className="flex items-center gap-3 mb-4">
@@ -738,7 +738,7 @@ export function ProductTab() {
         </div>
       )}
 
-      <Glass3DCard dark={isDark}>
+      <Glass3DCard dark={isDark} id="product-top10">
         <div className="p-6">
           <h3 style={{ fontSize: '16px', marginBottom: '4px', ...text3D.number }}>상품별 매출 TOP 10</h3>
           <p style={{ fontSize: '12px', marginBottom: '20px', ...text3D.body }}>매출 기준 상위 10개 상품</p>
@@ -751,7 +751,7 @@ export function ProductTab() {
       </Glass3DCard>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Glass3DCard dark={isDark}>
+        <Glass3DCard dark={isDark} id="product-category-revenue">
           <div className="p-6">
             <h3 style={{ fontSize: '16px', marginBottom: '4px', ...text3D.number }}>카테고리별 매출 분포</h3>
             <p style={{ fontSize: '12px', marginBottom: '20px', ...text3D.body }}>카테고리별 매출 비율</p>
@@ -762,7 +762,7 @@ export function ProductTab() {
             )}
           </div>
         </Glass3DCard>
-        <Glass3DCard dark={isDark}>
+        <Glass3DCard dark={isDark} id="product-category-quantity">
           <div className="p-6">
             <h3 style={{ fontSize: '16px', marginBottom: '4px', ...text3D.number }}>카테고리별 판매량</h3>
             <p style={{ fontSize: '12px', marginBottom: '20px', ...text3D.body }}>카테고리별 판매 수량</p>

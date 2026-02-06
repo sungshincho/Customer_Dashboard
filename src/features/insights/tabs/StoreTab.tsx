@@ -664,7 +664,7 @@ export function StoreTab() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div id="store-kpi-cards" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Glass3DCard dark={isDark}>
           <div className="p-6">
             <div className="flex items-center gap-3 mb-4">
@@ -719,7 +719,7 @@ export function StoreTab() {
       )}
 
       <Glass3DCard dark={isDark}>
-        <div className="p-6">
+        <div id="store-hourly-pattern" className="p-6">
           <h3 style={{ fontSize: '16px', marginBottom: '4px', ...text3D.number }}>시간대별 방문 패턴</h3>
           <p style={{ fontSize: '12px', marginBottom: '20px', ...text3D.body }}>시간대별 입장 횟수</p>
           {hourlyData && hourlyData.some(h => h.visitors > 0) ? (
@@ -732,7 +732,7 @@ export function StoreTab() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Glass3DCard dark={isDark}>
-          <div className="p-6">
+          <div id="store-zone-dwell" className="p-6">
             <h3 style={{ fontSize: '16px', marginBottom: '4px', ...text3D.number }}>존별 체류시간</h3>
             <p style={{ fontSize: '12px', marginBottom: '20px', ...text3D.body }}>각 존별 평균 체류시간 (분)</p>
             {zoneData && zoneData.length > 0 ? (
@@ -743,7 +743,7 @@ export function StoreTab() {
           </div>
         </Glass3DCard>
         <Glass3DCard dark={isDark}>
-          <div className="p-6">
+          <div id="store-zone-distribution" className="p-6">
             <h3 style={{ fontSize: '16px', marginBottom: '4px', ...text3D.number }}>존별 방문자 분포</h3>
             <p style={{ fontSize: '12px', marginBottom: '20px', ...text3D.body }}>각 존별 방문자 비율</p>
             {zoneData && zoneData.length > 0 ? (
@@ -756,7 +756,7 @@ export function StoreTab() {
       </div>
 
       <Glass3DCard dark={isDark}>
-        <div className="p-6">
+        <div id="store-zone-performance" className="p-6">
           <h3 style={{ fontSize: '16px', marginBottom: '20px', ...text3D.number }}>존별 성과 비교</h3>
           {zoneData && zoneData.length > 0 ? (
             <div className="overflow-x-auto">

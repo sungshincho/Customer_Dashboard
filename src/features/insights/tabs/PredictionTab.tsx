@@ -63,8 +63,8 @@ const getText3D = (isDark: boolean) => ({
   } as React.CSSProperties,
 });
 
-const GlassCard = ({ children, dark = false, className = '' }: { children: React.ReactNode; dark?: boolean; className?: string }) => (
-  <div style={{ perspective: '1200px', height: '100%' }} className={className}>
+const GlassCard = ({ children, dark = false, className = '', id }: { children: React.ReactNode; dark?: boolean; className?: string; id?: string }) => (
+  <div id={id} style={{ perspective: '1200px', height: '100%' }} className={className}>
     <div style={{
       borderRadius: '24px', padding: '1.5px',
       background: dark
@@ -688,7 +688,7 @@ export function PredictionTab() {
       </div>
 
       {/* 요약 카드 4개 */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div id="prediction-kpi-cards" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <GlassCard dark={isDark}>
           <div style={{ padding: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
@@ -743,7 +743,7 @@ export function PredictionTab() {
       </div>
 
       {/* 매출 예측 차트 */}
-      <GlassCard dark={isDark}>
+      <GlassCard dark={isDark} id="prediction-revenue">
         <div style={{ padding: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
             <Sparkles className="h-5 w-5" style={{ color: iconColor }} />
@@ -756,7 +756,7 @@ export function PredictionTab() {
 
       {/* 방문자 & 전환율 예측 */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <GlassCard dark={isDark}>
+        <GlassCard dark={isDark} id="prediction-visitors">
           <div style={{ padding: '24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
               <Users className="h-5 w-5" style={{ color: iconColor }} />
@@ -767,7 +767,7 @@ export function PredictionTab() {
           </div>
         </GlassCard>
 
-        <GlassCard dark={isDark}>
+        <GlassCard dark={isDark} id="prediction-conversion">
           <div style={{ padding: '24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
               <Percent className="h-5 w-5" style={{ color: iconColor }} />
@@ -780,7 +780,7 @@ export function PredictionTab() {
       </div>
 
       {/* 일별 예측 상세 테이블 */}
-      <GlassCard dark={isDark}>
+      <GlassCard dark={isDark} id="prediction-daily">
         <div style={{ padding: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
             <Calendar className="h-5 w-5" style={{ color: iconColor }} />
@@ -842,7 +842,7 @@ export function PredictionTab() {
       </GlassCard>
 
       {/* 예측 모델 정보 */}
-      <GlassCard dark={isDark}>
+      <GlassCard dark={isDark} id="prediction-model">
         <div style={{ padding: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
             <Info className="h-5 w-5" style={{ color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }} />

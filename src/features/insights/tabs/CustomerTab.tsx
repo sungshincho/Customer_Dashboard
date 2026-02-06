@@ -976,7 +976,7 @@ export function CustomerTab() {
   return (
     <div className="space-y-6">
       {/* 요약 카드 */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div id="customer-kpi-cards" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Glass3DCard dark={isDark}>
           <div className="p-6">
             <div className="flex items-center gap-3 mb-4">
@@ -1060,7 +1060,7 @@ export function CustomerTab() {
       {/* 고객 세그먼트 분포 + 세그먼트별 평균 구매액 */}
       <div className="grid gap-6 lg:grid-cols-2">
         <Glass3DCard dark={isDark}>
-          <div className="p-6">
+          <div id="customer-segment-distribution" className="p-6">
             <h3 style={{ fontSize: '16px', marginBottom: '4px', ...text3D.number }}>고객 세그먼트 분포</h3>
             <p style={{ fontSize: '12px', marginBottom: '20px', ...text3D.body }}>세그먼트별 고객 수</p>
             {segmentData && segmentData.length > 0 ? (
@@ -1072,7 +1072,7 @@ export function CustomerTab() {
         </Glass3DCard>
 
         <Glass3DCard dark={isDark}>
-          <div className="p-6">
+          <div id="customer-avg-purchase" className="p-6">
             <h3 style={{ fontSize: '16px', marginBottom: '4px', ...text3D.number }}>세그먼트별 평균 구매액</h3>
             <p style={{ fontSize: '12px', marginBottom: '20px', ...text3D.body }}>고객 세그먼트별 평균 구매 금액</p>
             {segmentData && segmentData.length > 0 ? (
@@ -1086,7 +1086,7 @@ export function CustomerTab() {
 
       {/* 재방문 추이 */}
       <Glass3DCard dark={isDark}>
-        <div className="p-6">
+        <div id="customer-return-trend" className="p-6">
           <div className="flex justify-between items-start mb-5">
             <div>
               <h3 style={{ fontSize: '16px', marginBottom: '4px', ...text3D.number }}>재방문 추이</h3>

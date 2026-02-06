@@ -17,6 +17,7 @@ interface Glass3DCardProps {
   className?: string;
   dark?: boolean;
   style?: React.CSSProperties;
+  id?: string;
 }
 
 export const Glass3DCard: React.FC<Glass3DCardProps> = ({
@@ -24,9 +25,10 @@ export const Glass3DCard: React.FC<Glass3DCardProps> = ({
   className,
   dark = false,
   style,
+  id,
 }) => {
   return (
-    <div className="perspective-1200">
+    <div id={id} className="perspective-1200">
       <div
         className={cn(
           'rounded-3xl p-[1.5px] h-full',

@@ -526,6 +526,7 @@ export function AIRecommendationTab() {
       </div>
 
       {/* 진행 중인 전략 */}
+      <div id="ai-active-strategies">
       <GlassCard dark={isDark}>
         <div style={{ padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
@@ -592,12 +593,13 @@ export function AIRecommendationTab() {
           ))}
         </div>
       </GlassCard>
+      </div>
 
       {/* 구분선 */}
       <div style={{ height: '1px', background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }} />
 
       {/* 1단계: 예측 */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div id="ai-predict" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{
             width: '24px', height: '24px', borderRadius: '50%',
@@ -698,7 +700,7 @@ export function AIRecommendationTab() {
       <div style={{ height: '1px', background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }} />
 
       {/* 2단계: 최적화 */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div id="ai-optimize" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{
             width: '24px', height: '24px', borderRadius: '50%',
@@ -849,7 +851,7 @@ export function AIRecommendationTab() {
       <div style={{ height: '1px', background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }} />
 
       {/* 3단계: 추천 */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div id="ai-recommend" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{
             width: '24px', height: '24px', borderRadius: '50%',
@@ -978,7 +980,7 @@ export function AIRecommendationTab() {
       </div>
 
       {/* ROI 측정 바로가기 */}
-      <div style={{
+      <div id="ai-execute" style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         padding: '24px', borderRadius: '16px',
         background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',

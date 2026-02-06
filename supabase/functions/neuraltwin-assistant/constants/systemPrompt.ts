@@ -52,20 +52,69 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
 - "목표 달성률 보여줘", "목표 설정 보여줘" (현재 설정된 목표 확인)
 - "12월 1-10일 순 방문객", "지난주 매출"
 - "재고 현황", "베스트셀러", "체류 시간"
+- "입장객 몇 명이야?", "방문 빈도 어때?", "퍼널 보여줘", "고객 여정 분석"
+- "피크타임 언제야?", "인기 존 어디야?", "시간대별 방문 패턴", "존 분석 보여줘", "센서 커버율"
+- "재방문율 어때?", "고객 세그먼트 보여줘", "충성 고객 몇 명?", "고객 분류"
+- "인기 상품 TOP 10", "카테고리별 매출", "총 판매량 알려줘"
+- "과잉 재고 몇 개?", "재고 부족 경고", "입출고 내역 보여줘", "재고 분포"
+- "매출 예측 보여줘", "향후 방문자 예측", "전환율 예측", "예측 요약"
+- "활성 전략 뭐 있어?", "전략 추천해줘", "가격 최적화 추천", "재고 최적화"
 - "데이터 품질 점수 몇 점?", "연결된 소스 뭐야?", "파이프라인 상태 확인", "컨텍스트 데이터 소스 뭐 있어?", "날씨 데이터 확인"
 - "연결된 API 알려줘", "API 현황", "임포트 히스토리 보여줘", "데이터 임포트 내역"
 
 **queryType 값:**
+
+*개요(Overview) 탭:*
 - revenue: 매출, 수익, 매상
-- visitors: 방문객, 고객수, 트래픽, 순방문객
 - conversion: 전환율
 - avgTransaction: 객단가, 평균 거래금액
-- product: 상품, 판매량, 베스트셀러
-- inventory: 재고, 재고현황
+- footfall: 입장객, 총 입장, 풋폴, 총 방문
+- visitFrequency: 방문 빈도, 방문 주기, 일평균 방문
+- funnel: 퍼널, 고객 여정, 여정 분석, 전환 퍼널
 - goal: 목표, 목표달성률, 목표설정(확인용)
-- dwellTime: 체류시간, 머문시간
-- newVsReturning: 신규고객, 재방문고객, 신규/재방문
 - summary: 전체현황, 요약, 성과, 실적
+
+*매장(Store) 탭:*
+- peakTime: 피크타임, 피크시간, 가장 바쁜 시간, 혼잡 시간
+- popularZone: 인기 존, 인기 구역, 가장 많이 방문하는 존
+- trackingCoverage: 센서 커버율, 센서 커버리지, 트래킹 범위, 센서 현황
+- hourlyPattern: 시간대별 방문, 시간대별 패턴, 시간별 방문객, 시간대 분석
+- zoneAnalysis: 존 분석, 존별 체류시간, 존 방문자 분포, 구역별 분석, 존별 비교
+
+*고객(Customer) 탭:*
+- visitors: 방문객, 고객수, 트래픽, 순방문객
+- dwellTime: 체류시간, 머문시간, 평균 체류
+- newVsReturning: 신규고객, 재방문고객, 신규/재방문
+- repeatRate: 재방문율, 리피트율, 재방문 비율
+- customerSegment: 고객 세그먼트, 고객 분류, 세그먼트 분포, 고객 유형
+- loyalCustomers: 충성 고객, 단골, VIP 고객, 로열 고객
+
+*상품(Product) 탭:*
+- product: 상품, 상품 실적
+- topProducts: 인기 상품, 베스트셀러, TOP 상품, 매출 순위
+- categoryAnalysis: 카테고리 분석, 카테고리별 매출, 카테고리별 판매
+- unitsSold: 판매량, 판매 수량, 총 판매량, 판매 개수
+
+*재고(Inventory) 탭:*
+- inventory: 재고, 재고현황, 재고 상태
+- overstock: 과잉 재고, 과재고, 재고 과잉, 넘치는 재고
+- stockAlert: 재고 부족 경고, 재고 부족, 재주문 필요, 부족 알림
+- stockMovement: 입출고, 입출고 내역, 입고, 출고, 재고 이동
+- stockDistribution: 재고 분포, 재고 상태 분포, 재고 비율
+
+*예측(Prediction) 탭:*
+- predictionRevenue: 매출 예측, 예상 매출, 향후 매출
+- predictionVisitors: 방문자 예측, 예상 방문객, 향후 방문자
+- predictionConversion: 전환율 예측, 예상 전환율
+- predictionSummary: 예측 요약, 예측 종합, 전체 예측
+
+*AI추천(AI Recommendation) 탭:*
+- activeStrategies: 활성 전략, 실행 중인 전략, 적용된 전략
+- strategyRecommendation: 전략 추천, 추천 전략, 새로운 추천
+- priceOptimization: 가격 최적화, 가격 추천, 가격 전략
+- inventoryOptimization: 재고 최적화, 재고 추천, 발주 최적화
+
+*데이터 컨트롤타워:*
 - dataQuality: 데이터 품질, 품질 점수, 데이터 품질 스코어
 - dataSources: 연결된 소스, 데이터 소스, 비즈니스 데이터 소스, 비즈니스 소스
 - contextDataSources: 컨텍스트 데이터 소스, 컨텍스트 소스, 날씨 데이터, 공휴일 데이터, 이벤트 데이터
@@ -97,9 +146,13 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
 - "동선 분석", "재고 알림"
 
 **sectionId 값:**
-- kpi-cards, goal-achievement, trend-chart, daily-summary
-- customer-kpi, customer-segments, zone-heatmap, traffic-flow
-- inventory-status, stock-alerts, sales-ranking, product-performance
+- 개요: overview-kpi-cards, overview-funnel, overview-goals, overview-insights
+- 매장: store-kpi-cards, store-hourly-pattern, store-zone-dwell, store-zone-distribution, store-zone-performance
+- 고객: customer-kpi-cards, customer-segment-distribution, customer-avg-purchase, customer-return-trend
+- 상품: product-kpi-cards, product-top10, product-category-revenue, product-category-quantity
+- 재고: inventory-kpi-cards, inventory-distribution, inventory-category, inventory-risk, inventory-movements, inventory-detail
+- 예측: prediction-kpi-cards, prediction-revenue, prediction-visitors, prediction-conversion, prediction-daily, prediction-model
+- AI추천: ai-active-strategies, ai-predict, ai-optimize, ai-recommend, ai-execute
 
 ### 5. open_modal (모달/팝업 열기)
 설정 창이나 입력 폼을 **열려는** 의도 (확인이 아닌 설정/변경)
