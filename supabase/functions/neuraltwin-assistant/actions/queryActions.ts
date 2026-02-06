@@ -29,16 +29,49 @@ export interface PageContext {
  * 쿼리 타입별 관련 탭 매핑 (확장됨)
  */
 const QUERY_TYPE_TO_TAB: Record<string, { page: string; tab?: string; section?: string }> = {
-  revenue: { page: '/insights', tab: 'overview', section: 'kpi-cards' },
-  visitors: { page: '/insights', tab: 'customer', section: 'customer-kpi' },
-  conversion: { page: '/insights', tab: 'overview', section: 'kpi-cards' },
-  avgTransaction: { page: '/insights', tab: 'overview', section: 'kpi-cards' },
-  product: { page: '/insights', tab: 'product', section: 'product-performance' },
-  inventory: { page: '/insights', tab: 'inventory', section: 'inventory-status' },
-  goal: { page: '/insights', tab: 'overview', section: 'goal-achievement' },
-  dwellTime: { page: '/insights', tab: 'customer', section: 'customer-kpi' },
-  newVsReturning: { page: '/insights', tab: 'customer', section: 'customer-kpi' },
-  summary: { page: '/insights', tab: 'overview', section: 'kpi-cards' },
+  // 개요(Overview) 탭
+  revenue: { page: '/insights', tab: 'overview', section: 'overview-kpi-cards' },
+  conversion: { page: '/insights', tab: 'overview', section: 'overview-kpi-cards' },
+  avgTransaction: { page: '/insights', tab: 'overview', section: 'overview-kpi-cards' },
+  footfall: { page: '/insights', tab: 'overview', section: 'overview-kpi-cards' },
+  visitFrequency: { page: '/insights', tab: 'overview', section: 'overview-kpi-cards' },
+  funnel: { page: '/insights', tab: 'overview', section: 'overview-funnel' },
+  goal: { page: '/insights', tab: 'overview', section: 'overview-goals' },
+  summary: { page: '/insights', tab: 'overview', section: 'overview-kpi-cards' },
+  // 매장(Store) 탭
+  peakTime: { page: '/insights', tab: 'store', section: 'store-kpi-cards' },
+  popularZone: { page: '/insights', tab: 'store', section: 'store-zone-performance' },
+  trackingCoverage: { page: '/insights', tab: 'store', section: 'store-kpi-cards' },
+  hourlyPattern: { page: '/insights', tab: 'store', section: 'store-hourly-pattern' },
+  zoneAnalysis: { page: '/insights', tab: 'store', section: 'store-zone-dwell' },
+  // 고객(Customer) 탭
+  visitors: { page: '/insights', tab: 'customer', section: 'customer-kpi-cards' },
+  dwellTime: { page: '/insights', tab: 'customer', section: 'customer-kpi-cards' },
+  newVsReturning: { page: '/insights', tab: 'customer', section: 'customer-kpi-cards' },
+  repeatRate: { page: '/insights', tab: 'customer', section: 'customer-kpi-cards' },
+  customerSegment: { page: '/insights', tab: 'customer', section: 'customer-segment-distribution' },
+  loyalCustomers: { page: '/insights', tab: 'customer', section: 'customer-kpi-cards' },
+  // 상품(Product) 탭
+  product: { page: '/insights', tab: 'product', section: 'product-kpi-cards' },
+  topProducts: { page: '/insights', tab: 'product', section: 'product-top10' },
+  categoryAnalysis: { page: '/insights', tab: 'product', section: 'product-category-revenue' },
+  unitsSold: { page: '/insights', tab: 'product', section: 'product-kpi-cards' },
+  // 재고(Inventory) 탭
+  inventory: { page: '/insights', tab: 'inventory', section: 'inventory-kpi-cards' },
+  overstock: { page: '/insights', tab: 'inventory', section: 'inventory-kpi-cards' },
+  stockAlert: { page: '/insights', tab: 'inventory', section: 'inventory-risk' },
+  stockMovement: { page: '/insights', tab: 'inventory', section: 'inventory-movements' },
+  stockDistribution: { page: '/insights', tab: 'inventory', section: 'inventory-distribution' },
+  // 예측(Prediction) 탭
+  predictionRevenue: { page: '/insights', tab: 'prediction', section: 'prediction-revenue' },
+  predictionVisitors: { page: '/insights', tab: 'prediction', section: 'prediction-visitors' },
+  predictionConversion: { page: '/insights', tab: 'prediction', section: 'prediction-conversion' },
+  predictionSummary: { page: '/insights', tab: 'prediction', section: 'prediction-kpi-cards' },
+  // AI추천(AI Recommendation) 탭
+  activeStrategies: { page: '/insights', tab: 'ai-recommendation', section: 'ai-active-strategies' },
+  strategyRecommendation: { page: '/insights', tab: 'ai-recommendation', section: 'ai-recommend' },
+  priceOptimization: { page: '/insights', tab: 'ai-recommendation', section: 'ai-optimize' },
+  inventoryOptimization: { page: '/insights', tab: 'ai-recommendation', section: 'ai-optimize' },
   // 데이터 컨트롤타워 쿼리 (탭 없음)
   dataQuality: { page: '/data/control-tower', section: 'data-sources' },
   dataSources: { page: '/data/control-tower', section: 'data-sources' },
@@ -53,16 +86,49 @@ const QUERY_TYPE_TO_TAB: Record<string, { page: string; tab?: string; section?: 
  */
 function getTermKeyword(queryType: string): string {
   const termMap: Record<string, string> = {
-    visitors: '방문객',
+    // 개요
     revenue: '매출',
     conversion: '전환율',
     avgTransaction: '객단가',
-    product: '상품',
-    inventory: '재고',
+    footfall: '입장객',
+    visitFrequency: '방문 빈도',
+    funnel: '고객 여정 퍼널',
     goal: '목표 달성률',
+    summary: '매출',
+    // 매장
+    peakTime: '피크타임',
+    popularZone: '인기 존',
+    trackingCoverage: '센서 커버율',
+    hourlyPattern: '시간대별 방문',
+    zoneAnalysis: '존 분석',
+    // 고객
+    visitors: '방문객',
     dwellTime: '체류 시간',
     newVsReturning: '방문객',
-    summary: '매출',
+    repeatRate: '재방문율',
+    customerSegment: '고객 세그먼트',
+    loyalCustomers: '충성 고객',
+    // 상품
+    product: '상품',
+    topProducts: '인기 상품',
+    categoryAnalysis: '카테고리 분석',
+    unitsSold: '판매량',
+    // 재고
+    inventory: '재고',
+    overstock: '과잉 재고',
+    stockAlert: '재고 부족 경고',
+    stockMovement: '입출고 내역',
+    stockDistribution: '재고 분포',
+    // 예측
+    predictionRevenue: '매출 예측',
+    predictionVisitors: '방문자 예측',
+    predictionConversion: '전환율 예측',
+    predictionSummary: '예측 요약',
+    // AI추천
+    activeStrategies: '활성 전략',
+    strategyRecommendation: '전략 추천',
+    priceOptimization: '가격 최적화',
+    inventoryOptimization: '재고 최적화',
   };
   return termMap[queryType] || '매출';
 }
@@ -164,48 +230,95 @@ export async function handleQueryKpi(
     const dateRange = getDateRange(period);
 
     switch (queryType) {
+      // 개요(Overview) 탭
       case 'revenue':
         return await queryRevenue(supabase, storeId, dateRange, pageContext);
-
-      case 'visitors':
-        return await queryVisitors(supabase, storeId, dateRange, pageContext);
-
       case 'conversion':
         return await queryConversion(supabase, storeId, dateRange, pageContext);
-
       case 'avgTransaction':
         return await queryAvgTransaction(supabase, storeId, dateRange, pageContext);
-
-      case 'product':
-        return await queryProduct(supabase, storeId, dateRange, pageContext);
-
-      case 'inventory':
-        return await queryInventory(supabase, storeId, dateRange, pageContext);
-
+      case 'footfall':
+        return await queryFootfall(supabase, storeId, dateRange, pageContext);
+      case 'visitFrequency':
+        return await queryVisitFrequency(supabase, storeId, dateRange, pageContext);
+      case 'funnel':
+        return await queryFunnel(supabase, storeId, dateRange, pageContext);
       case 'goal':
         return await queryGoal(supabase, storeId, dateRange, pageContext);
 
+      // 매장(Store) 탭
+      case 'peakTime':
+        return await queryPeakTime(supabase, storeId, dateRange, pageContext);
+      case 'popularZone':
+        return await queryPopularZone(supabase, storeId, dateRange, pageContext);
+      case 'trackingCoverage':
+        return await queryTrackingCoverage(supabase, storeId, dateRange, pageContext);
+      case 'hourlyPattern':
+        return await queryHourlyPattern(supabase, storeId, dateRange, pageContext);
+      case 'zoneAnalysis':
+        return await queryZoneAnalysis(supabase, storeId, dateRange, pageContext);
+
+      // 고객(Customer) 탭
+      case 'visitors':
+        return await queryVisitors(supabase, storeId, dateRange, pageContext);
       case 'dwellTime':
         return await queryDwellTime(supabase, storeId, dateRange, pageContext);
-
       case 'newVsReturning':
         return await queryNewVsReturning(supabase, storeId, dateRange, pageContext);
+      case 'repeatRate':
+        return await queryRepeatRate(supabase, storeId, dateRange, pageContext);
+      case 'customerSegment':
+        return await queryCustomerSegment(supabase, storeId, dateRange, pageContext);
+      case 'loyalCustomers':
+        return await queryLoyalCustomers(supabase, storeId, dateRange, pageContext);
 
+      // 상품(Product) 탭
+      case 'product':
+        return await queryProduct(supabase, storeId, dateRange, pageContext);
+      case 'topProducts':
+        return await queryTopProducts(supabase, storeId, dateRange, pageContext);
+      case 'categoryAnalysis':
+        return await queryCategoryAnalysis(supabase, storeId, dateRange, pageContext);
+      case 'unitsSold':
+        return await queryUnitsSold(supabase, storeId, dateRange, pageContext);
+
+      // 재고(Inventory) 탭
+      case 'inventory':
+        return await queryInventory(supabase, storeId, dateRange, pageContext);
+      case 'overstock':
+        return await queryOverstock(supabase, storeId, dateRange, pageContext);
+      case 'stockAlert':
+        return await queryStockAlert(supabase, storeId, dateRange, pageContext);
+      case 'stockMovement':
+        return await queryStockMovement(supabase, storeId, dateRange, pageContext);
+      case 'stockDistribution':
+        return await queryStockDistribution(supabase, storeId, dateRange, pageContext);
+
+      // 예측(Prediction) 탭
+      case 'predictionRevenue':
+      case 'predictionVisitors':
+      case 'predictionConversion':
+      case 'predictionSummary':
+        return await queryPrediction(supabase, storeId, dateRange, queryType, pageContext);
+
+      // AI추천(AI Recommendation) 탭
+      case 'activeStrategies':
+      case 'strategyRecommendation':
+      case 'priceOptimization':
+      case 'inventoryOptimization':
+        return await queryAIRecommendation(supabase, storeId, dateRange, queryType, pageContext);
+
+      // 데이터 컨트롤타워
       case 'dataQuality':
         return await queryDataQuality(supabase, storeId, pageContext);
-
       case 'dataSources':
         return await queryDataSources(supabase, storeId, pageContext);
-
       case 'contextDataSources':
         return await queryContextDataSources(supabase, storeId, pageContext);
-
       case 'apiConnections':
         return await queryApiConnections(supabase, storeId, pageContext);
-
       case 'importHistory':
         return await queryImportHistory(supabase, storeId, pageContext);
-
       case 'pipelineStatus':
         return await queryPipelineStatus(supabase, storeId, pageContext);
 
@@ -919,6 +1032,978 @@ async function queryNewVsReturning(
     suggestions: ['방문객 수 알려줘', '체류 시간 알려줘'],
     data: { newVisitors: totalNew, returningVisitors: totalReturning, newRate, returnRate },
   };
+}
+
+// ============================================
+// 개요(Overview) 탭 추가 쿼리 핸들러
+// ============================================
+
+/**
+ * 총 입장객(Footfall) 조회
+ */
+async function queryFootfall(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
+): Promise<QueryActionResult> {
+  const { actions, tabChanged, targetTab } = createNavigationActions('footfall', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 데이터를 확인합니다.` : '';
+
+  const { data, error } = await supabase
+    .from('daily_kpis_agg')
+    .select('total_visitors, unique_visitors')
+    .eq('store_id', storeId)
+    .gte('date', dateRange.startDate)
+    .lte('date', dateRange.endDate);
+
+  if (error || !data || data.length === 0) {
+    return {
+      actions,
+      message: `입장객 데이터를 조회할 수 없습니다.${tabMessage}`,
+      suggestions: ['방문객 수 알려줘', '개요탭 보여줘'],
+      data: null,
+    };
+  }
+
+  const totalFootfall = data.reduce((sum, row) => sum + (row.total_visitors || 0), 0);
+  const uniqueVisitors = data.reduce((sum, row) => sum + (row.unique_visitors || 0), 0);
+
+  return {
+    actions,
+    message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 총 입장객은 ${totalFootfall.toLocaleString()}명, 순 방문객은 ${uniqueVisitors.toLocaleString()}명입니다.${tabMessage}`,
+    suggestions: ['매출 알려줘', '전환율 어때?', '방문 빈도 알려줘'],
+    data: { totalFootfall, uniqueVisitors },
+  };
+}
+
+/**
+ * 방문 빈도 조회
+ */
+async function queryVisitFrequency(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
+): Promise<QueryActionResult> {
+  const { actions, tabChanged, targetTab } = createNavigationActions('visitFrequency', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 데이터를 확인합니다.` : '';
+
+  const { data, error } = await supabase
+    .from('daily_kpis_agg')
+    .select('total_visitors, returning_visitors')
+    .eq('store_id', storeId)
+    .gte('date', dateRange.startDate)
+    .lte('date', dateRange.endDate);
+
+  if (error || !data || data.length === 0) {
+    return {
+      actions,
+      message: `방문 빈도 데이터를 조회할 수 없습니다.${tabMessage}`,
+      suggestions: ['방문객 수 알려줘', '개요탭 보여줘'],
+      data: null,
+    };
+  }
+
+  const totalVisitors = data.reduce((sum, row) => sum + (row.total_visitors || 0), 0);
+  const returningVisitors = data.reduce((sum, row) => sum + (row.returning_visitors || 0), 0);
+  const days = data.length;
+  const avgDaily = days > 0 ? Math.round(totalVisitors / days) : 0;
+  const returnRate = totalVisitors > 0 ? Math.round((returningVisitors / totalVisitors) * 100) : 0;
+
+  return {
+    actions,
+    message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 일평균 방문객은 ${avgDaily.toLocaleString()}명이며, 재방문율은 ${returnRate}%입니다.${tabMessage}`,
+    suggestions: ['입장객 수 알려줘', '재방문율 알려줘', '매출 알려줘'],
+    data: { avgDaily, returnRate, totalVisitors, days },
+  };
+}
+
+/**
+ * 고객 여정 퍼널 조회
+ */
+async function queryFunnel(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
+): Promise<QueryActionResult> {
+  const { actions, tabChanged, targetTab } = createNavigationActions('funnel', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 퍼널을 확인합니다.` : '';
+
+  const { data, error } = await supabase
+    .from('daily_kpis_agg')
+    .select('total_visitors, unique_visitors, total_transactions, total_revenue')
+    .eq('store_id', storeId)
+    .gte('date', dateRange.startDate)
+    .lte('date', dateRange.endDate);
+
+  if (error || !data || data.length === 0) {
+    return {
+      actions,
+      message: `퍼널 데이터를 조회할 수 없습니다.${tabMessage}`,
+      suggestions: ['매출 알려줘', '개요탭 보여줘'],
+      data: null,
+    };
+  }
+
+  const totalVisitors = data.reduce((sum, row) => sum + (row.total_visitors || 0), 0);
+  const uniqueVisitors = data.reduce((sum, row) => sum + (row.unique_visitors || 0), 0);
+  const totalTransactions = data.reduce((sum, row) => sum + (row.total_transactions || 0), 0);
+  const conversionRate = totalVisitors > 0 ? ((totalTransactions / totalVisitors) * 100).toFixed(1) : '0';
+
+  return {
+    actions,
+    message: `고객 여정 퍼널:\n• 입장: ${totalVisitors.toLocaleString()}명\n• 탐색(순 방문): ${uniqueVisitors.toLocaleString()}명\n• 구매: ${totalTransactions.toLocaleString()}건\n• 전환율: ${conversionRate}%${tabMessage}`,
+    suggestions: ['전환율 올리려면?', '매출 알려줘', '목표 달성률 보여줘'],
+    data: { totalVisitors, uniqueVisitors, totalTransactions, conversionRate },
+  };
+}
+
+// ============================================
+// 매장(Store) 탭 쿼리 핸들러
+// ============================================
+
+/**
+ * 피크타임 조회
+ */
+async function queryPeakTime(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
+): Promise<QueryActionResult> {
+  const { actions, tabChanged, targetTab } = createNavigationActions('peakTime', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 분석을 확인합니다.` : '';
+
+  const { data, error } = await supabase
+    .from('hourly_visitors_agg')
+    .select('hour, visitor_count')
+    .eq('store_id', storeId)
+    .gte('date', dateRange.startDate)
+    .lte('date', dateRange.endDate);
+
+  if (error || !data || data.length === 0) {
+    return {
+      actions,
+      message: `피크타임 데이터를 조회할 수 없습니다.${tabMessage}`,
+      suggestions: ['매장탭 보여줘', '방문객 알려줘'],
+      data: null,
+    };
+  }
+
+  // 시간대별 합산
+  const hourlyMap: Record<number, number> = {};
+  data.forEach((row: any) => {
+    const h = row.hour;
+    hourlyMap[h] = (hourlyMap[h] || 0) + (row.visitor_count || 0);
+  });
+
+  const peakHour = Object.entries(hourlyMap).sort((a, b) => b[1] - a[1])[0];
+  const peakTime = peakHour ? `${peakHour[0]}시` : '확인 불가';
+  const peakVisitors = peakHour ? Number(peakHour[1]) : 0;
+
+  return {
+    actions,
+    message: `피크타임은 ${peakTime}이며, 해당 시간대 방문객은 총 ${peakVisitors.toLocaleString()}명입니다.${tabMessage}`,
+    suggestions: ['시간대별 방문 패턴 보여줘', '인기 존 알려줘', '매출 알려줘'],
+    data: { peakTime, peakVisitors, hourlyMap },
+  };
+}
+
+/**
+ * 인기 존 조회
+ */
+async function queryPopularZone(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
+): Promise<QueryActionResult> {
+  const { actions, tabChanged, targetTab } = createNavigationActions('popularZone', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 존 분석을 확인합니다.` : '';
+
+  const { data, error } = await supabase
+    .from('zone_metrics_agg')
+    .select('zone_id, zone_name, total_visitors, avg_dwell_time_seconds')
+    .eq('store_id', storeId)
+    .gte('date', dateRange.startDate)
+    .lte('date', dateRange.endDate)
+    .order('total_visitors', { ascending: false })
+    .limit(5);
+
+  if (error || !data || data.length === 0) {
+    return {
+      actions,
+      message: `존 데이터를 조회할 수 없습니다.${tabMessage}`,
+      suggestions: ['매장탭 보여줘', '피크타임 알려줘'],
+      data: null,
+    };
+  }
+
+  const topZone = data[0];
+  const zoneList = data.map((z: any, i: number) =>
+    `${i + 1}. ${z.zone_name || z.zone_id}: ${(z.total_visitors || 0).toLocaleString()}명 (평균 체류 ${Math.round((z.avg_dwell_time_seconds || 0) / 60)}분)`
+  ).join('\n');
+
+  return {
+    actions,
+    message: `가장 인기 있는 존은 "${topZone.zone_name || topZone.zone_id}"입니다.\n\n${zoneList}${tabMessage}`,
+    suggestions: ['존 체류시간 분석', '피크타임 알려줘', '매출 알려줘'],
+    data: { zones: data },
+  };
+}
+
+/**
+ * 센서 커버율 조회
+ */
+async function queryTrackingCoverage(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
+): Promise<QueryActionResult> {
+  const { actions, tabChanged, targetTab } = createNavigationActions('trackingCoverage', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 확인합니다.` : '';
+
+  // zones_dim에서 전체 존 수 조회
+  const { data: zones, error } = await supabase
+    .from('zones_dim')
+    .select('id, name, is_active')
+    .eq('store_id', storeId);
+
+  if (error || !zones) {
+    return {
+      actions,
+      message: `센서 커버율 데이터를 조회할 수 없습니다.${tabMessage}`,
+      suggestions: ['매장탭 보여줘', '피크타임 알려줘'],
+      data: null,
+    };
+  }
+
+  const totalZones = zones.length;
+  const activeZones = zones.filter((z: any) => z.is_active !== false).length;
+  const coverage = totalZones > 0 ? Math.round((activeZones / totalZones) * 100) : 0;
+
+  return {
+    actions,
+    message: `센서 커버율은 ${coverage}%입니다 (${activeZones}/${totalZones} 존 활성).${tabMessage}`,
+    suggestions: ['인기 존 알려줘', '피크타임 알려줘', '존 분석 보여줘'],
+    data: { coverage, activeZones, totalZones },
+  };
+}
+
+/**
+ * 시간대별 방문 패턴 조회
+ */
+async function queryHourlyPattern(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
+): Promise<QueryActionResult> {
+  const { actions, tabChanged, targetTab } = createNavigationActions('hourlyPattern', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 시간대별 차트를 확인합니다.` : '';
+
+  const { data, error } = await supabase
+    .from('hourly_visitors_agg')
+    .select('hour, visitor_count')
+    .eq('store_id', storeId)
+    .gte('date', dateRange.startDate)
+    .lte('date', dateRange.endDate);
+
+  if (error || !data || data.length === 0) {
+    return {
+      actions,
+      message: `시간대별 방문 패턴 데이터를 조회할 수 없습니다.${tabMessage}`,
+      suggestions: ['매장탭 보여줘', '피크타임 알려줘'],
+      data: null,
+    };
+  }
+
+  const hourlyMap: Record<number, number> = {};
+  data.forEach((row: any) => {
+    const h = row.hour;
+    hourlyMap[h] = (hourlyMap[h] || 0) + (row.visitor_count || 0);
+  });
+
+  const sorted = Object.entries(hourlyMap).sort((a, b) => b[1] - a[1]);
+  const top3 = sorted.slice(0, 3).map(([h, v]) => `${h}시: ${v.toLocaleString()}명`).join(', ');
+
+  return {
+    actions,
+    message: `시간대별 방문 패턴 TOP 3: ${top3}${tabMessage}`,
+    suggestions: ['피크타임 알려줘', '인기 존 알려줘', '방문객 알려줘'],
+    data: { hourlyMap },
+  };
+}
+
+/**
+ * 존 분석 (체류시간/방문자 분포) 조회
+ */
+async function queryZoneAnalysis(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
+): Promise<QueryActionResult> {
+  const { actions, tabChanged, targetTab } = createNavigationActions('zoneAnalysis', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 존 분석을 확인합니다.` : '';
+
+  const { data, error } = await supabase
+    .from('zone_metrics_agg')
+    .select('zone_id, zone_name, total_visitors, avg_dwell_time_seconds')
+    .eq('store_id', storeId)
+    .gte('date', dateRange.startDate)
+    .lte('date', dateRange.endDate)
+    .order('total_visitors', { ascending: false });
+
+  if (error || !data || data.length === 0) {
+    return {
+      actions,
+      message: `존 분석 데이터를 조회할 수 없습니다.${tabMessage}`,
+      suggestions: ['매장탭 보여줘', '피크타임 알려줘'],
+      data: null,
+    };
+  }
+
+  const zoneList = data.slice(0, 5).map((z: any) =>
+    `• ${z.zone_name || z.zone_id}: 방문 ${(z.total_visitors || 0).toLocaleString()}명, 체류 ${Math.round((z.avg_dwell_time_seconds || 0) / 60)}분`
+  ).join('\n');
+
+  return {
+    actions,
+    message: `존별 분석 결과:\n${zoneList}${tabMessage}`,
+    suggestions: ['인기 존 알려줘', '피크타임 알려줘', '체류시간 알려줘'],
+    data: { zones: data },
+  };
+}
+
+// ============================================
+// 고객(Customer) 탭 추가 쿼리 핸들러
+// ============================================
+
+/**
+ * 재방문율 조회
+ */
+async function queryRepeatRate(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
+): Promise<QueryActionResult> {
+  const { actions, tabChanged, targetTab } = createNavigationActions('repeatRate', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 분석을 확인합니다.` : '';
+
+  const { data, error } = await supabase
+    .from('daily_kpis_agg')
+    .select('total_visitors, returning_visitors')
+    .eq('store_id', storeId)
+    .gte('date', dateRange.startDate)
+    .lte('date', dateRange.endDate);
+
+  if (error || !data || data.length === 0) {
+    return {
+      actions,
+      message: `재방문율 데이터를 조회할 수 없습니다.${tabMessage}`,
+      suggestions: ['고객탭 보여줘', '방문객 알려줘'],
+      data: null,
+    };
+  }
+
+  const totalVisitors = data.reduce((sum, row) => sum + (row.total_visitors || 0), 0);
+  const returningVisitors = data.reduce((sum, row) => sum + (row.returning_visitors || 0), 0);
+  const repeatRate = totalVisitors > 0 ? Math.round((returningVisitors / totalVisitors) * 100) : 0;
+
+  return {
+    actions,
+    message: `재방문율은 ${repeatRate}%입니다 (재방문 고객 ${returningVisitors.toLocaleString()}명 / 전체 ${totalVisitors.toLocaleString()}명).${tabMessage}`,
+    suggestions: ['고객 세그먼트 보여줘', '충성 고객 알려줘', '방문객 알려줘'],
+    data: { repeatRate, returningVisitors, totalVisitors },
+  };
+}
+
+/**
+ * 고객 세그먼트 조회
+ */
+async function queryCustomerSegment(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
+): Promise<QueryActionResult> {
+  const { actions, tabChanged, targetTab } = createNavigationActions('customerSegment', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 세그먼트 분포를 확인합니다.` : '';
+
+  const { data, error } = await supabase
+    .from('customer_segments_agg')
+    .select('segment, customer_count, avg_revenue')
+    .eq('store_id', storeId)
+    .gte('date', dateRange.startDate)
+    .lte('date', dateRange.endDate);
+
+  if (error || !data || data.length === 0) {
+    return {
+      actions,
+      message: `고객 세그먼트 데이터를 조회할 수 없습니다.${tabMessage}`,
+      suggestions: ['고객탭 보여줘', '방문객 알려줘'],
+      data: null,
+    };
+  }
+
+  // 세그먼트별 집계
+  const segmentMap: Record<string, { count: number; revenue: number }> = {};
+  data.forEach((row: any) => {
+    const seg = row.segment || '기타';
+    if (!segmentMap[seg]) segmentMap[seg] = { count: 0, revenue: 0 };
+    segmentMap[seg].count += row.customer_count || 0;
+    segmentMap[seg].revenue += row.avg_revenue || 0;
+  });
+
+  const segmentList = Object.entries(segmentMap)
+    .sort((a, b) => b[1].count - a[1].count)
+    .map(([seg, v]) => `• ${seg}: ${v.count.toLocaleString()}명`)
+    .join('\n');
+
+  const topSegment = Object.entries(segmentMap).sort((a, b) => b[1].count - a[1].count)[0];
+
+  return {
+    actions,
+    message: `주요 세그먼트는 "${topSegment?.[0] || '-'}"입니다.\n\n${segmentList}${tabMessage}`,
+    suggestions: ['재방문율 알려줘', '충성 고객 알려줘', '체류시간 알려줘'],
+    data: { segments: segmentMap, topSegment: topSegment?.[0] },
+  };
+}
+
+/**
+ * 충성 고객 조회
+ */
+async function queryLoyalCustomers(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
+): Promise<QueryActionResult> {
+  const { actions, tabChanged, targetTab } = createNavigationActions('loyalCustomers', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 분석을 확인합니다.` : '';
+
+  const { data, error } = await supabase
+    .from('customer_segments_agg')
+    .select('segment, customer_count, avg_revenue')
+    .eq('store_id', storeId)
+    .gte('date', dateRange.startDate)
+    .lte('date', dateRange.endDate)
+    .in('segment', ['loyal', 'vip', 'champion', '충성', 'VIP']);
+
+  if (error || !data || data.length === 0) {
+    return {
+      actions,
+      message: `충성 고객 데이터를 조회할 수 없습니다.${tabMessage}`,
+      suggestions: ['고객 세그먼트 보여줘', '재방문율 알려줘'],
+      data: null,
+    };
+  }
+
+  const totalLoyal = data.reduce((sum, row: any) => sum + (row.customer_count || 0), 0);
+  const avgRevenue = data.reduce((sum, row: any) => sum + (row.avg_revenue || 0), 0) / (data.length || 1);
+
+  return {
+    actions,
+    message: `충성 고객은 총 ${totalLoyal.toLocaleString()}명이며, 평균 구매금액은 ${formatNumber(Math.round(avgRevenue))}원입니다.${tabMessage}`,
+    suggestions: ['고객 세그먼트 보여줘', '재방문율 알려줘', '매출 알려줘'],
+    data: { totalLoyal, avgRevenue },
+  };
+}
+
+// ============================================
+// 상품(Product) 탭 추가 쿼리 핸들러
+// ============================================
+
+/**
+ * TOP 상품 조회
+ */
+async function queryTopProducts(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
+): Promise<QueryActionResult> {
+  const { actions, tabChanged, targetTab } = createNavigationActions('topProducts', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 내역을 확인합니다.` : '';
+
+  const { data, error } = await supabase
+    .from('product_performance_agg')
+    .select('product_id, units_sold, revenue')
+    .eq('store_id', storeId)
+    .gte('date', dateRange.startDate)
+    .lte('date', dateRange.endDate);
+
+  if (error || !data || data.length === 0) {
+    return {
+      actions,
+      message: `상품 데이터를 조회할 수 없습니다.${tabMessage}`,
+      suggestions: ['상품탭 보여줘', '매출 알려줘'],
+      data: null,
+    };
+  }
+
+  // product_id 별 집계
+  const productMap: Record<string, { units: number; revenue: number }> = {};
+  data.forEach((row: any) => {
+    const pid = row.product_id;
+    if (!productMap[pid]) productMap[pid] = { units: 0, revenue: 0 };
+    productMap[pid].units += row.units_sold || 0;
+    productMap[pid].revenue += row.revenue || 0;
+  });
+
+  const topByRevenue = Object.entries(productMap)
+    .sort((a, b) => b[1].revenue - a[1].revenue)
+    .slice(0, 5);
+
+  const productList = topByRevenue.map(([pid, v], i) =>
+    `${i + 1}. 상품#${pid}: ${formatNumber(v.revenue)}원 (${v.units.toLocaleString()}개)`
+  ).join('\n');
+
+  return {
+    actions,
+    message: `매출 TOP 5 상품:\n${productList}${tabMessage}`,
+    suggestions: ['카테고리 분석 보여줘', '판매량 알려줘', '재고 현황 알려줘'],
+    data: { topProducts: topByRevenue },
+  };
+}
+
+/**
+ * 카테고리 분석 조회
+ */
+async function queryCategoryAnalysis(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
+): Promise<QueryActionResult> {
+  const { actions, tabChanged, targetTab } = createNavigationActions('categoryAnalysis', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 카테고리 분석을 확인합니다.` : '';
+
+  const { data, error } = await supabase
+    .from('product_performance_agg')
+    .select('category, units_sold, revenue')
+    .eq('store_id', storeId)
+    .gte('date', dateRange.startDate)
+    .lte('date', dateRange.endDate);
+
+  if (error || !data || data.length === 0) {
+    return {
+      actions,
+      message: `카테고리 분석 데이터를 조회할 수 없습니다.${tabMessage}`,
+      suggestions: ['상품탭 보여줘', '매출 알려줘'],
+      data: null,
+    };
+  }
+
+  // 카테고리별 집계
+  const catMap: Record<string, { units: number; revenue: number }> = {};
+  data.forEach((row: any) => {
+    const cat = row.category || '기타';
+    if (!catMap[cat]) catMap[cat] = { units: 0, revenue: 0 };
+    catMap[cat].units += row.units_sold || 0;
+    catMap[cat].revenue += row.revenue || 0;
+  });
+
+  const sorted = Object.entries(catMap).sort((a, b) => b[1].revenue - a[1].revenue);
+  const catList = sorted.slice(0, 5).map(([cat, v]) =>
+    `• ${cat}: ${formatNumber(v.revenue)}원 (${v.units.toLocaleString()}개)`
+  ).join('\n');
+
+  return {
+    actions,
+    message: `카테고리별 매출:\n${catList}${tabMessage}`,
+    suggestions: ['TOP 상품 보여줘', '판매량 알려줘', '재고 현황 알려줘'],
+    data: { categories: catMap },
+  };
+}
+
+/**
+ * 총 판매량 조회
+ */
+async function queryUnitsSold(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
+): Promise<QueryActionResult> {
+  const { actions, tabChanged, targetTab } = createNavigationActions('unitsSold', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 내역을 확인합니다.` : '';
+
+  const { data, error } = await supabase
+    .from('product_performance_agg')
+    .select('units_sold, revenue')
+    .eq('store_id', storeId)
+    .gte('date', dateRange.startDate)
+    .lte('date', dateRange.endDate);
+
+  if (error || !data || data.length === 0) {
+    return {
+      actions,
+      message: `판매량 데이터를 조회할 수 없습니다.${tabMessage}`,
+      suggestions: ['상품탭 보여줘', '매출 알려줘'],
+      data: null,
+    };
+  }
+
+  const totalUnits = data.reduce((sum, row: any) => sum + (row.units_sold || 0), 0);
+  const totalRevenue = data.reduce((sum, row: any) => sum + (row.revenue || 0), 0);
+
+  return {
+    actions,
+    message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 총 판매량은 ${totalUnits.toLocaleString()}개, 총 매출은 ${formatNumber(totalRevenue)}원입니다.${tabMessage}`,
+    suggestions: ['TOP 상품 보여줘', '카테고리 분석 보여줘', '재고 현황 알려줘'],
+    data: { totalUnits, totalRevenue },
+  };
+}
+
+// ============================================
+// 재고(Inventory) 탭 추가 쿼리 핸들러
+// ============================================
+
+/**
+ * 과잉 재고 조회
+ */
+async function queryOverstock(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
+): Promise<QueryActionResult> {
+  const { actions, tabChanged, targetTab } = createNavigationActions('overstock', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 내역을 확인합니다.` : '';
+
+  const { data: storeData } = await supabase
+    .from('stores').select('org_id').eq('id', storeId).single();
+  const orgId = storeData?.org_id;
+
+  if (!orgId) {
+    return { actions, message: `매장 정보를 확인할 수 없습니다.${tabMessage}`, suggestions: ['재고탭 보여줘'], data: null };
+  }
+
+  const { data, error } = await supabase
+    .from('inventory_levels')
+    .select('product_id, current_stock, optimal_stock')
+    .eq('org_id', orgId);
+
+  if (error || !data) {
+    return { actions, message: `재고 데이터를 조회할 수 없습니다.${tabMessage}`, suggestions: ['재고탭 보여줘'], data: null };
+  }
+
+  const overstockItems = data.filter((item: any) =>
+    item.optimal_stock > 0 && item.current_stock > item.optimal_stock * 1.5
+  );
+
+  return {
+    actions,
+    message: `과잉 재고 상품은 ${overstockItems.length}개입니다 (전체 ${data.length}개 중).${tabMessage}`,
+    suggestions: ['재고 부족 경고 알려줘', '재고 현황 보여줘', '재고 최적화 추천'],
+    data: { overstockCount: overstockItems.length, totalItems: data.length },
+  };
+}
+
+/**
+ * 재고 부족 경고 조회
+ */
+async function queryStockAlert(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
+): Promise<QueryActionResult> {
+  const { actions, tabChanged, targetTab } = createNavigationActions('stockAlert', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 내역을 확인합니다.` : '';
+
+  const { data: storeData } = await supabase
+    .from('stores').select('org_id').eq('id', storeId).single();
+  const orgId = storeData?.org_id;
+
+  if (!orgId) {
+    return { actions, message: `매장 정보를 확인할 수 없습니다.${tabMessage}`, suggestions: ['재고탭 보여줘'], data: null };
+  }
+
+  const { data, error } = await supabase
+    .from('inventory_levels')
+    .select('product_id, current_stock, minimum_stock')
+    .eq('org_id', orgId);
+
+  if (error || !data) {
+    return { actions, message: `재고 데이터를 조회할 수 없습니다.${tabMessage}`, suggestions: ['재고탭 보여줘'], data: null };
+  }
+
+  const lowStockItems = data.filter((item: any) => item.current_stock <= item.minimum_stock);
+
+  return {
+    actions,
+    message: `재고 부족 경고 상품은 ${lowStockItems.length}개입니다 (전체 ${data.length}개 중). 재주문이 필요합니다.${tabMessage}`,
+    suggestions: ['과잉 재고 알려줘', '재고 현황 보여줘', '입출고 내역 보여줘'],
+    data: { lowStockCount: lowStockItems.length, totalItems: data.length },
+  };
+}
+
+/**
+ * 입출고 내역 조회
+ */
+async function queryStockMovement(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
+): Promise<QueryActionResult> {
+  const { actions, tabChanged, targetTab } = createNavigationActions('stockMovement', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 내역을 확인합니다.` : '';
+
+  const { data: storeData } = await supabase
+    .from('stores').select('org_id').eq('id', storeId).single();
+  const orgId = storeData?.org_id;
+
+  if (!orgId) {
+    return { actions, message: `매장 정보를 확인할 수 없습니다.${tabMessage}`, suggestions: ['재고탭 보여줘'], data: null };
+  }
+
+  const { data, error } = await supabase
+    .from('inventory_movements')
+    .select('product_id, movement_type, quantity, created_at')
+    .eq('org_id', orgId)
+    .gte('created_at', dateRange.startDate)
+    .lte('created_at', dateRange.endDate + 'T23:59:59')
+    .order('created_at', { ascending: false })
+    .limit(10);
+
+  if (error || !data || data.length === 0) {
+    return {
+      actions,
+      message: `해당 기간의 입출고 내역이 없습니다.${tabMessage}`,
+      suggestions: ['재고 현황 보여줘', '재고 부족 경고 알려줘'],
+      data: null,
+    };
+  }
+
+  const inCount = data.filter((m: any) => m.movement_type === 'in' || m.movement_type === 'inbound').length;
+  const outCount = data.filter((m: any) => m.movement_type === 'out' || m.movement_type === 'outbound').length;
+
+  return {
+    actions,
+    message: `최근 입출고 내역: 입고 ${inCount}건, 출고 ${outCount}건 (총 ${data.length}건).${tabMessage}`,
+    suggestions: ['재고 현황 보여줘', '재고 부족 경고 알려줘', '과잉 재고 알려줘'],
+    data: { movements: data, inCount, outCount },
+  };
+}
+
+/**
+ * 재고 상태 분포 조회
+ */
+async function queryStockDistribution(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
+): Promise<QueryActionResult> {
+  const { actions, tabChanged, targetTab } = createNavigationActions('stockDistribution', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 분포 차트를 확인합니다.` : '';
+
+  const { data: storeData } = await supabase
+    .from('stores').select('org_id').eq('id', storeId).single();
+  const orgId = storeData?.org_id;
+
+  if (!orgId) {
+    return { actions, message: `매장 정보를 확인할 수 없습니다.${tabMessage}`, suggestions: ['재고탭 보여줘'], data: null };
+  }
+
+  const { data, error } = await supabase
+    .from('inventory_levels')
+    .select('product_id, current_stock, minimum_stock, optimal_stock')
+    .eq('org_id', orgId);
+
+  if (error || !data) {
+    return { actions, message: `재고 데이터를 조회할 수 없습니다.${tabMessage}`, suggestions: ['재고탭 보여줘'], data: null };
+  }
+
+  const total = data.length;
+  const lowStock = data.filter((i: any) => i.current_stock <= i.minimum_stock).length;
+  const overstock = data.filter((i: any) => i.optimal_stock > 0 && i.current_stock > i.optimal_stock * 1.5).length;
+  const healthy = total - lowStock - overstock;
+
+  return {
+    actions,
+    message: `재고 상태 분포:\n• 정상: ${healthy}개 (${total > 0 ? Math.round((healthy / total) * 100) : 0}%)\n• 부족: ${lowStock}개 (${total > 0 ? Math.round((lowStock / total) * 100) : 0}%)\n• 과잉: ${overstock}개 (${total > 0 ? Math.round((overstock / total) * 100) : 0}%)${tabMessage}`,
+    suggestions: ['재고 부족 경고 알려줘', '과잉 재고 알려줘', '입출고 내역 보여줘'],
+    data: { total, lowStock, overstock, healthy },
+  };
+}
+
+// ============================================
+// 예측(Prediction) 탭 쿼리 핸들러
+// ============================================
+
+/**
+ * 예측 데이터 조회 (매출/방문자/전환율/요약)
+ */
+async function queryPrediction(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string },
+  queryType: string,
+  pageContext?: PageContext
+): Promise<QueryActionResult> {
+  const { actions, tabChanged, targetTab } = createNavigationActions(queryType, dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 예측 차트를 확인합니다.` : '';
+
+  // ai_predictions 테이블에서 예측 데이터 조회
+  const { data, error } = await supabase
+    .from('ai_predictions')
+    .select('prediction_date, metric_type, predicted_value, confidence_score')
+    .eq('store_id', storeId)
+    .gte('prediction_date', dateRange.startDate)
+    .lte('prediction_date', dateRange.endDate)
+    .order('prediction_date', { ascending: true });
+
+  if (error || !data || data.length === 0) {
+    // 폴백: 예측 탭으로 이동만 안내
+    return {
+      actions,
+      message: `예측 데이터를 조회할 수 없습니다. 예측탭에서 직접 확인해 주세요.${tabMessage}`,
+      suggestions: ['예측탭 보여줘', '매출 알려줘', '방문객 알려줘'],
+      data: null,
+    };
+  }
+
+  const metricFilter: Record<string, string[]> = {
+    predictionRevenue: ['revenue'],
+    predictionVisitors: ['visitors'],
+    predictionConversion: ['conversion'],
+    predictionSummary: ['revenue', 'visitors', 'conversion'],
+  };
+
+  const targetMetrics = metricFilter[queryType] || ['revenue', 'visitors', 'conversion'];
+  const filtered = data.filter((d: any) => targetMetrics.includes(d.metric_type));
+  const avgConfidence = filtered.length > 0
+    ? Math.round(filtered.reduce((sum, d: any) => sum + (d.confidence_score || 0), 0) / filtered.length * 100)
+    : 0;
+
+  if (queryType === 'predictionSummary') {
+    const revPreds = filtered.filter((d: any) => d.metric_type === 'revenue');
+    const visPreds = filtered.filter((d: any) => d.metric_type === 'visitors');
+    const convPreds = filtered.filter((d: any) => d.metric_type === 'conversion');
+
+    const avgRev = revPreds.length > 0 ? revPreds.reduce((s, d: any) => s + d.predicted_value, 0) : 0;
+    const avgVis = visPreds.length > 0 ? Math.round(visPreds.reduce((s, d: any) => s + d.predicted_value, 0) / visPreds.length) : 0;
+    const avgConv = convPreds.length > 0 ? (convPreds.reduce((s, d: any) => s + d.predicted_value, 0) / convPreds.length).toFixed(1) : '0';
+
+    return {
+      actions,
+      message: `예측 요약 (신뢰도 ${avgConfidence}%):\n• 예상 매출: ${formatNumber(Math.round(avgRev))}원\n• 예상 일평균 방문자: ${avgVis.toLocaleString()}명\n• 예상 전환율: ${avgConv}%${tabMessage}`,
+      suggestions: ['매출 예측 상세', '방문자 예측 상세', '전환율 예측 상세'],
+      data: { avgRev, avgVis, avgConv, avgConfidence },
+    };
+  }
+
+  const metricLabel: Record<string, string> = { predictionRevenue: '매출', predictionVisitors: '방문자', predictionConversion: '전환율' };
+  const label = metricLabel[queryType] || '데이터';
+  const total = filtered.reduce((s, d: any) => s + (d.predicted_value || 0), 0);
+  const avg = filtered.length > 0 ? total / filtered.length : 0;
+
+  const unit = queryType === 'predictionRevenue' ? '원' : queryType === 'predictionVisitors' ? '명' : '%';
+  const displayValue = queryType === 'predictionConversion' ? `${avg.toFixed(1)}${unit}` : `${formatNumber(Math.round(queryType === 'predictionRevenue' ? total : avg))}${unit}`;
+
+  return {
+    actions,
+    message: `${label} 예측 결과: ${displayValue} (신뢰도 ${avgConfidence}%)${tabMessage}`,
+    suggestions: ['예측 요약 보여줘', '매출 알려줘', 'AI추천 보여줘'],
+    data: { predictions: filtered, avgConfidence },
+  };
+}
+
+// ============================================
+// AI추천(AI Recommendation) 탭 쿼리 핸들러
+// ============================================
+
+/**
+ * AI 추천 데이터 조회 (활성 전략/전략 추천/가격 최적화/재고 최적화)
+ */
+async function queryAIRecommendation(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string },
+  queryType: string,
+  pageContext?: PageContext
+): Promise<QueryActionResult> {
+  const { actions, tabChanged, targetTab } = createNavigationActions(queryType, dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 내용을 확인합니다.` : '';
+
+  // ai_recommendations 테이블에서 추천 데이터 조회
+  const { data, error } = await supabase
+    .from('ai_recommendations')
+    .select('id, recommendation_type, title, description, status, priority, expected_impact, created_at')
+    .eq('store_id', storeId)
+    .order('created_at', { ascending: false })
+    .limit(20);
+
+  if (error || !data || data.length === 0) {
+    return {
+      actions,
+      message: `AI 추천 데이터를 조회할 수 없습니다. AI추천탭에서 직접 확인해 주세요.${tabMessage}`,
+      suggestions: ['AI추천탭 보여줘', '매출 알려줘', '예측 요약 보여줘'],
+      data: null,
+    };
+  }
+
+  switch (queryType) {
+    case 'activeStrategies': {
+      const active = data.filter((r: any) => r.status === 'active' || r.status === 'applied');
+      const list = active.slice(0, 5).map((r: any) => `• ${r.title || r.recommendation_type}`).join('\n');
+      return {
+        actions,
+        message: `현재 활성 전략은 ${active.length}개입니다.\n\n${list || '활성 전략이 없습니다.'}${tabMessage}`,
+        suggestions: ['전략 추천 보여줘', '가격 최적화 알려줘', '매출 알려줘'],
+        data: { activeCount: active.length, strategies: active },
+      };
+    }
+    case 'strategyRecommendation': {
+      const pending = data.filter((r: any) => r.status === 'pending' || r.status === 'recommended');
+      const list = pending.slice(0, 5).map((r: any) => {
+        const impact = r.expected_impact ? ` (예상 효과: ${r.expected_impact})` : '';
+        return `• ${r.title || r.recommendation_type}${impact}`;
+      }).join('\n');
+      return {
+        actions,
+        message: `추천 전략은 ${pending.length}개입니다.\n\n${list || '새로운 추천이 없습니다.'}${tabMessage}`,
+        suggestions: ['활성 전략 보여줘', '가격 최적화 알려줘', '매출 예측 보여줘'],
+        data: { pendingCount: pending.length, recommendations: pending },
+      };
+    }
+    case 'priceOptimization': {
+      const priceRecs = data.filter((r: any) => r.recommendation_type === 'price' || r.recommendation_type === 'pricing');
+      const list = priceRecs.slice(0, 5).map((r: any) => `• ${r.title}: ${r.description || ''}`).join('\n');
+      return {
+        actions,
+        message: `가격 최적화 추천:\n${list || '가격 관련 추천이 없습니다.'}${tabMessage}`,
+        suggestions: ['재고 최적화 알려줘', '전략 추천 보여줘', '매출 알려줘'],
+        data: { priceRecs },
+      };
+    }
+    case 'inventoryOptimization': {
+      const invRecs = data.filter((r: any) => r.recommendation_type === 'inventory' || r.recommendation_type === 'stock');
+      const list = invRecs.slice(0, 5).map((r: any) => `• ${r.title}: ${r.description || ''}`).join('\n');
+      return {
+        actions,
+        message: `재고 최적화 추천:\n${list || '재고 관련 추천이 없습니다.'}${tabMessage}`,
+        suggestions: ['가격 최적화 알려줘', '재고 현황 보여줘', '전략 추천 보여줘'],
+        data: { invRecs },
+      };
+    }
+    default:
+      return {
+        actions,
+        message: `AI추천탭에서 확인해 주세요.${tabMessage}`,
+        suggestions: ['AI추천탭 보여줘'],
+        data: null,
+      };
+  }
 }
 
 // ============================================

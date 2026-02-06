@@ -601,7 +601,7 @@ export function InventoryTab() {
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div id="inventory-kpi-cards" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Glass3DCard dark={isDark}>
           <div className="p-6">
             <div className="flex items-center gap-3 mb-4">
@@ -673,7 +673,7 @@ export function InventoryTab() {
 
       {/* Charts Row */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <Glass3DCard dark={isDark}>
+        <Glass3DCard id="inventory-distribution" dark={isDark}>
           <div className="p-6">
             <h3 style={{ fontSize: '16px', marginBottom: '4px', ...text3D.number }}>재고 상태 분포</h3>
             <p style={{ fontSize: '12px', marginBottom: '16px', ...text3D.body }}>전체 상품의 재고 상태별 분포</p>
@@ -684,7 +684,7 @@ export function InventoryTab() {
           </div>
         </Glass3DCard>
 
-        <Glass3DCard dark={isDark}>
+        <Glass3DCard id="inventory-category" dark={isDark}>
           <div className="p-6">
             <h3 style={{ fontSize: '16px', marginBottom: '4px', ...text3D.number }}>카테고리별 재고 현황</h3>
             <p style={{ fontSize: '12px', marginBottom: '16px', ...text3D.body }}>카테고리별 총 재고 수량</p>
@@ -696,7 +696,7 @@ export function InventoryTab() {
       {/* Risk Products & Recent Movements */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* 재고 부족 경고 */}
-        <Glass3DCard dark={isDark}>
+        <Glass3DCard id="inventory-risk" dark={isDark}>
           <div className="p-6">
             <div className="flex items-center gap-2 mb-4">
               <AlertCircle className="h-5 w-5" style={{ color: '#ef4444' }} />
@@ -741,7 +741,7 @@ export function InventoryTab() {
         </Glass3DCard>
 
         {/* 최근 입출고 내역 */}
-        <Glass3DCard dark={isDark}>
+        <Glass3DCard id="inventory-movements" dark={isDark}>
           <div className="p-6">
             <div className="flex items-center gap-2 mb-4">
               <Clock className="h-5 w-5" style={{ color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280' }} />
@@ -794,7 +794,7 @@ export function InventoryTab() {
       </div>
 
       {/* Detailed Inventory Table */}
-      <Glass3DCard dark={isDark}>
+      <Glass3DCard id="inventory-detail" dark={isDark}>
         <div className="p-6">
           <h3 style={{ fontSize: '16px', marginBottom: '20px', ...text3D.number }}>상세 재고 현황</h3>
           {data?.inventoryLevels && data.inventoryLevels.length > 0 ? (
