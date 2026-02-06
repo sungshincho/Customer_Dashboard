@@ -10,13 +10,14 @@
 
 import { callGemini, parseJsonResponse } from '../utils/geminiClient.ts';
 import { INTENT_CLASSIFICATION_PROMPT, formatContext } from '../constants/systemPrompt.ts';
+import { getCachedIntent, setCachedIntent, cleanupExpiredCache } from '../utils/intentCache.ts';
 import { extractDateRange } from './entityExtractor.ts';
 
 export interface ClassificationResult {
   intent: string;
   confidence: number;
   entities: Record<string, any>;
-  method: 'ai' | 'fallback';
+  method: 'ai' | 'cache' | 'fallback';
   reasoning?: string;
 }
 
@@ -62,10 +63,23 @@ export async function classifyIntent(
     page?: { current?: string; tab?: string };
     dateRange?: { preset?: string; startDate?: string; endDate?: string };
   }
-): Promise<ClassificationResult> { 
-
+): Promise<ClassificationResult> {
+  // 주기적 캐시 정리 (5% 확률)
+  if (Math.random() < 0.05) {
+    cleanupExpiredCache();
+  }
 
   // 1. 캐시 확인
+  const cached = getCachedIntent(message);
+  if (cached) {
+    console.log('[classifier] Cache hit:', cached.intent);
+    return {
+      intent: cached.intent,
+      confidence: cached.confidence,
+      entities: cached.entities,
+      method: 'cache',
+    };
+  }
 
   // 2. AI 분류
   console.log('[classifier] AI classification for:', message.substring(0, 50));
@@ -93,6 +107,7 @@ export async function classifyIntent(
       const entities = transformEntities(parsed.entities || {}, message);
 
       // 캐시 저장
+      setCachedIntent(message, parsed.intent, parsed.confidence, entities);
 
       return {
         intent: parsed.intent,
