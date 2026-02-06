@@ -66,6 +66,7 @@ function getTermKeyword(queryType: string): string {
 
 /**
  * 날짜 범위를 기반으로 네비게이션 액션 생성 (컨텍스트 인식)
+ * navigate + set_tab을 하나의 navigate('page?tab=xxx') 액션으로 합침
  */
 function createNavigationActions(
   queryType: string,
@@ -85,23 +86,28 @@ function createNavigationActions(
   const tabNeedsChange = targetTab ? currentTab !== targetTab : false;
   const tabChanged = pageNeedsChange || tabNeedsChange;
 
-  // 1. 페이지 이동 (필요시)
-  if (pageNeedsChange) {
+  // 1. 페이지 이동 + 탭 전환을 하나의 navigate 액션으로 합침
+  if (pageNeedsChange && targetTab) {
+    // 페이지 + 탭 동시 이동: navigate('/insights?tab=overview')
+    actions.push({
+      type: 'navigate',
+      target: `${targetPage}?tab=${targetTab}`,
+    });
+  } else if (pageNeedsChange) {
+    // 페이지만 이동 (탭 없는 페이지: control-tower, roi 등)
     actions.push({
       type: 'navigate',
       target: targetPage,
     });
-  }
-
-  // 2. 탭 전환 (필요시, 탭이 있는 페이지만)
-  if (tabNeedsChange && targetTab) {
+  } else if (tabNeedsChange && targetTab) {
+    // 같은 페이지에서 탭만 변경
     actions.push({
       type: 'set_tab',
       target: targetTab,
     });
   }
 
-  // 3. 날짜 범위 설정
+  // 2. 날짜 범위 설정
   actions.push({
     type: 'set_date_range',
     target: {
@@ -110,7 +116,7 @@ function createNavigationActions(
     },
   });
 
-  // 4. 섹션으로 스크롤 (있으면)
+  // 3. 섹션으로 스크롤 (있으면)
   if (mapping.section) {
     actions.push({
       type: 'scroll_to_section',
@@ -909,6 +915,7 @@ async function queryNewVsReturning(
 
 /**
  * 데이터 품질 점수 조회
+ * RPC 응답 구조: quality_score { overall_score, confidence_level, coverage { pos/sensor/crm/product/erp }, warnings }
  */
 async function queryDataQuality(
   supabase: SupabaseClient,
@@ -937,24 +944,41 @@ async function queryDataQuality(
       };
     }
 
-    const overallScore = score.overall || 0;
-    const completeness = score.completeness || 0;
-    const freshness = score.freshness || 0;
-    const consistency = score.consistency || 0;
+    const overallScore = score.overall_score || 0;
+    const confidenceLevel = score.confidence_level || 'low';
+    const coverage = score.coverage || {};
 
     const gradeEmoji = overallScore >= 90 ? 'A+' : overallScore >= 80 ? 'A' : overallScore >= 70 ? 'B' : overallScore >= 60 ? 'C' : 'D';
+    const confidenceLabel = confidenceLevel === 'high' ? '높음' : confidenceLevel === 'medium' ? '보통' : '낮음';
 
-    const message = `현재 데이터 품질 점수는 ${overallScore}점 (${gradeEmoji})입니다.\n\n` +
-      `• 완전성(Completeness): ${completeness}점\n` +
-      `• 최신성(Freshness): ${freshness}점\n` +
-      `• 일관성(Consistency): ${consistency}점` +
+    // 소스별 커버리지 표시
+    const sourceLabels: Record<string, string> = {
+      pos: 'POS/매출',
+      sensor: 'NEURALSENSE 센서',
+      crm: 'CRM/고객',
+      product: '상품 마스터',
+      erp: 'ERP/재고',
+    };
+
+    const coverageLines = Object.entries(sourceLabels).map(([key, label]) => {
+      const src = coverage[key];
+      if (!src) return `• ${label}: 미연동`;
+      const statusIcon = src.available ? '연동' : '미연동';
+      const count = src.record_count ? ` (${src.record_count.toLocaleString()}건)` : '';
+      return `• ${label}: ${statusIcon}${count}`;
+    }).join('\n');
+
+    const warningCount = score.warning_count || 0;
+    const warningNote = warningCount > 0 ? `\n\n${warningCount}건의 경고가 있습니다.` : '';
+
+    const message = `현재 데이터 품질 점수는 ${overallScore}점 (${gradeEmoji})입니다.\n신뢰도: ${confidenceLabel}\n\n${coverageLines}${warningNote}` +
       (!isOnControlTower ? '\n\n데이터 컨트롤타워로 이동합니다.' : '');
 
     return {
       actions: isOnControlTower ? [] : [{ type: 'navigate', target: '/data/control-tower' }],
       message,
-      suggestions: ['연결된 소스 뭐 있어?', '새 연결 추가해줘', '매출 알려줘'],
-      data: { overallScore, completeness, freshness, consistency },
+      suggestions: ['연결된 소스 뭐 있어?', '새 연결 추가해줘', '파이프라인 상태 확인'],
+      data: { overallScore, confidenceLevel, coverage },
     };
   } catch (error) {
     console.error('[queryDataQuality] Error:', error);
@@ -969,6 +993,8 @@ async function queryDataQuality(
 
 /**
  * 데이터 소스 연결 현황 조회
+ * RPC 응답 구조: data_sources는 Record<string, { name, description, status, last_sync }> (Object, NOT Array)
+ * + quality_score.coverage에서 record_count 가져옴
  */
 async function queryDataSources(
   supabase: SupabaseClient,
@@ -987,9 +1013,13 @@ async function queryDataSources(
     if (error) throw error;
 
     const status = data as any;
-    const sources = status?.data_sources || [];
+    const dataSources = status?.data_sources || {};
+    const coverage = status?.quality_score?.coverage || {};
 
-    if (sources.length === 0) {
+    // Object → Array 변환
+    const sourceEntries = Object.entries(dataSources) as [string, any][];
+
+    if (sourceEntries.length === 0) {
       return {
         actions: isOnControlTower ? [] : [{ type: 'navigate', target: '/data/control-tower' }],
         message: '현재 연결된 데이터 소스가 없습니다. 새 연결을 추가해 보세요.',
@@ -997,28 +1027,31 @@ async function queryDataSources(
       };
     }
 
-    const sourceList = sources.map((s: any) => {
-      const statusLabel = s.status === 'active' ? 'Active' : s.status === 'error' ? 'Error' : s.status;
-      const recordCount = s.record_count ? `${s.record_count.toLocaleString()}건` : '-';
-      return `• ${s.name || s.source_type}: ${statusLabel} (${recordCount})`;
+    const sourceList = sourceEntries.map(([key, src]) => {
+      const statusLabel = src.status === 'active' ? '활성' : src.status === 'error' ? '오류' : '비활성';
+      const statusIcon = src.status === 'active' ? '🟢' : src.status === 'error' ? '🔴' : '⚪';
+      // record_count는 coverage에서 가져옴
+      const coverageData = coverage[key];
+      const recordCount = coverageData?.record_count ? `${coverageData.record_count.toLocaleString()}건` : '-';
+      return `${statusIcon} ${src.name || key}: ${statusLabel} (${recordCount})`;
     }).join('\n');
 
-    const activeCount = sources.filter((s: any) => s.status === 'active').length;
-    const errorCount = sources.filter((s: any) => s.status === 'error').length;
+    const activeCount = sourceEntries.filter(([, src]) => src.status === 'active').length;
+    const errorCount = sourceEntries.filter(([, src]) => src.status === 'error').length;
 
     let summaryNote = '';
     if (errorCount > 0) {
-      summaryNote = `\n\n${errorCount}개 소스에 오류가 있습니다. 확인이 필요합니다.`;
+      summaryNote = `\n\n⚠️ ${errorCount}개 소스에 오류가 있습니다. 확인이 필요합니다.`;
     }
 
-    const message = `현재 ${sources.length}개 데이터 소스가 연결되어 있습니다 (활성: ${activeCount}개).\n\n${sourceList}${summaryNote}` +
+    const message = `현재 ${sourceEntries.length}개 데이터 소스가 연결되어 있습니다 (활성: ${activeCount}개).\n\n${sourceList}${summaryNote}` +
       (!isOnControlTower ? '\n\n데이터 컨트롤타워로 이동합니다.' : '');
 
     return {
       actions: isOnControlTower ? [] : [{ type: 'navigate', target: '/data/control-tower' }],
       message,
       suggestions: ['데이터 품질 점수 알려줘', '새 연결 추가해줘', '파이프라인 상태 확인'],
-      data: { totalSources: sources.length, activeCount, errorCount, sources },
+      data: { totalSources: sourceEntries.length, activeCount, errorCount },
     };
   } catch (error) {
     console.error('[queryDataSources] Error:', error);
@@ -1033,6 +1066,7 @@ async function queryDataSources(
 
 /**
  * 파이프라인 상태 조회
+ * RPC 응답 구조: pipeline_stats { raw_imports: {total,completed,failed,pending}, l2_records, l3_records, data_flows, pipeline_health, today_processed }
  */
 async function queryPipelineStatus(
   supabase: SupabaseClient,
@@ -1061,24 +1095,43 @@ async function queryPipelineStatus(
       };
     }
 
-    const totalRuns = pipeline.total_runs || 0;
-    const successRuns = pipeline.success_runs || 0;
-    const failedRuns = pipeline.failed_runs || 0;
-    const successRate = totalRuns > 0 ? Math.round((successRuns / totalRuns) * 100) : 0;
-    const lastRun = pipeline.last_run_at ? new Date(pipeline.last_run_at).toLocaleString('ko-KR') : '없음';
+    // raw_imports 통계
+    const rawImports = pipeline.raw_imports || {};
+    const totalImports = rawImports.total || 0;
+    const completedImports = rawImports.completed || 0;
+    const failedImports = rawImports.failed || 0;
+    const pendingImports = rawImports.pending || 0;
+
+    // 데이터 레이어 현황
+    const l2Records = pipeline.l2_records || 0;
+    const l3Records = pipeline.l3_records || 0;
+
+    // 파이프라인 건강 상태
+    const health = pipeline.pipeline_health || {};
+    const healthStatus = health.status === 'healthy' ? '정상' : health.status === 'warning' ? '주의' : '확인 필요';
+    const healthMessage = health.message || '';
+
+    // 오늘 처리 현황
+    const todayProcessed = pipeline.today_processed || {};
+
+    // 활성 데이터 흐름 수
+    const dataFlows = pipeline.data_flows || [];
+    const activeFlows = dataFlows.filter((f: any) => f.status === 'active').length;
 
     const message = `데이터 파이프라인 현황:\n\n` +
-      `• 총 실행: ${totalRuns}회\n` +
-      `• 성공: ${successRuns}회 (${successRate}%)\n` +
-      `• 실패: ${failedRuns}회\n` +
-      `• 마지막 실행: ${lastRun}` +
+      `• 상태: ${healthStatus}\n` +
+      `• 활성 소스: ${activeFlows}/${dataFlows.length}개\n` +
+      `• 원본 데이터(L1): 총 ${totalImports}건 (완료 ${completedImports}, 실패 ${failedImports}, 대기 ${pendingImports})\n` +
+      `• 변환 데이터(L2): ${l2Records.toLocaleString()}건\n` +
+      `• 집계 KPI(L3): ${l3Records.toLocaleString()}건` +
+      (healthMessage ? `\n\n${healthMessage}` : '') +
       (!isOnControlTower ? '\n\n데이터 컨트롤타워로 이동합니다.' : '');
 
     return {
       actions: isOnControlTower ? [] : [{ type: 'navigate', target: '/data/control-tower' }],
       message,
       suggestions: ['데이터 품질 점수 알려줘', '연결된 소스 확인', '매출 알려줘'],
-      data: { totalRuns, successRuns, failedRuns, successRate },
+      data: { totalImports, completedImports, failedImports, l2Records, l3Records, healthStatus },
     };
   } catch (error) {
     console.error('[queryPipelineStatus] Error:', error);
