@@ -61,6 +61,8 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
 - "활성 전략 뭐 있어?", "전략 추천해줘", "가격 최적화 추천", "재고 최적화"
 - "데이터 품질 점수 몇 점?", "연결된 소스 뭐야?", "파이프라인 상태 확인", "컨텍스트 데이터 소스 뭐 있어?", "날씨 데이터 확인"
 - "연결된 API 알려줘", "API 현황", "임포트 히스토리 보여줘", "데이터 임포트 내역"
+- "ROI 보여줘", "적용된 전략 알려줘", "전략 성과 어때?", "카테고리별 성과 보여줘"
+- "매장 관리 보여줘", "사용자 목록 알려줘", "현재 플랜 뭐야?", "라이선스 확인"
 
 **queryType 값:**
 
@@ -137,6 +139,19 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
 - apiConnections: API 연결, 연결된 API, API 현황, API 연결 목록
 - importHistory: 임포트 히스토리, 임포트 내역, 데이터 임포트, 업로드 이력
 
+*ROI 측정:*
+- roiSummary: ROI 요약, ROI 현황, ROI 얼마, ROI 보여줘, 성과 요약
+- appliedStrategies: 적용된 전략, 적용 전략, 전략 이력, 적용 이력, 전략 히스토리
+- categoryPerformance: 카테고리별 성과, 2D 성과, 3D 성과, 전략 카테고리, 시뮬레이션 성과
+- roiInsight: ROI 인사이트, ROI 분석, 전략 분석
+
+*설정 & 관리:*
+- storeManagement: 매장 관리, 매장 목록, 매장 설정, 등록된 매장
+- userManagement: 사용자 관리, 팀원 관리, 멤버, 멤버 목록, 사용자 목록
+- subscriptionInfo: 구독 정보, 플랜, 라이선스, 요금제, 구독 현황, 현재 플랜
+- systemSettings: 시스템 설정, 조직 설정, 알림 설정, 타임존 설정, 알림
+- dataSettings: 데이터 설정, 그래프 엔티티, 온톨로지, 커넥터 관리, API 커넥터
+
 ### 2. navigate (페이지 이동)
 다른 페이지로 이동하려는 의도
 - "인사이트 허브로 가줘", "스튜디오 열어줘"
@@ -173,6 +188,13 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
 - 재고: inventory-kpi-cards, inventory-distribution, inventory-category, inventory-risk, inventory-movements, inventory-detail
 - 예측: prediction-kpi-cards, prediction-revenue, prediction-visitors, prediction-conversion, prediction-daily, prediction-model
 - AI추천: ai-active-strategies, ai-predict, ai-optimize, ai-recommend, ai-execute
+- ROI 측정: roi-summary, strategy-performance, applied-strategies, roi-analysis
+- 데이터 컨트롤타워: data-quality, data-sources, data-import, api-connections, pipeline, model-upload
+- 설정(매장관리): settings-store-list
+- 설정(데이터): settings-data-stats, settings-api-connections
+- 설정(사용자): settings-members
+- 설정(시스템): settings-org
+- 설정(플랜): settings-subscription
 
 ### 5. open_modal (모달/팝업 열기)
 설정 창이나 입력 폼을 **열려는** 의도 (확인이 아닌 설정/변경)
@@ -252,6 +274,23 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
 ### "AI추천" 요청 해석
 - "AI추천 보여줘", "AI추천 탭 보여줘", "ai추천 탭" → set_tab (tab: "ai") - AI추천 탭 전환
 - "활성 전략 보여줘", "전략 추천해줘" → query_kpi - AI추천 탭의 특정 데이터 조회
+
+### "ROI" 요청 해석
+- "ROI 보여줘", "ROI 얼마야?", "ROI 현황" → query_kpi (queryType: roiSummary)
+- "적용된 전략 뭐야?", "전략 이력 보여줘" → query_kpi (queryType: appliedStrategies)
+- "카테고리별 성과", "2D/3D 성과 비교" → query_kpi (queryType: categoryPerformance)
+- "ROI 분석해줘", "ROI 인사이트" → query_kpi (queryType: roiInsight)
+- "ROI 측정 페이지로 가줘" → navigate (page: "/roi")
+
+### "설정" 요청 해석
+- "매장 관리 보여줘", "등록된 매장 알려줘" → query_kpi (queryType: storeManagement)
+- "사용자 목록", "팀원 몇 명?" → query_kpi (queryType: userManagement)
+- "현재 플랜 뭐야?", "라이선스 확인" → query_kpi (queryType: subscriptionInfo)
+- "시스템 설정 보여줘", "알림 설정 확인" → query_kpi (queryType: systemSettings)
+- "데이터 설정", "커넥터 관리" → query_kpi (queryType: dataSettings)
+- "사용자 초대해줘" → open_modal (modalId: invite-user)
+- "플랜 업그레이드" → open_modal (modalId: plan-upgrade)
+- "매장 관리 탭 열어줘" → set_tab (tab: "store-management")
 
 ### 중복 위치 용어 처리 (중의성 해소)
 일부 용어는 여러 탭에 존재합니다. 이 경우 **현재 컨텍스트**를 고려하세요:

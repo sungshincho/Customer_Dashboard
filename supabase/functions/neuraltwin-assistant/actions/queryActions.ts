@@ -88,12 +88,23 @@ const QUERY_TYPE_TO_TAB: Record<string, { page: string; tab?: string; section?: 
   riskPrediction: { page: '/insights', tab: 'ai', section: 'ai-predict' },
   campaignStatus: { page: '/insights', tab: 'ai', section: 'ai-execute' },
   // 데이터 컨트롤타워 쿼리 (탭 없음)
-  dataQuality: { page: '/data/control-tower', section: 'data-sources' },
+  dataQuality: { page: '/data/control-tower', section: 'data-quality' },
   dataSources: { page: '/data/control-tower', section: 'data-sources' },
   contextDataSources: { page: '/data/control-tower', section: 'data-sources' },
-  apiConnections: { page: '/data/control-tower', section: 'data-sources' },
-  importHistory: { page: '/data/control-tower', section: 'data-sources' },
-  pipelineStatus: { page: '/data/control-tower', section: 'data-sources' },
+  apiConnections: { page: '/data/control-tower', section: 'api-connections' },
+  importHistory: { page: '/data/control-tower', section: 'data-import' },
+  pipelineStatus: { page: '/data/control-tower', section: 'pipeline' },
+  // ROI 측정 쿼리 (탭 없음)
+  roiSummary: { page: '/roi', section: 'roi-summary' },
+  appliedStrategies: { page: '/roi', section: 'applied-strategies' },
+  categoryPerformance: { page: '/roi', section: 'strategy-performance' },
+  roiInsight: { page: '/roi', section: 'roi-analysis' },
+  // 설정 & 관리 쿼리 (탭별)
+  storeManagement: { page: '/settings', tab: 'store-management', section: 'settings-store-list' },
+  userManagement: { page: '/settings', tab: 'users', section: 'settings-members' },
+  subscriptionInfo: { page: '/settings', tab: 'plan', section: 'settings-subscription' },
+  systemSettings: { page: '/settings', tab: 'system', section: 'settings-org' },
+  dataSettings: { page: '/settings', tab: 'data', section: 'settings-data-stats' },
 };
 
 /**
@@ -159,6 +170,17 @@ function getTermKeyword(queryType: string): string {
     seasonTrend: '시즌 트렌드',
     riskPrediction: '리스크 예측',
     campaignStatus: '캠페인 현황',
+    // ROI 측정
+    roiSummary: 'ROI 요약',
+    appliedStrategies: '적용된 전략',
+    categoryPerformance: '카테고리별 성과',
+    roiInsight: 'ROI 인사이트',
+    // 설정 & 관리
+    storeManagement: '매장 관리',
+    userManagement: '사용자 관리',
+    subscriptionInfo: '구독 정보',
+    systemSettings: '시스템 설정',
+    dataSettings: '데이터 설정',
   };
   return termMap[queryType] || '매출';
 }
@@ -240,8 +262,27 @@ function getTabDisplayName(tabId: string): string {
     inventory: '재고',
     prediction: '예측',
     ai: 'AI추천',
+    'store-management': '매장 관리',
+    data: '데이터',
+    users: '사용자',
+    system: '시스템',
+    plan: '플랜',
   };
   return tabNames[tabId] || tabId;
+}
+
+/**
+ * 페이지 이름을 한글로 변환
+ */
+function getPageDisplayName(pagePath: string): string {
+  const pageNames: Record<string, string> = {
+    '/insights': '인사이트 허브',
+    '/studio': '디지털트윈 스튜디오',
+    '/roi': 'ROI 측정',
+    '/settings': '설정',
+    '/data/control-tower': '데이터 컨트롤타워',
+  };
+  return pageNames[pagePath] || pagePath;
 }
 
 /**
@@ -253,14 +294,26 @@ function createGenericNavigationResult(
   pageContext?: PageContext
 ): QueryActionResult {
   const termKeyword = getTermKeyword(queryType);
+  const mapping = QUERY_TYPE_TO_TAB[queryType] || QUERY_TYPE_TO_TAB.summary;
   const { actions, tabChanged, targetTab } = createNavigationActions(queryType, dateRange, pageContext);
-  const tabName = getTabDisplayName(targetTab);
 
-  let message = `${termKeyword} 정보를 확인하시려면 ${tabName} 탭을 확인해주세요.`;
-  if (tabChanged) {
-    message = `${tabName} 탭의 ${termKeyword} 섹션으로 이동합니다.`;
+  let message: string;
+  if (targetTab) {
+    // 탭이 있는 페이지 (인사이트 허브, 설정)
+    const tabName = getTabDisplayName(targetTab);
+    if (tabChanged) {
+      message = `${tabName} 탭의 ${termKeyword} 섹션으로 이동합니다.`;
+    } else {
+      message = `현재 ${tabName} 탭에서 ${termKeyword}을(를) 확인할 수 있습니다.`;
+    }
   } else {
-    message = `현재 ${tabName} 탭에서 ${termKeyword}을(를) 확인할 수 있습니다.`;
+    // 탭이 없는 페이지 (ROI, 데이터 컨트롤타워)
+    const pageName = getPageDisplayName(mapping.page);
+    if (tabChanged) {
+      message = `${pageName} 페이지의 ${termKeyword} 섹션으로 이동합니다.`;
+    } else {
+      message = `현재 ${pageName} 페이지에서 ${termKeyword}을(를) 확인할 수 있습니다.`;
+    }
   }
 
   return {
@@ -499,6 +552,29 @@ export async function handleQueryKpi(
         break;
       case 'pipelineStatus':
         result = await queryPipelineStatus(supabase, storeId, pageContext);
+        break;
+
+      // ROI 측정
+      case 'roiSummary':
+        result = await queryROISummary(supabase, storeId, dateRange, pageContext);
+        break;
+      case 'appliedStrategies':
+        result = await queryAppliedStrategies(supabase, storeId, dateRange, pageContext);
+        break;
+      case 'categoryPerformance':
+        result = await queryROICategoryPerformance(supabase, storeId, dateRange, pageContext);
+        break;
+      case 'roiInsight':
+        result = createGenericNavigationResult(queryType, dateRange, pageContext);
+        break;
+
+      // 설정 & 관리
+      case 'storeManagement':
+      case 'userManagement':
+      case 'subscriptionInfo':
+      case 'systemSettings':
+      case 'dataSettings':
+        result = createGenericNavigationResult(queryType, dateRange, pageContext);
         break;
 
       case 'summary':
@@ -2195,6 +2271,205 @@ async function queryAIRecommendation(
         suggestions: ['AI추천탭 보여줘'],
         data: null,
       };
+  }
+}
+
+// ============================================
+// ROI 측정 전용 쿼리 핸들러
+// ============================================
+
+/**
+ * ROI 요약 KPI 조회
+ * applied_strategies 테이블에서 집계
+ */
+async function queryROISummary(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
+): Promise<QueryActionResult> {
+  const isOnROI = pageContext?.current === '/roi';
+
+  try {
+    const { data: storeData } = await supabase
+      .from('stores').select('org_id').eq('id', storeId).single();
+    const orgId = storeData?.org_id;
+
+    const { data, error } = await supabase
+      .from('applied_strategies')
+      .select('id, status, result, final_roi, current_roi, expected_roi, actual_revenue, expected_revenue, source, source_module, name, start_date, end_date')
+      .eq('store_id', storeId)
+      .gte('start_date', dateRange.startDate)
+      .lte('start_date', dateRange.endDate);
+
+    if (error || !data || data.length === 0) {
+      return {
+        actions: isOnROI ? [] : [{ type: 'navigate', target: '/roi' }],
+        message: `해당 기간에 적용된 전략이 없습니다.${!isOnROI ? ' ROI 측정 페이지로 이동합니다.' : ''}`,
+        suggestions: ['기간 변경해줘', '전체 기간으로 보여줘', '인사이트 허브로 가줘'],
+      };
+    }
+
+    const totalApplied = data.length;
+    const successCount = data.filter((s: any) => s.result === 'success' || s.status === 'completed').length;
+    const successRate = totalApplied > 0 ? Math.round((successCount / totalApplied) * 100) : 0;
+    const rois = data.filter((s: any) => s.final_roi != null || s.current_roi != null);
+    const avgRoi = rois.length > 0
+      ? Math.round(rois.reduce((sum, s: any) => sum + (s.final_roi ?? s.current_roi ?? 0), 0) / rois.length)
+      : 0;
+    const totalRevenueImpact = data.reduce((sum, s: any) => sum + (s.actual_revenue || 0), 0);
+
+    const message = `ROI 요약 (${dateRange.startDate} ~ ${dateRange.endDate}):\n` +
+      `• 총 적용 전략: ${totalApplied}개\n` +
+      `• 성공률: ${successRate}%\n` +
+      `• 평균 ROI: ${avgRoi}%\n` +
+      `• 총 추가매출: ${formatNumber(totalRevenueImpact)}원` +
+      (!isOnROI ? '\n\nROI 측정 페이지로 이동합니다.' : '');
+
+    return {
+      actions: isOnROI ? [] : [{ type: 'navigate', target: '/roi' }],
+      message,
+      suggestions: ['적용된 전략 이력 보여줘', '카테고리별 성과 보여줘', '인사이트 허브로 가줘'],
+      data: { totalApplied, successRate, avgRoi, totalRevenueImpact },
+    };
+  } catch (error) {
+    console.error('[queryROISummary] Error:', error);
+    return {
+      actions: isOnROI ? [] : [{ type: 'navigate', target: '/roi' }],
+      message: 'ROI 데이터를 조회하는 중 오류가 발생했습니다.',
+      suggestions: ['ROI 측정 페이지로 가줘', '매출 알려줘'],
+    };
+  }
+}
+
+/**
+ * 적용된 전략 이력 조회
+ */
+async function queryAppliedStrategies(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
+): Promise<QueryActionResult> {
+  const isOnROI = pageContext?.current === '/roi';
+
+  try {
+    const { data, error } = await supabase
+      .from('applied_strategies')
+      .select('id, name, source, source_module, status, result, final_roi, current_roi, actual_revenue, start_date')
+      .eq('store_id', storeId)
+      .order('start_date', { ascending: false })
+      .limit(10);
+
+    if (error || !data || data.length === 0) {
+      return {
+        actions: isOnROI ? [] : [{ type: 'navigate', target: '/roi' }],
+        message: `적용된 전략 이력이 없습니다.${!isOnROI ? ' ROI 측정 페이지로 이동합니다.' : ''}`,
+        suggestions: ['AI추천탭 보여줘', '인사이트 허브로 가줘'],
+      };
+    }
+
+    const statusLabels: Record<string, string> = {
+      completed: '완료', active: '진행중', pending: '대기', failed: '실패',
+    };
+    const resultLabels: Record<string, string> = {
+      success: '성공', failure: '실패', partial: '부분성공', pending: '대기',
+    };
+
+    const strategyList = data.slice(0, 5).map((s: any) => {
+      const status = statusLabels[s.status] || s.status || '-';
+      const result = s.result ? (resultLabels[s.result] || s.result) : '-';
+      const roi = s.final_roi ?? s.current_roi;
+      const roiStr = roi != null ? ` (ROI: ${roi}%)` : '';
+      return `• ${s.name || s.source_module || '전략'}: ${status}/${result}${roiStr}`;
+    }).join('\n');
+
+    const message = `최근 적용된 전략 (${data.length}건):\n\n${strategyList}` +
+      (!isOnROI ? '\n\nROI 측정 페이지로 이동합니다.' : '');
+
+    return {
+      actions: isOnROI ? [] : [{ type: 'navigate', target: '/roi' }],
+      message,
+      suggestions: ['ROI 요약 보여줘', '카테고리별 성과 보여줘', 'AI추천탭 보여줘'],
+      data: { strategies: data },
+    };
+  } catch (error) {
+    console.error('[queryAppliedStrategies] Error:', error);
+    return {
+      actions: isOnROI ? [] : [{ type: 'navigate', target: '/roi' }],
+      message: '적용된 전략 이력을 조회하는 중 오류가 발생했습니다.',
+      suggestions: ['ROI 측정 페이지로 가줘'],
+    };
+  }
+}
+
+/**
+ * ROI 카테고리별 성과 조회 (2D/3D 시뮬레이션)
+ */
+async function queryROICategoryPerformance(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
+): Promise<QueryActionResult> {
+  const isOnROI = pageContext?.current === '/roi';
+
+  try {
+    const { data, error } = await supabase
+      .from('applied_strategies')
+      .select('source, source_module, status, result, final_roi, current_roi, actual_revenue')
+      .eq('store_id', storeId)
+      .gte('start_date', dateRange.startDate)
+      .lte('start_date', dateRange.endDate);
+
+    if (error || !data || data.length === 0) {
+      return {
+        actions: isOnROI ? [] : [{ type: 'navigate', target: '/roi' }],
+        message: `해당 기간에 카테고리별 성과 데이터가 없습니다.${!isOnROI ? ' ROI 측정 페이지로 이동합니다.' : ''}`,
+        suggestions: ['기간 변경해줘', 'ROI 요약 보여줘'],
+      };
+    }
+
+    // source별 (insight_hub = 2D, studio = 3D) 그룹핑
+    const sourceLabels: Record<string, string> = {
+      insight_hub: '2D 시뮬레이션 (인사이트 허브)',
+      studio: '3D 시뮬레이션 (디지털트윈)',
+    };
+
+    const grouped: Record<string, { count: number; successCount: number; totalRevenue: number; totalRoi: number; roiCount: number }> = {};
+    data.forEach((s: any) => {
+      const key = s.source || 'other';
+      if (!grouped[key]) grouped[key] = { count: 0, successCount: 0, totalRevenue: 0, totalRoi: 0, roiCount: 0 };
+      grouped[key].count++;
+      if (s.result === 'success' || s.status === 'completed') grouped[key].successCount++;
+      grouped[key].totalRevenue += s.actual_revenue || 0;
+      const roi = s.final_roi ?? s.current_roi;
+      if (roi != null) { grouped[key].totalRoi += roi; grouped[key].roiCount++; }
+    });
+
+    const lines = Object.entries(grouped).map(([source, g]) => {
+      const label = sourceLabels[source] || source;
+      const avgRoi = g.roiCount > 0 ? Math.round(g.totalRoi / g.roiCount) : 0;
+      const successRate = g.count > 0 ? Math.round((g.successCount / g.count) * 100) : 0;
+      return `[${label}]\n  전략 수: ${g.count}개 | 성공률: ${successRate}% | 평균 ROI: ${avgRoi}% | 추가매출: ${formatNumber(g.totalRevenue)}원`;
+    }).join('\n\n');
+
+    const message = `카테고리별 성과:\n\n${lines}` +
+      (!isOnROI ? '\n\nROI 측정 페이지로 이동합니다.' : '');
+
+    return {
+      actions: isOnROI ? [] : [{ type: 'navigate', target: '/roi' }],
+      message,
+      suggestions: ['ROI 요약 보여줘', '적용된 전략 이력 보여줘', '인사이트 허브로 가줘'],
+      data: { categories: grouped },
+    };
+  } catch (error) {
+    console.error('[queryROICategoryPerformance] Error:', error);
+    return {
+      actions: isOnROI ? [] : [{ type: 'navigate', target: '/roi' }],
+      message: '카테고리별 성과를 조회하는 중 오류가 발생했습니다.',
+      suggestions: ['ROI 측정 페이지로 가줘'],
+    };
   }
 }
 
