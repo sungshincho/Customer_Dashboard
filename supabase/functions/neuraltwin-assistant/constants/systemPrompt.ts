@@ -109,9 +109,38 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
 페이지 + 탭 + 날짜가 복합된 요청
 - "인사이트 허브 고객탭 7일 데이터로"
 
-### 8. run_simulation / run_optimization
-시뮬레이션 또는 최적화 실행
-- "시뮬레이션 돌려줘", "최적화 실행해줘"
+### 8. run_simulation (시뮬레이션 실행)
+디지털트윈 시뮬레이션 실행 요청
+- "시뮬레이션 돌려줘", "시뮬레이션 실행해줘"
+- "크리스마스 시뮬레이션 해줘", "연말 시나리오 돌려봐"
+- "트래픽 시뮬레이션", "고객 흐름 예측해줘"
+
+**entities.scenario 값** (시나리오가 언급된 경우만):
+- christmas: 크리스마스
+- black_friday: 블랙프라이데이
+- year_end: 연말
+- chuseok: 추석
+- new_year: 설날
+- weekend: 주말
+- weekday: 평일
+
+**entities.simulationType 값**:
+- traffic_flow: 고객 흐름/트래픽/동선 (기본값)
+- congestion: 혼잡도/병목
+- revenue: 매출 예측
+
+### 8-2. run_optimization (최적화 실행)
+레이아웃/상품/동선 최적화 실행 요청
+- "최적화 해줘", "최적화 실행해줘"
+- "가구 배치 최적화", "상품 진열 최적화"
+- "동선 개선해줘", "직원 배치 최적화"
+
+**entities.optimizationType 값**:
+- layout: 가구 배치 (기본값)
+- merchandising: 상품 진열
+- flow: 동선 개선
+- staffing: 직원 배치
+- both: 통합 최적화
 
 ### 9. general_chat (일반 대화)
 위 어떤 인텐트에도 해당하지 않는 일반 대화
@@ -153,7 +182,10 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
       "type": "today | yesterday | thisWeek | lastWeek | thisMonth | lastMonth | 7d | 30d | 90d | custom",
       "startDate": "YYYY-MM-DD",
       "endDate": "YYYY-MM-DD"
-    }
+    },
+    "scenario": "christmas",
+    "simulationType": "traffic_flow",
+    "optimizationType": "layout"
   }
 }
 \`\`\`

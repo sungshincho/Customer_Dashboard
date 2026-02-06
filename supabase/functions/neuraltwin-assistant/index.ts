@@ -8,6 +8,7 @@ import { classifyIntent } from './intent/classifier.ts';
 import { dispatchNavigationAction, UIAction } from './actions/navigationActions.ts';
 import { handleGeneralChat } from './actions/chatActions.ts';
 import { handleQueryKpi } from './actions/queryActions.ts';
+import { handleRunSimulation, handleRunOptimization } from './actions/executionActions.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -146,6 +147,12 @@ Deno.serve(async (req) => {
         message: queryResult.message,
         suggestions: queryResult.suggestions,
       };
+    } else if (classification.intent === 'run_simulation') {
+      // 시뮬레이션 실행 (Phase 3-C) - 스튜디오 이동 + 실행 이벤트 발행
+      actionResult = handleRunSimulation(classification, context);
+    } else if (classification.intent === 'run_optimization') {
+      // 최적화 실행 (Phase 3-C) - 스튜디오 이동 + 실행 이벤트 발행
+      actionResult = handleRunOptimization(classification, context);
     } else if (classification.intent === 'general_chat') {
       // 일반 대화 (AI 응답)
       const chatResult = await handleGeneralChat(message, [], context);
