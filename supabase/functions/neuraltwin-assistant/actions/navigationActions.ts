@@ -432,13 +432,15 @@ function getSuggestionsForPage(page: string): string[] {
       ];
     case '/roi':
       return [
-        '90일 기간으로 변경해줘',
-        '적용된 전략 보여줘',
+        'ROI 요약 보여줘',
+        '적용된 전략 이력 보여줘',
+        '카테고리별 성과 보여줘',
       ];
     case '/settings':
       return [
         '매장 관리 탭 열어줘',
-        '데이터 연결 추가해줘',
+        '사용자 목록 보여줘',
+        '현재 플랜 확인해줘',
       ];
     case '/data/control-tower':
       return [

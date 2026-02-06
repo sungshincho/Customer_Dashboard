@@ -47,11 +47,49 @@ export const DASHBOARD_STRUCTURE: DashboardPage[] = [
     aliases: ['컨트롤타워', '데이터 컨트롤', 'data control tower', '데이터컨트롤타워'],
     sections: [
       {
+        id: 'data-quality',
+        name: '데이터 품질 점수',
+        components: [
+          { id: 'quality-score-card', name: '품질 점수 카드', aliases: ['품질 점수', '데이터 품질', '품질'] },
+        ],
+      },
+      {
         id: 'data-sources',
         name: '데이터 소스',
         components: [
           { id: 'connection-list', name: '연결 목록', aliases: ['데이터 연결', '소스 목록'] },
           { id: 'add-connection', name: '새 연결 추가', aliases: ['연결 추가', '소스 추가'] },
+          { id: 'business-sources', name: '비즈니스 데이터 소스', aliases: ['비즈니스 소스', 'POS', '센서'] },
+          { id: 'context-sources', name: '컨텍스트 데이터 소스', aliases: ['컨텍스트 소스', '날씨', '공휴일'] },
+        ],
+      },
+      {
+        id: 'data-import',
+        name: '데이터 임포트',
+        components: [
+          { id: 'import-widget', name: '데이터 임포트 위젯', aliases: ['임포트', '파일 업로드'] },
+          { id: 'import-history', name: '임포트 히스토리', aliases: ['임포트 내역', '업로드 이력'] },
+        ],
+      },
+      {
+        id: 'api-connections',
+        name: 'API 연결',
+        components: [
+          { id: 'api-list', name: 'API 연결 목록', aliases: ['API 목록', 'API 현황'] },
+        ],
+      },
+      {
+        id: 'pipeline',
+        name: '데이터 흐름',
+        components: [
+          { id: 'pipeline-timeline', name: '파이프라인 타임라인', aliases: ['데이터 흐름', '파이프라인', 'ETL'] },
+        ],
+      },
+      {
+        id: 'model-upload',
+        name: '3D 모델 업로드',
+        components: [
+          { id: '3d-upload', name: '3D 모델 업로드', aliases: ['모델 업로드', '3D 업로드', 'GLB 업로드'] },
         ],
       },
     ],
@@ -390,10 +428,40 @@ export const DASHBOARD_STRUCTURE: DashboardPage[] = [
   {
     path: '/roi',
     name: 'ROI 측정',
-    aliases: ['ROI', 'roi', '알오아이', 'ROI측정'],
+    aliases: ['ROI', 'roi', '알오아이', 'ROI측정', 'ROI 분석', 'roi측정'],
     sections: [
-      { id: 'strategy-performance', name: '전략 성과' },
-      { id: 'roi-analysis', name: 'ROI 분석' },
+      {
+        id: 'roi-summary',
+        name: 'ROI 요약 KPI',
+        components: [
+          { id: 'total-applied', name: '총 적용 전략', aliases: ['적용 전략 수', '총 적용'] },
+          { id: 'success-rate', name: '성공률', aliases: ['전략 성공률'] },
+          { id: 'average-roi', name: '평균 ROI', aliases: ['ROI 수치', 'ROI 평균'] },
+          { id: 'revenue-impact', name: '총 추가매출', aliases: ['매출 효과', '추가 매출'] },
+        ],
+      },
+      {
+        id: 'strategy-performance',
+        name: '카테고리별 성과',
+        components: [
+          { id: '2d-simulation', name: '2D 시뮬레이션 성과', aliases: ['인사이트 허브 전략', '2D 성과'] },
+          { id: '3d-simulation', name: '3D 시뮬레이션 성과', aliases: ['디지털트윈 전략', '3D 성과'] },
+        ],
+      },
+      {
+        id: 'applied-strategies',
+        name: '적용된 전략 이력',
+        components: [
+          { id: 'strategy-table', name: '전략 이력 테이블', aliases: ['적용 이력', '전략 히스토리'] },
+        ],
+      },
+      {
+        id: 'roi-analysis',
+        name: 'AI 인사이트',
+        components: [
+          { id: 'ai-insight-card', name: 'AI 분석 인사이트', aliases: ['ROI 인사이트', 'AI 분석'] },
+        ],
+      },
     ],
   },
   {
@@ -405,26 +473,81 @@ export const DASHBOARD_STRUCTURE: DashboardPage[] = [
         id: 'store-management',
         name: '매장 관리',
         aliases: ['매장관리', '매장설정', 'stores'],
+        sections: [
+          {
+            id: 'settings-store-list',
+            name: '매장 목록',
+            components: [
+              { id: 'store-table', name: '매장 테이블', aliases: ['매장 목록', '매장 리스트'] },
+            ],
+          },
+        ],
       },
       {
         id: 'data',
         name: '데이터',
         aliases: ['데이터탭', '데이터설정'],
+        sections: [
+          {
+            id: 'settings-data-stats',
+            name: '데이터 통계',
+            components: [
+              { id: 'graph-entities', name: '그래프 엔티티', aliases: ['엔티티', '지식그래프'] },
+              { id: 'graph-relations', name: '그래프 관계', aliases: ['관계', '릴레이션'] },
+            ],
+          },
+          {
+            id: 'settings-api-connections',
+            name: 'API 연결 관리',
+            components: [
+              { id: 'connector-list', name: '커넥터 목록', aliases: ['API 커넥터', '커넥터'] },
+            ],
+          },
+        ],
       },
       {
         id: 'users',
         name: '사용자',
         aliases: ['사용자탭', '사용자관리', '팀원'],
+        sections: [
+          {
+            id: 'settings-members',
+            name: '멤버 관리',
+            components: [
+              { id: 'member-table', name: '멤버 테이블', aliases: ['사용자 목록', '팀원 목록'] },
+            ],
+          },
+        ],
       },
       {
         id: 'system',
         name: '시스템',
         aliases: ['시스템탭', '시스템설정'],
+        sections: [
+          {
+            id: 'settings-org',
+            name: '조직 설정',
+            components: [
+              { id: 'org-settings', name: '조직 정보', aliases: ['조직', '회사 정보'] },
+              { id: 'notification-settings', name: '알림 설정', aliases: ['알림', '노티'] },
+            ],
+          },
+        ],
       },
       {
         id: 'plan',
         name: '플랜',
         aliases: ['플랜탭', '구독', '요금제', 'license'],
+        sections: [
+          {
+            id: 'settings-subscription',
+            name: '구독 정보',
+            components: [
+              { id: 'subscription-info', name: '구독 현황', aliases: ['플랜 현황', '라이선스 현황'] },
+              { id: 'license-table', name: '라이선스 목록', aliases: ['라이선스', '라이선스 키'] },
+            ],
+          },
+        ],
       },
     ],
   },
@@ -813,15 +936,150 @@ export const TERM_LOCATION_MAP: Record<string, TermLocationEntry> = {
     primary: { page: '/insights', tab: 'ai', section: 'ai-execute' },
   },
 
-  // ===== 스튜디오/ROI 용어 =====
+  // ===== 스튜디오 용어 =====
   '시뮬레이션': {
     primary: { page: '/studio', tab: 'ai-simulation' },
   },
-  '최적화': {
-    primary: { page: '/studio', tab: 'ai-optimization' },
-  },
+
+  // ===== ROI 측정 용어 =====
   'ROI': {
+    primary: { page: '/roi', section: 'roi-summary' },
+  },
+  'ROI 분석': {
     primary: { page: '/roi', section: 'roi-analysis' },
+  },
+  'ROI 측정': {
+    primary: { page: '/roi', section: 'roi-summary' },
+  },
+  '전략 성과': {
+    primary: { page: '/roi', section: 'strategy-performance' },
+  },
+  '적용된 전략': {
+    primary: { page: '/roi', section: 'applied-strategies' },
+  },
+  '적용 전략': {
+    primary: { page: '/roi', section: 'applied-strategies' },
+  },
+  '성공률': {
+    primary: { page: '/roi', section: 'roi-summary', component: 'success-rate' },
+  },
+  '평균 ROI': {
+    primary: { page: '/roi', section: 'roi-summary', component: 'average-roi' },
+  },
+  '추가매출': {
+    primary: { page: '/roi', section: 'roi-summary', component: 'revenue-impact' },
+  },
+  '총 추가매출': {
+    primary: { page: '/roi', section: 'roi-summary', component: 'revenue-impact' },
+  },
+  '매출 효과': {
+    primary: { page: '/roi', section: 'roi-summary', component: 'revenue-impact' },
+  },
+  '카테고리별 성과': {
+    primary: { page: '/roi', section: 'strategy-performance' },
+  },
+  '2D 시뮬레이션 성과': {
+    primary: { page: '/roi', section: 'strategy-performance', component: '2d-simulation' },
+  },
+  '3D 시뮬레이션 성과': {
+    primary: { page: '/roi', section: 'strategy-performance', component: '3d-simulation' },
+  },
+
+  // ===== 데이터 컨트롤타워 용어 =====
+  '데이터 품질': {
+    primary: { page: '/data/control-tower', section: 'data-quality' },
+  },
+  '데이터 품질 점수': {
+    primary: { page: '/data/control-tower', section: 'data-quality' },
+  },
+  '품질 점수': {
+    primary: { page: '/data/control-tower', section: 'data-quality' },
+  },
+  '데이터 소스': {
+    primary: { page: '/data/control-tower', section: 'data-sources' },
+  },
+  '연결된 소스': {
+    primary: { page: '/data/control-tower', section: 'data-sources' },
+  },
+  '비즈니스 데이터': {
+    primary: { page: '/data/control-tower', section: 'data-sources', component: 'business-sources' },
+  },
+  '컨텍스트 데이터': {
+    primary: { page: '/data/control-tower', section: 'data-sources', component: 'context-sources' },
+  },
+  '날씨 데이터': {
+    primary: { page: '/data/control-tower', section: 'data-sources', component: 'context-sources' },
+  },
+  'API 연결': {
+    primary: { page: '/data/control-tower', section: 'api-connections' },
+  },
+  'API 현황': {
+    primary: { page: '/data/control-tower', section: 'api-connections' },
+  },
+  '파이프라인': {
+    primary: { page: '/data/control-tower', section: 'pipeline' },
+  },
+  '데이터 흐름': {
+    primary: { page: '/data/control-tower', section: 'pipeline' },
+  },
+  '임포트 히스토리': {
+    primary: { page: '/data/control-tower', section: 'data-import', component: 'import-history' },
+  },
+  '임포트 내역': {
+    primary: { page: '/data/control-tower', section: 'data-import', component: 'import-history' },
+  },
+  '3D 모델 업로드': {
+    primary: { page: '/data/control-tower', section: 'model-upload' },
+  },
+
+  // ===== 설정 & 관리 용어 =====
+  '매장 관리': {
+    primary: { page: '/settings', tab: 'store-management' },
+  },
+  '매장 설정': {
+    primary: { page: '/settings', tab: 'store-management' },
+  },
+  '사용자 관리': {
+    primary: { page: '/settings', tab: 'users' },
+  },
+  '사용자 초대': {
+    primary: { page: '/settings', tab: 'users' },
+  },
+  '팀원 관리': {
+    primary: { page: '/settings', tab: 'users' },
+  },
+  '시스템 설정': {
+    primary: { page: '/settings', tab: 'system' },
+  },
+  '알림 설정': {
+    primary: { page: '/settings', tab: 'system' },
+  },
+  '조직 설정': {
+    primary: { page: '/settings', tab: 'system' },
+  },
+  '플랜': {
+    primary: { page: '/settings', tab: 'plan' },
+  },
+  '구독': {
+    primary: { page: '/settings', tab: 'plan' },
+  },
+  '라이선스': {
+    primary: { page: '/settings', tab: 'plan' },
+  },
+  '요금제': {
+    primary: { page: '/settings', tab: 'plan' },
+  },
+  '플랜 업그레이드': {
+    primary: { page: '/settings', tab: 'plan' },
+  },
+  '데이터 설정': {
+    primary: { page: '/settings', tab: 'data' },
+  },
+  '그래프 엔티티': {
+    primary: { page: '/settings', tab: 'data' },
+  },
+  'API 커넥터': {
+    primary: { page: '/settings', tab: 'data' },
   },
 };
 
