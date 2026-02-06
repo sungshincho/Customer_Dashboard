@@ -3,7 +3,7 @@
 // 데이터 컨트롤타워 - 통합 데이터 관리 대시보드
 // ============================================================================
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -78,6 +78,18 @@ export default function DataControlTowerPage() {
       attributeFilter: ['class'],
     });
     return () => observer.disconnect();
+  }, []);
+
+  // AI 어시스턴트 모달 이벤트 리스너 (assistant:open-modal)
+  useEffect(() => {
+    const handleOpenModal = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.modalId === 'new-connection') {
+        setShowAddConnector(true);
+      }
+    };
+    window.addEventListener('assistant:open-modal', handleOpenModal);
+    return () => window.removeEventListener('assistant:open-modal', handleOpenModal);
   }, []);
 
   // 컨텍스트 데이터(공휴일) 자동 동기화 - 페이지 로드 시 1회

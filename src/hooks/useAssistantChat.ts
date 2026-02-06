@@ -1,22 +1,18 @@
 /**
  * AI 연동 채팅 훅
- * 기존 useChatPanel과 동일한 인터페이스 유지
+ * Zustand chatStore 기반 - 라우트 변경 시에도 상태 유지
  */
 
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { useLocation } from 'react-router-dom';
 import { useDateFilterStore } from '@/store/dateFilterStore';
 import { useActionDispatcher } from '@/features/assistant/hooks/useActionDispatcher';
+import { useChatStore, type ChatMessage } from '@/store/chatStore';
 
-export interface ChatMessage {
-  id: string;
-  content: string;
-  sender: 'user' | 'assistant';
-  timestamp: Date;
-}
+export type { ChatMessage };
 
 interface UseAssistantChatReturn {
   isOpen: boolean;
@@ -32,47 +28,32 @@ interface UseAssistantChatReturn {
   isStreaming: boolean;
 }
 
-const MIN_WIDTH = 300;
-const MAX_WIDTH = 600;
-const DEFAULT_WIDTH = 380;
-
 export function useAssistantChat(): UseAssistantChatReturn {
-  const [isOpen, setIsOpen] = useState(false);
-  const [width, setWidthState] = useState(DEFAULT_WIDTH);
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: '1',
-      content: '안녕하세요! NEURALTWIN AI 어시스턴트입니다. 무엇을 도와드릴까요?',
-      sender: 'assistant',
-      timestamp: new Date(),
-    },
-  ]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  // Zustand 스토어에서 상태 가져오기 (라우트 변경에도 유지됨)
+  const {
+    isOpen,
+    width,
+    messages,
+    isLoading,
+    isStreaming,
+    conversationId,
+    togglePanel,
+    openPanel,
+    closePanel,
+    setWidth,
+    clearMessages,
+    addMessage,
+    updateMessage,
+    setIsLoading,
+    setIsStreaming,
+    setConversationId,
+  } = useChatStore();
 
   const { session } = useAuth();
   const { selectedStore } = useSelectedStore();
   const location = useLocation();
   const { dateRange } = useDateFilterStore();
   const { dispatchActions } = useActionDispatcher();
-
-  const togglePanel = useCallback(() => {
-    setIsOpen((prev) => !prev);
-  }, []);
-
-  const openPanel = useCallback(() => {
-    setIsOpen(true);
-  }, []);
-
-  const closePanel = useCallback(() => {
-    setIsOpen(false);
-  }, []);
-
-  const setWidth = useCallback((newWidth: number) => {
-    const clampedWidth = Math.min(Math.max(newWidth, MIN_WIDTH), MAX_WIDTH);
-    setWidthState(clampedWidth);
-  }, []);
 
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim() || isLoading || isStreaming) return;
@@ -84,19 +65,19 @@ export function useAssistantChat(): UseAssistantChatReturn {
       sender: 'user',
       timestamp: new Date(),
     };
-    setMessages((prev) => [...prev, userMessage]);
+    addMessage(userMessage);
 
     // 2. 로딩 상태 시작
     setIsLoading(true);
 
     // 3. "생각 중..." 임시 메시지 추가
     const loadingMessageId = (Date.now() + 1).toString();
-    setMessages((prev) => [...prev, {
+    addMessage({
       id: loadingMessageId,
       content: '생각 중...',
       sender: 'assistant',
       timestamp: new Date(),
-    }]);
+    });
 
     try {
       // 4. 현재 컨텍스트 수집
@@ -138,56 +119,35 @@ export function useAssistantChat(): UseAssistantChatReturn {
       setIsStreaming(true);
       setConversationId(data.meta?.conversationId || null);
 
-      // 7. 액션 실행
-      if (data.actions && data.actions.length > 0) {
-        await dispatchActions(data.actions);
-      }
+      // 7. "생각 중..." 메시지를 실제 응답으로 교체
+      let responseContent = data.message;
 
-      // 8. "생각 중..." 메시지를 실제 응답으로 교체
-      setMessages((prev) => prev.map((msg) =>
-        msg.id === loadingMessageId
-          ? {
-              ...msg,
-              content: data.message,
-              timestamp: new Date(),
-            }
-          : msg
-      ));
-
-      // 9. 후속 제안 추가 (있는 경우)
+      // 8. 후속 제안 추가 (있는 경우)
       if (data.suggestions && data.suggestions.length > 0) {
         const suggestionsText = `\n\n이런 것도 해볼 수 있어요:\n${data.suggestions.map((s: string) => `- ${s}`).join('\n')}`;
+        responseContent += suggestionsText;
+      }
 
-        setMessages((prev) => prev.map((msg) =>
-          msg.id === loadingMessageId
-            ? { ...msg, content: msg.content + suggestionsText }
-            : msg
-        ));
+      updateMessage(loadingMessageId, responseContent);
+
+      // 9. 액션 실행 (응답 메시지 표시 후 실행)
+      if (data.actions && data.actions.length > 0) {
+        await dispatchActions(data.actions);
       }
 
     } catch (error) {
       console.error('[useAssistantChat] Error:', error);
 
       // 에러 메시지로 교체
-      setMessages((prev) => prev.map((msg) =>
-        msg.id === loadingMessageId
-          ? {
-              ...msg,
-              content: '죄송합니다. 요청을 처리하는 중 오류가 발생했습니다. 다시 시도해주세요.',
-              timestamp: new Date(),
-            }
-          : msg
-      ));
+      updateMessage(
+        loadingMessageId,
+        '죄송합니다. 요청을 처리하는 중 오류가 발생했습니다. 다시 시도해주세요.'
+      );
     } finally {
       setIsLoading(false);
       setIsStreaming(false);
     }
-  }, [isLoading, isStreaming, conversationId, location, dateRange, selectedStore, dispatchActions]);
-
-  const clearMessages = useCallback(() => {
-    setMessages([]);
-    setConversationId(null);
-  }, []);
+  }, [isLoading, isStreaming, conversationId, location, dateRange, selectedStore, dispatchActions, addMessage, updateMessage, setIsLoading, setIsStreaming, setConversationId]);
 
   return {
     isOpen,
@@ -204,4 +164,4 @@ export function useAssistantChat(): UseAssistantChatReturn {
   };
 }
 
-export { MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH };
+export { MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH } from '@/store/chatStore';
