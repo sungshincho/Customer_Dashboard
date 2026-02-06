@@ -506,6 +506,8 @@ function getSuggestionsForModal(modalId: string): string[] {
       return ['시뮬레이션 실행', '결과 확인'];
     case 'invite-user':
       return ['사용자 관리', '설정으로 이동'];
+    case 'new-connection':
+      return ['연결된 소스 확인', '데이터 품질 점수 확인', '인사이트 허브로 이동'];
     default:
       return ['인사이트 허브로 이동', '매출 확인'];
   }

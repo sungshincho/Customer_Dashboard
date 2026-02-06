@@ -4,7 +4,7 @@ import { X, MessageCircle, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
-import { ChatMessage as ChatMessageType, MIN_WIDTH, MAX_WIDTH } from '@/hooks/useChatPanel';
+import { ChatMessage as ChatMessageType, MIN_WIDTH, MAX_WIDTH } from '@/store/chatStore';
 
 interface ChatPanelProps {
   isOpen: boolean;

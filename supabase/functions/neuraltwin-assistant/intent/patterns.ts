@@ -125,7 +125,7 @@ function extractModalId(text: string): string | null {
   if (/내보내기|export/.test(normalizedText)) return 'export-data';
   if (/시뮬레이션.*설정|설정.*시뮬레이션/.test(normalizedText)) return 'simulation-config';
   if (/최적화.*설정|설정.*최적화/.test(normalizedText)) return 'optimization-config';
-  if (/연결.*추가|새.*연결|데이터.*연결/.test(normalizedText)) return 'new-connection';
+  if (/연결.*추가|새.*연결|데이터.*연결|소스.*추가|커넥터.*추가/.test(normalizedText)) return 'new-connection';
   if (/사용자.*초대|팀원.*초대|invite/.test(normalizedText)) return 'invite-user';
   if (/플랜.*업그레이드|요금제.*변경/.test(normalizedText)) return 'plan-upgrade';
 
@@ -182,6 +182,14 @@ export const INTENT_PATTERNS: IntentPattern[] = [
 
       // 비교 질문
       /(?:전주|전월|지난달|작년)\s*대비\s*(?:매출|방문객|전환율)/i,
+
+      // 데이터 컨트롤타워 관련 쿼리
+      /(?:데이터\s*)?(?:품질|quality)\s*(?:점수|스코어|score|몇\s*점|어때|확인|알려)/i,
+      /(?:연결된|현재)\s*(?:데이터\s*)?(?:소스|연결|connection)\s*(?:뭐|몇|어때|알려|확인|보여|있어)/i,
+      /(?:비즈니스\s*)?(?:소스|데이터\s*소스)\s*(?:뭐|어떤|확인|알려|보여|있어|연결)/i,
+      /(?:컨텍스트|context)\s*(?:데이터\s*)?(?:소스|연결)\s*(?:뭐|어때|알려|확인|보여|있어)/i,
+      /(?:파이프라인|pipeline|ETL)\s*(?:상태|현황|어때|알려|확인)/i,
+      /(?:데이터\s*)?(?:수집|동기화|싱크)\s*(?:상태|현황|어때|알려|확인)/i,
     ],
     confidence: 0.90,
     extractors: {
@@ -290,7 +298,8 @@ export const INTENT_PATTERNS: IntentPattern[] = [
     intent: 'open_modal',
     patterns: [
       /목표\s*(?:를)?\s*(?:설정|지정)\s*(?:하고\s*싶어|할래|해줘)/i,
-      /(?:새|신규)\s*(?:데이터)?\s*연결\s*(?:추가|생성)/i,
+      /(?:새|신규)\s*(?:데이터)?\s*(?:연결|소스|커넥터)\s*(?:추가|생성)/i,
+      /(?:소스|커넥터|연결)\s*(?:를)?\s*(?:추가|생성)\s*(?:하고\s*싶어|할래|해줘)?/i,
       /(?:사용자|팀원)\s*(?:를)?\s*초대/i,
       /데이터\s*(?:를)?\s*(?:내보내기|export)/i,
       /(?:플랜|요금제)\s*(?:를)?\s*(?:업그레이드|변경)/i,
@@ -349,6 +358,18 @@ function extractQueryType(text: string): string {
 
   // 신규/재방문
   if (/신규.*재방문|new.*returning/.test(normalizedText)) return 'newVsReturning';
+
+  // 데이터 품질 관련
+  if (/품질|quality|품질\s*점수|quality\s*score/.test(normalizedText)) return 'dataQuality';
+
+  // 데이터 소스/연결 관련
+  if (/(?:연결된|현재).*(?:소스|연결)|비즈니스\s*소스|데이터\s*소스/.test(normalizedText)) return 'dataSources';
+
+  // 컨텍스트 데이터 소스
+  if (/컨텍스트.*(?:소스|연결|데이터)|context.*(?:source|data)/.test(normalizedText)) return 'dataSources';
+
+  // 파이프라인/ETL/동기화
+  if (/파이프라인|pipeline|etl|수집.*(?:상태|현황)|동기화.*(?:상태|현황)/.test(normalizedText)) return 'pipelineStatus';
 
   // 성과/실적/현황/요약
   if (/성과|실적|현황|요약/.test(normalizedText)) return 'summary';

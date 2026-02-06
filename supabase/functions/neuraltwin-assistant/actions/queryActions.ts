@@ -28,7 +28,7 @@ export interface PageContext {
 /**
  * 쿼리 타입별 관련 탭 매핑 (확장됨)
  */
-const QUERY_TYPE_TO_TAB: Record<string, { page: string; tab: string; section?: string }> = {
+const QUERY_TYPE_TO_TAB: Record<string, { page: string; tab?: string; section?: string }> = {
   revenue: { page: '/insights', tab: 'overview', section: 'kpi-cards' },
   visitors: { page: '/insights', tab: 'customer', section: 'customer-kpi' },
   conversion: { page: '/insights', tab: 'overview', section: 'kpi-cards' },
@@ -39,6 +39,10 @@ const QUERY_TYPE_TO_TAB: Record<string, { page: string; tab: string; section?: s
   dwellTime: { page: '/insights', tab: 'customer', section: 'customer-kpi' },
   newVsReturning: { page: '/insights', tab: 'customer', section: 'customer-kpi' },
   summary: { page: '/insights', tab: 'overview', section: 'kpi-cards' },
+  // 데이터 컨트롤타워 쿼리 (탭 없음)
+  dataQuality: { page: '/data/control-tower', section: 'data-sources' },
+  dataSources: { page: '/data/control-tower', section: 'data-sources' },
+  pipelineStatus: { page: '/data/control-tower', section: 'data-sources' },
 };
 
 /**
@@ -75,10 +79,10 @@ function createNavigationActions(
   const currentPage = pageContext?.current || '';
   const currentTab = pageContext?.tab || '';
   const targetPage = mapping.page;
-  const targetTab = mapping.tab;
+  const targetTab = mapping.tab || '';
 
-  const pageNeedsChange = !currentPage.includes('/insights') || (currentPage !== targetPage);
-  const tabNeedsChange = currentTab !== targetTab;
+  const pageNeedsChange = currentPage !== targetPage;
+  const tabNeedsChange = targetTab ? currentTab !== targetTab : false;
   const tabChanged = pageNeedsChange || tabNeedsChange;
 
   // 1. 페이지 이동 (필요시)
@@ -89,8 +93,8 @@ function createNavigationActions(
     });
   }
 
-  // 2. 탭 전환 (필요시)
-  if (tabNeedsChange) {
+  // 2. 탭 전환 (필요시, 탭이 있는 페이지만)
+  if (tabNeedsChange && targetTab) {
     actions.push({
       type: 'set_tab',
       target: targetTab,
@@ -177,6 +181,15 @@ export async function handleQueryKpi(
 
       case 'newVsReturning':
         return await queryNewVsReturning(supabase, storeId, dateRange, pageContext);
+
+      case 'dataQuality':
+        return await queryDataQuality(supabase, storeId, pageContext);
+
+      case 'dataSources':
+        return await queryDataSources(supabase, storeId, pageContext);
+
+      case 'pipelineStatus':
+        return await queryPipelineStatus(supabase, storeId, pageContext);
 
       case 'summary':
       default:
@@ -888,6 +901,193 @@ async function queryNewVsReturning(
     suggestions: ['방문객 수 알려줘', '체류 시간 알려줘'],
     data: { newVisitors: totalNew, returningVisitors: totalReturning, newRate, returnRate },
   };
+}
+
+// ============================================
+// 데이터 컨트롤타워 전용 쿼리 핸들러
+// ============================================
+
+/**
+ * 데이터 품질 점수 조회
+ */
+async function queryDataQuality(
+  supabase: SupabaseClient,
+  storeId: string,
+  pageContext?: PageContext
+): Promise<QueryActionResult> {
+  const isOnControlTower = pageContext?.current === '/data/control-tower';
+
+  try {
+    const { data, error } = await supabase
+      .rpc('get_data_control_tower_status', {
+        p_store_id: storeId,
+        p_limit: 5,
+      });
+
+    if (error) throw error;
+
+    const status = data as any;
+    const score = status?.quality_score;
+
+    if (!score) {
+      return {
+        actions: isOnControlTower ? [] : [{ type: 'navigate', target: '/data/control-tower' }],
+        message: '데이터 품질 점수를 조회할 수 없습니다. 데이터 컨트롤타워에서 확인해 주세요.',
+        suggestions: ['데이터 컨트롤타워로 가줘', '매출 알려줘'],
+      };
+    }
+
+    const overallScore = score.overall || 0;
+    const completeness = score.completeness || 0;
+    const freshness = score.freshness || 0;
+    const consistency = score.consistency || 0;
+
+    const gradeEmoji = overallScore >= 90 ? 'A+' : overallScore >= 80 ? 'A' : overallScore >= 70 ? 'B' : overallScore >= 60 ? 'C' : 'D';
+
+    const message = `현재 데이터 품질 점수는 ${overallScore}점 (${gradeEmoji})입니다.\n\n` +
+      `• 완전성(Completeness): ${completeness}점\n` +
+      `• 최신성(Freshness): ${freshness}점\n` +
+      `• 일관성(Consistency): ${consistency}점` +
+      (!isOnControlTower ? '\n\n데이터 컨트롤타워로 이동합니다.' : '');
+
+    return {
+      actions: isOnControlTower ? [] : [{ type: 'navigate', target: '/data/control-tower' }],
+      message,
+      suggestions: ['연결된 소스 뭐 있어?', '새 연결 추가해줘', '매출 알려줘'],
+      data: { overallScore, completeness, freshness, consistency },
+    };
+  } catch (error) {
+    console.error('[queryDataQuality] Error:', error);
+    return {
+      actions: isOnControlTower ? [] : [{ type: 'navigate', target: '/data/control-tower' }],
+      message: '데이터 품질 점수를 조회하는 중 오류가 발생했습니다.' +
+        (!isOnControlTower ? ' 데이터 컨트롤타워에서 직접 확인해 주세요.' : ''),
+      suggestions: ['데이터 컨트롤타워로 가줘', '매출 알려줘'],
+    };
+  }
+}
+
+/**
+ * 데이터 소스 연결 현황 조회
+ */
+async function queryDataSources(
+  supabase: SupabaseClient,
+  storeId: string,
+  pageContext?: PageContext
+): Promise<QueryActionResult> {
+  const isOnControlTower = pageContext?.current === '/data/control-tower';
+
+  try {
+    const { data, error } = await supabase
+      .rpc('get_data_control_tower_status', {
+        p_store_id: storeId,
+        p_limit: 20,
+      });
+
+    if (error) throw error;
+
+    const status = data as any;
+    const sources = status?.data_sources || [];
+
+    if (sources.length === 0) {
+      return {
+        actions: isOnControlTower ? [] : [{ type: 'navigate', target: '/data/control-tower' }],
+        message: '현재 연결된 데이터 소스가 없습니다. 새 연결을 추가해 보세요.',
+        suggestions: ['새 연결 추가해줘', '데이터 컨트롤타워로 가줘'],
+      };
+    }
+
+    const sourceList = sources.map((s: any) => {
+      const statusLabel = s.status === 'active' ? 'Active' : s.status === 'error' ? 'Error' : s.status;
+      const recordCount = s.record_count ? `${s.record_count.toLocaleString()}건` : '-';
+      return `• ${s.name || s.source_type}: ${statusLabel} (${recordCount})`;
+    }).join('\n');
+
+    const activeCount = sources.filter((s: any) => s.status === 'active').length;
+    const errorCount = sources.filter((s: any) => s.status === 'error').length;
+
+    let summaryNote = '';
+    if (errorCount > 0) {
+      summaryNote = `\n\n${errorCount}개 소스에 오류가 있습니다. 확인이 필요합니다.`;
+    }
+
+    const message = `현재 ${sources.length}개 데이터 소스가 연결되어 있습니다 (활성: ${activeCount}개).\n\n${sourceList}${summaryNote}` +
+      (!isOnControlTower ? '\n\n데이터 컨트롤타워로 이동합니다.' : '');
+
+    return {
+      actions: isOnControlTower ? [] : [{ type: 'navigate', target: '/data/control-tower' }],
+      message,
+      suggestions: ['데이터 품질 점수 알려줘', '새 연결 추가해줘', '파이프라인 상태 확인'],
+      data: { totalSources: sources.length, activeCount, errorCount, sources },
+    };
+  } catch (error) {
+    console.error('[queryDataSources] Error:', error);
+    return {
+      actions: isOnControlTower ? [] : [{ type: 'navigate', target: '/data/control-tower' }],
+      message: '데이터 소스 현황을 조회하는 중 오류가 발생했습니다.' +
+        (!isOnControlTower ? ' 데이터 컨트롤타워에서 직접 확인해 주세요.' : ''),
+      suggestions: ['데이터 컨트롤타워로 가줘', '매출 알려줘'],
+    };
+  }
+}
+
+/**
+ * 파이프라인 상태 조회
+ */
+async function queryPipelineStatus(
+  supabase: SupabaseClient,
+  storeId: string,
+  pageContext?: PageContext
+): Promise<QueryActionResult> {
+  const isOnControlTower = pageContext?.current === '/data/control-tower';
+
+  try {
+    const { data, error } = await supabase
+      .rpc('get_data_control_tower_status', {
+        p_store_id: storeId,
+        p_limit: 5,
+      });
+
+    if (error) throw error;
+
+    const status = data as any;
+    const pipeline = status?.pipeline_stats;
+
+    if (!pipeline) {
+      return {
+        actions: isOnControlTower ? [] : [{ type: 'navigate', target: '/data/control-tower' }],
+        message: '파이프라인 상태 정보를 조회할 수 없습니다.',
+        suggestions: ['데이터 컨트롤타워로 가줘', '데이터 품질 점수 확인'],
+      };
+    }
+
+    const totalRuns = pipeline.total_runs || 0;
+    const successRuns = pipeline.success_runs || 0;
+    const failedRuns = pipeline.failed_runs || 0;
+    const successRate = totalRuns > 0 ? Math.round((successRuns / totalRuns) * 100) : 0;
+    const lastRun = pipeline.last_run_at ? new Date(pipeline.last_run_at).toLocaleString('ko-KR') : '없음';
+
+    const message = `데이터 파이프라인 현황:\n\n` +
+      `• 총 실행: ${totalRuns}회\n` +
+      `• 성공: ${successRuns}회 (${successRate}%)\n` +
+      `• 실패: ${failedRuns}회\n` +
+      `• 마지막 실행: ${lastRun}` +
+      (!isOnControlTower ? '\n\n데이터 컨트롤타워로 이동합니다.' : '');
+
+    return {
+      actions: isOnControlTower ? [] : [{ type: 'navigate', target: '/data/control-tower' }],
+      message,
+      suggestions: ['데이터 품질 점수 알려줘', '연결된 소스 확인', '매출 알려줘'],
+      data: { totalRuns, successRuns, failedRuns, successRate },
+    };
+  } catch (error) {
+    console.error('[queryPipelineStatus] Error:', error);
+    return {
+      actions: isOnControlTower ? [] : [{ type: 'navigate', target: '/data/control-tower' }],
+      message: '파이프라인 상태를 조회하는 중 오류가 발생했습니다.',
+      suggestions: ['데이터 컨트롤타워로 가줘', '매출 알려줘'],
+    };
+  }
 }
 
 function formatNumber(num: number): string {
