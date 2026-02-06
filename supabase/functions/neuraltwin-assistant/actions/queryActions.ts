@@ -43,6 +43,8 @@ const QUERY_TYPE_TO_TAB: Record<string, { page: string; tab?: string; section?: 
   dataQuality: { page: '/data/control-tower', section: 'data-sources' },
   dataSources: { page: '/data/control-tower', section: 'data-sources' },
   contextDataSources: { page: '/data/control-tower', section: 'data-sources' },
+  apiConnections: { page: '/data/control-tower', section: 'data-sources' },
+  importHistory: { page: '/data/control-tower', section: 'data-sources' },
   pipelineStatus: { page: '/data/control-tower', section: 'data-sources' },
 };
 
@@ -197,6 +199,12 @@ export async function handleQueryKpi(
 
       case 'contextDataSources':
         return await queryContextDataSources(supabase, storeId, pageContext);
+
+      case 'apiConnections':
+        return await queryApiConnections(supabase, storeId, pageContext);
+
+      case 'importHistory':
+        return await queryImportHistory(supabase, storeId, pageContext);
 
       case 'pipelineStatus':
         return await queryPipelineStatus(supabase, storeId, pageContext);
@@ -919,7 +927,8 @@ async function queryNewVsReturning(
 
 /**
  * RPC 결과에서 통합 소스 목록 생성 (coverage + data_sources 병합)
- * RPC는 coverage와 data_sources 키가 다를 수 있으므로 양쪽을 합침
+ * 프론트엔드와 동일한 5개 비즈니스 소스만 포함: pos, sensor, crm, product, erp
+ * RPC가 zone을 반환하면 무시 (프론트엔드는 ensureERPCoverage로 erp를 별도 추가)
  */
 function buildUnifiedSources(status: any): Array<{
   key: string;
@@ -931,25 +940,23 @@ function buildUnifiedSources(status: any): Array<{
   const coverage = status?.quality_score?.coverage || {};
   const dataSources = status?.data_sources || {};
 
-  // 양쪽 키를 합쳐서 unique 키 목록 생성
-  const allKeys = new Set([...Object.keys(coverage), ...Object.keys(dataSources)]);
+  // 프론트엔드와 동일한 5개 비즈니스 소스만 표시
+  const KNOWN_SOURCES: Array<{ key: string; name: string }> = [
+    { key: 'pos', name: 'POS/매출 데이터' },
+    { key: 'sensor', name: 'NEURALSENSE 센서' },
+    { key: 'crm', name: 'CRM/고객 데이터' },
+    { key: 'product', name: '상품 마스터' },
+    { key: 'erp', name: 'ERP/재고 데이터' },
+  ];
 
-  const nameMap: Record<string, string> = {
-    pos: 'POS/매출',
-    sensor: 'NEURALSENSE 센서',
-    crm: 'CRM/고객',
-    product: '상품 마스터',
-    erp: 'ERP/재고',
-  };
-
-  return Array.from(allKeys).map(key => {
+  return KNOWN_SOURCES.map(({ key, name }) => {
     const cov = coverage[key];
     const ds = dataSources[key];
     return {
       key,
-      name: ds?.name || cov?.label || nameMap[key] || key,
+      name: ds?.name ? `${ds.name}` : cov?.label || name,
       status: ds?.status || (cov?.available ? 'active' : 'inactive'),
-      available: cov?.available ?? (ds?.status === 'active'),
+      available: cov?.available ?? (ds?.status === 'active') ?? false,
       recordCount: cov?.record_count || 0,
     };
   });
@@ -1160,7 +1167,7 @@ async function queryContextDataSources(
 
 /**
  * 데이터 흐름(파이프라인) 현황 조회
- * pipeline_stats.data_flows 배열로 프론트엔드 데이터 흐름 시각화와 동일한 정보 제공
+ * RPC data_flows가 없으면 coverage 기반으로 직접 생성 (프론트엔드 ensureERPCoverage와 동일)
  */
 async function queryPipelineStatus(
   supabase: SupabaseClient,
@@ -1179,54 +1186,53 @@ async function queryPipelineStatus(
     if (error) throw error;
 
     const status = data as any;
-    const pipeline = status?.pipeline_stats;
+    const pipeline = status?.pipeline_stats || {};
+    const coverage = status?.quality_score?.coverage || {};
 
-    if (!pipeline) {
-      return {
-        actions: isOnControlTower ? [] : [{ type: 'navigate', target: '/data/control-tower' }],
-        message: '데이터 흐름 정보를 조회할 수 없습니다.',
-        suggestions: ['데이터 컨트롤타워로 가줘', '데이터 품질 점수 확인'],
-      };
+    // data_flows가 없으면 coverage 기반으로 생성 (프론트엔드와 동일 로직)
+    let dataFlows = pipeline.data_flows || [];
+    if (dataFlows.length === 0) {
+      const l3Records = pipeline.l3_records || 0;
+      const rawTotal = pipeline.raw_imports?.total || 0;
+      const rawCompleted = pipeline.raw_imports?.completed || 0;
+
+      dataFlows = [
+        { label: 'POS', source: 'pos', inputCount: coverage.pos?.record_count || 0, outputTable: 'transactions', outputCount: coverage.pos?.record_count || 0, kpiConnected: l3Records > 0 && (coverage.pos?.record_count || 0) > 0, status: (coverage.pos?.record_count || 0) > 0 ? 'active' : 'inactive' },
+        { label: '센서', source: 'sensor', inputCount: coverage.sensor?.record_count || 0, outputTable: 'zone_events', outputCount: pipeline.l2_records || coverage.sensor?.record_count || 0, kpiConnected: l3Records > 0 && (coverage.sensor?.record_count || 0) > 0, status: (coverage.sensor?.record_count || 0) > 0 ? 'active' : 'inactive' },
+        { label: '고객', source: 'customer', inputCount: coverage.crm?.record_count || 0, outputTable: 'customers', outputCount: coverage.crm?.record_count || 0, kpiConnected: false, status: (coverage.crm?.record_count || 0) > 0 ? 'active' : 'inactive' },
+        { label: '재고', source: 'inventory', inputCount: coverage.erp?.record_count || 0, outputTable: 'inventory_levels', outputCount: coverage.erp?.record_count || 0, kpiConnected: false, status: (coverage.erp?.record_count || 0) > 0 ? 'active' : 'inactive' },
+        { label: '파일', source: 'import', inputCount: rawTotal, outputTable: 'user_data_imports', outputCount: rawCompleted, kpiConnected: false, status: rawTotal > 0 ? 'active' : 'inactive' },
+      ];
     }
+
+    const activeFlows = dataFlows.filter((f: any) => f.status === 'active').length;
+    const kpiConnected = dataFlows.filter((f: any) => f.kpiConnected).length;
+    const l3Records = pipeline.l3_records || 0;
 
     // 파이프라인 건강 상태
     const health = pipeline.pipeline_health || {};
-    const healthStatus = health.status === 'healthy' ? '정상' : health.status === 'warning' ? '주의' : '확인 필요';
+    const healthStatus = health.status === 'healthy' ? '정상' : health.status === 'warning' ? '주의' : (activeFlows >= 3 ? '정상' : activeFlows >= 1 ? '주의' : '확인 필요');
     const healthMessage = health.message || '';
 
-    // data_flows 배열 기반 (프론트엔드 데이터 흐름 시각화와 동일)
-    const dataFlows = pipeline.data_flows || [];
-    const activeFlows = dataFlows.filter((f: any) => f.status === 'active').length;
-
-    let flowLines = '';
-    if (dataFlows.length > 0) {
-      flowLines = dataFlows.map((flow: any) => {
-        const statusIcon = flow.status === 'active' ? '활성' : '비활성';
-        const input = flow.inputCount ? flow.inputCount.toLocaleString() : '0';
-        const output = flow.outputCount ? flow.outputCount.toLocaleString() : '0';
-        const kpi = flow.kpiConnected ? ' → KPI 연결됨' : '';
-        return `• ${flow.label}: ${statusIcon} (입력 ${input}건 → ${flow.outputTable || '변환'} ${output}건${kpi})`;
-      }).join('\n');
-    }
-
-    // 오늘 처리 현황
-    const today = pipeline.today_processed || {};
-    const todayLine = (today.input || today.transformed || today.aggregated)
-      ? `\n\n오늘 처리: 입력 ${(today.input || 0).toLocaleString()}건 → 변환 ${(today.transformed || 0).toLocaleString()}건 → 집계 ${(today.aggregated || 0).toLocaleString()}건`
-      : '';
+    const flowLines = dataFlows.map((flow: any) => {
+      const statusText = flow.status === 'active' ? '활성' : '비활성';
+      const input = flow.inputCount ? flow.inputCount.toLocaleString() : '0';
+      const output = flow.outputCount ? flow.outputCount.toLocaleString() : '0';
+      const kpi = flow.kpiConnected ? ' → KPI 연결' : '';
+      return `• ${flow.label}: ${statusText} (${input}건 → ${flow.outputTable} ${output}건${kpi})`;
+    }).join('\n');
 
     const message = `데이터 흐름 현황:\n\n` +
-      `상태: ${healthStatus} | 활성 소스: ${activeFlows}/${dataFlows.length}개\n\n` +
-      (flowLines || '데이터 흐름 정보가 없습니다.') +
-      todayLine +
+      `활성 소스: ${activeFlows}/${dataFlows.length}개 | KPI 연결: ${kpiConnected}개 | L3 집계: ${l3Records.toLocaleString()}건\n\n` +
+      flowLines +
       (healthMessage ? `\n\n${healthMessage}` : '') +
       (!isOnControlTower ? '\n\n데이터 컨트롤타워로 이동합니다.' : '');
 
     return {
       actions: isOnControlTower ? [] : [{ type: 'navigate', target: '/data/control-tower' }],
       message,
-      suggestions: ['데이터 품질 점수 알려줘', '연결된 소스 확인', '매출 알려줘'],
-      data: { healthStatus, activeFlows, totalFlows: dataFlows.length },
+      suggestions: ['데이터 품질 점수 알려줘', '연결된 소스 확인', '임포트 히스토리 보여줘'],
+      data: { healthStatus, activeFlows, totalFlows: dataFlows.length, kpiConnected, l3Records },
     };
   } catch (error) {
     console.error('[queryPipelineStatus] Error:', error);
@@ -1234,6 +1240,158 @@ async function queryPipelineStatus(
       actions: isOnControlTower ? [] : [{ type: 'navigate', target: '/data/control-tower' }],
       message: '데이터 흐름 현황을 조회하는 중 오류가 발생했습니다.',
       suggestions: ['데이터 컨트롤타워로 가줘', '매출 알려줘'],
+    };
+  }
+}
+
+/**
+ * API 연결 현황 조회 (api_connections 테이블 — 프론트엔드 "API 연결" 카드와 동일)
+ */
+async function queryApiConnections(
+  supabase: SupabaseClient,
+  storeId: string,
+  pageContext?: PageContext
+): Promise<QueryActionResult> {
+  const isOnControlTower = pageContext?.current === '/data/control-tower';
+
+  try {
+    const { data: storeData } = await supabase
+      .from('stores')
+      .select('org_id')
+      .eq('id', storeId)
+      .single();
+
+    const orgId = storeData?.org_id;
+    if (!orgId) {
+      return {
+        actions: isOnControlTower ? [] : [{ type: 'navigate', target: '/data/control-tower' }],
+        message: '매장 정보를 찾을 수 없습니다.',
+        suggestions: ['데이터 컨트롤타워로 가줘'],
+      };
+    }
+
+    const { data: connections, error } = await supabase
+      .from('api_connections')
+      .select('id, name, type, provider, data_category, connection_category, is_active, status, total_records_synced, last_sync')
+      .eq('org_id', orgId)
+      .order('display_order', { ascending: true });
+
+    if (error) throw error;
+
+    if (!connections || connections.length === 0) {
+      return {
+        actions: isOnControlTower ? [] : [{ type: 'navigate', target: '/data/control-tower' }],
+        message: '현재 연결된 API가 없습니다. 새 연결을 추가해 보세요.',
+        suggestions: ['새 연결 추가해줘', '데이터 컨트롤타워로 가줘'],
+      };
+    }
+
+    const connList = connections.map((conn: any) => {
+      const isActive = conn.is_active || conn.status === 'active';
+      const statusLabel = isActive ? '활성' : conn.status === 'error' ? '오류' : '비활성';
+      const category = conn.data_category || conn.connection_category || '';
+      const records = conn.total_records_synced ? ` (${conn.total_records_synced.toLocaleString()}건)` : '';
+      return `• ${conn.name}${category ? ` [${category}]` : ''}: ${statusLabel}${records}`;
+    }).join('\n');
+
+    const activeCount = connections.filter((c: any) => c.is_active || c.status === 'active').length;
+
+    const message = `현재 ${connections.length}개 API가 연결되어 있습니다 (활성: ${activeCount}개).\n\n${connList}` +
+      (!isOnControlTower ? '\n\n데이터 컨트롤타워로 이동합니다.' : '');
+
+    return {
+      actions: isOnControlTower ? [] : [{ type: 'navigate', target: '/data/control-tower' }],
+      message,
+      suggestions: ['새 연결 추가해줘', '데이터 품질 점수 알려줘', '임포트 히스토리 보여줘'],
+      data: { totalConnections: connections.length, activeCount },
+    };
+  } catch (error) {
+    console.error('[queryApiConnections] Error:', error);
+    return {
+      actions: isOnControlTower ? [] : [{ type: 'navigate', target: '/data/control-tower' }],
+      message: 'API 연결 현황을 조회하는 중 오류가 발생했습니다.',
+      suggestions: ['데이터 컨트롤타워로 가줘'],
+    };
+  }
+}
+
+/**
+ * 임포트 히스토리 조회 (user_data_imports 테이블 — 프론트엔드 "임포트 히스토리" 카드와 동일)
+ */
+async function queryImportHistory(
+  supabase: SupabaseClient,
+  storeId: string,
+  pageContext?: PageContext
+): Promise<QueryActionResult> {
+  const isOnControlTower = pageContext?.current === '/data/control-tower';
+
+  try {
+    const { data: storeData } = await supabase
+      .from('stores')
+      .select('org_id')
+      .eq('id', storeId)
+      .single();
+
+    const orgId = storeData?.org_id;
+    if (!orgId) {
+      return {
+        actions: isOnControlTower ? [] : [{ type: 'navigate', target: '/data/control-tower' }],
+        message: '매장 정보를 찾을 수 없습니다.',
+        suggestions: ['데이터 컨트롤타워로 가줘'],
+      };
+    }
+
+    const { data: imports, error } = await supabase
+      .from('user_data_imports')
+      .select('id, file_name, data_type, total_rows, status, created_at')
+      .eq('org_id', orgId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (error) throw error;
+
+    if (!imports || imports.length === 0) {
+      return {
+        actions: isOnControlTower ? [] : [{ type: 'navigate', target: '/data/control-tower' }],
+        message: '임포트 히스토리가 없습니다. 데이터를 임포트해 보세요.',
+        suggestions: ['데이터 컨트롤타워로 가줘', '연결된 소스 확인'],
+      };
+    }
+
+    const typeLabels: Record<string, string> = {
+      products: '상품', customers: '고객', transactions: '거래', staff: '직원', inventory: '재고',
+    };
+    const statusLabels: Record<string, string> = {
+      pending: '대기', processing: '처리중', completed: '완료', partial: '부분완료', failed: '실패', rolled_back: '롤백됨',
+    };
+
+    const importList = imports.map((imp: any) => {
+      const type = typeLabels[imp.data_type] || imp.data_type || '-';
+      const statusText = statusLabels[imp.status] || imp.status || '-';
+      const rows = imp.total_rows ? `${imp.total_rows.toLocaleString()}행` : '-';
+      const date = imp.created_at ? new Date(imp.created_at).toLocaleDateString('ko-KR') : '-';
+      return `• ${imp.file_name || '파일'} (${type}) — ${rows} — ${statusText} — ${date}`;
+    }).join('\n');
+
+    const completedCount = imports.filter((i: any) => i.status === 'completed').length;
+    const failedCount = imports.filter((i: any) => i.status === 'failed').length;
+
+    const message = `최근 임포트 히스토리 (${imports.length}건):\n\n${importList}` +
+      (failedCount > 0 ? `\n\n${failedCount}건 실패가 있습니다.` : '') +
+      (!isOnControlTower ? '\n\n데이터 컨트롤타워로 이동합니다.' : '');
+
+    return {
+      actions: isOnControlTower ? [] : [{ type: 'navigate', target: '/data/control-tower' }],
+      message,
+      suggestions: ['데이터 품질 점수 알려줘', '연결된 소스 확인', '데이터 흐름 현황 확인'],
+      data: { totalImports: imports.length, completedCount, failedCount },
+    };
+  } catch (error) {
+    console.error('[queryImportHistory] Error:', error);
+    return {
+      actions: isOnControlTower ? [] : [{ type: 'navigate', target: '/data/control-tower' }],
+      message: '임포트 히스토리를 조회하는 중 오류가 발생했습니다.',
+      suggestions: ['데이터 컨트롤타워로 가줘'],
     };
   }
 }
