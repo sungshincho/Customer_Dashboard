@@ -256,9 +256,12 @@ export default function InsightHubPage() {
   const tabFromUrl = searchParams.get('tab') as InsightTabType | null;
 
   // URL 쿼리 파라미터로 탭 전환 (AI 어시스턴트 연동)
+  // 'ai-recommendation' → 'ai' 정규화 (백엔드 호환)
   useEffect(() => {
-    if (tabFromUrl && ['overview', 'store', 'customer', 'product', 'inventory', 'prediction', 'ai'].includes(tabFromUrl)) {
-      setActiveTab(tabFromUrl);
+    if (!tabFromUrl) return;
+    const normalizedTab = tabFromUrl === 'ai-recommendation' ? 'ai' : tabFromUrl;
+    if (['overview', 'store', 'customer', 'product', 'inventory', 'prediction', 'ai'].includes(normalizedTab)) {
+      setActiveTab(normalizedTab as InsightTabType);
     }
   }, [tabFromUrl]);
 

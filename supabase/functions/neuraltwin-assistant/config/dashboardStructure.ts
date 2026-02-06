@@ -313,7 +313,7 @@ export const DASHBOARD_STRUCTURE: DashboardPage[] = [
         ],
       },
       {
-        id: 'ai-recommendation',
+        id: 'ai',
         name: 'AI추천',
         aliases: ['AI추천탭', 'ai-recommendation', 'AI 추천', '추천', 'ai추천'],
         sections: [
@@ -464,6 +464,9 @@ export const TERM_LOCATION_MAP: Record<string, TermLocationEntry> = {
   '총 입장': {
     primary: { page: '/insights', tab: 'overview', section: 'overview-kpi-cards', component: 'total-footfall' },
   },
+  '총입장': {
+    primary: { page: '/insights', tab: 'overview', section: 'overview-kpi-cards', component: 'total-footfall' },
+  },
   '순 방문객': {
     primary: { page: '/insights', tab: 'customer', section: 'customer-kpi-cards', component: 'unique-visitors' },
     secondary: [
@@ -486,12 +489,36 @@ export const TERM_LOCATION_MAP: Record<string, TermLocationEntry> = {
       { page: '/insights', tab: 'product', section: 'product-kpi-cards' },
       { page: '/roi', section: 'strategy-performance' },
     ],
+    description: {
+      overview: '전체 매출 요약',
+      product: '상품별 매출 분석',
+    },
+  },
+  '총 매출': {
+    primary: { page: '/insights', tab: 'overview', section: 'overview-kpi-cards', component: 'total-revenue' },
+    secondary: [
+      { page: '/insights', tab: 'product', section: 'product-kpi-cards' },
+    ],
+    description: {
+      overview: '전체 매출 요약',
+      product: '상품별 매출 분석',
+    },
   },
   '전환율': {
     primary: { page: '/insights', tab: 'overview', section: 'overview-kpi-cards', component: 'conversion-rate' },
     secondary: [
       { page: '/insights', tab: 'customer', section: 'customer-kpi-cards' },
     ],
+    description: {
+      overview: '전체 구매 전환율',
+      customer: '고객 세그먼트별 전환 분석',
+    },
+  },
+  '구매 전환율': {
+    primary: { page: '/insights', tab: 'overview', section: 'overview-kpi-cards', component: 'conversion-rate' },
+  },
+  '구매전환율': {
+    primary: { page: '/insights', tab: 'overview', section: 'overview-kpi-cards', component: 'conversion-rate' },
   },
   '객단가': {
     primary: { page: '/insights', tab: 'overview', section: 'overview-kpi-cards', component: 'avg-transaction' },
@@ -521,7 +548,19 @@ export const TERM_LOCATION_MAP: Record<string, TermLocationEntry> = {
     primary: { page: '/insights', tab: 'overview', section: 'overview-goals', component: 'goal-card' },
     requires: 'goal_settings',
   },
+  'AI 추천 효과': {
+    primary: { page: '/insights', tab: 'overview', section: 'overview-goals', component: 'ai-effect' },
+  },
+  '추천 효과': {
+    primary: { page: '/insights', tab: 'overview', section: 'overview-goals', component: 'ai-effect' },
+  },
   'AI 인사이트': {
+    primary: { page: '/insights', tab: 'overview', section: 'overview-insights' },
+  },
+  '오늘의 AI 인사이트': {
+    primary: { page: '/insights', tab: 'overview', section: 'overview-insights' },
+  },
+  '오늘의 인사이트': {
     primary: { page: '/insights', tab: 'overview', section: 'overview-insights' },
   },
 
@@ -532,22 +571,60 @@ export const TERM_LOCATION_MAP: Record<string, TermLocationEntry> = {
   '인기 존': {
     primary: { page: '/insights', tab: 'store', section: 'store-zone-performance', component: 'zone-compare' },
   },
+  '인기존': {
+    primary: { page: '/insights', tab: 'store', section: 'store-zone-performance', component: 'zone-compare' },
+  },
   '센서 커버율': {
     primary: { page: '/insights', tab: 'store', section: 'store-kpi-cards', component: 'tracking-coverage' },
   },
   '시간대별 방문': {
     primary: { page: '/insights', tab: 'store', section: 'store-hourly-pattern' },
   },
+  '시간대별 방문 패턴': {
+    primary: { page: '/insights', tab: 'store', section: 'store-hourly-pattern' },
+  },
   '존 체류시간': {
+    primary: { page: '/insights', tab: 'store', section: 'store-zone-dwell' },
+  },
+  '존별 체류시간': {
     primary: { page: '/insights', tab: 'store', section: 'store-zone-dwell' },
   },
   '존 분석': {
     primary: { page: '/insights', tab: 'store', section: 'store-zone-dwell' },
   },
-  '체류 시간': {
-    primary: { page: '/insights', tab: 'customer', section: 'customer-kpi-cards' },
+  '존별 방문자 분포': {
+    primary: { page: '/insights', tab: 'store', section: 'store-zone-distribution' },
+  },
+  '존별 성과 비교': {
+    primary: { page: '/insights', tab: 'store', section: 'store-zone-performance' },
+  },
+  '존별 성과': {
+    primary: { page: '/insights', tab: 'store', section: 'store-zone-performance' },
+  },
+  '평균 체류시간': {
+    primary: { page: '/insights', tab: 'store', section: 'store-kpi-cards', component: 'avg-dwell' },
     secondary: [
-      { page: '/insights', tab: 'store', section: 'store-zone-dwell' },
+      { page: '/insights', tab: 'customer', section: 'customer-kpi-cards' },
+    ],
+    description: {
+      store: '매장 내 평균 체류시간',
+      customer: '고객별 체류시간 분석',
+    },
+  },
+  '체류 시간': {
+    primary: { page: '/insights', tab: 'store', section: 'store-kpi-cards', component: 'avg-dwell' },
+    secondary: [
+      { page: '/insights', tab: 'customer', section: 'customer-kpi-cards' },
+    ],
+    description: {
+      store: '매장 내 평균 체류시간',
+      customer: '고객별 체류시간 분석',
+    },
+  },
+  '체류시간': {
+    primary: { page: '/insights', tab: 'store', section: 'store-kpi-cards', component: 'avg-dwell' },
+    secondary: [
+      { page: '/insights', tab: 'customer', section: 'customer-kpi-cards' },
     ],
   },
   '히트맵': {
@@ -564,7 +641,25 @@ export const TERM_LOCATION_MAP: Record<string, TermLocationEntry> = {
   '충성 고객': {
     primary: { page: '/insights', tab: 'customer', section: 'customer-kpi-cards', component: 'loyal-customers' },
   },
+  '주요 세그먼트': {
+    primary: { page: '/insights', tab: 'customer', section: 'customer-kpi-cards', component: 'top-segment' },
+  },
+  '고객 세그먼트 분포': {
+    primary: { page: '/insights', tab: 'customer', section: 'customer-segment-distribution' },
+  },
+  '세그먼트별 평균 구매액': {
+    primary: { page: '/insights', tab: 'customer', section: 'customer-avg-purchase' },
+  },
+  '평균 구매액': {
+    primary: { page: '/insights', tab: 'customer', section: 'customer-avg-purchase' },
+  },
+  '세그먼트 상세 분석': {
+    primary: { page: '/insights', tab: 'customer', section: 'customer-segment-distribution' },
+  },
   '재방문 추이': {
+    primary: { page: '/insights', tab: 'customer', section: 'customer-return-trend' },
+  },
+  '재방문 트렌드': {
     primary: { page: '/insights', tab: 'customer', section: 'customer-return-trend' },
   },
 
@@ -581,8 +676,26 @@ export const TERM_LOCATION_MAP: Record<string, TermLocationEntry> = {
   '베스트셀러': {
     primary: { page: '/insights', tab: 'product', section: 'product-top10' },
   },
+  '총 판매량': {
+    primary: { page: '/insights', tab: 'product', section: 'product-kpi-cards' },
+  },
+  '상품별 매출 TOP 10': {
+    primary: { page: '/insights', tab: 'product', section: 'product-top10' },
+  },
+  '상품별 매출 top 10': {
+    primary: { page: '/insights', tab: 'product', section: 'product-top10' },
+  },
   '카테고리 분석': {
     primary: { page: '/insights', tab: 'product', section: 'product-category-revenue' },
+  },
+  '카테고리별 매출 분포': {
+    primary: { page: '/insights', tab: 'product', section: 'product-category-revenue' },
+  },
+  '카테고리별 판매량': {
+    primary: { page: '/insights', tab: 'product', section: 'product-category-quantity' },
+  },
+  '상품별 상세 성과': {
+    primary: { page: '/insights', tab: 'product', section: 'product-kpi-cards' },
   },
 
   // ===== 재고(Inventory) 탭 용어 =====
@@ -610,6 +723,37 @@ export const TERM_LOCATION_MAP: Record<string, TermLocationEntry> = {
   '재고 분포': {
     primary: { page: '/insights', tab: 'inventory', section: 'inventory-distribution' },
   },
+  '총 상품 수': {
+    primary: { page: '/insights', tab: 'inventory', section: 'inventory-kpi-cards' },
+  },
+  '정상 재고': {
+    primary: { page: '/insights', tab: 'inventory', section: 'inventory-kpi-cards', component: 'healthy-stock' },
+  },
+  '카테고리별 재고': {
+    primary: { page: '/insights', tab: 'inventory', section: 'inventory-category' },
+  },
+  '카테고리별 재고 현황': {
+    primary: { page: '/insights', tab: 'inventory', section: 'inventory-category' },
+  },
+  '재고 부족 경고 상품': {
+    primary: { page: '/insights', tab: 'inventory', section: 'inventory-risk' },
+  },
+  '최근 입출고 내역': {
+    primary: { page: '/insights', tab: 'inventory', section: 'inventory-movements' },
+  },
+  '상세 재고 현황': {
+    primary: { page: '/insights', tab: 'inventory', section: 'inventory-detail' },
+  },
+  '재고부족': {
+    primary: { page: '/insights', tab: 'inventory', section: 'inventory-risk' },
+    secondary: [
+      { page: '/insights', tab: 'product', section: 'product-kpi-cards' },
+    ],
+    description: {
+      inventory: '재고 부족 경고 상품 목록',
+      product: '재고 부족 상품 수',
+    },
+  },
 
   // ===== 예측(Prediction) 탭 용어 =====
   '매출 예측': {
@@ -630,19 +774,43 @@ export const TERM_LOCATION_MAP: Record<string, TermLocationEntry> = {
   '예측 모델': {
     primary: { page: '/insights', tab: 'prediction', section: 'prediction-model' },
   },
+  '예측 신뢰도': {
+    primary: { page: '/insights', tab: 'prediction', section: 'prediction-kpi-cards', component: 'pred-confidence' },
+  },
+  '일별 예측': {
+    primary: { page: '/insights', tab: 'prediction', section: 'prediction-daily' },
+  },
+  '일별 예측 상세': {
+    primary: { page: '/insights', tab: 'prediction', section: 'prediction-daily' },
+  },
 
   // ===== AI추천(AI Recommendation) 탭 용어 =====
   '활성 전략': {
-    primary: { page: '/insights', tab: 'ai-recommendation', section: 'ai-active-strategies' },
+    primary: { page: '/insights', tab: 'ai', section: 'ai-active-strategies' },
   },
   '전략 추천': {
-    primary: { page: '/insights', tab: 'ai-recommendation', section: 'ai-recommend' },
+    primary: { page: '/insights', tab: 'ai', section: 'ai-recommend' },
   },
   '가격 최적화': {
-    primary: { page: '/insights', tab: 'ai-recommendation', section: 'ai-optimize', component: 'price-optimization' },
+    primary: { page: '/insights', tab: 'ai', section: 'ai-optimize', component: 'price-optimization' },
   },
   '재고 최적화': {
-    primary: { page: '/insights', tab: 'ai-recommendation', section: 'ai-optimize', component: 'inventory-optimization' },
+    primary: { page: '/insights', tab: 'ai', section: 'ai-optimize', component: 'inventory-optimization' },
+  },
+  'AI 수요 예측': {
+    primary: { page: '/insights', tab: 'ai', section: 'ai-predict', component: 'demand-forecast' },
+  },
+  '시즌 트렌드': {
+    primary: { page: '/insights', tab: 'ai', section: 'ai-predict', component: 'season-trend' },
+  },
+  '리스크 예측': {
+    primary: { page: '/insights', tab: 'ai', section: 'ai-predict', component: 'risk-prediction' },
+  },
+  '캠페인': {
+    primary: { page: '/insights', tab: 'ai', section: 'ai-execute' },
+  },
+  '캠페인 현황': {
+    primary: { page: '/insights', tab: 'ai', section: 'ai-execute' },
   },
 
   // ===== 스튜디오/ROI 용어 =====

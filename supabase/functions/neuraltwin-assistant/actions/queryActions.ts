@@ -37,6 +37,8 @@ const QUERY_TYPE_TO_TAB: Record<string, { page: string; tab?: string; section?: 
   visitFrequency: { page: '/insights', tab: 'overview', section: 'overview-kpi-cards' },
   funnel: { page: '/insights', tab: 'overview', section: 'overview-funnel' },
   goal: { page: '/insights', tab: 'overview', section: 'overview-goals' },
+  aiEffect: { page: '/insights', tab: 'overview', section: 'overview-goals' },
+  dailyInsight: { page: '/insights', tab: 'overview', section: 'overview-insights' },
   summary: { page: '/insights', tab: 'overview', section: 'overview-kpi-cards' },
   // 매장(Store) 탭
   peakTime: { page: '/insights', tab: 'store', section: 'store-kpi-cards' },
@@ -44,6 +46,7 @@ const QUERY_TYPE_TO_TAB: Record<string, { page: string; tab?: string; section?: 
   trackingCoverage: { page: '/insights', tab: 'store', section: 'store-kpi-cards' },
   hourlyPattern: { page: '/insights', tab: 'store', section: 'store-hourly-pattern' },
   zoneAnalysis: { page: '/insights', tab: 'store', section: 'store-zone-dwell' },
+  storeDwell: { page: '/insights', tab: 'store', section: 'store-kpi-cards' },
   // 고객(Customer) 탭
   visitors: { page: '/insights', tab: 'customer', section: 'customer-kpi-cards' },
   dwellTime: { page: '/insights', tab: 'customer', section: 'customer-kpi-cards' },
@@ -51,6 +54,8 @@ const QUERY_TYPE_TO_TAB: Record<string, { page: string; tab?: string; section?: 
   repeatRate: { page: '/insights', tab: 'customer', section: 'customer-kpi-cards' },
   customerSegment: { page: '/insights', tab: 'customer', section: 'customer-segment-distribution' },
   loyalCustomers: { page: '/insights', tab: 'customer', section: 'customer-kpi-cards' },
+  segmentAvgPurchase: { page: '/insights', tab: 'customer', section: 'customer-avg-purchase' },
+  returnTrend: { page: '/insights', tab: 'customer', section: 'customer-return-trend' },
   // 상품(Product) 탭
   product: { page: '/insights', tab: 'product', section: 'product-kpi-cards' },
   topProducts: { page: '/insights', tab: 'product', section: 'product-top10' },
@@ -62,16 +67,26 @@ const QUERY_TYPE_TO_TAB: Record<string, { page: string; tab?: string; section?: 
   stockAlert: { page: '/insights', tab: 'inventory', section: 'inventory-risk' },
   stockMovement: { page: '/insights', tab: 'inventory', section: 'inventory-movements' },
   stockDistribution: { page: '/insights', tab: 'inventory', section: 'inventory-distribution' },
+  healthyStock: { page: '/insights', tab: 'inventory', section: 'inventory-kpi-cards' },
+  inventoryCategory: { page: '/insights', tab: 'inventory', section: 'inventory-category' },
+  inventoryDetail: { page: '/insights', tab: 'inventory', section: 'inventory-detail' },
   // 예측(Prediction) 탭
   predictionRevenue: { page: '/insights', tab: 'prediction', section: 'prediction-revenue' },
   predictionVisitors: { page: '/insights', tab: 'prediction', section: 'prediction-visitors' },
   predictionConversion: { page: '/insights', tab: 'prediction', section: 'prediction-conversion' },
   predictionSummary: { page: '/insights', tab: 'prediction', section: 'prediction-kpi-cards' },
+  predictionConfidence: { page: '/insights', tab: 'prediction', section: 'prediction-kpi-cards' },
+  predictionDaily: { page: '/insights', tab: 'prediction', section: 'prediction-daily' },
+  predictionModel: { page: '/insights', tab: 'prediction', section: 'prediction-model' },
   // AI추천(AI Recommendation) 탭
-  activeStrategies: { page: '/insights', tab: 'ai-recommendation', section: 'ai-active-strategies' },
-  strategyRecommendation: { page: '/insights', tab: 'ai-recommendation', section: 'ai-recommend' },
-  priceOptimization: { page: '/insights', tab: 'ai-recommendation', section: 'ai-optimize' },
-  inventoryOptimization: { page: '/insights', tab: 'ai-recommendation', section: 'ai-optimize' },
+  activeStrategies: { page: '/insights', tab: 'ai', section: 'ai-active-strategies' },
+  strategyRecommendation: { page: '/insights', tab: 'ai', section: 'ai-recommend' },
+  priceOptimization: { page: '/insights', tab: 'ai', section: 'ai-optimize' },
+  inventoryOptimization: { page: '/insights', tab: 'ai', section: 'ai-optimize' },
+  demandForecast: { page: '/insights', tab: 'ai', section: 'ai-predict' },
+  seasonTrend: { page: '/insights', tab: 'ai', section: 'ai-predict' },
+  riskPrediction: { page: '/insights', tab: 'ai', section: 'ai-predict' },
+  campaignStatus: { page: '/insights', tab: 'ai', section: 'ai-execute' },
   // 데이터 컨트롤타워 쿼리 (탭 없음)
   dataQuality: { page: '/data/control-tower', section: 'data-sources' },
   dataSources: { page: '/data/control-tower', section: 'data-sources' },
@@ -94,6 +109,8 @@ function getTermKeyword(queryType: string): string {
     visitFrequency: '방문 빈도',
     funnel: '고객 여정 퍼널',
     goal: '목표 달성률',
+    aiEffect: 'AI 추천 효과',
+    dailyInsight: 'AI 인사이트',
     summary: '매출',
     // 매장
     peakTime: '피크타임',
@@ -101,6 +118,7 @@ function getTermKeyword(queryType: string): string {
     trackingCoverage: '센서 커버율',
     hourlyPattern: '시간대별 방문',
     zoneAnalysis: '존 분석',
+    storeDwell: '평균 체류시간',
     // 고객
     visitors: '방문객',
     dwellTime: '체류 시간',
@@ -108,6 +126,8 @@ function getTermKeyword(queryType: string): string {
     repeatRate: '재방문율',
     customerSegment: '고객 세그먼트',
     loyalCustomers: '충성 고객',
+    segmentAvgPurchase: '세그먼트별 평균 구매액',
+    returnTrend: '재방문 추이',
     // 상품
     product: '상품',
     topProducts: '인기 상품',
@@ -119,16 +139,26 @@ function getTermKeyword(queryType: string): string {
     stockAlert: '재고 부족 경고',
     stockMovement: '입출고 내역',
     stockDistribution: '재고 분포',
+    healthyStock: '정상 재고',
+    inventoryCategory: '카테고리별 재고',
+    inventoryDetail: '상세 재고 현황',
     // 예측
     predictionRevenue: '매출 예측',
     predictionVisitors: '방문자 예측',
     predictionConversion: '전환율 예측',
     predictionSummary: '예측 요약',
+    predictionConfidence: '예측 신뢰도',
+    predictionDaily: '일별 예측',
+    predictionModel: '예측 모델',
     // AI추천
     activeStrategies: '활성 전략',
     strategyRecommendation: '전략 추천',
     priceOptimization: '가격 최적화',
     inventoryOptimization: '재고 최적화',
+    demandForecast: '수요 예측',
+    seasonTrend: '시즌 트렌드',
+    riskPrediction: '리스크 예측',
+    campaignStatus: '캠페인 현황',
   };
   return termMap[queryType] || '매출';
 }
@@ -209,9 +239,95 @@ function getTabDisplayName(tabId: string): string {
     product: '상품',
     inventory: '재고',
     prediction: '예측',
-    'ai-recommendation': 'AI추천',
+    ai: 'AI추천',
   };
   return tabNames[tabId] || tabId;
+}
+
+/**
+ * 새로 추가된 queryType용 - DB 쿼리 없이 해당 탭으로 네비게이션만 수행
+ */
+function createGenericNavigationResult(
+  queryType: string,
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext
+): QueryActionResult {
+  const termKeyword = getTermKeyword(queryType);
+  const { actions, tabChanged, targetTab } = createNavigationActions(queryType, dateRange, pageContext);
+  const tabName = getTabDisplayName(targetTab);
+
+  let message = `${termKeyword} 정보를 확인하시려면 ${tabName} 탭을 확인해주세요.`;
+  if (tabChanged) {
+    message = `${tabName} 탭의 ${termKeyword} 섹션으로 이동합니다.`;
+  } else {
+    message = `현재 ${tabName} 탭에서 ${termKeyword}을(를) 확인할 수 있습니다.`;
+  }
+
+  return {
+    actions,
+    message,
+    suggestions: [`${termKeyword} 더 보기`, '다른 지표 보기'],
+  };
+}
+
+/**
+ * 중복 위치 용어 체크 및 메시지 생성
+ * 사용자가 현재 탭에 있으면 유지, 아니면 가장 관련 높은 탭으로 이동 + 다른 위치 안내
+ */
+function getDisambiguationInfo(
+  queryType: string,
+  pageContext?: PageContext
+): { extraMessage: string; shouldAsk: boolean; alternativeTabs: string[] } | null {
+  const termKeyword = getTermKeyword(queryType);
+  const entry = findTermLocation(termKeyword);
+
+  if (!entry || !entry.secondary || entry.secondary.length === 0) {
+    return null; // 중복 위치 없음
+  }
+
+  const currentTab = pageContext?.tab || '';
+  const currentPage = pageContext?.current || '';
+
+  // 모든 위치 수집 (primary + secondary)
+  const allLocations = [entry.primary, ...entry.secondary];
+  const allTabs = allLocations
+    .filter(loc => loc.tab)
+    .map(loc => ({
+      tab: loc.tab!,
+      tabName: getTabDisplayName(loc.tab!),
+      description: entry.description?.[loc.tab!] || '',
+    }));
+
+  // 현재 탭이 해당 용어가 있는 탭 중 하나인지 확인
+  const isOnMatchingTab = allTabs.some(t => t.tab === currentTab);
+  const otherTabs = allTabs.filter(t => t.tab !== currentTab);
+
+  if (isOnMatchingTab && otherTabs.length > 0) {
+    // 현재 탭에 해당 데이터가 있음 → 유지, 다른 탭 안내
+    const otherTabNames = otherTabs.map(t => {
+      return t.description ? `${t.tabName} 탭(${t.description})` : `${t.tabName} 탭`;
+    }).join(', ');
+    return {
+      extraMessage: `\n참고: ${termKeyword}은(는) ${otherTabNames}에서도 확인할 수 있습니다.`,
+      shouldAsk: false,
+      alternativeTabs: otherTabs.map(t => t.tab),
+    };
+  }
+
+  if (!isOnMatchingTab && allTabs.length > 1) {
+    // 현재 탭에 해당 데이터 없음, 여러 탭에 존재 → 가장 관련 높은 곳으로 이동하되 안내
+    const otherTabsFromPrimary = allTabs.filter(t => t.tab !== entry.primary.tab);
+    const otherTabNames = otherTabsFromPrimary.map(t => {
+      return t.description ? `${t.tabName} 탭(${t.description})` : `${t.tabName} 탭`;
+    }).join(', ');
+    return {
+      extraMessage: `\n참고: ${termKeyword}은(는) ${otherTabNames}에서도 확인할 수 있습니다.`,
+      shouldAsk: false,
+      alternativeTabs: otherTabsFromPrimary.map(t => t.tab),
+    };
+  }
+
+  return null;
 }
 
 /**
@@ -229,103 +345,179 @@ export async function handleQueryKpi(
   try {
     const dateRange = getDateRange(period);
 
+    // 중복 위치 용어 체크 (disambiguation)
+    const disambiguationInfo = getDisambiguationInfo(queryType, pageContext);
+
+    let result: QueryActionResult;
+
     switch (queryType) {
       // 개요(Overview) 탭
       case 'revenue':
-        return await queryRevenue(supabase, storeId, dateRange, pageContext);
+        result = await queryRevenue(supabase, storeId, dateRange, pageContext);
+        break;
       case 'conversion':
-        return await queryConversion(supabase, storeId, dateRange, pageContext);
+        result = await queryConversion(supabase, storeId, dateRange, pageContext);
+        break;
       case 'avgTransaction':
-        return await queryAvgTransaction(supabase, storeId, dateRange, pageContext);
+        result = await queryAvgTransaction(supabase, storeId, dateRange, pageContext);
+        break;
       case 'footfall':
-        return await queryFootfall(supabase, storeId, dateRange, pageContext);
+        result = await queryFootfall(supabase, storeId, dateRange, pageContext);
+        break;
       case 'visitFrequency':
-        return await queryVisitFrequency(supabase, storeId, dateRange, pageContext);
+        result = await queryVisitFrequency(supabase, storeId, dateRange, pageContext);
+        break;
       case 'funnel':
-        return await queryFunnel(supabase, storeId, dateRange, pageContext);
+        result = await queryFunnel(supabase, storeId, dateRange, pageContext);
+        break;
       case 'goal':
-        return await queryGoal(supabase, storeId, dateRange, pageContext);
+        result = await queryGoal(supabase, storeId, dateRange, pageContext);
+        break;
+      case 'aiEffect':
+      case 'dailyInsight':
+        result = createGenericNavigationResult(queryType, dateRange, pageContext);
+        break;
 
       // 매장(Store) 탭
       case 'peakTime':
-        return await queryPeakTime(supabase, storeId, dateRange, pageContext);
+        result = await queryPeakTime(supabase, storeId, dateRange, pageContext);
+        break;
       case 'popularZone':
-        return await queryPopularZone(supabase, storeId, dateRange, pageContext);
+        result = await queryPopularZone(supabase, storeId, dateRange, pageContext);
+        break;
       case 'trackingCoverage':
-        return await queryTrackingCoverage(supabase, storeId, dateRange, pageContext);
+        result = await queryTrackingCoverage(supabase, storeId, dateRange, pageContext);
+        break;
       case 'hourlyPattern':
-        return await queryHourlyPattern(supabase, storeId, dateRange, pageContext);
+        result = await queryHourlyPattern(supabase, storeId, dateRange, pageContext);
+        break;
       case 'zoneAnalysis':
-        return await queryZoneAnalysis(supabase, storeId, dateRange, pageContext);
+        result = await queryZoneAnalysis(supabase, storeId, dateRange, pageContext);
+        break;
+      case 'storeDwell':
+        result = createGenericNavigationResult(queryType, dateRange, pageContext);
+        break;
 
       // 고객(Customer) 탭
       case 'visitors':
-        return await queryVisitors(supabase, storeId, dateRange, pageContext);
+        result = await queryVisitors(supabase, storeId, dateRange, pageContext);
+        break;
       case 'dwellTime':
-        return await queryDwellTime(supabase, storeId, dateRange, pageContext);
+        result = await queryDwellTime(supabase, storeId, dateRange, pageContext);
+        break;
       case 'newVsReturning':
-        return await queryNewVsReturning(supabase, storeId, dateRange, pageContext);
+        result = await queryNewVsReturning(supabase, storeId, dateRange, pageContext);
+        break;
       case 'repeatRate':
-        return await queryRepeatRate(supabase, storeId, dateRange, pageContext);
+        result = await queryRepeatRate(supabase, storeId, dateRange, pageContext);
+        break;
       case 'customerSegment':
-        return await queryCustomerSegment(supabase, storeId, dateRange, pageContext);
+        result = await queryCustomerSegment(supabase, storeId, dateRange, pageContext);
+        break;
       case 'loyalCustomers':
-        return await queryLoyalCustomers(supabase, storeId, dateRange, pageContext);
+        result = await queryLoyalCustomers(supabase, storeId, dateRange, pageContext);
+        break;
+      case 'segmentAvgPurchase':
+      case 'returnTrend':
+        result = createGenericNavigationResult(queryType, dateRange, pageContext);
+        break;
 
       // 상품(Product) 탭
       case 'product':
-        return await queryProduct(supabase, storeId, dateRange, pageContext);
+        result = await queryProduct(supabase, storeId, dateRange, pageContext);
+        break;
       case 'topProducts':
-        return await queryTopProducts(supabase, storeId, dateRange, pageContext);
+        result = await queryTopProducts(supabase, storeId, dateRange, pageContext);
+        break;
       case 'categoryAnalysis':
-        return await queryCategoryAnalysis(supabase, storeId, dateRange, pageContext);
+        result = await queryCategoryAnalysis(supabase, storeId, dateRange, pageContext);
+        break;
       case 'unitsSold':
-        return await queryUnitsSold(supabase, storeId, dateRange, pageContext);
+        result = await queryUnitsSold(supabase, storeId, dateRange, pageContext);
+        break;
 
       // 재고(Inventory) 탭
       case 'inventory':
-        return await queryInventory(supabase, storeId, dateRange, pageContext);
+        result = await queryInventory(supabase, storeId, dateRange, pageContext);
+        break;
       case 'overstock':
-        return await queryOverstock(supabase, storeId, dateRange, pageContext);
+        result = await queryOverstock(supabase, storeId, dateRange, pageContext);
+        break;
       case 'stockAlert':
-        return await queryStockAlert(supabase, storeId, dateRange, pageContext);
+        result = await queryStockAlert(supabase, storeId, dateRange, pageContext);
+        break;
       case 'stockMovement':
-        return await queryStockMovement(supabase, storeId, dateRange, pageContext);
+        result = await queryStockMovement(supabase, storeId, dateRange, pageContext);
+        break;
       case 'stockDistribution':
-        return await queryStockDistribution(supabase, storeId, dateRange, pageContext);
+        result = await queryStockDistribution(supabase, storeId, dateRange, pageContext);
+        break;
+      case 'healthyStock':
+      case 'inventoryCategory':
+      case 'inventoryDetail':
+        result = createGenericNavigationResult(queryType, dateRange, pageContext);
+        break;
 
       // 예측(Prediction) 탭
       case 'predictionRevenue':
       case 'predictionVisitors':
       case 'predictionConversion':
       case 'predictionSummary':
-        return await queryPrediction(supabase, storeId, dateRange, queryType, pageContext);
+      case 'predictionConfidence':
+      case 'predictionDaily':
+      case 'predictionModel':
+        result = await queryPrediction(supabase, storeId, dateRange, queryType, pageContext);
+        break;
 
       // AI추천(AI Recommendation) 탭
       case 'activeStrategies':
       case 'strategyRecommendation':
       case 'priceOptimization':
       case 'inventoryOptimization':
-        return await queryAIRecommendation(supabase, storeId, dateRange, queryType, pageContext);
+      case 'demandForecast':
+      case 'seasonTrend':
+      case 'riskPrediction':
+      case 'campaignStatus':
+        result = await queryAIRecommendation(supabase, storeId, dateRange, queryType, pageContext);
+        break;
 
       // 데이터 컨트롤타워
       case 'dataQuality':
-        return await queryDataQuality(supabase, storeId, pageContext);
+        result = await queryDataQuality(supabase, storeId, pageContext);
+        break;
       case 'dataSources':
-        return await queryDataSources(supabase, storeId, pageContext);
+        result = await queryDataSources(supabase, storeId, pageContext);
+        break;
       case 'contextDataSources':
-        return await queryContextDataSources(supabase, storeId, pageContext);
+        result = await queryContextDataSources(supabase, storeId, pageContext);
+        break;
       case 'apiConnections':
-        return await queryApiConnections(supabase, storeId, pageContext);
+        result = await queryApiConnections(supabase, storeId, pageContext);
+        break;
       case 'importHistory':
-        return await queryImportHistory(supabase, storeId, pageContext);
+        result = await queryImportHistory(supabase, storeId, pageContext);
+        break;
       case 'pipelineStatus':
-        return await queryPipelineStatus(supabase, storeId, pageContext);
+        result = await queryPipelineStatus(supabase, storeId, pageContext);
+        break;
 
       case 'summary':
       default:
-        return await querySummary(supabase, storeId, dateRange, pageContext);
+        result = await querySummary(supabase, storeId, dateRange, pageContext);
+        break;
     }
+
+    // 중복 위치 용어인 경우 → 다른 탭 안내 메시지 추가
+    if (disambiguationInfo && disambiguationInfo.extraMessage) {
+      result.message += disambiguationInfo.extraMessage;
+      // 다른 탭으로의 제안도 추가
+      const altSuggestions = disambiguationInfo.alternativeTabs.map(tab =>
+        `${getTabDisplayName(tab)} 탭에서 보기`
+      );
+      result.suggestions = [...result.suggestions, ...altSuggestions].slice(0, 4);
+    }
+
+    return result;
 
   } catch (error) {
     console.error('[queryActions] Error:', error);
