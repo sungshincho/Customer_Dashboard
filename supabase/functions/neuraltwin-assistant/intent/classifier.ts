@@ -221,7 +221,7 @@ function transformEntities(
  * 탭에서 페이지 추론
  */
 function inferPageFromTab(tab: string): string | null {
-  const insightsTabs = ['overview', 'store', 'customer', 'product', 'inventory', 'prediction', 'ai-recommendation'];
+  const insightsTabs = ['overview', 'store', 'customer', 'product', 'inventory', 'prediction', 'ai', 'ai-recommendation'];
   const studioTabs = ['layer', 'ai-simulation', 'ai-optimization', 'apply'];
   const settingsTabs = ['store-management', 'data', 'users', 'system', 'plan'];
 

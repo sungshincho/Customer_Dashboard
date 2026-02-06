@@ -86,7 +86,6 @@ const TAB_NAMES: Record<string, string> = {
   'inventory': '재고',
   'prediction': '예측',
   'ai': 'AI추천',
-  'ai-recommendation': 'AI추천',
   'store-management': '매장 관리',
   'stores': '매장 관리',
   'data': '데이터',

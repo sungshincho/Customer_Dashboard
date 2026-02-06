@@ -65,54 +65,69 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
 **queryType 값:**
 
 *개요(Overview) 탭:*
-- revenue: 매출, 수익, 매상
-- conversion: 전환율
+- revenue: 매출, 수익, 매상, 총 매출 (개요 맥락에서)
+- conversion: 전환율, 구매 전환율, 구매전환율, 구매 전환
 - avgTransaction: 객단가, 평균 거래금액
-- footfall: 입장객, 총 입장, 풋폴, 총 방문
+- footfall: 입장객, 총 입장, 풋폴, 총 방문, 총입장
 - visitFrequency: 방문 빈도, 방문 주기, 일평균 방문
-- funnel: 퍼널, 고객 여정, 여정 분석, 전환 퍼널
-- goal: 목표, 목표달성률, 목표설정(확인용)
+- funnel: 퍼널, 고객 여정, 여정 분석, 전환 퍼널, 고객 여정 퍼널
+- goal: 목표, 목표달성률, 목표설정(확인용), 목표 달성률, 달성률
+- aiEffect: AI 추천 효과, 추천 효과, AI 효과
+- dailyInsight: 오늘의 AI 인사이트, AI 인사이트, 오늘의 인사이트, 인사이트 요약
 - summary: 전체현황, 요약, 성과, 실적
 
 *매장(Store) 탭:*
 - peakTime: 피크타임, 피크시간, 가장 바쁜 시간, 혼잡 시간
-- popularZone: 인기 존, 인기 구역, 가장 많이 방문하는 존
+- popularZone: 인기 존, 인기 구역, 인기존, 가장 많이 방문하는 존
 - trackingCoverage: 센서 커버율, 센서 커버리지, 트래킹 범위, 센서 현황
-- hourlyPattern: 시간대별 방문, 시간대별 패턴, 시간별 방문객, 시간대 분석
-- zoneAnalysis: 존 분석, 존별 체류시간, 존 방문자 분포, 구역별 분석, 존별 비교
+- hourlyPattern: 시간대별 방문, 시간대별 패턴, 시간별 방문객, 시간대 분석, 시간대별 방문 패턴
+- zoneAnalysis: 존 분석, 존별 체류시간, 존 방문자 분포, 구역별 분석, 존별 비교, 존별 성과 비교, 존별 방문자 분포, 존별 성과
+- storeDwell: 평균 체류시간 (매장 탭 맥락에서), 체류시간 (매장 탭)
 
 *고객(Customer) 탭:*
-- visitors: 방문객, 고객수, 트래픽, 순방문객
-- dwellTime: 체류시간, 머문시간, 평균 체류
+- visitors: 방문객, 고객수, 트래픽, 순방문객, 순 방문객
+- dwellTime: 체류시간, 머문시간, 평균 체류 (고객 탭 맥락에서)
 - newVsReturning: 신규고객, 재방문고객, 신규/재방문
 - repeatRate: 재방문율, 리피트율, 재방문 비율
-- customerSegment: 고객 세그먼트, 고객 분류, 세그먼트 분포, 고객 유형
+- customerSegment: 고객 세그먼트, 고객 분류, 세그먼트 분포, 고객 유형, 고객 세그먼트 분포, 세그먼트 상세 분석, 세그먼트 상세
 - loyalCustomers: 충성 고객, 단골, VIP 고객, 로열 고객
+- segmentAvgPurchase: 세그먼트별 평균 구매액, 세그먼트별 구매액, 평균 구매액
+- returnTrend: 재방문 추이, 재방문 트렌드
 
 *상품(Product) 탭:*
-- product: 상품, 상품 실적
-- topProducts: 인기 상품, 베스트셀러, TOP 상품, 매출 순위
-- categoryAnalysis: 카테고리 분석, 카테고리별 매출, 카테고리별 판매
+- product: 상품, 상품 실적, 상품별 상세 성과, 상품 상세
+- topProducts: 인기 상품, 베스트셀러, TOP 상품, 매출 순위, 상품별 매출 TOP 10, 상품별 매출 top 10
+- categoryAnalysis: 카테고리 분석, 카테고리별 매출, 카테고리별 판매, 카테고리별 매출 분포, 카테고리별 판매량
 - unitsSold: 판매량, 판매 수량, 총 판매량, 판매 개수
 
 *재고(Inventory) 탭:*
-- inventory: 재고, 재고현황, 재고 상태
+- inventory: 재고, 재고현황, 재고 상태, 총 상품 수
 - overstock: 과잉 재고, 과재고, 재고 과잉, 넘치는 재고
-- stockAlert: 재고 부족 경고, 재고 부족, 재주문 필요, 부족 알림
-- stockMovement: 입출고, 입출고 내역, 입고, 출고, 재고 이동
+- stockAlert: 재고 부족 경고, 재고 부족, 재주문 필요, 부족 알림, 재고부족
+- stockMovement: 입출고, 입출고 내역, 입고, 출고, 재고 이동, 최근 입출고
 - stockDistribution: 재고 분포, 재고 상태 분포, 재고 비율
+- healthyStock: 정상 재고, 양호 재고
+- inventoryCategory: 카테고리별 재고, 카테고리별 재고 현황
+- inventoryDetail: 상세 재고, 상세 재고 현황, 재고 테이블
 
 *예측(Prediction) 탭:*
 - predictionRevenue: 매출 예측, 예상 매출, 향후 매출
 - predictionVisitors: 방문자 예측, 예상 방문객, 향후 방문자
 - predictionConversion: 전환율 예측, 예상 전환율
 - predictionSummary: 예측 요약, 예측 종합, 전체 예측
+- predictionConfidence: 예측 신뢰도, 신뢰도, 정확도
+- predictionDaily: 일별 예측, 일별 예측 상세
+- predictionModel: 예측 모델, 모델 정보
 
 *AI추천(AI Recommendation) 탭:*
 - activeStrategies: 활성 전략, 실행 중인 전략, 적용된 전략
 - strategyRecommendation: 전략 추천, 추천 전략, 새로운 추천
 - priceOptimization: 가격 최적화, 가격 추천, 가격 전략
 - inventoryOptimization: 재고 최적화, 재고 추천, 발주 최적화
+- demandForecast: 수요 예측 (AI추천), 수요 분석
+- seasonTrend: 시즌 트렌드, 계절성, 시즌 분석
+- riskPrediction: 리스크 예측, 위험 예측, 리스크 분석
+- campaignStatus: 캠페인, 캠페인 현황, 캠페인 실행
 
 *데이터 컨트롤타워:*
 - dataQuality: 데이터 품질, 품질 점수, 데이터 품질 스코어
@@ -133,11 +148,16 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
 현재 페이지 내에서 탭만 변경
 - "고객탭 보여줘", "재고탭 열어줘"
 - "개요로 돌아가", "AI추천 탭"
+- "AI추천 보여줘", "ai추천 탭 보여줘" → tab: "ai"
+- "예측탭 열어줘", "예측 보여줘" → tab: "prediction"
+- "매장탭 보여줘" → tab: "store"
 
 **tab 값:**
-- 인사이트: overview, store, customer, product, inventory, prediction, ai-recommendation
+- 인사이트: overview, store, customer, product, inventory, prediction, ai
 - 스튜디오: layer, ai-simulation, ai-optimization, apply
 - 설정: store-management, data, users, system, plan
+
+**중요:** "AI추천", "AI 추천", "ai추천"이라는 단어가 포함되어 있고 탭 전환 의도면 반드시 tab: "ai"를 사용하세요 ("ai-recommendation"이 아님).
 
 ### 4. scroll_to_section (섹션 스크롤)
 페이지 내 특정 섹션으로 스크롤
@@ -157,6 +177,7 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
 ### 5. open_modal (모달/팝업 열기)
 설정 창이나 입력 폼을 **열려는** 의도 (확인이 아닌 설정/변경)
 - "목표 설정해줘", "목표 설정하고 싶어" (새로 설정하려는 의도)
+- "목표 설정창 켜줘", "목표 설정 창 열어줘", "목표 설정 창 켜줘"
 - "데이터 내보내기", "사용자 초대"
 - "새 연결 추가", "플랜 업그레이드"
 
@@ -164,6 +185,8 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
 - goal-settings, date-picker, export-data
 - simulation-config, optimization-config
 - new-connection, invite-user, plan-upgrade
+
+**"켜줘/열어줘" + "창/설정창/팝업"** 패턴은 항상 open_modal로 분류하세요.
 
 ### 6. set_date_range (날짜 필터 변경)
 데이터 조회 없이 날짜 필터만 변경
@@ -223,7 +246,25 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
 
 ### "목표 설정" 요청 해석
 - "목표 설정 **보여줘/확인/어때**" → query_kpi (queryType: goal) - 현재 목표 확인
-- "목표 **설정해줘/설정하고 싶어/변경**" → open_modal (modalId: goal-settings) - 새로 설정
+- "목표 **설정해줘/설정하고 싶어/변경/켜줘**" → open_modal (modalId: goal-settings) - 새로 설정
+- "목표 설정창 켜줘", "목표 설정 창 열어줘" → open_modal (modalId: goal-settings)
+
+### "AI추천" 요청 해석
+- "AI추천 보여줘", "AI추천 탭 보여줘", "ai추천 탭" → set_tab (tab: "ai") - AI추천 탭 전환
+- "활성 전략 보여줘", "전략 추천해줘" → query_kpi - AI추천 탭의 특정 데이터 조회
+
+### 중복 위치 용어 처리 (중의성 해소)
+일부 용어는 여러 탭에 존재합니다. 이 경우 **현재 컨텍스트**를 고려하세요:
+- **순 방문객** → 개요탭(overview), 고객탭(customer) 모두에 존재
+- **총 매출** → 개요탭(overview), 상품탭(product) 모두에 존재
+- **전환율** → 개요탭(overview), 고객탭(customer) 모두에 존재
+- **재고 부족** → 상품탭(product), 재고탭(inventory) 모두에 존재
+- **체류 시간** → 매장탭(store), 고객탭(customer) 모두에 존재
+
+**판단 규칙:**
+1. 사용자가 현재 해당 용어가 있는 탭에 있으면 → 현재 탭 유지 (query_kpi)
+2. 사용자가 해당 용어가 없는 탭에 있으면 → 가장 관련성 높은 탭으로 이동 (query_kpi)
+3. 확신이 낮으면 confidence를 낮게 (0.6~0.7) 설정
 
 ### 날짜 표현 파싱
 - 상대 날짜: 오늘, 어제, 이번주, 지난주, 이번달, 지난달

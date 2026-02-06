@@ -4,7 +4,7 @@
  * 목표 설정 다이얼로그
  */
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -56,6 +56,21 @@ export function GoalSettingDialog({ trigger }: GoalSettingDialogProps) {
   });
 
   const createGoal = useCreateGoal();
+
+  // AI 어시스턴트에서 open_modal 이벤트로 다이얼로그 열기
+  const handleAssistantOpenModal = useCallback((e: Event) => {
+    const detail = (e as CustomEvent).detail;
+    if (detail?.modalId === 'goal-settings') {
+      setOpen(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener('assistant:open-modal', handleAssistantOpenModal);
+    return () => {
+      window.removeEventListener('assistant:open-modal', handleAssistantOpenModal);
+    };
+  }, [handleAssistantOpenModal]);
 
   const handleSubmit = async () => {
     if (!form.targetValue) return;
