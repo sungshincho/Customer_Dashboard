@@ -48,7 +48,7 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
 - "목표 달성률 보여줘", "목표 설정 보여줘" (현재 설정된 목표 확인)
 - "12월 1-10일 순 방문객", "지난주 매출"
 - "재고 현황", "베스트셀러", "체류 시간"
-- "데이터 품질 점수 몇 점?", "연결된 소스 뭐야?", "파이프라인 상태 확인"
+- "데이터 품질 점수 몇 점?", "연결된 소스 뭐야?", "파이프라인 상태 확인", "컨텍스트 데이터 소스 뭐 있어?", "날씨 데이터 확인"
 
 **queryType 값:**
 - revenue: 매출, 수익, 매상
@@ -62,8 +62,9 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
 - newVsReturning: 신규고객, 재방문고객, 신규/재방문
 - summary: 전체현황, 요약, 성과, 실적
 - dataQuality: 데이터 품질, 품질 점수, 데이터 품질 스코어
-- dataSources: 연결된 소스, 데이터 소스, 비즈니스 소스, 컨텍스트 데이터 소스
-- pipelineStatus: 파이프라인 상태, ETL 현황, 데이터 수집 상태, 동기화 현황
+- dataSources: 연결된 소스, 데이터 소스, 비즈니스 데이터 소스, 비즈니스 소스
+- contextDataSources: 컨텍스트 데이터 소스, 컨텍스트 소스, 날씨 데이터, 공휴일 데이터, 이벤트 데이터
+- pipelineStatus: 파이프라인 상태, 데이터 흐름, 데이터 흐름 현황, ETL 현황, 데이터 수집 상태, 동기화 현황
 
 ### 2. navigate (페이지 이동)
 다른 페이지로 이동하려는 의도

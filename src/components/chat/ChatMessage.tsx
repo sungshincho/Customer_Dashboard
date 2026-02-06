@@ -35,7 +35,7 @@ export function ChatMessage({ message, isDark }: ChatMessageProps) {
             : '1px solid rgba(0,0,0,0.05)',
         }}
       >
-        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words selectable">
           {message.content}
         </p>
         <span
