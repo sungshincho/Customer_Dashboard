@@ -592,17 +592,17 @@ async function queryProduct(
   const { actions, tabChanged, targetTab } = createNavigationActions('product', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 내역을 확인합니다.` : '';
 
-  // product_performance_agg 테이블에서 조회
+  // product_performance_agg 테이블에서 조회 (실제 컬럼: units_sold, revenue)
   const { data, error } = await supabase
     .from('product_performance_agg')
-    .select('product_id, product_name, sales_count, revenue')
+    .select('product_id, units_sold, revenue')
     .eq('store_id', storeId)
     .gte('date', dateRange.startDate)
     .lte('date', dateRange.endDate);
 
   if (error) {
     console.error('[queryProduct] Error:', error);
-    // 테이블이 없거나 에러 시 daily_kpis_agg에서 거래 수로 대체
+    // 폴백: daily_kpis_agg에서 거래 수로 대체
     const { data: kpiData } = await supabase
       .from('daily_kpis_agg')
       .select('total_transactions, total_revenue')
@@ -621,14 +621,14 @@ async function queryProduct(
     };
   }
 
-  const totalSalesCount = data?.reduce((sum, row) => sum + (row.sales_count || 0), 0) || 0;
+  const totalUnitsSold = data?.reduce((sum, row) => sum + (row.units_sold || 0), 0) || 0;
   const totalRevenue = data?.reduce((sum, row) => sum + (row.revenue || 0), 0) || 0;
 
   return {
     actions,
-    message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 총 판매량은 ${totalSalesCount.toLocaleString()}개, 매출은 ${formatNumber(totalRevenue)}원입니다.${tabMessage}`,
+    message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 총 판매량은 ${totalUnitsSold.toLocaleString()}개, 매출은 ${formatNumber(totalRevenue)}원입니다.${tabMessage}`,
     suggestions: ['매출 알려줘', '재고 현황 알려줘'],
-    data: { totalSalesCount, totalRevenue },
+    data: { totalUnitsSold, totalRevenue },
   };
 }
 
@@ -644,11 +644,29 @@ async function queryInventory(
   const { actions, tabChanged, targetTab } = createNavigationActions('inventory', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 내역을 확인합니다.` : '';
 
-  // 재고 관련 테이블에서 조회 시도
+  // store에서 org_id 조회 (inventory_levels는 org_id 기준 필터)
+  const { data: storeData } = await supabase
+    .from('stores')
+    .select('org_id')
+    .eq('id', storeId)
+    .single();
+
+  const orgId = storeData?.org_id;
+
+  if (!orgId) {
+    return {
+      actions,
+      message: `매장 정보를 확인할 수 없습니다.${tabMessage}`,
+      suggestions: ['상품 판매량 알려줘', '매출 알려줘'],
+      data: null,
+    };
+  }
+
+  // inventory_levels 테이블에서 재고 현황 조회 (실제 컬럼: current_stock, minimum_stock, optimal_stock)
   const { data, error } = await supabase
-    .from('inventory_status')
-    .select('product_id, product_name, current_stock, reorder_point')
-    .eq('store_id', storeId);
+    .from('inventory_levels')
+    .select('product_id, current_stock, minimum_stock, optimal_stock')
+    .eq('org_id', orgId);
 
   if (error) {
     console.error('[queryInventory] Error:', error);
@@ -661,18 +679,24 @@ async function queryInventory(
   }
 
   const totalItems = data?.length || 0;
-  const lowStockItems = data?.filter(item => item.current_stock <= item.reorder_point).length || 0;
+  const lowStockItems = data?.filter(item => item.current_stock <= item.minimum_stock).length || 0;
+  const overstockItems = data?.filter(item =>
+    item.optimal_stock > 0 && item.current_stock > item.optimal_stock * 1.5
+  ).length || 0;
 
   return {
     actions,
-    message: `현재 ${totalItems}개 상품 중 ${lowStockItems}개 상품이 재주문 필요 상태입니다.${tabMessage}`,
+    message: `현재 ${totalItems}개 상품 중 ${lowStockItems}개 상품이 재주문 필요(재고 부족), ${overstockItems}개 상품이 과잉 재고 상태입니다.${tabMessage}`,
     suggestions: ['상품 판매량 알려줘', '매출 알려줘'],
-    data: { totalItems, lowStockItems },
+    data: { totalItems, lowStockItems, overstockItems },
   };
 }
 
 /**
  * 목표 달성률 조회 (조건부 응답, 컨텍스트 인식)
+ * - store_goals 테이블 사용 (프론트엔드 useGoals.ts와 동일)
+ * - goal_type: revenue, visitors, conversion, avg_basket
+ * - 목표 없음 시 목표 설정 다이얼로그 팝업 유도
  */
 async function queryGoal(
   supabase: SupabaseClient,
@@ -680,45 +704,89 @@ async function queryGoal(
   dateRange: { startDate: string; endDate: string },
   pageContext?: PageContext
 ): Promise<QueryActionResult> {
-  // user_goals 테이블에서 목표 조회 시도
-  const { data: goalData, error: goalError } = await supabase
-    .from('user_goals')
-    .select('*')
+  const today = new Date().toISOString().split('T')[0];
+
+  // store_goals 테이블에서 활성 목표 조회 (현재 기간 내)
+  const { data: goals, error: goalError } = await supabase
+    .from('store_goals')
+    .select('id, goal_type, period_type, target_value, period_start, period_end')
     .eq('store_id', storeId)
     .eq('is_active', true)
-    .single();
+    .lte('period_start', today)
+    .gte('period_end', today);
 
-  // 목표 설정이 없는 경우 - 조건부 응답
-  if (goalError || !goalData) {
+  // 목표 설정이 없는 경우 → 목표 설정 다이얼로그 팝업 유도
+  if (goalError || !goals || goals.length === 0) {
     return {
       actions: [
         { type: 'navigate', target: '/insights?tab=overview' },
-        { type: 'scroll_to_section', sectionId: 'goal-achievement', highlight: true, highlightDuration: 2000 },
+        { type: 'open_modal', modalId: 'goal-settings' },
       ],
-      message: '현재 설정된 목표가 없습니다. 목표를 설정하시면 달성률을 확인할 수 있어요.\n\n개요탭으로 이동하여 목표 설정 섹션을 안내합니다.',
-      suggestions: ['목표 설정하기', '매출 알려줘', '방문객 수 확인'],
+      message: '현재 설정된 목표가 없습니다. 목표를 설정하시면 달성률을 확인할 수 있어요.\n\n목표 설정 창을 열어드리겠습니다.',
+      suggestions: ['매출 알려줘', '방문객 수 확인', '전환율 어때?'],
       data: { hasGoal: false },
     };
   }
 
-  // 목표가 있는 경우 - 현재 성과 조회
+  // 목표가 있는 경우 → KPI 데이터 조회 후 달성률 계산
   const { data: kpiData } = await supabase
     .from('daily_kpis_agg')
-    .select('total_revenue, total_visitors')
+    .select('total_revenue, total_visitors, total_transactions, conversion_rate, avg_transaction_value')
     .eq('store_id', storeId)
     .gte('date', dateRange.startDate)
     .lte('date', dateRange.endDate);
 
   const totalRevenue = kpiData?.reduce((sum, row) => sum + (row.total_revenue || 0), 0) || 0;
-  const goalRevenue = goalData.target_revenue || 0;
-  const achievementRate = goalRevenue > 0 ? Math.round((totalRevenue / goalRevenue) * 100) : 0;
+  const totalVisitors = kpiData?.reduce((sum, row) => sum + (row.total_visitors || 0), 0) || 0;
+  const totalTransactions = kpiData?.reduce((sum, row) => sum + (row.total_transactions || 0), 0) || 0;
+  const avgConversion = totalVisitors > 0 ? (totalTransactions / totalVisitors) * 100 : 0;
+  const avgBasket = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
 
-  const trend = achievementRate >= 100 ? '목표를 달성했어요!' :
-               achievementRate >= 80 ? '목표 달성에 근접해 있어요.' :
-               achievementRate >= 50 ? '중간 정도 진행 중이에요.' : '목표까지 더 노력이 필요해요.';
+  // goal_type별 달성률 계산
+  const goalTypeLabels: Record<string, string> = {
+    revenue: '매출', visitors: '방문자', conversion: '전환율', avg_basket: '객단가',
+  };
+  const goalTypeUnits: Record<string, string> = {
+    revenue: '원', visitors: '명', conversion: '%', avg_basket: '원',
+  };
+
+  const results = goals.map(goal => {
+    let currentValue = 0;
+    switch (goal.goal_type) {
+      case 'revenue': currentValue = totalRevenue; break;
+      case 'visitors': currentValue = totalVisitors; break;
+      case 'conversion': currentValue = avgConversion; break;
+      case 'avg_basket': currentValue = avgBasket; break;
+    }
+    const progress = goal.target_value > 0 ? Math.min(Math.round((currentValue / goal.target_value) * 100), 100) : 0;
+    const remaining = Math.max(goal.target_value - currentValue, 0);
+    return { ...goal, currentValue, progress, remaining };
+  });
+
+  // 전체 평균 달성률
+  const overallRate = results.length > 0
+    ? Math.round(results.reduce((sum, r) => sum + r.progress, 0) / results.length)
+    : 0;
+
+  const trend = overallRate >= 100 ? '목표를 달성했어요!' :
+               overallRate >= 80 ? '목표 달성에 근접해 있어요.' :
+               overallRate >= 50 ? '중간 정도 진행 중이에요.' : '목표까지 더 노력이 필요해요.';
+
+  // 각 목표 상세 메시지 구성
+  const details = results.map(r => {
+    const label = goalTypeLabels[r.goal_type] || r.goal_type;
+    const unit = goalTypeUnits[r.goal_type] || '';
+    const currentStr = r.goal_type === 'conversion'
+      ? `${r.currentValue.toFixed(1)}%`
+      : `${formatNumber(Math.round(r.currentValue))}${unit}`;
+    const targetStr = r.goal_type === 'conversion'
+      ? `${r.target_value}%`
+      : `${formatNumber(r.target_value)}${unit}`;
+    return `• ${label}: ${currentStr} / ${targetStr} (${r.progress}%)`;
+  }).join('\n');
 
   const { actions, tabChanged, targetTab } = createNavigationActions('goal', dateRange, pageContext);
-  let message = `현재 목표 달성률은 ${achievementRate}%입니다. ${trend}`;
+  let message = `현재 목표 달성률은 평균 ${overallRate}%입니다. ${trend}\n\n${details}`;
   if (tabChanged) {
     message += `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 데이터를 확인합니다.`;
   }
@@ -726,8 +794,8 @@ async function queryGoal(
   return {
     actions,
     message,
-    suggestions: ['목표 수정하기', '매출 알려줘', '상세 분석 보기'],
-    data: { achievementRate, totalRevenue, goalRevenue, hasGoal: true },
+    suggestions: ['목표 설정 변경하기', '매출 알려줘', '상세 분석 보기'],
+    data: { overallRate, goals: results, hasGoal: true },
   };
 }
 
@@ -743,51 +811,37 @@ async function queryDwellTime(
   const { actions, tabChanged, targetTab } = createNavigationActions('dwellTime', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 분석을 확인합니다.` : '';
 
-  // 체류 시간 데이터 조회 시도
+  // daily_kpis_agg에서 체류 시간 조회 (실제 컬럼: avg_visit_duration_seconds, 단위: 초)
   const { data, error } = await supabase
-    .from('customer_behavior_agg')
-    .select('avg_dwell_time, total_visitors')
+    .from('daily_kpis_agg')
+    .select('avg_visit_duration_seconds, total_visitors')
     .eq('store_id', storeId)
     .gte('date', dateRange.startDate)
     .lte('date', dateRange.endDate);
 
-  if (error) {
-    console.error('[queryDwellTime] Error:', error);
-    // 폴백: daily_kpis_agg 사용
-    const { data: kpiData } = await supabase
-      .from('daily_kpis_agg')
-      .select('avg_dwell_time')
-      .eq('store_id', storeId)
-      .gte('date', dateRange.startDate)
-      .lte('date', dateRange.endDate);
-
-    if (!kpiData || kpiData.length === 0) {
-      return {
-        actions,
-        message: `체류 시간 데이터를 조회할 수 없습니다.${tabMessage}`,
-        suggestions: ['방문객 수 알려줘', '고객탭 보여줘'],
-        data: null,
-      };
-    }
-
-    const avgDwell = kpiData.reduce((sum, row) => sum + (row.avg_dwell_time || 0), 0) / kpiData.length;
+  if (error || !data || data.length === 0) {
+    if (error) console.error('[queryDwellTime] Error:', error);
     return {
       actions,
-      message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 평균 체류 시간은 ${Math.round(avgDwell)}분입니다.${tabMessage}`,
-      suggestions: ['방문객 수 알려줘', '신규/재방문 비율'],
-      data: { avgDwellTime: avgDwell },
+      message: `체류 시간 데이터를 조회할 수 없습니다.${tabMessage}`,
+      suggestions: ['방문객 수 알려줘', '고객탭 보여줘'],
+      data: null,
     };
   }
 
+  // 방문자 가중 평균 (초 단위 → 분 변환)
   const totalVisitors = data.reduce((sum, row) => sum + (row.total_visitors || 0), 0);
-  const weightedDwellSum = data.reduce((sum, row) => sum + (row.avg_dwell_time || 0) * (row.total_visitors || 0), 0);
-  const avgDwellTime = totalVisitors > 0 ? weightedDwellSum / totalVisitors : 0;
+  const weightedDwellSum = data.reduce(
+    (sum, row) => sum + (row.avg_visit_duration_seconds || 0) * (row.total_visitors || 0), 0
+  );
+  const avgDwellSeconds = totalVisitors > 0 ? weightedDwellSum / totalVisitors : 0;
+  const avgDwellMinutes = avgDwellSeconds / 60;
 
   return {
     actions,
-    message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 평균 체류 시간은 ${Math.round(avgDwellTime)}분입니다.${tabMessage}`,
+    message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 평균 체류 시간은 ${Math.round(avgDwellMinutes)}분입니다.${tabMessage}`,
     suggestions: ['방문객 수 알려줘', '신규/재방문 비율'],
-    data: { avgDwellTime },
+    data: { avgDwellTime: avgDwellMinutes },
   };
 }
 
@@ -803,52 +857,30 @@ async function queryNewVsReturning(
   const { actions, tabChanged, targetTab } = createNavigationActions('newVsReturning', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 분석을 확인합니다.` : '';
 
-  // 고객 세그먼트 데이터 조회 시도
+  // daily_kpis_agg에서 total_visitors, returning_visitors 조회
+  // (customer_segments_agg는 세그먼트 분류 테이블이므로 방문자 수 집계에 부적합)
   const { data, error } = await supabase
-    .from('customer_segments_agg')
-    .select('new_visitors, returning_visitors')
+    .from('daily_kpis_agg')
+    .select('total_visitors, returning_visitors')
     .eq('store_id', storeId)
     .gte('date', dateRange.startDate)
     .lte('date', dateRange.endDate);
 
-  if (error) {
-    console.error('[queryNewVsReturning] Error:', error);
-    // 폴백: daily_kpis_agg 사용
-    const { data: kpiData } = await supabase
-      .from('daily_kpis_agg')
-      .select('new_visitors, returning_visitors, total_visitors')
-      .eq('store_id', storeId)
-      .gte('date', dateRange.startDate)
-      .lte('date', dateRange.endDate);
-
-    if (!kpiData || kpiData.length === 0) {
-      return {
-        actions,
-        message: `신규/재방문 데이터를 조회할 수 없습니다.${tabMessage}`,
-        suggestions: ['방문객 수 알려줘', '고객탭 보여줘'],
-        data: null,
-      };
-    }
-
-    const totalNew = kpiData.reduce((sum, row) => sum + (row.new_visitors || 0), 0);
-    const totalReturning = kpiData.reduce((sum, row) => sum + (row.returning_visitors || 0), 0);
-    const total = totalNew + totalReturning;
-    const newRate = total > 0 ? Math.round((totalNew / total) * 100) : 0;
-    const returnRate = total > 0 ? Math.round((totalReturning / total) * 100) : 0;
-
+  if (error || !data || data.length === 0) {
+    if (error) console.error('[queryNewVsReturning] Error:', error);
     return {
       actions,
-      message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 고객 구성:\n• 신규 고객: ${totalNew.toLocaleString()}명 (${newRate}%)\n• 재방문 고객: ${totalReturning.toLocaleString()}명 (${returnRate}%)${tabMessage}`,
-      suggestions: ['방문객 수 알려줘', '체류 시간 알려줘'],
-      data: { newVisitors: totalNew, returningVisitors: totalReturning, newRate, returnRate },
+      message: `신규/재방문 데이터를 조회할 수 없습니다.${tabMessage}`,
+      suggestions: ['방문객 수 알려줘', '고객탭 보여줘'],
+      data: null,
     };
   }
 
-  const totalNew = data.reduce((sum, row) => sum + (row.new_visitors || 0), 0);
+  const totalVisitors = data.reduce((sum, row) => sum + (row.total_visitors || 0), 0);
   const totalReturning = data.reduce((sum, row) => sum + (row.returning_visitors || 0), 0);
-  const total = totalNew + totalReturning;
-  const newRate = total > 0 ? Math.round((totalNew / total) * 100) : 0;
-  const returnRate = total > 0 ? Math.round((totalReturning / total) * 100) : 0;
+  const totalNew = totalVisitors - totalReturning;
+  const newRate = totalVisitors > 0 ? Math.round((totalNew / totalVisitors) * 100) : 0;
+  const returnRate = totalVisitors > 0 ? Math.round((totalReturning / totalVisitors) * 100) : 0;
 
   return {
     actions,
