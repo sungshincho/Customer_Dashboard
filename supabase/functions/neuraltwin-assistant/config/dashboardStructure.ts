@@ -1123,6 +1123,11 @@ export const MODAL_MAP: Record<string, ModalDefinition> = {
     page: '/data/control-tower',
     description: '새 데이터 연결 추가 모달',
   },
+  'add-store': {
+    page: '/settings',
+    tab: 'stores',
+    description: '매장 추가 다이얼로그',
+  },
   'invite-user': {
     page: '/settings',
     tab: 'users',

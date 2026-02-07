@@ -98,6 +98,23 @@ export default function SettingsPage() {
     }
   }, [searchParams]);
 
+  // AI 어시스턴트 모달 열기 이벤트 리스너
+  useEffect(() => {
+    const handleOpenModal = (e: Event) => {
+      const { modalId } = (e as CustomEvent).detail;
+      if (modalId === 'add-store') {
+        setActiveTab('stores');
+        setStoreDialogOpen(true);
+      }
+      if (modalId === 'invite-user') {
+        setActiveTab('users');
+        setInviteDialogOpen(true);
+      }
+    };
+    window.addEventListener('assistant:open-modal', handleOpenModal);
+    return () => window.removeEventListener('assistant:open-modal', handleOpenModal);
+  }, []);
+
   useEffect(() => { const check = () => setIsDark(document.documentElement.classList.contains('dark')); const obs = new MutationObserver(check); obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] }); return () => obs.disconnect(); }, []);
   const text3D = getText3D(isDark);
   const iconColor = isDark ? 'rgba(255,255,255,0.7)' : '#374151';

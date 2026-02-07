@@ -145,6 +145,20 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
 - categoryPerformance: 카테고리별 성과, 2D 성과, 3D 성과, 전략 카테고리, 시뮬레이션 성과
 - roiInsight: ROI 인사이트, ROI 분석, 전략 분석
 
+*ROI 테이블 제어:*
+- filterStrategies: 필터 변경 요청. filter 엔티티에 status/source 포함
+  - "완료된 전략만 보여줘" → filter: { status: "completed" }
+  - "진행 중인 전략만" → filter: { status: "active" }
+  - "취소된 전략" → filter: { status: "cancelled" }
+  - "3D 시뮬레이션 전략만" → filter: { source: "3d_simulation" }
+  - "2D 전략만 보여줘" → filter: { source: "2d_simulation" }
+  - "전체 보기", "필터 초기화" → filter: { status: "all", source: "all" }
+- exportStrategies: 적용 이력 내보내기, CSV 다운로드, 내보내기 해줘
+- roiTablePage: 다음 페이지, 이전 페이지, N페이지로
+  - "다음 페이지" → tablePage: "next"
+  - "이전 페이지" → tablePage: "prev"
+  - "1페이지로" → tablePage: 1, "3페이지" → tablePage: 3
+
 *설정 & 관리:*
 - storeManagement: 매장 관리, 매장 목록, 매장 설정, 등록된 매장
 - userManagement: 사용자 관리, 팀원 관리, 멤버, 멤버 목록, 사용자 목록
@@ -202,11 +216,12 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
 - "목표 설정창 켜줘", "목표 설정 창 열어줘", "목표 설정 창 켜줘"
 - "데이터 내보내기", "사용자 초대"
 - "새 연결 추가", "플랜 업그레이드"
+- "매장 추가해줘", "새 매장 등록"
 
 **modalId 값:**
 - goal-settings, date-picker, export-data
 - simulation-config, optimization-config
-- new-connection, invite-user, plan-upgrade
+- new-connection, add-store, invite-user, plan-upgrade
 
 **"켜줘/열어줘" + "창/설정창/팝업"** 패턴은 항상 open_modal로 분류하세요.
 
@@ -288,9 +303,19 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
 - "현재 플랜 뭐야?", "라이선스 확인" → query_kpi (queryType: subscriptionInfo)
 - "시스템 설정 보여줘", "알림 설정 확인" → query_kpi (queryType: systemSettings)
 - "데이터 설정", "커넥터 관리" → query_kpi (queryType: dataSettings)
+- "매장 추가해줘", "새 매장 등록" → open_modal (modalId: add-store)
 - "사용자 초대해줘" → open_modal (modalId: invite-user)
 - "플랜 업그레이드" → open_modal (modalId: plan-upgrade)
 - "매장 관리 탭 열어줘" → set_tab (tab: "stores")
+
+### "ROI 테이블" 요청 해석
+- "완료된 전략만 보여줘" → query_kpi (queryType: filterStrategies, filter: { status: "completed" })
+- "3D 시뮬레이션 전략만" → query_kpi (queryType: filterStrategies, filter: { source: "3d_simulation" })
+- "전체 보기", "필터 초기화" → query_kpi (queryType: filterStrategies, filter: { status: "all", source: "all" })
+- "적용 이력 내보내줘", "CSV 다운로드" → query_kpi (queryType: exportStrategies)
+- "다음 페이지" → query_kpi (queryType: roiTablePage, tablePage: "next")
+- "이전 페이지" → query_kpi (queryType: roiTablePage, tablePage: "prev")
+- "3페이지로" → query_kpi (queryType: roiTablePage, tablePage: 3)
 
 ### 중복 위치 용어 처리 (중의성 해소)
 일부 용어는 여러 탭에 존재합니다. 이 경우 **현재 컨텍스트**를 고려하세요:
@@ -308,6 +333,7 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
 ### 날짜 표현 파싱
 - 상대 날짜: 오늘, 어제, 이번주, 지난주, 이번달, 지난달
 - 기간: 7일, 30일, 90일
+- 커스텀 일수: "최근 5일", "10일간", "15일 동안" 등 임의 일수
 - 자연어: 12월 첫째주, 12월 초/중순/말, 연말, 연초
 - 절대 범위: 12월 1-10일, 12/1~15
 
@@ -328,6 +354,11 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
       "startDate": "YYYY-MM-DD",
       "endDate": "YYYY-MM-DD"
     },
+    "filter": {
+      "status": "all | active | completed | cancelled",
+      "source": "all | 2d_simulation | 3d_simulation"
+    },
+    "tablePage": "next | prev | 숫자",
     "scenario": "christmas",
     "simulationType": "traffic_flow",
     "optimizationType": "layout"

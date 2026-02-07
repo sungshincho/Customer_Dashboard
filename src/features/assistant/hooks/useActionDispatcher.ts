@@ -19,7 +19,10 @@ export interface UIAction {
     | 'highlight_element'
     | 'show_tooltip'
     | 'run_simulation'
-    | 'run_optimization';
+    | 'run_optimization'
+    | 'set_filter'
+    | 'trigger_export'
+    | 'set_table_page';
   target?: string | { startDate: string; endDate: string };
   preset?: PresetPeriod;
   startDate?: string;
@@ -34,6 +37,10 @@ export interface UIAction {
   message?: string;
   position?: 'top' | 'bottom' | 'left' | 'right';
   params?: Record<string, any>;
+  filterId?: string;
+  value?: string;
+  exportType?: string;
+  page?: number | 'next' | 'prev';
   [key: string]: any;
 }
 
@@ -131,15 +138,16 @@ export function useActionDispatcher() {
       case 'set_date_range':
         // 날짜 필터 변경 - 여러 형식 지원
         if (action.preset) {
-          // 프리셋 형식 - preset이 PresetPeriod 타입임을 명시
           setPreset(action.preset as PresetPeriod);
         } else if (action.startDate && action.endDate) {
-          // 직접 날짜 형식
           setCustomRange(action.startDate, action.endDate);
         } else if (typeof action.target === 'object' && action.target.startDate && action.target.endDate) {
-          // target 객체 형식 (백엔드 queryActions에서 사용)
           setCustomRange(action.target.startDate, action.target.endDate);
         }
+        // 페이지별 로컬 날짜 필터 동기화 이벤트
+        window.dispatchEvent(new CustomEvent('assistant:set-date-range', {
+          detail: { preset: action.preset, startDate: action.startDate, endDate: action.endDate },
+        }));
         break;
 
       case 'scroll_to_section':
@@ -191,6 +199,30 @@ export function useActionDispatcher() {
         });
         window.dispatchEvent(optEvent);
         console.log('[ActionDispatcher] run_optimization:', action);
+        break;
+
+      case 'set_filter':
+        // 테이블 필터 변경 - 커스텀 이벤트
+        window.dispatchEvent(new CustomEvent('assistant:set-filter', {
+          detail: { filterId: action.filterId, value: action.value },
+        }));
+        console.log('[ActionDispatcher] set_filter:', action.filterId, action.value);
+        break;
+
+      case 'trigger_export':
+        // 내보내기 트리거 - 커스텀 이벤트
+        window.dispatchEvent(new CustomEvent('assistant:trigger-export', {
+          detail: { exportType: action.exportType },
+        }));
+        console.log('[ActionDispatcher] trigger_export:', action.exportType);
+        break;
+
+      case 'set_table_page':
+        // 테이블 페이지 이동 - 커스텀 이벤트
+        window.dispatchEvent(new CustomEvent('assistant:set-table-page', {
+          detail: { page: action.page },
+        }));
+        console.log('[ActionDispatcher] set_table_page:', action.page);
         break;
 
       default:
