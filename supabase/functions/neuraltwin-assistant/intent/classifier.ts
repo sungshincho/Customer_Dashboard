@@ -37,6 +37,11 @@ interface AIClassificationResponse {
       startDate?: string;
       endDate?: string;
     };
+    filter?: {
+      status?: string;
+      source?: string;
+    };
+    tablePage?: string | number;
   };
 }
 
@@ -175,6 +180,16 @@ function transformEntities(
   // 쿼리 타입
   if (aiEntities.queryType) {
     entities.queryType = aiEntities.queryType;
+  }
+
+  // 필터
+  if (aiEntities.filter) {
+    entities.filter = aiEntities.filter;
+  }
+
+  // 테이블 페이지
+  if (aiEntities.tablePage !== undefined) {
+    entities.tablePage = aiEntities.tablePage;
   }
 
   // 기간 처리
