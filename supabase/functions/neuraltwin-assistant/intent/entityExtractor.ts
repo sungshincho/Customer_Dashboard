@@ -201,6 +201,24 @@ export function extractDateRange(text: string): {
   }
 
   // =====================
+  // 1-B. 커스텀 일수 매칭: "최근 5일", "10일간", "15일 동안" 등
+  // (프리셋에 없는 임의 일수 처리)
+  // =====================
+  const customDaysMatch = text.match(/최근\s*(\d+)\s*일|(\d+)\s*일\s*(?:간|동안)/);
+  if (customDaysMatch) {
+    const days = parseInt(customDaysMatch[1] || customDaysMatch[2], 10);
+    if (days > 0 && days <= 3650) {
+      const endDate = new Date(today);
+      const startDate = new Date(today);
+      startDate.setDate(startDate.getDate() - days);
+      return {
+        startDate: formatDate(startDate),
+        endDate: formatDate(endDate),
+      };
+    }
+  }
+
+  // =====================
   // 2. 커스텀 범위 매칭
   // =====================
 

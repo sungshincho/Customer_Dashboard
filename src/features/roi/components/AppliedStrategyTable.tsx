@@ -241,6 +241,33 @@ export const AppliedStrategyTable: React.FC<AppliedStrategyTableProps> = ({
     link.click();
   };
 
+  // AI 어시스턴트 테이블 제어 이벤트 리스너
+  useEffect(() => {
+    const handleSetFilter = (e: Event) => {
+      const { filterId, value } = (e as CustomEvent).detail;
+      if (filterId === 'status') setStatusFilter(value);
+      if (filterId === 'source') setSourceFilter(value);
+      setPage(1); // 필터 변경 시 첫 페이지로
+    };
+    const handleTriggerExport = () => {
+      handleExport();
+    };
+    const handleSetPage = (e: Event) => {
+      const { page: targetPage } = (e as CustomEvent).detail;
+      if (targetPage === 'next') setPage((p) => Math.min(p + 1, totalPages || 1));
+      else if (targetPage === 'prev') setPage((p) => Math.max(p - 1, 1));
+      else if (typeof targetPage === 'number' && targetPage >= 1) setPage(targetPage);
+    };
+    window.addEventListener('assistant:set-filter', handleSetFilter);
+    window.addEventListener('assistant:trigger-export', handleTriggerExport);
+    window.addEventListener('assistant:set-table-page', handleSetPage);
+    return () => {
+      window.removeEventListener('assistant:set-filter', handleSetFilter);
+      window.removeEventListener('assistant:trigger-export', handleTriggerExport);
+      window.removeEventListener('assistant:set-table-page', handleSetPage);
+    };
+  }, [totalPages, handleExport]);
+
   if (isLoading) {
     return (
       <GlassCard dark={isDark}>

@@ -51,6 +51,19 @@ export const ROIMeasurementPage: React.FC = () => {
     return () => observer.disconnect();
   }, []);
 
+  // AI 어시스턴트 날짜 필터 연동
+  useEffect(() => {
+    const handleDateRange = (e: Event) => {
+      const { preset } = (e as CustomEvent).detail;
+      const validPresets: DateRange[] = ['7d', '30d', '90d', 'all'];
+      if (preset && validPresets.includes(preset)) {
+        setDateRange(preset as DateRange);
+      }
+    };
+    window.addEventListener('assistant:set-date-range', handleDateRange);
+    return () => window.removeEventListener('assistant:set-date-range', handleDateRange);
+  }, []);
+
   // 데이터 훅
   const {
     data: summary,

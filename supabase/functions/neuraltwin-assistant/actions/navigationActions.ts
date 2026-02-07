@@ -58,7 +58,21 @@ export type UIAction =
       position?: 'top' | 'bottom' | 'left' | 'right';
     }
   | { type: 'run_simulation'; [key: string]: any }
-  | { type: 'run_optimization'; [key: string]: any };
+  | { type: 'run_optimization'; [key: string]: any }
+  // ROI 테이블 제어 액션
+  | {
+      type: 'set_filter';
+      filterId: string;
+      value: string;
+    }
+  | {
+      type: 'trigger_export';
+      exportType?: string;
+    }
+  | {
+      type: 'set_table_page';
+      page: number | 'next' | 'prev';
+    };
 
 export interface ActionResult {
   actions: UIAction[];
@@ -119,6 +133,7 @@ const MODAL_NAMES: Record<string, string> = {
   'simulation-config': '시뮬레이션 설정',
   'optimization-config': '최적화 설정',
   'new-connection': '새 데이터 연결',
+  'add-store': '매장 추가',
   'invite-user': '사용자 초대',
   'plan-upgrade': '플랜 업그레이드',
 };

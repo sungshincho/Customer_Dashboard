@@ -99,6 +99,9 @@ const QUERY_TYPE_TO_TAB: Record<string, { page: string; tab?: string; section?: 
   appliedStrategies: { page: '/roi', section: 'applied-strategies' },
   categoryPerformance: { page: '/roi', section: 'strategy-performance' },
   roiInsight: { page: '/roi', section: 'roi-analysis' },
+  filterStrategies: { page: '/roi', section: 'applied-strategies' },
+  exportStrategies: { page: '/roi', section: 'applied-strategies' },
+  roiTablePage: { page: '/roi', section: 'applied-strategies' },
   // 설정 & 관리 쿼리 (탭별)
   storeManagement: { page: '/settings', tab: 'stores', section: 'settings-store-list' },
   userManagement: { page: '/settings', tab: 'users', section: 'settings-members' },
@@ -175,6 +178,9 @@ function getTermKeyword(queryType: string): string {
     appliedStrategies: '적용된 전략',
     categoryPerformance: '카테고리별 성과',
     roiInsight: 'ROI 인사이트',
+    filterStrategies: '적용 이력 필터',
+    exportStrategies: '적용 이력 내보내기',
+    roiTablePage: '적용 이력',
     // 설정 & 관리
     storeManagement: '매장 관리',
     userManagement: '사용자 관리',
@@ -393,7 +399,11 @@ export async function handleQueryKpi(
   pageContext?: PageContext
 ): Promise<QueryActionResult> {
   const queryType = classification.entities.queryType || 'summary';
-  const period = classification.entities.period || { type: 'today' };
+
+  // ROI 쿼리는 기본 기간을 90일로 설정 (프론트엔드 ROI 페이지 기본값과 통일)
+  const ROI_QUERY_TYPES = ['roiSummary', 'appliedStrategies', 'categoryPerformance', 'roiInsight'];
+  const defaultPeriod = ROI_QUERY_TYPES.includes(queryType) ? { type: '90d' } : { type: 'today' };
+  const period = classification.entities.period || defaultPeriod;
 
   try {
     const dateRange = getDateRange(period);
@@ -566,6 +576,17 @@ export async function handleQueryKpi(
         break;
       case 'roiInsight':
         result = createGenericNavigationResult(queryType, dateRange, pageContext);
+        break;
+
+      // ROI 테이블 제어
+      case 'filterStrategies':
+        result = handleFilterStrategies(classification, pageContext);
+        break;
+      case 'exportStrategies':
+        result = handleExportStrategies(pageContext);
+        break;
+      case 'roiTablePage':
+        result = handleRoiTablePage(classification, pageContext);
         break;
 
       // 설정 & 관리
@@ -2471,6 +2492,104 @@ async function queryROICategoryPerformance(
       suggestions: ['ROI 측정 페이지로 가줘'],
     };
   }
+}
+
+// ============================================
+// ROI 테이블 제어 핸들러 (필터/내보내기/페이지)
+// ============================================
+
+/**
+ * 적용 이력 테이블 필터 설정
+ */
+function handleFilterStrategies(
+  classification: ClassificationResult,
+  pageContext?: PageContext
+): QueryActionResult {
+  const isOnROI = pageContext?.current === '/roi';
+  const actions: UIAction[] = [];
+  const filterMessages: string[] = [];
+
+  if (!isOnROI) {
+    actions.push({ type: 'navigate', target: '/roi' });
+  }
+
+  // 상태 필터
+  const statusFilter = classification.entities.filter?.status;
+  if (statusFilter) {
+    actions.push({ type: 'set_filter', filterId: 'status', value: statusFilter });
+    const statusLabels: Record<string, string> = {
+      active: '진행 중', completed: '완료', cancelled: '취소', all: '전체',
+    };
+    filterMessages.push(`상태: ${statusLabels[statusFilter] || statusFilter}`);
+  }
+
+  // 출처 필터
+  const sourceFilter = classification.entities.filter?.source;
+  if (sourceFilter) {
+    actions.push({ type: 'set_filter', filterId: 'source', value: sourceFilter });
+    const sourceLabels: Record<string, string> = {
+      '2d_simulation': '2D 시뮬레이션', '3d_simulation': '3D 시뮬레이션', all: '전체',
+    };
+    filterMessages.push(`출처: ${sourceLabels[sourceFilter] || sourceFilter}`);
+  }
+
+  const message = filterMessages.length > 0
+    ? `적용 이력 필터를 변경합니다. (${filterMessages.join(', ')})`
+    : '적용 이력 테이블로 이동합니다.';
+
+  return {
+    actions,
+    message,
+    suggestions: ['완료된 전략만 보여줘', '3D 시뮬레이션 전략만', '전체 보기', '내보내기 해줘'],
+  };
+}
+
+/**
+ * 적용 이력 내보내기 트리거
+ */
+function handleExportStrategies(
+  pageContext?: PageContext
+): QueryActionResult {
+  const isOnROI = pageContext?.current === '/roi';
+  const actions: UIAction[] = [];
+
+  if (!isOnROI) {
+    actions.push({ type: 'navigate', target: '/roi' });
+  }
+
+  actions.push({ type: 'trigger_export', exportType: 'strategies' });
+
+  return {
+    actions,
+    message: '적용 이력을 CSV 파일로 내보냅니다.',
+    suggestions: ['ROI 요약 보여줘', '카테고리별 성과 보여줘'],
+  };
+}
+
+/**
+ * 적용 이력 테이블 페이지 이동
+ */
+function handleRoiTablePage(
+  classification: ClassificationResult,
+  pageContext?: PageContext
+): QueryActionResult {
+  const isOnROI = pageContext?.current === '/roi';
+  const actions: UIAction[] = [];
+
+  if (!isOnROI) {
+    actions.push({ type: 'navigate', target: '/roi' });
+  }
+
+  const tablePage = classification.entities.tablePage || 'next';
+  actions.push({ type: 'set_table_page', page: tablePage });
+
+  const pageLabel = tablePage === 'next' ? '다음' : tablePage === 'prev' ? '이전' : `${tablePage}`;
+
+  return {
+    actions,
+    message: `적용 이력 ${pageLabel} 페이지로 이동합니다.`,
+    suggestions: ['다음 페이지', '이전 페이지', '첫 페이지'],
+  };
 }
 
 // ============================================
