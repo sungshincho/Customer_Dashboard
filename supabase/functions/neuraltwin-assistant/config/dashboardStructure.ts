@@ -470,9 +470,9 @@ export const DASHBOARD_STRUCTURE: DashboardPage[] = [
     aliases: ['설정', 'settings', '세팅', '관리'],
     tabs: [
       {
-        id: 'store-management',
+        id: 'stores',
         name: '매장 관리',
-        aliases: ['매장관리', '매장설정', 'stores'],
+        aliases: ['매장관리', '매장설정', 'store-management'],
         sections: [
           {
             id: 'settings-store-list',
@@ -535,9 +535,9 @@ export const DASHBOARD_STRUCTURE: DashboardPage[] = [
         ],
       },
       {
-        id: 'plan',
+        id: 'license',
         name: '플랜',
-        aliases: ['플랜탭', '구독', '요금제', 'license'],
+        aliases: ['플랜탭', '구독', '요금제', 'plan'],
         sections: [
           {
             id: 'settings-subscription',
@@ -1034,10 +1034,10 @@ export const TERM_LOCATION_MAP: Record<string, TermLocationEntry> = {
 
   // ===== 설정 & 관리 용어 =====
   '매장 관리': {
-    primary: { page: '/settings', tab: 'store-management' },
+    primary: { page: '/settings', tab: 'stores' },
   },
   '매장 설정': {
-    primary: { page: '/settings', tab: 'store-management' },
+    primary: { page: '/settings', tab: 'stores' },
   },
   '사용자 관리': {
     primary: { page: '/settings', tab: 'users' },
@@ -1058,19 +1058,19 @@ export const TERM_LOCATION_MAP: Record<string, TermLocationEntry> = {
     primary: { page: '/settings', tab: 'system' },
   },
   '플랜': {
-    primary: { page: '/settings', tab: 'plan' },
+    primary: { page: '/settings', tab: 'license' },
   },
   '구독': {
-    primary: { page: '/settings', tab: 'plan' },
+    primary: { page: '/settings', tab: 'license' },
   },
   '라이선스': {
-    primary: { page: '/settings', tab: 'plan' },
+    primary: { page: '/settings', tab: 'license' },
   },
   '요금제': {
-    primary: { page: '/settings', tab: 'plan' },
+    primary: { page: '/settings', tab: 'license' },
   },
   '플랜 업그레이드': {
-    primary: { page: '/settings', tab: 'plan' },
+    primary: { page: '/settings', tab: 'license' },
   },
   '데이터 설정': {
     primary: { page: '/settings', tab: 'data' },
@@ -1130,7 +1130,7 @@ export const MODAL_MAP: Record<string, ModalDefinition> = {
   },
   'plan-upgrade': {
     page: '/settings',
-    tab: 'plan',
+    tab: 'license',
     description: '플랜 업그레이드 모달',
   },
 };
