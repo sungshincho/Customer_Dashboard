@@ -170,7 +170,7 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
 **tab 값:**
 - 인사이트: overview, store, customer, product, inventory, prediction, ai
 - 스튜디오: layer, ai-simulation, ai-optimization, apply
-- 설정: store-management, data, users, system, plan
+- 설정: stores, data, users, system, license
 
 **중요:** "AI추천", "AI 추천", "ai추천"이라는 단어가 포함되어 있고 탭 전환 의도면 반드시 tab: "ai"를 사용하세요 ("ai-recommendation"이 아님).
 
@@ -290,7 +290,7 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
 - "데이터 설정", "커넥터 관리" → query_kpi (queryType: dataSettings)
 - "사용자 초대해줘" → open_modal (modalId: invite-user)
 - "플랜 업그레이드" → open_modal (modalId: plan-upgrade)
-- "매장 관리 탭 열어줘" → set_tab (tab: "store-management")
+- "매장 관리 탭 열어줘" → set_tab (tab: "stores")
 
 ### 중복 위치 용어 처리 (중의성 해소)
 일부 용어는 여러 탭에 존재합니다. 이 경우 **현재 컨텍스트**를 고려하세요:

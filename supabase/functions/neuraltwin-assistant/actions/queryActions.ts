@@ -100,9 +100,9 @@ const QUERY_TYPE_TO_TAB: Record<string, { page: string; tab?: string; section?: 
   categoryPerformance: { page: '/roi', section: 'strategy-performance' },
   roiInsight: { page: '/roi', section: 'roi-analysis' },
   // 설정 & 관리 쿼리 (탭별)
-  storeManagement: { page: '/settings', tab: 'store-management', section: 'settings-store-list' },
+  storeManagement: { page: '/settings', tab: 'stores', section: 'settings-store-list' },
   userManagement: { page: '/settings', tab: 'users', section: 'settings-members' },
-  subscriptionInfo: { page: '/settings', tab: 'plan', section: 'settings-subscription' },
+  subscriptionInfo: { page: '/settings', tab: 'license', section: 'settings-subscription' },
   systemSettings: { page: '/settings', tab: 'system', section: 'settings-org' },
   dataSettings: { page: '/settings', tab: 'data', section: 'settings-data-stats' },
 };
@@ -262,11 +262,11 @@ function getTabDisplayName(tabId: string): string {
     inventory: '재고',
     prediction: '예측',
     ai: 'AI추천',
-    'store-management': '매장 관리',
+    stores: '매장 관리',
     data: '데이터',
     users: '사용자',
     system: '시스템',
-    plan: '플랜',
+    license: '플랜',
   };
   return tabNames[tabId] || tabId;
 }

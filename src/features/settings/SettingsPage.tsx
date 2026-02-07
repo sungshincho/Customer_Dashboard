@@ -19,7 +19,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Store, Database, Users, Settings, CreditCard, Plus, Mail, Building2, Upload, Link, Eye, Edit, MapPin, Network, Boxes, Plug } from 'lucide-react';
 import { ApiConnectionsList, AddConnectorDialog } from '@/features/data-control/components';
 import { useActivityLogger } from '@/hooks/useActivityLogger';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { OntologyGraph3D } from '@/features/data-management/ontology/components/OntologyGraph3D';
 import { MasterSchemaSync } from '@/features/data-management/ontology/components/MasterSchemaSync';
@@ -85,7 +85,18 @@ export default function SettingsPage() {
   const { stores, loading: storesLoading, refreshStores } = useSelectedStore();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('stores');
+  const [searchParams] = useSearchParams();
   const [isDark, setIsDark] = useState(getInitialDarkMode);
+
+  // URL 쿼리 파라미터로 탭 전환 (AI 어시스턴트 연동)
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab');
+    if (!tabFromUrl) return;
+    const validTabs = ['stores', 'data', 'users', 'system', 'license'];
+    if (validTabs.includes(tabFromUrl)) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [searchParams]);
 
   useEffect(() => { const check = () => setIsDark(document.documentElement.classList.contains('dark')); const obs = new MutationObserver(check); obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] }); return () => obs.disconnect(); }, []);
   const text3D = getText3D(isDark);

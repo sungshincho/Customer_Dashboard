@@ -223,7 +223,7 @@ function transformEntities(
 function inferPageFromTab(tab: string): string | null {
   const insightsTabs = ['overview', 'store', 'customer', 'product', 'inventory', 'prediction', 'ai', 'ai-recommendation'];
   const studioTabs = ['layer', 'ai-simulation', 'ai-optimization', 'apply'];
-  const settingsTabs = ['store-management', 'data', 'users', 'system', 'plan'];
+  const settingsTabs = ['stores', 'data', 'users', 'system', 'license'];
 
   if (insightsTabs.includes(tab)) return '/insights';
   if (studioTabs.includes(tab)) return '/studio';
