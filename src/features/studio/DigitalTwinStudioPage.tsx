@@ -205,14 +205,58 @@ export default function DigitalTwinStudioPage() {
     }
   }, [tabFromUrl]);
 
-  // ============================================
-  // AI 어시스턴트 이벤트 리스너 (챗 → 스튜디오 제어)
-  // Ref 패턴으로 콜백/상태를 안정적으로 참조
-  // ============================================
+  // Refs for assistant event handlers (순서 독립적 참조)
   const saveSceneRef = useRef<(name: string) => void>(() => {});
   const currentRecipeRef = useRef<SceneRecipe | null>(null);
   const sceneNameRef = useRef('');
 
+  const [models, setModels] = useState<ModelLayer[]>([]);
+  const [activeLayers, setActiveLayers] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sceneName, setSceneName] = useState('');
+  const [transformMode, setTransformMode] = useState<TransformMode>('translate');
+
+  // 패널 리사이즈 상태
+  const PANEL_MIN_WIDTH = 280;
+  const PANEL_MAX_WIDTH = 500;
+  const PANEL_DEFAULT_WIDTH = 320;
+  const [panelWidth, setPanelWidth] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('studio_panel_width');
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= PANEL_MIN_WIDTH && parsed <= PANEL_MAX_WIDTH) {
+          return parsed;
+        }
+      }
+    }
+    return PANEL_DEFAULT_WIDTH;
+  });
+  const [isResizing, setIsResizing] = useState(false);
+  const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
+
+  // 플로팅 패널 위치 상수
+  const FLOATING_PANEL_TOP = 60;  // ViewModeToggle 아래 시작점
+  const FLOATING_PANEL_GAP = 8;   // 패널 간 간격
+
+  // 씬 저장 패널 실제 높이 (동적 추적)
+  const [sceneSavePanelHeight, setSceneSavePanelHeight] = useState(0);
+
+  // As-Is / To-Be / Split 뷰 모드
+  const [viewMode, setViewMode] = useState<ViewMode>('as-is');
+
+  // 드래그 패널 표시 상태
+  const [visiblePanels, setVisiblePanels] = useState<VisiblePanels>({
+    tools: false,
+    sceneSave: false,  // 기본값 OFF
+    property: true,
+    resultReport: false // 결과 있을 때만 자동 표시
+  });
+
+  // ============================================
+  // AI 어시스턴트 이벤트 리스너 (챗 → 스튜디오 제어)
+  // 모든 의존 상태(setViewMode, setVisiblePanels 등)가 선언된 이후에 배치
+  // ============================================
   useEffect(() => {
     // 1. 오버레이 토글
     const handleToggleOverlay = (e: Event) => {
@@ -383,49 +427,6 @@ export default function DigitalTwinStudioPage() {
       window.removeEventListener('assistant:set-environment', handleSetEnvironment);
     };
   }, [toggleOverlay, setOverlayVisibility, setActiveTab, setViewMode, setVisiblePanels]);
-
-  const [models, setModels] = useState<ModelLayer[]>([]);
-  const [activeLayers, setActiveLayers] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [sceneName, setSceneName] = useState('');
-  const [transformMode, setTransformMode] = useState<TransformMode>('translate');
-
-  // 패널 리사이즈 상태
-  const PANEL_MIN_WIDTH = 280;
-  const PANEL_MAX_WIDTH = 500;
-  const PANEL_DEFAULT_WIDTH = 320;
-  const [panelWidth, setPanelWidth] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('studio_panel_width');
-      if (saved) {
-        const parsed = parseInt(saved, 10);
-        if (!isNaN(parsed) && parsed >= PANEL_MIN_WIDTH && parsed <= PANEL_MAX_WIDTH) {
-          return parsed;
-        }
-      }
-    }
-    return PANEL_DEFAULT_WIDTH;
-  });
-  const [isResizing, setIsResizing] = useState(false);
-  const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
-
-  // 플로팅 패널 위치 상수
-  const FLOATING_PANEL_TOP = 60;  // ViewModeToggle 아래 시작점
-  const FLOATING_PANEL_GAP = 8;   // 패널 간 간격
-
-  // 씬 저장 패널 실제 높이 (동적 추적)
-  const [sceneSavePanelHeight, setSceneSavePanelHeight] = useState(0);
-
-  // As-Is / To-Be / Split 뷰 모드
-  const [viewMode, setViewMode] = useState<ViewMode>('as-is');
-
-  // 드래그 패널 표시 상태
-  const [visiblePanels, setVisiblePanels] = useState<VisiblePanels>({
-    tools: false,
-    sceneSave: false,  // 기본값 OFF
-    property: true,
-    resultReport: false // 결과 있을 때만 자동 표시
-  });
 
   // 씬 저장 패널이 닫히면 높이 초기화
   useEffect(() => {
