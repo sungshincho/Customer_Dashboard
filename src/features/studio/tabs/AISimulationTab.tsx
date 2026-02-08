@@ -202,6 +202,70 @@ export function AISimulationTab({
     setSimulationEnvConfig(defaultConfig);
   }, []);
 
+  // ============================================
+  // AI 어시스턴트 내부 이벤트 리스너
+  // ============================================
+  useEffect(() => {
+    // 프리셋 적용
+    const handleApplyPresetInternal = (e: Event) => {
+      const { preset: presetId } = (e as CustomEvent).detail;
+      const found = PRESET_SCENARIOS.find(p => p.id === presetId);
+      if (found) {
+        handlePresetSelect(found);
+      }
+    };
+
+    // 시뮬레이션 실행
+    const handleRunSimInternal = (e: Event) => {
+      // 약간의 딜레이 후 실행 (프리셋 적용 대기)
+      setTimeout(() => {
+        handleRunSimulation();
+      }, 200);
+    };
+
+    // 파라미터 설정
+    const handleSetParamsInternal = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail.simulation_type) {
+        setSimulationType(detail.simulation_type as SimulationType);
+      }
+      if (detail.customer_count) {
+        setCustomerCount(detail.customer_count);
+      }
+      if (detail.duration) {
+        setDuration(detail.duration);
+      }
+    };
+
+    // 환경 설정 변경
+    const handleSetEnvInternal = (e: Event) => {
+      const { weather, timeOfDay, holidayType } = (e as CustomEvent).detail;
+      setSimulationEnvConfig(prev => {
+        const updated = { ...prev, mode: 'manual' as const };
+        if (!updated.manualSettings) {
+          updated.manualSettings = {};
+        }
+        if (weather) updated.manualSettings.weather = weather;
+        if (timeOfDay) updated.manualSettings.timeOfDay = timeOfDay;
+        if (holidayType) updated.manualSettings.holidayType = holidayType;
+        updated.calculatedImpact = calculateSimulationImpacts(updated);
+        return updated;
+      });
+    };
+
+    window.addEventListener('studio:apply-preset-internal', handleApplyPresetInternal);
+    window.addEventListener('studio:run-simulation-internal', handleRunSimInternal);
+    window.addEventListener('studio:set-sim-params-internal', handleSetParamsInternal);
+    window.addEventListener('studio:set-environment-internal', handleSetEnvInternal);
+
+    return () => {
+      window.removeEventListener('studio:apply-preset-internal', handleApplyPresetInternal);
+      window.removeEventListener('studio:run-simulation-internal', handleRunSimInternal);
+      window.removeEventListener('studio:set-sim-params-internal', handleSetParamsInternal);
+      window.removeEventListener('studio:set-environment-internal', handleSetEnvInternal);
+    };
+  }, [handlePresetSelect, handleRunSimulation]);
+
   // 시간 포맷팅
   const formatTime = (seconds: number): string => {
     const absSeconds = Math.max(0, Math.abs(seconds));

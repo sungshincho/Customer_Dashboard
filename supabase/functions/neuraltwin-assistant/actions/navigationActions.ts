@@ -72,6 +72,77 @@ export type UIAction =
   | {
       type: 'set_table_page';
       page: number | 'next' | 'prev';
+    }
+
+  // ============================================
+  // 디지털트윈 스튜디오 제어 액션
+  // ============================================
+
+  // 오버레이 토글 (히트맵, 동선, 고객, 존, 직원)
+  | {
+      type: 'toggle_overlay';
+      overlay: 'heatmap' | 'flow' | 'avatar' | 'zone' | 'staff';
+      visible?: boolean; // 생략 시 토글, true/false면 명시적 설정
+    }
+
+  // 시뮬레이션 제어 (재생/일시정지/정지/리셋/속도)
+  | {
+      type: 'simulation_control';
+      command: 'play' | 'pause' | 'stop' | 'reset' | 'set_speed';
+      speed?: number; // set_speed일 때 0.5~4.0
+    }
+
+  // 프리셋 시나리오 적용
+  | {
+      type: 'apply_preset';
+      preset: string; // PresetScenarioId
+    }
+
+  // 시뮬레이션 파라미터 설정
+  | {
+      type: 'set_simulation_params';
+      params: {
+        simulation_type?: 'realtime' | 'prediction';
+        customer_count?: number;
+        duration?: number;
+      };
+    }
+
+  // 최적화 목표/옵션 설정
+  | {
+      type: 'set_optimization_config';
+      config: {
+        goal?: 'revenue' | 'dwell_time' | 'traffic' | 'conversion';
+        types?: ('layout' | 'staffing')[];
+        intensity?: 'low' | 'medium' | 'high';
+      };
+    }
+
+  // 뷰 모드 전환 (As-Is / Compare / To-Be)
+  | {
+      type: 'set_view_mode';
+      mode: 'as-is' | 'compare' | 'to-be';
+    }
+
+  // 패널 토글 (AI 리포트, 씬 저장)
+  | {
+      type: 'toggle_panel';
+      panel: 'resultReport' | 'sceneSave';
+      visible?: boolean;
+    }
+
+  // 씬 저장
+  | {
+      type: 'save_scene';
+      name?: string;
+    }
+
+  // 환경 설정 (날씨, 시간대, 휴일)
+  | {
+      type: 'set_environment';
+      weather?: string;
+      timeOfDay?: string;
+      holidayType?: string;
     };
 
 export interface ActionResult {
