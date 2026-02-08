@@ -32,7 +32,6 @@ import { loadUserModels } from './utils';
 import type { StudioMode, Model3D, OverlayType, HeatPoint, ZoneBoundary, SceneRecipe, LightingPreset, Vector3, SimulationScenario, TransformMode, RenderingConfig } from './types';
 import type { SimulationEnvironmentConfig } from './types/simulationEnvironment.types';
 import { convertToRenderingConfig, isDayTime, isCurrentTimeDayMode, isDayTimeWithPeakData } from './types/simulationEnvironment.types';
-import { PRESET_SCENARIOS, type PresetScenarioId } from './types/scenarioPresets.types';
 
 // 기존 시뮬레이션 훅
 import { useStoreContext } from '@/features/simulation/hooks/useStoreContext';
