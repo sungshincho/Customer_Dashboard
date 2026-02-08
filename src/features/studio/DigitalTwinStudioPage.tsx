@@ -32,6 +32,7 @@ import { loadUserModels } from './utils';
 import type { StudioMode, Model3D, OverlayType, HeatPoint, ZoneBoundary, SceneRecipe, LightingPreset, Vector3, SimulationScenario, TransformMode, RenderingConfig } from './types';
 import type { SimulationEnvironmentConfig } from './types/simulationEnvironment.types';
 import { convertToRenderingConfig, isDayTime, isCurrentTimeDayMode, isDayTimeWithPeakData } from './types/simulationEnvironment.types';
+import { PRESET_SCENARIOS, type PresetScenarioId } from './types/scenarioPresets.types';
 
 // 기존 시뮬레이션 훅
 import { useStoreContext } from '@/features/simulation/hooks/useStoreContext';
@@ -204,6 +205,185 @@ export default function DigitalTwinStudioPage() {
       setActiveTab(tabFromUrl);
     }
   }, [tabFromUrl]);
+
+  // ============================================
+  // AI 어시스턴트 이벤트 리스너 (챗 → 스튜디오 제어)
+  // Ref 패턴으로 콜백/상태를 안정적으로 참조
+  // ============================================
+  const saveSceneRef = useRef<(name: string) => void>(() => {});
+  const currentRecipeRef = useRef<SceneRecipe | null>(null);
+  const sceneNameRef = useRef('');
+
+  useEffect(() => {
+    // 1. 오버레이 토글
+    const handleToggleOverlay = (e: Event) => {
+      const { overlay, visible } = (e as CustomEvent).detail;
+      if (overlay) {
+        if (visible === true) {
+          setOverlayVisibility(overlay, true);
+        } else if (visible === false) {
+          setOverlayVisibility(overlay, false);
+        } else {
+          toggleOverlay(overlay);
+        }
+        console.log('[Studio:Assistant] toggle_overlay:', overlay, visible);
+      }
+    };
+
+    // 2. 시뮬레이션 제어
+    const handleSimulationControl = (e: Event) => {
+      const { command, speed } = (e as CustomEvent).detail;
+      const simStore = useSimulationStore.getState();
+      switch (command) {
+        case 'play':
+          if (simStore.isPaused) simStore.resume();
+          else if (!simStore.isRunning) {
+            setOverlayVisibility('avatar', true);
+            simStore.start();
+          }
+          break;
+        case 'pause':
+          if (simStore.isRunning && !simStore.isPaused) simStore.pause();
+          break;
+        case 'stop':
+          simStore.stop();
+          break;
+        case 'reset':
+          simStore.reset();
+          break;
+        case 'set_speed':
+          if (speed !== undefined) simStore.setSpeed(speed);
+          break;
+      }
+      console.log('[Studio:Assistant] simulation_control:', command, speed);
+    };
+
+    // 3. 프리셋 시나리오 적용
+    const handleApplyPreset = (e: Event) => {
+      const { preset } = (e as CustomEvent).detail;
+      if (preset) {
+        window.dispatchEvent(new CustomEvent('studio:apply-preset-internal', {
+          detail: { preset },
+        }));
+        setActiveTab('ai-simulation');
+        console.log('[Studio:Assistant] apply_preset:', preset);
+      }
+    };
+
+    // 4. 시뮬레이션 실행
+    const handleRunSimulation = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      setActiveTab('ai-simulation');
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('studio:run-simulation-internal', {
+          detail,
+        }));
+      }, 300);
+      console.log('[Studio:Assistant] run_simulation:', detail);
+    };
+
+    // 5. 최적화 실행
+    const handleRunOptimization = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      setActiveTab('ai-optimization');
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('studio:run-optimization-internal', {
+          detail,
+        }));
+      }, 300);
+      console.log('[Studio:Assistant] run_optimization:', detail);
+    };
+
+    // 6. 시뮬레이션 파라미터 설정
+    const handleSetSimulationParams = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      setActiveTab('ai-simulation');
+      window.dispatchEvent(new CustomEvent('studio:set-sim-params-internal', {
+        detail,
+      }));
+      console.log('[Studio:Assistant] set_simulation_params:', detail);
+    };
+
+    // 7. 최적화 설정
+    const handleSetOptimizationConfig = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      setActiveTab('ai-optimization');
+      window.dispatchEvent(new CustomEvent('studio:set-opt-config-internal', {
+        detail,
+      }));
+      console.log('[Studio:Assistant] set_optimization_config:', detail);
+    };
+
+    // 8. 뷰 모드 전환
+    const handleSetViewMode = (e: Event) => {
+      const { mode } = (e as CustomEvent).detail;
+      if (mode && ['as-is', 'compare', 'to-be'].includes(mode)) {
+        setViewMode(mode as ViewMode);
+        console.log('[Studio:Assistant] set_view_mode:', mode);
+      }
+    };
+
+    // 9. 패널 토글
+    const handleTogglePanel = (e: Event) => {
+      const { panel, visible } = (e as CustomEvent).detail;
+      if (panel && (panel === 'resultReport' || panel === 'sceneSave')) {
+        setVisiblePanels(prev => ({
+          ...prev,
+          [panel]: visible !== undefined ? visible : !prev[panel],
+        }));
+        console.log('[Studio:Assistant] toggle_panel:', panel, visible);
+      }
+    };
+
+    // 10. 씬 저장 (ref 사용으로 순서 독립)
+    const handleSaveSceneEvent = (e: Event) => {
+      const { name } = (e as CustomEvent).detail;
+      if (currentRecipeRef.current) {
+        const saveName = name || sceneNameRef.current || `씬_${new Date().toLocaleString('ko-KR')}`;
+        saveSceneRef.current(saveName);
+        console.log('[Studio:Assistant] save_scene:', saveName);
+      } else {
+        toast.error('저장할 씬 데이터가 없습니다');
+      }
+    };
+
+    // 11. 환경 설정 변경
+    const handleSetEnvironment = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      setActiveTab('ai-simulation');
+      window.dispatchEvent(new CustomEvent('studio:set-environment-internal', {
+        detail,
+      }));
+      console.log('[Studio:Assistant] set_environment:', detail);
+    };
+
+    // 이벤트 리스너 등록
+    window.addEventListener('assistant:toggle-overlay', handleToggleOverlay);
+    window.addEventListener('assistant:simulation-control', handleSimulationControl);
+    window.addEventListener('assistant:apply-preset', handleApplyPreset);
+    window.addEventListener('assistant:run-simulation', handleRunSimulation);
+    window.addEventListener('assistant:run-optimization', handleRunOptimization);
+    window.addEventListener('assistant:set-simulation-params', handleSetSimulationParams);
+    window.addEventListener('assistant:set-optimization-config', handleSetOptimizationConfig);
+    window.addEventListener('assistant:set-view-mode', handleSetViewMode);
+    window.addEventListener('assistant:toggle-panel', handleTogglePanel);
+    window.addEventListener('assistant:save-scene', handleSaveSceneEvent);
+    window.addEventListener('assistant:set-environment', handleSetEnvironment);
+
+    return () => {
+      window.removeEventListener('assistant:toggle-overlay', handleToggleOverlay);
+      window.removeEventListener('assistant:simulation-control', handleSimulationControl);
+      window.removeEventListener('assistant:apply-preset', handleApplyPreset);
+      window.removeEventListener('assistant:run-simulation', handleRunSimulation);
+      window.removeEventListener('assistant:run-optimization', handleRunOptimization);
+      window.removeEventListener('assistant:set-simulation-params', handleSetSimulationParams);
+      window.removeEventListener('assistant:set-optimization-config', handleSetOptimizationConfig);
+      window.removeEventListener('assistant:set-view-mode', handleSetViewMode);
+      window.removeEventListener('assistant:toggle-panel', handleTogglePanel);
+      window.removeEventListener('assistant:save-scene', handleSaveSceneEvent);
+      window.removeEventListener('assistant:set-environment', handleSetEnvironment);
+    };
+  }, [toggleOverlay, setOverlayVisibility, setActiveTab, setViewMode, setVisiblePanels]);
 
   const [models, setModels] = useState<ModelLayer[]>([]);
   const [activeLayers, setActiveLayers] = useState<string[]>([]);
@@ -1048,6 +1228,17 @@ export default function DigitalTwinStudioPage() {
       // 에러는 useScenePersistence에서 처리
     }
   };
+
+  // AI 어시스턴트 ref 업데이트 (이벤트 리스너에서 최신 값 참조용)
+  useEffect(() => {
+    saveSceneRef.current = handleSaveScene;
+  }, [handleSaveScene]);
+  useEffect(() => {
+    currentRecipeRef.current = currentRecipe;
+  }, [currentRecipe]);
+  useEffect(() => {
+    sceneNameRef.current = sceneName;
+  }, [sceneName]);
 
   // 새 씬 버튼 핸들러
   const handleNewScene = useCallback(() => {

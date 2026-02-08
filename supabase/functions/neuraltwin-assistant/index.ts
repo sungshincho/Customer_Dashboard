@@ -8,7 +8,14 @@ import { classifyIntent } from './intent/classifier.ts';
 import { dispatchNavigationAction, UIAction } from './actions/navigationActions.ts';
 import { handleGeneralChat } from './actions/chatActions.ts';
 import { handleQueryKpi } from './actions/queryActions.ts';
-import { handleRunSimulation, handleRunOptimization } from './actions/executionActions.ts';
+import { handleRunSimulation, handleRunOptimization, dispatchStudioAction } from './actions/executionActions.ts';
+
+// 스튜디오 제어 인텐트 목록
+const STUDIO_CONTROL_INTENTS = [
+  'toggle_overlay', 'simulation_control', 'apply_preset',
+  'set_simulation_params', 'set_optimization_config', 'set_view_mode',
+  'toggle_panel', 'save_scene', 'set_environment',
+];
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -148,11 +155,14 @@ Deno.serve(async (req) => {
         suggestions: queryResult.suggestions,
       };
     } else if (classification.intent === 'run_simulation') {
-      // 시뮬레이션 실행 (Phase 3-C) - 스튜디오 이동 + 실행 이벤트 발행
+      // 시뮬레이션 실행 - 스튜디오 이동 + (프리셋 적용) + 실행 이벤트 발행
       actionResult = handleRunSimulation(classification, context);
     } else if (classification.intent === 'run_optimization') {
-      // 최적화 실행 (Phase 3-C) - 스튜디오 이동 + 실행 이벤트 발행
+      // 최적화 실행 - 스튜디오 이동 + 실행 이벤트 발행
       actionResult = handleRunOptimization(classification, context);
+    } else if (STUDIO_CONTROL_INTENTS.includes(classification.intent)) {
+      // 스튜디오 제어 (오버레이, 시뮬레이션 컨트롤, 프리셋, 뷰모드, 패널, 씬저장, 환경설정)
+      actionResult = dispatchStudioAction(classification, context);
     } else if (classification.intent === 'general_chat') {
       // 일반 대화 (AI 응답)
       const chatResult = await handleGeneralChat(message, [], context);

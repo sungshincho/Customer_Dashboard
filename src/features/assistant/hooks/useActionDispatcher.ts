@@ -22,7 +22,17 @@ export interface UIAction {
     | 'run_optimization'
     | 'set_filter'
     | 'trigger_export'
-    | 'set_table_page';
+    | 'set_table_page'
+    // 스튜디오 제어
+    | 'toggle_overlay'
+    | 'simulation_control'
+    | 'apply_preset'
+    | 'set_simulation_params'
+    | 'set_optimization_config'
+    | 'set_view_mode'
+    | 'toggle_panel'
+    | 'save_scene'
+    | 'set_environment';
   target?: string | { startDate: string; endDate: string };
   preset?: PresetPeriod;
   startDate?: string;
@@ -223,6 +233,73 @@ export function useActionDispatcher() {
           detail: { page: action.page },
         }));
         console.log('[ActionDispatcher] set_table_page:', action.page);
+        break;
+
+      // ============================================
+      // 디지털트윈 스튜디오 제어 액션
+      // ============================================
+
+      case 'toggle_overlay':
+        window.dispatchEvent(new CustomEvent('assistant:toggle-overlay', {
+          detail: { overlay: action.overlay, visible: action.visible },
+        }));
+        console.log('[ActionDispatcher] toggle_overlay:', action.overlay, action.visible);
+        break;
+
+      case 'simulation_control':
+        window.dispatchEvent(new CustomEvent('assistant:simulation-control', {
+          detail: { command: action.command, speed: action.speed },
+        }));
+        console.log('[ActionDispatcher] simulation_control:', action.command, action.speed);
+        break;
+
+      case 'apply_preset':
+        window.dispatchEvent(new CustomEvent('assistant:apply-preset', {
+          detail: { preset: action.preset },
+        }));
+        console.log('[ActionDispatcher] apply_preset:', action.preset);
+        break;
+
+      case 'set_simulation_params':
+        window.dispatchEvent(new CustomEvent('assistant:set-simulation-params', {
+          detail: action.params || action,
+        }));
+        console.log('[ActionDispatcher] set_simulation_params:', action.params);
+        break;
+
+      case 'set_optimization_config':
+        window.dispatchEvent(new CustomEvent('assistant:set-optimization-config', {
+          detail: action.config || action,
+        }));
+        console.log('[ActionDispatcher] set_optimization_config:', action.config);
+        break;
+
+      case 'set_view_mode':
+        window.dispatchEvent(new CustomEvent('assistant:set-view-mode', {
+          detail: { mode: action.mode },
+        }));
+        console.log('[ActionDispatcher] set_view_mode:', action.mode);
+        break;
+
+      case 'toggle_panel':
+        window.dispatchEvent(new CustomEvent('assistant:toggle-panel', {
+          detail: { panel: action.panel, visible: action.visible },
+        }));
+        console.log('[ActionDispatcher] toggle_panel:', action.panel, action.visible);
+        break;
+
+      case 'save_scene':
+        window.dispatchEvent(new CustomEvent('assistant:save-scene', {
+          detail: { name: action.name },
+        }));
+        console.log('[ActionDispatcher] save_scene:', action.name);
+        break;
+
+      case 'set_environment':
+        window.dispatchEvent(new CustomEvent('assistant:set-environment', {
+          detail: { weather: action.weather, timeOfDay: action.timeOfDay, holidayType: action.holidayType },
+        }));
+        console.log('[ActionDispatcher] set_environment:', action.weather, action.timeOfDay, action.holidayType);
         break;
 
       default:

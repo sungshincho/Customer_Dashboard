@@ -602,6 +602,43 @@ export function AIOptimizationTab({
     }
   }, [selectedOptimizations, selectedGoal, storeId, sceneData, sceneSimulation, onOverlayToggle, onResultsUpdate, optimizationSettings, simulationEnvConfig]);
 
+  // ============================================
+  // AI 어시스턴트 내부 이벤트 리스너
+  // ============================================
+  useEffect(() => {
+    // 최적화 설정 변경
+    const handleSetOptConfig = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail.goal) {
+        setSelectedGoal(detail.goal as OptimizationGoal);
+      }
+      if (detail.types) {
+        setSelectedOptimizations(detail.types as OptimizationType[]);
+      }
+      if (detail.intensity) {
+        setOptimizationSettings(prev => ({
+          ...prev,
+          intensity: detail.intensity,
+        }));
+      }
+    };
+
+    // 최적화 실행
+    const handleRunOptInternal = (e: Event) => {
+      setTimeout(() => {
+        runOptimizations();
+      }, 200);
+    };
+
+    window.addEventListener('studio:set-opt-config-internal', handleSetOptConfig);
+    window.addEventListener('studio:run-optimization-internal', handleRunOptInternal);
+
+    return () => {
+      window.removeEventListener('studio:set-opt-config-internal', handleSetOptConfig);
+      window.removeEventListener('studio:run-optimization-internal', handleRunOptInternal);
+    };
+  }, [runOptimizations]);
+
   // 🆕 뷰 모드 변경 핸들러 (연타 방지 + 3D 위치 적용)
   const handleViewModeChange = useCallback(async (newMode: ViewMode) => {
     // 이미 같은 모드면 무시

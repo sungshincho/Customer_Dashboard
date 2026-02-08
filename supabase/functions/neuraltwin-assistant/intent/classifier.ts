@@ -42,6 +42,27 @@ interface AIClassificationResponse {
       source?: string;
     };
     tablePage?: string | number;
+    // 스튜디오 제어 엔티티
+    scenario?: string;
+    simulationType?: string;
+    optimizationType?: string;
+    overlay?: string;
+    visible?: boolean;
+    simCommand?: string;
+    simSpeed?: number;
+    simType?: string;
+    customerCount?: number;
+    duration?: number;
+    optGoal?: string;
+    optTypes?: string[];
+    optIntensity?: string;
+    viewMode?: string;
+    panel?: string;
+    sceneName?: string;
+    weather?: string;
+    timeOfDay?: string;
+    holidayType?: string;
+    preset?: string;
   };
 }
 
@@ -56,6 +77,16 @@ const VALID_INTENTS = [
   'composite_navigate',
   'run_simulation',
   'run_optimization',
+  // 디지털트윈 스튜디오 제어 인텐트
+  'toggle_overlay',
+  'simulation_control',
+  'apply_preset',
+  'set_simulation_params',
+  'set_optimization_config',
+  'set_view_mode',
+  'toggle_panel',
+  'save_scene',
+  'set_environment',
   'general_chat',
 ];
 
@@ -207,6 +238,21 @@ function transformEntities(
     }
     if (aiEntities.period.endDate) {
       entities.dateEnd = aiEntities.period.endDate;
+    }
+  }
+
+  // 스튜디오 제어 엔티티 (직접 패스스루)
+  const studioFields = [
+    'scenario', 'simulationType', 'optimizationType',
+    'overlay', 'visible', 'simCommand', 'simSpeed',
+    'simType', 'customerCount', 'duration',
+    'optGoal', 'optTypes', 'optIntensity',
+    'viewMode', 'panel', 'sceneName',
+    'weather', 'timeOfDay', 'holidayType', 'preset',
+  ] as const;
+  for (const field of studioFields) {
+    if (aiEntities[field] !== undefined) {
+      entities[field] = aiEntities[field];
     }
   }
 
