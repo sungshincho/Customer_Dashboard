@@ -76,10 +76,10 @@ export async function callGemini(
       model: data.model || DEFAULT_MODEL,
     };
 
-  } catch (error) {
+  } catch (error: unknown) {
     clearTimeout(timeoutId);
 
-    if (error.name === 'AbortError') {
+    if (error instanceof Error && error.name === 'AbortError') {
       throw new Error('AI_TIMEOUT');
     }
     throw error;

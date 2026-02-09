@@ -2627,7 +2627,7 @@ function buildUnifiedSources(status: any): Array<{
       key,
       name: ds?.name ? `${ds.name}` : cov?.label || name,
       status: ds?.status || (cov?.available ? 'active' : 'inactive'),
-      available: cov?.available ?? (ds?.status === 'active') ?? false,
+      available: cov?.available ?? ((ds?.status === 'active') || false),
       recordCount: cov?.record_count || 0,
     };
   });
