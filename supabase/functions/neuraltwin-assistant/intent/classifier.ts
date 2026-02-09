@@ -283,22 +283,26 @@ function transformEntities(
     entities.hour = aiEntities.hour;
   }
 
-  // 패턴 기반 날짜 보강 (AI가 날짜를 못 추출했을 때)
-  if (!entities.period && !entities.datePreset) {
-    const extractedDate = extractDateRange(originalMessage);
-    if (extractedDate) {
-      if (extractedDate.preset) {
+  // 패턴 기반 날짜 추출 (항상 실행, AI보다 정확한 한국어 날짜 파싱)
+  const extractedDate = extractDateRange(originalMessage);
+  if (extractedDate) {
+    if (extractedDate.preset) {
+      // 프리셋은 AI가 이미 추출했으면 유지, 아니면 패턴 기반 사용
+      if (!entities.period && !entities.datePreset) {
         entities.datePreset = extractedDate.preset;
         entities.period = { type: extractedDate.preset };
-      } else if (extractedDate.startDate && extractedDate.endDate) {
-        entities.dateStart = extractedDate.startDate;
-        entities.dateEnd = extractedDate.endDate;
-        entities.period = {
-          type: 'custom',
-          startDate: extractedDate.startDate,
-          endDate: extractedDate.endDate,
-        };
       }
+    } else if (extractedDate.startDate && extractedDate.endDate) {
+      // 커스텀 날짜(구체적 날짜)는 패턴 기반이 더 정확하므로 항상 우선
+      console.log(`[classifier] Pattern date override: ${extractedDate.startDate}~${extractedDate.endDate}` +
+        (entities.period?.startDate ? ` (AI was: ${entities.period.startDate}~${entities.period.endDate})` : ''));
+      entities.dateStart = extractedDate.startDate;
+      entities.dateEnd = extractedDate.endDate;
+      entities.period = {
+        type: 'custom',
+        startDate: extractedDate.startDate,
+        endDate: extractedDate.endDate,
+      };
     }
   }
 

@@ -1067,20 +1067,46 @@ async function querySummary(
     };
   }
 
-  // fallback: screenData가 없을 경우 DB 직접 조회
-  const { data, error } = await supabase
+  // fallback: screenData가 없을 경우 DB 직접 조회 (순차 실행 + 재시도 - 콜드 스타트 안정성)
+  console.log(`[querySummary] DB fallback for ${dateRange.startDate}~${dateRange.endDate}, storeId=${storeId}`);
+
+  let result = await supabase
     .from('daily_kpis_agg')
     .select('*')
     .eq('store_id', storeId)
     .gte('date', dateRange.startDate)
     .lte('date', dateRange.endDate);
 
-  if (error) throw error;
+  // 실패 시 1회 재시도
+  if (result.error) {
+    console.error('[querySummary] query error, retrying:', result.error.message);
+    result = await supabase
+      .from('daily_kpis_agg')
+      .select('*')
+      .eq('store_id', storeId)
+      .gte('date', dateRange.startDate)
+      .lte('date', dateRange.endDate);
+  }
 
-  const totalRevenue = data?.reduce((sum, row) => sum + (row.total_revenue || 0), 0) || 0;
-  const totalVisitors = data?.reduce((sum, row) => sum + (row.total_visitors || 0), 0) || 0;
-  const uniqueVisitors = data?.reduce((sum, row) => sum + (row.unique_visitors || 0), 0) || 0;
-  const totalTransactions = data?.reduce((sum, row) => sum + (row.total_transactions || 0), 0) || 0;
+  console.log(`[querySummary] rows: ${result.data?.length ?? 'null'}`);
+
+  if (result.error || !result.data || result.data.length === 0) {
+    if (result.error) {
+      console.error('[querySummary] final error:', result.error.message);
+    }
+    return {
+      actions,
+      message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 개요 데이터를 조회할 수 없습니다. 해당 기간에 데이터가 없을 수 있습니다.`,
+      suggestions: ['개요탭 보여줘', '오늘 데이터 알려줘', '매장 데이터 알려줘'],
+      data: null,
+    };
+  }
+
+  const data = result.data;
+  const totalRevenue = data.reduce((sum, row) => sum + (row.total_revenue || 0), 0) || 0;
+  const totalVisitors = data.reduce((sum, row) => sum + (row.total_visitors || 0), 0) || 0;
+  const uniqueVisitors = data.reduce((sum, row) => sum + (row.unique_visitors || 0), 0) || 0;
+  const totalTransactions = data.reduce((sum, row) => sum + (row.total_transactions || 0), 0) || 0;
   const conversionRate = totalVisitors > 0 ? (totalTransactions / totalVisitors) * 100 : 0;
 
   let message = `${dateRange.startDate} ~ ${dateRange.endDate} 주요 지표입니다:\n` +
