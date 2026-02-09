@@ -108,8 +108,11 @@ export async function classifyIntent(
     cleanupExpiredCache();
   }
 
-  // 1. 캐시 확인
-  const cached = getCachedIntent(message);
+  // 컨텍스트 탭 추출 (캐시 키에 포함하여 동일 메시지도 탭별 분류 구분)
+  const currentTab = context?.page?.tab;
+
+  // 1. 캐시 확인 (탭 컨텍스트 포함)
+  const cached = getCachedIntent(message, currentTab);
   if (cached) {
     console.log('[classifier] Cache hit:', cached.intent);
     // 캐시된 결과도 visitors+hour → hourlyPattern 보정 적용
@@ -158,8 +161,8 @@ export async function classifyIntent(
         finalIntent = 'query_kpi';
       }
 
-      // 캐시 저장
-      setCachedIntent(message, finalIntent, parsed.confidence, entities);
+      // 캐시 저장 (탭 컨텍스트 포함)
+      setCachedIntent(message, finalIntent, parsed.confidence, entities, currentTab);
 
       return {
         intent: finalIntent,

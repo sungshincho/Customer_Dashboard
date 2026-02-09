@@ -18,24 +18,26 @@ const MAX_CACHE_SIZE = 500; // 최대 캐시 항목 수
 const intentCache = new Map<string, CachedIntent>();
 
 /**
- * 캐시 키 생성 (텍스트 정규화)
+ * 캐시 키 생성 (텍스트 정규화 + 컨텍스트)
  * - 공백 통일
  * - 소문자 변환
  * - 특수문자 제거
+ * - 현재 탭 컨텍스트를 키에 포함하여 동일 메시지도 탭별로 구분
  */
-export function normalizeForCache(text: string): string {
-  return text
+export function normalizeForCache(text: string, contextTab?: string): string {
+  const normalized = text
     .toLowerCase()
     .replace(/\s+/g, '') // 모든 공백 제거
     .replace(/[?!.,;:'"~\-]/g, '') // 특수문자 제거
     .trim();
+  return contextTab ? `${normalized}|${contextTab}` : normalized;
 }
 
 /**
  * 캐시에서 인텐트 조회
  */
-export function getCachedIntent(message: string): CachedIntent | null {
-  const key = normalizeForCache(message);
+export function getCachedIntent(message: string, contextTab?: string): CachedIntent | null {
+  const key = normalizeForCache(message, contextTab);
   const cached = intentCache.get(key);
 
   if (!cached) {
@@ -46,11 +48,11 @@ export function getCachedIntent(message: string): CachedIntent | null {
   const now = Date.now();
   if (now - cached.timestamp > CACHE_TTL_MS) {
     intentCache.delete(key);
-    console.log('[intentCache] Cache expired for:', key.substring(0, 30));
+    console.log('[intentCache] Cache expired for:', key.substring(0, 40));
     return null;
   }
 
-  console.log('[intentCache] Cache hit for:', key.substring(0, 30));
+  console.log('[intentCache] Cache hit for:', key.substring(0, 40));
   return cached;
 }
 
@@ -61,9 +63,10 @@ export function setCachedIntent(
   message: string,
   intent: string,
   confidence: number,
-  entities: Record<string, any>
+  entities: Record<string, any>,
+  contextTab?: string
 ): void {
-  const key = normalizeForCache(message);
+  const key = normalizeForCache(message, contextTab);
 
   // 캐시 크기 제한 (LRU 방식 간소화: 가장 오래된 항목 제거)
   if (intentCache.size >= MAX_CACHE_SIZE) {
@@ -80,7 +83,7 @@ export function setCachedIntent(
     timestamp: Date.now(),
   });
 
-  console.log('[intentCache] Cached intent:', intent, 'for:', key.substring(0, 30));
+  console.log('[intentCache] Cached intent:', intent, 'for:', key.substring(0, 40));
 }
 
 /**
