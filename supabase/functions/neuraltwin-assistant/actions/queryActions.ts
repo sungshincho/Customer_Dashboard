@@ -2010,6 +2010,7 @@ async function queryStoreSummary(
   }
 
   // fallback: DB 직접 조회 (hourly + zone 데이터 종합)
+  console.log(`[storeSummary] DB fallback for ${dateRange.startDate}~${dateRange.endDate}, storeId=${storeId}`);
   const [hourlyResult, zoneResult] = await Promise.all([
     supabase
       .from('hourly_visitors_agg')
@@ -2026,6 +2027,14 @@ async function queryStoreSummary(
       .order('total_visitors', { ascending: false })
       .limit(10),
   ]);
+
+  if (hourlyResult.error) {
+    console.error('[storeSummary] hourly query error:', hourlyResult.error.message);
+  }
+  if (zoneResult.error) {
+    console.error('[storeSummary] zone query error:', zoneResult.error.message);
+  }
+  console.log(`[storeSummary] hourly rows: ${hourlyResult.data?.length ?? 'null'}, zone rows: ${zoneResult.data?.length ?? 'null'}`);
 
   const parts: string[] = [`${dateRange.startDate} ~ ${dateRange.endDate} 매장 주요 지표입니다:`];
 
