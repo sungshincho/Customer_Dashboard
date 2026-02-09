@@ -53,12 +53,14 @@ export interface ScreenData {
   overviewKPIs: OverviewKPIs | null;
   funnel: FunnelStages | null;
   storeKPIs: StoreKPIs | null;
+  // screenData가 생성된 시점의 날짜 범위 (stale 데이터 방지)
+  dateRange: { startDate: string; endDate: string } | null;
 }
 
 interface ScreenDataState {
   screenData: ScreenData;
-  setOverviewData: (kpis: OverviewKPIs, funnel: FunnelStages) => void;
-  setStoreData: (store: StoreKPIs) => void;
+  setOverviewData: (kpis: OverviewKPIs, funnel: FunnelStages, dateRange: { startDate: string; endDate: string }) => void;
+  setStoreData: (store: StoreKPIs, dateRange: { startDate: string; endDate: string }) => void;
   clearScreenData: () => void;
 }
 
@@ -66,25 +68,28 @@ const INITIAL_SCREEN_DATA: ScreenData = {
   overviewKPIs: null,
   funnel: null,
   storeKPIs: null,
+  dateRange: null,
 };
 
 export const useScreenDataStore = create<ScreenDataState>((set) => ({
   screenData: INITIAL_SCREEN_DATA,
 
-  setOverviewData: (kpis, funnel) =>
+  setOverviewData: (kpis, funnel, dateRange) =>
     set((state) => ({
       screenData: {
         ...state.screenData,
         overviewKPIs: kpis,
         funnel,
+        dateRange,
       },
     })),
 
-  setStoreData: (store) =>
+  setStoreData: (store, dateRange) =>
     set((state) => ({
       screenData: {
         ...state.screenData,
         storeKPIs: store,
+        dateRange,
       },
     })),
 

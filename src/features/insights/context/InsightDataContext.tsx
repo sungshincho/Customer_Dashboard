@@ -997,6 +997,7 @@ export function useIntegratedMetrics(): {
 
   // screenDataStore에 동기화 — 챗봇이 프론트엔드 계산값을 그대로 사용
   const setOverviewData = useScreenDataStore((s) => s.setOverviewData);
+  const { dateRange: currentDateRange } = useDateFilterStore();
   useEffect(() => {
     if (data) {
       setOverviewData(
@@ -1009,10 +1010,11 @@ export function useIntegratedMetrics(): {
           atv: data.atv,
           visitFrequency: data.visitFrequency,
         },
-        data.funnel
+        data.funnel,
+        { startDate: currentDateRange.startDate, endDate: currentDateRange.endDate }
       );
     }
-  }, [data, setOverviewData]);
+  }, [data, setOverviewData, currentDateRange.startDate, currentDateRange.endDate]);
 
   return {
     data,
