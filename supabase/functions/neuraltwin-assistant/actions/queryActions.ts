@@ -2086,7 +2086,7 @@ async function queryStoreSummary(
   if (parts.length === 1) {
     return {
       actions,
-      message: `해당 기간의 매장 데이터를 조회할 수 없습니다.${tabMessage}`,
+      message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 매장 데이터를 조회할 수 없습니다.${tabMessage}`,
       suggestions: ['매장탭 보여줘', '개요 데이터 알려줘'],
       data: null,
     };
