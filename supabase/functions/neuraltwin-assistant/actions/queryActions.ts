@@ -17,6 +17,7 @@ export interface QueryActionResult {
   message: string;
   suggestions: string[];
   data?: any;
+  needsRefresh?: boolean;  // screenData가 없어 탭 전환 후 재조회 필요
 }
 
 // 현재 페이지 컨텍스트 인터페이스
@@ -1067,63 +1068,14 @@ async function querySummary(
     };
   }
 
-  // fallback: screenData가 없을 경우 DB 직접 조회 (순차 실행 + 재시도 - 콜드 스타트 안정성)
-  console.log(`[querySummary] DB fallback for ${dateRange.startDate}~${dateRange.endDate}, storeId=${storeId}`);
-
-  let result = await supabase
-    .from('daily_kpis_agg')
-    .select('*')
-    .eq('store_id', storeId)
-    .gte('date', dateRange.startDate)
-    .lte('date', dateRange.endDate);
-
-  // 실패 시 1회 재시도
-  if (result.error) {
-    console.error('[querySummary] query error, retrying:', result.error.message);
-    result = await supabase
-      .from('daily_kpis_agg')
-      .select('*')
-      .eq('store_id', storeId)
-      .gte('date', dateRange.startDate)
-      .lte('date', dateRange.endDate);
-  }
-
-  console.log(`[querySummary] rows: ${result.data?.length ?? 'null'}`);
-
-  if (result.error || !result.data || result.data.length === 0) {
-    if (result.error) {
-      console.error('[querySummary] final error:', result.error.message);
-    }
-    return {
-      actions,
-      message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 개요 데이터를 조회할 수 없습니다. 해당 기간에 데이터가 없을 수 있습니다.`,
-      suggestions: ['개요탭 보여줘', '오늘 데이터 알려줘', '매장 데이터 알려줘'],
-      data: null,
-    };
-  }
-
-  const data = result.data;
-  const totalRevenue = data.reduce((sum, row) => sum + (row.total_revenue || 0), 0) || 0;
-  const totalVisitors = data.reduce((sum, row) => sum + (row.total_visitors || 0), 0) || 0;
-  const uniqueVisitors = data.reduce((sum, row) => sum + (row.unique_visitors || 0), 0) || 0;
-  const totalTransactions = data.reduce((sum, row) => sum + (row.total_transactions || 0), 0) || 0;
-  const conversionRate = totalVisitors > 0 ? (totalTransactions / totalVisitors) * 100 : 0;
-
-  let message = `${dateRange.startDate} ~ ${dateRange.endDate} 주요 지표입니다:\n` +
-    `• 총 입장: ${totalVisitors.toLocaleString()}명\n` +
-    `• 순 방문객: ${uniqueVisitors.toLocaleString()}명\n` +
-    `• 총 매출: ₩${totalRevenue.toLocaleString()}원\n` +
-    `• 구매 전환율: ${conversionRate.toFixed(1)}%`;
-
-  if (tabChanged) {
-    message += `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 데이터를 확인합니다.`;
-  }
+  // screenData가 없으면 → 탭 전환 후 프론트엔드 데이터 로드를 기다림 (DB fallback 대신)
+  console.log(`[querySummary] No screenData, requesting refresh for ${dateRange.startDate}~${dateRange.endDate}`);
 
   return {
     actions,
-    message,
+    message: `${dateRange.startDate} ~ ${dateRange.endDate} 개요 데이터를 조회합니다...`,
     suggestions: ['고객 여정 퍼널 보여줘', '고객탭 보여줘', '시뮬레이션 돌려줘'],
-    data: { footfall: totalVisitors, uniqueVisitors, totalRevenue, conversionRate },
+    needsRefresh: true,
   };
 }
 
@@ -2035,94 +1987,14 @@ async function queryStoreSummary(
     };
   }
 
-  // fallback: DB 직접 조회 (순차 실행 - 콜드 스타트 안정성)
-  console.log(`[storeSummary] DB fallback for ${dateRange.startDate}~${dateRange.endDate}, storeId=${storeId}`);
-
-  // 시간대별 조회 (실패 시 1회 재시도)
-  let hourlyResult = await supabase
-    .from('hourly_visitors_agg')
-    .select('hour, visitor_count')
-    .eq('store_id', storeId)
-    .gte('date', dateRange.startDate)
-    .lte('date', dateRange.endDate);
-
-  if (hourlyResult.error) {
-    console.error('[storeSummary] hourly query error, retrying:', hourlyResult.error.message);
-    hourlyResult = await supabase
-      .from('hourly_visitors_agg')
-      .select('hour, visitor_count')
-      .eq('store_id', storeId)
-      .gte('date', dateRange.startDate)
-      .lte('date', dateRange.endDate);
-  }
-
-  // 존별 조회 (실패 시 1회 재시도)
-  let zoneResult = await supabase
-    .from('zone_metrics_agg')
-    .select('zone_name, total_visitors, avg_dwell_time_seconds')
-    .eq('store_id', storeId)
-    .gte('date', dateRange.startDate)
-    .lte('date', dateRange.endDate)
-    .order('total_visitors', { ascending: false })
-    .limit(10);
-
-  if (zoneResult.error) {
-    console.error('[storeSummary] zone query error, retrying:', zoneResult.error.message);
-    zoneResult = await supabase
-      .from('zone_metrics_agg')
-      .select('zone_name, total_visitors, avg_dwell_time_seconds')
-      .eq('store_id', storeId)
-      .gte('date', dateRange.startDate)
-      .lte('date', dateRange.endDate)
-      .order('total_visitors', { ascending: false })
-      .limit(10);
-  }
-
-  console.log(`[storeSummary] hourly rows: ${hourlyResult.data?.length ?? 'null'}, zone rows: ${zoneResult.data?.length ?? 'null'}`);
-
-  const parts: string[] = [`${dateRange.startDate} ~ ${dateRange.endDate} 매장 주요 지표입니다:`];
-
-  // 시간대별 데이터 → 피크타임 계산
-  if (hourlyResult.data && hourlyResult.data.length > 0) {
-    const hourlyMap: Record<number, number> = {};
-    hourlyResult.data.forEach((row: any) => {
-      hourlyMap[row.hour] = (hourlyMap[row.hour] || 0) + (row.visitor_count || 0);
-    });
-    const peak = Object.entries(hourlyMap).sort((a, b) => b[1] - a[1])[0];
-    if (peak) {
-      parts.push(`• 피크타임: ${peak[0]}시 (${Number(peak[1]).toLocaleString()}명)`);
-    }
-  }
-
-  // 존 데이터 → 인기 존 + 체류시간
-  if (zoneResult.data && zoneResult.data.length > 0) {
-    const topZone = zoneResult.data[0];
-    parts.push(`• 인기 존: ${topZone.zone_name} (${(topZone.total_visitors || 0).toLocaleString()}명)`);
-
-    const avgDwell = zoneResult.data.reduce((sum: number, z: any) => sum + (z.avg_dwell_time_seconds || 0), 0) / zoneResult.data.length;
-    parts.push(`• 평균 체류시간: ${Math.round(avgDwell / 60)}분`);
-    parts.push(`• 운영 존: ${zoneResult.data.length}개`);
-
-    const topZones = zoneResult.data.slice(0, 3).map((z: any) =>
-      `  • ${z.zone_name}: ${(z.total_visitors || 0).toLocaleString()}명 (체류 ${Math.round((z.avg_dwell_time_seconds || 0) / 60)}분)`
-    ).join('\n');
-    parts.push(`\n존별 방문 TOP 3:\n${topZones}`);
-  }
-
-  if (parts.length === 1) {
-    return {
-      actions,
-      message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 매장 데이터를 조회할 수 없습니다.${tabMessage}`,
-      suggestions: ['매장탭 보여줘', '개요 데이터 알려줘'],
-      data: null,
-    };
-  }
+  // screenData가 없으면 → 탭 전환 후 프론트엔드 데이터 로드를 기다림 (DB fallback 대신)
+  console.log(`[storeSummary] No screenData, requesting refresh for ${dateRange.startDate}~${dateRange.endDate}`);
 
   return {
     actions,
-    message: parts.join('\n') + tabMessage,
+    message: `${dateRange.startDate} ~ ${dateRange.endDate} 매장 데이터를 조회합니다...`,
     suggestions: ['시간대별 방문 패턴 보여줘', '존 분석 보여줘', '피크타임 알려줘'],
-    data: { hourly: hourlyResult.data, zones: zoneResult.data },
+    needsRefresh: true,
   };
 }
 
