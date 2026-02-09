@@ -71,6 +71,7 @@ interface OSAssistantResponse {
     intent: string;
     confidence: number;
     executionTimeMs: number;
+    needsRefresh?: boolean;
   };
 }
 
@@ -154,7 +155,7 @@ Deno.serve(async (req) => {
     const classification = await classifyIntent(message, context);
 
     // 8. 액션 실행 (Phase 3-A: general_chat, Phase 3-B: query_kpi)
-    let actionResult = { actions: [] as UIAction[], message: '', suggestions: [] as string[] };
+    let actionResult = { actions: [] as UIAction[], message: '', suggestions: [] as string[], needsRefresh: false };
     const currentPage = context.page.current;
 
     if (['navigate', 'set_tab', 'set_date_range', 'composite_navigate', 'scroll_to_section', 'open_modal'].includes(classification.intent)) {
@@ -171,6 +172,7 @@ Deno.serve(async (req) => {
         actions: queryResult.actions,
         message: queryResult.message,
         suggestions: queryResult.suggestions,
+        needsRefresh: queryResult.needsRefresh || false,
       };
     } else if (classification.intent === 'run_simulation') {
       // 시뮬레이션 실행 - 스튜디오 이동 + (프리셋 적용) + 실행 이벤트 발행
@@ -224,6 +226,7 @@ Deno.serve(async (req) => {
         intent: classification.intent,
         confidence: classification.confidence,
         executionTimeMs,
+        needsRefresh: actionResult.needsRefresh || false,
       },
     };
 
