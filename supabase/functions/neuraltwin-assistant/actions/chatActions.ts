@@ -49,10 +49,10 @@ export async function handleGeneralChat(
       tokensUsed: response.tokensUsed,
     };
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[chatActions] handleGeneralChat error:', error);
 
-    if (error.message === 'AI_TIMEOUT') {
+    if (error instanceof Error && error.message === 'AI_TIMEOUT') {
       return {
         message: 'AI 응답이 지연되고 있어요. 잠시 후 다시 시도해주세요.',
         suggestions: ['다시 시도해줘'],

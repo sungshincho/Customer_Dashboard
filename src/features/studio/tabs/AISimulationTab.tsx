@@ -384,7 +384,7 @@ export function AISimulationTab({
       setSimulationEnvConfig(prev => {
         const updated = { ...prev, mode: 'manual' as const };
         if (!updated.manualSettings) {
-          updated.manualSettings = {};
+          updated.manualSettings = { weather: 'clear', timeOfDay: 'afternoon', holidayType: 'none' };
         }
         if (weather) updated.manualSettings.weather = weather;
         if (timeOfDay) updated.manualSettings.timeOfDay = timeOfDay;

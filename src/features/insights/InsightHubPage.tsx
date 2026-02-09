@@ -259,7 +259,7 @@ export default function InsightHubPage() {
   // 'ai-recommendation' → 'ai' 정규화 (백엔드 호환)
   useEffect(() => {
     if (!tabFromUrl) return;
-    const normalizedTab = tabFromUrl === 'ai-recommendation' ? 'ai' : tabFromUrl;
+    const normalizedTab = (tabFromUrl as string) === 'ai-recommendation' ? 'ai' : tabFromUrl;
     if (['overview', 'store', 'customer', 'product', 'inventory', 'prediction', 'ai'].includes(normalizedTab)) {
       setActiveTab(normalizedTab as InsightTabType);
     }
