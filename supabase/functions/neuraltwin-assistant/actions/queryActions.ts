@@ -462,6 +462,20 @@ export async function handleQueryKpi(
   try {
     const dateRange = getDateRange(period);
 
+    // DB 연결 워밍업 (콜드 스타트 시 첫 데이터 쿼리 실패 방지)
+    // screenData가 없어서 DB fallback이 필요한 쿼리 타입들에 대해 사전 워밍업
+    const needsDbFallback = !screenData ||
+      (queryType === 'summary' && !screenData.overviewKPIs) ||
+      (queryType === 'storeSummary' && !screenData.storeKPIs);
+    if (needsDbFallback) {
+      try {
+        await supabase.from('daily_kpis_agg').select('date').limit(1);
+        console.log('[handleQueryKpi] DB warmup OK');
+      } catch (e) {
+        console.warn('[handleQueryKpi] DB warmup failed (non-critical):', e);
+      }
+    }
+
     // 중복 위치 용어 체크 (disambiguation)
     const disambiguationInfo = getDisambiguationInfo(queryType, pageContext);
 
@@ -1077,9 +1091,10 @@ async function querySummary(
     .gte('date', dateRange.startDate)
     .lte('date', dateRange.endDate);
 
-  // 실패 시 1회 재시도
+  // 실패 시 1초 대기 후 재시도
   if (result.error) {
-    console.error('[querySummary] query error, retrying:', result.error.message);
+    console.error('[querySummary] query error, retrying after 1s:', result.error.message);
+    await new Promise(resolve => setTimeout(resolve, 1000));
     result = await supabase
       .from('daily_kpis_agg')
       .select('*')
@@ -2047,7 +2062,8 @@ async function queryStoreSummary(
     .lte('date', dateRange.endDate);
 
   if (hourlyResult.error) {
-    console.error('[storeSummary] hourly query error, retrying:', hourlyResult.error.message);
+    console.error('[storeSummary] hourly query error, retrying after 1s:', hourlyResult.error.message);
+    await new Promise(resolve => setTimeout(resolve, 1000));
     hourlyResult = await supabase
       .from('hourly_visitors_agg')
       .select('hour, visitor_count')
@@ -2056,7 +2072,7 @@ async function queryStoreSummary(
       .lte('date', dateRange.endDate);
   }
 
-  // 존별 조회 (실패 시 1회 재시도)
+  // 존별 조회 (실패 시 1초 대기 후 재시도)
   let zoneResult = await supabase
     .from('zone_metrics_agg')
     .select('zone_name, total_visitors, avg_dwell_time_seconds')
@@ -2067,7 +2083,8 @@ async function queryStoreSummary(
     .limit(10);
 
   if (zoneResult.error) {
-    console.error('[storeSummary] zone query error, retrying:', zoneResult.error.message);
+    console.error('[storeSummary] zone query error, retrying after 1s:', zoneResult.error.message);
+    await new Promise(resolve => setTimeout(resolve, 1000));
     zoneResult = await supabase
       .from('zone_metrics_agg')
       .select('zone_name, total_visitors, avg_dwell_time_seconds')
