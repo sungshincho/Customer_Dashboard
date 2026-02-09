@@ -362,6 +362,58 @@ export function extractDateRange(text: string): {
 }
 
 /**
+ * 특정 시간 추출 (0-23)
+ * "12시", "오후 3시", "오전 10시", "저녁 7시" 등
+ */
+export function extractHour(text: string): number | null {
+  // "오후 N시" → N + 12 (1-12)
+  const pmMatch = text.match(/오후\s*(\d{1,2})\s*시/);
+  if (pmMatch) {
+    const h = parseInt(pmMatch[1], 10);
+    return h < 12 ? h + 12 : h;
+  }
+
+  // "오전 N시" → N (0-11)
+  const amMatch = text.match(/오전\s*(\d{1,2})\s*시/);
+  if (amMatch) {
+    const h = parseInt(amMatch[1], 10);
+    return h === 12 ? 0 : h;
+  }
+
+  // "저녁 N시" → N + 12 if < 12
+  const eveningMatch = text.match(/저녁\s*(\d{1,2})\s*시/);
+  if (eveningMatch) {
+    const h = parseInt(eveningMatch[1], 10);
+    return h < 12 ? h + 12 : h;
+  }
+
+  // "새벽 N시" → N (0-6)
+  const dawnMatch = text.match(/새벽\s*(\d{1,2})\s*시/);
+  if (dawnMatch) {
+    return parseInt(dawnMatch[1], 10);
+  }
+
+  // 단순 "N시" (날짜의 "일"과 혼동 방지: "N월 N일" 패턴 제외)
+  // "11월 3일 12시" → "12시"만 매칭하도록 "일" 뒤의 시간을 찾음
+  const simpleHourMatch = text.match(/(?:일\s*)?(\d{1,2})\s*시(?:\s*(?:에|의|쯤|경|반|부터|까지|방문|트래픽|몇|몇명|에는))/);
+  if (simpleHourMatch) {
+    const h = parseInt(simpleHourMatch[1], 10);
+    if (h >= 0 && h <= 23) return h;
+  }
+
+  // 마지막 fallback: 문장 끝 쪽의 "N시"
+  const fallbackMatch = text.match(/(\d{1,2})\s*시\s*(?:에|의|쯤|경|반)?/);
+  if (fallbackMatch) {
+    const h = parseInt(fallbackMatch[1], 10);
+    // 날짜 패턴이 아닌지 확인 (월 뒤에 바로 오는 숫자는 "일"일 수 있음)
+    const isDatePart = text.match(new RegExp(`\\d{1,2}월\\s*${fallbackMatch[1]}\\s*시`));
+    if (!isDatePart && h >= 0 && h <= 23) return h;
+  }
+
+  return null;
+}
+
+/**
  * 전체 엔티티 추출
  */
 export function extractEntities(text: string, currentPage?: string): Record<string, any> {

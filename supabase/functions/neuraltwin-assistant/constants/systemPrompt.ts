@@ -82,8 +82,16 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
 - peakTime: 피크타임, 피크시간, 가장 바쁜 시간, 혼잡 시간
 - popularZone: 인기 존, 인기 구역, 인기존, 가장 많이 방문하는 존
 - trackingCoverage: 센서 커버율, 센서 커버리지, 트래킹 범위, 센서 현황
-- hourlyPattern: 시간대별 방문, 시간대별 패턴, 시간별 방문객, 시간대 분석, 시간대별 방문 패턴
+- hourlyPattern: 시간대별 방문, 시간대별 패턴, 시간별 방문객, 시간대 분석, 시간대별 방문 패턴, "N시에 몇명 방문", "N시 방문객", "N시에 몇명", "오후 N시 트래픽"
+  - **중요**: "12시에 몇명 방문했어?", "14시 트래픽" 등 특정 시간이 언급된 방문 질문은 반드시 hourlyPattern으로 분류 (visitors가 아님)
+  - 특정 시간이 있으면 → entities.hour에 시간 추출 (0-23, 24시간제)
+  - "오후 3시" → hour: 15, "12시" → hour: 12, "저녁 7시" → hour: 19
 - zoneAnalysis: 존 분석, 존별 체류시간, 존 방문자 분포, 구역별 분석, 존별 비교, 존별 성과 비교, 존별 방문자 분포, 존별 성과
+  - 특정 존 이름이 언급되면 → entities.itemFilter에 존 이름 배열 추출
+  - "액세서리존, 의류 존 비교" → itemFilter: ["액세서리", "의류"]
+  - "신발존 성과" → itemFilter: ["신발"]
+- popularZone: 인기 존, 인기 구역, 인기존, 가장 많이 방문하는 존
+  - 특정 존 이름이 언급되면 → entities.itemFilter에 존 이름 배열 추출
 - storeDwell: 평균 체류시간 (매장 탭 맥락에서), 체류시간 (매장 탭)
 
 *고객(Customer) 탭:*
@@ -468,7 +476,9 @@ AI 리포트 또는 씬 저장 패널을 열거나 닫는 요청
     "sceneName": "씬 이름",
     "weather": "clear | rain | snow | clouds | heavy_snow",
     "timeOfDay": "morning | afternoon | evening | night | peak",
-    "holidayType": "none | weekend | holiday | christmas | black_friday"
+    "holidayType": "none | weekend | holiday | christmas | black_friday",
+    "itemFilter": ["존/상품/세그먼트 이름"],
+    "hour": 0
   }
 }
 \`\`\`
@@ -477,7 +487,9 @@ AI 리포트 또는 씬 저장 패널을 열거나 닫는 요청
 - 엔티티는 해당하는 것만 포함 (불필요한 필드 제외)
 - confidence는 확신도에 따라 0.5~1.0 사이로 설정
 - 애매한 경우 가장 가능성 높은 인텐트 선택 후 confidence 낮춤
-- reasoning은 간단히 한 줄로`;
+- reasoning은 간단히 한 줄로
+- itemFilter: 특정 항목(존, 상품, 세그먼트 등)이 이름으로 언급된 경우만 포함. 핵심 키워드만 추출 (예: "액세서리 존" → "액세서리")
+- hour: 특정 시간이 언급된 경우만 포함 (0-23). "N시에 방문", "오후 N시" 등. 날짜의 일(日)과 혼동하지 말 것`;
 
 /**
  * 컨텍스트 포맷팅 함수

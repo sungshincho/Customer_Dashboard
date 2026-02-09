@@ -31,33 +31,62 @@ export interface FunnelStages {
   purchase: number;
 }
 
+// 매장탭 KPI & 상세 데이터 (프론트엔드 표시값 그대로)
+export interface StoreKPIs {
+  peakHour: number;              // 피크타임 시간 (0-23)
+  peakVisitors: number;          // 피크타임 방문객 수
+  popularZone: string;           // 인기 존 이름
+  popularZoneVisitors: number;   // 인기 존 방문객 수
+  avgDwellMinutes: number;       // 평균 체류시간 (분)
+  trackingCoverage: number;      // 센서 커버율 (%)
+  hourlyPattern: { hour: number; visitors: number }[];  // 시간대별 방문 패턴 (24개)
+  zones: {
+    name: string;
+    visitors: number;
+    avgDwellMinutes: number;
+    conversionRate: string;      // "X.X%" 형태
+  }[];
+}
+
 // 화면 데이터 전체 구조
 export interface ScreenData {
   overviewKPIs: OverviewKPIs | null;
   funnel: FunnelStages | null;
+  storeKPIs: StoreKPIs | null;
 }
 
 interface ScreenDataState {
   screenData: ScreenData;
   setOverviewData: (kpis: OverviewKPIs, funnel: FunnelStages) => void;
+  setStoreData: (store: StoreKPIs) => void;
   clearScreenData: () => void;
 }
 
 const INITIAL_SCREEN_DATA: ScreenData = {
   overviewKPIs: null,
   funnel: null,
+  storeKPIs: null,
 };
 
 export const useScreenDataStore = create<ScreenDataState>((set) => ({
   screenData: INITIAL_SCREEN_DATA,
 
   setOverviewData: (kpis, funnel) =>
-    set({
+    set((state) => ({
       screenData: {
+        ...state.screenData,
         overviewKPIs: kpis,
         funnel,
       },
-    }),
+    })),
+
+  setStoreData: (store) =>
+    set((state) => ({
+      screenData: {
+        ...state.screenData,
+        storeKPIs: store,
+      },
+    })),
 
   clearScreenData: () =>
     set({ screenData: INITIAL_SCREEN_DATA }),

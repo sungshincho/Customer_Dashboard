@@ -22,6 +22,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useCountUp } from '@/hooks/useCountUp';
 import { useIntegratedMetrics, useHourlyVisitors } from '../context/InsightDataContext';
 import { formatDuration } from '../components';
+import { useScreenDataStore } from '@/store/screenDataStore';
 
 // 🔧 FIX: 다크모드 초기값 동기 설정 (깜빡임 방지)
 const getInitialDarkMode = () =>
@@ -654,6 +655,28 @@ export function StoreTab() {
     if (zoneData?.length) return Math.round(zoneData.reduce((s, z) => s + z.avgDwell, 0) / zoneData.length);
     return 0;
   }, [metrics?.avgDwellTime, zoneData]);
+
+  // screenDataStore에 동기화 — 챗봇이 프론트엔드 계산값을 그대로 사용
+  const setStoreData = useScreenDataStore((s) => s.setStoreData);
+  useEffect(() => {
+    if (hourlyRawData && hourlyRawData.length > 0) {
+      setStoreData({
+        peakHour: peakHour ? parseInt(peakHour.hour) : 0,
+        peakVisitors: peakHour?.visitors || 0,
+        popularZone: zoneData?.[0]?.name || '',
+        popularZoneVisitors: zoneData?.[0]?.visitors || 0,
+        avgDwellMinutes,
+        trackingCoverage: metrics?.trackingCoverage || 0,
+        hourlyPattern: hourlyRawData.map(d => ({ hour: d.hour, visitors: d.count })),
+        zones: zoneData.map(z => ({
+          name: z.name,
+          visitors: z.visitors,
+          avgDwellMinutes: z.avgDwell,
+          conversionRate: `${z.conversion}%`,
+        })),
+      });
+    }
+  }, [hourlyRawData, zoneData, peakHour, avgDwellMinutes, metrics?.trackingCoverage, setStoreData]);
 
   // KPI 카운트업 애니메이션
   const animatedPeakVisitors = useCountUp(peakHour?.visitors || 0, { duration: 1500 });

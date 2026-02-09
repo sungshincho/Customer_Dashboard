@@ -11,7 +11,7 @@
 import { callGemini, parseJsonResponse } from '../utils/geminiClient.ts';
 import { INTENT_CLASSIFICATION_PROMPT, formatContext } from '../constants/systemPrompt.ts';
 import { getCachedIntent, setCachedIntent, cleanupExpiredCache } from '../utils/intentCache.ts';
-import { extractDateRange } from './entityExtractor.ts';
+import { extractDateRange, extractHour } from './entityExtractor.ts';
 
 export interface ClassificationResult {
   intent: string;
@@ -63,6 +63,9 @@ interface AIClassificationResponse {
     timeOfDay?: string;
     holidayType?: string;
     preset?: string;
+    // 세부 필터 엔티티
+    itemFilter?: string[];   // 특정 항목 필터 (존 이름, 상품명 등)
+    hour?: number;           // 특정 시간 (0-23)
   };
 }
 
@@ -256,6 +259,14 @@ function transformEntities(
     }
   }
 
+  // 세부 필터 엔티티 (직접 패스스루)
+  if (aiEntities.itemFilter && Array.isArray(aiEntities.itemFilter)) {
+    entities.itemFilter = aiEntities.itemFilter;
+  }
+  if (aiEntities.hour !== undefined && typeof aiEntities.hour === 'number') {
+    entities.hour = aiEntities.hour;
+  }
+
   // 패턴 기반 날짜 보강 (AI가 날짜를 못 추출했을 때)
   if (!entities.period && !entities.datePreset) {
     const extractedDate = extractDateRange(originalMessage);
@@ -272,6 +283,14 @@ function transformEntities(
           endDate: extractedDate.endDate,
         };
       }
+    }
+  }
+
+  // 패턴 기반 시간 보강 (AI가 시간을 못 추출했을 때)
+  if (entities.hour === undefined) {
+    const extractedHour = extractHour(originalMessage);
+    if (extractedHour !== null) {
+      entities.hour = extractedHour;
     }
   }
 
