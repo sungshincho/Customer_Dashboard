@@ -2009,23 +2009,50 @@ async function queryStoreSummary(
     };
   }
 
-  // fallback: DB 직접 조회 (hourly + zone 데이터 종합)
-  const [hourlyResult, zoneResult] = await Promise.all([
-    supabase
+  // fallback: DB 직접 조회 (순차 실행 - 콜드 스타트 안정성)
+  console.log(`[storeSummary] DB fallback for ${dateRange.startDate}~${dateRange.endDate}, storeId=${storeId}`);
+
+  // 시간대별 조회 (실패 시 1회 재시도)
+  let hourlyResult = await supabase
+    .from('hourly_visitors_agg')
+    .select('hour, visitor_count')
+    .eq('store_id', storeId)
+    .gte('date', dateRange.startDate)
+    .lte('date', dateRange.endDate);
+
+  if (hourlyResult.error) {
+    console.error('[storeSummary] hourly query error, retrying:', hourlyResult.error.message);
+    hourlyResult = await supabase
       .from('hourly_visitors_agg')
       .select('hour, visitor_count')
       .eq('store_id', storeId)
       .gte('date', dateRange.startDate)
-      .lte('date', dateRange.endDate),
-    supabase
+      .lte('date', dateRange.endDate);
+  }
+
+  // 존별 조회 (실패 시 1회 재시도)
+  let zoneResult = await supabase
+    .from('zone_metrics_agg')
+    .select('zone_name, total_visitors, avg_dwell_time_seconds')
+    .eq('store_id', storeId)
+    .gte('date', dateRange.startDate)
+    .lte('date', dateRange.endDate)
+    .order('total_visitors', { ascending: false })
+    .limit(10);
+
+  if (zoneResult.error) {
+    console.error('[storeSummary] zone query error, retrying:', zoneResult.error.message);
+    zoneResult = await supabase
       .from('zone_metrics_agg')
       .select('zone_name, total_visitors, avg_dwell_time_seconds')
       .eq('store_id', storeId)
       .gte('date', dateRange.startDate)
       .lte('date', dateRange.endDate)
       .order('total_visitors', { ascending: false })
-      .limit(10),
-  ]);
+      .limit(10);
+  }
+
+  console.log(`[storeSummary] hourly rows: ${hourlyResult.data?.length ?? 'null'}, zone rows: ${zoneResult.data?.length ?? 'null'}`);
 
   const parts: string[] = [`${dateRange.startDate} ~ ${dateRange.endDate} 매장 주요 지표입니다:`];
 
@@ -2059,7 +2086,7 @@ async function queryStoreSummary(
   if (parts.length === 1) {
     return {
       actions,
-      message: `해당 기간의 매장 데이터를 조회할 수 없습니다.${tabMessage}`,
+      message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 매장 데이터를 조회할 수 없습니다.${tabMessage}`,
       suggestions: ['매장탭 보여줘', '개요 데이터 알려줘'],
       data: null,
     };
