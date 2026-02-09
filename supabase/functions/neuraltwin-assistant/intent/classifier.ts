@@ -112,6 +112,11 @@ export async function classifyIntent(
   const cached = getCachedIntent(message);
   if (cached) {
     console.log('[classifier] Cache hit:', cached.intent);
+    // 캐시된 결과도 visitors+hour → hourlyPattern 보정 적용
+    if (cached.intent === 'query_kpi' && cached.entities.queryType === 'visitors' && cached.entities.hour !== undefined) {
+      console.log('[classifier] Cache override: visitors + hour → hourlyPattern');
+      cached.entities.queryType = 'hourlyPattern';
+    }
     return {
       intent: cached.intent,
       confidence: cached.confidence,
@@ -145,11 +150,19 @@ export async function classifyIntent(
       // 엔티티 변환 및 보강
       const entities = transformEntities(parsed.entities || {}, message);
 
+      // 분류 보정: "visitors" + 특정 시간(hour)이 있으면 → "hourlyPattern"으로 재분류
+      let finalIntent = parsed.intent;
+      if (parsed.intent === 'query_kpi' && entities.queryType === 'visitors' && entities.hour !== undefined) {
+        console.log('[classifier] Override: visitors + hour → hourlyPattern');
+        entities.queryType = 'hourlyPattern';
+        finalIntent = 'query_kpi';
+      }
+
       // 캐시 저장
-      setCachedIntent(message, parsed.intent, parsed.confidence, entities);
+      setCachedIntent(message, finalIntent, parsed.confidence, entities);
 
       return {
-        intent: parsed.intent,
+        intent: finalIntent,
         confidence: parsed.confidence,
         entities,
         method: 'ai',

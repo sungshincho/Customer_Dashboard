@@ -58,6 +58,23 @@ export interface ScreenData {
       conversionRate: string;
     }[];
   };
+  // screenData가 생성된 시점의 날짜 범위 (stale 데이터 방지)
+  dateRange?: { startDate: string; endDate: string };
+}
+
+/**
+ * screenData의 dateRange와 요청된 dateRange가 일치하는지 확인
+ * - 일치하지 않으면 screenData는 stale이므로 DB fallback 필요
+ */
+function isScreenDataFresh(
+  screenData: ScreenData | undefined,
+  requestedDateRange: { startDate: string; endDate: string }
+): boolean {
+  if (!screenData?.dateRange) return false;
+  return (
+    screenData.dateRange.startDate === requestedDateRange.startDate &&
+    screenData.dateRange.endDate === requestedDateRange.endDate
+  );
 }
 
 /**
@@ -1019,8 +1036,8 @@ async function querySummary(
 ): Promise<QueryActionResult> {
   const { actions, tabChanged, targetTab } = createNavigationActions('summary', dateRange, pageContext);
 
-  // screenData가 있으면 프론트엔드 계산값을 그대로 사용 (DB 조회 불필요)
-  if (screenData?.overviewKPIs) {
+  // screenData가 있으면 프론트엔드 계산값을 그대로 사용 (날짜 범위 일치 시에만)
+  if (screenData?.overviewKPIs && isScreenDataFresh(screenData, dateRange)) {
     const kpi = screenData.overviewKPIs;
 
     let message = `${dateRange.startDate} ~ ${dateRange.endDate} 주요 지표입니다:\n` +
@@ -1489,8 +1506,8 @@ async function queryFunnel(
   const { actions, tabChanged, targetTab } = createNavigationActions('funnel', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 퍼널을 확인합니다.` : '';
 
-  // screenData가 있으면 프론트엔드 계산값을 그대로 사용 (DB 조회 불필요)
-  if (screenData?.funnel) {
+  // screenData가 있으면 프론트엔드 계산값을 그대로 사용 (날짜 범위 일치 시에만)
+  if (screenData?.funnel && isScreenDataFresh(screenData, dateRange)) {
     const f = screenData.funnel;
 
     return {
@@ -1579,8 +1596,8 @@ async function queryPeakTime(
   const { actions, tabChanged, targetTab } = createNavigationActions('peakTime', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 분석을 확인합니다.` : '';
 
-  // screenData 우선 사용
-  if (screenData?.storeKPIs) {
+  // screenData 우선 사용 (날짜 범위 일치 시에만)
+  if (screenData?.storeKPIs && isScreenDataFresh(screenData, dateRange)) {
     const s = screenData.storeKPIs;
     return {
       actions,
@@ -1638,8 +1655,8 @@ async function queryPopularZone(
   const { actions, tabChanged, targetTab } = createNavigationActions('popularZone', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 존 분석을 확인합니다.` : '';
 
-  // screenData 우선 사용
-  if (screenData?.storeKPIs?.zones && screenData.storeKPIs.zones.length > 0) {
+  // screenData 우선 사용 (날짜 범위 일치 시에만)
+  if (screenData?.storeKPIs?.zones && screenData.storeKPIs.zones.length > 0 && isScreenDataFresh(screenData, dateRange)) {
     const { filtered, isFiltered } = filterZones(screenData.storeKPIs.zones, itemFilter);
     const topZone = filtered[0];
     const zoneList = formatZoneList(filtered);
@@ -1711,8 +1728,8 @@ async function queryTrackingCoverage(
   const { actions, tabChanged, targetTab } = createNavigationActions('trackingCoverage', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 확인합니다.` : '';
 
-  // screenData 우선 사용
-  if (screenData?.storeKPIs) {
+  // screenData 우선 사용 (날짜 범위 일치 시에만)
+  if (screenData?.storeKPIs && isScreenDataFresh(screenData, dateRange)) {
     const coverage = screenData.storeKPIs.trackingCoverage;
     const totalZones = screenData.storeKPIs.zones.length;
     return {
@@ -1764,8 +1781,8 @@ async function queryHourlyPattern(
   const { actions, tabChanged, targetTab } = createNavigationActions('hourlyPattern', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 시간대별 차트를 확인합니다.` : '';
 
-  // screenData 우선 사용
-  if (screenData?.storeKPIs?.hourlyPattern && screenData.storeKPIs.hourlyPattern.length > 0) {
+  // screenData 우선 사용 (날짜 범위 일치 시에만)
+  if (screenData?.storeKPIs?.hourlyPattern && screenData.storeKPIs.hourlyPattern.length > 0 && isScreenDataFresh(screenData, dateRange)) {
     const pattern = screenData.storeKPIs.hourlyPattern;
 
     // 특정 시간 질의
@@ -1851,8 +1868,8 @@ async function queryZoneAnalysis(
   const { actions, tabChanged, targetTab } = createNavigationActions('zoneAnalysis', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 존 분석을 확인합니다.` : '';
 
-  // screenData 우선 사용
-  if (screenData?.storeKPIs?.zones && screenData.storeKPIs.zones.length > 0) {
+  // screenData 우선 사용 (날짜 범위 일치 시에만)
+  if (screenData?.storeKPIs?.zones && screenData.storeKPIs.zones.length > 0 && isScreenDataFresh(screenData, dateRange)) {
     const { filtered, isFiltered } = filterZones(screenData.storeKPIs.zones, itemFilter);
 
     if (isFiltered && filtered.length >= 2) {
@@ -1935,7 +1952,7 @@ function queryStoreDwell(
   const { actions, tabChanged, targetTab } = createNavigationActions('storeDwell', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 확인합니다.` : '';
 
-  if (screenData?.storeKPIs) {
+  if (screenData?.storeKPIs && isScreenDataFresh(screenData, dateRange)) {
     return {
       actions,
       message: `평균 체류시간은 ${screenData.storeKPIs.avgDwellMinutes}분입니다.${tabMessage}`,

@@ -83,7 +83,8 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
 - popularZone: 인기 존, 인기 구역, 인기존, 가장 많이 방문하는 존
 - trackingCoverage: 센서 커버율, 센서 커버리지, 트래킹 범위, 센서 현황
 - hourlyPattern: 시간대별 방문, 시간대별 패턴, 시간별 방문객, 시간대 분석, 시간대별 방문 패턴, "N시에 몇명 방문", "N시 방문객", "N시에 몇명", "오후 N시 트래픽"
-  - **중요**: "12시에 몇명 방문했어?", "14시 트래픽" 등 특정 시간이 언급된 방문 질문은 반드시 hourlyPattern으로 분류 (visitors가 아님)
+  - **⚠️ 최우선 규칙**: 메시지에 특정 시간("N시", "오후 N시", "N시에")이 포함되고 방문/트래픽을 묻는 질문은 **무조건 hourlyPattern**으로 분류. visitors로 분류하면 안 됨.
+  - 예시: "12시 방문자 몇명이야?" → hourlyPattern (hour: 12), "11월 1일 14시 방문객" → hourlyPattern (hour: 14), "오후 3시에 몇명 왔어?" → hourlyPattern (hour: 15)
   - 특정 시간이 있으면 → entities.hour에 시간 추출 (0-23, 24시간제)
   - "오후 3시" → hour: 15, "12시" → hour: 12, "저녁 7시" → hour: 19
 - zoneAnalysis: 존 분석, 존별 체류시간, 존 방문자 분포, 구역별 분석, 존별 비교, 존별 성과 비교, 존별 방문자 분포, 존별 성과
@@ -96,6 +97,7 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
 
 *고객(Customer) 탭:*
 - visitors: 방문객, 고객수, 트래픽, 순방문객, 순 방문객
+  - **주의**: 특정 시간(N시)이 포함된 방문 질문은 visitors가 아닌 **hourlyPattern** (매장 탭)으로 분류. 예: "12시 방문자 몇명이야?" → hourlyPattern, "11월 1일 14시 트래픽" → hourlyPattern
 - dwellTime: 체류시간, 머문시간, 평균 체류 (고객 탭 맥락에서)
 - newVsReturning: 신규고객, 재방문고객, 신규/재방문
 - repeatRate: 재방문율, 리피트율, 재방문 비율
@@ -428,6 +430,11 @@ AI 리포트 또는 씬 저장 패널을 열거나 닫는 요청
 1. 사용자가 현재 해당 용어가 있는 탭에 있으면 → 현재 탭 유지 (query_kpi)
 2. 사용자가 해당 용어가 없는 탭에 있으면 → 가장 관련성 높은 탭으로 이동 (query_kpi)
 3. 확신이 낮으면 confidence를 낮게 (0.6~0.7) 설정
+
+**visitors vs hourlyPattern 구분 (최우선):**
+- "방문자/방문객/트래픽" 단어가 포함되더라도 **특정 시간(N시)이 함께 언급**되면 → **hourlyPattern** (매장 탭)
+- "방문자/방문객/트래픽"만 단독이면 → **visitors** (고객 탭)
+- 예: "12시 방문자 몇명?" → hourlyPattern, "25년 11월 1일 12시 방문자 몇명이야?" → hourlyPattern, "방문객 몇명?" → visitors
 
 ### 날짜 표현 파싱
 - 상대 날짜: 오늘, 어제, 이번주, 지난주, 이번달, 지난달

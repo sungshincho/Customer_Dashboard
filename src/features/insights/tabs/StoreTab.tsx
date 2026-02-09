@@ -660,23 +660,26 @@ export function StoreTab() {
   const setStoreData = useScreenDataStore((s) => s.setStoreData);
   useEffect(() => {
     if (hourlyRawData && hourlyRawData.length > 0) {
-      setStoreData({
-        peakHour: peakHour ? parseInt(peakHour.hour) : 0,
-        peakVisitors: peakHour?.visitors || 0,
-        popularZone: zoneData?.[0]?.name || '',
-        popularZoneVisitors: zoneData?.[0]?.visitors || 0,
-        avgDwellMinutes,
-        trackingCoverage: metrics?.trackingCoverage || 0,
-        hourlyPattern: hourlyRawData.map(d => ({ hour: d.hour, visitors: d.count })),
-        zones: zoneData.map(z => ({
-          name: z.name,
-          visitors: z.visitors,
-          avgDwellMinutes: z.avgDwell,
-          conversionRate: `${z.conversion}%`,
-        })),
-      });
+      setStoreData(
+        {
+          peakHour: peakHour ? parseInt(peakHour.hour) : 0,
+          peakVisitors: peakHour?.visitors || 0,
+          popularZone: zoneData?.[0]?.name || '',
+          popularZoneVisitors: zoneData?.[0]?.visitors || 0,
+          avgDwellMinutes,
+          trackingCoverage: metrics?.trackingCoverage || 0,
+          hourlyPattern: hourlyRawData.map(d => ({ hour: d.hour, visitors: d.count })),
+          zones: zoneData.map(z => ({
+            name: z.name,
+            visitors: z.visitors,
+            avgDwellMinutes: z.avgDwell,
+            conversionRate: `${z.conversion}%`,
+          })),
+        },
+        { startDate: dateRange.startDate, endDate: dateRange.endDate }
+      );
     }
-  }, [hourlyRawData, zoneData, peakHour, avgDwellMinutes, metrics?.trackingCoverage, setStoreData]);
+  }, [hourlyRawData, zoneData, peakHour, avgDwellMinutes, metrics?.trackingCoverage, setStoreData, dateRange.startDate, dateRange.endDate]);
 
   // KPI 카운트업 애니메이션
   const animatedPeakVisitors = useCountUp(peakHour?.visitors || 0, { duration: 1500 });
