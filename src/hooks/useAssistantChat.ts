@@ -11,6 +11,7 @@ import { useLocation } from 'react-router-dom';
 import { useDateFilterStore } from '@/store/dateFilterStore';
 import { useActionDispatcher } from '@/features/assistant/hooks/useActionDispatcher';
 import { useChatStore, type ChatMessage } from '@/store/chatStore';
+import { useScreenDataStore } from '@/store/screenDataStore';
 
 export type { ChatMessage };
 
@@ -54,6 +55,7 @@ export function useAssistantChat(): UseAssistantChatReturn {
   const location = useLocation();
   const { dateRange } = useDateFilterStore();
   const { dispatchActions } = useActionDispatcher();
+  const { screenData } = useScreenDataStore();
 
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim() || isLoading || isStreaming) return;
@@ -98,6 +100,7 @@ export function useAssistantChat(): UseAssistantChatReturn {
           id: selectedStore?.id || '',
           name: selectedStore?.store_name || '',
         },
+        screenData: screenData,
       };
 
       // 5. Edge Function 호출
@@ -147,7 +150,7 @@ export function useAssistantChat(): UseAssistantChatReturn {
       setIsLoading(false);
       setIsStreaming(false);
     }
-  }, [isLoading, isStreaming, conversationId, location, dateRange, selectedStore, dispatchActions, addMessage, updateMessage, setIsLoading, setIsStreaming, setConversationId]);
+  }, [isLoading, isStreaming, conversationId, location, dateRange, selectedStore, screenData, dispatchActions, addMessage, updateMessage, setIsLoading, setIsStreaming, setConversationId]);
 
   return {
     isOpen,

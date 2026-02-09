@@ -40,6 +40,24 @@ interface OSAssistantRequest {
       id: string;
       name: string;
     };
+    screenData?: {
+      overviewKPIs?: {
+        footfall: number;
+        uniqueVisitors: number;
+        revenue: number;
+        conversionRate: number;
+        transactions: number;
+        atv: number;
+        visitFrequency: number;
+      };
+      funnel?: {
+        entry: number;
+        browse: number;
+        engage: number;
+        fitting: number;
+        purchase: number;
+      };
+    };
   };
 }
 
@@ -143,12 +161,12 @@ Deno.serve(async (req) => {
       // 네비게이션 관련 인텐트 (Phase 3-B+: scroll_to_section, open_modal 추가)
       actionResult = dispatchNavigationAction(classification, currentPage);
     } else if (classification.intent === 'query_kpi') {
-      // KPI 데이터 조회 (Phase 3-B) - 컨텍스트 전달
+      // KPI 데이터 조회 (Phase 3-B) - 컨텍스트 + screenData 전달
       const pageContext = {
         current: context.page.current,
         tab: context.page.tab,
       };
-      const queryResult = await handleQueryKpi(supabase, classification, context.store.id, pageContext);
+      const queryResult = await handleQueryKpi(supabase, classification, context.store.id, pageContext, context.screenData);
       actionResult = {
         actions: queryResult.actions,
         message: queryResult.message,
