@@ -60,7 +60,7 @@ export function formatDataResponse(
 
   switch (queryType) {
     case 'revenue':
-      return `오늘 매출은 ${formatNumber(data.totalRevenue)}원입니다.` +
+      return `매출은 ₩${data.totalRevenue.toLocaleString()}원입니다.` +
         (data.change ? ` 전일 대비 ${data.change > 0 ? '+' : ''}${data.change}%입니다.` : '');
 
     case 'visitors':

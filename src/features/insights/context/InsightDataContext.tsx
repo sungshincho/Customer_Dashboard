@@ -13,12 +13,13 @@
  * - 데이터 일관성 보장
  */
 
-import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, useEffect, ReactNode } from 'react';
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useSelectedStore } from '@/hooks/useSelectedStore';
 import { useDateFilterStore } from '@/store/dateFilterStore';
 import { useAuth } from '@/hooks/useAuth';
+import { useScreenDataStore } from '@/store/screenDataStore';
 
 // ============================================================================
 // 타입 정의
@@ -993,6 +994,25 @@ export function useIntegratedMetrics(): {
       dataAvailable: kpi.totalVisitors > 0 || kpi.uniqueVisitors > 0,
     };
   }, [baseKPIs.data, funnelData.data]);
+
+  // screenDataStore에 동기화 — 챗봇이 프론트엔드 계산값을 그대로 사용
+  const setOverviewData = useScreenDataStore((s) => s.setOverviewData);
+  useEffect(() => {
+    if (data) {
+      setOverviewData(
+        {
+          footfall: data.footfall,
+          uniqueVisitors: data.uniqueVisitors,
+          revenue: data.revenue,
+          conversionRate: data.conversionRate,
+          transactions: data.transactions,
+          atv: data.atv,
+          visitFrequency: data.visitFrequency,
+        },
+        data.funnel
+      );
+    }
+  }, [data, setOverviewData]);
 
   return {
     data,

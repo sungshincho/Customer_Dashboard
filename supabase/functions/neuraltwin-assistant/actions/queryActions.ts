@@ -25,6 +25,26 @@ export interface PageContext {
   tab?: string;
 }
 
+// 프론트엔드에서 전달받은 화면 데이터 (DB 직접 조회 대신 사용)
+export interface ScreenData {
+  overviewKPIs?: {
+    footfall: number;
+    uniqueVisitors: number;
+    revenue: number;
+    conversionRate: number;
+    transactions: number;
+    atv: number;
+    visitFrequency: number;
+  };
+  funnel?: {
+    entry: number;
+    browse: number;
+    engage: number;
+    fitting: number;
+    purchase: number;
+  };
+}
+
 /**
  * 쿼리 타입별 관련 탭 매핑 (확장됨)
  */
@@ -396,7 +416,8 @@ export async function handleQueryKpi(
   supabase: SupabaseClient,
   classification: ClassificationResult,
   storeId: string,
-  pageContext?: PageContext
+  pageContext?: PageContext,
+  screenData?: ScreenData
 ): Promise<QueryActionResult> {
   const queryType = classification.entities.queryType || 'summary';
 
@@ -431,7 +452,7 @@ export async function handleQueryKpi(
         result = await queryVisitFrequency(supabase, storeId, dateRange, pageContext);
         break;
       case 'funnel':
-        result = await queryFunnel(supabase, storeId, dateRange, pageContext);
+        result = await queryFunnel(supabase, storeId, dateRange, pageContext, screenData);
         break;
       case 'goal':
         result = await queryGoal(supabase, storeId, dateRange, pageContext);
@@ -600,7 +621,7 @@ export async function handleQueryKpi(
 
       case 'summary':
       default:
-        result = await querySummary(supabase, storeId, dateRange, pageContext);
+        result = await querySummary(supabase, storeId, dateRange, pageContext, screenData);
         break;
     }
 
@@ -978,8 +999,39 @@ async function querySummary(
   supabase: SupabaseClient,
   storeId: string,
   dateRange: { startDate: string; endDate: string },
-  pageContext?: PageContext
+  pageContext?: PageContext,
+  screenData?: ScreenData
 ): Promise<QueryActionResult> {
+  const { actions, tabChanged, targetTab } = createNavigationActions('summary', dateRange, pageContext);
+
+  // screenData가 있으면 프론트엔드 계산값을 그대로 사용 (DB 조회 불필요)
+  if (screenData?.overviewKPIs) {
+    const kpi = screenData.overviewKPIs;
+
+    let message = `${dateRange.startDate} ~ ${dateRange.endDate} 주요 지표입니다:\n` +
+      `• 총 입장: ${kpi.footfall.toLocaleString()}명\n` +
+      `• 순 방문객: ${kpi.uniqueVisitors.toLocaleString()}명\n` +
+      `• 총 매출: ₩${kpi.revenue.toLocaleString()}원\n` +
+      `• 구매 전환율: ${kpi.conversionRate.toFixed(1)}%`;
+
+    if (tabChanged) {
+      message += `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 데이터를 확인합니다.`;
+    }
+
+    return {
+      actions,
+      message,
+      suggestions: ['고객 여정 퍼널 보여줘', '고객탭 보여줘', '시뮬레이션 돌려줘'],
+      data: {
+        footfall: kpi.footfall,
+        uniqueVisitors: kpi.uniqueVisitors,
+        totalRevenue: kpi.revenue,
+        conversionRate: kpi.conversionRate,
+      },
+    };
+  }
+
+  // fallback: screenData가 없을 경우 DB 직접 조회
   const { data, error } = await supabase
     .from('daily_kpis_agg')
     .select('*')
@@ -991,15 +1043,15 @@ async function querySummary(
 
   const totalRevenue = data?.reduce((sum, row) => sum + (row.total_revenue || 0), 0) || 0;
   const totalVisitors = data?.reduce((sum, row) => sum + (row.total_visitors || 0), 0) || 0;
+  const uniqueVisitors = data?.reduce((sum, row) => sum + (row.unique_visitors || 0), 0) || 0;
   const totalTransactions = data?.reduce((sum, row) => sum + (row.total_transactions || 0), 0) || 0;
   const conversionRate = totalVisitors > 0 ? (totalTransactions / totalVisitors) * 100 : 0;
 
-  const { actions, tabChanged, targetTab } = createNavigationActions('summary', dateRange, pageContext);
-
   let message = `${dateRange.startDate} ~ ${dateRange.endDate} 주요 지표입니다:\n` +
-    `• 매출: ${formatNumber(totalRevenue)}원\n` +
-    `• 방문객: ${totalVisitors.toLocaleString()}명\n` +
-    `• 전환율: ${conversionRate.toFixed(1)}%`;
+    `• 총 입장: ${totalVisitors.toLocaleString()}명\n` +
+    `• 순 방문객: ${uniqueVisitors.toLocaleString()}명\n` +
+    `• 총 매출: ₩${totalRevenue.toLocaleString()}원\n` +
+    `• 구매 전환율: ${conversionRate.toFixed(1)}%`;
 
   if (tabChanged) {
     message += `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 데이터를 확인합니다.`;
@@ -1008,8 +1060,8 @@ async function querySummary(
   return {
     actions,
     message,
-    suggestions: ['고객탭 보여줘', '시뮬레이션 돌려줘'],
-    data: { totalRevenue, totalVisitors, totalTransactions, conversionRate },
+    suggestions: ['고객 여정 퍼널 보여줘', '고객탭 보여줘', '시뮬레이션 돌려줘'],
+    data: { footfall: totalVisitors, uniqueVisitors, totalRevenue, conversionRate },
   };
 }
 
@@ -1410,24 +1462,52 @@ async function queryVisitFrequency(
 
 /**
  * 고객 여정 퍼널 조회
+ * screenData가 있으면 프론트엔드의 funnel_events 기반 5단계 데이터를 그대로 사용
  */
 async function queryFunnel(
   supabase: SupabaseClient,
   storeId: string,
   dateRange: { startDate: string; endDate: string },
-  pageContext?: PageContext
+  pageContext?: PageContext,
+  screenData?: ScreenData
 ): Promise<QueryActionResult> {
   const { actions, tabChanged, targetTab } = createNavigationActions('funnel', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 퍼널을 확인합니다.` : '';
 
-  const { data, error } = await supabase
-    .from('daily_kpis_agg')
-    .select('total_visitors, unique_visitors, total_transactions, total_revenue')
-    .eq('store_id', storeId)
-    .gte('date', dateRange.startDate)
-    .lte('date', dateRange.endDate);
+  // screenData가 있으면 프론트엔드 계산값을 그대로 사용 (DB 조회 불필요)
+  if (screenData?.funnel) {
+    const f = screenData.funnel;
 
-  if (error || !data || data.length === 0) {
+    return {
+      actions,
+      message: `고객 여정 퍼널:\n• 입장(Entry): ${f.entry.toLocaleString()}명\n• 탐색(Browse): ${f.browse.toLocaleString()}명\n• 참여(Engage): ${f.engage.toLocaleString()}명\n• 피팅(Fitting): ${f.fitting.toLocaleString()}명\n• 구매(Purchase): ${f.purchase.toLocaleString()}건${tabMessage}`,
+      suggestions: ['전환율 올리려면?', '매출 알려줘', '목표 달성률 보여줘'],
+      data: { funnel: f },
+    };
+  }
+
+  // fallback: screenData가 없을 경우 funnel_events 테이블에서 직접 조회
+  const funnelTypes = ['entry', 'browse', 'engage', 'fitting', 'purchase'] as const;
+  const counts: Record<string, number> = {};
+
+  for (const type of funnelTypes) {
+    const { count, error } = await supabase
+      .from('funnel_events')
+      .select('*', { count: 'exact', head: true })
+      .eq('store_id', storeId)
+      .eq('event_type', type)
+      .gte('event_date', dateRange.startDate)
+      .lte('event_date', dateRange.endDate);
+
+    if (error) {
+      console.error(`[queryFunnel] Error counting ${type}:`, error);
+      counts[type] = 0;
+    } else {
+      counts[type] = count || 0;
+    }
+  }
+
+  if (counts.entry === 0) {
     return {
       actions,
       message: `퍼널 데이터를 조회할 수 없습니다.${tabMessage}`,
@@ -1436,16 +1516,11 @@ async function queryFunnel(
     };
   }
 
-  const totalVisitors = data.reduce((sum, row) => sum + (row.total_visitors || 0), 0);
-  const uniqueVisitors = data.reduce((sum, row) => sum + (row.unique_visitors || 0), 0);
-  const totalTransactions = data.reduce((sum, row) => sum + (row.total_transactions || 0), 0);
-  const conversionRate = totalVisitors > 0 ? ((totalTransactions / totalVisitors) * 100).toFixed(1) : '0';
-
   return {
     actions,
-    message: `고객 여정 퍼널:\n• 입장: ${totalVisitors.toLocaleString()}명\n• 탐색(순 방문): ${uniqueVisitors.toLocaleString()}명\n• 구매: ${totalTransactions.toLocaleString()}건\n• 전환율: ${conversionRate}%${tabMessage}`,
+    message: `고객 여정 퍼널:\n• 입장(Entry): ${counts.entry.toLocaleString()}명\n• 탐색(Browse): ${counts.browse.toLocaleString()}명\n• 참여(Engage): ${counts.engage.toLocaleString()}명\n• 피팅(Fitting): ${counts.fitting.toLocaleString()}명\n• 구매(Purchase): ${counts.purchase.toLocaleString()}건${tabMessage}`,
     suggestions: ['전환율 올리려면?', '매출 알려줘', '목표 달성률 보여줘'],
-    data: { totalVisitors, uniqueVisitors, totalTransactions, conversionRate },
+    data: { funnel: counts },
   };
 }
 
