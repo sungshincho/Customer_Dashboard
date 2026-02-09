@@ -79,6 +79,9 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
 - summary: 전체현황, 요약, 성과, 실적
 
 *매장(Store) 탭:*
+- storeSummary: 매장 데이터, 매장 요약, 매장 현황, 매장 전체, 매장탭 데이터, 매장 실적, 매장 성과
+  - "매장탭 데이터 보여줘", "매장 현황 알려줘", "25년 11월 1일 매장탭 데이터 보여줘"
+  - **중요**: "매장탭/매장" + "데이터/요약/현황/성과/실적/보여줘" 조합은 반드시 storeSummary로 분류 (summary가 아님)
 - peakTime: 피크타임, 피크시간, 가장 바쁜 시간, 혼잡 시간
 - popularZone: 인기 존, 인기 구역, 인기존, 가장 많이 방문하는 존
 - trackingCoverage: 센서 커버율, 센서 커버리지, 트래킹 범위, 센서 현황

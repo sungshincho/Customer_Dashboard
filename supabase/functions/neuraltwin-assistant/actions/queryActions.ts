@@ -93,6 +93,7 @@ const QUERY_TYPE_TO_TAB: Record<string, { page: string; tab?: string; section?: 
   dailyInsight: { page: '/insights', tab: 'overview', section: 'overview-insights' },
   summary: { page: '/insights', tab: 'overview', section: 'overview-kpi-cards' },
   // 매장(Store) 탭
+  storeSummary: { page: '/insights', tab: 'store', section: 'store-kpi-cards' },
   peakTime: { page: '/insights', tab: 'store', section: 'store-kpi-cards' },
   popularZone: { page: '/insights', tab: 'store', section: 'store-zone-performance' },
   trackingCoverage: { page: '/insights', tab: 'store', section: 'store-kpi-cards' },
@@ -495,6 +496,9 @@ export async function handleQueryKpi(
         break;
 
       // 매장(Store) 탭
+      case 'storeSummary':
+        result = await queryStoreSummary(supabase, storeId, dateRange, pageContext, screenData);
+        break;
       case 'peakTime':
         result = await queryPeakTime(supabase, storeId, dateRange, pageContext, screenData);
         break;
@@ -1962,6 +1966,111 @@ function queryStoreDwell(
   }
 
   return createGenericNavigationResult('storeDwell', dateRange, pageContext);
+}
+
+/**
+ * 매장 탭 종합 요약 (screenData 우선, DB fallback)
+ */
+async function queryStoreSummary(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext,
+  screenData?: ScreenData
+): Promise<QueryActionResult> {
+  const { actions, tabChanged, targetTab } = createNavigationActions('storeSummary', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 데이터를 확인합니다.` : '';
+
+  // screenData 우선 사용 (날짜 범위 일치 시에만)
+  if (screenData?.storeKPIs && isScreenDataFresh(screenData, dateRange)) {
+    const s = screenData.storeKPIs;
+    const topZones = s.zones.slice(0, 3).map(z =>
+      `  • ${z.name}: ${z.visitors.toLocaleString()}명 (체류 ${z.avgDwellMinutes}분)`
+    ).join('\n');
+
+    return {
+      actions,
+      message: `${dateRange.startDate} ~ ${dateRange.endDate} 매장 주요 지표입니다:\n` +
+        `• 피크타임: ${s.peakHour}시 (${s.peakVisitors.toLocaleString()}명)\n` +
+        `• 인기 존: ${s.popularZone} (${s.popularZoneVisitors.toLocaleString()}명)\n` +
+        `• 평균 체류시간: ${s.avgDwellMinutes}분\n` +
+        `• 센서 커버율: ${s.trackingCoverage}%\n` +
+        `• 운영 존: ${s.zones.length}개\n\n` +
+        `존별 방문 TOP 3:\n${topZones}${tabMessage}`,
+      suggestions: ['시간대별 방문 패턴 보여줘', '존 분석 보여줘', '피크타임 알려줘'],
+      data: {
+        peakHour: s.peakHour,
+        peakVisitors: s.peakVisitors,
+        popularZone: s.popularZone,
+        avgDwellMinutes: s.avgDwellMinutes,
+        trackingCoverage: s.trackingCoverage,
+        zones: s.zones,
+      },
+    };
+  }
+
+  // fallback: DB 직접 조회 (hourly + zone 데이터 종합)
+  const [hourlyResult, zoneResult] = await Promise.all([
+    supabase
+      .from('hourly_visitors_agg')
+      .select('hour, visitor_count')
+      .eq('store_id', storeId)
+      .gte('date', dateRange.startDate)
+      .lte('date', dateRange.endDate),
+    supabase
+      .from('zone_metrics_agg')
+      .select('zone_name, total_visitors, avg_dwell_time_seconds')
+      .eq('store_id', storeId)
+      .gte('date', dateRange.startDate)
+      .lte('date', dateRange.endDate)
+      .order('total_visitors', { ascending: false })
+      .limit(10),
+  ]);
+
+  const parts: string[] = [`${dateRange.startDate} ~ ${dateRange.endDate} 매장 주요 지표입니다:`];
+
+  // 시간대별 데이터 → 피크타임 계산
+  if (hourlyResult.data && hourlyResult.data.length > 0) {
+    const hourlyMap: Record<number, number> = {};
+    hourlyResult.data.forEach((row: any) => {
+      hourlyMap[row.hour] = (hourlyMap[row.hour] || 0) + (row.visitor_count || 0);
+    });
+    const peak = Object.entries(hourlyMap).sort((a, b) => b[1] - a[1])[0];
+    if (peak) {
+      parts.push(`• 피크타임: ${peak[0]}시 (${Number(peak[1]).toLocaleString()}명)`);
+    }
+  }
+
+  // 존 데이터 → 인기 존 + 체류시간
+  if (zoneResult.data && zoneResult.data.length > 0) {
+    const topZone = zoneResult.data[0];
+    parts.push(`• 인기 존: ${topZone.zone_name} (${(topZone.total_visitors || 0).toLocaleString()}명)`);
+
+    const avgDwell = zoneResult.data.reduce((sum: number, z: any) => sum + (z.avg_dwell_time_seconds || 0), 0) / zoneResult.data.length;
+    parts.push(`• 평균 체류시간: ${Math.round(avgDwell / 60)}분`);
+    parts.push(`• 운영 존: ${zoneResult.data.length}개`);
+
+    const topZones = zoneResult.data.slice(0, 3).map((z: any) =>
+      `  • ${z.zone_name}: ${(z.total_visitors || 0).toLocaleString()}명 (체류 ${Math.round((z.avg_dwell_time_seconds || 0) / 60)}분)`
+    ).join('\n');
+    parts.push(`\n존별 방문 TOP 3:\n${topZones}`);
+  }
+
+  if (parts.length === 1) {
+    return {
+      actions,
+      message: `해당 기간의 매장 데이터를 조회할 수 없습니다.${tabMessage}`,
+      suggestions: ['매장탭 보여줘', '개요 데이터 알려줘'],
+      data: null,
+    };
+  }
+
+  return {
+    actions,
+    message: parts.join('\n') + tabMessage,
+    suggestions: ['시간대별 방문 패턴 보여줘', '존 분석 보여줘', '피크타임 알려줘'],
+    data: { hourly: hourlyResult.data, zones: zoneResult.data },
+  };
 }
 
 // ============================================
