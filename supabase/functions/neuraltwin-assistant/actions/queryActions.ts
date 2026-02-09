@@ -43,6 +43,21 @@ export interface ScreenData {
     fitting: number;
     purchase: number;
   };
+  storeKPIs?: {
+    peakHour: number;
+    peakVisitors: number;
+    popularZone: string;
+    popularZoneVisitors: number;
+    avgDwellMinutes: number;
+    trackingCoverage: number;
+    hourlyPattern: { hour: number; visitors: number }[];
+    zones: {
+      name: string;
+      visitors: number;
+      avgDwellMinutes: number;
+      conversionRate: string;
+    }[];
+  };
 }
 
 /**
@@ -464,22 +479,22 @@ export async function handleQueryKpi(
 
       // 매장(Store) 탭
       case 'peakTime':
-        result = await queryPeakTime(supabase, storeId, dateRange, pageContext);
+        result = await queryPeakTime(supabase, storeId, dateRange, pageContext, screenData);
         break;
       case 'popularZone':
-        result = await queryPopularZone(supabase, storeId, dateRange, pageContext);
+        result = await queryPopularZone(supabase, storeId, dateRange, pageContext, screenData, classification.entities.itemFilter);
         break;
       case 'trackingCoverage':
-        result = await queryTrackingCoverage(supabase, storeId, dateRange, pageContext);
+        result = await queryTrackingCoverage(supabase, storeId, dateRange, pageContext, screenData);
         break;
       case 'hourlyPattern':
-        result = await queryHourlyPattern(supabase, storeId, dateRange, pageContext);
+        result = await queryHourlyPattern(supabase, storeId, dateRange, pageContext, screenData, classification.entities.hour);
         break;
       case 'zoneAnalysis':
-        result = await queryZoneAnalysis(supabase, storeId, dateRange, pageContext);
+        result = await queryZoneAnalysis(supabase, storeId, dateRange, pageContext, screenData, classification.entities.itemFilter);
         break;
       case 'storeDwell':
-        result = createGenericNavigationResult(queryType, dateRange, pageContext);
+        result = queryStoreDwell(dateRange, pageContext, screenData);
         break;
 
       // 고객(Customer) 탭
@@ -1525,21 +1540,57 @@ async function queryFunnel(
 }
 
 // ============================================
-// 매장(Store) 탭 쿼리 핸들러
+// 매장(Store) 탭 쿼리 핸들러 (screenData 우선, DB fallback)
 // ============================================
 
 /**
- * 피크타임 조회
+ * 존 데이터를 텍스트로 포맷하는 헬퍼
+ */
+function formatZoneList(zones: { name: string; visitors: number; avgDwellMinutes: number; conversionRate: string }[], limit = 5): string {
+  return zones.slice(0, limit).map((z, i) =>
+    `${i + 1}. ${z.name}: ${z.visitors.toLocaleString()}명 (체류 ${z.avgDwellMinutes}분, 전환율 ${z.conversionRate})`
+  ).join('\n');
+}
+
+/**
+ * itemFilter로 존 데이터를 필터링하는 헬퍼
+ */
+function filterZones(zones: { name: string; visitors: number; avgDwellMinutes: number; conversionRate: string }[], itemFilter?: string[]): {
+  filtered: typeof zones;
+  isFiltered: boolean;
+} {
+  if (!itemFilter || itemFilter.length === 0) return { filtered: zones, isFiltered: false };
+  const filtered = zones.filter(z =>
+    itemFilter.some(f => z.name.toLowerCase().includes(f.toLowerCase()))
+  );
+  return { filtered: filtered.length > 0 ? filtered : zones, isFiltered: filtered.length > 0 };
+}
+
+/**
+ * 피크타임 조회 (screenData 우선)
  */
 async function queryPeakTime(
   supabase: SupabaseClient,
   storeId: string,
   dateRange: { startDate: string; endDate: string },
-  pageContext?: PageContext
+  pageContext?: PageContext,
+  screenData?: ScreenData
 ): Promise<QueryActionResult> {
   const { actions, tabChanged, targetTab } = createNavigationActions('peakTime', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 분석을 확인합니다.` : '';
 
+  // screenData 우선 사용
+  if (screenData?.storeKPIs) {
+    const s = screenData.storeKPIs;
+    return {
+      actions,
+      message: `피크타임은 ${s.peakHour}시이며, 해당 시간대 방문객은 총 ${s.peakVisitors.toLocaleString()}명입니다.${tabMessage}`,
+      suggestions: ['시간대별 방문 패턴 보여줘', '인기 존 알려줘', '매출 알려줘'],
+      data: { peakTime: `${s.peakHour}시`, peakVisitors: s.peakVisitors },
+    };
+  }
+
+  // fallback: DB 직접 조회
   const { data, error } = await supabase
     .from('hourly_visitors_agg')
     .select('hour, visitor_count')
@@ -1556,37 +1607,53 @@ async function queryPeakTime(
     };
   }
 
-  // 시간대별 합산
   const hourlyMap: Record<number, number> = {};
   data.forEach((row: any) => {
-    const h = row.hour;
-    hourlyMap[h] = (hourlyMap[h] || 0) + (row.visitor_count || 0);
+    hourlyMap[row.hour] = (hourlyMap[row.hour] || 0) + (row.visitor_count || 0);
   });
 
-  const peakHour = Object.entries(hourlyMap).sort((a, b) => b[1] - a[1])[0];
-  const peakTime = peakHour ? `${peakHour[0]}시` : '확인 불가';
-  const peakVisitors = peakHour ? Number(peakHour[1]) : 0;
+  const peakEntry = Object.entries(hourlyMap).sort((a, b) => b[1] - a[1])[0];
+  const peakTime = peakEntry ? `${peakEntry[0]}시` : '확인 불가';
+  const peakVisitors = peakEntry ? Number(peakEntry[1]) : 0;
 
   return {
     actions,
     message: `피크타임은 ${peakTime}이며, 해당 시간대 방문객은 총 ${peakVisitors.toLocaleString()}명입니다.${tabMessage}`,
     suggestions: ['시간대별 방문 패턴 보여줘', '인기 존 알려줘', '매출 알려줘'],
-    data: { peakTime, peakVisitors, hourlyMap },
+    data: { peakTime, peakVisitors },
   };
 }
 
 /**
- * 인기 존 조회
+ * 인기 존 조회 (screenData 우선 + itemFilter 지원)
  */
 async function queryPopularZone(
   supabase: SupabaseClient,
   storeId: string,
   dateRange: { startDate: string; endDate: string },
-  pageContext?: PageContext
+  pageContext?: PageContext,
+  screenData?: ScreenData,
+  itemFilter?: string[]
 ): Promise<QueryActionResult> {
   const { actions, tabChanged, targetTab } = createNavigationActions('popularZone', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 존 분석을 확인합니다.` : '';
 
+  // screenData 우선 사용
+  if (screenData?.storeKPIs?.zones && screenData.storeKPIs.zones.length > 0) {
+    const { filtered, isFiltered } = filterZones(screenData.storeKPIs.zones, itemFilter);
+    const topZone = filtered[0];
+    const zoneList = formatZoneList(filtered);
+    const filterNote = isFiltered ? ` (${itemFilter!.join(', ')} 필터 적용)` : '';
+
+    return {
+      actions,
+      message: `가장 인기 있는 존은 "${topZone.name}"입니다.${filterNote}\n\n${zoneList}${tabMessage}`,
+      suggestions: ['존 체류시간 분석', '피크타임 알려줘', '매출 알려줘'],
+      data: { zones: filtered },
+    };
+  }
+
+  // fallback: DB 직접 조회
   const { data, error } = await supabase
     .from('zone_metrics_agg')
     .select('zone_id, zone_name, total_visitors, avg_dwell_time_seconds')
@@ -1594,7 +1661,7 @@ async function queryPopularZone(
     .gte('date', dateRange.startDate)
     .lte('date', dateRange.endDate)
     .order('total_visitors', { ascending: false })
-    .limit(5);
+    .limit(10);
 
   if (error || !data || data.length === 0) {
     return {
@@ -1605,32 +1672,58 @@ async function queryPopularZone(
     };
   }
 
-  const topZone = data[0];
-  const zoneList = data.map((z: any, i: number) =>
-    `${i + 1}. ${z.zone_name || z.zone_id}: ${(z.total_visitors || 0).toLocaleString()}명 (평균 체류 ${Math.round((z.avg_dwell_time_seconds || 0) / 60)}분)`
+  // itemFilter가 있으면 DB 결과도 필터링
+  let results = data;
+  let filterNote = '';
+  if (itemFilter && itemFilter.length > 0) {
+    const filtered = data.filter((z: any) =>
+      itemFilter.some(f => (z.zone_name || z.zone_id || '').toLowerCase().includes(f.toLowerCase()))
+    );
+    if (filtered.length > 0) {
+      results = filtered;
+      filterNote = ` (${itemFilter.join(', ')} 필터 적용)`;
+    }
+  }
+
+  const topZone = results[0];
+  const zoneList = results.slice(0, 5).map((z: any, i: number) =>
+    `${i + 1}. ${z.zone_name || z.zone_id}: ${(z.total_visitors || 0).toLocaleString()}명 (체류 ${Math.round((z.avg_dwell_time_seconds || 0) / 60)}분)`
   ).join('\n');
 
   return {
     actions,
-    message: `가장 인기 있는 존은 "${topZone.zone_name || topZone.zone_id}"입니다.\n\n${zoneList}${tabMessage}`,
+    message: `가장 인기 있는 존은 "${topZone.zone_name || topZone.zone_id}"입니다.${filterNote}\n\n${zoneList}${tabMessage}`,
     suggestions: ['존 체류시간 분석', '피크타임 알려줘', '매출 알려줘'],
-    data: { zones: data },
+    data: { zones: results },
   };
 }
 
 /**
- * 센서 커버율 조회
+ * 센서 커버율 조회 (screenData 우선)
  */
 async function queryTrackingCoverage(
   supabase: SupabaseClient,
   storeId: string,
   dateRange: { startDate: string; endDate: string },
-  pageContext?: PageContext
+  pageContext?: PageContext,
+  screenData?: ScreenData
 ): Promise<QueryActionResult> {
   const { actions, tabChanged, targetTab } = createNavigationActions('trackingCoverage', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 확인합니다.` : '';
 
-  // zones_dim에서 전체 존 수 조회
+  // screenData 우선 사용
+  if (screenData?.storeKPIs) {
+    const coverage = screenData.storeKPIs.trackingCoverage;
+    const totalZones = screenData.storeKPIs.zones.length;
+    return {
+      actions,
+      message: `센서 커버율은 ${coverage}%입니다 (${totalZones}개 존 운영 중).${tabMessage}`,
+      suggestions: ['인기 존 알려줘', '피크타임 알려줘', '존 분석 보여줘'],
+      data: { coverage, totalZones },
+    };
+  }
+
+  // fallback: DB 직접 조회
   const { data: zones, error } = await supabase
     .from('zones_dim')
     .select('id, name, is_active')
@@ -1658,17 +1751,48 @@ async function queryTrackingCoverage(
 }
 
 /**
- * 시간대별 방문 패턴 조회
+ * 시간대별 방문 패턴 조회 (screenData 우선 + 특정 시간 필터 지원)
  */
 async function queryHourlyPattern(
   supabase: SupabaseClient,
   storeId: string,
   dateRange: { startDate: string; endDate: string },
-  pageContext?: PageContext
+  pageContext?: PageContext,
+  screenData?: ScreenData,
+  hour?: number
 ): Promise<QueryActionResult> {
   const { actions, tabChanged, targetTab } = createNavigationActions('hourlyPattern', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 시간대별 차트를 확인합니다.` : '';
 
+  // screenData 우선 사용
+  if (screenData?.storeKPIs?.hourlyPattern && screenData.storeKPIs.hourlyPattern.length > 0) {
+    const pattern = screenData.storeKPIs.hourlyPattern;
+
+    // 특정 시간 질의
+    if (hour !== undefined && hour >= 0 && hour <= 23) {
+      const entry = pattern.find(p => p.hour === hour);
+      const visitors = entry?.visitors || 0;
+      const peak = pattern.reduce((max, p) => p.visitors > max.visitors ? p : max, pattern[0]);
+      return {
+        actions,
+        message: `${dateRange.startDate} ${hour}시의 방문객은 ${visitors.toLocaleString()}명입니다.\n(피크타임: ${peak.hour}시 ${peak.visitors.toLocaleString()}명)${tabMessage}`,
+        suggestions: ['피크타임 알려줘', '시간대별 전체 패턴 보여줘', '인기 존 알려줘'],
+        data: { hour, visitors, peakHour: peak.hour, peakVisitors: peak.visitors },
+      };
+    }
+
+    // 전체 시간대 패턴
+    const sorted = [...pattern].sort((a, b) => b.visitors - a.visitors);
+    const top3 = sorted.slice(0, 3).map(p => `${p.hour}시: ${p.visitors.toLocaleString()}명`).join(', ');
+    return {
+      actions,
+      message: `시간대별 방문 패턴 TOP 3: ${top3}${tabMessage}`,
+      suggestions: ['피크타임 알려줘', '인기 존 알려줘', '방문객 알려줘'],
+      data: { hourlyPattern: pattern },
+    };
+  }
+
+  // fallback: DB 직접 조회
   const { data, error } = await supabase
     .from('hourly_visitors_agg')
     .select('hour, visitor_count')
@@ -1687,9 +1811,20 @@ async function queryHourlyPattern(
 
   const hourlyMap: Record<number, number> = {};
   data.forEach((row: any) => {
-    const h = row.hour;
-    hourlyMap[h] = (hourlyMap[h] || 0) + (row.visitor_count || 0);
+    hourlyMap[row.hour] = (hourlyMap[row.hour] || 0) + (row.visitor_count || 0);
   });
+
+  // 특정 시간 질의 (DB fallback)
+  if (hour !== undefined && hour >= 0 && hour <= 23) {
+    const visitors = hourlyMap[hour] || 0;
+    const peakEntry = Object.entries(hourlyMap).sort((a, b) => b[1] - a[1])[0];
+    return {
+      actions,
+      message: `${dateRange.startDate} ${hour}시의 방문객은 ${visitors.toLocaleString()}명입니다.\n(피크타임: ${peakEntry[0]}시 ${Number(peakEntry[1]).toLocaleString()}명)${tabMessage}`,
+      suggestions: ['피크타임 알려줘', '시간대별 전체 패턴 보여줘', '인기 존 알려줘'],
+      data: { hour, visitors },
+    };
+  }
 
   const sorted = Object.entries(hourlyMap).sort((a, b) => b[1] - a[1]);
   const top3 = sorted.slice(0, 3).map(([h, v]) => `${h}시: ${v.toLocaleString()}명`).join(', ');
@@ -1703,17 +1838,50 @@ async function queryHourlyPattern(
 }
 
 /**
- * 존 분석 (체류시간/방문자 분포) 조회
+ * 존 분석 (체류시간/방문자 분포) 조회 (screenData 우선 + itemFilter 지원)
  */
 async function queryZoneAnalysis(
   supabase: SupabaseClient,
   storeId: string,
   dateRange: { startDate: string; endDate: string },
-  pageContext?: PageContext
+  pageContext?: PageContext,
+  screenData?: ScreenData,
+  itemFilter?: string[]
 ): Promise<QueryActionResult> {
   const { actions, tabChanged, targetTab } = createNavigationActions('zoneAnalysis', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 존 분석을 확인합니다.` : '';
 
+  // screenData 우선 사용
+  if (screenData?.storeKPIs?.zones && screenData.storeKPIs.zones.length > 0) {
+    const { filtered, isFiltered } = filterZones(screenData.storeKPIs.zones, itemFilter);
+
+    if (isFiltered && filtered.length >= 2) {
+      // 특정 존 비교 모드
+      const compareList = filtered.map(z =>
+        `• ${z.name}: 방문 ${z.visitors.toLocaleString()}명, 체류 ${z.avgDwellMinutes}분, 전환율 ${z.conversionRate}`
+      ).join('\n');
+      return {
+        actions,
+        message: `존 성과 비교:\n${compareList}${tabMessage}`,
+        suggestions: ['전체 존 분석 보여줘', '피크타임 알려줘', '매출 알려줘'],
+        data: { zones: filtered, compared: true },
+      };
+    }
+
+    const zoneList = filtered.map(z =>
+      `• ${z.name}: 방문 ${z.visitors.toLocaleString()}명, 체류 ${z.avgDwellMinutes}분, 전환율 ${z.conversionRate}`
+    ).join('\n');
+    const filterNote = isFiltered ? ` (${itemFilter!.join(', ')} 필터 적용)` : '';
+
+    return {
+      actions,
+      message: `존별 분석 결과${filterNote}:\n${zoneList}${tabMessage}`,
+      suggestions: ['인기 존 알려줘', '피크타임 알려줘', '체류시간 알려줘'],
+      data: { zones: filtered },
+    };
+  }
+
+  // fallback: DB 직접 조회
   const { data, error } = await supabase
     .from('zone_metrics_agg')
     .select('zone_id, zone_name, total_visitors, avg_dwell_time_seconds')
@@ -1731,16 +1899,52 @@ async function queryZoneAnalysis(
     };
   }
 
-  const zoneList = data.slice(0, 5).map((z: any) =>
+  // itemFilter가 있으면 DB 결과도 필터링
+  let results = data;
+  let filterNote = '';
+  if (itemFilter && itemFilter.length > 0) {
+    const filtered = data.filter((z: any) =>
+      itemFilter.some(f => (z.zone_name || z.zone_id || '').toLowerCase().includes(f.toLowerCase()))
+    );
+    if (filtered.length > 0) {
+      results = filtered;
+      filterNote = ` (${itemFilter.join(', ')} 필터 적용)`;
+    }
+  }
+
+  const zoneList = results.slice(0, 5).map((z: any) =>
     `• ${z.zone_name || z.zone_id}: 방문 ${(z.total_visitors || 0).toLocaleString()}명, 체류 ${Math.round((z.avg_dwell_time_seconds || 0) / 60)}분`
   ).join('\n');
 
   return {
     actions,
-    message: `존별 분석 결과:\n${zoneList}${tabMessage}`,
+    message: `존별 분석 결과${filterNote}:\n${zoneList}${tabMessage}`,
     suggestions: ['인기 존 알려줘', '피크타임 알려줘', '체류시간 알려줘'],
-    data: { zones: data },
+    data: { zones: results },
   };
+}
+
+/**
+ * 매장 평균 체류시간 조회 (screenData 우선)
+ */
+function queryStoreDwell(
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext,
+  screenData?: ScreenData
+): QueryActionResult {
+  const { actions, tabChanged, targetTab } = createNavigationActions('storeDwell', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 확인합니다.` : '';
+
+  if (screenData?.storeKPIs) {
+    return {
+      actions,
+      message: `평균 체류시간은 ${screenData.storeKPIs.avgDwellMinutes}분입니다.${tabMessage}`,
+      suggestions: ['존별 체류시간 보여줘', '피크타임 알려줘', '인기 존 알려줘'],
+      data: { avgDwellMinutes: screenData.storeKPIs.avgDwellMinutes },
+    };
+  }
+
+  return createGenericNavigationResult('storeDwell', dateRange, pageContext);
 }
 
 // ============================================
