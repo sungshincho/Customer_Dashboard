@@ -6,7 +6,8 @@
  * Phase 3-B++: TERM_LOCATION_MAP 활용 - 컨텍스트 기반 탭 전환
  * Phase 4: RPC 전환 - 인사이트 허브 5개 RPC로 프론트엔드와 데이터 일관성 보장
  * Phase 4+: RPC 전면 전환 - 직접 테이블 쿼리 6개를 RPC로 전환
- *   (store_goals, daily_kpis_agg, hourly_visitors_agg, zones_dim, applied_strategies, inventory_movements)
+ *   (store_goals, daily_kpis_agg, zones_dim, applied_strategies, inventory_movements)
+ *   + 시간대별 방문 패턴은 프론트엔드와 동일한 get_hourly_entry_counts RPC 사용
  *   + 기존 RPC 4개 수정 (get_overview_kpis, get_zone_metrics, get_customer_segments, get_inventory_status)
  */
 
@@ -99,14 +100,16 @@ async function rpcStoreGoals(supabase: SupabaseClient, orgId: string, storeId: s
 }
 
 async function rpcHourlyVisitors(
-  supabase: SupabaseClient, storeId: string,
+  supabase: SupabaseClient, orgId: string, storeId: string,
   startDate: string, endDate: string
 ) {
-  const { data, error } = await supabase.rpc('get_hourly_visitors', {
-    p_store_id: storeId, p_start_date: startDate, p_end_date: endDate,
+  const { data, error } = await supabase.rpc('get_hourly_entry_counts', {
+    p_org_id: orgId, p_store_id: storeId,
+    p_start_date: startDate, p_end_date: endDate,
   });
   if (error) throw error;
-  return (data as any[]) ?? [];
+  // get_hourly_entry_counts returns {hour, count} — map to {hour, visitor_count} for downstream
+  return ((data as any[]) ?? []).map((r: any) => ({ hour: r.hour, visitor_count: r.count }));
 }
 
 async function rpcZonesDimList(supabase: SupabaseClient, orgId: string, storeId: string) {
@@ -567,7 +570,7 @@ export async function handleQueryKpi(
         result = await queryStoreSummary(supabase, storeId, dateRange, pageContext, orgId);
         break;
       case 'peakTime':
-        result = await queryPeakTime(supabase, storeId, dateRange, pageContext);
+        result = await queryPeakTime(supabase, storeId, dateRange, pageContext, orgId);
         break;
       case 'popularZone':
         result = await queryPopularZone(supabase, storeId, dateRange, pageContext, orgId, classification.entities.itemFilter);
@@ -576,7 +579,7 @@ export async function handleQueryKpi(
         result = await queryTrackingCoverage(supabase, storeId, dateRange, pageContext, orgId);
         break;
       case 'hourlyPattern':
-        result = await queryHourlyPattern(supabase, storeId, dateRange, pageContext, classification.entities.hour);
+        result = await queryHourlyPattern(supabase, storeId, dateRange, pageContext, classification.entities.hour, orgId);
         break;
       case 'zoneAnalysis':
         result = await queryZoneAnalysis(supabase, storeId, dateRange, pageContext, orgId, classification.entities.itemFilter);
@@ -1520,21 +1523,23 @@ function filterZones(zones: { name: string; visitors: number; avgDwellMinutes: n
 }
 
 /**
- * 피크타임 조회 (RPC: get_hourly_visitors)
+ * 피크타임 조회 (RPC: get_hourly_entry_counts)
  */
 async function queryPeakTime(
   supabase: SupabaseClient,
   storeId: string,
   dateRange: { startDate: string; endDate: string },
-  pageContext?: PageContext
+  pageContext?: PageContext,
+  orgId?: string
 ): Promise<QueryActionResult> {
+  if (!orgId) throw new Error('orgId required');
   const { actions, tabChanged, targetTab } = createNavigationActions('peakTime', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 분석을 확인합니다.` : '';
 
-  // RPC: get_hourly_visitors (hourly_visitors_agg 기반, hour별 SUM 사전 집계)
+  // RPC: get_hourly_entry_counts (funnel_events 기반, 프론트엔드와 동일)
   let data: any[] = [];
   try {
-    data = await rpcHourlyVisitors(supabase, storeId, dateRange.startDate, dateRange.endDate);
+    data = await rpcHourlyVisitors(supabase, orgId, storeId, dateRange.startDate, dateRange.endDate);
   } catch (e) {
     console.error('[queryPeakTime] RPC error:', e);
   }
@@ -1657,22 +1662,24 @@ async function queryTrackingCoverage(
 }
 
 /**
- * 시간대별 방문 패턴 조회 (RPC: get_hourly_visitors, 특정 시간 필터 지원)
+ * 시간대별 방문 패턴 조회 (RPC: get_hourly_entry_counts, 특정 시간 필터 지원)
  */
 async function queryHourlyPattern(
   supabase: SupabaseClient,
   storeId: string,
   dateRange: { startDate: string; endDate: string },
   pageContext?: PageContext,
-  hour?: number
+  hour?: number,
+  orgId?: string
 ): Promise<QueryActionResult> {
+  if (!orgId) throw new Error('orgId required');
   const { actions, tabChanged, targetTab } = createNavigationActions('hourlyPattern', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 시간대별 차트를 확인합니다.` : '';
 
-  // RPC: get_hourly_visitors (hourly_visitors_agg 기반, hour별 SUM 사전 집계)
+  // RPC: get_hourly_entry_counts (funnel_events 기반, 프론트엔드와 동일)
   let data: any[] = [];
   try {
-    data = await rpcHourlyVisitors(supabase, storeId, dateRange.startDate, dateRange.endDate);
+    data = await rpcHourlyVisitors(supabase, orgId, storeId, dateRange.startDate, dateRange.endDate);
   } catch (e) {
     console.error('[queryHourlyPattern] RPC error:', e);
   }
@@ -1779,7 +1786,7 @@ function queryStoreDwell(
 }
 
 /**
- * 매장 탭 종합 요약 (RPC: get_hourly_visitors + get_zone_metrics)
+ * 매장 탭 종합 요약 (RPC: get_hourly_entry_counts + get_zone_metrics)
  */
 async function queryStoreSummary(
   supabase: SupabaseClient,
@@ -1793,9 +1800,9 @@ async function queryStoreSummary(
   const { actions, tabChanged, targetTab } = createNavigationActions('storeSummary', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 데이터를 확인합니다.` : '';
 
-  // RPC 병렬 조회: get_hourly_visitors + get_zone_metrics
+  // RPC 병렬 조회: get_hourly_entry_counts + get_zone_metrics
   const [hourlyData, zones] = await Promise.all([
-    rpcHourlyVisitors(supabase, storeId, dateRange.startDate, dateRange.endDate),
+    rpcHourlyVisitors(supabase, orgId, storeId, dateRange.startDate, dateRange.endDate),
     rpcZoneMetrics(supabase, orgId, storeId, dateRange.startDate, dateRange.endDate),
   ]);
 
