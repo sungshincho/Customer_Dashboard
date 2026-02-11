@@ -1,15 +1,15 @@
 -- =====================================================
--- RPC 함수 v2: 기존 5개 수정 + 신규 5개 생성
+-- RPC 함수 v2: 기존 5개 수정 + 신규 4개 생성
 --
 -- [수정] get_overview_kpis     - avg_dwell_minutes 추가
 -- [수정] get_zone_metrics      - conversion_count 추가
 -- [수정] get_customer_segments - AVG→SUM/COUNT 프론트엔드 일치
 -- [수정] get_inventory_status  - sku, price, days_until_stockout 추가, stock_status 통일
 -- [신규] get_store_goals       - store_goals 테이블
--- [신규] get_hourly_visitors   - hourly_visitors_agg 테이블
 -- [신규] get_zones_dim_list    - zones_dim 테이블
 -- [신규] get_applied_strategies - applied_strategies 테이블
 -- [신규] get_inventory_movements - inventory_movements 테이블
+-- [제거] get_hourly_visitors   - 프론트엔드와 동일한 기존 get_hourly_entry_counts RPC 사용
 --
 -- 목적: 챗봇의 직접 테이블 쿼리를 RPC로 전환하여
 --       프론트엔드와 동일한 결과값 보장
@@ -324,40 +324,10 @@ COMMENT ON FUNCTION public.get_store_goals IS '활성 목표 조회 - 프론트�
 
 
 -- =====================================================
--- 6. get_hourly_visitors (신규)
--- hourly_visitors_agg 테이블 직접 쿼리 대체
--- 시간대별 방문객 집계 (GROUP BY hour)
--- 챗봇 queryPeakTime/queryHourlyPattern/queryStoreSummary에서 사용
+-- 6. get_hourly_visitors — 제거
+-- 프론트엔드와 동일한 기존 get_hourly_entry_counts RPC를 사용
+-- (20260108_get_hourly_entry_counts_rpc.sql에서 정의됨)
 -- =====================================================
-
-CREATE OR REPLACE FUNCTION public.get_hourly_visitors(
-  p_store_id uuid,
-  p_start_date date,
-  p_end_date date
-)
-RETURNS TABLE (
-  hour integer,
-  visitor_count bigint
-)
-LANGUAGE sql
-STABLE SECURITY DEFINER
-SET search_path TO 'public'
-AS $$
-  SELECT
-    hva.hour,
-    COALESCE(SUM(hva.visitor_count), 0)::bigint AS visitor_count
-  FROM hourly_visitors_agg hva
-  WHERE hva.store_id = p_store_id
-    AND hva.date >= p_start_date
-    AND hva.date <= p_end_date
-  GROUP BY hva.hour
-  ORDER BY hva.hour;
-$$;
-
-GRANT EXECUTE ON FUNCTION public.get_hourly_visitors(uuid, date, date) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.get_hourly_visitors(uuid, date, date) TO service_role;
-
-COMMENT ON FUNCTION public.get_hourly_visitors IS '시간대별 방문객 집계 - hourly_visitors_agg 직접 쿼리 대체';
 
 
 -- =====================================================
