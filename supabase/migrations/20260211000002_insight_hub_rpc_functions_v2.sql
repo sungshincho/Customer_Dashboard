@@ -281,10 +281,11 @@ COMMENT ON FUNCTION public.get_inventory_status IS '재고 현황 + sku/price/�
 -- =====================================================
 -- 5. get_store_goals (신규)
 -- store_goals 테이블 직접 쿼리 대체
--- 프론트엔드 useGoals.ts / 챗봇 queryGoal()과 동일
+-- 프론트엔드 useGoals.ts와 동일 (org_id + store_id 필터)
 -- =====================================================
 
 CREATE OR REPLACE FUNCTION public.get_store_goals(
+  p_org_id uuid,
   p_store_id uuid,
   p_date date DEFAULT CURRENT_DATE
 )
@@ -308,17 +309,18 @@ AS $$
     sg.period_start,
     sg.period_end
   FROM store_goals sg
-  WHERE sg.store_id = p_store_id
+  WHERE sg.org_id = p_org_id
+    AND sg.store_id = p_store_id
     AND sg.is_active = true
     AND sg.period_start <= p_date
     AND sg.period_end >= p_date
   ORDER BY sg.created_at DESC;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.get_store_goals(uuid, date) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.get_store_goals(uuid, date) TO service_role;
+GRANT EXECUTE ON FUNCTION public.get_store_goals(uuid, uuid, date) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_store_goals(uuid, uuid, date) TO service_role;
 
-COMMENT ON FUNCTION public.get_store_goals IS '활성 목표 조회 - store_goals 직접 쿼리 대체';
+COMMENT ON FUNCTION public.get_store_goals IS '활성 목표 조회 - 프론트엔드 useGoals.ts와 동일 (org_id + store_id 필터)';
 
 
 -- =====================================================
@@ -361,10 +363,11 @@ COMMENT ON FUNCTION public.get_hourly_visitors IS '시간대별 방문객 집계
 -- =====================================================
 -- 7. get_zones_dim_list (신규)
 -- zones_dim 테이블 직접 쿼리 대체
--- 챗봇 queryTrackingCoverage()에서 사용
+-- 프론트엔드 useZonesDim()과 동일 (org_id + store_id + is_active 필터)
 -- =====================================================
 
 CREATE OR REPLACE FUNCTION public.get_zones_dim_list(
+  p_org_id uuid,
   p_store_id uuid
 )
 RETURNS TABLE (
@@ -381,29 +384,31 @@ AS $$
     zd.id,
     COALESCE(zd.zone_name, zd.id::text) AS zone_name,
     COALESCE(zd.zone_type, 'unknown') AS zone_type,
-    COALESCE(zd.is_active, true) AS is_active
+    zd.is_active
   FROM zones_dim zd
-  WHERE zd.store_id = p_store_id
+  WHERE zd.org_id = p_org_id
+    AND zd.store_id = p_store_id
+    AND zd.is_active = true
   ORDER BY zd.zone_name;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.get_zones_dim_list(uuid) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.get_zones_dim_list(uuid) TO service_role;
+GRANT EXECUTE ON FUNCTION public.get_zones_dim_list(uuid, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_zones_dim_list(uuid, uuid) TO service_role;
 
-COMMENT ON FUNCTION public.get_zones_dim_list IS '존 차원 테이블 조회 - zones_dim 직접 쿼리 대체';
+COMMENT ON FUNCTION public.get_zones_dim_list IS '활성 존 목록 조회 - 프론트엔드 useZonesDim()과 동일 (org_id + store_id + is_active 필터)';
 
 
 -- =====================================================
 -- 8. get_applied_strategies (신규)
 -- applied_strategies 테이블 직접 쿼리 대체
--- 챗봇 queryROISummary/queryAppliedStrategies/queryROICategoryPerformance에서 사용
+-- 프론트엔드 useAppliedStrategies.ts와 동일 (created_at 기준 날짜 필터)
 -- 날짜 필터 선택적 (NULL이면 전체)
 -- =====================================================
 
 CREATE OR REPLACE FUNCTION public.get_applied_strategies(
   p_store_id uuid,
-  p_start_date date DEFAULT NULL,
-  p_end_date date DEFAULT NULL,
+  p_start_date timestamptz DEFAULT NULL,
+  p_end_date timestamptz DEFAULT NULL,
   p_limit integer DEFAULT 50
 )
 RETURNS TABLE (
@@ -419,7 +424,8 @@ RETURNS TABLE (
   actual_revenue numeric,
   expected_revenue numeric,
   start_date date,
-  end_date date
+  end_date date,
+  created_at timestamptz
 )
 LANGUAGE sql
 STABLE SECURITY DEFINER
@@ -438,19 +444,20 @@ AS $$
     s.actual_revenue,
     s.expected_revenue,
     s.start_date,
-    s.end_date
+    s.end_date,
+    s.created_at
   FROM applied_strategies s
   WHERE s.store_id = p_store_id
-    AND (p_start_date IS NULL OR s.start_date >= p_start_date)
-    AND (p_end_date IS NULL OR s.start_date <= p_end_date)
-  ORDER BY s.start_date DESC
+    AND (p_start_date IS NULL OR s.created_at >= p_start_date)
+    AND (p_end_date IS NULL OR s.created_at <= p_end_date)
+  ORDER BY s.created_at DESC
   LIMIT p_limit;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.get_applied_strategies(uuid, date, date, integer) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.get_applied_strategies(uuid, date, date, integer) TO service_role;
+GRANT EXECUTE ON FUNCTION public.get_applied_strategies(uuid, timestamptz, timestamptz, integer) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_applied_strategies(uuid, timestamptz, timestamptz, integer) TO service_role;
 
-COMMENT ON FUNCTION public.get_applied_strategies IS '적용된 전략 이력 조회 - applied_strategies 직접 쿼리 대체, 날짜 필터 선택적';
+COMMENT ON FUNCTION public.get_applied_strategies IS '적용된 전략 이력 조회 - 프론트엔드와 동일 (created_at 기준 날짜 필터)';
 
 
 -- =====================================================

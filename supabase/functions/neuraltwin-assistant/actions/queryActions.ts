@@ -90,9 +90,9 @@ async function rpcInventoryStatus(supabase: SupabaseClient, orgId: string) {
   return (data as any[]) ?? [];
 }
 
-async function rpcStoreGoals(supabase: SupabaseClient, storeId: string, date: string) {
+async function rpcStoreGoals(supabase: SupabaseClient, orgId: string, storeId: string, date: string) {
   const { data, error } = await supabase.rpc('get_store_goals', {
-    p_store_id: storeId, p_date: date,
+    p_org_id: orgId, p_store_id: storeId, p_date: date,
   });
   if (error) throw error;
   return (data as any[]) ?? [];
@@ -109,9 +109,9 @@ async function rpcHourlyVisitors(
   return (data as any[]) ?? [];
 }
 
-async function rpcZonesDimList(supabase: SupabaseClient, storeId: string) {
+async function rpcZonesDimList(supabase: SupabaseClient, orgId: string, storeId: string) {
   const { data, error } = await supabase.rpc('get_zones_dim_list', {
-    p_store_id: storeId,
+    p_org_id: orgId, p_store_id: storeId,
   });
   if (error) throw error;
   return (data as any[]) ?? [];
@@ -573,7 +573,7 @@ export async function handleQueryKpi(
         result = await queryPopularZone(supabase, storeId, dateRange, pageContext, orgId, classification.entities.itemFilter);
         break;
       case 'trackingCoverage':
-        result = await queryTrackingCoverage(supabase, storeId, dateRange, pageContext);
+        result = await queryTrackingCoverage(supabase, storeId, dateRange, pageContext, orgId);
         break;
       case 'hourlyPattern':
         result = await queryHourlyPattern(supabase, storeId, dateRange, pageContext, classification.entities.hour);
@@ -1194,7 +1194,7 @@ async function queryGoal(
   // RPC: get_store_goals (store_goals 테이블, 프론트엔드 useGoals.ts와 동일)
   let goals: any[] = [];
   try {
-    goals = await rpcStoreGoals(supabase, storeId, today);
+    goals = await rpcStoreGoals(supabase, orgId || '', storeId, today);
   } catch (e) {
     console.error('[queryGoal] RPC error:', e);
   }
@@ -1621,15 +1621,16 @@ async function queryTrackingCoverage(
   supabase: SupabaseClient,
   storeId: string,
   dateRange: { startDate: string; endDate: string },
-  pageContext?: PageContext
+  pageContext?: PageContext,
+  orgId?: string
 ): Promise<QueryActionResult> {
   const { actions, tabChanged, targetTab } = createNavigationActions('trackingCoverage', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 확인합니다.` : '';
 
-  // RPC: get_zones_dim_list (zones_dim 테이블, 프론트엔드와 동일)
+  // RPC: get_zones_dim_list (zones_dim 테이블, 프론트엔드 useZonesDim()과 동일)
   let zones: any[] = [];
   try {
-    zones = await rpcZonesDimList(supabase, storeId);
+    zones = await rpcZonesDimList(supabase, orgId || '', storeId);
   } catch (e) {
     console.error('[queryTrackingCoverage] RPC error:', e);
   }
