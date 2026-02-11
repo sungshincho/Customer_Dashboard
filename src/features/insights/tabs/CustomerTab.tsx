@@ -841,7 +841,7 @@ const GlowAreaChart = ({ data, isDark }: AreaChartProps) => {
         x: closestPoint.x,
         y: closestPoint.yTotal,
         title: closestPoint.data.date,
-        value: `총 방문: ${total.toLocaleString()}명`,
+        value: `순 방문객: ${total.toLocaleString()}명`,
         subValue: `신규 ${closestPoint.data.newVisitors.toLocaleString()} / 재방문 ${closestPoint.data.returningVisitors.toLocaleString()}`,
       });
     } else {
@@ -934,7 +934,7 @@ export function CustomerTab() {
 
       const { data, error } = await supabase
         .from('daily_kpis_agg')
-        .select('date, total_visitors, returning_visitors')
+        .select('date, unique_visitors, returning_visitors')
         .eq('org_id', orgId)
         .eq('store_id', selectedStore.id)
         .gte('date', dateRange.startDate)
@@ -945,10 +945,10 @@ export function CustomerTab() {
 
       return (data || []).map((d) => ({
         date: new Date(d.date).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }).replace('.', '/').replace('.', ''),
-        totalVisitors: d.total_visitors || 0,
-        newVisitors: (d.total_visitors || 0) - (d.returning_visitors || 0),
+        totalVisitors: d.unique_visitors || 0,
+        newVisitors: (d.unique_visitors || 0) - (d.returning_visitors || 0),
         returningVisitors: d.returning_visitors || 0,
-        returnRate: d.total_visitors ? ((d.returning_visitors || 0) / d.total_visitors * 100).toFixed(1) : '0',
+        returnRate: d.unique_visitors ? ((d.returning_visitors || 0) / d.unique_visitors * 100).toFixed(1) : '0',
       }));
     },
     enabled: !!selectedStore?.id && !!orgId,

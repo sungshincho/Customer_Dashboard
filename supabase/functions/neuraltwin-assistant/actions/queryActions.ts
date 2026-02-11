@@ -1355,11 +1355,11 @@ async function queryNewVsReturning(
     };
   }
 
-  const totalVisitors = kpi.total_visitors ?? 0;
+  const uniqueVisitors = kpi.unique_visitors ?? 0;
   const totalReturning = kpi.returning_visitors ?? 0;
-  const totalNew = totalVisitors - totalReturning;
-  const newRate = totalVisitors > 0 ? Math.round((totalNew / totalVisitors) * 100) : 0;
-  const returnRate = totalVisitors > 0 ? Math.round((totalReturning / totalVisitors) * 100) : 0;
+  const totalNew = uniqueVisitors - totalReturning;
+  const newRate = uniqueVisitors > 0 ? Math.round((totalNew / uniqueVisitors) * 100) : 0;
+  const returnRate = uniqueVisitors > 0 ? Math.round((totalReturning / uniqueVisitors) * 100) : 0;
 
   return {
     actions,
@@ -1436,20 +1436,15 @@ async function queryVisitFrequency(
     };
   }
 
-  const totalVisitors = kpi.total_visitors ?? 0;
-  const returningVisitors = kpi.returning_visitors ?? 0;
-  // 기간 일수 계산
-  const start = new Date(dateRange.startDate);
-  const end = new Date(dateRange.endDate);
-  const days = Math.max(Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1, 1);
-  const avgDaily = Math.round(totalVisitors / days);
-  const returnRate = totalVisitors > 0 ? Math.round((returningVisitors / totalVisitors) * 100) : 0;
+  const footfall = kpi.funnel_entry ?? 0;
+  const uniqueVisitors = kpi.unique_visitors ?? 0;
+  const visitFrequency = uniqueVisitors > 0 ? (footfall / uniqueVisitors) : 0;
 
   return {
     actions,
-    message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 일평균 방문객은 ${avgDaily.toLocaleString()}명이며, 재방문율은 ${returnRate}%입니다.${tabMessage}`,
+    message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 평균 방문 빈도는 ${visitFrequency.toFixed(1)}회입니다 (Footfall ${footfall.toLocaleString()} / 순 방문객 ${uniqueVisitors.toLocaleString()}명).${tabMessage}`,
     suggestions: ['입장객 수 알려줘', '재방문율 알려줘', '매출 알려줘'],
-    data: { avgDaily, returnRate, totalVisitors, days },
+    data: { visitFrequency: Number(visitFrequency.toFixed(1)), footfall, uniqueVisitors },
   };
 }
 
@@ -1880,15 +1875,15 @@ async function queryRepeatRate(
     };
   }
 
-  const totalVisitors = kpi.total_visitors ?? 0;
+  const uniqueVisitors = kpi.unique_visitors ?? 0;
   const returningVisitors = kpi.returning_visitors ?? 0;
-  const repeatRate = totalVisitors > 0 ? Math.round((returningVisitors / totalVisitors) * 100) : 0;
+  const repeatRate = uniqueVisitors > 0 ? Math.round((returningVisitors / uniqueVisitors) * 100) : 0;
 
   return {
     actions,
-    message: `재방문율은 ${repeatRate}%입니다 (재방문 고객 ${returningVisitors.toLocaleString()}명 / 전체 ${totalVisitors.toLocaleString()}명).${tabMessage}`,
+    message: `재방문율은 ${repeatRate}%입니다 (재방문 고객 ${returningVisitors.toLocaleString()}명 / 순 방문객 ${uniqueVisitors.toLocaleString()}명).${tabMessage}`,
     suggestions: ['고객 세그먼트 보여줘', '충성 고객 알려줘', '방문객 알려줘'],
-    data: { repeatRate, returningVisitors, totalVisitors },
+    data: { repeatRate, returningVisitors, uniqueVisitors },
   };
 }
 
