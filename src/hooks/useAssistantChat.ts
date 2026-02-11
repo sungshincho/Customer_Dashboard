@@ -1,10 +1,6 @@
 /**
  * AI 연동 채팅 훅
  * Zustand chatStore 기반 - 라우트 변경 시에도 상태 유지
- *
- * 2단계 응답 플로우 (needsRefresh):
- * 1단계: Edge Function → 인텐트 분류 + 액션 반환
- * 2단계: 액션 실행 (탭 전환) → screenData 대기 → 재호출 → 데이터 응답
  */
 
 import { useCallback } from 'react';
@@ -15,7 +11,6 @@ import { useLocation } from 'react-router-dom';
 import { useDateFilterStore } from '@/store/dateFilterStore';
 import { useActionDispatcher } from '@/features/assistant/hooks/useActionDispatcher';
 import { useChatStore, type ChatMessage } from '@/store/chatStore';
-import { useScreenDataStore } from '@/store/screenDataStore';
 
 export type { ChatMessage };
 
@@ -31,30 +26,6 @@ interface UseAssistantChatReturn {
   clearMessages: () => void;
   isLoading: boolean;
   isStreaming: boolean;
-}
-
-/**
- * screenData 변경을 감지하여 대기
- * 탭 전환 후 프론트엔드가 데이터를 로드하면 screenData가 업데이트됨
- */
-function waitForScreenDataUpdate(timeoutMs: number): Promise<ReturnType<typeof useScreenDataStore.getState>['screenData']> {
-  return new Promise((resolve) => {
-    const initialSnapshot = JSON.stringify(useScreenDataStore.getState().screenData);
-
-    const unsubscribe = useScreenDataStore.subscribe((state) => {
-      const currentSnapshot = JSON.stringify(state.screenData);
-      if (currentSnapshot !== initialSnapshot) {
-        unsubscribe();
-        resolve(state.screenData);
-      }
-    });
-
-    // 타임아웃: 최대 대기 시간 초과 시 현재 상태 반환
-    setTimeout(() => {
-      unsubscribe();
-      resolve(useScreenDataStore.getState().screenData);
-    }, timeoutMs);
-  });
 }
 
 export function useAssistantChat(): UseAssistantChatReturn {
@@ -83,7 +54,6 @@ export function useAssistantChat(): UseAssistantChatReturn {
   const location = useLocation();
   const { dateRange } = useDateFilterStore();
   const { dispatchActions } = useActionDispatcher();
-  const { screenData } = useScreenDataStore();
 
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim() || isLoading || isStreaming) return;
@@ -128,10 +98,9 @@ export function useAssistantChat(): UseAssistantChatReturn {
           id: selectedStore?.id || '',
           name: selectedStore?.store_name || '',
         },
-        screenData: screenData,
       };
 
-      // 5. Edge Function 호출 (1단계)
+      // 5. Edge Function 호출
       const { data, error } = await supabase.functions.invoke('neuraltwin-assistant', {
         body: {
           message: content.trim(),
@@ -146,75 +115,20 @@ export function useAssistantChat(): UseAssistantChatReturn {
 
       setConversationId(data.meta?.conversationId || null);
 
-      // 6. needsRefresh 판단: 탭 전환 후 데이터 로드가 필요한 경우
-      if (data.meta?.needsRefresh && data.actions?.length > 0) {
-        // 6-A. "데이터 로딩 중..." 표시
-        updateMessage(loadingMessageId, '데이터를 로딩 중입니다...');
+      // 6. 응답 처리
+      setIsLoading(false);
+      setIsStreaming(true);
 
-        // 6-B. 액션 먼저 실행 (탭 전환 + 날짜 설정)
+      let responseContent = data.message;
+      if (data.suggestions?.length > 0) {
+        responseContent += `\n\n이런 것도 해볼 수 있어요:\n${data.suggestions.map((s: string) => `- ${s}`).join('\n')}`;
+      }
+
+      updateMessage(loadingMessageId, responseContent);
+
+      // 7. 액션 실행 (응답 메시지 표시 후)
+      if (data.actions?.length > 0) {
         await dispatchActions(data.actions);
-
-        // 6-C. screenData 업데이트 대기 (최대 5초)
-        const freshScreenData = await waitForScreenDataUpdate(5000);
-
-        // 6-D. 새로운 screenData로 Edge Function 재호출 (2단계)
-        const refreshedContext = {
-          ...context,
-          page: {
-            current: location.pathname,
-            tab: new URLSearchParams(location.search).get('tab') || undefined,
-          },
-          screenData: freshScreenData,
-        };
-
-        const { data: refreshedData, error: refreshError } = await supabase.functions.invoke('neuraltwin-assistant', {
-          body: {
-            message: content.trim(),
-            conversationId: data.meta?.conversationId,
-            context: refreshedContext,
-          },
-        });
-
-        setIsLoading(false);
-        setIsStreaming(true);
-
-        if (refreshError) {
-          throw refreshError;
-        }
-
-        // 6-E. 2단계 응답 표시
-        let responseContent = refreshedData.message;
-        if (refreshedData.suggestions?.length > 0) {
-          responseContent += `\n\n이런 것도 해볼 수 있어요:\n${refreshedData.suggestions.map((s: string) => `- ${s}`).join('\n')}`;
-        }
-        updateMessage(loadingMessageId, responseContent);
-
-        // 2단계에서 추가 액션이 있으면 실행 (스크롤 등)
-        if (refreshedData.actions?.length > 0) {
-          // set_date_range과 navigate는 이미 실행했으므로 스크롤만 실행
-          const scrollActions = refreshedData.actions.filter(
-            (a: any) => a.type === 'scroll_to_section' || a.type === 'highlight_element'
-          );
-          if (scrollActions.length > 0) {
-            await dispatchActions(scrollActions);
-          }
-        }
-      } else {
-        // 7. 일반 플로우: screenData가 있어서 바로 응답
-        setIsLoading(false);
-        setIsStreaming(true);
-
-        let responseContent = data.message;
-        if (data.suggestions?.length > 0) {
-          responseContent += `\n\n이런 것도 해볼 수 있어요:\n${data.suggestions.map((s: string) => `- ${s}`).join('\n')}`;
-        }
-
-        updateMessage(loadingMessageId, responseContent);
-
-        // 액션 실행 (응답 메시지 표시 후)
-        if (data.actions?.length > 0) {
-          await dispatchActions(data.actions);
-        }
       }
 
     } catch (error) {
@@ -229,7 +143,7 @@ export function useAssistantChat(): UseAssistantChatReturn {
       setIsLoading(false);
       setIsStreaming(false);
     }
-  }, [isLoading, isStreaming, conversationId, location, dateRange, selectedStore, screenData, dispatchActions, addMessage, updateMessage, setIsLoading, setIsStreaming, setConversationId]);
+  }, [isLoading, isStreaming, conversationId, location, dateRange, selectedStore, dispatchActions, addMessage, updateMessage, setIsLoading, setIsStreaming, setConversationId]);
 
   return {
     isOpen,

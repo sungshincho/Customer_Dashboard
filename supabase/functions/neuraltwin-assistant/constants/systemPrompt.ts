@@ -132,24 +132,15 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
 - inventoryCategory: 카테고리별 재고, 카테고리별 재고 현황
 - inventoryDetail: 상세 재고, 상세 재고 현황, 재고 테이블
 
-*예측(Prediction) 탭:*
-- predictionRevenue: 매출 예측, 예상 매출, 향후 매출
-- predictionVisitors: 방문자 예측, 예상 방문객, 향후 방문자
-- predictionConversion: 전환율 예측, 예상 전환율
-- predictionSummary: 예측 요약, 예측 종합, 전체 예측
-- predictionConfidence: 예측 신뢰도, 신뢰도, 정확도
-- predictionDaily: 일별 예측, 일별 예측 상세
-- predictionModel: 예측 모델, 모델 정보
+*예측(Prediction) 탭:* (데이터 조회 없이 탭 이동만 수행)
+- predictionRevenue, predictionVisitors, predictionConversion, predictionSummary, predictionConfidence, predictionDaily, predictionModel
+- 매출 예측, 방문자 예측, 전환율 예측, 예측 요약, 예측 신뢰도, 일별 예측, 예측 모델 등
+- → 예측 탭으로 이동하고 "예측 데이터는 예측 탭에서 직접 확인하실 수 있습니다" 안내
 
-*AI추천(AI Recommendation) 탭:*
-- activeStrategies: 활성 전략, 실행 중인 전략, 적용된 전략
-- strategyRecommendation: 전략 추천, 추천 전략, 새로운 추천
-- priceOptimization: 가격 최적화, 가격 추천, 가격 전략
-- inventoryOptimization: 재고 최적화, 재고 추천, 발주 최적화
-- demandForecast: 수요 예측 (AI추천), 수요 분석
-- seasonTrend: 시즌 트렌드, 계절성, 시즌 분석
-- riskPrediction: 리스크 예측, 위험 예측, 리스크 분석
-- campaignStatus: 캠페인, 캠페인 현황, 캠페인 실행
+*AI추천(AI Recommendation) 탭:* (데이터 조회 없이 탭 이동만 수행)
+- activeStrategies, strategyRecommendation, priceOptimization, inventoryOptimization, demandForecast, seasonTrend, riskPrediction, campaignStatus
+- 활성 전략, 전략 추천, 가격 최적화, 재고 최적화, 수요 예측, 시즌 트렌드, 리스크 예측, 캠페인 등
+- → AI추천 탭으로 이동하고 "AI 추천 데이터는 AI추천 탭에서 직접 확인하실 수 있습니다" 안내
 
 *데이터 컨트롤타워:*
 - dataQuality: 데이터 품질, 품질 점수, 데이터 품질 스코어

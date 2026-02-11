@@ -40,24 +40,6 @@ interface OSAssistantRequest {
       id: string;
       name: string;
     };
-    screenData?: {
-      overviewKPIs?: {
-        footfall: number;
-        uniqueVisitors: number;
-        revenue: number;
-        conversionRate: number;
-        transactions: number;
-        atv: number;
-        visitFrequency: number;
-      };
-      funnel?: {
-        entry: number;
-        browse: number;
-        engage: number;
-        fitting: number;
-        purchase: number;
-      };
-    };
   };
 }
 
@@ -71,7 +53,6 @@ interface OSAssistantResponse {
     intent: string;
     confidence: number;
     executionTimeMs: number;
-    needsRefresh?: boolean;
   };
 }
 
@@ -120,6 +101,38 @@ Deno.serve(async (req) => {
       );
     }
 
+    // 4-1. 사용자-매장 소속 검증 + org_id 확보
+    const { data: membership, error: memberError } = await supabase
+      .from('organization_members')
+      .select('org_id')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (memberError || !membership?.org_id) {
+      return new Response(
+        JSON.stringify({ error: '조직 정보를 확인할 수 없습니다. 관리자에게 문의해주세요.' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const orgId = membership.org_id;
+
+    // 매장이 해당 조직 소속인지 검증
+    if (context.store?.id) {
+      const { data: storeData, error: storeError } = await supabase
+        .from('stores')
+        .select('org_id')
+        .eq('id', context.store.id)
+        .single();
+
+      if (storeError || !storeData || storeData.org_id !== orgId) {
+        return new Response(
+          JSON.stringify({ error: '해당 매장에 접근 권한이 없습니다.' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     // 5. 대화 세션 관리
     const session = await getOrCreateSession(supabase, {
       conversationId,
@@ -155,24 +168,23 @@ Deno.serve(async (req) => {
     const classification = await classifyIntent(message, context);
 
     // 8. 액션 실행 (Phase 3-A: general_chat, Phase 3-B: query_kpi)
-    let actionResult = { actions: [] as UIAction[], message: '', suggestions: [] as string[], needsRefresh: false };
+    let actionResult = { actions: [] as UIAction[], message: '', suggestions: [] as string[] };
     const currentPage = context.page.current;
 
     if (['navigate', 'set_tab', 'set_date_range', 'composite_navigate', 'scroll_to_section', 'open_modal'].includes(classification.intent)) {
       // 네비게이션 관련 인텐트 (Phase 3-B+: scroll_to_section, open_modal 추가)
       actionResult = dispatchNavigationAction(classification, currentPage);
     } else if (classification.intent === 'query_kpi') {
-      // KPI 데이터 조회 (Phase 3-B) - 컨텍스트 + screenData 전달
+      // KPI 데이터 조회
       const pageContext = {
         current: context.page.current,
         tab: context.page.tab,
       };
-      const queryResult = await handleQueryKpi(supabase, classification, context.store.id, pageContext, context.screenData);
+      const queryResult = await handleQueryKpi(supabase, classification, context.store.id, pageContext, orgId);
       actionResult = {
         actions: queryResult.actions,
         message: queryResult.message,
         suggestions: queryResult.suggestions,
-        needsRefresh: queryResult.needsRefresh || false,
       };
     } else if (classification.intent === 'run_simulation') {
       // 시뮬레이션 실행 - 스튜디오 이동 + (프리셋 적용) + 실행 이벤트 발행
@@ -226,7 +238,6 @@ Deno.serve(async (req) => {
         intent: classification.intent,
         confidence: classification.confidence,
         executionTimeMs,
-        needsRefresh: actionResult.needsRefresh || false,
       },
     };
 

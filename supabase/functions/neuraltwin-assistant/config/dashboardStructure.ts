@@ -878,63 +878,25 @@ export const TERM_LOCATION_MAP: Record<string, TermLocationEntry> = {
     },
   },
 
-  // ===== 예측(Prediction) 탭 용어 =====
-  '매출 예측': {
-    primary: { page: '/insights', tab: 'prediction', section: 'prediction-revenue' },
-  },
-  '방문자 예측': {
-    primary: { page: '/insights', tab: 'prediction', section: 'prediction-visitors' },
-  },
-  '전환율 예측': {
-    primary: { page: '/insights', tab: 'prediction', section: 'prediction-conversion' },
-  },
-  '수요 예측': {
-    primary: { page: '/insights', tab: 'prediction', section: 'prediction-kpi-cards' },
-  },
-  '트렌드 예측': {
-    primary: { page: '/insights', tab: 'prediction', section: 'prediction-kpi-cards' },
-  },
-  '예측 모델': {
-    primary: { page: '/insights', tab: 'prediction', section: 'prediction-model' },
-  },
-  '예측 신뢰도': {
-    primary: { page: '/insights', tab: 'prediction', section: 'prediction-kpi-cards', component: 'pred-confidence' },
-  },
-  '일별 예측': {
-    primary: { page: '/insights', tab: 'prediction', section: 'prediction-daily' },
-  },
-  '일별 예측 상세': {
-    primary: { page: '/insights', tab: 'prediction', section: 'prediction-daily' },
-  },
-
-  // ===== AI추천(AI Recommendation) 탭 용어 =====
-  '활성 전략': {
-    primary: { page: '/insights', tab: 'ai', section: 'ai-active-strategies' },
-  },
-  '전략 추천': {
-    primary: { page: '/insights', tab: 'ai', section: 'ai-recommend' },
-  },
-  '가격 최적화': {
-    primary: { page: '/insights', tab: 'ai', section: 'ai-optimize', component: 'price-optimization' },
-  },
-  '재고 최적화': {
-    primary: { page: '/insights', tab: 'ai', section: 'ai-optimize', component: 'inventory-optimization' },
-  },
-  'AI 수요 예측': {
-    primary: { page: '/insights', tab: 'ai', section: 'ai-predict', component: 'demand-forecast' },
-  },
-  '시즌 트렌드': {
-    primary: { page: '/insights', tab: 'ai', section: 'ai-predict', component: 'season-trend' },
-  },
-  '리스크 예측': {
-    primary: { page: '/insights', tab: 'ai', section: 'ai-predict', component: 'risk-prediction' },
-  },
-  '캠페인': {
-    primary: { page: '/insights', tab: 'ai', section: 'ai-execute' },
-  },
-  '캠페인 현황': {
-    primary: { page: '/insights', tab: 'ai', section: 'ai-execute' },
-  },
+  // ===== 예측/AI추천 탭 용어 (네비게이션만 수행, 데이터 조회 없음) =====
+  '매출 예측': { primary: { page: '/insights', tab: 'prediction' } },
+  '방문자 예측': { primary: { page: '/insights', tab: 'prediction' } },
+  '전환율 예측': { primary: { page: '/insights', tab: 'prediction' } },
+  '수요 예측': { primary: { page: '/insights', tab: 'prediction' } },
+  '트렌드 예측': { primary: { page: '/insights', tab: 'prediction' } },
+  '예측 모델': { primary: { page: '/insights', tab: 'prediction' } },
+  '예측 신뢰도': { primary: { page: '/insights', tab: 'prediction' } },
+  '일별 예측': { primary: { page: '/insights', tab: 'prediction' } },
+  '일별 예측 상세': { primary: { page: '/insights', tab: 'prediction' } },
+  '활성 전략': { primary: { page: '/insights', tab: 'ai' } },
+  '전략 추천': { primary: { page: '/insights', tab: 'ai' } },
+  '가격 최적화': { primary: { page: '/insights', tab: 'ai' } },
+  '재고 최적화': { primary: { page: '/insights', tab: 'ai' } },
+  'AI 수요 예측': { primary: { page: '/insights', tab: 'ai' } },
+  '시즌 트렌드': { primary: { page: '/insights', tab: 'ai' } },
+  '리스크 예측': { primary: { page: '/insights', tab: 'ai' } },
+  '캠페인': { primary: { page: '/insights', tab: 'ai' } },
+  '캠페인 현황': { primary: { page: '/insights', tab: 'ai' } },
 
   // ===== 스튜디오 용어 =====
   '시뮬레이션': {
