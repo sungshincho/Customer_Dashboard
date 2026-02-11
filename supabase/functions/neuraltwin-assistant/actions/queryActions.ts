@@ -5,6 +5,9 @@
  * 데이터 응답 + 관련 탭 자동 이동
  * Phase 3-B++: TERM_LOCATION_MAP 활용 - 컨텍스트 기반 탭 전환
  * Phase 4: RPC 전환 - 인사이트 허브 5개 RPC로 프론트엔드와 데이터 일관성 보장
+ * Phase 4+: RPC 전면 전환 - 직접 테이블 쿼리 6개를 RPC로 전환
+ *   (store_goals, daily_kpis_agg, hourly_visitors_agg, zones_dim, applied_strategies, inventory_movements)
+ *   + 기존 RPC 4개 수정 (get_overview_kpis, get_zone_metrics, get_customer_segments, get_inventory_status)
  */
 
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.89.0';
@@ -83,6 +86,59 @@ async function rpcInventoryStatus(supabase: SupabaseClient, orgId: string) {
   const { data, error } = await supabase.rpc('get_inventory_status', {
     p_org_id: orgId,
   });
+  if (error) throw error;
+  return (data as any[]) ?? [];
+}
+
+async function rpcStoreGoals(supabase: SupabaseClient, storeId: string, date: string) {
+  const { data, error } = await supabase.rpc('get_store_goals', {
+    p_store_id: storeId, p_date: date,
+  });
+  if (error) throw error;
+  return (data as any[]) ?? [];
+}
+
+async function rpcHourlyVisitors(
+  supabase: SupabaseClient, storeId: string,
+  startDate: string, endDate: string
+) {
+  const { data, error } = await supabase.rpc('get_hourly_visitors', {
+    p_store_id: storeId, p_start_date: startDate, p_end_date: endDate,
+  });
+  if (error) throw error;
+  return (data as any[]) ?? [];
+}
+
+async function rpcZonesDimList(supabase: SupabaseClient, storeId: string) {
+  const { data, error } = await supabase.rpc('get_zones_dim_list', {
+    p_store_id: storeId,
+  });
+  if (error) throw error;
+  return (data as any[]) ?? [];
+}
+
+async function rpcAppliedStrategies(
+  supabase: SupabaseClient, storeId: string,
+  startDate?: string, endDate?: string, limit?: number
+) {
+  const params: any = { p_store_id: storeId };
+  if (startDate) params.p_start_date = startDate;
+  if (endDate) params.p_end_date = endDate;
+  if (limit) params.p_limit = limit;
+  const { data, error } = await supabase.rpc('get_applied_strategies', params);
+  if (error) throw error;
+  return (data as any[]) ?? [];
+}
+
+async function rpcInventoryMovements(
+  supabase: SupabaseClient, orgId: string,
+  startDate: string, endDate: string, limit?: number
+) {
+  const params: any = {
+    p_org_id: orgId, p_start_date: startDate, p_end_date: endDate,
+  };
+  if (limit) params.p_limit = limit;
+  const { data, error } = await supabase.rpc('get_inventory_movements', params);
   if (error) throw error;
   return (data as any[]) ?? [];
 }
@@ -534,7 +590,7 @@ export async function handleQueryKpi(
         result = await queryVisitors(supabase, storeId, dateRange, pageContext, orgId);
         break;
       case 'dwellTime':
-        result = await queryDwellTime(supabase, storeId, dateRange, pageContext);
+        result = await queryDwellTime(supabase, storeId, dateRange, pageContext, orgId);
         break;
       case 'newVsReturning':
         result = await queryNewVsReturning(supabase, storeId, dateRange, pageContext, orgId);
@@ -1135,17 +1191,16 @@ async function queryGoal(
 ): Promise<QueryActionResult> {
   const today = new Date().toISOString().split('T')[0];
 
-  // store_goals 테이블에서 활성 목표 조회 (현재 기간 내)
-  const { data: goals, error: goalError } = await supabase
-    .from('store_goals')
-    .select('id, goal_type, period_type, target_value, period_start, period_end')
-    .eq('store_id', storeId)
-    .eq('is_active', true)
-    .lte('period_start', today)
-    .gte('period_end', today);
+  // RPC: get_store_goals (store_goals 테이블, 프론트엔드 useGoals.ts와 동일)
+  let goals: any[] = [];
+  try {
+    goals = await rpcStoreGoals(supabase, storeId, today);
+  } catch (e) {
+    console.error('[queryGoal] RPC error:', e);
+  }
 
   // 목표 설정이 없는 경우 → 목표 설정 다이얼로그 팝업 유도
-  if (goalError || !goals || goals.length === 0) {
+  if (!goals || goals.length === 0) {
     return {
       actions: [
         { type: 'navigate', target: '/insights?tab=overview' },
@@ -1228,27 +1283,31 @@ async function queryGoal(
 }
 
 /**
- * 체류 시간 조회 (컨텍스트 인식)
+ * 체류 시간 조회 (RPC: get_overview_kpis — avg_dwell_minutes 사용)
  */
 async function queryDwellTime(
   supabase: SupabaseClient,
   storeId: string,
   dateRange: { startDate: string; endDate: string },
-  pageContext?: PageContext
+  pageContext?: PageContext,
+  orgId?: string
 ): Promise<QueryActionResult> {
   const { actions, tabChanged, targetTab } = createNavigationActions('dwellTime', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 분석을 확인합니다.` : '';
 
-  // daily_kpis_agg에서 체류 시간 조회 (실제 컬럼: avg_visit_duration_seconds, 단위: 초)
-  const { data, error } = await supabase
-    .from('daily_kpis_agg')
-    .select('avg_visit_duration_seconds, total_visitors')
-    .eq('store_id', storeId)
-    .gte('date', dateRange.startDate)
-    .lte('date', dateRange.endDate);
+  if (!orgId) {
+    return {
+      actions,
+      message: `조직 정보를 확인할 수 없습니다.${tabMessage}`,
+      suggestions: ['방문객 수 알려줘', '고객탭 보여줘'],
+      data: null,
+    };
+  }
 
-  if (error || !data || data.length === 0) {
-    if (error) console.error('[queryDwellTime] Error:', error);
+  // RPC: get_overview_kpis (avg_dwell_minutes = 가중평균 체류시간, 분 단위)
+  const kpi = await rpcOverviewKpis(supabase, orgId, storeId, dateRange.startDate, dateRange.endDate);
+
+  if (!kpi) {
     return {
       actions,
       message: `체류 시간 데이터를 조회할 수 없습니다.${tabMessage}`,
@@ -1257,13 +1316,7 @@ async function queryDwellTime(
     };
   }
 
-  // 방문자 가중 평균 (초 단위 → 분 변환)
-  const totalVisitors = data.reduce((sum, row) => sum + (row.total_visitors || 0), 0);
-  const weightedDwellSum = data.reduce(
-    (sum, row) => sum + (row.avg_visit_duration_seconds || 0) * (row.total_visitors || 0), 0
-  );
-  const avgDwellSeconds = totalVisitors > 0 ? weightedDwellSum / totalVisitors : 0;
-  const avgDwellMinutes = avgDwellSeconds / 60;
+  const avgDwellMinutes = kpi.avg_dwell_minutes ?? 0;
 
   return {
     actions,
@@ -1467,7 +1520,7 @@ function filterZones(zones: { name: string; visitors: number; avgDwellMinutes: n
 }
 
 /**
- * 피크타임 조회
+ * 피크타임 조회 (RPC: get_hourly_visitors)
  */
 async function queryPeakTime(
   supabase: SupabaseClient,
@@ -1478,15 +1531,15 @@ async function queryPeakTime(
   const { actions, tabChanged, targetTab } = createNavigationActions('peakTime', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 분석을 확인합니다.` : '';
 
-  // DB 직접 조회
-  const { data, error } = await supabase
-    .from('hourly_visitors_agg')
-    .select('hour, visitor_count')
-    .eq('store_id', storeId)
-    .gte('date', dateRange.startDate)
-    .lte('date', dateRange.endDate);
+  // RPC: get_hourly_visitors (hourly_visitors_agg 기반, hour별 SUM 사전 집계)
+  let data: any[] = [];
+  try {
+    data = await rpcHourlyVisitors(supabase, storeId, dateRange.startDate, dateRange.endDate);
+  } catch (e) {
+    console.error('[queryPeakTime] RPC error:', e);
+  }
 
-  if (error || !data || data.length === 0) {
+  if (data.length === 0) {
     return {
       actions,
       message: `피크타임 데이터를 조회할 수 없습니다.${tabMessage}`,
@@ -1495,14 +1548,10 @@ async function queryPeakTime(
     };
   }
 
-  const hourlyMap: Record<number, number> = {};
-  data.forEach((row: any) => {
-    hourlyMap[row.hour] = (hourlyMap[row.hour] || 0) + (row.visitor_count || 0);
-  });
-
-  const peakEntry = Object.entries(hourlyMap).sort((a, b) => b[1] - a[1])[0];
-  const peakTime = peakEntry ? `${peakEntry[0]}시` : '확인 불가';
-  const peakVisitors = peakEntry ? Number(peakEntry[1]) : 0;
+  const sorted = [...data].sort((a: any, b: any) => (b.visitor_count || 0) - (a.visitor_count || 0));
+  const peak = sorted[0];
+  const peakTime = peak ? `${peak.hour}시` : '확인 불가';
+  const peakVisitors = peak ? Number(peak.visitor_count) : 0;
 
   return {
     actions,
@@ -1566,7 +1615,7 @@ async function queryPopularZone(
 }
 
 /**
- * 센서 커버율 조회
+ * 센서 커버율 조회 (RPC: get_zones_dim_list)
  */
 async function queryTrackingCoverage(
   supabase: SupabaseClient,
@@ -1577,13 +1626,15 @@ async function queryTrackingCoverage(
   const { actions, tabChanged, targetTab } = createNavigationActions('trackingCoverage', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 확인합니다.` : '';
 
-  // DB 직접 조회
-  const { data: zones, error } = await supabase
-    .from('zones_dim')
-    .select('id, name, is_active')
-    .eq('store_id', storeId);
+  // RPC: get_zones_dim_list (zones_dim 테이블, 프론트엔드와 동일)
+  let zones: any[] = [];
+  try {
+    zones = await rpcZonesDimList(supabase, storeId);
+  } catch (e) {
+    console.error('[queryTrackingCoverage] RPC error:', e);
+  }
 
-  if (error || !zones) {
+  if (zones.length === 0) {
     return {
       actions,
       message: `센서 커버율 데이터를 조회할 수 없습니다.${tabMessage}`,
@@ -1605,7 +1656,7 @@ async function queryTrackingCoverage(
 }
 
 /**
- * 시간대별 방문 패턴 조회 (특정 시간 필터 지원)
+ * 시간대별 방문 패턴 조회 (RPC: get_hourly_visitors, 특정 시간 필터 지원)
  */
 async function queryHourlyPattern(
   supabase: SupabaseClient,
@@ -1617,15 +1668,15 @@ async function queryHourlyPattern(
   const { actions, tabChanged, targetTab } = createNavigationActions('hourlyPattern', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 시간대별 차트를 확인합니다.` : '';
 
-  // DB 직접 조회
-  const { data, error } = await supabase
-    .from('hourly_visitors_agg')
-    .select('hour, visitor_count')
-    .eq('store_id', storeId)
-    .gte('date', dateRange.startDate)
-    .lte('date', dateRange.endDate);
+  // RPC: get_hourly_visitors (hourly_visitors_agg 기반, hour별 SUM 사전 집계)
+  let data: any[] = [];
+  try {
+    data = await rpcHourlyVisitors(supabase, storeId, dateRange.startDate, dateRange.endDate);
+  } catch (e) {
+    console.error('[queryHourlyPattern] RPC error:', e);
+  }
 
-  if (error || !data || data.length === 0) {
+  if (data.length === 0) {
     return {
       actions,
       message: `시간대별 방문 패턴 데이터를 조회할 수 없습니다.${tabMessage}`,
@@ -1634,25 +1685,27 @@ async function queryHourlyPattern(
     };
   }
 
+  // RPC가 이미 hour별 SUM을 반환하므로 바로 hourlyMap 구성
   const hourlyMap: Record<number, number> = {};
   data.forEach((row: any) => {
-    hourlyMap[row.hour] = (hourlyMap[row.hour] || 0) + (row.visitor_count || 0);
+    hourlyMap[row.hour] = row.visitor_count || 0;
   });
 
-  // 특정 시간 질의 (DB fallback)
+  // 특정 시간 질의
   if (hour !== undefined && hour >= 0 && hour <= 23) {
     const visitors = hourlyMap[hour] || 0;
-    const peakEntry = Object.entries(hourlyMap).sort((a, b) => b[1] - a[1])[0];
+    const sorted = [...data].sort((a: any, b: any) => (b.visitor_count || 0) - (a.visitor_count || 0));
+    const peak = sorted[0];
     return {
       actions,
-      message: `${dateRange.startDate} ${hour}시의 방문객은 ${visitors.toLocaleString()}명입니다.\n(피크타임: ${peakEntry[0]}시 ${Number(peakEntry[1]).toLocaleString()}명)${tabMessage}`,
+      message: `${dateRange.startDate} ${hour}시의 방문객은 ${visitors.toLocaleString()}명입니다.\n(피크타임: ${peak?.hour ?? '-'}시 ${Number(peak?.visitor_count || 0).toLocaleString()}명)${tabMessage}`,
       suggestions: ['피크타임 알려줘', '시간대별 전체 패턴 보여줘', '인기 존 알려줘'],
       data: { hour, visitors },
     };
   }
 
-  const sorted = Object.entries(hourlyMap).sort((a, b) => b[1] - a[1]);
-  const top3 = sorted.slice(0, 3).map(([h, v]) => `${h}시: ${v.toLocaleString()}명`).join(', ');
+  const sorted = [...data].sort((a: any, b: any) => (b.visitor_count || 0) - (a.visitor_count || 0));
+  const top3 = sorted.slice(0, 3).map((r: any) => `${r.hour}시: ${Number(r.visitor_count || 0).toLocaleString()}명`).join(', ');
 
   return {
     actions,
@@ -1725,7 +1778,7 @@ function queryStoreDwell(
 }
 
 /**
- * 매장 탭 종합 요약 (hourly_visitors_agg + RPC: get_zone_metrics)
+ * 매장 탭 종합 요약 (RPC: get_hourly_visitors + get_zone_metrics)
  */
 async function queryStoreSummary(
   supabase: SupabaseClient,
@@ -1739,18 +1792,13 @@ async function queryStoreSummary(
   const { actions, tabChanged, targetTab } = createNavigationActions('storeSummary', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 데이터를 확인합니다.` : '';
 
-  // hourly_visitors_agg (피크타임) + RPC zone_metrics (존 분석) 병렬 조회
-  const [hourlyResult, zones] = await Promise.all([
-    supabase
-      .from('hourly_visitors_agg')
-      .select('hour, visitor_count')
-      .eq('store_id', storeId)
-      .gte('date', dateRange.startDate)
-      .lte('date', dateRange.endDate),
+  // RPC 병렬 조회: get_hourly_visitors + get_zone_metrics
+  const [hourlyData, zones] = await Promise.all([
+    rpcHourlyVisitors(supabase, storeId, dateRange.startDate, dateRange.endDate),
     rpcZoneMetrics(supabase, orgId, storeId, dateRange.startDate, dateRange.endDate),
   ]);
 
-  if (hourlyResult.error && zones.length === 0) {
+  if (hourlyData.length === 0 && zones.length === 0) {
     return {
       actions,
       message: `${dateRange.startDate} ~ ${dateRange.endDate} 매장 데이터를 조회할 수 없습니다.${tabMessage}`,
@@ -1759,18 +1807,15 @@ async function queryStoreSummary(
     };
   }
 
-  // 피크타임 계산
+  // 피크타임 계산 (RPC가 이미 hour별 SUM 반환)
   let peakTime = '확인 불가';
   let peakVisitors = 0;
-  if (hourlyResult.data && hourlyResult.data.length > 0) {
-    const hourlyMap: Record<number, number> = {};
-    hourlyResult.data.forEach((row: any) => {
-      hourlyMap[row.hour] = (hourlyMap[row.hour] || 0) + (row.visitor_count || 0);
-    });
-    const peakEntry = Object.entries(hourlyMap).sort((a, b) => b[1] - a[1])[0];
-    if (peakEntry) {
-      peakTime = `${peakEntry[0]}시`;
-      peakVisitors = Number(peakEntry[1]);
+  if (hourlyData.length > 0) {
+    const sorted = [...hourlyData].sort((a: any, b: any) => (b.visitor_count || 0) - (a.visitor_count || 0));
+    const peak = sorted[0];
+    if (peak) {
+      peakTime = `${peak.hour}시`;
+      peakVisitors = Number(peak.visitor_count);
     }
   }
 
@@ -2100,7 +2145,7 @@ async function queryStockAlert(
 }
 
 /**
- * 입출고 내역 조회
+ * 입출고 내역 조회 (RPC: get_inventory_movements)
  */
 async function queryStockMovement(
   supabase: SupabaseClient,
@@ -2116,16 +2161,15 @@ async function queryStockMovement(
     return { actions, message: `조직 정보를 확인할 수 없습니다.${tabMessage}`, suggestions: ['재고탭 보여줘'], data: null };
   }
 
-  const { data, error } = await supabase
-    .from('inventory_movements')
-    .select('product_id, movement_type, quantity, created_at')
-    .eq('org_id', orgId)
-    .gte('created_at', dateRange.startDate)
-    .lte('created_at', dateRange.endDate + 'T23:59:59')
-    .order('created_at', { ascending: false })
-    .limit(10);
+  // RPC: get_inventory_movements (moved_at 기준, products JOIN, 프론트엔드와 동일)
+  let data: any[] = [];
+  try {
+    data = await rpcInventoryMovements(supabase, orgId, dateRange.startDate, dateRange.endDate, 10);
+  } catch (e) {
+    console.error('[queryStockMovement] RPC error:', e);
+  }
 
-  if (error || !data || data.length === 0) {
+  if (data.length === 0) {
     return {
       actions,
       message: `해당 기간의 입출고 내역이 없습니다.${tabMessage}`,
@@ -2134,8 +2178,8 @@ async function queryStockMovement(
     };
   }
 
-  const inCount = data.filter((m: any) => m.movement_type === 'in' || m.movement_type === 'inbound').length;
-  const outCount = data.filter((m: any) => m.movement_type === 'out' || m.movement_type === 'outbound').length;
+  const inCount = data.filter((m: any) => m.movement_type === 'in' || m.movement_type === 'inbound' || m.movement_type === '입고').length;
+  const outCount = data.filter((m: any) => m.movement_type === 'out' || m.movement_type === 'outbound' || m.movement_type === '출고').length;
 
   return {
     actions,
@@ -2181,8 +2225,7 @@ async function queryStockDistribution(
 // ============================================
 
 /**
- * ROI 요약 KPI 조회
- * applied_strategies 테이블에서 집계
+ * ROI 요약 KPI 조회 (RPC: get_applied_strategies)
  */
 async function queryROISummary(
   supabase: SupabaseClient,
@@ -2194,14 +2237,10 @@ async function queryROISummary(
   const isOnROI = pageContext?.current === '/roi';
 
   try {
-    const { data, error } = await supabase
-      .from('applied_strategies')
-      .select('id, status, result, final_roi, current_roi, expected_roi, actual_revenue, expected_revenue, source, source_module, name, start_date, end_date')
-      .eq('store_id', storeId)
-      .gte('start_date', dateRange.startDate)
-      .lte('start_date', dateRange.endDate);
+    // RPC: get_applied_strategies (날짜 필터 적용)
+    const data = await rpcAppliedStrategies(supabase, storeId, dateRange.startDate, dateRange.endDate);
 
-    if (error || !data || data.length === 0) {
+    if (data.length === 0) {
       return {
         actions: isOnROI ? [] : [{ type: 'navigate', target: '/roi' }],
         message: `해당 기간에 적용된 전략이 없습니다.${!isOnROI ? ' ROI 측정 페이지로 이동합니다.' : ''}`,
@@ -2214,9 +2253,9 @@ async function queryROISummary(
     const successRate = totalApplied > 0 ? Math.round((successCount / totalApplied) * 100) : 0;
     const rois = data.filter((s: any) => s.final_roi != null || s.current_roi != null);
     const avgRoi = rois.length > 0
-      ? Math.round(rois.reduce((sum, s: any) => sum + (s.final_roi ?? s.current_roi ?? 0), 0) / rois.length)
+      ? Math.round(rois.reduce((sum: number, s: any) => sum + (s.final_roi ?? s.current_roi ?? 0), 0) / rois.length)
       : 0;
-    const totalRevenueImpact = data.reduce((sum, s: any) => sum + (s.actual_revenue || 0), 0);
+    const totalRevenueImpact = data.reduce((sum: number, s: any) => sum + (s.actual_revenue || 0), 0);
 
     const message = `ROI 요약 (${dateRange.startDate} ~ ${dateRange.endDate}):\n` +
       `• 총 적용 전략: ${totalApplied}개\n` +
@@ -2242,7 +2281,7 @@ async function queryROISummary(
 }
 
 /**
- * 적용된 전략 이력 조회
+ * 적용된 전략 이력 조회 (RPC: get_applied_strategies)
  */
 async function queryAppliedStrategies(
   supabase: SupabaseClient,
@@ -2254,14 +2293,10 @@ async function queryAppliedStrategies(
   const isOnROI = pageContext?.current === '/roi';
 
   try {
-    const { data, error } = await supabase
-      .from('applied_strategies')
-      .select('id, name, source, source_module, status, result, final_roi, current_roi, actual_revenue, start_date')
-      .eq('store_id', storeId)
-      .order('start_date', { ascending: false })
-      .limit(10);
+    // RPC: get_applied_strategies (날짜 필터 없이 최근 10건)
+    const data = await rpcAppliedStrategies(supabase, storeId, undefined, undefined, 10);
 
-    if (error || !data || data.length === 0) {
+    if (data.length === 0) {
       return {
         actions: isOnROI ? [] : [{ type: 'navigate', target: '/roi' }],
         message: `적용된 전략 이력이 없습니다.${!isOnROI ? ' ROI 측정 페이지로 이동합니다.' : ''}`,
@@ -2304,7 +2339,7 @@ async function queryAppliedStrategies(
 }
 
 /**
- * ROI 카테고리별 성과 조회 (2D/3D 시뮬레이션)
+ * ROI 카테고리별 성과 조회 (RPC: get_applied_strategies)
  */
 async function queryROICategoryPerformance(
   supabase: SupabaseClient,
@@ -2316,14 +2351,10 @@ async function queryROICategoryPerformance(
   const isOnROI = pageContext?.current === '/roi';
 
   try {
-    const { data, error } = await supabase
-      .from('applied_strategies')
-      .select('source, source_module, status, result, final_roi, current_roi, actual_revenue')
-      .eq('store_id', storeId)
-      .gte('start_date', dateRange.startDate)
-      .lte('start_date', dateRange.endDate);
+    // RPC: get_applied_strategies (날짜 필터 적용)
+    const data = await rpcAppliedStrategies(supabase, storeId, dateRange.startDate, dateRange.endDate);
 
-    if (error || !data || data.length === 0) {
+    if (data.length === 0) {
       return {
         actions: isOnROI ? [] : [{ type: 'navigate', target: '/roi' }],
         message: `해당 기간에 카테고리별 성과 데이터가 없습니다.${!isOnROI ? ' ROI 측정 페이지로 이동합니다.' : ''}`,
