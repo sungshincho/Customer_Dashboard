@@ -31,6 +31,24 @@ export interface PageContext {
 }
 
 // ============================================
+// 세그먼트 동의어 → DB 세그먼트명 매핑 (충성→VIP, 신규→New 등)
+// AI가 동의어를 그대로 보낼 경우의 fallback
+// ============================================
+const SEGMENT_SYNONYM_MAP: Record<string, string> = {
+  '충성': 'vip', '단골': 'vip', '로열': 'vip', 'loyal': 'vip',
+  '신규': 'new', '새로운': 'new',
+  '일반': 'regular', '보통': 'regular',
+  '휴면': 'dormant', '이탈': 'dormant', '비활성': 'dormant',
+};
+
+function normalizeSegmentFilter(itemFilter: string[]): string[] {
+  return itemFilter.map(f => {
+    const lower = f.toLowerCase();
+    return SEGMENT_SYNONYM_MAP[lower] || lower;
+  });
+}
+
+// ============================================
 // RPC 호출 헬퍼 — 프론트엔드와 동일 RPC 사용
 // 데이터 일관성 보장 (SECURITY DEFINER, org_id 필터)
 // ============================================
@@ -2043,12 +2061,13 @@ async function queryCustomerSegment(
     };
   }
 
-  // itemFilter 적용
+  // itemFilter 적용 (동의어 매핑 포함: 충성→VIP, 신규→New 등)
   let results = segments;
   let filterNote = '';
   if (itemFilter && itemFilter.length > 0) {
+    const normalized = normalizeSegmentFilter(itemFilter);
     const filtered = segments.filter((s: any) =>
-      itemFilter.some(f => (s.segment_name || '').toLowerCase().includes(f.toLowerCase()))
+      normalized.some(f => (s.segment_name || '').toLowerCase().includes(f.toLowerCase()))
     );
     if (filtered.length > 0) {
       results = filtered;
@@ -2156,12 +2175,13 @@ async function querySegmentAvgPurchase(
     };
   }
 
-  // itemFilter 적용
+  // itemFilter 적용 (동의어 매핑 포함: 충성→VIP, 신규→New 등)
   let results = segments;
   let filterNote = '';
   if (itemFilter && itemFilter.length > 0) {
+    const normalized = normalizeSegmentFilter(itemFilter);
     const filtered = segments.filter((s: any) =>
-      itemFilter.some(f => (s.segment_name || '').toLowerCase().includes(f.toLowerCase()))
+      normalized.some(f => (s.segment_name || '').toLowerCase().includes(f.toLowerCase()))
     );
     if (filtered.length > 0) {
       results = filtered;
@@ -2208,12 +2228,13 @@ async function querySegmentVisitFrequency(
     };
   }
 
-  // itemFilter 적용
+  // itemFilter 적용 (동의어 매핑 포함: 충성→VIP, 신규→New 등)
   let results = segments;
   let filterNote = '';
   if (itemFilter && itemFilter.length > 0) {
+    const normalized = normalizeSegmentFilter(itemFilter);
     const filtered = segments.filter((s: any) =>
-      itemFilter.some(f => (s.segment_name || '').toLowerCase().includes(f.toLowerCase()))
+      normalized.some(f => (s.segment_name || '').toLowerCase().includes(f.toLowerCase()))
     );
     if (filtered.length > 0) {
       results = filtered;
