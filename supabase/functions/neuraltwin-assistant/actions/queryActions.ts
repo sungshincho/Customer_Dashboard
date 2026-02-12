@@ -173,12 +173,14 @@ const QUERY_TYPE_TO_TAB: Record<string, { page: string; tab?: string; section?: 
   storeDwell: { page: '/insights', tab: 'store', section: 'store-kpi-cards' },
   // 고객(Customer) 탭
   visitors: { page: '/insights', tab: 'customer', section: 'customer-kpi-cards' },
-  dwellTime: { page: '/insights', tab: 'customer', section: 'customer-kpi-cards' },
+  dwellTime: { page: '/insights', tab: 'store', section: 'store-kpi-cards' }, // storeDwell로 통합, 매장탭으로 이동
   newVsReturning: { page: '/insights', tab: 'customer', section: 'customer-kpi-cards' },
   repeatRate: { page: '/insights', tab: 'customer', section: 'customer-kpi-cards' },
   customerSegment: { page: '/insights', tab: 'customer', section: 'customer-segment-distribution' },
   loyalCustomers: { page: '/insights', tab: 'customer', section: 'customer-kpi-cards' },
   segmentAvgPurchase: { page: '/insights', tab: 'customer', section: 'customer-avg-purchase' },
+  segmentVisitFrequency: { page: '/insights', tab: 'customer', section: 'customer-segment-distribution' },
+  segmentDetail: { page: '/insights', tab: 'customer', section: 'customer-segment-distribution' },
   returnTrend: { page: '/insights', tab: 'customer', section: 'customer-return-trend' },
   // 상품(Product) 탭
   product: { page: '/insights', tab: 'product', section: 'product-kpi-cards' },
@@ -260,12 +262,14 @@ function getTermKeyword(queryType: string): string {
     storeDwell: '평균 체류시간',
     // 고객
     visitors: '방문객',
-    dwellTime: '체류 시간',
+    dwellTime: '평균 체류시간', // storeDwell로 통합
     newVsReturning: '방문객',
     repeatRate: '재방문율',
     customerSegment: '고객 세그먼트',
     loyalCustomers: '충성 고객',
     segmentAvgPurchase: '세그먼트별 평균 구매액',
+    segmentVisitFrequency: '세그먼트별 방문 빈도',
+    segmentDetail: '세그먼트 상세 분석',
     returnTrend: '재방문 추이',
     // 상품
     product: '상품',
@@ -598,7 +602,8 @@ export async function handleQueryKpi(
         result = await queryVisitors(supabase, storeId, dateRange, pageContext, orgId);
         break;
       case 'dwellTime':
-        result = await queryDwellTime(supabase, storeId, dateRange, pageContext, orgId);
+        // 고객탭에 체류시간 KPI가 없으므로 storeDwell로 통합
+        result = await queryStoreDwell(supabase, storeId, dateRange, pageContext, orgId);
         break;
       case 'newVsReturning':
         result = await queryNewVsReturning(supabase, storeId, dateRange, pageContext, orgId);
@@ -607,12 +612,20 @@ export async function handleQueryKpi(
         result = await queryRepeatRate(supabase, storeId, dateRange, pageContext, orgId);
         break;
       case 'customerSegment':
-        result = await queryCustomerSegment(supabase, storeId, dateRange, pageContext, orgId);
+        result = await queryCustomerSegment(supabase, storeId, dateRange, pageContext, orgId, classification.entities.itemFilter, classification.entities.responseHint);
         break;
       case 'loyalCustomers':
         result = await queryLoyalCustomers(supabase, storeId, dateRange, pageContext, orgId);
         break;
       case 'segmentAvgPurchase':
+        result = await querySegmentAvgPurchase(supabase, storeId, dateRange, pageContext, orgId, classification.entities.itemFilter);
+        break;
+      case 'segmentVisitFrequency':
+        result = await querySegmentVisitFrequency(supabase, storeId, dateRange, pageContext, orgId, classification.entities.itemFilter);
+        break;
+      case 'segmentDetail':
+        result = await querySegmentDetail(supabase, storeId, dateRange, pageContext, orgId);
+        break;
       case 'returnTrend':
         result = createGenericNavigationResult(queryType, dateRange, pageContext);
         break;
@@ -970,13 +983,13 @@ async function queryVisitors(
   const totalVisitors = kpi?.total_visitors ?? 0;
   const uniqueVisitors = kpi?.unique_visitors ?? 0;
 
-  // 전일 대비 계산
+  // 전일 대비 계산 (순 방문객 기준)
   let change: number | null = null;
   if (dateRange.compareStartDate && dateRange.compareEndDate) {
     const compareKpi = await rpcOverviewKpis(supabase, orgId, storeId, dateRange.compareStartDate, dateRange.compareEndDate);
-    const prevVisitors = compareKpi?.total_visitors ?? 0;
-    if (prevVisitors > 0) {
-      change = Math.round(((totalVisitors - prevVisitors) / prevVisitors) * 100);
+    const prevUniqueVisitors = compareKpi?.unique_visitors ?? 0;
+    if (prevUniqueVisitors > 0) {
+      change = Math.round(((uniqueVisitors - prevUniqueVisitors) / prevUniqueVisitors) * 100);
     }
   }
 
@@ -1398,8 +1411,8 @@ async function queryFootfall(
   if (!kpi) {
     return {
       actions,
-      message: `입장객 데이터를 조회할 수 없습니다.${tabMessage}`,
-      suggestions: ['방문객 수 알려줘', '개요탭 보여줘'],
+      message: `총 입장 횟수 데이터를 조회할 수 없습니다.${tabMessage}`,
+      suggestions: ['순 방문객 알려줘', '개요탭 보여줘'],
       data: null,
     };
   }
@@ -1409,8 +1422,8 @@ async function queryFootfall(
 
   return {
     actions,
-    message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 총 입장객은 ${totalFootfall.toLocaleString()}명, 순 방문객은 ${uniqueVisitors.toLocaleString()}명입니다.${tabMessage}`,
-    suggestions: ['매출 알려줘', '전환율 어때?', '방문 빈도 알려줘'],
+    message: `${dateRange.startDate} ~ ${dateRange.endDate} 기간의 총 입장 횟수는 ${totalFootfall.toLocaleString()}회입니다 (순 방문객 ${uniqueVisitors.toLocaleString()}명).${tabMessage}`,
+    suggestions: ['순 방문객 알려줘', '전환율 어때?', '방문 빈도 알려줘'],
     data: { totalFootfall, uniqueVisitors },
   };
 }
@@ -1855,7 +1868,8 @@ async function queryZonePerformance(
 }
 
 /**
- * 매장 평균 체류시간 조회 (RPC: get_overview_kpis → avg_dwell_minutes)
+ * 매장 평균 체류시간 조회 (RPC: get_zone_metrics → zone별 avg_dwell_seconds 평균)
+ * 프론트엔드 StoreTab.tsx와 동일 계산: zoneData.reduce(avg_dwell) / zoneData.length
  */
 async function queryStoreDwell(
   supabase: SupabaseClient,
@@ -1869,9 +1883,9 @@ async function queryStoreDwell(
   const { actions, tabChanged, targetTab } = createNavigationActions('storeDwell', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 확인합니다.` : '';
 
-  const kpi = await rpcOverviewKpis(supabase, orgId, storeId, dateRange.startDate, dateRange.endDate);
+  const zones = await rpcZoneMetrics(supabase, orgId, storeId, dateRange.startDate, dateRange.endDate);
 
-  if (!kpi) {
+  if (zones.length === 0) {
     return {
       actions,
       message: `평균 체류시간 데이터를 조회할 수 없습니다.${tabMessage}`,
@@ -1880,13 +1894,15 @@ async function queryStoreDwell(
     };
   }
 
-  const dwellMinutes = Number(kpi.avg_dwell_minutes || 0);
+  // 프론트엔드와 동일: zone별 avg_dwell_seconds 단순 평균 → 분 변환
+  const totalDwellSeconds = zones.reduce((sum: number, z: any) => sum + (z.avg_dwell_seconds || 0), 0);
+  const avgDwellMinutes = Math.round(totalDwellSeconds / zones.length / 60);
 
   return {
     actions,
-    message: `평균 체류시간은 ${dwellMinutes}분입니다.${tabMessage}`,
+    message: `평균 체류시간은 ${avgDwellMinutes}분입니다.${tabMessage}`,
     suggestions: ['존별 체류시간 보여줘', '피크타임 알려줘', '인기 존 알려줘'],
-    data: { avgDwellMinutes: dwellMinutes },
+    data: { avgDwellMinutes },
   };
 }
 
@@ -1999,16 +2015,20 @@ async function queryRepeatRate(
 
 /**
  * 고객 세그먼트 조회 (RPC: get_customer_segments — segment_name 기준, 프론트엔드와 일치)
+ * responseHint === 'distribution' 시 퍼센트 기반 분포 응답
  */
 async function queryCustomerSegment(
   supabase: SupabaseClient,
   storeId: string,
   dateRange: { startDate: string; endDate: string },
   pageContext?: PageContext,
-  orgId?: string
+  orgId?: string,
+  itemFilter?: string[],
+  responseHint?: string
 ): Promise<QueryActionResult> {
   if (!orgId) throw new Error('orgId required');
 
+  const isDistribution = responseHint === 'distribution';
   const { actions, tabChanged, targetTab } = createNavigationActions('customerSegment', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 세그먼트 분포를 확인합니다.` : '';
 
@@ -2023,17 +2043,48 @@ async function queryCustomerSegment(
     };
   }
 
-  const segmentList = segments.map((s: any) =>
-    `• ${s.segment_name}: ${(s.customer_count || 0).toLocaleString()}명`
+  // itemFilter 적용
+  let results = segments;
+  let filterNote = '';
+  if (itemFilter && itemFilter.length > 0) {
+    const filtered = segments.filter((s: any) =>
+      itemFilter.some(f => (s.segment_name || '').toLowerCase().includes(f.toLowerCase()))
+    );
+    if (filtered.length > 0) {
+      results = filtered;
+      filterNote = ` (${itemFilter.join(', ')} 필터 적용)`;
+    }
+  }
+
+  if (isDistribution) {
+    // 분포 모드: 퍼센트 기반 응답 (프론트엔드 도넛 차트와 동일)
+    const totalCustomers = results.reduce((sum: number, s: any) => sum + (s.customer_count || 0), 0);
+    const segmentList = results.map((s: any) => {
+      const count = s.customer_count || 0;
+      const pct = totalCustomers > 0 ? ((count / totalCustomers) * 100).toFixed(1) : '0';
+      return `• ${s.segment_name}: ${pct}% (${count.toLocaleString()}명)`;
+    }).join('\n');
+
+    return {
+      actions,
+      message: `고객 세그먼트 분포${filterNote}:\n${segmentList}\n\n총 고객: ${totalCustomers.toLocaleString()}명${tabMessage}`,
+      suggestions: ['세그먼트 상세 분석', '세그먼트별 평균 구매액', '충성 고객 알려줘'],
+      data: { segments: results, totalCustomers },
+    };
+  }
+
+  // 일반 모드: 고객수 + 평균구매액 + 방문빈도 요약
+  const segmentList = results.map((s: any) =>
+    `• ${s.segment_name}: ${(s.customer_count || 0).toLocaleString()}명 (객단가 ₩${Math.round(s.avg_transaction_value || 0).toLocaleString()}, 방문 ${Number(s.visit_frequency || 0).toFixed(1)}회/월)`
   ).join('\n');
 
-  const topSegment = segments[0];
+  const topSegment = results[0];
 
   return {
     actions,
-    message: `주요 세그먼트는 "${topSegment?.segment_name || '-'}"입니다.\n\n${segmentList}${tabMessage}`,
-    suggestions: ['재방문율 알려줘', '충성 고객 알려줘', '체류시간 알려줘'],
-    data: { segments, topSegment: topSegment?.segment_name },
+    message: `주요 세그먼트는 "${topSegment?.segment_name || '-'}"입니다.${filterNote}\n\n${segmentList}${tabMessage}`,
+    suggestions: ['세그먼트 분포 보여줘', '충성 고객 알려줘', '세그먼트별 평균 구매액'],
+    data: { segments: results, topSegment: topSegment?.segment_name },
   };
 }
 
@@ -2075,6 +2126,149 @@ async function queryLoyalCustomers(
     message: `충성 고객은 총 ${totalLoyal.toLocaleString()}명이며, 평균 구매금액은 ${formatNumber(Math.round(avgRevenue))}원입니다.${tabMessage}`,
     suggestions: ['고객 세그먼트 보여줘', '재방문율 알려줘', '매출 알려줘'],
     data: { totalLoyal, avgRevenue },
+  };
+}
+
+/**
+ * 세그먼트별 평균 구매액 조회 (RPC: get_customer_segments — avg_transaction_value)
+ */
+async function querySegmentAvgPurchase(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext,
+  orgId?: string,
+  itemFilter?: string[]
+): Promise<QueryActionResult> {
+  if (!orgId) throw new Error('orgId required');
+
+  const { actions, tabChanged, targetTab } = createNavigationActions('segmentAvgPurchase', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 세그먼트별 평균 구매액을 확인합니다.` : '';
+
+  const segments = await rpcCustomerSegments(supabase, orgId, storeId, dateRange.startDate, dateRange.endDate);
+
+  if (segments.length === 0) {
+    return {
+      actions,
+      message: `세그먼트별 평균 구매액 데이터를 조회할 수 없습니다.${tabMessage}`,
+      suggestions: ['고객 세그먼트 보여줘', '고객탭 보여줘'],
+      data: null,
+    };
+  }
+
+  // itemFilter 적용
+  let results = segments;
+  let filterNote = '';
+  if (itemFilter && itemFilter.length > 0) {
+    const filtered = segments.filter((s: any) =>
+      itemFilter.some(f => (s.segment_name || '').toLowerCase().includes(f.toLowerCase()))
+    );
+    if (filtered.length > 0) {
+      results = filtered;
+      filterNote = ` (${itemFilter.join(', ')} 필터 적용)`;
+    }
+  }
+
+  const segmentList = results.map((s: any) =>
+    `• ${s.segment_name}: ₩${Math.round(s.avg_transaction_value || 0).toLocaleString()}`
+  ).join('\n');
+
+  return {
+    actions,
+    message: `세그먼트별 평균 구매액${filterNote}:\n${segmentList}${tabMessage}`,
+    suggestions: ['세그먼트별 방문 빈도', '세그먼트 분포 보여줘', '세그먼트 상세 분석'],
+    data: { segments: results },
+  };
+}
+
+/**
+ * 세그먼트별 방문 빈도 조회 (RPC: get_customer_segments — visit_frequency)
+ */
+async function querySegmentVisitFrequency(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext,
+  orgId?: string,
+  itemFilter?: string[]
+): Promise<QueryActionResult> {
+  if (!orgId) throw new Error('orgId required');
+
+  const { actions, tabChanged, targetTab } = createNavigationActions('segmentVisitFrequency', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 세그먼트별 방문 빈도를 확인합니다.` : '';
+
+  const segments = await rpcCustomerSegments(supabase, orgId, storeId, dateRange.startDate, dateRange.endDate);
+
+  if (segments.length === 0) {
+    return {
+      actions,
+      message: `세그먼트별 방문 빈도 데이터를 조회할 수 없습니다.${tabMessage}`,
+      suggestions: ['고객 세그먼트 보여줘', '고객탭 보여줘'],
+      data: null,
+    };
+  }
+
+  // itemFilter 적용
+  let results = segments;
+  let filterNote = '';
+  if (itemFilter && itemFilter.length > 0) {
+    const filtered = segments.filter((s: any) =>
+      itemFilter.some(f => (s.segment_name || '').toLowerCase().includes(f.toLowerCase()))
+    );
+    if (filtered.length > 0) {
+      results = filtered;
+      filterNote = ` (${itemFilter.join(', ')} 필터 적용)`;
+    }
+  }
+
+  const segmentList = results.map((s: any) =>
+    `• ${s.segment_name}: ${Number(s.visit_frequency || 0).toFixed(1)}회/월`
+  ).join('\n');
+
+  return {
+    actions,
+    message: `세그먼트별 방문 빈도${filterNote}:\n${segmentList}${tabMessage}`,
+    suggestions: ['세그먼트별 평균 구매액', '세그먼트 분포 보여줘', '세그먼트 상세 분석'],
+    data: { segments: results },
+  };
+}
+
+/**
+ * 세그먼트 상세 분석 조회 (RPC: get_customer_segments — 고객수+평균구매액+방문빈도 전체)
+ * 프론트엔드 CustomerTab.tsx "세그먼트 상세 분석" 테이블과 동일
+ */
+async function querySegmentDetail(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext,
+  orgId?: string
+): Promise<QueryActionResult> {
+  if (!orgId) throw new Error('orgId required');
+
+  const { actions, tabChanged, targetTab } = createNavigationActions('segmentDetail', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 세그먼트 상세 분석을 확인합니다.` : '';
+
+  const segments = await rpcCustomerSegments(supabase, orgId, storeId, dateRange.startDate, dateRange.endDate);
+
+  if (segments.length === 0) {
+    return {
+      actions,
+      message: `세그먼트 상세 분석 데이터를 조회할 수 없습니다.${tabMessage}`,
+      suggestions: ['고객 세그먼트 보여줘', '고객탭 보여줘'],
+      data: null,
+    };
+  }
+
+  const segmentList = segments.map((s: any) =>
+    `• ${s.segment_name}: ${(s.customer_count || 0).toLocaleString()}명 | ₩${Math.round(s.avg_transaction_value || 0).toLocaleString()} | ${Number(s.visit_frequency || 0).toFixed(1)}회/월`
+  ).join('\n');
+
+  return {
+    actions,
+    message: `세그먼트 상세 분석 (고객수 | 평균구매액 | 방문빈도):\n${segmentList}${tabMessage}`,
+    suggestions: ['세그먼트 분포 보여줘', '충성 고객 알려줘', '재방문율 알려줘'],
+    data: { segments },
   };
 }
 
