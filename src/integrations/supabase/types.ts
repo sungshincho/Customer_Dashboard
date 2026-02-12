@@ -10830,6 +10830,30 @@ export type Database = {
           rule_name_ko: string
         }[]
       }
+      get_applied_strategies: {
+        Args: {
+          p_end_date?: string
+          p_limit?: number
+          p_start_date?: string
+          p_store_id: string
+        }
+        Returns: {
+          actual_revenue: number
+          created_at: string
+          current_roi: number
+          end_date: string
+          expected_revenue: number
+          expected_roi: number
+          final_roi: number
+          id: string
+          name: string
+          result: string
+          source: string
+          source_module: string
+          start_date: string
+          status: string
+        }[]
+      }
       get_association_summary: { Args: { p_store_id: string }; Returns: Json }
       get_available_slots_for_display_type: {
         Args: { p_display_type: string; p_store_id: string }
@@ -10888,6 +10912,20 @@ export type Database = {
       get_context_data_sources: {
         Args: { p_org_id: string; p_store_id?: string }
         Returns: Json
+      }
+      get_customer_segments: {
+        Args: {
+          p_end_date: string
+          p_org_id: string
+          p_start_date: string
+          p_store_id: string
+        }
+        Returns: {
+          avg_transaction_value: number
+          customer_count: number
+          segment_name: string
+          visit_frequency: number
+        }[]
       }
       get_daily_kpis_summary: {
         Args: { p_days?: number; p_store_id: string }
@@ -10953,6 +10991,41 @@ export type Database = {
         Args: { p_import_type: string }
         Returns: string
       }
+      get_inventory_movements: {
+        Args: {
+          p_end_date: string
+          p_limit?: number
+          p_org_id: string
+          p_start_date: string
+        }
+        Returns: {
+          id: string
+          moved_at: string
+          movement_type: string
+          new_stock: number
+          previous_stock: number
+          product_id: string
+          product_name: string
+          quantity: number
+          reason: string
+        }[]
+      }
+      get_inventory_status: {
+        Args: { p_org_id: string }
+        Returns: {
+          category: string
+          current_stock: number
+          days_until_stockout: number
+          minimum_stock: number
+          optimal_stock: number
+          price: number
+          product_id: string
+          product_name: string
+          sku: string
+          stock_status: string
+          weekly_demand: number
+        }[]
+      }
       get_kpi_lineage: {
         Args: {
           p_date?: string
@@ -10961,6 +11034,29 @@ export type Database = {
           p_store_id?: string
         }
         Returns: Json
+      }
+      get_overview_kpis: {
+        Args: {
+          p_end_date: string
+          p_org_id: string
+          p_start_date: string
+          p_store_id: string
+        }
+        Returns: {
+          avg_conversion_rate: number
+          avg_dwell_minutes: number
+          avg_transaction_value: number
+          funnel_browse: number
+          funnel_engage: number
+          funnel_entry: number
+          funnel_fitting: number
+          funnel_purchase: number
+          returning_visitors: number
+          total_revenue: number
+          total_transactions: number
+          total_visitors: number
+          unique_visitors: number
+        }[]
       }
       get_product_associations: {
         Args: {
@@ -10971,6 +11067,22 @@ export type Database = {
           p_store_id: string
         }
         Returns: Json
+      }
+      get_product_performance: {
+        Args: {
+          p_end_date: string
+          p_org_id: string
+          p_start_date: string
+          p_store_id: string
+        }
+        Returns: {
+          category: string
+          product_id: string
+          product_name: string
+          revenue: number
+          stock_level: number
+          units_sold: number
+        }[]
       }
       get_roi_by_category: {
         Args: { p_org_id: string; p_store_id?: string }
@@ -10997,6 +11109,17 @@ export type Database = {
         }[]
       }
       get_schema_metadata: { Args: never; Returns: Json }
+      get_store_goals: {
+        Args: { p_date?: string; p_org_id: string; p_store_id: string }
+        Returns: {
+          goal_type: string
+          id: string
+          period_end: string
+          period_start: string
+          period_type: string
+          target_value: number
+        }[]
+      }
       get_store_persona_context: { Args: { p_store_id: string }; Returns: Json }
       get_strategy_roi_trend: {
         Args: { p_strategy_id: string }
@@ -11048,6 +11171,32 @@ export type Database = {
           date: string
           purchase_count: number
           total_visits: number
+        }[]
+      }
+      get_zone_metrics: {
+        Args: {
+          p_end_date: string
+          p_org_id: string
+          p_start_date: string
+          p_store_id: string
+        }
+        Returns: {
+          avg_dwell_seconds: number
+          conversion_count: number
+          revenue: number
+          visitors: number
+          zone_id: string
+          zone_name: string
+          zone_type: string
+        }[]
+      }
+      get_zones_dim_list: {
+        Args: { p_org_id: string; p_store_id: string }
+        Returns: {
+          id: string
+          is_active: boolean
+          zone_name: string
+          zone_type: string
         }[]
       }
       graph_n_hop_query: {
