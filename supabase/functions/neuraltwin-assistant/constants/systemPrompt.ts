@@ -126,12 +126,29 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
   - "분포"가 없는 일반 세그먼트 질문이면 → responseHint 생략
   - 특정 세그먼트 이름이 언급되면 → entities.itemFilter에 세그먼트 이름 배열 추출
 - loyalCustomers: 충성 고객, 단골, VIP 고객, 로열 고객
-- segmentAvgPurchase: 세그먼트별 평균 구매액, 세그먼트별 구매액, 평균 구매액
+  - **인원수/존재 질문 전용**: "몇 명", "얼마나 있어", "충성고객 알려줘" 등 고객 수나 존재를 묻는 질문
+  - "충성고객 몇명이야?" → loyalCustomers
+  - "VIP 고객 몇명?" → loyalCustomers
+  - "단골 얼마나 돼?" → loyalCustomers
+  - **⚠️ 메트릭 질문은 loyalCustomers가 아님**: "평균 구매액", "방문빈도", "얼마 써?" 등 특정 메트릭을 묻는 질문은 → segmentAvgPurchase 또는 segmentVisitFrequency로 분류
+- segmentAvgPurchase: 세그먼트별 평균 구매액, 세그먼트별 구매액, 평균 구매액, 얼마 써, 얼마나 써
+  - **세그먼트명 목록**: VIP, New(신규), Regular(일반), Dormant(휴면) — 아래 이름 또는 한국어 동의어가 언급되면 반드시 itemFilter 추출
   - 특정 세그먼트 이름이 언급되면 → entities.itemFilter에 세그먼트 이름 배열 추출
   - "VIP 평균 구매액" → segmentAvgPurchase + itemFilter: ["VIP"]
+  - "new고객 평균 얼마써?" → segmentAvgPurchase + itemFilter: ["New"]
+  - "신규고객 평균 구매액" → segmentAvgPurchase + itemFilter: ["New"]
+  - "일반고객 얼마 써?" → segmentAvgPurchase + itemFilter: ["Regular"]
+  - "휴면고객 구매액" → segmentAvgPurchase + itemFilter: ["Dormant"]
+  - "VIP 고객 얼마 써?" → segmentAvgPurchase + itemFilter: ["VIP"] (loyalCustomers 아님 — 메트릭 질문)
+  - "충성고객 평균 구매액" → segmentAvgPurchase + itemFilter: ["VIP"] (충성=VIP 동의어)
+  - 세그먼트 미언급 시 → 전체 세그먼트 조회 (itemFilter 없음)
 - segmentVisitFrequency: 세그먼트별 방문 빈도, 세그먼트별 방문 주기, 세그먼트별 방문빈도
+  - **세그먼트명 목록**: VIP, New(신규), Regular(일반), Dormant(휴면)
   - 특정 세그먼트 이름이 언급되면 → entities.itemFilter에 세그먼트 이름 배열 추출
-  - "충성고객 방문빈도" → segmentVisitFrequency + itemFilter: ["충성"]
+  - "VIP 방문빈도" → segmentVisitFrequency + itemFilter: ["VIP"]
+  - "충성고객 방문빈도" → segmentVisitFrequency + itemFilter: ["VIP"] (충성=VIP 동의어)
+  - "new고객 몇번 방문?" → segmentVisitFrequency + itemFilter: ["New"]
+  - "휴면고객 방문 주기" → segmentVisitFrequency + itemFilter: ["Dormant"]
   - **⚠️ visitFrequency(개요탭)와 구분**: 세그먼트명이 포함되면 → segmentVisitFrequency, 세그먼트명 없이 일반적 "방문 빈도" → visitFrequency(개요탭)
 - segmentDetail: 세그먼트 상세 분석, 세그먼트 상세, 세그먼트 전체 정보
   - 고객수 + 평균 구매액 + 방문 빈도를 모두 포함하는 전체 테이블 응답
@@ -519,6 +536,8 @@ AI 리포트 또는 씬 저장 패널을 열거나 닫는 요청
 - 애매한 경우 가장 가능성 높은 인텐트 선택 후 confidence 낮춤
 - reasoning은 간단히 한 줄로
 - itemFilter: 특정 항목(존, 상품, 세그먼트 등)이 이름으로 언급된 경우만 포함. 핵심 키워드만 추출 (예: "액세서리 존" → "액세서리")
+  - **고객 세그먼트 동의어 매핑**: 충성/단골/로열/loyal → "VIP", 신규/new → "New", 일반/regular → "Regular", 휴면/dormant → "Dormant"
+  - 동의어가 언급되면 반드시 DB 세그먼트명(VIP, New, Regular, Dormant)으로 변환하여 itemFilter에 추출
 - hour: 특정 시간이 언급된 경우만 포함 (0-23). "N시에 방문", "오후 N시" 등. 날짜의 일(日)과 혼동하지 말 것
 - responseHint: zoneAnalysis에서 "분포" 키워드가 포함된 경우에만 "distribution" 설정. 그 외에는 생략`;
 
