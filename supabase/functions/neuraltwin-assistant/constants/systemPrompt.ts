@@ -97,9 +97,13 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
   - 예시: "12시 방문자 몇명이야?" → hourlyPattern (hour: 12), "11월 1일 14시 방문객" → hourlyPattern (hour: 14), "오후 3시에 몇명 왔어?" → hourlyPattern (hour: 15)
   - 특정 시간이 있으면 → entities.hour에 시간 추출 (0-23, 24시간제)
   - "오후 3시" → hour: 15, "12시" → hour: 12, "저녁 7시" → hour: 19
-- zoneAnalysis: 존 분석, 존별 체류시간, 존 방문자 분포, 구역별 분석, 존별 비교, 존별 성과 비교, 존별 방문자 분포, 존별 성과
+- zoneAnalysis: 존 분석, 존별 체류시간, 존 방문자 분포, 구역별 분석, 존별 방문자 분포
   - 특정 존 이름이 언급되면 → entities.itemFilter에 존 이름 배열 추출
   - "액세서리존, 의류 존 비교" → itemFilter: ["액세서리", "의류"]
+  - **"분포" 키워드 감지**: "존별 방문자 분포", "존 분포", "구역별 분포" 등 "분포"가 포함되면 → entities.responseHint: "distribution" 추가
+  - "분포"가 없는 일반 존 분석이면 → responseHint 생략
+- zonePerformance: 존별 성과 비교, 존별 성과, 존별 비교, 존 실적, 존별 실적 비교
+  - 특정 존 이름이 언급되면 → entities.itemFilter에 존 이름 배열 추출
   - "신발존 성과" → itemFilter: ["신발"]
 - popularZone: 인기 존, 인기 구역, 인기존, 가장 많이 방문하는 존
   - 특정 존 이름이 언급되면 → entities.itemFilter에 존 이름 배열 추출
@@ -486,7 +490,8 @@ AI 리포트 또는 씬 저장 패널을 열거나 닫는 요청
     "timeOfDay": "morning | afternoon | evening | night | peak",
     "holidayType": "none | weekend | holiday | christmas | black_friday",
     "itemFilter": ["존/상품/세그먼트 이름"],
-    "hour": 0
+    "hour": 0,
+    "responseHint": "distribution"
   }
 }
 \`\`\`
@@ -497,7 +502,8 @@ AI 리포트 또는 씬 저장 패널을 열거나 닫는 요청
 - 애매한 경우 가장 가능성 높은 인텐트 선택 후 confidence 낮춤
 - reasoning은 간단히 한 줄로
 - itemFilter: 특정 항목(존, 상품, 세그먼트 등)이 이름으로 언급된 경우만 포함. 핵심 키워드만 추출 (예: "액세서리 존" → "액세서리")
-- hour: 특정 시간이 언급된 경우만 포함 (0-23). "N시에 방문", "오후 N시" 등. 날짜의 일(日)과 혼동하지 말 것`;
+- hour: 특정 시간이 언급된 경우만 포함 (0-23). "N시에 방문", "오후 N시" 등. 날짜의 일(日)과 혼동하지 말 것
+- responseHint: zoneAnalysis에서 "분포" 키워드가 포함된 경우에만 "distribution" 설정. 그 외에는 생략`;
 
 /**
  * 컨텍스트 포맷팅 함수

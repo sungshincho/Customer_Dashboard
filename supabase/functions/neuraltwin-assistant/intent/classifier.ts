@@ -66,6 +66,7 @@ interface AIClassificationResponse {
     // 세부 필터 엔티티
     itemFilter?: string[];   // 특정 항목 필터 (존 이름, 상품명 등)
     hour?: number;           // 특정 시간 (0-23)
+    responseHint?: string;   // 응답 형식 힌트 (예: 'distribution')
   };
 }
 
@@ -281,6 +282,9 @@ function transformEntities(
   }
   if (aiEntities.hour !== undefined && typeof aiEntities.hour === 'number') {
     entities.hour = aiEntities.hour;
+  }
+  if (aiEntities.responseHint && typeof aiEntities.responseHint === 'string') {
+    entities.responseHint = aiEntities.responseHint;
   }
 
   // 패턴 기반 날짜 추출 (항상 실행, AI보다 정확한 한국어 날짜 파싱)

@@ -169,6 +169,7 @@ const QUERY_TYPE_TO_TAB: Record<string, { page: string; tab?: string; section?: 
   trackingCoverage: { page: '/insights', tab: 'store', section: 'store-kpi-cards' },
   hourlyPattern: { page: '/insights', tab: 'store', section: 'store-hourly-pattern' },
   zoneAnalysis: { page: '/insights', tab: 'store', section: 'store-zone-dwell' },
+  zonePerformance: { page: '/insights', tab: 'store', section: 'store-zone-performance' },
   storeDwell: { page: '/insights', tab: 'store', section: 'store-kpi-cards' },
   // 고객(Customer) 탭
   visitors: { page: '/insights', tab: 'customer', section: 'customer-kpi-cards' },
@@ -255,6 +256,7 @@ function getTermKeyword(queryType: string): string {
     trackingCoverage: '센서 커버율',
     hourlyPattern: '시간대별 방문',
     zoneAnalysis: '존 분석',
+    zonePerformance: '존별 성과 비교',
     storeDwell: '평균 체류시간',
     // 고객
     visitors: '방문객',
@@ -582,10 +584,13 @@ export async function handleQueryKpi(
         result = await queryHourlyPattern(supabase, storeId, dateRange, pageContext, classification.entities.hour, orgId);
         break;
       case 'zoneAnalysis':
-        result = await queryZoneAnalysis(supabase, storeId, dateRange, pageContext, orgId, classification.entities.itemFilter);
+        result = await queryZoneAnalysis(supabase, storeId, dateRange, pageContext, orgId, classification.entities.itemFilter, classification.entities.responseHint);
+        break;
+      case 'zonePerformance':
+        result = await queryZonePerformance(supabase, storeId, dateRange, pageContext, orgId, classification.entities.itemFilter);
         break;
       case 'storeDwell':
-        result = queryStoreDwell(dateRange, pageContext);
+        result = await queryStoreDwell(supabase, storeId, dateRange, pageContext, orgId);
         break;
 
       // 고객(Customer) 탭 — get_overview_kpis / get_customer_segments RPC 사용
@@ -1720,6 +1725,7 @@ async function queryHourlyPattern(
 
 /**
  * 존 분석 (체류시간/방문자 분포) 조회 (RPC: get_zone_metrics)
+ * responseHint === 'distribution' 시 퍼센트 기반 분포 응답
  */
 async function queryZoneAnalysis(
   supabase: SupabaseClient,
@@ -1727,10 +1733,12 @@ async function queryZoneAnalysis(
   dateRange: { startDate: string; endDate: string },
   pageContext?: PageContext,
   orgId?: string,
-  itemFilter?: string[]
+  itemFilter?: string[],
+  responseHint?: string
 ): Promise<QueryActionResult> {
   if (!orgId) throw new Error('orgId required');
 
+  const isDistribution = responseHint === 'distribution';
   const { actions, tabChanged, targetTab } = createNavigationActions('zoneAnalysis', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 존 분석을 확인합니다.` : '';
 
@@ -1758,26 +1766,128 @@ async function queryZoneAnalysis(
     }
   }
 
-  const zoneList = results.slice(0, 5).map((z: any) =>
-    `• ${z.zone_name || z.zone_id}: 방문 ${(z.visitors || 0).toLocaleString()}명, 체류 ${Math.round((z.avg_dwell_seconds || 0) / 60)}분`
-  ).join('\n');
+  if (isDistribution) {
+    // 분포 모드: 퍼센트 기반 응답
+    const totalVisitors = results.reduce((sum: number, z: any) => sum + (z.visitors || 0), 0);
+    const zoneList = results.map((z: any) => {
+      const visitors = z.visitors || 0;
+      const pct = totalVisitors > 0 ? ((visitors / totalVisitors) * 100).toFixed(1) : '0';
+      return `• ${z.zone_name || z.zone_id}: ${pct}% (${visitors.toLocaleString()}명)`;
+    }).join('\n');
+
+    return {
+      actions,
+      message: `존별 방문자 분포${filterNote}:\n${zoneList}${tabMessage}`,
+      suggestions: ['존별 성과 비교해줘', '인기 존 알려줘', '피크타임 알려줘'],
+      data: { zones: results, totalVisitors },
+    };
+  }
+
+  // 일반 모드: 방문자 + 체류시간 + 전환율
+  const zoneList = results.map((z: any) => {
+    const convRate = (z.visitors || 0) > 0
+      ? ((z.conversion_count || 0) / z.visitors * 100).toFixed(1)
+      : '0';
+    return `• ${z.zone_name || z.zone_id}: 방문 ${(z.visitors || 0).toLocaleString()}명, 체류 ${Math.round((z.avg_dwell_seconds || 0) / 60)}분, 전환율 ${convRate}%`;
+  }).join('\n');
 
   return {
     actions,
     message: `존별 분석 결과${filterNote}:\n${zoneList}${tabMessage}`,
-    suggestions: ['인기 존 알려줘', '피크타임 알려줘', '체류시간 알려줘'],
+    suggestions: ['존별 방문자 분포 알려줘', '피크타임 알려줘', '체류시간 알려줘'],
     data: { zones: results },
   };
 }
 
 /**
- * 매장 평균 체류시간 조회
+ * 존별 성과 비교 조회 (RPC: get_zone_metrics, 전환율 포함)
  */
-function queryStoreDwell(
+async function queryZonePerformance(
+  supabase: SupabaseClient,
+  storeId: string,
   dateRange: { startDate: string; endDate: string },
-  pageContext?: PageContext
-): QueryActionResult {
-  return createGenericNavigationResult('storeDwell', dateRange, pageContext);
+  pageContext?: PageContext,
+  orgId?: string,
+  itemFilter?: string[]
+): Promise<QueryActionResult> {
+  if (!orgId) throw new Error('orgId required');
+
+  const { actions, tabChanged, targetTab } = createNavigationActions('zonePerformance', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 존별 성과를 확인합니다.` : '';
+
+  const zones = await rpcZoneMetrics(supabase, orgId, storeId, dateRange.startDate, dateRange.endDate);
+
+  if (zones.length === 0) {
+    return {
+      actions,
+      message: `존별 성과 데이터를 조회할 수 없습니다.${tabMessage}`,
+      suggestions: ['매장탭 보여줘', '피크타임 알려줘'],
+      data: null,
+    };
+  }
+
+  // itemFilter 적용
+  let results = zones;
+  let filterNote = '';
+  if (itemFilter && itemFilter.length > 0) {
+    const filtered = zones.filter((z: any) =>
+      itemFilter.some(f => (z.zone_name || z.zone_id || '').toLowerCase().includes(f.toLowerCase()))
+    );
+    if (filtered.length > 0) {
+      results = filtered;
+      filterNote = ` (${itemFilter.join(', ')} 필터 적용)`;
+    }
+  }
+
+  const zoneList = results.map((z: any) => {
+    const convRate = (z.visitors || 0) > 0
+      ? ((z.conversion_count || 0) / z.visitors * 100).toFixed(1)
+      : '0';
+    return `• ${z.zone_name || z.zone_id}: 방문 ${(z.visitors || 0).toLocaleString()}명, 체류 ${Math.round((z.avg_dwell_seconds || 0) / 60)}분, 전환율 ${convRate}%`;
+  }).join('\n');
+
+  return {
+    actions,
+    message: `존별 성과 비교${filterNote}:\n${zoneList}${tabMessage}`,
+    suggestions: ['존별 방문자 분포 알려줘', '인기 존 알려줘', '피크타임 알려줘'],
+    data: { zones: results },
+  };
+}
+
+/**
+ * 매장 평균 체류시간 조회 (RPC: get_overview_kpis → avg_dwell_minutes)
+ */
+async function queryStoreDwell(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext,
+  orgId?: string
+): Promise<QueryActionResult> {
+  if (!orgId) throw new Error('orgId required');
+
+  const { actions, tabChanged, targetTab } = createNavigationActions('storeDwell', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 확인합니다.` : '';
+
+  const kpi = await rpcOverviewKpis(supabase, orgId, storeId, dateRange.startDate, dateRange.endDate);
+
+  if (!kpi) {
+    return {
+      actions,
+      message: `평균 체류시간 데이터를 조회할 수 없습니다.${tabMessage}`,
+      suggestions: ['매장탭 보여줘', '피크타임 알려줘'],
+      data: null,
+    };
+  }
+
+  const dwellMinutes = Number(kpi.avg_dwell_minutes || 0);
+
+  return {
+    actions,
+    message: `평균 체류시간은 ${dwellMinutes}분입니다.${tabMessage}`,
+    suggestions: ['존별 체류시간 보여줘', '피크타임 알려줘', '인기 존 알려줘'],
+    data: { avgDwellMinutes: dwellMinutes },
+  };
 }
 
 /**
