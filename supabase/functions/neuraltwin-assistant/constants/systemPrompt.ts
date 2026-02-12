@@ -70,7 +70,7 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
 - revenue: 매출, 수익, 매상, 총 매출 (개요 맥락에서)
 - conversion: 전환율, 구매 전환율, 구매전환율, 구매 전환
 - avgTransaction: 객단가, 평균 거래금액
-- footfall: 입장객, 총 입장, 풋폴, 총 방문, 총입장
+- footfall: 총 입장, 풋폴, 총입장, 총 입장 횟수, 입장 횟수, 총 방문 횟수, 몇번 입장, 몇번 들어왔어
 - visitFrequency: 방문 빈도, 방문 주기, 일평균 방문
 - funnel: 퍼널, 고객 여정, 여정 분석, 전환 퍼널, 고객 여정 퍼널
 - goal: 목표, 목표달성률, 목표설정(확인용), 목표 달성률, 달성률
@@ -107,17 +107,34 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
   - "신발존 성과" → itemFilter: ["신발"]
 - popularZone: 인기 존, 인기 구역, 인기존, 가장 많이 방문하는 존
   - 특정 존 이름이 언급되면 → entities.itemFilter에 존 이름 배열 추출
-- storeDwell: 평균 체류시간 (매장 탭 맥락에서), 체류시간 (매장 탭)
+- storeDwell: 평균 체류시간, 체류시간, 머문시간, 평균 체류
+  - 탭 맥락(매장/고객)에 관계없이 모든 체류시간 질문은 storeDwell로 분류 (매장 탭으로 이동)
 
 *고객(Customer) 탭:*
-- visitors: 방문객, 고객수, 트래픽, 순방문객, 순 방문객
+- visitors: 방문객, 고객수, 트래픽, 순방문객, 순 방문객, 입장객, 손님, 사람 몇명
   - **주의**: 특정 시간(N시)이 포함된 방문 질문은 visitors가 아닌 **hourlyPattern** (매장 탭)으로 분류. 예: "12시 방문자 몇명이야?" → hourlyPattern, "11월 1일 14시 트래픽" → hourlyPattern
-- dwellTime: 체류시간, 머문시간, 평균 체류 (고객 탭 맥락에서)
+  - **⚠️ visitors vs footfall 구분 규칙:**
+  - "몇 명", "얼마나 왔어", "사람/손님/고객 + 수" → visitors (고유 방문자 수)
+  - "몇 번", "몇 회", "횟수", "번 입장/들어왔어" → footfall (총 입장 횟수)
+  - 예: "오늘 사람 몇명왔어?" → visitors, "오늘 손님 얼마나 왔어?" → visitors
+  - 예: "사람들 몇번 들어왔어?" → footfall, "손님 몇번 입장했어?" → footfall
+  - 애매한 경우 → visitors (기본값)
 - newVsReturning: 신규고객, 재방문고객, 신규/재방문
 - repeatRate: 재방문율, 리피트율, 재방문 비율
-- customerSegment: 고객 세그먼트, 고객 분류, 세그먼트 분포, 고객 유형, 고객 세그먼트 분포, 세그먼트 상세 분석, 세그먼트 상세
+- customerSegment: 고객 세그먼트, 고객 분류, 고객 유형
+  - **"분포" 키워드 감지**: "세그먼트 분포", "고객 세그먼트 분포", "세그먼트별 분포" 등 "분포"가 포함되면 → entities.responseHint: "distribution" 추가
+  - "분포"가 없는 일반 세그먼트 질문이면 → responseHint 생략
+  - 특정 세그먼트 이름이 언급되면 → entities.itemFilter에 세그먼트 이름 배열 추출
 - loyalCustomers: 충성 고객, 단골, VIP 고객, 로열 고객
 - segmentAvgPurchase: 세그먼트별 평균 구매액, 세그먼트별 구매액, 평균 구매액
+  - 특정 세그먼트 이름이 언급되면 → entities.itemFilter에 세그먼트 이름 배열 추출
+  - "VIP 평균 구매액" → segmentAvgPurchase + itemFilter: ["VIP"]
+- segmentVisitFrequency: 세그먼트별 방문 빈도, 세그먼트별 방문 주기, 세그먼트별 방문빈도
+  - 특정 세그먼트 이름이 언급되면 → entities.itemFilter에 세그먼트 이름 배열 추출
+  - "충성고객 방문빈도" → segmentVisitFrequency + itemFilter: ["충성"]
+  - **⚠️ visitFrequency(개요탭)와 구분**: 세그먼트명이 포함되면 → segmentVisitFrequency, 세그먼트명 없이 일반적 "방문 빈도" → visitFrequency(개요탭)
+- segmentDetail: 세그먼트 상세 분석, 세그먼트 상세, 세그먼트 전체 정보
+  - 고객수 + 평균 구매액 + 방문 빈도를 모두 포함하는 전체 테이블 응답
 - returnTrend: 재방문 추이, 재방문 트렌드
 
 *상품(Product) 탭:*
