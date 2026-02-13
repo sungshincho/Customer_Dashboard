@@ -1663,15 +1663,26 @@ async function queryTrackingCoverage(
   const { actions, tabChanged, targetTab } = createNavigationActions('trackingCoverage', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 확인합니다.` : '';
 
-  // RPC: get_zones_dim_list (zones_dim 테이블, 프론트엔드 useZonesDim()과 동일)
-  let zones: any[] = [];
+  // 등록된 존 목록
+  let registeredZones: any[] = [];
   try {
-    zones = await rpcZonesDimList(supabase, orgId || '', storeId);
+    registeredZones = await rpcZonesDimList(supabase, orgId || '', storeId);
   } catch (e) {
-    console.error('[queryTrackingCoverage] RPC error:', e);
+    console.error('[queryTrackingCoverage] zones_dim RPC error:', e);
   }
 
-  if (zones.length === 0) {
+  // 실제 데이터가 있는 존 (zone_daily_metrics)
+  let zoneMetrics: any[] = [];
+  try {
+    if (orgId) {
+      zoneMetrics = await rpcZoneMetrics(supabase, orgId, storeId, dateRange.startDate, dateRange.endDate);
+    }
+  } catch (e) {
+    console.error('[queryTrackingCoverage] zone_metrics RPC error:', e);
+  }
+
+  const totalZones = registeredZones.length;
+  if (totalZones === 0) {
     return {
       actions,
       message: `센서 커버율 데이터를 조회할 수 없습니다.${tabMessage}`,
@@ -1680,15 +1691,15 @@ async function queryTrackingCoverage(
     };
   }
 
-  const totalZones = zones.length;
-  const activeZones = zones.filter((z: any) => z.is_active !== false).length;
-  const coverage = totalZones > 0 ? Math.round((activeZones / totalZones) * 100) : 0;
+  const zonesWithData = zoneMetrics.filter((z: any) => (z.visitors || 0) > 0).length;
+  const coverage = Math.round((zonesWithData / totalZones) * 100);
+  const trackedVisitors = zoneMetrics.reduce((sum: number, z: any) => sum + (z.visitors || 0), 0);
 
   return {
     actions,
-    message: `센서 커버율은 ${coverage}%입니다 (${activeZones}/${totalZones} 존 활성).${tabMessage}`,
+    message: `센서 커버율은 ${coverage}%입니다 (${zonesWithData}/${totalZones} 존 데이터 수집 중, 추적 방문자 ${trackedVisitors.toLocaleString()}명).${tabMessage}`,
     suggestions: ['인기 존 알려줘', '피크타임 알려줘', '존 분석 보여줘'],
-    data: { coverage, activeZones, totalZones },
+    data: { coverage, zonesWithData, totalZones, trackedVisitors },
   };
 }
 
@@ -1808,7 +1819,7 @@ async function queryZoneAnalysis(
 
     return {
       actions,
-      message: `존별 방문자 분포${filterNote}:\n${zoneList}${tabMessage}`,
+      message: `존별 방문자 분포${filterNote} (중복 포함, 연 방문 기준):\n${zoneList}${tabMessage}`,
       suggestions: ['존별 성과 비교해줘', '인기 존 알려줘', '피크타임 알려줘'],
       data: { zones: results, totalVisitors },
     };
@@ -1824,7 +1835,7 @@ async function queryZoneAnalysis(
 
   return {
     actions,
-    message: `존별 분석 결과${filterNote}:\n${zoneList}${tabMessage}`,
+    message: `존별 분석 결과${filterNote} (방문자 수는 중복 포함):\n${zoneList}${tabMessage}`,
     suggestions: ['존별 방문자 분포 알려줘', '피크타임 알려줘', '체류시간 알려줘'],
     data: { zones: results },
   };
@@ -1879,7 +1890,7 @@ async function queryZonePerformance(
 
   return {
     actions,
-    message: `존별 성과 비교${filterNote}:\n${zoneList}${tabMessage}`,
+    message: `존별 성과 비교${filterNote} (방문자 수는 중복 포함):\n${zoneList}${tabMessage}`,
     suggestions: ['존별 방문자 분포 알려줘', '인기 존 알려줘', '피크타임 알려줘'],
     data: { zones: results },
   };

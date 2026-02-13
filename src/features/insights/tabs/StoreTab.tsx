@@ -649,6 +649,19 @@ export function StoreTab() {
     return hourlyData.reduce((max, item) => (item.visitors > (max?.visitors || 0) ? item : max), hourlyData[0]);
   }, [hourlyData]);
 
+  // 센서 커버율: 데이터가 있는 존 / 등록된 전체 존
+  const trackedVisitors = useMemo(() => {
+    if (!zoneData || zoneData.length === 0) return 0;
+    return zoneData.reduce((sum, z) => sum + z.visitors, 0);
+  }, [zoneData]);
+
+  const trackingCoverage = useMemo(() => {
+    const totalZones = zonesDim?.length || 0;
+    if (totalZones === 0) return 0;
+    const zonesWithData = zoneData?.filter(z => z.visitors > 0).length || 0;
+    return (zonesWithData / totalZones) * 100;
+  }, [zoneData, zonesDim]);
+
   // 평균 체류시간 계산 (분 단위)
   const avgDwellMinutes = useMemo(() => {
     if (metrics?.avgDwellTime) return Math.round(metrics.avgDwellTime / 60);
@@ -667,7 +680,7 @@ export function StoreTab() {
           popularZone: zoneData?.[0]?.name || '',
           popularZoneVisitors: zoneData?.[0]?.visitors || 0,
           avgDwellMinutes,
-          trackingCoverage: metrics?.trackingCoverage || 0,
+          trackingCoverage,
           hourlyPattern: hourlyRawData.map(d => ({ hour: d.hour, visitors: d.count })),
           zones: zoneData.map(z => ({
             name: z.name,
@@ -679,14 +692,14 @@ export function StoreTab() {
         { startDate: dateRange.startDate, endDate: dateRange.endDate }
       );
     }
-  }, [hourlyRawData, zoneData, peakHour, avgDwellMinutes, metrics?.trackingCoverage, setStoreData, dateRange.startDate, dateRange.endDate]);
+  }, [hourlyRawData, zoneData, peakHour, avgDwellMinutes, trackingCoverage, setStoreData, dateRange.startDate, dateRange.endDate]);
 
   // KPI 카운트업 애니메이션
   const animatedPeakVisitors = useCountUp(peakHour?.visitors || 0, { duration: 1500 });
   const animatedZoneVisitors = useCountUp(zoneData?.[0]?.visitors || 0, { duration: 1500 });
   const animatedAvgDwell = useCountUp(avgDwellMinutes, { duration: 1500 });
-  const animatedCoverage = useCountUp(metrics?.trackingCoverage || 0, { duration: 1500, decimals: 1 });
-  const animatedTrackedVisitors = useCountUp(metrics?.trackedVisitors || 0, { duration: 1500 });
+  const animatedCoverage = useCountUp(trackingCoverage, { duration: 1500, decimals: 1 });
+  const animatedTrackedVisitors = useCountUp(trackedVisitors, { duration: 1500 });
 
   return (
     <div className="space-y-6">
@@ -734,12 +747,12 @@ export function StoreTab() {
       </div>
 
       {/* 센서 커버율 안내 배너 - 데이터 있을 때만 표시 */}
-      {(metrics?.trackedVisitors ?? 0) > 0 && (metrics?.uniqueVisitors ?? 0) > 0 && (
+      {trackedVisitors > 0 && (metrics?.uniqueVisitors ?? 0) > 0 && (
         <div className={`p-3 rounded-lg flex items-start gap-2 ${isDark ? 'bg-white/5 border border-white/10' : 'bg-black/5 border border-black/10'}`}>
           <Info className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }} />
           <p style={{ fontSize: '13px', ...text3D.body }}>
-            존 분석은 센서 감지 방문객 <span style={{ fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>{metrics.trackedVisitors.toLocaleString()}명</span> 기준
-            (전체 {metrics.uniqueVisitors.toLocaleString()}명의 <span style={{ fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>{metrics.trackingCoverage.toFixed(0)}%</span>)
+            존 분석은 센서 감지 방문객 <span style={{ fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>{trackedVisitors.toLocaleString()}명</span> 기준
+            (전체 {metrics.uniqueVisitors.toLocaleString()}명의 <span style={{ fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>{trackingCoverage.toFixed(0)}%</span>)
           </p>
         </div>
       )}
@@ -771,7 +784,7 @@ export function StoreTab() {
         <Glass3DCard dark={isDark}>
           <div id="store-zone-distribution" className="p-6">
             <h3 style={{ fontSize: '16px', marginBottom: '4px', ...text3D.number }}>존별 방문자 분포</h3>
-            <p style={{ fontSize: '12px', marginBottom: '20px', ...text3D.body }}>각 존별 방문자 비율</p>
+            <p style={{ fontSize: '12px', marginBottom: '20px', ...text3D.body }}>각 존별 방문자 비율 (중복 포함, 연 방문 기준)</p>
             {zoneData && zoneData.length > 0 ? (
               <GlowZoneDonutChart data={zoneData} isDark={isDark} />
             ) : (
@@ -783,7 +796,8 @@ export function StoreTab() {
 
       <Glass3DCard dark={isDark}>
         <div id="store-zone-performance" className="p-6">
-          <h3 style={{ fontSize: '16px', marginBottom: '20px', ...text3D.number }}>존별 성과 비교</h3>
+          <h3 style={{ fontSize: '16px', marginBottom: '4px', ...text3D.number }}>존별 성과 비교</h3>
+          <p style={{ fontSize: '12px', marginBottom: '16px', ...text3D.body }}>방문자 수는 중복 포함 (1명이 여러 존 방문 시 각각 카운트)</p>
           {zoneData && zoneData.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
