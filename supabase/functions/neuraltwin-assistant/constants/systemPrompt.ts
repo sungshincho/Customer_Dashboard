@@ -156,9 +156,24 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
 
 *상품(Product) 탭:*
 - product: 상품, 상품 실적, 상품별 상세 성과, 상품 상세
-- topProducts: 인기 상품, 베스트셀러, TOP 상품, 매출 순위, 상품별 매출 TOP 10, 상품별 매출 top 10
+  - 특정 상품명이 언급되면 → entities.itemFilter에 상품명 배열 추출
+  - "프리미엄 캐시미어 코트 매출" → product + itemFilter: ["프리미엄 캐시미어 코트"]
+- bestSeller: 베스트셀러, 1등 상품, 가장 잘 팔리는 상품, 인기 1위, 베스트 상품
+  - 1위 상품 1개만 반환하는 인텐트. "베스트셀러 뭐야?" → bestSeller
+- topProducts: 인기 상품, TOP 상품, 매출 순위, 상품별 매출 TOP 10, 상품별 매출 top 10
+  - 특정 상품명이 언급되면 → entities.itemFilter에 상품명 배열 추출
 - categoryAnalysis: 카테고리 분석, 카테고리별 매출, 카테고리별 판매, 카테고리별 매출 분포, 카테고리별 판매량
-- unitsSold: 판매량, 판매 수량, 총 판매량, 판매 개수
+  - **"분포" 키워드 감지**: "카테고리별 매출 분포" → entities.responseHint: "distribution" 추가
+  - **"판매량" 키워드 감지**: "카테고리별 판매량" → entities.responseHint: "quantity" 추가
+  - 특정 카테고리명이 언급되면 → entities.itemFilter에 카테고리명 배열 추출
+  - "아우터 매출" → categoryAnalysis + itemFilter: ["아우터"]
+  - "아우터 판매량" → categoryAnalysis + responseHint: "quantity" + itemFilter: ["아우터"]
+  - "하의 매출 분포" → categoryAnalysis + responseHint: "distribution" + itemFilter: ["하의"]
+- unitsSold: 총 판매량, 총 판매 수량, 판매 개수
+  - **⚠️ 최우선 규칙**: 카테고리명이나 상품명이 포함된 판매량 질문은 unitsSold가 아님
+  - "아우터 판매량" → categoryAnalysis + itemFilter: ["아우터"] (unitsSold 아님)
+  - "코트 판매량" → product + itemFilter: ["코트"] (unitsSold 아님)
+  - 카테고리/상품명 미포함 시에만 → unitsSold (전체 총 판매량)
 
 *재고(Inventory) 탭:*
 - inventory: 재고, 재고현황, 재고 상태, 총 상품 수
@@ -539,7 +554,7 @@ AI 리포트 또는 씬 저장 패널을 열거나 닫는 요청
   - **고객 세그먼트 동의어 매핑**: 충성/단골/로열/loyal → "VIP", 신규/new → "New", 일반/regular → "Regular", 휴면/dormant → "Dormant"
   - 동의어가 언급되면 반드시 DB 세그먼트명(VIP, New, Regular, Dormant)으로 변환하여 itemFilter에 추출
 - hour: 특정 시간이 언급된 경우만 포함 (0-23). "N시에 방문", "오후 N시" 등. 날짜의 일(日)과 혼동하지 말 것
-- responseHint: zoneAnalysis에서 "분포" 키워드가 포함된 경우에만 "distribution" 설정. 그 외에는 생략`;
+- responseHint: zoneAnalysis/categoryAnalysis에서 "분포" → "distribution", categoryAnalysis에서 "판매량/수량" → "quantity". 해당 없으면 생략`;
 
 /**
  * 컨텍스트 포맷팅 함수
