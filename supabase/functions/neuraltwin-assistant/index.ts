@@ -164,8 +164,28 @@ Deno.serve(async (req) => {
       },
     });
 
-    // 7. 인텐트 분류 (Phase 2-A에서 구현)
-    const classification = await classifyIntent(message, context);
+    // 7. 상품 카탈로그 조회 (인텐트 분류 시 카테고리/상품명 인식용)
+    let productCatalog: { categories: string[]; products: Array<{ name: string; category: string }> } | undefined;
+    try {
+      const { data: productData } = await supabase
+        .from('products')
+        .select('name, category')
+        .eq('org_id', orgId);
+
+      if (productData && productData.length > 0) {
+        const categories = [...new Set(productData.map((p: any) => p.category).filter(Boolean))] as string[];
+        const products = productData.map((p: any) => ({
+          name: p.name as string,
+          category: (p.category || '기타') as string,
+        }));
+        productCatalog = { categories, products };
+      }
+    } catch (e) {
+      console.warn('[neuraltwin-assistant] Failed to load product catalog:', e);
+    }
+
+    // 인텐트 분류
+    const classification = await classifyIntent(message, context, productCatalog);
 
     // 8. 액션 실행 (Phase 3-A: general_chat, Phase 3-B: query_kpi)
     let actionResult = { actions: [] as UIAction[], message: '', suggestions: [] as string[] };
