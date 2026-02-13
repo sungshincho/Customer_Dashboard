@@ -26,14 +26,21 @@
 **데이터 로딩**: 항상 로드 (Eager Loading)
 **훅**: `useIntegratedMetrics()` → 내부적으로 `baseKPIs` + `funnelData` 결합
 
-### 카드 목록 및 데이터 소스
+### KPI 요약 카드 (4개)
+
+| # | 카드명 | 한글 라벨 | 표시 값 | 소스 테이블 | 사용 컬럼 | 계산 로직 |
+|---|--------|-----------|---------|------------|-----------|-----------|
+| 1 | **FOOTFALL** | 총 입장 | 총 입장 횟수 + 전기 대비 변화율(%) | `funnel_events` | `event_type='entry'`, `event_date`, `org_id`, `store_id` | 서버사이드 COUNT (`select('*', {count:'exact', head:true})`) |
+| 2 | **UNIQUE VISITORS** | 순 방문객 | 고유 방문자 수 + 평균 방문 빈도 | `daily_kpis_agg` | `unique_visitors`, `date`, `org_id`, `store_id` | SUM(unique_visitors), 부가: footfall/unique_visitors로 방문빈도 계산 |
+| 3 | **REVENUE** | 총 매출 | 총 매출 금액 + 객단가(ATV) | `daily_kpis_agg` | `total_revenue`, `total_transactions`, `date`, `org_id`, `store_id` | SUM(total_revenue), 부가: revenue/transactions로 ATV 계산 |
+| 4 | **CONVERSION** | 구매 전환율 | 평균 전환율(%) + 거래 건수 | `daily_kpis_agg` | `conversion_rate`, `total_transactions`, `date`, `org_id`, `store_id` | AVG(conversion_rate), SUM(total_transactions) |
+
+> **변화율 계산**: 현재 기간과 동일 길이의 이전 기간을 비교하여 `changes.footfall`, `changes.uniqueVisitors`, `changes.revenue`, `changes.conversionRate` 산출 (InsightDataContext에서 처리)
+
+### 차트 및 위젯
 
 | # | 카드명 | 표시 지표 | 소스 테이블 | 사용 컬럼 |
 |---|--------|-----------|------------|-----------|
-| 1 | **FOOTFALL (방문객)** | 총 방문자 수, 전기 대비 변화율 | `funnel_events` | `event_type='entry'`, `event_date`, `org_id`, `store_id` (서버사이드 COUNT) |
-| 2 | **REVENUE (매출)** | 총 매출, 전기 대비 변화율 | `daily_kpis_agg` | `total_revenue`, `date`, `org_id`, `store_id` |
-| 3 | **CONVERSION (전환율)** | 평균 전환율, 전기 대비 변화 | `daily_kpis_agg` | `conversion_rate`, `date`, `org_id`, `store_id` |
-| 4 | **AVG. SPEND (객단가)** | 평균 거래 금액 | `daily_kpis_agg` | `total_revenue`, `total_transactions` (계산: revenue / transactions) |
 | 5 | **퍼널 차트** | Entry→Browse→Engage→Fitting→Purchase 단계별 수, 드롭오프율, 전환율 | `funnel_events` | `event_type` ('entry','browse','engage','fitting','purchase'), `event_date`, `org_id`, `store_id` |
 | 6 | **시간대별 방문 분포** | 24시간 시간대별 입장 수 | `funnel_events` (via RPC) | RPC `get_hourly_entry_counts(p_org_id, p_store_id, p_start_date, p_end_date)` |
 | 7 | **AI 인사이트 카드** | AI 추천 요약 (우선순위별) | `ai_recommendations` | `title`, `description`, `priority`, `status`, `is_displayed`, `user_id`, `org_id`, `store_id` |
@@ -51,82 +58,108 @@ funnel_events: .select('*', {count:'exact', head:true}).eq('event_type', type) (
 ## 2. Store 탭 (매장)
 
 **파일**: `tabs/StoreTab.tsx`
-**데이터 로딩**: Lazy Loading (Store 탭 진입 시)
-**훅**: `useZoneMetricsData()`
+**데이터 로딩**: Lazy Loading (Store 탭 진입 시) + Eager (`useIntegratedMetrics`, `useHourlyVisitors`)
+**훅**: `useIntegratedMetrics()`, `useHourlyVisitors()`, `useZoneMetricsByDateRange()`, `useZonesDim()`
 
-### 카드 목록 및 데이터 소스
+### KPI 요약 카드 (4개)
+
+| # | 카드명 | 한글 라벨 | 표시 값 | 소스 테이블 | 사용 컬럼 | 계산 로직 |
+|---|--------|-----------|---------|------------|-----------|-----------|
+| 1 | **PEAK TIME** | 피크타임 | 피크 시간대 + 해당 시간 방문자 수 | `funnel_events` (via RPC) | RPC `get_hourly_entry_counts` → `{hour, count}[]` | hourlyData에서 `visitors` 최대값인 시간대 추출 (`reduce(max)`) |
+| 2 | **POPULAR ZONE** | 인기 존 | 1위 존 이름 + 방문자 수 | `zone_daily_metrics` + `zones_dim` | `zone_id`, `total_visitors` + `zone_name` | zone_id별 SUM(total_visitors) → 방문자 수 기준 정렬 → 1위 |
+| 3 | **AVG DWELL TIME** | 평균 체류시간 | 전체 존 평균 체류시간(분) | `zone_daily_metrics` (또는 `useIntegratedMetrics`) | `avg_dwell_seconds` | `metrics.avgDwellTime / 60` 또는 zoneData 평균 체류시간 |
+| 4 | **TRACKING COVERAGE** | 센서 커버율 | 추적 비율(%) + 추적 방문자 수 | `daily_kpis_agg` + `funnel_events` | `unique_visitors`, `funnel_events(entry count)` | `useIntegratedMetrics()` → `trackedVisitors / uniqueVisitors * 100` |
+
+### 차트 및 테이블
 
 | # | 카드명 | 표시 지표 | 소스 테이블 | 사용 컬럼 |
 |---|--------|-----------|------------|-----------|
-| 1 | **존별 방문자 수** | 각 존의 총 방문자 | `zone_daily_metrics` | `zone_id`, `total_visitors`, `date`, `org_id`, `store_id` |
-| 2 | **존별 평균 체류시간** | 각 존의 평균 체류 시간(초) | `zone_daily_metrics` | `zone_id`, `avg_dwell_seconds` |
-| 3 | **존별 매출 기여** | 존에 귀속된 매출 | `zone_daily_metrics` | `zone_id`, `revenue_attributed` |
-| 4 | **존 이름/유형** | 존 마스터 데이터 | `zones_dim` | `id`, `zone_name`, `zone_type`, `is_active`, `org_id`, `store_id` |
-| 5 | **존 이동 경로 (동선)** | from→to 이동 건수 상위 20개 | `zone_transitions` | `from_zone_id`, `to_zone_id`, `transition_count`, `transition_date`, `org_id`, `store_id` |
+| 5 | **시간대별 방문 패턴** | 24시간 시간대별 입장 수 (바 차트) | `funnel_events` (via RPC) | RPC `get_hourly_entry_counts` |
+| 6 | **존별 체류시간 분석** | 존별 평균 체류시간 (바 차트) | `zone_daily_metrics` + `zones_dim` | `zone_id`, `avg_dwell_seconds`, `zone_name` |
+| 7 | **존별 방문자 비중** | 존별 방문자 분포 (도넛 차트) | `zone_daily_metrics` + `zones_dim` | `zone_id`, `total_visitors`, `zone_name` |
+| 8 | **존별 성과 비교 테이블** | 존명, 방문자수, 평균체류, 전환율 | `zone_daily_metrics` + `zones_dim` | `zone_id`, `total_visitors`, `avg_dwell_seconds`, `conversion_count`, `zone_name` |
 
 **쿼리 패턴**:
 ```
 zone_daily_metrics: .select('zone_id, total_visitors, avg_dwell_seconds, revenue_attributed')
                     .eq('org_id').eq('store_id').gte('date').lte('date').limit(10000)
 zones_dim:          .select('id, zone_name, zone_type').eq('org_id').eq('store_id').eq('is_active', true)
-zone_transitions:   .select('from_zone_id, to_zone_id, transition_count')
-                    .eq('org_id').eq('store_id').gte('transition_date').lte('transition_date').limit(10000)
 ```
 
-**데이터 가공**: 프론트엔드에서 zone_id 기준으로 zone_daily_metrics를 집계(SUM visitors, AVG dwell, SUM revenue)한 뒤 zones_dim과 조인
+**데이터 가공**: 프론트엔드에서 zone_id 기준으로 zone_daily_metrics를 집계(SUM visitors, AVG dwell, SUM revenue)한 뒤 zones_dim과 조인하여 존 이름 매핑
 
 ---
 
 ## 3. Customer 탭 (고객)
 
 **파일**: `tabs/CustomerTab.tsx`
-**데이터 로딩**: Lazy Loading (Customer 탭 진입 시)
-**훅**: `useCustomerSegmentsData()`
+**데이터 로딩**: Lazy Loading (Customer 탭 진입 시) + Eager (`useIntegratedMetrics`)
+**훅**: `useIntegratedMetrics()`, 자체 `useQuery` (customer_segments_agg, return-visits)
 
-### 카드 목록 및 데이터 소스
+### KPI 요약 카드 (4개)
+
+| # | 카드명 | 한글 라벨 | 표시 값 | 소스 테이블 | 사용 컬럼 | 계산 로직 |
+|---|--------|-----------|---------|------------|-----------|-----------|
+| 1 | **UNIQUE VISITORS** | 순 방문객 | 고유 방문자 수(명) | `daily_kpis_agg` | `unique_visitors`, `date`, `org_id`, `store_id` | `useIntegratedMetrics()` → `metrics.uniqueVisitors` |
+| 2 | **REPEAT RATE** | 재방문율 | 재방문율(%) | `daily_kpis_agg` | `returning_visitors`, `unique_visitors` | `metrics.repeatRate` 또는 폴백: SUM(returning_visitors) / SUM(unique_visitors) * 100 |
+| 3 | **TOP SEGMENT** | 주요 세그먼트 | 최다 세그먼트명 + 고객 수 | `customer_segments_agg` | `segment_name`, `customer_count`, `date`, `org_id`, `store_id` | customer_count 기준 내림차순 정렬 → 1위 세그먼트 |
+| 4 | **LOYAL CUSTOMERS** | 충성 고객 | VIP/충성 세그먼트 고객 수(명) | `customer_segments_agg` | `segment_name`, `customer_count` | `segment_name`에 'VIP', '충성', 'loyal' 포함 여부 필터 |
+
+### 차트 및 테이블
 
 | # | 카드명 | 표시 지표 | 소스 테이블 | 사용 컬럼 |
 |---|--------|-----------|------------|-----------|
-| 1 | **고객 세그먼트 분포** | 세그먼트별 고객 수 (도넛 차트) | `customer_segments_agg` | `segment_name`, `customer_count`, `date`, `org_id`, `store_id` |
-| 2 | **세그먼트별 매출** | 세그먼트별 총 매출 기여 | `customer_segments_agg` | `segment_name`, `total_revenue` |
-| 3 | **세그먼트별 LTV** | 평균 고객 생애 가치 | `customer_segments_agg` | `segment_name`, `ltv_estimate` |
-| 4 | **세그먼트별 이탈 위험** | 이탈 위험 점수 | `customer_segments_agg` | `segment_name`, `churn_risk_score` |
-| 5 | **총 고객 수** | 전체 고객 합계 | `customer_segments_agg` | `customer_count` (SUM) |
-| 6 | **재방문율** | 재방문 고객 비율 | `daily_kpis_agg` | `returning_visitors`, `unique_visitors` (계산: returning / unique * 100) |
+| 5 | **고객 세그먼트 분포** | 세그먼트별 고객 수 (도넛 차트) | `customer_segments_agg` | `segment_name`, `customer_count` |
+| 6 | **세그먼트별 평균 구매** | 세그먼트별 평균 거래 금액 (바 차트) | `customer_segments_agg` | `segment_name`, `avg_transaction_value` |
+| 7 | **재방문 추이** | 일별 신규/재방문 방문자 추이 (영역 차트) | `daily_kpis_agg` | `date`, `unique_visitors`, `returning_visitors` |
+| 8 | **세그먼트 상세 테이블** | 세그먼트명, 고객수, 매출, LTV, 이탈위험 | `customer_segments_agg` | `segment_name`, `customer_count`, `total_revenue`, `ltv_estimate`, `churn_risk_score` |
 
 **쿼리 패턴**:
 ```
-customer_segments_agg: .select('segment_name, customer_count, total_revenue, ltv_estimate, churn_risk_score')
+customer_segments_agg: .select('segment_name, customer_count, total_revenue, avg_transaction_value, visit_frequency, ltv_estimate, churn_risk_score')
                        .eq('org_id').eq('store_id').eq('date', endDate)
+daily_kpis_agg (재방문): .select('date, unique_visitors, returning_visitors')
+                         .eq('org_id').eq('store_id').gte('date').lte('date').order('date')
 ```
 
-**참고**: `date`는 최신 날짜(endDate) 기준 단일 조회. 재방문율은 이미 로드된 `baseKPIs` 데이터에서 계산.
+**참고**: `customer_segments_agg`는 최신 날짜(endDate) 기준 단일 조회. 재방문율은 `useIntegratedMetrics()`에서 제공되며, 재방문 추이 차트는 별도 `useQuery`로 기간 전체 일별 데이터를 조회.
 
 ---
 
 ## 4. Product 탭 (상품)
 
 **파일**: `tabs/ProductTab.tsx`
-**데이터 로딩**: Lazy Loading (Product 탭 진입 시)
-**훅**: `useProductPerformanceData()`
+**데이터 로딩**: Lazy Loading (Product 탭 진입 시) + Eager (`useIntegratedMetrics`)
+**훅**: `useIntegratedMetrics()`, 자체 `useQuery` (product-performance)
 
-### 카드 목록 및 데이터 소스
+### KPI 요약 카드 (4개)
+
+| # | 카드명 | 한글 라벨 | 표시 값 | 소스 테이블 | 사용 컬럼 | 계산 로직 |
+|---|--------|-----------|---------|------------|-----------|-----------|
+| 1 | **REVENUE** | 총 매출 | 분석 기간 총 매출 금액 | `daily_kpis_agg` | `total_revenue`, `date`, `org_id`, `store_id` | `useIntegratedMetrics()` → `metrics.revenue` (Overview탭과 동일 소스) |
+| 2 | **UNITS SOLD** | 총 판매량 | 총 판매 수량(개) | `product_performance_agg` | `product_id`, `units_sold`, `date`, `org_id`, `store_id` | product_id별 SUM(units_sold) → 전체 합계 |
+| 3 | **BESTSELLER** | 베스트셀러 | 1위 상품명 + 매출 금액 | `product_performance_agg` + `products` | `product_id`, `revenue` + `product_name` | product_id별 SUM(revenue) → 매출 기준 정렬 → 1위 상품, 하이브리드 정규화 적용 |
+| 4 | **LOW STOCK** | 재고 부족 | 재고 부족 상품 수(개) | `product_performance_agg` | `product_id`, `stock_level` | `stock_level >= 0 && stock_level < 10` 조건 필터 → COUNT |
+
+> **하이브리드 정규화**: `product_performance_agg`의 상품별 매출 비율을 `daily_kpis_agg.total_revenue`에 적용하여 데이터 일관성 확보 (`revenueRatio = kpiTotalRevenue / productPerfTotal`)
+
+### 차트 및 테이블
 
 | # | 카드명 | 표시 지표 | 소스 테이블 | 사용 컬럼 |
 |---|--------|-----------|------------|-----------|
-| 1 | **TOP 10 상품** | 매출 기준 상위 10개 상품 (이름, 카테고리, 매출, 판매수량) | `product_performance_agg` + `products` | **product_performance_agg**: `product_id`, `revenue`, `units_sold`, `date`, `org_id`, `store_id` / **products**: `id`, `product_name`, `category` |
-| 2 | **카테고리별 매출 비중** | 카테고리별 매출, 판매수량, 매출 비율(%) | `product_performance_agg` + `products` | 동일 (카테고리 기준 집계) |
-| 3 | **총 판매 수량** | 전체 기간 누적 판매 수량 | `product_performance_agg` | `units_sold` (SUM) |
-| 4 | **평균 단가** | 총 매출 / 총 판매 수량 | `product_performance_agg` | `revenue`, `units_sold` (계산) |
+| 5 | **상품별 매출 TOP 10** | 매출 기준 상위 10개 상품 (가로 바 차트) | `product_performance_agg` + `products` | `product_id`, `revenue`, `units_sold` + `product_name`, `category` |
+| 6 | **카테고리별 매출 비중** | 카테고리별 매출 분포 (도넛 차트) | `product_performance_agg` + `products` | `revenue` (카테고리별 집계) + `category` |
+| 7 | **카테고리별 판매량** | 카테고리별 판매 수량 (바 차트) | `product_performance_agg` + `products` | `units_sold` (카테고리별 집계) + `category` |
+| 8 | **상세 상품 테이블** | 순위, 상품명, 카테고리, 판매량, 매출 | `product_performance_agg` + `products` | `product_id`, `revenue`, `units_sold` + `product_name`, `category` |
 
 **쿼리 패턴**:
 ```
-product_performance_agg: .select('product_id, revenue, units_sold')
+product_performance_agg: .select('product_id, units_sold, revenue, stock_level')
                          .eq('org_id').eq('store_id').gte('date').lte('date').limit(10000)
 products:                .select('id, product_name, category').in('id', productIds)
 ```
 
-**데이터 가공**: 프론트엔드에서 product_id별 집계(SUM revenue, SUM units_sold) → products 테이블과 조인 → 매출 기준 정렬 → 카테고리별 재집계
+**데이터 가공**: 프론트엔드에서 product_id별 집계(SUM revenue, SUM units_sold, 최신 stock_level) → products 테이블과 조인 → 매출 기준 정렬 → 카테고리별 재집계. 하이브리드 정규화로 `daily_kpis_agg` 총액 기준 비율 적용.
 
 ---
 
@@ -136,14 +169,19 @@ products:                .select('id, product_name, category').in('id', productI
 **데이터 로딩**: Lazy Loading (Inventory 탭 진입 시)
 **훅**: `useInventoryMetricsData()`
 
-### 카드 목록 및 데이터 소스
+### KPI 요약 카드 (4개)
+
+| # | 카드명 | 한글 라벨 | 표시 값 | 소스 테이블 | 사용 컬럼 | 계산 로직 |
+|---|--------|-----------|---------|------------|-----------|-----------|
+| 1 | **TOTAL ITEMS** | 총 상품 수 | 관리 중인 SKU 수 | `inventory_levels` | 전체 행 | COUNT(*) |
+| 2 | **LOW STOCK** | 재고 부족 | 부족+위험 상품 수 | `inventory_levels` | `current_stock`, `optimal_stock`, `minimum_stock` | current ≤ minimum → critical, current < optimal×0.5 → low, 합산 COUNT |
+| 3 | **OVERSTOCK** | 과잉 재고 | 과잉 재고 상품 수 | `inventory_levels` | `current_stock`, `optimal_stock` | current > optimal×1.5 → overstock COUNT |
+| 4 | **HEALTHY** | 정상 재고 | 정상 재고 상품 수 + 비율(%) | `inventory_levels` | `current_stock`, `optimal_stock`, `minimum_stock` | critical/low/overstock 아닌 나머지 → normal COUNT, (normal/total×100)% |
+
+### 차트 및 테이블
 
 | # | 카드명 | 표시 지표 | 소스 테이블 | 사용 컬럼 |
 |---|--------|-----------|------------|-----------|
-| 1 | **TOTAL ITEMS (총 상품 수)** | 관리 중인 SKU 수 | `inventory_levels` | 전체 행 수 (COUNT) |
-| 2 | **LOW STOCK (재고 부족)** | 부족+위험 상품 수 | `inventory_levels` | `current_stock`, `optimal_stock`, `minimum_stock` (계산: current <= minimum → critical, current < optimal*0.5 → low) |
-| 3 | **OVERSTOCK (과잉 재고)** | 과잉 재고 상품 수 | `inventory_levels` | `current_stock`, `optimal_stock` (계산: current > optimal*1.5) |
-| 4 | **HEALTHY (정상 재고)** | 정상 재고 상품 수, 정상 비율(%) | `inventory_levels` | `current_stock`, `optimal_stock`, `minimum_stock` (계산) |
 | 5 | **재고 상태 분포 (도넛 차트)** | critical/low/normal/overstock 분포 | `inventory_levels` | `current_stock`, `optimal_stock`, `minimum_stock` (상태별 COUNT) |
 | 6 | **카테고리별 재고 현황 (바 차트)** | 카테고리별 총 재고, 부족/과잉 건수 | `inventory_levels` + `products` | **inventory_levels**: `product_id`, `current_stock`, `optimal_stock`, `minimum_stock` / **products**: `id`, `category` |
 | 7 | **재고 부족 경고** | 위험 상품 목록 (상품명, 현재고/적정재고, 품절 예상일, 긴급도) | `inventory_levels` + `products` | **inventory_levels**: `product_id`, `current_stock`, `optimal_stock`, `minimum_stock`, `weekly_demand` / **products**: `id`, `product_name` |
@@ -173,14 +211,19 @@ inventory_movements: .select('id, product_id, movement_type, quantity, previous_
 **데이터 로딩**: 독립 훅 (탭 진입 시)
 **훅**: `useAIPrediction()`
 
-### 카드 목록 및 데이터 소스
+### KPI 요약 카드 (4개)
+
+| # | 카드명 | 한글 라벨 | 표시 값 | 소스 테이블 / API | 사용 컬럼 | 계산 로직 |
+|---|--------|-----------|---------|-------------------|-----------|-----------|
+| 1 | **향후 7일 예상 매출** | - | 예측 매출 합계 + 전주 대비 변화율(%) | `daily_kpis_agg` → Edge Function `retail-ai-inference` | `total_revenue`, `date` | 과거 14~30일 데이터 → AI 예측 또는 통계적 폴백(이동평균+트렌드+요일패턴) |
+| 2 | **예상 방문자** | - | 7일 누적 예상 방문자 수 | 동일 | `total_visitors`, `date` | 동일 파이프라인 |
+| 3 | **예상 전환율** | - | 7일 평균 예측 전환율(%) | 동일 | `conversion_rate`, `date` | 동일 파이프라인 |
+| 4 | **예측 신뢰도** | - | 전체 신뢰도 (높음/보통/낮음) + % | 내부 계산 | - | AI 모델 confidence 또는 통계적 신뢰구간(±1.96σ) |
+
+### 차트 및 테이블
 
 | # | 카드명 | 표시 지표 | 소스 테이블 / API | 사용 컬럼 |
 |---|--------|-----------|-------------------|-----------|
-| 1 | **향후 7일 예상 매출** | 예측 매출 합계, 전주 대비 변화율 | `daily_kpis_agg` → Edge Function `retail-ai-inference` (또는 통계적 폴백) | `total_revenue`, `total_visitors`, `conversion_rate`, `date` |
-| 2 | **예상 방문자** | 7일 누적 예상 방문자 | 동일 | 동일 |
-| 3 | **예상 전환율** | 7일 평균 예측 전환율 | 동일 | 동일 |
-| 4 | **예측 신뢰도** | 전체 신뢰도 (높음/보통/낮음), % | 내부 계산 | AI 모델 또는 통계적 신뢰구간 |
 | 5 | **매출 예측 차트** | 과거 14일 실적 + 향후 7일 예측 라인 차트 | `daily_kpis_agg` | `total_revenue`, `date` (과거 14~30일) |
 | 6 | **방문자 예측 차트** | 일별 방문자 추이 | 동일 | `total_visitors`, `date` |
 | 7 | **전환율 예측 차트** | 일별 전환율 추이 | 동일 | `conversion_rate`, `date` |
@@ -211,17 +254,21 @@ inventory_movements: .select('id, product_id, movement_type, quantity, previous_
 **데이터 로딩**: 독립 훅
 **훅**: `useAIRecommendations(storeId)`
 
+### KPI 예측 카드 (4개) — 1단계: 예측 (Predict)
+
+| # | 카드명 | 한글 라벨 | 표시 값 | 소스 | 계산 로직 |
+|---|--------|-----------|---------|------|-----------|
+| 1 | **수요 예측** | - | 다음 7일 예상 매출 + 전주 대비 변화(%) | **Mock 데이터** | 향후 `daily_kpis_agg` + AI 연동 예정 |
+| 2 | **방문자 예측** | - | 다음 7일 예상 방문자 + 변화율(%) | **Mock 데이터** | 향후 연동 예정 |
+| 3 | **시즌 트렌드** | - | 계절성 분석 + 피크 시기 | **Mock 데이터** | 향후 연동 예정 |
+| 4 | **리스크 예측** | - | 위험 요소 건수 + 재고 부족 위험 품목 | **Mock 데이터** | 향후 연동 예정 |
+
 ### 섹션별 데이터 소스
 
 | # | 섹션/카드명 | 표시 지표 | 소스 테이블 / API | 사용 컬럼 |
 |---|------------|-----------|-------------------|-----------|
 | **진행 중인 전략** | | | | |
-| 1 | ActiveStrategy 카드 | 전략명, 상태, 진행일, 예상/현재 ROI, 진행률 | Mock 데이터 (향후 `applied_strategies` 연동 예정) | - |
-| **1단계: 예측 (Predict)** | | | | |
-| 2 | 수요 예측 | 다음 7일 예상 매출, 전주 대비 변화 | Mock 데이터 (향후 `daily_kpis_agg` + AI 연동 예정) | - |
-| 3 | 방문자 예측 | 다음 7일 예상 방문자, 변화율 | Mock 데이터 | - |
-| 4 | 시즌 트렌드 | 계절성 분석, 피크 시기 | Mock 데이터 | - |
-| 5 | 리스크 예측 | 위험 요소 건수, 재고 부족 위험 품목 | Mock 데이터 | - |
+| 5 | ActiveStrategy 카드 | 전략명, 상태, 진행일, 예상/현재 ROI, 진행률 | Mock 데이터 (향후 `applied_strategies` 연동 예정) | - |
 | **2단계: 최적화 (Optimize)** | | | | |
 | 6 | 가격 최적화 | 분석 대상/최적화 가능 상품 수, 잠재 수익 증가(%) | Mock 데이터 | - |
 | 7 | 재고 최적화 | 분석 대상, 발주 추천 건수, 품절 방지 건수 | Mock 데이터 | - |
@@ -248,8 +295,8 @@ ai_recommendations: .select('*')
 
 | 테이블명 | 주요 컬럼 | 사용 탭 | 로딩 방식 |
 |----------|-----------|---------|-----------|
-| `daily_kpis_agg` | `date`, `total_visitors`, `unique_visitors`, `returning_visitors`, `total_revenue`, `total_transactions`, `conversion_rate`, `avg_transaction_value`, `org_id`, `store_id` | Overview, Customer(재방문율), Prediction(과거데이터) | Eager |
-| `funnel_events` | `event_type`, `event_date`, `org_id`, `store_id` | Overview | Eager |
+| `daily_kpis_agg` | `date`, `total_visitors`, `unique_visitors`, `returning_visitors`, `total_revenue`, `total_transactions`, `conversion_rate`, `avg_transaction_value`, `org_id`, `store_id` | Overview, Store(커버율), Customer(재방문율), Product(매출), Prediction(과거데이터) | Eager |
+| `funnel_events` | `event_type`, `event_date`, `org_id`, `store_id` | Overview, Store(피크타임·커버율) | Eager |
 | `zone_daily_metrics` | `zone_id`, `date`, `total_visitors`, `avg_dwell_seconds`, `revenue_attributed`, `org_id`, `store_id` | Store | Lazy |
 | `zones_dim` | `id`, `zone_name`, `zone_type`, `is_active`, `org_id`, `store_id` | Store | Lazy |
 | `zone_transitions` | `from_zone_id`, `to_zone_id`, `transition_count`, `transition_date`, `org_id`, `store_id` | Store | Lazy |
@@ -264,7 +311,7 @@ ai_recommendations: .select('*')
 
 | 함수명 | 파라미터 | 반환값 | 사용 탭 |
 |--------|----------|--------|---------|
-| `get_hourly_entry_counts` | `p_org_id`, `p_store_id`, `p_start_date`, `p_end_date` | `{hour, count}[]` | Overview |
+| `get_hourly_entry_counts` | `p_org_id`, `p_store_id`, `p_start_date`, `p_end_date` | `{hour, count}[]` | Overview, Store(피크타임) |
 
 ### Edge Function
 
