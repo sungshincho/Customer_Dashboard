@@ -572,16 +572,23 @@ export function formatProductCatalog(catalog?: {
 
   const parts: string[] = [];
   parts.push('## 현재 DB에 등록된 상품 카탈로그 (인텐트 분류 참고용)');
+  parts.push('\n**⚠️ 중요: 대시보드 데이터 조회 vs 일반 지식 질문 구분**');
+  parts.push('- 아래 카탈로그는 **이 매장의 대시보드 데이터를 조회**할 때만 참고하세요.');
+  parts.push('- "전세계", "글로벌", "브랜드 추천", "트렌드", "업계", "시장" 등 외부/일반 지식을 묻는 질문은 카테고리/상품명이 포함되어 있어도 → **general_chat**으로 분류');
+  parts.push('- 예: "26년 전세계 브랜드 아우터 판매량 얼마야?" → general_chat (대시보드 데이터가 아닌 일반 지식 질문)');
+  parts.push('- 예: "아우터 트렌드 어때?" → general_chat (패션 트렌드는 일반 지식)');
+  parts.push('- 예: "가방 브랜드 추천해줘" → general_chat (추천은 일반 대화)');
+  parts.push('- 예: "아우터 몇개 팔았어?" → query_kpi + categoryAnalysis (이 매장 데이터 조회)');
 
   if (catalog.categories && catalog.categories.length > 0) {
     parts.push(`\n**카테고리 목록:** ${catalog.categories.join(', ')}`);
-    parts.push('- 사용자 메시지에 위 카테고리명이 포함되면 → queryType: "categoryAnalysis" + itemFilter에 해당 카테고리명 추출');
+    parts.push('- 이 매장의 데이터를 묻는 맥락에서 위 카테고리명이 포함되면 → queryType: "categoryAnalysis" + itemFilter에 해당 카테고리명 추출');
   }
 
   if (catalog.products && catalog.products.length > 0) {
     const productList = catalog.products.map(p => `${p.name}(${p.category})`).join(', ');
     parts.push(`\n**상품 목록 (상품명(카테고리)):** ${productList}`);
-    parts.push('- 사용자 메시지에 위 상품명이 포함되면 → queryType: "product" + itemFilter에 해당 상품명 추출');
+    parts.push('- 이 매장의 데이터를 묻는 맥락에서 위 상품명이 포함되면 → queryType: "product" + itemFilter에 해당 상품명 추출');
     parts.push('- "X는 무슨 카테고리야?" 류 질문도 → queryType: "product" + itemFilter에 해당 상품명 추출 (응답에서 카테고리 정보 포함)');
   }
 
