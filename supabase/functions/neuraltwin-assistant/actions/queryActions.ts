@@ -202,6 +202,7 @@ const QUERY_TYPE_TO_TAB: Record<string, { page: string; tab?: string; section?: 
   returnTrend: { page: '/insights', tab: 'customer', section: 'customer-return-trend' },
   // 상품(Product) 탭
   product: { page: '/insights', tab: 'product', section: 'product-kpi-cards' },
+  bestSeller: { page: '/insights', tab: 'product', section: 'product-kpi-cards' },
   topProducts: { page: '/insights', tab: 'product', section: 'product-top10' },
   categoryAnalysis: { page: '/insights', tab: 'product', section: 'product-category-revenue' },
   unitsSold: { page: '/insights', tab: 'product', section: 'product-kpi-cards' },
@@ -291,6 +292,7 @@ function getTermKeyword(queryType: string): string {
     returnTrend: '재방문 추이',
     // 상품
     product: '상품',
+    bestSeller: '베스트셀러',
     topProducts: '인기 상품',
     categoryAnalysis: '카테고리 분석',
     unitsSold: '판매량',
@@ -650,13 +652,16 @@ export async function handleQueryKpi(
 
       // 상품(Product) 탭 — get_product_performance RPC 사용
       case 'product':
-        result = await queryProduct(supabase, storeId, dateRange, pageContext, orgId);
+        result = await queryProduct(supabase, storeId, dateRange, pageContext, orgId, classification.entities.itemFilter);
+        break;
+      case 'bestSeller':
+        result = await queryBestSeller(supabase, storeId, dateRange, pageContext, orgId);
         break;
       case 'topProducts':
-        result = await queryTopProducts(supabase, storeId, dateRange, pageContext, orgId);
+        result = await queryTopProducts(supabase, storeId, dateRange, pageContext, orgId, classification.entities.itemFilter);
         break;
       case 'categoryAnalysis':
-        result = await queryCategoryAnalysis(supabase, storeId, dateRange, pageContext, orgId, classification.entities.responseHint);
+        result = await queryCategoryAnalysis(supabase, storeId, dateRange, pageContext, orgId, classification.entities.responseHint, classification.entities.itemFilter);
         break;
       case 'unitsSold':
         result = await queryUnitsSold(supabase, storeId, dateRange, pageContext, orgId);
@@ -1161,7 +1166,8 @@ async function queryProduct(
   storeId: string,
   dateRange: { startDate: string; endDate: string },
   pageContext?: PageContext,
-  orgId?: string
+  orgId?: string,
+  itemFilter?: string[]
 ): Promise<QueryActionResult> {
   if (!orgId) throw new Error('orgId required');
 
@@ -1169,6 +1175,26 @@ async function queryProduct(
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 상세 내역을 확인합니다.` : '';
 
   const products = await rpcProductPerformance(supabase, orgId, storeId, dateRange.startDate, dateRange.endDate);
+
+  // itemFilter: 특정 상품명 필터링
+  if (itemFilter && itemFilter.length > 0) {
+    const filtered = products.filter((p: any) =>
+      itemFilter.some(f => (p.product_name || '').toLowerCase().includes(f.toLowerCase()))
+    );
+    if (filtered.length > 0) {
+      const filterNote = `(${itemFilter.join(', ')} 필터 적용)`;
+      const list = filtered.map((p: any) =>
+        `• ${p.product_name}: 판매 ${(p.units_sold || 0).toLocaleString()}개, 매출 ${formatNumber(p.revenue || 0)}원`
+      ).join('\n');
+      return {
+        actions,
+        message: `상품 실적 ${filterNote}:\n${list}${tabMessage}`,
+        suggestions: ['TOP 상품 보여줘', '카테고리 분석 보여줘'],
+        data: { products: filtered },
+      };
+    }
+  }
+
   const totalUnitsSold = products.reduce((sum: number, p: any) => sum + (p.units_sold || 0), 0);
   const totalRevenue = products.reduce((sum: number, p: any) => sum + (p.revenue || 0), 0);
 
@@ -2309,6 +2335,42 @@ async function querySegmentDetail(
 // ============================================
 
 /**
+ * 베스트셀러 조회 (RPC: get_product_performance — 매출 1위 상품)
+ */
+async function queryBestSeller(
+  supabase: SupabaseClient,
+  storeId: string,
+  dateRange: { startDate: string; endDate: string },
+  pageContext?: PageContext,
+  orgId?: string
+): Promise<QueryActionResult> {
+  if (!orgId) throw new Error('orgId required');
+
+  const { actions, tabChanged, targetTab } = createNavigationActions('bestSeller', dateRange, pageContext);
+  const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 확인합니다.` : '';
+
+  const products = await rpcProductPerformance(supabase, orgId, storeId, dateRange.startDate, dateRange.endDate);
+
+  if (products.length === 0) {
+    return {
+      actions,
+      message: `상품 데이터를 조회할 수 없습니다.${tabMessage}`,
+      suggestions: ['상품탭 보여줘', '매출 알려줘'],
+      data: null,
+    };
+  }
+
+  // RPC가 이미 매출 DESC 정렬 → [0]이 베스트셀러
+  const best = products[0];
+  return {
+    actions,
+    message: `베스트셀러는 "${best.product_name}"입니다.\n• 매출: ${formatNumber(best.revenue || 0)}원\n• 판매량: ${(best.units_sold || 0).toLocaleString()}개\n• 카테고리: ${best.category || '미분류'}${tabMessage}`,
+    suggestions: ['TOP 상품 보여줘', '카테고리 분석 보여줘', '재고 현황 알려줘'],
+    data: { bestSeller: best },
+  };
+}
+
+/**
  * TOP 상품 조회 (RPC: get_product_performance — 상품명 포함, product_id별 사전 집계)
  */
 async function queryTopProducts(
@@ -2316,7 +2378,8 @@ async function queryTopProducts(
   storeId: string,
   dateRange: { startDate: string; endDate: string },
   pageContext?: PageContext,
-  orgId?: string
+  orgId?: string,
+  itemFilter?: string[]
 ): Promise<QueryActionResult> {
   if (!orgId) throw new Error('orgId required');
 
@@ -2334,15 +2397,28 @@ async function queryTopProducts(
     };
   }
 
+  // itemFilter: 특정 상품명 필터링
+  let results = products;
+  let filterNote = '';
+  if (itemFilter && itemFilter.length > 0) {
+    const filtered = products.filter((p: any) =>
+      itemFilter.some(f => (p.product_name || '').toLowerCase().includes(f.toLowerCase()))
+    );
+    if (filtered.length > 0) {
+      results = filtered;
+      filterNote = ` (${itemFilter.join(', ')} 필터 적용)`;
+    }
+  }
+
   // RPC가 이미 매출 DESC 정렬 + product_id별 집계 완료
-  const top10 = products.slice(0, 10);
+  const top10 = results.slice(0, 10);
   const productList = top10.map((p: any, i: number) =>
     `${i + 1}. ${p.product_name || '상품#' + p.product_id}: ${formatNumber(p.revenue || 0)}원 (${(p.units_sold || 0).toLocaleString()}개)`
   ).join('\n');
 
   return {
     actions,
-    message: `매출 TOP 10 상품:\n${productList}${tabMessage}`,
+    message: `매출 TOP ${top10.length} 상품${filterNote}:\n${productList}${tabMessage}`,
     suggestions: ['카테고리 분석 보여줘', '판매량 알려줘', '재고 현황 알려줘'],
     data: { topProducts: top10 },
   };
@@ -2357,11 +2433,13 @@ async function queryCategoryAnalysis(
   dateRange: { startDate: string; endDate: string },
   pageContext?: PageContext,
   orgId?: string,
-  responseHint?: string
+  responseHint?: string,
+  itemFilter?: string[]
 ): Promise<QueryActionResult> {
   if (!orgId) throw new Error('orgId required');
 
   const isQuantity = responseHint === 'quantity';
+  const isDistribution = responseHint === 'distribution';
   const { actions, tabChanged, targetTab } = createNavigationActions('categoryAnalysis', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 카테고리 분석을 확인합니다.` : '';
 
@@ -2385,30 +2463,60 @@ async function queryCategoryAnalysis(
     catMap[cat].revenue += p.revenue || 0;
   });
 
+  // itemFilter: 특정 카테고리 필터링
+  let entries = Object.entries(catMap);
+  let filterNote = '';
+  if (itemFilter && itemFilter.length > 0) {
+    const filtered = entries.filter(([cat]) =>
+      itemFilter.some(f => cat.toLowerCase().includes(f.toLowerCase()))
+    );
+    if (filtered.length > 0) {
+      entries = filtered;
+      filterNote = ` (${itemFilter.join(', ')} 필터 적용)`;
+    }
+  }
+
+  if (isDistribution) {
+    // 분포 모드: 퍼센트 기반 응답
+    const totalRevenue = entries.reduce((sum, [, v]) => sum + v.revenue, 0);
+    const sorted = entries.sort((a, b) => b[1].revenue - a[1].revenue);
+    const catList = sorted.map(([cat, v]) => {
+      const pct = totalRevenue > 0 ? ((v.revenue / totalRevenue) * 100).toFixed(1) : '0';
+      return `• ${cat}: ${pct}% (${formatNumber(v.revenue)}원)`;
+    }).join('\n');
+
+    return {
+      actions,
+      message: `카테고리별 매출 분포${filterNote}:\n${catList}${tabMessage}`,
+      suggestions: ['카테고리별 판매량 보여줘', 'TOP 상품 보여줘'],
+      data: { categories: catMap },
+    };
+  }
+
   if (isQuantity) {
     // 판매량 기준 정렬 및 응답
-    const sorted = Object.entries(catMap).sort((a, b) => b[1].units - a[1].units);
+    const sorted = entries.sort((a, b) => b[1].units - a[1].units);
     const catList = sorted.map(([cat, v]) =>
       `• ${cat}: ${v.units.toLocaleString()}개 (매출 ${formatNumber(v.revenue)}원)`
     ).join('\n');
 
     return {
       actions,
-      message: `카테고리별 판매량:\n${catList}${tabMessage}`,
+      message: `카테고리별 판매량${filterNote}:\n${catList}${tabMessage}`,
       suggestions: ['카테고리별 매출 보여줘', 'TOP 상품 보여줘', '재고 현황 알려줘'],
       data: { categories: catMap },
     };
   }
 
   // 매출 기준 정렬 및 응답 (기본)
-  const sorted = Object.entries(catMap).sort((a, b) => b[1].revenue - a[1].revenue);
+  const sorted = entries.sort((a, b) => b[1].revenue - a[1].revenue);
   const catList = sorted.map(([cat, v]) =>
     `• ${cat}: ${formatNumber(v.revenue)}원 (${v.units.toLocaleString()}개)`
   ).join('\n');
 
   return {
     actions,
-    message: `카테고리별 매출:\n${catList}${tabMessage}`,
+    message: `카테고리별 매출${filterNote}:\n${catList}${tabMessage}`,
     suggestions: ['카테고리별 판매량 보여줘', 'TOP 상품 보여줘', '재고 현황 알려줘'],
     data: { categories: catMap },
   };
