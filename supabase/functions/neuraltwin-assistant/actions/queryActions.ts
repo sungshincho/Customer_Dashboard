@@ -656,7 +656,7 @@ export async function handleQueryKpi(
         result = await queryTopProducts(supabase, storeId, dateRange, pageContext, orgId);
         break;
       case 'categoryAnalysis':
-        result = await queryCategoryAnalysis(supabase, storeId, dateRange, pageContext, orgId);
+        result = await queryCategoryAnalysis(supabase, storeId, dateRange, pageContext, orgId, classification.entities.responseHint);
         break;
       case 'unitsSold':
         result = await queryUnitsSold(supabase, storeId, dateRange, pageContext, orgId);
@@ -2335,16 +2335,16 @@ async function queryTopProducts(
   }
 
   // RPC가 이미 매출 DESC 정렬 + product_id별 집계 완료
-  const top5 = products.slice(0, 5);
-  const productList = top5.map((p: any, i: number) =>
+  const top10 = products.slice(0, 10);
+  const productList = top10.map((p: any, i: number) =>
     `${i + 1}. ${p.product_name || '상품#' + p.product_id}: ${formatNumber(p.revenue || 0)}원 (${(p.units_sold || 0).toLocaleString()}개)`
   ).join('\n');
 
   return {
     actions,
-    message: `매출 TOP 5 상품:\n${productList}${tabMessage}`,
+    message: `매출 TOP 10 상품:\n${productList}${tabMessage}`,
     suggestions: ['카테고리 분석 보여줘', '판매량 알려줘', '재고 현황 알려줘'],
-    data: { topProducts: top5 },
+    data: { topProducts: top10 },
   };
 }
 
@@ -2356,10 +2356,12 @@ async function queryCategoryAnalysis(
   storeId: string,
   dateRange: { startDate: string; endDate: string },
   pageContext?: PageContext,
-  orgId?: string
+  orgId?: string,
+  responseHint?: string
 ): Promise<QueryActionResult> {
   if (!orgId) throw new Error('orgId required');
 
+  const isQuantity = responseHint === 'quantity';
   const { actions, tabChanged, targetTab } = createNavigationActions('categoryAnalysis', dateRange, pageContext);
   const tabMessage = tabChanged ? `\n\n${getTabDisplayName(targetTab)}탭으로 이동하여 카테고리 분석을 확인합니다.` : '';
 
@@ -2383,15 +2385,31 @@ async function queryCategoryAnalysis(
     catMap[cat].revenue += p.revenue || 0;
   });
 
+  if (isQuantity) {
+    // 판매량 기준 정렬 및 응답
+    const sorted = Object.entries(catMap).sort((a, b) => b[1].units - a[1].units);
+    const catList = sorted.map(([cat, v]) =>
+      `• ${cat}: ${v.units.toLocaleString()}개 (매출 ${formatNumber(v.revenue)}원)`
+    ).join('\n');
+
+    return {
+      actions,
+      message: `카테고리별 판매량:\n${catList}${tabMessage}`,
+      suggestions: ['카테고리별 매출 보여줘', 'TOP 상품 보여줘', '재고 현황 알려줘'],
+      data: { categories: catMap },
+    };
+  }
+
+  // 매출 기준 정렬 및 응답 (기본)
   const sorted = Object.entries(catMap).sort((a, b) => b[1].revenue - a[1].revenue);
-  const catList = sorted.slice(0, 5).map(([cat, v]) =>
+  const catList = sorted.map(([cat, v]) =>
     `• ${cat}: ${formatNumber(v.revenue)}원 (${v.units.toLocaleString()}개)`
   ).join('\n');
 
   return {
     actions,
     message: `카테고리별 매출:\n${catList}${tabMessage}`,
-    suggestions: ['TOP 상품 보여줘', '판매량 알려줘', '재고 현황 알려줘'],
+    suggestions: ['카테고리별 판매량 보여줘', 'TOP 상품 보여줘', '재고 현황 알려줘'],
     data: { categories: catMap },
   };
 }

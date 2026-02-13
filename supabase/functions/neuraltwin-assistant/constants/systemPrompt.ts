@@ -158,6 +158,8 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
 - product: 상품, 상품 실적, 상품별 상세 성과, 상품 상세
 - topProducts: 인기 상품, 베스트셀러, TOP 상품, 매출 순위, 상품별 매출 TOP 10, 상품별 매출 top 10
 - categoryAnalysis: 카테고리 분석, 카테고리별 매출, 카테고리별 판매, 카테고리별 매출 분포, 카테고리별 판매량
+  - **"판매량" 키워드 감지**: "카테고리별 판매량", "카테고리 판매 수량" 등 "판매량/수량"이 포함되면 → entities.responseHint: "quantity" 추가
+  - "판매량"이 없는 일반 카테고리 분석/매출이면 → responseHint 생략
 - unitsSold: 판매량, 판매 수량, 총 판매량, 판매 개수
 
 *재고(Inventory) 탭:*
@@ -539,7 +541,7 @@ AI 리포트 또는 씬 저장 패널을 열거나 닫는 요청
   - **고객 세그먼트 동의어 매핑**: 충성/단골/로열/loyal → "VIP", 신규/new → "New", 일반/regular → "Regular", 휴면/dormant → "Dormant"
   - 동의어가 언급되면 반드시 DB 세그먼트명(VIP, New, Regular, Dormant)으로 변환하여 itemFilter에 추출
 - hour: 특정 시간이 언급된 경우만 포함 (0-23). "N시에 방문", "오후 N시" 등. 날짜의 일(日)과 혼동하지 말 것
-- responseHint: zoneAnalysis에서 "분포" 키워드가 포함된 경우에만 "distribution" 설정. 그 외에는 생략`;
+- responseHint: zoneAnalysis에서 "분포" 키워드 → "distribution", categoryAnalysis에서 "판매량/수량" 키워드 → "quantity". 해당 없으면 생략`;
 
 /**
  * 컨텍스트 포맷팅 함수
