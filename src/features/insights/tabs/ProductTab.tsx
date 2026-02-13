@@ -635,33 +635,21 @@ export function ProductTab() {
     enabled: !!selectedStore?.id && !!orgId,
   });
 
-  // 🔧 FIX: 하이브리드 정규화 - daily_kpis_agg 총액 기준으로 product_performance_agg 비율 적용
-  // 정규화 비율 계산 (카테고리 차트 + 상품 테이블 공통 사용)
-  const revenueRatio = useMemo(() => {
-    if (!productData?.length) return 1;
-    const productPerfTotal = productData.reduce((s, p) => s + p.revenue, 0);
-    const kpiTotalRevenue = metrics?.revenue || productPerfTotal;
-    return productPerfTotal > 0 ? kpiTotalRevenue / productPerfTotal : 1;
-  }, [productData, metrics?.revenue]);
-
-  // 차트 중앙 총액 = daily_kpis_agg.total_revenue, 카테고리 비율 = product_performance_agg 기준
   const categoryData = useMemo(() => {
     if (!productData?.length) return [];
 
-    // product_performance_agg에서 카테고리별 원본 합계 계산
     const map = new Map<string, { revenue: number; quantity: number }>();
     productData.forEach(p => {
       const e = map.get(p.category) || { revenue: 0, quantity: 0 };
       map.set(p.category, { revenue: e.revenue + p.revenue, quantity: e.quantity + p.quantity });
     });
 
-    // 각 카테고리에 정규화 적용
     return [...map.entries()].map(([name, d]) => ({
       name,
-      revenue: Math.round(d.revenue * revenueRatio), // 정규화된 매출 (합계 = kpiTotalRevenue)
-      quantity: d.quantity, // 판매량은 원본 유지 (product_performance_agg 기준)
+      revenue: d.revenue,
+      quantity: d.quantity,
     })).sort((a, b) => b.revenue - a.revenue);
-  }, [productData, revenueRatio]);
+  }, [productData]);
 
   const summary = useMemo(() => {
     const totalRevenue = productData?.reduce((s, p) => s + p.revenue, 0) || 0;
@@ -680,7 +668,7 @@ export function ProductTab() {
   const animatedRevenue = useCountUp(metrics?.revenue || 0, { duration: 1500, enabled: !metricsLoading });
   const animatedTotalQuantity = useCountUp(summary.totalQuantity, { duration: 1500 });
   const animatedLowStock = useCountUp(summary.lowStockCount, { duration: 1500 });
-  const animatedTopProductRevenue = useCountUp(Math.round((summary.topProduct?.revenue || 0) * revenueRatio), { duration: 1500 });
+  const animatedTopProductRevenue = useCountUp(summary.topProduct?.revenue || 0, { duration: 1500 });
 
   return (
     <div className="space-y-6">
@@ -797,7 +785,7 @@ export function ProductTab() {
                       <td className="py-3 px-4">
                         <span style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '11px', background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)', color: isDark ? 'rgba(255,255,255,0.8)' : '#6b7280' }}>{p.category}</span>
                       </td>
-                      <td className="text-right py-3 px-4" style={text3D.body}>{formatCurrency(Math.round(p.revenue * revenueRatio))}</td>
+                      <td className="text-right py-3 px-4" style={text3D.body}>{formatCurrency(p.revenue)}</td>
                       <td className="text-right py-3 px-4" style={text3D.body}>{p.quantity.toLocaleString()}개</td>
                       <td className="text-right py-3 px-4">
                         <span style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, background: p.stock < 10 ? 'rgba(239,68,68,0.15)' : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'), color: p.stock < 10 ? '#ef4444' : (isDark ? 'rgba(255,255,255,0.7)' : '#6b7280') }}>{p.stock}개</span>
