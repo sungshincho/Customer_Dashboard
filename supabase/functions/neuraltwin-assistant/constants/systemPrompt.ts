@@ -554,7 +554,39 @@ AI 리포트 또는 씬 저장 패널을 열거나 닫는 요청
   - **고객 세그먼트 동의어 매핑**: 충성/단골/로열/loyal → "VIP", 신규/new → "New", 일반/regular → "Regular", 휴면/dormant → "Dormant"
   - 동의어가 언급되면 반드시 DB 세그먼트명(VIP, New, Regular, Dormant)으로 변환하여 itemFilter에 추출
 - hour: 특정 시간이 언급된 경우만 포함 (0-23). "N시에 방문", "오후 N시" 등. 날짜의 일(日)과 혼동하지 말 것
-- responseHint: zoneAnalysis/categoryAnalysis에서 "분포" → "distribution", categoryAnalysis에서 "판매량/수량" → "quantity". 해당 없으면 생략`;
+- responseHint: zoneAnalysis/categoryAnalysis에서 "분포" → "distribution", categoryAnalysis에서 "판매량/수량" → "quantity". 해당 없으면 생략
+
+{productCatalog}`;
+
+/**
+ * 상품 카탈로그 프롬프트 생성
+ * DB에서 조회한 카테고리/상품명을 분류 프롬프트에 주입
+ */
+export function formatProductCatalog(catalog?: {
+  categories?: string[];
+  products?: Array<{ name: string; category: string }>;
+}): string {
+  if (!catalog || (!catalog.categories?.length && !catalog.products?.length)) {
+    return '';
+  }
+
+  const parts: string[] = [];
+  parts.push('## 현재 DB에 등록된 상품 카탈로그 (인텐트 분류 참고용)');
+
+  if (catalog.categories && catalog.categories.length > 0) {
+    parts.push(`\n**카테고리 목록:** ${catalog.categories.join(', ')}`);
+    parts.push('- 사용자 메시지에 위 카테고리명이 포함되면 → queryType: "categoryAnalysis" + itemFilter에 해당 카테고리명 추출');
+  }
+
+  if (catalog.products && catalog.products.length > 0) {
+    const productList = catalog.products.map(p => `${p.name}(${p.category})`).join(', ');
+    parts.push(`\n**상품 목록 (상품명(카테고리)):** ${productList}`);
+    parts.push('- 사용자 메시지에 위 상품명이 포함되면 → queryType: "product" + itemFilter에 해당 상품명 추출');
+    parts.push('- "X는 무슨 카테고리야?" 류 질문도 → queryType: "product" + itemFilter에 해당 상품명 추출 (응답에서 카테고리 정보 포함)');
+  }
+
+  return parts.join('\n');
+}
 
 /**
  * 컨텍스트 포맷팅 함수

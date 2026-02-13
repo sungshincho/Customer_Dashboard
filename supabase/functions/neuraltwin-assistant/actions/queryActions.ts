@@ -1184,7 +1184,7 @@ async function queryProduct(
     if (filtered.length > 0) {
       const filterNote = `(${itemFilter.join(', ')} 필터 적용)`;
       const list = filtered.map((p: any) =>
-        `• ${p.product_name}: 판매 ${(p.units_sold || 0).toLocaleString()}개, 매출 ${formatNumber(p.revenue || 0)}원`
+        `• ${p.product_name} [${p.category || '기타'}]: 판매 ${(p.units_sold || 0).toLocaleString()}개, 매출 ${formatNumber(p.revenue || 0)}원`
       ).join('\n');
       return {
         actions,
@@ -2463,8 +2463,12 @@ async function queryCategoryAnalysis(
     catMap[cat].revenue += p.revenue || 0;
   });
 
+  // 전체 카테고리 기준 총 매출 (분포 계산 시 필터링 전 전체 기준 사용)
+  const allEntries = Object.entries(catMap);
+  const allTotalRevenue = allEntries.reduce((sum, [, v]) => sum + v.revenue, 0);
+
   // itemFilter: 특정 카테고리 필터링
-  let entries = Object.entries(catMap);
+  let entries = allEntries;
   let filterNote = '';
   if (itemFilter && itemFilter.length > 0) {
     const filtered = entries.filter(([cat]) =>
@@ -2477,8 +2481,8 @@ async function queryCategoryAnalysis(
   }
 
   if (isDistribution) {
-    // 분포 모드: 퍼센트 기반 응답
-    const totalRevenue = entries.reduce((sum, [, v]) => sum + v.revenue, 0);
+    // 분포 모드: 퍼센트 기반 응답 (전체 매출 대비 비율)
+    const totalRevenue = allTotalRevenue;
     const sorted = entries.sort((a, b) => b[1].revenue - a[1].revenue);
     const catList = sorted.map(([cat, v]) => {
       const pct = totalRevenue > 0 ? ((v.revenue / totalRevenue) * 100).toFixed(1) : '0';

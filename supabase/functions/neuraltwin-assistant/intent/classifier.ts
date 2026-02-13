@@ -9,7 +9,7 @@
  */
 
 import { callGemini, parseJsonResponse } from '../utils/geminiClient.ts';
-import { INTENT_CLASSIFICATION_PROMPT, formatContext } from '../constants/systemPrompt.ts';
+import { INTENT_CLASSIFICATION_PROMPT, formatContext, formatProductCatalog } from '../constants/systemPrompt.ts';
 import { getCachedIntent, setCachedIntent, cleanupExpiredCache } from '../utils/intentCache.ts';
 import { extractDateRange, extractHour } from './entityExtractor.ts';
 
@@ -102,6 +102,10 @@ export async function classifyIntent(
   context?: {
     page?: { current?: string; tab?: string };
     dateRange?: { preset?: string; startDate?: string; endDate?: string };
+  },
+  productCatalog?: {
+    categories?: string[];
+    products?: Array<{ name: string; category: string }>;
   }
 ): Promise<ClassificationResult> {
   // 주기적 캐시 정리 (5% 확률)
@@ -135,9 +139,11 @@ export async function classifyIntent(
   try {
     // 프롬프트 생성
     const contextStr = formatContext(context);
+    const catalogStr = formatProductCatalog(productCatalog);
     const prompt = INTENT_CLASSIFICATION_PROMPT
       .replace('{userMessage}', message)
-      .replace('{context}', contextStr);
+      .replace('{context}', contextStr)
+      .replace('{productCatalog}', catalogStr);
 
     // Gemini API 호출
     const response = await callGemini(
