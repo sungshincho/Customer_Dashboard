@@ -181,12 +181,30 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
 
 *재고(Inventory) 탭:*
 - inventory: 재고, 재고현황, 재고 상태, 총 상품 수
+  - 특정 상품명이 언급되면 → entities.itemFilter에 상품명 배열 추출
+  - 특정 카테고리명이 언급되면 → entities.itemFilter에 카테고리명 배열 추출
+  - "프리미엄 캐시미어 코트 재고" → inventory + itemFilter: ["프리미엄 캐시미어 코트"]
+  - "상의 재고 알려줘" → inventory + itemFilter: ["상의"]
+  - **속성 키워드 감지** (responseHint):
+    - "SKU"/"sku넘버"/"SKU번호" → responseHint: "sku"
+    - "현재고"/"재고 수량"/"재고 몇 개" → responseHint: "currentStock"
+    - "적정재고"/"적정 재고" → responseHint: "optimalStock"
+    - "최소재고"/"최소 재고" → responseHint: "minimumStock"
+    - "품절 예상"/"소진 예상"/"품절까지" → responseHint: "stockout"
+    - "상태"/"재고 상태" (단독 상품과 함께) → responseHint: "status"
+  - "가죽 토트백 SKU넘버 알려줘" → inventory + itemFilter: ["가죽 토트백"] + responseHint: "sku"
+  - "코트 품절 예상일" → inventory + itemFilter: ["코트"] + responseHint: "stockout"
+  - 상품명/카테고리명 미언급 시 → 전체 재고 요약 (기존 동작)
 - overstock: 과잉 재고, 과재고, 재고 과잉, 넘치는 재고
+  - 특정 카테고리명이 언급되면 → entities.itemFilter에 카테고리명 배열 추출
 - stockAlert: 재고 부족 경고, 재고 부족, 재주문 필요, 부족 알림, 재고부족
+  - 특정 카테고리명이 언급되면 → entities.itemFilter에 카테고리명 배열 추출
 - stockMovement: 입출고, 입출고 내역, 입고, 출고, 재고 이동, 최근 입출고
 - stockDistribution: 재고 분포, 재고 상태 분포, 재고 비율
-- healthyStock: 정상 재고, 양호 재고
+- healthyStock: 정상 재고, 양호 재고, 정상 재고 몇 개
 - inventoryCategory: 카테고리별 재고, 카테고리별 재고 현황
+  - 특정 카테고리명이 언급되면 → entities.itemFilter에 카테고리명 배열 추출
+  - "아우터 카테고리 재고" → inventoryCategory + itemFilter: ["아우터"]
 - inventoryDetail: 상세 재고, 상세 재고 현황, 재고 테이블
 
 *예측(Prediction) 탭:* (데이터 조회 없이 탭 이동만 수행)
@@ -558,7 +576,7 @@ AI 리포트 또는 씬 저장 패널을 열거나 닫는 요청
   - **고객 세그먼트 동의어 매핑**: 충성/단골/로열/loyal → "VIP", 신규/new → "New", 일반/regular → "Regular", 휴면/dormant → "Dormant"
   - 동의어가 언급되면 반드시 DB 세그먼트명(VIP, New, Regular, Dormant)으로 변환하여 itemFilter에 추출
 - hour: 특정 시간이 언급된 경우만 포함 (0-23). "N시에 방문", "오후 N시" 등. 날짜의 일(日)과 혼동하지 말 것
-- responseHint: zoneAnalysis/categoryAnalysis에서 "분포" → "distribution", categoryAnalysis에서 "판매량/수량" → "quantity". 해당 없으면 생략
+- responseHint: zoneAnalysis/categoryAnalysis에서 "분포" → "distribution", categoryAnalysis에서 "판매량/수량" → "quantity". inventory에서 "SKU/sku넘버" → "sku", "현재고/재고 수량" → "currentStock", "적정재고" → "optimalStock", "최소재고" → "minimumStock", "품절 예상/소진 예상" → "stockout", "상태" → "status". 해당 없으면 생략
 
 {productCatalog}`;
 
