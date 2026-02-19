@@ -106,10 +106,10 @@ async function rpcProductPerformance(
   return (data as any[]) ?? [];
 }
 
-async function rpcInventoryStatus(supabase: SupabaseClient, orgId: string, storeId?: string) {
-  const params: any = { p_org_id: orgId };
-  if (storeId) params.p_store_id = storeId;
-  const { data, error } = await supabase.rpc('get_inventory_status', params);
+async function rpcInventoryStatus(supabase: SupabaseClient, orgId: string) {
+  const { data, error } = await supabase.rpc('get_inventory_status', {
+    p_org_id: orgId,
+  });
   if (error) throw error;
   return (data as any[]) ?? [];
 }
@@ -1241,7 +1241,7 @@ async function queryInventory(
     };
   }
 
-  const items = await rpcInventoryStatus(supabase, orgId, storeId);
+  const items = await rpcInventoryStatus(supabase, orgId);
 
   // itemFilter가 있으면 상품명/카테고리로 필터링
   if (itemFilter && itemFilter.length > 0) {
@@ -2659,7 +2659,7 @@ async function queryOverstock(
     return { actions, message: `조직 정보를 확인할 수 없습니다.${tabMessage}`, suggestions: ['재고탭 보여줘'], data: null };
   }
 
-  let items = await rpcInventoryStatus(supabase, orgId, storeId);
+  let items = await rpcInventoryStatus(supabase, orgId);
   if (itemFilter && itemFilter.length > 0) {
     items = items.filter((i: any) =>
       itemFilter.some(f => {
@@ -2710,7 +2710,7 @@ async function queryStockAlert(
     return { actions, message: `조직 정보를 확인할 수 없습니다.${tabMessage}`, suggestions: ['재고탭 보여줘'], data: null };
   }
 
-  let items = await rpcInventoryStatus(supabase, orgId, storeId);
+  let items = await rpcInventoryStatus(supabase, orgId);
   if (itemFilter && itemFilter.length > 0) {
     items = items.filter((i: any) =>
       itemFilter.some(f => {
@@ -2805,7 +2805,7 @@ async function queryStockDistribution(
     return { actions, message: `조직 정보를 확인할 수 없습니다.${tabMessage}`, suggestions: ['재고탭 보여줘'], data: null };
   }
 
-  const items = await rpcInventoryStatus(supabase, orgId, storeId);
+  const items = await rpcInventoryStatus(supabase, orgId);
   const total = items.length;
   const lowStock = items.filter((i: any) => i.stock_status === 'critical' || i.stock_status === 'low').length;
   const overstock = items.filter((i: any) => i.stock_status === 'overstock').length;
@@ -2836,7 +2836,7 @@ async function queryHealthyStock(
     return { actions, message: `조직 정보를 확인할 수 없습니다.${tabMessage}`, suggestions: ['재고탭 보여줘'], data: null };
   }
 
-  const items = await rpcInventoryStatus(supabase, orgId, storeId);
+  const items = await rpcInventoryStatus(supabase, orgId);
   const healthyItems = items.filter((i: any) => i.stock_status === 'normal');
   const total = items.length;
   const ratio = total > 0 ? Math.round((healthyItems.length / total) * 100) : 0;
@@ -2882,7 +2882,7 @@ async function queryInventoryCategory(
     return { actions, message: `조직 정보를 확인할 수 없습니다.${tabMessage}`, suggestions: ['재고탭 보여줘'], data: null };
   }
 
-  const items = await rpcInventoryStatus(supabase, orgId, storeId);
+  const items = await rpcInventoryStatus(supabase, orgId);
 
   // 카테고리별 그룹화
   const categoryMap = new Map<string, { totalStock: number; count: number; low: number; overstock: number }>();
@@ -2946,7 +2946,7 @@ async function queryInventoryDetail(
     return { actions, message: `조직 정보를 확인할 수 없습니다.${tabMessage}`, suggestions: ['재고탭 보여줘'], data: null };
   }
 
-  const items = await rpcInventoryStatus(supabase, orgId, storeId);
+  const items = await rpcInventoryStatus(supabase, orgId);
   const statusLabel: Record<string, string> = { critical: '위험', low: '부족', normal: '정상', overstock: '과잉' };
 
   // 최대 10개만 텍스트 표시 (나머지는 탭에서 확인 유도)
