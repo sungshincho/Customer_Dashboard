@@ -49,6 +49,14 @@ function normalizeSegmentFilter(itemFilter: string[]): string[] {
 }
 
 // ============================================
+// 공백 제거 후 소문자 변환 — 한국어 띄어쓰기 변형 대응
+// "폴로셔츠" vs "폴로 셔츠" 등 공백 차이에도 매칭 가능
+// ============================================
+function normalizeForMatch(str: string): string {
+  return str.toLowerCase().replace(/\s+/g, '');
+}
+
+// ============================================
 // RPC 호출 헬퍼 — 프론트엔드와 동일 RPC 사용
 // 데이터 일관성 보장 (SECURITY DEFINER, org_id 필터)
 // ============================================
@@ -1183,7 +1191,7 @@ async function queryProduct(
   // itemFilter: 특정 상품명 필터링
   if (itemFilter && itemFilter.length > 0) {
     const filtered = products.filter((p: any) =>
-      itemFilter.some(f => (p.product_name || '').toLowerCase().includes(f.toLowerCase()))
+      itemFilter.some(f => normalizeForMatch(p.product_name || '').includes(normalizeForMatch(f)))
     );
     if (filtered.length > 0) {
       const filterNote = `(${itemFilter.join(', ')} 필터 적용)`;
@@ -1242,9 +1250,9 @@ async function queryInventory(
   if (itemFilter && itemFilter.length > 0) {
     const filtered = items.filter((i: any) =>
       itemFilter.some(f => {
-        const lower = f.toLowerCase();
-        return (i.product_name || '').toLowerCase().includes(lower)
-          || (i.category || '').toLowerCase().includes(lower);
+        const nf = normalizeForMatch(f);
+        return normalizeForMatch(i.product_name || '').includes(nf)
+          || normalizeForMatch(i.category || '').includes(nf);
       })
     );
 
@@ -1653,7 +1661,7 @@ function filterZones(zones: { name: string; visitors: number; avgDwellMinutes: n
 } {
   if (!itemFilter || itemFilter.length === 0) return { filtered: zones, isFiltered: false };
   const filtered = zones.filter(z =>
-    itemFilter.some(f => z.name.toLowerCase().includes(f.toLowerCase()))
+    itemFilter.some(f => normalizeForMatch(z.name).includes(normalizeForMatch(f)))
   );
   return { filtered: filtered.length > 0 ? filtered : zones, isFiltered: filtered.length > 0 };
 }
@@ -1734,7 +1742,7 @@ async function queryPopularZone(
   let filterNote = '';
   if (itemFilter && itemFilter.length > 0) {
     const filtered = zones.filter((z: any) =>
-      itemFilter.some(f => (z.zone_name || z.zone_id || '').toLowerCase().includes(f.toLowerCase()))
+      itemFilter.some(f => normalizeForMatch(z.zone_name || z.zone_id || '').includes(normalizeForMatch(f)))
     );
     if (filtered.length > 0) {
       results = filtered;
@@ -1905,7 +1913,7 @@ async function queryZoneAnalysis(
   let filterNote = '';
   if (itemFilter && itemFilter.length > 0) {
     const filtered = zones.filter((z: any) =>
-      itemFilter.some(f => (z.zone_name || z.zone_id || '').toLowerCase().includes(f.toLowerCase()))
+      itemFilter.some(f => normalizeForMatch(z.zone_name || z.zone_id || '').includes(normalizeForMatch(f)))
     );
     if (filtered.length > 0) {
       results = filtered;
@@ -1978,7 +1986,7 @@ async function queryZonePerformance(
   let filterNote = '';
   if (itemFilter && itemFilter.length > 0) {
     const filtered = zones.filter((z: any) =>
-      itemFilter.some(f => (z.zone_name || z.zone_id || '').toLowerCase().includes(f.toLowerCase()))
+      itemFilter.some(f => normalizeForMatch(z.zone_name || z.zone_id || '').includes(normalizeForMatch(f)))
     );
     if (filtered.length > 0) {
       results = filtered;
@@ -2183,7 +2191,7 @@ async function queryCustomerSegment(
   if (itemFilter && itemFilter.length > 0) {
     const normalized = normalizeSegmentFilter(itemFilter);
     const filtered = segments.filter((s: any) =>
-      normalized.some(f => (s.segment_name || '').toLowerCase().includes(f.toLowerCase()))
+      normalized.some(f => normalizeForMatch(s.segment_name || '').includes(normalizeForMatch(f)))
     );
     if (filtered.length > 0) {
       results = filtered;
@@ -2241,7 +2249,7 @@ async function queryLoyalCustomers(
   const segments = await rpcCustomerSegments(supabase, orgId, storeId, dateRange.startDate, dateRange.endDate);
   const loyalKeywords = ['loyal', 'vip', 'champion', '충성', 'VIP'];
   const loyalSegments = segments.filter((s: any) =>
-    loyalKeywords.some(kw => (s.segment_name || '').toLowerCase().includes(kw.toLowerCase()))
+    loyalKeywords.some(kw => normalizeForMatch(s.segment_name || '').includes(normalizeForMatch(kw)))
   );
 
   if (loyalSegments.length === 0) {
@@ -2297,7 +2305,7 @@ async function querySegmentAvgPurchase(
   if (itemFilter && itemFilter.length > 0) {
     const normalized = normalizeSegmentFilter(itemFilter);
     const filtered = segments.filter((s: any) =>
-      normalized.some(f => (s.segment_name || '').toLowerCase().includes(f.toLowerCase()))
+      normalized.some(f => normalizeForMatch(s.segment_name || '').includes(normalizeForMatch(f)))
     );
     if (filtered.length > 0) {
       results = filtered;
@@ -2350,7 +2358,7 @@ async function querySegmentVisitFrequency(
   if (itemFilter && itemFilter.length > 0) {
     const normalized = normalizeSegmentFilter(itemFilter);
     const filtered = segments.filter((s: any) =>
-      normalized.some(f => (s.segment_name || '').toLowerCase().includes(f.toLowerCase()))
+      normalized.some(f => normalizeForMatch(s.segment_name || '').includes(normalizeForMatch(f)))
     );
     if (filtered.length > 0) {
       results = filtered;
@@ -2481,7 +2489,7 @@ async function queryTopProducts(
   let filterNote = '';
   if (itemFilter && itemFilter.length > 0) {
     const filtered = products.filter((p: any) =>
-      itemFilter.some(f => (p.product_name || '').toLowerCase().includes(f.toLowerCase()))
+      itemFilter.some(f => normalizeForMatch(p.product_name || '').includes(normalizeForMatch(f)))
     );
     if (filtered.length > 0) {
       results = filtered;
@@ -2551,7 +2559,7 @@ async function queryCategoryAnalysis(
   let filterNote = '';
   if (itemFilter && itemFilter.length > 0) {
     const filtered = entries.filter(([cat]) =>
-      itemFilter.some(f => cat.toLowerCase().includes(f.toLowerCase()))
+      itemFilter.some(f => normalizeForMatch(cat).includes(normalizeForMatch(f)))
     );
     if (filtered.length > 0) {
       entries = filtered;
@@ -2658,9 +2666,9 @@ async function queryOverstock(
   if (itemFilter && itemFilter.length > 0) {
     items = items.filter((i: any) =>
       itemFilter.some(f => {
-        const lower = f.toLowerCase();
-        return (i.product_name || '').toLowerCase().includes(lower)
-          || (i.category || '').toLowerCase().includes(lower);
+        const nf = normalizeForMatch(f);
+        return normalizeForMatch(i.product_name || '').includes(nf)
+          || normalizeForMatch(i.category || '').includes(nf);
       })
     );
   }
@@ -2709,9 +2717,9 @@ async function queryStockAlert(
   if (itemFilter && itemFilter.length > 0) {
     items = items.filter((i: any) =>
       itemFilter.some(f => {
-        const lower = f.toLowerCase();
-        return (i.product_name || '').toLowerCase().includes(lower)
-          || (i.category || '').toLowerCase().includes(lower);
+        const nf = normalizeForMatch(f);
+        return normalizeForMatch(i.product_name || '').includes(nf)
+          || normalizeForMatch(i.category || '').includes(nf);
       })
     );
   }
@@ -2896,7 +2904,7 @@ async function queryInventoryCategory(
   let categories = Array.from(categoryMap.entries()).map(([cat, data]) => ({ category: cat, ...data }));
   if (itemFilter && itemFilter.length > 0) {
     categories = categories.filter(c =>
-      itemFilter.some(f => c.category.toLowerCase().includes(f.toLowerCase()))
+      itemFilter.some(f => normalizeForMatch(c.category).includes(normalizeForMatch(f)))
     );
   }
 

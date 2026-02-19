@@ -13,6 +13,11 @@ import { INTENT_CLASSIFICATION_PROMPT, formatContext, formatProductCatalog } fro
 import { getCachedIntent, setCachedIntent, cleanupExpiredCache } from '../utils/intentCache.ts';
 import { extractDateRange, extractHour } from './entityExtractor.ts';
 
+/** 공백 제거 후 소문자 변환 — 한국어 띄어쓰기 변형 대응 */
+function normalizeForMatch(str: string): string {
+  return str.toLowerCase().replace(/\s+/g, '');
+}
+
 export interface ClassificationResult {
   intent: string;
   confidence: number;
@@ -403,11 +408,12 @@ function disambiguateCategoryVsProduct(
   if (itemFilter.length > 0) {
     for (const filter of itemFilter) {
       const filterLower = filter.toLowerCase();
+      const filterNorm = normalizeForMatch(filter);
 
-      // 정확히 일치하는 상품명이 있는지 확인
-      const exactProductMatch = products.some(p => p.name === filterLower || p.name.includes(filterLower));
-      // 카테고리명과 일치하는지 확인
-      const categoryMatch = categories.some(c => c === filterLower || c.includes(filterLower) || filterLower.includes(c));
+      // 정확히 일치하는 상품명이 있는지 확인 (공백 무시)
+      const exactProductMatch = products.some(p => normalizeForMatch(p.name) === filterNorm || normalizeForMatch(p.name).includes(filterNorm));
+      // 카테고리명과 일치하는지 확인 (공백 무시)
+      const categoryMatch = categories.some(c => normalizeForMatch(c) === filterNorm || normalizeForMatch(c).includes(filterNorm) || filterNorm.includes(normalizeForMatch(c)));
 
       if (exactProductMatch && !categoryMatch) {
         // 상품명만 매칭 → product로 확정
@@ -432,7 +438,7 @@ function disambiguateCategoryVsProduct(
 
       if (categoryMatch && exactProductMatch) {
         // 둘 다 매칭 → 상품명이 카테고리명보다 더 구체적으로 매칭되는지 확인
-        const exactNameMatch = products.some(p => p.name === filterLower);
+        const exactNameMatch = products.some(p => normalizeForMatch(p.name) === filterNorm);
         if (exactNameMatch) {
           // 상품명 정확 일치 → product 우선
           return {
@@ -455,9 +461,9 @@ function disambiguateCategoryVsProduct(
   } else {
     // itemFilter가 없는 경우: 메시지에서 카테고리명 직접 탐지
     for (const cat of productCatalog.categories || []) {
-      if (messageLower.includes(cat.toLowerCase())) {
+      if (normalizeForMatch(messageLower).includes(normalizeForMatch(cat))) {
         // 동시에 상품명에도 포함되는지 확인
-        const matchingProducts = products.filter(p => p.name.includes(cat.toLowerCase()));
+        const matchingProducts = products.filter(p => normalizeForMatch(p.name).includes(normalizeForMatch(cat)));
         const isAlsoProductName = matchingProducts.length > 0;
 
         if (!isAlsoProductName) {
