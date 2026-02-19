@@ -164,28 +164,30 @@ Deno.serve(async (req) => {
       },
     });
 
-    // 7. 상품 카탈로그 조회 (인텐트 분류 시 카테고리/상품명 인식용)
-    let productCatalog: { categories: string[]; products: Array<{ name: string; category: string }> } | undefined;
-    try {
-      const { data: productData } = await supabase
-        .from('products')
-        .select('name, category')
-        .eq('org_id', orgId);
+    // 7. 인텐트 분류 (상품 카탈로그는 캐시 미스 시에만 lazy 로드)
+    const loadProductCatalog = async () => {
+      try {
+        const { data: productData } = await supabase
+          .from('products')
+          .select('name, category')
+          .eq('org_id', orgId);
 
-      if (productData && productData.length > 0) {
-        const categories = [...new Set(productData.map((p: any) => p.category).filter(Boolean))] as string[];
-        const products = productData.map((p: any) => ({
-          name: p.name as string,
-          category: (p.category || '기타') as string,
-        }));
-        productCatalog = { categories, products };
+        if (productData && productData.length > 0) {
+          const categories = [...new Set(productData.map((p: any) => p.category).filter(Boolean))] as string[];
+          const products = productData.map((p: any) => ({
+            name: p.name as string,
+            category: (p.category || '기타') as string,
+          }));
+          return { categories, products };
+        }
+        return undefined;
+      } catch (e) {
+        console.warn('[neuraltwin-assistant] Failed to load product catalog:', e);
+        return undefined;
       }
-    } catch (e) {
-      console.warn('[neuraltwin-assistant] Failed to load product catalog:', e);
-    }
+    };
 
-    // 인텐트 분류
-    const classification = await classifyIntent(message, context, productCatalog);
+    const classification = await classifyIntent(message, context, loadProductCatalog);
 
     // 7-1. 카테고리/상품 중의성 → 사용자에게 되물어보기
     const queryType = classification.entities?.queryType;

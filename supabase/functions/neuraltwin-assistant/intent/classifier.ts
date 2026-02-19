@@ -12,11 +12,7 @@ import { callGemini, parseJsonResponse } from '../utils/geminiClient.ts';
 import { INTENT_CLASSIFICATION_PROMPT, formatContext, formatProductCatalog } from '../constants/systemPrompt.ts';
 import { getCachedIntent, setCachedIntent, cleanupExpiredCache } from '../utils/intentCache.ts';
 import { extractDateRange, extractHour } from './entityExtractor.ts';
-
-/** 공백 제거 후 소문자 변환 — 한국어 띄어쓰기 변형 대응 */
-function normalizeForMatch(str: string): string {
-  return str.toLowerCase().replace(/\s+/g, '');
-}
+import { normalizeForMatch } from '../utils/normalize.ts';
 
 export interface ClassificationResult {
   intent: string;
@@ -108,10 +104,10 @@ export async function classifyIntent(
     page?: { current?: string; tab?: string };
     dateRange?: { preset?: string; startDate?: string; endDate?: string };
   },
-  productCatalog?: {
-    categories?: string[];
-    products?: Array<{ name: string; category: string }>;
-  }
+  loadProductCatalog?: () => Promise<{
+    categories: string[];
+    products: Array<{ name: string; category: string }>;
+  } | undefined>
 ): Promise<ClassificationResult> {
   // 주기적 캐시 정리 (5% 확률)
   if (Math.random() < 0.05) {
@@ -138,8 +134,11 @@ export async function classifyIntent(
     };
   }
 
-  // 2. AI 분류
+  // 2. AI 분류 (캐시 미스 → 상품 카탈로그 lazy 로딩)
   console.log('[classifier] AI classification for:', message.substring(0, 50));
+
+  // 캐시 미스일 때만 상품 카탈로그 로드 (성능 최적화)
+  const productCatalog = await loadProductCatalog?.();
 
   try {
     // 프롬프트 생성
