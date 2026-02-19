@@ -164,11 +164,15 @@ export const INTENT_CLASSIFICATION_PROMPT = `당신은 NEURALTWIN 대시보드�
   - 특정 상품명이 언급되면 → entities.itemFilter에 상품명 배열 추출
 - categoryAnalysis: 카테고리 분석, 카테고리별 매출, 카테고리별 판매, 카테고리별 매출 분포, 카테고리별 판매량
   - **"분포" 키워드 감지**: "카테고리별 매출 분포" → entities.responseHint: "distribution" 추가
-  - **"판매량" 키워드 감지**: "카테고리별 판매량" → entities.responseHint: "quantity" 추가
+  - **"판매량"/"몇개"/"몇 개" 키워드 감지**: "카테고리별 판매량", "가방 몇개 팔았어?" → entities.responseHint: "quantity" 추가
   - 특정 카테고리명이 언급되면 → entities.itemFilter에 카테고리명 배열 추출
+  - **⚠️ 카테고리명 직접 언급 규칙**: DB 카테고리 목록에 있는 이름이 언급되고, 매출/판매/팔았어/몇개 등 판매 관련 질문이면 → **categoryAnalysis**로 분류 ("카테고리별" 키워드 없어도)
   - "아우터 매출" → categoryAnalysis + itemFilter: ["아우터"]
   - "아우터 판매량" → categoryAnalysis + responseHint: "quantity" + itemFilter: ["아우터"]
   - "하의 매출 분포" → categoryAnalysis + responseHint: "distribution" + itemFilter: ["하의"]
+  - "가방 몇개 팔았어?" → categoryAnalysis + responseHint: "quantity" + itemFilter: ["가방"]
+  - "신발 매출 얼마야?" → categoryAnalysis + itemFilter: ["신발"]
+  - "악세서리 얼마나 팔렸어?" → categoryAnalysis + responseHint: "quantity" + itemFilter: ["악세서리"]
 - unitsSold: 총 판매량, 총 판매 수량, 판매 개수
   - **⚠️ 최우선 규칙**: 카테고리명이나 상품명이 포함된 판매량 질문은 unitsSold가 아님
   - "아우터 판매량" → categoryAnalysis + itemFilter: ["아우터"] (unitsSold 아님)
@@ -583,6 +587,9 @@ export function formatProductCatalog(catalog?: {
   if (catalog.categories && catalog.categories.length > 0) {
     parts.push(`\n**카테고리 목록:** ${catalog.categories.join(', ')}`);
     parts.push('- 이 매장의 데이터를 묻는 맥락에서 위 카테고리명이 포함되면 → queryType: "categoryAnalysis" + itemFilter에 해당 카테고리명 추출');
+    parts.push('- "카테고리별" 키워드 없이 카테고리명만 언급해도 categoryAnalysis로 분류');
+    parts.push('  - 예: "가방 몇개 팔았어?" → categoryAnalysis + itemFilter: ["가방"] + responseHint: "quantity"');
+    parts.push('  - 예: "신발 매출 얼마야?" → categoryAnalysis + itemFilter: ["신발"]');
   }
 
   if (catalog.products && catalog.products.length > 0) {
@@ -590,6 +597,16 @@ export function formatProductCatalog(catalog?: {
     parts.push(`\n**상품 목록 (상품명(카테고리)):** ${productList}`);
     parts.push('- 이 매장의 데이터를 묻는 맥락에서 위 상품명이 포함되면 → queryType: "product" + itemFilter에 해당 상품명 추출');
     parts.push('- "X는 무슨 카테고리야?" 류 질문도 → queryType: "product" + itemFilter에 해당 상품명 추출 (응답에서 카테고리 정보 포함)');
+  }
+
+  if (catalog.categories && catalog.categories.length > 0 && catalog.products && catalog.products.length > 0) {
+    parts.push('\n**⚠️ 카테고리명 vs 상품명 중의성 해소 규칙:**');
+    parts.push('1. 사용자 입력이 **상품명과 정확히 일치**하면 → queryType: "product" (상품 우선)');
+    parts.push('   - 예: "가방 정리함 매출" → product + itemFilter: ["가방 정리함"] (상품명 정확 매칭)');
+    parts.push('2. 사용자 입력이 **카테고리명과만 일치**하면 → queryType: "categoryAnalysis" (카테고리 우선)');
+    parts.push('   - 예: "가방 몇개 팔았어?" → categoryAnalysis + itemFilter: ["가방"] (카테고리 매칭)');
+    parts.push('3. 사용자 입력이 **카테고리명과 상품명 둘 다에 매칭**되고 어느 쪽인지 불분명하면 → confidence를 0.6 이하로 낮추고 categoryAnalysis로 분류');
+    parts.push('   - 이 경우 시스템이 사용자에게 "카테고리 전체를 말씀하신 건가요, 특정 상품인가요?" 되물을 수 있음');
   }
 
   return parts.join('\n');
