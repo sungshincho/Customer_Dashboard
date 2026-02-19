@@ -303,47 +303,15 @@ const StockDistributionChart = ({ data, isDark }: StockDistributionChartProps) =
     );
   }
 
-  const legendItems = [
-    { label: '정상', count: data.normal, color: '#22c55e' },
-    { label: '과잉', count: data.overstock, color: '#3b82f6' },
-    { label: '부족', count: data.low, color: '#f97316' },
-    { label: '위험', count: data.critical, color: '#ef4444' },
-  ];
-
   return (
-    <div ref={containerRef} style={{ width: '100%', position: 'relative' }}>
-      <div style={{ display: 'flex', justifyContent: 'center', position: 'relative' }}>
-        <canvas
-          ref={canvasRef}
-          style={{ width: dimensions.width, height: dimensions.height, cursor: tooltip ? 'pointer' : 'default' }}
-          onMouseMove={handleMouseMove}
-          onMouseLeave={handleMouseLeave}
-        />
-        <ChartTooltip data={tooltip} isDark={isDark} />
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '12px', flexWrap: 'wrap' }}>
-        {legendItems.map((item) => {
-          const percent = total > 0 ? ((item.count / total) * 100).toFixed(0) : '0';
-          return (
-            <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                backgroundColor: item.color,
-                flexShrink: 0,
-              }} />
-              <span style={{
-                fontSize: '12px',
-                color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)',
-                whiteSpace: 'nowrap',
-              }}>
-                {item.label} {item.count}개 ({percent}%)
-              </span>
-            </div>
-          );
-        })}
-      </div>
+    <div ref={containerRef} style={{ width: '100%', display: 'flex', justifyContent: 'center', position: 'relative' }}>
+      <canvas
+        ref={canvasRef}
+        style={{ width: dimensions.width, height: dimensions.height, cursor: tooltip ? 'pointer' : 'default' }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+      />
+      <ChartTooltip data={tooltip} isDark={isDark} />
     </div>
   );
 };
