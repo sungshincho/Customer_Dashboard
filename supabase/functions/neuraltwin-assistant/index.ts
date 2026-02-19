@@ -187,6 +187,49 @@ Deno.serve(async (req) => {
     // 인텐트 분류
     const classification = await classifyIntent(message, context, productCatalog);
 
+    // 7-1. 카테고리/상품 중의성 → 사용자에게 되물어보기
+    const queryType = classification.entities?.queryType;
+    const isAmbiguousCategoryProduct = classification.intent === 'query_kpi'
+      && ['categoryAnalysis', 'product'].includes(queryType)
+      && classification.confidence <= 0.6
+      && classification.entities?.itemFilter?.length > 0;
+
+    if (isAmbiguousCategoryProduct) {
+      const filterName = classification.entities.itemFilter[0];
+      const disambiguationMessage = `"${filterName}"은(는) 카테고리 이름이기도 하고, 상품명에도 포함되어 있어요.\n\n어떤 걸 확인하시겠어요?\n• **"${filterName} 카테고리 매출"** — ${filterName} 카테고리 전체\n• **구체적인 상품명** — 예: "가죽 토트백 매출"`;
+      const disambiguationSuggestions = [`${filterName} 카테고리 매출`, `${filterName} 카테고리 판매량`, 'TOP 상품 보여줘'];
+
+      // 되묻기 응답 저장 및 반환
+      await saveMessage(supabase, {
+        conversation_id: session.conversationId,
+        role: 'assistant',
+        content: disambiguationMessage,
+        channel_data: {
+          intent: classification.intent,
+          confidence: classification.confidence,
+          actions: [],
+          suggestions: disambiguationSuggestions,
+          disambiguation: true,
+        },
+      });
+
+      const executionTimeMs = Date.now() - startTime;
+      return new Response(
+        JSON.stringify({
+          message: disambiguationMessage,
+          actions: [],
+          suggestions: disambiguationSuggestions,
+          meta: {
+            conversationId: session.conversationId,
+            intent: classification.intent,
+            confidence: classification.confidence,
+            executionTimeMs,
+          },
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // 8. 액션 실행 (Phase 3-A: general_chat, Phase 3-B: query_kpi)
     let actionResult = { actions: [] as UIAction[], message: '', suggestions: [] as string[] };
     const currentPage = context.page.current;

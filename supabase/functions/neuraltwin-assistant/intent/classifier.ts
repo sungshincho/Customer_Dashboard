@@ -162,18 +162,33 @@ export async function classifyIntent(
 
       // 분류 보정: "visitors" + 특정 시간(hour)이 있으면 → "hourlyPattern"으로 재분류
       let finalIntent = parsed.intent;
+      let finalConfidence = parsed.confidence;
       if (parsed.intent === 'query_kpi' && entities.queryType === 'visitors' && entities.hour !== undefined) {
         console.log('[classifier] Override: visitors + hour → hourlyPattern');
         entities.queryType = 'hourlyPattern';
         finalIntent = 'query_kpi';
       }
 
+      // 분류 보정: 카테고리 vs 상품 중의성 해소
+      if (parsed.intent === 'query_kpi' && productCatalog) {
+        const corrected = disambiguateCategoryVsProduct(
+          entities, message, productCatalog, finalConfidence
+        );
+        if (corrected.changed || corrected.confidence !== finalConfidence) {
+          entities.queryType = corrected.queryType;
+          if (corrected.itemFilter) entities.itemFilter = corrected.itemFilter;
+          if (corrected.responseHint) entities.responseHint = corrected.responseHint;
+          finalConfidence = corrected.confidence;
+          console.log(`[classifier] Category/Product disambiguation: queryType=${corrected.queryType}, confidence=${corrected.confidence}`);
+        }
+      }
+
       // 캐시 저장 (탭 컨텍스트 포함)
-      setCachedIntent(message, finalIntent, parsed.confidence, entities, currentTab);
+      setCachedIntent(message, finalIntent, finalConfidence, entities, currentTab);
 
       return {
         intent: finalIntent,
-        confidence: parsed.confidence,
+        confidence: finalConfidence,
         entities,
         method: 'ai',
         reasoning: parsed.reasoning,
@@ -340,4 +355,135 @@ function inferPageFromTab(tab: string): string | null {
   if (settingsTabs.includes(tab)) return '/settings';
 
   return null;
+}
+
+/**
+ * 카테고리 vs 상품 중의성 해소 (후처리 보정)
+ *
+ * 규칙:
+ * 1. 정확히 일치하는 상품명이 있으면 → product 우선
+ * 2. 카테고리명만 매칭되면 → categoryAnalysis 우선
+ * 3. 둘 다 매칭되고 애매하면 → confidence를 낮춰서 되물을 수 있게 함
+ */
+function disambiguateCategoryVsProduct(
+  entities: Record<string, any>,
+  message: string,
+  productCatalog: {
+    categories?: string[];
+    products?: Array<{ name: string; category: string }>;
+  },
+  currentConfidence: number
+): {
+  changed: boolean;
+  queryType: string;
+  itemFilter?: string[];
+  responseHint?: string;
+  confidence: number;
+} {
+  const queryType = entities.queryType;
+  const itemFilter: string[] = entities.itemFilter || [];
+  const messageLower = message.toLowerCase();
+
+  // product/categoryAnalysis/topProducts 관련 쿼리만 대상
+  if (!['product', 'categoryAnalysis', 'topProducts'].includes(queryType)) {
+    return { changed: false, queryType, confidence: currentConfidence };
+  }
+
+  const categories = (productCatalog.categories || []).map(c => c.toLowerCase());
+  const products = (productCatalog.products || []).map(p => ({
+    name: p.name.toLowerCase(),
+    category: p.category.toLowerCase(),
+  }));
+
+  // 판매 관련 키워드 감지 (responseHint 보정용)
+  const quantityKeywords = /몇\s*개|몇개|판매량|팔았|팔렸|얼마나\s*팔/;
+  const hasQuantityHint = quantityKeywords.test(message);
+
+  // itemFilter가 있는 경우: 각 필터를 카테고리/상품에 대조
+  if (itemFilter.length > 0) {
+    for (const filter of itemFilter) {
+      const filterLower = filter.toLowerCase();
+
+      // 정확히 일치하는 상품명이 있는지 확인
+      const exactProductMatch = products.some(p => p.name === filterLower || p.name.includes(filterLower));
+      // 카테고리명과 일치하는지 확인
+      const categoryMatch = categories.some(c => c === filterLower || c.includes(filterLower) || filterLower.includes(c));
+
+      if (exactProductMatch && !categoryMatch) {
+        // 상품명만 매칭 → product로 확정
+        return {
+          changed: queryType !== 'product',
+          queryType: 'product',
+          itemFilter,
+          confidence: Math.max(currentConfidence, 0.85),
+        };
+      }
+
+      if (categoryMatch && !exactProductMatch) {
+        // 카테고리명만 매칭 → categoryAnalysis로 확정
+        return {
+          changed: queryType !== 'categoryAnalysis',
+          queryType: 'categoryAnalysis',
+          itemFilter,
+          responseHint: hasQuantityHint ? 'quantity' : entities.responseHint,
+          confidence: Math.max(currentConfidence, 0.85),
+        };
+      }
+
+      if (categoryMatch && exactProductMatch) {
+        // 둘 다 매칭 → 상품명이 카테고리명보다 더 구체적으로 매칭되는지 확인
+        const exactNameMatch = products.some(p => p.name === filterLower);
+        if (exactNameMatch) {
+          // 상품명 정확 일치 → product 우선
+          return {
+            changed: queryType !== 'product',
+            queryType: 'product',
+            itemFilter,
+            confidence: Math.max(currentConfidence, 0.8),
+          };
+        }
+        // 애매한 경우 → confidence 낮춤 (되물을 수 있게)
+        return {
+          changed: false,
+          queryType: queryType,
+          itemFilter,
+          responseHint: hasQuantityHint ? 'quantity' : entities.responseHint,
+          confidence: Math.min(currentConfidence, 0.55),
+        };
+      }
+    }
+  } else {
+    // itemFilter가 없는 경우: 메시지에서 카테고리명 직접 탐지
+    for (const cat of productCatalog.categories || []) {
+      if (messageLower.includes(cat.toLowerCase())) {
+        // 동시에 상품명에도 포함되는지 확인
+        const matchingProducts = products.filter(p => p.name.includes(cat.toLowerCase()));
+        const isAlsoProductName = matchingProducts.length > 0;
+
+        if (!isAlsoProductName) {
+          // 카테고리명만 매칭 → categoryAnalysis로 보정
+          return {
+            changed: queryType !== 'categoryAnalysis',
+            queryType: 'categoryAnalysis',
+            itemFilter: [cat],
+            responseHint: hasQuantityHint ? 'quantity' : entities.responseHint,
+            confidence: Math.max(currentConfidence, 0.85),
+          };
+        }
+        // 상품명에도 포함 → 애매 → confidence 낮춤
+        if (queryType !== 'categoryAnalysis') {
+          return {
+            changed: true,
+            queryType: 'categoryAnalysis',
+            itemFilter: [cat],
+            responseHint: hasQuantityHint ? 'quantity' : entities.responseHint,
+            confidence: Math.min(currentConfidence, 0.55),
+          };
+        }
+      }
+    }
+  }
+
+  // 변경 없음
+  return { changed: false, queryType, confidence: currentConfidence };
 }
