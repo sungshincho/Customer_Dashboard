@@ -48,13 +48,10 @@ function normalizeSegmentFilter(itemFilter: string[]): string[] {
   });
 }
 
-// ============================================
-// 공백 제거 후 소문자 변환 — 한국어 띄어쓰기 변형 대응
-// "폴로셔츠" vs "폴로 셔츠" 등 공백 차이에도 매칭 가능
-// ============================================
-function normalizeForMatch(str: string): string {
-  return str.toLowerCase().replace(/\s+/g, '');
-}
+import { normalizeForMatch } from '../utils/normalize.ts';
+
+// 재고 데이터는 시계열이 아닌 현재 스냅샷 — 사용자에게 명시
+const INVENTORY_SNAPSHOT_NOTE = '\n\n※ 재고 데이터는 현재 시점 기준입니다.';
 
 // ============================================
 // RPC 호출 헬퍼 — 프론트엔드와 동일 RPC 사용
@@ -1315,7 +1312,7 @@ async function queryInventory(
 
   return {
     actions,
-    message: `현재 ${totalItems}개 상품 중 ${lowStockItems}개 상품이 재주문 필요(재고 부족), ${overstockItems}개 상품이 과잉 재고 상태입니다.${tabMessage}`,
+    message: `현재 ${totalItems}개 상품 중 ${lowStockItems}개 상품이 재주문 필요(재고 부족), ${overstockItems}개 상품이 과잉 재고 상태입니다.${INVENTORY_SNAPSHOT_NOTE}${tabMessage}`,
     suggestions: ['상품 판매량 알려줘', '매출 알려줘'],
     data: { totalItems, lowStockItems, overstockItems },
   };
@@ -2681,7 +2678,7 @@ async function queryOverstock(
     ).join('\n');
     return {
       actions,
-      message: `과잉 재고 상품은 ${overstockItems.length}개입니다${filterNote}:\n${list}${tabMessage}`,
+      message: `과잉 재고 상품은 ${overstockItems.length}개입니다${filterNote}:\n${list}${INVENTORY_SNAPSHOT_NOTE}${tabMessage}`,
       suggestions: ['재고 부족 경고 알려줘', '재고 현황 보여줘', '재고 최적화 추천'],
       data: { overstockCount: overstockItems.length, totalItems: items.length, items: overstockItems },
     };
@@ -2732,7 +2729,7 @@ async function queryStockAlert(
     ).join('\n');
     return {
       actions,
-      message: `재고 부족 경고 상품은 ${lowStockItems.length}개입니다${filterNote}:\n${list}${tabMessage}`,
+      message: `재고 부족 경고 상품은 ${lowStockItems.length}개입니다${filterNote}:\n${list}${INVENTORY_SNAPSHOT_NOTE}${tabMessage}`,
       suggestions: ['과잉 재고 알려줘', '재고 현황 보여줘', '입출고 내역 보여줘'],
       data: { lowStockCount: lowStockItems.length, totalItems: items.length, items: lowStockItems },
     };
@@ -2816,7 +2813,7 @@ async function queryStockDistribution(
 
   return {
     actions,
-    message: `재고 상태 분포:\n• 정상: ${healthy}개 (${total > 0 ? Math.round((healthy / total) * 100) : 0}%)\n• 부족: ${lowStock}개 (${total > 0 ? Math.round((lowStock / total) * 100) : 0}%)\n• 과잉: ${overstock}개 (${total > 0 ? Math.round((overstock / total) * 100) : 0}%)${tabMessage}`,
+    message: `재고 상태 분포:\n• 정상: ${healthy}개 (${total > 0 ? Math.round((healthy / total) * 100) : 0}%)\n• 부족: ${lowStock}개 (${total > 0 ? Math.round((lowStock / total) * 100) : 0}%)\n• 과잉: ${overstock}개 (${total > 0 ? Math.round((overstock / total) * 100) : 0}%)${INVENTORY_SNAPSHOT_NOTE}${tabMessage}`,
     suggestions: ['재고 부족 경고 알려줘', '과잉 재고 알려줘', '입출고 내역 보여줘'],
     data: { total, lowStock, overstock, healthy },
   };
@@ -2853,7 +2850,7 @@ async function queryHealthyStock(
 
     return {
       actions,
-      message: `정상 재고 상품은 ${healthyItems.length}개입니다 (전체 ${total}개 중, ${ratio}%):\n${list}${moreNote}${tabMessage}`,
+      message: `정상 재고 상품은 ${healthyItems.length}개입니다 (전체 ${total}개 중, ${ratio}%):\n${list}${moreNote}${INVENTORY_SNAPSHOT_NOTE}${tabMessage}`,
       suggestions: ['재고 부족 경고 알려줘', '과잉 재고 알려줘', '재고 현황 보여줘'],
       data: { healthyCount: healthyItems.length, totalItems: total, ratio },
     };
@@ -2926,7 +2923,7 @@ async function queryInventoryCategory(
 
   return {
     actions,
-    message: `카테고리별 재고 현황${filterNote}:\n${list}${tabMessage}`,
+    message: `카테고리별 재고 현황${filterNote}:\n${list}${INVENTORY_SNAPSHOT_NOTE}${tabMessage}`,
     suggestions: ['재고 현황 보여줘', '재고 부족 경고 알려줘', '과잉 재고 알려줘'],
     data: { categories },
   };
@@ -2959,7 +2956,7 @@ async function queryInventoryDetail(
 
   return {
     actions,
-    message: `상세 재고 현황 (총 ${items.length}개 상품):\n${list}${moreNote}${tabMessage}`,
+    message: `상세 재고 현황 (총 ${items.length}개 상품):\n${list}${moreNote}${INVENTORY_SNAPSHOT_NOTE}${tabMessage}`,
     suggestions: ['재고 부족 경고 알려줘', '카테고리별 재고 보여줘', '과잉 재고 알려줘'],
     data: { items, totalItems: items.length },
   };
