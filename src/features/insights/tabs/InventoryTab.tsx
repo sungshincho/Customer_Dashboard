@@ -303,15 +303,47 @@ const StockDistributionChart = ({ data, isDark }: StockDistributionChartProps) =
     );
   }
 
+  const legendItems = [
+    { label: '정상', count: data.normal, color: '#22c55e' },
+    { label: '과잉', count: data.overstock, color: '#3b82f6' },
+    { label: '부족', count: data.low, color: '#f97316' },
+    { label: '위험', count: data.critical, color: '#ef4444' },
+  ];
+
   return (
-    <div ref={containerRef} style={{ width: '100%', display: 'flex', justifyContent: 'center', position: 'relative' }}>
-      <canvas
-        ref={canvasRef}
-        style={{ width: dimensions.width, height: dimensions.height, cursor: tooltip ? 'pointer' : 'default' }}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
-      />
-      <ChartTooltip data={tooltip} isDark={isDark} />
+    <div ref={containerRef} style={{ width: '100%', position: 'relative' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', position: 'relative' }}>
+        <canvas
+          ref={canvasRef}
+          style={{ width: dimensions.width, height: dimensions.height, cursor: tooltip ? 'pointer' : 'default' }}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+        />
+        <ChartTooltip data={tooltip} isDark={isDark} />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '12px', flexWrap: 'wrap' }}>
+        {legendItems.map((item) => {
+          const percent = total > 0 ? ((item.count / total) * 100).toFixed(0) : '0';
+          return (
+            <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: item.color,
+                flexShrink: 0,
+              }} />
+              <span style={{
+                fontSize: '12px',
+                color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)',
+                whiteSpace: 'nowrap',
+              }}>
+                {item.label} {item.count}개 ({percent}%)
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };
@@ -571,6 +603,7 @@ export function InventoryTab() {
 
   const text3D = getText3D(isDark);
   const iconColor = isDark ? 'rgba(255,255,255,0.8)' : '#1a1a1f';
+  const [inventoryPage, setInventoryPage] = useState(0);
 
   // KPI 카운트업 애니메이션
   const animatedTotalProducts = useCountUp(data?.totalProducts || 0, { duration: 1500, enabled: !isLoading });
@@ -797,67 +830,136 @@ export function InventoryTab() {
       <Glass3DCard id="inventory-detail" dark={isDark}>
         <div className="p-6">
           <h3 style={{ fontSize: '16px', marginBottom: '20px', ...text3D.number }}>상세 재고 현황</h3>
-          {data?.inventoryLevels && data.inventoryLevels.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr style={{ borderBottom: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.1)' }}>
-                    <th className="text-left py-3 px-4" style={text3D.body}>상품명</th>
-                    <th className="text-left py-3 px-4" style={text3D.body}>SKU</th>
-                    <th className="text-left py-3 px-4" style={text3D.body}>카테고리</th>
-                    <th className="text-right py-3 px-4" style={text3D.body}>현재고</th>
-                    <th className="text-right py-3 px-4" style={text3D.body}>적정재고</th>
-                    <th className="text-right py-3 px-4" style={text3D.body}>최소재고</th>
-                    <th className="text-center py-3 px-4" style={text3D.body}>상태</th>
-                    <th className="text-right py-3 px-4" style={text3D.body}>품절 예상</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.inventoryLevels.slice(0, 15).map((item) => (
-                    <tr
-                      key={item.id}
-                      style={{ borderBottom: isDark ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(0,0,0,0.05)' }}
+          {data?.inventoryLevels && data.inventoryLevels.length > 0 ? (() => {
+            const ITEMS_PER_PAGE = 10;
+            const totalPages = Math.ceil(data.inventoryLevels.length / ITEMS_PER_PAGE);
+            const safePage = Math.min(inventoryPage, totalPages - 1);
+            const paginatedLevels = data.inventoryLevels.slice(
+              safePage * ITEMS_PER_PAGE,
+              (safePage + 1) * ITEMS_PER_PAGE
+            );
+            return (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr style={{ borderBottom: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.1)' }}>
+                        <th className="text-left py-3 px-4" style={text3D.body}>상품명</th>
+                        <th className="text-left py-3 px-4" style={text3D.body}>SKU</th>
+                        <th className="text-left py-3 px-4" style={text3D.body}>카테고리</th>
+                        <th className="text-right py-3 px-4" style={text3D.body}>현재고</th>
+                        <th className="text-right py-3 px-4" style={text3D.body}>적정재고</th>
+                        <th className="text-right py-3 px-4" style={text3D.body}>최소재고</th>
+                        <th className="text-center py-3 px-4" style={text3D.body}>상태</th>
+                        <th className="text-right py-3 px-4" style={text3D.body}>품절 예상</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedLevels.map((item) => (
+                        <tr
+                          key={item.id}
+                          style={{ borderBottom: isDark ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(0,0,0,0.05)' }}
+                        >
+                          <td className="py-3 px-4" style={{ fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>
+                            {item.product_name}
+                          </td>
+                          <td className="py-3 px-4" style={text3D.body}>{item.sku || '-'}</td>
+                          <td className="py-3 px-4">
+                            <span style={{
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                              color: isDark ? 'rgba(255,255,255,0.8)' : '#6b7280',
+                            }}>
+                              {item.category || '기타'}
+                            </span>
+                          </td>
+                          <td className="text-right py-3 px-4" style={{
+                            fontWeight: 600,
+                            color: item.stock_status === 'critical' ? '#ef4444'
+                              : item.stock_status === 'low' ? '#f97316'
+                              : (isDark ? '#fff' : '#1a1a1f'),
+                          }}>
+                            {item.current_stock.toLocaleString()}
+                          </td>
+                          <td className="text-right py-3 px-4" style={text3D.body}>{item.optimal_stock.toLocaleString()}</td>
+                          <td className="text-right py-3 px-4" style={text3D.body}>{item.minimum_stock.toLocaleString()}</td>
+                          <td className="text-center py-3 px-4">
+                            <StatusBadge status={item.stock_status} isDark={isDark} />
+                          </td>
+                          <td className="text-right py-3 px-4" style={{
+                            color: item.days_until_stockout !== null && item.days_until_stockout <= 7 ? '#ef4444' : (isDark ? 'rgba(255,255,255,0.6)' : '#6b7280'),
+                            fontWeight: item.days_until_stockout !== null && item.days_until_stockout <= 7 ? 600 : 400,
+                          }}>
+                            {item.days_until_stockout !== null ? `${item.days_until_stockout}일` : '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {totalPages > 1 && (
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    gap: '12px',
+                    marginTop: '16px',
+                    paddingTop: '12px',
+                    borderTop: isDark ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(0,0,0,0.05)',
+                  }}>
+                    <button
+                      onClick={() => setInventoryPage(p => Math.max(0, p - 1))}
+                      disabled={safePage === 0}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        border: 'none',
+                        cursor: safePage === 0 ? 'not-allowed' : 'pointer',
+                        background: safePage === 0
+                          ? (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)')
+                          : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)'),
+                        color: safePage === 0
+                          ? (isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.25)')
+                          : (isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.7)'),
+                      }}
                     >
-                      <td className="py-3 px-4" style={{ fontWeight: 600, color: isDark ? '#fff' : '#1a1a1f' }}>
-                        {item.product_name}
-                      </td>
-                      <td className="py-3 px-4" style={text3D.body}>{item.sku || '-'}</td>
-                      <td className="py-3 px-4">
-                        <span style={{
-                          padding: '4px 8px',
-                          borderRadius: '6px',
-                          fontSize: '11px',
-                          background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-                          color: isDark ? 'rgba(255,255,255,0.8)' : '#6b7280',
-                        }}>
-                          {item.category || '기타'}
-                        </span>
-                      </td>
-                      <td className="text-right py-3 px-4" style={{
-                        fontWeight: 600,
-                        color: item.stock_status === 'critical' ? '#ef4444'
-                          : item.stock_status === 'low' ? '#f97316'
-                          : (isDark ? '#fff' : '#1a1a1f'),
-                      }}>
-                        {item.current_stock.toLocaleString()}
-                      </td>
-                      <td className="text-right py-3 px-4" style={text3D.body}>{item.optimal_stock.toLocaleString()}</td>
-                      <td className="text-right py-3 px-4" style={text3D.body}>{item.minimum_stock.toLocaleString()}</td>
-                      <td className="text-center py-3 px-4">
-                        <StatusBadge status={item.stock_status} isDark={isDark} />
-                      </td>
-                      <td className="text-right py-3 px-4" style={{
-                        color: item.days_until_stockout !== null && item.days_until_stockout <= 7 ? '#ef4444' : (isDark ? 'rgba(255,255,255,0.6)' : '#6b7280'),
-                        fontWeight: item.days_until_stockout !== null && item.days_until_stockout <= 7 ? 600 : 400,
-                      }}>
-                        {item.days_until_stockout !== null ? `${item.days_until_stockout}일` : '-'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
+                      이전
+                    </button>
+                    <span style={{
+                      fontSize: '12px',
+                      color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)',
+                    }}>
+                      {safePage + 1} / {totalPages}
+                    </span>
+                    <button
+                      onClick={() => setInventoryPage(p => Math.min(totalPages - 1, p + 1))}
+                      disabled={safePage >= totalPages - 1}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        border: 'none',
+                        cursor: safePage >= totalPages - 1 ? 'not-allowed' : 'pointer',
+                        background: safePage >= totalPages - 1
+                          ? (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)')
+                          : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)'),
+                        color: safePage >= totalPages - 1
+                          ? (isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.25)')
+                          : (isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.7)'),
+                      }}
+                    >
+                      다음
+                    </button>
+                  </div>
+                )}
+              </>
+            );
+          })() : (
             <div className="py-8 text-center" style={text3D.body}>재고 데이터가 없습니다</div>
           )}
         </div>
