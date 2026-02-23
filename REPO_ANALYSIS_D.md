@@ -2106,7 +2106,20 @@ apps/website/tailwind.config.ts   → preset: ['@neuraltwin/ui/tailwind.preset']
 
 > **결론:** tailwind.config.ts의 커스텀 설정이 모두 CSS 변수 기반이므로, **프리셋으로 분리 후 CSS 변수값만 앱별로 변경**하면 디자인 시스템 통합이 용이합니다.
 
----
+### 9.6 공유 가능성 종합 매트릭스
+
+| 카테고리 | 공유율 | 상세 |
+|---|---:|---|
+| **UI 컴포넌트** (shadcn/ui) | 95% | 49개 표준 + Glass3DCard 커스텀 — 거의 전부 공유 가능 |
+| **Supabase 클라이언트** | 90% | 초기화 패턴 공유, 환경 변수 접두사만 변경 (VITE_→NEXT_PUBLIC_) |
+| **Tailwind 설정** | 80% | CSS 변수 기반 — 프리셋으로 분리 후 테마값만 앱별 커스텀 |
+| **알림/Toast 시스템** | 70% | Sonner 기반 공유 가능, `next-themes` 의존성 정리 필요 |
+| **포맷 유틸리티** | 60% | `cn()`, `formatCurrency`, `formatPercent` 등 — 중복 정의 통합 필요 |
+| **타입 정의** | 40% | `Database`, `analysis.types`, `auth` 타입만 — 3D/온톨로지 타입은 대시보드 전용 |
+| **데이터 유틸리티** | 30% | Storage 라이브러리만 공유 가능, 스키마/정규화는 대시보드 전용 |
+| **Error Boundary** | 0% | ❌ 미존재 — 공통 컴포넌트 신규 생성 필요 |
+
+> **결론:** UI 레이어의 약 **80%** 를 모노레포 공유 패키지로 추출 가능합니다. 데이터/비즈니스 로직 레이어는 대시보드 전용이 대부분이므로 별도 관리가 적합합니다.
 
 ---
 
