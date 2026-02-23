@@ -1267,3 +1267,555 @@ invalidateStoreData(id)   // 특정 매장 관련 쿼리를 stale로 표시 (inv
 | 폴링 폴백 | ⚠️ 부분적 — `refetchInterval`을 사용하는 7개 쿼리만 |
 
 > **결론:** 오프라인 처리가 전혀 구현되어 있지 않습니다. 네트워크 단절 시 Realtime 구독이 중단되며, 복구 메커니즘은 Supabase 클라이언트 내장 재연결에만 의존합니다.
+
+---
+
+## 섹션 7: Supabase 연결
+
+### 7.1 테이블 접근
+
+코드에서 `.from('테이블명')` 패턴을 검색한 결과, **총 76개 테이블**에 접근하고 있습니다.
+
+> **범례:** S=select, I=insert, U=update, D=delete, P=upsert
+
+#### 핵심 비즈니스 테이블 (매출/방문/고객)
+
+| # | 테이블명 | 작업 | 주요 사용 위치 |
+|---|---|---|---|
+| 1 | `daily_kpis_agg` | S, D | InsightDataContext, useDashboardKPI, useDashboardKPIAgg, useAIPrediction, useGoals, useROITracking, alertService 등 14개 파일 |
+| 2 | `customers` | S | useStoreData, useDataControlTower, useDataSourceMapping, useRealtimeTracking, sceneRecipeGenerator 등 6개 파일 |
+| 3 | `customer_segments_agg` | S | InsightDataContext, CustomerTab, useCustomerSegments, useCustomerSegmentsAgg |
+| 4 | `transactions` | S | useDataControlTower, useAIPrediction, useStoreContext |
+| 5 | `purchases` | S | useStoreData, useGoals, useDataSourceMapping |
+| 6 | `line_items` | S | useGoals, useProductPerformance |
+| 7 | `store_visits` | S | useStoreData, useGoals, useStoreContext, useDataSourceMapping, store-context-builder |
+| 8 | `stores` | S, I | useSelectedStore, SettingsPage, useStoreContext, environmentDataService, store-context-builder 등 10개 파일 |
+| 9 | `store_goals` | S, U, P | useGoals, alertService |
+| 10 | `store_personas` | S | useOptimizationFeedback |
+
+#### 상품/재고 테이블
+
+| # | 테이블명 | 작업 | 주요 사용 위치 |
+|---|---|---|---|
+| 11 | `products` | S | InsightDataContext, useStoreData, useProductPerformance, ProductTab, alertService 등 11개 파일 |
+| 12 | `product_performance_agg` | S | InsightDataContext, ProductTab, store-context-builder, useProductPerformance |
+| 13 | `product_placements` | S, U, P | useOptimization, usePlacement, modelLayerLoader, sceneRecipeGenerator |
+| 14 | `product_models` | S | modelLayerLoader, sceneRecipeGenerator |
+| 15 | `inventory_levels` | S | InsightDataContext, useRealtimeInventory, useDataControlTower, useInventoryMetrics, useDataSourceMapping |
+| 16 | `inventory_movements` | S | useDataControlTower, InsightDataContext, useInventoryMetrics |
+| 17 | `auto_order_suggestions` | S, U | useRealtimeInventory |
+| 18 | `realtime_inventory` | S | usePOSIntegration |
+| 19 | `realtime_transactions` | S | usePOSIntegration |
+
+#### 존/공간 분석 테이블
+
+| # | 테이블명 | 작업 | 주요 사용 위치 |
+|---|---|---|---|
+| 20 | `zones_dim` | S | InsightDataContext, useZoneMetrics, useStoreBounds, useStaffData, useCustomerFlowData, SimulationPage, store-context-builder |
+| 21 | `zones` | U | useLayoutSimulation |
+| 22 | `zone_daily_metrics` | S | InsightDataContext, useZoneMetrics, store-context-builder |
+| 23 | `zone_events` | S | useDataControlTower, useZoneMetrics |
+| 24 | `zone_transitions` | S | InsightDataContext, useCustomerFlowData, store-context-builder |
+| 25 | `funnel_events` | S | InsightDataContext, useFunnelAnalysis |
+| 26 | `hourly_metrics` | S | useFootfallAnalysis, useFunnelAnalysis, store-context-builder |
+
+#### 3D/디지털 트윈 테이블
+
+| # | 테이블명 | 작업 | 주요 사용 위치 |
+|---|---|---|---|
+| 27 | `store_scenes` | S, I, U, D | useScenePersistence, useStoreScene, useSceneSimulation, StorageManager, IntegratedImportStatus |
+| 28 | `furniture` | S, U | useLayoutSimulation, modelLayerLoader, sceneRecipeGenerator, store-context-builder |
+| 29 | `furniture_slots` | S, U | useFurnitureSlots, usePlacement, useSceneSimulation, useLayoutSimulation, sceneRecipeGenerator, store-context-builder |
+| 30 | `model_3d_files` | S, I, D | Model3DUploadWidget |
+| 31 | `placement_history` | S, I | usePlacement |
+| 32 | `simulation_history` | S, I, U, D | useSimulationHistory |
+| 33 | `layout_optimization_results` | S, U | useOptimization, useOptimizationFeedback, sceneRecipeGenerator |
+| 34 | `optimization_feedback` | I | useOptimizationFeedback |
+| 35 | `optimization_tasks` | I | useFlowSimulation |
+| 36 | `staff` | S | useStaffData, useStoreData, sceneRecipeGenerator, store-context-builder |
+| 37 | `staff_assignments` | P | useStaffingSimulation |
+
+#### 온톨로지/그래프 테이블
+
+| # | 테이블명 | 작업 | 주요 사용 위치 |
+|---|---|---|---|
+| 38 | `graph_entities` | S, I, U, D | useOntologyData, GraphQueryBuilder, OntologyDataManagement, StorageManager, ModelUploader, useLayoutApply, sceneRecipeGenerator, useEnhancedAIInference 등 19개 파일 |
+| 39 | `graph_relations` | S, D | useOntologyData, OntologyDataManagement, useEnhancedAIInference, useStoreContext, store-context-builder 등 8개 파일 |
+| 40 | `ontology_entity_types` | S, I, U, D | EntityTypeManager, RetailSchemaPreset, SchemaMapper, SchemaVersionManager, comprehensiveRetailSchema 등 22개 파일 |
+| 41 | `ontology_relation_types` | S, I, U, D | RelationTypeManager, RetailSchemaPreset, SchemaMapper, SchemaVersionManager, comprehensiveRetailSchema 등 12개 파일 |
+| 42 | `ontology_schema_versions` | S, I | RetailSchemaPreset, SchemaVersionManager |
+| 43 | `retail_concepts` | S | useRetailOntology |
+| 44 | `data_sources` | S | useRetailOntology |
+
+#### AI/추천/ROI 테이블
+
+| # | 테이블명 | 작업 | 주요 사용 위치 |
+|---|---|---|---|
+| 45 | `ai_inference_results` | S | useAI, useRetailOntology, useCongestionSimulation, useFlowSimulation, useLayoutSimulation, useStaffingSimulation |
+| 46 | `ai_recommendations` | S, U, D | useAI, useAIRecommendations, IntegratedImportStatus |
+| 47 | `applied_strategies` | S, I, U, D | useAppliedStrategies, useCategoryPerformance, useROISummary, useFlowSimulation, useLayoutSimulation, useStaffingSimulation |
+| 48 | `recommendation_applications` | S | useROITracking, useStoreContext, alertService |
+| 49 | `roi_measurements` | S | useROITracking |
+| 50 | `kpi_snapshots` | S | useROITracking |
+| 51 | `strategy_feedback` | S, I, U | useLearningFeedback, useOptimizationFeedback, useROITracking |
+| 52 | `feedback_reason_codes` | S | useOptimizationFeedback |
+
+#### 데이터 임포트/ETL 테이블
+
+| # | 테이블명 | 작업 | 주요 사용 위치 |
+|---|---|---|---|
+| 53 | `user_data_imports` | S, I, D | DataImportWidget, ImportHistoryWidget, DataImportHistory, UnifiedDataUpload, StorageManager, useImportProgress 등 12개 파일 |
+| 54 | `raw_imports` | S | useDataControlTower |
+| 55 | `etl_runs` | S | useDataControlTower |
+| 56 | `upload_sessions` | S, I, U | useUploadSession |
+
+#### API 연동 테이블
+
+| # | 테이블명 | 작업 | 주요 사용 위치 |
+|---|---|---|---|
+| 57 | `api_connections` | S, U, D | useApiConnector, useDataControlTower |
+| 58 | `api_mapping_templates` | S | useApiConnector |
+| 59 | `api_sync_logs` | S | useApiConnector |
+| 60 | `pos_integrations` | U | usePOSIntegration |
+| 61 | `sync_logs` | S | usePOSIntegration |
+
+#### 사용자/조직/설정 테이블
+
+| # | 테이블명 | 작업 | 주요 사용 위치 |
+|---|---|---|---|
+| 62 | `user_alerts` | S, I, U | useAlerts, alertService |
+| 63 | `user_activity_logs` | I | useActivityLogger, useAuth, EntityTypeManager |
+| 64 | `user_guide_completions` | S | useOnboarding |
+| 65 | `organization_members` | S | useAuth, useActivityLogger, SettingsPage |
+| 66 | `organization_settings` | S, I, P | SettingsPage |
+| 67 | `notification_settings` | S, I, P | SettingsPage |
+| 68 | `subscriptions` | S | useAuth, SettingsPage |
+| 69 | `licenses` | S | SettingsPage |
+| 70 | `invitations` | I | SettingsPage |
+| 71 | `onboarding_progress` | S, I, U | useOnboarding |
+| 72 | `sample_data_templates` | S | useOnboarding |
+| 73 | `quickstart_guides` | S | useOnboarding |
+
+#### 환경/외부 데이터 테이블
+
+| # | 테이블명 | 작업 | 주요 사용 위치 |
+|---|---|---|---|
+| 74 | `weather_data` | S | useDataControlTower, useContextData, useTrafficHeatmap |
+| 75 | `holidays_events` | S, P | useDataControlTower, useContextData, environmentDataService, useTrafficHeatmap |
+| 76 | `economic_indicators` | S | useContextData |
+| 77 | `regional_data` | S | useTrafficHeatmap |
+
+#### IoT/센서 테이블
+
+| # | 테이블명 | 작업 | 주요 사용 위치 |
+|---|---|---|---|
+| 78 | `wifi_tracking` | S, D | useWiFiTracking, useStoreData, IntegratedImportStatus |
+| 79 | `wifi_zones` | S | useWiFiTracking, useStoreData |
+| 80 | `iot_sensors` | S | useRealtimeTracking |
+
+#### 임포트 상태 삭제 전용 테이블
+
+| # | 테이블명 | 작업 | 주요 사용 위치 |
+|---|---|---|---|
+| 81 | `dashboard_kpis` | D | IntegratedImportStatus |
+| 82 | `funnel_metrics` | D | IntegratedImportStatus |
+| 83 | `analysis_history` | D | IntegratedImportStatus |
+
+#### 테이블 접근 통계
+
+| 항목 | 수치 |
+|---|---|
+| 총 테이블 수 | 83개 |
+| DB 테이블 | 81개 |
+| Storage 버킷 (`3d-models`, `store-data`) | 2개 (7-4 참조) |
+| select 전용 테이블 | 42개 |
+| CRUD 전체 지원 테이블 | 8개 (`graph_entities`, `ontology_entity_types`, `ontology_relation_types`, `applied_strategies`, `simulation_history`, `store_scenes`, `ai_recommendations`, `user_data_imports`) |
+| insert 전용 테이블 | 4개 (`user_activity_logs`, `optimization_feedback`, `optimization_tasks`, `invitations`) |
+
+### 7.2 Edge Function 호출
+
+코드에서 `supabase.functions.invoke()` 및 `fetch()` 기반 Edge Function 호출을 검색한 결과, **29개 고유 Edge Function**을 **75회 이상** 호출합니다.
+
+#### AI/추론 Edge Functions
+
+| # | 함수명 | 용도 | 호출 위치 | 호출 수 |
+|---|---|---|---|---|
+| 1 | `unified-ai` | 통합 AI 추론 (범용) | useEnhancedAIInference, useAIRecommendations, useUnifiedAI | 4 |
+| 2 | `retail-ai-inference` | 리테일 도메인 AI 추론 | useAIPrediction, useSimulationAI, useRetailAI, useRetailOntology | 4 |
+| 3 | `advanced-ai-inference` | 고급 AI 추론 (혼잡도, 동선, 씬) | useEnhancedAIInference, useCongestionSimulation, useFlowSimulation, useSceneSimulation | 8 |
+| 4 | `neuraltwin-assistant` | AI 어시스턴트 채팅 | useAssistantChat | 1 |
+| 5 | `generate-ai-recommendations` | AI 추천 생성 | UnifiedDataUpload | 2 |
+| 6 | `generate-optimization` | 레이아웃/배치 최적화 생성 | useLayoutSimulation, useOptimization, useSceneSimulation, useStaffingSimulation | 6 |
+| 7 | `run-simulation` | 시뮬레이션 실행 | simulationStore | 1 |
+
+#### 데이터 파이프라인 Edge Functions
+
+| # | 함수명 | 용도 | 호출 위치 | 호출 수 |
+|---|---|---|---|---|
+| 8 | `auto-map-etl` | 자동 스키마 매핑 | OntologyDataManagement, SchemaMapper, UnifiedDataUpload, DataImportWidget(fetch) | 4 |
+| 9 | `unified-etl` | 통합 ETL 파이프라인 | SchemaMapper | 1 |
+| 10 | `integrated-data-pipeline` | 통합 데이터 파이프라인 | UnifiedDataUpload | 1 |
+| 11 | `validate-batch-files` | 배치 파일 유효성 검증 | UnifiedDataUpload | 1 |
+| 12 | `auto-fix-data` | 데이터 자동 수정 | DataValidation | 1 |
+| 13 | `aggregate-all-kpis` | KPI 집계 | UnifiedDataUpload | 2 |
+| 14 | `process-wifi-data` | WiFi 데이터 처리 | UnifiedDataUpload | 1 |
+| 15 | `replay-import` | 임포트 재실행 | useDataControlTower | 1 |
+| 16 | `etl-health` | ETL 헬스 체크 | useDataControlTower | 1 |
+| 17 | `apply-sample-data` | 온보딩 샘플 데이터 적용 | useOnboarding | 1 |
+
+#### 3D 모델 처리 Edge Functions
+
+| # | 함수명 | 용도 | 호출 위치 | 호출 수 |
+|---|---|---|---|---|
+| 18 | `analyze-3d-model` | 3D 모델 분석 | StorageManager, ModelUploader | 2 |
+| 19 | `auto-process-3d-models` | 3D 모델 자동 처리 | StorageManager, UnifiedDataUpload, ModelLayerManager | 3 |
+
+#### 외부 연동 Edge Functions
+
+| # | 함수명 | 용도 | 호출 위치 | 호출 수 |
+|---|---|---|---|---|
+| 20 | `api-connector` | API 연동 (테스트/동기화/스키마) | useApiConnector | 4 |
+| 21 | `datasource-mapper` | 데이터 소스 매핑 | useRetailOntology | 5 |
+| 22 | `environment-proxy` | 외부 API 프록시 (날씨/공휴일) | environmentDataService | 2 |
+| 23 | `pos-oauth-start` | POS OAuth 인증 시작 | usePOSIntegration | 1 |
+| 24 | `pos-oauth-callback` | POS OAuth 콜백 처리 | usePOSIntegration | 1 |
+| 25 | `sync-pos-data` | POS 데이터 동기화 | usePOSIntegration | 1 |
+| 26 | `inventory-monitor` | 재고 모니터링 | useRealtimeInventory | 1 |
+
+#### 기타 Edge Functions
+
+| # | 함수명 | 용도 | 호출 위치 | 호출 수 |
+|---|---|---|---|---|
+| 27 | `graph-query` | 그래프 쿼리 실행 | GraphQueryBuilder | 1 |
+| 28 | `fetch-db-schema` | DB 스키마 조회 | useSchemaMetadata | 1 |
+| 29 | `ontology-inference` | 온톨로지 추론 (동적 함수명) | useOntologyInference | 3 |
+
+#### `fetch()` 기반 Edge Function 직접 호출 (DataImportWidget)
+
+| # | 엔드포인트 | 용도 | 파일 |
+|---|---|---|---|
+| 1 | `/functions/v1/upload-file` | 파일 업로드 | DataImportWidget.tsx:541 |
+| 2 | `/functions/v1/parse-file` | 파일 파싱 | DataImportWidget.tsx:561 |
+| 3 | `/functions/v1/validate-data` | 데이터 유효성 검증 | DataImportWidget.tsx:625 |
+| 4 | `/functions/v1/execute-import` | 임포트 실행 | DataImportWidget.tsx:699 |
+| 5 | `/functions/v1/generate-template` | 템플릿 생성 | DataImportWidget.tsx:815 |
+| 6 | `/functions/v1/auto-map-etl` | 자동 ETL 매핑 | DataImportWidget.tsx:894 |
+| 7 | `/functions/v1/rollback-import` | 임포트 롤백 | ImportHistoryWidget.tsx:287 |
+
+#### 동적 함수명 호출 (파라미터 기반)
+
+| # | 파일 | 동적 호출 방식 |
+|---|---|---|
+| 1 | `hooks/useAI.ts` | `functionName` 파라미터로 함수명 결정 |
+| 2 | `hooks/useAIInference.ts` | `functionName` 파라미터 (기본값: `retail-ai-inference`) |
+| 3 | `hooks/useDataSourceMapping.ts` | `functionName` 파라미터 (기본값: `datasource-mapper`) |
+| 4 | `hooks/useOntologyInference.ts` | `ontology-inference` 고정 + 동적 action 분기 |
+
+### 7.3 RPC 호출
+
+코드에서 `supabase.rpc()` 호출을 검색한 결과, **18개 RPC 함수**를 사용합니다.
+
+#### 데이터 컨트롤타워 RPC
+
+| # | RPC 함수명 | 용도 | 호출 위치 |
+|---|---|---|---|
+| 1 | `get_data_control_tower_status` | 데이터 컨트롤타워 상태 조회 | `useDataControlTower.ts:38` |
+| 2 | `calculate_data_quality_score` | 데이터 품질 점수 계산 | `useDataControlTower.ts:526` |
+| 3 | `get_kpi_lineage` | KPI 리니지 조회 | `useDataControlTower.ts:782` |
+
+#### API 연동 RPC
+
+| # | RPC 함수명 | 용도 | 호출 위치 |
+|---|---|---|---|
+| 4 | `get_api_connections_dashboard` | API 커넥터 대시보드 데이터 | `useApiConnector.ts:97` |
+| 5 | `create_api_connection` | API 연결 생성 | `useApiConnector.ts:183` |
+| 6 | `get_sync_history` | 동기화 이력 조회 | `SyncHistoryTable.tsx:294` |
+
+#### 리테일 온톨로지 RPC
+
+| # | RPC 함수명 | 용도 | 호출 위치 |
+|---|---|---|---|
+| 7 | `compute_all_retail_concepts` | 전체 리테일 컨셉 계산 | `useRetailOntology.ts:244` |
+| 8 | `compute_zone_conversion_funnel` | 존별 전환 퍼널 계산 | `useRetailOntology.ts:272` |
+| 9 | `compute_cross_sell_affinity` | 교차 판매 친화도 계산 | `useRetailOntology.ts:295` |
+| 10 | `compute_inventory_turnover` | 재고 회전율 계산 | `useRetailOntology.ts:318` |
+| 11 | `compute_zone_heatmap` | 존 히트맵 계산 | `useRetailOntology.ts:341` |
+
+#### AI 학습/피드백 RPC
+
+| # | RPC 함수명 | 용도 | 호출 위치 |
+|---|---|---|---|
+| 12 | `aggregate_ai_performance` | AI 성능 집계 | `useLearningFeedback.ts:211` |
+| 13 | `get_success_patterns` | 성공 패턴 분석 | `useLearningFeedback.ts:400` |
+| 14 | `get_failure_patterns` | 실패 패턴 분석 | `useLearningFeedback.ts:417` |
+| 15 | `calculate_confidence_adjustment` | 신뢰도 보정 계산 | `useLearningFeedback.ts:438` |
+
+#### 기타 RPC
+
+| # | RPC 함수명 | 용도 | 호출 위치 |
+|---|---|---|---|
+| 16 | `migrate_user_to_organization` | 사용자 조직 마이그레이션 | `useAuth.tsx:48` |
+| 17 | `graph_n_hop_query` | N-Hop 그래프 탐색 | `useOntologyData.ts:126` |
+| 18 | `get_hourly_entry_counts` | 시간대별 입장 수 | `InsightDataContext.tsx:344` |
+
+### 7.4 Storage 사용
+
+Supabase Storage에서 **2개 버킷**을 사용합니다.
+
+| 버킷명 | 용도 | 주요 작업 | 사용 파일 수 |
+|---|---|---|---|
+| `3d-models` | 3D 모델 파일 (GLB, GLTF 등) 저장 | upload, list, getPublicUrl, remove, download | 14개 |
+| `store-data` | 매장 데이터 파일 (CSV, Excel) 저장 | upload, list, getPublicUrl, remove | 6개 |
+
+#### 버킷별 상세 사용
+
+**`3d-models` 버킷:**
+
+| 작업 | 파일 | 코드 위치 |
+|---|---|---|
+| **upload** | Model3DUploadWidget, StorageManager, UnifiedDataUpload, ModelUploader, modelStorageManager | 6곳 |
+| **list** | DataImportHistory, DataStatistics, IntegratedImportStatus, StorageManager, Store3DViewer, modelLayerLoader, verifyAndCleanupModelUrls, useEnvironmentModels, useSpaceTextures | 9곳 |
+| **getPublicUrl** | DataImportHistory, StorageManager, Store3DViewer, modelLayerLoader, modelStorageManager, ModelUploader, useEnvironmentModels, useSpaceTextures | 8곳 |
+| **remove** | Model3DUploadWidget, IntegratedImportStatus, modelStorageManager | 4곳 |
+| **download** | verifyAndCleanupModelUrls | 1곳 |
+
+**`store-data` 버킷:**
+
+| 작업 | 파일 | 코드 위치 |
+|---|---|---|
+| **upload** | StorageManager, UnifiedDataUpload | 3곳 |
+| **list** | DataImportHistory, DataStatistics, IntegratedImportStatus, StorageManager | 6곳 |
+| **getPublicUrl** | DataImportHistory, StorageManager, UnifiedDataUpload | 3곳 |
+| **remove** | DataImportHistory, IntegratedImportStatus | 3곳 |
+
+#### 공유 Storage 유틸리티
+
+```typescript
+// src/lib/storage/loader.ts — 범용 Storage 유틸리티
+downloadBlob(bucket, path)     // 바이너리 다운로드
+listFiles(bucket, folder)       // 파일 목록
+getPublicUrl(bucket, path)      // 공개 URL 생성
+removeFile(bucket, path)        // 파일 삭제
+uploadFile(bucket, path, file)  // 파일 업로드
+```
+
+#### Storage 작업 통계
+
+| 작업 | 총 사용 횟수 |
+|---|---|
+| list | 12곳 |
+| getPublicUrl | 10곳 |
+| upload | 9곳 |
+| remove | 8곳 |
+| download | 2곳 |
+
+### 7.5 Auth 사용
+
+인증은 `src/hooks/useAuth.tsx`에 중앙화되어 있습니다.
+
+#### 인증 방식
+
+| # | 인증 메서드 | Supabase API | 코드 위치 |
+|---|---|---|---|
+| 1 | 이메일/비밀번호 로그인 | `supabase.auth.signInWithPassword()` | `useAuth.tsx:259` |
+| 2 | 이메일 회원가입 | `supabase.auth.signUp()` | `useAuth.tsx:313` |
+| 3 | Google OAuth | `supabase.auth.signInWithOAuth({ provider: 'google' })` | `useAuth.tsx:365` |
+| 4 | Kakao OAuth | `supabase.auth.signInWithOAuth({ provider: 'kakao' })` | `useAuth.tsx:375` |
+| 5 | 로그아웃 | `supabase.auth.signOut()` | `useAuth.tsx:133, 139, 159, 348` |
+| 6 | 비밀번호 재설정 | `supabase.auth.resetPasswordForEmail()` | `useAuth.tsx:358` |
+| 7 | 세션 조회 | `supabase.auth.getSession()` | `useAuth.tsx:230` |
+| 8 | 인증 상태 구독 | `supabase.auth.onAuthStateChange()` | `useAuth.tsx:188` |
+
+#### `getUser()` 호출 (사용자 ID 기반 RLS 체크)
+
+| # | 사용 파일 | 호출 횟수 |
+|---|---|---|
+| 1 | DataImportHistory | 3 |
+| 2 | DataStatistics | 1 |
+| 3 | DataValidation | 1 |
+| 4 | OntologyDataManagement | 2 |
+| 5 | SchemaMapper | 2 |
+| 6 | StorageManager | 5 |
+| 7 | UnifiedDataUpload | 2 |
+| 8 | EntityTypeManager | 7 |
+| 9 | RelationTypeManager | 1 |
+| 10 | RetailSchemaPreset | 4 |
+| 11 | SchemaVersionManager | 1 |
+| 12 | useOntologyData | 4 |
+| 13 | useOntologySchema | 1 |
+| **합계** | **13개 파일** | **34회** |
+
+#### `getSession()` 호출 (Bearer 토큰 추출)
+
+Edge Function 직접 `fetch()` 호출 시 인증 헤더에 사용:
+
+| # | 사용 파일 | 호출 횟수 |
+|---|---|---|
+| 1 | DataImportWidget | 5 |
+| 2 | ImportHistoryWidget | 1 |
+| 3 | Model3DUploadWidget | 1 |
+| 4 | SchemaMapper | 1 |
+| 5 | GraphQueryBuilder | 1 |
+| 6 | ModelUploader | 1 |
+| 7 | useRealtimeInventory | 1 |
+| **합계** | **7개 파일** | **11회** |
+
+#### Auth UI 진입점
+
+| 파일 | 역할 |
+|---|---|
+| `src/core/pages/AuthPage.tsx` | 로그인/회원가입 UI (signIn, resetPassword, signInWithGoogle, signInWithKakao) |
+| `src/components/DashboardLayout.tsx` | 로그아웃 트리거 (line 248) |
+| `src/components/ProtectedRoute.tsx` | 미인증 시 `/auth`로 리다이렉트 |
+
+#### Auth 아키텍처 요약
+
+```
+┌─────────────────────┐
+│    AuthPage.tsx      │  ← 로그인/회원가입 UI
+│  (이메일, Google,    │
+│   Kakao, 비밀번호)   │
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│  useAuth.tsx         │  ← 중앙 인증 허브
+│  (AuthProvider)      │
+│  - signIn/Up/Out     │
+│  - onAuthStateChange │
+│  - role/org 관리     │
+└──────────┬──────────┘
+           │
+     ┌─────┴─────┐
+     ▼           ▼
+┌──────────┐ ┌──────────────┐
+│ getUser()│ │ getSession() │
+│ (34회)   │ │ (11회)       │
+│ RLS 체크 │ │ Bearer 토큰  │
+└──────────┘ └──────────────┘
+```
+
+---
+
+## 섹션 8: 외부 서비스 연결
+
+### 8.1 외부 API 연결 구조
+
+모든 외부 API는 **Supabase Edge Function을 프록시**로 사용하며, 클라이언트에서 외부 API를 직접 호출하지 않습니다.
+
+```
+┌────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│  React App │────▶│  Edge Function   │────▶│  External API   │
+│  (클라이언트)│     │  (environment-   │     │  (OpenWeatherMap│
+│            │     │   proxy)         │     │   등)           │
+└────────────┘     └──────────────────┘     └─────────────────┘
+```
+
+### 8.2 외부 서비스 목록
+
+| # | 서비스명 | API 엔드포인트 | 용도 | 프록시 Edge Function | 환경변수 |
+|---|---|---|---|---|---|
+| 1 | **OpenWeatherMap** | `api.openweathermap.org/data/2.5` | 실시간 날씨 데이터 (기온, 습도, 강수량) | `environment-proxy` | `VITE_OPENWEATHERMAP_API_KEY` |
+| 2 | **Calendarific** | `calendarific.com/api/v2` | 공휴일/기념일 캘린더 데이터 | `environment-proxy` | `VITE_CALENDARIFIC_API_KEY` |
+| 3 | **data.go.kr** (공공데이터포털) | `apis.data.go.kr` | 한국 공휴일/지역 데이터 | `environment-proxy` | `VITE_DATA_GO_KR_API_KEY` |
+
+### 8.3 외부 API 사용 상세
+
+#### `environment-proxy` Edge Function (중앙 프록시)
+
+```typescript
+// src/features/studio/services/environmentDataService.ts
+
+// 날씨 데이터 요청 (line 169)
+supabase.functions.invoke('environment-proxy', {
+  body: {
+    type: 'weather',
+    lat: store.latitude,
+    lon: store.longitude
+  }
+});
+
+// 공휴일 데이터 요청 (line 325)
+supabase.functions.invoke('environment-proxy', {
+  body: {
+    type: 'holidays',
+    country: 'KR',
+    year: currentYear
+  }
+});
+```
+
+#### 데이터 흐름
+
+```
+1. 날씨 데이터:
+   environmentDataService.ts → environment-proxy → OpenWeatherMap API
+                                                    → weather_data 테이블 캐싱
+
+2. 공휴일 데이터:
+   environmentDataService.ts → environment-proxy → Calendarific API / data.go.kr
+                                                    → holidays_events 테이블 캐싱
+
+3. 경제 지표:
+   useContextData.ts → economic_indicators 테이블 (직접 조회, 외부 API 없음)
+```
+
+### 8.4 POS 시스템 연동
+
+| # | Edge Function | 용도 | 인증 방식 |
+|---|---|---|---|
+| 1 | `pos-oauth-start` | POS 시스템 OAuth 인증 시작 | OAuth 2.0 |
+| 2 | `pos-oauth-callback` | OAuth 콜백 처리 + 토큰 저장 | OAuth 2.0 |
+| 3 | `sync-pos-data` | POS 거래 데이터 동기화 | 저장된 OAuth 토큰 |
+
+```
+┌──────────┐    ┌────────────────┐    ┌───────────┐
+│ React App│───▶│ pos-oauth-start│───▶│ POS 시스템 │
+│          │    └────────────────┘    │ (외부)     │
+│          │                         └─────┬─────┘
+│          │    ┌─────────────────┐         │
+│          │◀───│pos-oauth-callback│◀────────┘ (redirect)
+│          │    └─────────────────┘
+│          │    ┌────────────────┐    ┌───────────┐
+│          │───▶│ sync-pos-data  │───▶│ POS API   │
+│          │    └────────────────┘    └───────────┘
+└──────────┘
+```
+
+#### POS 관련 테이블
+
+| 테이블 | 용도 |
+|---|---|
+| `pos_integrations` | POS 연동 설정 및 OAuth 토큰 저장 |
+| `realtime_transactions` | 실시간 POS 거래 데이터 |
+| `realtime_inventory` | 실시간 POS 재고 데이터 |
+| `sync_logs` | POS 동기화 이력 |
+
+### 8.5 NeuralTwin / NeuralSense
+
+| 이름 | 유형 | 설명 |
+|---|---|---|
+| **NeuralTwin** | 브랜드/플랫폼명 | 이 애플리케이션 자체의 브랜드명 (외부 API 아님) |
+| **NeuralSense** | 센서 데이터 소스 라벨 | WiFi/BLE 센서 기반 고객 추적 데이터의 소스 식별자 |
+
+- `NeuralTwin`은 플랫폼 이름으로, `neuraltwin-assistant` Edge Function 등 내부 서비스에 사용
+- `NeuralSense`는 IoT 센서 데이터의 라벨로, `wifi_tracking`, `iot_sensors` 테이블의 소스 식별에 사용
+
+### 8.6 기타 `fetch()` 호출
+
+| # | 파일 | 코드 위치 | 용도 | 대상 |
+|---|---|---|---|---|
+| 1 | `StorageManager.tsx` | line 413 | 파일 다운로드 | Supabase Storage 공개 URL |
+| 2 | `LayoutComparisonView.tsx` | line 162 | URL 접근 가능 여부 확인 (HEAD 요청) | Storage URL |
+| 3 | `sceneRecipeGenerator.ts` | line 130 | 로컬 조명 프리셋 JSON 로드 | 로컬 파일 (`/lighting-presets/`) |
+
+### 8.7 외부 연결 종합 요약
+
+| 구분 | 외부 서비스 수 | 연결 방식 |
+|---|---|---|
+| 날씨/환경 API | 3개 (OpenWeatherMap, Calendarific, data.go.kr) | Edge Function 프록시 |
+| POS 시스템 | 1개 (OAuth 기반) | Edge Function 프록시 |
+| 직접 외부 API 호출 | 0개 | — |
+| **총 외부 서비스** | **4개** | **모두 Edge Function 경유** |
+
+> **아키텍처 특징:** 클라이언트(React)에서 외부 API를 직접 호출하는 경우가 없으며, 모든 외부 통신은 Supabase Edge Function을 프록시로 사용합니다. 이는 API 키 노출 방지와 CORS 문제 해결을 위한 설계입니다.
