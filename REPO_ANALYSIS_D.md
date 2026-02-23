@@ -2483,3 +2483,434 @@ boxShadow: CSS 변수 기반 (2xs → 2xl 7단계)
 | **품질** | 데이터 품질 점수 + 제약조건 검증 + SCD2 이력 추적 |
 | **캐싱** | React Query (2분~30분 staleTime) + localStorage persist |
 | **피처 관리** | 3-Tier 피처 플래그 (MVP 23개 활성 / Enhanced 8개 / AI 18개 대기) |
+
+---
+
+## 섹션 13: 빌드 & 배포
+
+### 13.1 빌드 명령어
+
+| 명령어 | 설명 | 비고 |
+|---|---|---|
+| `npm run dev` | Vite 개발 서버 (포트 8080, HMR) | SWC 기반 Fast Refresh |
+| `npm run build` | 프로덕션 빌드 | `vite build` |
+| `npm run build:dev` | 개발 모드 빌드 | `vite build --mode development` |
+| `npm run lint` | ESLint 린트 | `eslint .` |
+| `npm run preview` | 빌드 결과 로컬 프리뷰 | `vite preview` |
+
+### 13.2 빌드 출력 (`dist/`)
+
+> **참고:** 이 프로젝트는 Next.js가 아닌 **Vite SPA**입니다. 출력 디렉토리는 `.next/`가 아닌 `dist/`입니다.
+
+```
+dist/
+├── index.html                      2.07 KB (gzip: 0.99 KB)
+├── favicon.ico                     16 KB
+├── placeholder.svg                 3.2 KB
+├── robots.txt                      160 B
+├── lighting-presets/
+│   ├── cool-modern.json            554 B
+│   ├── dramatic-spot.json          773 B
+│   └── warm-retail.json            685 B
+└── assets/
+    ├── index-CN1jdXzu.js           3,608.70 KB (gzip: 1,067.95 KB) ⚠️
+    └── index-V0WuZEg0.css         130.88 KB (gzip: 21.42 KB)
+
+총 용량: ~3.7 MB (gzip: ~1.1 MB)
+```
+
+#### 빌드 경고
+
+```
+⚠️ Some chunks are larger than 500 kB after minification.
+```
+
+**원인:** 코드 스플리팅 미적용 — 단일 JS 번들(3.6MB)로 전체 앱이 번들링됨
+
+**개선 방안:**
+1. `React.lazy()` + `Suspense`로 라우트별 코드 스플리팅
+2. `build.rollupOptions.output.manualChunks`로 벤더 분리 (three.js ~800KB, recharts ~300KB)
+3. Three.js 관련 모듈 동적 import (Studio 페이지 진입 시에만 로드)
+
+### 13.3 빌드 시간
+
+| 환경 | 빌드 시간 | 모듈 수 |
+|---|---:|---:|
+| **Production** (`npm run build`) | ~24초 | 3,973개 |
+| **Development** (`npm run build:dev`) | ~30초 | 3,973개 |
+
+### 13.4 빌드 도구 설정 (`vite.config.ts`)
+
+```typescript
+export default defineConfig(({ mode }) => ({
+  server: {
+    host: "::",      // IPv6 + IPv4 듀얼스택
+    port: 8080,      // 개발 서버 포트
+  },
+  plugins: [
+    react(),                                    // @vitejs/plugin-react-swc
+    mode === "development" && componentTagger()  // lovable-tagger (개발 전용)
+  ].filter(Boolean),
+  resolve: {
+    alias: { "@": path.resolve(__dirname, "./src") }  // @/ → src/
+  },
+}));
+```
+
+**특이사항:**
+- 코드 스플리팅 설정 없음 (`rollupOptions` 미사용)
+- Chunk 크기 제한 설정 없음 (`chunkSizeWarningLimit` 미설정)
+- Source map 설정 없음 (프로덕션 디버깅 불가)
+- `lovable-tagger`: Lovable 플랫폼 전용 컴포넌트 태깅 (개발 모드에서만 활성화)
+
+### 13.5 배포 대상
+
+| 항목 | 현재 상태 | 설명 |
+|---|---|---|
+| **배포 플랫폼** | Lovable (추정) | `lovable-tagger` dev dependency, Vite SPA 구조 |
+| **대안 1** | Vercel | Vite SPA 호환, 정적 자산 CDN 제공 |
+| **대안 2** | Netlify | `dist/` 폴더 직접 배포, `_redirects` 파일 필요 (SPA fallback) |
+| **대안 3** | AWS S3 + CloudFront | 정적 호스팅 + CDN |
+| **대안 4** | 자체 서버 (Nginx) | `dist/` 정적 서빙 + SPA fallback 설정 |
+
+**SPA 라우팅 요구사항:** 모든 경로를 `index.html`로 리다이렉트 필요 (React Router 클라이언트 사이드 라우팅)
+
+### 13.6 CI/CD 설정
+
+| 항목 | 상태 | 설명 |
+|---|---|---|
+| **GitHub Actions** | ❌ 없음 | `.github/workflows/` 디렉토리 없음 |
+| **CODEOWNERS** | ✅ 있음 | 3명 개발자 역할 기반 코드 소유권 정의 |
+| **PR 템플릿** | ✅ 있음 | 변경 유형, 테스트 체크리스트, 리뷰어 가이드 포함 |
+
+#### CODEOWNERS 역할 분담
+
+| 역할 | 담당 | 영역 |
+|---|---|---|
+| 🟦 @dev-a | UI/UX | 공유 Chat UI, 웹/OS 챗봇 UI, App.tsx 라우팅 |
+| 🟩 @dev-b | Web Bot | 웹사이트 챗봇 Edge Function, 훅 |
+| 🟧 @dev-c | OS Bot | OS 챗봇 Edge Function, 공유 EF 유틸리티 |
+| 🟪 전원 | 공유 | 타입 정의, DB 스키마, 프로젝트 설정 |
+
+#### PR 리뷰 정책
+
+| 변경 영역 | 필요 승인 수 |
+|---|---|
+| 본인 영역 | Self-merge 가능 |
+| 공유 타입 | 영향 받는 개발자 1명 이상 |
+| DB 스키마 | 2명 |
+| 프로젝트 설정 | 2명 (전원) |
+
+### 13.7 환경별 설정
+
+| 환경 | 감지 방법 | 용도 |
+|---|---|---|
+| **Development** | `import.meta.env.DEV === true` | 개발 서버 모드 감지, 디버그 로깅, Mock 데이터 |
+| **Production** | `import.meta.env.PROD === true` | 프로덕션 빌드 |
+| **Mode** | `import.meta.env.MODE` | `'development'` 또는 `'production'` |
+
+**환경별 분기 사용 위치 (13개 참조):**
+
+| 파일 | 변수 | 용도 |
+|---|---|---|
+| `integrations/supabase/client.ts` | `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase 연결 |
+| `hooks/useAuth.tsx` | `import.meta.env.DEV` | 개발 모드 디버그 로깅 |
+| `data-control/components/DataImportWidget.tsx` | `VITE_SUPABASE_URL` (6회) | Edge Function 직접 호출 URL 구성 |
+| `data-control/components/ImportHistoryWidget.tsx` | `VITE_SUPABASE_URL` | Edge Function URL |
+| `studio/services/environmentDataService.ts` | `VITE_OPENWEATHERMAP_API_KEY` 등 3개 | 외부 API 키 |
+
+> **주의:** `process.env`는 사용되지 않습니다. Vite의 `import.meta.env.*` 패턴만 사용합니다.
+
+---
+
+## 섹션 14: 특이사항 & 기술 부채
+
+> 모노레포 통합 시 주의해야 할 항목들
+
+### 14.1 하드코딩된 값
+
+#### 하드코딩된 URL (22개)
+
+| # | 파일 | 유형 | URL / 패턴 | 심각도 |
+|---|---|---|---|---|
+| 1-5 | `simulation/utils/modelLayerLoader.ts:587-591` | Supabase Storage | `https://bdrvowacecxnraaivlhr.supabase.co/storage/.../*.glb` (5개) | 🔴 높음 |
+| 6 | `data-control/constants/providers.ts:42-114` | 외부 문서 | POS/CRM/ERP 공급자 문서 URL 8개 | 🟡 낮음 |
+| 7 | `studio/services/environmentDataService.ts:34` | 외부 API | `https://api.openweathermap.org/data/2.5` | 🟡 중간 |
+| 8 | `core/pages/AuthPage.tsx:53` | 마케팅 | `https://www.neuraltwin.ai/pricing` | 🟡 낮음 |
+| 9-11 | `data-control/components/*.tsx` | 플레이스홀더 | `https://api.example.com/*` (3개) | ⚪ 무해 |
+
+#### 하드코딩된 API 경로 (7개)
+
+| 파일 | 경로 패턴 | 대상 |
+|---|---|---|
+| `data-control/types/index.ts:306-442` | `/sap/opu/odata/...` (2개) | SAP ERP |
+| 같은 파일 | `/services/rest/record/...` (2개) | NetSuite |
+| 같은 파일 | `/admin/api/2024-01/...` (1개) | Shopify |
+| 같은 파일 | `/api/v1/inventory*` (2개) | 일반 ERP |
+
+#### 환경별 분기 처리
+
+- `import.meta.env.*` **13개 참조** — 모두 Vite 전용 패턴
+- `process.env` **0개** — 미사용
+- `NODE_ENV` **0개** — 미사용
+- 모노레포 이동 시 번들러 변경 없으면 영향 없음. Next.js 전환 시 `process.env.NEXT_PUBLIC_*`로 변경 필요
+
+### 14.2 3D 에셋 관련
+
+| 항목 | 현황 |
+|---|---|
+| 로컬 .glb/.gltf 파일 | **0개** — public/ 디렉토리에 3D 모델 파일 없음 |
+| 코드 내 .glb 참조 | **29개** — 모두 Supabase Storage URL 또는 DB 레코드 |
+| 코드 내 .gltf 참조 | **11개** |
+| 코드 내 .obj/.fbx 참조 | **1개씩** |
+| 업로드 지원 형식 | `.glb, .gltf, .fbx, .obj, .dae` |
+| 에셋 저장 위치 | Supabase Storage (`3d-models` 버킷) |
+| Git LFS 설정 | ❌ **미설정** — `.gitattributes` 없음 |
+
+**권장사항:**
+- 현재 3D 에셋이 모두 Supabase Storage에 있어 Git LFS는 즉시 필요하지 않음
+- 향후 로컬 에셋 추가 시 `.gitattributes`에 `*.glb filter=lfs diff=lfs merge=lfs -text` 설정 필요
+- 하드코딩된 5개 기본 모델 URL을 환경 변수 또는 설정 파일로 분리 필요
+
+### 14.3 의존성 이슈
+
+| 이슈 | 심각도 | 설명 |
+|---|---|---|
+| `next-themes` ^0.3.0 | 🟡 중간 | Next.js 전용 라이브러리를 Vite 프로젝트에서 사용. `sonner.tsx`에서 1곳 import. 커스텀 ThemeProvider로 대체 권장 |
+| `three` ^0.160.1 ↔ `@react-three/fiber` ^8.18.0 | 🟡 주의 | Three.js는 빠르게 업데이트되어 마이너 버전에도 Breaking Change 가능. 버전 고정 권장 |
+| `zod` ^4.1.12 | 🟡 주의 | Zod v4는 비교적 최신 메이저. 일부 생태계 라이브러리와 호환성 확인 필요 |
+| `store/` vs `stores/` 디렉토리 | ⚪ 구조 | 두 개의 Zustand 스토어 디렉토리 공존 (혼동 가능) |
+| peer dependency 충돌 | ✅ 없음 | `npm ls` 검사 결과 peer dependency 이슈 없음 |
+
+### 14.4 SSR 관련
+
+| 항목 | 현황 | 영향도 |
+|---|---|---|
+| `window.*` 참조 | **371개** (50+ 파일) | 🔴 높음 |
+| `document.*` 참조 | 위 371개에 포함 | 🔴 높음 |
+| `React.lazy()` 사용 | **0개** | — |
+| `dynamic import()` 사용 | **2개** | 🟢 낮음 |
+
+**window/document 주요 사용 패턴:**
+
+| 패턴 | 대략적 횟수 | 설명 |
+|---|---|---|
+| `document.documentElement.classList` | ~120 | 다크모드 감지/토글 |
+| `window.location.*` | ~15 | 경로, origin, href |
+| `window.addEventListener` | ~15 | 이벤트 리스너 |
+| `document.body.style` | ~4 | 스타일 직접 조작 |
+| `document.getElementById('root')` | 1 | React 마운트 (main.tsx) |
+
+**SSR 전환 시 필요 작업:**
+1. `typeof window !== 'undefined'` 가드 추가 (~50개 파일)
+2. 다크모드 감지를 서버 호환 로직으로 교체
+3. Three.js 관련 컴포넌트를 `'use client'` 또는 `next/dynamic`으로 래핑
+4. Canvas 렌더링 컴포넌트 (Glow* 차트) 클라이언트 전용 분리
+
+### 14.5 테스트 현황
+
+| 항목 | 상태 |
+|---|---|
+| **테스트 파일** (`*.test.*`, `*.spec.*`) | ❌ **0개** — 테스트 파일 없음 |
+| **테스트 프레임워크** (jest, vitest, cypress 등) | ❌ 미설치 |
+| **테스트 커버리지** | N/A |
+| **E2E 테스트** | ❌ 없음 |
+| **PR 템플릿 테스트 체크리스트** | ✅ 있음 (수동 체크) |
+
+**테스트 체크리스트 (PR 템플릿 기반, 수동):**
+- 타입 체크 (`npm run typecheck` 또는 IDE)
+- 빌드 성공 (`npm run build`)
+- 린트 통과 (`npm run lint`)
+- 브라우저 동작 확인 / 반응형 / 다크모드
+- Edge Function curl 테스트
+- SSE 스트리밍 파싱 검증
+
+### 14.6 기타 기술 부채
+
+#### TODO 주석 (11개, 8개 파일)
+
+| # | 파일 | 내용 | 분류 |
+|---|---|---|---|
+| 1 | `hooks/useChatPanel.ts:31` | 초기 메시지 — 백엔드 연동 시 제거 | 백엔드 연동 |
+| 2 | `hooks/useChatPanel.ts:69` | 백엔드 API 연동 | 백엔드 연동 |
+| 3 | `studio/DigitalTwinStudioPage.tsx:495` | 실제 피크 시간 데이터 연동 | 데이터 연동 |
+| 4 | `insights/hooks/useInventoryMetrics.ts:286` | 실제 계산 로직 추가 | 구현 미완 |
+| 5 | `simulation/hooks/useRealtimeTracking.ts:76` | iot_sensors 테이블 생성 후 활성화 | DB 스키마 |
+| 6 | `simulation/utils/modelLayerLoader.ts:585` | 실제 기본 모델 URL로 교체 필요 | 하드코딩 |
+| 7 | `simulation/hooks/useDataSourceMapping.ts:444` | 실제 프리셋 API 활성화/비활성화 로직 | 구현 미완 |
+| 8 | `data-management/.../DataValidation.tsx:83` | user_data_imports에 file_path 컬럼 추가 | DB 스키마 |
+| 9 | `data-management/.../DataImportHistory.tsx:221` | Storage cleanup 구현 | 구현 미완 |
+| 10-11 | `simulation/.../SceneViewer.tsx:119,193` | GLB 모델 로드 (2건) | 구현 미완 |
+
+**FIXME/HACK/XXX/TEMP:** 0개
+
+#### TypeScript 설정 관련
+
+| 설정 | 값 | 영향 |
+|---|---|---|
+| `noUnusedLocals` | ❌ 비활성 | 미사용 변수 감지 안 됨 |
+| `noUnusedParameters` | ❌ 비활성 | 미사용 매개변수 감지 안 됨 |
+| `strictNullChecks` | (기본값 false 추정) | null 안전성 미보장 |
+
+#### 구조적 기술 부채
+
+| 항목 | 설명 | 심각도 |
+|---|---|---|
+| 단일 번들 (3.6MB) | 코드 스플리팅 미적용, 초기 로딩 느림 | 🟡 중간 |
+| 다크모드 감지 중복 | MutationObserver로 다크모드 감지하는 패턴이 여러 컴포넌트에 중복 | 🟡 중간 |
+| `store/` vs `stores/` 공존 | Zustand 스토어가 두 디렉토리에 분산 | ⚪ 낮음 |
+| CSS `@import` 순서 경고 | `index.css`에서 Pretendard 폰트 `@import`가 `@layer` 뒤에 위치 | ⚪ 낮음 |
+| `lovable-tagger` 의존 | Lovable 플랫폼 전용 dev dependency | ⚪ 낮음 |
+
+---
+
+## 섹션 15: 모노레포 이동 시 예상 작업
+
+### 15.1 Import 경로 변경
+
+| 항목 | 수치 |
+|---|---|
+| `@/` alias 사용 파일 수 | **291개** |
+| `@/` alias 총 import 수 | **938개** |
+| 수정 방법 | `tsconfig.json`의 `paths` 및 `vite.config.ts`의 `alias` 수정 |
+
+**변경 전략:**
+- 패키지 내부 참조는 `@/` alias 유지 (tsconfig paths만 재설정)
+- 패키지 간 참조는 `@neuraltwin/shared`, `@neuraltwin/ui` 등 패키지명으로 변경
+- 자동화 도구: `jscodeshift` 또는 `ts-morph`로 일괄 변환 가능
+
+### 15.2 설정 파일 수정
+
+| 파일 | 필요 변경 | 난이도 |
+|---|---|---|
+| `tsconfig.json` | `references` 추가, `paths` 패키지별 분리 | 🟡 중간 |
+| `tsconfig.app.json` | `include` 범위 조정, `references` 추가 | 🟡 중간 |
+| `vite.config.ts` | `resolve.alias` 패키지 경로로 변경, `manualChunks` 추가 | 🟡 중간 |
+| `tailwind.config.ts` | `content` 경로 패키지별 확장, 프리셋으로 분리 | 🟢 쉬움 |
+| `components.json` | shadcn/ui 경로 조정 | 🟢 쉬움 |
+| `eslint.config.js` | 모노레포 루트 + 패키지별 설정 분리 | 🟡 중간 |
+| `postcss.config.js` | 변경 불필요 (패키지별 동일) | ✅ 없음 |
+| `package.json` | workspace 설정, 의존성 분리 | 🔴 복잡 |
+
+### 15.3 공유 타입 추출
+
+| 분류 | 타입/인터페이스 수 | 추출 대상 파일 |
+|---|---|---|
+| AI 관련 타입 | ~15개 | `src/types/ai.types.ts` |
+| 분석 관련 타입 | ~10개 | `src/types/analysis.types.ts` |
+| 3D Scene 타입 | ~25개 | `src/types/scene3d.ts` |
+| 리테일 온톨로지 타입 | ~20개 | `src/types/retail-ontology.ts` |
+| 데이터 스키마 타입 | ~15개 | `src/utils/dataSchemas.ts`, `enterpriseSchemas.ts` |
+| Supabase 생성 타입 | ~100+ 테이블 | `src/integrations/supabase/types.ts` |
+| Storage 타입 | ~10개 | `src/lib/storage/types.ts` |
+| 스토어 타입 | ~15개 | `src/store/*.ts`, `src/stores/*.ts` |
+| **합계** | **~210개** | — |
+
+**추천 패키지 구조:**
+```
+@neuraltwin/types        ← 공유 타입 (ai, analysis, scene3d, ontology)
+@neuraltwin/supabase     ← Supabase 클라이언트 + 생성 타입
+@neuraltwin/schemas      ← 데이터 스키마 + 정규화 엔진
+```
+
+### 15.4 공유 컴포넌트 추출
+
+| 분류 | 컴포넌트 수 | 추출 대상 |
+|---|---|---|
+| shadcn/ui 기본 | **49개** | `src/components/ui/` (표준 Radix 기반) |
+| 커스텀 Glass3D | **2개** | `glass-card.tsx`, `sidebar.tsx` |
+| 레이아웃 공통 | **3개** | NavLink, ProtectedRoute, ThemeToggle |
+| 유틸리티 함수 | **1개** | `src/lib/utils.ts` (cn 함수) |
+| **합계** | **~55개** | — |
+
+**추천 패키지 구조:**
+```
+@neuraltwin/ui           ← shadcn/ui 49개 + Glass3DCard + cn()
+@neuraltwin/layout       ← DashboardLayout, AppSidebar, NavLink, ProtectedRoute, ThemeToggle
+```
+
+### 15.5 3D 에셋 재배치
+
+| 항목 | 수치 |
+|---|---|
+| 로컬 3D 모델 파일 | **0개** (모두 Supabase Storage) |
+| 로컬 조명 프리셋 JSON | **3개** (2KB 미만) |
+| 코드 내 3D 관련 파일 | ~120개 (features/studio/ + features/simulation/) |
+| Supabase Storage 버킷 | `3d-models`, `store-data` |
+
+**재배치 필요 사항:**
+- `public/lighting-presets/` → 패키지 내 `assets/` 또는 CDN 이동
+- Supabase Storage URL 참조 → 환경 변수로 분리 (5개 하드코딩된 URL)
+
+### 15.6 Supabase 관련 파일 분리
+
+| 디렉토리 | 파일 수 | 용도 |
+|---|---|---|
+| `supabase/functions/` | 36개 Edge Functions | 백엔드 로직 |
+| `supabase/functions/_shared/` | ~10개 | 공유 유틸리티 |
+| `supabase/migrations/` | 40+개 SQL | DB 마이그레이션 |
+| `supabase/queries/` | 다수 | SQL 쿼리 |
+| `supabase/seed/` + `seeds/` | 다수 | 시드 데이터 |
+| **합계** | **~100+개** | — |
+
+**추천 패키지:**
+```
+@neuraltwin/supabase     ← 클라이언트 + 타입 + 마이그레이션 + Edge Functions
+```
+
+### 15.7 예상 모노레포 패키지 구조
+
+```
+neuraltwin/
+├── packages/
+│   ├── ui/                    ← @neuraltwin/ui (55 컴포넌트)
+│   │   ├── src/components/
+│   │   ├── tailwind.preset.ts
+│   │   └── package.json
+│   ├── types/                 ← @neuraltwin/types (~210 타입)
+│   │   ├── src/
+│   │   └── package.json
+│   ├── schemas/               ← @neuraltwin/schemas (데이터 스키마 + 정규화)
+│   │   ├── src/
+│   │   └── package.json
+│   └── supabase/              ← @neuraltwin/supabase (클라이언트 + 타입 + EF)
+│       ├── client/
+│       ├── functions/
+│       ├── migrations/
+│       └── package.json
+├── apps/
+│   └── dashboard/             ← @neuraltwin/dashboard (메인 앱)
+│       ├── src/
+│       │   ├── features/      ← 비즈니스 로직 (인사이트, 스튜디오, ROI 등)
+│       │   ├── hooks/         ← 앱 전용 훅
+│       │   ├── store/         ← Zustand 스토어
+│       │   └── App.tsx
+│       ├── vite.config.ts
+│       └── package.json
+├── turbo.json / nx.json       ← 빌드 오케스트레이션
+├── pnpm-workspace.yaml        ← 워크스페이스 정의
+└── package.json               ← 루트 설정
+```
+
+### 15.8 예상 작업 규모 요약
+
+| 작업 | 파일 수 | 복잡도 | 설명 |
+|---|---|---|---|
+| Import 경로 변경 | ~291개 | 🟡 중간 | `@/` alias 재설정 + 패키지 간 참조 변경 |
+| 설정 파일 수정 | 7개 | 🟡 중간 | tsconfig, vite, tailwind, eslint 등 |
+| 공유 타입 추출 | ~210개 타입 | 🟡 중간 | 6개 타입 파일 → `@neuraltwin/types` |
+| 공유 컴포넌트 추출 | ~55개 | 🟡 중간 | shadcn/ui + Glass3D → `@neuraltwin/ui` |
+| 3D 에셋 재배치 | 3개 로컬 + 5개 URL | 🟢 쉬움 | 조명 프리셋 이동 + URL 환경 변수화 |
+| Supabase 분리 | ~100+개 | 🔴 복잡 | Edge Functions + 마이그레이션 독립 패키지 |
+| 코드 스플리팅 추가 | ~10개 라우트 | 🟡 중간 | React.lazy + Suspense 적용 |
+| SSR 호환성 (선택) | ~50개 파일 | 🔴 복잡 | window/document 가드 371개 처리 |
+| 테스트 추가 (선택) | 0 → 신규 | 🔴 복잡 | vitest 설정 + 주요 훅/유틸 테스트 |
+
+### 15.9 우선순위 권장
+
+```
+Phase 1 (필수, ~1주): 패키지 구조 설정 + 설정 파일 수정 + import 경로 변경
+Phase 2 (권장, ~1주): 공유 타입/컴포넌트 추출 + Supabase 패키지 분리
+Phase 3 (개선, ~1주): 코드 스플리팅 + 하드코딩 제거 + TODO 해소
+Phase 4 (선택): SSR 호환성 + 테스트 추가
+```
