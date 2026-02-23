@@ -973,3 +973,297 @@ export default defineConfig(({ mode }) => ({
 | **Recharts** | 5종 (라인, 영역, 파이, 바, 레이더) | 6개 |
 | **d3-force / react-force-graph-2d** | ⚠️ 설치만 됨 (활성 사용 미확인) | 0개 |
 | **합계** | **13종** | **25개** |
+
+---
+
+## 섹션 6: 상태 관리 구조
+
+### 6.1 전역 상태 관리
+
+#### 사용 중인 상태 관리 라이브러리
+
+| 라이브러리 | 버전 | 사용 여부 | 역할 |
+|---|---|---|---|
+| `zustand` | ^5.0.9 | ✅ 사용 | 클라이언트 전역 상태 (6개 스토어) |
+| `@tanstack/react-query` | ^5.83.0 | ✅ 사용 | 서버 상태 캐싱 (61개 쿼리, 48개 뮤테이션) |
+| React Context API | 내장 | ✅ 사용 | 인증, 매장 선택, 인사이트 데이터 등 (10개 컨텍스트) |
+| `jotai` / `recoil` / `redux` | — | ❌ 미사용 | — |
+| `swr` | — | ❌ 미사용 | — |
+
+#### Zustand 스토어 목록
+
+| 스토어 (훅) | 파일 위치 | 관리하는 데이터 | Middleware | 주요 구독 컴포넌트 |
+|---|---|---|---|---|
+| `useChatStore` | `src/store/chatStore.ts` | AI 채팅 패널 상태 (열림/닫힘, 너비, 메시지 배열, 대화 ID, 로딩/스트리밍) | 없음 | `useAssistantChat`, `useActionDispatcher`, ChatPanel |
+| `useDateFilterStore` | `src/store/dateFilterStore.ts` | 전역 날짜 필터 (프리셋: today/7d/30d/90d/custom, startDate, endDate) | `persist` (localStorage, key: `neuraltwin-date-filter`) | GlobalDateFilter, OverviewTab, StoreTab, ProductTab, CustomerTab, useAssistantChat |
+| `useScreenDataStore` | `src/store/screenDataStore.ts` | 현재 화면의 계산된 KPI 메트릭 (overview KPIs, funnel stages, store KPIs) — 챗봇과 공유용 | 없음 | OverviewTab, StoreTab, InsightDataContext |
+| `useSimulationStore` (AI) | `src/stores/simulationStore.ts` | AI 시뮬레이션 상태 (실행/로딩/진행도/결과/진단이슈/옵션) — Edge Function 호출 | 없음 | SimulationControls, SimulationMetrics, useSimulationAI |
+| `useSimulationStore` (3D) | `src/features/studio/stores/simulationStore.ts` | 3D 실시간 시뮬레이션 (상태, 고객 에이전트 배열, 존 메트릭, 실시간 KPI, 엔티티) | `subscribeWithSelector` | Canvas3D, CustomerAgents, RealtimeSimulationPanel, SimulationControlPopup |
+| `useSceneStore` | `src/features/studio/stores/sceneStore.ts` | 3D 씬 상태 (모델 배열, 레이어, 선택/호버 ID, 활성 오버레이, 카메라, dirty 플래그) | 없음 | Canvas3D, SceneProvider, LayerPanel, AISimulationTab, useStoreBounds |
+
+> **⚠️ 주의:** `useSimulationStore` 이름이 2개 파일에서 중복됩니다. AI 시뮬레이션(`src/stores/`)과 3D 실시간 시뮬레이션(`src/features/studio/stores/`)은 별개 스토어입니다.
+
+#### `useDateFilterStore` 상세 (유일한 Persist 스토어)
+
+```typescript
+// localStorage key: 'neuraltwin-date-filter'
+interface DateRange {
+  preset: 'today' | '7d' | '30d' | '90d' | 'custom';
+  startDate: string;  // ISO date
+  endDate: string;    // ISO date
+}
+```
+
+#### `useSimulationStore` (3D) 선택자(Selectors)
+
+| 선택자 | 반환값 |
+|---|---|
+| `selectSimulationProgress(state)` | 진행률 (%) |
+| `selectActiveCustomerCount(state)` | 퇴장하지 않은 고객 수 |
+| `selectZoneById(zoneId)(state)` | 특정 존 엔티티 |
+| `selectZoneMetricById(zoneId)(state)` | 특정 존 메트릭 |
+| `selectTotalRevenue(state)` | 존별 매출 합계 |
+| `selectAverageConversion(state)` | 평균 전환율 |
+
+#### Context API 사용 (커스텀 Provider 목록)
+
+| Context | Provider | 파일 위치 | 마운트 위치 | 제공 데이터 |
+|---|---|---|---|---|
+| `AuthContext` | `AuthProvider` | `src/hooks/useAuth.tsx` | App.tsx (전역) | user, session, orgId, role, license, signIn/Out/Up, OAuth, 역할 체크 함수 |
+| `SelectedStoreContext` | `SelectedStoreProvider` | `src/hooks/useSelectedStore.tsx` | App.tsx (전역) | selectedStore, stores[], setSelectedStore, loading, refreshStores |
+| `InsightDataContext` | `InsightDataProvider` | `src/features/insights/context/InsightDataContext.tsx` | InsightHubPage (페이지 레벨) | activeTab, baseKPIs, funnelData, zoneMetrics, customerSegments, productPerformance, inventoryMetrics, refreshAll |
+| `AssistantProviderContext` | `AssistantProvider` | `src/features/assistant/context/AssistantProvider.tsx` | Feature 레벨 (조건부) | context (page, dateRange, store) |
+| `SidebarContext` | `SidebarProvider` | `src/components/ui/sidebar.tsx` | DashboardLayout | state, open, toggleSidebar, isMobile |
+| `FormFieldContext` | FormField 내부 | `src/components/ui/form.tsx` | 컴포넌트 레벨 | field name |
+| `FormItemContext` | FormItem 내부 | `src/components/ui/form.tsx` | 컴포넌트 레벨 | field id |
+| `CarouselContext` | Carousel 컴포넌트 | `src/components/ui/carousel.tsx` | 컴포넌트 레벨 | carouselRef, api, scrollPrev/Next |
+| `ChartContext` | ChartContainer | `src/components/ui/chart.tsx` | 컴포넌트 레벨 | chart config (색상, 테마) |
+| `ToggleGroupContext` | ToggleGroup | `src/components/ui/toggle-group.tsx` | 컴포넌트 레벨 | size, variant |
+
+#### Provider 계층 구조 (App.tsx)
+
+```
+<QueryClientProvider>                          ← TanStack Query
+  <TooltipProvider>                            ← UI
+    <Toaster /> <Sonner />                     ← Toast 알림
+    <BrowserRouter>                            ← React Router
+      <AuthProvider>                           ← 인증 (전역)
+        <SelectedStoreProvider>                ← 매장 선택 (전역)
+          <OnboardingWrapper>                  ← 온보딩 체크
+            <Routes>
+              <ProtectedRoute>
+                <DashboardLayout>              ← SidebarProvider 포함
+                  <InsightDataProvider>         ← 인사이트 페이지만
+                    <페이지 컴포넌트 />
+                  </InsightDataProvider>
+                </DashboardLayout>
+              </ProtectedRoute>
+            </Routes>
+          </OnboardingWrapper>
+        </SelectedStoreProvider>
+      </AuthProvider>
+    </BrowserRouter>
+  </TooltipProvider>
+</QueryClientProvider>
+```
+
+### 6.2 서버 상태 vs 클라이언트 상태
+
+#### TanStack React Query 사용
+
+| 항목 | 설정 |
+|---|---|
+| **라이브러리** | `@tanstack/react-query` ^5.83.0 |
+| **SWR** | ❌ 미사용 |
+| **useInfiniteQuery** | ❌ 미사용 |
+
+#### QueryClient 기본 설정
+
+```typescript
+// src/App.tsx
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,  // 탭 전환 시 자동 refetch 비활성화
+      // staleTime: 기본값 (0)
+      // gcTime: 기본값 (5분)
+      // retry: 기본값 (3회)
+    },
+  },
+});
+```
+
+#### 캐싱 전략
+
+| 전략 | 사용처 | 설정 |
+|---|---|---|
+| **기본값** (staleTime=0, gcTime=5min) | 대부분의 쿼리 | 즉시 stale 처리, 5분 후 GC |
+| **5분 캐시** | InsightDataContext 내부 쿼리 | `staleTime: 300,000`, `gcTime: 600,000` |
+| **10분 캐시** | 수요 예측, 리스크 예측, 최적화 | `staleTime: 600,000` |
+| **30분 캐시** | 시즌 트렌드 | `staleTime: 1,800,000` |
+| **자동 폴링** | 7개 쿼리 | `refetchInterval: 30,000~60,000` (30초~1분) |
+
+#### 자동 폴링(refetchInterval) 쿼리
+
+| 쿼리 | 파일 | 간격 | 대상 |
+|---|---|---|---|
+| `useDataControlTowerStatus` | `useDataControlTower.ts` | 30초 | 데이터 컨트롤타워 상태 |
+| `useETLHealth` | `useDataControlTower.ts` | 60초 | ETL 헬스 체크 |
+| `useAlerts` | `useAlerts.ts` | 60초 | 사용자 알림 |
+| `useRealtimeTransactions` | `usePOSIntegration.ts` | 60초 | POS 실시간 거래 |
+| `useRealtimeInventory` | `usePOSIntegration.ts` | 60초 | POS 실시간 재고 |
+
+#### useQuery 주요 통계
+
+| 메트릭 | 수치 |
+|---|---|
+| 총 useQuery 훅 | 61개 |
+| 총 useMutation 훅 | 48개 |
+| useQueryClient 사용 | 23곳 |
+| `enabled` 조건부 쿼리 | 대부분 (storeId, user 존재 여부 체크) |
+| Edge Function 호출 쿼리 | 8개 |
+| RPC(Stored Procedure) 호출 | 12개 |
+| 직접 테이블 쿼리 | 41개 |
+
+#### 주요 뮤테이션 & 캐시 무효화 패턴
+
+| 뮤테이션 그룹 | 파일 | 뮤테이션 수 | 무효화 대상 |
+|---|---|---|---|
+| API 커넥터 CRUD | `useApiConnector.ts` | 8개 | `['api-connector']` 전체 + 개별 connection |
+| 데이터 컨트롤타워 | `useDataControlTower.ts` | 1개 | recent-imports, etl-history, data-control-tower |
+| AI 추론 & 추천 | `useAI.ts`, `useAIRecommendations.ts`, `useRetailOntology.ts`, `useUnifiedAI.ts` | 11개 | `['ai-inference-results']`, `['ai-recommendations']`, `['data-sources']` |
+| 목표 관리 | `useGoals.ts` | 2개 | `['store-goals']`, `['goal-progress']` |
+| 알림 관리 | `useAlerts.ts` | 4개 | `['user-alerts']` |
+| 학습 피드백 | `useLearningFeedback.ts` | 3개 | `['strategy-feedback']`, `['model-performance']` |
+| 온보딩 | `useOnboarding.ts` | 7개 | `['onboarding-progress']`, `['dashboard-kpis']`, `['stores']` |
+| POS 연동 | `usePOSIntegration.ts` | 5개 | `['pos-integrations']`, `['sync-logs']`, `['realtime-transactions']`, `['realtime-inventory']` |
+| ROI 측정 | `useROITracking.ts` | 3개 | `['recommendation-applications']`, `['roi-measurements']`, `['roi-summary']` |
+| 씬 관리 | `useStoreScene.ts` | 3개 | `['store-scene']`, `['store-scenes-all']` |
+
+#### 캐시 유틸리티 (`useClearCache`)
+
+```typescript
+// src/hooks/useClearCache.ts
+clearAllCache()           // queryClient.clear() — 전체 캐시 삭제
+clearStoreDataCache(id)   // 특정 매장 관련 쿼리만 제거 (removeQueries)
+invalidateStoreData(id)   // 특정 매장 관련 쿼리를 stale로 표시 (invalidateQueries)
+```
+
+### 6.3 Supabase Realtime 구독
+
+#### Realtime 채널 목록
+
+| # | 채널 이름 | 구독 이벤트 | 테이블 | 구독 위치 (파일) | 처리 로직 |
+|---|---|---|---|---|---|
+| 1 | `inventory-changes` | INSERT, UPDATE, DELETE | `inventory_levels` | `src/hooks/useRealtimeInventory.ts` | 재고 변경 시 상태 배열 업데이트, 긴급 재고는 토스트 알림 |
+| 2 | `suggestions-changes` | INSERT, UPDATE, DELETE | `auto_order_suggestions` | `src/hooks/useRealtimeInventory.ts` | 자동 발주 제안 변경 시 상태 업데이트, 긴급시 "긴급 발주 알림" 토스트 |
+| 3 | `import-progress-{id}` | UPDATE | `user_data_imports` | `src/hooks/useImportProgress.ts` | 임포트 진행률(%), 단계, 상태, 에러 실시간 추적 |
+| 4 | `stores-changes` | INSERT, UPDATE, DELETE | `stores` | `src/hooks/useSelectedStore.tsx` | 매장 목록 변경 시 refetch, 자동 선택 갱신 |
+| 5 | `wifi-tracking-changes` | ALL | `wifi_tracking` | `src/hooks/useWiFiTracking.ts` | WiFi 추적 데이터 변경 시 전체 리로드 (최근 1000건) |
+| 6 | `store-tracking-{storeId}` | Presence + Broadcast | N/A (채널 전용) | `src/features/simulation/hooks/useRealtimeTracking.ts` | IoT 센서 → WiFi 삼변측량 → 칼만 필터 → 3D 좌표 변환 |
+
+#### Broadcast 사용 여부
+
+| 항목 | 상태 | 상세 |
+|---|---|---|
+| **Broadcast** | ✅ 사용 | `store-tracking-{storeId}` 채널에서 `tracking-update` 이벤트로 IoT 센서 데이터 수신 |
+| 이벤트명 | `tracking-update` | WiFi 삼변측량 기반 고객 위치 추적 데이터 |
+| 처리 로직 | 5초 윈도우 버퍼 → 칼만 필터 평활화 → 3D 좌표 변환 → 존 ID 계산 | |
+
+#### Presence 사용 여부
+
+| 항목 | 상태 | 상세 |
+|---|---|---|
+| **Presence** | ✅ 사용 | `store-tracking-{storeId}` 채널에서 고객 위치 동기화 |
+| `sync` 이벤트 | 전체 고객 위치 동기화 (customer_id → position, velocity, status, zone_id) |
+| `join` 이벤트 | 새 고객 입장 감지 |
+| `leave` 이벤트 | 고객 퇴장 감지 |
+| `track()` 호출 | 고객 상태 퍼블리시 (position, velocity, status, last_updated, zone_id) |
+| 온라인 사용자 추적 | 고객 아바타 URL 캐싱, 3D 모델 좌표 시스템 변환 |
+
+#### Realtime 연결 해제 처리 (Cleanup)
+
+| 채널 | Cleanup 방식 | 안전성 |
+|---|---|---|
+| `inventory-changes` | `supabase.removeChannel(channel)` in useEffect return | ✅ 안전 |
+| `suggestions-changes` | `supabase.removeChannel(channel)` in useEffect return | ✅ 안전 |
+| `import-progress-{id}` | `supabase.removeChannel(channel)` with null 체크 | ✅ 안전 |
+| `stores-changes` | `supabase.removeChannel(channel)` in useEffect return | ✅ 안전 |
+| `wifi-tracking-changes` | `supabase.removeChannel(channel)` in useEffect return | ✅ 안전 |
+| `store-tracking-{id}` | `channel.unsubscribe()` + ref null 처리 | ✅ 안전 |
+
+> **결론:** 모든 6개 Realtime 채널이 컴포넌트 언마운트 시 올바르게 정리됩니다.
+
+#### 인증 상태 구독 (추가)
+
+| 항목 | 상세 |
+|---|---|
+| 파일 | `src/hooks/useAuth.tsx` |
+| 방식 | `supabase.auth.onAuthStateChange()` |
+| 이벤트 | SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED, USER_UPDATED |
+| Cleanup | `subscription.unsubscribe()` in useEffect return |
+
+### 6.4 데이터 동기화 패턴
+
+#### Realtime → 상태 업데이트 흐름
+
+```
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│  Supabase DB    │────▶│  Realtime 채널    │────▶│  React State    │
+│  (INSERT/UPDATE)│     │  postgres_changes │     │  useState/Store │
+└─────────────────┘     └──────────────────┘     └────────┬────────┘
+                                                          │
+                        ┌──────────────────┐              ▼
+                        │  IoT 센서 데이터  │     ┌─────────────────┐
+                        │  (WiFi AP)       │────▶│  Broadcast      │
+                        └──────────────────┘     │  tracking-update│
+                                                 └────────┬────────┘
+                                                          │
+                                                          ▼
+                                                 ┌─────────────────┐
+                                                 │  Presence 동기화 │
+                                                 │  (고객 위치 공유) │
+                                                 └────────┬────────┘
+                                                          │
+                                                          ▼
+                                                 ┌─────────────────┐
+                                                 │  3D 렌더링      │
+                                                 │  (Canvas3D)     │
+                                                 └─────────────────┘
+```
+
+**패턴 1 — postgres_changes → 로컬 상태:**
+- 재고, 발주 제안, 매장 목록: DB 변경 → Realtime 이벤트 → useState 배열 업데이트
+- 임포트 진행: DB UPDATE → 진행률/상태 실시간 반영
+
+**패턴 2 — Broadcast → 칼만 필터 → 3D:**
+- WiFi AP 센서 → Broadcast `tracking-update` → 5초 버퍼 → 삼변측량 → 칼만 필터 → 3D 좌표 변환 → Presence `track()` → 다른 클라이언트 동기화
+
+**패턴 3 — 뮤테이션 → 캐시 무효화:**
+- useMutation `onSuccess` → `queryClient.invalidateQueries()` → 관련 useQuery 자동 refetch
+
+#### 낙관적 업데이트(Optimistic Update) 사용 여부
+
+| 항목 | 상태 |
+|---|---|
+| **진정한 낙관적 업데이트** (뮤테이션 전 UI 선반영) | ❌ 미사용 |
+| **성공 후 즉시 캐시 업데이트** | ⚠️ 부분 사용 |
+| 구현 위치 | `useApiConnector.ts` — `useUpdateConnection` |
+| 패턴 | `onSuccess`에서 `queryClient.setQueryData()` + `invalidateQueries()` |
+| 나머지 48개 뮤테이션 | `invalidateQueries()`만 사용 (refetch 대기) |
+
+> **영향:** 뮤테이션 후 UI 업데이트까지 네트워크 왕복 시간만큼 지연 발생 가능
+
+#### 오프라인 처리 여부
+
+| 항목 | 상태 |
+|---|---|
+| `navigator.onLine` 감지 | ❌ 없음 |
+| `online`/`offline` 이벤트 리스너 | ❌ 없음 |
+| Service Worker | ❌ 없음 |
+| 오프라인 캐시 전략 | ❌ 없음 |
+| 연결 상태 UI 표시 | ❌ 없음 |
+| Realtime 재연결 로직 | ❌ 없음 (Supabase 클라이언트 기본 재연결에 의존) |
+| 폴링 폴백 | ⚠️ 부분적 — `refetchInterval`을 사용하는 7개 쿼리만 |
+
+> **결론:** 오프라인 처리가 전혀 구현되어 있지 않습니다. 네트워크 단절 시 Realtime 구독이 중단되며, 복구 메커니즘은 Supabase 클라이언트 내장 재연결에만 의존합니다.
