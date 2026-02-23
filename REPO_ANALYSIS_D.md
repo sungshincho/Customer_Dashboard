@@ -1819,3 +1819,667 @@ supabase.functions.invoke('environment-proxy', {
 | **총 외부 서비스** | **4개** | **모두 Edge Function 경유** |
 
 > **아키텍처 특징:** 클라이언트(React)에서 외부 API를 직접 호출하는 경우가 없으며, 모든 외부 통신은 Supabase Edge Function을 프록시로 사용합니다. 이는 API 키 노출 방지와 CORS 문제 해결을 위한 설계입니다.
+
+---
+
+## 섹션 9: 유틸리티 함수 & 데이터 아키텍처
+
+### 9.1 유틸리티 파일 개요
+
+| 파일 | LOC | 용도 | 핵심 알고리즘/패턴 |
+|---|---:|---|---|
+| `src/utils/dataNormalizer.ts` | ~400 | 다양한 형식의 원본 데이터를 표준 스키마로 정규화 | 레벤슈타인 거리 퍼지 매칭, SCD2 |
+| `src/utils/dataSchemas.ts` | ~200 | 데이터 아키텍처 표준 스키마 정의 (L1 원본 + L3 파생) | Star Schema (팩트/차원) |
+| `src/utils/enterpriseSchemas.ts` | ~350 | 엔터프라이즈급 스키마 (SCD2, 파티셔닝, 품질 체크) | SCD2, 파티셔닝, 제약조건 |
+| `src/utils/dependencyGraph.ts` | ~150 | 테이블 간 FK 의존성 그래프 & 업로드 순서 계산 | Kahn's Algorithm (위상정렬) |
+| `src/utils/rolePermissions.ts` | ~120 | 역할 기반 접근 제어(RBAC) & 라이선스 검증 | Permission Matrix |
+
+### 9.2 데이터 정규화 엔진 (`dataNormalizer.ts`)
+
+#### 내보낸 함수
+
+| 함수 | 매개변수 | 반환값 | 설명 |
+|---|---|---|---|
+| `detectDataType(columns)` | `string[]` | `DataFileType` | 컬럼명으로 데이터 타입 자동 감지 |
+| `normalizeData(rawData, targetSchema)` | `Record[], DataSchema` | `NormalizedData` | 원본→표준 스키마 정규화 |
+| `normalizeMultipleDatasets(datasets)` | `{raw, schema}[]` | `NormalizedData[]` | 일괄 정규화 |
+
+#### 핵심 알고리즘
+
+```
+1. 한글-영문 동의어 매핑
+   "고객" | "회원" → customer_id
+   "상품" | "제품" → product_name
+   "가격" | "금액" → price
+
+2. 레벤슈타인 거리 퍼지 매칭 (70% 이상 유사도)
+   "prduct_name" → "product_name" (오타 자동 보정)
+
+3. 타입 자동 변환
+   Excel 날짜 직렬 → ISO Date
+   Boolean: "true"/"false" → true/false
+   Number: "100" → 100
+
+4. 자동 계산 필드
+   total_amount = price × quantity
+   SCD2 필드: is_current=true, valid_from=now()
+
+5. 품질 점수 계산
+   score = 매핑 성공한 중요 필드 수 / 전체 중요 필드 수
+```
+
+### 9.3 데이터 스키마 아키텍처
+
+#### 3-Layer 구조
+
+```
+L1 (Raw)        → CSV/Excel 업로드 → Storage → 정규화
+L2 (ETL)        → dataNormalizer → 변환/정제
+L3 (Aggregated) → 집계 테이블 → DB 조회 (useQuery)
+```
+
+#### 원본 데이터 스키마 (L1) — `dataSchemas.ts`
+
+| 스키마 상수 | Grain | 주요 컬럼 |
+|---|---|---|
+| `SALES_SCHEMA` | 거래 건 | transaction_id, date, product, price, qty, total, discount, tax, customer_id |
+| `ZONE_SCHEMA` | 구역 | zone_id, name, x/y/z, area |
+| `TRAFFIC_SCHEMA` | 방문 이벤트 | visitor_id, zone, timestamp, dwell_time |
+| `PRODUCT_SCHEMA` | 상품 | product_id, name, category, brand, price, cost, sku |
+| `CUSTOMER_SCHEMA` | 고객 | customer_id, segment, join_date, purchase_count, ltv |
+| `INVENTORY_SCHEMA` | 재고 | product_id, stock_qty, reorder_point, location |
+| `BRAND_SCHEMA` | 브랜드 | brand_id, name, category, origin |
+| `STORE_SCHEMA` | 매장 | store_id, name, location, type, area, open_date |
+| `STAFF_SCHEMA` | 직원 | staff_id, name, store_id, position, hire_date, salary, performance, sales_count, satisfaction |
+
+#### 파생 데이터 스키마 (L3)
+
+| 스키마 상수 | 용도 | 주요 컬럼 |
+|---|---|---|
+| `DASHBOARD_KPI_SCHEMA` | 집계 KPI | total_revenue, total_visits, total_purchases, conversion_rate, sales_per_sqm |
+| `AI_RECOMMENDATION_SCHEMA` | AI 추천 | type, priority, title, description, expected_impact |
+
+### 9.4 엔터프라이즈 스키마 (`enterpriseSchemas.ts`)
+
+#### SCD2 지원 차원 테이블
+
+| 스키마 상수 | Grain | SCD2 | 파티션 | PII 컬럼 |
+|---|---|---|---|---|
+| `SENSOR_FACT_SCHEMA` | 센서 이벤트 | ✗ | `event_date` | ✗ |
+| `CUSTOMER_DIM_SCHEMA` | 고객 | ✓ | ✗ | customer_id, loyalty_tier |
+| `BRAND_DIM_SCHEMA` | 브랜드 | ✓ | ✗ | ✗ |
+| `PRODUCT_DIM_SCHEMA` | 상품 | ✓ | ✗ | ✗ |
+| `SKU_DIM_SCHEMA` | SKU 변형 | ✗ | ✗ | ✗ |
+| `STORE_DIM_SCHEMA` | 매장 | ✓ | ✗ | ✗ |
+| `STAFF_DIM_SCHEMA` | 직원 | ✓ | ✗ | ✗ |
+| `SALES_FACT_SCHEMA` | 매출 | ✗ | ✗ | ✗ |
+
+#### 품질 체크 규칙 예시 (SALES_FACT)
+
+```typescript
+qualityChecks: [
+  'qty > 0',
+  'unit_price >= 0',
+  'net_revenue = qty × unit_price - discount + tax'
+]
+```
+
+### 9.5 의존성 그래프 (`dependencyGraph.ts`)
+
+#### 내보낸 함수
+
+| 함수 | 설명 |
+|---|---|
+| `buildDependencyGraph(schemas)` | FK 관계로 의존성 그래프 생성 |
+| `calculateUploadOrder(graph)` | **Kahn's Algorithm** 위상정렬 기반 업로드 순서 계산 |
+| `getTablesByLevel(graph)` | 테이블을 레벨별로 그룹화 (0=독립, 1=1차 의존 ...) |
+| `groupFilesByTable(files)` | 파일을 테이블별로 그룹화 |
+| `checkCanUpload(table, uploaded)` | 특정 테이블 업로드 가능 여부 확인 |
+| `getNextUploadableTables(graph, uploaded)` | 다음 업로드 가능 테이블 목록 반환 |
+
+#### 업로드 순서 예시
+
+```
+Level 0: brands, stores (독립 테이블)
+Level 1: products (→ brands), staff (→ stores)
+Level 2: customers (→ stores), inventory (→ products)
+Level 3: sales (→ products, customers, stores, staff)
+```
+
+### 9.6 역할 기반 접근 제어 (`rolePermissions.ts`)
+
+#### 역할 권한 매트릭스
+
+| 권한 | NEURALTWIN_MASTER | ORG_HQ | ORG_STORE | ORG_VIEWER |
+|---|:---:|:---:|:---:|:---:|
+| 시스템 관리 | ✓ | ✗ | ✗ | ✗ |
+| 조직 관리 | ✓ | ✓ | ✗ | ✗ |
+| 매장 관리 | ✓ | ✓ | ✗ | ✗ |
+| 고급 분석 | ✓ | ✓ | ✗ | ✗ |
+| AI 기능 | ✓ | ✓ | ✓ | ✗ |
+| ETL / 데이터 관리 | ✓ | ✓ | ✗ | ✗ |
+| 사용자 초대 | ✓ | ✓ | ✓ | ✗ |
+| 라이선스 관리 | ✓ | ✓ | ✗ | ✗ |
+
+#### 라이선스 시스템
+
+| 라이선스 타입 | 대상 역할 | 상태 |
+|---|---|---|
+| `HQ_SEAT` | ORG_HQ | ACTIVE, ASSIGNED, SUSPENDED, EXPIRED, REVOKED |
+| `STORE` | ORG_STORE | ACTIVE, ASSIGNED, SUSPENDED, EXPIRED, REVOKED |
+
+### 9.7 라이브러리 (`src/lib/`)
+
+#### `lib/utils.ts`
+
+```typescript
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+```
+
+- `clsx` + `tailwind-merge` 조합으로 Tailwind CSS 클래스 충돌 해결
+- 전체 프로젝트에서 가장 많이 사용되는 유틸리티
+
+#### `lib/storage/types.ts` — 스토리지 타입 정의
+
+| 타입 | 설명 |
+|---|---|
+| `StorageBucket` | `'store-data'` \| `'3d-models'` |
+| `DataFileType` | customers, products, purchases, visits, staff, brands, stores, wifi_sensors, wifi_tracking 등 |
+| `CustomerData`, `ProductData`, `PurchaseData`, `VisitData`, `StaffData` | 각 데이터 행 인터페이스 |
+| `WiFiSensorData`, `WiFiTrackingData` | IoT 센서 데이터 인터페이스 |
+| `StoreDataset` | 전체 데이터셋 (모든 DataFileType 통합) |
+| `LoadOptions` | `{ skipCache?: boolean; signal?: AbortSignal }` |
+| `LoadResult<T>` | `{ data: T[]; source: 'storage' \| 'cache'; loadedAt: Date; error?: string }` |
+
+#### `lib/storage/parser.ts` — 파일 파서
+
+| 함수 | 설명 |
+|---|---|
+| `parseCSV(text)` | CSV 텍스트 파싱 (헤더 자동 감지, 타입 자동 변환) |
+| `parseJSON(text)` | JSON 파싱 |
+| `validateData(data, requiredFields)` | 필수 필드 유효성 검증 |
+| `cleanData(data)` | null/undefined/빈값 제거 |
+| `inferDataType(filename)` | 파일명으로 DataFileType 추론 |
+
+---
+
+## 섹션 10: 커스텀 훅 상세
+
+### 10.1 훅 분류 및 개요
+
+> 총 **50+ 커스텀 훅** — 7개 분류 기준
+
+| 분류 | 훅 수 | 주요 패턴 |
+|---|---:|---|
+| 인증 & 컨텍스트 | 2 | React Context + Supabase Auth |
+| AI & ML 추론 | 12+ | useMutation + Edge Function |
+| 데이터 조회 | 15+ | useQuery + Supabase Client |
+| ROI & 목표 | 8+ | useQuery + useMutation |
+| 시뮬레이션 | 5+ | useMutation + Zustand Store |
+| 데이터 관리 | 8+ | useMutation (CRUD) |
+| 유틸리티 | 5+ | 순수 React Hook |
+
+### 10.2 인증 & 컨텍스트 훅
+
+#### `useAuth()` — 통합 인증 훅
+
+| 반환값 | 타입 | 설명 |
+|---|---|---|
+| `user` | `User \| null` | 현재 로그인 사용자 |
+| `session` | `Session \| null` | 활성 세션 |
+| `orgId` | `string \| null` | 소속 조직 ID |
+| `orgName` | `string \| null` | 조직명 |
+| `role` | `AppRole` | 역할 (NEURALTWIN_MASTER, ORG_HQ, ORG_STORE, ORG_VIEWER) |
+| `licenseId` / `licenseType` / `licenseStatus` | `string` | 라이선스 정보 |
+| `signIn(email, pw)` | `Promise` | 이메일 로그인 |
+| `signUp(email, pw, name)` | `Promise` | 회원가입 |
+| `signOut()` | `Promise` | 로그아웃 |
+| `signInWithGoogle()` / `signInWithKakao()` | `Promise` | OAuth 소셜 로그인 |
+| `resetPassword(email)` | `Promise` | 비밀번호 초기화 |
+| `canAccessFeature(feature)` | `boolean` | 권한 확인 |
+| `isNeuralTwinMaster` / `isOrgHQ` / `isOrgStore` / `isOrgViewer` | `boolean` | 역할 확인 헬퍼 |
+
+**패턴**: React Context + `onAuthStateChange` 구독 + 조직/라이선스 자동 로드
+
+#### `useSelectedStore()` — 매장 선택 훅
+
+| 반환값 | 타입 | 설명 |
+|---|---|---|
+| `selectedStore` | `Store \| null` | 현재 선택된 매장 |
+| `stores` | `Store[]` | 조직의 전체 매장 목록 |
+| `setSelectedStore(store)` | `void` | 매장 선택 변경 |
+| `loading` | `boolean` | 로딩 상태 |
+| `refreshStores()` | `void` | 매장 목록 새로고침 |
+
+**패턴**: React Context + Supabase Realtime 구독 (실시간 매장 변경 감지)
+
+### 10.3 AI & ML 훅
+
+#### `useAI()` — 통합 AI 추론 (12가지 추론 타입)
+
+```
+지원 타입:
+├─ generate_recommendations    ← 추천 생성
+├─ ontology_recommendation     ← 온톨로지 기반 추천
+├─ anomaly_detection           ← 이상 탐지
+├─ pattern_analysis            ← 패턴 분석
+├─ infer_relations             ← 관계 추론
+├─ layout_optimization         ← 레이아웃 최적화
+├─ zone_analysis               ← 구역 분석
+├─ traffic_flow                ← 동선 분석
+├─ demand_forecast             ← 수요 예측
+├─ inventory_optimization      ← 재고 최적화
+├─ cross_sell                  ← 교차 판매
+└─ customer_segmentation       ← 고객 세분화
+```
+
+**라우팅 로직**: 타입에 따라 `unified-ai` 또는 `retail-ai-inference` Edge Function 자동 선택
+
+#### `useRetailAI()` — 리테일 AI 추론 (Gemini 2.5 Flash)
+
+| 편의 훅 | 추론 타입 | 결과 |
+|---|---|---|
+| `useDemandForecast()` | 수요 예측 | 7~30일 일일 예측 + 신뢰 구간 |
+| `useRiskPrediction()` | 리스크 예측 | stockout, overstock, demand_spike, conversion_drop |
+| `useOptimizationSuggestions()` | 최적화 제안 | 가격/재고 최적화 액션 |
+| `useSeasonTrend()` | 시즌 트렌드 | 시즌별 영향도 분석 |
+
+#### AI 훅 추가 목록
+
+| 훅 | 파일 | 용도 |
+|---|---|---|
+| `useSimulationAI()` | `useAI.ts` | 시뮬레이션 기반 분석 |
+| `useGenerateRecommendations()` | `useAI.ts` | AI 추천 생성 |
+| `useOntologyRecommendation()` | `useAI.ts` | 온톨로지 기반 추천 |
+| `useInferRelations()` | `useAI.ts` | 데이터 관계 추론 |
+| `useAnomalyDetection()` | `useAI.ts` | 이상치 탐지 |
+| `usePatternAnalysis()` | `useAI.ts` | 패턴 분석 |
+| `useAIInferenceHistory()` | `useAI.ts` | AI 추론 이력 조회 |
+| `useAIRecommendations()` | `useAI.ts` | AI 추천 목록 조회 |
+
+### 10.4 데이터 조회 훅
+
+#### `useStoreData` — 통합 매장 데이터
+
+| 훅 | 반환 타입 | staleTime | 데이터 소스 |
+|---|---|---:|---|
+| `useStoreDataFile(type)` | `LoadResult<T>` | 2분 | DB (테이블 직접 조회) |
+| `useStoreDataset()` | `StoreDataset` | 2분 | 병렬 로드 (모든 타입) |
+| `useMultipleStoreDataFiles(types)` | `LoadResult<T>[]` | 2분 | 병렬 로드 |
+| `useCustomers()` | `CustomerData[]` | 5분 | customers 테이블 |
+| `useProducts()` | `ProductData[]` | 5분 | products 테이블 |
+| `usePurchases()` | `PurchaseData[]` | 2분 | purchases + products JOIN |
+| `useVisits()` | `VisitData[]` | 2분 | store_visits 테이블 |
+| `useStaff()` | `StaffData[]` | 5분 | staff 테이블 |
+| `useWiFiSensors()` | `WiFiSensorData[]` | 2분 | wifi_sensors 테이블 |
+| `useWiFiTracking()` | `WiFiTrackingData[]` | 2분 | wifi_tracking 테이블 |
+| `useRefreshStoreData()` | `mutation` | — | 캐시 무효화 + 재조회 |
+
+#### `useDashboardKPI()` — KPI 조회
+
+| 훅 | 매개변수 | 데이터 소스 |
+|---|---|---|
+| `useDashboardKPI(storeId, date)` | 매장 ID + 날짜 | `daily_kpis_agg` (L3) |
+| `useLatestKPIs(storeId, days)` | 매장 ID + 최근 N일 | `daily_kpis_agg` |
+| `useKPIsByDateRange(storeId, start, end)` | 기간 범위 | `daily_kpis_agg` |
+
+**반환 데이터**: total_revenue, total_visits, total_purchases, conversion_rate, sales_per_sqm, funnel_entry/browse/fitting/purchase/return
+
+#### `useZoneMetrics()` — 구역 분석
+
+| 훅 | 데이터 소스 |
+|---|---|
+| `useZoneDailyMetrics(storeId, date)` | `zone_daily_metrics` |
+| `useZoneMetricsByDateRange(storeId, start, end)` | `zone_daily_metrics` |
+| `useZoneEvents(storeId, zoneId)` | `zone_events` |
+| `useZoneHeatmapData(storeId, date)` | `zone_daily_metrics` (히트맵용 변환) |
+| `useZonesDim(storeId)` | `zones_dim` |
+
+### 10.5 캐싱 전략 (React Query)
+
+| 데이터 분류 | staleTime | gcTime | 예시 |
+|---|---:|---:|---|
+| 실시간 데이터 | 2분 | 5분 | 방문, 구매, WiFi, 데이터 파일 |
+| 마스터 데이터 | 5분 | 5분 | 상품, 고객, 직원 |
+| AI 분석 결과 | 10분 | 5분 | 추천, 이상탐지, 패턴 |
+| 시즌 트렌드 | 30분 | 5분 | 시즌 분석, 트렌드 |
+
+#### 캐시 관리 — `useClearCache()`
+
+| 함수 | 설명 |
+|---|---|
+| `clearAllCache()` | 전체 React Query 캐시 + localStorage 초기화 |
+| `clearStoreDataCache(storeId)` | 특정 매장 데이터만 초기화 |
+| `invalidateStoreData(storeId)` | 캐시 무효화 및 자동 재조회 |
+
+**무효화 키**: `store-data`, `store-dataset`, `dashboard-kpis`, `ai-recommendations`, `ontology-data`
+
+### 10.6 유틸리티 훅
+
+#### `useCountUp()` — 숫자 카운팅 애니메이션
+
+| 매개변수 | 기본값 | 설명 |
+|---|---|---|
+| `end` | — | 목표 숫자 |
+| `duration` | 1500ms | 애니메이션 길이 |
+| `decimals` | 0 | 소수점 자릿수 |
+| `delay` | 0ms | 시작 지연 |
+| `enabled` | true | 활성화 여부 |
+| `preserveValue` | false | 리렌더 시 값 유지 |
+
+- **이징 함수**: `easeOutQuart` — `1 - (1 - t)^4` (자연스러운 감속)
+- **포맷 버전**: `useFormattedCountUp(end, formatter, options)` — 포맷 함수 적용 가능
+
+---
+
+## 섹션 11: UI 디자인 시스템 & 피처 플래그
+
+### 11.1 Tailwind CSS 커스텀 설정
+
+#### 색상 시스템 (CSS 변수 기반)
+
+```
+┌─── 시맨틱 색상 ────────────────────────────────────┐
+│ background / foreground    기본 배경/전경          │
+│ primary (DEFAULT, foreground, glow, dark)  주요 색상│
+│ secondary (DEFAULT, foreground)            보조 색상│
+│ destructive (DEFAULT, foreground)          경고 색상│
+│ muted (DEFAULT, foreground)               약한 색상│
+│ accent (DEFAULT, foreground)              강조 색상│
+│ border / input / ring                     테두리   │
+│ popover (DEFAULT, foreground)             팝오버   │
+│ card (DEFAULT, foreground)                카드     │
+│ sidebar (8가지 변형)                       사이드바  │
+└──────────────────────────────────────────────────┘
+```
+
+> 모든 색상은 `hsl(var(--token))` 형식으로 CSS 변수를 참조하여 다크/라이트 모드 전환이 가능합니다.
+
+#### 커스텀 폰트
+
+| 토큰 | 폰트 스택 | 용도 |
+|---|---|---|
+| `font-sans` | ui-sans-serif, system-ui, sans-serif | 기본 |
+| `font-pretendard` | Pretendard, sans-serif | 한글 최적화 |
+| `font-inter` | Inter, sans-serif | 영문 / 숫자 |
+| `font-serif` | ui-serif, Georgia, Cambria | 장식용 |
+| `font-mono` | ui-monospace, SFMono-Regular, Menlo | 코드 |
+
+#### 커스텀 애니메이션
+
+| 이름 | 지속시간 | 이징 | 반복 | 용도 |
+|---|---|---|---|---|
+| `accordion-down/up` | 0.3s | ease-out | 1회 | 아코디언 열기/닫기 |
+| `fade-in/out` | 0.3s | ease-out | 1회 | 페이드 + Y 이동 |
+| `scale-in/out` | 0.2s | ease-out | 1회 | 스케일 전환 |
+| `slide-in-right/left` | 0.3s | ease-out | 1회 | 슬라이드 진입 |
+| `slide-up` | 0.4s | ease-out | 1회 | 아래→위 슬라이드 |
+| `pulse-glow` | 2s | cubic-bezier | ∞ | 글로우 맥동 효과 |
+| `shimmer` | 2s | linear | ∞ | 로딩 쉬머 |
+| `float` | 3s | ease-in-out | ∞ | 떠다니는 효과 |
+| `enter` | 0.3s+0.2s | ease-out | 1회 | fade-in + scale-in 복합 |
+| `exit` | 0.3s+0.2s | ease-out | 1회 | fade-out + scale-out 복합 |
+
+#### 컨테이너 & 반응형
+
+```
+container:
+  center: true
+  padding: 2rem
+  max-width (2xl): 1400px
+
+borderRadius:
+  lg: var(--radius)
+  md: calc(var(--radius) - 2px)
+  sm: calc(var(--radius) - 4px)
+
+boxShadow: CSS 변수 기반 (2xs → 2xl 7단계)
+```
+
+### 11.2 Glassmorphism 디자인 언어
+
+#### Glass3DCard 컴포넌트 (`src/components/ui/glass-card.tsx`)
+
+**구조** (다층 레이어):
+
+```
+┌─ 1. Outer Border Gradient (1.5px padding) ────────────┐
+│ ┌─ 2. Inner Content (backdrop-blur: 80px) ──────────┐ │
+│ │ ┌─ 3. Chrome Highlight (top edge) ──────────────┐ │ │
+│ │ │ ┌─ 4. Chrome Left Edge ────────────────────┐  │ │ │
+│ │ │ │ ┌─ 5. Surface Reflection (55% height) ┐ │  │ │ │
+│ │ │ │ │                                      │ │  │ │ │
+│ │ │ │ │    [ children 콘텐츠 영역 ]            │ │  │ │ │
+│ │ │ │ │                                      │ │  │ │ │
+│ │ │ │ └──────────────────────────────────────┘ │  │ │ │
+│ │ │ └──────────────────────────────────────────┘  │ │ │
+│ │ ├─ 6. Bottom Shadow Gradient ───────────────────┤ │ │
+│ │ └───────────────────────────────────────────────┘ │ │
+│ └───────────────────────────────────────────────────┘ │
+└───────────────────────────────────────────────────────┘
+```
+
+**서브 컴포넌트:**
+
+| 컴포넌트 | 용도 | 기본 크기 |
+|---|---|---|
+| `Glass3DCard` | 메인 카드 컨테이너 | 자동 |
+| `Icon3D` | 3D 입체 아이콘 컨테이너 | 48×48px |
+| `Badge3D` | 3D 입체 뱃지 | 인라인 |
+
+**타이포그래피 스타일 객체** (`text3DStyles`):
+
+| 스타일 | 굵기 | 자간 | 용도 |
+|---|---|---|---|
+| `heroNumber` | 800 | -0.04em | 대형 숫자 (메인 KPI) |
+| `number` | 800 | -0.03em | 일반 숫자 |
+| `heading` | 700 | -0.02em | 제목 |
+| `label` | 700 | 0.14em (대문자) | 레이블 |
+| `body` | 500 | -0.01em | 본문 |
+| `dark*` 변형 | — | — | 다크모드 전용 |
+
+**인터랙티브 효과:**
+
+| 효과 | 값 | 적용 대상 |
+|---|---|---|
+| Hover Y 이동 | `translateY(-2px)` | GlassMenuButton |
+| Hover 스케일 | `scale(1.05)` | GlassMenuButton |
+| Backdrop Blur | `blur(40px) saturate(180%)` | DashboardLayout 헤더 |
+| Transition | `300ms` / `duration-200` | 전체 인터랙티브 요소 |
+
+### 11.3 shadcn/ui 컴포넌트 현황
+
+> **51개 UI 컴포넌트** — 49개 shadcn/ui (Radix 기반) + 2개 커스텀
+
+| 카테고리 | 수 | 대표 컴포넌트 |
+|---|---:|---|
+| 폼 컨트롤 | 12 | Input, Button, Select, Checkbox, Radio, Switch, Slider, Toggle, OTP |
+| 레이아웃 | 7 | Sidebar, Card, Drawer, Sheet, ScrollArea, Resizable, AspectRatio |
+| 네비게이션 | 6 | NavigationMenu, Menubar, ContextMenu, Dropdown, Breadcrumb, Pagination |
+| 데이터 표시 | 4 | Table, Carousel, Chart, Progress |
+| 다이얼로그 | 2 | Dialog, AlertDialog |
+| 팝오버/툴팁 | 4 | Popover, HoverCard, Tooltip, Command |
+| 콘텐츠 | 9 | Alert, Badge, Accordion, Collapsible, Tabs, Separator, Avatar, Skeleton |
+| 알림 | 3 | Toast, Toaster, Sonner |
+| **커스텀** | **2** | **Glass3DCard, Advanced Sidebar** |
+
+### 11.4 피처 플래그 시스템 (`src/config/featureFlags.ts`)
+
+#### 3-Tier 시스템
+
+| Tier | 이름 | 피처 수 | 상태 | 설명 |
+|---|---|---:|:---:|---|
+| **TIER 1** | MVP | 23 | ✅ 활성화 | 핵심 기능 (대시보드, 분석, 3D, 데이터 관리) |
+| **TIER 2** | Enhanced | 8 | ❌ 비활성 | 외부 API 연동 (날씨, 경쟁사, CRM, POS) |
+| **TIER 3** | Advanced AI | 18 | ❌ 비활성 | AI 예측 (매출, 수요, 이탈, 교차판매, 레이아웃 최적화) |
+
+#### Tier 1 (활성화된 23개 피처)
+
+| 분류 | 피처 |
+|---|---|
+| 대시보드 기본 | sales, visitors, products, segments |
+| 매장 분석 | heatmap, funnel, dwell_time |
+| 고객 분석 | segmentation, patterns, LTV |
+| 상품 분석 | performance, turnover, stockout |
+| 디지털 트윈 3D | basic_viewer, avatars, heatmap_overlay |
+| 데이터 관리 | upload, mapping, samples, quality |
+| 기본 리포트 | basic_reports |
+
+#### 헬퍼 함수
+
+| 함수 | 설명 |
+|---|---|
+| `isTierComplete(tier)` | 해당 Tier의 모든 피처 활성화 여부 |
+| `isFeatureEnabled(tier, name)` | 특정 피처 활성화 여부 |
+| `getEnabledFeatures()` | 활성화된 전체 피처 목록 |
+| `getTierProgress(tier)` | Tier 완성도 (%) |
+
+### 11.5 접근성
+
+| 항목 | 구현 방식 |
+|---|---|
+| 시맨틱 HTML | Radix UI 프리미티브 기반 |
+| ARIA 레이블 | 아이콘 전용 버튼에 `aria-label` 적용 |
+| 키보드 네비게이션 | Enter, Shift+Enter, Arrow Keys 지원 |
+| 포커스 관리 | Dialog, Modal 열기/닫기 시 포커스 트랩 |
+| 색상 대비 | WCAG AA 기준 충족 |
+| 스크린 리더 | AlertCard dismiss 등 테스트됨 |
+
+---
+
+## 섹션 12: 아키텍처 종합 다이어그램
+
+### 12.1 전체 시스템 아키텍처
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                       React SPA (Vite)                          │
+│                                                                 │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐   │
+│  │ Insights │  │  Studio  │  │   ROI    │  │ Data Control │   │
+│  │ Hub Page │  │ 3D Page  │  │Measure Pg│  │  Tower Page  │   │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └──────┬───────┘   │
+│       │              │              │               │           │
+│  ┌────┴──────────────┴──────────────┴───────────────┴────────┐  │
+│  │                   Custom Hooks Layer                       │  │
+│  │  useAuth · useSelectedStore · useStoreData · useDashboard │  │
+│  │  useAI · useRetailAI · useZoneMetrics · useCountUp · ...  │  │
+│  └────┬──────────────┬──────────────┬───────────────┬────────┘  │
+│       │              │              │               │           │
+│  ┌────┴────┐   ┌─────┴────┐  ┌─────┴─────┐  ┌─────┴────────┐  │
+│  │ Zustand │   │  React   │  │  React    │  │   Supabase   │  │
+│  │ Stores  │   │  Query   │  │  Context  │  │   Client     │  │
+│  │ (6개)   │   │ (cache)  │  │  (10개)   │  │              │  │
+│  └─────────┘   └──────────┘  └───────────┘  └──────┬───────┘  │
+│                                                      │          │
+└──────────────────────────────────────────────────────┼──────────┘
+                                                       │
+                                           ┌───────────┼───────────┐
+                                           │     Supabase Cloud    │
+                                           │                       │
+                                           │  ┌─────────────────┐  │
+                                           │  │  Edge Functions  │  │
+                                           │  │  (36개)          │  │
+                                           │  │  · unified-ai    │  │
+                                           │  │  · retail-ai     │  │
+                                           │  │  · environment   │  │
+                                           │  │  · pos-oauth     │  │
+                                           │  │  · neuraltwin-*  │  │
+                                           │  └────────┬────────┘  │
+                                           │           │           │
+                                           │  ┌────────┴────────┐  │
+                                           │  │   PostgreSQL    │  │
+                                           │  │   (40+ tables)  │  │
+                                           │  │   · L1 raw      │  │
+                                           │  │   · L3 agg      │  │
+                                           │  │   · dims/facts  │  │
+                                           │  └─────────────────┘  │
+                                           │                       │
+                                           │  ┌─────────────────┐  │
+                                           │  │    Storage      │  │
+                                           │  │  · store-data   │  │
+                                           │  │  · 3d-models    │  │
+                                           │  └─────────────────┘  │
+                                           └───────────────────────┘
+```
+
+### 12.2 데이터 흐름 다이어그램
+
+```
+[CSV/Excel 파일]
+     │
+     ▼
+┌─────────────┐     ┌──────────────────┐     ┌───────────────┐
+│ parseCSV()  │────▶│ dataNormalizer   │────▶│ Supabase DB   │
+│ parseJSON() │     │ · 동의어 매핑    │     │ · L1 원본     │
+└─────────────┘     │ · 퍼지 매칭      │     │ · L3 집계     │
+                    │ · 타입 변환      │     └───────┬───────┘
+                    │ · 자동 계산      │             │
+                    │ · 품질 점수      │             ▼
+                    └──────────────────┘     ┌───────────────┐
+                                            │ React Query   │
+                                            │ (캐싱 레이어) │
+                                            └───────┬───────┘
+                                                    │
+                                                    ▼
+                                            ┌───────────────┐
+                                            │ Custom Hooks  │
+                                            │ · KPI 조회    │
+                                            │ · 존 메트릭   │
+                                            │ · AI 추론     │
+                                            └───────┬───────┘
+                                                    │
+                                                    ▼
+                                            ┌───────────────┐
+                                            │ UI 컴포넌트   │
+                                            │ · Glass3D     │
+                                            │ · Recharts    │
+                                            │ · Three.js    │
+                                            └───────────────┘
+```
+
+### 12.3 AI 추론 파이프라인
+
+```
+┌───────────────────── 프론트엔드 ─────────────────────┐
+│                                                       │
+│  useAI()                      useRetailAI()           │
+│  ├─ 12가지 추론 타입           ├─ useDemandForecast   │
+│  ├─ 자동 라우팅                ├─ useRiskPrediction   │
+│  │  · unified-ai              ├─ useOptimization     │
+│  │  · retail-ai-inference     └─ useSeasonTrend      │
+│  └─ 결과 캐싱 (10분)                                  │
+│                                                       │
+└────────────┬─────────────────────────┬────────────────┘
+             │                         │
+             ▼                         ▼
+┌────────────────────┐   ┌────────────────────────┐
+│   unified-ai       │   │  retail-ai-inference   │
+│   Edge Function    │   │  Edge Function         │
+│                    │   │                        │
+│  · 온톨로지 추천   │   │  · Gemini 2.5 Flash   │
+│  · 이상 탐지      │   │  · 수요 예측          │
+│  · 패턴 분석      │   │  · 리스크 예측        │
+│  · 관계 추론      │   │  · 최적화 제안        │
+│  · 레이아웃 최적화 │   │  · 시즌 트렌드        │
+└────────────────────┘   └────────────────────────┘
+```
+
+### 12.4 주요 기술적 특징 요약
+
+| 항목 | 내용 |
+|---|---|
+| **프로젝트 규모** | ~743개 파일, ~242,750 LOC |
+| **프론트엔드** | React 18 + Vite 5 + TypeScript 5.8 |
+| **3D 렌더링** | Three.js + React Three Fiber + Drei + PostProcessing |
+| **상태 관리** | Zustand (6 stores) + React Query + Context (10개) |
+| **데이터** | 3-Layer (L1→L2→L3) + Star Schema (팩트/차원) + SCD2 |
+| **AI** | Gemini 2.5 Flash via Edge Functions (12가지 추론 타입) |
+| **백엔드** | Supabase (PostgreSQL + 36 Edge Functions + Storage + Auth) |
+| **UI** | Glassmorphism 디자인 + shadcn/ui (51 컴포넌트) + Tailwind CSS |
+| **보안** | RBAC (4 역할) + 라이선스 시스템 + Edge Function 프록시 (API 키 미노출) |
+| **품질** | 데이터 품질 점수 + 제약조건 검증 + SCD2 이력 추적 |
+| **캐싱** | React Query (2분~30분 staleTime) + localStorage persist |
+| **피처 관리** | 3-Tier 피처 플래그 (MVP 23개 활성 / Enhanced 8개 / AI 18개 대기) |
