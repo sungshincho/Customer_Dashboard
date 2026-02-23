@@ -2571,3 +2571,151 @@ Phase 4 (선택): 코드 스플리팅 + 하드코딩 제거 + TODO 해소 + SSR 
 
 > **예상 총 소요 시간:** 82~112시간 (숙련된 TypeScript/모노레포 개발자 기준 2~3주 풀타임 스프린트)
 
+---
+
+## 부록 A. Tailwind Config 원본 (웹사이트 E 비교용)
+
+> **목적:** 웹사이트 E의 `tailwind.config`와 1:1 비교하기 위한 Customer Dashboard(D)의 전체 설정 원본.
+> **파일 경로:** `tailwind.config.ts` (254줄)
+
+### A-1. 기본 설정
+
+| 항목 | 값 |
+|---|---|
+| `darkMode` | `["class"]` |
+| `prefix` | `""` (없음) |
+| `content` | `./pages/**/*.{ts,tsx}`, `./components/**/*.{ts,tsx}`, `./app/**/*.{ts,tsx}`, `./src/**/*.{ts,tsx}` |
+| `plugins` | `tailwindcss-animate` (1개) |
+
+### A-2. theme.container
+
+```json
+{
+  "center": true,
+  "padding": "2rem",
+  "screens": { "2xl": "1400px" }
+}
+```
+
+### A-3. theme.extend.fontFamily
+
+| 키 | 폰트 스택 |
+|---|---|
+| `sans` | `ui-sans-serif`, `system-ui`, `sans-serif`, `Apple Color Emoji`, `Segoe UI Emoji`, `Segoe UI Symbol`, `Noto Color Emoji` |
+| `pretendard` | `Pretendard`, `sans-serif` |
+| `inter` | `Inter`, `sans-serif` |
+| `serif` | `ui-serif`, `Georgia`, `Cambria`, `Times New Roman`, `Times`, `serif` |
+| `mono` | `ui-monospace`, `SFMono-Regular`, `Menlo`, `Monaco`, `Consolas`, `Liberation Mono`, `Courier New`, `monospace` |
+
+### A-4. theme.extend.colors (전체 — CSS 변수 기반)
+
+| 토큰 | 값 | 비고 |
+|---|---|---|
+| `border` | `hsl(var(--border))` | |
+| `input` | `hsl(var(--input))` | |
+| `ring` | `hsl(var(--ring))` | |
+| `background` | `hsl(var(--background))` | |
+| `foreground` | `hsl(var(--foreground))` | |
+| **primary** | | |
+| `primary.DEFAULT` | `hsl(var(--primary))` | |
+| `primary.foreground` | `hsl(var(--primary-foreground))` | |
+| `primary.glow` | `hsl(var(--primary-glow))` | 커스텀 |
+| `primary.dark` | `hsl(var(--primary-dark))` | 커스텀 |
+| **secondary** | | |
+| `secondary.DEFAULT` | `hsl(var(--secondary))` | |
+| `secondary.foreground` | `hsl(var(--secondary-foreground))` | |
+| **destructive** | | |
+| `destructive.DEFAULT` | `hsl(var(--destructive))` | |
+| `destructive.foreground` | `hsl(var(--destructive-foreground))` | |
+| **muted** | | |
+| `muted.DEFAULT` | `hsl(var(--muted))` | |
+| `muted.foreground` | `hsl(var(--muted-foreground))` | |
+| **accent** | | |
+| `accent.DEFAULT` | `hsl(var(--accent))` | |
+| `accent.foreground` | `hsl(var(--accent-foreground))` | |
+| **popover** | | |
+| `popover.DEFAULT` | `hsl(var(--popover))` | |
+| `popover.foreground` | `hsl(var(--popover-foreground))` | |
+| **card** | | |
+| `card.DEFAULT` | `hsl(var(--card))` | |
+| `card.foreground` | `hsl(var(--card-foreground))` | |
+| **sidebar** | | |
+| `sidebar.DEFAULT` | `hsl(var(--sidebar-background))` | |
+| `sidebar.foreground` | `hsl(var(--sidebar-foreground))` | |
+| `sidebar.primary` | `hsl(var(--sidebar-primary))` | |
+| `sidebar.primary-foreground` | `hsl(var(--sidebar-primary-foreground))` | |
+| `sidebar.accent` | `hsl(var(--sidebar-accent))` | |
+| `sidebar.accent-foreground` | `hsl(var(--sidebar-accent-foreground))` | |
+| `sidebar.border` | `hsl(var(--sidebar-border))` | |
+| `sidebar.ring` | `hsl(var(--sidebar-ring))` | |
+
+### A-5. theme.extend.borderRadius
+
+| 키 | 값 |
+|---|---|
+| `lg` | `var(--radius)` |
+| `md` | `calc(var(--radius) - 2px)` |
+| `sm` | `calc(var(--radius) - 4px)` |
+
+### A-6. theme.extend.boxShadow
+
+| 키 | 값 |
+|---|---|
+| `2xs` | `var(--shadow-2xs)` |
+| `xs` | `var(--shadow-xs)` |
+| `sm` | `var(--shadow-sm)` |
+| `md` | `var(--shadow-md)` |
+| `lg` | `var(--shadow-lg)` |
+| `xl` | `var(--shadow-xl)` |
+| `2xl` | `var(--shadow-2xl)` |
+
+### A-7. theme.extend.keyframes (11개)
+
+| 이름 | 설명 |
+|---|---|
+| `accordion-down` | Radix accordion 열림 (height 0→auto, opacity 0→1) |
+| `accordion-up` | Radix accordion 닫힘 (height auto→0, opacity 1→0) |
+| `fade-in` | 페이드인 + translateY(10px→0) |
+| `fade-out` | 페이드아웃 + translateY(0→10px) |
+| `scale-in` | 스케일인 (0.95→1) + opacity |
+| `scale-out` | 스케일아웃 (1→0.95) + opacity |
+| `slide-in-right` | 우측에서 슬라이드인 (translateX 100%→0) |
+| `slide-out-right` | 우측으로 슬라이드아웃 (translateX 0→100%) |
+| `slide-in-left` | 좌측에서 슬라이드인 (translateX -100%→0) |
+| `slide-up` | 하단에서 슬라이드업 (translateY 100%→0) + opacity |
+| `pulse-glow` | primary 색상 glow 펄스 (boxShadow 20px↔30px) |
+| `shimmer` | 배경 포지션 시머 (-200%→200%) |
+| `float` | 상하 플로팅 (translateY 0↔-10px) |
+
+### A-8. theme.extend.animation (15개)
+
+| 이름 | 값 |
+|---|---|
+| `accordion-down` | `accordion-down 0.3s ease-out` |
+| `accordion-up` | `accordion-up 0.3s ease-out` |
+| `fade-in` | `fade-in 0.3s ease-out` |
+| `fade-out` | `fade-out 0.3s ease-out` |
+| `scale-in` | `scale-in 0.2s ease-out` |
+| `scale-out` | `scale-out 0.2s ease-out` |
+| `slide-in-right` | `slide-in-right 0.3s ease-out` |
+| `slide-out-right` | `slide-out-right 0.3s ease-out` |
+| `slide-in-left` | `slide-in-left 0.3s ease-out` |
+| `slide-up` | `slide-up 0.4s ease-out` |
+| `pulse-glow` | `pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite` |
+| `shimmer` | `shimmer 2s linear infinite` |
+| `float` | `float 3s ease-in-out infinite` |
+| `enter` | `fade-in 0.3s ease-out, scale-in 0.2s ease-out` (복합) |
+| `exit` | `fade-out 0.3s ease-out, scale-out 0.2s ease-out` (복합) |
+
+### A-9. 웹사이트 E 비교 시 체크리스트
+
+- [ ] `darkMode` 전략 동일 여부 (`class` vs `media`)
+- [ ] `content` 경로 패턴 차이 (모노레포 전환 시 경로 변경 필요)
+- [ ] **컬러 토큰 일치 여부** — CSS 변수명이 동일한지, D에만 있는 토큰 (`primary.glow`, `primary.dark`, `sidebar.*`)
+- [ ] **폰트 패밀리** — `pretendard`, `inter` 공유 여부
+- [ ] **borderRadius** — `--radius` 변수 값이 동일한지
+- [ ] **boxShadow** — CSS 변수(`--shadow-*`) 공유 여부
+- [ ] **keyframes/animation** — 공통 애니메이션 추출 가능 여부
+- [ ] **plugins** — `tailwindcss-animate` 외 E에 추가 플러그인 존재 여부
+- [ ] `prefix` 충돌 — 모노레포에서 prefix 분리 필요 여부
+
