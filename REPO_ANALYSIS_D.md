@@ -675,3 +675,301 @@ Customer_Dashboard/
 | 🟡 중간 | `DraggablePanel` | 드래그 패널 — 범용 UI 컴포넌트 |
 | 🟢 낮음 | `ModelLoader`, `PostProcessing`, `SceneEnvironment`, `TransformControls` | 3D 기본 유틸 — 3D 프로젝트 공용 |
 | 🟢 낮음 | `Store3DViewer`, `SceneViewer`, `Model3DPreview` | 3D 뷰어 — 3D 프로젝트에서 재사용 |
+
+---
+
+## 섹션 5: 3D 및 시각화 의존성 상세
+
+### 5.1 Three.js / React Three Fiber 설정
+
+#### 패키지 버전
+
+| 패키지 | 버전 | 역할 |
+|---|---|---|
+| `three` | ^0.160.1 | 3D 그래픽 엔진 코어 |
+| `@react-three/fiber` | ^8.18.0 | React 선언형 Three.js 렌더러 |
+| `@react-three/drei` | ^9.122.0 | R3F 유틸리티 (useGLTF, OrbitControls, Grid, Environment, Html 등) |
+| `@react-three/postprocessing` | ^2.16.2 | 후처리 이펙트 래퍼 |
+| `postprocessing` | ^6.36.0 | 후처리 이펙트 엔진 (Bloom, N8AO, Vignette, ToneMapping) |
+
+#### 물리 엔진
+
+| 패키지 | 사용 여부 |
+|---|---|
+| `@react-three/cannon` | ❌ 미사용 |
+| `@react-three/rapier` | ❌ 미사용 |
+| `cannon-es` | ❌ 미사용 |
+| `rapier3d` | ❌ 미사용 |
+
+> 이 프로젝트는 순수 시각화/UI 목적으로 Three.js를 사용하며, 물리 시뮬레이션은 포함되어 있지 않습니다.
+
+#### Canvas 초기화 코드 (11개 파일)
+
+| # | 파일 경로 | 주요 props | 비고 |
+|---|---|---|---|
+| 1 | `src/features/studio/core/Canvas3D.tsx` | `shadows`, `dpr={1}`, `gl={{ antialias, alpha:false, powerPreference:'high-performance', preserveDrawingBuffer }}` | **메인 스튜디오 캔버스** — 가장 상세한 GL 설정 |
+| 2 | `src/features/simulation/components/SimulationScene.tsx` | `shadows`, PerspectiveCamera `[20,20,20]` fov=50 | 시뮬레이션 씬 |
+| 3 | `src/features/data-management/ontology/components/SchemaGraph3D.tsx` | `gl={{ antialias, alpha:true, powerPreference:'high-performance' }}`, camera `[0,0,160]` fov=70 | 온톨로지 그래프 (투명 배경) |
+| 4 | `src/features/simulation/components/digital-twin/Store3DViewer.tsx` | `camera={{ position:[10,10,10], fov:50 }}`, style background | 매장 3D 뷰어 |
+| 5 | `src/features/simulation/components/digital-twin/SceneViewer.tsx` | `shadows`, recipe 기반 동적 카메라 설정 | 씬 뷰어 |
+| 6 | `src/features/simulation/components/LayoutComparisonView.tsx` | `camera={{ position:[10,10,10], fov:50 }}` | 레이아웃 비교 (다중 Canvas) |
+| 7 | `src/features/simulation/components/digital-twin/Model3DPreview.tsx` | PerspectiveCamera `[3,3,3]` | 모델 미리보기 |
+| 8 | `src/features/simulation/components/digital-twin/SceneComposer.tsx` | Canvas 래퍼 | 씬 구성기 |
+| 9 | `src/features/simulation/components/digital-twin/ComparisonView.tsx` | Canvas | 비교 뷰 |
+| 10 | `src/features/simulation/components/digital-twin/PlacementEditor.tsx` | Canvas | 배치 편집기 |
+
+#### 성능 최적화 설정
+
+| 최적화 | 위치 | 설명 |
+|---|---|---|
+| `dpr={1}` | Canvas3D | 디바이스 픽셀 비율 고정 (슈퍼샘플링 비활성화) |
+| `alpha: false` | Canvas3D GL | 불투명 배경 (합성 비용 절감) |
+| `powerPreference: 'high-performance'` | Canvas3D, SchemaGraph3D GL | 고성능 GPU 선택 요청 |
+| `stencil: false` | Canvas3D GL | 스텐실 버퍼 비활성화 |
+| `multisampling={2}` | PostProcessing EffectComposer | 후처리 안티앨리어싱 (2x) |
+| `multisampling={4}` | PostProcessingEffects (sim) | 후처리 안티앨리어싱 (4x, 고품질) |
+| `enableDamping: false` | OrbitControls | 댐핑 비활성화 (성능 최적화) |
+| `Preload all` | Canvas3D | 에셋 사전 로딩 |
+
+#### 후처리(PostProcessing) 이펙트
+
+| 이펙트 | 파일 | 설정 |
+|---|---|---|
+| `Bloom` | `studio/core/PostProcessing.tsx` | intensity=0.5, luminanceThreshold=0.9, mipmapBlur |
+| `N8AO` (SSAO) | `studio/core/PostProcessing.tsx` | intensity=1.5, aoRadius=0.5, quality='medium' |
+| `Vignette` | `studio/core/PostProcessing.tsx` | offset=0.3, darkness=0.4 |
+| `ToneMapping` | `studio/core/PostProcessing.tsx` | ACES Filmic |
+| `BrightnessContrast` | `studio/core/PostProcessing.tsx` | 밝기/대비 조정 |
+| `HueSaturation` | `studio/core/PostProcessing.tsx` | 색조/채도 조정 |
+| Bloom + N8AO + Vignette + ToneMapping | `simulation/.../PostProcessingEffects.tsx` | 4개 프리셋: natural, cinematic, clean, dramatic |
+
+#### SSR 비활성화 처리
+
+- **방식:** `<Suspense fallback={...}>` 경계를 모든 3D Canvas 내부에 적용
+- **dynamic import (ssr: false):** 미사용 (Vite SPA이므로 SSR 자체가 없음)
+- **Suspense 사용 파일:** 11개 (Canvas3D, Model3DPreview, SceneComposer, SceneViewer, LayoutComparisonView, CustomerAvatarOverlay, StaffAvatarsOverlay, StaffingOverlay, RealtimeCustomerOverlay 등)
+
+#### Three.js 직접 사용 패턴
+
+| 패턴 | 용도 | 주요 사용 파일 |
+|---|---|---|
+| `THREE.Color()` | 색상 인스턴스 생성 | SchemaGraph3D, LayoutComparisonView |
+| `THREE.Vector3()` | 벡터 연산 (위치/방향) | Studio overlays, ComparisonView |
+| `THREE.Quaternion()` | 회전 계산 | SceneViewer, overlays |
+| `THREE.Box3()` | 바운딩 박스 계산 | Canvas3D (모델 센터링) |
+| `THREE.AdditiveBlending` | 파티클 블렌딩 모드 | SchemaGraph3D (배경 파티클) |
+| `THREE.DoubleSide` | 양면 렌더링 | 다수 오버레이 |
+| `THREE.Mesh` / `THREE.Points` | 타입 어노테이션 | 다수 컴포넌트 |
+
+### 5.2 3D 에셋 파일
+
+#### GLB/GLTF 모델 파일
+
+> **중요:** 3D 모델 파일은 로컬 레포지토리에 포함되어 있지 않습니다. 모든 모델은 **Supabase Storage** (`3d-models` 버킷)에 외부 저장됩니다.
+
+**참조된 모델 목록 (코드 및 시드 데이터 기준):**
+
+| # | 파일명 | 분류 | 용도 |
+|---|---|---|---|
+| 1 | `store_simple_10x10_baked.glb` | 공간(Space) | 메인 매장 공간 (Baked Lighting) |
+| 2 | `rack_hanger_simple.glb` | 가구(Furniture) | 옷걸이 행거 진열대 |
+| 3 | `shelf_simple.glb` | 가구 | 선반 진열대 |
+| 4 | `table_simple.glb` | 가구 | 테이블 진열대 |
+| 5 | `rack_shoes_simple.glb` | 가구 | 신발 진열대 |
+| 6 | `product_coat.glb` | 상품(Product) | 프리미엄 캐시미어 코트 |
+| 7 | `product_sweater.glb` | 상품 | 프리미엄 언더웨어 세트 |
+| 8 | `product_shoes.glb` | 상품 | 프리미엄 로퍼 |
+| 9 | `product_giftbox.glb` | 상품 | 기프트 박스 세트 |
+| 10 | `product_tshirt_stack.glb` | 상품 | 베이직 티셔츠 3팩 |
+| 11 | `avatar_staff.glb` | 아바타(Avatar) | 직원 아바타 |
+
+**Supabase Storage 경로 구조:**
+
+```
+3d-models/
+└── {userId}/
+    └── {storeId}/
+        ├── {model}.glb              # 가구/상품 모델
+        ├── environment/             # 환경 모델 (day/night)
+        │   ├── *_day.glb
+        │   └── *_night.glb
+        └── space-textures/          # 공간 텍스처
+            ├── *_day.{png,jpg,webp}
+            └── *_night.{png,jpg,webp}
+```
+
+#### 텍스처 파일
+
+- **로컬 파일:** 없음 (Supabase Storage에 외부 저장)
+- **지원 형식:** `.png`, `.jpg`, `.webp`
+- **Day/Night 시스템:** 파일명 패턴으로 주간/야간 텍스처 자동 감지 및 전환
+- **로딩 코드:** `src/features/studio/hooks/useSpaceTextures.ts`
+
+#### 조명 프리셋 (로컬)
+
+| 파일 | 분위기 | 주요 조명 | 배경색 |
+|---|---|---|---|
+| `public/lighting-presets/cool-modern.json` | 쿨톤 모던 | Ambient #e6f2ff + Directional #b3d9ff | #d9ecff |
+| `public/lighting-presets/dramatic-spot.json` | 드라마틱 스팟 | Ambient #1a1a1a (어두움) + Spot #ffffff, #ffd700 | #0d0d0d |
+| `public/lighting-presets/warm-retail.json` | 따뜻한 매장 | Ambient #fff5e6 + Directional #ffd699 + Point #ffcc80 ×2 | #f5e6d3 |
+
+**프리셋 JSON 구조:**
+```json
+{
+  "name": "프리셋명",
+  "description": "설명",
+  "lights": [
+    { "type": "ambient|directional|point|spot", "color": "#hex", "intensity": 0.0, "position": [x,y,z] }
+  ],
+  "environment": { "background": "#hex" }
+}
+```
+
+#### Git LFS 사용 여부
+
+- **`.gitattributes` 파일:** ❌ 없음
+- **Git LFS:** ❌ 미설정
+- **이유:** 3D 모델은 Supabase Storage에 외부 저장되므로 Git LFS가 필요하지 않음
+
+#### Baked Material 시스템
+
+| 항목 | 상세 |
+|---|---|
+| 구현 파일 | `src/features/simulation/utils/bakedMaterialUtils.ts` |
+| 감지 패턴 | `bottom_plate`, `space_a`, `space a`, `_baked`, `-baked` |
+| 동작 | `MeshStandardMaterial` → `MeshBasicMaterial` 변환 (조명 비활성화) |
+| 추가 처리 | 그림자 비활성화, 톤매핑 비활성화 (원본 색상 보존) |
+
+### 5.3 셰이더 파일
+
+#### GLSL / Vertex / Fragment 파일
+
+| 항목 | 상태 |
+|---|---|
+| `.glsl` 파일 | ❌ 없음 |
+| `.vert` 파일 | ❌ 없음 |
+| `.frag` 파일 | ❌ 없음 |
+| GLSL import 구문 | ❌ 없음 |
+
+#### 커스텀 셰이더 사용
+
+| 항목 | 상태 |
+|---|---|
+| `ShaderMaterial` 사용 | ❌ 없음 |
+| `RawShaderMaterial` 사용 | ❌ 없음 |
+| `shaderMaterial` (drei) 사용 | ❌ 없음 |
+| `vertexShader:` 인라인 | ❌ 없음 |
+| `fragmentShader:` 인라인 | ❌ 없음 |
+
+#### 사용 중인 Material 타입
+
+| Material | 용도 | 주요 사용처 |
+|---|---|---|
+| `meshStandardMaterial` | PBR 기본 머터리얼 (가장 많이 사용) | 모든 3D 모델 |
+| `meshBasicMaterial` | UI 오버레이, 글로우 효과, Baked 모델 | 오버레이, bakedMaterialUtils |
+| `meshPhysicalMaterial` | 고급 반사/투명 표현 | SchemaGraph3D |
+| `pointsMaterial` | 파티클 이펙트 | SchemaGraph3D (배경 파티클) |
+
+> **결론:** 이 프로젝트는 커스텀 셰이더를 전혀 사용하지 않으며, Three.js 내장 머터리얼과 `@react-three/postprocessing` 후처리 이펙트로 모든 시각 효과를 구현합니다.
+
+### 5.4 3D 관련 특수 설정
+
+#### 빌드 설정 (vite.config.ts)
+
+```typescript
+// vite.config.ts — 3D 관련 특수 설정 없음
+export default defineConfig(({ mode }) => ({
+  server: { host: "::", port: 8080 },
+  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+  resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
+}));
+```
+
+| 항목 | 상태 | 설명 |
+|---|---|---|
+| `transpilePackages` (three.js) | ❌ 불필요 | Vite가 ESM을 네이티브 지원 |
+| Webpack GLSL 로더 | ❌ 불필요 | 커스텀 셰이더 미사용 |
+| GLTF/GLB 로더 설정 | ❌ 불필요 | `useGLTF` (drei)가 런타임에 처리 |
+| Draco 디코더 설정 | ❌ 없음 | Draco 압축 미사용 |
+| KTX2 텍스처 설정 | ❌ 없음 | KTX2 미사용 |
+
+#### SSR 비활성화
+
+- **해당 없음** — Vite + React SPA 아키텍처이므로 SSR 자체가 없음
+- Next.js의 `dynamic(() => import(...), { ssr: false })` 패턴 불필요
+- 대신 `<Suspense>` 경계로 비동기 3D 에셋 로딩을 관리
+
+#### Canvas 초기화 엔트리포인트
+
+| 역할 | 파일 |
+|---|---|
+| **Studio 메인 3D** | `src/features/studio/core/Canvas3D.tsx` |
+| **시뮬레이션 3D** | `src/features/simulation/components/SimulationScene.tsx` |
+| **온톨로지 3D 그래프** | `src/features/data-management/ontology/components/SchemaGraph3D.tsx` |
+| **모델 미리보기** | `src/features/simulation/components/digital-twin/Model3DPreview.tsx` |
+| **씬 뷰어** | `src/features/simulation/components/digital-twin/SceneViewer.tsx` |
+
+### 5.5 차트/그래프 라이브러리
+
+#### 사용 중인 라이브러리
+
+| 라이브러리 | 버전 | 활성 사용 | 렌더링 방식 |
+|---|---|---|---|
+| `recharts` | ^2.15.4 | ✅ 활성 | SVG (내부) |
+| `d3-force` | ^3.0.0 | ⚠️ 의존성만 설치 | — |
+| `react-force-graph-2d` | ^1.29.0 | ⚠️ 의존성만 설치 | Canvas (내부) |
+| Canvas API (커스텀) | — | ✅ 활성 (주력) | Canvas 2D |
+
+> **기술 비중:** Canvas API 커스텀 차트 ~70% / Recharts ~30%
+
+#### Recharts로 구현된 차트
+
+| # | 차트 유형 | 컴포넌트 | 파일 경로 | 용도 |
+|---|---|---|---|---|
+| 1 | Line Chart | `MeasureSection` | `features/insights/tabs/AIRecommendTab/components/MeasureSection.tsx` | ROI 트렌드 (기대 vs 실제) |
+| 2 | Area Chart | `DemandForecastResult` | `features/simulation/components/DemandForecastResult.tsx` | 일별 수요 예측 |
+| 3 | Pie Chart (Donut) | `OntologyInsightChart` | `features/simulation/components/OntologyInsightChart.tsx` | 엔티티 타입 분포 |
+| 4 | Bar Chart (Horizontal) | `OntologyInsightChart` | 〃 | 허브 엔티티 연결 수 |
+| 5 | Bar Chart | `OntologyInsightChart` | 〃 | 동시 발생 패턴 |
+| 6 | Radar Chart | `OntologyInsightChart` | 〃 | 스키마 활용 메트릭 |
+
+#### Canvas API 커스텀 차트
+
+> 모든 커스텀 차트는 `useRef<HTMLCanvasElement>()` + `getContext('2d')` + `requestAnimationFrame()` 패턴을 사용합니다.
+> 공통 특징: 글로우 이펙트, 그래디언트 채움, easeOutCubic 애니메이션, 다크/라이트 모드 지원, ResizeObserver 반응형
+
+| # | 차트 함수명 | 유형 | 파일 경로 | 용도 |
+|---|---|---|---|---|
+| 1 | `GlowFunnelChart` | 퍼널 차트 | `features/insights/tabs/OverviewTab.tsx` | 고객 여정 퍼널 (Entry→Purchase) |
+| 2 | `GlowHourlyBarChart` | 세로 바 차트 | `features/insights/tabs/StoreTab.tsx` | 시간대별 방문자 수 (24시간) |
+| 3 | `GlowCategoryChart` | 세로 바 차트 | `features/insights/tabs/StoreTab.tsx` | 카테고리별 매출 비교 |
+| 4 | `GlowDonutChart` | 도넛 차트 | `features/insights/tabs/CustomerTab.tsx` | 고객 세그먼트 분포 |
+| 5 | `GlowBarChart` | 가로 바 차트 | `features/insights/tabs/CustomerTab.tsx` | 세그먼트별 구매액 |
+| 6 | `GlowAreaChart` | 영역 차트 | `features/insights/tabs/CustomerTab.tsx` | 재방문 추이 |
+| 7 | `GlowHorizontalBarChart` | 가로 바 차트 | `features/insights/tabs/ProductTab.tsx` | Top 10 상품 매출 |
+| 8 | `GlowDonutChart` | 도넛 차트 | `features/insights/tabs/ProductTab.tsx` | 카테고리별 매출 비율 |
+| 9 | `GlowVerticalBarChart` | 세로 바 차트 | `features/insights/tabs/ProductTab.tsx` | 카테고리별 판매량 |
+| 10 | `StockDistributionChart` | 도넛 차트 | `features/insights/tabs/InventoryTab.tsx` | 재고 상태 분포 |
+| 11 | `GlowLineChart` | 라인 + 영역 차트 | `features/insights/tabs/PredictionTab.tsx` | 매출 예측 (실제 + 예측선 + 신뢰구간) |
+| 12 | `GlowMiniLineChart` | 미니 라인 차트 | `features/insights/tabs/PredictionTab.tsx` | 보조 지표 (방문자, 전환율) 트렌드 |
+| 13 | `ConfidenceChart` | 신뢰구간 영역 차트 | `features/insights/tabs/PredictionTab.tsx` | 예측 신뢰구간 시각화 |
+
+#### Canvas API 커스텀 위젯 (프로그레스 바)
+
+| # | 위젯 함수명 | 파일 경로 | 용도 |
+|---|---|---|---|
+| 1 | `GlowProgressBar` | `components/dashboard/AIRecommendationEffectWidget.tsx` | AI 추천 효과 ROI 진행도 |
+| 2 | `GlowProgressBar` | `components/goals/GoalProgressWidget.tsx` | 목표 달성률 |
+| 3 | `GlowProgressBar` | `features/data-control/components/DataQualityScore.tsx` | 데이터 품질 점수 |
+| 4 | `GlowProgressBar` | `features/insights/tabs/AIRecommendationTab.tsx` | AI 추천 진행도 |
+| 5 | `GlowProgressBar` | `features/insights/tabs/AIRecommendTab/components/ActiveStrategies.tsx` | 활성 전략 진행도 |
+| 6 | `GlowProgressBar` | `features/insights/tabs/AIRecommendTab/components/ExecuteSection.tsx` | 실행 진행도 |
+
+#### 차트 유형 종합 요약
+
+| 렌더링 기술 | 차트 유형 수 | 인스턴스 수 |
+|---|---:|---:|
+| **Canvas API 커스텀** | 8종 (퍼널, 라인, 영역, 바, 도넛, 미니라인, 신뢰구간, 프로그레스) | 19개 |
+| **Recharts** | 5종 (라인, 영역, 파이, 바, 레이더) | 6개 |
+| **d3-force / react-force-graph-2d** | ⚠️ 설치만 됨 (활성 사용 미확인) | 0개 |
+| **합계** | **13종** | **25개** |
