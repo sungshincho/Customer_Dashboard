@@ -1822,664 +1822,752 @@ supabase.functions.invoke('environment-proxy', {
 
 ---
 
-## 섹션 9: 유틸리티 함수 & 데이터 아키텍처
+## 섹션 9: 웹사이트(E)와 공유 가능한 코드
 
-### 9.1 유틸리티 파일 개요
+> 모노레포 통합 시 `packages/shared-*`로 추출할 후보를 식별합니다.
 
-| 파일 | LOC | 용도 | 핵심 알고리즘/패턴 |
-|---|---:|---|---|
-| `src/utils/dataNormalizer.ts` | ~400 | 다양한 형식의 원본 데이터를 표준 스키마로 정규화 | 레벤슈타인 거리 퍼지 매칭, SCD2 |
-| `src/utils/dataSchemas.ts` | ~200 | 데이터 아키텍처 표준 스키마 정의 (L1 원본 + L3 파생) | Star Schema (팩트/차원) |
-| `src/utils/enterpriseSchemas.ts` | ~350 | 엔터프라이즈급 스키마 (SCD2, 파티셔닝, 품질 체크) | SCD2, 파티셔닝, 제약조건 |
-| `src/utils/dependencyGraph.ts` | ~150 | 테이블 간 FK 의존성 그래프 & 업로드 순서 계산 | Kahn's Algorithm (위상정렬) |
-| `src/utils/rolePermissions.ts` | ~120 | 역할 기반 접근 제어(RBAC) & 라이선스 검증 | Permission Matrix |
+### 9.1 공유 가능한 UI 컴포넌트
 
-### 9.2 데이터 정규화 엔진 (`dataNormalizer.ts`)
+웹사이트(E)에서도 사용할 수 있는 범용 컴포넌트:
 
-#### 내보낸 함수
+#### A. 즉시 공유 가능 (shadcn/ui 표준 컴포넌트)
 
-| 함수 | 매개변수 | 반환값 | 설명 |
+| 컴포넌트 | 현재 경로 | 공유 시 이점 | 수정 필요 사항 |
 |---|---|---|---|
-| `detectDataType(columns)` | `string[]` | `DataFileType` | 컬럼명으로 데이터 타입 자동 감지 |
-| `normalizeData(rawData, targetSchema)` | `Record[], DataSchema` | `NormalizedData` | 원본→표준 스키마 정규화 |
-| `normalizeMultipleDatasets(datasets)` | `{raw, schema}[]` | `NormalizedData[]` | 일괄 정규화 |
+| **Button** | `src/components/ui/button.tsx` | 디자인 시스템 일관성 | 없음 (Radix 표준) |
+| **Dialog** | `src/components/ui/dialog.tsx` | 모달/팝업 통일 | 없음 |
+| **Card** | `src/components/ui/card.tsx` | 카드 레이아웃 통일 | 없음 |
+| **Input** | `src/components/ui/input.tsx` | 폼 입력 통일 | Glassmorphism 스타일 분리 필요 |
+| **Select** | `src/components/ui/select.tsx` | 드롭다운 통일 | 없음 |
+| **Table** | `src/components/ui/table.tsx` | 데이터 테이블 통일 | 없음 |
+| **Tabs** | `src/components/ui/tabs.tsx` | 탭 UI 통일 | 없음 |
+| **Badge** | `src/components/ui/badge.tsx` | 뱃지/태그 통일 | 없음 |
+| **Toast/Sonner** | `src/components/ui/sonner.tsx` | 알림 시스템 통일 | `next-themes` 의존성 제거 필요 |
+| **Skeleton** | `src/components/ui/skeleton.tsx` | 로딩 상태 통일 | 없음 |
+| **Tooltip** | `src/components/ui/tooltip.tsx` | 툴팁 UX 통일 | 없음 |
+| **Accordion** | `src/components/ui/accordion.tsx` | FAQ, 접기/펼치기 | 없음 |
+| **Alert/AlertDialog** | `src/components/ui/alert-dialog.tsx` | 확인 다이얼로그 | 없음 |
+| **Breadcrumb** | `src/components/ui/breadcrumb.tsx` | 네비게이션 | 없음 |
+| **Pagination** | `src/components/ui/pagination.tsx` | 페이지네이션 통일 | 없음 |
+| **Progress** | `src/components/ui/progress.tsx` | 진행률 표시 | 없음 |
+| **Switch** | `src/components/ui/switch.tsx` | 토글 스위치 | 없음 |
+| **Checkbox** | `src/components/ui/checkbox.tsx` | 체크박스 | 없음 |
+| **Form** | `src/components/ui/form.tsx` | 폼 레이아웃 | 없음 |
+| **Separator** | `src/components/ui/separator.tsx` | 구분선 | 없음 |
+| **ScrollArea** | `src/components/ui/scroll-area.tsx` | 스크롤 영역 | 없음 |
+| **Avatar** | `src/components/ui/avatar.tsx` | 사용자 아바타 | 없음 |
 
-#### 핵심 알고리즘
+> **총 49개 shadcn/ui 컴포넌트** — 대부분 수정 없이 공유 가능
 
-```
-1. 한글-영문 동의어 매핑
-   "고객" | "회원" → customer_id
-   "상품" | "제품" → product_name
-   "가격" | "금액" → price
+#### B. 커스텀 컴포넌트 (공유 시 수정 필요)
 
-2. 레벤슈타인 거리 퍼지 매칭 (70% 이상 유사도)
-   "prduct_name" → "product_name" (오타 자동 보정)
+| 컴포넌트 | 현재 경로 | 공유 시 이점 | 수정 필요 사항 |
+|---|---|---|---|
+| **Glass3DCard** | `src/components/ui/glass-card.tsx` | 브랜드 디자인 통일 | 다크모드 감지 → 테마 prop으로 변경 |
+| **Icon3D** | `src/components/ui/glass-card.tsx` | 3D 아이콘 스타일 | 위와 동일 |
+| **Badge3D** | `src/components/ui/glass-card.tsx` | 3D 뱃지 스타일 | 위와 동일 |
+| **Sidebar** | `src/components/ui/sidebar.tsx` | 사이드바 레이아웃 | 대시보드 종속적 — 분리 설계 필요 |
 
-3. 타입 자동 변환
-   Excel 날짜 직렬 → ISO Date
-   Boolean: "true"/"false" → true/false
-   Number: "100" → 100
+#### C. 대시보드 전용 (공유 불가)
 
-4. 자동 계산 필드
-   total_amount = price × quantity
-   SCD2 필드: is_current=true, valid_from=now()
+| 컴포넌트 | 이유 |
+|---|---|
+| `FunnelChart` | 리테일 퍼널 전용 |
+| `MetricCard` | KPI 대시보드 전용 |
+| 3D 컴포넌트 (Store3DViewer 등) | Three.js 의존 |
 
-5. 품질 점수 계산
-   score = 매핑 성공한 중요 필드 수 / 전체 중요 필드 수
-```
+#### D. Error Boundary
 
-### 9.3 데이터 스키마 아키텍처
+| 항목 | 현황 |
+|---|---|
+| Error Boundary 컴포넌트 | ❌ **없음** — 별도의 ErrorBoundary 클래스 미구현 |
+| 에러 처리 패턴 | try/catch 패턴 (49개 파일에서 사용) |
+| Toast 기반 에러 알림 | ✅ Sonner + use-toast 조합 |
 
-#### 3-Layer 구조
+> **권장:** `packages/shared-ui/ErrorBoundary.tsx` 공통 컴포넌트 신규 생성 필요
 
-```
-L1 (Raw)        → CSV/Excel 업로드 → Storage → 정규화
-L2 (ETL)        → dataNormalizer → 변환/정제
-L3 (Aggregated) → 집계 테이블 → DB 조회 (useQuery)
-```
+### 9.2 Supabase 클라이언트 설정
 
-#### 원본 데이터 스키마 (L1) — `dataSchemas.ts`
+#### 클라이언트 초기화 코드
 
-| 스키마 상수 | Grain | 주요 컬럼 |
-|---|---|---|
-| `SALES_SCHEMA` | 거래 건 | transaction_id, date, product, price, qty, total, discount, tax, customer_id |
-| `ZONE_SCHEMA` | 구역 | zone_id, name, x/y/z, area |
-| `TRAFFIC_SCHEMA` | 방문 이벤트 | visitor_id, zone, timestamp, dwell_time |
-| `PRODUCT_SCHEMA` | 상품 | product_id, name, category, brand, price, cost, sku |
-| `CUSTOMER_SCHEMA` | 고객 | customer_id, segment, join_date, purchase_count, ltv |
-| `INVENTORY_SCHEMA` | 재고 | product_id, stock_qty, reorder_point, location |
-| `BRAND_SCHEMA` | 브랜드 | brand_id, name, category, origin |
-| `STORE_SCHEMA` | 매장 | store_id, name, location, type, area, open_date |
-| `STAFF_SCHEMA` | 직원 | staff_id, name, store_id, position, hire_date, salary, performance, sales_count, satisfaction |
-
-#### 파생 데이터 스키마 (L3)
-
-| 스키마 상수 | 용도 | 주요 컬럼 |
-|---|---|---|
-| `DASHBOARD_KPI_SCHEMA` | 집계 KPI | total_revenue, total_visits, total_purchases, conversion_rate, sales_per_sqm |
-| `AI_RECOMMENDATION_SCHEMA` | AI 추천 | type, priority, title, description, expected_impact |
-
-### 9.4 엔터프라이즈 스키마 (`enterpriseSchemas.ts`)
-
-#### SCD2 지원 차원 테이블
-
-| 스키마 상수 | Grain | SCD2 | 파티션 | PII 컬럼 |
-|---|---|---|---|---|
-| `SENSOR_FACT_SCHEMA` | 센서 이벤트 | ✗ | `event_date` | ✗ |
-| `CUSTOMER_DIM_SCHEMA` | 고객 | ✓ | ✗ | customer_id, loyalty_tier |
-| `BRAND_DIM_SCHEMA` | 브랜드 | ✓ | ✗ | ✗ |
-| `PRODUCT_DIM_SCHEMA` | 상품 | ✓ | ✗ | ✗ |
-| `SKU_DIM_SCHEMA` | SKU 변형 | ✗ | ✗ | ✗ |
-| `STORE_DIM_SCHEMA` | 매장 | ✓ | ✗ | ✗ |
-| `STAFF_DIM_SCHEMA` | 직원 | ✓ | ✗ | ✗ |
-| `SALES_FACT_SCHEMA` | 매출 | ✗ | ✗ | ✗ |
-
-#### 품질 체크 규칙 예시 (SALES_FACT)
+**위치:** `src/integrations/supabase/client.ts`
 
 ```typescript
-qualityChecks: [
-  'qty > 0',
-  'unit_price >= 0',
-  'net_revenue = qty × unit_price - discount + tax'
-]
+import { createClient } from '@supabase/supabase-js';
+import type { Database } from './types';
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  auth: {
+    storage: localStorage,
+    persistSession: true,
+    autoRefreshToken: true,
+  }
+});
 ```
 
-### 9.5 의존성 그래프 (`dependencyGraph.ts`)
+#### 환경 변수 사용 패턴
 
-#### 내보낸 함수
+| 변수명 | 접두사 패턴 | 값 예시 | 웹사이트(E) 공유 |
+|---|---|---|---|
+| `VITE_SUPABASE_URL` | `VITE_` (Vite 전용) | `https://bdrvowacecxnraaivlhr.supabase.co` | ✅ (동일 Supabase 프로젝트 시) |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | `VITE_` | `eyJhbG...` (anon key) | ✅ |
+| `VITE_SUPABASE_PROJECT_ID` | `VITE_` | `bdrvowacecxnraaivlhr` | ✅ |
 
-| 함수 | 설명 |
+> **주의:** 웹사이트(E)가 Next.js 기반이면 `NEXT_PUBLIC_SUPABASE_URL` 접두사로 변경 필요
+
+#### createClient() 래퍼 함수
+
+| 항목 | 현황 |
 |---|---|
-| `buildDependencyGraph(schemas)` | FK 관계로 의존성 그래프 생성 |
-| `calculateUploadOrder(graph)` | **Kahn's Algorithm** 위상정렬 기반 업로드 순서 계산 |
-| `getTablesByLevel(graph)` | 테이블을 레벨별로 그룹화 (0=독립, 1=1차 의존 ...) |
-| `groupFilesByTable(files)` | 파일을 테이블별로 그룹화 |
-| `checkCanUpload(table, uploaded)` | 특정 테이블 업로드 가능 여부 확인 |
-| `getNextUploadableTables(graph, uploaded)` | 다음 업로드 가능 테이블 목록 반환 |
+| 별도 래퍼 함수 | ❌ 없음 — `createClient()` 직접 호출 |
+| 자동 생성 파일 주석 | `// This file is automatically generated. Do not edit it directly.` |
+| 타입 안전성 | ✅ `Database` 제네릭으로 타입드 클라이언트 |
+| Auth 설정 | `localStorage` 기반 세션 지속 + 자동 토큰 갱신 |
 
-#### 업로드 순서 예시
-
+**모노레포 공유 전략:**
 ```
-Level 0: brands, stores (독립 테이블)
-Level 1: products (→ brands), staff (→ stores)
-Level 2: customers (→ stores), inventory (→ products)
-Level 3: sales (→ products, customers, stores, staff)
+@neuraltwin/supabase
+├── client.ts          ← createClient 래퍼 (환경변수 추상화)
+├── types.ts           ← Database 타입 (11,488줄, 자동 생성)
+└── index.ts           ← 재내보내기
 ```
 
-### 9.6 역할 기반 접근 제어 (`rolePermissions.ts`)
+### 9.3 타입 정의 공유
 
-#### 역할 권한 매트릭스
+#### 전체 타입 파일 인벤토리
 
-| 권한 | NEURALTWIN_MASTER | ORG_HQ | ORG_STORE | ORG_VIEWER |
-|---|:---:|:---:|:---:|:---:|
-| 시스템 관리 | ✓ | ✗ | ✗ | ✗ |
-| 조직 관리 | ✓ | ✓ | ✗ | ✗ |
-| 매장 관리 | ✓ | ✓ | ✗ | ✗ |
-| 고급 분석 | ✓ | ✓ | ✗ | ✗ |
-| AI 기능 | ✓ | ✓ | ✓ | ✗ |
-| ETL / 데이터 관리 | ✓ | ✓ | ✗ | ✗ |
-| 사용자 초대 | ✓ | ✓ | ✓ | ✗ |
-| 라이선스 관리 | ✓ | ✓ | ✗ | ✗ |
+| 타입/인터페이스 | 현재 위치 | 용도 | 웹사이트 필요? | 백엔드 필요? |
+|---|---|---|---|---|
+| **Database** (Supabase 생성) | `src/integrations/supabase/types.ts` (11,488줄) | 40+ 테이블 Row/Insert/Update 타입 | ✅ 필수 | ✅ 필수 |
+| **Json** 헬퍼 타입 | 같은 파일 | Supabase JSON 컬럼 타입 | ✅ | ✅ |
+| **AIRequest, AIRecommendation** 등 18개 | `src/types/ai.types.ts` | AI 추론 요청/응답 타입 | 🟡 일부 (추천 표시 시) | ✅ |
+| **BaseInsight, Alert** 등 8개 | `src/types/analysis.types.ts` | 분석 인사이트 타입 | 🟡 일부 | ✅ |
+| **Vector3D, SceneAsset** 등 28개 | `src/types/scene3d.ts` | 3D 렌더링 전용 | ❌ | ❌ |
+| **DataSource, RetailConcept** 등 18개 | `src/types/retail-ontology.ts` | 온톨로지 데이터 모델 | ❌ | ✅ |
+| **StorageBucket, DataFileType** 등 | `src/lib/storage/types.ts` | Storage 파일 타입 | ❌ | ✅ |
+| **AppRole, LicenseType** | `src/utils/rolePermissions.ts` | RBAC 타입 | ✅ (인증 공유 시) | ✅ |
+| 시뮬레이션 타입 (avatar, iot, overlay) | `src/features/simulation/types/` | 디지털트윈 전용 | ❌ | ❌ |
 
-#### 라이선스 시스템
+#### Supabase Database 타입 상세
 
-| 라이선스 타입 | 대상 역할 | 상태 |
+```
+src/integrations/supabase/types.ts — 11,488줄 (자동 생성)
+├── Json 유틸리티 타입
+├── Database.public.Tables (40+ 테이블)
+│   ├── Row: SELECT 결과 타입
+│   ├── Insert: INSERT 파라미터 타입
+│   └── Update: UPDATE 파라미터 타입
+├── Database.public.Views
+├── Database.public.Functions (RPC 함수 타입)
+├── Database.public.Enums
+└── 헬퍼 타입 (Tables, TablesInsert, TablesUpdate, Enums)
+```
+
+> **핵심:** `Database` 타입은 `supabase gen types` 자동 생성이므로 별도 관리 불필요. 모노레포에서는 `@neuraltwin/supabase` 패키지에서 단일 관리.
+
+#### 공유 패키지 분리 권장
+
+```
+@neuraltwin/types
+├── ai.types.ts          ← AI 추론 타입 (웹사이트 + 백엔드)
+├── analysis.types.ts    ← 분석 타입 (웹사이트 + 백엔드)
+├── auth.types.ts        ← 역할/라이선스 타입 (웹사이트 + 백엔드)
+└── index.ts
+
+@neuraltwin/supabase
+├── types.ts             ← Database 타입 (자동 생성, 전체 공유)
+├── client.ts            ← 클라이언트 초기화
+└── index.ts
+
+(대시보드 전용 — 공유 불필요)
+├── scene3d.ts           ← 3D 전용 타입
+├── retail-ontology.ts   ← 온톨로지 전용 타입
+└── simulation/types/    ← 시뮬레이션 전용 타입
+```
+
+### 9.4 유틸리티 함수
+
+#### A. 공유 가능한 유틸리티
+
+| 함수명 | 현재 위치 | 용도 | 공유 가능? | 비고 |
+|---|---|---|---|---|
+| `cn(...inputs)` | `src/lib/utils.ts` | Tailwind 클래스 병합 (`clsx` + `tailwind-merge`) | ✅ 필수 공유 | 모든 컴포넌트에서 사용 |
+| `formatCurrency(value, unit)` | `src/features/insights/components/MetricCard.tsx` | 한국 원화 포맷 (`₩1,000원`, `₩100만`) | ✅ 공유 권장 | 웹사이트에서도 가격 표시 필요 |
+| `formatPercent(value, decimals)` | 같은 파일 | 퍼센트 포맷 (`12.3%`) | ✅ 공유 권장 | |
+| `formatNumber(value)` | 같은 파일 | 숫자 포맷 (`1,234`) | ✅ 공유 권장 | |
+| `formatDuration(seconds)` | 같은 파일 | 시간 포맷 (`2분 30초`) | ✅ 공유 권장 | |
+| `parseCSV(text)` | `src/lib/storage/parser.ts` | CSV 파싱 | 🟡 대시보드 전용 | |
+| `parseJSON(text)` | 같은 파일 | JSON 파싱 | 🟡 대시보드 전용 | |
+| `validateData(data, fields)` | 같은 파일 | 데이터 유효성 검증 | 🟡 대시보드 전용 | |
+| `hasPermission(role, perm)` | `src/utils/rolePermissions.ts` | RBAC 권한 확인 | ✅ 공유 권장 | 인증 공유 시 |
+| `validateLicenseForRole(...)` | 같은 파일 | 라이선스 검증 | ✅ 공유 권장 | |
+
+#### B. 대시보드 전용 유틸리티 (공유 불필요)
+
+| 함수명 | 현재 위치 | 이유 |
 |---|---|---|
-| `HQ_SEAT` | ORG_HQ | ACTIVE, ASSIGNED, SUSPENDED, EXPIRED, REVOKED |
-| `STORE` | ORG_STORE | ACTIVE, ASSIGNED, SUSPENDED, EXPIRED, REVOKED |
+| `normalizeData(rawData, schema)` | `src/utils/dataNormalizer.ts` | 데이터 ETL 전용 |
+| `buildDependencyGraph(schemas)` | `src/utils/dependencyGraph.ts` | 업로드 순서 계산 전용 |
+| SALES_SCHEMA, ZONE_SCHEMA 등 | `src/utils/dataSchemas.ts` | 데이터 관리 전용 |
+| 엔터프라이즈 스키마 전체 | `src/utils/enterpriseSchemas.ts` | 데이터 관리 전용 |
 
-### 9.7 라이브러리 (`src/lib/`)
+#### C. 날짜 포맷팅 현황
 
-#### `lib/utils.ts`
+| 항목 | 현황 |
+|---|---|
+| 전용 날짜 포맷 함수 | ❌ 없음 — `toLocaleDateString()` 인라인 사용 |
+| 날짜 라이브러리 (dayjs, date-fns 등) | ❌ 미사용 |
+| 현재 패턴 | `new Date().toLocaleString('ko-KR')` 직접 호출 |
+
+> **권장:** `@neuraltwin/lib/format.ts`로 포맷 유틸리티 중앙화
+
+#### D. 숫자 포맷팅 현황
+
+| 패턴 | 사용 위치 | 비고 |
+|---|---|---|
+| `formatCurrency()` (MetricCard) | insights 탭 5개 | 중앙화된 함수 |
+| `formatCurrency()` (useROITracking) | hooks/useROITracking.ts | **별도 중복 정의** (동일 이름, 다른 로직) |
+| `₩${value.toLocaleString()}원` | OverviewTab.tsx | **인라인 중복** |
+| `value.toLocaleString()` | 20+ 파일 | 인라인 사용 |
+
+> **문제:** `formatCurrency`가 2곳에 다르게 정의되어 있음. 공유 패키지로 통합 필요.
+
+### 9.5 tailwind.config 비교 준비
+
+#### 현재 커스텀 설정 전체
+
+**파일:** `tailwind.config.ts`
+
+##### 색상 시스템
+
+```
+모든 색상은 CSS 변수 기반 — hsl(var(--token)) 패턴
+├── 시맨틱: background, foreground, border, input, ring
+├── 브랜드: primary (DEFAULT, foreground, glow, dark)
+├── 역할: secondary, destructive, muted, accent
+├── 컨테이너: popover, card
+└── 사이드바: sidebar (8가지 변형 — DEFAULT, foreground, primary, primary-foreground, accent, accent-foreground, border, ring)
+```
+
+> **이점:** CSS 변수 기반이므로 웹사이트(E)에서 변수값만 변경하면 다른 테마 적용 가능
+
+##### 폰트 설정
+
+| 토큰 | 폰트 스택 | 웹사이트 공유 |
+|---|---|---|
+| `font-sans` | system-ui, sans-serif 등 | ✅ |
+| `font-pretendard` | Pretendard, sans-serif | ✅ (한글 최적화) |
+| `font-inter` | Inter, sans-serif | ✅ (영문/숫자) |
+| `font-serif` | Georgia, Times 등 | ✅ |
+| `font-mono` | SFMono-Regular, Menlo 등 | ✅ |
+
+##### 애니메이션 (13개)
+
+| 애니메이션 | 웹사이트 공유 |
+|---|---|
+| `accordion-down/up` | ✅ |
+| `fade-in/out` | ✅ |
+| `scale-in/out` | ✅ |
+| `slide-in-right/left`, `slide-up` | ✅ |
+| `pulse-glow` | ✅ (브랜드 효과) |
+| `shimmer` | ✅ (로딩 효과) |
+| `float` | ✅ (장식 효과) |
+| `enter/exit` | ✅ (전환 효과) |
+
+##### 기타 커스텀
+
+| 항목 | 설정 | 웹사이트 공유 |
+|---|---|---|
+| `container` | center: true, padding: 2rem, max-width: 1400px | ✅ |
+| `borderRadius` | CSS 변수 기반 (lg/md/sm) | ✅ |
+| `boxShadow` | CSS 변수 기반 (2xs~2xl 7단계) | ✅ |
+| `darkMode` | `["class"]` — 클래스 기반 | ✅ |
+
+##### 플러그인
+
+| 플러그인 | 용도 | 웹사이트 공유 |
+|---|---|---|
+| `tailwindcss-animate` | 애니메이션 유틸리티 | ✅ |
+
+##### 모노레포 공유 전략
+
+```
+@neuraltwin/ui
+├── tailwind.preset.ts    ← 공유 프리셋 (colors, fonts, animations, plugins)
+├── globals.css           ← CSS 변수 정의 (--primary, --background 등)
+└── components/           ← shadcn/ui 컴포넌트
+
+apps/dashboard/tailwind.config.ts → preset: ['@neuraltwin/ui/tailwind.preset']
+apps/website/tailwind.config.ts   → preset: ['@neuraltwin/ui/tailwind.preset']
+```
+
+> **결론:** tailwind.config.ts의 커스텀 설정이 모두 CSS 변수 기반이므로, **프리셋으로 분리 후 CSS 변수값만 앱별로 변경**하면 디자인 시스템 통합이 용이합니다.
+
+### 9.6 공유 가능성 종합 매트릭스
+
+| 카테고리 | 공유율 | 상세 |
+|---|---:|---|
+| **UI 컴포넌트** (shadcn/ui) | 95% | 49개 표준 + Glass3DCard 커스텀 — 거의 전부 공유 가능 |
+| **Supabase 클라이언트** | 90% | 초기화 패턴 공유, 환경 변수 접두사만 변경 (VITE_→NEXT_PUBLIC_) |
+| **Tailwind 설정** | 80% | CSS 변수 기반 — 프리셋으로 분리 후 테마값만 앱별 커스텀 |
+| **알림/Toast 시스템** | 70% | Sonner 기반 공유 가능, `next-themes` 의존성 정리 필요 |
+| **포맷 유틸리티** | 60% | `cn()`, `formatCurrency`, `formatPercent` 등 — 중복 정의 통합 필요 |
+| **타입 정의** | 40% | `Database`, `analysis.types`, `auth` 타입만 — 3D/온톨로지 타입은 대시보드 전용 |
+| **데이터 유틸리티** | 30% | Storage 라이브러리만 공유 가능, 스키마/정규화는 대시보드 전용 |
+| **Error Boundary** | 0% | ❌ 미존재 — 공통 컴포넌트 신규 생성 필요 |
+
+> **결론:** UI 레이어의 약 **80%** 를 모노레포 공유 패키지로 추출 가능합니다. 데이터/비즈니스 로직 레이어는 대시보드 전용이 대부분이므로 별도 관리가 적합합니다.
+
+---
+
+## 섹션 10: 빌드 & 배포
+
+### 10.1 빌드 명령어
+
+| 명령어 | 설명 | 비고 |
+|---|---|---|
+| `npm run dev` | Vite 개발 서버 (포트 8080, HMR) | SWC 기반 Fast Refresh |
+| `npm run build` | 프로덕션 빌드 | `vite build` |
+| `npm run build:dev` | 개발 모드 빌드 | `vite build --mode development` |
+| `npm run lint` | ESLint 린트 | `eslint .` |
+| `npm run preview` | 빌드 결과 로컬 프리뷰 | `vite preview` |
+
+### 10.2 빌드 출력 (`dist/`)
+
+> **참고:** 이 프로젝트는 Next.js가 아닌 **Vite SPA**입니다. 출력 디렉토리는 `.next/`가 아닌 `dist/`입니다.
+
+```
+dist/
+├── index.html                      2.07 KB (gzip: 0.99 KB)
+├── favicon.ico                     16 KB
+├── placeholder.svg                 3.2 KB
+├── robots.txt                      160 B
+├── lighting-presets/
+│   ├── cool-modern.json            554 B
+│   ├── dramatic-spot.json          773 B
+│   └── warm-retail.json            685 B
+└── assets/
+    ├── index-CN1jdXzu.js           3,608.70 KB (gzip: 1,067.95 KB) ⚠️
+    └── index-V0WuZEg0.css         130.88 KB (gzip: 21.42 KB)
+
+총 용량: ~3.7 MB (gzip: ~1.1 MB)
+```
+
+#### 빌드 경고
+
+```
+⚠️ Some chunks are larger than 500 kB after minification.
+```
+
+**원인:** 코드 스플리팅 미적용 — 단일 JS 번들(3.6MB)로 전체 앱이 번들링됨
+
+**개선 방안:**
+1. `React.lazy()` + `Suspense`로 라우트별 코드 스플리팅
+2. `build.rollupOptions.output.manualChunks`로 벤더 분리 (three.js ~800KB, recharts ~300KB)
+3. Three.js 관련 모듈 동적 import (Studio 페이지 진입 시에만 로드)
+
+### 10.3 빌드 시간
+
+| 환경 | 빌드 시간 | 모듈 수 |
+|---|---:|---:|
+| **Production** (`npm run build`) | ~24초 | 3,973개 |
+| **Development** (`npm run build:dev`) | ~30초 | 3,973개 |
+
+### 10.4 빌드 도구 설정 (`vite.config.ts`)
 
 ```typescript
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
+export default defineConfig(({ mode }) => ({
+  server: {
+    host: "::",      // IPv6 + IPv4 듀얼스택
+    port: 8080,      // 개발 서버 포트
+  },
+  plugins: [
+    react(),                                    // @vitejs/plugin-react-swc
+    mode === "development" && componentTagger()  // lovable-tagger (개발 전용)
+  ].filter(Boolean),
+  resolve: {
+    alias: { "@": path.resolve(__dirname, "./src") }  // @/ → src/
+  },
+}));
 ```
 
-- `clsx` + `tailwind-merge` 조합으로 Tailwind CSS 클래스 충돌 해결
-- 전체 프로젝트에서 가장 많이 사용되는 유틸리티
+**특이사항:**
+- 코드 스플리팅 설정 없음 (`rollupOptions` 미사용)
+- Chunk 크기 제한 설정 없음 (`chunkSizeWarningLimit` 미설정)
+- Source map 설정 없음 (프로덕션 디버깅 불가)
+- `lovable-tagger`: Lovable 플랫폼 전용 컴포넌트 태깅 (개발 모드에서만 활성화)
 
-#### `lib/storage/types.ts` — 스토리지 타입 정의
+### 10.5 배포 대상
 
-| 타입 | 설명 |
+| 항목 | 현재 상태 | 설명 |
+|---|---|---|
+| **배포 플랫폼** | Lovable (추정) | `lovable-tagger` dev dependency, Vite SPA 구조 |
+| **대안 1** | Vercel | Vite SPA 호환, 정적 자산 CDN 제공 |
+| **대안 2** | Netlify | `dist/` 폴더 직접 배포, `_redirects` 파일 필요 (SPA fallback) |
+| **대안 3** | AWS S3 + CloudFront | 정적 호스팅 + CDN |
+| **대안 4** | 자체 서버 (Nginx) | `dist/` 정적 서빙 + SPA fallback 설정 |
+
+**SPA 라우팅 요구사항:** 모든 경로를 `index.html`로 리다이렉트 필요 (React Router 클라이언트 사이드 라우팅)
+
+### 10.6 CI/CD 설정
+
+| 항목 | 상태 | 설명 |
+|---|---|---|
+| **GitHub Actions** | ❌ 없음 | `.github/workflows/` 디렉토리 없음 |
+| **CODEOWNERS** | ✅ 있음 | 3명 개발자 역할 기반 코드 소유권 정의 |
+| **PR 템플릿** | ✅ 있음 | 변경 유형, 테스트 체크리스트, 리뷰어 가이드 포함 |
+
+#### CODEOWNERS 역할 분담
+
+| 역할 | 담당 | 영역 |
+|---|---|---|
+| 🟦 @dev-a | UI/UX | 공유 Chat UI, 웹/OS 챗봇 UI, App.tsx 라우팅 |
+| 🟩 @dev-b | Web Bot | 웹사이트 챗봇 Edge Function, 훅 |
+| 🟧 @dev-c | OS Bot | OS 챗봇 Edge Function, 공유 EF 유틸리티 |
+| 🟪 전원 | 공유 | 타입 정의, DB 스키마, 프로젝트 설정 |
+
+#### PR 리뷰 정책
+
+| 변경 영역 | 필요 승인 수 |
 |---|---|
-| `StorageBucket` | `'store-data'` \| `'3d-models'` |
-| `DataFileType` | customers, products, purchases, visits, staff, brands, stores, wifi_sensors, wifi_tracking 등 |
-| `CustomerData`, `ProductData`, `PurchaseData`, `VisitData`, `StaffData` | 각 데이터 행 인터페이스 |
-| `WiFiSensorData`, `WiFiTrackingData` | IoT 센서 데이터 인터페이스 |
-| `StoreDataset` | 전체 데이터셋 (모든 DataFileType 통합) |
-| `LoadOptions` | `{ skipCache?: boolean; signal?: AbortSignal }` |
-| `LoadResult<T>` | `{ data: T[]; source: 'storage' \| 'cache'; loadedAt: Date; error?: string }` |
+| 본인 영역 | Self-merge 가능 |
+| 공유 타입 | 영향 받는 개발자 1명 이상 |
+| DB 스키마 | 2명 |
+| 프로젝트 설정 | 2명 (전원) |
 
-#### `lib/storage/parser.ts` — 파일 파서
+### 10.7 환경별 설정
 
-| 함수 | 설명 |
-|---|---|
-| `parseCSV(text)` | CSV 텍스트 파싱 (헤더 자동 감지, 타입 자동 변환) |
-| `parseJSON(text)` | JSON 파싱 |
-| `validateData(data, requiredFields)` | 필수 필드 유효성 검증 |
-| `cleanData(data)` | null/undefined/빈값 제거 |
-| `inferDataType(filename)` | 파일명으로 DataFileType 추론 |
+| 환경 | 감지 방법 | 용도 |
+|---|---|---|
+| **Development** | `import.meta.env.DEV === true` | 개발 서버 모드 감지, 디버그 로깅, Mock 데이터 |
+| **Production** | `import.meta.env.PROD === true` | 프로덕션 빌드 |
+| **Mode** | `import.meta.env.MODE` | `'development'` 또는 `'production'` |
+
+**환경별 분기 사용 위치 (13개 참조):**
+
+| 파일 | 변수 | 용도 |
+|---|---|---|
+| `integrations/supabase/client.ts` | `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase 연결 |
+| `hooks/useAuth.tsx` | `import.meta.env.DEV` | 개발 모드 디버그 로깅 |
+| `data-control/components/DataImportWidget.tsx` | `VITE_SUPABASE_URL` (6회) | Edge Function 직접 호출 URL 구성 |
+| `data-control/components/ImportHistoryWidget.tsx` | `VITE_SUPABASE_URL` | Edge Function URL |
+| `studio/services/environmentDataService.ts` | `VITE_OPENWEATHERMAP_API_KEY` 등 3개 | 외부 API 키 |
+
+> **주의:** `process.env`는 사용되지 않습니다. Vite의 `import.meta.env.*` 패턴만 사용합니다.
+
 
 ---
 
-## 섹션 10: 커스텀 훅 상세
+## 섹션 11: 특이사항 & 기술 부채
 
-### 10.1 훅 분류 및 개요
+> 모노레포 통합 시 주의해야 할 항목들
 
-> 총 **50+ 커스텀 훅** — 7개 분류 기준
+### 11.1 하드코딩된 값
 
-| 분류 | 훅 수 | 주요 패턴 |
-|---|---:|---|
-| 인증 & 컨텍스트 | 2 | React Context + Supabase Auth |
-| AI & ML 추론 | 12+ | useMutation + Edge Function |
-| 데이터 조회 | 15+ | useQuery + Supabase Client |
-| ROI & 목표 | 8+ | useQuery + useMutation |
-| 시뮬레이션 | 5+ | useMutation + Zustand Store |
-| 데이터 관리 | 8+ | useMutation (CRUD) |
-| 유틸리티 | 5+ | 순수 React Hook |
+#### 하드코딩된 URL (22개)
 
-### 10.2 인증 & 컨텍스트 훅
-
-#### `useAuth()` — 통합 인증 훅
-
-| 반환값 | 타입 | 설명 |
-|---|---|---|
-| `user` | `User \| null` | 현재 로그인 사용자 |
-| `session` | `Session \| null` | 활성 세션 |
-| `orgId` | `string \| null` | 소속 조직 ID |
-| `orgName` | `string \| null` | 조직명 |
-| `role` | `AppRole` | 역할 (NEURALTWIN_MASTER, ORG_HQ, ORG_STORE, ORG_VIEWER) |
-| `licenseId` / `licenseType` / `licenseStatus` | `string` | 라이선스 정보 |
-| `signIn(email, pw)` | `Promise` | 이메일 로그인 |
-| `signUp(email, pw, name)` | `Promise` | 회원가입 |
-| `signOut()` | `Promise` | 로그아웃 |
-| `signInWithGoogle()` / `signInWithKakao()` | `Promise` | OAuth 소셜 로그인 |
-| `resetPassword(email)` | `Promise` | 비밀번호 초기화 |
-| `canAccessFeature(feature)` | `boolean` | 권한 확인 |
-| `isNeuralTwinMaster` / `isOrgHQ` / `isOrgStore` / `isOrgViewer` | `boolean` | 역할 확인 헬퍼 |
-
-**패턴**: React Context + `onAuthStateChange` 구독 + 조직/라이선스 자동 로드
-
-#### `useSelectedStore()` — 매장 선택 훅
-
-| 반환값 | 타입 | 설명 |
-|---|---|---|
-| `selectedStore` | `Store \| null` | 현재 선택된 매장 |
-| `stores` | `Store[]` | 조직의 전체 매장 목록 |
-| `setSelectedStore(store)` | `void` | 매장 선택 변경 |
-| `loading` | `boolean` | 로딩 상태 |
-| `refreshStores()` | `void` | 매장 목록 새로고침 |
-
-**패턴**: React Context + Supabase Realtime 구독 (실시간 매장 변경 감지)
-
-### 10.3 AI & ML 훅
-
-#### `useAI()` — 통합 AI 추론 (12가지 추론 타입)
-
-```
-지원 타입:
-├─ generate_recommendations    ← 추천 생성
-├─ ontology_recommendation     ← 온톨로지 기반 추천
-├─ anomaly_detection           ← 이상 탐지
-├─ pattern_analysis            ← 패턴 분석
-├─ infer_relations             ← 관계 추론
-├─ layout_optimization         ← 레이아웃 최적화
-├─ zone_analysis               ← 구역 분석
-├─ traffic_flow                ← 동선 분석
-├─ demand_forecast             ← 수요 예측
-├─ inventory_optimization      ← 재고 최적화
-├─ cross_sell                  ← 교차 판매
-└─ customer_segmentation       ← 고객 세분화
-```
-
-**라우팅 로직**: 타입에 따라 `unified-ai` 또는 `retail-ai-inference` Edge Function 자동 선택
-
-#### `useRetailAI()` — 리테일 AI 추론 (Gemini 2.5 Flash)
-
-| 편의 훅 | 추론 타입 | 결과 |
-|---|---|---|
-| `useDemandForecast()` | 수요 예측 | 7~30일 일일 예측 + 신뢰 구간 |
-| `useRiskPrediction()` | 리스크 예측 | stockout, overstock, demand_spike, conversion_drop |
-| `useOptimizationSuggestions()` | 최적화 제안 | 가격/재고 최적화 액션 |
-| `useSeasonTrend()` | 시즌 트렌드 | 시즌별 영향도 분석 |
-
-#### AI 훅 추가 목록
-
-| 훅 | 파일 | 용도 |
-|---|---|---|
-| `useSimulationAI()` | `useAI.ts` | 시뮬레이션 기반 분석 |
-| `useGenerateRecommendations()` | `useAI.ts` | AI 추천 생성 |
-| `useOntologyRecommendation()` | `useAI.ts` | 온톨로지 기반 추천 |
-| `useInferRelations()` | `useAI.ts` | 데이터 관계 추론 |
-| `useAnomalyDetection()` | `useAI.ts` | 이상치 탐지 |
-| `usePatternAnalysis()` | `useAI.ts` | 패턴 분석 |
-| `useAIInferenceHistory()` | `useAI.ts` | AI 추론 이력 조회 |
-| `useAIRecommendations()` | `useAI.ts` | AI 추천 목록 조회 |
-
-### 10.4 데이터 조회 훅
-
-#### `useStoreData` — 통합 매장 데이터
-
-| 훅 | 반환 타입 | staleTime | 데이터 소스 |
-|---|---|---:|---|
-| `useStoreDataFile(type)` | `LoadResult<T>` | 2분 | DB (테이블 직접 조회) |
-| `useStoreDataset()` | `StoreDataset` | 2분 | 병렬 로드 (모든 타입) |
-| `useMultipleStoreDataFiles(types)` | `LoadResult<T>[]` | 2분 | 병렬 로드 |
-| `useCustomers()` | `CustomerData[]` | 5분 | customers 테이블 |
-| `useProducts()` | `ProductData[]` | 5분 | products 테이블 |
-| `usePurchases()` | `PurchaseData[]` | 2분 | purchases + products JOIN |
-| `useVisits()` | `VisitData[]` | 2분 | store_visits 테이블 |
-| `useStaff()` | `StaffData[]` | 5분 | staff 테이블 |
-| `useWiFiSensors()` | `WiFiSensorData[]` | 2분 | wifi_sensors 테이블 |
-| `useWiFiTracking()` | `WiFiTrackingData[]` | 2분 | wifi_tracking 테이블 |
-| `useRefreshStoreData()` | `mutation` | — | 캐시 무효화 + 재조회 |
-
-#### `useDashboardKPI()` — KPI 조회
-
-| 훅 | 매개변수 | 데이터 소스 |
-|---|---|---|
-| `useDashboardKPI(storeId, date)` | 매장 ID + 날짜 | `daily_kpis_agg` (L3) |
-| `useLatestKPIs(storeId, days)` | 매장 ID + 최근 N일 | `daily_kpis_agg` |
-| `useKPIsByDateRange(storeId, start, end)` | 기간 범위 | `daily_kpis_agg` |
-
-**반환 데이터**: total_revenue, total_visits, total_purchases, conversion_rate, sales_per_sqm, funnel_entry/browse/fitting/purchase/return
-
-#### `useZoneMetrics()` — 구역 분석
-
-| 훅 | 데이터 소스 |
-|---|---|
-| `useZoneDailyMetrics(storeId, date)` | `zone_daily_metrics` |
-| `useZoneMetricsByDateRange(storeId, start, end)` | `zone_daily_metrics` |
-| `useZoneEvents(storeId, zoneId)` | `zone_events` |
-| `useZoneHeatmapData(storeId, date)` | `zone_daily_metrics` (히트맵용 변환) |
-| `useZonesDim(storeId)` | `zones_dim` |
-
-### 10.5 캐싱 전략 (React Query)
-
-| 데이터 분류 | staleTime | gcTime | 예시 |
-|---|---:|---:|---|
-| 실시간 데이터 | 2분 | 5분 | 방문, 구매, WiFi, 데이터 파일 |
-| 마스터 데이터 | 5분 | 5분 | 상품, 고객, 직원 |
-| AI 분석 결과 | 10분 | 5분 | 추천, 이상탐지, 패턴 |
-| 시즌 트렌드 | 30분 | 5분 | 시즌 분석, 트렌드 |
-
-#### 캐시 관리 — `useClearCache()`
-
-| 함수 | 설명 |
-|---|---|
-| `clearAllCache()` | 전체 React Query 캐시 + localStorage 초기화 |
-| `clearStoreDataCache(storeId)` | 특정 매장 데이터만 초기화 |
-| `invalidateStoreData(storeId)` | 캐시 무효화 및 자동 재조회 |
-
-**무효화 키**: `store-data`, `store-dataset`, `dashboard-kpis`, `ai-recommendations`, `ontology-data`
-
-### 10.6 유틸리티 훅
-
-#### `useCountUp()` — 숫자 카운팅 애니메이션
-
-| 매개변수 | 기본값 | 설명 |
-|---|---|---|
-| `end` | — | 목표 숫자 |
-| `duration` | 1500ms | 애니메이션 길이 |
-| `decimals` | 0 | 소수점 자릿수 |
-| `delay` | 0ms | 시작 지연 |
-| `enabled` | true | 활성화 여부 |
-| `preserveValue` | false | 리렌더 시 값 유지 |
-
-- **이징 함수**: `easeOutQuart` — `1 - (1 - t)^4` (자연스러운 감속)
-- **포맷 버전**: `useFormattedCountUp(end, formatter, options)` — 포맷 함수 적용 가능
-
----
-
-## 섹션 11: UI 디자인 시스템 & 피처 플래그
-
-### 11.1 Tailwind CSS 커스텀 설정
-
-#### 색상 시스템 (CSS 변수 기반)
-
-```
-┌─── 시맨틱 색상 ────────────────────────────────────┐
-│ background / foreground    기본 배경/전경          │
-│ primary (DEFAULT, foreground, glow, dark)  주요 색상│
-│ secondary (DEFAULT, foreground)            보조 색상│
-│ destructive (DEFAULT, foreground)          경고 색상│
-│ muted (DEFAULT, foreground)               약한 색상│
-│ accent (DEFAULT, foreground)              강조 색상│
-│ border / input / ring                     테두리   │
-│ popover (DEFAULT, foreground)             팝오버   │
-│ card (DEFAULT, foreground)                카드     │
-│ sidebar (8가지 변형)                       사이드바  │
-└──────────────────────────────────────────────────┘
-```
-
-> 모든 색상은 `hsl(var(--token))` 형식으로 CSS 변수를 참조하여 다크/라이트 모드 전환이 가능합니다.
-
-#### 커스텀 폰트
-
-| 토큰 | 폰트 스택 | 용도 |
-|---|---|---|
-| `font-sans` | ui-sans-serif, system-ui, sans-serif | 기본 |
-| `font-pretendard` | Pretendard, sans-serif | 한글 최적화 |
-| `font-inter` | Inter, sans-serif | 영문 / 숫자 |
-| `font-serif` | ui-serif, Georgia, Cambria | 장식용 |
-| `font-mono` | ui-monospace, SFMono-Regular, Menlo | 코드 |
-
-#### 커스텀 애니메이션
-
-| 이름 | 지속시간 | 이징 | 반복 | 용도 |
+| # | 파일 | 유형 | URL / 패턴 | 심각도 |
 |---|---|---|---|---|
-| `accordion-down/up` | 0.3s | ease-out | 1회 | 아코디언 열기/닫기 |
-| `fade-in/out` | 0.3s | ease-out | 1회 | 페이드 + Y 이동 |
-| `scale-in/out` | 0.2s | ease-out | 1회 | 스케일 전환 |
-| `slide-in-right/left` | 0.3s | ease-out | 1회 | 슬라이드 진입 |
-| `slide-up` | 0.4s | ease-out | 1회 | 아래→위 슬라이드 |
-| `pulse-glow` | 2s | cubic-bezier | ∞ | 글로우 맥동 효과 |
-| `shimmer` | 2s | linear | ∞ | 로딩 쉬머 |
-| `float` | 3s | ease-in-out | ∞ | 떠다니는 효과 |
-| `enter` | 0.3s+0.2s | ease-out | 1회 | fade-in + scale-in 복합 |
-| `exit` | 0.3s+0.2s | ease-out | 1회 | fade-out + scale-out 복합 |
+| 1-5 | `simulation/utils/modelLayerLoader.ts:587-591` | Supabase Storage | `https://bdrvowacecxnraaivlhr.supabase.co/storage/.../*.glb` (5개) | 🔴 높음 |
+| 6 | `data-control/constants/providers.ts:42-114` | 외부 문서 | POS/CRM/ERP 공급자 문서 URL 8개 | 🟡 낮음 |
+| 7 | `studio/services/environmentDataService.ts:34` | 외부 API | `https://api.openweathermap.org/data/2.5` | 🟡 중간 |
+| 8 | `core/pages/AuthPage.tsx:53` | 마케팅 | `https://www.neuraltwin.ai/pricing` | 🟡 낮음 |
+| 9-11 | `data-control/components/*.tsx` | 플레이스홀더 | `https://api.example.com/*` (3개) | ⚪ 무해 |
 
-#### 컨테이너 & 반응형
+#### 하드코딩된 API 경로 (7개)
 
-```
-container:
-  center: true
-  padding: 2rem
-  max-width (2xl): 1400px
-
-borderRadius:
-  lg: var(--radius)
-  md: calc(var(--radius) - 2px)
-  sm: calc(var(--radius) - 4px)
-
-boxShadow: CSS 변수 기반 (2xs → 2xl 7단계)
-```
-
-### 11.2 Glassmorphism 디자인 언어
-
-#### Glass3DCard 컴포넌트 (`src/components/ui/glass-card.tsx`)
-
-**구조** (다층 레이어):
-
-```
-┌─ 1. Outer Border Gradient (1.5px padding) ────────────┐
-│ ┌─ 2. Inner Content (backdrop-blur: 80px) ──────────┐ │
-│ │ ┌─ 3. Chrome Highlight (top edge) ──────────────┐ │ │
-│ │ │ ┌─ 4. Chrome Left Edge ────────────────────┐  │ │ │
-│ │ │ │ ┌─ 5. Surface Reflection (55% height) ┐ │  │ │ │
-│ │ │ │ │                                      │ │  │ │ │
-│ │ │ │ │    [ children 콘텐츠 영역 ]            │ │  │ │ │
-│ │ │ │ │                                      │ │  │ │ │
-│ │ │ │ └──────────────────────────────────────┘ │  │ │ │
-│ │ │ └──────────────────────────────────────────┘  │ │ │
-│ │ ├─ 6. Bottom Shadow Gradient ───────────────────┤ │ │
-│ │ └───────────────────────────────────────────────┘ │ │
-│ └───────────────────────────────────────────────────┘ │
-└───────────────────────────────────────────────────────┘
-```
-
-**서브 컴포넌트:**
-
-| 컴포넌트 | 용도 | 기본 크기 |
+| 파일 | 경로 패턴 | 대상 |
 |---|---|---|
-| `Glass3DCard` | 메인 카드 컨테이너 | 자동 |
-| `Icon3D` | 3D 입체 아이콘 컨테이너 | 48×48px |
-| `Badge3D` | 3D 입체 뱃지 | 인라인 |
+| `data-control/types/index.ts:306-442` | `/sap/opu/odata/...` (2개) | SAP ERP |
+| 같은 파일 | `/services/rest/record/...` (2개) | NetSuite |
+| 같은 파일 | `/admin/api/2024-01/...` (1개) | Shopify |
+| 같은 파일 | `/api/v1/inventory*` (2개) | 일반 ERP |
 
-**타이포그래피 스타일 객체** (`text3DStyles`):
+#### 환경별 분기 처리
 
-| 스타일 | 굵기 | 자간 | 용도 |
+- `import.meta.env.*` **13개 참조** — 모두 Vite 전용 패턴
+- `process.env` **0개** — 미사용
+- `NODE_ENV` **0개** — 미사용
+- 모노레포 이동 시 번들러 변경 없으면 영향 없음. Next.js 전환 시 `process.env.NEXT_PUBLIC_*`로 변경 필요
+
+### 11.2 3D 에셋 관련
+
+| 항목 | 현황 |
+|---|---|
+| 로컬 .glb/.gltf 파일 | **0개** — public/ 디렉토리에 3D 모델 파일 없음 |
+| 코드 내 .glb 참조 | **29개** — 모두 Supabase Storage URL 또는 DB 레코드 |
+| 코드 내 .gltf 참조 | **11개** |
+| 코드 내 .obj/.fbx 참조 | **1개씩** |
+| 업로드 지원 형식 | `.glb, .gltf, .fbx, .obj, .dae` |
+| 에셋 저장 위치 | Supabase Storage (`3d-models` 버킷) |
+| Git LFS 설정 | ❌ **미설정** — `.gitattributes` 없음 |
+
+**권장사항:**
+- 현재 3D 에셋이 모두 Supabase Storage에 있어 Git LFS는 즉시 필요하지 않음
+- 향후 로컬 에셋 추가 시 `.gitattributes`에 `*.glb filter=lfs diff=lfs merge=lfs -text` 설정 필요
+- 하드코딩된 5개 기본 모델 URL을 환경 변수 또는 설정 파일로 분리 필요
+
+### 11.3 의존성 이슈
+
+| 이슈 | 심각도 | 설명 |
+|---|---|---|
+| `next-themes` ^0.3.0 | 🟡 중간 | Next.js 전용 라이브러리를 Vite 프로젝트에서 사용. `sonner.tsx`에서 1곳 import. 커스텀 ThemeProvider로 대체 권장 |
+| `three` ^0.160.1 ↔ `@react-three/fiber` ^8.18.0 | 🟡 주의 | Three.js는 빠르게 업데이트되어 마이너 버전에도 Breaking Change 가능. 버전 고정 권장 |
+| `zod` ^4.1.12 | 🟡 주의 | Zod v4는 비교적 최신 메이저. 일부 생태계 라이브러리와 호환성 확인 필요 |
+| `store/` vs `stores/` 디렉토리 | ⚪ 구조 | 두 개의 Zustand 스토어 디렉토리 공존 (혼동 가능) |
+| peer dependency 충돌 | ✅ 없음 | `npm ls` 검사 결과 peer dependency 이슈 없음 |
+
+### 11.4 SSR 관련
+
+| 항목 | 현황 | 영향도 |
+|---|---|---|
+| `window.*` 참조 | **371개** (50+ 파일) | 🔴 높음 |
+| `document.*` 참조 | 위 371개에 포함 | 🔴 높음 |
+| `React.lazy()` 사용 | **0개** | — |
+| `dynamic import()` 사용 | **2개** | 🟢 낮음 |
+
+**window/document 주요 사용 패턴:**
+
+| 패턴 | 대략적 횟수 | 설명 |
+|---|---|---|
+| `document.documentElement.classList` | ~120 | 다크모드 감지/토글 |
+| `window.location.*` | ~15 | 경로, origin, href |
+| `window.addEventListener` | ~15 | 이벤트 리스너 |
+| `document.body.style` | ~4 | 스타일 직접 조작 |
+| `document.getElementById('root')` | 1 | React 마운트 (main.tsx) |
+
+**SSR 전환 시 필요 작업:**
+1. `typeof window !== 'undefined'` 가드 추가 (~50개 파일)
+2. 다크모드 감지를 서버 호환 로직으로 교체
+3. Three.js 관련 컴포넌트를 `'use client'` 또는 `next/dynamic`으로 래핑
+4. Canvas 렌더링 컴포넌트 (Glow* 차트) 클라이언트 전용 분리
+
+### 11.5 테스트 현황
+
+| 항목 | 상태 |
+|---|---|
+| **테스트 파일** (`*.test.*`, `*.spec.*`) | ❌ **0개** — 테스트 파일 없음 |
+| **테스트 프레임워크** (jest, vitest, cypress 등) | ❌ 미설치 |
+| **테스트 커버리지** | N/A |
+| **E2E 테스트** | ❌ 없음 |
+| **PR 템플릿 테스트 체크리스트** | ✅ 있음 (수동 체크) |
+
+**테스트 체크리스트 (PR 템플릿 기반, 수동):**
+- 타입 체크 (`npm run typecheck` 또는 IDE)
+- 빌드 성공 (`npm run build`)
+- 린트 통과 (`npm run lint`)
+- 브라우저 동작 확인 / 반응형 / 다크모드
+- Edge Function curl 테스트
+- SSE 스트리밍 파싱 검증
+
+### 11.6 기타 기술 부채
+
+#### TODO 주석 (11개, 8개 파일)
+
+| # | 파일 | 내용 | 분류 |
 |---|---|---|---|
-| `heroNumber` | 800 | -0.04em | 대형 숫자 (메인 KPI) |
-| `number` | 800 | -0.03em | 일반 숫자 |
-| `heading` | 700 | -0.02em | 제목 |
-| `label` | 700 | 0.14em (대문자) | 레이블 |
-| `body` | 500 | -0.01em | 본문 |
-| `dark*` 변형 | — | — | 다크모드 전용 |
+| 1 | `hooks/useChatPanel.ts:31` | 초기 메시지 — 백엔드 연동 시 제거 | 백엔드 연동 |
+| 2 | `hooks/useChatPanel.ts:69` | 백엔드 API 연동 | 백엔드 연동 |
+| 3 | `studio/DigitalTwinStudioPage.tsx:495` | 실제 피크 시간 데이터 연동 | 데이터 연동 |
+| 4 | `insights/hooks/useInventoryMetrics.ts:286` | 실제 계산 로직 추가 | 구현 미완 |
+| 5 | `simulation/hooks/useRealtimeTracking.ts:76` | iot_sensors 테이블 생성 후 활성화 | DB 스키마 |
+| 6 | `simulation/utils/modelLayerLoader.ts:585` | 실제 기본 모델 URL로 교체 필요 | 하드코딩 |
+| 7 | `simulation/hooks/useDataSourceMapping.ts:444` | 실제 프리셋 API 활성화/비활성화 로직 | 구현 미완 |
+| 8 | `data-management/.../DataValidation.tsx:83` | user_data_imports에 file_path 컬럼 추가 | DB 스키마 |
+| 9 | `data-management/.../DataImportHistory.tsx:221` | Storage cleanup 구현 | 구현 미완 |
+| 10-11 | `simulation/.../SceneViewer.tsx:119,193` | GLB 모델 로드 (2건) | 구현 미완 |
 
-**인터랙티브 효과:**
+**FIXME/HACK/XXX/TEMP:** 0개
 
-| 효과 | 값 | 적용 대상 |
+#### TypeScript 설정 관련
+
+| 설정 | 값 | 영향 |
 |---|---|---|
-| Hover Y 이동 | `translateY(-2px)` | GlassMenuButton |
-| Hover 스케일 | `scale(1.05)` | GlassMenuButton |
-| Backdrop Blur | `blur(40px) saturate(180%)` | DashboardLayout 헤더 |
-| Transition | `300ms` / `duration-200` | 전체 인터랙티브 요소 |
+| `noUnusedLocals` | ❌ 비활성 | 미사용 변수 감지 안 됨 |
+| `noUnusedParameters` | ❌ 비활성 | 미사용 매개변수 감지 안 됨 |
+| `strictNullChecks` | (기본값 false 추정) | null 안전성 미보장 |
 
-### 11.3 shadcn/ui 컴포넌트 현황
+#### 구조적 기술 부채
 
-> **51개 UI 컴포넌트** — 49개 shadcn/ui (Radix 기반) + 2개 커스텀
+| 항목 | 설명 | 심각도 |
+|---|---|---|
+| 단일 번들 (3.6MB) | 코드 스플리팅 미적용, 초기 로딩 느림 | 🟡 중간 |
+| 다크모드 감지 중복 | MutationObserver로 다크모드 감지하는 패턴이 여러 컴포넌트에 중복 | 🟡 중간 |
+| `store/` vs `stores/` 공존 | Zustand 스토어가 두 디렉토리에 분산 | ⚪ 낮음 |
+| CSS `@import` 순서 경고 | `index.css`에서 Pretendard 폰트 `@import`가 `@layer` 뒤에 위치 | ⚪ 낮음 |
+| `lovable-tagger` 의존 | Lovable 플랫폼 전용 dev dependency | ⚪ 낮음 |
 
-| 카테고리 | 수 | 대표 컴포넌트 |
-|---|---:|---|
-| 폼 컨트롤 | 12 | Input, Button, Select, Checkbox, Radio, Switch, Slider, Toggle, OTP |
-| 레이아웃 | 7 | Sidebar, Card, Drawer, Sheet, ScrollArea, Resizable, AspectRatio |
-| 네비게이션 | 6 | NavigationMenu, Menubar, ContextMenu, Dropdown, Breadcrumb, Pagination |
-| 데이터 표시 | 4 | Table, Carousel, Chart, Progress |
-| 다이얼로그 | 2 | Dialog, AlertDialog |
-| 팝오버/툴팁 | 4 | Popover, HoverCard, Tooltip, Command |
-| 콘텐츠 | 9 | Alert, Badge, Accordion, Collapsible, Tabs, Separator, Avatar, Skeleton |
-| 알림 | 3 | Toast, Toaster, Sonner |
-| **커스텀** | **2** | **Glass3DCard, Advanced Sidebar** |
-
-### 11.4 피처 플래그 시스템 (`src/config/featureFlags.ts`)
-
-#### 3-Tier 시스템
-
-| Tier | 이름 | 피처 수 | 상태 | 설명 |
-|---|---|---:|:---:|---|
-| **TIER 1** | MVP | 23 | ✅ 활성화 | 핵심 기능 (대시보드, 분석, 3D, 데이터 관리) |
-| **TIER 2** | Enhanced | 8 | ❌ 비활성 | 외부 API 연동 (날씨, 경쟁사, CRM, POS) |
-| **TIER 3** | Advanced AI | 18 | ❌ 비활성 | AI 예측 (매출, 수요, 이탈, 교차판매, 레이아웃 최적화) |
-
-#### Tier 1 (활성화된 23개 피처)
-
-| 분류 | 피처 |
-|---|---|
-| 대시보드 기본 | sales, visitors, products, segments |
-| 매장 분석 | heatmap, funnel, dwell_time |
-| 고객 분석 | segmentation, patterns, LTV |
-| 상품 분석 | performance, turnover, stockout |
-| 디지털 트윈 3D | basic_viewer, avatars, heatmap_overlay |
-| 데이터 관리 | upload, mapping, samples, quality |
-| 기본 리포트 | basic_reports |
-
-#### 헬퍼 함수
-
-| 함수 | 설명 |
-|---|---|
-| `isTierComplete(tier)` | 해당 Tier의 모든 피처 활성화 여부 |
-| `isFeatureEnabled(tier, name)` | 특정 피처 활성화 여부 |
-| `getEnabledFeatures()` | 활성화된 전체 피처 목록 |
-| `getTierProgress(tier)` | Tier 완성도 (%) |
-
-### 11.5 접근성
-
-| 항목 | 구현 방식 |
-|---|---|
-| 시맨틱 HTML | Radix UI 프리미티브 기반 |
-| ARIA 레이블 | 아이콘 전용 버튼에 `aria-label` 적용 |
-| 키보드 네비게이션 | Enter, Shift+Enter, Arrow Keys 지원 |
-| 포커스 관리 | Dialog, Modal 열기/닫기 시 포커스 트랩 |
-| 색상 대비 | WCAG AA 기준 충족 |
-| 스크린 리더 | AlertCard dismiss 등 테스트됨 |
 
 ---
 
-## 섹션 12: 아키텍처 종합 다이어그램
+## 섹션 12: 모노레포 이동 시 예상 작업
 
-### 12.1 전체 시스템 아키텍처
+### 12.1 Import 경로 변경
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                       React SPA (Vite)                          │
-│                                                                 │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐   │
-│  │ Insights │  │  Studio  │  │   ROI    │  │ Data Control │   │
-│  │ Hub Page │  │ 3D Page  │  │Measure Pg│  │  Tower Page  │   │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └──────┬───────┘   │
-│       │              │              │               │           │
-│  ┌────┴──────────────┴──────────────┴───────────────┴────────┐  │
-│  │                   Custom Hooks Layer                       │  │
-│  │  useAuth · useSelectedStore · useStoreData · useDashboard │  │
-│  │  useAI · useRetailAI · useZoneMetrics · useCountUp · ...  │  │
-│  └────┬──────────────┬──────────────┬───────────────┬────────┘  │
-│       │              │              │               │           │
-│  ┌────┴────┐   ┌─────┴────┐  ┌─────┴─────┐  ┌─────┴────────┐  │
-│  │ Zustand │   │  React   │  │  React    │  │   Supabase   │  │
-│  │ Stores  │   │  Query   │  │  Context  │  │   Client     │  │
-│  │ (6개)   │   │ (cache)  │  │  (10개)   │  │              │  │
-│  └─────────┘   └──────────┘  └───────────┘  └──────┬───────┘  │
-│                                                      │          │
-└──────────────────────────────────────────────────────┼──────────┘
-                                                       │
-                                           ┌───────────┼───────────┐
-                                           │     Supabase Cloud    │
-                                           │                       │
-                                           │  ┌─────────────────┐  │
-                                           │  │  Edge Functions  │  │
-                                           │  │  (36개)          │  │
-                                           │  │  · unified-ai    │  │
-                                           │  │  · retail-ai     │  │
-                                           │  │  · environment   │  │
-                                           │  │  · pos-oauth     │  │
-                                           │  │  · neuraltwin-*  │  │
-                                           │  └────────┬────────┘  │
-                                           │           │           │
-                                           │  ┌────────┴────────┐  │
-                                           │  │   PostgreSQL    │  │
-                                           │  │   (40+ tables)  │  │
-                                           │  │   · L1 raw      │  │
-                                           │  │   · L3 agg      │  │
-                                           │  │   · dims/facts  │  │
-                                           │  └─────────────────┘  │
-                                           │                       │
-                                           │  ┌─────────────────┐  │
-                                           │  │    Storage      │  │
-                                           │  │  · store-data   │  │
-                                           │  │  · 3d-models    │  │
-                                           │  └─────────────────┘  │
-                                           └───────────────────────┘
-```
-
-### 12.2 데이터 흐름 다이어그램
-
-```
-[CSV/Excel 파일]
-     │
-     ▼
-┌─────────────┐     ┌──────────────────┐     ┌───────────────┐
-│ parseCSV()  │────▶│ dataNormalizer   │────▶│ Supabase DB   │
-│ parseJSON() │     │ · 동의어 매핑    │     │ · L1 원본     │
-└─────────────┘     │ · 퍼지 매칭      │     │ · L3 집계     │
-                    │ · 타입 변환      │     └───────┬───────┘
-                    │ · 자동 계산      │             │
-                    │ · 품질 점수      │             ▼
-                    └──────────────────┘     ┌───────────────┐
-                                            │ React Query   │
-                                            │ (캐싱 레이어) │
-                                            └───────┬───────┘
-                                                    │
-                                                    ▼
-                                            ┌───────────────┐
-                                            │ Custom Hooks  │
-                                            │ · KPI 조회    │
-                                            │ · 존 메트릭   │
-                                            │ · AI 추론     │
-                                            └───────┬───────┘
-                                                    │
-                                                    ▼
-                                            ┌───────────────┐
-                                            │ UI 컴포넌트   │
-                                            │ · Glass3D     │
-                                            │ · Recharts    │
-                                            │ · Three.js    │
-                                            └───────────────┘
-```
-
-### 12.3 AI 추론 파이프라인
-
-```
-┌───────────────────── 프론트엔드 ─────────────────────┐
-│                                                       │
-│  useAI()                      useRetailAI()           │
-│  ├─ 12가지 추론 타입           ├─ useDemandForecast   │
-│  ├─ 자동 라우팅                ├─ useRiskPrediction   │
-│  │  · unified-ai              ├─ useOptimization     │
-│  │  · retail-ai-inference     └─ useSeasonTrend      │
-│  └─ 결과 캐싱 (10분)                                  │
-│                                                       │
-└────────────┬─────────────────────────┬────────────────┘
-             │                         │
-             ▼                         ▼
-┌────────────────────┐   ┌────────────────────────┐
-│   unified-ai       │   │  retail-ai-inference   │
-│   Edge Function    │   │  Edge Function         │
-│                    │   │                        │
-│  · 온톨로지 추천   │   │  · Gemini 2.5 Flash   │
-│  · 이상 탐지      │   │  · 수요 예측          │
-│  · 패턴 분석      │   │  · 리스크 예측        │
-│  · 관계 추론      │   │  · 최적화 제안        │
-│  · 레이아웃 최적화 │   │  · 시즌 트렌드        │
-└────────────────────┘   └────────────────────────┘
-```
-
-### 12.4 주요 기술적 특징 요약
-
-| 항목 | 내용 |
+| 항목 | 수치 |
 |---|---|
-| **프로젝트 규모** | ~743개 파일, ~242,750 LOC |
-| **프론트엔드** | React 18 + Vite 5 + TypeScript 5.8 |
-| **3D 렌더링** | Three.js + React Three Fiber + Drei + PostProcessing |
-| **상태 관리** | Zustand (6 stores) + React Query + Context (10개) |
-| **데이터** | 3-Layer (L1→L2→L3) + Star Schema (팩트/차원) + SCD2 |
-| **AI** | Gemini 2.5 Flash via Edge Functions (12가지 추론 타입) |
-| **백엔드** | Supabase (PostgreSQL + 36 Edge Functions + Storage + Auth) |
-| **UI** | Glassmorphism 디자인 + shadcn/ui (51 컴포넌트) + Tailwind CSS |
-| **보안** | RBAC (4 역할) + 라이선스 시스템 + Edge Function 프록시 (API 키 미노출) |
-| **품질** | 데이터 품질 점수 + 제약조건 검증 + SCD2 이력 추적 |
-| **캐싱** | React Query (2분~30분 staleTime) + localStorage persist |
-| **피처 관리** | 3-Tier 피처 플래그 (MVP 23개 활성 / Enhanced 8개 / AI 18개 대기) |
+| `@/` alias 사용 파일 수 | **291개** |
+| `@/` alias 총 import 수 | **938개** |
+| 수정 방법 | `tsconfig.json`의 `paths` 및 `vite.config.ts`의 `alias` 수정 |
+
+**변경 전략:**
+- 패키지 내부 참조는 `@/` alias 유지 (tsconfig paths만 재설정)
+- 패키지 간 참조는 `@neuraltwin/shared`, `@neuraltwin/ui` 등 패키지명으로 변경
+- 자동화 도구: `jscodeshift` 또는 `ts-morph`로 일괄 변환 가능
+
+### 12.2 설정 파일 수정
+
+| 파일 | 필요 변경 | 난이도 |
+|---|---|---|
+| `tsconfig.json` | `references` 추가, `paths` 패키지별 분리 | 🟡 중간 |
+| `tsconfig.app.json` | `include` 범위 조정, `references` 추가 | 🟡 중간 |
+| `vite.config.ts` | `resolve.alias` 패키지 경로로 변경, `manualChunks` 추가 | 🟡 중간 |
+| `tailwind.config.ts` | `content` 경로 패키지별 확장, 프리셋으로 분리 | 🟢 쉬움 |
+| `components.json` | shadcn/ui 경로 조정 | 🟢 쉬움 |
+| `eslint.config.js` | 모노레포 루트 + 패키지별 설정 분리 | 🟡 중간 |
+| `postcss.config.js` | 변경 불필요 (패키지별 동일) | ✅ 없음 |
+| `package.json` | workspace 설정, 의존성 분리 | 🔴 복잡 |
+
+### 12.3 공유 타입 추출
+
+| 분류 | 타입/인터페이스 수 | 추출 대상 파일 |
+|---|---|---|
+| AI 관련 타입 | ~15개 | `src/types/ai.types.ts` |
+| 분석 관련 타입 | ~10개 | `src/types/analysis.types.ts` |
+| 3D Scene 타입 | ~25개 | `src/types/scene3d.ts` |
+| 리테일 온톨로지 타입 | ~20개 | `src/types/retail-ontology.ts` |
+| 데이터 스키마 타입 | ~15개 | `src/utils/dataSchemas.ts`, `enterpriseSchemas.ts` |
+| Supabase 생성 타입 | ~100+ 테이블 | `src/integrations/supabase/types.ts` |
+| Storage 타입 | ~10개 | `src/lib/storage/types.ts` |
+| 스토어 타입 | ~15개 | `src/store/*.ts`, `src/stores/*.ts` |
+| **합계** | **~210개** | — |
+
+**추천 패키지 구조:**
+```
+@neuraltwin/types        ← 공유 타입 (ai, analysis, scene3d, ontology)
+@neuraltwin/supabase     ← Supabase 클라이언트 + 생성 타입
+@neuraltwin/schemas      ← 데이터 스키마 + 정규화 엔진
+```
+
+### 12.4 공유 컴포넌트 추출
+
+| 분류 | 컴포넌트 수 | 추출 대상 |
+|---|---|---|
+| shadcn/ui 기본 | **49개** | `src/components/ui/` (표준 Radix 기반) |
+| 커스텀 Glass3D | **2개** | `glass-card.tsx`, `sidebar.tsx` |
+| 레이아웃 공통 | **3개** | NavLink, ProtectedRoute, ThemeToggle |
+| 유틸리티 함수 | **1개** | `src/lib/utils.ts` (cn 함수) |
+| **합계** | **~55개** | — |
+
+**추천 패키지 구조:**
+```
+@neuraltwin/ui           ← shadcn/ui 49개 + Glass3DCard + cn()
+@neuraltwin/layout       ← DashboardLayout, AppSidebar, NavLink, ProtectedRoute, ThemeToggle
+```
+
+### 12.5 3D 에셋 재배치
+
+| 항목 | 수치 |
+|---|---|
+| 로컬 3D 모델 파일 | **0개** (모두 Supabase Storage) |
+| 로컬 조명 프리셋 JSON | **3개** (2KB 미만) |
+| 코드 내 3D 관련 파일 | ~120개 (features/studio/ + features/simulation/) |
+| Supabase Storage 버킷 | `3d-models`, `store-data` |
+
+**재배치 필요 사항:**
+- `public/lighting-presets/` → 패키지 내 `assets/` 또는 CDN 이동
+- Supabase Storage URL 참조 → 환경 변수로 분리 (5개 하드코딩된 URL)
+
+### 12.6 Supabase 관련 파일 분리
+
+| 디렉토리 | 파일 수 | 용도 |
+|---|---|---|
+| `supabase/functions/` | 36개 Edge Functions | 백엔드 로직 |
+| `supabase/functions/_shared/` | ~10개 | 공유 유틸리티 |
+| `supabase/migrations/` | 40+개 SQL | DB 마이그레이션 |
+| `supabase/queries/` | 다수 | SQL 쿼리 |
+| `supabase/seed/` + `seeds/` | 다수 | 시드 데이터 |
+| **합계** | **~100+개** | — |
+
+**추천 패키지:**
+```
+@neuraltwin/supabase     ← 클라이언트 + 타입 + 마이그레이션 + Edge Functions
+```
+
+### 12.7 예상 모노레포 패키지 구조
+
+```
+neuraltwin/
+├── packages/
+│   ├── ui/                    ← @neuraltwin/ui (55 컴포넌트)
+│   │   ├── src/components/
+│   │   ├── tailwind.preset.ts
+│   │   └── package.json
+│   ├── types/                 ← @neuraltwin/types (~210 타입)
+│   │   ├── src/
+│   │   └── package.json
+│   ├── schemas/               ← @neuraltwin/schemas (데이터 스키마 + 정규화)
+│   │   ├── src/
+│   │   └── package.json
+│   └── supabase/              ← @neuraltwin/supabase (클라이언트 + 타입 + EF)
+│       ├── client/
+│       ├── functions/
+│       ├── migrations/
+│       └── package.json
+├── apps/
+│   └── dashboard/             ← @neuraltwin/dashboard (메인 앱)
+│       ├── src/
+│       │   ├── features/      ← 비즈니스 로직 (인사이트, 스튜디오, ROI 등)
+│       │   ├── hooks/         ← 앱 전용 훅
+│       │   ├── store/         ← Zustand 스토어
+│       │   └── App.tsx
+│       ├── vite.config.ts
+│       └── package.json
+├── turbo.json / nx.json       ← 빌드 오케스트레이션
+├── pnpm-workspace.yaml        ← 워크스페이스 정의
+└── package.json               ← 루트 설정
+```
+
+### 12.8 예상 작업 규모 요약
+
+| 작업 | 파일 수 | 예상 공수 | 설명 |
+|---|---|---|---|
+| Import 경로 변경 | 208개 | 8~12h | `@/` alias 재설정 + 패키지 간 참조 변경 |
+| 설정 파일 수정 | 8개 | 6~8h | tsconfig, vite, tailwind, eslint, components.json 등 |
+| 공유 타입 추출 | 79개 타입 (5파일, 1,200 LOC) | 4~6h | → `@neuraltwin/types` (ai, scene3d, ontology, analysis) |
+| 공유 컴포넌트 추출 | 50개 (4,806 LOC) | 6~8h | → `@neuraltwin/ui` (shadcn/ui + Glass3D + cn) |
+| 공유 라이브러리 추출 | 12개 파일 (3,500 LOC) | 6~8h | → `@neuraltwin/schemas` + `@neuraltwin/lib` |
+| Feature 패키지 분리 | 272개 (72,536 LOC) | 24~32h | 5개 주요 feature 모듈 독립 패키지화 |
+| Supabase 패키지 분리 | 218개 | 4~6h | 40 Edge Functions + 110 마이그레이션 + 16 공유 유틸 |
+| 모노레포 인프라 설정 | — | 8~12h | turbo/nx + pnpm workspace + CI/CD |
+| 테스트 & 통합 검증 | — | 16~20h | 전체 동작 확인, 빌드 검증 |
+| **합계** | **~571개 파일** | **82~112h** | — |
+
+### 12.9 Feature 모듈 규모별 추출 우선순위
+
+| 순위 | Feature | 파일 수 | LOC | 전체 비중 | 독립성 |
+|---|---|---:|---:|---:|---|
+| 1 | `studio` (3D 디지털트윈) | 114 | 42,250 | 29.9% | 🟢 높음 |
+| 2 | `simulation` (시뮬레이션) | 80 | 21,600 | 15.3% | 🟢 높음 |
+| 3 | `data-management` (데이터 관리) | 27 | 13,822 | 9.8% | 🟢 높음 |
+| 4 | `insights` (인사이트 허브) | 27 | 12,231 | 8.7% | 🟢 높음 |
+| 5 | `data-control` (컨트롤타워) | 23 | 11,623 | 8.2% | 🟢 높음 |
+| 6 | `roi` (ROI 측정) | 15 | 3,260 | 2.3% | 🟡 중간 |
+| 7 | `assistant` (AI 어시스턴트) | 4 | 453 | 0.3% | 🟡 중간 |
+| 8 | `onboarding` / `settings` | 3 | 938 | 0.7% | ⚪ 낮음 |
+| — | **공유 코드** (lib, utils, hooks 등) | 113 | 36,184 | 25.6% | — (공유) |
+
+### 12.10 우선순위 권장
+
+```
+Phase 1 (필수, ~1주): 모노레포 인프라 설정 + 설정 파일 수정 + import 경로 변경
+Phase 2 (권장, ~1주): 공유 타입/컴포넌트/라이브러리 추출 + Supabase 패키지 분리
+Phase 3 (개선, ~1~2주): Feature 모듈 분리 (studio, simulation 우선)
+Phase 4 (선택): 코드 스플리팅 + 하드코딩 제거 + TODO 해소 + SSR 호환성 + 테스트 추가
+```
+
+> **예상 총 소요 시간:** 82~112시간 (숙련된 TypeScript/모노레포 개발자 기준 2~3주 풀타임 스프린트)
+
