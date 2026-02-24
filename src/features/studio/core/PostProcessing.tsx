@@ -18,6 +18,7 @@ import {
   HueSaturation,
 } from '@react-three/postprocessing';
 import { BlendFunction, ToneMappingMode } from 'postprocessing';
+import { useDeviceCapability } from '@/hooks/useDeviceCapability';
 
 // ============================================================================
 // 후처리 설정
@@ -94,15 +95,20 @@ export function PostProcessing({
   vignette,
   quality,
 }: PostProcessingProps) {
-  if (!enabled) return null;
+  const { config } = useDeviceCapability();
+  const ppCfg = config.postProcessing;
 
-  const bloomEnabled = bloom ?? POSTPROCESS_CONFIG.bloom.enabled;
-  const ssaoEnabled = ssao ?? POSTPROCESS_CONFIG.ssao.enabled;
-  const vignetteEnabled = vignette ?? POSTPROCESS_CONFIG.vignette.enabled;
-  const ssaoQuality = quality ?? POSTPROCESS_CONFIG.ssao.quality;
+  // 디바이스가 PP 미지원(low tier) 이거나 caller가 비활성화 → 렌더링 안 함
+  if (!ppCfg.enabled || !enabled) return null;
+
+  // props 오버라이드 > 디바이스 설정 > 하드코딩 기본값
+  const bloomEnabled = bloom ?? ppCfg.bloom;
+  const ssaoEnabled = ssao ?? ppCfg.ssao;
+  const vignetteEnabled = vignette ?? ppCfg.vignette;
+  const ssaoQuality = quality ?? ppCfg.ssaoQuality;
 
   return (
-    <EffectComposer multisampling={2}>
+    <EffectComposer multisampling={ppCfg.multisampling}>
       {/* Bloom */}
       {bloomEnabled && (
         <Bloom
