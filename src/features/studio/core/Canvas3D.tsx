@@ -214,7 +214,7 @@ function SceneContent({
 
   // 실시간 시뮬레이션 상태
   const isRunning = useSimulationStore((state) => state.isRunning);
-  const config = useSimulationStore((state) => state.config);
+  const simConfig = useSimulationStore((state) => state.config);
 
   // 🆕 시뮬레이션 엔진 활성화 (DB 데이터 기반)
   // storeId가 있으면 DB에서 zones_dim, zone_transitions 데이터 로드
