@@ -211,6 +211,7 @@ function SceneContent({
   nightTextureUrl,  // 🆕 밤 텍스처 URL
 }: SceneContentProps) {
   const { camera } = useScene();
+  const { config: deviceConfig } = useDeviceCapability();
 
   // 실시간 시뮬레이션 상태
   const isRunning = useSimulationStore((state) => state.isRunning);
