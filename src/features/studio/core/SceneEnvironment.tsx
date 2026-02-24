@@ -13,6 +13,7 @@ import { Environment, ContactShadows, BakeShadows, useGLTF } from '@react-three/
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
+import { useDeviceCapability } from '@/hooks/useDeviceCapability';
 import type { EnvironmentPreset } from '../types';
 
 // RectAreaLight 유니폼 초기화 (앱 시작 시 한 번만 실행)
@@ -200,15 +201,16 @@ interface RendererSetupProps {
 
 function RendererSetup({ config = SCENE_CONFIG }: RendererSetupProps) {
   const { gl } = useThree();
+  const { config: qualityCfg } = useDeviceCapability();
 
   useEffect(() => {
     // THREE 상수는 여기서 직접 사용 (TDZ 방지)
     gl.toneMapping = THREE.ACESFilmicToneMapping;
     gl.toneMappingExposure = config.renderer.toneMappingExposure;
     gl.outputColorSpace = THREE.SRGBColorSpace;
-    gl.shadowMap.enabled = true;
+    gl.shadowMap.enabled = qualityCfg.shadow.enabled;
     gl.shadowMap.type = THREE.PCFSoftShadowMap;
-  }, [gl, config]);
+  }, [gl, config, qualityCfg]);
 
   return null;
 }
@@ -247,10 +249,15 @@ export function SceneEnvironment({
 }: SceneEnvironmentProps) {
   // 낮/밤에 따른 설정 선택
   const CONFIG = isDayMode ? SCENE_CONFIG : NIGHT_SCENE_CONFIG;
+  const { config: qualityCfg } = useDeviceCapability();
+  const shadowCfg = qualityCfg.shadow;
 
   const preset = environmentPreset || CONFIG.environment.preset;
   const bgColor = backgroundColor || CONFIG.backgroundColor;
   const envIntensity = environmentIntensity ?? CONFIG.environment.intensity;
+
+  // 그림자 맵 크기: 디바이스 설정과 씬 설정 중 작은 값 사용
+  const shadowMapSize = Math.min(CONFIG.mainLight.shadow.mapSize, shadowCfg.mainLightMapSize);
 
   return (
     <>
@@ -282,9 +289,9 @@ export function SceneEnvironment({
         color={CONFIG.mainLight.color}
         intensity={CONFIG.mainLight.intensity}
         position={CONFIG.mainLight.position}
-        castShadow={CONFIG.mainLight.castShadow}
-        shadow-mapSize-width={CONFIG.mainLight.shadow.mapSize}
-        shadow-mapSize-height={CONFIG.mainLight.shadow.mapSize}
+        castShadow={shadowCfg.enabled && CONFIG.mainLight.castShadow}
+        shadow-mapSize-width={shadowMapSize}
+        shadow-mapSize-height={shadowMapSize}
         shadow-bias={CONFIG.mainLight.shadow.bias}
         shadow-normalBias={CONFIG.mainLight.shadow.normalBias}
         shadow-camera-near={CONFIG.mainLight.shadow.camera.near}
