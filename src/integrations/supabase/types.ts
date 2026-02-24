@@ -1358,6 +1358,45 @@ export type Database = {
           },
         ]
       }
+      chat_context_memory: {
+        Row: {
+          conversation_id: string
+          conversation_insights: Json | null
+          conversation_summary: string | null
+          created_at: string | null
+          id: string
+          last_turn_count: number | null
+          session_id: string | null
+          updated_at: string | null
+          user_id: string | null
+          user_profile: Json | null
+        }
+        Insert: {
+          conversation_id: string
+          conversation_insights?: Json | null
+          conversation_summary?: string | null
+          created_at?: string | null
+          id?: string
+          last_turn_count?: number | null
+          session_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          user_profile?: Json | null
+        }
+        Update: {
+          conversation_id?: string
+          conversation_insights?: Json | null
+          conversation_summary?: string | null
+          created_at?: string | null
+          id?: string
+          last_turn_count?: number | null
+          session_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          user_profile?: Json | null
+        }
+        Relationships: []
+      }
       chat_conversations: {
         Row: {
           channel: Database["public"]["Enums"]["chat_channel"]
@@ -6847,6 +6886,48 @@ export type Database = {
           },
         ]
       }
+      retail_knowledge_chunks: {
+        Row: {
+          chunk_type: string
+          conditions: Json | null
+          content: string
+          created_at: string | null
+          embedding: string | null
+          id: string
+          insight_id: string | null
+          source: string | null
+          title: string
+          topic_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          chunk_type: string
+          conditions?: Json | null
+          content: string
+          created_at?: string | null
+          embedding?: string | null
+          id?: string
+          insight_id?: string | null
+          source?: string | null
+          title: string
+          topic_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          chunk_type?: string
+          conditions?: Json | null
+          content?: string
+          created_at?: string | null
+          embedding?: string | null
+          id?: string
+          insight_id?: string | null
+          source?: string | null
+          title?: string
+          topic_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       roi_measurements: {
         Row: {
           application_id: string
@@ -11269,6 +11350,40 @@ export type Database = {
           p_value: Json
         }
         Returns: string
+      }
+      search_knowledge: {
+        Args: {
+          filter_topic?: string
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          chunk_type: string
+          conditions: Json
+          content: string
+          id: string
+          similarity: number
+          title: string
+          topic_id: string
+        }[]
+      }
+      search_knowledge_trgm: {
+        Args: {
+          filter_topic?: string
+          match_count?: number
+          match_threshold?: number
+          search_query: string
+        }
+        Returns: {
+          chunk_type: string
+          conditions: Json
+          content: string
+          id: string
+          similarity: number
+          title: string
+          topic_id: string
+        }[]
       }
       test_api_connection: { Args: { p_connection_id: string }; Returns: Json }
       update_connection_after_sync: {
