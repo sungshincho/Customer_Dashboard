@@ -294,24 +294,24 @@ const QUALITY_CONFIGS: Record<QualityTier, Omit<QualityConfig, 'tier' | 'deviceT
   high: {
     canvas: {
       antialias: true,
-      shadows: true,
+      shadows: false,
       preserveDrawingBuffer: false,
       dpr: 1,
       powerPreference: 'high-performance',
     },
     postProcessing: {
       enabled: true,
-      multisampling: 0, // EffectComposer 자체 AA로 충분
-      ssao: true,
+      multisampling: 0,
+      ssao: false,
       ssaoQuality: 'medium',
       bloom: false,
       vignette: true,
     },
     shadow: {
-      enabled: true,
-      mainLightMapSize: 1024,
-      dynamicLightMapSize: 1024, // 2048 → 1024 (시각 차이 미미)
-      dynamicLightCastShadow: true,
+      enabled: false,
+      mainLightMapSize: 512,
+      dynamicLightMapSize: 512,
+      dynamicLightCastShadow: false,
     },
     simulation: {
       maxCustomers: 30,
