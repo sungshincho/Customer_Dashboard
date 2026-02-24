@@ -8,7 +8,7 @@
  * - 실시간 고객 시뮬레이션 지원
  */
 
-import { Suspense, ReactNode, useMemo } from 'react';
+import { Suspense, ReactNode, useMemo, useCallback } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Preload, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
@@ -25,6 +25,7 @@ import { CustomerAgents } from '../components/CustomerAgents';
 import { useSimulationEngine } from '@/hooks/useSimulationEngine';
 import { useSimulationStore } from '@/stores/simulationStore';
 import { ChildProductItem } from '@/features/simulation/components/digital-twin/ChildProductItem';
+import { useDeviceCapability } from '@/hooks/useDeviceCapability';
 import type { StudioMode, EnvironmentPreset, Canvas3DProps, RenderingConfig } from '../types';
 import type { ProductAsset } from '@/types/scene3d';
 import { EnvironmentEffectsOverlay } from '../overlays/EnvironmentEffectsOverlay';
@@ -93,18 +94,35 @@ export function Canvas3D({
     enabled: !!userId && !!storeId,
   });
 
+  // 디바이스 품질 설정
+  const { config } = useDeviceCapability();
+  const canvasCfg = config.canvas;
+
+  // WebGL 컨텍스트 손실 핸들러 (onCreated에서 등록)
+  const handleCreated = useCallback(({ gl }: { gl: THREE.WebGLRenderer }) => {
+    const canvas = gl.domElement;
+    canvas.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      console.warn('[Canvas3D] WebGL context lost — awaiting restore');
+    });
+    canvas.addEventListener('webglcontextrestored', () => {
+      console.info('[Canvas3D] WebGL context restored');
+    });
+  }, []);
+
   return (
     <div className={cn('w-full h-full', className)}>
       <Canvas
-        shadows
-        dpr={1}  // 성능 최적화
+        shadows={canvasCfg.shadows}
+        dpr={canvasCfg.dpr}
         gl={{
-          antialias: true,
+          antialias: canvasCfg.antialias,
           alpha: false,
-          powerPreference: 'high-performance',
+          powerPreference: canvasCfg.powerPreference,
           stencil: false,
-          preserveDrawingBuffer: true,
+          preserveDrawingBuffer: canvasCfg.preserveDrawingBuffer,
         }}
+        onCreated={handleCreated}
       >
         <SceneContent
           mode={mode}
@@ -431,18 +449,35 @@ export function StandaloneCanvas3D({
   cameraTarget = [0, 0, 0],
   cameraFov = 50,
 }: StandaloneCanvas3DProps) {
+  // 디바이스 품질 설정
+  const { config } = useDeviceCapability();
+  const canvasCfg = config.canvas;
+
+  // WebGL 컨텍스트 손실 핸들러
+  const handleCreated = useCallback(({ gl }: { gl: THREE.WebGLRenderer }) => {
+    const canvas = gl.domElement;
+    canvas.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      console.warn('[StandaloneCanvas3D] WebGL context lost — awaiting restore');
+    });
+    canvas.addEventListener('webglcontextrestored', () => {
+      console.info('[StandaloneCanvas3D] WebGL context restored');
+    });
+  }, []);
+
   return (
     <div className={cn('w-full h-full', className)}>
       <Canvas
-        shadows
-        dpr={1}  // 성능 최적화
+        shadows={canvasCfg.shadows}
+        dpr={canvasCfg.dpr}
         gl={{
-          antialias: true,
+          antialias: canvasCfg.antialias,
           alpha: false,
-          powerPreference: 'high-performance',
+          powerPreference: canvasCfg.powerPreference,
           stencil: false,
-          preserveDrawingBuffer: true,
+          preserveDrawingBuffer: canvasCfg.preserveDrawingBuffer,
         }}
+        onCreated={handleCreated}
       >
         <PerspectiveCamera
           makeDefault
