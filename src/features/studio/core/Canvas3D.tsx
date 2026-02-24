@@ -314,7 +314,7 @@ function SceneContent({
         )}
 
         {/* 프리로드 */}
-        {simConfig.particle?.preloadAll && <Preload all />}
+        {deviceConfig.particle.preloadAll && <Preload all />}
       </Suspense>
     </>
   );
