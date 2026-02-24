@@ -287,7 +287,7 @@ function SceneContent({
 
         {/* 🆕 고객 에이전트 시뮬레이션 (실시간 모드) */}
         <CustomerAgents
-          showPaths={config.showAgentPaths}
+          showPaths={simConfig.showAgentPaths}
           showLabels={false}
         />
 
