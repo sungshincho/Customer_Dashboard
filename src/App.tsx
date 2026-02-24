@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,20 +8,20 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { SelectedStoreProvider } from "@/hooks/useSelectedStore";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 
-// Core pages
+// Core pages (경량 → eager)
 import Auth from "@/core/pages/AuthPage";
 import NotFound from "@/core/pages/NotFoundPage";
 
-// 4개 메인 페이지 (확정 아키텍처)
-import InsightHubPage from "@/features/insights/InsightHubPage";
-import DigitalTwinStudioPage from "@/features/studio/DigitalTwinStudioPage";
-import ROIMeasurementPage from "@/features/roi/ROIMeasurementPage";
-import SettingsPage from "@/features/settings/SettingsPage";
+// 메인 페이지 (lazy load — 초기 번들에서 분리)
+const InsightHubPage = React.lazy(() => import("@/features/insights/InsightHubPage"));
+const DigitalTwinStudioPage = React.lazy(() => import("@/features/studio/DigitalTwinStudioPage"));
+const ROIMeasurementPage = React.lazy(() => import("@/features/roi/ROIMeasurementPage"));
+const SettingsPage = React.lazy(() => import("@/features/settings/SettingsPage"));
 
-// 데이터 컨트롤타워 (Foundation Layer)
-import DataControlTowerPage from "@/features/data-control/DataControlTowerPage";
-import LineageExplorerPage from "@/features/data-control/LineageExplorerPage";
-import ConnectorSettingsPage from "@/features/data-control/ConnectorSettingsPage";
+// 데이터 컨트롤타워 (lazy load)
+const DataControlTowerPage = React.lazy(() => import("@/features/data-control/DataControlTowerPage"));
+const LineageExplorerPage = React.lazy(() => import("@/features/data-control/LineageExplorerPage"));
+const ConnectorSettingsPage = React.lazy(() => import("@/features/data-control/ConnectorSettingsPage"));
 
 // Onboarding
 import { OnboardingWizard } from "@/features/onboarding/components/OnboardingWizard";
@@ -69,6 +69,7 @@ const App = () => (
           <SelectedStoreProvider>
             {/* 온보딩 래퍼로 감싸기 */}
             <OnboardingWrapper>
+              <Suspense fallback={<div className="flex h-screen w-full items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>}>
               <Routes>
                 <Route path="/auth" element={<Auth />} />
 
@@ -100,6 +101,7 @@ const App = () => (
 
                 <Route path="*" element={<NotFound />} />
               </Routes>
+              </Suspense>
             </OnboardingWrapper>
           </SelectedStoreProvider>
         </AuthProvider>

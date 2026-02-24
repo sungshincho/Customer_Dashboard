@@ -8,7 +8,7 @@
  * - 실시간 고객 시뮬레이션 지원
  */
 
-import { Suspense, ReactNode, useMemo, useCallback } from 'react';
+import { Suspense, ReactNode, useMemo, useCallback, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Preload, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
@@ -98,20 +98,37 @@ export function Canvas3D({
   const { config } = useDeviceCapability();
   const canvasCfg = config.canvas;
 
-  // WebGL 컨텍스트 손실 핸들러 (onCreated에서 등록)
+  // WebGL 컨텍스트 손실/복구 상태
+  const [contextLost, setContextLost] = useState(false);
+
   const handleCreated = useCallback(({ gl }: { gl: THREE.WebGLRenderer }) => {
     const canvas = gl.domElement;
     canvas.addEventListener('webglcontextlost', (e) => {
       e.preventDefault();
       console.warn('[Canvas3D] WebGL context lost — awaiting restore');
+      setContextLost(true);
     });
     canvas.addEventListener('webglcontextrestored', () => {
       console.info('[Canvas3D] WebGL context restored');
+      setContextLost(false);
     });
   }, []);
 
   return (
-    <div className={cn('w-full h-full', className)}>
+    <div className={cn('w-full h-full relative', className)}>
+      {/* WebGL 컨텍스트 손실 시 복구 안내 오버레이 */}
+      {contextLost && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/60 text-white gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-white border-t-transparent" />
+          <p className="text-sm">3D 렌더링을 복구하는 중입니다…</p>
+          <button
+            className="mt-2 px-4 py-1.5 text-xs bg-white/20 hover:bg-white/30 rounded-md transition-colors"
+            onClick={() => window.location.reload()}
+          >
+            페이지 새로고침
+          </button>
+        </div>
+      )}
       <Canvas
         shadows={canvasCfg.shadows}
         dpr={canvasCfg.dpr}
@@ -296,7 +313,7 @@ function SceneContent({
         )}
 
         {/* 프리로드 */}
-        <Preload all />
+        {config.particle.preloadAll && <Preload all />}
       </Suspense>
     </>
   );
@@ -453,20 +470,36 @@ export function StandaloneCanvas3D({
   const { config } = useDeviceCapability();
   const canvasCfg = config.canvas;
 
-  // WebGL 컨텍스트 손실 핸들러
+  // WebGL 컨텍스트 손실/복구 상태
+  const [contextLost, setContextLost] = useState(false);
+
   const handleCreated = useCallback(({ gl }: { gl: THREE.WebGLRenderer }) => {
     const canvas = gl.domElement;
     canvas.addEventListener('webglcontextlost', (e) => {
       e.preventDefault();
       console.warn('[StandaloneCanvas3D] WebGL context lost — awaiting restore');
+      setContextLost(true);
     });
     canvas.addEventListener('webglcontextrestored', () => {
       console.info('[StandaloneCanvas3D] WebGL context restored');
+      setContextLost(false);
     });
   }, []);
 
   return (
-    <div className={cn('w-full h-full', className)}>
+    <div className={cn('w-full h-full relative', className)}>
+      {contextLost && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/60 text-white gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-white border-t-transparent" />
+          <p className="text-sm">3D 렌더링을 복구하는 중입니다…</p>
+          <button
+            className="mt-2 px-4 py-1.5 text-xs bg-white/20 hover:bg-white/30 rounded-md transition-colors"
+            onClick={() => window.location.reload()}
+          >
+            페이지 새로고침
+          </button>
+        </div>
+      )}
       <Canvas
         shadows={canvasCfg.shadows}
         dpr={canvasCfg.dpr}
@@ -521,7 +554,7 @@ export function StandaloneCanvas3D({
 
           <PostProcessing enabled={mode !== 'edit'} />
 
-          <Preload all />
+          {config.particle.preloadAll && <Preload all />}
         </Suspense>
       </Canvas>
     </div>
