@@ -211,10 +211,11 @@ function SceneContent({
   nightTextureUrl,  // 🆕 밤 텍스처 URL
 }: SceneContentProps) {
   const { camera } = useScene();
+  const { config: deviceConfig } = useDeviceCapability();
 
   // 실시간 시뮬레이션 상태
   const isRunning = useSimulationStore((state) => state.isRunning);
-  const config = useSimulationStore((state) => state.config);
+  const simConfig = useSimulationStore((state) => state.config);
 
   // 🆕 시뮬레이션 엔진 활성화 (DB 데이터 기반)
   // storeId가 있으면 DB에서 zones_dim, zone_transitions 데이터 로드
@@ -287,7 +288,7 @@ function SceneContent({
 
         {/* 🆕 고객 에이전트 시뮬레이션 (실시간 모드) */}
         <CustomerAgents
-          showPaths={config.showAgentPaths}
+          showPaths={simConfig.showAgentPaths}
           showLabels={false}
         />
 
@@ -313,7 +314,7 @@ function SceneContent({
         )}
 
         {/* 프리로드 */}
-        {config.particle.preloadAll && <Preload all />}
+        {deviceConfig.particle.preloadAll && <Preload all />}
       </Suspense>
     </>
   );
