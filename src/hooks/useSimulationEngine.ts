@@ -13,6 +13,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useSimulationStore, CustomerAgent, STATE_COLORS, CustomerState } from '@/stores/simulationStore';
 import { useCustomerFlowData, FlowPath, ZoneInfo } from '@/features/studio/hooks/useCustomerFlowData';
+import { getQualityConfig } from '@/utils/deviceCapability';
 
 // ============================================
 // 타입 정의
@@ -286,7 +287,10 @@ export function useSimulationEngine({
       console.log('[useSimulationEngine] No entry zone found, cannot spawn customer');
       return;
     }
-    if (currentCustomerCount >= (currentConfig?.maxCustomers || 30)) {
+    // 디바이스 품질에 따른 최대 고객 수 제한
+    const deviceMaxCustomers = getQualityConfig().simulation.maxCustomers;
+    const effectiveMax = Math.min(currentConfig?.maxCustomers || 30, deviceMaxCustomers);
+    if (currentCustomerCount >= effectiveMax) {
       return;
     }
 
@@ -546,8 +550,9 @@ export function useSimulationEngine({
       const currentConfig = configRef.current;
 
       if (currentZones && currentZones.length > 0 && currentConfig) {
-        // 고객 생성 (확률적)
-        const spawnProb = currentConfig.spawnRate * clampedDelta * currentConfig.speed;
+        // 고객 생성 (확률적, 디바이스 스폰율 배율 적용)
+        const deviceSpawnMul = getQualityConfig().simulation.spawnRateMultiplier;
+        const spawnProb = currentConfig.spawnRate * clampedDelta * currentConfig.speed * deviceSpawnMul;
         if (Math.random() < spawnProb) {
           spawnCustomerRef.current();
         }

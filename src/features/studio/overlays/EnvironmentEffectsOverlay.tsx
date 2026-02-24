@@ -12,6 +12,7 @@
 import { useRef, useMemo, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+import { getQualityConfig } from '@/utils/deviceCapability';
 import type { RenderingConfig, ParticleConfig, LightingConfig } from '../types/environment.types';
 
 // ============================================================================
@@ -232,6 +233,9 @@ function DynamicLighting({ config }: DynamicLightingProps) {
   const directionalRef = useRef<THREE.DirectionalLight>(null);
   const fillRef = useRef<THREE.DirectionalLight>(null);
 
+  // 디바이스 그림자 설정
+  const shadowCfg = getQualityConfig().shadow;
+
   // 조명 설정 적용 (부드러운 전환)
   useFrame((_, delta) => {
     const lerpFactor = Math.min(delta * 2, 1);
@@ -275,9 +279,9 @@ function DynamicLighting({ config }: DynamicLightingProps) {
         intensity={config.directionalIntensity}
         color={config.directionalColor}
         position={config.directionalPosition}
-        castShadow={config.shadowEnabled}
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
+        castShadow={shadowCfg.dynamicLightCastShadow && config.shadowEnabled}
+        shadow-mapSize-width={shadowCfg.dynamicLightMapSize}
+        shadow-mapSize-height={shadowCfg.dynamicLightMapSize}
         shadow-camera-far={50}
         shadow-camera-left={-20}
         shadow-camera-right={20}
@@ -340,8 +344,16 @@ export function EnvironmentEffectsOverlay({
 
   const { particles, lighting } = renderingConfig;
 
+  // 디바이스 파티클 배율 적용 (low: 0.3, medium: 0.5, high: 1.0)
+  const qualityCfg = getQualityConfig();
+  const countMul = qualityCfg.particle.countMultiplier;
+  const scaledParticles = useMemo(() => ({
+    ...particles.weatherParticles,
+    count: Math.round(particles.weatherParticles.count * countMul),
+  }), [particles.weatherParticles, countMul]);
+
   // 파티클 설정이 변경될 때 컴포넌트를 재생성하기 위한 key
-  const particleKey = `${particles.weatherParticles.type}-${particles.weatherParticles.count}-${particles.weatherParticles.intensity}`;
+  const particleKey = `${scaledParticles.type}-${scaledParticles.count}-${scaledParticles.intensity}`;
   console.log('[EnvironmentEffectsOverlay] Particle key:', particleKey);
 
   return (
@@ -350,17 +362,17 @@ export function EnvironmentEffectsOverlay({
       <DynamicLighting config={lighting} />
 
       {/* 날씨 파티클 - key를 사용해 설정 변경 시 재생성 */}
-      {particles.weatherParticles.type === 'rain' && (
+      {scaledParticles.type === 'rain' && (
         <RainParticles
           key={`rain-${particleKey}`}
-          config={particles.weatherParticles}
+          config={scaledParticles}
           scale={particleScale}
         />
       )}
-      {particles.weatherParticles.type === 'snow' && (
+      {scaledParticles.type === 'snow' && (
         <SnowParticles
           key={`snow-${particleKey}`}
-          config={particles.weatherParticles}
+          config={scaledParticles}
           scale={particleScale}
         />
       )}

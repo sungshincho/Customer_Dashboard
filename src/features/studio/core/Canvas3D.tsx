@@ -296,7 +296,7 @@ function SceneContent({
         )}
 
         {/* 프리로드 */}
-        <Preload all />
+        {config.particle.preloadAll && <Preload all />}
       </Suspense>
     </>
   );
@@ -521,7 +521,7 @@ export function StandaloneCanvas3D({
 
           <PostProcessing enabled={mode !== 'edit'} />
 
-          <Preload all />
+          {config.particle.preloadAll && <Preload all />}
         </Suspense>
       </Canvas>
     </div>
